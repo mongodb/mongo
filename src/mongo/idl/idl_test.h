@@ -37,6 +37,8 @@ namespace mongo {
 namespace idl {
 namespace test {
 
+class StructWithValidator;
+
 /**
  * Validates the given number is even
  */
@@ -97,6 +99,12 @@ inline Status validateOneInt(const std::vector<mongo::idl::import::One_int>& val
     }
     return Status::OK();
 }
+
+/**
+ * Check that the two values in the struct are equal, assert otherwise.
+ */
+void checkValuesEqual(StructWithValidator* structToValidate);
+
 
 }  // namespace test
 }  // namespace idl

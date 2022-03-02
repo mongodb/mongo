@@ -142,13 +142,17 @@ private:
  * and appends the response object to the provided builder under the field name "cursor".
  *
  * The response object has the following format:
- *   { id: <NumberLong>, ns: <String>, firstBatch: <Array> }.
+ *   { id: <NumberLong>, ns: <String>, firstBatch: <Array> , type: <String>}.
+ *
+ * The type field is optional, but can be used to differentiate cursors if multiple are returned
+ * at once.
  *
  * This function is deprecated.  Prefer CursorResponseBuilder or CursorResponse::toBSON() instead.
  */
 void appendCursorResponseObject(long long cursorId,
                                 StringData cursorNamespace,
                                 BSONArray firstBatch,
+                                boost::optional<StringData> cursorType,
                                 BSONObjBuilder* builder);
 
 /**
@@ -207,6 +211,7 @@ public:
                    boost::optional<BSONObj> postBatchResumeToken = boost::none,
                    boost::optional<BSONObj> writeConcernError = boost::none,
                    boost::optional<BSONObj> varsField = boost::none,
+                   boost::optional<std::string> cursorType = boost::none,
                    bool partialResultsReturned = false,
                    bool invalidated = false);
 
@@ -249,6 +254,10 @@ public:
         return _varsField;
     }
 
+    auto getCursorType() const {
+        return _cursorType;
+    }
+
     bool getPartialResultsReturned() const {
         return _partialResultsReturned;
     }
@@ -274,6 +283,7 @@ private:
     boost::optional<BSONObj> _postBatchResumeToken;
     boost::optional<BSONObj> _writeConcernError;
     boost::optional<BSONObj> _varsField;
+    boost::optional<std::string> _cursorType;
     bool _partialResultsReturned = false;
     bool _invalidated = false;
 };

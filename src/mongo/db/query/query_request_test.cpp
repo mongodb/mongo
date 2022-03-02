@@ -1551,7 +1551,7 @@ TEST(QueryRequestTest, ConvertToFindWithAllowDiskUseFalseSucceeds) {
 TEST(QueryRequestHelperTest, ValidateResponseMissingFields) {
     BSONObjBuilder builder;
     ASSERT_THROWS_CODE(
-        query_request_helper::validateCursorResponse(builder.asTempObj()), DBException, 40414);
+        query_request_helper::validateCursorResponse(builder.asTempObj()), DBException, 6253507);
 }
 
 TEST(QueryRequestHelperTest, ValidateResponseWrongDataType) {

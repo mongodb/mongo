@@ -41,6 +41,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/sharded_agg_helpers_targeting_policy.h"
+#include "mongo/db/query/cursor_response_gen.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/executor/task_executor.h"
@@ -382,6 +383,21 @@ public:
      */
     friend class PipelineD;
 
+    /**
+     * For commands that return multiple pipelines, this value will contain the type of pipeline.
+     * This can be populated to the cursor so consumers do not have to depend on order or guess
+     * which pipeline is which. Default to a regular result pipeline.
+     */
+    CursorTypeEnum pipelineType = CursorTypeEnum::DocumentResult;
+
+    /**
+     * Get a string representation of the pipeline type.
+     */
+    auto getTypeString() {
+        return CursorType_serializer(pipelineType);
+    }
+
+
 private:
     friend class PipelineDeleter;
 
@@ -450,4 +466,15 @@ private:
     bool _dismissed = false;
 };
 
+/**
+ * A 'ServiceContext' decorator that by default does nothing but can be set to generate a
+ * complimentary, metadata pipeline to the one passed in.
+ */
+extern ServiceContext::Decoration<std::unique_ptr<Pipeline, PipelineDeleter> (*)(
+    OperationContext* opCtx,
+    boost::intrusive_ptr<ExpressionContext> expCtx,
+    const AggregateCommandRequest& request,
+    Pipeline* origPipeline,
+    boost::optional<UUID> uuid)>
+    generateMetadataPipelineFunc;
 }  // namespace mongo

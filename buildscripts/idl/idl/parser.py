@@ -526,6 +526,7 @@ def _parse_struct(ctxt, spec, name, node):
             "immutable": _RuleDesc('bool_scalar'),
             "generate_comparison_operators": _RuleDesc("bool_scalar"),
             "non_const_getter": _RuleDesc('bool_scalar'),
+            "cpp_validator_func": _RuleDesc('scalar'),
         })
 
     # PyLint has difficulty with some iterables: https://github.com/PyCQA/pylint/issues/3105

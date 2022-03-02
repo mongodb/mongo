@@ -963,7 +963,15 @@ DispatchShardPipelineResults dispatchShardPipeline(
                     "needsPrimaryShardMerge"_attr = needsPrimaryShardMerge);
         splitPipelines = splitPipeline(std::move(pipeline));
 
-        exchangeSpec = checkIfEligibleForExchange(opCtx, splitPipelines->mergePipeline.get());
+        // If the first stage of the pipeline is a $search stage, exchange optimization isn't
+        // possible.
+        // TODO SERVER-62537 Investigate relaxing this restriction.
+        if (!splitPipelines || !splitPipelines->shardsPipeline ||
+            !splitPipelines->shardsPipeline->peekFront() ||
+            splitPipelines->shardsPipeline->peekFront()->getSourceName() !=
+                "$_internalSearchMongotRemote"_sd) {
+            exchangeSpec = checkIfEligibleForExchange(opCtx, splitPipelines->mergePipeline.get());
+        }
     }
 
     // Generate the command object for the targeted shards.

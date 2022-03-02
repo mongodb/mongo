@@ -183,6 +183,7 @@ env.Library(
 env.Library(
     target='cursor_response_idl',
     source=[
+        'cursor_idl_validator.cpp',
         'cursor_response.idl',
     ],
     LIBDEPS_PRIVATE=[

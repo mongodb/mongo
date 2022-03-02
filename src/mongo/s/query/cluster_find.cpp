@@ -875,6 +875,7 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
                           postBatchResumeToken,
                           boost::none,
                           boost::none,
+                          boost::none,
                           partialResultsReturned);
 }
 

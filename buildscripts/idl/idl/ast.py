@@ -143,6 +143,7 @@ class Struct(common.SourceLocation):
         self.fields = []  # type: List[Field]
         self.allow_global_collection_name = False  # type: bool
         self.non_const_getter = False  # type: bool
+        self.cpp_validator_func = None  # type: str
         super(Struct, self).__init__(file_name, line, column)
 
 

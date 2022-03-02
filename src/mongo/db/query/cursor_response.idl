@@ -33,9 +33,18 @@ global:
   cpp_includes:
     - "mongo/db/namespace_string.h"
     - "mongo/idl/basic_types.h"
+    - "mongo/db/query/cursor_idl_validator.h"
 
 imports:
     - "mongo/idl/basic_types.idl"
+
+enums:
+    CursorType:
+        description: "The type of a single cursor if a response has multiple cursors"
+        type: string
+        values:
+            SearchMetaResult: "meta"
+            DocumentResult: "results"
 
 structs:
     ResponseCursorBase:
@@ -80,18 +89,59 @@ structs:
                 type: array<object>
                 unstable: false
 
+    MultiResponseInitialResponseCursor: 
+        description: "A struct representing an initial response cursor if multiple cursors are returned."
+        inline_chained_structs: true
+        chained_structs:
+            ResponseCursorBase: ResponseCursorBase
+        fields:
+            firstBatch:
+                description: "The first batch of the cursor."
+                type: array<object>
+                unstable: false
+            type:
+                description: "Optional disambiguation string of a cursor."
+                type: CursorType
+                cpp_name: cursorType
+                unstable: true
+                optional: true
+ 
+    MultiResponseCursor:
+        description: "A struct representing a cursor object inside an array of cursors"
+        fields:
+            cursor:
+                description: "The actual cursor object."
+                type: MultiResponseInitialResponseCursor 
+                unstable: true
+            ok:
+                type: bool
+                unstable: true
+
     CursorInitialReply:
         description: "A struct representing a initial cursor reply."
+        cpp_validator_func: "validateIDLParsedCursorResponse"
         fields:
             cursor:
                 description: "A response cursor object."
                 type: InitialResponseCursor
                 unstable: false
+                optional: true
+            cursors:
+                description: "An array of cursor objects."
+                type: array<MultiResponseCursor>
+                unstable: true
+                optional: true
             vars:
                 description: "An optional field containing additional response information for the query."
                 type: object
                 optional: true
-                unstable: false
+                unstable: true 
+            type:
+                description: "An optional field containing disambiguation information if a reply contains multiple cursors."
+                type: CursorType 
+                cpp_name: cursorType
+                optional: true
+                unstable: true
 
     GetMoreResponseCursor:
         description: "A struct representing a subsequent response cursor."

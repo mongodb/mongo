@@ -166,6 +166,14 @@ IGNORE_UNSTABLE_LIST: List[str] = [
     # visible. This is part of the listIndexes output when executed against system.bucket.*
     # collections, which users should avoid doing.
     'listIndexes-reply-originalSpec',
+    # The 'vars' field was introduced to facilitate communication between mongot and mongod and is
+    # not user visible.
+    'find-reply-vars',
+    'aggregate-reply-vars',
+    # The 'cursor' field is now optional in a reply, as inter-node communication in aggregation
+    # can return one or more cursors. Multiple cursors are covered under the 'cursors' field.
+    'find-reply-cursor',
+    'aggregate-reply-cursor',
 ]
 
 SKIPPED_FILES = ["unittest.idl"]
@@ -499,8 +507,8 @@ def check_reply_field(ctxt: IDLCompatibilityContext, old_field: syntax.Field,
                                                 and old_field_type.name == "optionalBool")
     new_field_optional = new_field.optional or (new_field_type
                                                 and new_field_type.name == "optionalBool")
-    if not old_field.unstable:
-        field_name: str = cmd_name + "-reply-" + new_field.name
+    field_name: str = cmd_name + "-reply-" + new_field.name
+    if not old_field.unstable and field_name not in IGNORE_UNSTABLE_LIST:
         if new_field.unstable and field_name not in IGNORE_UNSTABLE_LIST:
             ctxt.add_new_reply_field_unstable_error(cmd_name, new_field.name, new_idl_file_path)
         if new_field_optional and not old_field_optional:

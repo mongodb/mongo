@@ -114,6 +114,16 @@ public:
      */
     boost::optional<BSONObj> getNext(OperationContext* opCtx);
 
+    /**
+     * Read the response from the remote command issued by this cursor and parse it into this
+     * object. Performs the same work as getNext() above does on the first call to it, and so this
+     * can throw any error that getNext can throw.
+     *
+     * Should not be called once getNext() has been called or the cursor has been otherwise
+     * initialized.
+     */
+    void populateCursor(OperationContext* opCtx);
+
     const CursorId getCursorId() const {
         return _cursorId;
     }
@@ -126,6 +136,10 @@ public:
 
     boost::optional<BSONObj> getCursorVars() {
         return _cursorVars;
+    }
+
+    auto getType() {
+        return _cursorType;
     }
 
     long long getBatchNum() {
@@ -142,6 +156,14 @@ public:
 
     auto getNumAdditionalCursors() {
         return _additionalCursors.size();
+    }
+
+    /**
+     * Return the callback that this cursor is waiting on. Can be used to block on getting a
+     * response to this request. Can be boost::none.
+     */
+    auto getCallbackHandle() {
+        return _cbHandle;
     }
 
 private:
@@ -185,6 +207,9 @@ private:
 
     // Variables sent alongside the results in the cursor.
     boost::optional<BSONObj> _cursorVars = boost::none;
+
+    // For commands that return multiple cursors, the type of the cursor.
+    boost::optional<std::string> _cursorType;
 
     // This is a sum of the time spent waiting on remote calls.
     Milliseconds _millisecondsWaiting = Milliseconds(0);

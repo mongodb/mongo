@@ -410,7 +410,8 @@ public:
      *
      * NOTE: Do not call from a callback running in the executor.
      *
-     * Prefer the version that takes an OperationContext* to this version.
+     * Prefer passing an OperationContext* or other interruptible as the second argument to leaving
+     * as not interruptible.
      */
     virtual void wait(const CallbackHandle& cbHandle,
                       Interruptible* interruptible = Interruptible::notInterruptible()) = 0;

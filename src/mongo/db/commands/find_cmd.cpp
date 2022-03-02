@@ -591,7 +591,8 @@ public:
                 const CursorId cursorId = 0;
                 endQueryOp(opCtx, collection, *exec, numResults, cursorId);
                 auto bodyBuilder = result->getBodyBuilder();
-                appendCursorResponseObject(cursorId, nss.ns(), BSONArray(), &bodyBuilder);
+                appendCursorResponseObject(
+                    cursorId, nss.ns(), BSONArray(), boost::none, &bodyBuilder);
                 return;
             }
 

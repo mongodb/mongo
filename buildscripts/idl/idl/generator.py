@@ -1784,6 +1784,9 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             field_usage_check.add_final_checks()
             self._writer.write_empty_line()
 
+            if struct.cpp_validator_func is not None:
+                self._writer.write_line(struct.cpp_validator_func + "(this);")
+
             self._gen_command_deserializer(struct, "bsonObject")
 
     def gen_op_msg_request_deserializer_methods(self, struct):

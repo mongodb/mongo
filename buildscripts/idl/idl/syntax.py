@@ -529,6 +529,7 @@ class Struct(common.SourceLocation):
         self.fields = None  # type: List[Field]
         self.allow_global_collection_name = False  # type: bool
         self.non_const_getter = False  # type: bool
+        self.cpp_validator_func = None  # type: str
 
         # Command only property
         self.cpp_name = None  # type: str

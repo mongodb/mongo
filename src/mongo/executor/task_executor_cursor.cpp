@@ -86,6 +86,9 @@ TaskExecutorCursor::TaskExecutorCursor(TaskExecutorCursor&& other)
     if (other._cursorVars) {
         _cursorVars = other._cursorVars->getOwned();
     }
+    if (other._cursorType) {
+        _cursorType = other._cursorType;
+    }
     // Other is no longer responsible for this cursor id.
     other._cursorId = 0;
     // Other should not cancel the callback on destruction.
@@ -125,6 +128,19 @@ boost::optional<BSONObj> TaskExecutorCursor::getNext(OperationContext* opCtx) {
     }
 
     return std::move(*_batchIter++);
+}
+
+void TaskExecutorCursor::populateCursor(OperationContext* opCtx) {
+    tassert(6253502,
+            "populateCursors should only be called before cursor is initialized",
+            _cursorId == kUnitializedCursorId);
+    tassert(6253503,
+            "populateCursors should only be called after a remote command has been run",
+            _cbHandle);
+    // We really only care about populating the cursor "first batch" fields, but at some point we'll
+    // have to do all of the work done by this function anyway. This would have been called by
+    // getNext() the first time it was called.
+    _getNextBatch(opCtx);
 }
 
 const RemoteCommandRequest& TaskExecutorCursor::_createRequest(OperationContext* opCtx,
@@ -171,8 +187,9 @@ void TaskExecutorCursor::_processResponse(OperationContext* opCtx, CursorRespons
     if (_cursorId == kUnitializedCursorId) {
         _ns = response.getNSS();
         _rcr.dbname = _ns.db().toString();
-        // 'vars' are only included in the first batch.
+        // 'vars' and type are only included in the first batch.
         _cursorVars = response.getVarsField();
+        _cursorType = response.getCursorType();
     }
 
     _cursorId = response.getCursorId();

@@ -46,6 +46,22 @@ public:
     // invoked for inner collection in $lookup, for instance, only when expanded pipeline is passed
     // to the specific shard.
     virtual void injectSearchShardFiltererIfNeeded(Pipeline* pipeline){};
+
+    /**
+     * Check to see if in the current environment an additional pipeline needs to be run by the
+     * aggregation command to generate metadata results. Either returns the additional pipeline
+     * or nullptr if no pipeline is necessary.
+     *
+     * This can modify the passed in pipeline but does not take ownership of it.
+     */
+    virtual std::unique_ptr<Pipeline, PipelineDeleter> generateMetadataPipelineForSearch(
+        OperationContext* opCtx,
+        boost::intrusive_ptr<ExpressionContext> expCtx,
+        const AggregateCommandRequest& request,
+        Pipeline* origPipeline,
+        boost::optional<UUID> uuid) {
+        return nullptr;
+    }
 };
 
 /**

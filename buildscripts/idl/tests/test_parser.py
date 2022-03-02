@@ -286,6 +286,7 @@ class TestParser(testcase.IDLTestcase):
                 immutable: true
                 inline_chained_structs: true
                 generate_comparison_operators: true
+                cpp_validator_func: funcName
                 fields:
                     foo: bar
             """))
@@ -300,6 +301,7 @@ class TestParser(testcase.IDLTestcase):
                 immutable: false
                 inline_chained_structs: false
                 generate_comparison_operators: false
+                cpp_validator_func: funcName
                 fields:
                     foo: bar
             """))

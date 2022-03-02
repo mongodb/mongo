@@ -275,10 +275,17 @@ void CursorEstablisher::_handleFailure(const AsyncRequestsSender::Response& resp
     if (_allowPartialResults && isEligibleException) {
         // This exception is eligible to be swallowed. Add an entry with a cursorID of 0, an
         // empty HostAndPort, and which has the 'partialResultsReturned' flag set to true.
-        _remoteCursors.push_back(
-            {response.shardId.toString(),
-             {},
-             {_nss, CursorId{0}, {}, boost::none, boost::none, boost::none, boost::none, true}});
+        _remoteCursors.push_back({response.shardId.toString(),
+                                  {},
+                                  {_nss,
+                                   CursorId{0},
+                                   {},
+                                   boost::none,
+                                   boost::none,
+                                   boost::none,
+                                   boost::none,
+                                   boost::none,
+                                   true}});
         return;
     }
 

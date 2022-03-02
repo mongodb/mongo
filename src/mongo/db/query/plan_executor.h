@@ -359,6 +359,13 @@ public:
      */
     virtual void enableSaveRecoveryUnitAcrossCommandsIfSupported() = 0;
     virtual bool isSaveRecoveryUnitAcrossCommandsEnabled() const = 0;
+
+    /**
+     * For queries that have multiple executors, this can be used to differentiate between them.
+     */
+    virtual boost::optional<StringData> getExecutorType() const {
+        return boost::none;
+    }
 };
 
 }  // namespace mongo

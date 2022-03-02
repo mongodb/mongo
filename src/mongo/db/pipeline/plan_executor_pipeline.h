@@ -163,6 +163,11 @@ public:
         return false;
     }
 
+    boost::optional<StringData> getExecutorType() const override {
+        tassert(6253504, "Can't get type string without pipeline", _pipeline);
+        return _pipeline->getTypeString();
+    }
+
 private:
     /**
      * Obtains the next document from the underlying Pipeline, and does change streams-related

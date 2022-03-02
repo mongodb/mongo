@@ -48,6 +48,11 @@ using namespace mongo::idl::import;
 
 namespace mongo {
 
+void mongo::idl::test::checkValuesEqual(StructWithValidator* structToValidate) {
+    uassert(
+        6253512, "Values not equal", structToValidate->getFirst() == structToValidate->getSecond());
+}
+
 namespace {
 
 bool isEquals(ConstDataRange left, const std::vector<uint8_t>& right) {
@@ -1047,6 +1052,17 @@ TEST(IDLStructTests, WriteConcernTest) {
         writeConcernStruct.serialize(&builder);
         ASSERT_BSONOBJ_EQ(builder.obj(), writeConcernDocWithoutIgnoredFields);
     }
+}
+
+TEST(IDLStructTests, TestValidator) {
+    // Parser should assert that the values are equal.
+    IDLParserErrorContext ctxt("root");
+    auto objToParse = BSON("first" << 1 << "second" << 2);
+
+    ASSERT_THROWS_CODE(StructWithValidator::parse(ctxt, objToParse), AssertionException, 6253512);
+
+    objToParse = BSON("first" << 1 << "second" << 1);
+    StructWithValidator::parse(ctxt, objToParse);
 }
 
 /// Struct default comparison tests

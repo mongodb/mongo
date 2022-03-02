@@ -619,7 +619,7 @@ bool appendEmptyResultSet(OperationContext* opCtx,
 
     if (status == ErrorCodes::NamespaceNotFound) {
         // New (command) style reply
-        appendCursorResponseObject(0LL, ns, BSONArray(), &result);
+        appendCursorResponseObject(0LL, ns, BSONArray(), boost::none, &result);
 
         return true;
     }

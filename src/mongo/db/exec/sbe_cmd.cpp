@@ -148,7 +148,7 @@ public:
         }
 
         if (exec->isEOF()) {
-            appendCursorResponseObject(0LL, nss.ns(), firstBatch.arr(), &result);
+            appendCursorResponseObject(0LL, nss.ns(), firstBatch.arr(), boost::none, &result);
             return true;
         }
 
@@ -167,7 +167,7 @@ public:
              {}});
 
         appendCursorResponseObject(
-            pinnedCursor.getCursor()->cursorid(), nss.ns(), firstBatch.arr(), &result);
+            pinnedCursor.getCursor()->cursorid(), nss.ns(), firstBatch.arr(), boost::none, &result);
 
         return true;
     }

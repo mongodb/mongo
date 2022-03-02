@@ -141,8 +141,11 @@ bool handleCursorCommand(OperationContext* opCtx,
             invariant(cursors[idx]);
 
             BSONObjBuilder cursorResult;
-            appendCursorResponseObject(
-                cursors[idx]->cursorid(), nsForCursor.ns(), BSONArray(), &cursorResult);
+            appendCursorResponseObject(cursors[idx]->cursorid(),
+                                       nsForCursor.ns(),
+                                       BSONArray(),
+                                       cursors[idx]->getExecutor()->getExecutorType(),
+                                       &cursorResult);
             cursorResult.appendBool("ok", 1);
 
             cursorsBuilder.append(cursorResult.obj());
@@ -514,6 +517,35 @@ std::vector<std::unique_ptr<Pipeline, PipelineDeleter>> createExchangePipelinesI
 }
 
 /**
+ * Creates additional pipelines if needed to serve the aggregation. This includes additional
+ * pipelines for exchange optimization and search commands that generate metadata. Returns
+ * a vector of all pipelines needed for the query, including the original one.
+ *
+ * Takes ownership of the original, passed in, pipeline.
+ */
+std::vector<std::unique_ptr<Pipeline, PipelineDeleter>> createAdditionalPipelinesIfNeeded(
+    OperationContext* opCtx,
+    boost::intrusive_ptr<ExpressionContext> expCtx,
+    const AggregateCommandRequest& request,
+    std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
+    boost::optional<UUID> collUUID) {
+
+    std::vector<std::unique_ptr<Pipeline, PipelineDeleter>> pipelines;
+    // Exchange is not allowed to be specified if there is a $search stage.
+    if (auto metadataPipe = getSearchHelpers(opCtx->getServiceContext())
+                                ->generateMetadataPipelineForSearch(
+                                    opCtx, expCtx, request, pipeline.get(), collUUID)) {
+        pipelines.push_back(std::move(pipeline));
+        pipelines.push_back(std::move(metadataPipe));
+    } else {
+        // Takes ownership of 'pipeline'.
+        pipelines =
+            createExchangePipelinesIfNeeded(opCtx, expCtx, request, std::move(pipeline), collUUID);
+    }
+    return pipelines;
+}
+
+/**
  * Performs validations related to API versioning and time-series stages.
  * Throws UserAssertion if any of the validations fails
  *     - validation of API versioning on each stage on the pipeline
@@ -574,7 +606,7 @@ std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createLegacyEx
                                                       std::move(attachExecutorCallback.second),
                                                       pipeline.get());
 
-        auto pipelines = createExchangePipelinesIfNeeded(
+        auto pipelines = createAdditionalPipelinesIfNeeded(
             expCtx->opCtx, expCtx, request, std::move(pipeline), expCtx->uuid);
         for (auto&& pipelineIt : pipelines) {
             // There are separate ExpressionContexts for each exchange pipeline, so make sure to

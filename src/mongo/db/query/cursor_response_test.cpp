@@ -348,6 +348,7 @@ TEST(CursorResponseTest, toBSONPartialResultsReturned) {
                             boost::none,
                             boost::none,
                             boost::none,
+                            boost::none,
                             true);
     BSONObj responseObj = response.toBSON(CursorResponse::ResponseType::InitialResponse);
     BSONObj expectedResponse = BSON(

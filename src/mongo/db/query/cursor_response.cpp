@@ -45,6 +45,7 @@ const char kCursorField[] = "cursor";
 const char kIdField[] = "id";
 const char kNsField[] = "ns";
 const char kVarsField[] = "vars";
+const char kTypeField[] = "type";
 const char kAtClusterTimeField[] = "atClusterTime";
 const char kBatchField[] = "nextBatch";
 const char kBatchFieldInitial[] = "firstBatch";
@@ -104,11 +105,15 @@ void CursorResponseBuilder::abandon() {
 void appendCursorResponseObject(long long cursorId,
                                 StringData cursorNamespace,
                                 BSONArray firstBatch,
+                                boost::optional<StringData> cursorType,
                                 BSONObjBuilder* builder) {
     BSONObjBuilder cursorObj(builder->subobjStart(kCursorField));
     cursorObj.append(kIdField, cursorId);
     cursorObj.append(kNsField, cursorNamespace);
     cursorObj.append(kBatchFieldInitial, firstBatch);
+    if (cursorType) {
+        cursorObj.append(kTypeField, cursorType.get());
+    }
     cursorObj.done();
 }
 
@@ -130,6 +135,7 @@ CursorResponse::CursorResponse(NamespaceString nss,
                                boost::optional<BSONObj> postBatchResumeToken,
                                boost::optional<BSONObj> writeConcernError,
                                boost::optional<BSONObj> varsField,
+                               boost::optional<std::string> cursorType,
                                bool partialResultsReturned,
                                bool invalidated)
     : _nss(std::move(nss)),
@@ -139,6 +145,7 @@ CursorResponse::CursorResponse(NamespaceString nss,
       _postBatchResumeToken(std::move(postBatchResumeToken)),
       _writeConcernError(std::move(writeConcernError)),
       _varsField(std::move(varsField)),
+      _cursorType(std::move(cursorType)),
       _partialResultsReturned(partialResultsReturned),
       _invalidated(invalidated) {}
 
@@ -207,6 +214,13 @@ StatusWith<CursorResponse> CursorResponse::parseFromBSON(const BSONObj& cmdRespo
         return {ErrorCodes::TypeMismatch,
                 str::stream() << "Field '" << kVarsField
                               << "' must be of type object in: " << cmdResponse};
+    }
+
+    BSONElement typeElt = cursorObj[kTypeField];
+    if (!typeElt.eoo() && typeElt.type() != BSONType::String) {
+        return {ErrorCodes::TypeMismatch,
+                str::stream() << "Field '" << kTypeField << "' must be of type string but got "
+                              << typeElt.type() << " in: " << cmdResponse};
     }
 
     BSONElement batchElt = cursorObj[kBatchField];
@@ -297,6 +311,7 @@ StatusWith<CursorResponse> CursorResponse::parseFromBSON(const BSONObj& cmdRespo
                                       : boost::optional<BSONObj>{},
              writeConcernError ? writeConcernError.Obj().getOwned() : boost::optional<BSONObj>{},
              varsElt ? varsElt.Obj().getOwned() : boost::optional<BSONObj>{},
+             typeElt ? boost::make_optional<std::string>(typeElt.String()) : boost::none,
              partialResultsReturned.trueValue(),
              invalidatedElem.trueValue()}};
 }
