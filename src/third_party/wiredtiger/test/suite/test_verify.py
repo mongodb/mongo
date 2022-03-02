@@ -117,7 +117,7 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
         params = 'key_format=S,value_format=S'
         self.session.create('table:' + self.tablename, params)
         self.populate(self.tablename)
-        self.session.verify('table:' + self.tablename, None)
+        self.verifyUntilSuccess(self.session, 'table:' + self.tablename)
         self.check_populate(self.tablename)
 
     def test_verify_api_75pct_null(self):

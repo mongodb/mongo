@@ -124,7 +124,7 @@ verify(SHARED_CONFIG *cfg, const char *name)
 
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
-    testutil_check(session->verify(session, name, NULL));
+    testutil_verify(session, name, NULL);
 
     testutil_check(session->close(session, NULL));
 }

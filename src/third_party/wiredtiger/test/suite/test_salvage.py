@@ -261,7 +261,7 @@ class test_salvage(wttest.WiredTigerTestCase, suite_subprocess):
         self.moreinit()
         self.session.create('table:' + self.tablename, self.session_params)
         self.populate(self.tablename)
-        self.session.salvage('file:' + self.tablename + ".wt", None)
+        self.salvageUntilSuccess(self.session, 'file:' + self.tablename + ".wt")
         self.check_populate(self.tablename)
 
     def test_salvage_api_damaged(self):

@@ -52,7 +52,7 @@ class test_index01(wttest.WiredTigerTestCase):
 
     def drop_table(self):
         self.pr('drop table')
-        self.session.drop(self.tablename, None)
+        self.dropUntilSuccess(self.session, self.tablename)
 
     def cursor(self, config=None):
         self.pr('open cursor')

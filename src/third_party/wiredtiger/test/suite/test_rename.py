@@ -59,11 +59,11 @@ class test_rename(wttest.WiredTigerTestCase):
                 lambda: self.session.rename(uri1, uri2, None))
             cursor.close()
 
-        self.session.rename(uri1, uri2, None)
+        self.renameUntilSuccess(self.session, uri1, uri2)
         confirm_does_not_exist(self, uri1)
         ds2.check()
 
-        self.session.rename(uri2, uri1, None)
+        self.renameUntilSuccess(self.session, uri2, uri1)
         confirm_does_not_exist(self, uri2)
         ds1.check()
 
