@@ -32,32 +32,18 @@
 
 namespace {
 constexpr int64_t kPlaceholderTimestampForTesting = 0;
+constexpr int64_t kPlaceholderTimeRemainingForTesting = 0;
 constexpr auto TEMP_VALUE = "placeholder";
 
 }  // namespace
 
 namespace mongo {
 
-namespace {
-const stdx::unordered_map<ShardingDataTransformInstanceMetrics::Role, StringData> roleToName = {
-    {ShardingDataTransformInstanceMetrics::kCoordinator, "Coordinator"_sd},
-    {ShardingDataTransformInstanceMetrics::kDonor, "Donor"_sd},
-    {ShardingDataTransformInstanceMetrics::kRecipient, "Recipient"_sd},
-};
-}
-
-StringData ShardingDataTransformInstanceMetrics::getRoleName(Role role) {
-    auto it = roleToName.find(role);
-    invariant(it != roleToName.end());
-    return it->second;
-}
-
 ShardingDataTransformInstanceMetrics::ShardingDataTransformInstanceMetrics(
     UUID instanceId,
     BSONObj originalCommand,
     NamespaceString sourceNs,
     Role role,
-
     ShardingDataTransformCumulativeMetrics* cumulativeMetrics)
     : ShardingDataTransformInstanceMetrics{
           std::move(instanceId),
@@ -93,8 +79,12 @@ ShardingDataTransformInstanceMetrics::~ShardingDataTransformInstanceMetrics() {
     }
 }
 
-int64_t ShardingDataTransformInstanceMetrics::getRemainingTimeMillis() const {
-    return _observer->getRemainingTimeMillis();
+int64_t ShardingDataTransformInstanceMetrics::getHighEstimateRemainingTimeMillis() const {
+    return kPlaceholderTimeRemainingForTesting;
+}
+
+int64_t ShardingDataTransformInstanceMetrics::getLowEstimateRemainingTimeMillis() const {
+    return kPlaceholderTimeRemainingForTesting;
 }
 
 int64_t ShardingDataTransformInstanceMetrics::getStartTimestamp() const {
@@ -105,10 +95,14 @@ const UUID& ShardingDataTransformInstanceMetrics::getUuid() const {
     return _placeholderUuidForTesting;
 }
 
-std::string ShardingDataTransformInstanceMetrics::createOperationDescription() const noexcept {
+ShardingDataTransformInstanceMetrics::Role ShardingDataTransformInstanceMetrics::getRole() const {
+    return _role;
+}
 
-    return fmt::format(
-        "ShardingDataTransformMetrics{}Service {}", getRoleName(_role), _instanceId.toString());
+std::string ShardingDataTransformInstanceMetrics::createOperationDescription() const noexcept {
+    return fmt::format("ShardingDataTransformMetrics{}Service {}",
+                       ShardingDataTransformMetrics::getRoleName(_role),
+                       _instanceId.toString());
 }
 
 BSONObj ShardingDataTransformInstanceMetrics::reportForCurrentOp() const noexcept {

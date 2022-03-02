@@ -148,29 +148,49 @@ ShardingDataTransformCumulativeMetrics* ShardingDataTransformCumulativeMetrics::
 
 ShardingDataTransformCumulativeMetrics::ShardingDataTransformCumulativeMetrics(
     const std::string& rootSectionName)
-    : _rootSectionName{rootSectionName}, _operationWasAttempted{false} {}
+    : _rootSectionName{rootSectionName},
+      _instanceMetricsForAllRoles(ShardingDataTransformMetrics::kRoleCount),
+      _operationWasAttempted{false} {}
 
 ShardingDataTransformCumulativeMetrics::DeregistrationFunction
 ShardingDataTransformCumulativeMetrics::registerInstanceMetrics(const InstanceObserver* metrics) {
     _operationWasAttempted.store(true);
-    auto it = insertMetrics(metrics);
+    auto role = metrics->getRole();
+    auto it = insertMetrics(metrics, getMetricsSetForRole(role));
     return [=] {
         stdx::unique_lock guard(_mutex);
-        _instanceMetrics.erase(it);
+        getMetricsSetForRole(role).erase(it);
     };
 }
 
-int64_t ShardingDataTransformCumulativeMetrics::getOldestOperationRemainingTimeMillis() const {
+int64_t ShardingDataTransformCumulativeMetrics::getOldestOperationHighEstimateRemainingTimeMillis(
+    Role role) const {
+
     stdx::unique_lock guard(_mutex);
-    if (_instanceMetrics.empty()) {
-        return 0;
-    }
-    return (*_instanceMetrics.begin())->getRemainingTimeMillis();
+    auto op = getOldestOperation(guard, role);
+    return op ? op->getHighEstimateRemainingTimeMillis() : 0;
+}
+
+int64_t ShardingDataTransformCumulativeMetrics::getOldestOperationLowEstimateRemainingTimeMillis(
+    Role role) const {
+
+    stdx::unique_lock guard(_mutex);
+    auto op = getOldestOperation(guard, role);
+    return op ? op->getLowEstimateRemainingTimeMillis() : 0;
 }
 
 size_t ShardingDataTransformCumulativeMetrics::getObservedMetricsCount() const {
     stdx::unique_lock guard(_mutex);
-    return _instanceMetrics.size();
+    size_t count = 0;
+    for (const auto& set : _instanceMetricsForAllRoles) {
+        count += set.size();
+    }
+    return count;
+}
+
+size_t ShardingDataTransformCumulativeMetrics::getObservedMetricsCount(Role role) const {
+    stdx::unique_lock guard(_mutex);
+    return getMetricsSetForRole(role).size();
 }
 
 void ShardingDataTransformCumulativeMetrics::reportForServerStatus(BSONObjBuilder* bob) const {
@@ -205,9 +225,12 @@ void ShardingDataTransformCumulativeMetrics::reportActive(BSONObjBuilder* bob) c
 
 void ShardingDataTransformCumulativeMetrics::reportOldestActive(BSONObjBuilder* bob) const {
     BSONObjBuilder s(bob->subobjStart(kOldestActive));
-    s.append(kCoordinatorAllShardsHighestRemainingOperationTimeEstimatedMillis, kPlaceholderLong);
-    s.append(kCoordinatorAllShardsLowestRemainingOperationTimeEstimatedMillis, kPlaceholderLong);
-    s.append(kRecipientRemainingOperationTimeEstimatedMillis, kPlaceholderLong);
+    s.append(kCoordinatorAllShardsHighestRemainingOperationTimeEstimatedMillis,
+             getOldestOperationHighEstimateRemainingTimeMillis(Role::kCoordinator));
+    s.append(kCoordinatorAllShardsLowestRemainingOperationTimeEstimatedMillis,
+             getOldestOperationLowEstimateRemainingTimeMillis(Role::kCoordinator));
+    s.append(kRecipientRemainingOperationTimeEstimatedMillis,
+             getOldestOperationHighEstimateRemainingTimeMillis(Role::kRecipient));
 }
 
 void ShardingDataTransformCumulativeMetrics::reportLatencies(BSONObjBuilder* bob) const {
@@ -251,12 +274,32 @@ void ShardingDataTransformCumulativeMetrics::reportCurrentInSteps(BSONObjBuilder
     s.append(kCountInstancesInDonorState7Done, kPlaceholderInt);
 }
 
+const ShardingDataTransformCumulativeMetrics::InstanceObserver*
+ShardingDataTransformCumulativeMetrics::getOldestOperation(WithLock, Role role) const {
+    auto set = getMetricsSetForRole(role);
+    if (set.empty()) {
+        return nullptr;
+    }
+    return *set.begin();
+}
+
+ShardingDataTransformCumulativeMetrics::MetricsSet&
+ShardingDataTransformCumulativeMetrics::getMetricsSetForRole(Role role) {
+    return _instanceMetricsForAllRoles[static_cast<size_t>(role)];
+}
+
+const ShardingDataTransformCumulativeMetrics::MetricsSet&
+ShardingDataTransformCumulativeMetrics::getMetricsSetForRole(Role role) const {
+    return _instanceMetricsForAllRoles[static_cast<size_t>(role)];
+}
+
 ShardingDataTransformCumulativeMetrics::MetricsSet::iterator
-ShardingDataTransformCumulativeMetrics::insertMetrics(const InstanceObserver* metrics) {
+ShardingDataTransformCumulativeMetrics::insertMetrics(const InstanceObserver* metrics,
+                                                      MetricsSet& set) {
     stdx::unique_lock guard(_mutex);
-    auto before = _instanceMetrics.size();
-    auto it = _instanceMetrics.insert(_instanceMetrics.end(), metrics);
-    invariant(before + 1 == _instanceMetrics.size());
+    auto before = set.size();
+    auto it = set.insert(set.end(), metrics);
+    invariant(before + 1 == set.size());
     return it;
 }
 

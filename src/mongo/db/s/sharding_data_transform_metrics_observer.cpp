@@ -29,17 +29,18 @@
 
 #include "mongo/db/s/sharding_data_transform_metrics_observer.h"
 
-namespace {
-constexpr int64_t kPlaceholderTimeRemainingForTesting = 0;
-}
 namespace mongo {
 
 ShardingDataTransformMetricsObserver::ShardingDataTransformMetricsObserver(
     ShardingDataTransformInstanceMetrics* metrics)
     : _metrics(metrics) {}
 
-int64_t ShardingDataTransformMetricsObserver::getRemainingTimeMillis() const {
-    return kPlaceholderTimeRemainingForTesting;
+int64_t ShardingDataTransformMetricsObserver::getHighEstimateRemainingTimeMillis() const {
+    return _metrics->getHighEstimateRemainingTimeMillis();
+}
+
+int64_t ShardingDataTransformMetricsObserver::getLowEstimateRemainingTimeMillis() const {
+    return _metrics->getLowEstimateRemainingTimeMillis();
 }
 
 int64_t ShardingDataTransformMetricsObserver::getStartTimestamp() const {
@@ -48,6 +49,10 @@ int64_t ShardingDataTransformMetricsObserver::getStartTimestamp() const {
 
 const UUID& ShardingDataTransformMetricsObserver::getUuid() const {
     return _metrics->getUuid();
+}
+
+ShardingDataTransformMetrics::Role ShardingDataTransformMetricsObserver::getRole() const {
+    return _metrics->getRole();
 }
 
 }  // namespace mongo

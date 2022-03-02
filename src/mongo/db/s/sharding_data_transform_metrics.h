@@ -29,23 +29,15 @@
 
 #pragma once
 
-#include "mongo/db/s/sharding_data_transform_instance_metrics.h"
-#include "mongo/db/s/sharding_data_transform_metrics_observer_interface.h"
-#include "mongo/util/uuid.h"
+#include "mongo/base/string_data.h"
 
 namespace mongo {
 
-class ShardingDataTransformMetricsObserver : public ShardingDataTransformMetricsObserverInterface {
+class ShardingDataTransformMetrics {
 public:
-    ShardingDataTransformMetricsObserver(ShardingDataTransformInstanceMetrics* metrics);
-    int64_t getHighEstimateRemainingTimeMillis() const override;
-    int64_t getLowEstimateRemainingTimeMillis() const override;
-    int64_t getStartTimestamp() const override;
-    const UUID& getUuid() const override;
-    ShardingDataTransformMetrics::Role getRole() const override;
-
-private:
-    ShardingDataTransformInstanceMetrics* _metrics;
+    static constexpr size_t kRoleCount = 3;
+    enum class Role { kCoordinator, kDonor, kRecipient };
+    static StringData getRoleName(Role role);
 };
 
 }  // namespace mongo

@@ -61,7 +61,7 @@ TEST_F(ReshardingMetricsTest, ReportForCurrentOpShouldHaveGlobalIndexDescription
 
         ASSERT_EQ(report.getStringField("desc").toString(),
                   fmt::format("ReshardingMetrics{}Service {}",
-                              ReshardingMetricsNew::getRoleName(role),
+                              ShardingDataTransformMetrics::getRoleName(role),
                               instanceId.toString()));
     });
 }

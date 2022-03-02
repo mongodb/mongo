@@ -109,12 +109,13 @@ public:
             }
 
             _metrics = std::make_unique<ReshardingMetrics>(serviceContext);
-            _metricsNew = ReshardingMetricsNew::makeInstance(UUID::gen(),
-                                                             _outputNss,
-                                                             ReshardingMetricsNew::kRecipient,
-                                                             BSON("y" << 1),
-                                                             false,
-                                                             serviceContext);
+            _metricsNew =
+                ReshardingMetricsNew::makeInstance(UUID::gen(),
+                                                   _outputNss,
+                                                   ShardingDataTransformMetrics::Role::kRecipient,
+                                                   BSON("y" << 1),
+                                                   false,
+                                                   serviceContext);
             _crudApplication = std::make_unique<ReshardingOplogApplicationRules>(
                 _outputNss,
                 std::vector<NamespaceString>{_myStashNss, _otherStashNss},

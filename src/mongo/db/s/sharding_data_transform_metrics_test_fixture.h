@@ -45,29 +45,52 @@ namespace mongo {
 
 class ObserverMock : public ShardingDataTransformMetricsObserverInterface {
 public:
+    constexpr static auto kDefaultRole = ShardingDataTransformMetrics::Role::kCoordinator;
     ObserverMock(int64_t startTime, int64_t timeRemaining)
-        : _uuid{UUID::gen()}, _startTime{startTime}, _timeRemaining{timeRemaining} {}
+        : ObserverMock{startTime, timeRemaining, timeRemaining, kDefaultRole} {}
+    ObserverMock(int64_t startTime,
+                 int64_t timeRemainingHigh,
+                 int64_t timeRemainingLow,
+                 ShardingDataTransformMetrics::Role role)
+        : _uuid{UUID::gen()},
+          _startTime{startTime},
+          _timeRemainingHigh{timeRemainingHigh},
+          _timeRemainingLow{timeRemainingLow},
+          _role{role} {
+        invariant(timeRemainingHigh >= timeRemainingLow);
+    }
 
     virtual const UUID& getUuid() const override {
         return _uuid;
     }
 
-    virtual int64_t getRemainingTimeMillis() const override {
-        return _timeRemaining;
+    virtual int64_t getHighEstimateRemainingTimeMillis() const override {
+        return _timeRemainingHigh;
+    }
+
+    virtual int64_t getLowEstimateRemainingTimeMillis() const override {
+        return _timeRemainingLow;
     }
 
     virtual int64_t getStartTimestamp() const override {
         return _startTime;
     }
 
+    virtual ShardingDataTransformMetrics::Role getRole() const override {
+        return _role;
+    }
+
 private:
     UUID _uuid;
     int64_t _startTime;
-    int64_t _timeRemaining;
+    int64_t _timeRemainingHigh;
+    int64_t _timeRemainingLow;
+    ShardingDataTransformMetrics::Role _role;
 };
 
 class ShardingDataTransformMetricsTestFixture : public unittest::Test {
 protected:
+    constexpr static auto kTestMetricsName = "testMetrics";
     constexpr static int64_t kYoungestTime = std::numeric_limits<int64_t>::max();
     constexpr static int64_t kOldestTime = 1;
     using Role = ShardingDataTransformInstanceMetrics::Role;
@@ -75,7 +98,7 @@ protected:
     const BSONObj kTestCommand = BSON("command"
                                       << "test");
 
-    ShardingDataTransformMetricsTestFixture() : _cumulativeMetrics{"testMetrics"} {}
+    ShardingDataTransformMetricsTestFixture() : _cumulativeMetrics{kTestMetricsName} {}
 
     const ObserverMock* getYoungestObserver() {
         static StaticImmortal<ObserverMock> youngest{kYoungestTime, kYoungestTime};
@@ -142,7 +165,9 @@ protected:
                                 kRemovalOdds,
                                 rng.nextInt64(),
                                 registerAtIndex(rng.nextInt32(kIterations), getOldestObserver()));
-        ASSERT_EQ(_cumulativeMetrics.getOldestOperationRemainingTimeMillis(), kOldestTime);
+        ASSERT_EQ(_cumulativeMetrics.getOldestOperationHighEstimateRemainingTimeMillis(
+                      ObserverMock::kDefaultRole),
+                  kOldestTime);
     }
 
     template <typename ScopedObserverType>
@@ -177,7 +202,9 @@ protected:
         for (auto& pf : threadPFs) {
             pf.future.wait();
         }
-        ASSERT_EQ(_cumulativeMetrics.getOldestOperationRemainingTimeMillis(), kOldestTime);
+        ASSERT_EQ(_cumulativeMetrics.getOldestOperationHighEstimateRemainingTimeMillis(
+                      ObserverMock::kDefaultRole),
+                  kOldestTime);
         size_t expectedCount = 1;  // Special insert for kOldest is not counted in vector size.
         for (auto& v : threadStorage) {
             expectedCount += v.size();

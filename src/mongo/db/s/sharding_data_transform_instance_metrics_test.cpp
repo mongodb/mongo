@@ -96,12 +96,6 @@ TEST_F(ShardingDataTransformInstanceMetricsTest, RegisterAndDeregisterMetricsAtO
     ASSERT_EQ(_cumulativeMetrics.getObservedMetricsCount(), 0);
 }
 
-TEST_F(ShardingDataTransformInstanceMetricsTest, UsesObserverToReportTimeEstimate) {
-    constexpr auto kExpectedTimeLeft = 1000;
-    auto metrics = createInstanceMetrics(std::make_unique<ObserverMock>(0, kExpectedTimeLeft));
-    ASSERT_EQ(metrics->getRemainingTimeMillis(), kExpectedTimeLeft);
-}
-
 TEST_F(ShardingDataTransformInstanceMetricsTest, RandomOperations) {
     doRandomOperationsTest<InstanceMetricsWithObserverMock>();
 }
@@ -122,7 +116,7 @@ TEST_F(ShardingDataTransformInstanceMetricsTest, ReportForCurrentOpShouldHaveGen
         auto report = metrics->reportForCurrentOp();
         ASSERT_EQ(report.getStringField("desc").toString(),
                   fmt::format("ShardingDataTransformMetrics{}Service {}",
-                              ShardingDataTransformInstanceMetrics::getRoleName(role),
+                              ShardingDataTransformMetrics::getRoleName(role),
                               instanceId.toString()));
     });
 }
@@ -135,7 +129,7 @@ TEST_F(ShardingDataTransformInstanceMetricsTest, GetRoleNameShouldReturnCorrectN
     };
 
     std::for_each(roles.begin(), roles.end(), [&](auto role) {
-        ASSERT_EQ(ShardingDataTransformInstanceMetrics::getRoleName(role.first), role.second);
+        ASSERT_EQ(ShardingDataTransformMetrics::getRoleName(role.first), role.second);
     });
 }
 

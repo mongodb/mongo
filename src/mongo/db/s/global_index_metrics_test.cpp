@@ -61,7 +61,7 @@ TEST_F(GlobalIndexMetricsTest, ReportForCurrentOpShouldHaveGlobalIndexDescriptio
 
         ASSERT_EQ(report.getStringField("desc").toString(),
                   fmt::format("GlobalIndexMetrics{}Service {}",
-                              GlobalIndexMetrics::getRoleName(role),
+                              ShardingDataTransformMetrics::getRoleName(role),
                               instanceId.toString()));
     });
 }

@@ -62,7 +62,9 @@ ReshardingMetricsNew::ReshardingMetricsNew(
                                            cumulativeMetrics) {}
 
 std::string ReshardingMetricsNew::createOperationDescription() const noexcept {
-    return fmt::format("ReshardingMetrics{}Service {}", getRoleName(_role), _instanceId.toString());
+    return fmt::format("ReshardingMetrics{}Service {}",
+                       ShardingDataTransformMetrics::getRoleName(_role),
+                       _instanceId.toString());
 }
 
 std::unique_ptr<ReshardingMetricsNew> ReshardingMetricsNew::makeInstance(

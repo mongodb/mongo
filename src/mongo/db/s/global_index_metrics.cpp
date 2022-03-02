@@ -61,7 +61,8 @@ GlobalIndexMetrics::GlobalIndexMetrics(UUID uuid,
           cumulativeMetrics) {}
 
 std::string GlobalIndexMetrics::createOperationDescription() const noexcept {
-    return fmt::format(
-        "GlobalIndexMetrics{}Service {}", getRoleName(_role), _instanceId.toString());
+    return fmt::format("GlobalIndexMetrics{}Service {}",
+                       ShardingDataTransformMetrics::getRoleName(_role),
+                       _instanceId.toString());
 }
 }  // namespace mongo

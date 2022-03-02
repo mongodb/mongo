@@ -41,6 +41,7 @@ namespace mongo {
 
 class ShardingDataTransformCumulativeMetrics {
 public:
+    using Role = ShardingDataTransformMetrics::Role;
     using InstanceObserver = ShardingDataTransformMetricsObserverInterface;
     using DeregistrationFunction = unique_function<void()>;
 
@@ -49,8 +50,10 @@ public:
 
     ShardingDataTransformCumulativeMetrics(const std::string& rootSectionName);
     [[nodiscard]] DeregistrationFunction registerInstanceMetrics(const InstanceObserver* metrics);
-    int64_t getOldestOperationRemainingTimeMillis() const;
+    int64_t getOldestOperationHighEstimateRemainingTimeMillis(Role role) const;
+    int64_t getOldestOperationLowEstimateRemainingTimeMillis(Role role) const;
     size_t getObservedMetricsCount() const;
+    size_t getObservedMetricsCount(Role role) const;
     void reportForServerStatus(BSONObjBuilder* bob) const;
 
 private:
@@ -70,11 +73,14 @@ private:
     void reportOldestActive(BSONObjBuilder* bob) const;
     void reportLatencies(BSONObjBuilder* bob) const;
     void reportCurrentInSteps(BSONObjBuilder* bob) const;
-    MetricsSet::iterator insertMetrics(const InstanceObserver* metrics);
+    MetricsSet& getMetricsSetForRole(Role role);
+    const MetricsSet& getMetricsSetForRole(Role role) const;
+    const InstanceObserver* getOldestOperation(WithLock, Role role) const;
+    MetricsSet::iterator insertMetrics(const InstanceObserver* metrics, MetricsSet& set);
 
     mutable Mutex _mutex;
     const std::string _rootSectionName;
-    MetricsSet _instanceMetrics;
+    std::vector<MetricsSet> _instanceMetricsForAllRoles;
     AtomicWord<bool> _operationWasAttempted;
 };
 

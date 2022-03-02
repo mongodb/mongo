@@ -31,13 +31,14 @@
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/sharding_data_transform_cumulative_metrics.h"
+#include "mongo/db/s/sharding_data_transform_metrics.h"
 #include "mongo/db/s/sharding_data_transform_metrics_observer_interface.h"
 
 namespace mongo {
 
 class ShardingDataTransformInstanceMetrics {
 public:
-    enum Role { kCoordinator, kDonor, kRecipient };
+    using Role = ShardingDataTransformMetrics::Role;
     using ObserverPtr = std::unique_ptr<ShardingDataTransformMetricsObserverInterface>;
 
     ShardingDataTransformInstanceMetrics(UUID instanceId,
@@ -55,14 +56,15 @@ public:
     virtual ~ShardingDataTransformInstanceMetrics();
 
     BSONObj reportForCurrentOp() const noexcept;
-    static StringData getRoleName(Role role);
-    int64_t getRemainingTimeMillis() const;
+    int64_t getHighEstimateRemainingTimeMillis() const;
+    int64_t getLowEstimateRemainingTimeMillis() const;
     int64_t getStartTimestamp() const;
     const UUID& getUuid() const;
     void onInsertApplied();
     void onUpdateApplied();
     void onDeleteApplied();
     void onOplogEntriesApplied(int64_t numEntries);
+    Role getRole() const;
 
 protected:
     virtual std::string createOperationDescription() const noexcept;
