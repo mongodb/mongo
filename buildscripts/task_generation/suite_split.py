@@ -13,7 +13,7 @@ from evergreen import EvergreenApi
 
 from buildscripts.task_generation.resmoke_proxy import ResmokeProxyService
 from buildscripts.task_generation.suite_split_strategies import SplitStrategy, FallbackStrategy
-from buildscripts.task_generation.timeout import TimeoutEstimate
+from buildscripts.timeouts.timeout import TimeoutEstimate
 from buildscripts.util import taskname
 from buildscripts.util.teststats import HistoricTaskData, TestRuntime, normalize_test_name
 

@@ -1,7 +1,7 @@
 """Unit tests for timeout.py."""
 import unittest
 
-from buildscripts.task_generation import timeout as under_test
+from buildscripts.timeouts import timeout as under_test
 
 # pylint: disable=missing-docstring,invalid-name,unused-argument,no-self-use,protected-access,no-value-for-parameter
 

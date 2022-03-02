@@ -1218,6 +1218,9 @@ functions:
   - *update_resmoke_jobs_expansions
   - *f_expansions_write
   - *configure_evergreen_api_credentials
+  - *determine_task_timeout
+  - *update_task_timeout_expansions
+  - *f_expansions_write
   - command: subprocess.exec
     params:
       binary: bash
@@ -1243,6 +1246,7 @@ functions:
 
   "run tests":
     - *f_expansions_write
+    - *configure_evergreen_api_credentials
     - *determine_task_timeout
     - *update_task_timeout_expansions
     - *f_expansions_write
@@ -2246,7 +2250,9 @@ tasks:
           - "./build/**.gcno"
           - "./etc/*san.suppressions"
           - "./etc/backports_required_for_multiversion_tests.yml"
+          - "./etc/evergreen_timeouts.yml"
           - "./etc/expansions.default.yml"
+          - "./etc/evergreen.yml"
           - "./etc/pip/**"
           - "./etc/repo_config.yaml"
           - "./etc/scons/**"
