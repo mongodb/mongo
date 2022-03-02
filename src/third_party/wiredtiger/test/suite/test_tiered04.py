@@ -262,7 +262,7 @@ class test_tiered04(wttest.WiredTigerTestCase):
         # statistics should stay the same.
         skip1 = self.get_stat(stat.conn.flush_tier_skipped, None)
         switch1 = self.get_stat(stat.conn.flush_tier_switched, None)
-        self.session.flush_tier('timeout=10')
+        self.session.flush_tier('timeout=100')
         skip2 = self.get_stat(stat.conn.flush_tier_skipped, None)
         switch2 = self.get_stat(stat.conn.flush_tier_switched, None)
         self.assertEqual(switch1, switch2)
