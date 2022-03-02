@@ -9,6 +9,7 @@
  *   assumes_superuser_permissions,
  *   # applyOps is not retryable.
  *   requires_non_retryable_commands,
+ *   requires_fcv_52,
  * ]
  */
 (function() {
