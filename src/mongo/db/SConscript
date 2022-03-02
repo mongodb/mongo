@@ -1432,6 +1432,7 @@ env.Library(
         'db_raii',
         'dbdirectclient',
         'exec/projection_executor',
+        'exec/sbe/query_sbe_abt',
         'exec/sbe/query_sbe_storage',
         'exec/scoped_timer',
         'exec/sort_executor',

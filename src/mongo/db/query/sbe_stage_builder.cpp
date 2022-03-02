@@ -36,6 +36,7 @@
 #include <fmt/format.h>
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/exec/sbe/abt/abt_lower.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
 #include "mongo/db/exec/sbe/stages/column_scan.h"
 #include "mongo/db/exec/sbe/stages/filter.h"
@@ -58,9 +59,12 @@
 #include "mongo/db/fts/fts_query_impl.h"
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/index/fts_access_method.h"
+#include "mongo/db/pipeline/abt/field_map_builder.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_visitor.h"
 #include "mongo/db/query/expression_walker.h"
+#include "mongo/db/query/optimizer/rewrites/const_eval.h"
+#include "mongo/db/query/optimizer/rewrites/path_lower.h"
 #include "mongo/db/query/sbe_stage_builder_accumulator.h"
 #include "mongo/db/query/sbe_stage_builder_coll_scan.h"
 #include "mongo/db/query/sbe_stage_builder_expression.h"
@@ -881,7 +885,25 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     return {std::move(stage), std::move(outputs)};
 }
+namespace {
+std::unique_ptr<sbe::EExpression> abtToExpr(optimizer::ABT& abt, optimizer::SlotVarMap& slotMap) {
+    auto env = optimizer::VariableEnvironment::build(abt);
 
+    optimizer::PrefixId prefixId;
+    // Convert paths into ABT expressions.
+    optimizer::EvalPathLowering pathLower{prefixId, env};
+    pathLower.optimize(abt);
+
+    // Run the constant folding to eliminate lambda applications as they are not directly
+    // supported by the SBE VM.
+    optimizer::ConstEval constEval{env};
+    constEval.optimize(abt);
+
+    // And finally convert to the SBE expression.
+    optimizer::SBEExpressionLowering exprLower{env, slotMap};
+    return exprLower.optimize(abt);
+}
+}  // namespace
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildColumnScan(
     const QuerySolutionNode* root, const PlanStageReqs& reqs) {
     invariant(!reqs.getIndexKeyBitset());
@@ -901,22 +923,38 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     }
 
     auto fieldSlotIds = _slotIdGenerator.generateMultiple(csn->fields.size());
-    auto internalSlotId = _slotIdGenerator.generate();
+    auto rowStoreSlot = _slotIdGenerator.generate();
     auto emptyExpr = sbe::makeE<sbe::EFunction>("newObj", sbe::EExpression::Vector{});
     std::vector<std::unique_ptr<sbe::EExpression>> pathExprs;
     for (size_t idx = 0; idx < csn->fields.size(); ++idx) {
         pathExprs.emplace_back(emptyExpr->clone());
     }
 
+    std::string rootStr = "rowStoreRoot";
+    optimizer::FieldMapBuilder builder(rootStr, true);
+    for (const std::string& field : csn->fields) {
+        builder.integrateFieldPath(FieldPath(field),
+                                   [](const bool isLastElement, optimizer::FieldMapEntry& entry) {
+                                       entry._hasLeadingObj = true;
+                                       entry._hasKeep = true;
+                                   });
+    }
+
+    // Generate expression that reconstructs the whole object (runs against the row store bson for
+    // now).
+    optimizer::SlotVarMap slotMap{};
+    slotMap[rootStr] = rowStoreSlot;
+    auto abt = builder.generateABT();
+    auto exprOut = abt ? abtToExpr(*abt, slotMap) : emptyExpr->clone();
     auto stage = std::make_unique<sbe::ColumnScanStage>(_collections.getMainCollection()->uuid(),
                                                         csn->indexEntry.catalogName,
                                                         fieldSlotIds,
                                                         csn->fields,
                                                         recordSlot,
                                                         ridSlot,
-                                                        std::move(emptyExpr),
+                                                        std::move(exprOut),
                                                         std::move(pathExprs),
-                                                        internalSlotId,
+                                                        rowStoreSlot,
                                                         _yieldPolicy,
                                                         csn->nodeId());
 

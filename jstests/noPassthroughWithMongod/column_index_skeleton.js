@@ -20,7 +20,7 @@ const testDB = db;
 const coll = db.column_index_skeleton;
 coll.drop();
 
-assert.commandWorked(coll.insert({a: 1}));
+assert.commandWorked(coll.insert({a: [[1, 2], [{b: [[1, 2], [{c: [[1, 2], [{}], 2]}], 2]}], 2]}));
 
 // Enable the columnar fail point.
 const failPoint = configureFailPoint(testDB, "includeFakeColumnarIndex");
@@ -30,7 +30,9 @@ try {
     assert(planHasStage(db, expl, "COLUMN_IXSCAN"));
 
     // Run a query.
-    assert.eq(coll.find({}, {a: 1}).itcount(), 1);
+    let results = coll.find({}, {_id: 0, "a.b.c": 1}).toArray();
+    assert.eq(results.length, 1);
+    assert.eq(results[0], {a: [[], [{b: [[], [{c: [[1, 2], [{}], 2]}]]}]]});
 } finally {
     failPoint.off();
 }
