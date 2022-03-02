@@ -32,6 +32,15 @@ global:
 imports:
     - "mongo/idl/basic_types.idl"
 
+structs:
+    SetUserWriteBlockModeRequest:
+        description: "setUserWriteBlockMode command request"
+        strict: true
+        fields:
+            global:
+                description: "If true, enables write blocking. If false, disables."
+                type: bool
+
 commands:
     set_user_write_block_mode:
         description: "Set whether user write blocking is enabled."
@@ -41,7 +50,5 @@ commands:
         cpp_name: SetUserWriteBlockMode
         reply_type: OkReply
         strict: true
-        fields:
-            global:
-                description: "If true, enables write blocking. If false, disables."
-                type: bool
+        chained_structs:
+            SetUserWriteBlockModeRequest: SetUserWriteBlockModeRequest

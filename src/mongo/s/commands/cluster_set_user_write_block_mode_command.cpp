@@ -35,6 +35,8 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/set_user_write_block_mode_gen.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/grid.h"
+#include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 
 namespace mongo {
 namespace {
@@ -58,8 +60,23 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            auto req = request();
-            LOGV2(6345101, "In SetUserWriteBlockModeCommand", "global"_attr = req.getGlobal());
+            ConfigsvrSetUserWriteBlockMode configsvrSetUserWriteBlockModeCmd;
+            configsvrSetUserWriteBlockModeCmd.setDbName(NamespaceString::kAdminDb);
+            SetUserWriteBlockModeRequest setUserWriteBlockModeRequest(
+                request().getSetUserWriteBlockModeRequest());
+            configsvrSetUserWriteBlockModeCmd.setSetUserWriteBlockModeRequest(
+                setUserWriteBlockModeRequest);
+
+            auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+            auto cmdResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
+                opCtx,
+                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                NamespaceString::kAdminDb.toString(),
+                CommandHelpers::appendMajorityWriteConcern(
+                    configsvrSetUserWriteBlockModeCmd.toBSON({}), opCtx->getWriteConcern()),
+                Shard::RetryPolicy::kIdempotent));
+            uassertStatusOK(cmdResponse.commandStatus);
+            uassertStatusOK(cmdResponse.writeConcernStatus);
         }
 
     private:

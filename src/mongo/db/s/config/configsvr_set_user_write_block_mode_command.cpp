@@ -63,7 +63,7 @@ public:
                 "featureFlagUserWriteBlocking not enabled",
                 gFeatureFlagUserWriteBlocking.isEnabled(serverGlobalParams.featureCompatibility));
 
-            const auto startBlocking = request().getCommandParameter();
+            const auto startBlocking = request().getGlobal();
 
             SetUserWriteBlockModeCoordinatorDocument coordinatorDoc{startBlocking};
             coordinatorDoc.setConfigsvrCoordinatorMetadata(

@@ -33,6 +33,7 @@ global:
 
 imports:
     - "mongo/db/commands/rename_collection.idl"
+    - "mongo/db/commands/set_user_write_block_mode.idl"
     - "mongo/db/drop_database.idl"
     - "mongo/db/keypattern.idl"
     - "mongo/db/coll_mod.idl"
@@ -374,10 +375,11 @@ commands:
         command_name: _configsvrSetUserWriteBlockMode
         cpp_name: ConfigsvrSetUserWriteBlockMode
         description: "internal _configsvrSetUserWriteBlockMode command"
-        namespace: type
+        namespace: ignored
         api_version: ""
-        type: bool
         strict: false
+        chained_structs:
+            SetUserWriteBlockModeRequest: SetUserWriteBlockModeRequest
 
     _configsvrSetClusterParameter:
         command_name: _configsvrSetClusterParameter
