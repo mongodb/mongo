@@ -83,7 +83,7 @@ AsyncRequestsSender::Response executeCommandAgainstDatabasePrimaryOrFirstShard(
 
 CachedDatabaseInfo createDatabase(OperationContext* opCtx,
                                   StringData dbName,
-                                  boost::optional<ShardId> suggestedPrimaryId) {
+                                  const boost::optional<ShardId>& suggestedPrimaryId) {
     auto catalogCache = Grid::get(opCtx)->catalogCache();
 
     auto dbStatus = catalogCache->getDatabase(opCtx, dbName);

@@ -41,7 +41,7 @@ namespace cluster {
  */
 CachedDatabaseInfo createDatabase(OperationContext* opCtx,
                                   StringData dbName,
-                                  boost::optional<ShardId> suggestedPrimaryId = boost::none);
+                                  const boost::optional<ShardId>& suggestedPrimaryId = boost::none);
 
 /**
  * Creates the specified sharded collection.

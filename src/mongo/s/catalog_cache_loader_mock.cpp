@@ -121,14 +121,7 @@ SemiFuture<CollectionAndChangedChunks> CatalogCacheLoaderMock::getChunksSince(
 }
 
 SemiFuture<DatabaseType> CatalogCacheLoaderMock::getDatabase(StringData dbName) {
-    return makeReadyFutureWith([this] {
-               uassertStatusOK(_swDatabaseReturnValue);
-               return DatabaseType(_swDatabaseReturnValue.getValue().getName().toString(),
-                                   _swDatabaseReturnValue.getValue().getPrimary(),
-                                   _swDatabaseReturnValue.getValue().getSharded(),
-                                   _swDatabaseReturnValue.getValue().getVersion());
-           })
-        .semi();
+    return makeReadyFutureWith([this] { return _swDatabaseReturnValue; }).semi();
 }
 
 void CatalogCacheLoaderMock::setCollectionRefreshReturnValue(

@@ -331,14 +331,22 @@ DatabaseType ShardingCatalogClientImpl::getDatabase(OperationContext* opCtx,
             NamespaceString::validDBName(dbName, NamespaceString::DollarInDbNameBehavior::Allow));
 
     // The admin database is always hosted on the config server.
-    if (dbName == NamespaceString::kAdminDb)
-        return DatabaseType(
-            dbName.toString(), ShardId::kConfigServerId, false, DatabaseVersion::makeFixed());
+    if (dbName == NamespaceString::kAdminDb) {
+        DatabaseType adminDb{
+            dbName.toString(), ShardId::kConfigServerId, DatabaseVersion::makeFixed()};
+        // TODO SERVER-63983: do not set sharded flag once 6.0 becomes lastLTS
+        adminDb.setSharded(true);
+        return adminDb;
+    }
 
     // The config database's primary shard is always config, and it is always sharded.
-    if (dbName == NamespaceString::kConfigDb)
-        return DatabaseType(
-            dbName.toString(), ShardId::kConfigServerId, true, DatabaseVersion::makeFixed());
+    if (dbName == NamespaceString::kConfigDb) {
+        DatabaseType configDb{
+            dbName.toString(), ShardId::kConfigServerId, DatabaseVersion::makeFixed()};
+        // TODO SERVER-63983: do not set sharded flag once 6.0 becomes lastLTS
+        configDb.setSharded(true);
+        return configDb;
+    }
 
     auto result =
         _fetchDatabaseMetadata(opCtx, dbName.toString(), kConfigReadSelector, readConcernLevel);

@@ -132,11 +132,7 @@ ChunkManager CatalogCacheTestFixture::makeChunkManager(
     boost::optional<ReshardingFields> reshardingFields) {
     ChunkVersion version(1, 0, OID::gen(), Timestamp(42) /* timestamp */);
 
-    const BSONObj databaseBSON = [&]() {
-        DatabaseType db(
-            nss.db().toString(), {"0"}, true, DatabaseVersion(UUID::gen(), Timestamp()));
-        return db.toBSON();
-    }();
+    DatabaseType db(nss.db().toString(), {"0"}, DatabaseVersion(UUID::gen(), Timestamp()));
 
     const auto uuid = UUID::gen();
     const BSONObj collectionBSON = [&]() {
@@ -181,7 +177,7 @@ ChunkManager CatalogCacheTestFixture::makeChunkManager(
 
     auto future = scheduleRoutingInfoUnforcedRefresh(nss);
 
-    expectFindSendBSONObjVector(kConfigHostAndPort, {databaseBSON});
+    expectFindSendBSONObjVector(kConfigHostAndPort, {db.toBSON()});
     expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
         std::vector<BSONObj> aggResult{collectionBSON};
         std::transform(initialChunks.begin(),
@@ -196,8 +192,7 @@ ChunkManager CatalogCacheTestFixture::makeChunkManager(
 
 void CatalogCacheTestFixture::expectGetDatabase(NamespaceString nss, std::string shardId) {
     expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
-        DatabaseType db(
-            nss.db().toString(), {shardId}, true, DatabaseVersion(UUID::gen(), Timestamp()));
+        DatabaseType db(nss.db().toString(), {shardId}, DatabaseVersion(UUID::gen(), Timestamp()));
         return std::vector<BSONObj>{db.toBSON()};
     }());
 }

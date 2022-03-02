@@ -136,7 +136,7 @@ protected:
     /**
      * Inserts a document for the database into the config.databases collection.
      */
-    void setupDatabase(const std::string& dbName, ShardId primaryShard, bool sharded);
+    void setupDatabase(const std::string& dbName, const ShardId& primaryShard);
 
     /**
      * Returns the indexes definitions defined on a given collection.

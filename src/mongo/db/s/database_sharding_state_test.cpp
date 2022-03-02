@@ -120,7 +120,7 @@ public:
 
     DatabaseType createDatabase(const UUID& uuid, const Timestamp& timestamp) {
         return DatabaseType(
-            kDbName.toString(), kShardList[0].getName(), true, DatabaseVersion(uuid, timestamp));
+            kDbName.toString(), kShardList[0].getName(), DatabaseVersion(uuid, timestamp));
     }
 
 protected:

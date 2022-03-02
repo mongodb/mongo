@@ -743,7 +743,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
             const auto clusterTime = now.clusterTime().asTimestamp();
 
             DatabaseType dbt(
-                dbName, shardType.getName(), false, DatabaseVersion(UUID::gen(), clusterTime));
+                dbName, shardType.getName(), DatabaseVersion(UUID::gen(), clusterTime));
 
             {
                 const auto status = Grid::get(opCtx)->catalogClient()->updateConfigDocument(

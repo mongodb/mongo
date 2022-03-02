@@ -90,7 +90,7 @@ DatabaseType ShardingCatalogManager::createDatabase(OperationContext* opCtx,
                                                     bool enableSharding) {
     if (dbName == NamespaceString::kConfigDb) {
         return DatabaseType(
-            dbName.toString(), ShardId::kConfigServerId, true, DatabaseVersion::makeFixed());
+            dbName.toString(), ShardId::kConfigServerId, DatabaseVersion::makeFixed());
     }
 
     uassert(ErrorCodes::InvalidOptions,
@@ -214,10 +214,12 @@ DatabaseType ShardingCatalogManager::createDatabase(OperationContext* opCtx,
             const auto clusterTime = now.clusterTime().asTimestamp();
 
             // Pick a primary shard for the new database.
-            DatabaseType db(dbName.toString(),
-                            shardPtr->getId(),
-                            enableShardingOptional ? false : enableSharding,
-                            DatabaseVersion(UUID::gen(), clusterTime));
+            DatabaseType db(
+                dbName.toString(), shardPtr->getId(), DatabaseVersion(UUID::gen(), clusterTime));
+
+            if (!enableShardingOptional) {
+                db.setSharded(enableSharding);
+            }
 
             LOGV2(21938,
                   "Registering new database {db} in sharding catalog",

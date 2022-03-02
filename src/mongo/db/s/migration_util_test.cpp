@@ -368,11 +368,8 @@ public:
     const UUID kDefaultUUID = UUID::gen();
     const OID kEpoch = OID::gen();
     const Timestamp kDefaultTimestamp = Timestamp(2, 0);
-    const DatabaseType kDefaultDatabaseType =
-        DatabaseType(kTestNss.db().toString(),
-                     ShardId("0"),
-                     true,
-                     DatabaseVersion(kDefaultUUID, kDefaultTimestamp));
+    const DatabaseType kDefaultDatabaseType = DatabaseType(
+        kTestNss.db().toString(), ShardId("0"), DatabaseVersion(kDefaultUUID, kDefaultTimestamp));
     const std::vector<ShardType> kShardList = {ShardType("0", "Host0:12345"),
                                                ShardType("1", "Host1:12345")};
 

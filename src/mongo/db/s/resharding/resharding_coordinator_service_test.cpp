@@ -382,7 +382,6 @@ public:
 
         DatabaseType dbDoc(coordinatorDoc.getSourceNss().db().toString(),
                            coordinatorDoc.getDonorShards().front().getId(),
-                           true,
                            DatabaseVersion{UUID::gen(), Timestamp(1, 1)});
         client.insert(NamespaceString::kConfigDatabasesNamespace.ns(), dbDoc.toBSON());
 

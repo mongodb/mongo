@@ -328,7 +328,7 @@ void ConfigServerTestFixture::setupCollection(const NamespaceString& nss,
         invariant(swShardDoc.isOK(),
                   "At least one shard should be setup when initializing a collection");
         auto shard = uassertStatusOK(ShardType::fromBSON(swShardDoc.getValue()));
-        setupDatabase(nss.db().toString(), ShardId(shard.getName()), true /* sharded */);
+        setupDatabase(nss.db().toString(), ShardId(shard.getName()));
     }
 
     CollectionType coll(nss,
@@ -400,9 +400,8 @@ StatusWith<ChunkVersion> ConfigServerTestFixture::getCollectionVersion(Operation
 }
 
 void ConfigServerTestFixture::setupDatabase(const std::string& dbName,
-                                            const ShardId primaryShard,
-                                            const bool sharded) {
-    DatabaseType db(dbName, primaryShard, sharded, DatabaseVersion(UUID::gen(), Timestamp()));
+                                            const ShardId& primaryShard) {
+    DatabaseType db(dbName, primaryShard, DatabaseVersion(UUID::gen(), Timestamp()));
     ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
                                                     NamespaceString::kConfigDatabasesNamespace,
                                                     db.toBSON(),

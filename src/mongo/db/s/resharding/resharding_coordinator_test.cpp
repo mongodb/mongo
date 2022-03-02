@@ -536,7 +536,7 @@ protected:
         // Create original collection's catalog entry as well as both config.chunks and config.tags
         // collections.
         {
-            setupDatabase("db", ShardId("shard0000"), true);
+            setupDatabase("db", ShardId("shard0000"));
             auto opCtx = operationContext();
             DBDirectClient client(opCtx);
 

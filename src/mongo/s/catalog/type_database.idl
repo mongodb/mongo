@@ -58,6 +58,7 @@ structs:
                 description: "Specify if it is allowed to create sharded collection on this database."
                 cpp_name: sharded
                 type: bool
+                default: false
                 optional: false
             version:
                 description: "Version of the database."

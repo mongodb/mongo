@@ -353,6 +353,7 @@ commands:
                               primary for the database (if not already created). Otherwise, the
                               system will use the balancer in order to select a primary."
                 optional: true
+            # TODO SERVER-63983: remove the following field when 6.0 becomes lastLTS
             enableSharding:
                 type: bool
                 description: "May only be set to 'true'. If set, indicates to the config server that

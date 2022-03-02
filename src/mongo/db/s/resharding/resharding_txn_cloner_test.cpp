@@ -82,7 +82,6 @@ class ReshardingTxnClonerTest : public ShardServerTestFixture {
         mockLoader->setDatabaseRefreshReturnValue(
             DatabaseType{NamespaceString::kConfigDb.toString(),
                          ShardId::kConfigServerId,
-                         true,
                          DatabaseVersion::makeFixed()});
 
         // The config.transactions collection is always unsharded.

@@ -162,7 +162,7 @@ TEST_F(ShardingCatalogClientTest, GetDatabaseExisting) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     DatabaseType expectedDb(
-        "bigdata", ShardId("shard0000"), true, DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
+        "bigdata", ShardId("shard0000"), DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
 
     const OpTime newOpTime(Timestamp(7, 6), 5);
 
@@ -213,7 +213,7 @@ TEST_F(ShardingCatalogClientTest, GetDatabaseStaleSecondaryRetrySuccess) {
     configTargeter()->setFindHostReturnValue(firstHost);
 
     DatabaseType expectedDb(
-        "bigdata", ShardId("shard0000"), true, DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
+        "bigdata", ShardId("shard0000"), DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
 
     auto future = launchAsync([this, &expectedDb] {
         return catalogClient()->getDatabase(
@@ -920,10 +920,8 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsInvalidCollectionType) {
 TEST_F(ShardingCatalogClientTest, GetDatabasesForShardValid) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
-    DatabaseType dbt1(
-        "db1", ShardId("shard0000"), false, DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
-    DatabaseType dbt2(
-        "db2", ShardId("shard0000"), false, DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
+    DatabaseType dbt1("db1", ShardId("shard0000"), DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
+    DatabaseType dbt2("db2", ShardId("shard0000"), DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
 
     auto future = launchAsync([this] {
         return assertGet(
@@ -967,8 +965,7 @@ TEST_F(ShardingCatalogClientTest, GetDatabasesForShardInvalidDoc) {
     });
 
     onFindCommand([](const RemoteCommandRequest& request) {
-        DatabaseType dbt1(
-            "db1", {"shard0000"}, false, DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
+        DatabaseType dbt1("db1", {"shard0000"}, DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
         return vector<BSONObj>{
             dbt1.toBSON(),
             BSON(DatabaseType::kNameFieldName << 0)  // Database name should be a string
@@ -1075,8 +1072,7 @@ TEST_F(ShardingCatalogClientTest, GetTagsForCollectionInvalidTag) {
 TEST_F(ShardingCatalogClientTest, UpdateDatabase) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
-    DatabaseType dbt(
-        "test", ShardId("shard0000"), true, DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
+    DatabaseType dbt("test", ShardId("shard0000"), DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
 
     auto future = launchAsync([this, dbt] {
         auto status = catalogClient()->updateConfigDocument(
@@ -1123,8 +1119,7 @@ TEST_F(ShardingCatalogClientTest, UpdateConfigDocumentNonRetryableError) {
     HostAndPort host1("TestHost1");
     configTargeter()->setFindHostReturnValue(host1);
 
-    DatabaseType dbt(
-        "test", ShardId("shard0001"), false, DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
+    DatabaseType dbt("test", ShardId("shard0001"), DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
 
     auto future = launchAsync([this, dbt] {
         auto status = catalogClient()->updateConfigDocument(
@@ -1329,7 +1324,7 @@ TEST_F(ShardingCatalogClientTest, RetryOnFindCommandNetworkErrorSucceedsAtMaxRet
 
     onFindCommand([](const RemoteCommandRequest& request) {
         DatabaseType dbType(
-            "TestDB", ShardId("TestShard"), true, DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
+            "TestDB", ShardId("TestShard"), DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
 
         return vector<BSONObj>{dbType.toBSON()};
     });
