@@ -27,70 +27,14 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/commands/fle2_compact.h"
 
 #include "mongo/crypto/encryption_fields_gen.h"
-#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection_catalog.h"
-#include "mongo/db/catalog/rename_collection.h"
-#include "mongo/db/catalog_raii.h"
-#include "mongo/db/commands.h"
-#include "mongo/logv2/log.h"
 
 namespace mongo {
-namespace {
-
-class CompactStructuredEncryptionDataCmd final
-    : public TypedCommand<CompactStructuredEncryptionDataCmd> {
-public:
-    using Request = CompactStructuredEncryptionData;
-    using Reply = CompactStructuredEncryptionData::Reply;
-    using TC = TypedCommand<CompactStructuredEncryptionDataCmd>;
-
-    class Invocation final : public TC::InvocationBase {
-    public:
-        using TC::InvocationBase::InvocationBase;
-        using TC::InvocationBase::request;
-
-        Reply typedRun(OperationContext* opCtx) {
-            auto swCompactStats = compactEncryptedCompactionCollection(opCtx, request());
-            uassertStatusOK(swCompactStats);
-            return Reply(swCompactStats.getValue());
-        }
-
-    private:
-        bool supportsWriteConcern() const final {
-            return false;
-        }
-
-        void doCheckAuthorization(OperationContext* opCtx) const final {
-            auto* as = AuthorizationSession::get(opCtx->getClient());
-            uassert(ErrorCodes::Unauthorized,
-                    "Not authorized to compact structured encryption data",
-                    as->isAuthorizedForActionsOnResource(
-                        ResourcePattern::forExactNamespace(request().getNamespace()),
-                        ActionType::compactStructuredEncryptionData));
-        }
-
-        NamespaceString ns() const final {
-            return request().getNamespace();
-        }
-    };
-
-    typename TC::AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
-        return BasicCommand::AllowedOnSecondary::kNever;
-    }
-
-    bool adminOnly() const final {
-        return false;
-    }
-} compactStructuredEncryptionDataCmd;
-
-}  // namespace
 
 StatusWith<EncryptedStateCollectionsNamespaces>
 EncryptedStateCollectionsNamespaces::createFromDataCollection(const Collection& edc) {
@@ -127,62 +71,6 @@ EncryptedStateCollectionsNamespaces::createFromDataCollection(const Collection& 
     namespaces.ecocRenameNss =
         NamespaceString(db, namespaces.ecocNss.coll().toString().append(".compact"));
     return namespaces;
-}
-
-StatusWith<CompactStats> compactEncryptedCompactionCollection(
-    OperationContext* opCtx, const CompactStructuredEncryptionData& request) {
-    mongo::ECOCStats ecocStats(0, 0);
-    mongo::ECStats eccStats(0, 0, 0, 0);
-    mongo::ECStats escStats(0, 0, 0, 0);
-    const auto& edcNss = request.getNamespace();
-
-    LOGV2(6319900, "Compacting the encrypted compaction collection", "namespace"_attr = edcNss);
-
-    AutoGetDb autoDb(opCtx, edcNss.db(), MODE_IX);
-    if (!autoDb.getDb()) {
-        return Status(ErrorCodes::NamespaceNotFound, str::stream() << "database does not exist");
-    }
-
-    auto catalog = CollectionCatalog::get(opCtx);
-    Lock::CollectionLock edcLock(opCtx, edcNss, MODE_IS);
-
-    // Check the data collection exists and is not a view
-    auto edc = catalog->lookupCollectionByNamespace(opCtx, edcNss);
-    if (!edc) {
-        if (catalog->lookupView(opCtx, edcNss)) {
-            return Status(ErrorCodes::CommandNotSupportedOnView,
-                          "cannot compact structured encryption data on a view");
-        }
-        return Status(ErrorCodes::NamespaceNotFound, "collection does not exist");
-    }
-
-    uassert(6319903, "Feature flag FLE2 is not enabled", gFeatureFlagFLE2.isEnabledAndIgnoreFCV());
-
-    auto swNamespaces = EncryptedStateCollectionsNamespaces::createFromDataCollection(*edc.get());
-    if (!swNamespaces.isOK()) {
-        return swNamespaces.getStatus();
-    }
-    auto& namespaces = swNamespaces.getValue();
-
-    auto ecoc = catalog->lookupCollectionByNamespace(opCtx, namespaces.ecocNss);
-    auto ecocRename = catalog->lookupCollectionByNamespace(opCtx, namespaces.ecocRenameNss);
-
-    if (ecoc && !ecocRename) {
-        LOGV2(6319901,
-              "Renaming the encrypted compaction collection",
-              "ecocNss"_attr = namespaces.ecocNss,
-              "ecocRenameNss"_attr = namespaces.ecocRenameNss);
-        RenameCollectionOptions renameOpts;
-        validateAndRunRenameCollection(
-            opCtx, namespaces.ecocNss, namespaces.ecocRenameNss, renameOpts);
-        ecoc.reset();
-    }
-
-
-    LOGV2(6319902,
-          "Done compacting the encrypted compaction collection",
-          "namespace"_attr = request.getNamespace());
-    return CompactStats(ecocStats, eccStats, escStats);
 }
 
 }  // namespace mongo

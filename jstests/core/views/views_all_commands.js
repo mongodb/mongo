@@ -143,6 +143,7 @@ let viewsCommandTests = {
     _recvChunkStatus: {skip: isAnInternalCommand},
     _shardsvrAbortReshardCollection: {skip: isAnInternalCommand},
     _shardsvrCloneCatalogData: {skip: isAnInternalCommand},
+    _shardsvrCompactStructuredEncryptionData: {skip: isAnInternalCommand},
     _shardsvrDropCollection: {skip: isAnInternalCommand},
     _shardsvrDropCollectionIfUUIDNotMatching: {skip: isUnrelated},
     _shardsvrDropCollectionParticipant: {skip: isAnInternalCommand},
@@ -244,11 +245,7 @@ let viewsCommandTests = {
     commitReshardCollection: {skip: isUnrelated},
     commitTransaction: {skip: isUnrelated},
     compact: {command: {compact: "view", force: true}, expectFailure: true, skipSharded: true},
-    compactStructuredEncryptionData: {
-        command: {compactStructuredEncryptionData: "view", compactionTokens: {}},
-        expectFailure: true,
-        skipSharded: true
-    },
+    compactStructuredEncryptionData: {skip: isUnrelated},
     configureFailPoint: {skip: isUnrelated},
     configureCollectionAutoSplitter: {
         skip: isUnrelated

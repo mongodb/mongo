@@ -16,6 +16,7 @@ const commandsAddedToMongosSinceLastLTS = [
     "appendOplogNote",
     "cleanupReshardCollection",
     "commitReshardCollection",
+    "compactStructuredEncryptionData",
     "configureCollectionBalancing",
     "moveRange",
     "reshardCollection",

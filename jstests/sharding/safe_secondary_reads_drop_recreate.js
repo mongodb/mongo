@@ -82,6 +82,7 @@ let testCases = {
     _killOperations: {skip: "does not return user data"},
     _mergeAuthzCollections: {skip: "primary only"},
     _migrateClone: {skip: "primary only"},
+    _shardsvrCompactStructuredEncryptionData: {skip: "primary only"},
     _shardsvrMovePrimary: {skip: "primary only"},
     _shardsvrMoveRange: {skip: "primary only"},
     _recvChunkAbort: {skip: "primary only"},
@@ -136,6 +137,7 @@ let testCases = {
     commitReshardCollection: {skip: "primary only"},
     commitTransaction: {skip: "primary only"},
     compact: {skip: "does not return user data"},
+    compactStructuredEncryptionData: {skip: "does not return user data"},
     configureCollectionAutoSplitter: {
         skip: "does not return user data"
     },  // TODO SERVER-62374: remove this once 5.3 becomes last continuos release

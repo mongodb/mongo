@@ -539,6 +539,7 @@ const testCases = {
     _recvChunkStart: {skip: isNotRunOnUserDatabase},
     _recvChunkStatus: {skip: isNotRunOnUserDatabase},
     _shardsvrCloneCatalogData: {skip: isNotRunOnUserDatabase},
+    _shardsvrCompactStructuredEncryptionData: {skip: isOnlySupportedOnShardedCluster},
     _shardsvrCreateCollection: {skip: isOnlySupportedOnShardedCluster},
     _shardsvrCreateCollectionParticipant: {skip: isOnlySupportedOnShardedCluster},
     _shardsvrMovePrimary: {skip: isNotRunOnUserDatabase},

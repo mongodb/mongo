@@ -40,6 +40,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/s/collmod_coordinator.h"
 #include "mongo/db/s/collmod_coordinator_pre60_compatible.h"
+#include "mongo/db/s/compact_structured_encryption_data_coordinator.h"
 #include "mongo/db/s/create_collection_coordinator.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/drop_collection_coordinator.h"
@@ -104,6 +105,10 @@ std::shared_ptr<ShardingDDLCoordinator> constructShardingDDLCoordinatorInstance(
             break;
         case DDLCoordinatorTypeEnum::kReshardCollectionNoResilient:
             return std::make_shared<ReshardCollectionCoordinator_NORESILIENT>(
+                service, std::move(initialState));
+            break;
+        case DDLCoordinatorTypeEnum::kCompactStructuredEncryptionData:
+            return std::make_shared<CompactStructuredEncryptionDataCoordinator>(
                 service, std::move(initialState));
             break;
         default:

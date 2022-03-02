@@ -30,8 +30,8 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/commands/fle2_compact_gen.h"
-#include "mongo/db/operation_context.h"
 
 namespace mongo {
 
@@ -45,8 +45,5 @@ struct EncryptedStateCollectionsNamespaces {
     NamespaceString ecocNss;
     NamespaceString ecocRenameNss;
 };
-
-StatusWith<CompactStats> compactEncryptedCompactionCollection(
-    OperationContext* opCtx, const CompactStructuredEncryptionData& request);
 
 }  // namespace mongo

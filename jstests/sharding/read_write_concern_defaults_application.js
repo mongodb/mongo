@@ -147,6 +147,7 @@ let testCases = {
     _shardsvrCleanupReshardCollection: {skip: "internal command"},
     _shardsvrCloneCatalogData: {skip: "internal command"},
     _shardsvrCommitReshardCollection: {skip: "internal command"},
+    _shardsvrCompactStructuredEncryptionData: {skip: "internal command"},
     _shardsvrCreateCollection: {skip: "internal command"},
     _shardsvrCreateCollectionParticipant: {skip: "internal command"},
     _shardsvrDropCollection: {skip: "internal command"},

@@ -213,6 +213,9 @@ public:
     // Namespace used during the recovery procedure for the config server.
     static const NamespaceString kConfigsvrRestoreNamespace;
 
+    // Namespace used for CompactParticipantCoordinator service.
+    static const NamespaceString kCompactStructuredEncryptionCoordinatorNamespace;
+
     /**
      * Constructs an empty NamespaceString.
      */

@@ -300,6 +300,7 @@ let testCases = {
     commitReshardCollection: {skip: "always targets the config server"},
     commitTransaction: {skip: "unversioned and uses special targetting rules"},
     compact: {skip: "not allowed through mongos"},
+    compactStructuredEncryptionData: {skip: "requires encrypted collections"},
     configureCollectionBalancing: {skip: "always targets the config server"},
     configureFailPoint: {skip: "executes locally on mongos (not sent to any remote node)"},
     connPoolStats: {skip: "executes locally on mongos (not sent to any remote node)"},

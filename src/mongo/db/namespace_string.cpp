@@ -154,6 +154,9 @@ const NamespaceString NamespaceString::kConfigsvrCoordinatorsNamespace(
 const NamespaceString NamespaceString::kUserWritesCriticalSectionsNamespace(
     NamespaceString::kConfigDb, "user_writes_critical_sections");
 
+const NamespaceString NamespaceString::kCompactStructuredEncryptionCoordinatorNamespace(
+    NamespaceString::kConfigDb, "compact_structured_encryption_coordinator");
+
 bool NamespaceString::isListCollectionsCursorNS() const {
     return coll() == listCollectionsCursorCol;
 }
