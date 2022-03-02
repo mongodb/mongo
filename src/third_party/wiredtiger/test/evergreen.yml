@@ -57,10 +57,21 @@ functions:
   "fetch mongo repo" :
     command: shell.exec
     params:
+      shell: bash
       script: |
         set -o errexit
         set -o verbose
-        git clone https://github.com/mongodb/mongo
+        mongo_repo=https://github.com/mongodb/mongo
+        if [[ "${branch_name}" == "mongodb-5.0" ]]; then
+          git clone $mongo_repo -b v5.0
+        elif [[ "${branch_name}" == "mongodb-4.4" ]]; then
+          git clone $mongo_repo -b v4.4
+        elif [[ "${branch_name}" =~ "mongodb-" ]]; then   
+          echo "'fetch mongo repo' does not currently handle branch ${branch_name}"
+          exit 1
+        else
+          git clone $mongo_repo -b master
+        fi
   "import wiredtiger into mongo" :
     command: shell.exec
     params:
