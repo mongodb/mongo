@@ -51,6 +51,13 @@ enums:
           kFLE2UnindexedEncryptedValue : 6 # see FLE2IndexedEqualityEncryptedValue
           kFLE2EqualityIndexedValue : 7
 
+    FleVersion:
+        description: "The version / type of field-level encryption in use."
+        type: int
+        values:
+            kFle1: 1
+            kFle2: 2
+
     FleAlgorithmInt:
         description: "The algorithm used to encrypt fields for field level encryption represented
             as an unsigned integer."
