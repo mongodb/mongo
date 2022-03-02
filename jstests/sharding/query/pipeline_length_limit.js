@@ -164,18 +164,22 @@ function runTest(lengthLimit, mongosConfig = {}, mongodConfig = {}) {
     st.stop();
 }
 
+// This is a sanity check to make sure that the default value is correct. If the limit is changed,
+// it will break for users and this check catches that.
 const st = new ShardingTest({shards: 1, rs: {nodes: 1}});
-const debugBuild = st.s0.getDB("TestDB").adminCommand("buildInfo").debug;
-st.stop();
+let buildInfo = assert.commandWorked(st.s0.getDB("test").adminCommand("buildInfo"));
+let pipelineLimit =
+    assert.commandWorked(st.s0.adminCommand({"getParameter": 1, "internalPipelineLengthLimit": 1}));
+let expectedPipelineLimit = buildInfo.debug ? 200 : 1000;
+assert.eq(expectedPipelineLimit, pipelineLimit["internalPipelineLengthLimit"]);
 
-if (!debugBuild) {
-    // Test default pipeline length limit.
-    runTest(1000);
-} else {
-    // In debug builds we need to run with a lower limit because the available stack space is half
-    // what is available in normal builds.
-    runTest(200);
-}
+const shardPrimary = st.rs0.getPrimary().getDB("test");
+buildInfo = assert.commandWorked(shardPrimary.adminCommand("buildInfo"));
+expectedPipelineLimit = buildInfo.debug ? 200 : 1000;
+pipelineLimit = assert.commandWorked(
+    shardPrimary.adminCommand({"getParameter": 1, "internalPipelineLengthLimit": 1}));
+assert.eq(expectedPipelineLimit, pipelineLimit["internalPipelineLengthLimit"]);
+st.stop();
 
 // Test with modified pipeline length limit.
 runTest(50,
