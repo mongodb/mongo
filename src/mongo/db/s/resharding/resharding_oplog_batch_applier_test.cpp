@@ -109,14 +109,20 @@ public:
             }
 
             _metrics = std::make_unique<ReshardingMetrics>(serviceContext);
-
+            _metricsNew = ReshardingMetricsNew::makeInstance(UUID::gen(),
+                                                             _outputNss,
+                                                             ReshardingMetricsNew::kRecipient,
+                                                             BSON("y" << 1),
+                                                             false,
+                                                             serviceContext);
             _crudApplication = std::make_unique<ReshardingOplogApplicationRules>(
                 _outputNss,
                 std::vector<NamespaceString>{_myStashNss, _otherStashNss},
                 0U,
                 _myDonorId,
                 makeChunkManagerForSourceCollection(),
-                _metrics.get());
+                _metrics.get(),
+                _metricsNew.get());
 
             _sessionApplication = std::make_unique<ReshardingOplogSessionApplication>();
 
@@ -337,6 +343,7 @@ private:
         getLocalConflictStashNamespace(_sourceUUID, _otherDonorId);
 
     std::unique_ptr<ReshardingMetrics> _metrics;
+    std::unique_ptr<ReshardingMetricsNew> _metricsNew;
 
     std::unique_ptr<ReshardingOplogApplicationRules> _crudApplication;
     std::unique_ptr<ReshardingOplogSessionApplication> _sessionApplication;

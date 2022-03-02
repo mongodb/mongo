@@ -111,13 +111,20 @@ public:
             }
 
             _metrics = std::make_unique<ReshardingMetrics>(getServiceContext());
+            _metricsNew = ReshardingMetricsNew::makeInstance(_sourceUUID,
+                                                             _outputNss,
+                                                             ReshardingMetricsNew::kRecipient,
+                                                             BSON(_newShardKey << 1),
+                                                             false,
+                                                             serviceContext);
             _applier = std::make_unique<ReshardingOplogApplicationRules>(
                 _outputNss,
                 std::vector<NamespaceString>{_myStashNss, _otherStashNss},
                 0U,
                 _myDonorId,
                 makeChunkManagerForSourceCollection(),
-                _metrics.get());
+                _metrics.get(),
+                _metricsNew.get());
         }
     }
 
@@ -332,6 +339,7 @@ private:
 
     std::unique_ptr<ReshardingOplogApplicationRules> _applier;
     std::unique_ptr<ReshardingMetrics> _metrics;
+    std::unique_ptr<ReshardingMetricsNew> _metricsNew;
 };
 
 TEST_F(ReshardingOplogCrudApplicationTest, InsertOpInsertsIntoOuputCollection) {

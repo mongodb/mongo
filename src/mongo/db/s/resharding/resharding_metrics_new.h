@@ -37,21 +37,21 @@
 namespace mongo {
 
 
-class GlobalIndexMetrics : public ShardingDataTransformInstanceMetrics {
+class ReshardingMetricsNew : public ShardingDataTransformInstanceMetrics {
 public:
-    GlobalIndexMetrics(UUID uuid,
-                       NamespaceString nss,
-                       Role role,
-                       BSONObj keyPattern,
-                       bool unique,
-                       ShardingDataTransformCumulativeMetrics* cumulativeMetrics);
+    ReshardingMetricsNew(UUID uuid,
+                         NamespaceString nss,
+                         Role role,
+                         BSONObj shardKey,
+                         bool unique,
+                         ShardingDataTransformCumulativeMetrics* cumulativeMetrics);
 
-    static std::unique_ptr<GlobalIndexMetrics> makeInstance(UUID uuid,
-                                                            NamespaceString nss,
-                                                            Role role,
-                                                            BSONObj keyPattern,
-                                                            bool unique,
-                                                            ServiceContext* serviceContext);
+    static std::unique_ptr<ReshardingMetricsNew> makeInstance(UUID instanceId,
+                                                              NamespaceString nss,
+                                                              Role role,
+                                                              BSONObj shardKey,
+                                                              bool unique,
+                                                              ServiceContext* serviceContext);
 
 private:
     std::string createOperationDescription() const noexcept override;

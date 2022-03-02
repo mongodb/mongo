@@ -41,6 +41,7 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/s/resharding/resharding_metrics_new.h"
 #include "mongo/s/chunk_manager.h"
 
 namespace mongo {
@@ -60,7 +61,8 @@ public:
                                     size_t myStashIdx,
                                     ShardId donorShardId,
                                     ChunkManager sourceChunkMgr,
-                                    ReshardingMetrics* metrics);
+                                    ReshardingMetrics* metrics,
+                                    ReshardingMetricsNew* metricsNew);
 
     const NamespaceString& getOutputNss() const {
         return _outputNss;
@@ -120,6 +122,7 @@ private:
     const ChunkManager _sourceChunkMgr;
 
     ReshardingMetrics* _metrics;
+    ReshardingMetricsNew* _metricsNew;
 };
 
 }  // namespace mongo

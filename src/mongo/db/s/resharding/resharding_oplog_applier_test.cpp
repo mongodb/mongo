@@ -155,6 +155,12 @@ public:
         _cm = createChunkManagerForOriginalColl();
 
         _metrics = std::make_unique<ReshardingMetrics>(getServiceContext());
+        _metricsNew = ReshardingMetricsNew::makeInstance(kCrudUUID,
+                                                         kCrudNs,
+                                                         ReshardingMetricsNew::Role::kRecipient,
+                                                         BSON("y" << 1),
+                                                         false,
+                                                         getServiceContext());
         _metrics->onStart(ReshardingMetrics::Role::kRecipient,
                           getServiceContext()->getFastClockSource()->now());
         _metrics->setRecipientState(RecipientStateEnum::kApplying);
@@ -297,7 +303,8 @@ public:
 
 protected:
     auto makeApplierEnv() {
-        return std::make_unique<ReshardingOplogApplier::Env>(getServiceContext(), &*_metrics);
+        return std::make_unique<ReshardingOplogApplier::Env>(
+            getServiceContext(), _metrics.get(), _metricsNew.get());
     }
 
     std::shared_ptr<executor::ThreadPoolTaskExecutor> makeTaskExecutorForApplier() {
@@ -354,6 +361,7 @@ protected:
 
     const ReshardingSourceId _sourceId{UUID::gen(), kMyShardId};
     std::unique_ptr<ReshardingMetrics> _metrics;
+    std::unique_ptr<ReshardingMetricsNew> _metricsNew;
 
     std::shared_ptr<executor::ThreadPoolTaskExecutor> _executor;
     std::shared_ptr<ThreadPool> _cancelableOpCtxExecutor;

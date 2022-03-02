@@ -27,34 +27,44 @@
  *    it in the license file.
  */
 
-#pragma once
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/s/sharding_data_transform_instance_metrics.h"
-#include "mongo/util/uuid.h"
+#include "mongo/platform/basic.h"
+
+#include "mongo/db/s/resharding/resharding_metrics_new.h"
+#include "mongo/db/s/sharding_data_transform_cumulative_metrics.h"
+#include "mongo/db/s/sharding_data_transform_metrics_test_fixture.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
+namespace {
 
 
-class GlobalIndexMetrics : public ShardingDataTransformInstanceMetrics {
+class ReshardingMetricsTest : public ShardingDataTransformMetricsTestFixture {
+
 public:
-    GlobalIndexMetrics(UUID uuid,
-                       NamespaceString nss,
-                       Role role,
-                       BSONObj keyPattern,
-                       bool unique,
-                       ShardingDataTransformCumulativeMetrics* cumulativeMetrics);
-
-    static std::unique_ptr<GlobalIndexMetrics> makeInstance(UUID uuid,
-                                                            NamespaceString nss,
-                                                            Role role,
-                                                            BSONObj keyPattern,
-                                                            bool unique,
-                                                            ServiceContext* serviceContext);
-
-private:
-    std::string createOperationDescription() const noexcept override;
+    std::unique_ptr<ReshardingMetricsNew> createInstanceMetrics(UUID instanceId = UUID::gen(),
+                                                                Role role = Role::kDonor) {
+        return std::make_unique<ReshardingMetricsNew>(
+            instanceId, kTestNamespace, role, BSON("y" << 1), false, &_cumulativeMetrics);
+    }
 };
 
+
+TEST_F(ReshardingMetricsTest, ReportForCurrentOpShouldHaveGlobalIndexDescription) {
+    std::vector<Role> roles{Role::kCoordinator, Role::kDonor, Role::kRecipient};
+
+    std::for_each(roles.begin(), roles.end(), [&](Role role) {
+        auto instanceId = UUID::gen();
+        auto metrics = createInstanceMetrics(instanceId, role);
+        auto report = metrics->reportForCurrentOp();
+
+        ASSERT_EQ(report.getStringField("desc").toString(),
+                  fmt::format("ReshardingMetrics{}Service {}",
+                              ReshardingMetricsNew::getRoleName(role),
+                              instanceId.toString()));
+    });
+}
+
+}  // namespace
 }  // namespace mongo

@@ -135,6 +135,13 @@ ReshardingRecipientService::RecipientStateMachine::RecipientStateMachine(
     ReshardingDataReplicationFactory dataReplicationFactory)
     : repl::PrimaryOnlyService::TypedInstance<RecipientStateMachine>(),
       _recipientService{recipientService},
+      _metricsNew{ReshardingMetricsNew::makeInstance(
+          recipientDoc.getReshardingUUID(),
+          recipientDoc.getSourceNss(),
+          ReshardingMetricsNew::Role::kRecipient,
+          recipientDoc.getCommonReshardingMetadata().getReshardingKey().toBSON(),
+          false,
+          getGlobalServiceContext())},
       _metadata{recipientDoc.getCommonReshardingMetadata()},
       _minimumOperationDuration{Milliseconds{recipientDoc.getMinimumOperationDurationMillis()}},
       _recipientCtx{recipientDoc.getMutableState()},
@@ -539,6 +546,7 @@ ReshardingRecipientService::RecipientStateMachine::_makeDataReplication(Operatio
 
     return _dataReplicationFactory(opCtx,
                                    _metrics(),
+                                   _metricsNew.get(),
                                    _metadata,
                                    _donorShards,
                                    *_cloneTimestamp,

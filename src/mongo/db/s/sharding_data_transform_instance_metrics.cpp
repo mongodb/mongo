@@ -81,7 +81,11 @@ ShardingDataTransformInstanceMetrics::ShardingDataTransformInstanceMetrics(
       _observer{std::move(observer)},
       _cumulativeMetrics{cumulativeMetrics},
       _deregister{_cumulativeMetrics->registerInstanceMetrics(_observer.get())},
-      _placeholderUuidForTesting(UUID::gen()) {}
+      _placeholderUuidForTesting(UUID::gen()),
+      _insertsApplied{0},
+      _updatesApplied{0},
+      _deletesApplied{0},
+      _oplogEntriesApplied{0} {}
 
 ShardingDataTransformInstanceMetrics::~ShardingDataTransformInstanceMetrics() {
     if (_deregister) {
@@ -141,10 +145,10 @@ BSONObj ShardingDataTransformInstanceMetrics::reportForCurrentOp() const noexcep
             builder.append(kApproxBytesToCopy, TEMP_VALUE);
             builder.append(kBytesCopied, TEMP_VALUE);
             builder.append(kCountWritesToStashCollections, TEMP_VALUE);
-            builder.append(kInsertsApplied, TEMP_VALUE);
-            builder.append(kUpdatesApplied, TEMP_VALUE);
-            builder.append(kDeletesApplied, TEMP_VALUE);
-            builder.append(kOplogEntriesApplied, TEMP_VALUE);
+            builder.append(kInsertsApplied, _insertsApplied.load());
+            builder.append(kUpdatesApplied, _updatesApplied.load());
+            builder.append(kDeletesApplied, _deletesApplied.load());
+            builder.append(kOplogEntriesApplied, _oplogEntriesApplied.load());
             builder.append(kOplogEntriesFetched, TEMP_VALUE);
             builder.append(kDocumentsCopied, TEMP_VALUE);
             break;
@@ -153,6 +157,22 @@ BSONObj ShardingDataTransformInstanceMetrics::reportForCurrentOp() const noexcep
     }
 
     return builder.obj();
+}
+
+void ShardingDataTransformInstanceMetrics::onInsertApplied() {
+    _insertsApplied.addAndFetch(1);
+}
+
+void ShardingDataTransformInstanceMetrics::onUpdateApplied() {
+    _updatesApplied.addAndFetch(1);
+}
+
+void ShardingDataTransformInstanceMetrics::onDeleteApplied() {
+    _deletesApplied.addAndFetch(1);
+}
+
+void ShardingDataTransformInstanceMetrics::onOplogEntriesApplied(int64_t numEntries) {
+    _oplogEntriesApplied.addAndFetch(numEntries);
 }
 
 }  // namespace mongo

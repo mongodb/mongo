@@ -139,5 +139,53 @@ TEST_F(ShardingDataTransformInstanceMetricsTest, GetRoleNameShouldReturnCorrectN
     });
 }
 
+
+TEST_F(ShardingDataTransformInstanceMetricsTest, OnInsertAppliedShouldIncrementInsertsApplied) {
+    auto metrics = createInstanceMetrics(UUID::gen(), Role::kRecipient);
+
+    auto report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("insertsApplied"), 0);
+    metrics->onInsertApplied();
+
+    report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("insertsApplied"), 1);
+}
+
+
+TEST_F(ShardingDataTransformInstanceMetricsTest, OnUpdateAppliedShouldIncrementUpdatesApplied) {
+    auto metrics = createInstanceMetrics(UUID::gen(), Role::kRecipient);
+
+    auto report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("updatesApplied"), 0);
+    metrics->onUpdateApplied();
+
+    report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("updatesApplied"), 1);
+}
+
+TEST_F(ShardingDataTransformInstanceMetricsTest, OnDeleteAppliedShouldIncrementDeletesApplied) {
+    auto metrics = createInstanceMetrics(UUID::gen(), Role::kRecipient);
+
+    auto report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("deletesApplied"), 0);
+    metrics->onDeleteApplied();
+
+    report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("deletesApplied"), 1);
+}
+
+
+TEST_F(ShardingDataTransformInstanceMetricsTest,
+       OnOplogsEntriesAppliedShouldIncrementOplogsEntriesApplied) {
+    auto metrics = createInstanceMetrics(UUID::gen(), Role::kRecipient);
+
+    auto report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("oplogEntriesApplied"), 0);
+    metrics->onOplogEntriesApplied(100);
+
+    report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("oplogEntriesApplied"), 100);
+}
+
 }  // namespace
 }  // namespace mongo

@@ -36,6 +36,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/s/resharding/donor_oplog_id_gen.h"
+#include "mongo/db/s/resharding/resharding_metrics_new.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/s/shard_id.h"
@@ -138,6 +139,7 @@ public:
     static std::unique_ptr<ReshardingDataReplicationInterface> make(
         OperationContext* opCtx,
         ReshardingMetrics* metrics,
+        ReshardingMetricsNew* metricsNew,
         CommonReshardingMetadata metadata,
         const std::vector<DonorShardFetchTimestamp>& donorShards,
         Timestamp cloneTimestamp,
@@ -213,6 +215,7 @@ private:
     static std::vector<std::unique_ptr<ReshardingOplogApplier>> _makeOplogAppliers(
         OperationContext* opCtx,
         ReshardingMetrics* metrics,
+        ReshardingMetricsNew* metricsNew,
         const CommonReshardingMetadata& metadata,
         const std::vector<DonorShardFetchTimestamp>& donorShards,
         Timestamp cloneTimestamp,

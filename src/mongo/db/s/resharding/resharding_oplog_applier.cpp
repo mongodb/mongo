@@ -40,6 +40,7 @@
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/uuid.h"
@@ -66,7 +67,8 @@ ReshardingOplogApplier::ReshardingOplogApplier(
                        myStashIdx,
                        _sourceId.getShardId(),
                        std::move(sourceChunkMgr),
-                       _env->metrics()},
+                       _env->metrics(),
+                       _env->metricsNew()},
       _sessionApplication{},
       _batchApplier{_crudApplication, _sessionApplication},
       _oplogIter(std::move(oplogIterator)) {}
@@ -233,6 +235,9 @@ void ReshardingOplogApplier::_clearAppliedOpsAndStoreProgress(OperationContext* 
         BSON(ReshardingOplogApplierProgress::kOplogSourceIdFieldName << _sourceId.toBSON()),
         builder.obj());
     _env->metrics()->onOplogEntriesApplied(_currentBatchToApply.size());
+    if (feature_flags::gFeatureFlagShardingDataTransformMetrics.isEnabledAndIgnoreFCV()) {
+        _env->metricsNew()->onOplogEntriesApplied(_currentBatchToApply.size());
+    }
 
     _currentBatchToApply.clear();
     _currentDerivedOps.clear();

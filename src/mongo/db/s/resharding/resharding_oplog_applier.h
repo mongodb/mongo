@@ -36,6 +36,7 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/s/resharding/donor_oplog_id_gen.h"
 #include "mongo/db/s/resharding/resharding_donor_oplog_iterator.h"
+#include "mongo/db/s/resharding/resharding_metrics_new.h"
 #include "mongo/db/s/resharding/resharding_oplog_application.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier_progress_gen.h"
 #include "mongo/db/s/resharding/resharding_oplog_batch_applier.h"
@@ -66,8 +67,9 @@ class ReshardingOplogApplier {
 public:
     class Env {
     public:
-        Env(ServiceContext* service, ReshardingMetrics* metrics)
-            : _service(service), _metrics(metrics) {}
+        Env(ServiceContext* service, ReshardingMetrics* metrics, ReshardingMetricsNew* metricsNew)
+            : _service(service), _metrics(metrics), _metricsNew(metricsNew) {}
+
         ServiceContext* service() const {
             return _service;
         }
@@ -75,9 +77,14 @@ public:
             return _metrics;
         }
 
+        ReshardingMetricsNew* metricsNew() const {
+            return _metricsNew;
+        }
+
     private:
         ServiceContext* _service;
         ReshardingMetrics* _metrics;
+        ReshardingMetricsNew* _metricsNew;
     };
 
     ReshardingOplogApplier(std::unique_ptr<Env> env,

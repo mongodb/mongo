@@ -59,6 +59,10 @@ public:
     int64_t getRemainingTimeMillis() const;
     int64_t getStartTimestamp() const;
     const UUID& getUuid() const;
+    void onInsertApplied();
+    void onUpdateApplied();
+    void onDeleteApplied();
+    void onOplogEntriesApplied(int64_t numEntries);
 
 protected:
     virtual std::string createOperationDescription() const noexcept;
@@ -102,6 +106,10 @@ private:
     ShardingDataTransformCumulativeMetrics::DeregistrationFunction _deregister;
 
     UUID _placeholderUuidForTesting;
+    AtomicWord<int64_t> _insertsApplied;
+    AtomicWord<int64_t> _updatesApplied;
+    AtomicWord<int64_t> _deletesApplied;
+    AtomicWord<int64_t> _oplogEntriesApplied;
 };
 
 }  // namespace mongo
