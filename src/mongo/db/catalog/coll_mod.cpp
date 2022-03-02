@@ -564,8 +564,7 @@ Status _processCollModDryRunMode(OperationContext* opCtx,
     // Throws exception if index contains duplicates.
     auto violatingRecordsList = scanIndexForDuplicates(opCtx, collection, cmr.indexRequest.idx);
     if (!violatingRecordsList.empty()) {
-        uassertStatusOK(buildConvertUniqueErrorStatus(
-            buildDuplicateViolations(opCtx, collection, violatingRecordsList)));
+        uassertStatusOK(buildConvertUniqueErrorStatus(opCtx, collection, violatingRecordsList));
     }
 
     return Status::OK();
@@ -603,8 +602,7 @@ StatusWith<const IndexDescriptor*> _setUpCollModIndexUnique(OperationContext* op
                                                      nss);
 
     if (!violatingRecordsList.empty()) {
-        uassertStatusOK(buildConvertUniqueErrorStatus(
-            buildDuplicateViolations(opCtx, collection, violatingRecordsList)));
+        uassertStatusOK(buildConvertUniqueErrorStatus(opCtx, collection, violatingRecordsList));
     }
 
     return idx;

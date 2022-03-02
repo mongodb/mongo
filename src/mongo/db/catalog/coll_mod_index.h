@@ -79,15 +79,11 @@ std::list<std::set<RecordId>> scanIndexForDuplicates(
     boost::optional<KeyString::Value> firstKeyString = {});
 
 /**
- * Builds the BSONArray of the violations with duplicate index keys.
+ * Builds a BSONArray of the violations with duplicate index keys and returns the formatted error
+ * status for not being able to convert the index to unique.
  */
-BSONArray buildDuplicateViolations(OperationContext* opCtx,
-                                   const CollectionPtr& collection,
-                                   const std::list<std::set<RecordId>>& duplicateRecordsList);
-
-/**
- * Returns the formatted error status for not being able to convert the index to unique.
- */
-Status buildConvertUniqueErrorStatus(const BSONArray& violations);
+Status buildConvertUniqueErrorStatus(OperationContext* opCtx,
+                                     const CollectionPtr& collection,
+                                     const std::list<std::set<RecordId>>& duplicateRecordsList);
 
 }  // namespace mongo

@@ -145,8 +145,7 @@ void _processCollModIndexRequestUnique(OperationContext* opCtx,
     if (mode && *mode == repl::OplogApplication::Mode::kApplyOpsCmd) {
         auto duplicateRecordsList = scanIndexForDuplicates(opCtx, collection, idx);
         if (!duplicateRecordsList.empty()) {
-            uassertStatusOK(buildConvertUniqueErrorStatus(
-                buildDuplicateViolations(opCtx, collection, duplicateRecordsList)));
+            uassertStatusOK(buildConvertUniqueErrorStatus(opCtx, collection, duplicateRecordsList));
         }
     }
 
@@ -340,23 +339,38 @@ std::list<std::set<RecordId>> scanIndexForDuplicates(
     return duplicateRecordsList;
 }
 
-BSONArray buildDuplicateViolations(OperationContext* opCtx,
-                                   const CollectionPtr& collection,
-                                   const std::list<std::set<RecordId>>& duplicateRecordsList) {
+Status buildConvertUniqueErrorStatus(OperationContext* opCtx,
+                                     const CollectionPtr& collection,
+                                     const std::list<std::set<RecordId>>& duplicateRecordsList) {
     BSONArrayBuilder duplicateViolations;
+    size_t violationsSize = 0;
+
     for (const auto& duplicateRecords : duplicateRecordsList) {
         BSONArrayBuilder currViolatingIds;
         for (const auto& recordId : duplicateRecords) {
             auto doc = collection->docFor(opCtx, recordId).value();
-            currViolatingIds.append(doc["_id"]);
+            auto id = doc["_id"];
+            violationsSize += id.size();
+
+            // Returns duplicate violations up to 8MB.
+            if (violationsSize > BSONObjMaxUserSize / 2) {
+                // Returns at least one violation.
+                if (duplicateViolations.arrSize() == 0 && currViolatingIds.arrSize() == 0) {
+                    currViolatingIds.append(id);
+                }
+                if (currViolatingIds.arrSize() > 0) {
+                    duplicateViolations.append(BSON("ids" << currViolatingIds.arr()));
+                }
+                return Status(
+                    CannotConvertIndexToUniqueInfo(duplicateViolations.arr()),
+                    "Cannot convert the index to unique. Too many conflicting documents were "
+                    "detected. Please resolve them and rerun collMod.");
+            }
+            currViolatingIds.append(id);
         }
         duplicateViolations.append(BSON("ids" << currViolatingIds.arr()));
     }
-    return duplicateViolations.arr();
-}
-
-Status buildConvertUniqueErrorStatus(const BSONArray& violations) {
-    return Status(CannotConvertIndexToUniqueInfo(violations),
+    return Status(CannotConvertIndexToUniqueInfo(duplicateViolations.arr()),
                   "Cannot convert the index to unique. Please resolve conflicting documents "
                   "before running collMod again.");
 }
