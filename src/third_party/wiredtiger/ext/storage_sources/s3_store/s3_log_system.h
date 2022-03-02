@@ -26,8 +26,8 @@ class S3LogSystem : public Aws::Utils::Logging::LogSystemInterface {
       Aws::Utils::Logging::LogLevel logLevel, const char *tag, const char *format, ...) override;
     void LogStream(Aws::Utils::Logging::LogLevel logLevel, const char *tag,
       const Aws::OStringStream &messageStream) override;
-    void LogVerboseErrorMessage(const std::string &message) const;
-    void LogVerboseDebugMessage(const std::string &message) const;
+    void LogErrorMessage(const std::string &message) const;
+    void LogDebugMessage(const std::string &message) const;
     void SetWtVerbosityLevel(int32_t wtVerbosityLevel);
     void Flush() override;
 

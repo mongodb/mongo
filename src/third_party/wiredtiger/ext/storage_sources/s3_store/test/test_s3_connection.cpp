@@ -17,6 +17,7 @@ static std::string objPrefix("s3test_artefacts/unit_"); // To be concatenated wi
 int TestListObjects(const Aws::S3Crt::ClientConfiguration &config);
 int TestGetObject(const Aws::S3Crt::ClientConfiguration &config);
 int TestObjectExists(const Aws::S3Crt::ClientConfiguration &config);
+int TestBadBucket(const Aws::S3Crt::ClientConfiguration &config);
 
 /* Wrapper for unit test functions. */
 #define TEST(func, config)                            \
@@ -280,6 +281,7 @@ TestGetObject(const Aws::S3Crt::ClientConfiguration &config)
     std::cout << "TestGetObject() succeeded." << std::endl;
     return (TEST_SUCCESS);
 }
+
 /*
  * TestObjectExists --
  *     Unit test to check if an object exists in an AWS bucket and size of the object is correct.
@@ -326,6 +328,54 @@ TestObjectExists(const Aws::S3Crt::ClientConfiguration &config)
 }
 
 /*
+ * TestBadBucket --
+ *     Unit test to check if connection to a non-existing bucket fails gracefully.
+ */
+int
+TestBadBucket(const Aws::S3Crt::ClientConfiguration &config)
+{
+    int ret = TEST_FAILURE;
+
+    /* The connection object instantitation should not succeed. */
+    try {
+        S3Connection conn(config, "BadBucket", TestDefaults::objPrefix);
+        (void)conn;
+        std::cerr << "TestBadBucket: Failed to generate exception for the bad bucket." << std::endl;
+    } catch (std::invalid_argument &e) {
+        /* Make sure we get the expected exception message. */
+        if (std::string(e.what()).compare("BadBucket : No such bucket.") == 0)
+            ret = 0;
+        else
+            std::cerr << "TestBadBucket failed with unexpected exception: " << e.what()
+                      << std::endl;
+    }
+
+    if (ret != 0)
+        return (ret);
+
+    ret = TEST_FAILURE;
+    /* Also check for the dynamic allocation. */
+    try {
+        auto conn2 = new S3Connection(config, "BadBucket2", TestDefaults::objPrefix);
+        (void)conn2;
+        std::cerr << "TestBadBucket: Failed to generate exception for the bad bucket." << std::endl;
+    } catch (std::invalid_argument &e) {
+        /* Make sure we get the expected exception message. */
+        if (std::string(e.what()).compare("BadBucket2 : No such bucket.") == 0)
+            ret = 0;
+        else
+            std::cerr << "TestBadBucket failed with unexpected exception: " << e.what()
+                      << std::endl;
+    }
+
+    if (ret != 0)
+        return (ret);
+
+    std::cout << "TestBadBucket() succeeded." << std::endl;
+    return (TEST_SUCCESS);
+}
+
+/*
  * main --
  *     Set up configs and call unit tests.
  */
@@ -346,6 +396,7 @@ main()
     Aws::SDKOptions options;
     Aws::InitAPI(options);
 
+    TEST(TestBadBucket, awsConfig);
     TEST(TestObjectExists, awsConfig);
     TEST(TestListObjects, awsConfig);
     TEST(TestGetObject, awsConfig);

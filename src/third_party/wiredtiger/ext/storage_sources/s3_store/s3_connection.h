@@ -31,6 +31,8 @@ class S3Connection {
     ~S3Connection() = default;
 
     private:
+    int BucketExists(bool &exists) const;
+
     const Aws::S3Crt::S3CrtClient _s3CrtClient;
     const std::string _bucketName;
     const std::string _objectPrefix;
