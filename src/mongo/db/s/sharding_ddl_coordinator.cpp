@@ -282,22 +282,15 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
             bool isSteppingDown = status.isA<ErrorCategory::NotPrimaryError>() ||
                 status.isA<ErrorCategory::ShutdownError>();
 
-            // If we are stepping down the token MUST be cancelled. Each implementation of the
-            // coordinator must retry remote stepping down errors, unless, we allow finalizing the
-            // coordinator in the presence of errors.
-            dassert(!isSteppingDown || token.isCanceled() || _completeOnError);
+            // Release the coordinator only in case the node is not stepping down or in case of
+            // acceptable error
+            if (!isSteppingDown || (!status.isOK() && _completeOnError)) {
+                LOGV2(
+                    5565601, "Releasing sharding DDL coordinator", "coordinatorId"_attr = _coordId);
 
-            // Remove the ddl coordinator and release locks if the execution was successfull or if
-            // there was any error and we have the _completeOnError flag set or if we are not
-            // stepping down.
-            auto cleanup = [&]() { return status.isOK() || _completeOnError || !isSteppingDown; };
+                auto session = metadata().getSession();
 
-            if (cleanup()) {
                 try {
-                    LOGV2(5565601,
-                          "Releasing sharding DDL coordinator",
-                          "coordinatorId"_attr = _coordId);
-
                     // We need to execute this in another executor to ensure the remove work is
                     // done.
                     const auto docWasRemoved = _removeDocumentUntillSuccessOrStepdown(
@@ -311,8 +304,6 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
                             Status::OK());
                     }
 
-                    auto session = metadata().getSession();
-
                     if (status.isOK() && session) {
                         // Return lsid to the SessionCache. If status is not OK, let the lsid be
                         // discarded.
@@ -321,7 +312,6 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
                     }
                 } catch (const DBException& ex) {
                     completionStatus = ex.toStatus();
-                    // Ensure the only possible error is that we're stepping down.
                     isSteppingDown = completionStatus.isA<ErrorCategory::NotPrimaryError>() ||
                         completionStatus.isA<ErrorCategory::ShutdownError>() ||
                         completionStatus.isA<ErrorCategory::CancellationError>();
@@ -329,7 +319,7 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
                 }
             }
 
-            if (!cleanup()) {
+            if (isSteppingDown) {
                 LOGV2(5950000,
                       "Not releasing distributed locks because the node is stepping down or "
                       "shutting down",
@@ -338,7 +328,7 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
             }
 
             while (!_scopedLocks.empty()) {
-                if (cleanup()) {
+                if (!isSteppingDown) {
                     // (SERVER-59500) Only release the remote locks in case of no stepdown/shutdown
                     const auto& resource = _scopedLocks.top().getNs();
                     DistLockManager::get(opCtx)->unlock(opCtx, resource);
