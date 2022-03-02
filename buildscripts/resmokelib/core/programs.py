@@ -197,6 +197,7 @@ def mongo_shell_program(  # pylint: disable=too-many-arguments,too-many-branches
     # Command line options to resmoke.py override the YAML configuration.
     if config.MONGOCRYPTD_SET_PARAMETERS is not None:
         mongocryptd_set_parameters.update(utils.load_yaml(config.MONGOCRYPTD_SET_PARAMETERS))
+        mongocryptd_set_parameters.update(feature_flag_dict)
 
     fixturelib = FixtureLib()
     mongod_launcher = standalone.MongodLauncher(fixturelib)
