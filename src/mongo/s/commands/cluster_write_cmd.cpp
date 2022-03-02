@@ -172,18 +172,19 @@ void handleWouldChangeOwningShardErrorRetryableWrite(OperationContext* opCtx,
 
     // Shared state for the transaction API use below.
     struct SharedBlock {
-        SharedBlock(NamespaceString nss_) : nss(nss_) {}
+        SharedBlock(BSONObj cmdObj_, NamespaceString nss_) : cmdObj(cmdObj_), nss(nss_) {}
 
+        BSONObj cmdObj;
         NamespaceString nss;
         BSONObj response;
     };
-    auto sharedBlock = std::make_shared<SharedBlock>(request->getNS());
+    BSONObjBuilder cmdWithStmtId(request->toBSON());
+    cmdWithStmtId.append(write_ops::WriteCommandRequestBase::kStmtIdFieldName, 0);
+    auto sharedBlock = std::make_shared<SharedBlock>(cmdWithStmtId.obj(), request->getNS());
 
     auto swCommitResult = txn.runSyncNoThrow(
-        opCtx,
-        [cmdObj = request->toBSON(), sharedBlock](const txn_api::TransactionClient& txnClient,
-                                                  ExecutorPtr txnExec) {
-            return txnClient.runCommand(sharedBlock->nss.db(), cmdObj)
+        opCtx, [sharedBlock](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+            return txnClient.runCommand(sharedBlock->nss.db(), sharedBlock->cmdObj)
                 .thenRunOn(txnExec)
                 .then([sharedBlock](auto res) {
                     uassertStatusOK(getStatusFromWriteCommandReply(res));

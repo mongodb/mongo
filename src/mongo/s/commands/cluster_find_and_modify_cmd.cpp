@@ -549,6 +549,7 @@ private:
                 // recursively sent through the service entry point.
                 parsedRequest.setLegacyRuntimeConstants(boost::none);
                 if (isRetryableWrite) {
+                    parsedRequest.setStmtId(0);
                     handleWouldChangeOwningShardErrorRetryableWrite(
                         opCtx, shardId, nss, parsedRequest, result);
                 } else {

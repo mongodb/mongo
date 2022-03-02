@@ -69,11 +69,11 @@ const StringMap<int> transactionCommands = {{"commitTransaction", 1},
                                             {"abortTransaction", 1},
                                             {"prepareTransaction", 1}};
 
+}  // namespace
+
 bool isRetryableWriteCommand(StringData cmdName) {
     return retryableWriteCommands.find(cmdName) != retryableWriteCommands.cend();
 }
-
-}  // namespace
 
 bool isTransactionCommand(StringData cmdName) {
     return transactionCommands.find(cmdName) != transactionCommands.cend();

@@ -38,6 +38,7 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/is_mongos.h"
 #include "mongo/stdx/future.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/executor_test_util.h"
 #include "mongo/util/fail_point.h"
@@ -1126,7 +1127,11 @@ TEST_F(TxnAPITest, ClientRetryableWrite_UsesRetryableInternalSession) {
                                  .runCommand("user"_sd,
                                              BSON("insert"
                                                   << "foo"
-                                                  << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                                  << "documents"
+                                                  << BSON_ARRAY(BSON("x" << 1))
+                                                  // Retryable transactions must include stmtIds for
+                                                  // retryable write commands.
+                                                  << "stmtIds" << BSON_ARRAY(1)))
                                  .get();
             ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
             assertTxnMetadata(mockClient()->getLastSentRequest(),
@@ -1136,6 +1141,26 @@ TEST_F(TxnAPITest, ClientRetryableWrite_UsesRetryableInternalSession) {
                                     LsidAssertion::kRetryableChild,
                                     opCtx()->getLogicalSessionId(),
                                     opCtx()->getTxnNumber());
+
+            // Verify a non-retryable write command does not need to include stmtIds.
+            mockClient()->setNextCommandResponse(kOKCommandResponse);
+            auto findRes = txnClient
+                               .runCommand("user"_sd,
+                                           BSON("find"
+                                                << "foo"))
+                               .get();
+            ASSERT(findRes["ok"]);  // Verify the mocked response was returned.
+
+            // Verify the alternate format for stmtIds is allowed.
+            mockClient()->setNextCommandResponse(kOKInsertResponse);
+            insertRes =
+                txnClient
+                    .runCommand("user"_sd,
+                                BSON("insert"
+                                     << "foo"
+                                     << "documents" << BSON_ARRAY(BSON("x" << 1)) << "stmtId" << 1))
+                    .get();
+            ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
 
             if (attempt == 0) {
                 firstAttemptLsid = getLsid(mockClient()->getLastSentRequest());
@@ -1161,6 +1186,32 @@ TEST_F(TxnAPITest, ClientRetryableWrite_UsesRetryableInternalSession) {
                             opCtx()->getLogicalSessionId(),
                             opCtx()->getTxnNumber());
     ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "commitTransaction"_sd);
+}
+
+TEST_F(TxnAPITest, ClientRetryableWrite_RetryableWriteWithoutStmtIdFails) {
+    // This case is only currently supported on mongos.
+    // TODO SERVER-63747: Remove this once this restriction is lifted.
+    bool savedMongos = isMongos();
+    ON_BLOCK_EXIT([&] { setMongos(savedMongos); });
+    setMongos(true);
+
+    opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
+    opCtx()->setTxnNumber(5);
+    resetTxnWithRetries();
+
+    auto swResult = txnWithRetries().runSyncNoThrow(
+        opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+            mockClient()->setNextCommandResponse(kOKInsertResponse);
+            auto insertRes = txnClient
+                                 .runCommand("user"_sd,
+                                             BSON("insert"
+                                                  << "foo"
+                                                  << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                 .get();
+
+            return SemiFuture<void>::makeReady();
+        });
+    ASSERT_EQ(swResult.getStatus(), ErrorCodes::duplicateCodeForTest(6410500));
 }
 
 }  // namespace

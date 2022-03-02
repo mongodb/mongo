@@ -53,7 +53,7 @@ TEST_F(DocumentShardKeyUpdateTest, constructShardKeyDeleteCmdObj) {
     NamespaceString nss("test.foo");
     BSONObj updatePreImage = BSON("x" << 4 << "y" << 3 << "_id" << 20);
 
-    auto deleteCmdObj = constructShardKeyDeleteCmdObj(nss, updatePreImage, boost::none);
+    auto deleteCmdObj = constructShardKeyDeleteCmdObj(nss, updatePreImage);
 
     auto deletesObj = deleteCmdObj["deletes"].Array();
     ASSERT_EQ(deletesObj.size(), 1U);
@@ -69,7 +69,7 @@ TEST_F(DocumentShardKeyUpdateTest, constructShardKeyInsertCmdObj) {
     NamespaceString nss("test.foo");
     BSONObj updatePostImage = BSON("x" << 4 << "y" << 3 << "_id" << 20);
 
-    auto insertCmdObj = constructShardKeyInsertCmdObj(nss, updatePostImage, boost::none);
+    auto insertCmdObj = constructShardKeyInsertCmdObj(nss, updatePostImage);
 
     auto insertsObj = insertCmdObj["documents"].Array();
     ASSERT_EQ(insertsObj.size(), 1U);

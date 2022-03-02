@@ -102,8 +102,7 @@ bool executeOperationsAsPartOfShardKeyUpdate(OperationContext* opCtx,
  * original document _id retrieved from 'updatePreImage'.
  */
 write_ops::DeleteCommandRequest createShardKeyDeleteOp(const NamespaceString& nss,
-                                                       const BSONObj& updatePreImage,
-                                                       boost::optional<StmtId> stmtId) {
+                                                       const BSONObj& updatePreImage) {
     write_ops::DeleteCommandRequest deleteOp(nss);
     deleteOp.setDeletes({[&] {
         write_ops::DeleteOpEntry entry;
@@ -111,9 +110,6 @@ write_ops::DeleteCommandRequest createShardKeyDeleteOp(const NamespaceString& ns
         entry.setMulti(false);
         return entry;
     }()});
-    if (stmtId) {
-        deleteOp.getWriteCommandRequestBase().setStmtId(*stmtId);
-    }
 
     return deleteOp;
 }
@@ -122,13 +118,9 @@ write_ops::DeleteCommandRequest createShardKeyDeleteOp(const NamespaceString& ns
  * Creates the insert op that will be used to insert the new document with the post-update image.
  */
 write_ops::InsertCommandRequest createShardKeyInsertOp(const NamespaceString& nss,
-                                                       const BSONObj& updatePostImage,
-                                                       boost::optional<StmtId> stmtId) {
+                                                       const BSONObj& updatePostImage) {
     write_ops::InsertCommandRequest insertOp(nss);
     insertOp.setDocuments({updatePostImage});
-    if (stmtId) {
-        insertOp.getWriteCommandRequestBase().setStmtId(*stmtId);
-    }
     return insertOp;
 }
 
@@ -142,8 +134,8 @@ bool updateShardKeyForDocumentLegacy(OperationContext* opCtx,
     auto updatePreImage = documentKeyChangeInfo.getPreImage().getOwned();
     auto updatePostImage = documentKeyChangeInfo.getPostImage().getOwned();
 
-    auto deleteCmdObj = constructShardKeyDeleteCmdObj(nss, updatePreImage, boost::none);
-    auto insertCmdObj = constructShardKeyInsertCmdObj(nss, updatePostImage, boost::none);
+    auto deleteCmdObj = constructShardKeyDeleteCmdObj(nss, updatePreImage);
+    auto insertCmdObj = constructShardKeyInsertCmdObj(nss, updatePostImage);
 
     return executeOperationsAsPartOfShardKeyUpdate(
         opCtx, deleteCmdObj, insertCmdObj, nss.db(), documentKeyChangeInfo.getShouldUpsert());
@@ -166,17 +158,13 @@ BSONObj commitShardKeyUpdateTransaction(OperationContext* opCtx) {
     return txnRouter.commitTransaction(opCtx, boost::none);
 }
 
-BSONObj constructShardKeyDeleteCmdObj(const NamespaceString& nss,
-                                      const BSONObj& updatePreImage,
-                                      boost::optional<StmtId> stmtId) {
-    auto deleteOp = createShardKeyDeleteOp(nss, updatePreImage, stmtId);
+BSONObj constructShardKeyDeleteCmdObj(const NamespaceString& nss, const BSONObj& updatePreImage) {
+    auto deleteOp = createShardKeyDeleteOp(nss, updatePreImage);
     return deleteOp.toBSON({});
 }
 
-BSONObj constructShardKeyInsertCmdObj(const NamespaceString& nss,
-                                      const BSONObj& updatePostImage,
-                                      boost::optional<StmtId> stmtId) {
-    auto insertOp = createShardKeyInsertOp(nss, updatePostImage, stmtId);
+BSONObj constructShardKeyInsertCmdObj(const NamespaceString& nss, const BSONObj& updatePostImage) {
+    auto insertOp = createShardKeyInsertOp(nss, updatePostImage);
     return insertOp.toBSON({});
 }
 
@@ -184,15 +172,14 @@ SemiFuture<bool> updateShardKeyForDocument(const txn_api::TransactionClient& txn
                                            ExecutorPtr txnExec,
                                            const NamespaceString& nss,
                                            const WouldChangeOwningShardInfo& changeInfo) {
-    // Use stmtId=1 for this delete (and 2 for the subsequent insert) because the original
-    // update/findAndModify that threw the WouldChangeOwningShard error used stmtId=0 to store the
-    // WouldChangeOwningShard sentinel noop entry.
     auto deleteCmdObj = documentShardKeyUpdateUtil::constructShardKeyDeleteCmdObj(
-        nss, changeInfo.getPreImage().getOwned(), {1});
+        nss, changeInfo.getPreImage().getOwned());
     auto deleteOpMsg = OpMsgRequest::fromDBAndBody(nss.db(), std::move(deleteCmdObj));
     auto deleteRequest = BatchedCommandRequest::parseDelete(std::move(deleteOpMsg));
 
-    return txnClient.runCRUDOp(deleteRequest, {})
+    // Retry history for this delete isn't necessary, but it can be part of a retryable transaction,
+    // so send it with the uninitialized sentinel statement id to opt out of storing history.
+    return txnClient.runCRUDOp(deleteRequest, {kUninitializedStmtId})
         .thenRunOn(txnExec)
         .then([&txnClient, &nss, &changeInfo](
                   auto deleteResponse) -> SemiFuture<BatchedCommandResponse> {
@@ -219,11 +206,13 @@ SemiFuture<bool> updateShardKeyForDocument(const txn_api::TransactionClient& txn
             }
 
             auto insertCmdObj = documentShardKeyUpdateUtil::constructShardKeyInsertCmdObj(
-                nss, changeInfo.getPostImage().getOwned(), {2});
+                nss, changeInfo.getPostImage().getOwned());
             auto insertOpMsg = OpMsgRequest::fromDBAndBody(nss.db(), std::move(insertCmdObj));
             auto insertRequest = BatchedCommandRequest::parseInsert(std::move(insertOpMsg));
 
-            return txnClient.runCRUDOp(insertRequest, {});
+            // Same as for the insert, retry history isn't necessary so opt out with a sentinel
+            // stmtId.
+            return txnClient.runCRUDOp(insertRequest, {kUninitializedStmtId});
         })
         .thenRunOn(txnExec)
         .then([&nss](auto insertResponse) {

@@ -31,6 +31,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/logical_session_id.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/rpc/write_concern_error_detail.h"
 #include "mongo/s/write_ops/batched_upsert_detail.h"
@@ -54,6 +55,7 @@ public:
     static const BSONField<std::vector<WriteErrorDetail*>> writeErrors;
     static const BSONField<WriteConcernErrorDetail*> writeConcernError;
     static const BSONField<std::vector<std::string>> errorLabels;
+    static const BSONField<std::vector<StmtId>> retriedStmtIds;
 
     BatchedCommandResponse();
     ~BatchedCommandResponse();
@@ -126,6 +128,9 @@ public:
     bool isErrorLabelsSet() const;
     const std::vector<std::string>& getErrorLabels() const;
 
+    bool areRetriedStmtIdsSet() const;
+    const std::vector<StmtId>& getRetriedStmtIds() const;
+
 private:
     // Convention: (M)andatory, (O)ptional
 
@@ -167,6 +172,9 @@ private:
 
     // (O)  array containing the error labels in string format.
     std::vector<std::string> _errorLabels;
+
+    // (O)  Array containing the retried statement ids from the response.
+    std::vector<StmtId> _retriedStmtIds;
 };
 
 }  // namespace mongo

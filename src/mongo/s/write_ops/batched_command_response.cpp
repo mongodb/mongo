@@ -54,6 +54,7 @@ const BSONField<std::vector<WriteErrorDetail*>> BatchedCommandResponse::writeErr
 const BSONField<WriteConcernErrorDetail*> BatchedCommandResponse::writeConcernError(
     "writeConcernError");
 const BSONField<std::vector<std::string>> BatchedCommandResponse::errorLabels("errorLabels");
+const BSONField<std::vector<StmtId>> BatchedCommandResponse::retriedStmtIds("retriedStmtIds");
 
 BatchedCommandResponse::BatchedCommandResponse() {
     clear();
@@ -137,6 +138,10 @@ BSONObj BatchedCommandResponse::toBSON() const {
 
     if (_wcErrDetails.get()) {
         builder.append(writeConcernError(), _wcErrDetails->toBSON());
+    }
+
+    if (areRetriedStmtIdsSet()) {
+        builder.append(retriedStmtIds(), _retriedStmtIds);
     }
 
     return builder.obj();
@@ -228,6 +233,12 @@ bool BatchedCommandResponse::parseBSON(const BSONObj& source, string* errMsg) {
     if (fieldState == FieldParser::FIELD_INVALID)
         return false;
     _errorLabels = std::move(tempErrorLabels);
+
+    std::vector<StmtId> tempRetriedStmtIds;
+    fieldState = FieldParser::extract(source, retriedStmtIds, &tempRetriedStmtIds, errMsg);
+    if (fieldState == FieldParser::FIELD_INVALID)
+        return false;
+    _retriedStmtIds = std::move(tempRetriedStmtIds);
 
     return true;
 }
@@ -450,6 +461,14 @@ bool BatchedCommandResponse::isErrorLabelsSet() const {
 
 const std::vector<std::string>& BatchedCommandResponse::getErrorLabels() const {
     return _errorLabels;
+}
+
+bool BatchedCommandResponse::areRetriedStmtIdsSet() const {
+    return !_retriedStmtIds.empty();
+}
+
+const std::vector<StmtId>& BatchedCommandResponse::getRetriedStmtIds() const {
+    return _retriedStmtIds;
 }
 
 }  // namespace mongo

@@ -36,6 +36,11 @@
 namespace mongo {
 
 /**
+ * Returns true if the given command name can run as a retryable write.
+ */
+bool isRetryableWriteCommand(StringData cmdName);
+
+/**
  * Returns true if the given cmd name is a transaction control command.  These are also the only
  * commands allowed to specify write concern in a transaction.
  */

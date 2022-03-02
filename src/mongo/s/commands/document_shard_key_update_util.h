@@ -112,9 +112,7 @@ BSONObj commitShardKeyUpdateTransaction(OperationContext* opCtx);
  * This method should not be called outside of this class. It is only temporarily exposed for
  * intermediary test coverage.
  */
-BSONObj constructShardKeyDeleteCmdObj(const NamespaceString& nss,
-                                      const BSONObj& updatePreImage,
-                                      boost::optional<StmtId> stmtId);
+BSONObj constructShardKeyDeleteCmdObj(const NamespaceString& nss, const BSONObj& updatePreImage);
 
 /*
  * Creates the BSONObj that will be used to insert the new document with the post-update image.
@@ -123,8 +121,6 @@ BSONObj constructShardKeyDeleteCmdObj(const NamespaceString& nss,
  * This method should not be called outside of this class. It is only temporarily exposed for
  * intermediary test coverage.
  */
-BSONObj constructShardKeyInsertCmdObj(const NamespaceString& nss,
-                                      const BSONObj& updatePostImage,
-                                      boost::optional<StmtId> stmtId);
+BSONObj constructShardKeyInsertCmdObj(const NamespaceString& nss, const BSONObj& updatePostImage);
 }  // namespace documentShardKeyUpdateUtil
 }  // namespace mongo

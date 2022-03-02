@@ -92,6 +92,23 @@ public:
     /**
      * Helper method to run commands representable as a BatchedCommandRequest in the transaction
      * client's transaction.
+     *
+     * The given stmtIds are included in the sent command. If the API's transaction was spawned on
+     * behalf of a retryable write, the statement ids must be unique for each write in the
+     * transaction as the underlying servers will save history for each id the same as for a
+     * retryable write. A write can opt out of this by sending a -1 statement id, which is ignored.
+     *
+     * If a sent statement id had already been seen for this transaction, the write with that id
+     * won't apply a second time and instead returns its response from its original execution. That
+     * write's id will be in the batch response's "retriedStmtIds" array field.
+     *
+     * Users of this API for transactions spawned on behalf of retryable writes likely should
+     * include a stmtId for each write that should not execute twice and should check the
+     * "retriedStmtIds" in the returned BatchedCommandResponse to detect when a write had already
+     * applied, and thus the retryable write that spawned this transaction has already committed.
+     * Note that only one "pre" or "post" image can be stored per transaction, so only one
+     * findAndModify per transaction may have a non -1 statement id.
+     *
      */
     virtual SemiFuture<BatchedCommandResponse> runCRUDOp(const BatchedCommandRequest& cmd,
                                                          std::vector<StmtId> stmtIds) const = 0;

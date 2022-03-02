@@ -29,9 +29,9 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTransaction
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/transaction_api.h"
+
+#include <fmt/format.h>
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
@@ -41,9 +41,11 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/operation_time_tracker.h"
+#include "mongo/db/ops/write_ops.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/session_catalog.h"
+#include "mongo/db/transaction_validation.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log.h"
@@ -274,7 +276,18 @@ SemiFuture<BSONObj> SEPTransactionClient::runCommand(StringData dbName, BSONObj 
 
 SemiFuture<BatchedCommandResponse> SEPTransactionClient::runCRUDOp(
     const BatchedCommandRequest& cmd, std::vector<StmtId> stmtIds) const {
-    return runCommand(cmd.getNS().db(), cmd.toBSON())
+    invariant(!stmtIds.size() || (cmd.sizeWriteOps() == stmtIds.size()),
+              fmt::format("If stmtIds are specified, they must match the number of write ops. "
+                          "Found {} stmtId(s) and {} write op(s).",
+                          stmtIds.size(),
+                          cmd.sizeWriteOps()));
+
+    BSONObjBuilder cmdBob(cmd.toBSON());
+    if (stmtIds.size()) {
+        cmdBob.append(write_ops::WriteCommandRequestBase::kStmtIdsFieldName, stmtIds);
+    }
+
+    return runCommand(cmd.getNS().db(), cmdBob.obj())
         .thenRunOn(_executor)
         .then([](BSONObj reply) {
             uassertStatusOK(getStatusFromCommandResult(reply));
@@ -445,6 +458,25 @@ Transaction::ErrorHandlingStep Transaction::handleError(
 }
 
 void Transaction::prepareRequest(BSONObjBuilder* cmdBuilder) {
+    if (isInternalSessionForRetryableWrite(*_sessionInfo.getSessionId())) {
+        // Statement ids are meaningful in a transaction spawned on behalf of a retryable write, so
+        // every write in the transaction should explicitly specify an id. Either a positive number,
+        // which indicates retry history should be saved for the command, or kUninitializedStmtId
+        // (aka -1), which indicates retry history should not be saved. If statement ids are not
+        // explicitly sent, implicit ids may be inferred, which could lead to bugs if different
+        // commands have the same ids inferred.
+        uassert(
+            6410500,
+            str::stream()
+                << "In a retryable write transaction every retryable write command should have an "
+                   "explicit statement id, command: "
+                << redact(cmdBuilder->asTempObj()),
+            !isRetryableWriteCommand(
+                cmdBuilder->asTempObj().firstElement().fieldNameStringData()) ||
+                (cmdBuilder->hasField(write_ops::WriteCommandRequestBase::kStmtIdsFieldName) ||
+                 cmdBuilder->hasField(write_ops::WriteCommandRequestBase::kStmtIdFieldName)));
+    }
+
     stdx::lock_guard<Latch> lg(_mutex);
 
     _sessionInfo.serialize(cmdBuilder);

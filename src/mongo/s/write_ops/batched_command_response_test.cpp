@@ -55,16 +55,23 @@ TEST(BatchedCommandResponse, Basic) {
                     << "norepl"
                     << "errInfo" << BSON("a" << 1)));
 
+    auto retriedStmtIds = BSON_ARRAY(1 << 3);
+
     BSONObj origResponseObj =
         BSON(BatchedCommandResponse::n(0)
              << "opTime" << mongo::Timestamp(1ULL) << BatchedCommandResponse::writeErrors()
              << writeErrorsArray << BatchedCommandResponse::writeConcernError() << writeConcernError
-             << "ok" << 1.0);
+             << BatchedCommandResponse::retriedStmtIds() << retriedStmtIds << "ok" << 1.0);
 
     std::string errMsg;
     BatchedCommandResponse response;
     bool ok = response.parseBSON(origResponseObj, &errMsg);
     ASSERT_TRUE(ok);
+
+    ASSERT(response.areRetriedStmtIdsSet());
+    ASSERT_EQ(response.getRetriedStmtIds().size(), 2);
+    ASSERT_EQ(response.getRetriedStmtIds()[0], 1);
+    ASSERT_EQ(response.getRetriedStmtIds()[1], 3);
 
     BSONObj genResponseObj = BSONObjBuilder(response.toBSON()).append("ok", 1.0).obj();
 
