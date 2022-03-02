@@ -81,4 +81,36 @@ assert.docEq(result, [{_id: 0, time: docDate, a: {b: 1}, b: 4, c: [{}, {}]}]);
 // Test that an exclude does not overwrite meta field pushdown.
 result = coll.aggregate([{$unset: "b"}, {$set: {b: "$meta"}}]).toArray();
 assert.docEq(result, [{_id: 0, time: docDate, meta: 4, a: {b: 1}, b: 4, c: [{}, {}]}]);
+
+// Test that a field reference in a projection refers to the stage's input document
+// rather than another field with the same name in the projection.
+(function() {
+const regColl = db.timeseries_project_reg;
+regColl.drop();
+
+const tsColl = db.timeseries_project_ts;
+tsColl.drop();
+assert.commandWorked(
+    db.createCollection(tsColl.getName(), {timeseries: {timeField: 'time', metaField: 'x'}}));
+
+const doc = {
+    time: new Date("2019-10-11T14:39:18.670Z"),
+    x: 5,
+    a: 3,
+};
+assert.commandWorked(tsColl.insert(doc));
+assert.commandWorked(regColl.insert(doc));
+
+// Test $project.
+let pipeline = [{$project: {_id: 0, a: "$x", b: "$a"}}];
+let tsDoc = tsColl.aggregate(pipeline).toArray();
+let regDoc = regColl.aggregate(pipeline).toArray();
+assert.docEq(tsDoc, regDoc);
+
+// Test $addFields.
+pipeline = [{$addFields: {a: "$x", b: "$a"}}, {$project: {_id: 0}}];
+tsDoc = tsColl.aggregate(pipeline).toArray();
+regDoc = regColl.aggregate(pipeline).toArray();
+assert.docEq(tsDoc, regDoc);
+})();
 })();

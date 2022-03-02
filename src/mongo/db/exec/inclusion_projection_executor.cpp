@@ -108,6 +108,10 @@ std::pair<BSONObj, bool> InclusionNode::extractComputedProjectionsInProject(
     if (_policies.computedFieldsPolicy != ComputedFieldsPolicy::kAllowComputedFields) {
         return {BSONObj{}, false};
     }
+
+    DepsTracker allDeps;
+    reportDependencies(&allDeps);
+
     // Auxiliary vector with extracted computed projections: <name, expression, replacement
     // strategy>. If the replacement strategy flag is true, the expression is replaced with a
     // projected field. If it is false - the expression is replaced with an identity projection.
@@ -117,6 +121,13 @@ std::pair<BSONObj, bool> InclusionNode::extractComputedProjectionsInProject(
     for (auto&& field : _orderToProcessAdditionsAndChildren) {
         if (reservedNames.count(field) > 0) {
             // Do not pushdown computed projection with reserved name.
+            replaceWithProjField = false;
+            continue;
+        }
+        if (allDeps.fields.count(field) > 0) {
+            // Do not extract a computed projection if its name is the same as a dependent field. If
+            // the extracted $addFields were to be placed before this projection, the dependency
+            // with the common name would be shadowed by the computed projection.
             replaceWithProjField = false;
             continue;
         }
@@ -185,6 +196,10 @@ std::pair<BSONObj, bool> InclusionNode::extractComputedProjectionsInAddFields(
     if (_policies.computedFieldsPolicy != ComputedFieldsPolicy::kAllowComputedFields) {
         return {BSONObj{}, false};
     }
+
+    DepsTracker allDeps;
+    reportDependencies(&allDeps);
+
     // Auxiliary vector with extracted computed projections: <name, expression>.
     // To preserve the original fields order, only projections at the beginning of the
     // _orderToProcessAdditionsAndChildren list can be extracted for pushdown.
@@ -192,6 +207,12 @@ std::pair<BSONObj, bool> InclusionNode::extractComputedProjectionsInAddFields(
     for (auto&& field : _orderToProcessAdditionsAndChildren) {
         // Do not extract for pushdown computed projection with reserved name.
         if (reservedNames.count(field) > 0) {
+            break;
+        }
+        if (allDeps.fields.count(field) > 0) {
+            // Do not extract a computed projection if its name is the same as a dependent field. If
+            // the extracted $addFields were to be placed before this $addFields, the dependency
+            // with the common name would be shadowed by the computed projection.
             break;
         }
         auto expressionIt = _expressions.find(field);
