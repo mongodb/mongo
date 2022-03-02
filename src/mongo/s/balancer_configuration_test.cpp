@@ -39,6 +39,7 @@
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
@@ -85,7 +86,9 @@ protected:
             ASSERT_EQ(findCommand->getNamespaceOrUUID().nss()->ns(), "config.settings");
             ASSERT_BSONOBJ_EQ(findCommand->getFilter(), BSON("_id" << key));
 
-            checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
+            checkReadConcern(request.cmdObj,
+                             VectorClock::kInitialComponentTime.asTimestamp(),
+                             repl::OpTime::kUninitializedTerm);
 
             if (!result.isOK()) {
                 return StatusWith<vector<BSONObj>>(result.getStatus());

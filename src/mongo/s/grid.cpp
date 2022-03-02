@@ -35,7 +35,6 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/vector_clock.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
@@ -199,7 +198,8 @@ void Grid::clearForUnitTests() {
     _executorPool.reset();
     _network = nullptr;
 
-    _configOpTime = repl::OpTime();
+    _configOpTime = repl::OpTime{VectorClock::kInitialComponentTime.asTimestamp(),
+                                 repl::OpTime::kUninitializedTerm};
 }
 
 }  // namespace mongo

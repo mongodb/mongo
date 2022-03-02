@@ -128,7 +128,7 @@ TEST_F(VectorClockConfigServerTest, TickToConfigTime) {
     auto vc = VectorClockMutable::get(sc);
 
     const auto t0 = vc->getTime();
-    ASSERT_EQ(LogicalTime(), t0.configTime());
+    ASSERT_EQ(VectorClock::kInitialComponentTime, t0.configTime());
 
     vc->tickConfigTimeTo(LogicalTime(Timestamp(1, 1)));
     const auto t1 = vc->getTime();
@@ -154,7 +154,7 @@ TEST_F(VectorClockConfigServerTest, TickToTopologyTime) {
     auto vc = VectorClockMutable::get(sc);
 
     const auto t0 = vc->getTime();
-    ASSERT_EQ(LogicalTime(), t0.topologyTime());
+    ASSERT_EQ(VectorClock::kInitialComponentTime, t0.topologyTime());
 
     vc->tickTopologyTimeTo(LogicalTime(Timestamp(1, 1)));
     const auto t1 = vc->getTime();

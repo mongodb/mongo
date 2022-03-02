@@ -32,6 +32,7 @@
 #include <functional>
 
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
@@ -207,7 +208,8 @@ private:
 
     // Last known highest opTime from the config server that should be used when doing reads.
     // This value is updated any time a shard or mongos talks to a config server or a shard.
-    repl::OpTime _configOpTime;
+    repl::OpTime _configOpTime{VectorClock::kInitialComponentTime.asTimestamp(),
+                               repl::OpTime::kUninitializedTerm};
 
     /**
      * Called to update what we've seen as the last config server optime.

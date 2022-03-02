@@ -40,6 +40,7 @@
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/time_proof_service.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
@@ -111,7 +112,9 @@ TEST_F(ShardingCatalogClientTest, GetCollectionExisting) {
             ASSERT_BSONOBJ_EQ(query->getSort(), BSONObj());
             ASSERT_EQ(query->getLimit().get(), 1);
 
-            checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
+            checkReadConcern(request.cmdObj,
+                             VectorClock::kInitialComponentTime.asTimestamp(),
+                             repl::OpTime::kUninitializedTerm);
 
             ReplSetMetadata metadata(10,
                                      {newOpTime, Date_t() + Seconds(newOpTime.getSecs())},
@@ -180,7 +183,9 @@ TEST_F(ShardingCatalogClientTest, GetDatabaseExisting) {
         ASSERT_BSONOBJ_EQ(query->getSort(), BSONObj());
         ASSERT(!query->getLimit());
 
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
+        checkReadConcern(request.cmdObj,
+                         VectorClock::kInitialComponentTime.asTimestamp(),
+                         repl::OpTime::kUninitializedTerm);
 
         ReplSetMetadata metadata(10,
                                  {newOpTime, Date_t() + Seconds(newOpTime.getSecs())},
@@ -310,7 +315,9 @@ TEST_F(ShardingCatalogClientTest, GetAllShardsValid) {
         ASSERT_BSONOBJ_EQ(query->getSort(), BSONObj());
         ASSERT_FALSE(query->getLimit().is_initialized());
 
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
+        checkReadConcern(request.cmdObj,
+                         VectorClock::kInitialComponentTime.asTimestamp(),
+                         repl::OpTime::kUninitializedTerm);
 
         return vector<BSONObj>{s1.toBSON(), s2.toBSON(), s3.toBSON()};
     });
@@ -411,7 +418,9 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSWithSortAndLimit) {
             ASSERT_BSONOBJ_EQ(query->getSort(), BSON(ChunkType::lastmod() << -1));
             ASSERT_EQ(query->getLimit().get(), 1);
 
-            checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
+            checkReadConcern(request.cmdObj,
+                             VectorClock::kInitialComponentTime.asTimestamp(),
+                             repl::OpTime::kUninitializedTerm);
 
             ReplSetMetadata metadata(10,
                                      {newOpTime, Date_t() + Seconds(newOpTime.getSecs())},
@@ -474,7 +483,9 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSNoSortNoLimit) {
         ASSERT_BSONOBJ_EQ(query->getSort(), BSONObj());
         ASSERT_FALSE(query->getLimit().is_initialized());
 
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
+        checkReadConcern(request.cmdObj,
+                         VectorClock::kInitialComponentTime.asTimestamp(),
+                         repl::OpTime::kUninitializedTerm);
 
         return vector<BSONObj>{};
     });
@@ -788,7 +799,9 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsValidResultsNoDb) {
         ASSERT_BSONOBJ_EQ(query->getFilter(), BSONObj());
         ASSERT_BSONOBJ_EQ(query->getSort(), BSONObj());
 
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
+        checkReadConcern(request.cmdObj,
+                         VectorClock::kInitialComponentTime.asTimestamp(),
+                         repl::OpTime::kUninitializedTerm);
 
         ReplSetMetadata metadata(10,
                                  {newOpTime, Date_t() + Seconds(newOpTime.getSecs())},
@@ -839,7 +852,9 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsValidResultsWithDb) {
             ASSERT_BSONOBJ_EQ(query->getFilter(), b.obj());
         }
 
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
+        checkReadConcern(request.cmdObj,
+                         VectorClock::kInitialComponentTime.asTimestamp(),
+                         repl::OpTime::kUninitializedTerm);
 
         return vector<BSONObj>{coll1.toBSON(), coll2.toBSON()};
     });
@@ -877,7 +892,9 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsInvalidCollectionType) {
             ASSERT_BSONOBJ_EQ(query->getFilter(), b.obj());
         }
 
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
+        checkReadConcern(request.cmdObj,
+                         VectorClock::kInitialComponentTime.asTimestamp(),
+                         repl::OpTime::kUninitializedTerm);
 
         return vector<BSONObj>{
             validColl.toBSON(),
@@ -912,7 +929,9 @@ TEST_F(ShardingCatalogClientTest, GetDatabasesForShardValid) {
                           BSON(DatabaseType::primary(dbt1.getPrimary().toString())));
         ASSERT_BSONOBJ_EQ(query->getSort(), BSONObj());
 
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
+        checkReadConcern(request.cmdObj,
+                         VectorClock::kInitialComponentTime.asTimestamp(),
+                         repl::OpTime::kUninitializedTerm);
 
         return vector<BSONObj>{dbt1.toBSON(), dbt2.toBSON()};
     });
@@ -980,7 +999,9 @@ TEST_F(ShardingCatalogClientTest, GetTagsForCollection) {
         ASSERT_BSONOBJ_EQ(query->getFilter(), BSON(TagsType::ns("TestDB.TestColl")));
         ASSERT_BSONOBJ_EQ(query->getSort(), BSON(TagsType::min() << 1));
 
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
+        checkReadConcern(request.cmdObj,
+                         VectorClock::kInitialComponentTime.asTimestamp(),
+                         repl::OpTime::kUninitializedTerm);
 
         return vector<BSONObj>{tagA.toBSON(), tagB.toBSON()};
     });
@@ -1337,7 +1358,9 @@ TEST_F(ShardingCatalogClientTest, GetNewKeys) {
         ASSERT_BSONOBJ_EQ(BSON("expiresAt" << 1), query->getSort());
         ASSERT_FALSE(query->getLimit().is_initialized());
 
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
+        checkReadConcern(request.cmdObj,
+                         VectorClock::kInitialComponentTime.asTimestamp(),
+                         repl::OpTime::kUninitializedTerm);
 
         return vector<BSONObj>{key1.toBSON(), key2.toBSON()};
     });
@@ -1389,7 +1412,9 @@ TEST_F(ShardingCatalogClientTest, GetNewKeysWithEmptyCollection) {
         ASSERT_BSONOBJ_EQ(BSON("expiresAt" << 1), query->getSort());
         ASSERT_FALSE(query->getLimit().is_initialized());
 
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
+        checkReadConcern(request.cmdObj,
+                         VectorClock::kInitialComponentTime.asTimestamp(),
+                         repl::OpTime::kUninitializedTerm);
 
         return vector<BSONObj>{};
     });
