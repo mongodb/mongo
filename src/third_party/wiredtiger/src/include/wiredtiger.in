@@ -1083,8 +1083,10 @@ struct __wt_session {
 	 * except that updates with no timestamp are allowed at any time\, \c never enforces that
 	 * timestamps are never used for a table and \c none does not enforce any expectation on
 	 * timestamp usage meaning that no log message or assertions will be produced regardless of
-	 * the corresponding \c assert setting., a string\, chosen from the following options: \c
-	 * "always"\, \c "mixed_mode"\, \c "never"\, \c "none"\, \c "ordered"; default \c none.}
+	 * the corresponding \c assert setting.  (The \c key_consistent choice is no longer
+	 * supported\, retained for backward compatibility.)., a string\, chosen from the following
+	 * options: \c "always"\, \c "key_consistent"\, \c "mixed_mode"\, \c "never"\, \c "none"\,
+	 * \c "ordered"; default \c none.}
 	 * @configend
 	 * @errors
 	 */
@@ -1365,8 +1367,10 @@ struct __wt_session {
 	 * except that updates with no timestamp are allowed at any time\, \c never enforces that
 	 * timestamps are never used for a table and \c none does not enforce any expectation on
 	 * timestamp usage meaning that no log message or assertions will be produced regardless of
-	 * the corresponding \c assert setting., a string\, chosen from the following options: \c
-	 * "always"\, \c "mixed_mode"\, \c "never"\, \c "none"\, \c "ordered"; default \c none.}
+	 * the corresponding \c assert setting.  (The \c key_consistent choice is no longer
+	 * supported\, retained for backward compatibility.)., a string\, chosen from the following
+	 * options: \c "always"\, \c "key_consistent"\, \c "mixed_mode"\, \c "never"\, \c "none"\,
+	 * \c "ordered"; default \c none.}
 	 * @configend
 	 * @errors
 	 */

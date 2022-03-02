@@ -50,10 +50,10 @@ common_runtime_config = [
         type='category', subconfig= [
         Config('commit_timestamp', 'none', r'''
             this option is no longer supported, retained for backward compatibility''',
-            choices=['always', 'never', 'none'], undoc=True),
+            choices=['always', 'key_consistent', 'never', 'none'], undoc=True),
         Config('durable_timestamp', 'none', r'''
             this option is no longer supported, retained for backward compatibility''',
-            choices=['always', 'never', 'none'], undoc=True),
+            choices=['always', 'key_consistent', 'never', 'none'], undoc=True),
         Config('read_timestamp', 'none', r'''
             check timestamps are \c always or \c never used on reads with
             this table, writing an error message if policy is violated.
@@ -83,8 +83,10 @@ common_runtime_config = [
         are allowed at any time, \c never enforces that timestamps are never
         used for a table and \c none does not enforce any expectation on
         timestamp usage meaning that no log message or assertions will be
-        produced regardless of the corresponding \c assert setting''',
-        choices=['always', 'mixed_mode', 'never', 'none', 'ordered']),
+        produced regardless of the corresponding \c assert setting. (The
+        \c key_consistent choice is no longer supported, retained for
+        backward compatibility.)''',
+        choices=['always', 'key_consistent', 'mixed_mode', 'never', 'none', 'ordered']),
 ]
 
 # Metadata shared by all schema objects

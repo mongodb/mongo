@@ -191,8 +191,14 @@ static const WT_CONFIG_CHECK confchk_WT_CURSOR_reconfigure[] = {
   {"prefix_search", "boolean", NULL, NULL, NULL, 0}, {NULL, NULL, NULL, NULL, NULL, 0}};
 
 static const WT_CONFIG_CHECK confchk_WT_SESSION_create_assert_subconfigs[] = {
-  {"commit_timestamp", "string", NULL, "choices=[\"always\",\"never\",\"none\"]", NULL, 0},
-  {"durable_timestamp", "string", NULL, "choices=[\"always\",\"never\",\"none\"]", NULL, 0},
+  {"commit_timestamp", "string", NULL,
+    "choices=[\"always\",\"key_consistent\",\"never\","
+    "\"none\"]",
+    NULL, 0},
+  {"durable_timestamp", "string", NULL,
+    "choices=[\"always\",\"key_consistent\",\"never\","
+    "\"none\"]",
+    NULL, 0},
   {"read_timestamp", "string", NULL, "choices=[\"always\",\"never\",\"none\"]", NULL, 0},
   {"write_timestamp", "string", NULL, "choices=[\"off\",\"on\"]", NULL, 0},
   {NULL, NULL, NULL, NULL, NULL, 0}};
@@ -212,8 +218,8 @@ static const WT_CONFIG_CHECK confchk_WT_SESSION_alter[] = {
   {"tiered_object", "boolean", NULL, NULL, NULL, 0},
   {"verbose", "list", NULL, "choices=[\"write_timestamp\"]", NULL, 0},
   {"write_timestamp_usage", "string", NULL,
-    "choices=[\"always\",\"mixed_mode\",\"never\",\"none\","
-    "\"ordered\"]",
+    "choices=[\"always\",\"key_consistent\",\"mixed_mode\","
+    "\"never\",\"none\",\"ordered\"]",
     NULL, 0},
   {NULL, NULL, NULL, NULL, NULL, 0}};
 
@@ -336,8 +342,8 @@ static const WT_CONFIG_CHECK confchk_WT_SESSION_create[] = {
   {"value_format", "format", __wt_struct_confchk, NULL, NULL, 0},
   {"verbose", "list", NULL, "choices=[\"write_timestamp\"]", NULL, 0},
   {"write_timestamp_usage", "string", NULL,
-    "choices=[\"always\",\"mixed_mode\",\"never\",\"none\","
-    "\"ordered\"]",
+    "choices=[\"always\",\"key_consistent\",\"mixed_mode\","
+    "\"never\",\"none\",\"ordered\"]",
     NULL, 0},
   {NULL, NULL, NULL, NULL, NULL, 0}};
 
@@ -444,8 +450,8 @@ static const WT_CONFIG_CHECK confchk_colgroup_meta[] = {
   {"source", "string", NULL, NULL, NULL, 0}, {"type", "string", NULL, NULL, NULL, 0},
   {"verbose", "list", NULL, "choices=[\"write_timestamp\"]", NULL, 0},
   {"write_timestamp_usage", "string", NULL,
-    "choices=[\"always\",\"mixed_mode\",\"never\",\"none\","
-    "\"ordered\"]",
+    "choices=[\"always\",\"key_consistent\",\"mixed_mode\","
+    "\"never\",\"none\",\"ordered\"]",
     NULL, 0},
   {NULL, NULL, NULL, NULL, NULL, 0}};
 
@@ -493,8 +499,8 @@ static const WT_CONFIG_CHECK confchk_file_config[] = {
   {"value_format", "format", __wt_struct_confchk, NULL, NULL, 0},
   {"verbose", "list", NULL, "choices=[\"write_timestamp\"]", NULL, 0},
   {"write_timestamp_usage", "string", NULL,
-    "choices=[\"always\",\"mixed_mode\",\"never\",\"none\","
-    "\"ordered\"]",
+    "choices=[\"always\",\"key_consistent\",\"mixed_mode\","
+    "\"never\",\"none\",\"ordered\"]",
     NULL, 0},
   {NULL, NULL, NULL, NULL, NULL, 0}};
 
@@ -546,8 +552,8 @@ static const WT_CONFIG_CHECK confchk_file_meta[] = {
   {"verbose", "list", NULL, "choices=[\"write_timestamp\"]", NULL, 0},
   {"version", "string", NULL, NULL, NULL, 0},
   {"write_timestamp_usage", "string", NULL,
-    "choices=[\"always\",\"mixed_mode\",\"never\",\"none\","
-    "\"ordered\"]",
+    "choices=[\"always\",\"key_consistent\",\"mixed_mode\","
+    "\"never\",\"none\",\"ordered\"]",
     NULL, 0},
   {NULL, NULL, NULL, NULL, NULL, 0}};
 
@@ -562,8 +568,8 @@ static const WT_CONFIG_CHECK confchk_index_meta[] = {
   {"value_format", "format", __wt_struct_confchk, NULL, NULL, 0},
   {"verbose", "list", NULL, "choices=[\"write_timestamp\"]", NULL, 0},
   {"write_timestamp_usage", "string", NULL,
-    "choices=[\"always\",\"mixed_mode\",\"never\",\"none\","
-    "\"ordered\"]",
+    "choices=[\"always\",\"key_consistent\",\"mixed_mode\","
+    "\"never\",\"none\",\"ordered\"]",
     NULL, 0},
   {NULL, NULL, NULL, NULL, NULL, 0}};
 
@@ -613,8 +619,8 @@ static const WT_CONFIG_CHECK confchk_lsm_meta[] = {
   {"value_format", "format", __wt_struct_confchk, NULL, NULL, 0},
   {"verbose", "list", NULL, "choices=[\"write_timestamp\"]", NULL, 0},
   {"write_timestamp_usage", "string", NULL,
-    "choices=[\"always\",\"mixed_mode\",\"never\",\"none\","
-    "\"ordered\"]",
+    "choices=[\"always\",\"key_consistent\",\"mixed_mode\","
+    "\"never\",\"none\",\"ordered\"]",
     NULL, 0},
   {NULL, NULL, NULL, NULL, NULL, 0}};
 
@@ -667,8 +673,8 @@ static const WT_CONFIG_CHECK confchk_object_meta[] = {
   {"verbose", "list", NULL, "choices=[\"write_timestamp\"]", NULL, 0},
   {"version", "string", NULL, NULL, NULL, 0},
   {"write_timestamp_usage", "string", NULL,
-    "choices=[\"always\",\"mixed_mode\",\"never\",\"none\","
-    "\"ordered\"]",
+    "choices=[\"always\",\"key_consistent\",\"mixed_mode\","
+    "\"never\",\"none\",\"ordered\"]",
     NULL, 0},
   {NULL, NULL, NULL, NULL, NULL, 0}};
 
@@ -681,8 +687,8 @@ static const WT_CONFIG_CHECK confchk_table_meta[] = {
   {"value_format", "format", __wt_struct_confchk, NULL, NULL, 0},
   {"verbose", "list", NULL, "choices=[\"write_timestamp\"]", NULL, 0},
   {"write_timestamp_usage", "string", NULL,
-    "choices=[\"always\",\"mixed_mode\",\"never\",\"none\","
-    "\"ordered\"]",
+    "choices=[\"always\",\"key_consistent\",\"mixed_mode\","
+    "\"never\",\"none\",\"ordered\"]",
     NULL, 0},
   {NULL, NULL, NULL, NULL, NULL, 0}};
 
@@ -736,8 +742,8 @@ static const WT_CONFIG_CHECK confchk_tier_meta[] = {
   {"verbose", "list", NULL, "choices=[\"write_timestamp\"]", NULL, 0},
   {"version", "string", NULL, NULL, NULL, 0},
   {"write_timestamp_usage", "string", NULL,
-    "choices=[\"always\",\"mixed_mode\",\"never\",\"none\","
-    "\"ordered\"]",
+    "choices=[\"always\",\"key_consistent\",\"mixed_mode\","
+    "\"never\",\"none\",\"ordered\"]",
     NULL, 0},
   {NULL, NULL, NULL, NULL, NULL, 0}};
 
@@ -791,8 +797,8 @@ static const WT_CONFIG_CHECK confchk_tiered_meta[] = {
   {"verbose", "list", NULL, "choices=[\"write_timestamp\"]", NULL, 0},
   {"version", "string", NULL, NULL, NULL, 0},
   {"write_timestamp_usage", "string", NULL,
-    "choices=[\"always\",\"mixed_mode\",\"never\",\"none\","
-    "\"ordered\"]",
+    "choices=[\"always\",\"key_consistent\",\"mixed_mode\","
+    "\"never\",\"none\",\"ordered\"]",
     NULL, 0},
   {NULL, NULL, NULL, NULL, NULL, 0}};
 
