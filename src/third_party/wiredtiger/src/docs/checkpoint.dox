@@ -115,6 +115,11 @@ backup cursor is open, then the system will be restored to the most recent
 checkpoint prior to the opening of the backup cursor, even if later database
 checkpoints were completed.
 
+Applications using commit-level durability retain durability via the write-ahead
+log even though checkpoints taken while a backup cursor is open are not durable.
+All log files are retained once the backup cursor is opened and, in the event of
+a crash, all operations will be replayed to provide durability.
+
 @section checkpoint_compaction Checkpoints and file compaction
 
 Checkpoints share file blocks, and dropping a checkpoint may or may not
