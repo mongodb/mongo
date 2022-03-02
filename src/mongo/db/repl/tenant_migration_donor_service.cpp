@@ -87,7 +87,7 @@ const int kMaxRecipientKeyDocsFindAttempts = 10;
 
 bool shouldStopSendingRecipientForgetMigrationCommand(Status status) {
     return status.isOK() ||
-        !(ErrorCodes::isRetriableError(status) ||
+        !(ErrorCodes::isRetriableError(status) || ErrorCodes::isNetworkTimeoutError(status) ||
           // Returned if findHost() is unable to target the recipient in 15 seconds, which may
           // happen after a failover.
           status == ErrorCodes::FailedToSatisfyReadPreference ||
@@ -95,18 +95,23 @@ bool shouldStopSendingRecipientForgetMigrationCommand(Status status) {
 }
 
 bool shouldStopSendingRecipientSyncDataCommand(Status status, MigrationProtocolEnum protocol) {
-    auto isRetriable =
-        ErrorCodes::isRetriableError(status) && protocol != MigrationProtocolEnum::kShardMerge;
-    return status.isOK() ||
-        !(isRetriable ||
-          // Returned if findHost() is unable to target the recipient in 15 seconds, which may
-          // happen after a failover.
-          status == ErrorCodes::FailedToSatisfyReadPreference);
+    if (status.isOK() || protocol == MigrationProtocolEnum::kShardMerge) {
+        return true;
+    }
+
+    return !(ErrorCodes::isRetriableError(status) || ErrorCodes::isNetworkTimeoutError(status) ||
+             // Returned if findHost() is unable to target the recipient in 15 seconds, which may
+             // happen after a failover.
+             status == ErrorCodes::FailedToSatisfyReadPreference);
 }
 
 bool shouldStopFetchingRecipientClusterTimeKeyDocs(Status status) {
     return status.isOK() ||
-        !(ErrorCodes::isRetriableError(status) || ErrorCodes::isInterruption(status));
+        !(ErrorCodes::isRetriableError(status) || ErrorCodes::isInterruption(status) ||
+          ErrorCodes::isNetworkTimeoutError(status) ||
+          // Returned if findHost() is unable to target the recipient in 15 seconds, which may
+          // happen after a failover.
+          status == ErrorCodes::FailedToSatisfyReadPreference);
 }
 
 void checkForTokenInterrupt(const CancellationToken& token) {
