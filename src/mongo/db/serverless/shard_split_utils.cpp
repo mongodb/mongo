@@ -103,11 +103,14 @@ repl::ReplSetConfig makeSplitConfig(const repl::ReplSetConfig& config,
     uassert(6201801, "No recipient members found for split config.", !recipientMembers.empty());
     uassert(6201802, "No donor members found for split config.", !donorMembers.empty());
 
-    const auto configNoMembersBson = config.toBSON().removeField("members");
+    const auto updatedVersion = config.getConfigVersion() + 1;
+    const auto configNoMembersBson = config.toBSON().removeField("members").removeField("version");
 
     BSONObjBuilder recipientConfigBob(
         configNoMembersBson.removeField("_id").removeField("settings"));
-    recipientConfigBob.append("_id", recipientSetName).append("members", recipientMembers);
+    recipientConfigBob.append("_id", recipientSetName)
+        .append("members", recipientMembers)
+        .append("version", updatedVersion);
     if (configNoMembersBson.hasField("settings") &&
         configNoMembersBson.getField("settings").isABSONObj()) {
         BSONObj settings = configNoMembersBson.getField("settings").Obj();
@@ -117,6 +120,7 @@ repl::ReplSetConfig makeSplitConfig(const repl::ReplSetConfig& config,
     }
 
     BSONObjBuilder splitConfigBob(configNoMembersBson);
+    splitConfigBob.append("version", updatedVersion);
     splitConfigBob.append("members", donorMembers);
     splitConfigBob.append("recipientConfig", recipientConfigBob.obj());
 

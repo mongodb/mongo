@@ -330,6 +330,9 @@ SemiFuture<void> ShardSplitDonorService::DonorStateMachine::run(
                 return _waitForRecipientToReachBlockTimestamp(executor, abortToken);
             })
             .then([this, executor, abortToken] {
+                return _applySplitConfigToDonor(executor, abortToken);
+            })
+            .then([this, executor, abortToken] {
                 return _waitForRecipientToAcceptSplit(executor, abortToken);
             })
             .then([this, executor, abortToken] {
@@ -427,6 +430,64 @@ ShardSplitDonorService::DonorStateMachine::_waitForRecipientToReachBlockTimestam
         auto replCoord = repl::ReplicationCoordinator::get(cc().getServiceContext());
         uassertStatusOK(replCoord->awaitReplication(opCtx.get(), blockOpTime, writeConcern).status);
     });
+}
+
+ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_applySplitConfigToDonor(
+    const ScopedTaskExecutorPtr& executor, const CancellationToken& token) {
+    checkForTokenInterrupt(token);
+
+    {
+        stdx::lock_guard<Latch> lg(_mutex);
+        if (_stateDoc.getState() >= ShardSplitDonorStateEnum::kCommitted) {
+            return ExecutorFuture(**executor);
+        }
+    }
+
+
+    auto replCoord = repl::ReplicationCoordinator::get(cc().getServiceContext());
+    invariant(replCoord);
+
+    LOGV2(6309100,
+          "Generating and applying a split config",
+          "id"_attr = _migrationId,
+          "conf"_attr = replCoord->getConfig());
+
+    return AsyncTry([this] {
+               auto opCtxHolder = _cancelableOpCtxFactory->makeOperationContext(&cc());
+
+               auto newConfig = [&]() {
+                   stdx::lock_guard<Latch> lg(_mutex);
+                   auto setName = _stateDoc.getRecipientSetName();
+                   invariant(setName);
+                   auto tagName = _stateDoc.getRecipientTagName();
+                   invariant(tagName);
+
+                   auto replCoord = repl::ReplicationCoordinator::get(cc().getServiceContext());
+                   invariant(replCoord);
+
+                   return serverless::makeSplitConfig(
+                       replCoord->getConfig(), setName->toString(), tagName->toString());
+               }();
+
+               DBDirectClient client(opCtxHolder.get());
+
+               BSONObj result;
+               const bool returnValue =
+                   client.runCommand(NamespaceString::kAdminDb.toString(),
+                                     BSON("replSetReconfig" << newConfig.toBSON()),
+                                     result);
+               uassert(
+                   ErrorCodes::BadValue, "Invalid return value for replSetReconfig", returnValue);
+               uassertStatusOK(getStatusFromCommandResult(result));
+           })
+        .until([](Status status) { return status.isOK(); })
+        .withBackoffBetweenIterations(kExponentialBackoff)
+        .on(**executor, token)
+        .then([this] {
+            LOGV2(6309101,
+                  "Split config has been generated and committed.",
+                  "id"_attr = _migrationId);
+        });
 }
 
 ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_waitForRecipientToAcceptSplit(

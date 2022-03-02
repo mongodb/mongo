@@ -40,7 +40,7 @@ tenantIds.forEach(id => {
 const adminDb = donorPrimary.getDB("admin");
 const blockingFailPoint = configureFailPoint(adminDb, "pauseShardSplitAfterBlocking");
 
-// TODO(SERVER-63091): remove this when we actually split recipients
+// TODO(SERVER-62346): remove this when we actually split recipients
 configureFailPoint(adminDb, "skipShardSplitWaitForSplitAcceptance");
 
 jsTestLog("Running commitShardSplit command");

@@ -52,6 +52,11 @@ class BasicServerlessTest {
         assert.commandWorked(admin.runCommand({replSetReconfig: config}));
         this.recipientNodes.forEach(node => donor.waitForState(node, ReplSetTest.State.SECONDARY));
     }
+
+    removeAndStopRecipientNodes() {
+        print("Removing and stopping recipient nodes");
+        this.recipientNodes.forEach(node => this.donor.remove(node));
+    }
 }
 
 function findMigration(primary, uuid) {

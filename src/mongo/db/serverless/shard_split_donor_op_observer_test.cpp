@@ -168,6 +168,8 @@ protected:
 protected:
     MockReplicaSet _replSet =
         MockReplicaSet("donorSet", 3, true /* hasPrimary */, true /* dollarPrefixHosts */);
+    MockReplicaSet _recipientReplSet =
+        MockReplicaSet("recipientSet", 3, true /* hasPrimary */, true /* dollarPrefixHosts */);
     const NamespaceString _nss = NamespaceString::kTenantSplitDonorsNamespace;
     std::vector<std::string> _tenantIds = {"tenant1", "tenantAB"};
     std::string _connectionStr = _replSet.getConnectionString();
@@ -262,7 +264,7 @@ TEST_F(ShardSplitDonorOpObserverTest, InsertValidAbortedDocument) {
 
 TEST_F(ShardSplitDonorOpObserverTest, InsertDocument) {
     test::shard_split::reconfigToAddRecipientNodes(
-        getServiceContext(), _recipientTagName, _replSet.getHosts());
+        getServiceContext(), _recipientTagName, _replSet.getHosts(), _recipientReplSet.getHosts());
 
     auto stateDocument = defaultStateDocument();
     auto mtabVerifier = [opCtx = _opCtx.get()](std::shared_ptr<TenantMigrationAccessBlocker> mtab) {

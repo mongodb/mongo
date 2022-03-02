@@ -493,7 +493,15 @@ Status ReplicationCoordinatorMock::processReplSetFreeze(int secs, BSONObjBuilder
 Status ReplicationCoordinatorMock::processReplSetReconfig(OperationContext* opCtx,
                                                           const ReplSetReconfigArgs& args,
                                                           BSONObjBuilder* resultObj) {
+    stdx::lock_guard<Latch> lg(_mutex);
+    _latestReconfig = args.newConfigObj;
     return Status::OK();
+}
+
+BSONObj ReplicationCoordinatorMock::getLatestReconfig() {
+    stdx::lock_guard<Latch> lg(_mutex);
+
+    return _latestReconfig;
 }
 
 Status ReplicationCoordinatorMock::doReplSetReconfig(OperationContext* opCtx,

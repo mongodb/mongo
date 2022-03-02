@@ -54,10 +54,16 @@ void ScopedTenantAccessBlocker::dismiss() {
 
 void reconfigToAddRecipientNodes(ServiceContext* serviceContext,
                                  const std::string& recipientTagName,
-                                 const std::vector<HostAndPort>& nodes) {
+                                 const std::vector<HostAndPort>& donorNodes,
+                                 const std::vector<HostAndPort>& recipientNodes) {
     BSONArrayBuilder members;
-    for (auto node : nodes) {
-        members.append(BSON("_id" << 1 << "host" << node.toString() << "tags"
+    int idx = 0;
+    for (auto node : donorNodes) {
+        members.append(BSON("_id" << idx++ << "host" << node.toString()));
+    }
+    for (auto node : recipientNodes) {
+        members.append(BSON("_id" << idx++ << "host" << node.toString() << "priority" << 0
+                                  << "votes" << 0 << "tags"
                                   << BSON(recipientTagName << UUID::gen().toString())));
     }
 

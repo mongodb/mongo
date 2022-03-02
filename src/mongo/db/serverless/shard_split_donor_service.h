@@ -161,6 +161,9 @@ private:
     ExecutorFuture<void> _waitForRecipientToReachBlockTimestamp(
         const ScopedTaskExecutorPtr& executor, const CancellationToken& token);
 
+    ExecutorFuture<void> _applySplitConfigToDonor(const ScopedTaskExecutorPtr& executor,
+                                                  const CancellationToken& token);
+
     ExecutorFuture<void> _waitForRecipientToAcceptSplit(const ScopedTaskExecutorPtr& executor,
                                                         const CancellationToken& token);
 

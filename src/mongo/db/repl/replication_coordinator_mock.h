@@ -251,6 +251,8 @@ public:
                                           const ReplSetReconfigArgs& args,
                                           BSONObjBuilder* resultObj);
 
+    BSONObj getLatestReconfig();
+
     virtual Status doReplSetReconfig(OperationContext* opCtx,
                                      GetNewConfigFn getNewConfig,
                                      bool force);
@@ -418,6 +420,7 @@ private:
     OpTime _myLastAppliedOpTime;
     Date_t _myLastAppliedWallTime;
     OpTime _currentCommittedSnapshotOpTime;
+    BSONObj _latestReconfig;
 
     long long _term = OpTime::kInitialTerm;
     bool _resetLastOpTimesCalled = false;

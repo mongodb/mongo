@@ -72,6 +72,53 @@
 
 namespace mongo {
 
+class MockReplReconfigCommandInvocation : public CommandInvocation {
+public:
+    MockReplReconfigCommandInvocation(const Command* command) : CommandInvocation(command) {}
+    void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) final {
+        result->setCommandReply(BSON("ok" << 1));
+    }
+
+    NamespaceString ns() const final {
+        return NamespaceString::kSystemReplSetNamespace;
+    }
+
+    bool supportsWriteConcern() const final {
+        return true;
+    }
+
+private:
+    void doCheckAuthorization(OperationContext* opCtx) const final {}
+};
+
+class MockReplReconfigCommand : public Command {
+public:
+    MockReplReconfigCommand() : Command("replSetReconfig") {}
+
+    std::unique_ptr<CommandInvocation> parse(OperationContext* opCtx,
+                                             const OpMsgRequest& request) final {
+        stdx::lock_guard<Latch> lg(_mutex);
+        _hasBeenCalled = true;
+        _msg = request.body;
+        return std::make_unique<MockReplReconfigCommandInvocation>(this);
+    }
+
+    AllowedOnSecondary secondaryAllowed(ServiceContext* context) const final {
+        return AllowedOnSecondary::kNever;
+    }
+
+    BSONObj getLatestConfig() {
+        stdx::lock_guard<Latch> lg(_mutex);
+        ASSERT_TRUE(_hasBeenCalled);
+        return _msg;
+    }
+
+private:
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("MockReplReconfigCommand::_mutex");
+    bool _hasBeenCalled{false};
+    BSONObj _msg;
+} mockReplSetReconfigCmd;
+
 namespace {
 sdam::TopologyDescriptionPtr makeRecipientTopologyDescription(const MockReplicaSet& set) {
     std::shared_ptr<TopologyDescription> topologyDescription =
@@ -175,6 +222,8 @@ protected:
     UUID _uuid = UUID::gen();
     MockReplicaSet _replSet{
         "donorSetForTest", 3, true /* hasPrimary */, false /* dollarPrefixHosts */};
+    MockReplicaSet _recipientSet{
+        "recipientSetForTest", 3, true /* hasPrimary */, false /* dollarPrefixHosts */};
     const NamespaceString _nss{"testDB2", "testColl2"};
     std::vector<std::string> _tenantIds = {"tenant1", "tenantAB"};
     StreamableReplicaSetMonitorForTesting _rsmMonitor;
@@ -186,7 +235,7 @@ TEST_F(ShardSplitDonorServiceTest, BasicShardSplitDonorServiceInstanceCreation) 
     auto opCtx = makeOperationContext();
     test::shard_split::ScopedTenantAccessBlocker scopedTenants(_tenantIds, opCtx.get());
     test::shard_split::reconfigToAddRecipientNodes(
-        getServiceContext(), _recipientTagName, _replSet.getHosts());
+        getServiceContext(), _recipientTagName, _replSet.getHosts(), _recipientSet.getHosts());
 
     // Create and start the instance.
     auto serviceInstance = ShardSplitDonorService::DonorStateMachine::getOrCreate(
@@ -215,6 +264,11 @@ TEST_F(ShardSplitDonorServiceTest, BasicShardSplitDonorServiceInstanceCreation) 
 
     decisionFuture.wait();
 
+    BSONObj splitConfigBson = mockReplSetReconfigCmd.getLatestConfig();
+    ASSERT_TRUE(splitConfigBson.hasField("replSetReconfig"));
+    auto splitConfig = repl::ReplSetConfig::parse(splitConfigBson["replSetReconfig"].Obj());
+    ASSERT(splitConfig.isSplitConfig());
+
     auto result = decisionFuture.get();
     ASSERT(!result.abortReason);
     ASSERT_EQ(result.state, mongo::ShardSplitDonorStateEnum::kCommitted);
@@ -230,7 +284,7 @@ TEST_F(ShardSplitDonorServiceTest, ShardSplitDonorServiceTimeout) {
     auto serviceContext = getServiceContext();
     test::shard_split::ScopedTenantAccessBlocker scopedTenants(_tenantIds, opCtx.get());
     test::shard_split::reconfigToAddRecipientNodes(
-        serviceContext, _recipientTagName, _replSet.getHosts());
+        serviceContext, _recipientTagName, _replSet.getHosts(), _recipientSet.getHosts());
 
     auto stateDocument = defaultStateDocument();
 
@@ -289,7 +343,7 @@ TEST_F(ShardSplitDonorServiceTest, CreateInstanceThenAbort) {
 
     test::shard_split::ScopedTenantAccessBlocker scopedTenants(_tenantIds, opCtx.get());
     test::shard_split::reconfigToAddRecipientNodes(
-        serviceContext, _recipientTagName, _replSet.getHosts());
+        serviceContext, _recipientTagName, _replSet.getHosts(), _recipientSet.getHosts());
 
     std::shared_ptr<ShardSplitDonorService::DonorStateMachine> serviceInstance;
     {
@@ -322,7 +376,7 @@ TEST_F(ShardSplitDonorServiceTest, StepDownTest) {
     auto opCtx = makeOperationContext();
     test::shard_split::ScopedTenantAccessBlocker scopedTenants(_tenantIds, opCtx.get());
     test::shard_split::reconfigToAddRecipientNodes(
-        getServiceContext(), _recipientTagName, _replSet.getHosts());
+        getServiceContext(), _recipientTagName, _replSet.getHosts(), _recipientSet.getHosts());
 
     std::shared_ptr<ShardSplitDonorService::DonorStateMachine> serviceInstance;
 
@@ -372,7 +426,7 @@ TEST_F(ShardSplitDonorServiceTest, StepUpWithkCommitted) {
 
     test::shard_split::ScopedTenantAccessBlocker scopedTenants(_tenantIds, opCtx.get());
     test::shard_split::reconfigToAddRecipientNodes(
-        getServiceContext(), _recipientTagName, _replSet.getHosts());
+        getServiceContext(), _recipientTagName, _replSet.getHosts(), _recipientSet.getHosts());
 
     auto nss = NamespaceString::kTenantSplitDonorsNamespace;
     auto stateDocument = defaultStateDocument();
@@ -436,6 +490,8 @@ public:
 protected:
     MockReplicaSet _validRepl{
         "replInScope", 3, true /* hasPrimary */, false /* dollarPrefixHosts */};
+    MockReplicaSet _recipientSet{
+        "recipientReplSet", 3, true /* hasPrimary */, false /* dollarPrefixHosts */};
     MockReplicaSet _invalidRepl{
         "replNotInScope", 3, true /* hasPrimary */, false /* dollarPrefixHosts */};
 
@@ -449,7 +505,7 @@ protected:
 
 TEST_F(SplitReplicaSetObserverTest, SupportsCancellation) {
     test::shard_split::reconfigToAddRecipientNodes(
-        getServiceContext(), _recipientTagName, _validRepl.getHosts());
+        getServiceContext(), _recipientTagName, _validRepl.getHosts(), _recipientSet.getHosts());
 
     CancellationSource source;
     auto future = detail::makeRecipientAcceptSplitFuture(
@@ -463,7 +519,7 @@ TEST_F(SplitReplicaSetObserverTest, SupportsCancellation) {
 
 TEST_F(SplitReplicaSetObserverTest, GetRecipientAcceptSplitFutureTest) {
     test::shard_split::reconfigToAddRecipientNodes(
-        getServiceContext(), _recipientTagName, _validRepl.getHosts());
+        getServiceContext(), _recipientTagName, _validRepl.getHosts(), _recipientSet.getHosts());
 
     CancellationSource source;
     auto future = detail::makeRecipientAcceptSplitFuture(
@@ -502,7 +558,7 @@ TEST_F(SplitReplicaSetObserverTest, FutureNotReadyWrongSet) {
 
 TEST_F(SplitReplicaSetObserverTest, ExecutorCanceled) {
     test::shard_split::reconfigToAddRecipientNodes(
-        getServiceContext(), _recipientTagName, _validRepl.getHosts());
+        getServiceContext(), _recipientTagName, _validRepl.getHosts(), _recipientSet.getHosts());
 
     CancellationSource source;
     auto future = detail::makeRecipientAcceptSplitFuture(

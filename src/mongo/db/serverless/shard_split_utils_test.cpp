@@ -62,7 +62,7 @@ TEST(MakeSplitConfig, toBSONRoundTripAbility) {
     // the hardcoded recipientConfig.
     const std::string recipientConfigSetName{"newSet"};
     BSONObj resultRecipientConfigBSON = BSON(
-        "_id" << recipientConfigSetName << "version" << 1 << "protocolVersion" << 1 << "members"
+        "_id" << recipientConfigSetName << "version" << 2 << "protocolVersion" << 1 << "members"
               << BSON_ARRAY(BSON("_id" << 0 << "host"
                                        << "localhost:20002"
                                        << "priority" << 1 << "votes" << 1 << "tags"
@@ -72,7 +72,7 @@ TEST(MakeSplitConfig, toBSONRoundTripAbility) {
 
     BSONObj resultSplitConfigBSON = BSON("_id"
                                          << "rs0"
-                                         << "version" << 1 << "protocolVersion" << 1 << "members"
+                                         << "version" << 2 << "protocolVersion" << 1 << "members"
                                          << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                   << "localhost:12345"))
                                          << "settings"
@@ -94,6 +94,7 @@ TEST(MakeSplitConfig, toBSONRoundTripAbility) {
     auto recipientConfigResultPtr = splitConfigResult.getRecipientConfig();
     // we use getReplicaSetId to match the newly replicaSetId created from makeSplitConfig on the
     // recipientConfig since configA had a replicaSetId in its config.
+
     ASSERT_TRUE(*recipientConfigResultPtr == ReplSetConfig::parse(resultRecipientConfigBSON));
 }
 

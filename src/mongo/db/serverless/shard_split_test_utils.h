@@ -58,8 +58,8 @@ private:
  */
 void reconfigToAddRecipientNodes(ServiceContext* serviceContext,
                                  const std::string& recipientTagName,
-                                 const std::vector<HostAndPort>& nodes);
-
+                                 const std::vector<HostAndPort>& donorNodes,
+                                 const std::vector<HostAndPort>& recipientNodes);
 
 }  // namespace shard_split
 }  // namespace test
