@@ -32,6 +32,7 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/query/cursor_response.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard_factory.h"
 #include "mongo/s/client/shard_registry.h"
@@ -134,8 +135,8 @@ TEST_F(ShardRemoteTest, NetworkReplyWithLastCommittedOpTime) {
     // Verify shards that were not targeted were not affected.
     for (auto shardId : kTestShardIds) {
         if (shardId != targetedShard) {
-            ASSERT_EQ(LogicalTime::kUninitialized,
-                      shardRegistry()->getShardNoReload(shardId)->getLastCommittedOpTime());
+            ASSERT(!VectorClock::isValidComponentTime(
+                shardRegistry()->getShardNoReload(shardId)->getLastCommittedOpTime()));
         }
     }
 }

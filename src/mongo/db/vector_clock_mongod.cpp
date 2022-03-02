@@ -267,7 +267,7 @@ VectorClock::VectorTime VectorClockMongoD::recoverDirect(OperationContext* opCtx
                       return true;
                   });
 
-    const auto newDurableTime = VectorTime({LogicalTime(Timestamp(0)),
+    const auto newDurableTime = VectorTime({VectorClock::kInitialComponentTime,
                                             LogicalTime(durableVectorClock.getConfigTime()),
                                             LogicalTime(durableVectorClock.getTopologyTime())});
 
@@ -364,14 +364,17 @@ Future<void> VectorClockMongoD::_doWhileQueueNotEmptyOrError(ServiceContext* ser
             }
 
             auto vectorTime = getTime();
-            const VectorClockDocument vcd(vectorTime.configTime().asTimestamp(),
-                                          vectorTime.topologyTime().asTimestamp());
+
+            VectorClockDocument vcd;
+            vcd.setConfigTime(vectorTime.configTime().asTimestamp());
+            vcd.setTopologyTime(vectorTime.topologyTime().asTimestamp());
 
             PersistentTaskStore<VectorClockDocument> store(NamespaceString::kVectorClockNamespace);
             store.upsert(opCtx,
                          BSON(VectorClockDocument::k_idFieldName << vcd.get_id()),
                          vcd.toBSON(),
                          WriteConcerns::kMajorityWriteConcernNoTimeout);
+
             return vectorTime;
         })
         .getAsync([this, promise = std::move(p)](StatusWith<VectorTime> swResult) mutable {

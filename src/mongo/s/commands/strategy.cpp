@@ -152,14 +152,14 @@ void appendRequiredFieldsToResponse(OperationContext* opCtx, BSONObjBuilder* res
     // Ensure that either both operationTime and $clusterTime are output, or neither.
     if (clusterTimeWasOutput) {
         auto operationTime = OperationTimeTracker::get(opCtx)->getMaxOperationTime();
-        if (operationTime != LogicalTime::kUninitialized) {
+        if (VectorClock::isValidComponentTime(operationTime)) {
             LOGV2_DEBUG(22764,
                         5,
                         "Appending operationTime: {operationTime}",
                         "Appending operationTime",
                         "operationTime"_attr = operationTime.asTimestamp());
             operationTime.appendAsOperationTime(responseBuilder);
-        } else if (clusterTime != LogicalTime::kUninitialized) {
+        } else if (VectorClock::isValidComponentTime(clusterTime)) {
             // If we don't know the actual operation time, use the cluster time instead. This is
             // safe but not optimal because we can always return a later operation time than
             // actual.

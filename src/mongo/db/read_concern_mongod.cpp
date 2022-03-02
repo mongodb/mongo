@@ -352,7 +352,7 @@ Status waitForReadConcernImpl(OperationContext* opCtx,
 
             const auto currentTime = VectorClock::get(opCtx)->getTime();
             const auto clusterTime = currentTime.clusterTime();
-            if (clusterTime == LogicalTime::kUninitialized) {
+            if (!VectorClock::isValidComponentTime(clusterTime)) {
                 // currentTime should only be uninitialized if we are in startup recovery or initial
                 // sync.
                 invariant(memberState.startup() || memberState.startup2());

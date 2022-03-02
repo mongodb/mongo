@@ -281,7 +281,7 @@ LegacyRuntimeConstants Variables::generateRuntimeConstants(OperationContext* opC
     if (opCtx->getClient()) {
         if (const auto vectorClock = VectorClock::get(opCtx)) {
             const auto now = vectorClock->getTime();
-            if (now.clusterTime() != LogicalTime::kUninitialized) {
+            if (VectorClock::isValidComponentTime(now.clusterTime())) {
                 return {Date_t::now(), now.clusterTime().asTimestamp()};
             }
         }
