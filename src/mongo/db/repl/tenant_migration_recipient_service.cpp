@@ -977,96 +977,98 @@ ExecutorFuture<void> TenantMigrationRecipientService::Instance::_getDonorFilenam
 
     auto fetchStatus = std::make_shared<boost::optional<Status>>();
     auto uniqueMetadataInfo = std::make_unique<boost::optional<shard_merge_utils::MetadataInfo>>();
-    auto fetcherCallback = [this,
-                            self = shared_from_this(),
-                            fetchStatus,
-                            metadataInfoPtr = uniqueMetadataInfo.get(),
-                            token](const Fetcher::QueryResponseStatus& dataStatus,
-                                   Fetcher::NextAction* nextAction,
-                                   BSONObjBuilder* getMoreBob) {
-        if (!dataStatus.isOK()) {
-            *fetchStatus = dataStatus.getStatus();
-            LOGV2_ERROR(6113003, "backup cursor failed", "error"_attr = dataStatus.getStatus());
-            return;
-        }
+    auto fetcherCallback =
+        [
+            this,
+            self = shared_from_this(),
+            fetchStatus,
+            metadataInfoPtr = uniqueMetadataInfo.get(),
+            token
+        ](const Fetcher::QueryResponseStatus& dataStatus,
+          Fetcher::NextAction* nextAction,
+          BSONObjBuilder* getMoreBob) noexcept {
+        try {
+            uassertStatusOK(dataStatus);
+            uassert(ErrorCodes::CallbackCanceled, "backup cursor interrupted", !token.isCanceled());
 
-        if (token.isCanceled()) {
-            *fetchStatus = Status(ErrorCodes::CallbackCanceled, "backup cursor interrupted");
-            return;
-        }
+            auto uniqueOpCtx = cc().makeOperationContext();
+            auto opCtx = uniqueOpCtx.get();
 
-        auto uniqueOpCtx = cc().makeOperationContext();
-        auto opCtx = uniqueOpCtx.get();
-
-        const auto& data = dataStatus.getValue();
-        {
-            stdx::lock_guard lk(_mutex);
-            _donorFilenameBackupCursorId = data.cursorId;
-            _donorFilenameBackupCursorNamespaceString = data.nss;
-        }
-
-        for (const BSONObj& doc : data.documents) {
-            if (doc["metadata"]) {
-                // First batch must contain the metadata.
-                const auto& metadata = doc["metadata"].Obj();
-                auto startApplyingDonorOpTime =
-                    OpTime(metadata["checkpointTimestamp"].timestamp(), OpTime::kUninitializedTerm);
-
-
-                invariant(metadataInfoPtr && !*metadataInfoPtr);
-                (*metadataInfoPtr) = shard_merge_utils::MetadataInfo::constructMetadataInfo(
-                    getMigrationUUID(), _client->getServerAddress(), metadata);
-
-                _stateDoc.setStartApplyingDonorOpTime(startApplyingDonorOpTime);
-                LOGV2_INFO(6113001,
-                           "Opened backup cursor on donor",
-                           "migrationId"_attr = getMigrationUUID(),
-                           "startApplyingDonorOpTime"_attr = startApplyingDonorOpTime,
-                           "backupCursorId"_attr = data.cursorId);
-            } else {
-                LOGV2_DEBUG(6113002,
-                            1,
-                            "Backup cursor entry",
-                            "migrationId"_attr = getMigrationUUID(),
-                            "filename"_attr = doc["filename"].String(),
-                            "backupCursorId"_attr = data.cursorId);
-
-                invariant(metadataInfoPtr && *metadataInfoPtr);
-                auto docs = std::vector<mongo::BSONObj>{(*metadataInfoPtr)->toBSON(doc).getOwned()};
-
-                // Disabling internal document validation because the fetcher batch size
-                // can exceed the max data size limit BSONObjMaxUserSize with the
-                // additional fields we add to documents.
-                DisableDocumentValidation documentValidationDisabler(
-                    opCtx, DocumentValidationSettings::kDisableInternalValidation);
-
-                write_ops::InsertCommandRequest insertOp(
-                    shard_merge_utils::getDonatedFilesNs(getMigrationUUID()));
-                insertOp.setDocuments(std::move(docs));
-                insertOp.setWriteCommandRequestBase([] {
-                    write_ops::WriteCommandRequestBase wcb;
-                    wcb.setOrdered(true);
-                    return wcb;
-                }());
-
-                auto writeResult = write_ops_exec::performInserts(opCtx, insertOp);
-                invariant(!writeResult.results.empty());
-                // Writes are ordered, check only the last writeOp result.
-                uassertStatusOK(writeResult.results.back());
+            const auto& data = dataStatus.getValue();
+            {
+                stdx::lock_guard lk(_mutex);
+                _donorFilenameBackupCursorId = data.cursorId;
+                _donorFilenameBackupCursorNamespaceString = data.nss;
             }
-        }
 
-        *fetchStatus = Status::OK();
-        if (!getMoreBob || data.documents.empty()) {
-            // Exit fetcher but keep the backupCursor alive to prevent WT on Donor from
-            // modifying file bytes. backupCursor can be closed after all Recipient nodes
-            // have copied files from Donor primary.
-            *nextAction = Fetcher::NextAction::kExitAndKeepCursorAlive;
-            return;
-        }
+            for (const BSONObj& doc : data.documents) {
+                if (doc["metadata"]) {
+                    // First batch must contain the metadata.
+                    const auto& metadata = doc["metadata"].Obj();
+                    auto startApplyingDonorOpTime = OpTime(
+                        metadata["checkpointTimestamp"].timestamp(), OpTime::kUninitializedTerm);
 
-        getMoreBob->append("getMore", data.cursorId);
-        getMoreBob->append("collection", data.nss.coll());
+
+                    invariant(metadataInfoPtr && !*metadataInfoPtr);
+                    (*metadataInfoPtr) = shard_merge_utils::MetadataInfo::constructMetadataInfo(
+                        getMigrationUUID(), _client->getServerAddress(), metadata);
+
+                    _stateDoc.setStartApplyingDonorOpTime(startApplyingDonorOpTime);
+                    LOGV2_INFO(6113001,
+                               "Opened backup cursor on donor",
+                               "migrationId"_attr = getMigrationUUID(),
+                               "startApplyingDonorOpTime"_attr = startApplyingDonorOpTime,
+                               "backupCursorId"_attr = data.cursorId);
+                } else {
+                    LOGV2_DEBUG(6113002,
+                                1,
+                                "Backup cursor entry",
+                                "migrationId"_attr = getMigrationUUID(),
+                                "filename"_attr = doc["filename"].String(),
+                                "backupCursorId"_attr = data.cursorId);
+
+                    invariant(metadataInfoPtr && *metadataInfoPtr);
+                    auto docs =
+                        std::vector<mongo::BSONObj>{(*metadataInfoPtr)->toBSON(doc).getOwned()};
+
+                    // Disabling internal document validation because the fetcher batch size
+                    // can exceed the max data size limit BSONObjMaxUserSize with the
+                    // additional fields we add to documents.
+                    DisableDocumentValidation documentValidationDisabler(
+                        opCtx, DocumentValidationSettings::kDisableInternalValidation);
+
+                    write_ops::InsertCommandRequest insertOp(
+                        shard_merge_utils::getDonatedFilesNs(getMigrationUUID()));
+                    insertOp.setDocuments(std::move(docs));
+                    insertOp.setWriteCommandRequestBase([] {
+                        write_ops::WriteCommandRequestBase wcb;
+                        wcb.setOrdered(true);
+                        return wcb;
+                    }());
+
+                    auto writeResult = write_ops_exec::performInserts(opCtx, insertOp);
+                    invariant(!writeResult.results.empty());
+                    // Writes are ordered, check only the last writeOp result.
+                    uassertStatusOK(writeResult.results.back());
+                }
+            }
+
+            *fetchStatus = Status::OK();
+            if (!getMoreBob || data.documents.empty()) {
+                // Exit fetcher but keep the backupCursor alive to prevent WT on Donor from
+                // modifying file bytes. backupCursor can be closed after all Recipient nodes
+                // have copied files from Donor primary.
+                *nextAction = Fetcher::NextAction::kExitAndKeepCursorAlive;
+                return;
+            }
+
+            getMoreBob->append("getMore", data.cursorId);
+            getMoreBob->append("collection", data.nss.coll());
+        } catch (DBException& ex) {
+            LOGV2_ERROR(
+                6409801, "Error fetching backup cursor entries", "error"_attr = ex.toString());
+            *fetchStatus = ex.toStatus();
+        }
     };
 
     _donorFilenameBackupCursorFileFetcher = std::make_unique<Fetcher>(
