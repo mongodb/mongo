@@ -87,7 +87,7 @@ public:
     class VectorTime {
     public:
         explicit VectorTime(LogicalTimeArray time) : _time(std::move(time)) {}
-        VectorTime() = default;
+        VectorTime() = delete;
 
         LogicalTime clusterTime() const& {
             return _time[Component::ClusterTime];
@@ -114,6 +114,20 @@ public:
 
         LogicalTimeArray _time;
     };
+
+    // There is a special logic in the storage engine which fixes up Timestamp(0, 0) to the latest
+    // available time on the node. Because of this, we should never gossip or have a VectorClock
+    // initialised with a value of Timestamp(0, 0), because that would cause the checkpointed value
+    // to move forward in time.
+    static const LogicalTime kInitialComponentTime;
+
+    /**
+     * Returns true if the passed LogicalTime is set to a value higher than kInitialComponentTime,
+     * false otherwise.
+     */
+    static bool isValidComponentTime(const LogicalTime& time) {
+        return time > kInitialComponentTime;
+    }
 
     static constexpr char kClusterTimeFieldName[] = "$clusterTime";
     static constexpr char kConfigTimeFieldName[] = "$configTime";
@@ -294,7 +308,8 @@ protected:
 
     bool _isEnabled{true};
 
-    LogicalTimeArray _vectorTime;
+    LogicalTimeArray _vectorTime = {
+        kInitialComponentTime, kInitialComponentTime, kInitialComponentTime};
 
 private:
     class PlainComponentFormat;

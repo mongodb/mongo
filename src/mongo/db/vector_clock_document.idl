@@ -46,6 +46,8 @@ structs:
             configTime:
                 type: timestamp
                 description: "Persists the configTime component of the vector clock"
+                default: Timestamp(0, 1)
             topologyTime:
                 type: timestamp
                 description: "Persists the topologyTime component of the vector clock"
+                default: Timestamp(0, 1)

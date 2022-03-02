@@ -45,6 +45,8 @@ const auto vectorClockDecoration = ServiceContext::declareDecoration<VectorClock
 
 }  // namespace
 
+const LogicalTime VectorClock::kInitialComponentTime{Timestamp{0, 1}};
+
 VectorClock* VectorClock::get(ServiceContext* service) {
     return vectorClockDecoration(service);
 }
@@ -388,7 +390,7 @@ void VectorClock::resetVectorClock_forTest() {
     stdx::lock_guard<Latch> lock(_mutex);
     auto it = _vectorTime.begin();
     for (; it != _vectorTime.end(); ++it) {
-        *it = LogicalTime();
+        *it = VectorClock::kInitialComponentTime;
     }
     _isEnabled = true;
 }

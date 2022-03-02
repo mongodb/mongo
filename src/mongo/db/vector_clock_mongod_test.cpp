@@ -216,8 +216,8 @@ TEST_F(VectorClockMongoDTest, GossipInInternal) {
     // $configTime or $topologyTime.
     auto afterTime = vc->getTime();
     ASSERT_EQ(afterTime.clusterTime().asTimestamp(), Timestamp(2, 2));
-    ASSERT_EQ(afterTime.configTime().asTimestamp(), Timestamp(0, 0));
-    ASSERT_EQ(afterTime.topologyTime().asTimestamp(), Timestamp(0, 0));
+    ASSERT_EQ(afterTime.configTime(), VectorClock::kInitialComponentTime);
+    ASSERT_EQ(afterTime.topologyTime(), VectorClock::kInitialComponentTime);
 
     vc->gossipIn(nullptr,
                  BSON("$clusterTime"
@@ -228,8 +228,8 @@ TEST_F(VectorClockMongoDTest, GossipInInternal) {
 
     auto afterTime2 = vc->getTime();
     ASSERT_EQ(afterTime2.clusterTime().asTimestamp(), Timestamp(2, 2));
-    ASSERT_EQ(afterTime2.configTime().asTimestamp(), Timestamp(0, 0));
-    ASSERT_EQ(afterTime2.topologyTime().asTimestamp(), Timestamp(0, 0));
+    ASSERT_EQ(afterTime2.configTime(), VectorClock::kInitialComponentTime);
+    ASSERT_EQ(afterTime2.topologyTime(), VectorClock::kInitialComponentTime);
 
     vc->gossipIn(nullptr,
                  BSON("$clusterTime"
@@ -240,8 +240,8 @@ TEST_F(VectorClockMongoDTest, GossipInInternal) {
 
     auto afterTime3 = vc->getTime();
     ASSERT_EQ(afterTime3.clusterTime().asTimestamp(), Timestamp(3, 3));
-    ASSERT_EQ(afterTime3.configTime().asTimestamp(), Timestamp(0, 0));
-    ASSERT_EQ(afterTime3.topologyTime().asTimestamp(), Timestamp(0, 0));
+    ASSERT_EQ(afterTime3.configTime(), VectorClock::kInitialComponentTime);
+    ASSERT_EQ(afterTime3.topologyTime(), VectorClock::kInitialComponentTime);
 }
 
 TEST_F(VectorClockMongoDTest, GossipInExternal) {
@@ -263,8 +263,8 @@ TEST_F(VectorClockMongoDTest, GossipInExternal) {
     // $configTime or $topologyTime.
     auto afterTime = vc->getTime();
     ASSERT_EQ(afterTime.clusterTime().asTimestamp(), Timestamp(2, 2));
-    ASSERT_EQ(afterTime.configTime().asTimestamp(), Timestamp(0, 0));
-    ASSERT_EQ(afterTime.topologyTime().asTimestamp(), Timestamp(0, 0));
+    ASSERT_EQ(afterTime.configTime(), VectorClock::kInitialComponentTime);
+    ASSERT_EQ(afterTime.topologyTime(), VectorClock::kInitialComponentTime);
 
     vc->gossipIn(nullptr,
                  BSON("$clusterTime"
@@ -274,8 +274,8 @@ TEST_F(VectorClockMongoDTest, GossipInExternal) {
 
     auto afterTime2 = vc->getTime();
     ASSERT_EQ(afterTime2.clusterTime().asTimestamp(), Timestamp(2, 2));
-    ASSERT_EQ(afterTime2.configTime().asTimestamp(), Timestamp(0, 0));
-    ASSERT_EQ(afterTime2.topologyTime().asTimestamp(), Timestamp(0, 0));
+    ASSERT_EQ(afterTime2.configTime(), VectorClock::kInitialComponentTime);
+    ASSERT_EQ(afterTime2.topologyTime(), VectorClock::kInitialComponentTime);
 
     vc->gossipIn(nullptr,
                  BSON("$clusterTime"
@@ -285,8 +285,8 @@ TEST_F(VectorClockMongoDTest, GossipInExternal) {
 
     auto afterTime3 = vc->getTime();
     ASSERT_EQ(afterTime3.clusterTime().asTimestamp(), Timestamp(3, 3));
-    ASSERT_EQ(afterTime2.configTime().asTimestamp(), Timestamp(0, 0));
-    ASSERT_EQ(afterTime3.topologyTime().asTimestamp(), Timestamp(0, 0));
+    ASSERT_EQ(afterTime2.configTime(), VectorClock::kInitialComponentTime);
+    ASSERT_EQ(afterTime3.topologyTime(), VectorClock::kInitialComponentTime);
 }
 
 }  // namespace

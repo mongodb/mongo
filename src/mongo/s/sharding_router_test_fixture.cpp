@@ -46,6 +46,7 @@
 #include "mongo/db/query/collation/collator_factory_mock.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/db/vector_clock_metadata_hook.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
@@ -262,7 +263,9 @@ void ShardingTestFixture::expectGetShards(const std::vector<ShardType>& shards) 
         ASSERT_BSONOBJ_EQ(query->getSort(), BSONObj());
         ASSERT_FALSE(query->getLimit().is_initialized());
 
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
+        checkReadConcern(request.cmdObj,
+                         VectorClock::kInitialComponentTime.asTimestamp(),
+                         repl::OpTime::kUninitializedTerm);
 
         std::vector<BSONObj> shardsToReturn;
 
@@ -358,7 +361,9 @@ void ShardingTestFixture::expectCount(const HostAndPort& configHost,
             return BSON("ok" << 1 << "n" << response.getValue());
         }
 
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
+        checkReadConcern(request.cmdObj,
+                         VectorClock::kInitialComponentTime.asTimestamp(),
+                         repl::OpTime::kUninitializedTerm);
 
         BSONObjBuilder responseBuilder;
         CommandHelpers::appendCommandStatusNoThrow(responseBuilder, response.getStatus());

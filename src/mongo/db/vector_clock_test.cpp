@@ -320,7 +320,7 @@ TEST_F(VectorClockTest, RejectsLogicalTimesGreaterThanMaxTime) {
     resetClock();
     ASSERT_THROWS(VectorClockMutable::get(getServiceContext())->tickClusterTimeTo(beyondMaxTime),
                   DBException);
-    ASSERT_TRUE(getClusterTime() == LogicalTime());
+    ASSERT_TRUE(getClusterTime() == VectorClock::kInitialComponentTime);
 
     // The time can't be advanced through metadata to a time greater than the max possible.
     // Advance the wall clock close enough to the new value so the rate check is passed.
@@ -328,7 +328,7 @@ TEST_F(VectorClockTest, RejectsLogicalTimesGreaterThanMaxTime) {
         Seconds(maxVal) - Seconds(kMaxAcceptableLogicalClockDriftSecsDefault) + Seconds(10);
     setMockClockSourceTime(Date_t::fromDurationSinceEpoch(almostMaxSecs));
     ASSERT_THROWS(advanceClusterTime(beyondMaxTime), DBException);
-    ASSERT_TRUE(getClusterTime() == LogicalTime());
+    ASSERT_TRUE(getClusterTime() == VectorClock::kInitialComponentTime);
 }
 
 }  // unnamed namespace

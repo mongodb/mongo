@@ -161,9 +161,9 @@ TEST_F(VectorClockShardServerTest, GossipOutInternal) {
     ASSERT_TRUE(obj.hasField("$clusterTime"));
     ASSERT_EQ(obj["$clusterTime"].Obj()["clusterTime"].timestamp(), clusterTime.asTimestamp());
     ASSERT_TRUE(obj.hasField("$configTime"));
-    ASSERT_EQ(obj["$configTime"].timestamp(), Timestamp(0, 0));
+    ASSERT_EQ(obj["$configTime"].timestamp(), VectorClock::kInitialComponentTime.asTimestamp());
     ASSERT_TRUE(obj.hasField("$topologyTime"));
-    ASSERT_EQ(obj["$topologyTime"].timestamp(), Timestamp(0, 0));
+    ASSERT_EQ(obj["$topologyTime"].timestamp(), VectorClock::kInitialComponentTime.asTimestamp());
 }
 
 TEST_F(VectorClockShardServerTest, GossipOutExternal) {
@@ -254,8 +254,8 @@ TEST_F(VectorClockShardServerTest, GossipInExternal) {
     // $configTime or $topologyTime.
     auto afterTime = vc->getTime();
     ASSERT_EQ(afterTime.clusterTime().asTimestamp(), Timestamp(2, 2));
-    ASSERT_EQ(afterTime.configTime().asTimestamp(), Timestamp(0, 0));
-    ASSERT_EQ(afterTime.topologyTime().asTimestamp(), Timestamp(0, 0));
+    ASSERT_EQ(afterTime.configTime(), VectorClock::kInitialComponentTime);
+    ASSERT_EQ(afterTime.topologyTime(), VectorClock::kInitialComponentTime);
 
     vc->gossipIn(nullptr,
                  BSON("$clusterTime"
@@ -265,8 +265,8 @@ TEST_F(VectorClockShardServerTest, GossipInExternal) {
 
     auto afterTime2 = vc->getTime();
     ASSERT_EQ(afterTime2.clusterTime().asTimestamp(), Timestamp(2, 2));
-    ASSERT_EQ(afterTime2.configTime().asTimestamp(), Timestamp(0, 0));
-    ASSERT_EQ(afterTime2.topologyTime().asTimestamp(), Timestamp(0, 0));
+    ASSERT_EQ(afterTime2.configTime(), VectorClock::kInitialComponentTime);
+    ASSERT_EQ(afterTime2.topologyTime(), VectorClock::kInitialComponentTime);
 
     vc->gossipIn(nullptr,
                  BSON("$clusterTime"
@@ -276,8 +276,8 @@ TEST_F(VectorClockShardServerTest, GossipInExternal) {
 
     auto afterTime3 = vc->getTime();
     ASSERT_EQ(afterTime3.clusterTime().asTimestamp(), Timestamp(3, 3));
-    ASSERT_EQ(afterTime3.configTime().asTimestamp(), Timestamp(0, 0));
-    ASSERT_EQ(afterTime3.topologyTime().asTimestamp(), Timestamp(0, 0));
+    ASSERT_EQ(afterTime3.configTime(), VectorClock::kInitialComponentTime);
+    ASSERT_EQ(afterTime3.topologyTime(), VectorClock::kInitialComponentTime);
 }
 
 class VectorClockPersistenceTest : public ShardServerTestFixture {
@@ -329,8 +329,8 @@ TEST_F(VectorClockPersistenceTest, PrimaryRecoverWithoutExistingVectorClockDocum
     vc->recoverDirect(opCtx);
 
     auto time = vc->getTime();
-    ASSERT_EQ(Timestamp(0), time.configTime().asTimestamp());
-    ASSERT_EQ(Timestamp(0), time.topologyTime().asTimestamp());
+    ASSERT_EQ(VectorClock::kInitialComponentTime, time.configTime());
+    ASSERT_EQ(VectorClock::kInitialComponentTime, time.topologyTime());
 }
 
 TEST_F(VectorClockPersistenceTest, PrimaryRecoverWithExistingVectorClockDocument) {
@@ -341,7 +341,10 @@ TEST_F(VectorClockPersistenceTest, PrimaryRecoverWithExistingVectorClockDocument
     // Check that no vectorClockState document is present
     PersistentTaskStore<VectorClockDocument> store(NamespaceString::kVectorClockNamespace);
     ASSERT_EQ(store.count(opCtx, kVectorClockQuery), 0);
-    store.add(opCtx, VectorClockDocument(Timestamp(100), Timestamp(50)));
+    VectorClockDocument vcd;
+    vcd.setConfigTime(Timestamp(100));
+    vcd.setTopologyTime(Timestamp(50));
+    store.add(opCtx, vcd);
 
     vc->recoverDirect(opCtx);
 
@@ -365,8 +368,11 @@ TEST_F(VectorClockPersistenceTest, PrimaryRecoverWithIllegalVectorClockDocument)
                        << "IllegalKey"
                        << "IllegalValue"));
 
-    const int kParseErrorCode = 40414;
-    ASSERT_THROWS_CODE(vc->recoverDirect(opCtx), DBException, ErrorCodes::Error(kParseErrorCode));
+    vc->recoverDirect(opCtx);
+
+    auto time = vc->getTime();
+    ASSERT_EQ(VectorClock::kInitialComponentTime, time.configTime());
+    ASSERT_EQ(VectorClock::kInitialComponentTime, time.topologyTime());
 }
 
 }  // namespace
