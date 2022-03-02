@@ -572,7 +572,8 @@ long long PlanExecutorImpl::executeDelete() {
             return static_cast<const DeleteStats*>(stats)->docsDeleted;
         }
         default: {
-            invariant(StageType::STAGE_DELETE == _root->stageType());
+            invariant(StageType::STAGE_DELETE == _root->stageType() ||
+                      StageType::STAGE_BATCHED_DELETE == _root->stageType());
             const auto* deleteStats = static_cast<const DeleteStats*>(_root->getSpecificStats());
             return deleteStats->docsDeleted;
         }

@@ -37,6 +37,7 @@ StringData stageTypeToString(StageType stageType) {
     static const stdx::unordered_map<StageType, StringData> kStageTypesMap = {
         {STAGE_AND_HASH, "AND_HASH"_sd},
         {STAGE_AND_SORTED, "AND_SORTED"_sd},
+        {STAGE_BATCHED_DELETE, "BATCHED_DELETE"_sd},
         {STAGE_CACHED_PLAN, "CACHED_PLAN"},
         {STAGE_COLLSCAN, "COLLSCAN"_sd},
         {STAGE_COLUMN_IXSCAN, "COLUMN_IXSCAN"_sd},

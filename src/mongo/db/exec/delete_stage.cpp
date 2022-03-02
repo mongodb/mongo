@@ -73,12 +73,20 @@ DeleteStage::DeleteStage(ExpressionContext* expCtx,
                          WorkingSet* ws,
                          const CollectionPtr& collection,
                          PlanStage* child)
-    : RequiresMutableCollectionStage(kStageType.rawData(), expCtx, collection),
+    : DeleteStage(kStageType.rawData(), expCtx, std::move(params), ws, collection, child) {}
+
+DeleteStage::DeleteStage(const char* stageType,
+                         ExpressionContext* expCtx,
+                         std::unique_ptr<DeleteStageParams> params,
+                         WorkingSet* ws,
+                         const CollectionPtr& collection,
+                         PlanStage* child)
+    : RequiresMutableCollectionStage(stageType, expCtx, collection),
       _params(std::move(params)),
       _ws(ws),
+      _preWriteFilter(opCtx(), collection->ns()),
       _idRetrying(WorkingSet::INVALID_ID),
-      _idReturning(WorkingSet::INVALID_ID),
-      _preWriteFilter(opCtx(), collection->ns()) {
+      _idReturning(WorkingSet::INVALID_ID) {
     _children.emplace_back(child);
 }
 
@@ -203,9 +211,6 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
     if (_params->removeSaver) {
         uassertStatusOK(_params->removeSaver->goingToDelete(bsonObjDoc));
     }
-
-    // TODO: Do we want to buffer docs and delete them in a group rather than saving/restoring state
-    // repeatedly?
 
     try {
         child()->saveState();

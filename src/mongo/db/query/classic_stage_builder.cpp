@@ -400,6 +400,7 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
             }
             return qds;
         }
+        case STAGE_BATCHED_DELETE:
         case STAGE_CACHED_PLAN:
         case STAGE_COUNT:
         case STAGE_DELETE:

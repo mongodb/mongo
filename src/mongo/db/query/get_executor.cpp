@@ -62,6 +62,7 @@
 #include "mongo/db/index_names.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
+#include "mongo/db/ops/delete_request_gen.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/query/bind_input_params.h"
 #include "mongo/db/query/canonical_query.h"
@@ -109,6 +110,7 @@
 
 namespace mongo {
 MONGO_FAIL_POINT_DEFINE(includeFakeColumnarIndex);
+MONGO_FAIL_POINT_DEFINE(batchUserMultiDeletes);
 
 boost::intrusive_ptr<ExpressionContext> makeExpressionContextForGetExecutor(
     OperationContext* opCtx, const BSONObj& requestCollation, const NamespaceString& nss) {
@@ -1655,8 +1657,24 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
     invariant(root);
 
     deleteStageParams->canonicalQuery = cq.get();
-    root = std::make_unique<DeleteStage>(
-        cq->getExpCtxRaw(), std::move(deleteStageParams), ws.get(), collection, root.release());
+
+    bool makeBatchedDeleteStage = false;
+    batchUserMultiDeletes.executeIf(
+        [&](const BSONObj& data) { makeBatchedDeleteStage = true; },
+        [&](const BSONObj& data) { return data["ns"].String() == nss.ns(); });
+
+    if (MONGO_unlikely(makeBatchedDeleteStage)) {
+        root =
+            std::make_unique<BatchedDeleteStage>(cq->getExpCtxRaw(),
+                                                 std::move(deleteStageParams),
+                                                 std::make_unique<BatchedDeleteStageBatchParams>(),
+                                                 ws.get(),
+                                                 collection,
+                                                 root.release());
+    } else {
+        root = std::make_unique<DeleteStage>(
+            cq->getExpCtxRaw(), std::move(deleteStageParams), ws.get(), collection, root.release());
+    }
 
     if (projection) {
         root = std::make_unique<ProjectionStageDefault>(

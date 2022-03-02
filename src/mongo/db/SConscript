@@ -1321,6 +1321,7 @@ env.Library(
         'cursor_manager.cpp',
         'exec/and_hash.cpp',
         'exec/and_sorted.cpp',
+        'exec/batched_delete_stage.cpp',
         'exec/cached_plan.cpp',
         'exec/collection_scan.cpp',
         'exec/count.cpp',

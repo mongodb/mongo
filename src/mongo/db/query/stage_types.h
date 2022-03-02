@@ -49,6 +49,7 @@ static constexpr PlanNodeId kEmptyPlanNodeId = 0u;
 enum StageType {
     STAGE_AND_HASH,
     STAGE_AND_SORTED,
+    STAGE_BATCHED_DELETE,
     STAGE_CACHED_PLAN,
     STAGE_COLLSCAN,
     STAGE_COLUMN_IXSCAN,

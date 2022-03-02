@@ -101,7 +101,7 @@ struct DeleteStageParams {
  * Callers of work() must be holding a write lock (and, for replicated deletes, callers must have
  * had the replication coordinator approve the write).
  */
-class DeleteStage final : public RequiresMutableCollectionStage {
+class DeleteStage : public RequiresMutableCollectionStage {
     DeleteStage(const DeleteStage&) = delete;
     DeleteStage& operator=(const DeleteStage&) = delete;
 
@@ -114,10 +114,17 @@ public:
                 const CollectionPtr& collection,
                 PlanStage* child);
 
-    bool isEOF() final;
-    StageState doWork(WorkingSetID* out) final;
+    DeleteStage(const char* stageType,
+                ExpressionContext* expCtx,
+                std::unique_ptr<DeleteStageParams> params,
+                WorkingSet* ws,
+                const CollectionPtr& collection,
+                PlanStage* child);
 
-    StageType stageType() const final {
+    bool isEOF() final;
+    StageState doWork(WorkingSetID* out);
+
+    StageType stageType() const {
         return STAGE_DELETE;
     }
 
@@ -132,23 +139,10 @@ protected:
 
     void doRestoreStateRequiresCollection() final;
 
-private:
-    /**
-     * Stores 'idToRetry' in '_idRetrying' so the delete can be retried during the next call to
-     * work(). Always returns NEED_YIELD and sets 'out' to WorkingSet::INVALID_ID.
-     */
-    StageState prepareToRetryWSM(WorkingSetID idToRetry, WorkingSetID* out);
-
     std::unique_ptr<DeleteStageParams> _params;
 
     // Not owned by us.
     WorkingSet* _ws;
-
-    // If not WorkingSet::INVALID_ID, we use this rather than asking our child what to do next.
-    WorkingSetID _idRetrying;
-
-    // If not WorkingSet::INVALID_ID, we return this member to our caller.
-    WorkingSetID _idReturning;
 
     // Stats
     DeleteStats _specificStats;
@@ -162,6 +156,19 @@ private:
      * It's refreshed after yielding and reacquiring the locks.
      */
     write_stage_common::PreWriteFilter _preWriteFilter;
+
+private:
+    /**
+     * Stores 'idToRetry' in '_idRetrying' so the delete can be retried during the next call to
+     * work(). Always returns NEED_YIELD and sets 'out' to WorkingSet::INVALID_ID.
+     */
+    StageState prepareToRetryWSM(WorkingSetID idToRetry, WorkingSetID* out);
+
+    // If not WorkingSet::INVALID_ID, we use this rather than asking our child what to do next.
+    WorkingSetID _idRetrying;
+
+    // If not WorkingSet::INVALID_ID, we return this member to our caller.
+    WorkingSetID _idReturning;
 };
 
 }  // namespace mongo
