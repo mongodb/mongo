@@ -79,7 +79,7 @@ Pipeline::SourceContainer::iterator DocumentSourceSetVariableFromSubPipeline::do
         // Check if next stage uses $$SEARCH_META.
         if (!depsTracker.hasVariableReferenceTo(std::set<Variables::Id>{_variableID})) {
             std::swap(*itr, *nextStage);
-            return std::prev(itr);
+            return itr == container->begin() ? itr : std::prev(itr);
         }
     }
 
