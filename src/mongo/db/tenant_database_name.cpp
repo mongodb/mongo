@@ -45,6 +45,18 @@ TenantDatabaseName::TenantDatabaseName(boost::optional<TenantId> tenantId, Strin
     _tenantDbName =
         _tenantId ? boost::make_optional(_tenantId->toString() + "_" + _dbName) : boost::none;
 }
+/*
+TenantDatabaseName::TenantDatabaseName(StringData dbName) {
+    _tenantId = boost::none;
+    _dbName = dbName.toString();
+    _tenantDbName = boost::none;
+}
+
+TenantDatabaseName::TenantDatabaseName(const std::string& dbName) {
+    _tenantId = boost::none;
+    _dbName = dbName;
+    _tenantDbName = boost::none;
+}*/
 
 TenantDatabaseName TenantDatabaseName::createSystemTenantDbName(StringData dbName) {
     // TODO SERVER-62114 Check instead if gMultitenancySupport is enabled.

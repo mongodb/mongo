@@ -34,7 +34,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/tenant_id.h"
+#include "mongo/idl/tenant_id.h"
 #include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/attributes.h"
 #include "mongo/logv2/constants.h"

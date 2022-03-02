@@ -37,6 +37,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/idl/tenant_id.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/stdx/type_traits.h"
 
@@ -336,13 +337,16 @@ public:
     void throwAPIStrictErrorIfApplicable(StringData fieldName) const;
     void throwAPIStrictErrorIfApplicable(BSONElement fieldName) const;
 
+    void throwDuplicateTenantIdErrorIfApplicable(boost::optional<TenantId> dollarTenant) const;
+
     /**
      * Equivalent to CommandHelpers::parseNsCollectionRequired.
      * 'allowGlobalCollectionName' allows use of global collection name, e.g. {aggregate: 1}.
      */
     static NamespaceString parseNSCollectionRequired(StringData dbName,
                                                      const BSONElement& element,
-                                                     bool allowGlobalCollectionName);
+                                                     bool allowGlobalCollectionName,
+                                                     boost::optional<TenantId> tenantId = boost::none);
 
     /**
      * Equivalent to CommandHelpers::parseNsOrUUID

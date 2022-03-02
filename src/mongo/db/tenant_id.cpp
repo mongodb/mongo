@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/tenant_id.h"
+#include "mongo/idl/tenant_id.h"
 
 #include "mongo/bson/oid.h"
 

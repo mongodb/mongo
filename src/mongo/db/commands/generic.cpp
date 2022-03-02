@@ -83,6 +83,9 @@ public:
         NamespaceString ns() const override {
             return NamespaceString(request().getDbName());
         }
+        boost::optional<auth::SecurityToken> securityToken() const final {
+            return request().getSecurityToken();
+        }
         Reply typedRun(OperationContext* opCtx) final {
             // IMPORTANT: Don't put anything in here that might lock db - including authentication
             return Reply{};
@@ -271,6 +274,9 @@ public:
 
         NamespaceString ns() const final {
             return NamespaceString(request().getDbName(), "");
+        }
+        boost::optional<auth::SecurityToken> securityToken() const final {
+            return request().getSecurityToken();
         }
     };
 

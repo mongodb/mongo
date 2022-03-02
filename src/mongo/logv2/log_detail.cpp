@@ -33,7 +33,7 @@
 
 #include <fmt/format.h>
 
-#include "mongo/db/tenant_id.h"
+#include "mongo/idl/tenant_id.h"
 #include "mongo/logv2/attributes.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_domain.h"

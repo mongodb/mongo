@@ -72,7 +72,7 @@
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/tenant_id.h"
+#include "mongo/idl/tenant_id.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/rpc/factory.h"
@@ -952,6 +952,10 @@ public:
         NamespaceString ns() const final {
             return NamespaceString(request().getDbName(), "");
         }
+
+        boost::optional<auth::SecurityToken> securityToken() const final {
+            return request().getSecurityToken();
+        }
     };
 
     bool skipApiVersionCheck() const final {
@@ -988,7 +992,7 @@ void CmdUMCTyped<CreateUserCommand>::Invocation::typedRun(OperationContext* opCt
     uassert(ErrorCodes::BadValue,
             "Username cannot contain NULL characters",
             cmd.getCommandParameter().find('\0') == std::string::npos);
-    UserName userName(cmd.getCommandParameter(), dbname, getActiveTenant(opCtx));
+    UserName userName(cmd.getCommandParameter(), dbname, cmd.getDollarTenantId());
 
     uassert(ErrorCodes::BadValue,
             "Must provide a 'pwd' field for all user documents, except those"

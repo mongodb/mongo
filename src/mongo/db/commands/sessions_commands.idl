@@ -33,6 +33,7 @@ imports:
   - "mongo/db/auth/access_checks.idl"
   - "mongo/db/logical_session_id.idl"
   - "mongo/idl/basic_types.idl"
+  - "mongo/db/auth/security_token.idl"
 
 commands:
     endSessionsFromClient:

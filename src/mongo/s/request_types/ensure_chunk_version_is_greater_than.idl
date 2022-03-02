@@ -34,6 +34,7 @@ global:
 imports:
     - "mongo/idl/basic_types.idl"
     - "mongo/s/chunk_version.idl"
+    - "mongo/db/auth/security_token.idl"
 
 commands:
     _configsvrEnsureChunkVersionIsGreaterThan:

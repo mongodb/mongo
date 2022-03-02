@@ -35,6 +35,7 @@ imports:
     - "mongo/crypto/encryption_fields.idl"
     - "mongo/db/auth/access_checks.idl"
     - "mongo/db/auth/action_type.idl"
+    - "mongo/db/auth/security_token.idl"
     - "mongo/db/catalog/collection_options.idl"
     - "mongo/db/catalog/clustered_collection_options.idl"
     - "mongo/db/timeseries/timeseries.idl"
@@ -55,7 +56,7 @@ commands:
     create:
         description: "Parser for the 'create' Command"
         command_name: create
-        namespace: concatenate_with_db
+        namespace: concatenate_with_tenantid_and_db
         cpp_name: CreateCommand
         api_version: "1"
         access_check:

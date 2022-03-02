@@ -32,6 +32,7 @@ global:
     cpp_includes:
         - "mongo/db/logical_time.h"
         - "mongo/db/namespace_string.h"
+        - "mongo/idl/tenant_id.h"
         - "mongo/idl/basic_types.h"
         - "mongo/util/uuid.h"
 
@@ -265,6 +266,13 @@ types:
             See https://docs.mongodb.com/manual/reference/write-concern/"
         cpp_type: std::int64_t
         deserializer: "mongo::parseWTimeoutFromBSON"
+    
+    tenant_id:
+        bson_serialization_type: any
+        description: "A struct representing a tenant id"
+        cpp_type: "TenantId"
+        deserializer: "mongo::TenantId::parseFromBSON"
+        serializer: "mongo::TenantId::serializeToBSON"
 
 enums:
     ReadWriteConcernProvenanceSource:

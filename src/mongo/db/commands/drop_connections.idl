@@ -34,6 +34,7 @@ global:
 imports:
     - "mongo/idl/basic_types.idl"
     - "mongo/util/net/hostandport.idl"
+    - "mongo/db/auth/security_token.idl"
 
 commands:
     dropConnections:

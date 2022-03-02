@@ -96,9 +96,9 @@ void readRequestMetadata(OperationContext* opCtx, const OpMsg& opMsg, bool cmdRe
     }
 
     readImpersonatedUserMetadata(impersonationElem, opCtx);
-    auth::readSecurityTokenMetadata(opCtx, opMsg.securityToken);
+    //auth::readSecurityTokenMetadata(opCtx, opMsg.securityToken);
 
-    parseDollarTenantFromRequest(opCtx, opMsg);
+   // parseDollarTenantFromRequest(opCtx, opMsg);
 
     // We check for "$client" but not "client" here, because currentOp can filter on "client" as
     // a top-level field.

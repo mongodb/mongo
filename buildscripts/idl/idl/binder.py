@@ -403,11 +403,23 @@ def _inject_hidden_command_fields(command):
     db_field.cpp_name = "dbName"
     db_field.serialize_op_msg_request_only = True
 
+    # Inject a "$tenant" which we can decode during command parsing
+    dollar_tenantid_field = syntax.Field(command.file_name, command.line, command.column)
+    dollar_tenantid_field.name = "$tenant"
+    dollar_tenantid_field.type = syntax.FieldTypeSingle(command.file_name, command.line, command.column)
+    dollar_tenantid_field.type.type_name = "tenant_id"  # This comes from basic_types.idl
+    dollar_tenantid_field.cpp_name = "dollarTenantId"
+    dollar_tenantid_field.optional = True
+
     # Commands that require namespaces do not need to have db defaulted in the constructor
-    if command.namespace == common.COMMAND_NAMESPACE_CONCATENATE_WITH_DB:
+    if command.namespace == common.COMMAND_NAMESPACE_CONCATENATE_WITH_DB or command.namespace == common.COMMAND_NAMESPACE_CONCATENATE_WITH_TENANTID_AND_DB:
         db_field.constructed = True
+    
+    if command.namespace == common.COMMAND_NAMESPACE_CONCATENATE_WITH_TENANTID_AND_DB:
+        dollar_tenantid_field.constructed = True
 
     command.fields.append(db_field)
+    command.fields.append(dollar_tenantid_field)
 
 
 def _bind_struct_type(struct):

@@ -42,7 +42,7 @@ namespace auth {
 class SecurityTokenAuthenticationGuard {
 public:
     SecurityTokenAuthenticationGuard() = delete;
-    SecurityTokenAuthenticationGuard(OperationContext* opCtx);
+    SecurityTokenAuthenticationGuard(OperationContext* opCtx, boost::optional<SecurityToken> token);
     ~SecurityTokenAuthenticationGuard();
 
 private:
@@ -59,13 +59,13 @@ BSONObj signSecurityToken(BSONObj obj);
  * Verify the contents of the provided security token
  * using the temporary signing algorithm,
  */
-SecurityToken verifySecurityToken(BSONObj obj);
+SecurityToken verifySecurityToken(SecurityToken token, BSONObj tokenObj);
 
 /**
  * Parse any SecurityToken from the OpMsg and place it as a decoration
  * on OperationContext
  */
-void readSecurityTokenMetadata(OperationContext* opCtx, BSONObj securityToken);
+//void readSecurityTokenMetadata(OperationContext* opCtx, BSONObj securityToken);
 
 /**
  * Retrieve the Security Token associated with this operation context

@@ -63,6 +63,7 @@
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/logical_time_validator.h"
+#include "mongo/db/multitenancy.h"
 #include "mongo/db/not_primary_error_tracker.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/ops/write_ops_exec.h"
@@ -1314,11 +1315,16 @@ void ExecCommandDatabase::_initiateCommand() {
     });
 
     rpc::readRequestMetadata(opCtx, request, command->requiresAuth());
-    uassert(ErrorCodes::Unauthorized,
+    if (auto token = _invocation->securityToken()) {
+        verifySecurityToken(*token, request.securityToken);
+        _tokenAuthorizationSessionGuard.emplace(opCtx, token);
+    } else if (auto dollarTenant = _invocation->ns().tenantId()) {
+        verifyDollarTenantField(opCtx);
+    }
+    /*uassert(ErrorCodes::Unauthorized,
             str::stream() << "Command " << command->getName()
                           << " is not supported in multitenancy mode",
-            command->allowedWithSecurityToken() || auth::getSecurityToken(opCtx) == boost::none);
-    _tokenAuthorizationSessionGuard.emplace(opCtx);
+            command->allowedWithSecurityToken() || auth::getSecurityToken(opCtx) == boost::none);*/
 
     rpc::TrackingMetadata::get(opCtx).initWithOperName(command->getName());
 

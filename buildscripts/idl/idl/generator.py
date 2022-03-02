@@ -656,7 +656,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                     common.template_args(
                         'static constexpr auto kCommandAlias = "${command_alias}"_sd;',
                         command_alias=struct.command_alias))
-
+    
     def gen_authorization_contract_declaration(self, struct):
         # type: (ast.Struct) -> None
         """Generate the authorization contract declaration."""
@@ -1069,9 +1069,12 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
 
                     if isinstance(struct, ast.Command):
                         self.gen_op_msg_request_methods(struct)
+                        self._writer.write_line('const boost::optional<auth::SecurityToken>& getSecurityToken() const { return _securityToken; }')
+                        self.write_empty_line()
 
                     # Write getters & setters
                     for field in struct.fields:
+
                         if not field.ignore:
                             if field.description:
                                 self.gen_description_comment(field.description)
@@ -1099,6 +1102,8 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                         self.write_empty_line()
 
                         self.gen_op_msg_request_member(struct)
+                        self._writer.write_line('boost::optional<auth::SecurityToken> _securityToken;')
+                        self.write_empty_line()
 
                     # Write member variables
                     for field in struct.fields:
@@ -1570,7 +1575,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         self._writer.write_empty_line()
 
-    def _gen_command_deserializer(self, struct, bson_object):
+    def _gen_command_deserializer(self, struct, bson_object, tenant_id=None):
         # type: (ast.Struct, str) -> None
         """Generate the command field deserializer."""
 
@@ -1583,7 +1588,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             struct_type_info = struct_types.get_struct_info(struct)
 
             # Generate namespace check now that "$db" has been read or defaulted
-            struct_type_info.gen_namespace_check(self._writer, "_dbName", "commandElement")
+            struct_type_info.gen_namespace_check(self._writer, "_dbName", "commandElement", tenant_id)
 
     def _gen_fields_deserializer_common(self, struct, bson_object):
         # type: (ast.Struct, str) -> _FieldUsageCheckerBase
@@ -1693,7 +1698,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     self._writer.write_line(
                         '%s object(localCmdType);' % (common.title_case(struct.cpp_name)))
                 elif struct.namespace in (common.COMMAND_NAMESPACE_CONCATENATE_WITH_DB,
-                                          common.COMMAND_NAMESPACE_CONCATENATE_WITH_DB_OR_UUID):
+                                          common.COMMAND_NAMESPACE_CONCATENATE_WITH_DB_OR_UUID,
+                                          common.COMMAND_NAMESPACE_CONCATENATE_WITH_TENANTID_AND_DB):
                     self._writer.write_line('NamespaceString localNS;')
                     self._writer.write_line(
                         '%s object(localNS);' % (common.title_case(struct.cpp_name)))
@@ -1784,6 +1790,13 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             field_usage_check.add_final_checks()
             self._writer.write_empty_line()
 
+            if isinstance(struct, ast.Command):
+                optional_block_start = 'if (auto securityToken = bsonObject["authenticatedUser"]) {'
+                with self._block(optional_block_start, '}'):
+                    self._writer.write_line('_securityToken.emplace(auth::SecurityToken::parse({"Security Token"}, securityToken.Obj()));')
+                    self._writer.write_line('uassert(ErrorCodes::BadValue, "Security token authenticated user requires a valid Tenant ID", _securityToken->getAuthenticatedUser().getTenant());')
+                    self._writer.write_line('ctxt.throwDuplicateTenantIdErrorIfApplicable(_dollarTenantId);')
+
             self._gen_command_deserializer(struct, "bsonObject")
 
     def gen_op_msg_request_deserializer_methods(self, struct):
@@ -1805,7 +1818,9 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         with self._block('%s {' % (func_def), '}'):
 
             # Deserialize all the fields
-            field_usage_check = self._gen_fields_deserializer_common(struct, "request.body")
+            field_usage_check = self._gen_fields_deserializer_common(struct, "request.body")                
+            
+            self._writer.write_empty_line()
 
             # Iterate through the document sequences if we have any
             has_doc_sequence = len(
@@ -1854,7 +1869,18 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             field_usage_check.add_final_checks()
             self._writer.write_empty_line()
 
-            self._gen_command_deserializer(struct, "request.body")
+            # Parse securityToken
+            optional_block_start = 'if (request.securityToken.nFields() > 0) {'
+            with self._block(optional_block_start, '}'):
+                self._writer.write_line('_securityToken.emplace(auth::SecurityToken::parse({"Security Token"}, request.securityToken));')
+                self._writer.write_line('uassert(ErrorCodes::BadValue, "Security token authenticated user requires a valid Tenant ID", _securityToken->getAuthenticatedUser().getTenant());')
+                self._writer.write_line('ctxt.throwDuplicateTenantIdErrorIfApplicable(_dollarTenantId);')
+
+            if isinstance(struct, ast.Command) and struct.namespace == common.COMMAND_NAMESPACE_CONCATENATE_WITH_TENANTID_AND_DB:
+                self._writer.write_line('boost::optional<TenantId> tenantId = _securityToken->getAuthenticatedUser().getTenant() ? *_securityToken->getAuthenticatedUser().getTenant() : _dollarTenantId;')
+                self._gen_command_deserializer(struct, "request.body", "tenantId")
+            else:
+                self._gen_command_deserializer(struct, "request.body")
 
     def _gen_serializer_method_custom(self, field):
         # type: (ast.Field) -> None
@@ -2654,7 +2680,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 self.write_empty_line()
 
                 self.gen_authorization_contract_definition(struct)
-
+    
                 # Write known fields declaration for command
                 self.gen_known_fields_declaration(struct)
                 self.write_empty_line()

@@ -40,6 +40,7 @@ imports:
   - "mongo/idl/basic_types.idl"
   - "mongo/s/sharding_types.idl"
   - "mongo/db/repl/replication_types.idl"
+  - "mongo/db/auth/security_token.idl"
 
 structs:
     recipientSyncDataResponse:

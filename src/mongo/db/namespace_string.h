@@ -39,6 +39,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/server_options.h"
+#include "mongo/idl/tenant_id.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
@@ -218,6 +219,7 @@ public:
     explicit NamespaceString(StringData ns) {
         _ns = ns.toString();  // copy to our buffer
         _dotIndex = _ns.find('.');
+        _tenantIndex = std::string::npos;
         uassert(ErrorCodes::InvalidNamespace,
                 "namespaces cannot have embedded null characters",
                 _ns.find('\0') == std::string::npos);
@@ -241,9 +243,39 @@ public:
         ++it;
         it = std::copy(collectionName.begin(), collectionName.end(), it);
         _dotIndex = dbName.size();
+        _tenantIndex = std::string::npos;
 
         dassert(it == _ns.end());
         dassert(_ns[_dotIndex] == '.');
+
+        uassert(ErrorCodes::InvalidNamespace,
+                "namespaces cannot have embedded null characters",
+                _ns.find('\0') == std::string::npos);
+    }
+
+    NamespaceString(TenantId tenantId, StringData dbName, StringData collectionName)
+           : _ns(tenantId.toString().size() + dbName.size() + collectionName.size() + 2, '\0') {
+        uassert(ErrorCodes::InvalidNamespace,
+                "'.' is an invalid character in the database name: " + dbName,
+                dbName.find('.') == std::string::npos);
+        uassert(ErrorCodes::InvalidNamespace,
+                "Collection names cannot start with '.': " + collectionName,
+                collectionName.empty() || collectionName[0] != '.');
+
+        std::string::iterator it = std::copy(tenantId.toString().begin(), tenantId.toString().end(), _ns.begin());
+        *it = '_';
+        ++it;
+        it = std::copy(dbName.begin(), dbName.end(), it);
+        _tenantIndex = tenantId.toString().size();
+
+        *it = '.';
+        ++it;
+        it = std::copy(collectionName.begin(), collectionName.end(), it);
+        _dotIndex = tenantId.toString().size() + dbName.size() + 1;
+
+        dassert(it == _ns.end());
+        dassert(_ns[_dotIndex] == '.');
+        dassert(_ns[_tenantIndex] == '_');
 
         uassert(ErrorCodes::InvalidNamespace,
                 "namespaces cannot have embedded null characters",
@@ -281,6 +313,10 @@ public:
         return _dotIndex == std::string::npos
             ? StringData()
             : StringData(_ns.c_str() + _dotIndex + 1, _ns.size() - 1 - _dotIndex);
+    }
+
+    boost::optional<TenantId> tenantId() {
+        return _tenantIndex == std::string::npos ? boost::none : boost::make_optional<TenantId>(TenantId(OID::createFromString(StringData(_ns.data(), _tenantIndex))));
     }
 
     const std::string& ns() const {
@@ -583,6 +619,7 @@ public:
 private:
     std::string _ns;
     size_t _dotIndex = 0;
+    size_t _tenantIndex = 0;
 };
 
 /**

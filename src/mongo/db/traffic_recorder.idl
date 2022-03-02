@@ -35,6 +35,7 @@ global:
 
 imports:
   - "mongo/idl/basic_types.idl"
+  - "mongo/db/auth/security_token.idl"
 
 
 structs:

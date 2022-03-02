@@ -66,6 +66,9 @@ function runTest(conn, enabled, rst = undefined) {
         assert.commandFailed(admin.runCommand(createUserCmd));
     }
 
+    jsTest.log("xxx create coll with $tenant");
+    conn.getDB("dollartenantdb").createCollection("coll", {"$tenant": tenantID});
+
     if (rst) {
         rst.awaitReplication();
     }
@@ -113,9 +116,12 @@ function runTest(conn, enabled, rst = undefined) {
 
         // Negative test, logMessage requires logMessage privilege on cluster (not granted)
         assert.commandFailed(tokenDB.runCommand({logMessage: 'This is a test'}));
+        
+        jsTest.log("xxx create coll with security token");
+        tokenConn.getDB("tokendb").createCollection("coll");
 
         // CRUD operations not yet supported in multitenancy using security token.
-        assert.writeError(tokenConn.getDB('test').coll1.insert({x: 1}));
+        //assert.writeError(tokenConn.getDB('test').coll1.insert({x: 1}));
 
         const log = checkLog.getGlobalLog(conn).map((l) => JSON.parse(l));
 
@@ -124,7 +130,7 @@ function runTest(conn, enabled, rst = undefined) {
         // We should see two post-operation logout events.
         const logoutMessages = log.filter((l) => (l.id === kLogoutMessageID));
         assert.eq(logoutMessages.length,
-                  2,
+                  4,
                   'Unexpected number of logout messages: ' + tojson(logoutMessages));
 
         // None of those authorization sessions should remain active into their next requests.
@@ -166,5 +172,5 @@ function runTests(enabled) {
 }
 
 runTests(true);
-runTests(false);
+//runTests(false);
 })();
