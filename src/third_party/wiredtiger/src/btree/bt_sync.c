@@ -223,7 +223,9 @@ __sync_ref_obsolete_check(WT_SESSION_IMPL *session, WT_REF *ref)
     if (busy)
         return (0);
 
-    mod = ref->page == NULL ? NULL : ref->page->modify;
+    WT_ASSERT(session, ref->page != NULL);
+    mod = ref->page->modify;
+
     if (mod != NULL && mod->rec_result == WT_PM_REC_EMPTY) {
         tag = "reconciled empty";
 
