@@ -38,20 +38,26 @@
 
 namespace mongo {
 
-bool SetClusterParameterCoordinator::hasSameOptions(const BSONObj&) {
+bool SetClusterParameterCoordinator::hasSameOptions(const BSONObj& otherDocBSON) const {
     // TODO SERVER-63870: add command parameters to comparison.
-    return true;
+    const auto otherDoc = StateDoc::parse(
+        IDLParserErrorContext("SetClusterParameterCoordinatorDocument"), otherDocBSON);
+    return SimpleBSONObjComparator::kInstance.evaluate(_doc.getParameter() ==
+                                                       otherDoc.getParameter());
 }
 
 boost::optional<BSONObj> SetClusterParameterCoordinator::reportForCurrentOp(
     MongoProcessInterface::CurrentOpConnectionsMode connMode,
     MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept {
+    BSONObjBuilder cmdBob;
+    cmdBob.appendElements(_doc.getParameter());
 
     BSONObjBuilder bob;
     bob.append("type", "op");
     bob.append("desc", "SetClusterParameterCoordinator");
     bob.append("op", "command");
     bob.append("currentPhase", _doc.getPhase());
+    bob.append("command", cmdBob.obj());
     bob.append("active", true);
     return bob.obj();
 }

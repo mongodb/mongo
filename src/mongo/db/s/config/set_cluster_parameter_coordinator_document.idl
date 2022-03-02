@@ -55,3 +55,7 @@ structs:
                 type: SetClusterParameterCoordinatorPhase
                 description: "Coordinator phase."
                 default: kUnset
+            # TODO SERVER-63870: add setClusterParameter request arguments.
+            parameter:
+                type: object_owned
+                description: "Parameter to be set in the cluster"

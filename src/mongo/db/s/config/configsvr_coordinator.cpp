@@ -39,6 +39,8 @@
 
 namespace mongo {
 
+MONGO_FAIL_POINT_DEFINE(hangBeforeRunningConfigsvrCoordinatorInstance);
+
 namespace {
 
 const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
@@ -88,6 +90,8 @@ SemiFuture<void> ConfigsvrCoordinator::run(std::shared_ptr<executor::ScopedTaskE
                                            const CancellationToken& token) noexcept {
     return ExecutorFuture<void>(**executor)
         .then([this, executor, token, anchor = shared_from_this()] {
+            hangBeforeRunningConfigsvrCoordinatorInstance.pauseWhileSet();
+
             return AsyncTry([this, executor, token] { return _runImpl(executor, token); })
                 .until([this, token](Status status) { return status.isOK() || token.isCanceled(); })
                 .withBackoffBetweenIterations(kExponentialBackoff)

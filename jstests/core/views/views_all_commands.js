@@ -114,6 +114,7 @@ let viewsCommandTests = {
     _configsvrRepairShardedCollectionChunksHistory: {skip: isAnInternalCommand},
     _configsvrReshardCollection: {skip: isAnInternalCommand},
     _configsvrSetAllowMigrations: {skip: isAnInternalCommand},
+    _configsvrSetClusterParameter: {skip: isAnInternalCommand},
     _configsvrSetUserWriteBlockMode: {skip: isAnInternalCommand},
     _configsvrShardCollection:
         {skip: isAnInternalCommand},  // TODO SERVER-58843: Remove once 6.0 becomes last LTS

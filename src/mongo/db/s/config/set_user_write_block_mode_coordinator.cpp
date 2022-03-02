@@ -40,7 +40,7 @@
 
 namespace mongo {
 
-bool SetUserWriteBlockModeCoordinator::hasSameOptions(const BSONObj& otherDocBSON) {
+bool SetUserWriteBlockModeCoordinator::hasSameOptions(const BSONObj& otherDocBSON) const {
     const auto otherDoc = StateDoc::parse(
         IDLParserErrorContext("SetUserWriteBlockModeCoordinatorDocument"), otherDocBSON);
 

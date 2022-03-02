@@ -45,7 +45,7 @@ public:
           _doc(StateDoc::parse(IDLParserErrorContext("SetClusterParameterCoordinatorDocument"),
                                stateDoc)) {}
 
-    bool hasSameOptions(const BSONObj& participantDoc);
+    bool hasSameOptions(const BSONObj& participantDoc) const override;
 
     boost::optional<BSONObj> reportForCurrentOp(
         MongoProcessInterface::CurrentOpConnectionsMode connMode,

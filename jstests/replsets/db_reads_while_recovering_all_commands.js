@@ -51,6 +51,7 @@ const allCommands = {
     _configsvrRenameCollectionMetadata: {skip: isPrimaryOnly},
     _configsvrReshardCollection: {skip: isPrimaryOnly},
     _configsvrSetAllowMigrations: {skip: isPrimaryOnly},
+    _configsvrSetClusterParameter: {skip: isPrimaryOnly},
     _configsvrSetUserWriteBlockMode: {skip: isPrimaryOnly},
     _configsvrUpdateZoneKeyRange: {skip: isPrimaryOnly},
     _flushDatabaseCacheUpdates: {skip: isPrimaryOnly},

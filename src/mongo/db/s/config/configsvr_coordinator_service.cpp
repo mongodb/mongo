@@ -34,7 +34,9 @@
 #include "mongo/db/s/config/configsvr_coordinator_service.h"
 
 #include "mongo/base/checked_cast.h"
+#include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/s/config/configsvr_coordinator.h"
+#include "mongo/db/s/config/set_cluster_parameter_coordinator.h"
 #include "mongo/db/s/config/set_user_write_block_mode_coordinator.h"
 #include "mongo/logv2/log.h"
 
@@ -44,6 +46,30 @@ ConfigsvrCoordinatorService* ConfigsvrCoordinatorService::getService(OperationCo
     auto registry = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext());
     auto service = registry->lookupServiceByName(kServiceName);
     return checked_cast<ConfigsvrCoordinatorService*>(std::move(service));
+}
+
+std::shared_ptr<ConfigsvrCoordinator> ConfigsvrCoordinatorService::getOrCreateService(
+    OperationContext* opCtx, BSONObj coorDoc) {
+    auto [coordinator, created] = [&] {
+        try {
+            auto [coordinator, created] = PrimaryOnlyService::getOrCreateInstance(opCtx, coorDoc);
+            return std::make_pair(
+                checked_pointer_cast<ConfigsvrCoordinator>(std::move(coordinator)),
+                std::move(created));
+        } catch (const DBException& ex) {
+            LOGV2_ERROR(6226201,
+                        "Failed to create instance of configsvr coordinator",
+                        "reason"_attr = redact(ex));
+            throw;
+        }
+    }();
+
+    // Ensure the existing instance have the same options.
+    uassert(ErrorCodes::ConflictingOperationInProgress,
+            "Another ConfigsvrCoordinator with different arguments is already running",
+            created || coordinator->hasSameOptions(coorDoc));
+
+    return coordinator;
 }
 
 std::shared_ptr<ConfigsvrCoordinatorService::Instance>
@@ -57,6 +83,8 @@ ConfigsvrCoordinatorService::constructInstance(BSONObj initialState) {
     switch (op.getId().getCoordinatorType()) {
         case ConfigsvrCoordinatorTypeEnum::kSetUserWriteBlockMode:
             return std::make_shared<SetUserWriteBlockModeCoordinator>(std::move(initialState));
+        case ConfigsvrCoordinatorTypeEnum::kSetClusterParameter:
+            return std::make_shared<SetClusterParameterCoordinator>(std::move(initialState));
         default:
             uasserted(ErrorCodes::BadValue,
                       str::stream()

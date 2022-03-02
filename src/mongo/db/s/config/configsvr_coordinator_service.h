@@ -34,6 +34,7 @@
 
 namespace mongo {
 
+class ConfigsvrCoordinator;
 class ConfigsvrCoordinatorService final : public repl::PrimaryOnlyService {
 public:
     static constexpr StringData kServiceName = "ConfigsvrCoordinatorService"_sd;
@@ -56,6 +57,9 @@ public:
     ThreadPool::Limits getThreadPoolLimits() const override {
         return ThreadPool::Limits();
     }
+
+    std::shared_ptr<ConfigsvrCoordinator> getOrCreateService(OperationContext* opCtx,
+                                                             BSONObj coorDoc);
 
     void checkIfConflictsWithOtherInstances(
         OperationContext* opCtx,

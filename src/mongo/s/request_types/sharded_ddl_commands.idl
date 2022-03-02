@@ -377,3 +377,14 @@ commands:
         api_version: ""
         type: bool
         strict: false
+
+    _configsvrSetClusterParameter:
+        command_name: _configsvrSetClusterParameter
+        cpp_name: ConfigsvrSetClusterParameter
+        description: "Internal command sent to the config server to start a coordinator and set the
+                      cluster parameter."
+        # TODO SERVER-63870: use replica set command parameters.
+        namespace: type
+        type: object
+        api_version: ""
+        strict: false

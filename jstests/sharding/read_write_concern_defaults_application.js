@@ -117,6 +117,7 @@ let testCases = {
     _configsvrRepairShardedCollectionChunksHistory: {skip: "internal command"},
     _configsvrReshardCollection: {skip: "internal command"},
     _configsvrSetAllowMigrations: {skip: "internal command"},
+    _configsvrSetClusterParameter: {skip: "internal command"},
     _configsvrSetUserWriteBlockMode: {skip: "internal command"},
     _configsvrShardCollection:
         {skip: "internal command"},  // TODO SERVER-58843: Remove once 6.0 becomes last LTS

@@ -34,8 +34,8 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/s/config/configsvr_coordinator_service.h"
-#include "mongo/db/s/config/set_user_write_block_mode_coordinator.h"
-#include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/s/config/set_cluster_parameter_coordinator.h"
+#include "mongo/idl/cluster_server_parameter_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
@@ -43,10 +43,10 @@
 namespace mongo {
 namespace {
 
-class ConfigsvrSetUserWriteBlockModeCommand final
-    : public TypedCommand<ConfigsvrSetUserWriteBlockModeCommand> {
+class ConfigsvrSetClusterParameterCommand final
+    : public TypedCommand<ConfigsvrSetClusterParameterCommand> {
 public:
-    using Request = ConfigsvrSetUserWriteBlockMode;
+    using Request = ConfigsvrSetClusterParameter;
 
     class Invocation final : public InvocationBase {
     public:
@@ -56,19 +56,16 @@ public:
             uassert(ErrorCodes::IllegalOperation,
                     str::stream() << Request::kCommandName << " can only be run on config servers",
                     serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
-            CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
-                                                          opCtx->getWriteConcern());
+
             uassert(
                 ErrorCodes::IllegalOperation,
-                "featureFlagUserWriteBlocking not enabled",
-                gFeatureFlagUserWriteBlocking.isEnabled(serverGlobalParams.featureCompatibility));
+                "featureFlagClusterWideConfig not enabled",
+                gFeatureFlagClusterWideConfig.isEnabled(serverGlobalParams.featureCompatibility));
 
-            const auto startBlocking = request().getCommandParameter();
-
-            SetUserWriteBlockModeCoordinatorDocument coordinatorDoc{startBlocking};
+            SetClusterParameterCoordinatorDocument coordinatorDoc;
             coordinatorDoc.setConfigsvrCoordinatorMetadata(
-                {ConfigsvrCoordinatorTypeEnum::kSetUserWriteBlockMode});
-            const auto coordinatorDocBSON = coordinatorDoc.toBSON();
+                {ConfigsvrCoordinatorTypeEnum::kSetClusterParameter});
+            coordinatorDoc.setParameter(request().getCommandParameter());
 
             const auto service = ConfigsvrCoordinatorService::getService(opCtx);
             const auto instance = service->getOrCreateService(opCtx, coordinatorDoc.toBSON());
@@ -82,7 +79,7 @@ public:
         }
 
         bool supportsWriteConcern() const override {
-            return true;
+            return false;
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const override {
@@ -96,7 +93,7 @@ public:
 
     std::string help() const override {
         return "Internal command, which is exported by the config servers. Do not call "
-               "directly. Sets the user write blocking mode on a sharded cluster.";
+               "directly. Sets a parameter in the cluster.";
     }
 
     bool adminOnly() const override {
@@ -106,7 +103,7 @@ public:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
-} configsvrSetUserWriteBlockModeCmd;
+} configsvrSetClusterParameterCmd;
 
 }  // namespace
 }  // namespace mongo

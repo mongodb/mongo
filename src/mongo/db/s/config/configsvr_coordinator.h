@@ -54,6 +54,8 @@ public:
         return _completionPromise.getFuture();
     }
 
+    virtual bool hasSameOptions(const BSONObj&) const = 0;
+
 protected:
     const ConfigsvrCoordinatorId _coordId;
 
