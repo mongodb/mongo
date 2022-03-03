@@ -10800,7 +10800,7 @@ buildvariants:
       - ubuntu1804-xlarge
   - name: build_variant_gen
   - name: jsCore
-  - name: .aggregation
+  - name: .aggregation !.encrypt
   - name: replica_sets_jscore_passthrough
   - name: sharded_collections_jscore_passthrough
   - name: sharding_gen
