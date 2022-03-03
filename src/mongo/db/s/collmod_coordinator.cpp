@@ -226,7 +226,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                     const auto dbInfo = uassertStatusOK(
                         Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, nss().db()));
                     const auto shard = uassertStatusOK(
-                        Grid::get(opCtx)->shardRegistry()->getShard(opCtx, dbInfo.primaryId()));
+                        Grid::get(opCtx)->shardRegistry()->getShard(opCtx, dbInfo->getPrimary()));
                     BSONObjBuilder builder;
                     builder.appendElements(collModRes);
                     BSONObjBuilder subBuilder(builder.subobjStart("raw"));

@@ -642,12 +642,12 @@ void CreateCollectionCoordinator::_checkCommandArguments(OperationContext* opCtx
             auto catalogCache = Grid::get(opCtx)->catalogCache();
 
             auto dbInfo = uassertStatusOK(catalogCache->getDatabase(opCtx, nss().db()));
-            if (!dbInfo.shardingEnabled()) {
+            if (!dbInfo->getSharded()) {
                 sharding_ddl_util::linearizeCSRSReads(opCtx);
                 dbInfo = uassertStatusOK(catalogCache->getDatabaseWithRefresh(opCtx, nss().db()));
             }
 
-            return dbInfo.shardingEnabled();
+            return dbInfo->getSharded();
         }();
 
         uassert(ErrorCodes::IllegalOperation,

@@ -76,24 +76,6 @@ const OperationContext::Decoration<bool> operationBlockedBehindCatalogCacheRefre
 AtomicWord<uint64_t> ComparableDatabaseVersion::_disambiguatingSequenceNumSource{1ULL};
 AtomicWord<uint64_t> ComparableDatabaseVersion::_forcedRefreshSequenceNumSource{1ULL};
 
-CachedDatabaseInfo::CachedDatabaseInfo(DatabaseTypeValueHandle&& dbt) : _dbt(std::move(dbt)){};
-
-DatabaseType CachedDatabaseInfo::getDatabaseType() const {
-    return *_dbt;
-}
-
-const ShardId& CachedDatabaseInfo::primaryId() const {
-    return _dbt->getPrimary();
-}
-
-bool CachedDatabaseInfo::shardingEnabled() const {
-    return _dbt->getSharded();
-}
-
-DatabaseVersion CachedDatabaseInfo::databaseVersion() const {
-    return _dbt->getVersion();
-}
-
 ComparableDatabaseVersion ComparableDatabaseVersion::makeComparableDatabaseVersion(
     const boost::optional<DatabaseVersion>& version) {
     return ComparableDatabaseVersion(version,
@@ -197,7 +179,7 @@ StatusWith<CachedDatabaseInfo> CatalogCache::getDatabase(OperationContext* opCtx
                 str::stream() << "database " << dbName << " not found",
                 dbEntry);
 
-        return {CachedDatabaseInfo(std::move(dbEntry))};
+        return dbEntry;
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
@@ -246,8 +228,8 @@ StatusWith<ChunkManager> CatalogCache::_getCollectionRoutingInfoAt(
 
             if (collEntryFuture.isReady()) {
                 setOperationShouldBlockBehindCatalogCacheRefresh(opCtx, false);
-                return ChunkManager(dbInfo.primaryId(),
-                                    dbInfo.databaseVersion(),
+                return ChunkManager(dbInfo->getPrimary(),
+                                    dbInfo->getVersion(),
                                     collEntryFuture.get(opCtx),
                                     atClusterTime);
             } else {
@@ -270,8 +252,8 @@ StatusWith<ChunkManager> CatalogCache::_getCollectionRoutingInfoAt(
 
                 setOperationShouldBlockBehindCatalogCacheRefresh(opCtx, false);
 
-                return ChunkManager(dbInfo.primaryId(),
-                                    dbInfo.databaseVersion(),
+                return ChunkManager(dbInfo->getPrimary(),
+                                    dbInfo->getVersion(),
                                     std::move(collEntry),
                                     atClusterTime);
             } catch (const DBException& ex) {

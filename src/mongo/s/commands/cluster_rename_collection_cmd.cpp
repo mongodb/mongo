@@ -96,14 +96,14 @@ public:
             auto cri = uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, fromNss));
 
             auto shard = uassertStatusOK(
-                Grid::get(opCtx)->shardRegistry()->getShard(opCtx, dbInfo.primaryId()));
+                Grid::get(opCtx)->shardRegistry()->getShard(opCtx, dbInfo->getPrimary()));
 
             auto cmdResponse = uassertStatusOK(shard->runCommandWithFixedRetryAttempts(
                 opCtx,
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                 fromNss.db().toString(),
-                CommandHelpers::appendMajorityWriteConcern(appendDbVersionIfPresent(
-                    renameCollRequest.toBSON({}), dbInfo.databaseVersion())),
+                CommandHelpers::appendMajorityWriteConcern(
+                    appendDbVersionIfPresent(renameCollRequest.toBSON({}), dbInfo->getVersion())),
                 Shard::RetryPolicy::kNoRetry));
 
             uassertStatusOK(cmdResponse.commandStatus);
@@ -113,7 +113,7 @@ public:
 
             // TODO: SERVER-53098 advance the cache by collection version.
             catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
-                toNss, renameCollResp.getCollectionVersion(), dbInfo.primaryId());
+                toNss, renameCollResp.getCollectionVersion(), dbInfo->getPrimary());
 
             catalogCache->invalidateCollectionEntry_LINEARIZABLE(fromNss);
         }

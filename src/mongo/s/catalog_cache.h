@@ -47,28 +47,7 @@ class ComparableDatabaseVersion;
 
 using DatabaseTypeCache = ReadThroughCache<std::string, DatabaseType, ComparableDatabaseVersion>;
 using DatabaseTypeValueHandle = DatabaseTypeCache::ValueHandle;
-
-/**
- * Constructed exclusively by the CatalogCache,
- * contains a reference to the cached information for the specified database.
- */
-class CachedDatabaseInfo {
-public:
-    DatabaseType getDatabaseType() const;
-
-    const ShardId& primaryId() const;
-
-    bool shardingEnabled() const;
-
-    DatabaseVersion databaseVersion() const;
-
-private:
-    friend class CatalogCache;
-
-    CachedDatabaseInfo(DatabaseTypeValueHandle&& dbt);
-
-    DatabaseTypeValueHandle _dbt;
-};
+using CachedDatabaseInfo = DatabaseTypeValueHandle;
 
 /**
  * This class wrap a DatabaseVersion object augmenting it with:

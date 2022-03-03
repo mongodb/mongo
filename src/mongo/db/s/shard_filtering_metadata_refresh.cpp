@@ -508,8 +508,8 @@ void forceDatabaseRefresh(OperationContext* opCtx, const StringData dbName) {
         return;
     }
 
-    auto refreshedDbInfo = uassertStatusOK(std::move(swRefreshedDbInfo));
-    const auto refreshedDBVersion = refreshedDbInfo.databaseVersion();
+    const auto refreshedDbInfo = uassertStatusOK(std::move(swRefreshedDbInfo));
+    const auto& refreshedDBVersion = refreshedDbInfo->getVersion();
 
     // First, check under a shared lock if another thread already updated the cached version.
     // This is a best-effort optimization to make as few threads as possible to convoy on the
@@ -522,14 +522,14 @@ void forceDatabaseRefresh(OperationContext* opCtx, const StringData dbName) {
         auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
 
         const auto cachedDbVersion = dss->getDbVersion(opCtx, dssLock);
-        if (cachedDbVersion >= refreshedDBVersion) {
+        if (cachedDbVersion && *cachedDbVersion >= refreshedDBVersion) {
             LOGV2_DEBUG(5369130,
                         2,
                         "Skipping updating cached database info from refreshed version "
                         "because the one currently cached is more recent",
                         "db"_attr = dbName,
-                        "refreshedDbVersion"_attr = refreshedDbInfo.databaseVersion(),
-                        "cachedDbVersion"_attr = cachedDbVersion.get());
+                        "refreshedDbVersion"_attr = refreshedDBVersion,
+                        "cachedDbVersion"_attr = *cachedDbVersion);
             return;
         }
     }
@@ -539,7 +539,7 @@ void forceDatabaseRefresh(OperationContext* opCtx, const StringData dbName) {
     auto dss = DatabaseShardingState::get(opCtx, dbName);
     auto dssLock = DatabaseShardingState::DSSLock::lockExclusive(opCtx, dss);
 
-    dss->setDatabaseInfo(opCtx, refreshedDbInfo.getDatabaseType(), dssLock);
+    dss->setDatabaseInfo(opCtx, DatabaseType(*refreshedDbInfo), dssLock);
 }
 
 }  // namespace mongo

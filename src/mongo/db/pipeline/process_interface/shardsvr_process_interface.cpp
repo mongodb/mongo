@@ -208,7 +208,7 @@ BSONObj ShardServerProcessInterface::getCollectionOptions(OperationContext* opCt
     auto cachedDbInfo =
         uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, nss.db()));
     auto shard = uassertStatusOK(
-        Grid::get(opCtx)->shardRegistry()->getShard(opCtx, cachedDbInfo.primaryId()));
+        Grid::get(opCtx)->shardRegistry()->getShard(opCtx, cachedDbInfo->getPrimary()));
 
     const BSONObj filterObj = BSON("name" << nss.coll());
     const BSONObj cmdObj = BSON("listCollections" << 1 << "filter" << filterObj);
@@ -267,7 +267,7 @@ std::list<BSONObj> ShardServerProcessInterface::getIndexSpecs(OperationContext* 
     auto cachedDbInfo =
         uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, ns.db()));
     auto shard = uassertStatusOK(
-        Grid::get(opCtx)->shardRegistry()->getShard(opCtx, cachedDbInfo.primaryId()));
+        Grid::get(opCtx)->shardRegistry()->getShard(opCtx, cachedDbInfo->getPrimary()));
     auto cmdObj = BSON("listIndexes" << ns.coll());
     Shard::QueryResponse indexes;
     try {

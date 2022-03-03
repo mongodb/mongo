@@ -189,9 +189,9 @@ TEST_F(CatalogCacheTest, GetDatabase) {
 
     ASSERT_OK(swDatabase.getStatus());
     const auto cachedDb = swDatabase.getValue();
-    ASSERT_EQ(cachedDb.primaryId(), kShards[0]);
-    ASSERT_EQ(cachedDb.databaseVersion().getUuid(), dbVersion.getUuid());
-    ASSERT_EQ(cachedDb.databaseVersion().getLastMod(), dbVersion.getLastMod());
+    ASSERT_EQ(cachedDb->getPrimary(), kShards[0]);
+    ASSERT_EQ(cachedDb->getVersion().getUuid(), dbVersion.getUuid());
+    ASSERT_EQ(cachedDb->getVersion().getLastMod(), dbVersion.getLastMod());
 }
 
 TEST_F(CatalogCacheTest, GetCachedDatabase) {
@@ -203,9 +203,9 @@ TEST_F(CatalogCacheTest, GetCachedDatabase) {
 
     ASSERT_OK(swDatabase.getStatus());
     const auto cachedDb = swDatabase.getValue();
-    ASSERT_EQ(cachedDb.primaryId(), kShards[0]);
-    ASSERT_EQ(cachedDb.databaseVersion().getUuid(), dbVersion.getUuid());
-    ASSERT_EQ(cachedDb.databaseVersion().getLastMod(), dbVersion.getLastMod());
+    ASSERT_EQ(cachedDb->getPrimary(), kShards[0]);
+    ASSERT_EQ(cachedDb->getVersion().getUuid(), dbVersion.getUuid());
+    ASSERT_EQ(cachedDb->getVersion().getLastMod(), dbVersion.getLastMod());
 }
 
 TEST_F(CatalogCacheTest, GetDatabaseDrop) {
@@ -218,8 +218,8 @@ TEST_F(CatalogCacheTest, GetDatabaseDrop) {
     auto swDatabase = _catalogCache->getDatabase(operationContext(), dbName);
     ASSERT_OK(swDatabase.getStatus());
     const auto cachedDb = swDatabase.getValue();
-    ASSERT_EQ(cachedDb.databaseVersion().getUuid(), dbVersion.getUuid());
-    ASSERT_EQ(cachedDb.databaseVersion().getLastMod(), dbVersion.getLastMod());
+    ASSERT_EQ(cachedDb->getVersion().getUuid(), dbVersion.getUuid());
+    ASSERT_EQ(cachedDb->getVersion().getLastMod(), dbVersion.getLastMod());
 
     // Advancing the timeInStore, e.g. because of a movePrimary
     _catalogCache->onStaleDatabaseVersion(dbName, dbVersion.makeUpdated());
@@ -245,7 +245,7 @@ TEST_F(CatalogCacheTest, InvalidateSingleDbOnShardRemoval) {
 
     ASSERT_OK(swDatabase.getStatus());
     auto cachedDb = swDatabase.getValue();
-    ASSERT_EQ(cachedDb.primaryId(), kShards[1]);
+    ASSERT_EQ(cachedDb->getPrimary(), kShards[1]);
 }
 
 TEST_F(CatalogCacheTest, OnStaleDatabaseVersionNoVersion) {

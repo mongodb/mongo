@@ -66,7 +66,7 @@ AsyncRequestsSender::Response executeCommandAgainstDatabasePrimaryOrFirstShard(
         std::sort(shardIds.begin(), shardIds.end());
         shardId = shardIds[0];
     } else {
-        shardId = dbInfo.primaryId();
+        shardId = dbInfo->getPrimary();
     }
 
     auto responses =
@@ -137,7 +137,7 @@ void createCollection(OperationContext* opCtx, const ShardsvrCreateCollection& r
 
     auto catalogCache = Grid::get(opCtx)->catalogCache();
     catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
-        nss, createCollResp.getCollectionVersion(), dbInfo.primaryId());
+        nss, createCollResp.getCollectionVersion(), dbInfo->getPrimary());
 }
 
 }  // namespace cluster

@@ -63,7 +63,7 @@ bool cursorCommandPassthroughPrimaryShard(OperationContext* opCtx,
 
     auto transformedResponse = uassertStatusOK(
         storePossibleCursor(opCtx,
-                            dbInfo.primaryId(),
+                            dbInfo->getPrimary(),
                             *response.shardHostAndPort,
                             cmdResponse.data,
                             nss,

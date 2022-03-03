@@ -406,7 +406,7 @@ void checkDbPrimariesOnTheSameShard(OperationContext* opCtx,
 
     uassert(ErrorCodes::CommandFailed,
             "Source and destination collections must be on same shard",
-            fromDB.primaryId() == toDB.primaryId());
+            fromDB->getPrimary() == toDB->getPrimary());
 }
 
 boost::optional<CreateCollectionResponse> checkIfCollectionAlreadySharded(

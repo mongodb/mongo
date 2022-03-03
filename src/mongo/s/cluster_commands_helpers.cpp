@@ -276,7 +276,7 @@ std::vector<AsyncRequestsSender::Response> gatherResponsesNoThrowOnStaleShardVer
 }
 
 BSONObj appendDbVersionIfPresent(BSONObj cmdObj, const CachedDatabaseInfo& dbInfo) {
-    return appendDbVersionIfPresent(std::move(cmdObj), dbInfo.databaseVersion());
+    return appendDbVersionIfPresent(std::move(cmdObj), dbInfo->getVersion());
 }
 
 BSONObj appendDbVersionIfPresent(BSONObj cmdObj, DatabaseVersion dbVersion) {
@@ -435,7 +435,7 @@ AsyncRequestsSender::Response executeCommandAgainstDatabasePrimary(
     const ReadPreferenceSetting& readPref,
     Shard::RetryPolicy retryPolicy) {
     // Attach shardVersion "UNSHARDED", unless targeting the config server.
-    const auto cmdObjWithShardVersion = (dbInfo.primaryId() != ShardId::kConfigServerId)
+    const auto cmdObjWithShardVersion = (dbInfo->getPrimary() != ShardId::kConfigServerId)
         ? appendShardVersion(cmdObj, ChunkVersion::UNSHARDED())
         : cmdObj;
 
@@ -445,7 +445,7 @@ AsyncRequestsSender::Response executeCommandAgainstDatabasePrimary(
                         readPref,
                         retryPolicy,
                         std::vector<AsyncRequestsSender::Request>{AsyncRequestsSender::Request(
-                            dbInfo.primaryId(), appendDbVersionIfPresent(cmdObj, dbInfo))});
+                            dbInfo->getPrimary(), appendDbVersionIfPresent(cmdObj, dbInfo))});
     return std::move(responses.front());
 }
 

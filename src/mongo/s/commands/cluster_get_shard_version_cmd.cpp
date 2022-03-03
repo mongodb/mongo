@@ -96,9 +96,9 @@ public:
         if (nss.coll().empty()) {
             // Return the database's information.
             auto cachedDbInfo = uassertStatusOK(catalogCache->getDatabase(opCtx, nss.ns()));
-            result.append("primaryShard", cachedDbInfo.primaryId().toString());
-            result.append("shardingEnabled", cachedDbInfo.shardingEnabled());
-            result.append("version", cachedDbInfo.databaseVersion().toBSON());
+            result.append("primaryShard", cachedDbInfo->getPrimary().toString());
+            result.append("shardingEnabled", cachedDbInfo->getSharded());
+            result.append("version", cachedDbInfo->getVersion().toBSON());
         } else {
             // Return the collection's information.
             const auto cm = uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss));
