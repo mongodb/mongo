@@ -175,6 +175,7 @@
 #include "mongo/db/system_index.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/db/ttl.h"
+#include "mongo/db/user_write_block_mode_op_observer.h"
 #include "mongo/db/vector_clock_metadata_hook.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/network_connection_hook.h"
@@ -1115,6 +1116,7 @@ void setUpObservers(ServiceContext* serviceContext) {
         opObserverRegistry->addObserver(
             std::make_unique<repl::TenantMigrationRecipientOpObserver>());
         opObserverRegistry->addObserver(std::make_unique<ShardSplitDonorOpObserver>());
+        opObserverRegistry->addObserver(std::make_unique<UserWriteBlockModeOpObserver>());
     } else if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
         opObserverRegistry->addObserver(std::make_unique<OpObserverImpl>());
         opObserverRegistry->addObserver(std::make_unique<ConfigServerOpObserver>());
@@ -1125,6 +1127,7 @@ void setUpObservers(ServiceContext* serviceContext) {
         opObserverRegistry->addObserver(
             std::make_unique<repl::TenantMigrationRecipientOpObserver>());
         opObserverRegistry->addObserver(std::make_unique<ShardSplitDonorOpObserver>());
+        opObserverRegistry->addObserver(std::make_unique<UserWriteBlockModeOpObserver>());
     }
     opObserverRegistry->addObserver(std::make_unique<AuthOpObserver>());
     opObserverRegistry->addObserver(

@@ -5608,7 +5608,7 @@ var authCommandsLib = {
         },
         {
           testname: "setUserWriteBlockMode",
-          command: {setUserWriteBlockMode: 1, global: true},
+          command: {setUserWriteBlockMode: 1, global: false},
           skipTest: (conn) => !TestData.setParameters.featureFlagUserWriteBlocking,
           testcases: [
               {

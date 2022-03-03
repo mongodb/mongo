@@ -27,42 +27,39 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
-
 #include "mongo/platform/basic.h"
+
+#include "mongo/db/user_write_block_mode_op_observer.h"
 
 #include "mongo/db/s/global_user_write_block_state.h"
 
 namespace mongo {
 
-namespace {
-const auto serviceDecorator = ServiceContext::declareDecoration<GlobalUserWriteBlockState>();
-}  // namespace
-
-GlobalUserWriteBlockState* GlobalUserWriteBlockState::get(ServiceContext* serviceContext) {
-    return &serviceDecorator(serviceContext);
+void UserWriteBlockModeOpObserver::onInserts(OperationContext* opCtx,
+                                             const NamespaceString& nss,
+                                             const UUID& uuid,
+                                             std::vector<InsertStatement>::const_iterator first,
+                                             std::vector<InsertStatement>::const_iterator last,
+                                             bool fromMigrate) {
+    _checkWriteAllowed(opCtx, nss);
 }
 
-GlobalUserWriteBlockState* GlobalUserWriteBlockState::get(OperationContext* opCtx) {
-    return get(opCtx->getServiceContext());
+void UserWriteBlockModeOpObserver::onUpdate(OperationContext* opCtx,
+                                            const OplogUpdateEntryArgs& args) {
+    _checkWriteAllowed(opCtx, args.nss);
 }
 
-void GlobalUserWriteBlockState::enableUserWriteBlocking(OperationContext* opCtx) {
-    invariant(opCtx->lockState()->isLockHeldForMode(resourceIdGlobal, MODE_X));
-    _globalUserWritesBlocked = true;
+void UserWriteBlockModeOpObserver::onDelete(OperationContext* opCtx,
+                                            const NamespaceString& nss,
+                                            const UUID& uuid,
+                                            StmtId stmtId,
+                                            const OplogDeleteEntryArgs& args) {
+    _checkWriteAllowed(opCtx, nss);
 }
 
-void GlobalUserWriteBlockState::disableUserWriteBlocking(OperationContext* opCtx) {
-    invariant(opCtx->lockState()->isLockHeldForMode(resourceIdGlobal, MODE_X));
-    _globalUserWritesBlocked = false;
-}
-
-void GlobalUserWriteBlockState::checkUserWritesAllowed(OperationContext* opCtx,
-                                                       const NamespaceString& nss) const {
-    invariant(opCtx->lockState()->isLocked());
-    uassert(ErrorCodes::OperationFailed,
-            "User writes blocked",
-            !_globalUserWritesBlocked || nss.isOnInternalDb());
+void UserWriteBlockModeOpObserver::_checkWriteAllowed(OperationContext* opCtx,
+                                                      const NamespaceString& nss) {
+    GlobalUserWriteBlockState::get(opCtx)->checkUserWritesAllowed(opCtx, nss);
 }
 
 }  // namespace mongo

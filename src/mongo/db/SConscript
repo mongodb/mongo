@@ -1010,6 +1010,20 @@ env.Library(
 )
 
 env.Library(
+    target="user_write_block_mode_op_observer",
+    source=[
+        "user_write_block_mode_op_observer.cpp",
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        'op_observer',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/s/sharding_api_d',
+    ],
+)
+
+env.Library(
     target="service_entry_point_common",
     source=[
         "service_entry_point_common.cpp",
@@ -2429,6 +2443,7 @@ env.Library(
         'storage/storage_engine_common',
         'system_index',
         'ttl_d',
+        'user_write_block_mode_op_observer',
         'vector_clock',
     ],
     LIBDEPS_TAGS=[
@@ -2580,6 +2595,7 @@ if wiredtiger:
             'transaction_participant_retryable_writes_test.cpp',
             'transaction_participant_test.cpp',
             'update_index_data_test.cpp',
+            'user_write_block_mode_op_observer_test.cpp',
             'vector_clock_mongod_test.cpp',
             'vector_clock_test.cpp',
             'wire_version_test.cpp',
@@ -2669,6 +2685,7 @@ if wiredtiger:
             'transaction',
             'transaction_api',
             'update_index_data',
+            'user_write_block_mode_op_observer',
             'vector_clock',
             'vector_clock_test_fixture',
             'write_concern_options',
