@@ -220,7 +220,26 @@ var $config = (function() {
             const dbName = dbPrefix + i;
             for (let j = 0; j < collCount; j++) {
                 const fullNs = dbName + "." + collPrefix + j;
+                // Wait for defragmentation to complete
                 defragmentationUtil.waitForEndOfDefragmentation(mongos, fullNs);
+                // Enable balancing and wait for balanced
+                assertAlways.commandWorked(mongos.getDB('config').collections.update(
+                    {_id: fullNs}, {$set: {"noBalance": false}}));
+                assertAlways.soon(function() {
+                    let res = mongos.adminCommand({balancerCollectionStatus: fullNs});
+                    assertAlways.commandWorked(res);
+                    return res.balancerCompliant;
+                });
+                // Begin defragmentation again
+                assertAlways.commandWorked(mongos.adminCommand({
+                    configureCollectionBalancing: fullNs,
+                    defragmentCollection: true,
+                    chunkSize: maxChunkSizeMB,
+                }));
+                // Wait for defragmentation to complete and check final state
+                defragmentationUtil.waitForEndOfDefragmentation(mongos, fullNs);
+                defragmentationUtil.checkPostDefragmentationState(
+                    mongos, fullNs, maxChunkSizeMB, "key");
             }
         }
     }
