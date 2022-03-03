@@ -29,15 +29,11 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/field_parser.h"
 #include "mongo/s/catalog_cache.h"
-#include "mongo/s/cluster_ddl.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/util/scopeguard.h"
@@ -45,83 +41,80 @@
 namespace mongo {
 namespace {
 
-class EnableShardingCmd : public ErrmsgCommandDeprecated {
+class EnableShardingCmd final : public TypedCommand<EnableShardingCmd> {
 public:
-    EnableShardingCmd() : ErrmsgCommandDeprecated("enableSharding", "enablesharding") {}
+    using Request = ClusterCreateDatabase;
+
+    EnableShardingCmd()
+        : TypedCommand(ClusterCreateDatabase::kCommandName, ClusterCreateDatabase::kCommandAlias) {}
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kAlways;
+        return AllowedOnSecondary::kNever;
     }
 
     bool adminOnly() const override {
         return true;
     }
 
-    bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return true;
-    }
-
     std::string help() const override {
-        return "Enable sharding for a database. Optionally allows the caller to specify the shard "
-               "to be used as primary."
-               "(Use 'shardcollection' command afterwards.)\n"
-               "  { enableSharding : \"<dbname>\", primaryShard:  \"<shard>\"}\n";
+        return "Create a database with the provided options.";
     }
 
-    Status checkAuthForCommand(Client* client,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj) const override {
-        if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-                ResourcePattern::forDatabaseName(parseNs(dbname, cmdObj)),
-                ActionType::enableSharding)) {
-            return Status(ErrorCodes::Unauthorized, "Unauthorized");
+    class Invocation final : public InvocationBase {
+    public:
+        using InvocationBase::InvocationBase;
+
+        void typedRun(OperationContext* opCtx) {
+            const auto dbName = getDbName();
+
+            auto catalogCache = Grid::get(opCtx)->catalogCache();
+            ScopeGuard purgeDatabaseOnExit([&] { catalogCache->purgeDatabase(dbName); });
+
+            ConfigsvrCreateDatabase configsvrCreateDatabase{dbName.toString()};
+            configsvrCreateDatabase.setDbName(NamespaceString::kAdminDb);
+            configsvrCreateDatabase.setEnableSharding(true);
+            configsvrCreateDatabase.setPrimaryShardId(request().getPrimaryShard());
+
+            auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+            auto response = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
+                opCtx,
+                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                NamespaceString::kAdminDb.toString(),
+                CommandHelpers::appendMajorityWriteConcern(configsvrCreateDatabase.toBSON({})),
+                Shard::RetryPolicy::kIdempotent));
+
+            uassertStatusOKWithContext(response.commandStatus,
+                                       str::stream()
+                                           << "Database " << dbName << " could not be created");
+            uassertStatusOK(response.writeConcernStatus);
+
+            auto createDbResponse = ConfigsvrCreateDatabaseResponse::parse(
+                IDLParserErrorContext("configsvrCreateDatabaseResponse"), response.response);
+            catalogCache->onStaleDatabaseVersion(dbName, createDbResponse.getDatabaseVersion());
+            purgeDatabaseOnExit.dismiss();
         }
 
-        return Status::OK();
-    }
+    private:
+        const StringData getDbName() const {
+            return request().getCommandParameter();
+        }
+        NamespaceString ns() const override {
+            return {getDbName(), ""};
+        }
 
-    std::string parseNs(const std::string& dbname_unused, const BSONObj& cmdObj) const override {
-        return cmdObj.firstElement().str();
-    }
+        bool supportsWriteConcern() const override {
+            return true;
+        }
 
-    bool errmsgRun(OperationContext* opCtx,
-                   const std::string& dbname_unused,
-                   const BSONObj& cmdObj,
-                   std::string& errmsg,
-                   BSONObjBuilder& result) override {
-        const std::string dbName = parseNs("", cmdObj);
-
-        auto catalogCache = Grid::get(opCtx)->catalogCache();
-        ON_BLOCK_EXIT([opCtx, dbName] { Grid::get(opCtx)->catalogCache()->purgeDatabase(dbName); });
-
-        constexpr StringData kShardNameField = "primaryShard"_sd;
-        auto shardElem = cmdObj[kShardNameField];
-
-        ConfigsvrCreateDatabase request(dbName);
-        request.setDbName(NamespaceString::kAdminDb);
-        request.setEnableSharding(true);
-        if (shardElem.ok())
-            request.setPrimaryShardId(StringData(shardElem.String()));
-
-        auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-        auto response = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
-            opCtx,
-            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-            "admin",
-            CommandHelpers::appendMajorityWriteConcern(request.toBSON({})),
-            Shard::RetryPolicy::kIdempotent));
-        uassertStatusOKWithContext(response.commandStatus,
-                                   str::stream()
-                                       << "Database " << dbName << " could not be created");
-        uassertStatusOK(response.writeConcernStatus);
-
-        auto createDbResponse = ConfigsvrCreateDatabaseResponse::parse(
-            IDLParserErrorContext("configsvrCreateDatabaseResponse"), response.response);
-        catalogCache->onStaleDatabaseVersion(
-            dbName, DatabaseVersion(createDbResponse.getDatabaseVersion()));
-
-        return true;
-    }
+        void doCheckAuthorization(OperationContext* opCtx) const override {
+            uassert(
+                ErrorCodes::Unauthorized,
+                "Unauthorized",
+                AuthorizationSession::get(opCtx->getClient())
+                    ->isAuthorizedForActionsOnResource(
+                        ResourcePattern::forDatabaseName(getDbName()), ActionType::enableSharding));
+        }
+    };
 
 } enableShardingCmd;
 

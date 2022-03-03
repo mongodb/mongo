@@ -39,7 +39,7 @@ imports:
     - "mongo/db/coll_mod.idl"
     - "mongo/idl/basic_types.idl"
     - "mongo/s/chunk_version.idl"
-    - "mongo/s/database_version.idl"
+    - "mongo/s/sharding_types.idl"
     - "mongo/s/resharding/common_types.idl"
     - "mongo/db/timeseries/timeseries.idl"
 
@@ -58,7 +58,7 @@ structs:
         strict: false
         fields:
             databaseVersion:
-                type: DatabaseVersionBase
+                type: database_version
                 description: "The version of the newly-created or already existing database"
                 optional: false
 
@@ -213,6 +213,24 @@ structs:
 
 commands:
 
+    clusterCreateDatabase:
+        description: "The public enableSharding command on mongos."
+        command_name: enableSharding
+        command_alias: enablesharding
+        cpp_name: ClusterCreateDatabase
+        strict: false
+        namespace: type
+        type: string
+        api_version: ""
+        reply_type: OkReply
+        fields:
+            primaryShard:
+                type: shard_id
+                description: "If set, indicates to the system which shard should be used as the
+                              primary for the database (if not already created). Otherwise, the
+                              system will use the balancer in order to select a primary."
+                optional: true
+    
     _shardsvrCreateCollection:
         command_name: _shardsvrCreateCollection
         cpp_name: ShardsvrCreateCollection
@@ -349,7 +367,7 @@ commands:
         strict: false
         fields:
             primaryShardId:
-                type: string
+                type: shard_id
                 description: "If set, indicates to the system which shard should be used as the
                               primary for the database (if not already created). Otherwise, the
                               system will use the balancer in order to select a primary."

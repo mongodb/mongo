@@ -92,9 +92,7 @@ public:
             auto dbt = ShardingCatalogManager::get(opCtx)->createDatabase(
                 opCtx,
                 dbname,
-                request().getPrimaryShardId()
-                    ? boost::optional<ShardId>(request().getPrimaryShardId()->toString())
-                    : boost::optional<ShardId>(),
+                request().getPrimaryShardId(),
                 request().getEnableSharding().value_or(false));
 
             return {dbt.getVersion()};

@@ -92,7 +92,7 @@ CachedDatabaseInfo createDatabase(OperationContext* opCtx,
         ConfigsvrCreateDatabase request(dbName.toString());
         request.setDbName(NamespaceString::kAdminDb);
         if (suggestedPrimaryId)
-            request.setPrimaryShardId(StringData(suggestedPrimaryId->toString()));
+            request.setPrimaryShardId(*suggestedPrimaryId);
 
         auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
         auto response = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
@@ -108,8 +108,7 @@ CachedDatabaseInfo createDatabase(OperationContext* opCtx,
 
         auto createDbResponse = ConfigsvrCreateDatabaseResponse::parse(
             IDLParserErrorContext("configsvrCreateDatabaseResponse"), response.response);
-        catalogCache->onStaleDatabaseVersion(
-            dbName, DatabaseVersion(createDbResponse.getDatabaseVersion()));
+        catalogCache->onStaleDatabaseVersion(dbName, createDbResponse.getDatabaseVersion());
 
         dbStatus = catalogCache->getDatabase(opCtx, dbName);
     }
