@@ -108,9 +108,12 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
     auto& remoteCursor = params.remotes.back();
     remoteCursor.setShardId(shardId.toString());
     remoteCursor.setHostAndPort(server);
-    remoteCursor.setCursorResponse(CursorResponse(incomingCursorResponse.getValue().getNSS(),
-                                                  incomingCursorResponse.getValue().getCursorId(),
-                                                  {}));
+    remoteCursor.setCursorResponse(
+        CursorResponse(incomingCursorResponse.getValue().getNSS(),
+                       incomingCursorResponse.getValue().getCursorId(),
+                       {}, /* batch */
+                       incomingCursorResponse.getValue().getAtClusterTime(),
+                       incomingCursorResponse.getValue().getPostBatchResumeToken()));
     params.originatingCommandObj = CurOp::get(opCtx)->opDescription().getOwned();
     params.tailableMode = tailableMode;
     params.lsid = opCtx->getLogicalSessionId();
@@ -143,10 +146,12 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
 
     CurOp::get(opCtx)->debug().cursorid = clusterCursorId.getValue();
 
-    CursorResponse outgoingCursorResponse(requestedNss,
-                                          clusterCursorId.getValue(),
-                                          incomingCursorResponse.getValue().getBatch(),
-                                          incomingCursorResponse.getValue().getAtClusterTime());
+    CursorResponse outgoingCursorResponse(
+        requestedNss,
+        clusterCursorId.getValue(),
+        incomingCursorResponse.getValue().getBatch(),
+        incomingCursorResponse.getValue().getAtClusterTime(),
+        incomingCursorResponse.getValue().getPostBatchResumeToken());
     return outgoingCursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse);
 }
 
