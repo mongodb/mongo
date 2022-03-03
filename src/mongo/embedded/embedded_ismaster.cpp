@@ -71,8 +71,6 @@ public:
 
         auto wireSpec = WireSpec::instance().get();
 
-        auto metaElem = cmdObj[kMetadataDocumentName];
-        ClientMetadata::setFromMetadata(opCtx->getClient(), metaElem);
         ClientMetadata::tryFinalize(opCtx->getClient());
         audit::logClientMetadata(opCtx->getClient());
 
