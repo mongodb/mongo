@@ -678,6 +678,34 @@ void persistUpdatedNumOrphans(OperationContext* opCtx,
         WriteConcernOptions());
 }
 
+int retrieveNumOrphansFromRecipient(OperationContext* opCtx,
+                                    const MigrationCoordinatorDocument& migrationInfo) {
+    const auto recipientShard = uassertStatusOK(
+        Grid::get(opCtx)->shardRegistry()->getShard(opCtx, migrationInfo.getRecipientShardId()));
+    FindCommandRequest findCommand(NamespaceString::kRangeDeletionNamespace);
+    findCommand.setFilter(BSON("_id" << migrationInfo.getId()));
+    findCommand.setReadConcern(BSONObj());
+    Shard::QueryResponse rangeDeletionResponse =
+        uassertStatusOK(recipientShard->runExhaustiveCursorCommand(
+            opCtx,
+            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+            NamespaceString::kRangeDeletionNamespace.db().toString(),
+            findCommand.toBSON(BSONObj()),
+            Milliseconds(-1)));
+    if (rangeDeletionResponse.docs.empty()) {
+        // In case of shutdown/stepdown, the recipient may have already deleted its range deletion
+        // document. A previous call to this function will have already returned the correct number
+        // of orphans, so we can simply return 0.
+        LOGV2_DEBUG(6376301,
+                    2,
+                    "No matching document found for migration",
+                    "recipientId"_attr = migrationInfo.getRecipientShardId(),
+                    "migrationId"_attr = migrationInfo.getId());
+        return 0;
+    }
+    return rangeDeletionResponse.docs[0].getIntField("numOrphanDocs");
+}
+
 void persistCommitDecision(OperationContext* opCtx,
                            const MigrationCoordinatorDocument& migrationDoc) {
     invariant(migrationDoc.getDecision() &&

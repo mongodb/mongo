@@ -231,6 +231,18 @@ SemiFuture<void> MigrationCoordinator::_commitMigrationOnDonorAndRecipient(
 
     hangBeforeSendingCommitDecision.pauseWhileSet();
 
+    LOGV2_DEBUG(6376300,
+                2,
+                "Retrieving number of orphan documents from recipient",
+                "migrationId"_attr = _migrationInfo.getId());
+
+    auto numOrphans = migrationutil::retrieveNumOrphansFromRecipient(opCtx, _migrationInfo);
+
+    if (numOrphans > 0) {
+        migrationutil::persistUpdatedNumOrphans(
+            opCtx, BSON("_id" << _migrationInfo.getId()), numOrphans);
+    }
+
     LOGV2_DEBUG(23896,
                 2,
                 "Deleting range deletion task on recipient",

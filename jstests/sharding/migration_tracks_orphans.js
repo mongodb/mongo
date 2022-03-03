@@ -41,12 +41,6 @@ function assertOrphanCountIsCorrect(conn, ns, numOrphans) {
                   tojson(rangeDeletionDoc));
 }
 
-function assertEventuallyDoesNotHaveRangeDeletionDoc(conn) {
-    assert.soon(() => {
-        return 0 == conn.getDB("config").getCollection("rangeDeletions").find().itcount();
-    });
-}
-
 // Insert some docs into the collection.
 const numDocs = 1000;
 let bulk = coll.initializeUnorderedBulkOp();
@@ -65,6 +59,7 @@ const awaitResult = startParallelShell(
 // Assert that the range deletion document is present and has the correct number of orphans.
 bulkCloneFailpoint.wait();
 assertOrphanCountIsCorrect(st.shard1, nss, numDocs);
+assertOrphanCountIsCorrect(st.shard0, nss, 0);
 
 // Pause after transfer mods and check number of orphans has changed correctly.
 let transferModsFailpoint = configureFailPoint(st.shard1, "migrateThreadHangAtStep5");
@@ -93,11 +88,19 @@ bulkCloneFailpoint.off();
 transferModsFailpoint.wait();
 const updatedOrphanCount = numDocs + numUpserts - numDeletes;
 assertOrphanCountIsCorrect(st.shard1, nss, updatedOrphanCount);
-transferModsFailpoint.off();
+assertOrphanCountIsCorrect(st.shard0, nss, 0);
 
-// Allow migration to finish and clean up range deletions
+// Allow migration to finish but stop right after updating range deletion documents
+let migrationCommittedFailpoint =
+    configureFailPoint(st.shard0, "hangBeforeForgettingMigrationAfterCommitDecision");
+transferModsFailpoint.off();
+migrationCommittedFailpoint.wait();
+assertOrphanCountIsCorrect(st.shard0, nss, updatedOrphanCount);
+assert.eq(0, st.shard1.getDB("config").getCollection("rangeDeletions").find().itcount());
+
+// Allow migration to fully complete
+migrationCommittedFailpoint.off();
 awaitResult();
-assertEventuallyDoesNotHaveRangeDeletionDoc(st.shard1);
 
 st.stop();
 })();
