@@ -147,17 +147,9 @@ var $config = (function() {
                 configDB.chunks.aggregate([{$match: chunksJoinClause}, {$sample: {size: 1}}])
                     .toArray()[0];
             try {
-                const res = connCache.shards[randomChunk.shard][0].getDB("admin").runCommand({
-                    splitVector: randomColl.getFullName(),
-                    keyPattern: getCollectionShardKey(configDB, randomColl.getFullName()),
-                    min: randomChunk.min,
-                    max: randomChunk.max,
-                    force: true
-                });
-                assertAlways.commandWorked(res);
-                ChunkHelper.splitChunkAt(randomDB, randomColl.getName(), res.splitKeys[0]);
-                jsTest.log("Manual split chunk of chunk " + tojson(randomChunk) + " at " +
-                           tojson(res.splitKeys[0]));
+                assertAlways.commandWorked(
+                    db.adminCommand({split: randomColl.getFullName(), find: randomChunk.min}));
+                jsTest.log("Manual split chunk of chunk " + tojson(randomChunk));
             } catch (e) {
                 jsTest.log("Ignoring manual split chunk error: " + tojson(e));
             }
