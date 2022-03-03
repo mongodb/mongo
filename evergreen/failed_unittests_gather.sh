@@ -19,7 +19,7 @@ for core_file in $core_files; do
   # A core file name does not always have the executable name that generated it.
   # See http://stackoverflow.com/questions/34801353/core-dump-filename-gets-thread-name-instead-of-executable-name-with-core-pattern
   # On platforms with GDB, we get the binary name from core file
-  gdb=/opt/mongodbtoolchain/gdb/bin/gdb
+  gdb=/opt/mongodbtoolchain/v3/bin/gdb
   if [ -f $gdb ]; then
     binary_file=$($gdb -batch --quiet -ex "core $core_file" 2> /dev/null | grep "Core was generated" | cut -f2 -d "\`" | cut -f1 -d "'" | cut -f1 -d " ")
     binary_file_locations=$binary_file

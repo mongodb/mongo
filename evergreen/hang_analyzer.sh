@@ -14,8 +14,8 @@ else
 fi
 
 activate_venv
-echo "Calling the hang analyzer: PATH=\"/opt/mongodbtoolchain/gdb/bin:$PATH\" $python buildscripts/resmoke.py hang-analyzer $hang_analyzer_option"
-PATH="/opt/mongodbtoolchain/gdb/bin:$PATH" $python buildscripts/resmoke.py hang-analyzer $hang_analyzer_option
+echo "Calling the hang analyzer: PATH=\"/opt/mongodbtoolchain/v3/bin:$PATH\" $python buildscripts/resmoke.py hang-analyzer $hang_analyzer_option"
+PATH="/opt/mongodbtoolchain/v3/bin:$PATH" $python buildscripts/resmoke.py hang-analyzer $hang_analyzer_option
 
 # Call hang analyzer for tasks that are running remote mongo processes
 if [ -n "${private_ip_address}" ]; then
