@@ -332,4 +332,10 @@ private:
     boost::optional<SortKeyComparator> _sortKeyComparator;
     boost::optional<std::multimap<Value, Value, std::function<bool(Value, Value)>>> _map;
 };
+
+extern template class AccumulatorTopBottomN<TopBottomSense::kBottom, false>;
+extern template class AccumulatorTopBottomN<TopBottomSense::kBottom, true>;
+extern template class AccumulatorTopBottomN<TopBottomSense::kTop, false>;
+extern template class AccumulatorTopBottomN<TopBottomSense::kTop, true>;
+
 }  // namespace mongo
