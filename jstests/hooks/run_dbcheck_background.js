@@ -83,7 +83,8 @@ function runBackgroundDbCheck(hosts) {
         }
 
         const dbCheckCompleted = (db) => {
-            return db.currentOp().inprog.filter(x => x["desc"] == "dbCheck")[0] === undefined;
+            return db.currentOp({$all: true}).inprog.filter(x => x["desc"] === "dbCheck")[0] ===
+                undefined;
         };
 
         assert.soon(() => dbCheckCompleted(adminDb),
