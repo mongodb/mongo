@@ -9,9 +9,6 @@ env.Prepend(CPPPATH=[
     'zstd/lib/common',
 ])
 
-if env.TargetOSIs('macOS'):
-    env.AppendUnique(CPPDEFINES=['ZSTD_DISABLE_ASM'])
-
 env.Library(
     target="zstd",
     source=[
@@ -36,7 +33,7 @@ env.Library(
         'zstd/lib/compress/zstd_opt.c',
         'zstd/lib/compress/zstdmt_compress.c',
         'zstd/lib/decompress/huf_decompress.c',
-        'zstd/lib/decompress/huf_decompress_amd64.S' if not env.TargetOSIs('windows') and not env.TargetOSIs('macOS') else [],
+        'zstd/lib/decompress/huf_decompress_amd64.S' if not env.TargetOSIs('windows') else [],
         'zstd/lib/decompress/zstd_ddict.c',
         'zstd/lib/decompress/zstd_decompress.c',
         'zstd/lib/decompress/zstd_decompress_block.c',
@@ -47,7 +44,7 @@ env.Library(
         'zstd/lib/dictBuilder/divsufsort.c',
         'zstd/lib/dictBuilder/fastcover.c',
         'zstd/lib/dictBuilder/zdict.c',
-        
+
     ],
     LIBDEPS_TAGS=[
         'init-no-global-side-effects',

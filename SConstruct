@@ -796,6 +796,10 @@ env_vars.Add('CCFLAGS',
     help='Sets flags for the C and C++ compiler',
     converter=variable_shlex_converter)
 
+env_vars.Add('ASFLAGS',
+    help='Sets assembler specific flags',
+    converter=variable_shlex_converter)
+
 env_vars.Add('CFLAGS',
     help='Sets flags for the C compiler',
     converter=variable_shlex_converter)
