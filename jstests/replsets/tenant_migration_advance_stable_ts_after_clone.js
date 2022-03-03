@@ -63,7 +63,7 @@ assert.soon(function() {
         assert
             .commandWorked(donorPrimary.getDB(kUnrelatedDbNameDonor).runCommand({
                 insert: collName,
-                documents: [{_id: 1}],
+                documents: [{n: 1}],
                 writeConcern: {w: "majority"}
             }))
             .operationTime;
