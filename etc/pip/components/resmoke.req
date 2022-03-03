@@ -6,4 +6,5 @@ mock <= 4.0.3
 shrub.py == 1.1.0
 ocspresponder == 0.5.0
 flask == 1.1.1
+itsdangerous == 2.0.0
 ocspbuilder == 0.10.2
