@@ -14,6 +14,8 @@ selector:
   # against their test collections.
   - jstests/core/operation_latency_histogram.js
   - jstests/core/geo_s2cursorlimitskip.js
+  # Having duplicate namespaces is not supported and will cause initial sync to fail.
+  - jstests/core/views/duplicate_ns.js
   # These tests run getLatestProfilerEntry(). The downstream syncing node affects the profiler.
   - jstests/core/profile_agg.js
   - jstests/core/profile_count.js
