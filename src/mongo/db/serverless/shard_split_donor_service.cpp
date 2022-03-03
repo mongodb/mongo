@@ -231,6 +231,9 @@ ExecutorFuture<void> ShardSplitDonorService::_createStateDocumentTTLIndex(
 
 ExecutorFuture<void> ShardSplitDonorService::_rebuildService(
     std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token) {
+    if (!repl::feature_flags::gShardSplit.isEnabled(serverGlobalParams.featureCompatibility)) {
+        return ExecutorFuture(**executor);
+    }
     return _createStateDocumentTTLIndex(executor, token);
 }
 

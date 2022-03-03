@@ -64,7 +64,6 @@
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
-#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
@@ -400,25 +399,6 @@ TEST_F(ShardSplitDonorServiceTest, StepDownTest) {
     ASSERT_EQ(serviceInstance->completionFuture().getNoThrow(),
               ErrorCodes::InterruptedDueToReplStateChange);
     ASSERT_FALSE(serviceInstance->isGarbageCollectable());
-}
-
-// TODO(SERVER-62363) : Remove this test once the ticket is completed.
-DEATH_TEST_F(ShardSplitDonorServiceTest, StartWithExpireAtAlreadySet, "invariant") {
-    auto opCtx = makeOperationContext();
-
-    test::shard_split::ScopedTenantAccessBlocker scopedTenants(_tenantIds, opCtx.get());
-
-    auto stateDocument = defaultStateDocument();
-    stateDocument.setState(ShardSplitDonorStateEnum::kCommitted);
-
-    auto serviceInstance = ShardSplitDonorService::DonorStateMachine::getOrCreate(
-        opCtx.get(), _service, stateDocument.toBSON());
-
-    ASSERT(serviceInstance.get());
-
-    // this triggers an invariant updateResult.numDocsModified == 1 in _updateStateDocument when
-    // going in the _handleErrorOrEnterAbortedState.
-    auto result = serviceInstance->decisionFuture().get(opCtx.get());
 }
 
 TEST_F(ShardSplitDonorServiceTest, StepUpWithkCommitted) {
