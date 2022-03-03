@@ -113,6 +113,8 @@ struct ParsedCollModRequest {
     boost::optional<ChangeStreamPreAndPostImagesOptions> changeStreamPreAndPostImagesOptions;
     int numModifications = 0;
     bool dryRun = false;
+    boost::optional<long long> cappedSize;
+    boost::optional<long long> cappedMax;
 };
 
 StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
@@ -130,6 +132,25 @@ StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
         checkCollectionUUIDMismatch(opCtx, nss, coll, cmd.getCollModRequest().getCollectionUUID());
     } catch (const DBException& ex) {
         return ex.toStatus();
+    }
+
+    if (cmd.getCollModRequest().getCappedSize() || cmd.getCollModRequest().getCappedMax()) {
+        // TODO (SERVER-64042): Remove FCV check once 6.1 is released.
+        if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+            serverGlobalParams.featureCompatibility.isLessThan(
+                multiversion::FeatureCompatibilityVersion::kVersion_6_0)) {
+            return Status(ErrorCodes::InvalidOptions,
+                          "Cannot change the size limits of a capped collection.");
+        } else if (!coll->isCapped()) {
+            return Status(ErrorCodes::InvalidOptions, "Collection must be capped.");
+        } else if (coll->ns().isOplog()) {
+            return Status(ErrorCodes::InvalidOptions,
+                          "Cannot resize the oplog using this command. Use the "
+                          "'replSetResizeOplog' command instead.");
+        } else {
+            cmr.cappedSize = cmd.getCollModRequest().getCappedSize();
+            cmr.cappedMax = cmd.getCollModRequest().getCappedMax();
+        }
     }
 
     // TODO (SERVER-62732): Check options directly rather than using a loop.
@@ -451,6 +472,20 @@ StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
             // The dry run option should never be included in a collMod oplog entry.
             continue;
         } else if (fieldName == CollMod::kCollectionUUIDFieldName) {
+        } else if (fieldName == CollMod::kCappedSizeFieldName) {
+            const long long minSize = 4096;
+            auto swCappedSize = CollectionOptions::checkAndAdjustCappedSize(*cmr.cappedSize);
+            if (!swCappedSize.isOK()) {
+                return swCappedSize.getStatus();
+            }
+            cmr.cappedSize =
+                (swCappedSize.getValue() < minSize) ? minSize : swCappedSize.getValue();
+        } else if (fieldName == CollMod::kCappedMaxFieldName) {
+            auto swCappedMaxDocs = CollectionOptions::checkAndAdjustCappedMaxDocs(*cmr.cappedMax);
+            if (!swCappedMaxDocs.isOK()) {
+                return swCappedMaxDocs.getStatus();
+            }
+            cmr.cappedMax = swCappedMaxDocs.getValue();
         } else {
             if (isTimeseries) {
                 return Status(ErrorCodes::InvalidOptions,
@@ -774,6 +809,13 @@ Status _collModInternal(OperationContext* opCtx,
                 return Status(ErrorCodes::InvalidOptions,
                               "The 'changeStreamPreAndPostImages' is an unknown field.");
             }
+        }
+
+        if (cmrNew.cappedSize || cmrNew.cappedMax) {
+            // If the current capped collection size exceeds the newly set limits, future document
+            // inserts will prompt document deletion.
+            uassertStatusOK(coll.getWritableCollection(opCtx)->updateCappedSize(
+                opCtx, cmrNew.cappedSize, cmrNew.cappedMax));
         }
 
         boost::optional<IndexCollModInfo> indexCollModInfo;

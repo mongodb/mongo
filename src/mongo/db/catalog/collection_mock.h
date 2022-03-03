@@ -269,7 +269,9 @@ public:
         std::abort();
     }
 
-    Status updateCappedSize(OperationContext* opCtx, long long newCappedSize) {
+    Status updateCappedSize(OperationContext* opCtx,
+                            boost::optional<long long> newCappedSize,
+                            boost::optional<long long> newCappedMax) {
         std::abort();
     }
 

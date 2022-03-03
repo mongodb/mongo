@@ -188,6 +188,21 @@ structs:
                 type: uuid
                 optional: true
                 unstable: true
+            cappedSize:
+                description: "Update the maximum size in bytes for the capped collection."
+                type: safeInt64
+                optional: true
+                validator:
+                    gte: 1
+                    lte: 1125899906842624  # 1 PB
+                unstable: false
+            cappedMax:
+                description: "Update the maximum number of documents allowed in the capped collection."
+                type: safeInt64
+                optional: true
+                validator:
+                    lt: 2147483648  # 2^31
+                unstable: false
 
 commands:
     collMod:

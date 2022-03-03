@@ -79,6 +79,29 @@ void setEncryptedDefaultEncryptedCollectionNames(const NamespaceString& ns,
 
 }  // namespace
 
+StatusWith<long long> CollectionOptions::checkAndAdjustCappedSize(long long cappedSize) {
+    const long long kGB = 1024 * 1024 * 1024;
+    const long long kPB = 1024 * 1024 * kGB;
+
+    if (cappedSize < 0) {
+        return Status(ErrorCodes::BadValue, "size has to be >= 0");
+    }
+    if (cappedSize > kPB) {
+        return Status(ErrorCodes::BadValue, "size cannot exceed 1 PB");
+    }
+
+    return adjustCappedSize(cappedSize);
+}
+
+StatusWith<long long> CollectionOptions::checkAndAdjustCappedMaxDocs(long long cappedMaxDocs) {
+    if (cappedMaxDocs >= 0x1LL << 31) {
+        return Status(ErrorCodes::BadValue,
+                      "max in a capped collection has to be < 2^31 or not set");
+    }
+
+    return adjustCappedMaxDocs(cappedMaxDocs);
+}
+
 bool CollectionOptions::isView() const {
     return !viewOn.empty();
 }
@@ -121,24 +144,21 @@ StatusWith<CollectionOptions> CollectionOptions::parse(const BSONObj& options, P
                 // Ignoring for backwards compatibility.
                 continue;
             }
-            auto cappedSize = e.safeNumberLong();
-            if (cappedSize < 0)
-                return Status(ErrorCodes::BadValue, "size has to be >= 0");
-            const long long kGB = 1024 * 1024 * 1024;
-            const long long kPB = 1024 * 1024 * kGB;
-            if (cappedSize > kPB)
-                return Status(ErrorCodes::BadValue, "size cannot exceed 1 PB");
-            collectionOptions.cappedSize = adjustCappedSize(cappedSize);
+            auto swCappedSize = checkAndAdjustCappedSize(e.safeNumberLong());
+            if (!swCappedSize.isOK()) {
+                return swCappedSize.getStatus();
+            }
+            collectionOptions.cappedSize = swCappedSize.getValue();
         } else if (fieldName == "max") {
             if (!options["capped"].trueValue() || !e.isNumber()) {
                 // Ignoring for backwards compatibility.
                 continue;
             }
-            auto cappedMaxDocs = e.safeNumberLong();
-            if (cappedMaxDocs >= 0x1LL << 31)
-                return Status(ErrorCodes::BadValue,
-                              "max in a capped collection has to be < 2^31 or not set");
-            collectionOptions.cappedMaxDocs = adjustCappedMaxDocs(cappedMaxDocs);
+            auto swCappedMaxDocs = checkAndAdjustCappedMaxDocs(e.safeNumberLong());
+            if (!swCappedMaxDocs.isOK()) {
+                return swCappedMaxDocs.getStatus();
+            }
+            collectionOptions.cappedMaxDocs = swCappedMaxDocs.getValue();
         } else if (fieldName == "$nExtents") {
             // Ignoring for backwards compatibility.
             continue;

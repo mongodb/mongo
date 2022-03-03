@@ -343,7 +343,9 @@ public:
     void updateClusteredIndexTTLSetting(OperationContext* opCtx,
                                         boost::optional<int64_t> expireAfterSeconds) final;
 
-    Status updateCappedSize(OperationContext* opCtx, long long newCappedSize) final;
+    Status updateCappedSize(OperationContext* opCtx,
+                            boost::optional<long long> newCappedSize,
+                            boost::optional<long long> newCappedMax) final;
 
     //
     // Stats
@@ -580,7 +582,6 @@ private:
 
         // Capped information.
         const bool _isCapped;
-        const long long _cappedMaxDocs;
 
         // For capped deletes performed on collections where '_needCappedLock' is false, the mutex
         // below protects '_cappedFirstRecord'. Otherwise, when '_needCappedLock' is true, the

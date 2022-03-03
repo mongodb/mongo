@@ -573,7 +573,9 @@ public:
     virtual void updateClusteredIndexTTLSetting(OperationContext* opCtx,
                                                 boost::optional<int64_t> expireAfterSeconds) = 0;
 
-    virtual Status updateCappedSize(OperationContext* opCtx, long long newCappedSize) = 0;
+    virtual Status updateCappedSize(OperationContext* opCtx,
+                                    boost::optional<long long> newCappedSize,
+                                    boost::optional<long long> newCappedMax) = 0;
 
     //
     // Index

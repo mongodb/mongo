@@ -83,6 +83,9 @@ struct CollectionOptions {
     static CollectionOptions fromCreateCommand(const NamespaceString& nss,
                                                const CreateCommand& cmd);
 
+    static StatusWith<long long> checkAndAdjustCappedSize(long long cappedSize);
+    static StatusWith<long long> checkAndAdjustCappedMaxDocs(long long cappedMaxDocs);
+
     /**
      * Serialize to BSON. The 'includeUUID' parameter is used for the listCollections command to do
      * special formatting for the uuid. Aside from the UUID, if 'includeFields' is non-empty, only

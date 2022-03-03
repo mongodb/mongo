@@ -375,8 +375,7 @@ CollectionImpl::SharedState::SharedState(CollectionImpl* collection,
       // clustered capped collections because they only guarantee insertion order when cluster keys
       // are inserted in monotonically-increasing order.
       _needCappedLock(options.capped && collection->ns().isReplicated() && !options.clusteredIndex),
-      _isCapped(options.capped),
-      _cappedMaxDocs(options.cappedMaxDocs) {
+      _isCapped(options.capped) {
     if (_cappedNotifier) {
         _recordStore->setCappedCallback(this);
     }
@@ -993,7 +992,8 @@ bool CollectionImpl::_cappedAndNeedDelete(OperationContext* opCtx) const {
         return true;
     }
 
-    if ((_shared->_cappedMaxDocs != 0) && (numRecords(opCtx) > _shared->_cappedMaxDocs)) {
+    const auto cappedMaxDocs = _shared->_collectionLatest->getCollectionOptions().cappedMaxDocs;
+    if ((cappedMaxDocs != 0) && (numRecords(opCtx) > cappedMaxDocs)) {
         return true;
     }
 
@@ -1039,9 +1039,10 @@ void CollectionImpl::_cappedDeleteAsNeeded(OperationContext* opCtx,
     const auto cappedMaxSize = _shared->_collectionLatest->getCollectionOptions().cappedSize;
     const long long sizeOverCap =
         (currentDataSize > cappedMaxSize) ? currentDataSize - cappedMaxSize : 0;
-    const long long docsOverCap =
-        (_shared->_cappedMaxDocs != 0 && currentNumRecords > _shared->_cappedMaxDocs)
-        ? currentNumRecords - _shared->_cappedMaxDocs
+
+    const auto cappedMaxDocs = _shared->_collectionLatest->getCollectionOptions().cappedMaxDocs;
+    const long long docsOverCap = (cappedMaxDocs != 0 && currentNumRecords > cappedMaxDocs)
+        ? currentNumRecords - cappedMaxDocs
         : 0;
 
     long long sizeSaved = 0;
@@ -1509,7 +1510,9 @@ void CollectionImpl::updateClusteredIndexTTLSetting(OperationContext* opCtx,
     });
 }
 
-Status CollectionImpl::updateCappedSize(OperationContext* opCtx, long long newCappedSize) {
+Status CollectionImpl::updateCappedSize(OperationContext* opCtx,
+                                        boost::optional<long long> newCappedSize,
+                                        boost::optional<long long> newCappedMax) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(ns(), MODE_X));
 
     if (!_shared->_isCapped) {
@@ -1517,15 +1520,20 @@ Status CollectionImpl::updateCappedSize(OperationContext* opCtx, long long newCa
                       str::stream() << "Cannot update size on a non-capped collection " << ns());
     }
 
-    if (ns().isOplog()) {
-        Status status = _shared->_recordStore->updateOplogSize(newCappedSize);
+    if (ns().isOplog() && newCappedSize) {
+        Status status = _shared->_recordStore->updateOplogSize(*newCappedSize);
         if (!status.isOK()) {
             return status;
         }
     }
 
     _writeMetadata(opCtx, [&](BSONCollectionCatalogEntry::MetaData& md) {
-        md.options.cappedSize = newCappedSize;
+        if (newCappedSize) {
+            md.options.cappedSize = *newCappedSize;
+        }
+        if (newCappedMax) {
+            md.options.cappedMaxDocs = *newCappedMax;
+        }
     });
     return Status::OK();
 }
@@ -1563,7 +1571,7 @@ bool CollectionImpl::isCapped() const {
 }
 
 long long CollectionImpl::getCappedMaxDocs() const {
-    return _shared->_cappedMaxDocs;
+    return _metadata->options.cappedMaxDocs;
 }
 
 long long CollectionImpl::getCappedMaxSize() const {
