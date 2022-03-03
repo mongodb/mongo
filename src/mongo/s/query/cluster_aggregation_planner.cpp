@@ -648,6 +648,7 @@ Status runPipelineOnPrimaryShard(const boost::intrusive_ptr<ExpressionContext>& 
                                                                            explain,
                                                                            nullptr, /* pipeline */
                                                                            BSONObj(),
+                                                                           boost::none,
                                                                            boost::none);
 
     const auto shardId = cm.dbPrimary();
@@ -856,10 +857,14 @@ Status runPipelineOnSpecificShardOnly(const boost::intrusive_ptr<ExpressionConte
                                       BSONObjBuilder* out) {
     auto opCtx = expCtx->opCtx;
 
+    boost::optional<int> overrideBatchSize;
     if (forPerShardCursor) {
         tassert(6273804,
                 "Per shard cursors are supposed to pass fromMongos: false to shards",
                 !expCtx->inMongos);
+        // By using an initial batchSize of zero all of the events will get returned through
+        // the getMore path and have metadata stripped out.
+        overrideBatchSize = 0;
     }
 
     // Format the command for the shard. This wraps the command as an explain if necessary, and
@@ -869,7 +874,8 @@ Status runPipelineOnSpecificShardOnly(const boost::intrusive_ptr<ExpressionConte
                                                                            explain,
                                                                            nullptr, /* pipeline */
                                                                            BSONObj(),
-                                                                           boost::none);
+                                                                           boost::none,
+                                                                           overrideBatchSize);
 
     if (!forPerShardCursor && shardId != ShardId::kConfigServerId) {
         cmdObj = appendShardVersion(std::move(cmdObj), ChunkVersion::UNSHARDED());

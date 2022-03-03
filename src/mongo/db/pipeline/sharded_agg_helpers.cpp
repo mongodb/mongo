@@ -816,11 +816,22 @@ BSONObj createPassthroughCommandForShard(
     boost::optional<ExplainOptions::Verbosity> explainVerbosity,
     Pipeline* pipeline,
     BSONObj collationObj,
-    boost::optional<BSONObj> readConcern) {
+    boost::optional<BSONObj> readConcern,
+    boost::optional<int> overrideBatchSize) {
     // Create the command for the shards.
     MutableDocument targetedCmd(serializedCommand);
     if (pipeline) {
         targetedCmd[AggregateCommandRequest::kPipelineFieldName] = Value(pipeline->serialize());
+    }
+
+    if (overrideBatchSize.has_value()) {
+        if (serializedCommand[AggregateCommandRequest::kCursorFieldName].missing()) {
+            targetedCmd[AggregateCommandRequest::kCursorFieldName] =
+                Value(DOC(SimpleCursorOptions::kBatchSizeFieldName << Value(*overrideBatchSize)));
+        } else {
+            targetedCmd[AggregateCommandRequest::kCursorFieldName]
+                       [SimpleCursorOptions::kBatchSizeFieldName] = Value(*overrideBatchSize);
+        }
     }
 
     auto shardCommand = genericTransformForShards(std::move(targetedCmd),
@@ -987,7 +998,8 @@ DispatchShardPipelineResults dispatchShardPipeline(
                                                            expCtx->explain,
                                                            pipeline.get(),
                                                            expCtx->getCollatorBSON(),
-                                                           std::move(readConcern)));
+                                                           std::move(readConcern),
+                                                           boost::none));
 
     // A $changeStream pipeline must run on all shards, and will also open an extra cursor on the
     // config server in order to monitor for new shards. To guarantee that we do not miss any
