@@ -63,8 +63,6 @@ selector:
   # TODO (SERVER-61259): $text not supported: "No query solutions"
   - jstests/core/fts6.js
   - jstests/core/fts_projection.js
-  # TODO (SERVER-64081): index keystring comparison not compatible
-  - jstests/core/collmod_convert_to_unique_violations_size_limit.js
 
   exclude_with_any_tags:
   - assumes_standalone_mongod

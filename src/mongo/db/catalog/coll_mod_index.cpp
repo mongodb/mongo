@@ -316,7 +316,10 @@ std::list<std::set<RecordId>> scanIndexForDuplicates(
     for (auto indexEntry = indexCursor.seekForKeyString(opCtx, *firstKeyString); indexEntry;
          indexEntry = indexCursor.nextKeyString(opCtx)) {
         if (prevIndexEntry &&
-            indexEntry->keyString.compareWithoutRecordIdLong(prevIndexEntry->keyString) == 0) {
+            (indexEntry->loc.isLong()
+                 ? indexEntry->keyString.compareWithoutRecordIdLong(prevIndexEntry->keyString)
+                 : indexEntry->keyString.compareWithoutRecordIdStr(prevIndexEntry->keyString)) ==
+                0) {
             if (duplicateRecords.empty()) {
                 duplicateRecords.insert(prevIndexEntry->loc);
             }
