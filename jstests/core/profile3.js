@@ -1,6 +1,7 @@
 // @tags: [
 //   assumes_superuser_permissions,
 //   creates_and_authenticates_user,
+//   no_selinux,
 //   requires_profiling,
 // ]
 // special db so that it can be run in parallel tests

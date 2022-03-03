@@ -2,6 +2,7 @@
 //   assumes_superuser_permissions,
 //   creates_and_authenticates_user,
 //   does_not_support_stepdowns,
+//   no_selinux,
 //   requires_capped,
 //   requires_collstats,
 //   requires_non_retryable_commands,
