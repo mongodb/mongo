@@ -340,12 +340,26 @@ boost::optional<write_ops::WriteError> generateError(OperationContext* opCtx,
         if (ErrorCodes::isInterruption(*overwrittenStatus)) {
             uassertStatusOK(*overwrittenStatus);
         }
+
+        // Tenant migration errors, similarly to migration errors consume too much space in the
+        // ordered:false responses and get truncated. Since the call to
+        // 'handleTenantMigrationConflict' above replaces the original status, we need to manually
+        // truncate the new reason if the original 'status' was also truncated.
+        if (status.reason().empty()) {
+            overwrittenStatus = overwrittenStatus->withReason("");
+        }
     }
 
     constexpr size_t kMaxErrorReasonsToReport = 1;
-    if (numErrors >= kMaxErrorReasonsToReport)
-        overwrittenStatus =
-            overwrittenStatus ? overwrittenStatus->withReason("") : status.withReason("");
+    constexpr size_t kMaxErrorSizeToReportAfterMaxReasonsReached = 1024 * 1024;
+
+    if (numErrors > kMaxErrorReasonsToReport) {
+        size_t errorSize =
+            overwrittenStatus ? overwrittenStatus->reason().size() : status.reason().size();
+        if (errorSize > kMaxErrorSizeToReportAfterMaxReasonsReached)
+            overwrittenStatus =
+                overwrittenStatus ? overwrittenStatus->withReason("") : status.withReason("");
+    }
 
     if (overwrittenStatus)
         return write_ops::WriteError(index, std::move(*overwrittenStatus));
