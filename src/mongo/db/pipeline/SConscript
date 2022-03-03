@@ -514,6 +514,7 @@ env.CppUnitTest(
         'document_source_add_fields_test.cpp',
         'document_source_bucket_auto_test.cpp',
         'document_source_bucket_test.cpp',
+        'document_source_change_stream_rewrites_test.cpp',
         'document_source_change_stream_test.cpp',
         'document_source_check_resume_token_test.cpp',
         'document_source_count_test.cpp',
