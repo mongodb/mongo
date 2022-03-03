@@ -609,39 +609,40 @@ void ShardingCatalogManager::configureCollectionBalancing(
         return;
     }
 
-    // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk splits, merges, and
-    // migrations
-    Lock::ExclusiveLock lk(opCtx, opCtx->lockState(), _kChunkOpLock);
+    const auto update = updateCmd.obj();
+    {
+        // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk splits, merges, and
+        // migrations
+        Lock::ExclusiveLock lk(opCtx, opCtx->lockState(), _kChunkOpLock);
+
+        withTransaction(
+            opCtx, CollectionType::ConfigNS, [&](OperationContext* opCtx, TxnNumber txnNumber) {
+                const auto query = BSON(CollectionType::kNssFieldName << nss.ns());
+                const auto res = writeToConfigDocumentInTxn(
+                    opCtx,
+                    CollectionType::ConfigNS,
+                    BatchedCommandRequest::buildUpdateOp(CollectionType::ConfigNS,
+                                                         query,
+                                                         update /* update */,
+                                                         false /* upsert */,
+                                                         false /* multi */),
+                    txnNumber);
+                const auto numDocsModified = UpdateOp::parseResponse(res).getN();
+                uassert(ErrorCodes::ConflictingOperationInProgress,
+                        str::stream() << "Expected to match one doc for query " << query
+                                      << " but matched " << numDocsModified,
+                        numDocsModified == 1);
+
+                bumpCollectionMinorVersionInTxn(opCtx, nss, txnNumber);
+            });
+        // Now any migrations that change the list of shards will see the results of the transaction
+        // during refresh, so it is safe to release the chunk lock.
+    }
+
     const auto cm = uassertStatusOK(
         Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx, nss));
-    const auto uuid = cm.getUUID();
-
     std::set<ShardId> shardsIds;
     cm.getAllShardIds(&shardsIds);
-
-    const auto update = updateCmd.obj();
-
-    withTransaction(
-        opCtx, CollectionType::ConfigNS, [&](OperationContext* opCtx, TxnNumber txnNumber) {
-            const auto query = BSON(CollectionType::kNssFieldName
-                                    << nss.ns() << CollectionType::kUuidFieldName << uuid);
-            const auto res = writeToConfigDocumentInTxn(
-                opCtx,
-                CollectionType::ConfigNS,
-                BatchedCommandRequest::buildUpdateOp(CollectionType::ConfigNS,
-                                                     query,
-                                                     update /* update */,
-                                                     false /* upsert */,
-                                                     false /* multi */),
-                txnNumber);
-            const auto numDocsModified = UpdateOp::parseResponse(res).getN();
-            uassert(ErrorCodes::ConflictingOperationInProgress,
-                    str::stream() << "Expected to match one doc for query " << query
-                                  << " but matched " << numDocsModified,
-                    numDocsModified == 1);
-
-            bumpCollectionMinorVersionInTxn(opCtx, nss, txnNumber);
-        });
 
     const auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     sharding_util::tellShardsToRefreshCollection(
