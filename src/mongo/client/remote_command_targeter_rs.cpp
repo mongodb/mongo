@@ -37,6 +37,7 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/client/replica_set_monitor.h"
+#include "mongo/client/replica_set_monitor_server_parameters_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
@@ -81,8 +82,8 @@ StatusWith<HostAndPort> RemoteCommandTargeterRS::findHost(OperationContext* opCt
         return interruptStatus;
     }
 
-    bool maxTimeMsLesser =
-        (opCtx->getRemainingMaxTimeMillis() < ReplicaSetMonitorInterface::kDefaultFindHostTimeout);
+    bool maxTimeMsLesser = (opCtx->getRemainingMaxTimeMillis() <
+                            Milliseconds(gDefaultFindReplicaSetHostTimeoutMS.load()));
     auto swHostAndPort =
         _rsMonitor->getHostOrRefresh(readPref, opCtx->getCancellationToken()).getNoThrow(opCtx);
 

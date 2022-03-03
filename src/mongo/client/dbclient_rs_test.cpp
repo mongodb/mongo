@@ -49,6 +49,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/dbtests/mock/mock_conn_registry.h"
 #include "mongo/dbtests/mock/mock_replica_set.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -92,6 +93,10 @@ protected:
 
     std::shared_ptr<ClockSourceMock> _clkSource = std::make_shared<ClockSourceMock>();
     StreamableReplicaSetMonitorForTesting _rsmMonitor;
+
+private:
+    RAIIServerParameterControllerForTest _findHostTimeout{"defaultFindReplicaSetHostTimeoutMS",
+                                                          100};
 };
 
 /**

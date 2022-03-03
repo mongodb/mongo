@@ -37,3 +37,14 @@ server_parameters:
         set_at: startup
         cpp_class:
             name: RSMProtocolServerParameter
+
+
+    defaultFindReplicaSetHostTimeoutMS:
+      description: >-
+        The timeout used for finding a replica set host.
+
+      set_at: [ startup, runtime ]
+      cpp_vartype: 'AtomicWord<int>'
+      cpp_varname: gDefaultFindReplicaSetHostTimeoutMS
+      default: 15000
+      test_only: true

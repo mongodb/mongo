@@ -40,6 +40,7 @@
 #include "mongo/client/connpool.h"
 #include "mongo/client/global_conn_pool.h"
 #include "mongo/client/read_preference.h"
+#include "mongo/client/replica_set_monitor_server_parameters_gen.h"
 #include "mongo/client/streamable_replica_set_monitor_discovery_time_processor.h"
 #include "mongo/client/streamable_replica_set_monitor_query_processor.h"
 #include "mongo/db/operation_context.h"
@@ -353,8 +354,8 @@ SemiFuture<std::vector<HostAndPort>> StreamableReplicaSetMonitor::getHostsOrRefr
     }
 
     // start counting from the beginning of the operation
-    const auto deadline = _executor->now() +
-        duration_cast<Milliseconds>(ReplicaSetMonitorInterface::kDefaultFindHostTimeout);
+    const auto deadline =
+        _executor->now() + Milliseconds(gDefaultFindReplicaSetHostTimeoutMS.load());
 
     // try to satisfy query immediately
     auto immediateResult = _getHosts(criteria, excludedHosts);

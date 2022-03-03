@@ -50,12 +50,6 @@ public:
     virtual ~ReplicaSetMonitorInterface() = default;
 
     /**
-     * The default timeout, which will be used for finding a replica set host if the caller does
-     * not explicitly specify it.
-     */
-    static constexpr Seconds kDefaultFindHostTimeout{15};
-
-    /**
      * Schedules the initial refresh task into task executor.
      */
     virtual void init() = 0;

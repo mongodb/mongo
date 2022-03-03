@@ -57,9 +57,8 @@ public:
     virtual ConnectionString connectionString() = 0;
 
     /**
-     * Finds a host matching readPref blocking up to
-     * ReplicaSetMonitorInterface::kDefaultFindHostTimeout seconds or until the given operation is
-     * interrupted or its deadline expires.
+     * Finds a host matching readPref blocking up to gDefaultFindReplicaSetHostTimeoutMS
+     * milliseconds or until the given operation is interrupted or its deadline expires.
      */
     virtual StatusWith<HostAndPort> findHost(OperationContext* opCtx,
                                              const ReadPreferenceSetting& readPref) = 0;
@@ -67,10 +66,10 @@ public:
 
     /**
      * Finds a host that matches the read preference specified by readPref, blocking for up to
-     * ReplicaSetMonitorInterface::kDefaultFindHostTimeout seconds, if a match cannot be found
-     * immediately.
-     * DEPRECATED. Prefer findHost(OperationContext*, const ReadPreferenceSetting&), whenever
-     * an OperationContext is available.
+     * gDefaultFindReplicaSetHostTimeoutMS milliseconds, if a match cannot be found immediately.
+     *
+     * DEPRECATED. Prefer findHost(OperationContext*, const ReadPreferenceSetting&), whenever an
+     * OperationContext is available.
      */
     virtual SemiFuture<HostAndPort> findHost(const ReadPreferenceSetting& readPref,
                                              const CancellationToken& cancelToken) = 0;
