@@ -117,7 +117,7 @@ class HistoricTestInfo(NamedTuple):
         if not predicate:
             predicate = lambda _: True
         return sum([
-            hook.avg_duration * (hook.num_pass // (self.num_pass or hook.num_pass))
+            hook.avg_duration * (hook.num_pass // self.num_pass if self.num_pass else 1)
             for hook in self.hooks if predicate(hook)
         ])
 
