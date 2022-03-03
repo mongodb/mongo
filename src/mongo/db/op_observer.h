@@ -60,9 +60,10 @@ struct OplogUpdateEntryArgs {
         : updateArgs(std::move(updateArgs)), nss(std::move(nss)), uuid(std::move(uuid)) {}
 };
 
-struct TTLCollModInfo {
-    Seconds expireAfterSeconds;
-    Seconds oldExpireAfterSeconds;
+struct IndexCollModInfo {
+    boost::optional<Seconds> expireAfterSeconds;
+    boost::optional<Seconds> oldExpireAfterSeconds;
+    boost::optional<bool> unique;
     std::string indexName;
 };
 
@@ -179,7 +180,7 @@ public:
      *
      * To facilitate the rollback process, 'oldCollOptions' contains the previous state of all
      * collection options i.e. the state prior to completion of the current collMod command.
-     * 'ttlInfo' contains the index name and previous expiration time of a TTL index. The old
+     * 'indexInfo' contains the index name and previous expiration time of a TTL index. The old
      * collection options will be stored in the 'o2.collectionOptions_old' field, and the old TTL
      * expiration value in the 'o2.expireAfterSeconds_old' field.
      *
@@ -206,7 +207,7 @@ public:
                            OptionalCollectionUUID uuid,
                            const BSONObj& collModCmd,
                            const CollectionOptions& oldCollOptions,
-                           boost::optional<TTLCollModInfo> ttlInfo) = 0;
+                           boost::optional<IndexCollModInfo> indexInfo) = 0;
     virtual void onDropDatabase(OperationContext* opCtx, const std::string& dbName) = 0;
 
     /**

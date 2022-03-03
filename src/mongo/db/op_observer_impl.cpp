@@ -791,18 +791,21 @@ void OpObserverImpl::onCollMod(OperationContext* opCtx,
                                OptionalCollectionUUID uuid,
                                const BSONObj& collModCmd,
                                const CollectionOptions& oldCollOptions,
-                               boost::optional<TTLCollModInfo> ttlInfo) {
+                               boost::optional<IndexCollModInfo> indexInfo) {
     const auto cmdNss = nss.getCommandNS();
 
     // Create the 'o' field object.
-    const auto cmdObj = makeCollModCmdObj(collModCmd, oldCollOptions, ttlInfo);
+    const auto cmdObj = makeCollModCmdObj(collModCmd, oldCollOptions, indexInfo);
 
     // Create the 'o2' field object. We save the old collection metadata and TTL expiration.
     BSONObjBuilder o2Builder;
     o2Builder.append("collectionOptions_old", oldCollOptions.toBSON());
-    if (ttlInfo) {
-        auto oldExpireAfterSeconds = durationCount<Seconds>(ttlInfo->oldExpireAfterSeconds);
-        o2Builder.append("expireAfterSeconds_old", oldExpireAfterSeconds);
+    if (indexInfo) {
+        if (indexInfo->oldExpireAfterSeconds) {
+            auto oldExpireAfterSeconds =
+                durationCount<Seconds>(indexInfo->oldExpireAfterSeconds.get());
+            o2Builder.append("expireAfterSeconds_old", oldExpireAfterSeconds);
+        }
     }
 
     const auto o2Obj = o2Builder.done();
