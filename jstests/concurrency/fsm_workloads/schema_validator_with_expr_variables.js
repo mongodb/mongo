@@ -75,8 +75,8 @@ var $config = (function() {
     let transitions = {applyValidator: {applyValidator: 1}};
 
     return {
-        threadCount: 50,
-        iterations: 100,
+        threadCount: 30,
+        iterations: 50,
         states: states,
         startState: "applyValidator",
         transitions: transitions,
