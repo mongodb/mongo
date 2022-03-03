@@ -62,6 +62,7 @@
 #include "mongo/db/write_concern.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future_util.h"
 
@@ -613,6 +614,76 @@ SharedSemiFuture<void> removeDocumentsInRange(
         })
         .semi()
         .share();
+}
+
+void setOrphanCountersOnRangeDeletionTasks(OperationContext* opCtx) {
+    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
+    auto setNumOrphansOnTask = [opCtx, &store](const RangeDeletionTask& deletionTask,
+                                               int64_t numOrphans) {
+        store.update(opCtx,
+                     BSON(RangeDeletionTask::kIdFieldName << deletionTask.getId()),
+                     BSON("$set" << BSON(RangeDeletionTask::kNumOrphanDocsFieldName << numOrphans)),
+                     ShardingCatalogClient::kLocalWriteConcern);
+    };
+
+    store.forEach(
+        opCtx,
+        BSONObj(),
+        [opCtx, &store, &setNumOrphansOnTask](const RangeDeletionTask& deletionTask) {
+            AutoGetCollection collection(opCtx, deletionTask.getNss(), MODE_IX);
+            if (!collection || collection->uuid() != deletionTask.getCollectionUuid()) {
+                // The deletion task is referring to a collection that has been dropped
+                setNumOrphansOnTask(deletionTask, 0);
+                return true;
+            }
+
+            auto catalog = collection->getIndexCatalog();
+            auto shardKeyIdx = catalog->findShardKeyPrefixedIndex(
+                opCtx, *collection, (*collection).getShardKeyPattern(), /*requireSingleKey=*/false);
+
+            uassert(ErrorCodes::IndexNotFound,
+                    str::stream() << "couldn't find index over shard key "
+                                  << (*collection).getShardKeyPattern().clientReadable().toString()
+                                  << " for collection " << deletionTask.getNss()
+                                  << " (uuid: " << deletionTask.getCollectionUuid() << ")",
+                    shardKeyIdx);
+
+            const auto& range = deletionTask.getRange();
+            auto forwardIdxScanner =
+                InternalPlanner::shardKeyIndexScan(opCtx,
+                                                   &(*collection),
+                                                   *shardKeyIdx,
+                                                   range.getMin(),
+                                                   range.getMax(),
+                                                   BoundInclusion::kIncludeStartKeyOnly,
+                                                   PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                                   InternalPlanner::FORWARD);
+            int64_t numOrphansInRange = 0;
+            BSONObj indexEntry;
+            while (forwardIdxScanner->getNext(&indexEntry, nullptr) != PlanExecutor::IS_EOF) {
+                ++numOrphansInRange;
+            }
+
+            setNumOrphansOnTask(deletionTask, numOrphansInRange);
+            return true;
+        });
+
+    auto replClientInfo = repl::ReplClientInfo::forClient(opCtx->getClient());
+    replClientInfo.setLastOpToSystemLastOpTime(opCtx);
+    WriteConcernResult ignoreResult;
+    uassertStatusOK(waitForWriteConcern(opCtx,
+                                        replClientInfo.getLastOp(),
+                                        WriteConcerns::kMajorityWriteConcernNoTimeout,
+                                        &ignoreResult));
+}
+
+void clearOrphanCountersFromRangeDeletionTasks(OperationContext* opCtx) {
+    BSONObj allDocsQuery;
+    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
+    store.update(opCtx,
+                 allDocsQuery,
+                 BSON("$unset" << BSON(RangeDeletionTask::kNumOrphanDocsFieldName << "")),
+                 WriteConcerns::kMajorityWriteConcernNoTimeout);
 }
 
 }  // namespace mongo

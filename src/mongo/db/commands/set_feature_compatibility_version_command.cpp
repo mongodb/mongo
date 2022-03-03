@@ -67,6 +67,7 @@
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/migration_coordinator_document_gen.h"
 #include "mongo/db/s/migration_util.h"
+#include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
@@ -84,6 +85,7 @@
 #include "mongo/s/pm2583_feature_flags_gen.h"
 #include "mongo/s/refine_collection_shard_key_coordinator_feature_flags_gen.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point.h"
@@ -391,6 +393,12 @@ public:
 
             if (request.getPhase() == SetFCVPhaseEnum::kStart) {
                 invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
+                // TODO SERVER-64162 Destroy the BalancerStatsRegistry
+                if (actualVersion > requestedVersion &&
+                    feature_flags::gNoMoreAutoSplitter.isEnabled(
+                        serverGlobalParams.featureCompatibility)) {
+                    clearOrphanCountersFromRangeDeletionTasks(opCtx);
+                }
                 // TODO (SERVER-62325): Remove collMod draining mechanism after 6.0 branching.
                 if (actualVersion > requestedVersion &&
                     requestedVersion < multiversion::FeatureCompatibilityVersion::kVersion_5_3) {
@@ -559,6 +567,13 @@ private:
             // on a consistent version from start to finish. This will ensure that it will be able
             // to apply the oplog entries correctly.
             abortAllReshardCollection(opCtx);
+        }
+
+        if (serverGlobalParams.clusterRole == ClusterRole::ShardServer &&
+            request.getPhase() == SetFCVPhaseEnum::kComplete &&
+            feature_flags::gNoMoreAutoSplitter.isEnabled(serverGlobalParams.featureCompatibility)) {
+            // TODO SERVER-64162 Initialize the BalancerStatsRegistry
+            setOrphanCountersOnRangeDeletionTasks(opCtx);
         }
 
         // Create the pre-images collection if the feature flag is enabled on the requested version.

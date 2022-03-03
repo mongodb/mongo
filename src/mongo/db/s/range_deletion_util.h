@@ -98,4 +98,15 @@ void deleteRangeDeletionTasksForRename(OperationContext* opCtx,
                                        const NamespaceString& fromNss,
                                        const NamespaceString& toNss);
 
+/**
+ * Computes and sets the numOrphanDocs field for each document in `config.rangeDeletions` (skips
+ * documents referring to older incarnations of a collection)
+ */
+void setOrphanCountersOnRangeDeletionTasks(OperationContext* opCtx);
+
+/**
+ * Unsets the numOrphanDocs field from each document in `config.rangeDeletions`
+ */
+void clearOrphanCountersFromRangeDeletionTasks(OperationContext* opCtx);
+
 }  // namespace mongo
