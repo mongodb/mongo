@@ -460,7 +460,7 @@ Future<Message> TransportLayerASIO::ASIOSession::sourceMessageImpl(const BatonHa
 template <typename MutableBufferSequence>
 Future<void> TransportLayerASIO::ASIOSession::read(const MutableBufferSequence& buffers,
                                                    const BatonHandle& baton) {
-    // TODO SERVER-61192 Guard active ops for cancellation here.
+    // TODO SERVER-64191 Guard active ops for cancellation here.
 #ifdef MONGO_CONFIG_SSL
     if (_sslSocket) {
         return opportunisticRead(*_sslSocket, buffers, baton);
@@ -487,7 +487,7 @@ Future<void> TransportLayerASIO::ASIOSession::read(const MutableBufferSequence& 
 template <typename ConstBufferSequence>
 Future<void> TransportLayerASIO::ASIOSession::write(const ConstBufferSequence& buffers,
                                                     const BatonHandle& baton) {
-    // TODO SERVER-61192 Guard active ops for cancellation here.
+    // TODO SERVER-64191 Guard active ops for cancellation here.
 #ifdef MONGO_CONFIG_SSL
     _ranHandshake = true;
     if (_sslSocket) {

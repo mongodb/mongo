@@ -928,7 +928,7 @@ TEST_F(BatonASIOLinuxTest, AddAndRemoveSessionWhileInPoll) {
         cancelSessionResult.set(baton->cancelSession(*session));
     });
 
-    // TODO SERVER-61192 Change the following to `ASSERT_TRUE` once the underlying issue is fixed.
+    // TODO SERVER-64174 Change the following to `ASSERT_TRUE` once the underlying issue is fixed.
     ASSERT_FALSE(cancelSessionResult.get(opCtx.get()));
 }
 
@@ -1022,7 +1022,7 @@ TEST_F(BatonASIOLinuxTest, AddAndRemoveTimerWhileInPoll) {
         cancelTimerResult.set(baton->cancelTimer(*timer));
     });
 
-    // TODO SERVER-61192 Change the following to `ASSERT_TRUE` once the underlying issue is fixed.
+    // TODO SERVER-64174 Change the following to `ASSERT_TRUE` once the underlying issue is fixed.
     ASSERT_FALSE(cancelTimerResult.get(opCtx.get()));
 }
 
