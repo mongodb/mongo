@@ -725,6 +725,29 @@ MigrateInfo::MigrateInfo(const ShardId& a_to,
     reason = a_reason;
 }
 
+MigrateInfo::MigrateInfo(const ShardId& a_to,
+                         const ShardId& a_from,
+                         const NamespaceString& a_nss,
+                         const UUID& a_uuid,
+                         const BSONObj& a_min,
+                         const BSONObj& a_max,
+                         const ChunkVersion& a_version,
+                         const MoveChunkRequest::ForceJumbo a_forceJumbo,
+                         MigrationReason a_reason)
+    : nss(a_nss),
+      uuid(a_uuid),
+      minKey(a_min),
+      maxKey(a_max),
+      version(a_version),
+      forceJumbo(a_forceJumbo),
+      reason(a_reason) {
+    invariant(a_to.isValid());
+    invariant(a_from.isValid());
+
+    to = a_to;
+    from = a_from;
+}
+
 std::string MigrateInfo::getName() const {
     // Generates a unique name for a MigrateInfo based on the namespace and the lower bound of the
     // chunk being moved.

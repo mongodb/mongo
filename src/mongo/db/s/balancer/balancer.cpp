@@ -328,14 +328,11 @@ Status Balancer::rebalanceSingleChunk(OperationContext* opCtx,
     auto maxChunkSize =
         coll.getMaxChunkSizeBytes().value_or(balancerConfig->getMaxChunkSizeBytes());
 
-    MoveChunkSettings settings(maxChunkSize,
-                               balancerConfig->getSecondaryThrottle(),
-                               balancerConfig->waitForDelete(),
-                               migrateInfo->forceJumbo);
+    MoveChunkSettings settings(
+        maxChunkSize, balancerConfig->getSecondaryThrottle(), balancerConfig->waitForDelete());
     auto response =
         _commandScheduler
-            ->requestMoveChunk(
-                opCtx, nss, chunk, migrateInfo->to, settings, true /* issuedByRemoteUser */)
+            ->requestMoveChunk(opCtx, *migrateInfo, settings, true /* issuedByRemoteUser */)
             .getNoThrow();
     return processManualMigrationOutcome(opCtx, chunk.getMin(), nss, migrateInfo->to, response);
 }
@@ -365,15 +362,17 @@ Status Balancer::moveSingleChunk(OperationContext* opCtx,
         maxChunkSize = balancerConfig->getMaxChunkSizeBytes();
     }
 
-    MoveChunkSettings settings(maxChunkSize,
-                               secondaryThrottle,
-                               waitForDelete,
-                               forceJumbo ? MoveChunkRequest::ForceJumbo::kForceManual
-                                          : MoveChunkRequest::ForceJumbo::kDoNotForce);
-    auto response = _commandScheduler
-                        ->requestMoveChunk(
-                            opCtx, nss, chunk, newShardId, settings, true /* issuedByRemoteUser */)
-                        .getNoThrow();
+    MoveChunkSettings settings(maxChunkSize, secondaryThrottle, waitForDelete);
+    MigrateInfo migrateInfo(newShardId,
+                            nss,
+                            chunk,
+                            forceJumbo ? MoveChunkRequest::ForceJumbo::kForceManual
+                                       : MoveChunkRequest::ForceJumbo::kDoNotForce,
+                            MigrateInfo::chunksImbalance);
+    auto response =
+        _commandScheduler
+            ->requestMoveChunk(opCtx, migrateInfo, settings, true /* issuedByRemoteUser */)
+            .getNoThrow();
     return processManualMigrationOutcome(opCtx, chunk.getMin(), nss, newShardId, response);
 }
 
@@ -871,12 +870,6 @@ int Balancer::_moveChunks(OperationContext* opCtx,
     std::vector<std::pair<const MigrateInfo&, SemiFuture<void>>> rebalanceMigrationsAndResponses,
         defragmentationMigrationsAndResponses;
     auto requestMigration = [&](const MigrateInfo& migrateInfo) -> SemiFuture<void> {
-        ChunkType chunk;
-        chunk.setMin(migrateInfo.minKey);
-        chunk.setMax(migrateInfo.maxKey);
-        chunk.setShard(migrateInfo.from);
-        chunk.setVersion(migrateInfo.version);
-
         auto coll = Grid::get(opCtx)->catalogClient()->getCollection(
             opCtx, migrateInfo.nss, repl::ReadConcernLevel::kMajorityReadConcern);
         auto maxChunkSizeBytes =
@@ -884,10 +877,8 @@ int Balancer::_moveChunks(OperationContext* opCtx,
 
         MoveChunkSettings settings(maxChunkSizeBytes,
                                    balancerConfig->getSecondaryThrottle(),
-                                   balancerConfig->waitForDelete(),
-                                   migrateInfo.forceJumbo);
-        return _commandScheduler->requestMoveChunk(
-            opCtx, migrateInfo.nss, chunk, migrateInfo.to, settings);
+                                   balancerConfig->waitForDelete());
+        return _commandScheduler->requestMoveChunk(opCtx, migrateInfo, settings);
     };
 
     for (const auto& rebalanceOp : chunksToRebalance) {

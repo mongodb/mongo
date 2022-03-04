@@ -59,17 +59,14 @@ struct MigrationsRecoveryDefaultValues {
 struct MoveChunkSettings {
     MoveChunkSettings(int64_t maxChunkSizeBytes,
                       const MigrationSecondaryThrottleOptions& secondaryThrottle,
-                      bool waitForDelete,
-                      MoveChunkRequest::ForceJumbo forceJumbo)
+                      bool waitForDelete)
         : maxChunkSizeBytes(maxChunkSizeBytes),
           secondaryThrottle(secondaryThrottle),
-          waitForDelete(waitForDelete),
-          forceJumbo(forceJumbo) {}
+          waitForDelete(waitForDelete) {}
 
     int64_t maxChunkSizeBytes;
     const MigrationSecondaryThrottleOptions secondaryThrottle;
     bool waitForDelete;
-    MoveChunkRequest::ForceJumbo forceJumbo;
 };
 
 struct SplitVectorSettings {
@@ -116,9 +113,7 @@ public:
     virtual void stop() = 0;
 
     virtual SemiFuture<void> requestMoveChunk(OperationContext* opCtx,
-                                              const NamespaceString& nss,
-                                              const ChunkType& chunk,
-                                              const ShardId& recipient,
+                                              const MigrateInfo& migrateInfo,
                                               const MoveChunkSettings& commandSettings,
                                               bool issuedByRemoteUser = false) = 0;
 
