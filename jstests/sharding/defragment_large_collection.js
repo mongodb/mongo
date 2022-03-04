@@ -47,8 +47,14 @@ for (let i = 0; i < numCollections; ++i) {
 
     const coll = db[coll_prefix + i];
 
-    defragmentationUtil.createFragmentedCollection(
-        st.s, coll.getFullName(), numChunks, maxChunkFillMB, numZones, docSizeBytes, chunkSpacing);
+    defragmentationUtil.createFragmentedCollection(st.s,
+                                                   coll.getFullName(),
+                                                   numChunks,
+                                                   maxChunkFillMB,
+                                                   numZones,
+                                                   docSizeBytes,
+                                                   chunkSpacing,
+                                                   true);
 
     collections.push(coll);
 }

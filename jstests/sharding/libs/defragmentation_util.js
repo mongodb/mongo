@@ -1,12 +1,23 @@
 var defragmentationUtil = (function() {
     load("jstests/sharding/libs/find_chunks_util.js");
 
-    let createFragmentedCollection = function(
-        mongos, ns, numChunks, maxChunkFillMB, numZones, docSizeBytes, chunkSpacing) {
+    let createFragmentedCollection = function(mongos,
+                                              ns,
+                                              numChunks,
+                                              maxChunkFillMB,
+                                              numZones,
+                                              docSizeBytes,
+                                              chunkSpacing,
+                                              disableCollectionBalancing) {
         jsTest.log("Creating fragmented collection " + ns + " with parameters: numChunks = " +
                    numChunks + ", numZones = " + numZones + ", docSizeBytes = " + docSizeBytes +
                    ", maxChunkFillMB = " + maxChunkFillMB + ", chunkSpacing = " + chunkSpacing);
         assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {key: 1}}));
+        // Turn off balancer for this collection
+        if (disableCollectionBalancing) {
+            assert.commandWorked(
+                mongos.getDB('config').collections.update({_id: ns}, {$set: {"noBalance": true}}));
+        }
 
         createAndDistributeChunks(mongos, ns, numChunks, chunkSpacing);
         createRandomZones(mongos, ns, numZones, chunkSpacing);
@@ -84,8 +95,9 @@ var defragmentationUtil = (function() {
 
     let checkPostDefragmentationState = function(mongos, ns, maxChunkSizeMB, shardKey) {
         const oversizedChunkThreshold = maxChunkSizeMB * 1024 * 1024 * 4 / 3;
-        const chunks =
-            findChunksUtil.findChunksByNs(mongos.getDB('config'), ns).sort({shardKey: 1}).toArray();
+        const chunks = findChunksUtil.findChunksByNs(mongos.getDB('config'), ns)
+                           .sort({[shardKey]: 1})
+                           .toArray();
         const coll = mongos.getCollection(ns);
         const pipeline = [
             {'$collStats': {'storageStats': {}}},
@@ -102,7 +114,8 @@ var defragmentationUtil = (function() {
         let checkForOversizedChunk = function(
             coll, chunk, shardKey, avgObjSize, oversizedChunkThreshold) {
             let chunkSize =
-                coll.countDocuments({key: {$gte: chunk.min[shardKey], $lt: chunk.max[shardKey]}}) *
+                coll.countDocuments(
+                    {[shardKey]: {$gte: chunk.min[shardKey], $lt: chunk.max[shardKey]}}) *
                 avgObjSize;
             assert.lte(
                 chunkSize,
@@ -114,16 +127,22 @@ var defragmentationUtil = (function() {
             let chunk1 = chunks[i - 1];
             let chunk2 = chunks[i];
             // Check for mergeable chunks with combined size less than maxChunkSize
-            if (chunk1["shard"] === chunk2["shard"] && chunk1["max"] === chunk2["min"]) {
+            if (chunk1["shard"] === chunk2["shard"] &&
+                bsonWoCompare(chunk1["max"], chunk2["min"]) === 0) {
                 let chunk1Zone = getZoneForRange(mongos, ns, chunk1.min, chunk1.max);
                 let chunk2Zone = getZoneForRange(mongos, ns, chunk2.min, chunk2.max);
-                if (chunk1Zone === chunk2Zone) {
-                    let combinedDataSize = coll.countDocuments({
-                        shardKey: {$gte: chunk1.min[shardKey], $lt: chunk2.max[shardKey]}
-                    }) * avgObjSizeByShard[chunk1['shard']];
-                    assert.lte(
+                if (bsonWoCompare(chunk1Zone, chunk2Zone) === 0) {
+                    let combinedDataSize =
+                        coll.countDocuments(
+                            {[shardKey]: {$gte: chunk1.min[shardKey], $lt: chunk2.max[shardKey]}}) *
+                        avgObjSizeByShard[chunk1['shard']];
+                    // The autosplitter should not split chunks whose combined size is < 133% of
+                    // maxChunkSize but this threshold may be off by a few documents depending on
+                    // rounding of avgObjSize.
+                    const autosplitRoundingTolerance = 3 * avgObjSizeByShard[chunk1['shard']];
+                    assert.gte(
                         combinedDataSize,
-                        oversizedChunkThreshold,
+                        oversizedChunkThreshold - autosplitRoundingTolerance,
                         `Chunks ${tojson(chunk1)} and ${
                             tojson(chunk2)} are mergeable with combined size ${combinedDataSize}`);
                 }
@@ -147,7 +166,7 @@ var defragmentationUtil = (function() {
         const tags = mongos.getDB('config')
                          .tags.find({ns: ns, min: {$lte: minKey}, max: {$gte: maxKey}})
                          .toArray();
-        assert.leq(tags.length, 1);
+        assert.lte(tags.length, 1);
         if (tags.length === 1) {
             return tags[0].tag;
         }
