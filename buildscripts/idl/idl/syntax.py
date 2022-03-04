@@ -558,6 +558,19 @@ class Privilege(common.SourceLocation):
 
         super(Privilege, self).__init__(file_name, line, column)
 
+    def __str__(self):
+        # type: () -> str
+        """
+        Return formatted privilege information.
+
+        Example privilege message:
+        location: test.idl: (17, 4), resource_pattern: exact_namespace, action_type: ['find', 'insert', 'update', 'remove'], agg_stage: None
+        """
+        location = super(Privilege, self).__str__()
+        msg = "location: %s, resource_pattern: %s, action_type: %s, agg_stage: %s" % (
+            location, self.resource_pattern, self.action_type, self.agg_stage)
+        return msg  # type: ignore
+
 
 class AccessCheck(common.SourceLocation):
     """IDL access check information."""
@@ -570,6 +583,18 @@ class AccessCheck(common.SourceLocation):
         self.privilege = None  # type: Privilege
 
         super(AccessCheck, self).__init__(file_name, line, column)
+
+    def __str__(self):
+        # type: () -> str
+        """
+        Return formatted access check information.
+
+        Example access check message:
+        location: test.idl: (17, 4), check: get_single_user, privilege: (location: test.idl: (18, 6), resource_pattern: exact_namespace, action_type: ['find', 'insert', 'update', 'remove'], agg_stage: None
+        """
+        location = super(AccessCheck, self).__str__()
+        msg = "location: %s, check: %s, privilege: %s" % (location, self.check, self.privilege)
+        return msg  # type: ignore
 
 
 class AccessChecks(common.SourceLocation):
