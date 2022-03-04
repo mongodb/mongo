@@ -146,8 +146,8 @@ public:
             }
 
             uassert(ErrorCodes::InvalidOptions,
-                    "The specified max chunk size must be greater than 0",
-                    ret == boost::none || *ret > 0);
+                    "The specified max chunk size must be at least 1MB",
+                    ret == boost::none || *ret >= 1024 * 1024);
             return ret;
         }();
 

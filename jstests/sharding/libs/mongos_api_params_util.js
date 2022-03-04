@@ -1263,7 +1263,7 @@ let MongosAPIParametersUtil = (function() {
                     keyPattern: {_id: 1},
                     min: {_id: 0},
                     max: {_id: MaxKey},
-                    maxChunkSizeBytes: 1024
+                    maxChunkSizeBytes: 1024 * 1024
                 })
             }
         },
