@@ -543,7 +543,14 @@ private:
             // 'invalidate'. Place the value on the cache and return the necessary promises to
             // signal (those which are waiting for time < time at the store).
             auto& result = sw.getValue();
-            auto promisesToSet = inProgressLookup.getPromisesLessThanTime(ul, result.t);
+            const auto timeOfOldestPromise = inProgressLookup.getTimeOldestPromise(ul);
+            auto promisesToSet = inProgressLookup.getPromisesLessThanOrEqualToTime(ul, result.t);
+            tassert(6324100,
+                    str::stream() << "Time monotonicity violation: lookup time "
+                                  << result.t.toString()
+                                  << " which is less than the earliest expected timeInStore "
+                                  << timeOfOldestPromise.toString() << ".",
+                    !promisesToSet.empty());
 
             auto valueHandleToSet = [&] {
                 if (result.v) {
@@ -692,8 +699,18 @@ public:
         return ret;
     }
 
-    std::vector<std::unique_ptr<SharedPromise<ValueHandle>>> getPromisesLessThanTime(WithLock,
-                                                                                     Time time) {
+    /**
+     * Returns the time associated to the oldest promise. This function will invariant if there are
+     * no promises.
+     */
+    Time getTimeOldestPromise(WithLock) const {
+        invariant(_valid);
+        invariant(!_outstanding.empty());
+        return _outstanding.begin()->first;
+    }
+
+    std::vector<std::unique_ptr<SharedPromise<ValueHandle>>> getPromisesLessThanOrEqualToTime(
+        WithLock, Time time) {
         invariant(_valid);
         std::vector<std::unique_ptr<SharedPromise<ValueHandle>>> ret;
         for (auto it = _outstanding.begin(); it != _outstanding.end();) {

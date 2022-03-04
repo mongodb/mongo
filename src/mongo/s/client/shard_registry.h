@@ -368,12 +368,12 @@ private:
             return !(*this > other);
         }
 
-        BSONObj toBSON() const {
+        std::string toString() const {
             BSONObjBuilder bob;
             bob.append("topologyTime", topologyTime);
             bob.append("rsmIncrement", rsmIncrement);
             bob.append("forceReloadIncrement", forceReloadIncrement);
-            return bob.obj();
+            return bob.obj().toString();
         }
 
         Timestamp topologyTime;

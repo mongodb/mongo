@@ -30,6 +30,7 @@
 #pragma once
 
 #include <memory>
+#include <type_traits>
 #include <vector>
 
 #include "mongo/platform/mutex.h"
@@ -64,6 +65,10 @@ struct CacheNotCausallyConsistent {
     }
     bool operator<=(const CacheNotCausallyConsistent&) const {
         return true;
+    }
+
+    std::string toString() const {
+        return "NotCausallyConsistent";
     }
 };
 
@@ -315,6 +320,14 @@ public:
         LockGuardWithPostUnlockDestructor guard(_mutex);
         Time currentTime, currentTimeInStore;
         _invalidate(&guard, key, _cache.find(key), &currentTime, &currentTimeInStore);
+        if constexpr (!std::is_same_v<Time, CacheNotCausallyConsistent>) {
+            tassert(6324102,
+                    str::stream() << "Time monotonicity violation: new lookup time "
+                                  << time.toString() << " which is less than the current time  "
+                                  << currentTime.toString() << ".",
+                    currentTime <= time);
+        }
+
         if (auto evicted =
                 _cache.add(key,
                            std::make_shared<StoredValue>(this,
@@ -365,6 +378,15 @@ public:
         LockGuardWithPostUnlockDestructor guard(_mutex);
         Time currentTime, currentTimeInStore;
         _invalidate(&guard, key, _cache.find(key), &currentTime, &currentTimeInStore);
+
+        if constexpr (!std::is_same_v<Time, CacheNotCausallyConsistent>) {
+            tassert(6324101,
+                    str::stream() << "Time monotonicity violation: new lookup time "
+                                  << time.toString() << " which is less than the current time  "
+                                  << currentTime.toString() << ".",
+                    currentTime <= time);
+        }
+
         if (auto evicted =
                 _cache.add(key,
                            std::make_shared<StoredValue>(this,

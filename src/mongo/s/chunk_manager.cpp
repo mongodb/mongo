@@ -861,7 +861,7 @@ void ComparableChunkVersion::setChunkVersion(const ChunkVersion& version) {
     _chunkVersion = version;
 }
 
-BSONObj ComparableChunkVersion::toBSONForLogging() const {
+std::string ComparableChunkVersion::toString() const {
     BSONObjBuilder builder;
     if (_chunkVersion)
         _chunkVersion->serializeToBSON("chunkVersion"_sd, &builder);
@@ -872,7 +872,7 @@ BSONObj ComparableChunkVersion::toBSONForLogging() const {
     builder.append("epochDisambiguatingSequenceNum"_sd,
                    static_cast<int64_t>(_epochDisambiguatingSequenceNum));
 
-    return builder.obj();
+    return builder.obj().toString();
 }
 
 bool ComparableChunkVersion::operator==(const ComparableChunkVersion& other) const {

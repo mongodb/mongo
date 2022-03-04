@@ -403,7 +403,7 @@ public:
      */
     ComparableChunkVersion() = default;
 
-    BSONObj toBSONForLogging() const;
+    std::string toString() const;
 
     bool sameEpoch(const ComparableChunkVersion& other) const {
         return _chunkVersion->epoch() == other._chunkVersion->epoch();

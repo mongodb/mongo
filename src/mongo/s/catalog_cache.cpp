@@ -94,7 +94,7 @@ void ComparableDatabaseVersion::setDatabaseVersion(const DatabaseVersion& versio
     _dbVersion = version;
 }
 
-BSONObj ComparableDatabaseVersion::toBSONForLogging() const {
+std::string ComparableDatabaseVersion::toString() const {
     BSONObjBuilder builder;
     if (_dbVersion)
         builder.append("dbVersion"_sd, _dbVersion->toBSON());
@@ -106,7 +106,7 @@ BSONObj ComparableDatabaseVersion::toBSONForLogging() const {
 
     builder.append("forcedRefreshSequenceNum"_sd, static_cast<int64_t>(_forcedRefreshSequenceNum));
 
-    return builder.obj();
+    return builder.obj().toString();
 }
 
 bool ComparableDatabaseVersion::operator==(const ComparableDatabaseVersion& other) const {
@@ -341,7 +341,7 @@ void CatalogCache::onStaleDatabaseVersion(const StringData dbName,
                                   2,
                                   "Registering new database version",
                                   "db"_attr = dbName,
-                                  "version"_attr = version.toBSONForLogging());
+                                  "version"_attr = version);
         _databaseCache.advanceTimeInStore(dbName, version);
     } else {
         _databaseCache.invalidateKey(dbName);
@@ -543,8 +543,8 @@ CatalogCache::DatabaseCache::LookupResult CatalogCache::DatabaseCache::_lookupDa
                                   1,
                                   "Refreshed cached database entry",
                                   "db"_attr = dbName,
-                                  "newDbVersion"_attr = newDbVersion.toBSONForLogging(),
-                                  "oldDbVersion"_attr = previousDbVersion.toBSONForLogging(),
+                                  "newDbVersion"_attr = newDbVersion,
+                                  "oldDbVersion"_attr = previousDbVersion,
                                   "duration"_attr = Milliseconds(t.millis()));
         return CatalogCache::DatabaseCache::LookupResult(std::move(newDb), std::move(newDbVersion));
     } catch (const DBException& ex) {
@@ -633,7 +633,7 @@ CatalogCache::CollectionCache::LookupResult CatalogCache::CollectionCache::_look
                                   "Refreshing cached collection",
                                   "namespace"_attr = nss,
                                   "lookupSinceVersion"_attr = lookupVersion,
-                                  "timeInStore"_attr = previousVersion.toBSONForLogging());
+                                  "timeInStore"_attr = previousVersion);
 
         auto collectionAndChunks = _catalogCacheLoader.getChunksSince(nss, lookupVersion).get();
 
@@ -743,8 +743,8 @@ CatalogCache::CollectionCache::LookupResult CatalogCache::CollectionCache::_look
                                   "Refreshed cached collection",
                                   "namespace"_attr = nss,
                                   "lookupSinceVersion"_attr = lookupVersion,
-                                  "newVersion"_attr = newComparableVersion.toBSONForLogging(),
-                                  "timeInStore"_attr = previousVersion.toBSONForLogging(),
+                                  "newVersion"_attr = newComparableVersion,
+                                  "timeInStore"_attr = previousVersion,
                                   "duration"_attr = Milliseconds(t.millis()));
         _updateRefreshesStats(isIncremental, false);
 

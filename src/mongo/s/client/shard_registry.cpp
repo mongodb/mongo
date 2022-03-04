@@ -124,8 +124,8 @@ ShardRegistry::Cache::LookupResult ShardRegistry::_lookup(OperationContext* opCt
                 2,
                 "Starting ShardRegistry::_lookup",
                 "cachedData"_attr = cachedData->toBSON(),
-                "cachedData.getTime()"_attr = cachedData.getTime().toBSON(),
-                "timeInStore"_attr = timeInStore.toBSON());
+                "cachedData.getTime()"_attr = cachedData.getTime(),
+                "timeInStore"_attr = timeInStore);
 
     // Check if we need to refresh from the configsvrs.  If so, then do that and get the results,
     // otherwise (this is a lookup only to incorporate updated connection strings from the RSM),

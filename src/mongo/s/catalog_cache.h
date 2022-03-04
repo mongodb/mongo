@@ -83,7 +83,7 @@ public:
      */
     ComparableDatabaseVersion() = default;
 
-    BSONObj toBSONForLogging() const;
+    std::string toString() const;
 
     bool operator==(const ComparableDatabaseVersion& other) const;
 

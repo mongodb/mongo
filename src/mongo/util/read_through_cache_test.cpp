@@ -405,8 +405,8 @@ TEST_F(ReadThroughCacheAsyncTest, SuccessfulInProgressLookupForNotCausallyConsis
     ASSERT(inProgress.valid(WithLock::withoutLock()));
     ASSERT(res.v);
     ASSERT_EQ(500, res.v->counter);
-    auto promisesToSet =
-        inProgress.getPromisesLessThanTime(WithLock::withoutLock(), CacheNotCausallyConsistent());
+    auto promisesToSet = inProgress.getPromisesLessThanOrEqualToTime(WithLock::withoutLock(),
+                                                                     CacheNotCausallyConsistent());
     ASSERT_EQ(1U, promisesToSet.size());
     promisesToSet.front()->emplaceValue(std::move(*res.v));
 
