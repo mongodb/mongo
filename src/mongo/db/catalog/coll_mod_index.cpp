@@ -128,8 +128,7 @@ void getKeysForIndex(OperationContext* opCtx,
 }
 
 /**
- * Adjusts unique setting on an index.
- * An index can be converted to unique but removing the uniqueness property is not allowed.
+ * Adjusts unique setting on an index to true.
  */
 void _processCollModIndexRequestUnique(OperationContext* opCtx,
                                        AutoGetCollection* autoColl,
@@ -150,7 +149,7 @@ void _processCollModIndexRequestUnique(OperationContext* opCtx,
     }
 
     *newUnique = true;
-    autoColl->getWritableCollection(opCtx)->updateUniqueSetting(opCtx, idx->indexName());
+    autoColl->getWritableCollection(opCtx)->updateUniqueSetting(opCtx, idx->indexName(), true);
     // Resets 'prepareUnique' to false after converting to unique index;
     autoColl->getWritableCollection(opCtx)->updatePrepareUniqueSetting(
         opCtx, idx->indexName(), false);
@@ -173,6 +172,19 @@ void _processCollModIndexRequestPrepareUnique(OperationContext* opCtx,
     }
 }
 
+/**
+ * Adjusts unique setting on an index to false.
+ */
+void _processCollModIndexRequestForceNonUnique(OperationContext* opCtx,
+                                               AutoGetCollection* autoColl,
+                                               const IndexDescriptor* idx,
+                                               boost::optional<bool>* newForceNonUnique) {
+    invariant(idx->unique(), str::stream() << "Index is already non-unique: " << idx->infoObj());
+
+    *newForceNonUnique = true;
+    autoColl->getWritableCollection(opCtx)->updateUniqueSetting(opCtx, idx->indexName(), false);
+}
+
 }  // namespace
 
 void processCollModIndexRequest(OperationContext* opCtx,
@@ -186,9 +198,11 @@ void processCollModIndexRequest(OperationContext* opCtx,
     auto indexHidden = collModIndexRequest.indexHidden;
     auto indexUnique = collModIndexRequest.indexUnique;
     auto indexPrepareUnique = collModIndexRequest.indexPrepareUnique;
+    auto indexForceNonUnique = collModIndexRequest.indexForceNonUnique;
 
     // Return early if there are no index modifications requested.
-    if (!indexExpireAfterSeconds && !indexHidden && !indexUnique && !indexPrepareUnique) {
+    if (!indexExpireAfterSeconds && !indexHidden && !indexUnique && !indexPrepareUnique &&
+        !indexForceNonUnique) {
         return;
     }
 
@@ -199,6 +213,7 @@ void processCollModIndexRequest(OperationContext* opCtx,
     boost::optional<bool> newUnique;
     boost::optional<bool> newPrepareUnique;
     boost::optional<bool> oldPrepareUnique;
+    boost::optional<bool> newForceNonUnique;
 
     // TTL Index
     if (indexExpireAfterSeconds) {
@@ -224,6 +239,11 @@ void processCollModIndexRequest(OperationContext* opCtx,
             opCtx, autoColl, idx, *indexPrepareUnique, &newPrepareUnique, &oldPrepareUnique);
     }
 
+    // User wants to convert an index back to be non-unique.
+    if (indexForceNonUnique) {
+        _processCollModIndexRequestForceNonUnique(opCtx, autoColl, idx, &newForceNonUnique);
+    }
+
     *indexCollModInfo =
         IndexCollModInfo{!newExpireSecs ? boost::optional<Seconds>() : Seconds(*newExpireSecs),
                          !oldExpireSecs ? boost::optional<Seconds>() : Seconds(*oldExpireSecs),
@@ -232,13 +252,14 @@ void processCollModIndexRequest(OperationContext* opCtx,
                          newUnique,
                          newPrepareUnique,
                          oldPrepareUnique,
+                         newForceNonUnique,
                          idx->indexName()};
 
     // This matches the default for IndexCatalog::refreshEntry().
     auto flags = CreateIndexEntryFlags::kIsReady;
 
     // Update data format version in storage engine metadata for index.
-    if (indexUnique) {
+    if (indexUnique || indexForceNonUnique) {
         flags = CreateIndexEntryFlags::kIsReady | CreateIndexEntryFlags::kUpdateMetadata;
     }
 
@@ -254,6 +275,7 @@ void processCollModIndexRequest(OperationContext* opCtx,
                                      newUnique,
                                      oldPrepareUnique,
                                      newPrepareUnique,
+                                     newForceNonUnique,
                                      result](boost::optional<Timestamp>) {
         // add the fields to BSONObjBuilder result
         if (oldExpireSecs) {
@@ -275,6 +297,10 @@ void processCollModIndexRequest(OperationContext* opCtx,
             invariant(oldPrepareUnique);
             result->append("prepareUnique_old", *oldPrepareUnique);
             result->append("prepareUnique_new", *newPrepareUnique);
+        }
+        if (newForceNonUnique) {
+            invariant(*newForceNonUnique);
+            result->appendBool("forceNonUnique_new", true);
         }
     });
 

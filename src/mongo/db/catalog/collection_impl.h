@@ -443,7 +443,7 @@ public:
 
     void updateHiddenSetting(OperationContext* opCtx, StringData idxName, bool hidden) final;
 
-    void updateUniqueSetting(OperationContext* opCtx, StringData idxName) final;
+    void updateUniqueSetting(OperationContext* opCtx, StringData idxName, bool unique) final;
 
     void updatePrepareUniqueSetting(OperationContext* opCtx,
                                     StringData idxName,

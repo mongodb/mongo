@@ -1,5 +1,5 @@
 /**
- * Basic js tests for the collMod command converting regular indexes to unique indexes.
+ * Basic js tests for the collMod command converting between regular indexes and unique indexes.
  *
  * @tags: [
  *  # Cannot implicitly shard accessed collections because of collection existing when none
@@ -135,7 +135,7 @@ assert.commandFailedWithCode(
 assert.commandWorked(coll.remove({_id: 3}));
 
 // Successfully converts to a unique index.
-const result = assert.commandWorked(
+let result = assert.commandWorked(
     db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, unique: true}}));
 
 // New index state should be reflected in 'unique_new' field in collMod response.
@@ -156,4 +156,35 @@ assert.eq(countUnique({a: 1}), 1, 'index should be unique now: ' + tojson(coll.g
 
 // Test uniqueness constraint.
 assert.commandFailedWithCode(coll.insert({_id: 100, a: 100}), ErrorCodes.DuplicateKey);
+
+//
+// Converting to non-unique index tests.
+//
+
+// Tries to modify with a false 'forceNonUnique' value.
+assert.commandFailedWithCode(db.runCommand({
+    collMod: collName,
+    index: {keyPattern: {a: 1}, forceNonUnique: false},
+}),
+                             ErrorCodes.BadValue);
+
+// Successfully converts to a regular index.
+result = assert.commandWorked(
+    db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, forceNonUnique: true}}));
+
+// New index state should be reflected in 'forceNonUnique_new' field in collMod response.
+const assertForceNonUniqueNew = function(result) {
+    assert(result.hasOwnProperty('forceNonUnique_new'), tojson(result));
+    assert(result.forceNonUnique_new, tojson(result));
+};
+if (db.getMongo().isMongos()) {
+    // Checks the first shard's result from mongos.
+    assert(result.hasOwnProperty('raw'), tojson(result));
+    assertForceNonUniqueNew(Object.values(result.raw)[0]);
+} else {
+    assertForceNonUniqueNew(result);
+}
+
+// Tests the index now accepts duplicate keys.
+assert.commandWorked(coll.insert({_id: 100, a: 100}));
 })();

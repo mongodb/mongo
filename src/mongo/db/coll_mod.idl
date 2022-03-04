@@ -67,6 +67,10 @@ structs:
                 optional: true
                 type: safeBool
                 unstable: true
+            forceNonUnique:
+                optional: true
+                type: safeBool
+                unstable: true
 
     CollModReply:
         description: "The collMod command's reply."
@@ -97,6 +101,10 @@ structs:
                 type: safeBool
                 unstable: true
             prepareUnique_new:
+                optional: true
+                type: safeBool
+                unstable: true
+            forceNonUnique_new:
                 optional: true
                 type: safeBool
                 unstable: true

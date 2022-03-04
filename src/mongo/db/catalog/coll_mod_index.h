@@ -49,6 +49,7 @@ struct ParsedCollModIndexRequest {
     boost::optional<bool> indexHidden;
     boost::optional<bool> indexUnique;
     boost::optional<bool> indexPrepareUnique;
+    boost::optional<bool> indexForceNonUnique;
 };
 
 /**

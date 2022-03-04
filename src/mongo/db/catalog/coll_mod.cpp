@@ -185,7 +185,8 @@ StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
             }
 
             if (!cmdIndex.getExpireAfterSeconds() && !cmdIndex.getHidden() &&
-                !cmdIndex.getUnique() && !cmdIndex.getPrepareUnique()) {
+                !cmdIndex.getUnique() && !cmdIndex.getPrepareUnique() &&
+                !cmdIndex.getForceNonUnique()) {
                 return Status(ErrorCodes::InvalidOptions,
                               "no expireAfterSeconds, hidden, unique, or prepareUnique field");
             }
@@ -199,6 +200,13 @@ StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
                         "'prepareUnique' mode",
                         feature_flags::gCollModIndexUnique.isEnabled(
                             serverGlobalParams.featureCompatibility));
+            }
+
+            if (cmdIndex.getUnique() && cmdIndex.getForceNonUnique()) {
+                return Status(
+                    ErrorCodes::InvalidOptions,
+                    "collMod does not support 'unique' and 'forceNonUnique' options at the "
+                    "same time");
             }
 
             if (cmdIndex.getExpireAfterSeconds()) {
@@ -305,7 +313,7 @@ StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
 
                 cmr.numModifications++;
                 if (bool unique = *cmdIndex.getUnique(); !unique) {
-                    return Status(ErrorCodes::BadValue, "Cannot make index non-unique");
+                    return Status(ErrorCodes::BadValue, "'Unique: false' option is not supported");
                 }
 
                 // Attempting to converting a unique index should be treated as a no-op.
@@ -347,6 +355,21 @@ StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
                         indexObjForOplog.removeField(CollModIndex::kPrepareUniqueFieldName);
                 } else {
                     cmrIndex->indexPrepareUnique = cmdIndex.getPrepareUnique();
+                }
+            }
+
+            if (cmdIndex.getForceNonUnique()) {
+                cmr.numModifications++;
+                if (bool unique = *cmdIndex.getForceNonUnique(); !unique) {
+                    return Status(ErrorCodes::BadValue, "'forceNonUnique: false' is not supported");
+                }
+
+                // Attempting to convert a non-unique index should be treated as a no-op.
+                if (!cmrIndex->idx->unique()) {
+                    indexObjForOplog =
+                        indexObjForOplog.removeField(CollModIndex::kForceNonUniqueFieldName);
+                } else {
+                    cmrIndex->indexForceNonUnique = true;
                 }
             }
 

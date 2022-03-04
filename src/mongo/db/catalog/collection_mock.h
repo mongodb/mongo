@@ -411,7 +411,7 @@ public:
         std::abort();
     }
 
-    void updateUniqueSetting(OperationContext* opCtx, StringData idxName) {
+    void updateUniqueSetting(OperationContext* opCtx, StringData idxName, bool unique) {
         std::abort();
     }
 

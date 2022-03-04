@@ -1979,12 +1979,12 @@ void CollectionImpl::updateHiddenSetting(OperationContext* opCtx, StringData idx
     });
 }
 
-void CollectionImpl::updateUniqueSetting(OperationContext* opCtx, StringData idxName) {
+void CollectionImpl::updateUniqueSetting(OperationContext* opCtx, StringData idxName, bool unique) {
     int offset = _metadata->findIndexOffset(idxName);
     invariant(offset >= 0);
 
     _writeMetadata(opCtx, [&](BSONCollectionCatalogEntry::MetaData& md) {
-        md.indexes[offset].updateUniqueSetting();
+        md.indexes[offset].updateUniqueSetting(unique);
     });
 }
 

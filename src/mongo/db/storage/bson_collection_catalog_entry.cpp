@@ -140,9 +140,19 @@ void BSONCollectionCatalogEntry::IndexMetaData::updateHiddenSetting(bool hidden)
 }
 
 
-void BSONCollectionCatalogEntry::IndexMetaData::updateUniqueSetting() {
-    BSONObjBuilder b(spec);
-    b.appendBool("unique", true);
+void BSONCollectionCatalogEntry::IndexMetaData::updateUniqueSetting(bool unique) {
+    // If unique == false, we remove this field from catalog rather than add a field with false.
+    BSONObjBuilder b;
+    for (BSONObjIterator bi(spec); bi.more();) {
+        BSONElement e = bi.next();
+        if (e.fieldNameStringData() != "unique") {
+            b.append(e);
+        }
+    }
+
+    if (unique) {
+        b.append("unique", unique);
+    }
     spec = b.obj();
 }
 

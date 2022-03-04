@@ -98,7 +98,7 @@ public:
 
         void updateHiddenSetting(bool hidden);
 
-        void updateUniqueSetting();
+        void updateUniqueSetting(bool unique);
 
         void updatePrepareUniqueSetting(bool prepareUnique);
 

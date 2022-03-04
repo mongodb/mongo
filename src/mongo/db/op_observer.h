@@ -101,6 +101,7 @@ struct IndexCollModInfo {
     boost::optional<bool> unique;
     boost::optional<bool> prepareUnique;
     boost::optional<bool> oldPrepareUnique;
+    boost::optional<bool> forceNonUnique;
     std::string indexName;
 };
 
