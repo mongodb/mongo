@@ -54,37 +54,17 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
 
         self._suite = suite
         self.test_queue_logger = logging.loggers.new_testqueue_logger(suite.test_kind)
-        self._jobs = []
 
-    def _num_jobs_to_start(self, suite, num_tests):
+        # Must be done after getting buildlogger configuration.
+        self._jobs = self._create_jobs(suite.get_num_jobs_to_start())
+
+    def _create_jobs(self, num_jobs):
         """
-        Determine the number of jobs to start.
-
-        :param suite: Test suite being run.
-        :return: Number of jobs to start.
-        """
-        options = suite.options
-        num_jobs_to_start = options.num_jobs
-
-        if num_tests < num_jobs_to_start:
-            self.logger.info(
-                "Reducing the number of jobs from %d to %d since there are only %d test(s) to run.",
-                options.num_jobs, num_tests, num_tests)
-            num_jobs_to_start = num_tests
-
-        return num_jobs_to_start
-
-    def _create_jobs(self, num_tests):
-        """
-        Create job objects to consume and run tests.
-
-        Only start as many jobs as we need. Note this means that the number of jobs we run may
-        not actually be _config.JOBS or self._suite.options.num_jobs.
+        Start jobs.
 
         :return: List of jobs.
         """
-        n_jobs_to_start = self._num_jobs_to_start(self._suite, num_tests)
-        return [self._make_job(job_num) for job_num in range(n_jobs_to_start)]
+        return [self._make_job(job_num) for job_num in range(num_jobs)]
 
     def run(self):  # pylint: disable=too-many-branches
         """Execute the test suite.
@@ -102,12 +82,10 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
         # a test suite run earlier can be reused during this current test suite.
         network.PortAllocator.reset()
         teardown_flag = None
-        hook_failure_flag = None
         try:
             num_repeat_suites = self._suite.options.num_repeat_suites
             while num_repeat_suites > 0:
                 test_queue = self._make_test_queue()
-                self._jobs = self._create_jobs(test_queue.num_tests)
 
                 partial_reports = [job.report for job in self._jobs]
                 self._suite.record_test_start(partial_reports)
@@ -315,13 +293,12 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
         :return: Queue of testcases to run.
         """
         test_queue = TestQueue()
+        test_cases = []
 
         # Make test cases to put in test queue
-        test_cases = []
-        for _ in range(self._suite.get_num_times_to_repeat_tests()):
-            for test_name in self._suite.tests:
-                queue_elem = self._create_queue_elem_for_test_name(test_name)
-                test_cases.append(queue_elem)
+        for test_name in self._suite.make_test_case_names_list():
+            queue_elem = self._create_queue_elem_for_test_name(test_name)
+            test_cases.append(queue_elem)
         test_queue.add_test_cases(test_cases)
 
         return test_queue

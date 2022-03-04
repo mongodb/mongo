@@ -5,6 +5,7 @@ import unittest
 import mock
 
 from buildscripts.resmokelib.testing import executor
+from buildscripts.resmokelib.testing.suite import Suite
 
 # pylint: disable=missing-docstring,protected-access
 
@@ -21,6 +22,7 @@ def mock_suite(n_tests):
     suite.test_kind = "js_test"
     suite.tests = ["jstests/core/and{}.js".format(i) for i in range(n_tests)]
     suite.get_num_times_to_repeat_tests.return_value = 1
+    suite.make_test_case_names_list = lambda: Suite.make_test_case_names_list(suite)
     return suite
 
 
@@ -32,25 +34,6 @@ class UnitTestExecutor(executor.TestSuiteExecutor):
         self.logger = mock.MagicMock()
 
 
-class TestNumJobsToStart(unittest.TestCase):
-    def test_num_tests_gt_num_jobs(self):
-        num_tests = 8
-        num_jobs = 1
-        suite = mock_suite(num_tests)
-        suite.options.num_jobs = num_jobs
-        ut_executor = UnitTestExecutor(suite, None)
-
-        self.assertEqual(num_jobs, ut_executor._num_jobs_to_start(suite, num_tests))
-
-    def test_num_tests_lt_num_jobs(self):
-        num_tests = 2
-        suite = mock_suite(num_tests)
-        suite.options.num_jobs = 8
-        ut_executor = UnitTestExecutor(suite, None)
-
-        self.assertEqual(num_tests, ut_executor._num_jobs_to_start(suite, num_tests))
-
-
 class TestCreateJobs(unittest.TestCase):
     def setUp(self):
         self.suite = mock_suite(1)
@@ -58,15 +41,12 @@ class TestCreateJobs(unittest.TestCase):
         self.ut_executor._make_job = mock.MagicMock()
 
     def test_create_one_job(self):
-        num_jobs = 1
-        self.ut_executor._num_jobs_to_start = lambda x, y: num_jobs
         self.ut_executor._create_jobs(1)
         self.ut_executor._make_job.assert_called_once_with(0)
 
     def test_create_multiple_jobs(self):
         num_jobs = 8
-        self.ut_executor._num_jobs_to_start = lambda x, y: num_jobs
-        self.ut_executor._create_jobs(1)
+        self.ut_executor._create_jobs(num_jobs)
         self.assertEqual(num_jobs, self.ut_executor._make_job.call_count)
 
 
