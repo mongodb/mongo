@@ -263,6 +263,7 @@ let testCases = {
     mergeChunks: {skip: "primary only"},
     moveChunk: {skip: "primary only"},
     movePrimary: {skip: "primary only"},
+    moveRange: {skip: "primary only"},
     multicast: {skip: "does not return user data"},
     netstat: {skip: "does not return user data"},
     ping: {skip: "does not return user data"},

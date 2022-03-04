@@ -1,0 +1,87 @@
+# Copyright (C) 2022-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+global:
+    cpp_namespace: "mongo"
+
+imports:
+    - "mongo/idl/basic_types.idl"
+    - "mongo/s/sharding_types.idl"
+
+enums:
+    ForceJumbo:
+        description: "This enum represents whether or not a migration should attempt to move a large range"
+        type: int # Not `string` due to backwards compatibility
+        values:
+            kDoNotForce: 0    # do not attempt to migrate a large chunk
+            kForceManual: 1   # manual moveChunk command specified `forceJumbo: true`
+            kForceBalancer: 2 # balancer specified `forceJumbo: true`
+
+commands:
+    moveRange:
+        command_name: moveRange
+        command_alias: moveChunk
+        cpp_name: ShardsvrMoveRange
+        description: "Definition of the moveRange command called on shards."
+        namespace: type
+        type: namespacestring
+        api_version: ""
+        strict: false
+        fields:
+            epoch:
+                type: objectid
+                description: "Epoch of the collection"
+                default: mongo::OID()
+            fromShard:
+                type: shard_id
+                description: "ID of the donor shard"
+            toShard:
+                type: shard_id
+                description: "ID of the recipient shard"
+            min:
+                type: object
+                description: "The min key of the range to move"
+            max:
+                type: object
+                description: "The max key of the range to move"
+            maxChunkSizeBytes:
+                type: safeInt64
+                description: "Max size of data to move"
+                optional: true
+            waitForDelete:
+                type: bool
+                description: "If set, wait for the chunk migration to finish before returning"
+                default: false
+            forceJumbo:
+                type: ForceJumbo
+                description: "Specifies the policy to use for jumbo chunks"
+                default: kDoNotForce
+            secondaryThrottle:
+                type: bool
+                description: "Secondary throttle policy to adopt during the migration"
+                default: false

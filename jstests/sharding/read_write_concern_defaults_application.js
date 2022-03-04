@@ -552,6 +552,10 @@ let testCases = {
             "does not accept read or write concern (accepts writeConcern, but only explicitly and when _secondaryThrottle is true)"
     },
     movePrimary: {skip: "does not accept read or write concern"},
+    moveRange: {
+        skip:
+            "does not accept read or write concern (accepts writeConcern, but only explicitly and when _secondaryThrottle is true)"
+    },
     multicast: {skip: "does not accept read or write concern"},
     netstat: {skip: "internal command"},
     pinHistoryReplicated: {skip: "internal command"},

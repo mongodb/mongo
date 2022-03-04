@@ -475,6 +475,13 @@ let viewsCommandTests = {
         expectedErrorCode: ErrorCodes.NamespaceNotSharded,
     },
     movePrimary: {skip: "Tested in sharding/movePrimary1.js"},
+    moveRange: {
+        command: {moveRange: "test.view"},
+        skipStandalone: true,
+        isAdminCommand: true,
+        expectFailure: true,
+        expectedErrorCode: ErrorCodes.NamespaceNotSharded,
+    },
     multicast: {skip: isUnrelated},
     netstat: {skip: isAnInternalCommand},
     pinHistoryReplicated: {skip: isAnInternalCommand},

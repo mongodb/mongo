@@ -205,6 +205,7 @@ env.Library(
         'request_types/migration_secondary_throttle_options.cpp',
         'request_types/move_chunk_request.cpp',
         'request_types/move_primary.idl',
+        'request_types/move_range_request.idl',
         'request_types/refine_collection_shard_key.idl',
         'request_types/remove_shard_from_zone_request_type.cpp',
         'request_types/remove_tags.idl',

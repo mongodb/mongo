@@ -4904,8 +4904,8 @@ var authCommandsLib = {
         },
         {
           testname: "d_moveChunk",
-          command: {moveChunk: "test.x"},
-          skipSharded: true,
+          command: {moveChunk: "test.x", fromShard: "a", toShard: "b", min: {}, max: {}},
+          skipSharded: true, // TODO SERVER-64204 review this condition
           testcases: [
               {
                 runOnDb: adminDbName,
