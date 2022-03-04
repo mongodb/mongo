@@ -1460,6 +1460,47 @@ commands:
                 - check: checkTwo
                 - check: checkThree
 
+    addedAggStage:
+        description: "new command passes when a agg stage is added"
+        command_name: addedAggStage
+        namespace: ignored
+        cpp_name: addedAggStage
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        access_check:
+            complex:
+                - privilege:
+                    resource_pattern: resourcePatternTwo
+                    action_type: [actionTypeOne, actionTypeTwo]
+                - check: checkOne
+                - privilege:
+                    resource_pattern: resourcePattern
+                    action_type: [actionTypeOne, actionTypeTwo]
+
+    removedAggStage:
+        description: "new command passes when a agg stage is removed"
+        command_name: removedAggStage
+        namespace: ignored
+        cpp_name: removedAggStage
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        access_check:
+            complex:
+                - privilege:
+                    resource_pattern: resourcePatternTwo
+                    action_type: [actionTypeOne, actionTypeTwo]
+                - check: checkOne
+                - privilege:
+                    resource_pattern: resourcePattern
+                    action_type: [actionTypeOne, actionTypeTwo]
+                - privilege:
+                    agg_stage: aggStage
+                    resource_pattern: resourcePatternFour
+                    action_type: actionTypeFour
+
+
     removedComplexPrivilege:
         description: "new command passes when a complex privilege is removed"
         command_name: removedComplexPrivilege

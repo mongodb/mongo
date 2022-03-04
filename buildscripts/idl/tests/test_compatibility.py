@@ -149,7 +149,7 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
             path.join(dir_path, "compatibility_test_fail/new"), ["src"], ["src"])
 
         self.assertTrue(error_collection.has_errors())
-        self.assertEqual(error_collection.count(), 185)
+        self.assertEqual(error_collection.count(), 186)
 
         invalid_api_version_new_error = error_collection.get_error_by_command_name(
             "invalidAPIVersionNew")

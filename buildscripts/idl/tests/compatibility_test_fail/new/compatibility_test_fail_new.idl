@@ -2564,6 +2564,29 @@ commands:
                     resource_pattern: resourcePatternTwo
                     action_type: actionTypeOne
 
+    additionalComplexAccessCheckAggStage:
+        description: "new command fails because there is an additional complex access check on an agg stage"
+        command_name: additionalComplexAccessCheckAggStage
+        namespace: ignored
+        cpp_name: additionalComplexAccessCheckAggStage
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        access_check:
+            complex:
+                - privilege:
+                    resource_pattern: resourcePattern
+                    action_type: [actionTypeOne, actionTypeTwo]
+                - check: checkOne
+                - privilege:
+                    agg_stage: aggStage
+                    resource_pattern: resourcePattern
+                    action_type: actionTypeOne
+                - privilege:
+                    agg_stage: aggStage
+                    resource_pattern: resourcePatternTwo
+                    action_type: actionTypeOne
+
     removedAccessCheckField:
         description: "new command fails because it removes the access_check field"
         command_name: removedAccessCheckField

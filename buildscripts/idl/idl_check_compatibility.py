@@ -1070,6 +1070,38 @@ def check_complex_checks(ctxt: IDLCompatibilityContext,
                     ctxt.add_new_complex_privileges_not_subset_error(cmd_name, new_idl_file_path)
 
 
+def split_complex_checks_agg_stages(
+        complex_checks: List[syntax.AccessCheck]) -> Dict[str, List[syntax.AccessCheck]]:
+    """Split a list of AccessChecks into a map keyed by aggregation stage (defaults to None)."""
+    complex_checks_agg_stages: Dict[str, List[syntax.AccessCheck]] = dict()
+    for access_check in complex_checks:
+        agg_stage = None
+        if access_check.privilege is not None:
+            # x.privilege.agg_stage can still be None.
+            agg_stage = access_check.privilege.agg_stage
+        if agg_stage not in complex_checks_agg_stages:
+            complex_checks_agg_stages[agg_stage] = []
+        complex_checks_agg_stages[agg_stage].append(access_check)
+    return complex_checks_agg_stages
+
+
+def check_complex_checks_agg_stages(ctxt: IDLCompatibilityContext,
+                                    old_complex_checks: List[syntax.AccessCheck],
+                                    new_complex_checks: List[syntax.AccessCheck],
+                                    cmd: syntax.Command, new_idl_file_path: str) -> None:
+    """Check the compatibility between complex access checks of the old and new agggreation stages."""
+    new_complex_checks_agg_stages = split_complex_checks_agg_stages(new_complex_checks)
+    old_complex_checks_agg_stages = split_complex_checks_agg_stages(old_complex_checks)
+    for agg_stage in new_complex_checks_agg_stages:
+        # Aggregation stages are considered separate commands in the context of validating the
+        # Stable API. Therefore, it is okay to skip recently added aggregation stages that are
+        # are not present in the previous release.
+        if agg_stage not in old_complex_checks_agg_stages:
+            continue
+        check_complex_checks(ctxt, old_complex_checks_agg_stages[agg_stage],
+                             new_complex_checks_agg_stages[agg_stage], cmd, new_idl_file_path)
+
+
 def check_security_access_checks(ctxt: IDLCompatibilityContext,
                                  old_access_checks: syntax.AccessChecks,
                                  new_access_checks: syntax.AccessChecks, cmd: syntax.Command,
@@ -1104,8 +1136,8 @@ def check_security_access_checks(ctxt: IDLCompatibilityContext,
             old_complex_checks = old_access_checks.complex
             new_complex_checks = new_access_checks.complex
             if old_complex_checks is not None and new_complex_checks is not None:
-                check_complex_checks(ctxt, old_complex_checks, new_complex_checks, cmd,
-                                     new_idl_file_path)
+                check_complex_checks_agg_stages(ctxt, old_complex_checks, new_complex_checks, cmd,
+                                                new_idl_file_path)
 
     elif new_access_checks is None and old_access_checks is not None:
         ctxt.add_removed_access_check_field_error(cmd_name, new_idl_file_path)
