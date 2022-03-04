@@ -58,7 +58,7 @@ PrivilegeVector DocumentSourceListCatalog::LiteParsed::requiredPrivileges(
 
     // Refer to privileges for the readAnyDatabase role in addReadOnlyAnyDbPrivileges().
     // See builtin_roles.cpp.
-    // TODO(SERVER-63748): Change privileges to a combination of listDatabases, listCollections,
+    // TODO(SERVER-64203): Change privileges to a combination of listDatabases, listCollections,
     // and listIndexes.
     return {Privilege(ResourcePattern::forDatabaseName("admin"), ActionType::find)};
 }
