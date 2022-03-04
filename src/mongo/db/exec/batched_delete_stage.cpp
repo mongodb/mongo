@@ -34,6 +34,7 @@
 #include "mongo/db/exec/batched_delete_stage.h"
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/commands/server_status.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/scoped_timer.h"
@@ -49,6 +50,44 @@
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
+
+
+/**
+ * Reports globally-aggregated batch stats.
+ */
+struct BatchedDeletesSSS : ServerStatusSection {
+    BatchedDeletesSSS()
+        : ServerStatusSection("batchedDeletes"), batches(0), docs(0), sizeBytes(0), timeMillis(0) {}
+
+    bool includeByDefault() const override {
+        return true;
+    }
+
+    BSONObj generateSection(OperationContext* opCtx, const BSONElement& configElem) const override {
+        BSONObjBuilder bob;
+        bob.appendNumber("batches", batches.loadRelaxed());
+        bob.appendNumber("docs", docs.loadRelaxed());
+        bob.appendNumber("sizeBytes", sizeBytes.loadRelaxed());
+        bob.append("timeMillis", timeMillis.loadRelaxed());
+
+        return bob.obj();
+    }
+
+    AtomicWord<long long> batches;
+    AtomicWord<long long> docs;
+    AtomicWord<long long> sizeBytes;
+    AtomicWord<long long> timeMillis;
+} batchedDeletesSSS;
+
+void incrementSSSMetricNoOverflow(AtomicWord<long long>& metric, long long value) {
+    const int64_t MAX = 1ULL << 60;
+
+    if (metric.loadRelaxed() > MAX) {
+        metric.store(value);
+    } else {
+        metric.fetchAndAdd(value);
+    }
+}
 
 BatchedDeleteStage::BatchedDeleteStage(ExpressionContext* expCtx,
                                        std::unique_ptr<DeleteStageParams> params,
@@ -97,6 +136,7 @@ PlanStage::StageState BatchedDeleteStage::_deleteBatch(WorkingSetID* out) {
     opCtx()->recoveryUnit()->ignoreAllMultiTimestampConstraints();
 
     unsigned int docsDeleted = 0;
+    const auto startOfBatchTimestampMillis = Date_t::now().toMillisSinceEpoch();
 
     try {
         WriteUnitOfWork wuow(opCtx());
@@ -122,6 +162,13 @@ PlanStage::StageState BatchedDeleteStage::_deleteBatch(WorkingSetID* out) {
     } catch (const WriteConflictException&) {
         // TODO (SERVER-63863): retriability on write conflict exception.
     }
+
+    const auto endOfBatchTimestampMillis = Date_t::now().toMillisSinceEpoch();
+    incrementSSSMetricNoOverflow(batchedDeletesSSS.docs, docsDeleted);
+    incrementSSSMetricNoOverflow(batchedDeletesSSS.batches, 1);
+    incrementSSSMetricNoOverflow(batchedDeletesSSS.timeMillis,
+                                 endOfBatchTimestampMillis - startOfBatchTimestampMillis);
+    // TODO (SERVER-63039): report batch size
 
     _specificStats.docsDeleted += docsDeleted;
 

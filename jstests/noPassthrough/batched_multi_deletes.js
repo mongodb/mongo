@@ -17,7 +17,9 @@ const coll = db.getCollection('batchMultiDeletesColl');
 const collName = coll.getName();
 const ns = coll.getFullName();
 
-const collCount = 5017;  // Intentionally not a multiple of the default batch size.
+const docsPerBatchDefault = 100;  // BatchedDeleteStageBatchParams::targetBatchDocs
+const collCount =
+    5017;  // Intentionally not a multiple of BatchedDeleteStageBatchParams::targetBatchDocs.
 
 coll.drop();
 assert.commandWorked(
@@ -46,9 +48,20 @@ assert.commandFailedWithCode(
 
 // Actual deletion.
 {
+    const serverStatusBatchesBefore = db.serverStatus()['batchedDeletes']['batches'];
+    const serverStatusDocsBefore = db.serverStatus()['batchedDeletes']['docs'];
+
     assert.eq(collCount, coll.find().itcount());
     assert.commandWorked(coll.deleteMany({_id: {$gte: 0}}));
     assert.eq(0, coll.find().itcount());
+
+    const serverStatusBatchesAfter = db.serverStatus()['batchedDeletes']['batches'];
+    const serverStatusDocsAfter = db.serverStatus()['batchedDeletes']['docs'];
+    const serverStatusBatchesExpected =
+        serverStatusBatchesBefore + Math.ceil(collCount / docsPerBatchDefault);
+    const serverStatusDocsExpected = serverStatusDocsBefore + collCount;
+    assert.eq(serverStatusBatchesAfter, serverStatusBatchesExpected);
+    assert.eq(serverStatusDocsAfter, serverStatusDocsExpected);
 }
 
 batchUserMultiDeletesFailPoint.off();
