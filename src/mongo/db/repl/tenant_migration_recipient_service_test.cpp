@@ -63,6 +63,7 @@
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
 #include "mongo/unittest/log_test.h"
@@ -467,6 +468,7 @@ private:
         logv2::LogComponent::kTenantMigration, logv2::LogSeverity::Debug(1)};
 
     StreamableReplicaSetMonitorForTesting _rsmMonitor;
+    RAIIServerParameterControllerForTest _findHostTimeout{"defaultFindReplicaSetHostTimeoutMS", 10};
 };
 
 #ifdef MONGO_CONFIG_SSL
