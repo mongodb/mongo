@@ -249,12 +249,14 @@ class GenerateBuildVariantOrchestrator:
         run_vars = task_def.generate_resmoke_tasks_command.get("vars", {})
         run_vars = {k: translate_run_var(v, variant) for k, v in run_vars.items()}
 
+        num_tasks = min(int(run_vars.get("num_tasks")), self.evg_expansions.get_max_sub_suites())
+
         return FuzzerGenTaskParams(
             task_name=remove_gen_suffix(task_def.name),
             variant=build_variant,
             suite=run_vars.get("suite"),
             num_files=int(run_vars.get("num_files")),
-            num_tasks=int(run_vars.get("num_tasks")),
+            num_tasks=num_tasks,
             resmoke_args=run_vars.get("resmoke_args"),
             npm_command=run_vars.get("npm_command", "jstestfuzz"),
             jstestfuzz_vars=run_vars.get("jstestfuzz_vars", ""),

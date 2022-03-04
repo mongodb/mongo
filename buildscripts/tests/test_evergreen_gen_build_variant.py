@@ -53,6 +53,7 @@ def build_mock_project_config(variant=None, task_defs=None):
 def build_mock_expansions():
     mock_expansions = MagicMock()
     mock_expansions.config_location.return_value = "/path/to/config"
+    mock_expansions.get_max_sub_suites.return_value = 998
     return mock_expansions
 
 
@@ -247,6 +248,19 @@ class TestTaskDefToFuzzerParams(unittest.TestCase):
                          fuzzer_params.config_location)
         self.assertIsNone(fuzzer_params.large_distro_name)
         self.assertFalse(fuzzer_params.use_large_distro)
+
+    def test_num_tasks_respects_max_sub_suites(self):
+        run_vars = {
+            "num_files": "5",
+            "num_tasks": "3",
+        }
+        mock_task_def = build_mock_task("my_fuzzer_gen", run_vars)
+        mock_orchestrator = build_mock_orchestrator(task_def_list=[mock_task_def])
+        mock_orchestrator.evg_expansions.get_max_sub_suites.return_value = 1
+        fuzzer_params = mock_orchestrator.task_def_to_fuzzer_params(mock_task_def, "build_variant")
+
+        self.assertEqual(5, fuzzer_params.num_files)
+        self.assertEqual(1, fuzzer_params.num_tasks)
 
     def test_params_should_be_overwritable(self):
         run_vars = {

@@ -161,7 +161,7 @@ variables:
 - &jstestfuzz_config_vars
   is_jstestfuzz: true
   num_files: 15
-  num_tasks: 5
+  num_tasks: 5  # Upperbound by `max_sub_suites` specified through the variant with each task still running `num_files` files.
   resmoke_args: --help # resmoke_args needs to be overridden to specify one of the jstestfuzz suites
   resmoke_jobs_max: 1
   should_shuffle: false
