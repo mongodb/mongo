@@ -532,9 +532,7 @@ public:
     void stop() override;
 
     SemiFuture<void> requestMoveChunk(OperationContext* opCtx,
-                                      const NamespaceString& nss,
-                                      const ChunkType& chunk,
-                                      const ShardId& destination,
+                                      const MigrateInfo& migrateInfo,
                                       const MoveChunkSettings& commandSettings,
                                       bool issuedByRemoteUser) override;
 

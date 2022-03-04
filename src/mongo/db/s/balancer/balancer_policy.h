@@ -63,6 +63,16 @@ struct MigrateInfo {
                 MoveChunkRequest::ForceJumbo a_forceJumbo,
                 MigrationReason a_reason);
 
+    MigrateInfo(const ShardId& a_to,
+                const ShardId& a_from,
+                const NamespaceString& a_nss,
+                const UUID& a_uuid,
+                const BSONObj& a_min,
+                const BSONObj& a_max,
+                const ChunkVersion& a_version,
+                MoveChunkRequest::ForceJumbo a_forceJumbo,
+                MigrationReason a_reason);
+
     std::string getName() const;
 
     BSONObj getMigrationTypeQuery() const;

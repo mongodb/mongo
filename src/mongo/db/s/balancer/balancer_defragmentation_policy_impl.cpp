@@ -707,8 +707,12 @@ private:
                                   const NamespaceString& nss,
                                   const ChunkVersion& version) const {
             return MigrateInfo(chunkToMergeWith->shard,
+                               chunkToMove->shard,
                                nss,
-                               ChunkType(collUuid, chunkToMove->range, version, chunkToMove->shard),
+                               collUuid,
+                               chunkToMove->range.getMin(),
+                               chunkToMove->range.getMax(),
+                               version,
                                MoveChunkRequest::ForceJumbo::kForceBalancer,
                                MigrateInfo::chunksImbalance);
         }

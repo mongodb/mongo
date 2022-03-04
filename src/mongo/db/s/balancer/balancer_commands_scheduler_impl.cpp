@@ -203,25 +203,23 @@ void BalancerCommandsSchedulerImpl::stop() {
 
 SemiFuture<void> BalancerCommandsSchedulerImpl::requestMoveChunk(
     OperationContext* opCtx,
-    const NamespaceString& nss,
-    const ChunkType& chunk,
-    const ShardId& recipient,
+    const MigrateInfo& migrateInfo,
     const MoveChunkSettings& commandSettings,
     bool issuedByRemoteUser) {
 
     auto externalClientInfo =
         issuedByRemoteUser ? boost::optional<ExternalClientInfo>(opCtx) : boost::none;
 
-    auto commandInfo = std::make_shared<MoveChunkCommandInfo>(nss,
-                                                              chunk.getShard(),
-                                                              recipient,
-                                                              chunk.getMin(),
-                                                              chunk.getMax(),
+    auto commandInfo = std::make_shared<MoveChunkCommandInfo>(migrateInfo.nss,
+                                                              migrateInfo.from,
+                                                              migrateInfo.to,
+                                                              migrateInfo.minKey,
+                                                              migrateInfo.maxKey,
                                                               commandSettings.maxChunkSizeBytes,
                                                               commandSettings.secondaryThrottle,
                                                               commandSettings.waitForDelete,
-                                                              commandSettings.forceJumbo,
-                                                              chunk.getVersion(),
+                                                              migrateInfo.forceJumbo,
+                                                              migrateInfo.version,
                                                               std::move(externalClientInfo));
 
     return _buildAndEnqueueNewRequest(opCtx, std::move(commandInfo))
