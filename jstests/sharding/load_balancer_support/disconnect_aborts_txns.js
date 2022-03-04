@@ -1,6 +1,6 @@
 /**
- * @tags: [featureFlagLoadBalancer, uses_transactions, uses_multi_shard_transaction,
- * requires_sharding, requires_fcv_51]
+ * @tags: [uses_transactions, uses_multi_shard_transaction,
+ * requires_sharding, requires_fcv_53]
  *
  * Tests that when a load-balanced client disconnects, its in-progress transactions are aborted
  */
