@@ -908,6 +908,16 @@ void DurableCatalogImpl::updateTTLSetting(OperationContext* opCtx,
     putMetaData(opCtx, ns, md);
 }
 
+void DurableCatalogImpl::updateUniqueSetting(OperationContext* opCtx,
+                                             NamespaceString ns,
+                                             StringData idxName) {
+    BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, ns);
+    int offset = md.findIndexOffset(idxName);
+    invariant(offset >= 0);
+    md.indexes[offset].updateUniqueSetting();
+    putMetaData(opCtx, ns, md);
+}
+
 bool DurableCatalogImpl::isEqualToMetadataUUID(OperationContext* opCtx,
                                                NamespaceString ns,
                                                OptionalCollectionUUID uuid) {

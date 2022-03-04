@@ -64,6 +64,8 @@ public:
 
         void updateTTLSetting(long long newExpireSeconds);
 
+        void updateUniqueSetting();
+
         std::string name() const {
             return spec["name"].String();
         }

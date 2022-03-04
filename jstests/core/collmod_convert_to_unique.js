@@ -71,8 +71,8 @@ if (db.getMongo().isMongos()) {
 }
 
 // Look up index details in listIndexes output.
-assert.eq(countUnique({a: 1}), 0, 'index should not be unique yet: ' + tojson(coll.getIndexes()));
+assert.eq(countUnique({a: 1}), 1, 'index should be unique now: ' + tojson(coll.getIndexes()));
 
 // Test uniqueness constraint.
-assert.commandWorked(coll.insert({_id: 100, a: 100}));
+assert.commandFailedWithCode(coll.insert({_id: 100, a: 100}), ErrorCodes.DuplicateKey);
 })();

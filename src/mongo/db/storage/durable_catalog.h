@@ -131,6 +131,14 @@ public:
                                   StringData idxName,
                                   long long newExpireSeconds) = 0;
 
+    /*
+     * Converts the the given index to be unique.
+     * This is a one-way transformation - the uniqueness constraint cannot be removed.
+     */
+    virtual void updateUniqueSetting(OperationContext* opCtx,
+                                     NamespaceString ns,
+                                     StringData idxName) = 0;
+
     /**
      * Compare the UUID argument to the UUID obtained from the metadata. Return true if they
      * are equal, false otherwise. uuid can become a CollectionUUID once MMAPv1 is removed.

@@ -120,6 +120,12 @@ void BSONCollectionCatalogEntry::IndexMetaData::updateTTLSetting(long long newEx
     spec = b.obj();
 }
 
+void BSONCollectionCatalogEntry::IndexMetaData::updateUniqueSetting() {
+    BSONObjBuilder b(spec);
+    b.appendBool("unique", true);
+    spec = b.obj();
+}
+
 // --------------------------
 
 int BSONCollectionCatalogEntry::MetaData::findIndexOffset(StringData name) const {
