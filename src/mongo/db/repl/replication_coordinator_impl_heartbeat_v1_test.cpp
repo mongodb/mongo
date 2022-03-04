@@ -41,6 +41,7 @@
 #include "mongo/db/repl/replication_coordinator_test_fixture.h"
 #include "mongo/db/repl/task_runner_test_fixture.h"
 #include "mongo/db/repl/topology_coordinator.h"
+#include "mongo/db/serverless/shard_split_utils.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
@@ -440,6 +441,237 @@ TEST_F(
         ASSERT_FALSE(getNet()->hasReadyRequests());
         exitNetwork();
     }
+}
+class ReplCoordHBV1SplitConfigTest : public ReplCoordHBV1Test {
+public:
+    void startUp(const std::string& hostAndPort) {
+        BSONObj configBson =
+            BSON("_id" << _donorSetName << "version" << _configVersion << "term" << _configTerm
+                       << "members" << _members << "protocolVersion" << 1);
+        ReplSetConfig rsConfig = assertMakeRSConfig(configBson);
+        assertStartSuccess(configBson, HostAndPort(hostAndPort));
+        ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+
+        // Black hole initial heartbeat requests.
+        NetworkInterfaceMock* net = getNet();
+        net->enterNetwork();
+
+        // Ignore the initial heartbeat requests sent to each of the 5 other nodes of this replica
+        // set.
+        net->blackHole(net->getNextReadyRequest());
+        net->blackHole(net->getNextReadyRequest());
+        net->blackHole(net->getNextReadyRequest());
+        net->blackHole(net->getNextReadyRequest());
+        net->blackHole(net->getNextReadyRequest());
+
+        net->exitNetwork();
+    }
+
+    NetworkInterfaceMock::NetworkOperationIterator validateNextRequest(const std::string& target,
+                                                                       const std::string& setName,
+                                                                       const int configVersion,
+                                                                       const int termVersion) {
+        ASSERT(getNet()->hasReadyRequests());
+
+        ReplSetHeartbeatArgsV1 hbArgs;
+        auto noi = getNet()->getNextReadyRequest();
+        const RemoteCommandRequest& hbrequest = noi->getRequest();
+
+        if (!target.empty()) {
+            // We might not know the exact target as ordering might change. In that case, simply
+            // validate the content of the requests and ignore to which node it's sent.
+            ASSERT_EQUALS(HostAndPort(target, 1), hbrequest.target);
+        }
+        ASSERT_OK(hbArgs.initialize(hbrequest.cmdObj));
+        ASSERT_EQUALS(setName, hbArgs.getSetName());
+        ASSERT_EQUALS(configVersion, hbArgs.getConfigVersion());
+        ASSERT_EQUALS(termVersion, hbArgs.getConfigTerm());
+
+        return noi;
+    }
+
+    BSONObj constructResponse(const ReplSetConfig& config,
+                              const int configVersion,
+                              const int termVersion) {
+        ReplSetHeartbeatResponse hbResp;
+        hbResp.setSetName(_donorSetName);
+        hbResp.setState(MemberState::RS_PRIMARY);
+        hbResp.setConfigVersion(config.getConfigVersion());
+        hbResp.setConfigTerm(config.getConfigTerm());
+        // The smallest valid optime in PV1.
+        OpTime opTime(Timestamp(), 0);
+        hbResp.setAppliedOpTimeAndWallTime({opTime, Date_t()});
+        hbResp.setDurableOpTimeAndWallTime({opTime, Date_t()});
+        BSONObjBuilder responseBuilder;
+        responseBuilder << "ok" << 1;
+        hbResp.addToBSON(&responseBuilder);
+
+        // Add the raw config object.
+        auto conf = ReplSetConfig::parse(makeConfigObj(configVersion, termVersion));
+        auto splitConf = serverless::makeSplitConfig(conf, _recipientSetName, _recipientTag);
+
+        // makeSplitConf increment the config version. We don't want that here as it makes the unit
+        // test case harder to follow.
+        BSONObjBuilder splitBuilder(splitConf.toBSON().removeField("version"));
+        splitBuilder.append("version", configVersion);
+
+        responseBuilder << "config" << splitBuilder.obj();
+        return responseBuilder.obj();
+    }
+
+    BSONObj makeConfigObj(long long version, boost::optional<long long> term) {
+        BSONObjBuilder bob;
+        bob.appendElements(BSON("_id"
+                                << "mySet"
+                                << "version" << version << "members" << _members
+                                << "protocolVersion" << 1));
+        if (term) {
+            bob.append("term", *term);
+        }
+        return bob.obj();
+    }
+
+    ReplSetConfig makeRSConfigWithVersionAndTerm(long long version, long long term) {
+        return assertMakeRSConfig(makeConfigObj(version, term));
+    }
+
+    unittest::MinimumLoggedSeverityGuard severityGuard{logv2::LogComponent::kDefault,
+                                                       logv2::LogSeverity::Debug(3)};
+
+    int _configVersion = 2;
+    int _configTerm = 2;
+
+    BSONArray _members = BSON_ARRAY(BSON("_id" << 1 << "host"
+                                               << "h1:1")
+                                    << BSON("_id" << 2 << "host"
+                                                  << "h2:1")
+                                    << BSON("_id" << 3 << "host"
+                                                  << "h3:1")
+                                    << BSON("_id" << 4 << "host"
+                                                  << "h4:1"
+                                                  << "votes" << 0 << "priority" << 0 << "tags"
+                                                  << BSON("recip"
+                                                          << "tag2"))
+                                    << BSON("_id" << 5 << "host"
+                                                  << "h5:1"
+                                                  << "votes" << 0 << "priority" << 0 << "tags"
+                                                  << BSON("recip"
+                                                          << "tag2"))
+                                    << BSON("_id" << 6 << "host"
+                                                  << "h6:1"
+                                                  << "votes" << 0 << "priority" << 0 << "tags"
+                                                  << BSON("recip"
+                                                          << "tag2")));
+
+protected:
+    const std::string _donorSetName{"mySet"};
+    const std::string _recipientSetName{"newSet"};
+    const std::string _recipientTag{"recip"};
+    const std::string _donorSecondaryNode{"h2:1"};
+    const std::string _recipientSecondaryNode{"h4:1"};
+};
+
+TEST_F(ReplCoordHBV1SplitConfigTest, DonorNodeDontApplyConfig) {
+    startUp(_donorSecondaryNode);
+
+    // Config with newer version and same term.
+    ReplSetConfig rsConfig = makeRSConfigWithVersionAndTerm(_configVersion + 1, _configTerm);
+
+    // Receive a heartbeat request that tells us about a newer config.
+    receiveHeartbeatFrom(rsConfig, 1, HostAndPort("h1", 1));
+
+    getNet()->enterNetwork();
+    auto noi = validateNextRequest("h1", _donorSetName, _configVersion, _configTerm);
+
+    _configVersion += 1;
+
+    // Construct the heartbeat response containing the newer config.
+    auto responseObj = constructResponse(rsConfig, _configVersion, _configTerm);
+
+    // Schedule and deliver the heartbeat response.
+    getNet()->scheduleResponse(noi, getNet()->now(), makeResponseStatus(responseObj));
+    getNet()->runReadyNetworkOperations();
+
+    auto installedConfig = getReplCoord()->getConfig();
+    ASSERT_EQ(installedConfig.getReplSetName(), _donorSetName);
+
+    // The node has updated its config and term to the new values.
+    ASSERT_EQ(getReplCoord()->getConfigVersion(), _configVersion);
+    ASSERT_EQ(getReplCoord()->getConfigTerm(), _configTerm);
+
+    validateNextRequest("", _donorSetName, _configVersion, _configTerm);
+}
+
+TEST_F(ReplCoordHBV1SplitConfigTest, RecipientNodeApplyConfig) {
+    startUp(_recipientSecondaryNode);
+
+    // Config with newer version and same term.
+    ReplSetConfig rsConfig = makeRSConfigWithVersionAndTerm((_configVersion + 1), _configTerm);
+
+    // Receive a heartbeat request that tells us about a newer config.
+    receiveHeartbeatFrom(rsConfig, 1, HostAndPort("h1", 1));
+
+    getNet()->enterNetwork();
+    auto noi = validateNextRequest("h1", _donorSetName, _configVersion, _configTerm);
+
+    // Construct the heartbeat response containing the newer config.
+    auto responseObj = constructResponse(rsConfig, _configVersion + 1, _configTerm);
+
+    // Schedule and deliver the heartbeat response.
+    getNet()->scheduleResponse(noi, getNet()->now(), makeResponseStatus(responseObj));
+    getNet()->runReadyNetworkOperations();
+
+    // The recipient's config and term versions are set to 1.
+    ASSERT_EQ(getReplCoord()->getConfigVersion(), 1);
+    ASSERT_EQ(getReplCoord()->getConfigTerm(), 1);
+
+    validateNextRequest("", _recipientSetName, 1, 1);
+}
+
+TEST_F(ReplCoordHBV1SplitConfigTest, RecipientNodeNonZeroVotes) {
+    _members = BSON_ARRAY(BSON("_id" << 1 << "host"
+                                     << "h1:1")
+                          << BSON("_id" << 2 << "host"
+                                        << "h2:1")
+                          << BSON("_id" << 3 << "host"
+                                        << "h3:1")
+                          << BSON("_id" << 4 << "host"
+                                        << "h4:1"
+                                        << "votes" << 1 << "priority" << 0 << "tags"
+                                        << BSON("recip"
+                                                << "tag2"))
+                          << BSON("_id" << 5 << "host"
+                                        << "h5:1"
+                                        << "votes" << 1 << "priority" << 0 << "tags"
+                                        << BSON("recip"
+                                                << "tag2"))
+                          << BSON("_id" << 6 << "host"
+                                        << "h6:1"
+                                        << "votes" << 1 << "priority" << 0 << "tags"
+                                        << BSON("recip"
+                                                << "tag2")));
+    startUp(_recipientSecondaryNode);
+
+    // Config with newer version and same term.
+    ReplSetConfig rsConfig = makeRSConfigWithVersionAndTerm((_configVersion + 1), _configTerm);
+
+    // Receive a heartbeat request that tells us about a newer config.
+    receiveHeartbeatFrom(rsConfig, 1, HostAndPort("h1", 1));
+
+    getNet()->enterNetwork();
+    auto noi = validateNextRequest("h1", _donorSetName, _configVersion, _configTerm);
+
+    // Construct the heartbeat response containing the newer config.
+    auto responseObj = constructResponse(rsConfig, _configVersion + 1, _configTerm);
+
+    // Schedule and deliver the heartbeat response.
+    getNet()->scheduleResponse(noi, getNet()->now(), makeResponseStatus(responseObj));
+    getNet()->runReadyNetworkOperations();
+
+    // The node rejected the config as it's a voting node and its version has not changed.
+    ASSERT_EQ(getReplCoord()->getConfigVersion(), _configVersion);
+    ASSERT_EQ(getReplCoord()->getConfigTerm(), _configTerm);
+    ASSERT_EQ(getReplCoord()->getSettings().ourSetName(), _donorSetName);
 }
 
 class ReplCoordHBV1ReconfigTest : public ReplCoordHBV1Test {

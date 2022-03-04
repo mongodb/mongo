@@ -42,6 +42,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/commands/test_commands_enabled.h"
+#include "mongo/db/global_settings.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/kill_sessions_local.h"
 #include "mongo/db/operation_context.h"
@@ -640,6 +641,35 @@ void ReplicationCoordinatorImpl::_scheduleHeartbeatReconfig(WithLock lk,
         .status_with_transitional_ignore();
 }
 
+bool ReplicationCoordinatorImpl::_shouldUseRecipientConfig(WithLock lk,
+                                                           const ReplSetConfig& newConfig) {
+    const auto& member = _rsConfig.getMemberAt(_selfIndex);
+
+    return newConfig.getRecipientConfig()->findMemberByHostAndPort(member.getHostAndPort());
+}
+
+Status ReplicationCoordinatorImpl::_isRecipientConfigValid(WithLock lk,
+                                                           const ReplSetConfig& newConfig) {
+    const auto& member = _rsConfig.getMemberAt(_selfIndex);
+
+    if (member.getNumVotes() != 0 || member.getPriority() != 0) {
+        return Status(ErrorCodes::BadValue,
+                      "Cannot apply split config to a node with non-zero vote or priority");
+    }
+
+    if (!_rsConfig.isInitialized()) {
+        return Status(ErrorCodes::NotYetInitialized,
+                      "Cannot apply a split config if the current config is uninitialized");
+    }
+
+    if (_rsConfig.getReplSetName() == newConfig.getRecipientConfig()->getReplSetName()) {
+        return Status(ErrorCodes::InvalidReplicaSetConfig,
+                      "The current config and recipient config cannot have the same set name.");
+    }
+
+    return Status::OK();
+}
+
 void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
     const executor::TaskExecutor::CallbackArgs& cbd, const ReplSetConfig& newConfig) {
 
@@ -653,12 +683,46 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
         return;
     }
 
+    const auto [isSplitRecipientConfig,
+                statusWithConf] = [&]() -> std::tuple<bool, StatusWith<ReplSetConfig>> {
+        if (!newConfig.isSplitConfig()) {
+            return std::make_tuple(false, newConfig);
+        }
+
+        stdx::lock_guard<Latch> lg(_mutex);
+        if (!_shouldUseRecipientConfig(lg, newConfig)) {
+            return std::make_tuple(false, newConfig);
+        }
+
+        auto status = _isRecipientConfigValid(lg, newConfig);
+        if (!status.isOK()) {
+            return std::make_tuple(false, status);
+        }
+
+        auto mutableConfig = newConfig.getRecipientConfig()->getMutable();
+        mutableConfig.setConfigVersion(1);
+        mutableConfig.setConfigTerm(1);
+        auto config = ReplSetConfig(std::move(mutableConfig));
+
+        return std::make_tuple(true, config);
+    }();
+
+    if (!statusWithConf.isOK()) {
+        LOGV2_WARNING(6234600,
+                      "Not persisting new configuration in heartbeat response to disk because "
+                      "it is invalid",
+                      "conf"_attr = statusWithConf.getStatus());
+        return;
+    }
+
+    const auto configToApply = statusWithConf.getValue();
+
     const StatusWith<int> myIndex = validateConfigForHeartbeatReconfig(
-        _externalState.get(), newConfig, getGlobalServiceContext());
+        _externalState.get(), configToApply, getGlobalServiceContext());
 
     if (myIndex.getStatus() == ErrorCodes::NodeNotFound) {
         stdx::lock_guard<Latch> lk(_mutex);
-        // If this node absent in newConfig, and this node was not previously initialized,
+        // If this node absent in configToApply, and this node was not previously initialized,
         // return to kConfigUninitialized immediately, rather than storing the config and
         // transitioning into the RS_REMOVED state.  See SERVER-15740.
         if (!_rsConfig.isInitialized()) {
@@ -683,15 +747,24 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
     } else {
         LOGV2_FOR_HEARTBEATS(4615626,
                              2,
-                             "Config with {newConfigVersionAndTerm} validated for "
+                             "Config with {configToApplyVersionAndTerm} validated for "
                              "reconfig; persisting to disk.",
                              "Config validated for reconfig; persisting to disk",
-                             "newConfigVersionAndTerm"_attr = newConfig.getConfigVersionAndTerm());
+                             "configToApplyVersionAndTerm"_attr =
+                                 configToApply.getConfigVersionAndTerm());
 
         auto opCtx = cc().makeOperationContext();
         // Don't write the no-op for config learned via heartbeats.
-        auto status = _externalState->storeLocalConfigDocument(
-            opCtx.get(), newConfig.toBSON(), false /* writeOplog */);
+        auto status =
+            [&, isSplitRecipientConfig = isSplitRecipientConfig, config = configToApply]() {
+                if (isSplitRecipientConfig) {
+                    return _externalState->replaceLocalConfigDocument(opCtx.get(), config.toBSON());
+                } else {
+                    return _externalState->storeLocalConfigDocument(
+                        opCtx.get(), config.toBSON(), false /* writeOplog */);
+                }
+            }();
+
         // Wait for durability of the new config document.
         try {
             JournalFlusher::get(opCtx.get())->waitForJournalFlush();
@@ -726,7 +799,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
         }
 
         bool isArbiter = myIndex.isOK() && myIndex.getValue() != -1 &&
-            newConfig.getMemberAt(myIndex.getValue()).isArbiter();
+            configToApply.getMemberAt(myIndex.getValue()).isArbiter();
 
         if (isArbiter) {
             ReplicaSetAwareServiceRegistry::get(_service).onBecomeArbiter();
@@ -739,13 +812,13 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
         LOGV2_FOR_HEARTBEATS(
             4615627,
             2,
-            "New configuration with {newConfigVersionAndTerm} persisted "
+            "New configuration with {configToApplyVersionAndTerm} persisted "
             "to local storage; installing new config in memory",
             "New configuration persisted to local storage; installing new config in memory",
-            "newConfigVersionAndTerm"_attr = newConfig.getConfigVersionAndTerm());
+            "configToApplyVersionAndTerm"_attr = configToApply.getConfigVersionAndTerm());
     }
 
-    _heartbeatReconfigFinish(cbd, newConfig, myIndex);
+    _heartbeatReconfigFinish(cbd, configToApply, myIndex, isSplitRecipientConfig);
 
     // Start data replication after the config has been installed.
     if (shouldStartDataReplication) {
@@ -773,7 +846,8 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
 void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
     const executor::TaskExecutor::CallbackArgs& cbData,
     const ReplSetConfig& newConfig,
-    StatusWith<int> myIndex) {
+    StatusWith<int> myIndex,
+    const bool isSplitRecipientConfig) {
     if (cbData.status == ErrorCodes::CallbackCanceled) {
         return;
     }
@@ -786,7 +860,8 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
         _replExecutor
             ->scheduleWorkAt(_replExecutor->now() + Milliseconds{10},
                              [=](const executor::TaskExecutor::CallbackArgs& cbData) {
-                                 _heartbeatReconfigFinish(cbData, newConfig, myIndex);
+                                 _heartbeatReconfigFinish(
+                                     cbData, newConfig, myIndex, isSplitRecipientConfig);
                              })
             .status_with_transitional_ignore();
         return;
@@ -810,7 +885,8 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
             _replExecutor
                 ->onEvent(electionFinishedEvent,
                           [=](const executor::TaskExecutor::CallbackArgs& cbData) {
-                              _heartbeatReconfigFinish(cbData, newConfig, myIndex);
+                              _heartbeatReconfigFinish(
+                                  cbData, newConfig, myIndex, isSplitRecipientConfig);
                           })
                 .status_with_transitional_ignore();
             return;
@@ -863,7 +939,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
     invariant(_rsConfigState == kConfigHBReconfiguring);
     invariant(!_rsConfig.isInitialized() ||
               _rsConfig.getConfigVersionAndTerm() < newConfig.getConfigVersionAndTerm() ||
-              _selfIndex < 0);
+              _selfIndex < 0 || isSplitRecipientConfig);
 
     if (!myIndex.isOK()) {
         switch (myIndex.getStatus().code()) {

@@ -4067,9 +4067,8 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* opCt
                                                           BSONObjBuilder* resultObj) {
     LOGV2(21356, "replSetInitiate admin command received from client");
 
-    const auto replEnabled = _settings.usingReplSets();
     stdx::unique_lock<Latch> lk(_mutex);
-    if (!replEnabled) {
+    if (!isReplEnabled()) {
         return Status(ErrorCodes::NoReplicationEnabled, "server is not running with --replSet");
     }
     while (_rsConfigState == kConfigPreStart || _rsConfigState == kConfigStartingUp) {

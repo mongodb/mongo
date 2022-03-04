@@ -2750,9 +2750,14 @@ var ReplSetTest = function(opts) {
             oplogSize: this.oplogSize,
             keyFile: this.keyFile,
             port: _useBridge ? _unbridgedPorts[n] : this.ports[n],
-            replSet: this.useSeedList ? this.getURL() : this.name,
             dbpath: "$set-$node"
         };
+
+        if (this.serverless == null) {
+            defaults.replSet = this.useSeedList ? this.getURL() : this.name;
+        } else {
+            defaults.serverless = true;
+        }
 
         if (options && options.binVersion &&
             jsTest.options().useRandomBinVersionsWithinReplicaSet) {
@@ -3211,6 +3216,7 @@ var ReplSetTest = function(opts) {
         self.name = opts.name || jsTest.name();
         print('Starting new replica set ' + self.name);
 
+        self.serverless = opts.serverless;
         self.useHostName = opts.useHostName == undefined ? true : opts.useHostName;
         self.host = self.useHostName ? (opts.host || getHostName()) : 'localhost';
         self.oplogSize = opts.oplogSize || 40;
@@ -3343,10 +3349,11 @@ var ReplSetTest = function(opts) {
      * Constructor, which instantiates the ReplSetTest object from existing nodes.
      */
     function _constructFromExistingNodes(
-        {name, nodeHosts, nodeOptions, keyFile, host, waitForKeys}) {
+        {name, serverless, nodeHosts, nodeOptions, keyFile, host, waitForKeys}) {
         print('Recreating replica set from existing nodes ' + tojson(nodeHosts));
 
         self.name = name;
+        self.serverless = serverless;
         self.ports = nodeHosts.map(node => node.split(':')[1]);
         self.nodes = nodeHosts.map((node) => {
             const conn = Mongo(node);

@@ -134,7 +134,7 @@ Status ReplicationCoordinatorExternalStateMock::storeLocalConfigDocument(Operati
 
 Status ReplicationCoordinatorExternalStateMock::replaceLocalConfigDocument(OperationContext* opCtx,
                                                                            const BSONObj& config) {
-    MONGO_UNREACHABLE;
+    return storeLocalConfigDocument(opCtx, config, false);
 }
 
 void ReplicationCoordinatorExternalStateMock::setLocalConfigDocument(

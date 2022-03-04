@@ -41,7 +41,7 @@ for (let i = 0; i < 2000; i++) {
 }
 assert.commandWorked(bulk.execute());
 
-// TODO(SERVER-62346): remove this when we actually split recipients
+// TODO(SERVER-64168): remove this when split is ready
 configureFailPoint(adminDb, "skipShardSplitWaitForSplitAcceptance");
 
 jsTestLog("Running commitShardSplit command");

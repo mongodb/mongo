@@ -1,6 +1,6 @@
 class BasicServerlessTest {
     constructor({recipientTagName, recipientSetName, nodeOptions}) {
-        this.donor = new ReplSetTest({name: "donor", nodes: 3, nodeOptions});
+        this.donor = new ReplSetTest({name: "donor", nodes: 3, serverless: true, nodeOptions});
         this.donor.startSet();
         this.donor.initiate();
 

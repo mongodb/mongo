@@ -1267,6 +1267,16 @@ private:
     void _scheduleHeartbeatReconfig(WithLock lk, const ReplSetConfig& newConfig);
 
     /**
+     * Check if the node should use the recipientConfig contained within newConfig.
+     */
+    bool _shouldUseRecipientConfig(WithLock lk, const ReplSetConfig& newConfig);
+
+    /**
+     * Check if the recipient config provided can be applied to the current node.
+     */
+    Status _isRecipientConfigValid(WithLock lk, const ReplSetConfig& newConfig);
+
+    /**
      * Method to write a configuration transmitted via heartbeat message to stable storage.
      */
     void _heartbeatReconfigStore(const executor::TaskExecutor::CallbackArgs& cbd,
@@ -1277,7 +1287,8 @@ private:
      */
     void _heartbeatReconfigFinish(const executor::TaskExecutor::CallbackArgs& cbData,
                                   const ReplSetConfig& newConfig,
-                                  StatusWith<int> myIndex);
+                                  StatusWith<int> myIndex,
+                                  bool isSplitRecipientConfig);
 
     /**
      * Calculates the time (in millis) left in quiesce mode and converts the value to int64.
