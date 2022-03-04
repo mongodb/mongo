@@ -3,7 +3,11 @@
  * Exercises that the operation can run even if it has to await replication of the intermediate
  * collection drops.
  *
- * @tags: [requires_replication]
+ * @tags: [
+ *   requires_replication,
+ *   # dropDatabase can work in conjunction with other operations in 5.0.
+ *   requires_fcv_53
+ * ]
  */
 (function() {
 "use strict";
