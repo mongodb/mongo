@@ -373,7 +373,7 @@ error_codes:
     - {code: 312,name: OperationIsKilledAndDelisted,categories: [CancellationError,InternalOnly]}
 
     - {code: 313,name: ResumableRangeDeleterDisabled}
-    - {code: 314,name: ObjectIsBusy}
+    - {code: 314,name: ObjectIsBusy, categories: [CursorInvalidatedError]}
 
 
     - {code: 315,name: TooStaleToSyncFromSource,categories: [InternalOnly]}
