@@ -95,6 +95,11 @@ const NamespaceString& BatchedCommandRequest::getNS() const {
     return _visit([](auto&& op) -> decltype(auto) { return op.getNamespace(); });
 }
 
+bool BatchedCommandRequest::hasEncryptionInformation() const {
+    return _visit(
+        [](auto&& op) -> decltype(auto) { return op.getEncryptionInformation().has_value(); });
+}
+
 std::size_t BatchedCommandRequest::sizeWriteOps() const {
     struct Visitor {
         auto operator()(const write_ops::InsertCommandRequest& op) const {

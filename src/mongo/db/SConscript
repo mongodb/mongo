@@ -854,6 +854,24 @@ env.Library(
 )
 
 env.Library(
+    target='fle_crud',
+    source=[
+        'fle_crud.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/crypto/encrypted_field_config',
+        '$BUILD_DIR/mongo/crypto/fle_crypto',
+        '$BUILD_DIR/mongo/db/ops/write_ops_parsers',
+        '$BUILD_DIR/mongo/db/query/query_request',
+        '$BUILD_DIR/mongo/executor/task_executor_pool',
+        '$BUILD_DIR/mongo/s/grid',
+        '$BUILD_DIR/mongo/s/sharding_router_api',
+        'logical_session_id',
+        'transaction_api',
+    ],
+)
+
+env.Library(
     target='dbdirectclient',
     source=[
         'dbdirectclient.cpp',
@@ -2559,6 +2577,7 @@ if wiredtiger:
             'field_parser_test.cpp',
             'field_ref_set_test.cpp',
             'field_ref_test.cpp',
+            'fle_crud_test.cpp',
             'hasher_test.cpp',
             'index_build_entry_helpers_test.cpp',
             'index_builds_coordinator_mongod_test.cpp',
@@ -2607,6 +2626,8 @@ if wiredtiger:
             '$BUILD_DIR/mongo/base',
             '$BUILD_DIR/mongo/bson/util/bson_extract',
             '$BUILD_DIR/mongo/client/read_preference',
+            '$BUILD_DIR/mongo/crypto/encrypted_field_config',
+            '$BUILD_DIR/mongo/crypto/fle_crypto',
             '$BUILD_DIR/mongo/db/auth/auth',
             '$BUILD_DIR/mongo/db/auth/security_token',
             '$BUILD_DIR/mongo/db/catalog/catalog_test_fixture',
@@ -2636,6 +2657,7 @@ if wiredtiger:
             'dbdirectclient',
             'dbmessage',
             'fcv_op_observer',
+            'fle_crud',
             'index_build_entry_helpers',
             'index_builds_coordinator_mongod',
             'keys_collection_client_direct',

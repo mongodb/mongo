@@ -410,7 +410,7 @@ public:
 
 struct ESCNullDocument {
     // Id is not included as it is HMAC generated and cannot be reversed
-    uint64_t pos;
+    uint64_t position;
     uint64_t count;
 };
 
@@ -497,9 +497,9 @@ public:
     /**
      * Search for the highest document id for a given field/value pair based on the token.
      */
-    static uint64_t emuBinary(FLEStateCollectionReader* reader,
-                              ESCTwiceDerivedTagToken tagToken,
-                              ESCTwiceDerivedValueToken valueToken);
+    static boost::optional<uint64_t> emuBinary(FLEStateCollectionReader* reader,
+                                               ESCTwiceDerivedTagToken tagToken,
+                                               ESCTwiceDerivedValueToken valueToken);
 };
 
 
@@ -579,7 +579,7 @@ enum class ECCValueType : uint64_t {
 
 struct ECCNullDocument {
     // Id is not included as it HMAC generated and cannot be reversed
-    uint64_t pos;
+    uint64_t position;
 };
 
 
@@ -645,9 +645,9 @@ public:
     /**
      * Search for the highest document id for a given field/value pair based on the token.
      */
-    static uint64_t emuBinary(FLEStateCollectionReader* reader,
-                              ECCTwiceDerivedTagToken tagToken,
-                              ECCTwiceDerivedValueToken valueToken);
+    static boost::optional<uint64_t> emuBinary(FLEStateCollectionReader* reader,
+                                               ECCTwiceDerivedTagToken tagToken,
+                                               ECCTwiceDerivedValueToken valueToken);
 };
 
 /**
@@ -841,10 +841,17 @@ struct FLE2IndexedEqualityEncryptedValue {
 
 
 struct EDCServerPayloadInfo {
-    FLE2InsertUpdatePayload payload;
+    ESCDerivedFromDataTokenAndContentionFactorToken getESCToken() const;
 
+    FLE2InsertUpdatePayload payload;
     std::string fieldPathName;
     uint64_t count;
+};
+
+struct EDCIndexedFields {
+    ConstDataRange value;
+
+    std::string fieldPathName;
 };
 
 /**
@@ -877,8 +884,21 @@ public:
      * Converts FLE2InsertUpdatePayload to a final insert payload and updates __safeContent__ with
      * new tags.
      */
-    static BSONObj finalizeForInsert(BSONObj& doc,
+    static BSONObj finalizeForInsert(const BSONObj& doc,
                                      const std::vector<EDCServerPayloadInfo>& serverPayload);
+
+    /**
+     * Get a list of encrypted, indexed fields.
+     */
+    static std::vector<EDCIndexedFields> getEncryptedIndexedFields(BSONObj& obj);
+};
+
+class EncryptionInformationHelpers {
+public:
+    static BSONObj encryptionInformationSerialize(NamespaceString& nss, EncryptedFieldConfig& ef);
+
+    static EncryptedFieldConfig getAndValidateSchema(const NamespaceString& nss,
+                                                     const EncryptionInformation& ei);
 };
 
 }  // namespace mongo

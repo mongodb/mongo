@@ -283,7 +283,7 @@ TEST(FLE_ESC, RoundTrip) {
             ESCCollection::generateNullDocument(escTwiceTag, escTwiceValue, 123, 123456789);
         auto swDoc = ESCCollection::decryptNullDocument(escTwiceValue, doc);
         ASSERT_OK(swDoc.getStatus());
-        ASSERT_EQ(swDoc.getValue().pos, 123);
+        ASSERT_EQ(swDoc.getValue().position, 123);
         ASSERT_EQ(swDoc.getValue().count, 123456789);
     }
 
@@ -342,7 +342,7 @@ TEST(FLE_ECC, RoundTrip) {
         BSONObj doc = ECCCollection::generateNullDocument(twiceTag, twiceValue, 123456789);
         auto swDoc = ECCCollection::decryptNullDocument(twiceValue, doc);
         ASSERT_OK(swDoc.getStatus());
-        ASSERT_EQ(swDoc.getValue().pos, 123456789);
+        ASSERT_EQ(swDoc.getValue().position, 123456789);
     }
 
 
@@ -405,6 +405,33 @@ private:
     std::vector<BSONObj> _docs;
 };
 
+// Test Empty Collection
+TEST(FLE_ESC, EmuBinary_Empty) {
+
+    TestDocumentCollection coll;
+    ConstDataRange value(testValue);
+
+    auto c1 = FLELevel1TokenGenerator::generateCollectionsLevel1Token(indexKey);
+    auto escToken = FLECollectionTokenGenerator::generateESCToken(c1);
+
+    ESCDerivedFromDataToken escDatakey =
+        FLEDerivedFromDataTokenGenerator::generateESCDerivedFromDataToken(escToken, value);
+
+    auto escDerivedToken = FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
+        generateESCDerivedFromDataTokenAndContentionFactorToken(escDatakey, 0);
+
+    auto escTwiceTag =
+        FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedTagToken(escDerivedToken);
+    auto escTwiceValue =
+        FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedValueToken(escDerivedToken);
+
+
+    auto i = ESCCollection::emuBinary(&coll, escTwiceTag, escTwiceValue);
+
+    ASSERT_TRUE(i.has_value());
+    ASSERT_EQ(i.value(), 0);
+}
+
 // Test one new field in esc
 TEST(FLE_ESC, EmuBinary) {
 
@@ -430,10 +457,10 @@ TEST(FLE_ESC, EmuBinary) {
         coll.insert(doc);
     }
 
-    uint64_t i = ESCCollection::emuBinary(&coll, escTwiceTag, escTwiceValue);
+    auto i = ESCCollection::emuBinary(&coll, escTwiceTag, escTwiceValue);
 
-    std::cout << "i: " << i << std::endl;
-    ASSERT_EQ(i, 5);
+    ASSERT_TRUE(i.has_value());
+    ASSERT_EQ(i.value(), 5);
 }
 
 
@@ -480,14 +507,45 @@ TEST(FLE_ESC, EmuBinary2) {
         coll.insert(doc);
     }
 
-    uint64_t i = ESCCollection::emuBinary(&coll, escTwiceTag, escTwiceValue);
+    auto i = ESCCollection::emuBinary(&coll, escTwiceTag, escTwiceValue);
 
-    ASSERT_EQ(i, 13);
+    ASSERT_TRUE(i.has_value());
+    ASSERT_EQ(i.value(), 13);
 
     i = ESCCollection::emuBinary(&coll, escTwiceTag2, escTwiceValue2);
 
-    ASSERT_EQ(i, 5);
+    ASSERT_TRUE(i.has_value());
+    ASSERT_EQ(i.value(), 5);
 }
+
+// Test Emulated Binary with null record
+TEST(FLE_ESC, EmuBinary_NullRecord) {
+
+    TestDocumentCollection coll;
+    ConstDataRange value(testValue);
+
+    auto c1 = FLELevel1TokenGenerator::generateCollectionsLevel1Token(indexKey);
+    auto escToken = FLECollectionTokenGenerator::generateESCToken(c1);
+
+    ESCDerivedFromDataToken escDatakey =
+        FLEDerivedFromDataTokenGenerator::generateESCDerivedFromDataToken(escToken, value);
+
+    auto escDerivedToken = FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
+        generateESCDerivedFromDataTokenAndContentionFactorToken(escDatakey, 0);
+
+    auto escTwiceTag =
+        FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedTagToken(escDerivedToken);
+    auto escTwiceValue =
+        FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedValueToken(escDerivedToken);
+
+    BSONObj doc = ESCCollection::generateNullDocument(escTwiceTag, escTwiceValue, 7, 7);
+    coll.insert(doc);
+
+    auto i = ESCCollection::emuBinary(&coll, escTwiceTag, escTwiceValue);
+
+    ASSERT_FALSE(i.has_value());
+}
+
 
 std::vector<char> generatePlaceholder(BSONElement value) {
     FLE2EncryptionPlaceholder ep;
@@ -513,8 +571,6 @@ BSONObj encryptDocument(BSONObj obj, FLEKeyVault* keyVault) {
 
     // Start Server Side
     auto serverPayload = EDCServerCollection::getEncryptedFieldInfo(result);
-
-    ASSERT_EQ(serverPayload.size(), 1);
 
     // TODO set count based on EmuBinary
     for (auto& payload : serverPayload) {
@@ -894,6 +950,160 @@ TEST(FLE_EDC, DuplicateSafeContent_IncompatibleType) {
 
     ASSERT_THROWS_CODE(encryptDocument(builder.obj(), &keyVault), DBException, 6373510);
 }
+
+template <typename T, typename Func>
+bool vectorContains(const std::vector<T>& vec, Func func) {
+    return std::find_if(vec.begin(), vec.end(), func) != vec.end();
+}
+
+EncryptedFieldConfig getTestEncryptedFieldConfig() {
+
+    constexpr auto schema = R"({
+    "escCollection": "esc",
+    "eccCollection": "ecc",
+    "ecocCollection": "ecoc",
+    "fields": [
+        {
+            "keyId":
+                            {
+                                "$uuid": "12345678-1234-9876-1234-123456789012"
+                            }
+                        ,
+            "path": "encrypted",
+            "bsonType": "string",
+            "queries": {"queryType": "equality"}
+
+        },
+        {
+            "keyId":
+                            {
+                                "$uuid": "12345678-1234-9876-1234-123456789012"
+                            }
+                        ,
+            "path": "nested.encrypted",
+            "bsonType": "string",
+            "queries": {"queryType": "equality"}
+
+        },
+        {
+            "keyId":
+                            {
+                                "$uuid": "12345678-1234-9876-1234-123456789012"
+                            }
+                        ,
+            "path": "nested.notindexed",
+            "bsonType": "string"
+        }
+    ]
+})";
+
+    return EncryptedFieldConfig::parse(IDLParserErrorContext("root"), fromjson(schema));
+}
+
+TEST(EncryptionInformation, RoundTrip) {
+    NamespaceString ns("test.test");
+
+    EncryptedFieldConfig efc = getTestEncryptedFieldConfig();
+    auto obj = EncryptionInformationHelpers::encryptionInformationSerialize(ns, efc);
+
+
+    EncryptedFieldConfig efc2 = EncryptionInformationHelpers::getAndValidateSchema(
+        ns, EncryptionInformation::parse(IDLParserErrorContext("foo"), obj));
+
+    ASSERT_BSONOBJ_EQ(efc.toBSON(), efc2.toBSON());
+}
+
+TEST(EncryptionInformation, BadSchema) {
+    EncryptionInformation ei;
+    ei.setType(1);
+
+    ei.setSchema(BSON("a"
+                      << "b"));
+
+    auto obj = ei.toBSON();
+
+    NamespaceString ns("test.test");
+    ASSERT_THROWS_CODE(EncryptionInformationHelpers::getAndValidateSchema(
+                           ns, EncryptionInformation::parse(IDLParserErrorContext("foo"), obj)),
+                       DBException,
+                       6371205);
+}
+
+TEST(EncryptionInformation, MissingStateCollection) {
+    NamespaceString ns("test.test");
+
+    {
+        EncryptedFieldConfig efc = getTestEncryptedFieldConfig();
+        efc.setEscCollection(boost::none);
+        auto obj = EncryptionInformationHelpers::encryptionInformationSerialize(ns, efc);
+        ASSERT_THROWS_CODE(EncryptionInformationHelpers::getAndValidateSchema(
+                               ns, EncryptionInformation::parse(IDLParserErrorContext("foo"), obj)),
+                           DBException,
+                           6371207);
+    }
+    {
+        EncryptedFieldConfig efc = getTestEncryptedFieldConfig();
+        efc.setEccCollection(boost::none);
+        auto obj = EncryptionInformationHelpers::encryptionInformationSerialize(ns, efc);
+        ASSERT_THROWS_CODE(EncryptionInformationHelpers::getAndValidateSchema(
+                               ns, EncryptionInformation::parse(IDLParserErrorContext("foo"), obj)),
+                           DBException,
+                           6371206);
+    }
+    {
+        EncryptedFieldConfig efc = getTestEncryptedFieldConfig();
+        efc.setEcocCollection(boost::none);
+        auto obj = EncryptionInformationHelpers::encryptionInformationSerialize(ns, efc);
+        ASSERT_THROWS_CODE(EncryptionInformationHelpers::getAndValidateSchema(
+                               ns, EncryptionInformation::parse(IDLParserErrorContext("foo"), obj)),
+                           DBException,
+                           6371208);
+    }
+}
+
+TEST(IndexedFields, FetchTwoLevels) {
+    TestKeyVault keyVault;
+
+    auto doc = BSON("value"
+                    << "123456");
+    auto element = doc.firstElement();
+    auto inputDoc = BSON("__safeContent__" << BSON_ARRAY(1 << 2 << 4) << "encrypted" << element);
+
+    auto buf = generatePlaceholder(element);
+    BSONObjBuilder builder;
+    builder.append("__safeContent__", BSON_ARRAY(1 << 2 << 4));
+    builder.appendBinData("encrypted", buf.size(), BinDataType::Encrypt, buf.data());
+    {
+        BSONObjBuilder sub(builder.subobjStart("nested"));
+        sub.appendBinData("encrypted", buf.size(), BinDataType::Encrypt, buf.data());
+        {
+            BSONObjBuilder sub2(sub.subobjStart("nested2"));
+            sub2.appendBinData("encrypted", buf.size(), BinDataType::Encrypt, buf.data());
+        }
+    }
+
+    auto obj = builder.obj();
+
+    auto noIndexedFields = EDCServerCollection::getEncryptedIndexedFields(obj);
+
+    ASSERT_EQ(noIndexedFields.size(), 0);
+
+    auto finalDoc = encryptDocument(obj, &keyVault);
+
+    auto indexedFields = EDCServerCollection::getEncryptedIndexedFields(finalDoc);
+
+    ASSERT_EQ(indexedFields.size(), 3);
+
+
+    ASSERT(vectorContains(indexedFields,
+                          [](EDCIndexedFields i) { return i.fieldPathName == "encrypted"; }));
+    ASSERT(vectorContains(
+        indexedFields, [](EDCIndexedFields i) { return i.fieldPathName == "nested.encrypted"; }));
+    ASSERT(vectorContains(indexedFields, [](EDCIndexedFields i) {
+        return i.fieldPathName == "nested.nested2.encrypted";
+    }));
+}
+
 
 }  // namespace mongo
 

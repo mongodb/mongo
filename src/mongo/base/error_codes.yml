@@ -473,6 +473,9 @@ error_codes:
 
     - {code: 366, name: WouldChangeOwningShardDeletedNoDocument}
 
+    - {code: 367, name: FLECompactionPlaceholder}
+    - {code: 368, name: FLEStateCollectionContention}
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)

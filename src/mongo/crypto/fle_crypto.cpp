@@ -54,9 +54,11 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/bson/oid.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/crypto/aead_encryption.h"
+#include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/crypto/encryption_fields_util.h"
 #include "mongo/crypto/fle_data_frames.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
@@ -66,10 +68,22 @@
 #include "mongo/idl/basic_types.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/rpc/object_check.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 
+// Optional defines to help with debugging
+//
+// Appends unencrypted fields to the state collections to aid in debugging
+//#define FLE2_DEBUG_STATE_COLLECTIONS
+
+// Verbose std::cout to troubleshoot the EmuBinary algorithm
+//#define DEBUG_ENUM_BINARY 1
+
+#ifdef FLE2_DEBUG_STATE_COLLECTIONS
+static_assert(kDebugBuild == 1, "Only use in debug builds");
+#endif
 
 namespace mongo {
 
@@ -92,6 +106,7 @@ constexpr uint64_t kTwiceDerivedTokenFromESCValue = 2;
 constexpr uint64_t kTwiceDerivedTokenFromECCTag = 1;
 constexpr uint64_t kTwiceDerivedTokenFromECCValue = 2;
 
+constexpr int32_t kEncryptionInformationSchemaVersion = 1;
 
 constexpr auto kECCNullId = 0;
 constexpr auto kECCNonNullId = 1;
@@ -107,6 +122,17 @@ constexpr uint64_t kESCompactionRecordCountPlaceholder = 0;
 constexpr auto kId = "_id";
 constexpr auto kValue = "value";
 constexpr auto kFieldName = "fieldName";
+
+constexpr auto kEncryptedFields = "encryptedFields";
+
+#ifdef FLE2_DEBUG_STATE_COLLECTIONS
+constexpr auto kDebugId = "_debug_id";
+constexpr auto kDebugValuePosition = "_debug_value_position";
+constexpr auto kDebugValueCount = "_debug_value_count";
+
+constexpr auto kDebugValueStart = "_debug_value_start";
+constexpr auto kDebugValueEnd = "_debug_value_end";
+#endif
 
 using UUIDBuf = std::array<uint8_t, UUID::kNumBytes>;
 
@@ -419,16 +445,14 @@ StatusWith<std::tuple<T1, T2>> decryptAndUnpack(ConstDataRange cdr, FLEToken<Tok
 }
 
 
-//#define DEBUG_ENUM_BINARY 1
-
 template <typename collectionT, typename tagTokenT, typename valueTokenT>
-uint64_t emuBinaryCommon(FLEStateCollectionReader* reader,
-                         tagTokenT tagToken,
-                         valueTokenT valueToken) {
+boost::optional<uint64_t> emuBinaryCommon(FLEStateCollectionReader* reader,
+                                          tagTokenT tagToken,
+                                          valueTokenT valueToken) {
 
     // Default search parameters
     uint64_t lambda = 0;
-    uint64_t i = 0;
+    boost::optional<uint64_t> i = 0;
 
     // Step 2:
     // Search for null record
@@ -439,7 +463,8 @@ uint64_t emuBinaryCommon(FLEStateCollectionReader* reader,
     if (!nullDoc.isEmpty()) {
         auto swNullEscDoc = collectionT::decryptNullDocument(valueToken, nullDoc);
         uassertStatusOK(swNullEscDoc.getStatus());
-        lambda = swNullEscDoc.getValue().pos + 1;
+        lambda = swNullEscDoc.getValue().position + 1;
+        i = boost::none;
 #ifdef DEBUG_ENUM_BINARY
         std::cout << fmt::format("start: null_document: lambda {}, i: {}", lambda, i) << std::endl;
 #endif
@@ -478,7 +503,7 @@ uint64_t emuBinaryCommon(FLEStateCollectionReader* reader,
     uint64_t median = 0, min = 1, max = rho;
 
     // Step 9
-    uint64_t maxIterations = ceil(log2(rho));
+    uint64_t maxIterations = rho > 0 ? ceil(log2(rho)) : 0;
 
 #ifdef DEBUG_ENUM_BINARY
     std::cout << fmt::format("start2: maxIterations {}", maxIterations) << std::endl;
@@ -676,6 +701,78 @@ FLE2InsertUpdatePayload EDCClientPayload::serialize(FLEIndexKeyAndId indexKey,
     return iupayload;
 }
 
+
+/**
+ * Lightweight class to build a singly linked list of field names to represent the current field
+ * name
+ *
+ * Avoids heap allocations until getFieldPath() is called
+ */
+class SinglyLinkedFieldPath {
+public:
+    SinglyLinkedFieldPath() : _predecessor(nullptr) {}
+
+    SinglyLinkedFieldPath(StringData fieldName, const SinglyLinkedFieldPath* predecessor)
+        : _currentField(fieldName), _predecessor(predecessor) {}
+
+
+    std::string getFieldPath(StringData fieldName) const;
+
+private:
+    // Name of the current field that is being parsed.
+    const StringData _currentField;
+
+    // Pointer to a parent parser context.
+    // This provides a singly linked list of parent pointers, and use to produce a full path to a
+    // field with an error.
+    const SinglyLinkedFieldPath* _predecessor;
+};
+
+
+std::string SinglyLinkedFieldPath::getFieldPath(StringData fieldName) const {
+    dassert(!fieldName.empty());
+    if (_predecessor == nullptr) {
+        str::stream builder;
+
+        if (!_currentField.empty()) {
+            builder << _currentField << ".";
+        }
+
+        builder << fieldName;
+
+        return builder;
+    } else {
+        std::stack<StringData> pieces;
+
+        pieces.push(fieldName);
+
+        if (!_currentField.empty()) {
+            pieces.push(_currentField);
+        }
+
+        const SinglyLinkedFieldPath* head = _predecessor;
+        while (head) {
+            if (!head->_currentField.empty()) {
+                pieces.push(head->_currentField);
+            }
+            head = head->_predecessor;
+        }
+
+        str::stream builder;
+
+        while (!pieces.empty()) {
+            builder << pieces.top();
+            pieces.pop();
+
+            if (!pieces.empty()) {
+                builder << ".";
+            }
+        }
+
+        return builder;
+    }
+}
+
 /**
  * Copies an input document to the output but provides callers a way to customize how encrypted
  * fields are handled.
@@ -740,8 +837,8 @@ BSONObj transformBSON(
  * Callers can pass a function doVisit(Original bindata content, Field Name).
  */
 void visitEncryptedBSON(const BSONObj& object,
-                        const std::function<void(ConstDataRange, StringData)>& doVisit) {
-    std::stack<BSONObjIterator> frameStack;
+                        const std::function<void(ConstDataRange, std::string)>& doVisit) {
+    std::stack<std::pair<SinglyLinkedFieldPath, BSONObjIterator>> frameStack;
 
     const ScopeGuard frameStackGuard([&] {
         while (!frameStack.empty()) {
@@ -749,24 +846,28 @@ void visitEncryptedBSON(const BSONObj& object,
         }
     });
 
-    frameStack.emplace(BSONObjIterator(object));
+    frameStack.emplace(SinglyLinkedFieldPath(), BSONObjIterator(object));
 
-    while (frameStack.size() > 1 || frameStack.top().more()) {
+    while (frameStack.size() > 1 || frameStack.top().second.more()) {
         uassert(6373511,
                 "Object too deep to be encrypted. Exceeded stack depth.",
                 frameStack.size() < BSONDepth::kDefaultMaxAllowableDepth);
         auto& iterator = frameStack.top();
-        if (iterator.more()) {
-            BSONElement elem = iterator.next();
+        if (iterator.second.more()) {
+            BSONElement elem = iterator.second.next();
             if (elem.type() == BSONType::Object) {
-                frameStack.emplace(BSONObjIterator(elem.Obj()));
+                frameStack.emplace(
+                    SinglyLinkedFieldPath(elem.fieldNameStringData(), &iterator.first),
+                    BSONObjIterator(elem.Obj()));
             } else if (elem.type() == BSONType::Array) {
-                frameStack.emplace(BSONObjIterator(elem.Obj()));
+                frameStack.emplace(
+                    SinglyLinkedFieldPath(elem.fieldNameStringData(), &iterator.first),
+                    BSONObjIterator(elem.Obj()));
             } else if (elem.isBinData(BinDataType::Encrypt)) {
                 int len;
                 const char* data(elem.binData(len));
                 ConstDataRange cdr(data, len);
-                doVisit(cdr, elem.fieldNameStringData());
+                doVisit(cdr, iterator.first.getFieldPath(elem.fieldNameStringData()));
             }
         } else {
             frameStack.pop();
@@ -931,6 +1032,17 @@ void decryptField(FLEKeyVault* keyVault,
     BSONObj obj = toBSON(pair.first, pair.second);
 
     builder->appendAs(obj.firstElement(), fieldPath);
+}
+
+void collectIndexedFields(std::vector<EDCIndexedFields>* pFields,
+                          ConstDataRange cdr,
+                          StringData fieldPath) {
+    auto [encryptedTypeBinding, subCdr] = fromEncryptedConstDataRange(cdr);
+    if (encryptedTypeBinding != EncryptedBinDataType::kFLE2EqualityIndexedValue) {
+        return;
+    }
+
+    pFields->push_back({cdr, fieldPath.toString()});
 }
 
 }  // namespace
@@ -1148,6 +1260,11 @@ BSONObj ESCCollection::generateNullDocument(ESCTwiceDerivedTagToken tagToken,
     BSONObjBuilder builder;
     toBinData(kId, block, &builder);
     toBinData(kValue, swCipherText.getValue(), &builder);
+#ifdef FLE2_DEBUG_STATE_COLLECTIONS
+    builder.append(kDebugId, "NULL DOC");
+    builder.append(kDebugValuePosition, static_cast<int64_t>(pos));
+    builder.append(kDebugValueCount, static_cast<int64_t>(count));
+#endif
 
     return builder.obj();
 }
@@ -1165,6 +1282,10 @@ BSONObj ESCCollection::generateInsertDocument(ESCTwiceDerivedTagToken tagToken,
     BSONObjBuilder builder;
     toBinData(kId, block, &builder);
     toBinData(kValue, swCipherText.getValue(), &builder);
+#ifdef FLE2_DEBUG_STATE_COLLECTIONS
+    builder.append(kDebugId, static_cast<int64_t>(index));
+    builder.append(kDebugValueCount, static_cast<int64_t>(count));
+#endif
 
     return builder.obj();
 }
@@ -1183,6 +1304,11 @@ BSONObj ESCCollection::generatePositionalDocument(ESCTwiceDerivedTagToken tagTok
     BSONObjBuilder builder;
     toBinData(kId, block, &builder);
     toBinData(kValue, swCipherText.getValue(), &builder);
+#ifdef FLE2_DEBUG_STATE_COLLECTIONS
+    builder.append(kDebugId, static_cast<int64_t>(index));
+    builder.append(kDebugValuePosition, static_cast<int64_t>(pos));
+    builder.append(kDebugValueCount, static_cast<int64_t>(count));
+#endif
 
     return builder.obj();
 }
@@ -1245,9 +1371,9 @@ StatusWith<ESCDocument> ESCCollection::decryptDocument(ESCTwiceDerivedValueToken
 }
 
 
-uint64_t ESCCollection::emuBinary(FLEStateCollectionReader* reader,
-                                  ESCTwiceDerivedTagToken tagToken,
-                                  ESCTwiceDerivedValueToken valueToken) {
+boost::optional<uint64_t> ESCCollection::emuBinary(FLEStateCollectionReader* reader,
+                                                   ESCTwiceDerivedTagToken tagToken,
+                                                   ESCTwiceDerivedValueToken valueToken) {
     return emuBinaryCommon<ESCCollection, ESCTwiceDerivedTagToken, ESCTwiceDerivedValueToken>(
         reader, tagToken, valueToken);
 }
@@ -1273,6 +1399,10 @@ BSONObj ECCCollection::generateNullDocument(ECCTwiceDerivedTagToken tagToken,
     BSONObjBuilder builder;
     toBinData(kId, block, &builder);
     toBinData(kValue, swCipherText.getValue(), &builder);
+#ifdef FLE2_DEBUG_STATE_COLLECTIONS
+    builder.append(kDebugId, "NULL DOC");
+    builder.append(kDebugValueCount, static_cast<int64_t>(count));
+#endif
 
     return builder.obj();
 }
@@ -1290,6 +1420,11 @@ BSONObj ECCCollection::generateDocument(ECCTwiceDerivedTagToken tagToken,
     BSONObjBuilder builder;
     toBinData(kId, block, &builder);
     toBinData(kValue, swCipherText.getValue(), &builder);
+#ifdef FLE2_DEBUG_STATE_COLLECTIONS
+    builder.append(kDebugId, static_cast<int64_t>(index));
+    builder.append(kDebugValueStart, static_cast<int64_t>(start));
+    builder.append(kDebugValueEnd, static_cast<int64_t>(end));
+#endif
 
     return builder.obj();
 }
@@ -1313,6 +1448,11 @@ BSONObj ECCCollection::generateCompactionDocument(ECCTwiceDerivedTagToken tagTok
     BSONObjBuilder builder;
     toBinData(kId, block, &builder);
     toBinData(kValue, swCipherText.getValue(), &builder);
+#ifdef FLE2_DEBUG_STATE_COLLECTIONS
+    builder.append(kDebugId, static_cast<int64_t>(index));
+    builder.append(kDebugValueStart, static_cast<int64_t>(kECCompactionRecordValue));
+    builder.append(kDebugValueEnd, static_cast<int64_t>(kECCompactionRecordValue));
+#endif
 
     return builder.obj();
 }
@@ -1361,15 +1501,16 @@ StatusWith<ECCDocument> ECCCollection::decryptDocument(ECCTwiceDerivedValueToken
                        std::get<1>(value)};
 }
 
-uint64_t ECCCollection::emuBinary(FLEStateCollectionReader* reader,
-                                  ECCTwiceDerivedTagToken tagToken,
-                                  ECCTwiceDerivedValueToken valueToken) {
+boost::optional<uint64_t> ECCCollection::emuBinary(FLEStateCollectionReader* reader,
+                                                   ECCTwiceDerivedTagToken tagToken,
+                                                   ECCTwiceDerivedValueToken valueToken) {
     return emuBinaryCommon<ECCCollection, ECCTwiceDerivedTagToken, ECCTwiceDerivedValueToken>(
         reader, tagToken, valueToken);
 }
 
 BSONObj ECOCollection::generateDocument(StringData fieldName, ConstDataRange payload) {
     BSONObjBuilder builder;
+    builder.append(kId, OID::gen());
     builder.append(kFieldName, fieldName);
     toBinData(kValue, payload, &builder);
     return builder.obj();
@@ -1558,6 +1699,10 @@ StatusWith<std::vector<uint8_t>> FLE2IndexedEqualityEncryptedValue::serialize(
     return serializedServerValue;
 }
 
+ESCDerivedFromDataTokenAndContentionFactorToken EDCServerPayloadInfo::getESCToken() const {
+    return FLETokenFromCDR<FLETokenType::ESCDerivedFromDataTokenAndContentionFactorToken>(
+        payload.getEscDerivedToken());
+}
 
 std::vector<EDCServerPayloadInfo> EDCServerCollection::getEncryptedFieldInfo(BSONObj& obj) {
     std::vector<EDCServerPayloadInfo> fields;
@@ -1582,7 +1727,7 @@ PrfBlock EDCServerCollection::generateTag(const EDCServerPayloadInfo& payload) {
 }
 
 BSONObj EDCServerCollection::finalizeForInsert(
-    BSONObj& doc, const std::vector<EDCServerPayloadInfo>& serverPayload) {
+    const BSONObj& doc, const std::vector<EDCServerPayloadInfo>& serverPayload) {
 
     std::vector<TagInfo> tags;
     // TODO - improve size estimate after range is supported since it no longer be 1 to 1
@@ -1633,6 +1778,46 @@ BSONObj EDCServerCollection::finalizeForInsert(
     }
 
     return builder.obj();
+}
+
+std::vector<EDCIndexedFields> EDCServerCollection::getEncryptedIndexedFields(BSONObj& obj) {
+    std::vector<EDCIndexedFields> fields;
+
+    visitEncryptedBSON(obj, [&fields](ConstDataRange cdr, StringData fieldPath) {
+        collectIndexedFields(&fields, cdr, fieldPath);
+    });
+
+    return fields;
+}
+
+
+BSONObj EncryptionInformationHelpers::encryptionInformationSerialize(NamespaceString& nss,
+                                                                     EncryptedFieldConfig& ef) {
+    EncryptionInformation ei;
+    ei.setType(kEncryptionInformationSchemaVersion);
+
+    ei.setSchema(BSON(nss.toString() << ef.toBSON()));
+
+    return ei.toBSON();
+}
+
+EncryptedFieldConfig EncryptionInformationHelpers::getAndValidateSchema(
+    const NamespaceString& nss, const EncryptionInformation& ei) {
+    BSONObj schema = ei.getSchema();
+
+    auto element = schema.getField(nss.toString());
+
+    uassert(6371205,
+            "Expected an object for schema in EncryptionInformation",
+            !element.eoo() && element.type() == Object);
+
+    auto efc = EncryptedFieldConfig::parse(IDLParserErrorContext("schema"), element.Obj());
+
+    uassert(6371206, "Expected a value for eccCollection", efc.getEccCollection().has_value());
+    uassert(6371207, "Expected a value for escCollection", efc.getEscCollection().has_value());
+    uassert(6371208, "Expected a value for ecocCollection", efc.getEcocCollection().has_value());
+
+    return efc;
 }
 
 

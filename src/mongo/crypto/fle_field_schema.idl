@@ -211,13 +211,16 @@ structs:
             description: "The version number"
             type: safeInt
             default: 1
+            unstable: true
           deleteTokens:
             description: "A map of field paths to FLEDeletePayload"
             type: object
             optional: true
+            unstable: true
           schema:
             description: "A map of NamespaceString to EncryptedFieldConfig"
             type: object
+            unstable: true
 
     ecocDocument:
         description: "foo"
@@ -226,7 +229,6 @@ structs:
           _id:
             description: "Random id"
             type: objectid
-            optional: true
           fieldName:
             description: "Name of field"
             type: string

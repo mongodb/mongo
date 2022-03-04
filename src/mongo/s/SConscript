@@ -34,6 +34,7 @@ env.Library(
         'cluster_write.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/fle_crud',
         '$BUILD_DIR/mongo/db/not_primary_error_tracker',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_conversion_util',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_options',

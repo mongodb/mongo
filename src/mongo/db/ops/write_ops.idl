@@ -33,6 +33,7 @@ global:
         - "mongo/db/repl/optime.h"
 
 imports:
+    - "mongo/crypto/fle_field_schema.idl"
     - "mongo/db/auth/action_type.idl"
     - "mongo/db/logical_session_id.idl"
     - "mongo/db/pipeline/legacy_runtime_constants.idl"
@@ -95,7 +96,7 @@ structs:
                 optional: true
                 unstable: false
             writeErrors:
-                description: "Contains all the errors encoutered."
+                description: "Contains all the errors encountered."
                 type: array<write_error>
                 optional: true
                 unstable: false
@@ -194,6 +195,11 @@ structs:
             collectionUUID:
                 description: "The expected UUID of the collection."
                 type: uuid
+                optional: true
+                unstable: true
+            encryptionInformation:
+                description: "Encryption Information schema and other tokens for CRUD commands"
+                type: EncryptionInformation
                 optional: true
                 unstable: true
 
