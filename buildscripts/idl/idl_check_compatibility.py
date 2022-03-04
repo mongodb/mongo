@@ -1041,6 +1041,35 @@ def split_complex_checks(
     return checks, sorted(privileges, key=lambda x: len(x.action_type), reverse=True)
 
 
+def check_complex_checks(ctxt: IDLCompatibilityContext,
+                         old_complex_checks: List[syntax.AccessCheck],
+                         new_complex_checks: List[syntax.AccessCheck], cmd: syntax.Command,
+                         new_idl_file_path: str) -> None:
+    """Check the compatibility between complex access checks of the old and new command."""
+    cmd_name = cmd.command_name
+    if len(new_complex_checks) > len(old_complex_checks):
+        ctxt.add_new_additional_complex_access_check_error(cmd_name, new_idl_file_path)
+    else:
+        old_checks, old_privileges = split_complex_checks(old_complex_checks)
+        new_checks, new_privileges = split_complex_checks(new_complex_checks)
+        if not set(new_checks).issubset(old_checks):
+            ctxt.add_new_complex_checks_not_subset_error(cmd_name, new_idl_file_path)
+
+        if len(new_privileges) > len(old_privileges):
+            ctxt.add_new_complex_privileges_not_subset_error(cmd_name, new_idl_file_path)
+        else:
+            # Check that each new_privilege matches an old_privilege (the resource_pattern is
+            # equal and the action_types are a subset of the old action_types).
+            for new_privilege in new_privileges:
+                for old_privilege in old_privileges:
+                    if (new_privilege.resource_pattern == old_privilege.resource_pattern
+                            and set(new_privilege.action_type).issubset(old_privilege.action_type)):
+                        old_privileges.remove(old_privilege)
+                        break
+                else:
+                    ctxt.add_new_complex_privileges_not_subset_error(cmd_name, new_idl_file_path)
+
+
 def check_security_access_checks(ctxt: IDLCompatibilityContext,
                                  old_access_checks: syntax.AccessChecks,
                                  new_access_checks: syntax.AccessChecks, cmd: syntax.Command,
@@ -1075,30 +1104,8 @@ def check_security_access_checks(ctxt: IDLCompatibilityContext,
             old_complex_checks = old_access_checks.complex
             new_complex_checks = new_access_checks.complex
             if old_complex_checks is not None and new_complex_checks is not None:
-                if len(new_complex_checks) > len(old_complex_checks):
-                    ctxt.add_new_additional_complex_access_check_error(cmd_name, new_idl_file_path)
-                else:
-                    old_checks, old_privileges = split_complex_checks(old_complex_checks)
-                    new_checks, new_privileges = split_complex_checks(new_complex_checks)
-                    if not set(new_checks).issubset(old_checks):
-                        ctxt.add_new_complex_checks_not_subset_error(cmd_name, new_idl_file_path)
-
-                    if len(new_privileges) > len(old_privileges):
-                        ctxt.add_new_complex_privileges_not_subset_error(
-                            cmd_name, new_idl_file_path)
-                    else:
-                        # Check that each new_privilege matches an old_privilege (the resource_pattern is
-                        # equal and the action_types are a subset of the old action_types).
-                        for new_privilege in new_privileges:
-                            for old_privilege in old_privileges:
-                                if (new_privilege.resource_pattern == old_privilege.resource_pattern
-                                        and set(new_privilege.action_type).issubset(
-                                            old_privilege.action_type)):
-                                    old_privileges.remove(old_privilege)
-                                    break
-                            else:
-                                ctxt.add_new_complex_privileges_not_subset_error(
-                                    cmd_name, new_idl_file_path)
+                check_complex_checks(ctxt, old_complex_checks, new_complex_checks, cmd,
+                                     new_idl_file_path)
 
     elif new_access_checks is None and old_access_checks is not None:
         ctxt.add_removed_access_check_field_error(cmd_name, new_idl_file_path)
