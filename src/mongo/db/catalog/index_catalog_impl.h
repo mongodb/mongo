@@ -160,7 +160,8 @@ public:
      * on the collection.
      */
     const IndexDescriptor* refreshEntry(OperationContext* opCtx,
-                                        const IndexDescriptor* oldDesc) override;
+                                        const IndexDescriptor* oldDesc,
+                                        bool updateMetadata = false) override;
 
     const IndexCatalogEntry* getEntry(const IndexDescriptor* desc) const override;
 
@@ -449,7 +450,8 @@ private:
     IndexCatalogEntry* _setupInMemoryStructures(OperationContext* opCtx,
                                                 std::unique_ptr<IndexDescriptor> descriptor,
                                                 bool initFromDisk,
-                                                bool isReadyIndex);
+                                                bool isReadyIndex,
+                                                bool updateMetadata = false);
 
     /**
      * Applies a set of transformations to the user-provided index object 'spec' to make it

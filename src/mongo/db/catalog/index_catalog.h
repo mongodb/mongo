@@ -308,7 +308,8 @@ public:
      * on the collection.
      */
     virtual const IndexDescriptor* refreshEntry(OperationContext* const opCtx,
-                                                const IndexDescriptor* const oldDesc) = 0;
+                                                const IndexDescriptor* const oldDesc,
+                                                bool updateMetadata = false) = 0;
 
     /**
      * Returns a pointer to the index catalog entry associated with 'desc'. Throws if there is no

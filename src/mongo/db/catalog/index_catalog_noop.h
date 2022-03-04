@@ -111,7 +111,8 @@ public:
                          const bool includeUnfinishedIndexes = false) const override {}
 
     const IndexDescriptor* refreshEntry(OperationContext* const opCtx,
-                                        const IndexDescriptor* const oldDesc) override {
+                                        const IndexDescriptor* const oldDesc,
+                                        bool updateMetadata = false) override {
         return nullptr;
     }
 
