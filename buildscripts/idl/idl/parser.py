@@ -722,6 +722,7 @@ def _parse_privilege(ctxt, node):
         ctxt, node, "privilege", privilege, {
             "resource_pattern": _RuleDesc('scalar', _RuleDesc.REQUIRED),
             "action_type": _RuleDesc('scalar_or_sequence', _RuleDesc.REQUIRED),
+            "agg_stage": _RuleDesc('scalar', _RuleDesc.OPTIONAL),
         })
 
     return privilege

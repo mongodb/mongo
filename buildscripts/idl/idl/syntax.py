@@ -553,6 +553,8 @@ class Privilege(common.SourceLocation):
 
         self.resource_pattern = None  # type: str
         self.action_type = None  # type: List[str]
+        # This is a parser only field so users can add new agg stages.
+        self.agg_stage = None  # type: str
 
         super(Privilege, self).__init__(file_name, line, column)
 

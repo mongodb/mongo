@@ -1774,6 +1774,10 @@ class TestParser(testcase.IDLTestcase):
                         - privilege:
                             resource_pattern: foo
                             action_type: foo
+                        - privilege:
+                            agg_stage: bar
+                            resource_pattern: bar
+                            action_type: bar
                         - check: is_authenticated
                 fields:
                     foo: bar
