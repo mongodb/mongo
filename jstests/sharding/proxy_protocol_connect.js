@@ -18,12 +18,8 @@ function testProxyProtocolConnect(ingressPort, egressPort, version) {
     let proxy_server = new ProxyProtocolServer(ingressPort, egressPort, version);
     proxy_server.start();
 
-    let st = new ShardingTest({
-        shards: 1,
-        mongos: 1,
-        mongosOptions:
-            {setParameter: {"featureFlagLoadBalancer": true, "loadBalancerPort": egressPort}}
-    });
+    let st = new ShardingTest(
+        {shards: 1, mongos: 1, mongosOptions: {setParameter: {"loadBalancerPort": egressPort}}});
 
     const uri = `mongodb://127.0.0.1:${ingressPort}/?loadBalanced=true`;
     const conn = new Mongo(uri);
@@ -37,11 +33,8 @@ function testProxyProtocolConnect(ingressPort, egressPort, version) {
 function testProxyProtocolConnectFailure(lbPort, sendLoadBalanced) {
     'use strict';
 
-    let st = new ShardingTest({
-        shards: 1,
-        mongos: 1,
-        mongosOptions: {setParameter: {"featureFlagLoadBalancer": true, "loadBalancerPort": lbPort}}
-    });
+    let st = new ShardingTest(
+        {shards: 1, mongos: 1, mongosOptions: {setParameter: {"loadBalancerPort": lbPort}}});
 
     const hostName = st.s.host.substring(0, st.s.host.indexOf(":"));
     const uri = `mongodb://${hostName}:${lbPort}/?loadBalanced=${sendLoadBalanced}`;

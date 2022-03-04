@@ -38,4 +38,5 @@ feature_flags:
     featureFlagLoadBalancer:
         description: Feature flag for enabling L4 load balancer support.
         cpp_varname: gFeatureFlagLoadBalancer
-        default: false
+        default: true
+        version: 5.3 
