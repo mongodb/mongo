@@ -35,7 +35,7 @@ from wtscenario import make_scenarios
 from test_import01 import test_import_base
 
 class test_import05(test_import_base):
-    conn_config = 'cache_size=50MB'
+    conn_config = 'cache_size=50MB,log=(enabled)'
 
     ntables = 10
     nrows = 100
@@ -60,7 +60,7 @@ class test_import05(test_import_base):
     def test_file_import_ts_past_global_ts(self):
         original_db_file = 'original_db_file'
         uri = 'file:' + original_db_file
-        create_config = 'allocation_size=512,key_format=u,value_format=u'
+        create_config = 'allocation_size=512,key_format=u,log=(enabled=true),value_format=u'
         self.session.create(uri, create_config)
 
         # Add data and perform a checkpoint.

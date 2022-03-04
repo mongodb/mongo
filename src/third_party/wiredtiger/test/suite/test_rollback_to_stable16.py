@@ -125,8 +125,7 @@ class test_rollback_to_stable16(wttest.WiredTigerTestCase):
         else:
             values = [0x01, 0x02, 0x03, 0x04]
 
-        # Create a table.
-        create_params = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
+        create_params = 'log=(enabled=false),key_format={},value_format={}'.format(self.key_format, self.value_format)
         self.session.create(uri, create_params)
 
         # Pin oldest and stable to timestamp 1.

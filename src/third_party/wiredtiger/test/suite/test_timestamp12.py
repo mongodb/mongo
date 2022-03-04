@@ -35,8 +35,8 @@ from wtscenario import make_scenarios
 
 class test_timestamp12(wttest.WiredTigerTestCase):
     conn_config = 'config_base=false,create,log=(enabled)'
-    ckpt_uri = 'table:ckpt_table'
-    logged_uri = 'table:logged_table'
+    coll_uri = 'table:collection12'
+    oplog_uri = 'table:oplog12'
 
     format_values = [
         ('integer-row', dict(key_format='i', value_format='i')),
@@ -50,33 +50,33 @@ class test_timestamp12(wttest.WiredTigerTestCase):
     ]
     scenarios = make_scenarios(format_values, closecfg)
 
-    def verify_expected(self, logged_exp, ckpt_exp):
-        c_logged = self.session.open_cursor(self.logged_uri)
-        c_ckpt = self.session.open_cursor(self.ckpt_uri)
-        logged_actual = dict((k, v) for k, v in c_logged if v != 0)
-        ckpt_actual = dict((k, v) for k, v in c_ckpt if v != 0)
+    def verify_expected(self, op_exp, coll_exp):
+        c_op = self.session.open_cursor(self.oplog_uri)
+        c_coll = self.session.open_cursor(self.coll_uri)
+        op_actual = dict((k, v) for k, v in c_op if v != 0)
+        coll_actual = dict((k, v) for k, v in c_coll if v != 0)
         #print "CHECK: Op Expected"
-        #print logged_exp
+        #print op_exp
         #print "CHECK: Op Actual"
-        #print logged_actual
-        self.assertTrue(logged_actual == logged_exp)
+        #print op_actual
+        self.assertTrue(op_actual == op_exp)
         #print "CHECK: Coll Expected"
-        #print ckpt_exp
+        #print coll_exp
         #print "CHECK: Coll Actual"
-        #print ckpt_actual
-        self.assertTrue(ckpt_actual == ckpt_exp)
+        #print coll_actual
+        self.assertTrue(coll_actual == coll_exp)
 
     def test_timestamp_recovery(self):
         #
-        # Create a collection-like table that is checkpoint durability (that is, logging has been
-        # turned off), and an oplog-like table that is commit-level durability. Add data to each
-        # of them separately and checkpoint so each one has a different stable timestamp.
+        # Create several collection-like tables that are checkpoint durability.
+        # Add data to each of them separately and checkpoint so that each one
+        # has a different stable timestamp.
         #
         basecfg = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
-        self.session.create(self.logged_uri, basecfg)
-        self.session.create(self.ckpt_uri, basecfg + ',log=(enabled=false)')
-        c_logged = self.session.open_cursor(self.logged_uri)
-        c_ckpt = self.session.open_cursor(self.ckpt_uri)
+        self.session.create(self.oplog_uri, basecfg)
+        self.session.create(self.coll_uri, basecfg + ',log=(enabled=false)')
+        c_op = self.session.open_cursor(self.oplog_uri)
+        c_coll = self.session.open_cursor(self.coll_uri)
 
         # Begin by adding some data.
         nentries = 10
@@ -85,8 +85,8 @@ class test_timestamp12(wttest.WiredTigerTestCase):
         all_keys = range(1, nentries*2)
         for i in first_range:
             self.session.begin_transaction()
-            c_logged[i] = 1
-            c_ckpt[i] = 1
+            c_op[i] = 1
+            c_coll[i] = 1
             self.session.commit_transaction(
               'commit_timestamp=' + self.timestamp_str(i))
         # Set the oldest and stable timestamp to the end.
@@ -96,8 +96,8 @@ class test_timestamp12(wttest.WiredTigerTestCase):
         # Add more data but don't advance the stable timestamp.
         for i in second_range:
             self.session.begin_transaction()
-            c_logged[i] = 1
-            c_ckpt[i] = 1
+            c_op[i] = 1
+            c_coll[i] = 1
             self.pr("i: " + str(i))
             self.session.commit_transaction(
               'commit_timestamp=' + self.timestamp_str(i))
@@ -108,13 +108,13 @@ class test_timestamp12(wttest.WiredTigerTestCase):
         self.open_conn()
 
         # Set up our expected data and verify after the reopen.
-        logged_exp = dict((k, 1) for k in all_keys)
+        op_exp = dict((k, 1) for k in all_keys)
         if self.all_expected == True:
-            ckpt_exp = dict((k, 1) for k in all_keys)
+            coll_exp = dict((k, 1) for k in all_keys)
         else:
-            ckpt_exp = dict((k, 1) for k in first_range)
+            coll_exp = dict((k, 1) for k in first_range)
 
-        self.verify_expected(logged_exp, ckpt_exp)
+        self.verify_expected(op_exp, coll_exp)
 
 if __name__ == '__main__':
     wttest.run()

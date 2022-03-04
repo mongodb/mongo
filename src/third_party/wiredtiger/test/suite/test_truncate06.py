@@ -127,7 +127,7 @@ class test_truncate06(wttest.WiredTigerTestCase):
         table_uri = 'table:truncate06'
         ds = SimpleDataSet(
             self, table_uri, 0, key_format=self.key_format, value_format=self.value_format,
-            config=self.extraconfig)
+            config='log=(enabled=false)' + self.extraconfig)
         ds.populate()
         self.session.checkpoint()
 

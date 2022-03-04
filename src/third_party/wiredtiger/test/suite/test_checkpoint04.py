@@ -34,13 +34,14 @@ from wiredtiger import stat
 from wtdataset import SimpleDataSet
 
 class test_checkpoint04(wttest.WiredTigerTestCase):
-    conn_config = 'cache_size=50MB,statistics=(all)'
+    conn_config = 'cache_size=50MB,log=(enabled),statistics=(all)'
 
     def create_tables(self, ntables):
         tables = {}
         for i in range(0, ntables):
             uri = 'table:table' + str(i)
-            ds = SimpleDataSet(self, uri, 0, key_format="i", value_format="S")
+            ds = SimpleDataSet(
+                self, uri, 0, key_format="i", value_format="S", config='log=(enabled=false)')
             ds.populate()
             tables[uri] = ds
         return tables

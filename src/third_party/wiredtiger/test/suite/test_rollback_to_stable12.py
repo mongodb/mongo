@@ -56,16 +56,17 @@ class test_rollback_to_stable12(test_rollback_to_stable_base):
     scenarios = make_scenarios(format_values, prepare_values)
 
     def conn_config(self):
-        config = 'cache_size=500MB,statistics=(all)'
+        config = 'cache_size=500MB,statistics=(all),log=(enabled=true)'
         return config
 
     def test_rollback_to_stable(self):
         nrows = 1000000
 
-        # Create a table.
+        # Create a table without logging.
         uri = "table:rollback_to_stable12"
-        ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format=self.value_format,
-            config='split_pct=50')
+        ds = SimpleDataSet(
+            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
+            config='split_pct=50,log=(enabled=false)')
         ds.populate()
 
         if self.value_format == '8t':

@@ -50,7 +50,7 @@ class test_rollback_to_stable11(test_rollback_to_stable_base):
     scenarios = make_scenarios(format_values, prepare_values)
 
     def conn_config(self):
-        config = 'cache_size=1MB,statistics=(all)'
+        config = 'cache_size=1MB,statistics=(all),log=(enabled=true,remove=false)'
         return config
 
     def test_rollback_to_stable(self):
@@ -58,7 +58,9 @@ class test_rollback_to_stable11(test_rollback_to_stable_base):
 
         # Create a table without logging.
         uri = "table:rollback_to_stable11"
-        ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format=self.value_format)
+        ds = SimpleDataSet(
+            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
+            config='log=(enabled=false)')
         ds.populate()
 
         if self.value_format == '8t':

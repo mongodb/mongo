@@ -35,7 +35,7 @@ from test_rollback_to_stable01 import test_rollback_to_stable_base
 # test_rollback_to_stable29.py
 # Test that the rollback to stable to verify the history store order when an out of order to a tombstone.
 class test_rollback_to_stable29(test_rollback_to_stable_base):
-    conn_config = 'cache_size=25MB,statistics=(all),statistics_log=(json,on_close,wait=1)'
+    conn_config = 'cache_size=25MB,statistics=(all),statistics_log=(json,on_close,wait=1),log=(enabled=true)'
 
     format_values = [
         ('column', dict(key_format='r', value_format='S')),
@@ -61,7 +61,8 @@ class test_rollback_to_stable29(test_rollback_to_stable_base):
             value_d = 'd' * 100
 
         # Create our table.
-        ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format=self.value_format)
+        ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format=self.value_format,
+            config='log=(enabled=false)')
         ds.populate()
 
         # Pin oldest and stable to timestamp 1.

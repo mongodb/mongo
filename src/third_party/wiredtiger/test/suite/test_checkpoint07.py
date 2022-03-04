@@ -33,7 +33,7 @@ import wttest
 from wiredtiger import stat
 
 class test_checkpoint07(wttest.WiredTigerTestCase):
-    conn_config = 'cache_size=50MB,statistics=(all)'
+    conn_config = 'cache_size=50MB,log=(enabled),statistics=(all)'
 
     def get_stat(self, uri):
         stat_uri = 'statistics:' + uri

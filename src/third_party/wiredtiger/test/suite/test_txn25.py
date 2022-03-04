@@ -30,24 +30,24 @@
 #   Test the write generation mechanism to ensure that transaction ids get wiped between runs.
 #
 
-import wttest
+import wiredtiger, wttest
 from wtscenario import make_scenarios
 
 class test_txn25(wttest.WiredTigerTestCase):
-    base_config = 'create,cache_size=50MB'
+    conn_config = 'cache_size=50MB,log=(enabled)'
+
     format_values = [
-        ('fix', dict(key_format='r', usestrings=False, value_format='8t')),
-        ('row', dict(key_format='S', usestrings=True, value_format='S')),
-        ('var', dict(key_format='r', usestrings=False, value_format='S')),
+        ('string-row', dict(key_format='S', usestrings=True, value_format='S')),
+        ('column', dict(key_format='r', usestrings=False, value_format='S')),
+        ('column-fix', dict(key_format='r', usestrings=False, value_format='8t')),
     ]
-    log_config = [
-        ('logging', dict(conn_config=base_config + ',log=(enabled)')),
-        ('no-logging', dict(conn_config=base_config)),
-    ]
-    scenarios = make_scenarios(format_values, log_config)
+    scenarios = make_scenarios(format_values)
 
     def getkey(self, i):
-        return str(i) if self.usestrings else i
+        if self.usestrings:
+            return str(i)
+        else:
+            return i
 
     def test_txn25(self):
         uri = 'file:test_txn25'
@@ -88,13 +88,14 @@ class test_txn25(wttest.WiredTigerTestCase):
             cursor[self.getkey(i)] = value3
             self.session.commit_transaction()
 
-        # Force pages to be written with transaction IDs.
-        self.session.checkpoint()
-
         session2.rollback_transaction()
+        session2.close()
 
-        # Reopen the connection.
-        self.reopen_conn()
+        # Close and re-open the connection.
+        cursor.close()
+        self.conn.close()
+        self.conn = wiredtiger.wiredtiger_open(self.home, self.conn_config)
+        self.session = self.conn.open_session(self.session_config)
 
         # Now that we've reopened, check that we can view the latest data from the previous run.
         #

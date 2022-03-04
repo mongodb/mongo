@@ -1325,10 +1325,12 @@ __rollback_to_stable_btree(WT_SESSION_IMPL *session, wt_timestamp_t rollback_tim
       !F_ISSET(btree, WT_BTREE_NO_LOGGING) ? "true" : "false");
 
     /*
-     * Files with commit-level durability don't get their commits wiped. Check in-memory first,
-     * in-memory files won't have logging turned on.
+     * Immediately durable files don't get their commits wiped. This case mostly exists to support
+     * the semantic required for the oplog in MongoDB - updates that have been made to the oplog
+     * should not be aborted. It also wouldn't be safe to roll back updates for any table that had
+     * its records logged: those updates would be recovered after a crash, making them inconsistent.
      */
-    if (!F_ISSET(conn, WT_CONN_IN_MEMORY) && !F_ISSET(btree, WT_BTREE_NO_LOGGING))
+    if (__wt_btree_immediately_durable(session))
         return (0);
 
     /* There is never anything to do for checkpoint handles. */

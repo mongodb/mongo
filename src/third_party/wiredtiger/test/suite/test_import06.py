@@ -44,7 +44,7 @@ class test_import06(test_import_base):
     values = [b'\x01\x02aaa\x03\x04', b'\x01\x02bbb\x03\x04', b'\x01\x02ccc\x03\x04',
               b'\x01\x02ddd\x03\x04', b'\x01\x02eee\x03\x04', b'\x01\x02fff\x03\x04']
     ts = [10*k for k in range(1, len(keys)+1)]
-    create_config = 'allocation_size={},key_format=u,value_format=u,' \
+    create_config = 'allocation_size={},key_format=u,log=(enabled=true),value_format=u,' \
         'block_compressor={},encryption=(name={})'
 
     # To test the sodium encryptor, we use secretkey= rather than
@@ -86,7 +86,8 @@ class test_import06(test_import_base):
         extlist.extension('encryptors', self.encryptor)
 
     def conn_config(self):
-        return 'cache_size=50MB,encryption=(name={})'.format(self.encryptor + self.encryptor_args)
+        return 'cache_size=50MB,log=(enabled),encryption=(name={})'.format(
+            self.encryptor + self.encryptor_args)
 
     def test_import_repair(self):
         self.session.create(self.uri,

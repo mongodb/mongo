@@ -35,7 +35,7 @@ from wtscenario import make_scenarios
 
 class test_import07(test_import_base):
     original_db_file = 'original_db_file'
-    create_config = 'allocation_size=512,key_format=u,value_format=u'
+    create_config = 'allocation_size=512,key_format=u,log=(enabled=true),value_format=u'
 
     ntables = 10
     nrows = 100

@@ -47,10 +47,10 @@ class test_prepare04(wttest.WiredTigerTestCase, suite_subprocess):
     after_ts = timestamp_str(250)
 
     types = [
-        ('col', dict(extra_config=',key_format=r')),
-        ('col-fix', dict(extra_config=',key_format=r,value_format=8t')),
-        ('lsm', dict(extra_config=',type=lsm')),
-        ('row', dict(extra_config='')),
+        ('col', dict(extra_config=',log=(enabled=false),key_format=r')),
+        ('col-fix', dict(extra_config=',log=(enabled=false),key_format=r,value_format=8t')),
+        ('lsm', dict(extra_config=',log=(enabled=false),type=lsm')),
+        ('row', dict(extra_config=',log=(enabled=false)')),
     ]
 
     # Various begin_transaction config
@@ -64,6 +64,7 @@ class test_prepare04(wttest.WiredTigerTestCase, suite_subprocess):
         ('ignore_false', dict(ignore_config=',ignore_prepare=false', ignore=False)),
         ('ignore_true', dict(ignore_config=',ignore_prepare=true', ignore=True)),
     ]
+    conn_config = 'log=(enabled)'
 
     scenarios = make_scenarios(types, txncfg, preparecfg)
 

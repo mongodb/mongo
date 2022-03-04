@@ -34,7 +34,7 @@ from test_import01 import test_import_base
 from wtscenario import make_scenarios
 
 class test_import08(test_import_base):
-    conn_config = 'cache_size=50MB'
+    conn_config = 'cache_size=50MB,log=(enabled)'
 
     original_db_file = 'original_db_file'
     uri = 'file:' + original_db_file
@@ -45,7 +45,7 @@ class test_import08(test_import_base):
     values = [b'\x01\x02aaa\x03\x04', b'\x01\x02bbb\x03\x04', b'\x01\x02ccc\x03\x04',
               b'\x01\x02ddd\x03\x04', b'\x01\x02eee\x03\x04', b'\x01\x02fff\x03\x04']
     ts = [10*k for k in range(1, len(keys)+1)]
-    create_config = 'allocation_size=512,key_format=u,value_format=u'
+    create_config = 'allocation_size=512,key_format=u,log=(enabled=true),value_format=u'
     scenarios = make_scenarios([
         ('file_metadata', dict(repair=False)),
         ('repair', dict(repair=True)),

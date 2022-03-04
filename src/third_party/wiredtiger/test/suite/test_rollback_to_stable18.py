@@ -54,16 +54,18 @@ class test_rollback_to_stable18(test_rollback_to_stable_base):
     scenarios = make_scenarios(format_values, prepare_values)
 
     def conn_config(self):
-        config = 'cache_size=50MB,in_memory=true,statistics=(all),' \
+        config = 'cache_size=50MB,in_memory=true,statistics=(all),log=(enabled=false),' \
                  'eviction_dirty_trigger=10,eviction_updates_trigger=10'
         return config
 
     def test_rollback_to_stable(self):
         nrows = 10000
 
-        # Create a table.
+        # Create a table without logging.
         uri = "table:rollback_to_stable18"
-        ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format=self.value_format)
+        ds = SimpleDataSet(
+            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
+            config='log=(enabled=false)')
         ds.populate()
 
         if self.value_format == '8t':

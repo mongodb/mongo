@@ -52,6 +52,8 @@ class test_rollback_to_stable17(wttest.WiredTigerTestCase):
         config = 'cache_size=200MB,statistics=(all)'
         if self.in_memory:
             config += ',in_memory=true'
+        else:
+            config += ',in_memory=false'
         return config
 
     def insert_update_data(self, uri, value, start_row, end_row, timestamp):
@@ -87,9 +89,8 @@ class test_rollback_to_stable17(wttest.WiredTigerTestCase):
         else:
             values = ["aaaa", "bbbb", "cccc", "dddd"]
 
-        # Create a table.
-        config = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
-        self.session.create(uri, config)
+        format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
+        self.session.create(uri, format + ',log=(enabled=false)')
 
         # Pin oldest and stable to timestamp 1.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1) +

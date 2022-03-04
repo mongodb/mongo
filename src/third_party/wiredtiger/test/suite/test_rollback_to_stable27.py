@@ -52,7 +52,8 @@ class test_rollback_to_stable27(test_rollback_to_stable_base):
     def conn_config(self):
         if self.in_memory:
             return 'in_memory=true'
-        return ''
+        else:
+            return 'in_memory=false'
 
     # Evict the page to force reconciliation.
     def evict(self, uri, key, check_value):
@@ -67,9 +68,10 @@ class test_rollback_to_stable27(test_rollback_to_stable_base):
     def test_rollback_to_stable(self):
         nrows = 10
 
-        # Create a table.
+        # Create a table without logging.
         uri = "table:rollback_to_stable27"
-        ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format="S")
+        ds = SimpleDataSet(
+            self, uri, 0, key_format=self.key_format, value_format="S", config='log=(enabled=false)')
         ds.populate()
 
         value_a = "aaaaa" * 10

@@ -55,18 +55,22 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
     scenarios = make_scenarios(in_memory_values, format_values, restart_options)
 
     def conn_config(self):
-        config = 'cache_size=50MB,statistics=(all),eviction_dirty_trigger=10,' \
+        config = 'cache_size=50MB,statistics=(all),log=(enabled=false),eviction_dirty_trigger=10,' \
                  'eviction_updates_trigger=10'
         if self.in_memory:
             config += ',in_memory=true'
+        else:
+            config += ',in_memory=false'
         return config
 
     def test_rollback_to_stable_no_history(self):
         nrows = 1000
 
-        # Create a table.
+        # Create a table without logging.
         uri = "table:rollback_to_stable19"
-        ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format=self.value_format)
+        ds = SimpleDataSet(
+            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
+            config='log=(enabled=false)')
         ds.populate()
 
         if self.value_format == '8t':
@@ -154,9 +158,11 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
     def test_rollback_to_stable_with_history(self):
         nrows = 1000
 
-        # Create a table.
+        # Create a table without logging.
         uri = "table:rollback_to_stable19"
-        ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format=self.value_format)
+        ds = SimpleDataSet(
+            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
+            config='log=(enabled=false)')
         ds.populate()
 
         if self.value_format == '8t':

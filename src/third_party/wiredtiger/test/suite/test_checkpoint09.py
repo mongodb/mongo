@@ -35,7 +35,7 @@ from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
 class test_checkpoint09(wttest.WiredTigerTestCase):
-    conn_config = 'cache_size=50MB,statistics=(all)'
+    conn_config = 'cache_size=50MB,log=(enabled),statistics=(all)'
 
     format_values = [
         ('column-fix', dict(key_format='r', value_format='8t')),

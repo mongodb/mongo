@@ -56,8 +56,9 @@ class test_timestamp24(wttest.WiredTigerTestCase):
     def test_timestamp(self):
 
         table_uri = 'table:timestamp24'
-        ds = SimpleDataSet(self,
-            table_uri, 0, key_format=self.key_format, value_format=self.value_format)
+        ds = SimpleDataSet(
+            self, table_uri, 0, key_format=self.key_format, value_format=self.value_format,
+            config='log=(enabled=false)')
         ds.populate()
         self.session.checkpoint()
 

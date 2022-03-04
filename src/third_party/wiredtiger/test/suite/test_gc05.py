@@ -32,7 +32,7 @@ from wtdataset import SimpleDataSet
 # test_gc05.py
 # Verify a locked checkpoint is not removed during garbage collection.
 class test_gc05(test_gc_base):
-    conn_config = 'cache_size=50MB,statistics=(all)'
+    conn_config = 'cache_size=50MB,log=(enabled),statistics=(all)'
 
     def test_gc(self):
         uri = "table:gc05"
@@ -43,7 +43,8 @@ class test_gc05(test_gc_base):
         value_x = "xxxxx" * 100
         value_y = "yyyyy" * 100
         value_z = "zzzzz" * 100
-        ds = SimpleDataSet(self, uri, 0, key_format="i", value_format="S")
+        ds = SimpleDataSet(
+            self, uri, 0, key_format="i", value_format="S", config='log=(enabled=false)')
         ds.populate()
 
         # Set the oldest and stable timestamps to 10.

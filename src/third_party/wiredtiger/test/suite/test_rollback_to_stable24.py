@@ -72,7 +72,8 @@ class test_rollback_to_stable24(wttest.WiredTigerTestCase):
     def test_rollback_to_stable24(self):
         # Create a table without logging.
         uri = "table:rollback_to_stable24"
-        self.session.create(uri, 'key_format={},value_format=S'.format(self.key_format))
+        format = 'key_format={},value_format=S'.format(self.key_format)
+        self.session.create(uri, format + ', log=(enabled=false)')
 
         # Pin oldest timestamp to 10.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10))

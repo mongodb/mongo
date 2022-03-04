@@ -33,7 +33,7 @@ from wtdataset import SimpleDataSet
 # test_gc04.py
 # Test that checkpoint must not clean the pages that are not obsolete.
 class test_gc04(test_gc_base):
-    conn_config = 'cache_size=50MB,statistics=(all)'
+    conn_config = 'cache_size=50MB,log=(enabled),statistics=(all)'
 
     def get_stat(self, stat):
         stat_cursor = self.session.open_cursor('statistics:')
@@ -44,9 +44,10 @@ class test_gc04(test_gc_base):
     def test_gc(self):
         nrows = 10000
 
-        # Create a table.
+        # Create a table without logging.
         uri = "table:gc04"
-        ds = SimpleDataSet(self, uri, 0, key_format="i", value_format="S")
+        ds = SimpleDataSet(
+            self, uri, 0, key_format="i", value_format="S", config='log=(enabled=false)')
         ds.populate()
 
         # Pin oldest and stable to timestamp 1.

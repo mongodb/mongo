@@ -50,16 +50,17 @@ class test_rollback_to_stable13(test_rollback_to_stable_base):
     scenarios = make_scenarios(format_values, prepare_values)
 
     def conn_config(self):
-        config = 'cache_size=50MB,statistics=(all)'
+        config = 'cache_size=50MB,statistics=(all),log=(enabled=true)'
         return config
 
     def test_rollback_to_stable(self):
         nrows = 1000
 
-        # Create a table.
+        # Create a table without logging.
         uri = "table:rollback_to_stable13"
-        ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format=self.value_format,
-            config='split_pct=50')
+        ds = SimpleDataSet(
+            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
+            config='split_pct=50,log=(enabled=false)')
         ds.populate()
 
         if self.value_format == '8t':
@@ -111,10 +112,11 @@ class test_rollback_to_stable13(test_rollback_to_stable_base):
     def test_rollback_to_stable_with_aborted_updates(self):
         nrows = 1000
 
-        # Create a table.
+        # Create a table without logging.
         uri = "table:rollback_to_stable13"
-        ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format=self.value_format,
-            config='split_pct=50')
+        ds = SimpleDataSet(
+            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
+            config='split_pct=50,log=(enabled=false)')
         ds.populate()
 
         if self.value_format == '8t':
@@ -186,10 +188,11 @@ class test_rollback_to_stable13(test_rollback_to_stable_base):
     def test_rollback_to_stable_with_history_tombstone(self):
         nrows = 1000
 
-        # Create a table.
+        # Create a table without logging.
         uri = "table:rollback_to_stable13"
-        ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format=self.value_format,
-            config='split_pct=50')
+        ds = SimpleDataSet(
+            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
+            config='split_pct=50,log=(enabled=false)')
         ds.populate()
 
         if self.value_format == '8t':
@@ -254,10 +257,11 @@ class test_rollback_to_stable13(test_rollback_to_stable_base):
 
     def test_rollback_to_stable_with_stable_remove(self):
         nrows = 1000
-        # Create a table.
+        # Create a table without logging.
         uri = "table:rollback_to_stable13"
-        ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format=self.value_format,
-            config='split_pct=50')
+        ds = SimpleDataSet(
+            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
+            config='split_pct=50,log=(enabled=false)')
         ds.populate()
 
         if self.value_format == '8t':

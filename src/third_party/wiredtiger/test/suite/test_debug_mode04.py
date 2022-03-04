@@ -31,7 +31,7 @@ import wttest
 # test_debug_mode04.py
 #    Test the debug mode settings. Test eviction use.
 class test_debug_mode04(wttest.WiredTigerTestCase):
-    conn_config = 'debug_mode=(eviction=true)'
+    conn_config = 'log=(enabled=true,file_max=100K),debug_mode=(eviction=true)'
     uri = 'file:test_debug'
     entries = 100
     value = b'\x01\x02abcd\x03\x04'
@@ -45,11 +45,11 @@ class test_debug_mode04(wttest.WiredTigerTestCase):
 
     # Just test turning it on and off. There really isn't something
     # specific to verify.
-    def test_table_eviction(self):
+    def test_table_logging(self):
         self.session.create(self.uri, 'key_format=i,value_format=u')
         self.add_data()
 
-    def test_table_eviction_off(self):
+    def test_table_logging_off(self):
         self.conn.reconfigure("debug_mode=(eviction=false)")
         self.session.create(self.uri, 'key_format=i,value_format=u')
         self.add_data()

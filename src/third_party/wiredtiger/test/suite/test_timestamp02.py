@@ -46,6 +46,8 @@ class test_timestamp02(wttest.WiredTigerTestCase, suite_subprocess):
         ('row', dict(extra_config='')),
     ])
 
+    conn_config = 'log=(enabled)'
+
     # Check that a cursor (optionally started in a new transaction), sees the
     # expected values.
     def check(self, session, txn_config, expected):

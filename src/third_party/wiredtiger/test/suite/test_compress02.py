@@ -41,7 +41,7 @@ class test_compress02(wttest.WiredTigerTestCase):
     nrows = 1000
 
     def conn_config(self):
-        config = 'builtin_extension_config={zstd={compression_level=6}},cache_size=10MB'
+        config = 'builtin_extension_config={zstd={compression_level=6}},cache_size=10MB,log=(enabled=true)'
         return config
 
     def large_updates(self, uri, value, ds, nrows):
@@ -72,7 +72,8 @@ class test_compress02(wttest.WiredTigerTestCase):
 
     @wttest.zstdtest('Skip zstd on pcc and zseries machines')
     def test_compress02(self):
-        ds = SimpleDataSet(self, self.uri, 0, key_format="S", value_format="S",config='block_compressor=zstd')
+
+        ds = SimpleDataSet(self, self.uri, 0, key_format="S", value_format="S",config='block_compressor=zstd,log=(enabled=false)')
         ds.populate()
         valuea = "aaaaa" * 100
 
@@ -86,7 +87,7 @@ class test_compress02(wttest.WiredTigerTestCase):
         copy_wiredtiger_home(self, ".", "RESTART")
 
         # Close the connection and reopen it with a different zstd compression level configuration.
-        restart_config = 'builtin_extension_config={zstd={compression_level=9}},cache_size=10MB'
+        restart_config = 'builtin_extension_config={zstd={compression_level=9}},cache_size=10MB,log=(enabled=true)'
         self.close_conn()
         self.reopen_conn("RESTART", restart_config)
 

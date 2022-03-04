@@ -57,10 +57,12 @@ class test_prepare15(wttest.WiredTigerTestCase):
         config = 'cache_size=50MB'
         if self.in_memory:
             config += ',in_memory=true'
+        else:
+            config += ',in_memory=false'
         return config
 
     def test_prepare_hs_update_and_tombstone(self):
-        # Create a table.
+        # Create a table without logging.
         uri = "table:prepare15"
         create_config = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         self.session.create(uri, create_config)
@@ -145,7 +147,7 @@ class test_prepare15(wttest.WiredTigerTestCase):
         self.session.commit_transaction()
 
     def test_prepare_hs_update(self):
-        # Create a table.
+        # Create a table without logging.
         uri = "table:prepare15"
         create_config = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         self.session.create(uri, create_config)
@@ -248,7 +250,7 @@ class test_prepare15(wttest.WiredTigerTestCase):
         self.session.commit_transaction()
 
     def test_prepare_no_hs(self):
-        # Create a table.
+        # Create a table without logging.
         uri = "table:prepare15"
         create_config = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         self.session.create(uri, create_config)
