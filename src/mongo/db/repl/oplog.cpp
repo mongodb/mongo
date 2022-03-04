@@ -1135,7 +1135,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           std::tie(std::ignore, nss) = parseCollModUUIDAndNss(opCtx, ui, ns, cmd);
           // The collMod for apply ops could be either a user driven collMod or a collMod triggered
           // by an upgrade.
-          return collModWithUpgrade(opCtx, nss, cmd);
+          return collModWithUpgrade(opCtx, nss, cmd, mode);
       },
       {ErrorCodes::IndexNotFound, ErrorCodes::NamespaceNotFound}}},
     {"dbCheck", {dbCheckOplogCommand, {}}},
