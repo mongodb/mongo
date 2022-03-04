@@ -2105,18 +2105,6 @@ void WiredTigerKVEngine::setStableTimestamp(Timestamp stableTimestamp, bool forc
         return;
     }
 
-    Timestamp allDurableTimestamp = Timestamp(_fetchAllDurableValue(_conn));
-
-    // When 'force' is set, the all durable timestamp will be advanced to the stable timestamp.
-    // TODO SERVER-52623: to remove this enable majority read concern check.
-    if (serverGlobalParams.enableMajorityReadConcern && !force && !allDurableTimestamp.isNull() &&
-        stableTimestamp > allDurableTimestamp) {
-        LOGV2_FATAL(5138700,
-                    "The stable timestamp was greater than the all durable timestamp",
-                    "stableTimestamp"_attr = stableTimestamp,
-                    "allDurableTimestamp"_attr = allDurableTimestamp);
-    }
-
     // Communicate to WiredTiger what the "stable timestamp" is. Timestamp-aware checkpoints will
     // only persist to disk transactions committed with a timestamp earlier than the "stable
     // timestamp".
