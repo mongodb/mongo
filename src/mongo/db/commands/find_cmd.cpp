@@ -509,10 +509,6 @@ public:
                 }
             }
 
-            // Check whether we are allowed to read from this node after acquiring our locks.
-            uassertStatusOK(replCoord->checkCanServeReadsFor(
-                opCtx, nss, ReadPreferenceSetting::get(opCtx).canRunOnSecondary()));
-
             // Fill out curop information.
             beginQueryOp(opCtx, nss, _request.body);
 
@@ -553,6 +549,10 @@ public:
                 result->getBodyBuilder().appendElements(aggResult);
                 return;
             }
+
+            // Check whether we are allowed to read from this node after acquiring our locks.
+            uassertStatusOK(replCoord->checkCanServeReadsFor(
+                opCtx, nss, ReadPreferenceSetting::get(opCtx).canRunOnSecondary()));
 
             const auto& collection = ctx->getCollection();
 

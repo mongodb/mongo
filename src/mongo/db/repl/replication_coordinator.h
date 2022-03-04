@@ -322,6 +322,9 @@ public:
     /**
      * Returns Status::OK() if it is valid for this node to serve reads on the given collection
      * and an errorcode indicating why the node cannot if it cannot.
+     *
+     * Should not be called if namespace is locked is a view. The user should instead check if we
+     * can serve reads for the backing collection.
      */
     virtual Status checkCanServeReadsFor(OperationContext* opCtx,
                                          const NamespaceString& ns,

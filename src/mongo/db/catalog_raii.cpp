@@ -396,6 +396,11 @@ AutoGetCollectionLockFree::AutoGetCollectionLockFree(OperationContext* opCtx,
     uassert(ErrorCodes::CommandNotSupportedOnView,
             str::stream() << "Namespace " << _resolvedNss.ns() << " is a view, not a collection",
             !_view || viewMode == AutoGetCollectionViewMode::kViewsPermitted);
+    if (_view) {
+        // We are about to succeed setup as a view. No LockFree state was setup so do not mark the
+        // OperationContext as LFR.
+        _lockFreeReadsBlock.reset();
+    }
 }
 
 AutoGetCollectionMaybeLockFree::AutoGetCollectionMaybeLockFree(

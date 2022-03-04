@@ -106,7 +106,7 @@ function runTest(conn) {
         const exampleProfileDoc = db.system.profile.findOne();
         const profilerFields = Object.keys(exampleProfileDoc);
         const expectedMissingFields = [
-            // None for now!
+            "storage"  // storage stats are set after filtering and cannot be used for filtering
         ];
         for (const field of profilerFields) {
             if (expectedMissingFields.includes(field))
