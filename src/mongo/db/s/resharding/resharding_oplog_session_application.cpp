@@ -78,8 +78,29 @@ repl::OpTime ReshardingOplogSessionApplication::_logPrePostImage(
 }
 
 boost::optional<SharedSemiFuture<void>> ReshardingOplogSessionApplication::tryApplyOperation(
-    OperationContext* opCtx, const repl::OplogEntry& op) const {
+    OperationContext* opCtx, const mongo::repl::OplogEntry& op) const {
+    invariant(op.getSessionId());
+    invariant(op.getTxnNumber());
+
     auto lsid = *op.getSessionId();
+    if (isInternalSessionForNonRetryableWrite(lsid)) {
+        // TODO (SERVER-63877): Determine if resharding should migrate internal sessions for
+        // non-retryable writes.
+        return boost::none;
+    }
+    if (isInternalSessionForRetryableWrite(lsid)) {
+        // The oplog preparer should have turned each applyOps oplog entry for a retryable internal
+        // transaction into retryable write CRUD oplog entries.
+        invariant(op.getCommandType() != repl::OplogEntry::CommandType::kApplyOps);
+
+        if (op.getCommandType() == repl::OplogEntry::CommandType::kAbortTransaction) {
+            // Skip this oplog entry since there is no retryable write history to apply and writing
+            // a sentinel noop oplog entry would make retryable write statements that successfully
+            // executed outside of this internal transaction not retryable.
+            return boost::none;
+        }
+    }
+
     auto txnNumber = *op.getTxnNumber();
     bool isRetryableWrite = op.isCrudOpType();
 
@@ -88,6 +109,7 @@ boost::optional<SharedSemiFuture<void>> ReshardingOplogSessionApplication::tryAp
 
     auto stmtIds =
         isRetryableWrite ? op.getStatementIds() : std::vector<StmtId>{kIncompleteHistoryStmtId};
+    invariant(!stmtIds.empty());
 
     boost::optional<repl::OpTime> preImageOpTime;
     if (auto preImageOp = op.getPreImageOp()) {

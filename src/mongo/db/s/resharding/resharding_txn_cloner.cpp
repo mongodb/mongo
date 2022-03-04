@@ -167,8 +167,25 @@ boost::optional<SessionTxnRecord> ReshardingTxnCloner::_getNextRecord(OperationC
 
 boost::optional<SharedSemiFuture<void>> ReshardingTxnCloner::doOneRecord(
     OperationContext* opCtx, const SessionTxnRecord& donorRecord) {
+    auto sessionId = donorRecord.getSessionId();
+    auto txnNumber = donorRecord.getTxnNum();
+
+    if (isInternalSessionForNonRetryableWrite(sessionId)) {
+        // TODO (SERVER-63877): Determine if resharding should migrate internal sessions for
+        // non-retryable writes.
+        return boost::none;
+    }
+
+    if (isInternalSessionForRetryableWrite(sessionId)) {
+        // Turn this into write history for the retryable write that this internal transaction
+        // corresponds to in order to avoid making retryable internal transactions have a sentinel
+        // noop oplog entry at all.
+        txnNumber = *sessionId.getTxnNumber();
+        sessionId = *getParentSessionId(sessionId);
+    }
+
     return resharding::data_copy::withSessionCheckedOut(
-        opCtx, donorRecord.getSessionId(), donorRecord.getTxnNum(), boost::none /* stmtId */, [&] {
+        opCtx, sessionId, txnNumber, boost::none /* stmtId */, [&] {
             resharding::data_copy::updateSessionRecord(opCtx,
                                                        TransactionParticipant::kDeadEndSentinel,
                                                        {kIncompleteHistoryStmtId},

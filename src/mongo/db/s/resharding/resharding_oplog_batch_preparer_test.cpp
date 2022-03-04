@@ -31,6 +31,7 @@
 
 #include <boost/optional/optional_io.hpp>
 
+#include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/s/resharding/resharding_oplog_batch_preparer.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
@@ -66,25 +67,42 @@ protected:
         return {op.toBSON()};
     }
 
-    repl::OplogEntry makeApplyOps(BSONObj document,
-                                  bool isPrepare,
-                                  bool isPartial,
-                                  boost::optional<LogicalSessionId> lsid,
-                                  boost::optional<TxnNumber> txnNumber) {
-
-        std::vector<mongo::BSONObj> operations;
-        auto insertOp = repl::MutableOplogEntry::makeInsertOperation(
-            NamespaceString("foo.bar"), UUID::gen(), document, document);
-
+    /**
+     * Returns an applyOps oplog entry containing insert operations for the given documents. If the
+     * session is an internal session for retryable writes, uses the "_id" of each document as its
+     * statement id.
+     */
+    repl::OplogEntry makeApplyOpsForInsert(const std::vector<BSONObj> documents,
+                                           boost::optional<LogicalSessionId> lsid = boost::none,
+                                           boost::optional<TxnNumber> txnNumber = boost::none,
+                                           boost::optional<bool> isPrepare = boost::none,
+                                           boost::optional<bool> isPartial = boost::none) {
         BSONObjBuilder applyOpsBuilder;
-        applyOpsBuilder.append("applyOps", BSON_ARRAY(insertOp.toBSON()));
+
+        BSONArrayBuilder opsArrayBuilder = applyOpsBuilder.subarrayStart("applyOps");
+        for (const auto& document : documents) {
+            auto insertOp = repl::DurableReplOperation(repl::OpTypeEnum::kInsert, {}, document);
+            if (lsid && isInternalSessionForRetryableWrite(*lsid)) {
+                if (!document.hasField("_id")) {
+                    continue;
+                }
+                auto id = document.getIntField("_id");
+                insertOp.setStatementIds({{id}});
+            }
+            opsArrayBuilder.append(insertOp.toBSON());
+        }
+        opsArrayBuilder.done();
 
         if (isPrepare) {
-            applyOpsBuilder.append(repl::ApplyOpsCommandInfoBase::kPrepareFieldName, true);
+            invariant(lsid);
+            invariant(txnNumber);
+            applyOpsBuilder.append(repl::ApplyOpsCommandInfoBase::kPrepareFieldName, *isPrepare);
         }
 
         if (isPartial) {
-            applyOpsBuilder.append(repl::ApplyOpsCommandInfoBase::kPartialTxnFieldName, true);
+            invariant(lsid);
+            invariant(txnNumber);
+            applyOpsBuilder.append(repl::ApplyOpsCommandInfoBase::kPartialTxnFieldName, *isPartial);
         }
 
         repl::MutableOplogEntry op;
@@ -194,24 +212,13 @@ TEST_F(ReshardingOplogBatchPreparerTest, CreatesDerivedCrudOpsForApplyOps) {
     // We use the "fromApplyOps" field in the document to distinguish between the regular oplog
     // entries from the derived ones later on.
     int numOps = 20;
+    std::vector<BSONObj> docsForApplyOps;
     for (int i = 0; i < numOps; ++i) {
         batch.emplace_back(makeUpdateOp(BSON("_id" << i << "fromApplyOps" << false)));
+        docsForApplyOps.push_back(BSON("_id" << i << "fromApplyOps" << true));
     }
 
-    BSONObjBuilder applyOpsBuilder;
-    {
-        BSONArrayBuilder opsArrayBuilder = applyOpsBuilder.subarrayStart("applyOps");
-        for (int i = 0; i < numOps; ++i) {
-            // We use OpTypeEnum::kInsert rather than OpTypeEnum::kUpdate here to avoid needing to
-            // deal with setting the 'o2' field.
-            opsArrayBuilder.append(
-                repl::DurableReplOperation(
-                    repl::OpTypeEnum::kInsert, {}, BSON("_id" << i << "fromApplyOps" << true))
-                    .toBSON());
-        }
-    }
-
-    batch.emplace_back(makeCommandOp(applyOpsBuilder.done()));
+    batch.emplace_back(makeApplyOpsForInsert(docsForApplyOps));
 
     std::list<repl::OplogEntry> derivedOps;
     auto writerVectors = _batchPreparer.makeCrudOpWriterVectors(batch, derivedOps);
@@ -254,12 +261,8 @@ TEST_F(ReshardingOplogBatchPreparerTest, InterleavesDerivedCrudOpsForApplyOps) {
         } else {
             // We use OpTypeEnum::kInsert rather than OpTypeEnum::kUpdate here to avoid needing to
             // deal with setting the 'o2' field.
-            batch.emplace_back(makeCommandOp(BSON(
-                "applyOps" << BSON_ARRAY(repl::DurableReplOperation(
-                                             repl::OpTypeEnum::kInsert,
-                                             {},
-                                             BSON("_id" << 0 << "n" << i << "fromApplyOps" << true))
-                                             .toBSON()))));
+            batch.emplace_back(
+                makeApplyOpsForInsert({BSON("_id" << 0 << "n" << i << "fromApplyOps" << true)}));
         }
     }
 
@@ -290,8 +293,10 @@ TEST_F(ReshardingOplogBatchPreparerTest, AssignsSessionOpsToWriterVectorsByLsid)
         batch.emplace_back(makeUpdateOp(BSON("_id" << i), lsid, TxnNumber{1}));
     }
 
-    auto writerVectors = _batchPreparer.makeSessionOpWriterVectors(batch);
+    std::list<repl::OplogEntry> derivedOps;
+    auto writerVectors = _batchPreparer.makeSessionOpWriterVectors(batch, derivedOps);
     ASSERT_EQ(writerVectors.size(), kNumWriterVectors);
+    ASSERT_EQ(derivedOps.size(), 0U);
 
     auto writer = getNonEmptyWriterVector(writerVectors);
     ASSERT_EQ(writer.size(), numOps);
@@ -311,8 +316,10 @@ TEST_F(ReshardingOplogBatchPreparerTest, DiscardsLowerTxnNumberSessionOps) {
         batch.emplace_back(makeUpdateOp(BSON("_id" << i), lsid, TxnNumber{i}));
     }
 
-    auto writerVectors = _batchPreparer.makeSessionOpWriterVectors(batch);
+    std::list<repl::OplogEntry> derivedOps;
+    auto writerVectors = _batchPreparer.makeSessionOpWriterVectors(batch, derivedOps);
     ASSERT_EQ(writerVectors.size(), kNumWriterVectors);
+    ASSERT_EQ(derivedOps.size(), 0U);
 
     auto writer = getNonEmptyWriterVector(writerVectors);
     ASSERT_EQ(writer.size(), 1U);
@@ -330,7 +337,8 @@ TEST_F(ReshardingOplogBatchPreparerTest, DistributesSessionOpsToWriterVectorsFai
             makeUpdateOp(BSON("_id" << i), makeLogicalSessionIdForTest(), TxnNumber{1}));
     }
 
-    auto writerVectors = _batchPreparer.makeSessionOpWriterVectors(batch);
+    std::list<repl::OplogEntry> derivedOps;
+    auto writerVectors = _batchPreparer.makeSessionOpWriterVectors(batch, derivedOps);
     ASSERT_EQ(writerVectors.size(), kNumWriterVectors);
 
     // Use `numOps / 5` as a generous definition for "fair". There's no guarantee for how the lsid
@@ -357,107 +365,319 @@ TEST_F(ReshardingOplogBatchPreparerTest, ThrowsForUnsupportedCommandOps) {
         batch.emplace_back(makeCommandOp(BSON("commitIndexBuild" << 1)));
 
         std::list<repl::OplogEntry> derivedOps;
-        ASSERT_THROWS_CODE(_batchPreparer.makeSessionOpWriterVectors(batch),
+        ASSERT_THROWS_CODE(_batchPreparer.makeSessionOpWriterVectors(batch, derivedOps),
                            DBException,
                            ErrorCodes::OplogOperationUnsupported);
     }
 }
 
 TEST_F(ReshardingOplogBatchPreparerTest, DiscardsNoops) {
-    OplogBatch batch;
+    auto runTest = [&](const boost::optional<LogicalSessionId>& lsid,
+                       const boost::optional<TxnNumber>& txnNumber) {
+        OplogBatch batch;
 
-    int numOps = 5;
-    for (int i = 0; i < numOps; ++i) {
-        repl::MutableOplogEntry op;
-        op.setOpType(repl::OpTypeEnum::kNoop);
-        op.setObject({});
-        op.setNss({});
-        op.setOpTime({{}, {}});
-        op.setWallClockTime({});
-        batch.emplace_back(op.toBSON());
-    }
+        int numOps = 5;
+        for (int i = 0; i < numOps; ++i) {
+            repl::MutableOplogEntry op;
+            op.setSessionId(lsid);
+            op.setTxnNumber(txnNumber);
+            op.setOpType(repl::OpTypeEnum::kNoop);
+            op.setObject({});
+            op.setNss({});
+            op.setOpTime({{}, {}});
+            op.setWallClockTime({});
+            batch.emplace_back(op.toBSON());
+        }
 
-    std::list<repl::OplogEntry> derivedOps;
-    auto writerVectors = _batchPreparer.makeCrudOpWriterVectors(batch, derivedOps);
-    ASSERT_EQ(writerVectors.size(), kNumWriterVectors);
-    ASSERT_EQ(derivedOps.size(), 0U);
-    ASSERT_EQ(writerVectors[0].size(), 0U);
-    ASSERT_EQ(writerVectors[1].size(), 0U);
+        std::list<repl::OplogEntry> derivedOpsForCrudWriters;
+        auto writerVectors =
+            _batchPreparer.makeCrudOpWriterVectors(batch, derivedOpsForCrudWriters);
+        ASSERT_EQ(writerVectors.size(), kNumWriterVectors);
+        ASSERT_EQ(derivedOpsForCrudWriters.size(), 0U);
+        ASSERT_EQ(writerVectors[0].size(), 0U);
+        ASSERT_EQ(writerVectors[1].size(), 0U);
 
-    writerVectors = _batchPreparer.makeSessionOpWriterVectors(batch);
-    ASSERT_EQ(writerVectors.size(), kNumWriterVectors);
-    ASSERT_EQ(writerVectors[0].size(), 0U);
-    ASSERT_EQ(writerVectors[1].size(), 0U);
+        std::list<repl::OplogEntry> derivedOpsForSessionWriters;
+        writerVectors =
+            _batchPreparer.makeSessionOpWriterVectors(batch, derivedOpsForSessionWriters);
+        ASSERT_EQ(writerVectors.size(), kNumWriterVectors);
+        ASSERT_EQ(derivedOpsForSessionWriters.size(), 0U);
+        ASSERT_EQ(writerVectors[0].size(), 0U);
+        ASSERT_EQ(writerVectors[1].size(), 0U);
+    };
+
+    runTest(boost::none, boost::none);
+
+    TxnNumber txnNumber{1};
+    runTest(makeLogicalSessionIdForTest(), txnNumber);
+    runTest(makeLogicalSessionIdWithTxnUUIDForTest(), txnNumber);
+    runTest(makeLogicalSessionIdWithTxnNumberAndUUIDForTest(), txnNumber);
 }
 
 TEST_F(ReshardingOplogBatchPreparerTest, SessionWriteVectorsForApplyOpsWithoutTxnNumber) {
     OplogBatch batch;
-    batch.emplace_back(makeApplyOps(BSON("_id" << 3), false, false, boost::none, boost::none));
+    batch.emplace_back(makeApplyOpsForInsert({BSON("_id" << 0)}));
 
-    auto writerVectors = _batchPreparer.makeSessionOpWriterVectors(batch);
+    std::list<repl::OplogEntry> derivedOps;
+    auto writerVectors = _batchPreparer.makeSessionOpWriterVectors(batch, derivedOps);
+    ASSERT_EQ(derivedOps.size(), 0U);
 
     for (const auto& writer : writerVectors) {
         ASSERT_TRUE(writer.empty());
+    }
+}
+
+
+TEST_F(ReshardingOplogBatchPreparerTest,
+       SessionWriteVectorsDeriveCrudOpsForApplyOpsForRetryableInternalTransaction) {
+    const auto lsid = makeLogicalSessionIdWithTxnNumberAndUUIDForTest();
+    const TxnNumber txnNumber{1};
+
+    OplogBatch batch;
+    // 'makeApplyOpsForInsert' uses the "_id" of each document as the "stmtId" for its insert
+    // operation. The insert operation without a stmtId should not have a derived operation.
+    batch.emplace_back(makeApplyOpsForInsert({BSON("_id" << 0), BSONObj(), BSON("_id" << 1)},
+                                             lsid,
+                                             txnNumber,
+                                             false /* isPrepare */,
+                                             false /* isPartial */));
+
+    std::list<repl::OplogEntry> derivedOps;
+    auto writerVectors = _batchPreparer.makeSessionOpWriterVectors(batch, derivedOps);
+    ASSERT_FALSE(writerVectors.empty());
+
+    auto writer = getNonEmptyWriterVector(writerVectors);
+
+    ASSERT_EQ(writer.size(), 2U);
+    ASSERT_EQ(derivedOps.size(), 2U);
+    for (size_t i = 0; i < writer.size(); ++i) {
+        ASSERT_EQ(writer[i]->getSessionId(), *getParentSessionId(lsid));
+        ASSERT_EQ(*writer[i]->getTxnNumber(), *lsid.getTxnNumber());
+        ASSERT(writer[i]->getOpType() == repl::OpTypeEnum::kInsert);
+        ASSERT_BSONOBJ_EQ(writer[i]->getObject(), (BSON("_id" << static_cast<int>(i))));
     }
 }
 
 TEST_F(ReshardingOplogBatchPreparerTest, SessionWriteVectorsForSmallUnpreparedTxn) {
-    OplogBatch batch;
-    auto lsid = makeLogicalSessionIdForTest();
+    auto runTest = [&](const LogicalSessionId& lsid) {
+        const TxnNumber txnNumber{1};
 
-    batch.emplace_back(makeApplyOps(BSON("_id" << 3), false, false, lsid, 2));
+        OplogBatch batch;
+        batch.emplace_back(makeApplyOpsForInsert({BSON("_id" << 0), BSON("_id" << 1)},
+                                                 lsid,
+                                                 txnNumber,
+                                                 false /* isPrepare */,
+                                                 false /* isPartial */));
 
-    auto writerVectors = _batchPreparer.makeSessionOpWriterVectors(batch);
-    ASSERT_FALSE(writerVectors.empty());
+        std::list<repl::OplogEntry> derivedOps;
+        auto writerVectors = _batchPreparer.makeSessionOpWriterVectors(batch, derivedOps);
+        ASSERT_FALSE(writerVectors.empty());
 
-    auto writer = getNonEmptyWriterVector(writerVectors);
-    ASSERT_EQ(writer.size(), 1U);
-    ASSERT_EQ(writer[0]->getSessionId(), lsid);
-    ASSERT_EQ(*writer[0]->getTxnNumber(), 2);
+        auto writer = getNonEmptyWriterVector(writerVectors);
+
+        if (isInternalSessionForRetryableWrite(lsid)) {
+            ASSERT_EQ(writer.size(), 2U);
+            ASSERT_EQ(derivedOps.size(), 2U);
+            for (size_t i = 0; i < writer.size(); ++i) {
+                ASSERT_EQ(writer[i]->getSessionId(), *getParentSessionId(lsid));
+                ASSERT_EQ(*writer[i]->getTxnNumber(), *lsid.getTxnNumber());
+                ASSERT(writer[i]->getOpType() == repl::OpTypeEnum::kInsert);
+                ASSERT_BSONOBJ_EQ(writer[i]->getObject(), (BSON("_id" << static_cast<int>(i))));
+            }
+        } else {
+            ASSERT_EQ(writer.size(), 1U);
+            ASSERT_EQ(derivedOps.size(), 0U);
+            ASSERT_EQ(writer[0]->getSessionId(), lsid);
+            ASSERT_EQ(*writer[0]->getTxnNumber(), txnNumber);
+            ASSERT(writer[0]->getCommandType() == repl::OplogEntry::CommandType::kApplyOps);
+        }
+    };
+
+    runTest(makeLogicalSessionIdForTest());
+    runTest(makeLogicalSessionIdWithTxnUUIDForTest());
+    runTest(makeLogicalSessionIdWithTxnNumberAndUUIDForTest());
 }
 
-TEST_F(ReshardingOplogBatchPreparerTest, SessionWriteVectorsForCommittedTxn) {
-    OplogBatch batch;
-    auto lsid = makeLogicalSessionIdForTest();
+TEST_F(ReshardingOplogBatchPreparerTest, SessionWriteVectorsForLargeUnpreparedTxn) {
+    auto runTest = [&](const LogicalSessionId& lsid) {
+        const TxnNumber txnNumber{1};
 
-    batch.emplace_back(makeApplyOps(BSON("_id" << 3), true, false, lsid, 2));
-    batch.emplace_back(makeCommandOp(BSON("commitTransaction" << 1), lsid, 2));
+        OplogBatch batch;
+        batch.emplace_back(makeApplyOpsForInsert({BSON("_id" << 0), BSON("_id" << 1)},
+                                                 lsid,
+                                                 txnNumber,
+                                                 false /* isPrepare */,
+                                                 true /* isPartial */));
+        batch.emplace_back(makeApplyOpsForInsert(
+            {BSON("_id" << 2)}, lsid, txnNumber, false /* isPrepare */, false /* isPartial */));
 
-    auto writerVectors = _batchPreparer.makeSessionOpWriterVectors(batch);
-    ASSERT_FALSE(writerVectors.empty());
+        std::list<repl::OplogEntry> derivedOps;
+        auto writerVectors = _batchPreparer.makeSessionOpWriterVectors(batch, derivedOps);
+        ASSERT_FALSE(writerVectors.empty());
 
-    auto writer = getNonEmptyWriterVector(writerVectors);
-    ASSERT_EQ(writer.size(), 1U);
-    ASSERT_EQ(writer[0]->getSessionId(), lsid);
-    ASSERT_EQ(*writer[0]->getTxnNumber(), 2);
+        auto writer = getNonEmptyWriterVector(writerVectors);
+
+        if (isInternalSessionForRetryableWrite(lsid)) {
+            ASSERT_EQ(writer.size(), 3U);
+            ASSERT_EQ(derivedOps.size(), 3U);
+            for (size_t i = 0; i < writer.size(); ++i) {
+                ASSERT_EQ(writer[i]->getSessionId(), *getParentSessionId(lsid));
+                ASSERT_EQ(*writer[i]->getTxnNumber(), *lsid.getTxnNumber());
+                ASSERT(writer[i]->getOpType() == repl::OpTypeEnum::kInsert);
+                ASSERT_BSONOBJ_EQ(writer[i]->getObject(), (BSON("_id" << static_cast<int>(i))));
+            }
+        } else {
+            ASSERT_EQ(writer.size(), 1U);
+            ASSERT_EQ(derivedOps.size(), 0U);
+            ASSERT_EQ(writer[0]->getSessionId(), lsid);
+            ASSERT_EQ(*writer[0]->getTxnNumber(), txnNumber);
+            ASSERT(writer[0]->getCommandType() == repl::OplogEntry::CommandType::kApplyOps);
+        }
+    };
+
+    runTest(makeLogicalSessionIdForTest());
+    runTest(makeLogicalSessionIdWithTxnUUIDForTest());
+    runTest(makeLogicalSessionIdWithTxnNumberAndUUIDForTest());
+}
+
+TEST_F(ReshardingOplogBatchPreparerTest, SessionWriteVectorsForSmallCommittedPreparedTxn) {
+    auto runTest = [&](const LogicalSessionId& lsid) {
+        const TxnNumber txnNumber{1};
+
+        OplogBatch batch;
+        batch.emplace_back(makeApplyOpsForInsert({BSON("_id" << 0), BSON("_id" << 1)},
+                                                 lsid,
+                                                 txnNumber,
+                                                 true /* isPrepare */,
+                                                 false /* isPartial */));
+        batch.emplace_back(makeCommandOp(BSON("commitTransaction" << 1), lsid, txnNumber));
+
+        std::list<repl::OplogEntry> derivedOps;
+        auto writerVectors = _batchPreparer.makeSessionOpWriterVectors(batch, derivedOps);
+        ASSERT_FALSE(writerVectors.empty());
+
+        auto writer = getNonEmptyWriterVector(writerVectors);
+
+        if (isInternalSessionForRetryableWrite(lsid)) {
+            ASSERT_EQ(writer.size(), 2U);
+            ASSERT_EQ(derivedOps.size(), 2U);
+            for (size_t i = 0; i < writer.size(); ++i) {
+                ASSERT_EQ(writer[i]->getSessionId(), *getParentSessionId(lsid));
+                ASSERT_EQ(*writer[i]->getTxnNumber(), *lsid.getTxnNumber());
+                ASSERT(writer[i]->getOpType() == repl::OpTypeEnum::kInsert);
+                ASSERT_BSONOBJ_EQ(writer[i]->getObject(), (BSON("_id" << static_cast<int>(i))));
+            }
+        } else {
+            ASSERT_EQ(writer.size(), 1U);
+            ASSERT_EQ(derivedOps.size(), 0U);
+            ASSERT_EQ(writer[0]->getSessionId(), lsid);
+            ASSERT_EQ(*writer[0]->getTxnNumber(), txnNumber);
+            ASSERT(writer[0]->getCommandType() == repl::OplogEntry::CommandType::kApplyOps);
+        }
+    };
+
+    runTest(makeLogicalSessionIdForTest());
+    runTest(makeLogicalSessionIdWithTxnUUIDForTest());
+    runTest(makeLogicalSessionIdWithTxnNumberAndUUIDForTest());
+}
+
+TEST_F(ReshardingOplogBatchPreparerTest, SessionWriteVectorsForLargeCommittedPreparedTxn) {
+    auto runTest = [&](const LogicalSessionId& lsid) {
+        const TxnNumber txnNumber{1};
+
+        OplogBatch batch;
+        batch.emplace_back(makeApplyOpsForInsert({BSON("_id" << 0), BSON("_id" << 1)},
+                                                 lsid,
+                                                 txnNumber,
+                                                 false /* isPrepare */,
+                                                 true /* isPartial */));
+        batch.emplace_back(makeApplyOpsForInsert(
+            {BSON("_id" << 2)}, lsid, txnNumber, true /* isPrepare */, false /* isPartial */));
+        batch.emplace_back(makeCommandOp(BSON("commitTransaction" << 1), lsid, txnNumber));
+
+        std::list<repl::OplogEntry> derivedOps;
+        auto writerVectors = _batchPreparer.makeSessionOpWriterVectors(batch, derivedOps);
+        ASSERT_FALSE(writerVectors.empty());
+
+        auto writer = getNonEmptyWriterVector(writerVectors);
+
+        if (isInternalSessionForRetryableWrite(lsid)) {
+            ASSERT_EQ(writer.size(), 3U);
+            ASSERT_EQ(derivedOps.size(), 3U);
+            for (size_t i = 0; i < writer.size(); ++i) {
+                ASSERT_EQ(writer[i]->getSessionId(), *getParentSessionId(lsid));
+                ASSERT_EQ(*writer[i]->getTxnNumber(), *lsid.getTxnNumber());
+                ASSERT(writer[i]->getOpType() == repl::OpTypeEnum::kInsert);
+                ASSERT_BSONOBJ_EQ(writer[i]->getObject(), (BSON("_id" << static_cast<int>(i))));
+            }
+        } else {
+            ASSERT_EQ(writer.size(), 1U);
+            ASSERT_EQ(derivedOps.size(), 0U);
+            ASSERT_EQ(writer[0]->getSessionId(), lsid);
+            ASSERT_EQ(*writer[0]->getTxnNumber(), txnNumber);
+            ASSERT(writer[0]->getCommandType() == repl::OplogEntry::CommandType::kApplyOps);
+        }
+    };
+
+    runTest(makeLogicalSessionIdForTest());
+    runTest(makeLogicalSessionIdWithTxnUUIDForTest());
+    runTest(makeLogicalSessionIdWithTxnNumberAndUUIDForTest());
 }
 
 TEST_F(ReshardingOplogBatchPreparerTest, SessionWriteVectorsForAbortedPreparedTxn) {
-    OplogBatch batch;
-    auto lsid = makeLogicalSessionIdForTest();
+    auto runTest = [&](const LogicalSessionId& lsid) {
+        const TxnNumber txnNumber{1};
 
-    batch.emplace_back(makeCommandOp(BSON("abortTransaction" << 1), lsid, 2));
+        OplogBatch batch;
+        batch.emplace_back(makeCommandOp(BSON("abortTransaction" << 1), lsid, txnNumber));
 
-    auto writerVectors = _batchPreparer.makeSessionOpWriterVectors(batch);
-    ASSERT_FALSE(writerVectors.empty());
+        std::list<repl::OplogEntry> derivedOps;
+        auto writerVectors = _batchPreparer.makeSessionOpWriterVectors(batch, derivedOps);
+        ASSERT_FALSE(writerVectors.empty());
 
-    auto writer = getNonEmptyWriterVector(writerVectors);
-    ASSERT_EQ(writer.size(), 1U);
-    ASSERT_EQ(writer[0]->getSessionId(), lsid);
-    ASSERT_EQ(*writer[0]->getTxnNumber(), 2);
+        auto writer = getNonEmptyWriterVector(writerVectors);
+        ASSERT_EQ(writer.size(), 1U);
+        ASSERT_EQ(derivedOps.size(), 0U);
+        ASSERT_EQ(writer[0]->getSessionId(), lsid);
+        ASSERT_EQ(*writer[0]->getTxnNumber(), txnNumber);
+        ASSERT(writer[0]->getCommandType() == repl::OplogEntry::CommandType::kAbortTransaction);
+    };
+
+    runTest(makeLogicalSessionIdForTest());
+    runTest(makeLogicalSessionIdWithTxnUUIDForTest());
+    runTest(makeLogicalSessionIdWithTxnNumberAndUUIDForTest());
 }
 
 TEST_F(ReshardingOplogBatchPreparerTest, SessionWriteVectorsForPartialUnpreparedTxn) {
-    OplogBatch batch;
-    auto lsid = makeLogicalSessionIdForTest();
+    auto runTest = [&](const LogicalSessionId& lsid) {
+        const TxnNumber txnNumber{1};
 
-    batch.emplace_back(makeApplyOps(BSON("_id" << 3), false, true, lsid, 2));
+        OplogBatch batch;
+        batch.emplace_back(makeApplyOpsForInsert(
+            {BSON("_id" << 0)}, lsid, txnNumber, false /* isPrepare */, true /* isPartial */));
 
-    auto writerVectors = _batchPreparer.makeSessionOpWriterVectors(batch);
+        std::list<repl::OplogEntry> derivedOps;
+        auto writerVectors = _batchPreparer.makeSessionOpWriterVectors(batch, derivedOps);
+        if (isInternalSessionForRetryableWrite(lsid)) {
+            ASSERT_FALSE(writerVectors.empty());
+            auto writer = getNonEmptyWriterVector(writerVectors);
+            ASSERT_EQ(writer.size(), 1U);
+            ASSERT_EQ(derivedOps.size(), 1U);
+            ASSERT_EQ(writer[0]->getSessionId(), *getParentSessionId(lsid));
+            ASSERT_EQ(*writer[0]->getTxnNumber(), *lsid.getTxnNumber());
+            ASSERT(writer[0]->getOpType() == repl::OpTypeEnum::kInsert);
+            ASSERT_BSONOBJ_EQ(writer[0]->getObject(), (BSON("_id" << 0)));
+        } else {
+            ASSERT_EQ(derivedOps.size(), 0U);
+            for (const auto& writer : writerVectors) {
+                ASSERT_TRUE(writer.empty());
+            }
+        }
+    };
 
-    for (const auto& writer : writerVectors) {
-        ASSERT_TRUE(writer.empty());
-    }
+    runTest(makeLogicalSessionIdForTest());
+    runTest(makeLogicalSessionIdWithTxnUUIDForTest());
+    runTest(makeLogicalSessionIdWithTxnNumberAndUUIDForTest());
 }
 
 }  // namespace

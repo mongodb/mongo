@@ -78,8 +78,8 @@ SemiFuture<void> ReshardingOplogApplier::_applyBatch(
     CancellationToken cancelToken,
     CancelableOperationContextFactory factory) {
     Timer latencyTimer;
-    auto crudWriterVectors =
-        _batchPreparer.makeCrudOpWriterVectors(_currentBatchToApply, _currentDerivedOps);
+    auto crudWriterVectors = _batchPreparer.makeCrudOpWriterVectors(
+        _currentBatchToApply, _currentDerivedOpsForCrudWriters);
 
     CancellationSource errorSource(cancelToken);
 
@@ -99,7 +99,8 @@ SemiFuture<void> ReshardingOplogApplier::_applyBatch(
         }
     }
 
-    auto sessionWriterVectors = _batchPreparer.makeSessionOpWriterVectors(_currentBatchToApply);
+    auto sessionWriterVectors = _batchPreparer.makeSessionOpWriterVectors(
+        _currentBatchToApply, _currentDerivedOpsForSessionWriters);
     batchApplierFutures.reserve(crudWriterVectors.size() + sessionWriterVectors.size());
 
     for (auto&& writer : sessionWriterVectors) {
@@ -152,7 +153,8 @@ SemiFuture<void> ReshardingOplogApplier::run(
                                  "reshardingApplyOplogBatchTwice failpoint enabled, applying batch "
                                  "a second time",
                                  "batchSize"_attr = _currentBatchToApply.size());
-                           _currentDerivedOps.clear();
+                           _currentDerivedOpsForCrudWriters.clear();
+                           _currentDerivedOpsForSessionWriters.clear();
                            return _applyBatch(executor, cancelToken, factory);
                        }
                        return SemiFuture<void>();
@@ -240,7 +242,8 @@ void ReshardingOplogApplier::_clearAppliedOpsAndStoreProgress(OperationContext* 
     }
 
     _currentBatchToApply.clear();
-    _currentDerivedOps.clear();
+    _currentDerivedOpsForCrudWriters.clear();
+    _currentDerivedOpsForSessionWriters.clear();
 }
 
 NamespaceString ReshardingOplogApplier::ensureStashCollectionExists(

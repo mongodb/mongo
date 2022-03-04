@@ -229,8 +229,7 @@ var ReshardingTest = class {
         ];
     }
 
-    /** @private */
-    _getReplSetForShard(shardName) {
+    getReplSetForShard(shardName) {
         const res = this._allReplSetTests().find(shardInfo => shardInfo.shardName === shardName);
         return res.rs;
     }
@@ -817,7 +816,7 @@ var ReshardingTest = class {
     stepUpNewPrimaryOnShard(shardName) {
         jsTestLog(`ReshardingTestFixture stepping up new primary on shard ${shardName}`);
 
-        const replSet = this._getReplSetForShard(shardName);
+        const replSet = this.getReplSetForShard(shardName);
         let originalPrimary = replSet.getPrimary();
         let secondaries = replSet.getSecondaries();
 
@@ -864,7 +863,7 @@ var ReshardingTest = class {
     killAndRestartPrimaryOnShard(shardName) {
         jsTestLog(`ReshardingTestFixture killing and restarting primary on shard ${shardName}`);
 
-        const replSet = this._getReplSetForShard(shardName);
+        const replSet = this.getReplSetForShard(shardName);
         const originalPrimaryConn = replSet.getPrimary();
 
         const SIGKILL = 9;
@@ -877,7 +876,7 @@ var ReshardingTest = class {
         jsTestLog(
             `ReshardingTestFixture shutting down and restarting primary on shard ${shardName}`);
 
-        const replSet = this._getReplSetForShard(shardName);
+        const replSet = this.getReplSetForShard(shardName);
         const originalPrimaryConn = replSet.getPrimary();
 
         const SIGTERM = 15;
