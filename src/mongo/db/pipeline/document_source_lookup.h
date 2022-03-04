@@ -357,6 +357,12 @@ private:
      */
     bool foreignShardedLookupAllowed() const;
 
+    /**
+     * Checks conditions necessary for SBE compatibility and sets _sbeCompatible flag. Note: when
+     * optimizing the pipeline the flag might be modified.
+     */
+    void determineSbeCompatibility();
+
     DocumentSourceLookupStats _stats;
 
     NamespaceString _fromNs;

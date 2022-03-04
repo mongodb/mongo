@@ -326,6 +326,22 @@ runTest(
     ],
     JoinAlgorithm.INLJ /* expectedJoinAlgorithm for the second stage, because it's built first */);
 
+// "localField" contains a numeric component (unsupported by SBE).
+runTest(coll,
+        [{$lookup: {from: name, localField: "a.0", foreignField: "a", as: "out"}}],
+        JoinAlgorithm.Classic /* expectedJoinAlgorithm */);
+
+// "foreignField" contains a numeric component (unsupported by SBE).
+runTest(coll,
+        [{$lookup: {from: name, localField: "a", foreignField: "a.0", as: "out"}}],
+        JoinAlgorithm.Classic /* expectedJoinAlgorithm */);
+
+// "as" field contains a numeric component (numbers in this field are treated as literal field names
+// so this is supported by SBE).
+runTest(coll,
+        [{$lookup: {from: name, localField: "a", foreignField: "a", as: "out.0"}}],
+        JoinAlgorithm.NLJ /* expectedJoinAlgorithm */);
+
 MongoRunner.stopMongod(conn);
 
 // Sharded cases.

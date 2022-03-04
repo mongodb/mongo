@@ -1273,9 +1273,9 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
 
         auto lookupStage = dynamic_cast<DocumentSourceLookUp*>(innerStage->documentSource());
         if (lookupStage) {
-            tassert(5842409,
-                    "Only $lookup that use local/foreign field syntax should be lowered",
-                    lookupStage->getLocalField() && lookupStage->getForeignField());
+            tassert(6369000,
+                    "This $lookup stage should be compatible with SBE",
+                    lookupStage->sbeCompatible());
             auto eqLookupNode =
                 std::make_unique<EqLookupNode>(std::move(solnForAgg),
                                                lookupStage->getFromNs().toString(),
