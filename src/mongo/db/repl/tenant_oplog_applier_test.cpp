@@ -217,6 +217,7 @@ TEST_F(TenantOplogApplierTest, NoOpsForSingleBatch) {
     assertNoOpMatches(srcOps[1], entries[1]);
     ASSERT_EQ(srcOps.size(), applier->getNumOpsApplied());
     applier->shutdown();
+    _oplogBuffer.shutdown(_opCtx.get());
     applier->join();
 }
 
@@ -243,6 +244,7 @@ TEST_F(TenantOplogApplierTest, NoOpsForLargeBatch) {
     }
     ASSERT_EQ(srcOps.size(), applier->getNumOpsApplied());
     applier->shutdown();
+    _oplogBuffer.shutdown(_opCtx.get());
     applier->join();
 }
 
@@ -275,6 +277,7 @@ TEST_F(TenantOplogApplierTest, NoOpsForMultipleBatches) {
     assertNoOpMatches(srcOps[2], entries[2]);
     assertNoOpMatches(srcOps[3], entries[3]);
     applier->shutdown();
+    _oplogBuffer.shutdown(_opCtx.get());
     applier->join();
 }
 
@@ -311,6 +314,7 @@ TEST_F(TenantOplogApplierTest, NoOpsForLargeTransaction) {
         assertNoOpMatches(srcOps[i], entries[i]);
     }
     applier->shutdown();
+    _oplogBuffer.shutdown(_opCtx.get());
     applier->join();
 }
 
@@ -363,6 +367,7 @@ TEST_F(TenantOplogApplierTest, CommitUnpreparedTransaction_DataPartiallyApplied)
     ASSERT_TRUE(docExists(_opCtx.get(), nss, doc2));
 
     applier->shutdown();
+    _oplogBuffer.shutdown(_opCtx.get());
     applier->join();
 }
 
@@ -383,6 +388,7 @@ TEST_F(TenantOplogApplierTest, ApplyInsert_DatabaseMissing) {
     // Since no database was available, the insert shouldn't actually happen.
     ASSERT_FALSE(onInsertsCalled);
     applier->shutdown();
+    _oplogBuffer.shutdown(_opCtx.get());
     applier->join();
 }
 
@@ -404,6 +410,7 @@ TEST_F(TenantOplogApplierTest, ApplyInsert_CollectionMissing) {
     // Since no collection was available, the insert shouldn't actually happen.
     ASSERT_FALSE(onInsertsCalled);
     applier->shutdown();
+    _oplogBuffer.shutdown(_opCtx.get());
     applier->join();
 }
 
@@ -436,6 +443,7 @@ TEST_F(TenantOplogApplierTest, ApplyInsert_InsertExisting) {
     ASSERT_FALSE(onInsertsCalled);
     ASSERT_TRUE(onUpdateCalled);
     applier->shutdown();
+    _oplogBuffer.shutdown(_opCtx.get());
     applier->join();
 }
 
@@ -470,6 +478,7 @@ TEST_F(TenantOplogApplierTest, ApplyInsert_UniqueKey_InsertExisting) {
     // The DuplicateKey error should be ignored and insert should succeed.
     ASSERT_TRUE(onInsertsCalled);
     applier->shutdown();
+    _oplogBuffer.shutdown(_opCtx.get());
     applier->join();
 }
 
@@ -497,6 +506,7 @@ TEST_F(TenantOplogApplierTest, ApplyInsert_Success) {
     ASSERT_OK(opAppliedFuture.getNoThrow().getStatus());
     ASSERT_TRUE(onInsertsCalled);
     applier->shutdown();
+    _oplogBuffer.shutdown(_opCtx.get());
     applier->join();
 }
 
@@ -552,6 +562,7 @@ TEST_F(TenantOplogApplierTest, ApplyInserts_Grouped) {
     ASSERT_TRUE(onInsertsCalledNss1);
     ASSERT_TRUE(onInsertsCalledNss2);
     applier->shutdown();
+    _oplogBuffer.shutdown(_opCtx.get());
     applier->join();
 }
 
@@ -580,6 +591,7 @@ TEST_F(TenantOplogApplierTest, ApplyUpdate_MissingDocument) {
     ASSERT_FALSE(onInsertsCalled);
     ASSERT_FALSE(onUpdateCalled);
     applier->shutdown();
+    _oplogBuffer.shutdown(_opCtx.get());
     applier->join();
 }
 
@@ -605,6 +617,7 @@ TEST_F(TenantOplogApplierTest, ApplyUpdate_Success) {
     ASSERT_OK(opAppliedFuture.getNoThrow().getStatus());
     ASSERT_TRUE(onUpdateCalled);
     applier->shutdown();
+    _oplogBuffer.shutdown(_opCtx.get());
     applier->join();
 }
 
@@ -627,6 +640,7 @@ TEST_F(TenantOplogApplierTest, ApplyDelete_DatabaseMissing) {
     // Since no database was available, the delete shouldn't actually happen.
     ASSERT_FALSE(onDeleteCalled);
     applier->shutdown();
+    _oplogBuffer.shutdown(_opCtx.get());
     applier->join();
 }
 
@@ -650,6 +664,7 @@ TEST_F(TenantOplogApplierTest, ApplyDelete_CollectionMissing) {
     // Since no collection was available, the delete shouldn't actually happen.
     ASSERT_FALSE(onDeleteCalled);
     applier->shutdown();
+    _oplogBuffer.shutdown(_opCtx.get());
     applier->join();
 }
 
@@ -674,6 +689,7 @@ TEST_F(TenantOplogApplierTest, ApplyDelete_DocumentMissing) {
     // Since the document wasn't available, onDelete should not be called.
     ASSERT_FALSE(onDeleteCalled);
     applier->shutdown();
+    _oplogBuffer.shutdown(_opCtx.get());
     applier->join();
 }
 
@@ -708,6 +724,7 @@ TEST_F(TenantOplogApplierTest, ApplyDelete_Success) {
     ASSERT_OK(opAppliedFuture.getNoThrow().getStatus());
     ASSERT_TRUE(onDeleteCalled);
     applier->shutdown();
+    _oplogBuffer.shutdown(_opCtx.get());
     applier->join();
 }
 
@@ -736,6 +753,7 @@ TEST_F(TenantOplogApplierTest, ApplyCreateCollCommand_CollExisting) {
     // Since the collection already exists, onCreateCollection should not happen.
     ASSERT_FALSE(applyCmdCalled);
     applier->shutdown();
+    _oplogBuffer.shutdown(_opCtx.get());
     applier->join();
 }
 
@@ -769,6 +787,7 @@ TEST_F(TenantOplogApplierTest, ApplyRenameCollCommand_CollExisting) {
     // Since the collection already has the target name, onRenameCollection should not happen.
     ASSERT_FALSE(applyCmdCalled);
     applier->shutdown();
+    _oplogBuffer.shutdown(_opCtx.get());
     applier->join();
 }
 
@@ -802,6 +821,7 @@ TEST_F(TenantOplogApplierTest, ApplyCreateCollCommand_Success) {
     ASSERT_OK(opAppliedFuture.getNoThrow().getStatus());
     ASSERT_TRUE(applyCmdCalled);
     applier->shutdown();
+    _oplogBuffer.shutdown(_opCtx.get());
     applier->join();
 }
 
@@ -842,6 +862,7 @@ TEST_F(TenantOplogApplierTest, ApplyCreateIndexesCommand_Success) {
     ASSERT_OK(opAppliedFuture.getNoThrow().getStatus());
     ASSERT_TRUE(applyCmdCalled);
     applier->shutdown();
+    _oplogBuffer.shutdown(_opCtx.get());
     applier->join();
 }
 
@@ -865,6 +886,7 @@ TEST_F(TenantOplogApplierTest, ApplyStartIndexBuildCommand_Failure) {
     auto opAppliedFuture = applier->getNotificationForOpTime(entry.getOpTime());
     ASSERT_EQUALS(opAppliedFuture.getNoThrow().getStatus().code(), 5434700);
     applier->shutdown();
+    _oplogBuffer.shutdown(_opCtx.get());
     applier->join();
 }
 
@@ -893,6 +915,7 @@ TEST_F(TenantOplogApplierTest, ApplyCreateCollCommand_WrongNSS) {
     ASSERT_NOT_OK(opAppliedFuture.getNoThrow().getStatus());
     ASSERT_FALSE(applyCmdCalled);
     applier->shutdown();
+    _oplogBuffer.shutdown(_opCtx.get());
     applier->join();
 }
 
@@ -924,6 +947,7 @@ TEST_F(TenantOplogApplierTest, ApplyDropIndexesCommand_IndexNotFound) {
     // The IndexNotFound error should be ignored and drop index should not happen.
     ASSERT_FALSE(applyCmdCalled);
     applier->shutdown();
+    _oplogBuffer.shutdown(_opCtx.get());
     applier->join();
 }
 
@@ -960,6 +984,7 @@ TEST_F(TenantOplogApplierTest, ApplyCollModCommand_IndexNotFound) {
     // The IndexNotFound error should be ignored and collMod should not happen.
     ASSERT_FALSE(applyCmdCalled);
     applier->shutdown();
+    _oplogBuffer.shutdown(_opCtx.get());
     applier->join();
 }
 
@@ -997,6 +1022,7 @@ TEST_F(TenantOplogApplierTest, ApplyCollModCommand_CollectionMissing) {
     // The NamespaceNotFound error should be ignored and collMod should not happen.
     ASSERT_FALSE(applyCmdCalled);
     applier->shutdown();
+    _oplogBuffer.shutdown(_opCtx.get());
     applier->join();
 }
 
@@ -1019,6 +1045,7 @@ TEST_F(TenantOplogApplierTest, ApplyCRUD_WrongNSS) {
     ASSERT_NOT_OK(opAppliedFuture.getNoThrow().getStatus());
     ASSERT_FALSE(onInsertsCalled);
     applier->shutdown();
+    _oplogBuffer.shutdown(_opCtx.get());
     applier->join();
 }
 
@@ -1043,6 +1070,7 @@ TEST_F(TenantOplogApplierTest, ApplyCRUD_WrongUUID) {
     ASSERT_NOT_OK(opAppliedFuture.getNoThrow().getStatus());
     ASSERT_FALSE(onInsertsCalled);
     applier->shutdown();
+    _oplogBuffer.shutdown(_opCtx.get());
     applier->join();
 }
 
@@ -1066,6 +1094,7 @@ TEST_F(TenantOplogApplierTest, ApplyNoop_Success) {
     ASSERT_EQUALS(futureRes.getValue().recipientOpTime, entries[0].getOpTime());
 
     applier->shutdown();
+    _oplogBuffer.shutdown(_opCtx.get());
     applier->join();
 }
 
@@ -1089,6 +1118,7 @@ TEST_F(TenantOplogApplierTest, ApplyResumeTokenNoop_Success) {
     ASSERT_EQUALS(futureRes.getValue().recipientOpTime, OpTime());
 
     applier->shutdown();
+    _oplogBuffer.shutdown(_opCtx.get());
     applier->join();
 }
 
@@ -1118,6 +1148,7 @@ TEST_F(TenantOplogApplierTest, ApplyInsertThenResumeTokenNoopInDifferentBatch_Su
     ASSERT_EQUALS(futureRes.getValue().recipientOpTime, entries[0].getOpTime());
 
     applier->shutdown();
+    _oplogBuffer.shutdown(_opCtx.get());
     applier->join();
 }
 
@@ -1143,6 +1174,7 @@ TEST_F(TenantOplogApplierTest, ApplyResumeTokenNoopThenInsertInSameBatch_Success
     ASSERT_EQUALS(futureRes.getValue().recipientOpTime, entries[0].getOpTime());
 
     applier->shutdown();
+    _oplogBuffer.shutdown(_opCtx.get());
     applier->join();
 }
 
@@ -1169,6 +1201,7 @@ TEST_F(TenantOplogApplierTest, ApplyResumeTokenInsertThenNoopSameTimestamp_Succe
     ASSERT_EQUALS(futureRes.getValue().recipientOpTime, entries[0].getOpTime());
 
     applier->shutdown();
+    _oplogBuffer.shutdown(_opCtx.get());
     applier->join();
 }
 
@@ -1194,6 +1227,7 @@ TEST_F(TenantOplogApplierTest, ApplyResumeTokenInsertThenNoop_Success) {
     ASSERT_EQUALS(futureRes.getValue().recipientOpTime, entries[0].getOpTime());
 
     applier->shutdown();
+    _oplogBuffer.shutdown(_opCtx.get());
     applier->join();
 }
 
