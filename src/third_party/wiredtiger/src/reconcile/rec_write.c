@@ -2711,8 +2711,8 @@ err:
  *     history store contents associated with that key.
  */
 int
-__wt_rec_hs_clear_on_tombstone(
-  WT_SESSION_IMPL *session, WT_RECONCILE *r, uint64_t recno, WT_ITEM *rowkey)
+__wt_rec_hs_clear_on_tombstone(WT_SESSION_IMPL *session, WT_RECONCILE *r, wt_timestamp_t ts,
+  uint64_t recno, WT_ITEM *rowkey, bool reinsert)
 {
     WT_BTREE *btree;
     WT_ITEM hs_recno_key, *key;
@@ -2743,8 +2743,8 @@ __wt_rec_hs_clear_on_tombstone(
      * eviction starting its reconciliation as previous checks done while selecting an update will
      * detect that.
      */
-    WT_RET(
-      __wt_hs_delete_key_from_ts(session, r->hs_cursor, btree->id, key, WT_TS_NONE, false, false));
+    WT_RET(__wt_hs_delete_key_from_ts(session, r->hs_cursor, btree->id, key, ts, reinsert, true,
+      F_ISSET(r, WT_REC_CHECKPOINT_RUNNING)));
 
     /* Fail 0.01% of the time. */
     if (F_ISSET(r, WT_REC_EVICT) &&
