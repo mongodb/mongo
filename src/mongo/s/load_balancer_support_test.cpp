@@ -70,8 +70,6 @@ public:
     FailPointEnableBlock simulateLoadBalancerConnection() const {
         return FailPointEnableBlock("clientIsFromLoadBalancer");
     }
-
-    RAIIServerParameterControllerForTest featureEnabler{"featureFlagLoadBalancer", true};
 };
 
 TEST_F(LoadBalancerSupportTest, HelloNormalClientNoOption) {

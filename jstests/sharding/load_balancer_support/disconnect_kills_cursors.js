@@ -1,5 +1,5 @@
 /**
- * @tags: [featureFlagLoadBalancer]
+ * @tags: [requires_fcv_50]
  *
  * Tests that when a load-balanced client disconnects, its cursors are killed.
  */
