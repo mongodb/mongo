@@ -49,6 +49,7 @@ void OplogBufferMock::shutdown(OperationContext* opCtx) {
     invariant(_hasStartedUp);
     clear(lk);
     _hasShutDown = true;
+    _notEmptyCv.notify_all();
 }
 
 void OplogBufferMock::push(OperationContext* opCtx,
@@ -110,8 +111,9 @@ bool OplogBufferMock::tryPop(OperationContext* opCtx, Value* value) {
 
 bool OplogBufferMock::waitForData(Seconds waitDuration) {
     stdx::unique_lock<Latch> lk(_mutex);
-    _notEmptyCv.wait_for(
-        lk, waitDuration.toSystemDuration(), [&] { return _curIndex < _data.size(); });
+    _notEmptyCv.wait_for(lk, waitDuration.toSystemDuration(), [&] {
+        return _hasShutDown || _curIndex < _data.size();
+    });
     return _curIndex < _data.size();
 }
 
