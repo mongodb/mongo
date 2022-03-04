@@ -1395,6 +1395,19 @@ struct EqLookupNode : public QuerySolutionNode {
         kNestedLoopJoin,
     };
 
+    static StringData serializeLookupStrategy(LookupStrategy strategy) {
+        switch (strategy) {
+            case EqLookupNode::LookupStrategy::kHashJoin:
+                return "HashJoin";
+            case EqLookupNode::LookupStrategy::kIndexedLoopJoin:
+                return "IndexedLoopJoin";
+            case EqLookupNode::LookupStrategy::kNestedLoopJoin:
+                return "NestedLoopJoin";
+            default:
+                uasserted(6357204, "Unknown $lookup strategy type");
+        }
+    }
+
     EqLookupNode(std::unique_ptr<QuerySolutionNode> child,
                  const std::string& foreignCollection,
                  const std::string& joinFieldLocal,

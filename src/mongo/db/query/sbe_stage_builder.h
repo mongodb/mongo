@@ -184,6 +184,14 @@ public:
         _isTailableCollScanResumeBranch = b;
     }
 
+    void setTargetNamespace(const NamespaceString& nss) {
+        _targetNamespace = nss;
+    }
+
+    const NamespaceString& getTargetNamespace() const {
+        return _targetNamespace;
+    }
+
     friend PlanStageSlots::PlanStageSlots(const PlanStageReqs& reqs,
                                           sbe::value::SlotIdGenerator* slotIdGenerator);
 
@@ -205,6 +213,12 @@ private:
     // collection scan, this flag indicates whether we're currently building an anchor or resume
     // branch. At all other times, this flag will be false.
     bool _isTailableCollScanResumeBranch{false};
+
+    // Tracks the current namespace that we're building a plan over. Given that the stage builder
+    // can build plans for multiple namespaces, a node in the tree that targets a namespace
+    // different from its parent node can set this value to notify any child nodes of the correct
+    // namespace.
+    NamespaceString _targetNamespace;
 };
 
 void PlanStageSlots::forEachSlot(const PlanStageReqs& reqs,
@@ -405,6 +419,7 @@ private:
                          sbe::value::SlotId indexIdSlot,
                          sbe::value::SlotId indexKeySlot,
                          sbe::value::SlotId indexKeyPatternSlot,
+                         const CollectionPtr& collToFetch,
                          StringMap<const IndexAccessMethod*> iamMap,
                          PlanNodeId planNodeId,
                          sbe::value::SlotVector slotsToForward = {});
@@ -436,11 +451,21 @@ private:
     std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildLookup(
         const QuerySolutionNode* root, const PlanStageReqs& reqs);
 
+    /**
+     * Returns a CollectionPtr corresponding to the collection that we are currently building a
+     * plan over. If no current namespace is configured, a CollectionPtr referencing the main
+     * collection tracked by '_collections' is returned.
+     */
+    const CollectionPtr& getCurrentCollection(const PlanStageReqs& reqs) const;
+
     sbe::value::SlotIdGenerator _slotIdGenerator;
     sbe::value::FrameIdGenerator _frameIdGenerator;
     sbe::value::SpoolIdGenerator _spoolIdGenerator;
 
     const MultipleCollectionAccessor& _collections;
+
+    // Indicates the main namespace that we're building a plan over.
+    NamespaceString _mainNss;
 
     PlanYieldPolicySBE* const _yieldPolicy{nullptr};
 

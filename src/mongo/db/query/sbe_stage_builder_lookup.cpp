@@ -36,6 +36,7 @@
 #include <fmt/format.h>
 
 #include "mongo/db/exec/sbe/stages/loop_join.h"
+#include "mongo/db/exec/sbe/stages/scan.h"
 #include "mongo/db/query/sbe_stage_builder_coll_scan.h"
 #include "mongo/db/query/sbe_stage_builder_expression.h"
 #include "mongo/db/query/sbe_stage_builder_filter.h"
@@ -222,6 +223,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     const QuerySolutionNode* root, const PlanStageReqs& reqs) {
     const auto eqLookupNode = static_cast<const EqLookupNode*>(root);
 
+    // $lookup creates its own output documents.
+    _shouldProduceRecordIdSlot = false;
     switch (eqLookupNode->lookupStrategy) {
         case EqLookupNode::LookupStrategy::kHashJoin:
             uasserted(5842602, "$lookup planning logic picked hash join");
@@ -234,38 +237,54 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                           << index.identifier.toString());
             break;
         }
-        case EqLookupNode::LookupStrategy::kNestedLoopJoin:
-            // TODO SERVER-63533: replace the check for number of children with proper access to the
-            // foreign collection. The check currently allows us to run unit tests.
-            if (eqLookupNode->children.size() == 2) {
-                const auto& localRoot = eqLookupNode->children[0];
-                auto [localStage, localOutputs] = build(localRoot, reqs);
-                sbe::value::SlotId localScanSlot = localOutputs.get(PlanStageSlots::kResult);
+        case EqLookupNode::LookupStrategy::kNestedLoopJoin: {
+            auto numChildren = eqLookupNode->children.size();
+            tassert(6355300, "An EqLookupNode can only have one child", numChildren == 1);
+            const auto& localRoot = eqLookupNode->children[0];
+            auto [localStage, localOutputs] = build(localRoot, reqs);
+            sbe::value::SlotId localResultSlot = localOutputs.get(PlanStageSlots::kResult);
 
-                const auto& foreignRoot = eqLookupNode->children[1];
-                auto [foreignStage, foreignOutputs] = build(foreignRoot, reqs);
-                sbe::value::SlotId foreignScanSlot = foreignOutputs.get(PlanStageSlots::kResult);
+            auto foreignResultSlot = _slotIdGenerator.generate();
+            auto foreignRecordIdSlot = _slotIdGenerator.generate();
+            const auto& foreignColl =
+                _collections.lookupCollection(NamespaceString(eqLookupNode->foreignCollection));
 
-                auto [matchedSlot, nljStage] = buildNljLookupStage(_state,
-                                                                   std::move(localStage),
-                                                                   localScanSlot,
-                                                                   eqLookupNode->joinFieldLocal,
-                                                                   std::move(foreignStage),
-                                                                   foreignScanSlot,
-                                                                   eqLookupNode->joinFieldForeign,
-                                                                   eqLookupNode->nodeId(),
-                                                                   _slotIdGenerator);
+            // TODO SERVER-64091: Delete this tassert when we correctly handle the case of a non
+            //  existent foreign collection.
+            tassert(6355302, "The foreign collection should exist", foreignColl);
+            auto foreignStage = sbe::makeS<sbe::ScanStage>(foreignColl->uuid(),
+                                                           foreignResultSlot,
+                                                           foreignRecordIdSlot,
+                                                           boost::none /* snapshotIdSlot */,
+                                                           boost::none /* indexIdSlot */,
+                                                           boost::none /* indexKeySlot */,
+                                                           boost::none /* indexKeyPatternSlot */,
+                                                           boost::none /* tsSlot */,
+                                                           std::vector<std::string>{} /* fields */,
+                                                           sbe::makeSV() /* vars */,
+                                                           boost::none /* seekKeySlot */,
+                                                           true /* forward */,
+                                                           _yieldPolicy,
+                                                           eqLookupNode->nodeId(),
+                                                           sbe::ScanCallbacks{});
 
-                PlanStageSlots outputs;
-                outputs.set(kResult, localScanSlot);  // TODO: create an object for $lookup result
-                outputs.set("local"_sd, localScanSlot);
-                outputs.set("matched"_sd, matchedSlot);
-                return {std::move(nljStage), std::move(outputs)};
-            } else {
+            auto [matchedSlot, nljStage] = buildNljLookupStage(_state,
+                                                               std::move(localStage),
+                                                               localResultSlot,
+                                                               eqLookupNode->joinFieldLocal,
+                                                               std::move(foreignStage),
+                                                               foreignResultSlot,
+                                                               eqLookupNode->joinFieldForeign,
+                                                               eqLookupNode->nodeId(),
+                                                               _slotIdGenerator);
 
-                uasserted(5842604, "$lookup planning logic picked nested loop join");
-                break;
-            }
+            PlanStageSlots outputs;
+            outputs.set(kResult,
+                        localResultSlot);  // TODO SERVER-63753: create an object for $lookup result
+            outputs.set("local"_sd, localResultSlot);
+            outputs.set("matched"_sd, matchedSlot);
+            return {std::move(nljStage), std::move(outputs)};
+        }
         default:
             MONGO_UNREACHABLE_TASSERT(5842605);
     }

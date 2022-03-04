@@ -36,6 +36,8 @@
 #include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/sbe_stage_builder_test_fixture.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/util/assert_util.h"
 
 #include "mongo/db/pipeline/expression_context.h"
@@ -45,7 +47,33 @@
 namespace mongo::sbe {
 using namespace value;
 
-struct LookupStageBuilderTest : public SbeStageBuilderTestFixture {
+class LookupStageBuilderTest : public SbeStageBuilderTestFixture {
+public:
+    void setUp() override {
+        SbeStageBuilderTestFixture::setUp();
+
+        // Set up the storage engine.
+        auto service = getServiceContext();
+        _storage = std::make_unique<repl::StorageInterfaceImpl>();
+        // Set up ReplicationCoordinator and ensure that we are primary.
+        auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(service);
+        ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
+        repl::ReplicationCoordinator::set(service, std::move(replCoord));
+
+        // Set up oplog collection. The oplog collection is expected to exist when fetching the
+        // next opTime (LocalOplogInfo::getNextOpTimes) to use for a write.
+        repl::createOplog(opCtx());
+
+        // Acquire the lock for our inner collection in MODE_X as we will perform writes.
+        uassertStatusOK(_storage->createCollection(opCtx(), _secondaryNss, CollectionOptions()));
+    }
+
+    virtual void tearDown() {
+        _storage.reset();
+        _secondaryCollLock.reset();
+        SbeStageBuilderTestFixture::tearDown();
+    }
+
     // VirtualScanNode wants the docs wrapped into BSONArray.
     std::vector<BSONArray> prepInputForVirtualScanNode(const std::vector<BSONObj>& docs) {
         std::vector<BSONArray> input;
@@ -81,14 +109,34 @@ struct LookupStageBuilderTest : public SbeStageBuilderTestFixture {
                                                          docLookup->getForeignField()->fullPath(),
                                                          docLookup->getAsField().fullPath());
 
-        auto foreignVirtScanNode =
-            std::make_unique<VirtualScanNode>(prepInputForVirtualScanNode(foreignDocs),
-                                              VirtualScanNode::ScanType::kCollScan,
-                                              false /*hasRecordId*/);
-        std::vector<std::unique_ptr<QuerySolutionNode>> additionalChildren;
-        additionalChildren.push_back(std::move(foreignVirtScanNode));
-        lookupNode->addChildren(std::move(additionalChildren));
+        std::vector<InsertStatement> inserts;
+        for (const auto& doc : foreignDocs) {
+            inserts.emplace_back(doc);
+        }
 
+        // Perform our writes by acquiring the lock in MODE_X.
+        _secondaryCollLock =
+            std::make_unique<AutoGetCollection>(opCtx(), _secondaryNss, LockMode::MODE_X);
+        {
+            WriteUnitOfWork wuow{opCtx()};
+            uassertStatusOK(
+                _secondaryCollLock.get()->getWritableCollection(opCtx())->insertDocuments(
+                    opCtx(), inserts.begin(), inserts.end(), nullptr /* opDebug */));
+            wuow.commit();
+        }
+        _secondaryCollLock.reset();
+
+        // Before we read, lock the collection in MODE_IS.
+        _secondaryCollLock =
+            std::make_unique<AutoGetCollection>(opCtx(), _secondaryNss, LockMode::MODE_IS);
+
+        // While the main collection does not exist because the input to an EqLookupNode in these
+        // tests is a VirtualScanNode, we need a real collection for the foreign side.
+        _collections = MultipleCollectionAccessor(opCtx(),
+                                                  nullptr /* mainColl */,
+                                                  _nss,
+                                                  false /* isAnySecondaryNamespaceAViewOrSharded */,
+                                                  {_secondaryNss});
         return makeQuerySolution(std::move(lookupNode));
     }
 
@@ -158,7 +206,7 @@ struct LookupStageBuilderTest : public SbeStageBuilderTestFixture {
                  const std::string& fkey,
                  const std::vector<std::pair<BSONObj, std::vector<BSONObj>>>& expected,
                  bool debugPrint = false) {
-        const char* foreignCollName = "fromColl";
+        const char* foreignCollName = _secondaryNss.toString().data();
         std::stringstream lookupSpec;
         lookupSpec << "{$lookup: ";
         lookupSpec << "  {";
@@ -190,27 +238,32 @@ struct LookupStageBuilderTest : public SbeStageBuilderTestFixture {
         std::cout << DebugPrinter{}.print(stage.debugPrint());
         std::cout << std::endl;
     }
+
+private:
+    const NamespaceString _secondaryNss = NamespaceString{"testdb.sbe_stage_builder_secondary"};
+    std::unique_ptr<repl::StorageInterface> _storage;
+    std::unique_ptr<AutoGetCollection> _secondaryCollLock = nullptr;
 };
 
 TEST_F(LookupStageBuilderTest, NestedLoopJoin_Basic) {
     const std::vector<BSONObj> ldocs = {
-        fromjson("{id:0, lkey:1}"),
-        fromjson("{id:1, lkey:12}"),
-        fromjson("{id:2, lkey:3}"),
-        fromjson("{id:3, lkey:[1,4]}"),
+        fromjson("{_id:0, lkey:1}"),
+        fromjson("{_id:1, lkey:12}"),
+        fromjson("{_id:2, lkey:3}"),
+        fromjson("{_id:3, lkey:[1,4]}"),
     };
 
     const std::vector<BSONObj> fdocs = {
-        fromjson("{id:0, fkey:1}"),
-        fromjson("{id:1, fkey:3}"),
-        fromjson("{id:2, fkey:[1,4,25]}"),
-        fromjson("{id:3, fkey:4}"),
-        fromjson("{id:4, fkey:[24,25,26]}"),
-        fromjson("{id:5, no_fkey:true}"),
-        fromjson("{id:6, fkey:null}"),
-        fromjson("{id:7, fkey:undefined}"),
-        fromjson("{id:8, fkey:[]}"),
-        fromjson("{id:9, fkey:[null]}"),
+        fromjson("{_id:0, fkey:1}"),
+        fromjson("{_id:1, fkey:3}"),
+        fromjson("{_id:2, fkey:[1,4,25]}"),
+        fromjson("{_id:3, fkey:4}"),
+        fromjson("{_id:4, fkey:[24,25,26]}"),
+        fromjson("{_id:5, no_fkey:true}"),
+        fromjson("{_id:6, fkey:null}"),
+        fromjson("{_id:7, fkey:undefined}"),
+        fromjson("{_id:8, fkey:[]}"),
+        fromjson("{_id:9, fkey:[null]}"),
     };
 
     const std::vector<std::pair<BSONObj, std::vector<BSONObj>>> expected = {
@@ -224,16 +277,16 @@ TEST_F(LookupStageBuilderTest, NestedLoopJoin_Basic) {
 }
 
 TEST_F(LookupStageBuilderTest, NestedLoopJoin_LocalKey_Null) {
-    const std::vector<BSONObj> ldocs = {fromjson("{id:0, lkey:null}")};
+    const std::vector<BSONObj> ldocs = {fromjson("{_id:0, lkey:null}")};
 
-    const std::vector<BSONObj> fdocs = {fromjson("{id:0, fkey:1}"),
-                                        fromjson("{id:1, no_fkey:true}"),
-                                        fromjson("{id:2, fkey:null}"),
-                                        fromjson("{id:3, fkey:[null]}"),
-                                        fromjson("{id:4, fkey:undefined}"),
-                                        fromjson("{id:5, fkey:[undefined]}"),
-                                        fromjson("{id:6, fkey:[]}"),
-                                        fromjson("{id:7, fkey:[[]]}")};
+    const std::vector<BSONObj> fdocs = {fromjson("{_id:0, fkey:1}"),
+                                        fromjson("{_id:1, no_fkey:true}"),
+                                        fromjson("{_id:2, fkey:null}"),
+                                        fromjson("{_id:3, fkey:[null]}"),
+                                        fromjson("{_id:4, fkey:undefined}"),
+                                        fromjson("{_id:5, fkey:[undefined]}"),
+                                        fromjson("{_id:6, fkey:[]}"),
+                                        fromjson("{_id:7, fkey:[[]]}")};
 
     std::vector<std::pair<BSONObj, std::vector<BSONObj>>> expected{
         {ldocs[0], {fdocs[1], fdocs[2], fdocs[3], fdocs[4], fdocs[5]}},
@@ -243,16 +296,16 @@ TEST_F(LookupStageBuilderTest, NestedLoopJoin_LocalKey_Null) {
 }
 
 TEST_F(LookupStageBuilderTest, NestedLoopJoin_LocalKey_Missing) {
-    const std::vector<BSONObj> ldocs = {fromjson("{id:0, no_lkey:true}")};
+    const std::vector<BSONObj> ldocs = {fromjson("{_id:0, no_lkey:true}")};
 
-    const std::vector<BSONObj> fdocs = {fromjson("{id:0, fkey:1}"),
-                                        fromjson("{id:1, no_fkey:true}"),
-                                        fromjson("{id:2, fkey:null}"),
-                                        fromjson("{id:3, fkey:[null]}"),
-                                        fromjson("{id:4, fkey:undefined}"),
-                                        fromjson("{id:5, fkey:[undefined]}"),
-                                        fromjson("{id:6, fkey:[]}"),
-                                        fromjson("{id:7, fkey:[[]]}")};
+    const std::vector<BSONObj> fdocs = {fromjson("{_id:0, fkey:1}"),
+                                        fromjson("{_id:1, no_fkey:true}"),
+                                        fromjson("{_id:2, fkey:null}"),
+                                        fromjson("{_id:3, fkey:[null]}"),
+                                        fromjson("{_id:4, fkey:undefined}"),
+                                        fromjson("{_id:5, fkey:[undefined]}"),
+                                        fromjson("{_id:6, fkey:[]}"),
+                                        fromjson("{_id:7, fkey:[[]]}")};
 
     std::vector<std::pair<BSONObj, std::vector<BSONObj>>> expected = {
         {ldocs[0], {fdocs[1], fdocs[2], fdocs[3], fdocs[4], fdocs[5]}},
@@ -263,18 +316,18 @@ TEST_F(LookupStageBuilderTest, NestedLoopJoin_LocalKey_Missing) {
 
 TEST_F(LookupStageBuilderTest, NestedLoopJoin_EmptyArrays) {
     const std::vector<BSONObj> ldocs = {
-        fromjson("{id:0, lkey:[]}"),
-        fromjson("{id:1, lkey:[[]]}"),
+        fromjson("{_id:0, lkey:[]}"),
+        fromjson("{_id:1, lkey:[[]]}"),
     };
     const std::vector<BSONObj> fdocs = {
-        fromjson("{id:0, fkey:1}"),
-        fromjson("{id:1, no_fkey:true}"),
-        fromjson("{id:2, fkey:null}"),
-        fromjson("{id:3, fkey:[null]}"),
-        fromjson("{id:4, fkey:undefined}"),
-        fromjson("{id:5, fkey:[undefined]}"),
-        fromjson("{id:6, fkey:[]}"),
-        fromjson("{id:7, fkey:[[]]}"),
+        fromjson("{_id:0, fkey:1}"),
+        fromjson("{_id:1, no_fkey:true}"),
+        fromjson("{_id:2, fkey:null}"),
+        fromjson("{_id:3, fkey:[null]}"),
+        fromjson("{_id:4, fkey:undefined}"),
+        fromjson("{_id:5, fkey:[undefined]}"),
+        fromjson("{_id:6, fkey:[]}"),
+        fromjson("{_id:7, fkey:[[]]}"),
     };
 
     std::vector<std::pair<BSONObj, std::vector<BSONObj>>> expected = {
@@ -287,17 +340,17 @@ TEST_F(LookupStageBuilderTest, NestedLoopJoin_EmptyArrays) {
 
 TEST_F(LookupStageBuilderTest, NestedLoopJoin_LocalKey_SubFieldScalar) {
     const std::vector<BSONObj> ldocs = {
-        fromjson("{id:0, nested:{lkey:1, other:3}}"),
-        fromjson("{id:1, nested:{no_lkey:true}}"),
-        fromjson("{id:2, nested:1}"),
-        fromjson("{id:3, lkey:1}"),
-        fromjson("{id:4, nested:{lkey:42}}"),
+        fromjson("{_id:0, nested:{lkey:1, other:3}}"),
+        fromjson("{_id:1, nested:{no_lkey:true}}"),
+        fromjson("{_id:2, nested:1}"),
+        fromjson("{_id:3, lkey:1}"),
+        fromjson("{_id:4, nested:{lkey:42}}"),
     };
     const std::vector<BSONObj> fdocs = {
-        fromjson("{id:0, fkey:1}"),
-        fromjson("{id:1, no_fkey:true}"),
-        fromjson("{id:2, fkey:3}"),
-        fromjson("{id:3, fkey:[1, 2]}"),
+        fromjson("{_id:0, fkey:1}"),
+        fromjson("{_id:1, no_fkey:true}"),
+        fromjson("{_id:2, fkey:3}"),
+        fromjson("{_id:3, fkey:[1, 2]}"),
     };
 
     std::vector<std::pair<BSONObj, std::vector<BSONObj>>> expected = {
@@ -314,23 +367,23 @@ TEST_F(LookupStageBuilderTest, NestedLoopJoin_LocalKey_SubFieldScalar) {
 
 TEST_F(LookupStageBuilderTest, NestedLoopJoin_LocalKey_SubFieldArray) {
     const std::vector<BSONObj> ldocs = {
-        fromjson("{id:0, nested:[{lkey:1},{lkey:2}]}"),
-        fromjson("{id:1, nested:[{lkey:42}]}"),
-        fromjson("{id:2, nested:[{lkey:{other:1}}]}"),
-        fromjson("{id:3, nested:[{lkey:[]}]}"),
-        fromjson("{id:4, nested:[{other:3}]}"),
-        fromjson("{id:5, nested:[]}"),
-        fromjson("{id:6, nested:[[]]}"),
-        fromjson("{id:7, lkey:[1,2]}"),
+        fromjson("{_id:0, nested:[{lkey:1},{lkey:2}]}"),
+        fromjson("{_id:1, nested:[{lkey:42}]}"),
+        fromjson("{_id:2, nested:[{lkey:{other:1}}]}"),
+        fromjson("{_id:3, nested:[{lkey:[]}]}"),
+        fromjson("{_id:4, nested:[{other:3}]}"),
+        fromjson("{_id:5, nested:[]}"),
+        fromjson("{_id:6, nested:[[]]}"),
+        fromjson("{_id:7, lkey:[1,2]}"),
     };
     const std::vector<BSONObj> fdocs = {
-        fromjson("{id:0, fkey:1}"),
-        fromjson("{id:1, fkey:2}"),
-        fromjson("{id:2, fkey:3}"),
-        fromjson("{id:3, fkey:[1, 4]}"),
-        fromjson("{id:4, no_fkey:true}"),
-        fromjson("{id:5, fkey:[]}"),
-        fromjson("{id:6, fkey:null}"),
+        fromjson("{_id:0, fkey:1}"),
+        fromjson("{_id:1, fkey:2}"),
+        fromjson("{_id:2, fkey:3}"),
+        fromjson("{_id:3, fkey:[1, 4]}"),
+        fromjson("{_id:4, no_fkey:true}"),
+        fromjson("{_id:5, fkey:[]}"),
+        fromjson("{_id:6, fkey:null}"),
     };
 
     //'expected' documents pre-SERVER-63368 behavior of the classic engine.
@@ -351,18 +404,18 @@ TEST_F(LookupStageBuilderTest, NestedLoopJoin_LocalKey_SubFieldArray) {
 
 TEST_F(LookupStageBuilderTest, NestedLoopJoin_LocalKey_PathWithNumber) {
     const std::vector<BSONObj> ldocs = {
-        fromjson("{id:0, nested:[{lkey:1},{lkey:2}]}"),
-        fromjson("{id:1, nested:[{lkey:[2,3,1]}]}"),
-        fromjson("{id:2, nested:[{lkey:2},{lkey:1}]}"),
-        fromjson("{id:3, nested:[{lkey:[2,3]}]}"),
-        fromjson("{id:4, nested:{lkey:1}}"),
-        fromjson("{id:5, nested:{lkey:[1,2]}}"),
-        fromjson("{id:6, nested:[{other:1},{lkey:1}]}"),
+        fromjson("{_id:0, nested:[{lkey:1},{lkey:2}]}"),
+        fromjson("{_id:1, nested:[{lkey:[2,3,1]}]}"),
+        fromjson("{_id:2, nested:[{lkey:2},{lkey:1}]}"),
+        fromjson("{_id:3, nested:[{lkey:[2,3]}]}"),
+        fromjson("{_id:4, nested:{lkey:1}}"),
+        fromjson("{_id:5, nested:{lkey:[1,2]}}"),
+        fromjson("{_id:6, nested:[{other:1},{lkey:1}]}"),
     };
     const std::vector<BSONObj> fdocs = {
-        fromjson("{id:0, fkey:1}"),
-        fromjson("{id:1, fkey:3}"),
-        fromjson("{id:2, fkey:null}"),
+        fromjson("{_id:0, fkey:1}"),
+        fromjson("{_id:1, fkey:3}"),
+        fromjson("{_id:2, fkey:null}"),
     };
     //'expected' documents pre-SERVER-63368 behavior of the classic engine.
     std::vector<std::pair<BSONObj, std::vector<BSONObj>>> expected = {

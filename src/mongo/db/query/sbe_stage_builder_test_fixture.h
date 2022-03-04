@@ -81,7 +81,10 @@ public:
                    std::unique_ptr<ShardFiltererFactoryInterface> shardFiltererFactoryInterface,
                    std::unique_ptr<CollatorInterface> collator = nullptr);
 
-private:
+protected:
+    // Collections needed by this test fixture. Subclasses must manually set this if they require
+    // test collections.
+    MultipleCollectionAccessor _collections{CollectionPtr::null};
     const NamespaceString _nss = NamespaceString{"testdb.sbe_stage_builder"};
 };
 

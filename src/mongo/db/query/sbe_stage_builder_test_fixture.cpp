@@ -61,7 +61,7 @@ SbeStageBuilderTestFixture::buildPlanStage(
     ASSERT_OK(statusWithCQ.getStatus());
 
     stage_builder::SlotBasedStageBuilder builder{opCtx(),
-                                                 MultipleCollectionAccessor(CollectionPtr::null),
+                                                 _collections,
                                                  *statusWithCQ.getValue(),
                                                  *querySolution,
                                                  nullptr /* YieldPolicy */,

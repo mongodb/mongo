@@ -656,6 +656,7 @@ SlotBasedStageBuilder::SlotBasedStageBuilder(OperationContext* opCtx,
                                              ShardFiltererFactoryInterface* shardFiltererFactory)
     : StageBuilder(opCtx, cq, solution),
       _collections(collections),
+      _mainNss(cq.nss()),
       _yieldPolicy(yieldPolicy),
       _data(makeRuntimeEnvironment(_cq, _opCtx, &_slotIdGenerator)),
       _shardFiltererFactory(shardFiltererFactory),
@@ -699,6 +700,11 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::build(const QuerySolution
     reqs.set(kResult);
     reqs.setIf(kRecordId, _shouldProduceRecordIdSlot);
 
+    // Set the target namespace to '_mainNss'. This is necessary as some QuerySolutionNodes that
+    // require a collection when stage building do not explicitly name which collection they are
+    // targeting.
+    reqs.setTargetNamespace(_mainNss);
+
     // Build the SBE plan stage tree.
     auto [stage, outputs] = build(root, reqs);
 
@@ -718,13 +724,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     invariant(!reqs.getIndexKeyBitset());
 
     auto csn = static_cast<const CollectionScanNode*>(root);
-
-    auto [stage, outputs] =
-        generateCollScan(_state,
-                         _collections.lookupCollection(NamespaceString{csn->name}),
-                         csn,
-                         _yieldPolicy,
-                         reqs.getIsTailableCollScanResumeBranch());
+    auto [stage, outputs] = generateCollScan(_state,
+                                             getCurrentCollection(reqs),
+                                             csn,
+                                             _yieldPolicy,
+                                             reqs.getIsTailableCollScanResumeBranch());
 
     if (reqs.has(kReturnKey)) {
         // Assign the 'returnKeySlot' to be the empty object.
@@ -840,7 +844,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     }
 
     auto [stage, outputs] = generateIndexScan(_state,
-                                              _collections.getMainCollection(),
+                                              getCurrentCollection(reqs),
                                               ixn,
                                               indexKeyBitset,
                                               _yieldPolicy,
@@ -909,7 +913,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     invariant(!reqs.getIndexKeyBitset());
 
     auto csn = static_cast<const ColumnIndexScanNode*>(root);
-
     PlanStageSlots outputs;
 
     auto recordSlot = _slotIdGenerator.generate();
@@ -946,7 +949,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     slotMap[rootStr] = rowStoreSlot;
     auto abt = builder.generateABT();
     auto exprOut = abt ? abtToExpr(*abt, slotMap) : emptyExpr->clone();
-    auto stage = std::make_unique<sbe::ColumnScanStage>(_collections.getMainCollection()->uuid(),
+    auto stage = std::make_unique<sbe::ColumnScanStage>(getCurrentCollection(reqs)->uuid(),
                                                         csn->indexEntry.catalogName,
                                                         fieldSlotIds,
                                                         csn->fields,
@@ -968,9 +971,15 @@ SlotBasedStageBuilder::makeLoopJoinForFetch(std::unique_ptr<sbe::PlanStage> inpu
                                             sbe::value::SlotId indexIdSlot,
                                             sbe::value::SlotId indexKeySlot,
                                             sbe::value::SlotId indexKeyPatternSlot,
+                                            const CollectionPtr& collToFetch,
                                             StringMap<const IndexAccessMethod*> iamMap,
                                             PlanNodeId planNodeId,
                                             sbe::value::SlotVector slotsToForward) {
+    // It is assumed that we are generating a fetch loop join over the main collection. If we are
+    // generating a fetch over a secondary collection, it is the responsibility of a parent node
+    // in the QSN tree to indicate which collection we are fetching over.
+    tassert(6355301, "Cannot fetch from a collection that doesn't exist", collToFetch);
+
     auto resultSlot = _slotIdGenerator.generate();
     auto recordIdSlot = _slotIdGenerator.generate();
 
@@ -978,8 +987,9 @@ SlotBasedStageBuilder::makeLoopJoinForFetch(std::unique_ptr<sbe::PlanStage> inpu
     sbe::ScanCallbacks callbacks(
         indexKeyCorruptionCheckCallback,
         std::bind(indexKeyConsistencyCheckCallback, _1, std::move(iamMap), _2, _3, _4, _5, _6));
+
     // Scan the collection in the range [seekKeySlot, Inf).
-    auto scanStage = sbe::makeS<sbe::ScanStage>(_collections.getMainCollection()->uuid(),
+    auto scanStage = sbe::makeS<sbe::ScanStage>(collToFetch->uuid(),
                                                 resultSlot,
                                                 recordIdSlot,
                                                 snapshotIdSlot,
@@ -1053,6 +1063,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                              outputs.get(kIndexId),
                              outputs.get(kIndexKey),
                              outputs.get(kIndexKeyPattern),
+                             getCurrentCollection(reqs),
                              std::move(iamMap),
                              root->nodeId(),
                              std::move(relevantSlots));
@@ -1910,9 +1921,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildTextMatch(
     const QuerySolutionNode* root, const PlanStageReqs& reqs) {
-    const auto& mainColl = _collections.getMainCollection();
-    tassert(5432212, "no collection object", mainColl);
-    tassert(5432213, "index keys requsted for text match node", !reqs.getIndexKeyBitset());
+    auto textNode = static_cast<const TextMatchNode*>(root);
+    const auto& coll = getCurrentCollection(reqs);
+    tassert(5432212, "no collection object", coll);
+    tassert(5432213, "index keys requested for text match node", !reqs.getIndexKeyBitset());
     tassert(5432215,
             str::stream() << "text match node must have one child, but got "
                           << root->children.size(),
@@ -1922,15 +1934,13 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // assumption.
     tassert(5432216, "text match input must be fetched", root->children[0]->fetched());
 
-    auto textNode = static_cast<const TextMatchNode*>(root);
-
     auto childReqs = reqs.copy().set(kResult);
     auto [stage, outputs] = build(textNode->children[0], childReqs);
     tassert(5432217, "result slot is not produced by text match sub-plan", outputs.has(kResult));
 
     // Create an FTS 'matcher' to apply 'ftsQuery' to matching documents.
     auto matcher = makeFtsMatcher(
-        _opCtx, mainColl, textNode->index.identifier.catalogName, textNode->ftsQuery.get());
+        _opCtx, coll, textNode->index.identifier.catalogName, textNode->ftsQuery.get());
 
     // Build an 'ftsMatch' expression to match a document stored in the 'kResult' slot using the
     // 'matcher' instance.
@@ -3024,6 +3034,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         buildShardFilterGivenShardKeySlot(
             finalShardKeySlot, std::move(finalShardKeyObjStage), shardFiltererSlot, root->nodeId()),
         std::move(outputs)};
+}
+
+const CollectionPtr& SlotBasedStageBuilder::getCurrentCollection(const PlanStageReqs& reqs) const {
+    return _collections.lookupCollection(reqs.getTargetNamespace());
 }
 
 // Returns a non-null pointer to the root of a plan tree, or a non-OK status if the PlanStage tree

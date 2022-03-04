@@ -72,7 +72,7 @@ public:
         : MultipleCollectionAccessor(&mainColl) {}
 
     bool hasMainCollection() const {
-        return _mainColl->get();
+        return _mainColl && _mainColl->get();
     }
 
     const CollectionPtr& getMainCollection() const {
@@ -96,7 +96,7 @@ public:
     }
 
     const CollectionPtr& lookupCollection(const NamespaceString& nss) const {
-        if (_mainColl && nss == _mainColl->get()->ns()) {
+        if (_mainColl && _mainColl->get() && nss == _mainColl->get()->ns()) {
             return *_mainColl;
         } else if (auto itr = _secondaryColls.find(nss); itr != _secondaryColls.end()) {
             return itr->second;
