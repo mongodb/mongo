@@ -175,6 +175,7 @@ env.Library(
     target='storage_options',
     source=[
         'storage_options.cpp',
+        'storage_parameters.cpp',
         'storage_parameters.idl',
     ],
     LIBDEPS=[
@@ -183,6 +184,17 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/idl/server_parameter',
+        'ticketholders'
+    ],
+)
+
+env.Library(
+    target='ticketholders',
+    source=[
+        'ticketholders.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
     ],
 )
 

@@ -35,8 +35,10 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/future.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/hierarchical_acquisition.h"
+#include "mongo/util/producer_consumer_queue.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -112,15 +114,59 @@ private:
     // You can read _outof without a lock, but have to hold _resizeMutex to change.
     AtomicWord<int> _outof;
     Mutex _resizeMutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "TicketHolder::_resizeMutex");
+        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "SemaphoreTicketHolder::_resizeMutex");
 #else
     bool _tryAcquire();
 
     AtomicWord<int> _outof;
     int _num;
-    Mutex _mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "TicketHolder::_mutex");
+    Mutex _mutex =
+        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "SemaphoreTicketHolder::_mutex");
     stdx::condition_variable _newTicket;
 #endif
+};
+
+class FifoTicketHolder final : public TicketHolder {
+public:
+    explicit FifoTicketHolder(int num);
+    ~FifoTicketHolder() override final;
+
+    bool tryAcquire() override final;
+
+    void waitForTicket(OperationContext* opCtx) override final;
+
+    bool waitForTicketUntil(OperationContext* opCtx, Date_t until) override final;
+
+    void release() override final;
+
+    Status resize(int newSize) override final;
+
+    int available() const override final;
+
+    int used() const override final;
+
+    int outof() const override final;
+
+private:
+    void _release(WithLock);
+
+    Mutex _resizeMutex =
+        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "FifoTicketHolder::_resizeMutex");
+    AtomicWord<int> _capacity;
+    AtomicWord<int> _numAvailable;
+    AtomicWord<int> _elementsInQueue;
+    enum class WaitingState { Waiting, Cancelled, Assigned };
+    struct WaitingElement {
+        stdx::condition_variable signaler;
+        Mutex modificationMutex = MONGO_MAKE_LATCH(
+            HierarchicalAcquisitionLevel(1), "FifoTicketHolder::WaitingElement::modificationMutex");
+        WaitingState state;
+    };
+    MultiProducerMultiConsumerQueue<std::shared_ptr<WaitingElement>> _queue;
+    // _queueMutex protects all modifications made to either the _queue, or the statistics of the
+    // queue.
+    Mutex _queueMutex =
+        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "FifoTicketHolder::_queueMutex");
 };
 
 class ScopedTicket {

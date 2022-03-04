@@ -30,6 +30,7 @@ global:
     cpp_namespace: "mongo"
     cpp_includes:
         - "mongo/bson/bson_depth.h"
+        - "mongo/db/storage/ticketholders.h"
 
 server_parameters:
     notablescan:
@@ -114,6 +115,39 @@ server_parameters:
         cpp_vartype: bool
         default: false
 
+    # The wiredTigerQueueingPolicy specifies which policy to use and is essentially
+    # the same as the values of the enum QueueingPolicy
+    storageEngineQueueingPolicy:
+        description: "Storage Engine queueing policy to use"
+        set_at: [ startup ]
+        cpp_class:
+            name: TicketQueueingPolicy
+
+    storageEngineConcurrentWriteTransactions:
+        description: "Storage Engine Concurrent Write Transactions"
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gConcurrentWriteTransactions
+        on_update: "TicketHolders::updateConcurrentWriteTransactions"
+        deprecated_name:
+            - wiredTigerConcurrentWriteTransactions
+        # Default value being 0 means we're allowing the underlying storage engines to use their default values.
+        default: 0
+        validator:
+            gt: 0
+
+    storageEngineConcurrentReadTransactions:
+        description: "Storage Engine Concurrent Read Transactions"
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gConcurrentReadTransactions
+        on_update: "TicketHolders::updateConcurrentReadTransactions"
+        deprecated_name:
+            - wiredTigerConcurrentReadTransactions
+        # Default value being 0 means we're allowing the underlying storage engines to use their default values.
+        default: 0
+        validator:
+            gt: 0
 
 feature_flags:
     featureFlagClusteredIndexes:
@@ -157,3 +191,11 @@ feature_flags:
         description: "When enabled, allow the use of the $listCatalog aggregation stage"
         cpp_varname: feature_flags::gDocumentSourceListCatalog
         default: false
+
+enums:
+    QueueingPolicy:
+        description: Queueing policy to use for obtaining tickets
+        type: string
+        values:
+            Semaphore: semaphore
+            FifoQueue: fifoQueue

@@ -76,6 +76,7 @@
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/storage_file_util.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/storage/storage_parameters.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/storage_repair_observer.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor.h"
@@ -284,53 +285,6 @@ std::string toString(const StorageEngine::OldestActiveTransactionTimestampResult
     } else {
         return r.getStatus().toString();
     }
-}
-
-namespace {
-SemaphoreTicketHolder openWriteTransaction(128);
-SemaphoreTicketHolder openReadTransaction(128);
-}  // namespace
-
-OpenWriteTransactionParam::OpenWriteTransactionParam(StringData name, ServerParameterType spt)
-    : ServerParameter(name, spt), _data(&openWriteTransaction) {}
-
-void OpenWriteTransactionParam::append(OperationContext* opCtx,
-                                       BSONObjBuilder& b,
-                                       const std::string& name) {
-    b.append(name, _data->outof());
-}
-
-Status OpenWriteTransactionParam::setFromString(const std::string& str) {
-    int num = 0;
-    Status status = NumberParser{}(str, &num);
-    if (!status.isOK()) {
-        return status;
-    }
-    if (num <= 0) {
-        return {ErrorCodes::BadValue, str::stream() << name() << " has to be > 0"};
-    }
-    return _data->resize(num);
-}
-
-OpenReadTransactionParam::OpenReadTransactionParam(StringData name, ServerParameterType spt)
-    : ServerParameter(name, spt), _data(&openReadTransaction) {}
-
-void OpenReadTransactionParam::append(OperationContext* opCtx,
-                                      BSONObjBuilder& b,
-                                      const std::string& name) {
-    b.append(name, _data->outof());
-}
-
-Status OpenReadTransactionParam::setFromString(const std::string& str) {
-    int num = 0;
-    Status status = NumberParser{}(str, &num);
-    if (!status.isOK()) {
-        return status;
-    }
-    if (num <= 0) {
-        return {ErrorCodes::BadValue, str::stream() << name() << " has to be > 0"};
-    }
-    return _data->resize(num);
 }
 
 StringData WiredTigerKVEngine::kTableUriPrefix = "table:"_sd;
@@ -616,7 +570,31 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
 
     _sizeStorer = std::make_unique<WiredTigerSizeStorer>(_conn, _sizeStorerUri, _readOnly);
 
-    Locker::setGlobalThrottling(&openReadTransaction, &openWriteTransaction);
+    auto readTransactions = gConcurrentReadTransactions.load();
+    static constexpr auto DEFAULT_TICKETS_VALUE = 128;
+    readTransactions = readTransactions == 0 ? DEFAULT_TICKETS_VALUE : readTransactions;
+    auto writeTransactions = gConcurrentWriteTransactions.load();
+    writeTransactions = writeTransactions == 0 ? DEFAULT_TICKETS_VALUE : writeTransactions;
+
+    switch (gTicketQueueingPolicy) {
+        case QueueingPolicyEnum::Semaphore:
+            LOGV2_DEBUG(6382201, 1, "Using Semaphore-based ticketing scheduler");
+            TicketHolders::openReadTransaction =
+                std::make_unique<SemaphoreTicketHolder>(readTransactions);
+            TicketHolders::openWriteTransaction =
+                std::make_unique<SemaphoreTicketHolder>(writeTransactions);
+            break;
+        case QueueingPolicyEnum::FifoQueue:
+            LOGV2_DEBUG(6382200, 1, "Using FIFO queue-based ticketing scheduler");
+            TicketHolders::openReadTransaction =
+                std::make_unique<FifoTicketHolder>(readTransactions);
+            TicketHolders::openWriteTransaction =
+                std::make_unique<FifoTicketHolder>(writeTransactions);
+            break;
+    }
+
+    Locker::setGlobalThrottling(TicketHolders::openReadTransaction.get(),
+                                TicketHolders::openWriteTransaction.get());
 
     _runTimeConfigParam.reset(new WiredTigerEngineRuntimeConfigParameter(
         "wiredTigerEngineRuntimeConfig", ServerParameterType::kRuntimeOnly));
@@ -642,16 +620,16 @@ void WiredTigerKVEngine::appendGlobalStats(BSONObjBuilder& b) {
     BSONObjBuilder bb(b.subobjStart("concurrentTransactions"));
     {
         BSONObjBuilder bbb(bb.subobjStart("write"));
-        bbb.append("out", openWriteTransaction.used());
-        bbb.append("available", openWriteTransaction.available());
-        bbb.append("totalTickets", openWriteTransaction.outof());
+        bbb.append("out", TicketHolders::openWriteTransaction->used());
+        bbb.append("available", TicketHolders::openWriteTransaction->available());
+        bbb.append("totalTickets", TicketHolders::openWriteTransaction->outof());
         bbb.done();
     }
     {
         BSONObjBuilder bbb(bb.subobjStart("read"));
-        bbb.append("out", openReadTransaction.used());
-        bbb.append("available", openReadTransaction.available());
-        bbb.append("totalTickets", openReadTransaction.outof());
+        bbb.append("out", TicketHolders::openReadTransaction->used());
+        bbb.append("available", TicketHolders::openReadTransaction->available());
+        bbb.append("totalTickets", TicketHolders::openReadTransaction->outof());
         bbb.done();
     }
     bb.done();

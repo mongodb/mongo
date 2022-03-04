@@ -34,20 +34,6 @@ global:
         - "mongo/util/debug_util.h"
 
 server_parameters:
-    wiredTigerConcurrentWriteTransactions:
-        description: "WiredTiger Concurrent Write Transactions"
-        set_at: [ startup, runtime ]
-        cpp_class:
-            name: OpenWriteTransactionParam
-            data: 'TicketHolder*'
-            override_ctor: true
-    wiredTigerConcurrentReadTransactions:
-        description: "WiredTiger Concurrent Read Transactions"
-        set_at: [ startup, runtime ]
-        cpp_class:
-            name: OpenReadTransactionParam
-            data: 'TicketHolder*'
-            override_ctor: true
     wiredTigerEngineRuntimeConfig:
         description: 'WiredTiger Configuration'
         set_at: runtime
