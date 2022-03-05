@@ -176,8 +176,7 @@ void TenantMigrationRecipientOpObserver::onUpdate(OperationContext* opCtx,
 
             auto state = recipientStateDoc.getState();
             auto protocol = recipientStateDoc.getProtocol().value_or(kDefaultMigrationProtocol);
-            if (state == TenantMigrationRecipientStateEnum::kLearnedFilenames ||
-                state == TenantMigrationRecipientStateEnum::kCopiedFiles) {
+            if (state == TenantMigrationRecipientStateEnum::kLearnedFilenames) {
                 tassert(6112900,
                         "Bad state '{}' for protocol '{}'"_format(
                             TenantMigrationRecipientState_serializer(state),
@@ -190,10 +189,10 @@ void TenantMigrationRecipientOpObserver::onUpdate(OperationContext* opCtx,
                     break;
                 case TenantMigrationRecipientStateEnum::kStarted:
                     createAccessBlockerIfNeeded(opCtx, recipientStateDoc);
+                    repl::TenantFileImporterService::get(opCtx->getServiceContext())
+                        ->startMigration(recipientStateDoc.getId());
                     break;
                 case TenantMigrationRecipientStateEnum::kLearnedFilenames:
-                    break;
-                case TenantMigrationRecipientStateEnum::kCopiedFiles:
                     break;
                 case TenantMigrationRecipientStateEnum::kConsistent:
                     if (recipientStateDoc.getRejectReadsBeforeTimestamp()) {

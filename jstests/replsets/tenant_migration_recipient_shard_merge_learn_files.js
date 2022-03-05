@@ -37,9 +37,7 @@ const tenantId = "testTenantId";
 const tenantDB = tenantMigrationTest.tenantDB(tenantId, "DB");
 const collName = "testColl";
 
-const donorRst = tenantMigrationTest.getDonorRst();
 const donorPrimary = tenantMigrationTest.getDonorPrimary();
-const donorSecondary = donorRst.getSecondary();
 
 // Do a majority write.
 tenantMigrationTest.insertDonorDB(tenantDB, collName);
@@ -69,7 +67,7 @@ tenantMigrationTest.assertRecipientNodesInExpectedState(
     tenantMigrationTest.getRecipientRst().nodes,
     migrationUuid,
     kDummyTenantId,
-    TenantMigrationTest.RecipientState.kCopiedFiles,
+    TenantMigrationTest.RecipientState.kLearnedFilenames,
     TenantMigrationTest.RecipientAccessState.kReject);
 
 waitInFailPoint.off();

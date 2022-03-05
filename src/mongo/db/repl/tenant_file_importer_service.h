@@ -33,7 +33,6 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
-#include "mongo/db/repl/vote_commit_migration_progress_gen.h"
 #include "mongo/executor/scoped_task_executor.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/stdx/mutex.h"
@@ -47,6 +46,7 @@ public:
     static constexpr StringData kTenantFileImporterServiceName = "TenantFileImporterService"_sd;
     static TenantFileImporterService* get(ServiceContext* serviceContext);
     TenantFileImporterService() = default;
+    void startMigration(const UUID& migrationId);
     void learnedFilename(const UUID& migrationId, const BSONObj& metadataDoc);
     void learnedAllFilenames(const UUID& migrationId);
     void reset();
@@ -79,7 +79,7 @@ private:
         _reset(lk);
     }
 
-    void _voteCommitMigrationProgress(MigrationProgressStepEnum step);
+    void _voteImportedFiles();
 
     void _reset(WithLock lk);
 
@@ -102,12 +102,16 @@ private:
             _state = nextState;
         }
 
-        bool is(State state) {
+        bool is(State state) const {
             return _state == state;
         }
 
+        StringData toString() const {
+            return toString(_state);
+        }
+
     private:
-        StringData toString(State value) {
+        static StringData toString(State value) {
             switch (value) {
                 case State::kUninitialized:
                     return "uninitialized";

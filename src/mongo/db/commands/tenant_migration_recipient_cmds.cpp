@@ -34,6 +34,7 @@
 #include "mongo/db/commands/tenant_migration_donor_cmds_gen.h"
 #include "mongo/db/commands/tenant_migration_recipient_cmds_gen.h"
 #include "mongo/db/repl/primary_only_service.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/tenant_migration_recipient_service.h"
 #include "mongo/logv2/log.h"
 
@@ -159,6 +160,71 @@ public:
     }
 
 } recipientSyncDataCmd;
+
+
+class RecipientVoteImportedFilesCommand final
+    : public TypedCommand<RecipientVoteImportedFilesCommand> {
+public:
+    using Request = RecipientVoteImportedFiles;
+
+    std::string help() const override {
+        return "An internal mongod command to track which members have imported all donated files"
+               " during a tenant migration";
+    }
+
+    bool adminOnly() const override {
+        return true;
+    }
+
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+        return AllowedOnSecondary::kNever;
+    }
+
+    class Invocation final : public InvocationBase {
+    public:
+        using InvocationBase::InvocationBase;
+
+        void typedRun(OperationContext* opCtx) {
+            BSONObjBuilder result;
+            uassertStatusOK(
+                repl::ReplicationCoordinator::get(opCtx)->checkReplEnabledForCommand(&result));
+
+            const auto& cmd = request();
+            LOGV2(6112805,
+                  "Received RecipientVoteImportedFiles request",
+                  "migrationId"_attr = cmd.getMigrationId(),
+                  "from"_attr = cmd.getFrom(),
+                  "success"_attr = cmd.getSuccess(),
+                  "reason"_attr = cmd.getReason());
+
+            auto recipientService =
+                repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
+                    ->lookupServiceByName(repl::TenantMigrationRecipientService::
+                                              kTenantMigrationRecipientServiceName);
+            auto instance = repl::TenantMigrationRecipientService::Instance::lookup(
+                opCtx, recipientService, BSON("_id" << cmd.getMigrationId()));
+            uassert(8423340, "Unknown migrationId", instance);
+            (*instance)->onMemberImportedFiles(cmd.getFrom(), cmd.getSuccess(), cmd.getReason());
+        }
+
+    private:
+        NamespaceString ns() const override {
+            return NamespaceString(request().getDbName(), "");
+        }
+
+        bool supportsWriteConcern() const override {
+            return false;
+        }
+
+        void doCheckAuthorization(OperationContext* opCtx) const override {
+            uassert(ErrorCodes::Unauthorized,
+                    "Unauthorized",
+                    AuthorizationSession::get(opCtx->getClient())
+                        ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                           ActionType::internal));
+        }
+    };
+} recipientVoteImportedFilesCommand;
 
 class RecipientForgetMigrationCmd : public TypedCommand<RecipientForgetMigrationCmd> {
 public:

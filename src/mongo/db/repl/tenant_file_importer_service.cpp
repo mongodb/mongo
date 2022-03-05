@@ -34,6 +34,7 @@
 #include <fmt/format.h>
 
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/commands/tenant_migration_recipient_cmds_gen.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/tenant_migration_shard_merge_util.h"
@@ -72,21 +73,25 @@ void TenantFileImporterService::onStartup(OperationContext*) {
     _executor->startup();
 }
 
+void TenantFileImporterService::startMigration(const UUID& migrationId) {
+    stdx::lock_guard lk(_mutex);
+    _reset(lk);
+    _migrationId = migrationId;
+    _scopedExecutor = std::make_shared<executor::ScopedTaskExecutor>(
+        _executor,
+        Status{ErrorCodes::CallbackCanceled, "TenantFileImporterService executor cancelled"});
+    _state.setState(ImporterState::State::kCopyingFiles);
+}
+
 void TenantFileImporterService::learnedFilename(const UUID& migrationId,
                                                 const BSONObj& metadataDoc) {
     auto opCtx = cc().getOperationContext();
     {
         stdx::lock_guard lk(_mutex);
-        if (migrationId != _migrationId) {
-            _reset(lk);
-            _migrationId = migrationId;
-            _scopedExecutor = std::make_shared<executor::ScopedTaskExecutor>(
-                _executor,
-                Status{ErrorCodes::CallbackCanceled,
-                       "TenantFileImporterService executor cancelled"});
-        }
-
-        _state.setState(ImporterState::State::kCopyingFiles);
+        uassert(8423347,
+                "Called learnedFilename with migrationId {}, but {} is active"_format(
+                    migrationId.toString(), _migrationId ? _migrationId->toString() : "(null)"),
+                migrationId == _migrationId);
     }
 
     try {
@@ -104,23 +109,18 @@ void TenantFileImporterService::learnedFilename(const UUID& migrationId,
 void TenantFileImporterService::learnedAllFilenames(const UUID& migrationId) {
     {
         stdx::lock_guard lk(_mutex);
-        if (!_migrationId) {
-            _reset(lk);
-            uasserted(
-                8423336,
-                "Called learnedAllFilenames with migrationId {}, but no migration is active"_format(
-                    migrationId.toString()));
-        }
-        if (migrationId != _migrationId) {
-            _reset(lk);
-            uasserted(8423338,
-                      "Called learnedAllFilenames with migrationId {}, but {} is active"_format(
-                          migrationId.toString(), _migrationId->toString()));
-        }
-
+        // TODO: try uassert
         if (!_state.is(ImporterState::State::kCopyingFiles)) {
+            LOGV2_WARNING(8423346,
+                          "Called learnedAllFilenames in wrong state",
+                          "state"_attr = _state.toString());
             return;
         }
+
+        uassert(8423345,
+                "Called learnedAllFilenames with migrationId {}, but {} is active"_format(
+                    migrationId.toString(), _migrationId ? _migrationId->toString() : "(null)"),
+                migrationId == _migrationId);
 
         _state.setState(ImporterState::State::kCopiedFiles);
     }
@@ -134,7 +134,7 @@ void TenantFileImporterService::learnedAllFilenames(const UUID& migrationId) {
     shard_merge_utils::importCopiedFiles(opCtx, migrationId);
 
     // TODO (SERVER-62734): Keep count of files remaining to import, wait before voting.
-    _voteCommitMigrationProgress(MigrationProgressStepEnum::kImportedFiles);
+    _voteImportedFiles();
 
     stdx::lock_guard lk(_mutex);
     _state.setState(ImporterState::State::kImportedFiles);
@@ -145,9 +145,10 @@ void TenantFileImporterService::reset() {
     _reset(lk);
 }
 
-void TenantFileImporterService::_voteCommitMigrationProgress(MigrationProgressStepEnum step) {
+void TenantFileImporterService::_voteImportedFiles() {
     auto migrationId = [&] {
         stdx::lock_guard lk(_mutex);
+        uassert(8423344, "Called _voteImportedFiles with null _migrationId", _migrationId);
         return *_migrationId;
     }();
 
@@ -157,13 +158,12 @@ void TenantFileImporterService::_voteCommitMigrationProgress(MigrationProgressSt
     if (primary.empty()) {
         LOGV2_WARNING(
             6113406,
-            "No primary for voteCommitMigrationProgress command, cannot continue migration",
+            "No primary for recipientVoteImportedFiles command, cannot continue migration",
             "migrationId"_attr = migrationId);
         return;
     }
 
-    VoteCommitMigrationProgress cmd(
-        migrationId, replCoord->getMyHostAndPort(), step, true /* success */);
+    RecipientVoteImportedFiles cmd(migrationId, replCoord->getMyHostAndPort(), true /* success */);
 
     executor::RemoteCommandRequest request(primary, "admin", cmd.toBSON({}), nullptr);
     request.sslMode = transport::kGlobalSSLMode;
@@ -173,20 +173,20 @@ void TenantFileImporterService::_voteCommitMigrationProgress(MigrationProgressSt
                 request, [](const executor::TaskExecutor::RemoteCommandCallbackArgs& args) {
                     if (!args.response.isOK()) {
                         LOGV2_WARNING(6113405,
-                                      "voteCommitMigrationProgress command failed",
+                                      "recipientVoteImportedFiles command failed",
                                       "error"_attr = redact(args.response.status));
                         return;
                     }
                     auto status = getStatusFromCommandResult(args.response.data);
                     if (!status.isOK()) {
                         LOGV2_WARNING(6113404,
-                                      "voteCommitMigrationProgress command failed",
+                                      "recipientVoteImportedFiles command failed",
                                       "error"_attr = redact(status));
                     }
                 });
     if (!scheduleResult.isOK()) {
         LOGV2_WARNING(6113403,
-                      "Failed to schedule voteCommitMigrationProgress command on primary",
+                      "Failed to schedule recipientVoteImportedFiles command on primary",
                       "status"_attr = scheduleResult.getStatus());
     }
 }

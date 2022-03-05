@@ -372,7 +372,6 @@ void recoverTenantMigrationAccessBlockers(OperationContext* opCtx) {
         switch (doc.getState()) {
             case TenantMigrationRecipientStateEnum::kStarted:
             case TenantMigrationRecipientStateEnum::kLearnedFilenames:
-            case TenantMigrationRecipientStateEnum::kCopiedFiles:
                 invariant(!doc.getRejectReadsBeforeTimestamp());
                 break;
             case TenantMigrationRecipientStateEnum::kConsistent:

@@ -33,6 +33,16 @@ const donorDb = donorPrimary.getDB(kDbName);
 const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
 const recipientDb = recipientPrimary.getDB(kDbName);
 
+// TODO (SERVER-61677): Currently, when we call replSetStepUp below, the new recipient secondary
+// wrongly restarts the Shard Merge protocol. It copies and imports donor files again, and
+// eventually hits an invariant in TenantFileImporterService, which doesn't support restart.
+// Once we fix Shard Merge to not resume on stepup, this test will work as-is.
+if (TenantMigrationUtil.isShardMergeEnabled(donorPrimary.getDB("adminDB"))) {
+    jsTestLog("Skip: featureFlagShardMerge enabled, but shard merge does not survive stepup");
+    tenantMigrationTest.stop();
+    return;
+}
+
 jsTestLog("Run a migration to the end of cloning");
 const waitAfterCloning =
     configureFailPoint(recipientPrimary, "fpAfterCollectionClonerDone", {action: "hang"});

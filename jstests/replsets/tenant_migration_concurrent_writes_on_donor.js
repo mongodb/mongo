@@ -892,6 +892,7 @@ const testCases = {
     reapLogicalSessionCacheNow: {skip: isNotRunOnUserDatabase},
     refreshLogicalSessionCacheNow: {skip: isNotRunOnUserDatabase},
     refreshSessions: {skip: isNotRunOnUserDatabase},
+    recipientVoteImportedFiles: {skip: isNotRunOnUserDatabase},
     renameCollection: {
         runAgainstAdminDb: true,
         explicitlyCreateCollection: true,
@@ -997,7 +998,6 @@ const testCases = {
     usersInfo: {skip: isNotRunOnUserDatabase},
     validate: {skip: isNotWriteCommand},
     voteCommitIndexBuild: {skip: isNotRunOnUserDatabase},
-    voteCommitMigrationProgress: {skip: isNotRunOnUserDatabase},
     waitForFailPoint: {skip: isNotRunOnUserDatabase},
     waitForOngoingChunkSplits: {skip: isNotRunOnUserDatabase},
     whatsmysni: {skip: isNotRunOnUserDatabase},

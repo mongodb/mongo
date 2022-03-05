@@ -40,6 +40,7 @@ imports:
   - "mongo/idl/basic_types.idl"
   - "mongo/s/sharding_types.idl"
   - "mongo/db/repl/replication_types.idl"
+  - "mongo/util/net/hostandport.idl"
 
 structs:
     recipientSyncDataResponse:
@@ -116,6 +117,30 @@ commands:
           timestamp is majority committed.
         validator:
           callback: "tenant_migration_util::validateTimestampNotNull"
+  
+  recipientVoteImportedFiles:
+    command_name: recipientVoteImportedFiles
+    cpp_name: RecipientVoteImportedFiles
+    description: "An internal mongod command to coordinate recipient steps of a multitenant
+                  migration."
+    strict: true
+    namespace: ignored
+    api_version: ""
+    reply_type: OkReply
+    fields:
+      migrationId:
+        description: "Unique identifier for the tenant migration."
+        type: uuid
+      from:
+        type: HostAndPort
+        description: "Replica set member identification."
+      success:
+        type: safeBool
+        description: "Whether the calling node succeeded at importing all files."
+      reason:
+        type: string
+        optional: true
+        description: "Optional failure reason string."
 
   recipientForgetMigration:
     description: "Parser for the 'recipientForgetMigration' command."

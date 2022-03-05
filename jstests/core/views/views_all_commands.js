@@ -497,6 +497,7 @@ let viewsCommandTests = {
     reapLogicalSessionCacheNow: {skip: isAnInternalCommand},
     recipientForgetMigration: {skip: isUnrelated},
     recipientSyncData: {skip: isUnrelated},
+    recipientVoteImportedFiles: {skip: isAnInternalCommand},
     refreshSessions: {skip: isUnrelated},
     reIndex: {
         command: {reIndex: "view"},
@@ -672,7 +673,6 @@ let viewsCommandTests = {
     waitForOngoingChunkSplits: {skip: isUnrelated},
     voteCommitImportCollection: {skip: isUnrelated},
     voteCommitIndexBuild: {skip: isUnrelated},
-    voteCommitMigrationProgress: {skip: isUnrelated},
     voteCommitTransaction: {skip: isUnrelated},
     voteAbortTransaction: {skip: isUnrelated},
     waitForFailPoint: {skip: isUnrelated},

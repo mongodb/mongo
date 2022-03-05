@@ -150,7 +150,7 @@ public:
         const MigrationProtocolEnum& getProtocol() const;
 
         /*
-         * Returns the recipient document state
+         * Returns the recipient document state.
          */
         const TenantMigrationRecipientDocument getState() const;
 
@@ -180,6 +180,13 @@ public:
          */
         OpTime waitUntilMigrationReachesReturnAfterReachingTimestamp(
             OperationContext* opCtx, const Timestamp& returnAfterReachingTimestamp);
+
+        /*
+         * Called when a replica set member (self, or a secondary) finishes importing donated files.
+         */
+        void onMemberImportedFiles(const HostAndPort& host,
+                                   bool success,
+                                   const boost::optional<StringData>& reason = boost::none);
 
         /*
          *  Set the oplog creator functor, to allow use of a mock oplog fetcher.
@@ -456,7 +463,8 @@ public:
          * 2. Writing a no-op oplog entry with ts > startApplyingDonorOpTime
          * 3. Waiting for the majority commit timestamp to be the time of the no-op write
          */
-        SemiFuture<void> _advanceStableTimestampToStartApplyingDonorOpTime();
+        void _advanceStableTimestampToStartApplyingDonorOpTime(OperationContext* opCtx,
+                                                               const CancellationToken& token);
 
         /*
          * Gets called when the cloner completes cloning data successfully.
@@ -590,9 +598,13 @@ public:
         // Promise that is resolved Signaled when the instance has started tenant database cloner
         // and tenant oplog fetcher.
         SharedPromise<void> _dataSyncStartedPromise;  // (W)
-        // Future that is resolved when all recipient nodes have imported all donor files.
-        SharedSemiFuture<void> _importedFilesFuture;  // (W)
-        // Promise that is resolved Signaled when the tenant data sync has reached consistent point.
+        // Promise that is resolved when all recipient nodes have imported all donor files.
+        SharedPromise<void> _importedFilesPromise;  // (W)
+        // Whether we are waiting for members to import donor files.
+        bool _waitingForMembersToImportFiles = true;
+        // Which members have imported all donor files.
+        stdx::unordered_set<HostAndPort> _membersWhoHaveImportedFiles;
+        // Promise that is resolved when the tenant data sync has reached consistent point.
         SharedPromise<OpTime> _dataConsistentPromise;  // (W)
         // Promise that is resolved when the data sync has completed.
         SharedPromise<void> _dataSyncCompletionPromise;  // (W)

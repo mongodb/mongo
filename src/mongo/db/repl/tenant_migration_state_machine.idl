@@ -61,7 +61,6 @@ enums:
             kConsistent: "consistent"
             kDone: "done"
             kLearnedFilenames: "learned filenames"
-            kCopiedFiles: "copied files"
 
 structs:
     tenantMigrationDonorDocument:

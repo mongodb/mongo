@@ -63,13 +63,11 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/repl/tenant_migration_decoration.h"
-#include "mongo/db/repl/tenant_migration_recipient_coordinator.h"
 #include "mongo/db/repl/tenant_migration_recipient_entry_helpers.h"
 #include "mongo/db/repl/tenant_migration_recipient_service.h"
 #include "mongo/db/repl/tenant_migration_shard_merge_util.h"
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
 #include "mongo/db/repl/tenant_migration_statistics.h"
-#include "mongo/db/repl/vote_commit_migration_progress_gen.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/session_txn_record_gen.h"
@@ -259,6 +257,7 @@ public:
 
 
 }  // namespace
+
 TenantMigrationRecipientService::TenantMigrationRecipientService(
     ServiceContext* const serviceContext)
     : PrimaryOnlyService(serviceContext), _serviceContext(serviceContext) {}
@@ -1019,6 +1018,8 @@ ExecutorFuture<void> TenantMigrationRecipientService::Instance::_getDonorFilenam
                                "migrationId"_attr = getMigrationUUID(),
                                "startApplyingDonorOpTime"_attr = startApplyingDonorOpTime,
                                "backupCursorId"_attr = data.cursorId);
+
+                    _advanceStableTimestampToStartApplyingDonorOpTime(opCtx, token);
                 } else {
                     LOGV2_DEBUG(6113002,
                                 1,
@@ -1843,23 +1844,19 @@ Future<void> TenantMigrationRecipientService::Instance::_startTenantAllDatabaseC
     return std::move(startClonerFuture);
 }
 
-SemiFuture<void>
-TenantMigrationRecipientService::Instance::_advanceStableTimestampToStartApplyingDonorOpTime() {
+void TenantMigrationRecipientService::Instance::_advanceStableTimestampToStartApplyingDonorOpTime(
+    OperationContext* opCtx, const CancellationToken& token) {
     Timestamp startApplyingDonorTimestamp;
     {
-        auto opCtx = cc().makeOperationContext();
         stdx::lock_guard lk(_mutex);
-
-        if (_stateDoc.getProtocol() != MigrationProtocolEnum::kShardMerge) {
-            return SemiFuture<void>::makeReady();
-        }
 
         invariant(_stateDoc.getStartApplyingDonorOpTime());
         startApplyingDonorTimestamp = _stateDoc.getStartApplyingDonorOpTime()->getTimestamp();
-        if (opCtx->getServiceContext()->getStorageEngine()->getStableTimestamp() >=
-            startApplyingDonorTimestamp) {
-            return SemiFuture<void>::makeReady();
-        }
+    }
+
+    if (opCtx->getServiceContext()->getStorageEngine()->getStableTimestamp() >=
+        startApplyingDonorTimestamp) {
+        return;
     }
 
     LOGV2(6114000,
@@ -1868,43 +1865,38 @@ TenantMigrationRecipientService::Instance::_advanceStableTimestampToStartApplyin
           "tenantId"_attr = getTenantId(),
           "startApplyingDonorOpTime"_attr = startApplyingDonorTimestamp.toString());
 
-    return ExecutorFuture(**_scopedExecutor)
-        .then([this, self = shared_from_this(), startApplyingDonorTimestamp] {
-            auto opCtx = cc().makeOperationContext();
+    _stopOrHangOnFailPoint(&fpBeforeAdvancingStableTimestamp, opCtx);
 
-            _stopOrHangOnFailPoint(&fpBeforeAdvancingStableTimestamp, opCtx.get());
+    // Advance the cluster time to the startApplyingDonorTimestamp so that we ensure we
+    // write the no-op entry below at ts > startApplyingDonorTimestamp.
+    VectorClockMutable::get(_serviceContext)
+        ->tickClusterTimeTo(LogicalTime(startApplyingDonorTimestamp));
 
-            // Advance the cluster time to the startApplyingDonorTimestamp so that we ensure we
-            // write the no-op entry below at ts > startApplyingDonorTimestamp.
-            VectorClockMutable::get(_serviceContext)
-                ->tickClusterTimeTo(LogicalTime(startApplyingDonorTimestamp));
+    writeConflictRetry(opCtx,
+                       "mergeRecipientWriteNoopToAdvanceStableTimestamp",
+                       NamespaceString::kRsOplogNamespace.ns(),
+                       [&] {
+                           if (token.isCanceled()) {
+                               return;
+                           }
 
-            writeConflictRetry(
-                opCtx.get(),
-                "mergeRecipientWriteNoopToAdvanceStableTimestamp",
-                NamespaceString::kRsOplogNamespace.ns(),
-                [&] {
-                    AutoGetOplog oplogWrite(opCtx.get(), OplogAccessMode::kWrite);
+                           AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
+                           WriteUnitOfWork wuow(opCtx);
+                           const std::string msg = str::stream()
+                               << "Merge recipient advancing stable timestamp";
+                           opCtx->getClient()->getServiceContext()->getOpObserver()->onOpMessage(
+                               opCtx, BSON("msg" << msg));
+                           wuow.commit();
+                       });
 
-                    WriteUnitOfWork wuow(opCtx.get());
+    // Get the timestamp of the no-op. This will have ts > startApplyingDonorTimestamp.
+    auto noOpTs = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
 
-                    const std::string msg = str::stream()
-                        << "Merge recipient advancing stable timestamp";
-                    opCtx->getClient()->getServiceContext()->getOpObserver()->onOpMessage(
-                        opCtx.get(), BSON("msg" << msg));
-
-                    wuow.commit();
-                });
-
-            // Get the timestamp of the no-op. This will have ts > startApplyingDonorTimestamp.
-            auto noOpTs = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
-
-            // We do not have a mechanism to wait on the stableTimestamp reaching a specific ts, so
-            // we wait on the majority commit point instead.
-            return WaitForMajorityService::get(opCtx->getServiceContext())
-                .waitUntilMajority(noOpTs, CancellationToken::uncancelable());
-        })
-        .semi();
+    // We do not have a mechanism to wait on the stableTimestamp reaching a specific ts, so
+    // we wait on the majority commit point instead.
+    WaitForMajorityService::get(opCtx->getServiceContext())
+        .waitUntilMajority(noOpTs, token)
+        .get(opCtx);
 }
 
 SemiFuture<void> TenantMigrationRecipientService::Instance::_onCloneSuccess() {
@@ -2011,6 +2003,45 @@ void setPromiseOkifNotReady(WithLock lk, Promise& promise) {
 }
 
 }  // namespace
+
+void TenantMigrationRecipientService::Instance::onMemberImportedFiles(
+    const HostAndPort& host, bool success, const boost::optional<StringData>& reason) {
+    stdx::lock_guard lk(_mutex);
+    if (!_waitingForMembersToImportFiles) {
+        LOGV2_WARNING(8423343,
+                      "Ignoring delayed recipientVoteImportedFiles",
+                      "host"_attr = host.toString(),
+                      "migrationId"_attr = _migrationUuid);
+        return;
+    }
+
+    auto state = _stateDoc.getState();
+    uassert(8423341,
+            "The migration is at the wrong stage for recipientVoteImportedFiles: {}"_format(
+                TenantMigrationRecipientState_serializer(state)),
+            state == TenantMigrationRecipientStateEnum::kLearnedFilenames);
+
+    if (!success) {
+        _importedFilesPromise.setError(
+            {ErrorCodes::OperationFailed,
+             "Migration failed on {}, error: {}"_format(host, reason.value_or("null"))});
+        _waitingForMembersToImportFiles = false;
+        return;
+    }
+
+    _membersWhoHaveImportedFiles.insert(host);
+    // Not reconfig-safe, we must not do a reconfig concurrent with a migration.
+    if (static_cast<int>(_membersWhoHaveImportedFiles.size()) ==
+        repl::ReplicationCoordinator::get(getGlobalServiceContext())
+            ->getConfig()
+            .getNumDataBearingMembers()) {
+        LOGV2_INFO(6112809,
+                   "All members finished importing donated files",
+                   "migrationId"_attr = _migrationUuid);
+        _importedFilesPromise.emplaceValue();
+        _waitingForMembersToImportFiles = false;
+    }
+}
 
 SemiFuture<void> TenantMigrationRecipientService::Instance::_markStateDocAsGarbageCollectable() {
     _stopOrHangOnFailPoint(&fpAfterReceivingRecipientForgetMigration);
@@ -2552,9 +2583,6 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                            _donorFilenameBackupCursorNamespaceString);
                    })
                    .then([this, self = shared_from_this()] {
-                       return _advanceStableTimestampToStartApplyingDonorOpTime();
-                   })
-                   .then([this, self = shared_from_this()] {
                        stdx::lock_guard lk(_mutex);
                        _getStartOpTimesFromDonor(lk);
                        return _updateStateDocForMajority(lk);
@@ -2650,19 +2678,12 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                        return clonerFuture;
                    })
                    .then([this, self = shared_from_this()] { return _onCloneSuccess(); })
-                   .then([this, self = shared_from_this(), token] {
+                   .then([this, self = shared_from_this()] {
                        if (_stateDoc.getProtocol() != MigrationProtocolEnum::kShardMerge) {
                            return SemiFuture<void>::makeReady();
                        }
 
                        stdx::lock_guard lk(_mutex);
-                       // Before we tell all nodes what files to copy, prepare to receive their
-                       // voteCommitMigrationProgress commands telling the primary when they finish.
-                       _importedFilesFuture =
-                           TenantMigrationRecipientCoordinator::get(_serviceContext)
-                               ->beginAwaitingVotesForStep(
-                                   getMigrationUUID(), MigrationProgressStepEnum::kImportedFiles);
-
                        _stateDoc.setState(TenantMigrationRecipientStateEnum::kLearnedFilenames);
                        return _updateStateDocForMajority(lk);
                    })
@@ -2672,20 +2693,10 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                        }
 
                        LOGV2_INFO(6113402,
-                                  "Waiting for all nodes to call voteCommitMigrationProgress with "
-                                  "step 'imported files'");
-                       return std::move(_importedFilesFuture).semi();
+                                  "Waiting for all nodes to call recipientVoteImportedFiles");
+                       return _importedFilesPromise.getFuture().semi();
                    })
                    .then([this, self = shared_from_this()] { return _killBackupCursor(); })
-                   .then([this, self = shared_from_this()] {
-                       stdx::lock_guard lk(_mutex);
-                       if (_stateDoc.getProtocol() == MigrationProtocolEnum::kShardMerge) {
-                           _stateDoc.setState(TenantMigrationRecipientStateEnum::kCopiedFiles);
-                           return _updateStateDocForMajority(lk);
-                       }
-
-                       return SemiFuture<void>::makeReady();
-                   })
                    .then([this, self = shared_from_this()] {
                        {
                            auto opCtx = cc().makeOperationContext();
@@ -2842,7 +2853,6 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                 hangBeforeTaskCompletion.pauseWhileSet();
             }
 
-            TenantMigrationRecipientCoordinator::get(_serviceContext)->reset();
             _cleanupOnDataSyncCompletion(status);
             _setMigrationStatsOnCompletion(status);
 

@@ -154,9 +154,7 @@ res = recipientPrimary.adminCommand({currentOp: true, desc: "tenant recipient mi
 checkStandardFieldsOK(res);
 currOp = res.inprog[0];
 assert.gt(new Date(), currOp.receiveStart, tojson(res));
-
 assert.eq(currOp.state, TenantMigrationTest.RecipientStateEnum.kStarted, res);
-
 assert.eq(currOp.migrationCompleted, false, res);
 assert.eq(currOp.dataSyncCompleted, false, res);
 assert(!currOp.hasOwnProperty("dataConsistentStopDonorOpTime"), res);
@@ -186,7 +184,7 @@ checkStandardFieldsOK(res);
 currOp = res.inprog[0];
 
 if (shardMergeIsEnabled) {
-    assert.eq(currOp.state, TenantMigrationTest.RecipientStateEnum.kCopiedFiles, res);
+    assert.eq(currOp.state, TenantMigrationTest.RecipientStateEnum.kLearnedFilenames, res);
 } else {
     assert.eq(currOp.state, TenantMigrationTest.RecipientStateEnum.kStarted, res);
 }

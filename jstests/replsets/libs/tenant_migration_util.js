@@ -218,8 +218,12 @@ var TenantMigrationUtil = (function() {
                 return true;
             } catch (e) {
                 if (retryOnRetryableErrors && isNetworkError(e)) {
+                    jsTestLog(`runTenantMigrationCommand retryable error. Command: ${
+                        tojson(localCmdObj)}, reply: ${tojson(res)}`);
                     return false;
                 }
+                jsTestLog(`runTenantMigrationCommand fatal error. Command: ${
+                    tojson(localCmdObj)}, reply: ${tojson(res)}`);
                 throw e;
             }
         });
