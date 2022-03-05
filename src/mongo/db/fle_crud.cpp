@@ -66,6 +66,8 @@ public:
 
     void insertDocument(const NamespaceString& nss, BSONObj obj, bool translateDuplicateKey) final;
 
+    BSONObj deleteWithPreimage(const NamespaceString& nss, BSONObj query) final;
+
 private:
     const txn_api::TransactionClient& _txnClient;
 };
@@ -157,6 +159,25 @@ void FLEQueryInterfaceImpl::insertDocument(const NamespaceString& nss,
     uassertStatusOK(status);
 }
 
+BSONObj FLEQueryInterfaceImpl::deleteWithPreimage(const NamespaceString& nss, BSONObj query) {
+    write_ops::FindAndModifyCommandRequest findAndModifyRequest(nss);
+    findAndModifyRequest.setQuery(query);
+    findAndModifyRequest.setBatchSize(1);
+    findAndModifyRequest.setSingleBatch(true);
+    findAndModifyRequest.setRemove(true);
+
+    auto response = _txnClient.runCommand(nss.db(), findAndModifyRequest.toBSON({})).get();
+    auto status = getStatusFromWriteCommandReply(response);
+    uassertStatusOK(status);
+
+    auto reply =
+        write_ops::FindAndModifyCommandReply::parse(IDLParserErrorContext("reply"), response);
+
+    uassert(6371301, "Missing document from findAndModify", reply.getValue().has_value());
+
+    return reply.getValue().value();
+}
+
 /**
  * Implementation of FLEStateCollectionReader for txn_api::TransactionClient
  *
@@ -220,7 +241,6 @@ StatusWith<txn_api::CommitResult> runInTxnWithRetry(
     }
 }
 
-
 StatusWith<FLEBatchResult> processInsert(
     OperationContext* opCtx,
     const write_ops::InsertCommandRequest& insertRequest,
@@ -266,6 +286,52 @@ StatusWith<FLEBatchResult> processInsert(
 
             return SemiFuture<void>::makeReady();
         });
+    if (!swResult.isOK()) {
+        return swResult.getStatus();
+    }
+
+    return FLEBatchResult::kProcessed;
+}
+
+
+StatusWith<FLEBatchResult> processDelete(
+    OperationContext* opCtx,
+    const write_ops::DeleteCommandRequest& deleteRequest,
+    std::function<std::shared_ptr<txn_api::TransactionWithRetries>(OperationContext*)> getTxns) {
+
+    auto deletes = deleteRequest.getDeletes();
+    uassert(6371302, "Only single document deletes are permitted", deletes.size() == 1);
+
+    auto deleteDocument = deletes[0];
+
+    uassert(
+        6371303, "FLE only supports single document deletes", deleteDocument.getMulti() == false);
+
+    auto edcNss = deleteRequest.getNamespace();
+    auto ei = deleteRequest.getEncryptionInformation().get();
+    auto ownedDeleteQuery = deleteDocument.getQ().getOwned();
+
+    std::shared_ptr<txn_api::TransactionWithRetries> trun = getTxns(opCtx);
+
+    // The function that handles the transaction may outlive this function so we need to use
+    // shared_ptrs
+    auto deleteBlock = std::tie(edcNss, ei);
+    auto sharedDeleteBlock = std::make_shared<decltype(deleteBlock)>(deleteBlock);
+
+    auto swResult =
+        runInTxnWithRetry(opCtx,
+                          trun,
+                          [sharedDeleteBlock, ownedDeleteQuery](
+                              const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+                              FLEQueryInterfaceImpl queryImpl(txnClient);
+
+                              auto [edcNss2, ei2] = *sharedDeleteBlock.get();
+
+                              processDelete(&queryImpl, edcNss2, ei2, ownedDeleteQuery);
+
+                              return SemiFuture<void>::makeReady();
+                          });
+
     if (!swResult.isOK()) {
         return swResult.getStatus();
     }
@@ -351,6 +417,99 @@ void processInsert(FLEQueryInterface* queryImpl,
     queryImpl->insertDocument(edcNss, finalDoc, false);
 }
 
+
+void processDelete(FLEQueryInterface* queryImpl,
+                   const NamespaceString& edcNss,
+                   const EncryptionInformation& ei,
+                   BSONObj deleteQuery) {
+    auto efc = EncryptionInformationHelpers::getAndValidateSchema(edcNss, ei);
+
+    NamespaceString nssEcc(edcNss.db(), efc.getEccCollection().get());
+
+    auto docCount = queryImpl->countDocuments(nssEcc);
+
+    TxnCollectionReader reader(docCount, queryImpl, nssEcc);
+
+    auto tokenMap = EncryptionInformationHelpers::getDeleteTokens(edcNss, ei);
+
+    BSONObj deletedDocument = queryImpl->deleteWithPreimage(edcNss, deleteQuery);
+
+    auto indexedFields = EDCServerCollection::getEncryptedIndexedFields(deletedDocument);
+
+    for (const auto& indexedField : indexedFields) {
+        // TODO - verify each indexed fields is listed in EncryptionInformation for the
+        // schema
+
+        auto it = tokenMap.find(indexedField.fieldPathName);
+        uassert(6371304,
+                str::stream() << "Could not find delete token for field: "
+                              << indexedField.fieldPathName,
+                it != tokenMap.end());
+
+        auto deleteToken = it->second;
+
+        auto [encryptedTypeBinding, subCdr] = fromEncryptedConstDataRange(indexedField.value);
+
+        // TODO - add support other types
+        uassert(6371305,
+                "Ony support deleting equality indexed fields",
+                encryptedTypeBinding == EncryptedBinDataType::kFLE2EqualityIndexedValue);
+
+        auto plainTextField = uassertStatusOK(FLE2IndexedEqualityEncryptedValue::decryptAndParse(
+            deleteToken.serverEncryptionToken, subCdr));
+
+        auto tagToken =
+            FLETwiceDerivedTokenGenerator::generateECCTwiceDerivedTagToken(plainTextField.ecc);
+        auto valueToken =
+            FLETwiceDerivedTokenGenerator::generateECCTwiceDerivedValueToken(plainTextField.ecc);
+
+        auto alpha = ECCCollection::emuBinary(&reader, tagToken, valueToken);
+
+        uint64_t index = 0;
+        if (alpha.has_value() && alpha.value() == 0) {
+            index = 1;
+        } else if (!alpha.has_value()) {
+            auto block = ECCCollection::generateId(tagToken, boost::none);
+
+            auto r_ecc = reader.getById(block);
+            uassert(6371306, "ECC null document not found", !r_ecc.isEmpty());
+
+            auto eccNullDoc =
+                uassertStatusOK(ECCCollection::decryptNullDocument(valueToken, r_ecc));
+            index = eccNullDoc.position + 2;
+        } else {
+            auto block = ECCCollection::generateId(tagToken, alpha);
+
+            auto r_ecc = reader.getById(block);
+            uassert(6371307, "ECC document not found", !r_ecc.isEmpty());
+
+            auto eccDoc = uassertStatusOK(ECCCollection::decryptDocument(valueToken, r_ecc));
+
+            if (eccDoc.valueType == ECCValueType::kCompactionPlaceholder) {
+                uassertStatusOK(
+                    Status(ErrorCodes::FLECompactionPlaceholder, "Found contention placeholder"));
+            }
+
+            index = alpha.value() + 1;
+        }
+
+        queryImpl->insertDocument(
+            nssEcc,
+            ECCCollection::generateDocument(tagToken, valueToken, index, plainTextField.count),
+            true);
+
+        NamespaceString nssEcoc(edcNss.db(), efc.getEcocCollection().get());
+
+        // TODO - make this a batch of ECOC updates?
+        EncryptedStateCollectionTokens tokens(plainTextField.esc, plainTextField.ecc);
+        auto encryptedTokens = uassertStatusOK(tokens.serialize(deleteToken.ecocToken));
+        queryImpl->insertDocument(
+            nssEcoc,
+            ECOCollection::generateDocument(indexedField.fieldPathName, encryptedTokens),
+            false);
+    }
+}
+
 FLEBatchResult processFLEBatch(OperationContext* opCtx,
                                const BatchedCommandRequest& request,
                                BatchWriteExecStats* stats,
@@ -361,7 +520,7 @@ FLEBatchResult processFLEBatch(OperationContext* opCtx,
         uasserted(6371209, "Feature flag FLE2 is not enabled");
     }
 
-    if (request.getBatchType() != BatchedCommandRequest::BatchType_Insert) {
+    if (request.getBatchType() == BatchedCommandRequest::BatchType_Update) {
         return FLEBatchResult::kNotProcessed;
     }
 
@@ -376,6 +535,24 @@ FLEBatchResult processFLEBatch(OperationContext* opCtx,
         auto insertRequest = request.getInsertRequest();
 
         auto swResult = processInsert(opCtx, insertRequest, getTxn);
+
+        if (!swResult.isOK()) {
+            response->setStatus(swResult.getStatus());
+            response->setN(0);
+
+            return FLEBatchResult::kProcessed;
+        } else if (swResult.getValue() == FLEBatchResult::kProcessed) {
+            response->setStatus(Status::OK());
+            response->setN(1);
+        }
+
+        return swResult.getValue();
+    } else if (request.getBatchType() == BatchedCommandRequest::BatchType_Delete) {
+
+        auto deleteRequest = request.getDeleteRequest();
+
+        auto swResult = processDelete(opCtx, deleteRequest, getTxn);
+
 
         if (!swResult.isOK()) {
             response->setStatus(swResult.getStatus());

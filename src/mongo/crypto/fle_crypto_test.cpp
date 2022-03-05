@@ -715,17 +715,6 @@ void toEncryptedBinData(StringData field, EncryptedBinDataType dt, T t, BSONObjB
     builder->appendBinData(field, buf.size(), BinDataType::Encrypt, buf.data());
 }
 
-
-std::pair<EncryptedBinDataType, ConstDataRange> fromEncryptedConstDataRange(ConstDataRange cdr) {
-    ConstDataRangeCursor cdrc(cdr);
-
-    uint8_t subTypeByte = cdrc.readAndAdvance<uint8_t>();
-
-    auto subType = EncryptedBinDataType_parse(IDLParserErrorContext("subtype"), subTypeByte);
-    return {subType, cdrc};
-}
-
-
 BSONObj transformBSON(
     const BSONObj& object,
     const std::function<void(ConstDataRange, BSONObjBuilder*, StringData)>& doTransform) {
@@ -1104,6 +1093,58 @@ TEST(IndexedFields, FetchTwoLevels) {
     }));
 }
 
+TEST(DeleteTokens, Basic) {
+    TestKeyVault keyVault;
+    NamespaceString ns("test.test");
+    EncryptedFieldConfig efc = getTestEncryptedFieldConfig();
+
+    auto obj =
+        EncryptionInformationHelpers::encryptionInformationSerializeForDelete(ns, efc, &keyVault);
+
+    std::cout << "Tokens" << obj << std::endl;
+}
+
+TEST(DeleteTokens, Fetch) {
+    TestKeyVault keyVault;
+    NamespaceString ns("test.test");
+    EncryptedFieldConfig efc = getTestEncryptedFieldConfig();
+
+    auto obj =
+        EncryptionInformationHelpers::encryptionInformationSerializeForDelete(ns, efc, &keyVault);
+
+    auto tokenMap = EncryptionInformationHelpers::getDeleteTokens(
+        ns, EncryptionInformation::parse(IDLParserErrorContext("foo"), obj));
+
+    ASSERT_EQ(tokenMap.size(), 2);
+
+    ASSERT(tokenMap.contains("nested.encrypted"));
+    ASSERT(tokenMap.contains("encrypted"));
+}
+
+TEST(DeleteTokens, CorruptDelete) {
+    TestKeyVault keyVault;
+    NamespaceString ns("test.test");
+    EncryptedFieldConfig efc = getTestEncryptedFieldConfig();
+
+    EncryptionInformation ei;
+    ei.setType(1);
+
+    ei.setSchema(BSON(ns.toString() << efc.toBSON()));
+
+    // Missing Delete tokens
+    ASSERT_THROWS_CODE(EncryptionInformationHelpers::getDeleteTokens(ns, ei), DBException, 6371308);
+
+    // NSS map is not an object
+    ei.setDeleteTokens(BSON(ns.toString() << "str"));
+
+    ASSERT_THROWS_CODE(EncryptionInformationHelpers::getDeleteTokens(ns, ei), DBException, 6371309);
+
+    // Tokens is not a map
+    ei.setDeleteTokens(BSON(ns.toString() << BSON("a"
+                                                  << "b")));
+
+    ASSERT_THROWS_CODE(EncryptionInformationHelpers::getDeleteTokens(ns, ei), DBException, 6371310);
+}
 
 }  // namespace mongo
 

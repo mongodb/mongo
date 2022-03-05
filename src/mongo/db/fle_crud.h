@@ -95,6 +95,13 @@ public:
     virtual void insertDocument(const NamespaceString& nss,
                                 BSONObj obj,
                                 bool translateDuplicateKey) = 0;
+
+    /**
+     * Delete a single document with the given query.
+     *
+     * Returns the pre-image of the deleted document.
+     */
+    virtual BSONObj deleteWithPreimage(const NamespaceString& nss, BSONObj query) = 0;
 };
 
 /**
@@ -108,4 +115,13 @@ void processInsert(FLEQueryInterface* queryImpl,
                    const EncryptedFieldConfig& efc,
                    BSONObj document);
 
+/**
+ * Process a FLE delete with the query interface
+ *
+ * Used by unit tests.
+ */
+void processDelete(FLEQueryInterface* queryImpl,
+                   const NamespaceString& edcNss,
+                   const EncryptionInformation& ei,
+                   BSONObj deleteQuery);
 }  // namespace mongo

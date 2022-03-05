@@ -893,12 +893,46 @@ public:
     static std::vector<EDCIndexedFields> getEncryptedIndexedFields(BSONObj& obj);
 };
 
+struct FLEDeleteToken {
+    ECOCToken ecocToken;
+    ServerDataEncryptionLevel1Token serverEncryptionToken;
+};
+
 class EncryptionInformationHelpers {
 public:
+    /**
+     * Serialize EncryptedFieldConfig to a EncryptionInformation with
+     * EncryptionInformation.schema = { nss: EncryptedFieldConfig}
+     */
     static BSONObj encryptionInformationSerialize(NamespaceString& nss, EncryptedFieldConfig& ef);
 
+    /**
+     * Serialize EncryptionInformation with EncryptionInformation.schema and a map of delete tokens
+     * for each field in EncryptedFieldConfig.
+     */
+    static BSONObj encryptionInformationSerializeForDelete(NamespaceString& nss,
+                                                           EncryptedFieldConfig& ef,
+                                                           FLEKeyVault* keyVault);
+
+    /**
+     * Get a schema from EncryptionInformation and ensure the esc/ecc/ecoc are setup correctly.
+     */
     static EncryptedFieldConfig getAndValidateSchema(const NamespaceString& nss,
                                                      const EncryptionInformation& ei);
+
+    /**
+     * Get a set of delete tokens for a given nss from EncryptionInformation.
+     */
+    static StringMap<FLEDeleteToken> getDeleteTokens(const NamespaceString& nss,
+                                                     const EncryptionInformation& ei);
 };
+
+/**
+ * Split a ConstDataRange into a byte for EncryptedBinDataType and a ConstDataRange for the trailing
+ * bytes
+ *
+ * Verifies that EncryptedBinDataType is valid.
+ */
+std::pair<EncryptedBinDataType, ConstDataRange> fromEncryptedConstDataRange(ConstDataRange cdr);
 
 }  // namespace mongo

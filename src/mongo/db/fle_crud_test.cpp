@@ -71,13 +71,13 @@ public:
         : _opCtx(opCtx), _storage(storage) {}
     ~FLEQueryTestImpl() = default;
 
-    BSONObj getById(const NamespaceString& nss, PrfBlock block);
+    BSONObj getById(const NamespaceString& nss, PrfBlock block) final;
 
-    uint64_t countDocuments(const NamespaceString& nss);
+    uint64_t countDocuments(const NamespaceString& nss) final;
 
-    void insertDocument(const NamespaceString& nss, BSONObj obj, bool translateDuplicateKey);
+    void insertDocument(const NamespaceString& nss, BSONObj obj, bool translateDuplicateKey) final;
 
-    BSONObj deleteWithPreimage(const NamespaceString& nss, BSONObj query);
+    BSONObj deleteWithPreimage(const NamespaceString& nss, BSONObj query) final;
 
 private:
     OperationContext* _opCtx;
@@ -107,6 +107,16 @@ void FLEQueryTestImpl::insertDocument(const NamespaceString& nss,
     auto status = _storage->insertDocument(_opCtx, nss, tb, 0);
 
     uassertStatusOK(status);
+}
+
+BSONObj FLEQueryTestImpl::deleteWithPreimage(const NamespaceString& nss, BSONObj query) {
+    // A limit of the API, we can delete by _id and get the pre-image so we limit our unittests to
+    // this
+    ASSERT_EQ("_id"_sd, query.firstElementFieldNameStringData());
+
+    auto doc = uassertStatusOK(_storage->deleteById(_opCtx, nss, query.firstElement()));
+
+    return doc;
 }
 
 FLEIndexKey indexKey(KeyMaterial{0x6e, 0xda, 0x88, 0xc8, 0x49, 0x6e, 0xc9, 0x90, 0xf5, 0xd5, 0x51,
@@ -182,6 +192,8 @@ protected:
     void doSingleInsert(int id, BSONElement element);
     void doSingleInsert(int id, BSONObj obj);
 
+    void doSingleDelete(int id);
+
     using ValueGenerator = std::function<std::string(StringData fieldName, uint64_t row)>;
 
     void doSingleWideInsert(int id, uint64_t fieldCount, ValueGenerator func);
@@ -189,6 +201,10 @@ protected:
     ESCTwiceDerivedTagToken getTestESCToken(BSONElement value);
     ESCTwiceDerivedTagToken getTestESCToken(BSONObj obj);
     ESCTwiceDerivedTagToken getTestESCToken(StringData name, StringData value);
+
+    ECCDerivedFromDataTokenAndContentionFactorToken getTestECCToken(BSONElement value);
+
+    ECCDocument getECCDocument(ECCDerivedFromDataTokenAndContentionFactorToken token, int position);
 
     std::vector<char> generatePlaceholder(UUID keyId, BSONElement value);
 
@@ -286,6 +302,30 @@ ESCTwiceDerivedTagToken FleCrudTest::getTestESCToken(StringData name, StringData
     return FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedTagToken(escContentionToken);
 }
 
+ECCDerivedFromDataTokenAndContentionFactorToken FleCrudTest::getTestECCToken(BSONElement element) {
+    auto c1token = FLELevel1TokenGenerator::generateCollectionsLevel1Token(
+        _keyVault.getIndexKeyById(indexKeyId).key);
+    auto eccToken = FLECollectionTokenGenerator::generateECCToken(c1token);
+
+    auto eccDataToken =
+        FLEDerivedFromDataTokenGenerator::generateECCDerivedFromDataToken(eccToken, toCDR(element));
+    return FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
+        generateECCDerivedFromDataTokenAndContentionFactorToken(eccDataToken, 0);
+}
+
+ECCDocument FleCrudTest::getECCDocument(ECCDerivedFromDataTokenAndContentionFactorToken token,
+                                        int position) {
+
+    auto tag = FLETwiceDerivedTokenGenerator::generateECCTwiceDerivedTagToken(token);
+    auto value = FLETwiceDerivedTokenGenerator::generateECCTwiceDerivedValueToken(token);
+
+    BSONObj doc = _queryImpl->getById(_eccNs, ECCCollection::generateId(tag, position));
+    ASSERT_FALSE(doc.isEmpty());
+
+    return uassertStatusOK(ECCCollection::decryptDocument(value, doc));
+}
+
+
 std::vector<char> FleCrudTest::generatePlaceholder(UUID keyId, BSONElement value) {
     FLE2EncryptionPlaceholder ep;
 
@@ -335,7 +375,6 @@ void FleCrudTest::assertDocumentCounts(uint64_t edc, uint64_t esc, uint64_t ecc,
     ASSERT_EQ(_queryImpl->countDocuments(_eccNs), ecc);
     ASSERT_EQ(_queryImpl->countDocuments(_ecocNs), ecoc);
 }
-
 
 // Auto generate key ids from field id
 void FleCrudTest::doSingleWideInsert(int id, uint64_t fieldCount, ValueGenerator func) {
@@ -403,6 +442,18 @@ void FleCrudTest::doSingleInsert(int id, BSONElement element) {
 
 void FleCrudTest::doSingleInsert(int id, BSONObj obj) {
     doSingleInsert(id, obj.firstElement());
+}
+
+void FleCrudTest::doSingleDelete(int id) {
+
+    auto efc = getTestEncryptedFieldConfig();
+
+    auto doc = EncryptionInformationHelpers::encryptionInformationSerializeForDelete(
+        _edcNs, efc, &_keyVault);
+
+    auto ei = EncryptionInformation::parse(IDLParserErrorContext("test"), doc);
+
+    processDelete(_queryImpl.get(), _edcNs, ei, BSON("_id" << id));
 }
 
 // Insert one document
@@ -519,6 +570,88 @@ TEST_F(FleCrudTest, Insert20Fields50Rows) {
                     .isEmpty());
         }
     }
+}
+
+#define ASSERT_ECC_DOC(assertElement, assertPosition, assertStart, assertEnd)            \
+    {                                                                                    \
+        auto _eccDoc = getECCDocument(getTestECCToken((assertElement)), assertPosition); \
+        ASSERT(_eccDoc.valueType == ECCValueType::kNormal);                              \
+        ASSERT_EQ(_eccDoc.start, assertStart);                                           \
+        ASSERT_EQ(_eccDoc.end, assertEnd);                                               \
+    }
+
+// Insert and delete one document
+TEST_F(FleCrudTest, InsertAndDeleteOne) {
+    auto doc = BSON("encrypted"
+                    << "secret");
+    auto element = doc.firstElement();
+
+    doSingleInsert(1, element);
+
+    assertDocumentCounts(1, 1, 0, 1);
+
+    ASSERT_FALSE(_queryImpl->getById(_escNs, ESCCollection::generateId(getTestESCToken(element), 1))
+                     .isEmpty());
+
+    doSingleDelete(1);
+
+    assertDocumentCounts(0, 1, 1, 2);
+
+    getECCDocument(getTestECCToken(element), 1);
+}
+
+// Insert two documents, and delete both
+TEST_F(FleCrudTest, InsertTwoSamAndDeleteTwo) {
+    auto doc = BSON("encrypted"
+                    << "secret");
+    auto element = doc.firstElement();
+
+    doSingleInsert(1, element);
+    doSingleInsert(2, element);
+
+    assertDocumentCounts(2, 2, 0, 2);
+
+    ASSERT_FALSE(_queryImpl->getById(_escNs, ESCCollection::generateId(getTestESCToken(element), 1))
+                     .isEmpty());
+
+    doSingleDelete(2);
+    doSingleDelete(1);
+
+    assertDocumentCounts(0, 2, 2, 4);
+
+    ASSERT_ECC_DOC(element, 1, 2, 2);
+    ASSERT_ECC_DOC(element, 2, 1, 1);
+}
+
+// Insert two documents with different values and delete them
+TEST_F(FleCrudTest, InsertTwoDifferentAndDeleteTwo) {
+
+    doSingleInsert(1,
+                   BSON("encrypted"
+                        << "secret"));
+    doSingleInsert(2,
+                   BSON("encrypted"
+                        << "topsecret"));
+
+    assertDocumentCounts(2, 2, 0, 2);
+
+    doSingleDelete(2);
+    doSingleDelete(1);
+
+    assertDocumentCounts(0, 2, 2, 4);
+
+    ASSERT_ECC_DOC(BSON("encrypted"
+                        << "secret")
+                       .firstElement(),
+                   1,
+                   1,
+                   1);
+    ASSERT_ECC_DOC(BSON("encrypted"
+                        << "topsecret")
+                       .firstElement(),
+                   1,
+                   1,
+                   1);
 }
 
 }  // namespace

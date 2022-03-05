@@ -263,15 +263,6 @@ void toEncryptedBinData(StringData field,
     builder->appendBinData(field, buf.size(), BinDataType::Encrypt, buf.data());
 }
 
-std::pair<EncryptedBinDataType, ConstDataRange> fromEncryptedConstDataRange(ConstDataRange cdr) {
-    ConstDataRangeCursor cdrc(cdr);
-
-    uint8_t subTypeByte = cdrc.readAndAdvance<uint8_t>();
-
-    auto subType = EncryptedBinDataType_parse(IDLParserErrorContext("subtype"), subTypeByte);
-    return {subType, cdrc};
-}
-
 std::pair<EncryptedBinDataType, ConstDataRange> fromEncryptedBinData(BSONElement element) {
     uassert(
         6373502, "Expected binData with subtype Encrypt", element.isBinData(BinDataType::Encrypt));
@@ -1043,6 +1034,33 @@ void collectIndexedFields(std::vector<EDCIndexedFields>* pFields,
     }
 
     pFields->push_back({cdr, fieldPath.toString()});
+}
+
+void serializeDeletePayload(UUID keyId, FLEKeyVault* keyVault, BSONObjBuilder* builder) {
+
+    auto indexKey = keyVault->getIndexKeyById(keyId);
+
+    auto collectionToken = FLELevel1TokenGenerator::generateCollectionsLevel1Token(indexKey.key);
+    auto serverEncryptionToken =
+        FLELevel1TokenGenerator::generateServerDataEncryptionLevel1Token(indexKey.key);
+    auto ecocToken = FLECollectionTokenGenerator::generateECOCToken(collectionToken);
+
+    FLE2DeletePayload payload;
+    payload.setEcocToken(ecocToken.toCDR());
+    payload.setServerEncryptionToken(serverEncryptionToken.toCDR());
+    payload.serialize(builder);
+}
+
+BSONObj getDeleteTokensBSON(EncryptedFieldConfig& ef, FLEKeyVault* keyVault) {
+    BSONObjBuilder builder;
+    for (const auto& field : ef.getFields()) {
+        if (field.getQueries().has_value()) {
+            BSONObjBuilder subBuilder(builder.subobjStart(field.getPath()));
+            serializeDeletePayload(field.getKeyId(), keyVault, &subBuilder);
+        }
+    }
+
+    return builder.obj();
 }
 
 }  // namespace
@@ -1820,5 +1838,57 @@ EncryptedFieldConfig EncryptionInformationHelpers::getAndValidateSchema(
     return efc;
 }
 
+std::pair<EncryptedBinDataType, ConstDataRange> fromEncryptedConstDataRange(ConstDataRange cdr) {
+    ConstDataRangeCursor cdrc(cdr);
+
+    uint8_t subTypeByte = cdrc.readAndAdvance<uint8_t>();
+
+    auto subType = EncryptedBinDataType_parse(IDLParserErrorContext("subtype"), subTypeByte);
+    return {subType, cdrc};
+}
+
+BSONObj EncryptionInformationHelpers::encryptionInformationSerializeForDelete(
+    NamespaceString& nss, EncryptedFieldConfig& ef, FLEKeyVault* keyVault) {
+
+    EncryptionInformation ei;
+    ei.setType(kEncryptionInformationSchemaVersion);
+
+    ei.setSchema(BSON(nss.toString() << ef.toBSON()));
+
+    ei.setDeleteTokens(BSON(nss.toString() << getDeleteTokensBSON(ef, keyVault)));
+
+    return ei.toBSON();
+}
+
+StringMap<FLEDeleteToken> EncryptionInformationHelpers::getDeleteTokens(
+    const NamespaceString& nss, const EncryptionInformation& ei) {
+
+    uassert(6371308, "DeleteTokens is empty", ei.getDeleteTokens().has_value());
+
+    BSONObj deleteTokens = ei.getDeleteTokens().value();
+
+    auto element = deleteTokens.getField(nss.toString());
+
+    uassert(6371309,
+            "DeleteTokens item for namespace is not set",
+            !element.eoo() && element.type() == Object);
+
+    StringMap<FLEDeleteToken> map;
+    for (const auto& deleteTokenBSON : element.Obj()) {
+        uassert(6371310, "DeleteToken is not an object", deleteTokenBSON.type() == Object);
+
+        auto payload =
+            FLE2DeletePayload::parse(IDLParserErrorContext("delete"), deleteTokenBSON.Obj());
+
+        auto deleteToken =
+            FLEDeleteToken{FLETokenFromCDR<FLETokenType::ECOCToken>(payload.getEcocToken()),
+                           FLETokenFromCDR<FLETokenType::ServerDataEncryptionLevel1Token>(
+                               payload.getServerEncryptionToken())};
+
+        map.insert({deleteTokenBSON.fieldNameStringData().toString(), deleteToken});
+    }
+
+    return map;
+}
 
 }  // namespace mongo
