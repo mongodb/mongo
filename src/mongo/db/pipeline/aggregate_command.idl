@@ -123,6 +123,22 @@ commands:
                 - privilege: # $listCachedAndActiveUsers
                     resource_pattern: any_normal
                     action_type: listCachedAndActiveUsers
+                - privilege: # $listCatalog
+                    agg_stage: listCatalog
+                    resource_pattern: cluster
+                    action_type: listDatabases
+                - privilege: # $listCatalog
+                    agg_stage: listCatalog
+                    resource_pattern: any_normal
+                    action_type: [listCollections, listIndexes]
+                - privilege: # $listCatalog
+                    agg_stage: listCatalog
+                    resource_pattern: collection
+                    action_type: [listCollections, listIndexes]
+                - privilege: # $listCatalog
+                    agg_stage: listCatalog
+                    resource_pattern: any_system_buckets
+                    action_type: [listCollections, listIndexes]
                 - privilege: # $listSessions
                     resource_pattern: cluster
                     action_type: listSessions
