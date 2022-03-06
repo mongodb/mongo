@@ -146,7 +146,8 @@ private:
     OplogBatch _currentBatchToApply;
 
     // Buffer for internally generated oplog entries that needs to be processed for this batch.
-    std::list<repl::OplogEntry> _currentDerivedOps;
+    std::list<repl::OplogEntry> _currentDerivedOpsForCrudWriters;
+    std::list<repl::OplogEntry> _currentDerivedOpsForSessionWriters;
 
     // The source of the oplog entries to be applied.
     std::unique_ptr<ReshardingDonorOplogIteratorInterface> _oplogIter;

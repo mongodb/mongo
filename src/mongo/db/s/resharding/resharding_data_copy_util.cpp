@@ -307,13 +307,16 @@ void updateSessionRecord(OperationContext* opCtx,
     auto txnParticipant = TransactionParticipant::get(opCtx);
     invariant(txnParticipant, "Must be called with session checked out");
 
+    const auto sessionId = *opCtx->getLogicalSessionId();
+    const auto txnNumber = *opCtx->getTxnNumber();
+
     repl::MutableOplogEntry oplogEntry;
     oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
     oplogEntry.setObject(SessionCatalogMigration::kSessionOplogTag);
     oplogEntry.setObject2(std::move(o2Field));
     oplogEntry.setNss({});
-    oplogEntry.setSessionId(opCtx->getLogicalSessionId());
-    oplogEntry.setTxnNumber(opCtx->getTxnNumber());
+    oplogEntry.setSessionId(sessionId);
+    oplogEntry.setTxnNumber(txnNumber);
     oplogEntry.setStatementIds(stmtIds);
     oplogEntry.setPreImageOpTime(std::move(preImageOpTime));
     oplogEntry.setPostImageOpTime(std::move(postImageOpTime));
@@ -321,37 +324,33 @@ void updateSessionRecord(OperationContext* opCtx,
     oplogEntry.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
     oplogEntry.setFromMigrate(true);
 
-    writeConflictRetry(opCtx,
-                       "resharding::data_copy::updateSessionRecord",
-                       NamespaceString::kSessionTransactionsTableNamespace.ns(),
-                       [&] {
-                           AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
+    writeConflictRetry(
+        opCtx,
+        "resharding::data_copy::updateSessionRecord",
+        NamespaceString::kSessionTransactionsTableNamespace.ns(),
+        [&] {
+            AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
 
-                           WriteUnitOfWork wuow(opCtx);
-                           repl::OpTime opTime = repl::logOp(opCtx, &oplogEntry);
+            WriteUnitOfWork wuow(opCtx);
+            repl::OpTime opTime = repl::logOp(opCtx, &oplogEntry);
 
-                           uassert(4989901,
-                                   str::stream() << "Failed to create new oplog entry: "
-                                                 << redact(oplogEntry.toBSON()),
-                                   !opTime.isNull());
+            uassert(4989901,
+                    str::stream() << "Failed to create new oplog entry: "
+                                  << redact(oplogEntry.toBSON()),
+                    !opTime.isNull());
 
-                           // Use the same wallTime as the oplog entry since SessionUpdateTracker
-                           // looks at the oplog entry wallTime when replicating.
-                           SessionTxnRecord sessionTxnRecord(*oplogEntry.getSessionId(),
-                                                             *oplogEntry.getTxnNumber(),
-                                                             std::move(opTime),
-                                                             oplogEntry.getWallClockTime());
+            // Use the same wallTime as the oplog entry since SessionUpdateTracker
+            // looks at the oplog entry wallTime when replicating.
+            SessionTxnRecord sessionTxnRecord(
+                sessionId, txnNumber, std::move(opTime), oplogEntry.getWallClockTime());
+            if (isInternalSessionForRetryableWrite(sessionId)) {
+                sessionTxnRecord.setParentSessionId(*getParentSessionId(sessionId));
+            }
 
-                           if (isInternalSessionForRetryableWrite(*oplogEntry.getSessionId())) {
-                               sessionTxnRecord.setParentSessionId(
-                                   *getParentSessionId(*oplogEntry.getSessionId()));
-                           }
+            txnParticipant.onRetryableWriteCloningCompleted(opCtx, stmtIds, sessionTxnRecord);
 
-                           txnParticipant.onRetryableWriteCloningCompleted(
-                               opCtx, stmtIds, sessionTxnRecord);
-
-                           wuow.commit();
-                       });
+            wuow.commit();
+        });
 }
 
 }  // namespace mongo::resharding::data_copy

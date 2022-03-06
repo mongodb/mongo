@@ -50,8 +50,7 @@ namespace {
  * Return true if we need to update config.transactions collection for this oplog entry.
  */
 bool shouldUpdateTxnTable(const repl::OplogEntry& op) {
-    if (op.getCommandType() == repl::OplogEntry::CommandType::kCommitTransaction ||
-        op.getCommandType() == repl::OplogEntry::CommandType::kAbortTransaction) {
+    if (op.getCommandType() == repl::OplogEntry::CommandType::kAbortTransaction) {
         return true;
     }
 
@@ -64,8 +63,21 @@ bool shouldUpdateTxnTable(const repl::OplogEntry& op) {
     }
 
     if (op.getCommandType() == repl::OplogEntry::CommandType::kApplyOps) {
-        auto applyOpsInfo = repl::ApplyOpsCommandInfo::parse(op.getObject());
-        return !applyOpsInfo.getPrepare() && !applyOpsInfo.getPartialTxn();
+        // This applyOps oplog entry is guaranteed to correspond to a committed transaction since
+        // the resharding aggregation pipeline does not output applyOps oplog entries for aborted
+        // transactions (i.e. it only outputs the abortTransaction oplog entry).
+
+        if (isInternalSessionForRetryableWrite(*op.getSessionId())) {
+            // For a retryable internal transaction, we need to update the config.transactions
+            // collection upon writing the noop oplog entries for retryable operations contained
+            // within each applyOps oplog entry.
+            return true;
+        }
+
+        // The resharding aggregation pipeline also does not output the commitTransaction oplog
+        // entry so for a non-retryable transaction, we need to the update to the
+        // config.transactions collection upon seeing the final applyOps oplog entry.
+        return !op.isPartialTransaction();
     }
 
     return false;
@@ -116,6 +128,8 @@ WriterVectors ReshardingOplogBatchPreparer::makeCrudOpWriterVectors(
             }
 
             auto applyOpsInfo = repl::ApplyOpsCommandInfo::parse(op.getObject());
+            // TODO (SERVER-63880): Make resharding handle applyOps oplog entries with
+            // WouldChangeOwningShard sentinel noop entry.
             uassert(
                 ErrorCodes::OplogOperationUnsupported,
                 str::stream() << "Commands within applyOps are not supported during resharding: "
@@ -148,7 +162,7 @@ WriterVectors ReshardingOplogBatchPreparer::makeCrudOpWriterVectors(
 }
 
 WriterVectors ReshardingOplogBatchPreparer::makeSessionOpWriterVectors(
-    const OplogBatchToPrepare& batch) const {
+    const OplogBatchToPrepare& batch, std::list<OplogEntry>& derivedOps) const {
     auto writerVectors = _makeEmptyWriterVectors();
 
     struct SessionOpsList {
@@ -188,7 +202,52 @@ WriterVectors ReshardingOplogBatchPreparer::makeSessionOpWriterVectors(
         } else if (op.isCommand()) {
             throwIfUnsupportedCommandOp(op);
 
-            if (shouldUpdateTxnTable(op)) {
+            if (!shouldUpdateTxnTable(op)) {
+                continue;
+            }
+
+            auto sessionId = *op.getSessionId();
+
+            if (isInternalSessionForRetryableWrite(sessionId) &&
+                op.getCommandType() == OplogEntry::CommandType::kApplyOps) {
+                // Derive retryable write CRUD oplog entries from this retryable internal
+                // transaction applyOps oplog entry.
+
+                auto applyOpsInfo = repl::ApplyOpsCommandInfo::parse(op.getObject());
+                // TODO (SERVER-63880): Make resharding handle applyOps oplog entries with
+                // WouldChangeOwningShard sentinel noop entry.
+                uassert(ErrorCodes::OplogOperationUnsupported,
+                        str::stream()
+                            << "Commands within applyOps are not supported during resharding: "
+                            << redact(op.toBSONForLogging()),
+                        applyOpsInfo.areOpsCrudOnly());
+
+                auto unrolledOp =
+                    uassertStatusOK(repl::MutableOplogEntry::parse(op.getEntry().toBSON()));
+                unrolledOp.setSessionId(*getParentSessionId(sessionId));
+                unrolledOp.setTxnNumber(*sessionId.getTxnNumber());
+
+                for (const auto& innerOp : applyOpsInfo.getOperations()) {
+                    auto replOp = repl::ReplOperation::parse(
+                        {"ReshardingOplogBatchPreparer::makeSessionOpWriterVectors innerOp"},
+                        innerOp);
+                    if (replOp.getStatementIds().empty()) {
+                        // Skip this operation since it is not retryable.
+                        continue;
+                    }
+                    unrolledOp.setDurableReplOperation(replOp);
+
+                    // There isn't a direct way to convert from a MutableOplogEntry to a
+                    // DurableOplogEntry or OplogEntry. We serialize the unrolledOp to have it get
+                    // re-parsed into an OplogEntry.
+                    auto& derivedOp = derivedOps.emplace_back(unrolledOp.toBSON());
+                    invariant(derivedOp.isCrudOpType());
+
+                    // `&derivedOp` is guaranteed to remain stable while we append more derived
+                    // oplog entries because `derivedOps` is a std::list.
+                    updateSessionTracker(&derivedOp);
+                }
+            } else {
                 updateSessionTracker(&op);
             }
         } else {
