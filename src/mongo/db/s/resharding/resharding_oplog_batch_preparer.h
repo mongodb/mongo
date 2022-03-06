@@ -82,13 +82,11 @@ public:
      * to the config.transactions record for a higher txnNumber will cause any updates in `batch`
      * for lower txnNumbers to be elided.
      *
-     * The returned writer vectors refer to memory owned by `batch` and `derivedOps`. The caller
-     * must take care to ensure both `batch` and `derivedOps` outlive the writer vectors all being
-     * applied and must take care not to modify `batch` or `derivedOps` until after the writer
-     * vectors have all been applied.
+     * The returned writer vectors refer to memory owned by `batch`. The caller must take care to
+     * ensure `batch` outlives the writer vectors all being applied and must take care not to modify
+     * `batch` until after the writer vectors have all been applied.
      */
-    WriterVectors makeSessionOpWriterVectors(const OplogBatchToPrepare& batch,
-                                             std::list<OplogEntry>& derivedOps) const;
+    WriterVectors makeSessionOpWriterVectors(const OplogBatchToPrepare& batch) const;
 
     static void throwIfUnsupportedCommandOp(const OplogEntry& op);
 

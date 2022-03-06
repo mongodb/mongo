@@ -68,8 +68,6 @@ public:
 
             MongoDSessionCatalog::onStepUp(opCtx.get());
         }
-
-        serverGlobalParams.clusterRole = ClusterRole::ShardServer;
     }
 
     repl::OpTime insertSessionRecord(OperationContext* opCtx,
@@ -947,67 +945,6 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingTxnHasHigherTxnNumberThanP
 
     ASSERT_TRUE(hitPreparedTxn->isReady());
     ASSERT_OK(hitPreparedTxn->getNoThrow());
-}
-
-TEST_F(ReshardingOplogSessionApplicationTest, IgnoreIncomingAbortedRetryableInternalTransaction) {
-    auto lsid = makeLogicalSessionIdWithTxnNumberAndUUIDForTest();
-
-    TxnNumber incomingTxnNumber = 100;
-
-    auto opTime = [&] {
-        auto opCtx = makeOperationContext();
-        return insertSessionRecord(opCtx.get(), makeLogicalSessionIdForTest(), 100, {3});
-    }();
-
-    // 'makeFinishTxnOp' returns an abortTransaction oplog entry.
-    auto oplogEntry = makeFinishTxnOp(lsid, incomingTxnNumber);
-
-    {
-        auto opCtx = makeOperationContext();
-        ReshardingOplogSessionApplication applier;
-        auto hitPreparedTxn = applier.tryApplyOperation(opCtx.get(), oplogEntry);
-        ASSERT_FALSE(bool(hitPreparedTxn));
-    }
-
-    {
-        auto opCtx = makeOperationContext();
-        auto foundOps = findOplogEntriesNewerThan(opCtx.get(), opTime.getTimestamp());
-        ASSERT_EQ(foundOps.size(), 0U);
-
-        auto sessionTxnRecord = findSessionRecord(opCtx.get(), lsid);
-        ASSERT_FALSE(bool(sessionTxnRecord));
-    }
-}
-
-TEST_F(ReshardingOplogSessionApplicationTest, IgnoreIncomingNonRetryableInternalTransaction) {
-    // TODO (SERVER-63877): Determine if resharding should migrate internal sessions for
-    // non-retryable writes.
-    auto lsid = makeLogicalSessionIdWithTxnUUIDForTest();
-
-    TxnNumber incomingTxnNumber = 100;
-
-    auto opTime = [&] {
-        auto opCtx = makeOperationContext();
-        return insertSessionRecord(opCtx.get(), makeLogicalSessionIdForTest(), 100, {3});
-    }();
-
-    auto oplogEntry = makeFinishTxnOp(lsid, incomingTxnNumber);
-
-    {
-        auto opCtx = makeOperationContext();
-        ReshardingOplogSessionApplication applier;
-        auto hitPreparedTxn = applier.tryApplyOperation(opCtx.get(), oplogEntry);
-        ASSERT_FALSE(bool(hitPreparedTxn));
-    }
-
-    {
-        auto opCtx = makeOperationContext();
-        auto foundOps = findOplogEntriesNewerThan(opCtx.get(), opTime.getTimestamp());
-        ASSERT_EQ(foundOps.size(), 0U);
-
-        auto sessionTxnRecord = findSessionRecord(opCtx.get(), lsid);
-        ASSERT_FALSE(bool(sessionTxnRecord));
-    }
 }
 
 }  // namespace
