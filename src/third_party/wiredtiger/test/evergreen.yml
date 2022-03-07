@@ -1902,17 +1902,19 @@ tasks:
       - func: "make wiredtiger"
       - func: "make check all"
 
-  # Use format.sh to run tests in parallel (x4) for just under two hours (the
+  # Use format.sh to run tests in parallel for just under two hours (the
   # default Evergreen timeout) on the higher spec build distros. This allows
   # us to perform multiple test runs while ensuring a long-running config does
-  # not result in an Evergreen test timeout failure.
+  # not result in an Evergreen test timeout failure. This test is run on a 
+  # higher spec distro due to historical issues with timeout failures. Consider 
+  # reducing the parallelism if frequent timeouts occur.
   - name: linux-directio
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
       - func: "format test script"
         vars:
-          format_test_script_args: -t 110 -j 4 direct_io=1
+          format_test_script_args: -t 110 direct_io=1
 
   - name: format-linux-no-ftruncate
     commands:
