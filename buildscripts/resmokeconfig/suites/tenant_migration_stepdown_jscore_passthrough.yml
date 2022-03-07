@@ -53,7 +53,6 @@ selector:
   - jstests/core/crud_api.js
   # These tests use benchRun which does not use runCommand.
   - jstests/core/bench_test1.js
-  - jstests/core/bench_test3.js
   - jstests/core/benchrun_pipeline_updates.js
   # This test uses exhaust which does not use runCommand.
   - jstests/core/exhaust.js

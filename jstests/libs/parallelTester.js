@@ -223,7 +223,6 @@ if (typeof _threadInject != "undefined") {
             // within the parallel test job.
             "bench_test1.js",
             "bench_test2.js",
-            "bench_test3.js",
 
             // These tests cause deletes and updates to hang, which may affect other tests running
             // concurrently.
