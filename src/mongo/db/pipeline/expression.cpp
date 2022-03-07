@@ -2867,14 +2867,14 @@ public:
     }
 
     virtual Value evaluate(const Document& root, Variables* variables) const {
-
-        auto args = evaluateAndValidateArguments(root, _children, _indexMap.size(), variables);
+        int arraySize = _children[0]->evaluate(root, variables).getArrayLength();
+        auto args = evaluateAndValidateArguments(root, _children, arraySize, variables);
         auto indexVec = _indexMap.find(args.targetOfSearch);
 
         if (indexVec == _indexMap.end())
             return Value(-1);
 
-        // Search through the vector of indecies for first index in our range.
+        // Search through the vector of indexes for first index in our range.
         for (auto index : indexVec->second) {
             if (index >= args.startIndex && index < args.endIndex) {
                 return Value(index);
