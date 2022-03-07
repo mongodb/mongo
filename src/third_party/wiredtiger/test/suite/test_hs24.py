@@ -185,11 +185,11 @@ class test_hs24(wttest.WiredTigerTestCase):
         for i in range(1, self.numrows + 1):
             self.session.begin_transaction()
             cursor[i] = self.value1
-            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(4))
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
             self.session.begin_transaction()
             cursor[i] = self.value2
-            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(5))
-        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(4))
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(3))
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(2))
         for i in range(1, self.numrows + 1):
             self.session.begin_transaction()
             cursor[i] = self.value3
@@ -201,10 +201,9 @@ class test_hs24(wttest.WiredTigerTestCase):
         thread.join()
         simulate_crash_restart(self, '.', "RESTART")
         cursor = self.session.open_cursor(self.uri)
-        self.session.begin_transaction('read_timestamp=' + self.timestamp_str(4))
-        # Check we can only see the version at timestamp 4, it's either
-        # committed by the out of order timestamp commit thread before the
-        # checkpoint starts or value1.
+        self.session.begin_transaction('read_timestamp=' + self.timestamp_str(2))
+        # Check we can only see the version at timestamp 2, it's either committed by the out of
+        # order timestamp commit thread before the checkpoint starts or value1.
         newer_data_visible = False
         for i in range(1, self.numrows + 1):
             value = cursor[i]

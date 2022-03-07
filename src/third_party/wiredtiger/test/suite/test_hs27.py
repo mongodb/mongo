@@ -265,13 +265,13 @@ class test_hs27(wttest.WiredTigerTestCase):
         ds.populate()
         self.session.checkpoint()
 
-        # Pin oldest and stable to timestamp 1.
-        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1) +
-            ',stable_timestamp=' + self.timestamp_str(1))
-
         # Write the initial values, if requested.
         if self.doinit:
             self.initialize(ds.uri, ds)
+
+        # Pin oldest and stable to timestamp 1.
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1) +
+            ',stable_timestamp=' + self.timestamp_str(1))
 
         # Create a long running read transaction in a separate session.
         session_read = self.conn.open_session()

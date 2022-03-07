@@ -124,15 +124,14 @@ class test_timestamp09(wttest.WiredTigerTestCase, suite_subprocess):
                 self.timestamp_str(6)),
                 '/oldest timestamp \(0, 6\) must not be later than stable timestamp \(0, 5\)/')
 
-        # Commit timestamp >= Stable timestamp.
+        # Commit timestamp > Stable timestamp.
         # Check both timestamp_transaction and commit_transaction APIs.
         # Oldest and stable timestamp are set to 5 at the moment.
-        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(6))
         self.session.begin_transaction()
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.timestamp_transaction(
                 'commit_timestamp=' + self.timestamp_str(5)),
-                '/less than the stable timestamp/')
+                '/must be after the stable timestamp/')
         self.session.rollback_transaction()
 
         self.session.begin_transaction()
@@ -140,7 +139,7 @@ class test_timestamp09(wttest.WiredTigerTestCase, suite_subprocess):
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.commit_transaction(
                 'commit_timestamp=' + self.timestamp_str(5)),
-                '/less than the stable timestamp/')
+                '/must be after the stable timestamp/')
 
         # When explicitly set, commit timestamp for a transaction can be earlier
         # than the commit timestamp of an earlier transaction.

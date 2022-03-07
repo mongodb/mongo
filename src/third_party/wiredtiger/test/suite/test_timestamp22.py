@@ -157,7 +157,7 @@ class test_timestamp22(wttest.WiredTigerTestCase):
             if this_commit_ts >= 0:
                 if this_commit_ts < running_commit_ts:
                     ok = False
-                if this_commit_ts < self.stable_ts:
+                if this_commit_ts <= self.stable_ts:
                     ok = False
                 if this_commit_ts < self.oldest_ts:
                     ok = False
@@ -229,7 +229,7 @@ class test_timestamp22(wttest.WiredTigerTestCase):
                 ok_prepare = False
 
         # If the final commit is too old, we'll fail.
-        if commit_ts < self.oldest_ts or commit_ts < self.stable_ts:
+        if commit_ts < self.oldest_ts or commit_ts <= self.stable_ts:
             ok_commit = False
 
         # ODDITY: We don't have to move the commit_ts ahead, but it has to be
@@ -293,7 +293,8 @@ class test_timestamp22(wttest.WiredTigerTestCase):
                     needs_rollback = False
                     session.rollback_transaction()
         except Exception as e:
-            # We don't expect any exceptions, they should be caught as part of self.expect statements.
+            # We don't expect any exceptions, they should be caught as part of self.expect
+            # statements.
             self.pr(msg + 'UNEXPECTED EXCEPTION!')
             self.pr(msg + 'fail: ' + str(e))
             raise e

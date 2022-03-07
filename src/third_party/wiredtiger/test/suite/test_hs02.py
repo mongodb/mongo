@@ -93,11 +93,12 @@ class test_hs02(wttest.WiredTigerTestCase):
             bigvalue = "aaaaa" * 100
             bigvalue2 = "ddddd" * 100
 
+        # Commit at timestamp 1.
+        self.large_updates(uri, bigvalue, ds, nrows // 3, 1)
+
         # Pin oldest and stable to timestamp 1.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1) +
             ',stable_timestamp=' + self.timestamp_str(1))
-
-        self.large_updates(uri, bigvalue, ds, nrows // 3, 1)
 
         # Check that all updates are seen
         self.check(uri, [(bigvalue, nrows // 3)], 1)

@@ -53,7 +53,8 @@ class test_hs22(wttest.WiredTigerTestCase):
         self.session.create(uri, format)
         cursor = self.session.open_cursor(uri)
         self.conn.set_timestamp(
-            'oldest_timestamp=' + self.timestamp_str(1) + ',stable_timestamp=' + self.timestamp_str(1))
+            'oldest_timestamp=' + self.timestamp_str(1) +
+            ',stable_timestamp=' + self.timestamp_str(1))
 
         key1 = self.key1
         key2 = self.key2
@@ -116,7 +117,8 @@ class test_hs22(wttest.WiredTigerTestCase):
         self.session.create(uri, format)
         cursor = self.session.open_cursor(uri)
         self.conn.set_timestamp(
-            'oldest_timestamp=' + self.timestamp_str(1) + ',stable_timestamp=' + self.timestamp_str(1))
+            'oldest_timestamp=' + self.timestamp_str(1) +
+            ',stable_timestamp=' + self.timestamp_str(1))
 
         key1 = self.key1
         key2 = self.key2
@@ -184,7 +186,8 @@ class test_hs22(wttest.WiredTigerTestCase):
         self.session.create(uri, format)
         cursor = self.session.open_cursor(uri)
         self.conn.set_timestamp(
-            'oldest_timestamp=' + self.timestamp_str(1) + ',stable_timestamp=' + self.timestamp_str(1))
+            'oldest_timestamp=' + self.timestamp_str(1) +
+            ',stable_timestamp=' + self.timestamp_str(1))
 
         key1 = self.key1
 
@@ -200,7 +203,7 @@ class test_hs22(wttest.WiredTigerTestCase):
             value4 = 'd'
 
         self.session.begin_transaction()
-        self.session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(1))
+        self.session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(2))
         cursor[key1] = value1
         self.session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(3))
         cursor[key1] = value2
@@ -233,7 +236,8 @@ class test_hs22(wttest.WiredTigerTestCase):
         self.session.create(uri, format)
         cursor = self.session.open_cursor(uri)
         self.conn.set_timestamp(
-            'oldest_timestamp=' + self.timestamp_str(1) + ',stable_timestamp=' + self.timestamp_str(1))
+            'oldest_timestamp=' + self.timestamp_str(1) +
+            ',stable_timestamp=' + self.timestamp_str(1))
 
         key1 = self.key1
 

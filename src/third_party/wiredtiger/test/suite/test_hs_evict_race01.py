@@ -69,10 +69,10 @@ class test_hs_evict_race01(wttest.WiredTigerTestCase):
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(4))
         # Move the stable timestamp.
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(4))
-        # Insert a value at timetamp 5
+        # Insert a value at timetamp 6
         self.session.begin_transaction()
         cursor[1] = self.value2
-        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(5))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(6))
 
         cursor.close()
 
@@ -97,7 +97,7 @@ class test_hs_evict_race01(wttest.WiredTigerTestCase):
         cursor = session.open_cursor(self.uri)
         session.begin_transaction()
         cursor[1] = self.value4
-        session.commit_transaction('commit_timestamp=' + self.timestamp_str(4))
+        session.commit_transaction('commit_timestamp=' + self.timestamp_str(5))
         cursor.close()
         sleep(1.5)
         evict_cursor = session.open_cursor(self.uri, None, "debug=(release_evict)")

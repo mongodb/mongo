@@ -113,7 +113,7 @@ class test_prepare_hs04(wttest.WiredTigerTestCase):
             cursor.set_key(key)
             cursor.set_value(commit_value)
             self.assertEquals(cursor.insert(), 0)
-            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
         cursor.close()
 
         # Call checkpoint.
