@@ -690,6 +690,7 @@ let testCases = {
     stopRecordingTraffic: {skip: "does not accept read or write concern"},
     testDeprecation: {skip: "does not accept read or write concern"},
     testDeprecationInVersion2: {skip: "does not accept read or write concern"},
+    testInternalTransactions: {skip: "internal command"},
     testRemoval: {skip: "does not accept read or write concern"},
     testReshardCloneCollection: {skip: "internal command"},
     testVersions1And2: {skip: "does not accept read or write concern"},

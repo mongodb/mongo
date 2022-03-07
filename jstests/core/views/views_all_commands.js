@@ -645,6 +645,7 @@ let viewsCommandTests = {
     stopRecordingTraffic: {skip: isUnrelated},
     testDeprecation: {skip: isAnInternalCommand},
     testDeprecationInVersion2: {skip: isAnInternalCommand},
+    testInternalTransactions: {skip: isAnInternalCommand},
     testRemoval: {skip: isAnInternalCommand},
     testReshardCloneCollection: {skip: isAnInternalCommand},
     testVersion2: {skip: isAnInternalCommand},

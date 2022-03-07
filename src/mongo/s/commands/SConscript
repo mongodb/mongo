@@ -90,10 +90,12 @@ env.Library(
         'cluster_whats_my_uri_cmd.cpp',
         'cluster_write_cmd.cpp',
         'document_shard_key_update_util.cpp',
+        'internal_transactions_test_commands.cpp',
         'kill_sessions_remote.cpp',
         's_read_write_concern_defaults_server_status.cpp',
         'strategy.cpp',
         'cluster_commands.idl',
+        'internal_transactions_test_commands.idl',
         'shard_collection.idl',
     ],
     LIBDEPS_PRIVATE=[

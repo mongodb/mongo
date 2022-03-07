@@ -653,6 +653,7 @@ let testCases = {
     stopRecordingTraffic: {skip: "executes locally on mongos (not sent to any remote node)"},
     testDeprecation: {skip: "executes locally on mongos (not sent to any remote node)"},
     testDeprecationInVersion2: {skip: "executes locally on mongos (not sent to any remote node)"},
+    testInternalTransactions: {skip: "executes locally on mongos (not sent to any remote node)"},
     testRemoval: {skip: "executes locally on mongos (not sent to any remote node)"},
     testVersion2: {skip: "executes locally on mongos (not sent to any remote node)"},
     testVersions1And2: {skip: "executes locally on mongos (not sent to any remote node)"},

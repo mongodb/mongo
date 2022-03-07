@@ -22,6 +22,7 @@ const commandsAddedToMongosSinceLastLTS = [
     "setUserWriteBlockMode",
     "testDeprecation",
     "testDeprecationInVersion2",
+    "testInternalTransactions",
     "testRemoval",
     "testVersions1And2",
     "testVersion2",
