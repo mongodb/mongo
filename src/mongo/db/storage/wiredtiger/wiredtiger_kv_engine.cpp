@@ -852,18 +852,6 @@ Status WiredTigerKVEngine::_salvageIfNeeded(const char* uri) {
         return Status::OK();
     }
 
-    if (rc == EBUSY) {
-        // SERVER-16457: verify and salvage are occasionally failing with EBUSY. For now we
-        // lie and return OK to avoid breaking tests. This block should go away when that ticket
-        // is resolved.
-        LOGV2_ERROR(22356,
-                    "Verify failed with EBUSY. This means the collection was being "
-                    "accessed. No repair is necessary unless other "
-                    "errors are reported.",
-                    "uri"_attr = uri);
-        return Status::OK();
-    }
-
     if (rc == ENOENT) {
         LOGV2_WARNING(22350,
                       "Data file is missing. Attempting to drop and re-create the collection.",
