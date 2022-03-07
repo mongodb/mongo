@@ -27,39 +27,61 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import os, wttest
+from helper_tiered import generate_s3_prefix, get_auth_token, get_bucket1_name
 from wtdataset import SimpleDataSet
+from wtscenario import make_scenarios
 
 # test_tiered02.py
 #    Test tiered tree
 class test_tiered02(wttest.WiredTigerTestCase):
+    storage_sources = [
+        ('local', dict(auth_token = get_auth_token('local_store'),
+            bucket = get_bucket1_name('local_store'),
+            bucket_prefix = "pfx_",
+            ss_name = 'local_store')),
+        ('s3', dict(auth_token = get_auth_token('s3_store'),
+            bucket = get_bucket1_name('s3_store'),
+            bucket_prefix = generate_s3_prefix(),
+            ss_name = 's3_store')),
+    ]
+    # Make scenarios for different cloud service providers
+    scenarios = make_scenarios(storage_sources)
+
     uri = "table:test_tiered02"
 
-    auth_token = "test_token"
-    bucket = "mybucket"
-    bucket_prefix = "pfx_"
-    extension_name = "local_store"
-
     def conn_config(self):
-        if not os.path.exists(self.bucket):
+        if self.ss_name == 'local_store' and not os.path.exists(self.bucket):
             os.mkdir(self.bucket)
         return \
           'tiered_storage=(auth_token=%s,' % self.auth_token + \
           'bucket=%s,' % self.bucket + \
           'bucket_prefix=%s,' % self.bucket_prefix + \
-          'name=%s),tiered_manager=(wait=0)' % self.extension_name
+          'name=%s),tiered_manager=(wait=0)' % self.ss_name
 
-    # Load the local store extension.
+    # Load the storage store extension.
     def conn_extensions(self, extlist):
+        config = ''
+        # S3 store is built as an optional loadable extension, not all test environments build S3.
+        if self.ss_name == 's3_store':
+            #config = '=(config=\"(verbose=1)\")'
+            extlist.skip_if_missing = True
+        #if self.ss_name == 'local_store':
+            #config = '=(config=\"(verbose=1,delay_ms=200,force_delay=3)\")'
         # Windows doesn't support dynamically loaded extension libraries.
         if os.name == 'nt':
             extlist.skip_if_missing = True
-        extlist.extension('storage_sources', self.extension_name)
+        extlist.extension('storage_sources', self.ss_name + config)
 
     def progress(self, s):
         self.verbose(3, s)
         self.pr(s)
 
     def confirm_flush(self, increase=True):
+        # Without directly using the filesystem API, directory listing is only supported on the
+        # local store. Limit this check to the local store. 
+        if self.ss_name != 'local_store':
+            return
+
         got = sorted(list(os.listdir(self.bucket)))
         self.pr('Flushed objects: ' + str(got))
         if increase:

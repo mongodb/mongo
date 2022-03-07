@@ -29,10 +29,25 @@
 # test_tiered13.py
 # Check that importing tiered tables returns an error.
 
+from helper_tiered import generate_s3_prefix, get_auth_token, get_bucket1_name
+from wtscenario import make_scenarios
 import os, shutil, wiredtiger
 from test_import01 import test_import_base
 
 class test_tiered13(test_import_base):
+    storage_sources = [
+        ('local', dict(auth_token = get_auth_token('local_store'),
+            bucket = get_bucket1_name('local_store'),
+            bucket_prefix = "pfx_",
+            ss_name = 'local_store')),
+        ('s3', dict(auth_token = get_auth_token('s3_store'),
+            bucket = get_bucket1_name('s3_store'),
+            bucket_prefix = generate_s3_prefix(),
+            ss_name = 's3_store')),
+    ]
+    # Make scenarios for different cloud service providers
+    scenarios = make_scenarios(storage_sources)
+
     # If the 'uri' changes all the other names must change with it.
     base = 'test_tiered13-000000000'
     fileuri_base = 'file:' + base
@@ -43,24 +58,28 @@ class test_tiered13(test_import_base):
     otheruri = 'file:' + otherfile
     uri = "table:test_tiered13"
 
-    auth_token = "test_token"
-    bucket = "my_bucket"
-    bucket_prefix = "my_prefix"
-    extension_name = "local_store"
-
+    # Load the storage store extension.
     def conn_extensions(self, extlist):
+        config = ''
+        # S3 store is built as an optional loadable extension, not all test environments build S3.
+        if self.ss_name == 's3_store':
+            #config = '=(config=\"(verbose=1)\")'
+            extlist.skip_if_missing = True
+        #if self.ss_name == 'local_store':
+            #config = '=(config=\"(verbose=1,delay_ms=200,force_delay=3)\")'
         # Windows doesn't support dynamically loaded extension libraries.
         if os.name == 'nt':
             extlist.skip_if_missing = True
-        extlist.extension('storage_sources', self.extension_name)
+        extlist.extension('storage_sources', self.ss_name + config)
 
     def conn_config(self):
-        os.mkdir(self.bucket)
+        if self.ss_name == 'local_store' and not os.path.exists(self.bucket):
+            os.mkdir(self.bucket)
         self.saved_conn = \
           'create,tiered_storage=(auth_token=%s,' % self.auth_token + \
           'bucket=%s,' % self.bucket + \
           'bucket_prefix=%s,' % self.bucket_prefix + \
-          'name=%s,' % self.extension_name + \
+          'name=%s,' % self.ss_name + \
           'object_target_size=20M),'
         return self.saved_conn
 
@@ -113,7 +132,8 @@ class test_tiered13(test_import_base):
         shutil.rmtree(newdir, ignore_errors=True)
         os.mkdir(newdir)
         newbucket = os.path.join(newdir, self.bucket)
-        os.mkdir(newbucket)
+        if self.ss_name == 'local_store':
+            os.mkdir(newbucket)
         # It is tricky to work around the extension and connection bucket setup for
         # creating the new import directory that is tiered-enabled.
         ext = self.extensionsConfig()

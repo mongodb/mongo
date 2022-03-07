@@ -28,11 +28,30 @@
 
 import os, time, wiredtiger, wttest
 from wiredtiger import stat
+from helper_tiered import generate_s3_prefix, get_auth_token
+from helper_tiered import get_bucket1_name, get_bucket2_name
+from wtscenario import make_scenarios
 StorageSource = wiredtiger.StorageSource  # easy access to constants
 
 # test_tiered04.py
 #    Basic tiered storage API test.
 class test_tiered04(wttest.WiredTigerTestCase):
+    storage_sources = [
+        ('local', dict(auth_token = get_auth_token('local_store'),
+            bucket = get_bucket1_name('local_store'),
+            bucket1 = get_bucket2_name('local_store'),
+            prefix = "pfx_",
+            prefix1 = "pfx1_",
+            ss_name = 'local_store')),
+        ('s3', dict(auth_token = get_auth_token('s3_store'),
+            bucket = get_bucket1_name('s3_store'),
+            bucket1 = get_bucket2_name('s3_store'),
+            prefix = generate_s3_prefix(),
+            prefix1 = generate_s3_prefix(),
+            ss_name = 's3_store')),
+    ]
+    # Make scenarios for different cloud service providers
+    scenarios = make_scenarios(storage_sources)
 
     # If the 'uri' changes all the other names must change with it.
     base = 'test_tiered04-000000000'
@@ -46,12 +65,6 @@ class test_tiered04(wttest.WiredTigerTestCase):
     uri1 = "table:test_other_tiered04"
     uri_none = "table:test_local04"
 
-    auth_token = "test_token"
-    bucket = "mybucket"
-    bucket1 = "otherbucket"
-    extension_name = "local_store"
-    prefix = "this_pfx"
-    prefix1 = "other_pfx"
     object_sys = "9M"
     object_sys_val = 9 * 1024 * 1024
     object_uri = "15M"
@@ -59,24 +72,32 @@ class test_tiered04(wttest.WiredTigerTestCase):
     retention = 3
     retention1 = 600
     def conn_config(self):
-        os.mkdir(self.bucket)
-        os.mkdir(self.bucket1)
+        if self.ss_name == 'local_store':
+            os.mkdir(self.bucket)
+            os.mkdir(self.bucket1)
         self.saved_conn = \
           'statistics=(all),' + \
           'tiered_storage=(auth_token=%s,' % self.auth_token + \
           'bucket=%s,' % self.bucket + \
           'bucket_prefix=%s,' % self.prefix + \
           'local_retention=%d,' % self.retention + \
-          'name=%s,' % self.extension_name + \
+          'name=%s,' % self.ss_name + \
           'object_target_size=%s)' % self.object_sys
         return self.saved_conn
 
-    # Load the local store extension.
+    # Load the storage store extension.
     def conn_extensions(self, extlist):
+        config = ''
+        # S3 store is built as an optional loadable extension, not all test environments build S3.
+        if self.ss_name == 's3_store':
+            #config = '=(config=\"(verbose=1)\")'
+            extlist.skip_if_missing = True
+        #if self.ss_name == 'local_store':
+            #config = '=(config=\"(verbose=1,delay_ms=200,force_delay=3)\")'
         # Windows doesn't support dynamically loaded extension libraries.
         if os.name == 'nt':
             extlist.skip_if_missing = True
-        extlist.extension('storage_sources', self.extension_name)
+        extlist.extension('storage_sources', self.ss_name + config)
 
     # Check for a specific string as part of the uri's metadata.
     def check_metadata(self, uri, val_str):
@@ -114,7 +135,7 @@ class test_tiered04(wttest.WiredTigerTestCase):
           'bucket=%s,' % self.bucket1 + \
           'bucket_prefix=%s,' % self.prefix1 + \
           'local_retention=%d,' % self.retention1 + \
-          'name=%s,' % self.extension_name + \
+          'name=%s,' % self.ss_name + \
           'object_target_size=%s)' % self.object_uri
         self.pr("create non-sys tiered")
         self.session.create(self.uri1, base_create + conf)

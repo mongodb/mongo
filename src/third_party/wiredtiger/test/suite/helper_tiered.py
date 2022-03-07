@@ -35,11 +35,11 @@ import datetime, inspect, os, random
 # Generate a storage store specific authentication token.
 def get_auth_token(storage_source):
     auth_token = None
-    if storage_source is 'local_store':
+    if storage_source == 'local_store':
         # Fake a secret token.
         auth_token = "Secret"
-    if storage_source is 's3_store':
-        # Auth token is the AWS access key ID and the AWS secret key as comma-separated values.
+    if storage_source == 's3_store':
+        # Auth token is the AWS access key ID and the AWS secret key as semi-colon separated values.
         # We expect the values to have been provided through the environment variables.
         access_key = os.getenv('AWS_ACCESS_KEY_ID')
         secret_key = os.getenv('AWS_SECRET_ACCESS_KEY')
@@ -47,13 +47,28 @@ def get_auth_token(storage_source):
             auth_token = access_key + ";" + secret_key
     return auth_token
 
-# Get a list of buckets available for the storage source.
-def get_bucket_info(storage_source):
-    if storage_source is 'local_store':
-        return([('objects1',''), ('objects2','')])
-    if storage_source is 's3_store':
-        return([('s3testext',',region=ap-southeast-2'),
-                ('s3testext-us',',region=us-east-2')])
+# Get buckets configured for the storage source
+
+# S3 buckets with their regions
+s3_buckets = ['s3testext;ap-southeast-2', 's3testext-us;us-east-2']
+
+# Local buckets do not have a region
+local_buckets = ['bucket1', 'bucket2']
+
+# Get name of the first bucket in the list.
+def get_bucket1_name(storage_source):
+    if storage_source == 's3_store':
+        return s3_buckets[0]
+    if storage_source == 'local_store':
+        return local_buckets[0]
+    return None
+
+# Get name of the second bucket in the list.
+def get_bucket2_name(storage_source):
+    if storage_source == 's3_store':
+        return s3_buckets[1]
+    if storage_source == 'local_store':
+        return local_buckets[1]
     return None
 
 # Generate a unique object prefix for the S3 store. 
@@ -65,25 +80,13 @@ def generate_s3_prefix(test_name = ''):
     # Range upto int32_max, matches that of C++'s std::default_random_engine
     prefix += '_' + str(random.randrange(1, 2147483646)) + '--'
 
-    if test_name:
-        prefix += test_name + '--'
+    # If the calling function has not provided a name, extract it from the stack.
+    # It is important to generate unique prefixes for different tests in the same class,
+    # so that the database namespace do not collide.
+    # 0th element on the stack is the current function. 1st element is the calling function.
+    if not test_name:
+        test_name = inspect.stack()[1][3]
+    prefix += test_name + '--'
 
     return prefix
-
-# Generate a file system config for the object store.
-def get_fs_config(storage_source, additional_conf = '', test_name = ''):
-    # There is no local store specific configuration needed
-    if storage_source is 'local_store':
-        return additional_conf
-
-    # There is not need to generate a unique prefix for local store
-    if storage_source is 's3_store':
-        # If the calling function has not provided a name, extract it from the stack
-        if not test_name:
-            test_name = inspect.stack()[1][3]
-        fs_conf = 'prefix=' + generate_s3_prefix(test_name)
-        fs_conf += additional_conf
-        return fs_conf
-    
-    return None
 

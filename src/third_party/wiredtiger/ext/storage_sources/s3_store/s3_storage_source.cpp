@@ -475,7 +475,7 @@ S3FileSize(WT_FILE_HANDLE *fileHandle, WT_SESSION *session, wt_off_t *sizep)
  *     contains the AWS access key ID and the AWS secret key as comma-separated values.
  */
 static int
-S3CustomizeFileSystem(WT_STORAGE_SOURCE *storageSource, WT_SESSION *session, const char *bucketName,
+S3CustomizeFileSystem(WT_STORAGE_SOURCE *storageSource, WT_SESSION *session, const char *bucket,
   const char *authToken, const char *config, WT_FILE_SYSTEM **fileSystem)
 {
     S3_FILE_SYSTEM *fs;
@@ -486,11 +486,23 @@ S3CustomizeFileSystem(WT_STORAGE_SOURCE *storageSource, WT_SESSION *session, con
 
     s3 = (S3_STORAGE *)storageSource;
 
-    /* We need to have a bucket to setup the file system. */
-    if (bucketName == NULL || strlen(bucketName) == 0) {
+    /*
+     * We need to have a bucket to setup the file system. The bucket is expected to be a name and a
+     * region, separated by a semi-colon. eg: 'abcd;ap-southeast-2'.
+     */
+    if (bucket == NULL || strlen(bucket) == 0) {
         s3->log->LogErrorMessage("S3CustomizeFileSystem: bucket not specified.");
         return (EINVAL);
     }
+    int delimiter = std::string(bucket).find(';');
+    if (delimiter == std::string::npos || delimiter == 0 || delimiter == strlen(bucket) - 1) {
+        s3->log->LogErrorMessage(
+          "S3CustomizeFileSystem: bucket malformed, "
+          "should be a name and a region separated by a semi-colon.");
+        return (EINVAL);
+    }
+    const std::string bucketName = std::string(bucket).substr(0, delimiter);
+    const std::string region = std::string(bucket).substr(delimiter + 1);
 
     /* Fail if there is no authentication provided. */
     if (authToken == NULL || strlen(authToken) == 0) {
@@ -498,18 +510,22 @@ S3CustomizeFileSystem(WT_STORAGE_SOURCE *storageSource, WT_SESSION *session, con
         return (EINVAL);
     }
 
-    /* Extract the AWS access key ID and the AWS secret key from authToken. */
-    int delimiter = std::string(authToken).find(';');
-    if (delimiter == std::string::npos) {
+    /*
+     * An auth token is needed to setup the file system. The token is expected to be an access key
+     * and a secret key separated by a semi-colon.
+     */
+    if (authToken == NULL || strlen(authToken) == 0) {
+        s3->log->LogErrorMessage("S3CustomizeFileSystem: auth token not specified.");
+        return (EINVAL);
+    }
+    delimiter = std::string(authToken).find(';');
+    if (delimiter == std::string::npos || delimiter == 0 || delimiter == strlen(authToken) - 1) {
         s3->log->LogErrorMessage("S3CustomizeFileSystem: authToken malformed.");
         return (EINVAL);
     }
     const std::string accessKeyId = std::string(authToken).substr(0, delimiter);
     const std::string secretKey = std::string(authToken).substr(delimiter + 1);
-    if (accessKeyId.empty() || secretKey.empty()) {
-        s3->log->LogErrorMessage("S3CustomizeFileSystem: authToken malformed.");
-        return (EINVAL);
-    }
+
     Aws::Auth::AWSCredentials credentials;
     credentials.SetAWSAccessKeyId(accessKeyId);
     credentials.SetAWSSecretKey(secretKey);
@@ -531,25 +547,9 @@ S3CustomizeFileSystem(WT_STORAGE_SOURCE *storageSource, WT_SESSION *session, con
 
     /* Configure the AWS Client configuration. */
     Aws::S3Crt::ClientConfiguration awsConfig;
-    awsConfig.throughputTargetGbps = throughputTargetGbps;
     awsConfig.partSize = partSize;
-
-    /*
-     * Get the AWS region to be used. The allowable values for AWS region are listed here in the AWS
-     * documentation: http://sdk.amazonaws.com/cpp/api/LATEST/namespace_aws_1_1_region.html
-     */
-    WT_CONFIG_ITEM regionConf;
-    std::string region;
-    if ((ret = s3->wtApi->config_get_string(s3->wtApi, session, config, "region", &regionConf)) ==
-      0)
-        awsConfig.region = std::string(regionConf.str, regionConf.len);
-    else if (ret != WT_NOTFOUND) {
-        s3->log->LogErrorMessage("S3CustomizeFileSystem: error parsing config for AWS region.");
-        return (ret);
-    } else {
-        s3->log->LogErrorMessage("S3CustomizeFileSystem: AWS region not specified.");
-        return (EINVAL);
-    }
+    awsConfig.region = region;
+    awsConfig.throughputTargetGbps = throughputTargetGbps;
 
     /*
      * Get the directory to setup the cache, or use the default one. The default cache directory is
@@ -562,7 +562,7 @@ S3CustomizeFileSystem(WT_STORAGE_SOURCE *storageSource, WT_SESSION *session, con
            s3->wtApi, session, config, "cache_directory", &cacheDirConf)) == 0)
         cacheStr = std::string(cacheDirConf.str, cacheDirConf.len);
     else if (ret == WT_NOTFOUND) {
-        cacheStr = "cache-" + std::string(bucketName);
+        cacheStr = "cache-" + bucketName;
         ret = 0;
     } else {
         s3->log->LogErrorMessage(
