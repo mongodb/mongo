@@ -40,7 +40,7 @@ namespace mongo {
  */
 class JsFunction {
 public:
-    JsFunction(OperationContext* opCtx, const std::string& code, const std::string& dbName);
+    JsFunction(OperationContext* opCtx, std::string code, std::string dbName);
     JsFunction(const JsFunction& other);
     JsFunction(JsFunction&& other) = delete;
 
@@ -49,10 +49,18 @@ public:
 
     bool runAsPredicate(const BSONObj& obj) const;
 
+    const std::string& getCode() const {
+        return _code;
+    }
+
+    const std::string& getDbName() const {
+        return _dbName;
+    }
+
     size_t getApproximateSize() const;
 
 private:
-    void _init(OperationContext* opCtx, const std::string& code, const std::string& dbName);
+    void _init(OperationContext* opCtx, std::string code, std::string dbName);
 
     std::string _code;
     std::string _dbName;

@@ -1743,13 +1743,20 @@ public:
     void visit(const WhereMatchExpression* expr) final {
         auto makePredicate = [expr](sbe::value::SlotId inputSlot,
                                     EvalStage inputStage) -> EvalExprStagePair {
-            auto [predicateTag, predicateValue] =
-                sbe::value::makeCopyJsFunction(expr->getPredicate());
-            auto predicate = sbe::makeE<sbe::EConstant>(predicateTag, predicateValue);
+            // Generally speaking, this visitor is non-destructive and does not mutate the
+            // MatchExpression tree. However, in order to apply an optimization to avoid making a
+            // copy of the 'JsFunction' object stored within 'WhereMatchExpression', we can transfer
+            // its ownership from the match expression node into the SBE plan. Hence, we need to
+            // drop the const qualifier. This should be a safe operation, given that the match
+            // expression tree is allocated on the heap, and this visitor has exclusive access to
+            // this tree (after it has been translated into an SBE tree, it's no longer used).
+            auto predicate = makeConstant(
+                sbe::value::TypeTags::jsFunction,
+                sbe::value::bitcastFrom<JsFunction*>(
+                    const_cast<WhereMatchExpression*>(expr)->extractPredicate().release()));
 
-            auto whereExpr = sbe::makeE<sbe::EFunction>(
-                "runJsPredicate",
-                sbe::makeEs(std::move(predicate), sbe::makeE<sbe::EVariable>(inputSlot)));
+            auto whereExpr =
+                makeFunction("runJsPredicate", std::move(predicate), makeVariable(inputSlot));
             return {std::move(whereExpr), std::move(inputStage)};
         };
 

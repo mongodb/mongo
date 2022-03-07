@@ -170,8 +170,18 @@ public:
             return;
         }
 
-        auto&& [typeTag, jsFunctionVal] = sbe::value::makeCopyJsFunction(expr->getPredicate());
-        bindParam(*inputParam, true /*owned*/, typeTag, jsFunctionVal);
+        // Generally speaking, this visitor is non-destructive and does not mutate the
+        // MatchExpression tree. However, in order to apply an optimization to avoid making a copy
+        // of the 'JsFunction' object stored within 'WhereMatchExpression', we can transfer its
+        // ownership from the match expression node into the SBE runtime environment. Hence, we need
+        // to drop the const qualifier. This should be a safe operation, given that the match
+        // expression tree is allocated on the heap, and this visitor has exclusive access to this
+        // tree (after we have bound in all input parameters, it's no longer used).
+        bindParam(*inputParam,
+                  true /*owned*/,
+                  sbe::value::TypeTags::jsFunction,
+                  sbe::value::bitcastFrom<JsFunction*>(
+                      const_cast<WhereMatchExpression*>(expr)->extractPredicate().release()));
     }
 
     /**

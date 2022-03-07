@@ -53,19 +53,21 @@ WhereMatchExpression::WhereMatchExpression(OperationContext* opCtx,
                                            WhereParams params,
                                            StringData dbName)
     : WhereMatchExpressionBase(std::move(params)),
-      _dbName(dbName.toString()),
       _opCtx(opCtx),
-      _jsFunction(_opCtx, getCode(), _dbName) {}
+      _jsFunction(std::make_unique<JsFunction>(_opCtx, getCode(), dbName.toString())) {}
 
 bool WhereMatchExpression::matches(const MatchableDocument* doc, MatchDetails* details) const {
-    return _jsFunction.runAsPredicate(doc->toBSON());
+    validateState();
+    return _jsFunction->runAsPredicate(doc->toBSON());
 }
 
 unique_ptr<MatchExpression> WhereMatchExpression::shallowClone() const {
+    validateState();
+
     WhereParams params;
     params.code = getCode();
     unique_ptr<WhereMatchExpression> e =
-        std::make_unique<WhereMatchExpression>(_opCtx, std::move(params), _dbName);
+        std::make_unique<WhereMatchExpression>(_opCtx, std::move(params), _jsFunction->getDbName());
     if (getTag()) {
         e->setTag(getTag()->clone());
     }

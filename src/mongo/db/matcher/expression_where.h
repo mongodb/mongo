@@ -53,15 +53,21 @@ public:
     }
 
     const JsFunction& getPredicate() const {
-        return _jsFunction;
+        validateState();
+        return *_jsFunction;
+    }
+
+    std::unique_ptr<JsFunction> extractPredicate() {
+        return std::move(_jsFunction);
     }
 
 private:
-    std::string _dbName;
+    void validateState() const {
+        tassert(6403600, "JsFunction is unavailable", _jsFunction);
+    }
 
     OperationContext* const _opCtx;
-
-    JsFunction _jsFunction;
+    std::unique_ptr<JsFunction> _jsFunction;
 };
 
 }  // namespace mongo
