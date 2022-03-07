@@ -31,16 +31,22 @@ const maxNumIndexesAllowed = collectionIsClustered ? 65 : 64;
 jsTestLog("Creating " + (maxNumIndexesAllowed - 1) + " indexes.");
 
 // Only 63 will succeed because 64 is the maximum number of indexes allowed on a collection.
-let i = 1;
 assert.soon(() => {
-    const key = make(i++);
-    // May fail due to stepdowns and shutdowns. Keep trying until we reach the
+    // Index creation May fail due to stepdowns and shutdowns. Keep trying until we reach the
     // server limit for indexes in a collection.
-    const res = t.createIndex(key);
-    const num = t.getIndexKeys().length;
-    jsTestLog('createIndex: ' + tojson(key) + ': ' +
-              ' (num indexes: ' + num + '): ' + tojson(res));
-    return num === maxNumIndexesAllowed;
+    try {
+        const numCurrentIndexes = t.getIndexKeys().length;
+        for (let i = numCurrentIndexes + 1; i <= maxNumIndexesAllowed; i++) {
+            const key = make(i);
+            const res = assert.commandWorked(t.createIndex(key));
+            jsTestLog('createIndex: ' + tojson(key) + ': ' + tojson(res));
+        }
+        assert.eq(t.getIndexKeys().length, maxNumIndexesAllowed);
+        return true;
+    } catch (e) {
+        jsTest.log("Failed to create indexes: " + e);
+        return false;
+    }
 });
 
 const indexKeys = t.getIndexKeys();

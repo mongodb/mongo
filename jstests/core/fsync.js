@@ -15,6 +15,23 @@
 (function() {
 "use strict";
 
+function waitUntilOpCountIs(opFilter, num) {
+    assert.soon(() => {
+        let ops = db.getSiblingDB('admin')
+                      .aggregate([
+                          {$currentOp: {}},
+                          {$match: opFilter},
+                      ])
+                      .toArray();
+        if (ops.length != num) {
+            jsTest.log("Num opeartions: " + ops.length + ", expected: " + num);
+            jsTest.log(ops);
+            return false;
+        }
+        return true;
+    });
+}
+
 // Start with a clean DB.
 var fsyncLockDB = db.getSiblingDB('fsyncLockTestDB');
 fsyncLockDB.dropDatabase();
@@ -56,7 +73,7 @@ assert(db.getSiblingDB('admin').runCommand({currentOp: 1}).fsyncLock,
 // is blocked. There is really no way to do that currently, so just check that the write didn't
 // go through.
 var writeOpHandle = startParallelShell("db.getSiblingDB('fsyncLockTestDB').coll.insert({x:1});");
-sleep(3000);
+waitUntilOpCountIs({op: 'insert', ns: 'fsyncLockTestDB.coll', waitingForLock: true}, 1);
 
 // Make sure reads can still run even though there is a pending write and also that the write
 // didn't get through.
@@ -103,13 +120,14 @@ assert(currentOp.fsyncLock, "Value in currentOp result incorrect for fsyncLocked
 
 let shellHandle2 =
     startParallelShell("db.getSiblingDB('fsyncLockTestDB').multipleLock.insert({x:1});");
-sleep(3000);
+waitUntilOpCountIs({op: 'insert', ns: 'fsyncLockTestDB.multipleLock', waitingForLock: true}, 2);
+
 assert.eq(0, fsyncLockDB.multipleLock.find({}).itcount());
 
 fsyncUnlockRes = db.fsyncUnlock();
 assert.commandWorked(fsyncUnlockRes);
 assert(fsyncUnlockRes.lockCount == 1, tojson(fsyncLockRes));
-sleep(3000);
+sleep(1000);
 assert.eq(0, fsyncLockDB.multipleLock.find({}).itcount());
 
 fsyncUnlockRes = db.fsyncUnlock();

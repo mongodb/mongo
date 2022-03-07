@@ -74,7 +74,7 @@ function runTest(map, reduce, finalize, scope, wait) {
         startParallelShell("assert.commandWorked( db.runCommand( " + stringifiedSpec + " ) );");
 
     if (wait) {
-        sleep(2000);
+        sleep(20);
     }
 
     let opCode = null;
@@ -180,7 +180,7 @@ function runFinalizeTests(loop) {
 
 const loop = function() {
     while (1) {
-        sleep(1000);
+        sleep(10);
     }
 };
 runMapTests(loop, false);

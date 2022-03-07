@@ -37,10 +37,22 @@ truncate();
 assertEmpty();
 
 // Multi-extent case.
-var initialStorageSize = t.stats().storageSize;
+const initialStorageSize = t.stats().storageSize;
+const long_string = Array(1024 * 1024).toString();
+
+let idx = 0;
 while (t.stats().storageSize == initialStorageSize) {
-    t.insert({a: 1});
+    let bulk = t.initializeUnorderedBulkOp();
+    const nDocs = 300;
+    for (let i = 0; i < nDocs; i++) {
+        bulk.insert({a: ++idx, text: long_string});
+    }
+    assert.commandWorked(bulk.execute());
 }
+jsTest.log("Initial storage size: " + initialStorageSize);
+jsTest.log("Num inserts: " + idx);
+jsTest.log("Storage size after inserts: " + t.stats().storageSize);
+
 truncate();
 assertEmpty();
 

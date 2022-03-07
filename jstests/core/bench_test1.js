@@ -18,7 +18,7 @@ const ops = [
     {op: "update", ns: t.getFullName(), query: {_id: 1}, update: {$inc: {x: 1}}, writeCmd: true}
 ];
 
-const seconds = 10;
+const seconds = 2;
 
 const benchArgs = {
     ops: ops,
