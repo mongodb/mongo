@@ -62,16 +62,13 @@ functions:
         set -o errexit
         set -o verbose
         mongo_repo=https://github.com/mongodb/mongo
-        if [[ "${branch_name}" == "mongodb-5.0" ]]; then
-          git clone $mongo_repo -b v5.0
-        elif [[ "${branch_name}" == "mongodb-4.4" ]]; then
-          git clone $mongo_repo -b v4.4
-        elif [[ "${branch_name}" =~ "mongodb-" ]]; then   
-          echo "'fetch mongo repo' does not currently handle branch ${branch_name}"
-          exit 1
+        branch=${branch_name}
+        if [[ $branch =~ "mongodb-" ]]; then   
+          mongo_branch=v$(echo $branch | cut -d'-' -f 2)
         else
-          git clone $mongo_repo -b master
+          mongo_branch=master
         fi
+        git clone $mongo_repo -b $mongo_branch
   "import wiredtiger into mongo" :
     command: shell.exec
     params:
@@ -2639,7 +2636,8 @@ tasks:
             virtualenv -p python3 venv
             source venv/bin/activate
             pip3 install lorem pymongo==3.12.2
-            ./run_many_coll.sh ../../mongo/build/opt/install/bin/mongod mongodb.log config/many-collection-testing many-collection clean-and-populate
+            mongod_path=$(find ../../mongo/build -executable -type f -path \*/bin/mongod)
+            ./run_many_coll.sh $mongod_path mongodb.log config/many-collection-testing many-collection clean-and-populate
 
       - command: shell.exec
         params:
