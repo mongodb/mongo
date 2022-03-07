@@ -56,11 +56,11 @@ LOGGER_NAME = 'check-idl-definitions'
 LOGGER = logging.getLogger(LOGGER_NAME)
 
 
-def is_test_idl(idl_path: str) -> bool:
-    """Check if an IDL file is a test file."""
-    test_idls_subpaths = ["/idl/tests/", "unittest.idl"]
+def is_test_or_third_party_idl(idl_path: str) -> bool:
+    """Check if an IDL file is a test file or from a third-party library."""
+    ignored_idls_subpaths = ["/idl/tests/", "unittest.idl", "/src/third_party/"]
 
-    for file_name in test_idls_subpaths:
+    for file_name in ignored_idls_subpaths:
         if idl_path.find(file_name) != -1:
             return True
 
@@ -75,7 +75,7 @@ def get_command_definitions(api_version: str, directory: str,
 
     def gen():
         for idl_path in sorted(list_idls(directory)):
-            if not is_test_idl(idl_path):
+            if not is_test_or_third_party_idl(idl_path):
                 for command in parse_idl(idl_path, import_directories).spec.symbols.commands:
                     if command.api_version == api_version:
                         yield command.command_name, command

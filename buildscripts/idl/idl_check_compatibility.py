@@ -176,7 +176,10 @@ IGNORE_UNSTABLE_LIST: List[str] = [
     'aggregate-reply-cursor',
 ]
 
-SKIPPED_FILES = ["unittest.idl"]
+SKIPPED_FILES = [
+    "unittest.idl", "mozILocalization.idl", "mozILocaleService.idl", "mozIOSPreferences.idl",
+    "nsICollation.idl", "nsIStringBundle.idl", "nsIScriptableUConv.idl", "nsITextToSubURI.idl"
+]
 
 
 class FieldCompatibility:
