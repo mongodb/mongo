@@ -838,6 +838,24 @@ private:
     std::unique_ptr<ConnectionThread> _connThread;
 };
 
+// A `JoinThread` that waits for a ready signal from its underlying worker thread before returning
+// from its constructor.
+class MilestoneThread {
+public:
+    explicit MilestoneThread(std::function<void(Notification<void>&)> body)
+        : _thread([this, body = std::move(body)]() mutable { body(_isReady); }) {
+        _isReady.get();
+    }
+
+private:
+    Notification<void> _isReady;
+    JoinThread _thread;
+};
+
+void waitForTimesEntered(const FailPointEnableBlock& fp, FailPoint::EntryCountT times) {
+    fp->waitForTimesEntered(fp.initialTimesEntered() + times);
+}
+
 TEST_F(BatonASIOLinuxTest, CanWait) {
     auto opCtx = client().makeOperationContext();
     BatonHandle baton = opCtx->getBaton();  // ensures the baton outlives its opCtx.
@@ -915,12 +933,13 @@ TEST_F(BatonASIOLinuxTest, AddAndRemoveSessionWhileInPoll) {
     auto opCtx = client().makeOperationContext();
     Notification<bool> cancelSessionResult;
 
-    JoinThread thread([&] {
+    MilestoneThread thread([&](Notification<void>& isReady) {
         auto baton = opCtx->getBaton()->networking();
         auto session = client().session();
 
         FailPointEnableBlock fp("blockBatonASIOBeforePoll");
-        fp->waitForTimesEntered(1);
+        isReady.set();
+        waitForTimesEntered(fp, 1);
 
         // This thread is an external observer to the baton, so the expected behavior is for
         // `cancelSession` to happen after `addSession`, and thus it must return `true`.
@@ -942,10 +961,11 @@ TEST_F(BatonASIOLinuxTest, WaitAndNotify) {
     auto opCtx = client().makeOperationContext();
 
     Notification<void> notification;
-    JoinThread thread([&] {
+    MilestoneThread thread([&](Notification<void>& isReady) {
         auto baton = opCtx->getBaton()->networking();
         FailPointEnableBlock fp("blockBatonASIOBeforePoll");
-        fp->waitForTimesEntered(1);
+        isReady.set();
+        waitForTimesEntered(fp, 1);
         baton->schedule([&](Status) { notification.set(); });
     });
 
@@ -986,10 +1006,11 @@ TEST_F(BatonASIOLinuxTest, BatonWithAnExpiredTimerNeverPolls) {
 
 TEST_F(BatonASIOLinuxTest, NotifyInterruptsRunUntilBeforeTimeout) {
     auto opCtx = client().makeOperationContext();
-    JoinThread thread([&] {
+    MilestoneThread thread([&](Notification<void>& isReady) {
         auto baton = opCtx->getBaton();
         FailPointEnableBlock fp("blockBatonASIOBeforePoll");
-        fp->waitForTimesEntered(1);
+        isReady.set();
+        waitForTimesEntered(fp, 1);
         baton->notify();
     });
 
@@ -1009,11 +1030,12 @@ TEST_F(BatonASIOLinuxTest, AddAndRemoveTimerWhileInPoll) {
     auto opCtx = client().makeOperationContext();
     Notification<bool> cancelTimerResult;
 
-    JoinThread thread([&] {
+    MilestoneThread thread([&](Notification<void>& isReady) {
         auto baton = opCtx->getBaton()->networking();
 
         FailPointEnableBlock fp("blockBatonASIOBeforePoll");
-        fp->waitForTimesEntered(1);
+        isReady.set();
+        waitForTimesEntered(fp, 1);
 
         // This thread is an external observer to the baton, so the expected behavior is for
         // `cancelTimer` to happen after `waitUntil`, thus canceling the timer must return `true`.
