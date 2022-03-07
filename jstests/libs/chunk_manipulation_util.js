@@ -240,11 +240,11 @@ function waitForMigrateStep(shardConnection, stepNumber) {
 // Run the given function in the transferMods phase.
 //
 function runCommandDuringTransferMods(
-    mongos, staticMongod, ns, bounds, fromShard, toShard, cmdFunc) {
+    mongos, staticMongod, ns, findCriteria, bounds, fromShard, toShard, cmdFunc) {
     // Turn on the fail point and wait for moveChunk to hit the fail point.
     pauseMoveChunkAtStep(fromShard, moveChunkStepNames.startedMoveChunk);
     let joinMoveChunk =
-        moveChunkParallel(staticMongod, mongos.host, null, bounds, ns, toShard.shardName);
+        moveChunkParallel(staticMongod, mongos.host, findCriteria, bounds, ns, toShard.shardName);
     waitForMoveChunkStep(fromShard, moveChunkStepNames.startedMoveChunk);
 
     // Run the commands.
