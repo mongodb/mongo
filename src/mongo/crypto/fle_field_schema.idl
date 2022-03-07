@@ -38,7 +38,7 @@ enums:
         type: int
         values:
           # FLE 1 Payloads
-          kPayload : 0 # see FLEEncryptionPlaceholder
+          kPlaceholder : 0 # see FLEEncryptionPlaceholder
           kDeterministic : 1
           kRandom : 2
           # FLE 2

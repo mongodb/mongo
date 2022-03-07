@@ -634,7 +634,7 @@ TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, BsonTypeMatchesSingleType
     auto expr = uassertStatusOK(MatchExpressionParser::parse(query, expCtx));
 
     FleBlobHeader blob;
-    blob.fleBlobSubtype = FleBlobSubtype::Deterministic;
+    blob.fleBlobSubtype = static_cast<int8_t>(EncryptedBinDataType::kDeterministic);
     memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
     blob.originalBsonType = BSONType::String;
 
@@ -650,7 +650,7 @@ TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, BsonTypeMatchesSingleType
     auto expr = uassertStatusOK(MatchExpressionParser::parse(query, expCtx));
 
     FleBlobHeader blob;
-    blob.fleBlobSubtype = FleBlobSubtype::Deterministic;
+    blob.fleBlobSubtype = static_cast<int8_t>(EncryptedBinDataType::kDeterministic);
     memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
     blob.originalBsonType = BSONType::String;
 
@@ -667,7 +667,7 @@ TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, BsonTypeMatchesOneOfTypes
     auto expr = uassertStatusOK(MatchExpressionParser::parse(query, expCtx));
 
     FleBlobHeader blob;
-    blob.fleBlobSubtype = FleBlobSubtype::Deterministic;
+    blob.fleBlobSubtype = static_cast<int8_t>(EncryptedBinDataType::kDeterministic);
     memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
     blob.originalBsonType = BSONType::String;
 
@@ -683,7 +683,7 @@ TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, BsonTypeDoesNotMatchSingl
     auto expr = uassertStatusOK(MatchExpressionParser::parse(query, expCtx));
 
     FleBlobHeader blob;
-    blob.fleBlobSubtype = FleBlobSubtype::Deterministic;
+    blob.fleBlobSubtype = static_cast<int8_t>(EncryptedBinDataType::kDeterministic);
     memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
     blob.originalBsonType = BSONType::NumberInt;
 
@@ -700,7 +700,7 @@ TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, BsonTypeDoesNotMatchTypeA
     auto expr = uassertStatusOK(MatchExpressionParser::parse(query, expCtx));
 
     FleBlobHeader blob;
-    blob.fleBlobSubtype = FleBlobSubtype::Deterministic;
+    blob.fleBlobSubtype = static_cast<int8_t>(EncryptedBinDataType::kDeterministic);
     memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
     blob.originalBsonType = BSONType::NumberInt;
 
@@ -754,7 +754,7 @@ TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, IntentToEncryptFleBlobDoe
     auto expr = uassertStatusOK(MatchExpressionParser::parse(query, expCtx));
 
     FleBlobHeader blob;
-    blob.fleBlobSubtype = FleBlobSubtype::IntentToEncrypt;
+    blob.fleBlobSubtype = static_cast<int8_t>(EncryptedBinDataType::kPlaceholder);
     memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
     blob.originalBsonType = BSONType::String;
     BSONObj notMatch = BSON("a" << BSONBinData(reinterpret_cast<const void*>(&blob),

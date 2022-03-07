@@ -77,11 +77,7 @@ public:
 
     std::unique_ptr<MatchExpression> parseMatchExpression(const BSONObj& query) {
         boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-        StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
-        ASSERT_OK(result.getStatus());
-        std::unique_ptr<MatchExpression> expr;
-        result.getValue().swap(expr);
-        return expr;
+        return uassertStatusOK(MatchExpressionParser::parse(query, expCtx));
     }
 
 protected:
@@ -115,8 +111,35 @@ TEST_F(FLEServerRewriteTest, TopLevel_Equality) {
     ASSERT_BSONOBJ_EQ(actual, expected);
 }
 
+TEST_F(FLEServerRewriteTest, TopLevel_Equality_DottedPath) {
+    auto match = fromjson("{'user.ssn': {$eq: 5}}");
+    auto tags = BSON_ARRAY(1 << 2 << 3);
+
+    _mock.setEncryptedTags({"user.ssn", 5}, tags);
+    auto expected = BSON(kSafeContent << BSON("$in" << tags));
+
+    auto actual = _mock.rewriteMatchExpression(parseMatchExpression(match))->serialize();
+    ASSERT_BSONOBJ_EQ(actual, expected);
+}
+
 TEST_F(FLEServerRewriteTest, TopLevel_In) {
     auto match = fromjson("{ssn: {$in: [2, 4, 6]}}");
+
+    // The key/value pairs that the mock functions use to determine the fake FFPs are inside an
+    // array, and so the keys are the index values and the values are the actual array elements.
+    _mock.setEncryptedTags({"0", 2}, BSON_ARRAY(1 << 2));
+    _mock.setEncryptedTags({"1", 4}, BSON_ARRAY(5 << 3));
+    _mock.setEncryptedTags({"2", 6}, BSON_ARRAY(99 << 100));
+
+    // Order doesn't matter in a disjunction.
+    auto expected = BSON(kSafeContent << BSON("$in" << BSON_ARRAY(1 << 2 << 3 << 5 << 99 << 100)));
+
+    auto actual = _mock.rewriteMatchExpression(parseMatchExpression(match))->serialize();
+    ASSERT_BSONOBJ_EQ(actual, expected);
+}
+
+TEST_F(FLEServerRewriteTest, TopLevel_In_DottedPath) {
+    auto match = fromjson("{'user.ssn': {$in: [2, 4, 6]}}");
 
     // The key/value pairs that the mock functions use to determine the fake FFPs are inside an
     // array, and so the keys are the index values and the values are the actual array elements.
@@ -222,6 +245,25 @@ TEST_F(FLEServerRewriteTest, TopLevel_And_In) {
     ASSERT_BSONOBJ_EQ(actual, expected);
 }
 
+TEST_F(FLEServerRewriteTest, NestedConjunction) {
+    auto match = fromjson("{$and: [{$and: [{ssn: 2}, {other: 3}]}, {otherSsn: 5}]}");
+
+    _mock.setEncryptedTags({"ssn", 2}, BSON_ARRAY(1 << 2));
+    _mock.setEncryptedTags({"otherSsn", 5}, BSON_ARRAY(3 << 4));
+
+    auto expected = fromjson(R"(
+        { $and: [
+            { $and: [
+                { __safeContent__: { $in: [ 1, 2 ] } },
+                { other: { $eq: 3 } }
+            ] },
+            { __safeContent__: { $in: [ 3, 4 ] } }
+        ] })");
+
+    auto actual = _mock.rewriteMatchExpression(parseMatchExpression(match))->serialize();
+    ASSERT_BSONOBJ_EQ(actual, expected);
+}
+
 TEST_F(FLEServerRewriteTest, TopLevel_Nor_Equality) {
     auto match = fromjson("{$nor: [{ssn: 5}]}");
     auto tags = BSON_ARRAY(1 << 2 << 3);
@@ -287,5 +329,38 @@ TEST_F(FLEServerRewriteTest, TopLevel_Nin) {
     auto actual = _mock.rewriteMatchExpression(parseMatchExpression(match))->serialize();
     ASSERT_BSONOBJ_EQ(actual, expected);
 }
+
+TEST_F(FLEServerRewriteTest, InMixOfEncryptedElementsIsDisallowed) {
+    auto match = fromjson("{ssn: {$in: [2, 4, 6]}}");
+
+    _mock.setEncryptedTags({"0", 2}, BSON_ARRAY(1 << 2));
+    _mock.setEncryptedTags({"1", 4}, BSON_ARRAY(5 << 3));
+
+    ASSERT_THROWS_CODE(
+        _mock.rewriteMatchExpression(parseMatchExpression(match)), AssertionException, 6329400);
+}
+
+TEST_F(FLEServerRewriteTest, ComparisonToObjectIgnored) {
+    // Although such a query should fail in query analysis, it's not realistic for us to catch all
+    // the ways a FLEFindPayload could be improperly included in an explicitly encrypted query, so
+    // this test demonstrates the server side behavior.
+    {
+        auto match = fromjson("{user: {$eq: {ssn: 5}}}");
+
+        _mock.setEncryptedTags({"user.ssn", 5}, BSON_ARRAY(1 << 2));
+
+        auto actual = _mock.rewriteMatchExpression(parseMatchExpression(match))->serialize();
+        ASSERT_BSONOBJ_EQ(actual, match);
+    }
+    {
+        auto match = fromjson("{user: {$in: [{ssn: 5}]}}");
+
+        _mock.setEncryptedTags({"user.ssn", 5}, BSON_ARRAY(1 << 2));
+
+        auto actual = _mock.rewriteMatchExpression(parseMatchExpression(match))->serialize();
+        ASSERT_BSONOBJ_EQ(actual, match);
+    }
+}
+
 }  // namespace
 }  // namespace mongo

@@ -1394,7 +1394,7 @@ TEST(JSONSchemaValidation, EncryptWithSubtypeFailsDueToMismatchedSubtype) {
         "{'$jsonSchema':"
         "{bsonType: 'object', properties: {a: {encrypt: {bsonType: 'number'}}}}}");
     FleBlobHeader blob;
-    blob.fleBlobSubtype = FleBlobSubtype::Deterministic;
+    blob.fleBlobSubtype = static_cast<int8_t>(EncryptedBinDataType::kDeterministic);
     memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
     blob.originalBsonType = BSONType::String;
 
@@ -1418,7 +1418,7 @@ TEST(JSONSchemaValidation, EncryptWithSubtypeInvertedValueIsEncrypted) {
         "{$nor: [{'$jsonSchema': {bsonType: 'object', properties: "
         "  {a: {encrypt: {bsonType: 'number'}}}}}]}");
     FleBlobHeader blob;
-    blob.fleBlobSubtype = FleBlobSubtype::Deterministic;
+    blob.fleBlobSubtype = static_cast<int8_t>(EncryptedBinDataType::kDeterministic);
     memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
     blob.originalBsonType = BSONType::NumberInt;
 

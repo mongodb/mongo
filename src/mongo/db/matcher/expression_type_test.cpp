@@ -307,7 +307,7 @@ TEST(InternalSchemaBinDataEncryptedTypeTest, DoesNotTraverseLeafArrays) {
     InternalSchemaBinDataEncryptedTypeExpression expr("a", std::move(typeSet));
 
     FleBlobHeader blob;
-    blob.fleBlobSubtype = FleBlobSubtype::Deterministic;
+    blob.fleBlobSubtype = static_cast<int8_t>(EncryptedBinDataType::kDeterministic);
     memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
     blob.originalBsonType = BSONType::String;
     auto binData = BSONBinData(

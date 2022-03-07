@@ -77,7 +77,8 @@ public:
         }
         int dataLen;
         auto data = elt.binData(dataLen);
-        return dataLen >= 1 && data[0] == 0x05;
+        return dataLen >= 1 &&
+            data[0] == static_cast<uint8_t>(EncryptedBinDataType::kFLE2FindEqualityPayload);
     }
 
 protected:

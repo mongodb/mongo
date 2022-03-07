@@ -29,15 +29,11 @@
 
 #pragma once
 
+#include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/matcher_type_set.h"
 
 namespace mongo {
-
-/**
- * Types of the encryption payload.
- */
-enum FleBlobSubtype { IntentToEncrypt = 0, Deterministic = 1, Random = 2 };
 
 /**
  * The structure represents how data is laid out in an encrypted payload.
@@ -343,12 +339,13 @@ public:
         if (!binDataLen)
             return false;
 
-        auto fleBlobSubType = binData[0];
+        auto fleBlobSubType =
+            EncryptedBinDataType_parse(IDLParserErrorContext("subtype"), binData[0]);
         switch (fleBlobSubType) {
-            case FleBlobSubtype::IntentToEncrypt:
+            case EncryptedBinDataType::kPlaceholder:
                 return false;
-            case FleBlobSubtype::Deterministic:
-            case FleBlobSubtype::Random: {
+            case EncryptedBinDataType::kDeterministic:
+            case EncryptedBinDataType::kRandom: {
                 // Verify the type of the encrypted data.
                 auto fleBlob = reinterpret_cast<const FleBlobHeader*>(binData);
                 return typeSet().hasType(static_cast<BSONType>(fleBlob->originalBsonType));
@@ -356,7 +353,7 @@ public:
             default:
                 uasserted(33118,
                           str::stream() << "unexpected subtype " << static_cast<int>(fleBlobSubType)
-                                        << " of encrypted binary data (0, 1 and 2 are allowed)");
+                                        << " of encrypted binary data");
         }
     }
 

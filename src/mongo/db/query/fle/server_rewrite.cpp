@@ -95,7 +95,7 @@ std::unique_ptr<InMatchExpression> FLEFindRewriter::rewriteIn(const InMatchExpre
             for (auto&& elt : obj) {
                 backingBSONBuilder.append(elt);
             }
-        }  // TODO: SERVER-63295 check for encrypted fields nested in objects.
+        }
     }
     if (numFFPs == 0) {
         return nullptr;
