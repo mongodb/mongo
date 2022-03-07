@@ -102,7 +102,10 @@
 namespace mongo {
 namespace {
 
-Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj& spec) {
+Status createIndexFromSpec(OperationContext* opCtx,
+                           VectorClockMutable* clock,
+                           StringData ns,
+                           const BSONObj& spec) {
     AutoGetDb autoDb(opCtx, nsToDatabaseSubstring(ns), MODE_X);
     Collection* coll;
     {
@@ -125,9 +128,10 @@ Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj
                         .init(opCtx,
                               collection,
                               spec,
-                              [opCtx](const std::vector<BSONObj>& specs) -> Status {
+                              [opCtx, clock](const std::vector<BSONObj>& specs) -> Status {
                                   if (opCtx->recoveryUnit()->getCommitTimestamp().isNull()) {
-                                      return opCtx->recoveryUnit()->setTimestamp(Timestamp(1, 1));
+                                      return opCtx->recoveryUnit()->setTimestamp(
+                                          clock->tickClusterTime(1).asTimestamp());
                                   }
                                   return Status::OK();
                               })
@@ -153,7 +157,8 @@ Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj
     WriteUnitOfWork wunit(opCtx);
     ASSERT_OK(indexer.commit(
         opCtx, coll, MultiIndexBlock::kNoopOnCreateEachFn, MultiIndexBlock::kNoopOnCommitFn));
-    ASSERT_OK(opCtx->recoveryUnit()->setTimestamp(Timestamp(1, 1)));
+    LogicalTime indexTs = clock->tickClusterTime(1);
+    ASSERT_OK(opCtx->recoveryUnit()->setTimestamp(indexTs.asTimestamp()));
     wunit.commit();
     abortOnExit.dismiss();
     return Status::OK();
@@ -471,6 +476,13 @@ public:
     BSONObj queryOplog(const BSONObj& query) {
         OneOffRead oor(_opCtx, Timestamp::min());
         return queryCollection(NamespaceString::kRsOplogNamespace, query);
+    }
+
+    Timestamp getTopOfOplog() {
+        OneOffRead oor(_opCtx, Timestamp::min());
+        BSONObj ret;
+        ASSERT_TRUE(Helpers::getLast(_opCtx, NamespaceString::kRsOplogNamespace.ns().c_str(), ret));
+        return ret["ts"].timestamp();
     }
 
     void assertMinValidDocumentAtTimestamp(const NamespaceString& nss,
@@ -1348,7 +1360,7 @@ TEST_F(StorageTimestampTest, SecondarySetIndexMultikeyOnInsert) {
     auto indexName = "a_1";
     auto indexSpec = BSON("name" << indexName << "key" << BSON("a" << 1) << "v"
                                  << static_cast<int>(kIndexVersion));
-    ASSERT_OK(createIndexFromSpec(_opCtx, nss.ns(), indexSpec));
+    ASSERT_OK(createIndexFromSpec(_opCtx, _clock, nss.ns(), indexSpec));
 
     _coordinatorMock->alwaysAllowWrites(false);
 
@@ -1420,7 +1432,7 @@ TEST_F(StorageTimestampTest, SecondarySetWildcardIndexMultikeyOnInsert) {
     auto indexName = "a_1";
     auto indexSpec = BSON("name" << indexName << "key" << BSON("$**" << 1) << "v"
                                  << static_cast<int>(kIndexVersion));
-    ASSERT_OK(createIndexFromSpec(_opCtx, nss.ns(), indexSpec));
+    ASSERT_OK(createIndexFromSpec(_opCtx, _clock, nss.ns(), indexSpec));
 
     _coordinatorMock->alwaysAllowWrites(false);
 
@@ -1516,7 +1528,7 @@ TEST_F(StorageTimestampTest, SecondarySetWildcardIndexMultikeyOnUpdate) {
     auto indexName = "a_1";
     auto indexSpec = BSON("name" << indexName << "key" << BSON("$**" << 1) << "v"
                                  << static_cast<int>(kIndexVersion));
-    ASSERT_OK(createIndexFromSpec(_opCtx, nss.ns(), indexSpec));
+    ASSERT_OK(createIndexFromSpec(_opCtx, _clock, nss.ns(), indexSpec));
 
     _coordinatorMock->alwaysAllowWrites(false);
 
@@ -1600,99 +1612,6 @@ TEST_F(StorageTimestampTest, SecondarySetWildcardIndexMultikeyOnUpdate) {
     }
 }
 
-TEST_F(StorageTimestampTest, InitialSyncSetIndexMultikeyOnInsert) {
-    // Pretend to be a secondary.
-    repl::UnreplicatedWritesBlock uwb(_opCtx);
-
-    NamespaceString nss("unittests.InitialSyncSetIndexMultikeyOnInsert");
-    create(nss);
-    UUID uuid = UUID::gen();
-    {
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
-        uuid = autoColl.getCollection()->uuid();
-    }
-    auto indexName = "a_1";
-    auto indexSpec = BSON("name" << indexName << "key" << BSON("a" << 1) << "v"
-                                 << static_cast<int>(kIndexVersion));
-    ASSERT_OK(createIndexFromSpec(_opCtx, nss.ns(), indexSpec));
-
-    _coordinatorMock->alwaysAllowWrites(false);
-    ASSERT_OK(_coordinatorMock->setFollowerMode({repl::MemberState::MS::RS_STARTUP2}));
-
-    const LogicalTime pastTime = _clock->tickClusterTime(1);
-    const LogicalTime insertTime0 = _clock->tickClusterTime(1);
-    const LogicalTime indexBuildTime = _clock->tickClusterTime(1);
-    const LogicalTime insertTime1 = _clock->tickClusterTime(1);
-    const LogicalTime insertTime2 = _clock->tickClusterTime(1);
-
-    BSONObj doc0 = BSON("_id" << 0 << "a" << 3);
-    BSONObj doc1 = BSON("_id" << 1 << "a" << BSON_ARRAY(1 << 2));
-    BSONObj doc2 = BSON("_id" << 2 << "a" << BSON_ARRAY(1 << 2));
-    auto op0 = repl::OplogEntry(
-        BSON("ts" << insertTime0.asTimestamp() << "t" << 1LL << "v" << 2 << "op"
-                  << "i"
-                  << "ns" << nss.ns() << "ui" << uuid << "wall" << Date_t() << "o" << doc0));
-    auto op1 = repl::OplogEntry(
-        BSON("ts" << insertTime1.asTimestamp() << "t" << 1LL << "v" << 2 << "op"
-                  << "i"
-                  << "ns" << nss.ns() << "ui" << uuid << "wall" << Date_t() << "o" << doc1));
-    auto op2 = repl::OplogEntry(
-        BSON("ts" << insertTime2.asTimestamp() << "t" << 1LL << "v" << 2 << "op"
-                  << "i"
-                  << "ns" << nss.ns() << "ui" << uuid << "wall" << Date_t() << "o" << doc2));
-    auto indexSpec2 = BSON("createIndexes" << nss.coll() << "v" << static_cast<int>(kIndexVersion)
-                                           << "key" << BSON("b" << 1) << "name"
-                                           << "b_1");
-    auto createIndexOp =
-        repl::OplogEntry(BSON("ts" << indexBuildTime.asTimestamp() << "t" << 1LL << "v" << 2 << "op"
-                                   << "c"
-                                   << "ns" << nss.getCommandNS().ns() << "ui" << uuid << "wall"
-                                   << Date_t() << "o" << indexSpec2));
-
-    // We add in an index creation op to test that we restart tracking multikey path info
-    // after bulk index builds.
-    std::vector<repl::OplogEntry> ops = {op0, createIndexOp, op1, op2};
-
-    DoNothingOplogApplierObserver observer;
-    auto storageInterface = repl::StorageInterface::get(_opCtx);
-    auto writerPool = repl::makeReplWriterPool();
-
-    repl::OplogApplierImpl oplogApplier(
-        nullptr,  // task executor. not required for applyOplogBatch().
-        nullptr,  // oplog buffer. not required for applyOplogBatch().
-        &observer,
-        _coordinatorMock,
-        _consistencyMarkers,
-        storageInterface,
-        repl::OplogApplier::Options(repl::OplogApplication::Mode::kInitialSync),
-        writerPool.get());
-    auto lastTime = unittest::assertGet(oplogApplier.applyOplogBatch(_opCtx, ops));
-    ASSERT_EQ(lastTime.getTimestamp(), insertTime2.asTimestamp());
-
-    // Wait for the index build to finish before making any assertions.
-    IndexBuildsCoordinator::get(_opCtx)->awaitNoIndexBuildInProgressForCollection(_opCtx, uuid);
-
-    AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
-
-    // Ensure minimumVisible has not been updated due to the index creation.
-    ASSERT_LT(autoColl.getCollection()->getMinimumVisibleSnapshot().get(), pastTime.asTimestamp());
-
-    // Reading the multikey state before 'insertTime0' is not valid or reliable to test. If the
-    // background index build intercepts and drains writes during inital sync, the index write
-    // and the write to the multikey path state will not be timestamped. This write is not
-    // timestamped because the lastApplied timestamp, which would normally be used on a primary
-    // or secondary, is not always available during initial sync.
-    // Additionally, it is not valid to read at a timestamp before inital sync completes, so
-    // these assertions below only make sense in the context of this unit test, but would
-    // otherwise not be exercised in any normal scenario.
-    assertMultikeyPaths(
-        _opCtx, autoColl.getCollection(), indexName, insertTime0.asTimestamp(), true, {{0}});
-    assertMultikeyPaths(
-        _opCtx, autoColl.getCollection(), indexName, insertTime1.asTimestamp(), true, {{0}});
-    assertMultikeyPaths(
-        _opCtx, autoColl.getCollection(), indexName, insertTime2.asTimestamp(), true, {{0}});
-}
-
 TEST_F(StorageTimestampTest, PrimarySetIndexMultikeyOnInsert) {
     NamespaceString nss("unittests.PrimarySetIndexMultikeyOnInsert");
     create(nss);
@@ -1701,7 +1620,7 @@ TEST_F(StorageTimestampTest, PrimarySetIndexMultikeyOnInsert) {
     auto indexName = "a_1";
     auto indexSpec = BSON("name" << indexName << "key" << BSON("a" << 1) << "v"
                                  << static_cast<int>(kIndexVersion));
-    ASSERT_OK(createIndexFromSpec(_opCtx, nss.ns(), indexSpec));
+    ASSERT_OK(createIndexFromSpec(_opCtx, _clock, nss.ns(), indexSpec));
 
     const LogicalTime pastTime = _clock->tickClusterTime(1);
     const LogicalTime insertTime = pastTime.addTicks(1);
@@ -1726,7 +1645,7 @@ TEST_F(StorageTimestampTest, PrimarySetIndexMultikeyOnInsertUnreplicated) {
     auto indexName = "a_1";
     auto indexSpec = BSON("name" << indexName << "key" << BSON("a" << 1) << "v"
                                  << static_cast<int>(kIndexVersion));
-    ASSERT_OK(createIndexFromSpec(_opCtx, nss.ns(), indexSpec));
+    ASSERT_OK(createIndexFromSpec(_opCtx, _clock, nss.ns(), indexSpec));
 
     const LogicalTime pastTime = _clock->tickClusterTime(1);
     const LogicalTime insertTime = pastTime.addTicks(1);
@@ -1758,7 +1677,7 @@ TEST_F(StorageTimestampTest, PrimarySetsMultikeyInsideMultiDocumentTransaction) 
 
     {
         AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
-        ASSERT_OK(createIndexFromSpec(_opCtx, nss.ns(), indexSpec));
+        ASSERT_OK(createIndexFromSpec(_opCtx, _clock, nss.ns(), indexSpec));
     }
 
     const auto currentTime = _clock->getTime();
@@ -3183,6 +3102,82 @@ TEST_F(StorageTimestampTest, CreateCollectionWithSystemIndex) {
     }
     assertIdentsExistAtTimestamp(durableCatalog, "", indexIdent, indexCompleteTs);
     assertIdentsExistAtTimestamp(durableCatalog, "", indexIdent, _nullTs);
+}
+
+TEST_F(StorageTimestampTest, MultipleTimestampsForMultikeyWrites) {
+    auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
+    auto durableCatalog = storageEngine->getCatalog();
+    RecordId catalogId;
+
+    // Create config.system.indexBuilds collection to store commit quorum value during index
+    // building.
+    ASSERT_OK(repl::StorageInterface::get(_opCtx)->dropCollection(
+        _opCtx, NamespaceString::kIndexBuildEntryNamespace));
+    ASSERT_OK(
+        createCollection(_opCtx,
+                         NamespaceString::kIndexBuildEntryNamespace.db().toString(),
+                         BSON("create" << NamespaceString::kIndexBuildEntryNamespace.coll())));
+
+    NamespaceString nss("unittests.timestampVectoredInsertMultikey");
+    create(nss);
+
+    {
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
+
+        WriteUnitOfWork wuow(_opCtx);
+        insertDocument(
+            autoColl.getCollection(),
+            InsertStatement(BSON("_id" << 0 << "a" << 1 << "b" << 2), Timestamp(), _presentTerm));
+        wuow.commit();
+        ASSERT_EQ(1, itCount(autoColl.getCollection()));
+        catalogId = autoColl.getCollection()->getCatalogId();
+    }
+
+    DBDirectClient client(_opCtx);
+    {
+        auto index1 = BSON("v" << kIndexVersion << "key" << BSON("a" << 1) << "name"
+                               << "a_1");
+        auto index2 = BSON("v" << kIndexVersion << "key" << BSON("b" << 1) << "name"
+                               << "b_1");
+        // Disable index build commit quorum as we don't have support of replication subsystem for
+        // voting.
+        auto createIndexesCmdObj =
+            BSON("createIndexes" << nss.coll() << "indexes" << BSON_ARRAY(index1 << index2)
+                                 << "commitQuorum" << 0);
+        BSONObj result;
+        ASSERT(client.runCommand(nss.db().toString(), createIndexesCmdObj, result)) << result;
+    }
+
+    AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
+    Timestamp tsBeforeMultikeyWrites = getTopOfOplog();
+    {
+        const LogicalTime firstInsertTime = _clock->tickClusterTime(2);
+
+        std::vector<InsertStatement> vectoredInsert;
+        vectoredInsert.emplace_back(BSON("_id" << 1 << "b" << BSON_ARRAY(1 << 2)),
+                                    firstInsertTime.asTimestamp(),
+                                    _presentTerm);
+        vectoredInsert.emplace_back(BSON("_id" << 2 << "a" << BSON_ARRAY(1 << 2)),
+                                    firstInsertTime.addTicks(1).asTimestamp(),
+                                    _presentTerm);
+
+        WriteUnitOfWork wuow(_opCtx);
+        ASSERT_OK(autoColl.getCollection()->insertDocuments(
+            _opCtx, vectoredInsert.begin(), vectoredInsert.end(), nullptr, false));
+        wuow.commit();
+    }
+
+    // By virtue of not crashing due to WT observing an out of order write, this test has
+    // succeeded. For completeness, check the index metadata.
+    std::shared_ptr<BSONCollectionCatalogEntry::MetaData> mdBeforeInserts =
+        getMetaDataAtTime(durableCatalog, catalogId, tsBeforeMultikeyWrites);
+    ASSERT_FALSE(getIndexMetaData(mdBeforeInserts, "a_1").multikey);
+    ASSERT_FALSE(getIndexMetaData(mdBeforeInserts, "b_1").multikey);
+
+    std::shared_ptr<BSONCollectionCatalogEntry::MetaData> mdAfterInserts =
+        getMetaDataAtTime(durableCatalog, catalogId, getTopOfOplog());
+    ASSERT(getIndexMetaData(mdAfterInserts, "a_1").multikey);
+    ASSERT(getIndexMetaData(mdAfterInserts, "b_1").multikey);
 }
 
 class RetryableFindAndModifyTest : public StorageTimestampTest {

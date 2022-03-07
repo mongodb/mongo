@@ -59,6 +59,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/query/collation/collation_spec.h"
@@ -1601,16 +1602,61 @@ Status IndexCatalogImpl::indexRecords(OperationContext* opCtx,
         *keysInsertedOut = 0;
     }
 
-    for (auto&& it : _readyIndexes) {
-        Status s = _indexRecords(opCtx, coll, it.get(), bsonRecords, keysInsertedOut);
-        if (!s.isOK())
-            return s;
+    // For vectored inserts, we insert index keys and flip multikey in "index order". However
+    // because multikey state for different indexes both live on the same _mdb_catalog document,
+    // index order isn't necessarily timestamp order. We track multikey paths here to ensure we make
+    // changes to the _mdb_catalog document with in timestamp order updates.
+    MultikeyPathTracker& tracker = MultikeyPathTracker::get(opCtx);
+
+    // Take care when choosing to aggregate multikey writes. This code will only* track multikey
+    // when:
+    // * No parent is tracking multikey and*
+    // * There are timestamps associated with the input `bsonRecords`.
+    //
+    // If we are not responsible for tracking multikey:
+    // * Leave the multikey tracker in its original "tracking" state.
+    // * Not write any accumulated multikey paths to the _mdb_catalog document.
+    const bool manageMultikeyWrite =
+        !tracker.isTrackingMultikeyPathInfo() && !bsonRecords[0].ts.isNull();
+    {
+        ScopeGuard stopTrackingMultikeyChanges(
+            [&tracker] { tracker.stopTrackingMultikeyPathInfo(); });
+        if (manageMultikeyWrite) {
+            tracker.startTrackingMultikeyPathInfo();
+        } else {
+            stopTrackingMultikeyChanges.dismiss();
+        }
+        for (auto&& it : _readyIndexes) {
+            Status s = _indexRecords(opCtx, coll, it.get(), bsonRecords, keysInsertedOut);
+            if (!s.isOK())
+                return s;
+        }
+
+        for (auto&& it : _buildingIndexes) {
+            Status s = _indexRecords(opCtx, coll, it.get(), bsonRecords, keysInsertedOut);
+            if (!s.isOK())
+                return s;
+        }
     }
 
-    for (auto&& it : _buildingIndexes) {
-        Status s = _indexRecords(opCtx, coll, it.get(), bsonRecords, keysInsertedOut);
-        if (!s.isOK())
-            return s;
+    const WorkerMultikeyPathInfo& newPaths = tracker.getMultikeyPathInfo();
+    if (newPaths.size() == 0 || !manageMultikeyWrite) {
+        return Status::OK();
+    }
+
+    if (Status status = opCtx->recoveryUnit()->setTimestamp(bsonRecords[0].ts); !status.isOK()) {
+        return status;
+    }
+
+    for (const MultikeyPathInfo& newPath : newPaths) {
+        auto idx = findIndexByName(opCtx, newPath.indexName, /*includeUnfinishedIndexes=*/true);
+        if (!idx) {
+            return Status(ErrorCodes::IndexNotFound,
+                          str::stream()
+                              << "Could not find index " << newPath.indexName << " in "
+                              << coll->ns() << " (" << coll->uuid() << ") to set to multikey.");
+        }
+        setMultikeyPaths(opCtx, coll, idx, newPath.multikeyMetadataKeys, newPath.multikeyPaths);
     }
 
     return Status::OK();
