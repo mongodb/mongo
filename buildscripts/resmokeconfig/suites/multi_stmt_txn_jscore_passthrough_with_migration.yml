@@ -257,7 +257,6 @@ selector:
   - jstests/core/killop_drop_collection.js
   - jstests/core/loadserverscripts.js
   - jstests/core/mr_killop.js
-  - jstests/core/remove9.js
   - jstests/core/removeb.js
   - jstests/core/removec.js
   - jstests/core/shellstartparallel.js

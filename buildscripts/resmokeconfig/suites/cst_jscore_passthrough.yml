@@ -369,7 +369,6 @@ selector:
   - jstests/core/remove3.js
   - jstests/core/remove6.js
   - jstests/core/remove7.js
-  - jstests/core/remove9.js
   - jstests/core/removea.js
   - jstests/core/removeb.js
   - jstests/core/removec.js
@@ -630,7 +629,6 @@ selector:
   - jstests/core/regex_verbs.js
   - jstests/core/regexb.js
   - jstests/core/regexc.js
-  - jstests/core/remove9.js
   - jstests/core/server7756.js
   - jstests/core/sortk.js
   - jstests/core/system_js_access.js
