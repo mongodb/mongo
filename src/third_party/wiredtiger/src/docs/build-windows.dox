@@ -17,7 +17,7 @@ Now proceed with @ref windows_building
 
 Building WiredTiger on Windows requires
 <a href="https://cmake.org/">CMake</a> as well as the Microsoft Visual
-C++ compiler in Microsoft Visual Studio.
+C++ compiler in Microsoft Visual Studio 2017.
 
 You can build WiredTiger from source using command-line tools.
 When compiling via command-line tools, we recommend a prompt/shell that has been appropriately

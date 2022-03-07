@@ -4,6 +4,10 @@
 
 To build with CMake we **require** the following dependencies:
 
+* A compiler that supports C11:
+  * `gcc` : Version 8.5 or later, or 
+  * `clang`: Version 7.01 or later, or
+  * `Visual Studio 2017`: If compiling on Windows
 * `cmake` : Official CMake install instructions found here: https://cmake.org/install/
   * *WiredTiger supports CMake 3.10+*
 

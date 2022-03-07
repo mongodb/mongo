@@ -15,7 +15,7 @@ checkpoint and commit-level granularity.
 WiredTiger can be used as a simple key/value store, but also has a complete schema layer,
 including indices and projections.
 
-WiredTiger should be generally portable to any 64-bit system supporting the ANSI C and POSIX
+WiredTiger should be generally portable to any 64-bit system supporting the ANSI C11 and POSIX
 1003.1 standards.
 
 For more information on the WiredTiger architecture and why it might be right for your project,
