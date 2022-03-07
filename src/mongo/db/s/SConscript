@@ -619,13 +619,15 @@ env.Benchmark(
 )
 
 env.Benchmark(
-    target="sharding_write_router_bm",
-    source=["sharding_write_router_bm.cpp"],
+    target='sharding_write_router_bm',
+    source=[
+        'sharding_write_router_bm.cpp',
+    ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/db/auth/authmocks",
-        "$BUILD_DIR/mongo/s/grid",
-        "$BUILD_DIR/mongo/s/sharding_test_fixture_common",
-        "sharding_api_d",
-        "sharding_runtime_d",
+        '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/s/grid',
+        '$BUILD_DIR/mongo/s/sharding_test_fixture_common',
+        'sharding_api_d',
+        'sharding_runtime_d',
     ],
 )
