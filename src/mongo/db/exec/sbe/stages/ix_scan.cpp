@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/exec/sbe/stages/ix_scan.h"
@@ -37,6 +39,8 @@
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/trial_run_tracker.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/logv2/log.h"
+#include "mongo/util/stacktrace.h"
 
 namespace mongo::sbe {
 IndexScanStage::IndexScanStage(UUID collUuid,
@@ -117,10 +121,18 @@ void IndexScanStage::prepare(CompileCtx& ctx) {
 
     auto indexCatalog = _coll->getIndexCatalog();
     auto indexDesc = indexCatalog->findIndexByName(_opCtx, _indexName);
-    tassert(4938500,
-            str::stream() << "could not find index named '" << _indexName << "' in collection '"
-                          << _collName << "'",
-            indexDesc);
+    // TODO (SERVER-64297) Revert this uassert to a tassert.
+    if (!indexDesc) {
+        LOGV2_WARNING(6428200,
+                      "Unable to find index; dumping stack trace",
+                      "indexName"_attr = _indexName,
+                      "collectionName"_attr = _collName);
+        printStackTrace();
+        uasserted(4938500,
+                  str::stream() << "could not find index named '" << _indexName
+                                << "' in collection '" << _collName << "'");
+    }
+
     _weakIndexCatalogEntry = indexCatalog->getEntryShared(indexDesc);
     auto entry = _weakIndexCatalogEntry.lock();
     tassert(4938503,

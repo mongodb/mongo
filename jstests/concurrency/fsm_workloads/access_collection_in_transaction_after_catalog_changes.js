@@ -37,14 +37,17 @@ var $config = (function() {
                 op(ddlColl);
                 success = true;
             } catch (e) {
-                assertWhenOwnColl.contains(e.code,
-                                           [
-                                               ErrorCodes.LockTimeout,
-                                               ErrorCodes.WriteConflict,
-                                               ErrorCodes.SnapshotUnavailable,
-                                               ErrorCodes.OperationNotSupportedInTransaction
-                                           ],
-                                           () => tojson(e));
+                assertWhenOwnColl.contains(
+                    e.code,
+                    [
+                        ErrorCodes.LockTimeout,
+                        ErrorCodes.WriteConflict,
+                        ErrorCodes.SnapshotUnavailable,
+                        ErrorCodes.OperationNotSupportedInTransaction,
+                        // TODO (SERVER-64297) Stop ignoring this specific error.
+                        4938500,
+                    ],
+                    () => tojson(e));
             }
 
             // Commit or abort the transaction.
