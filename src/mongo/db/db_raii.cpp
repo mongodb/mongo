@@ -375,18 +375,20 @@ auto acquireCollectionAndConsistentSnapshot(
 
 }  // namespace
 
-AutoStatsTracker::AutoStatsTracker(OperationContext* opCtx,
-                                   const NamespaceString& nss,
-                                   Top::LockType lockType,
-                                   LogMode logMode,
-                                   int dbProfilingLevel,
-                                   Date_t deadline,
-                                   const std::vector<NamespaceString>& secondaryNssVector)
+AutoStatsTracker::AutoStatsTracker(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    Top::LockType lockType,
+    LogMode logMode,
+    int dbProfilingLevel,
+    Date_t deadline,
+    const std::vector<NamespaceStringOrUUID>& secondaryNssOrUUIDVector)
     : _opCtx(opCtx), _lockType(lockType), _logMode(logMode) {
     // Deduplicate all namespaces for Top reporting on destruct.
     _nssSet.insert(nss);
-    for (auto&& secondaryNss : secondaryNssVector) {
-        _nssSet.insert(secondaryNss);
+    auto catalog = CollectionCatalog::get(opCtx);
+    for (auto&& secondaryNssOrUUID : secondaryNssOrUUIDVector) {
+        _nssSet.insert(catalog->resolveNamespaceStringOrUUID(opCtx, secondaryNssOrUUID));
     }
 
     if (_logMode == LogMode::kUpdateTop) {
@@ -804,7 +806,8 @@ AutoGetCollectionForReadCommandBase<AutoGetCollectionForReadType>::
           Top::LockType::ReadLocked,
           logMode,
           CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(_autoCollForRead.getNss().db()),
-          deadline) {
+          deadline,
+          secondaryNssOrUUIDs) {
 
     if (!_autoCollForRead.getView()) {
         auto css =
