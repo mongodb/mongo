@@ -31,6 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/document_source_find_and_modify_image_lookup.h"
 #include "mongo/db/repl/apply_ops_command_info.h"
@@ -123,22 +124,40 @@ REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalFindAndModifyImageLookup,
 
 boost::intrusive_ptr<DocumentSourceFindAndModifyImageLookup>
 DocumentSourceFindAndModifyImageLookup::create(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    return new DocumentSourceFindAndModifyImageLookup(expCtx);
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, bool includeCommitTimestamp) {
+    return new DocumentSourceFindAndModifyImageLookup(expCtx, includeCommitTimestamp);
 }
 
 boost::intrusive_ptr<DocumentSourceFindAndModifyImageLookup>
 DocumentSourceFindAndModifyImageLookup::createFromBson(
     const BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(5806003,
-            str::stream() << "the '" << kStageName << "' spec must be an empty object",
-            elem.type() == BSONType::Object && elem.Obj().isEmpty());
-    return DocumentSourceFindAndModifyImageLookup::create(expCtx);
+            str::stream() << "the '" << kStageName << "' spec must be an object",
+            elem.type() == BSONType::Object);
+
+    bool includeCommitTimestamp = false;
+    for (auto&& subElem : elem.Obj()) {
+        if (subElem.fieldNameStringData() == kIncludeCommitTransactionTimestampFieldName) {
+            uassert(6387805,
+                    str::stream() << "expected a boolean for the "
+                                  << kIncludeCommitTransactionTimestampFieldName << " option to "
+                                  << kStageName << " stage, got " << typeName(subElem.type()),
+                    subElem.type() == Bool);
+            includeCommitTimestamp = subElem.Bool();
+        } else {
+            uasserted(6387800,
+                      str::stream() << "unrecognized option to " << kStageName
+                                    << " stage: " << subElem.fieldNameStringData());
+        }
+    }
+
+    return DocumentSourceFindAndModifyImageLookup::create(expCtx, includeCommitTimestamp);
 }
 
 DocumentSourceFindAndModifyImageLookup::DocumentSourceFindAndModifyImageLookup(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx)
-    : DocumentSource(kStageName, expCtx) {}
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, bool includeCommitTimestamp)
+    : DocumentSource(kStageName, expCtx),
+      _includeCommitTransactionTimestamp(includeCommitTimestamp) {}
 
 StageConstraints DocumentSourceFindAndModifyImageLookup::constraints(
     Pipeline::SplitState pipeState) const {
@@ -155,7 +174,10 @@ StageConstraints DocumentSourceFindAndModifyImageLookup::constraints(
 
 Value DocumentSourceFindAndModifyImageLookup::serialize(
     boost::optional<ExplainOptions::Verbosity> explain) const {
-    return Value(Document{{kStageName, Value(Document{})}});
+    return Value(
+        Document{{kStageName,
+                  Value(Document{{kIncludeCommitTransactionTimestampFieldName,
+                                  _includeCommitTransactionTimestamp ? Value(true) : Value()}})}});
 }
 
 DepsTracker::State DocumentSourceFindAndModifyImageLookup::getDependencies(
@@ -200,7 +222,31 @@ DocumentSource::GetNextResult DocumentSourceFindAndModifyImageLookup::doGetNext(
 
 boost::optional<Document> DocumentSourceFindAndModifyImageLookup::_forgeNoopImageDoc(
     Document inputDoc, OperationContext* opCtx) {
-    const auto inputOplogEntry = uassertStatusOK(repl::OplogEntry::parse(inputDoc.toBson()));
+    // If '_includeCommitTransactionTimestamp' is true, strip any commit transaction timestamp field
+    // from the input doc to avoid hitting an unknown field error when parsing the input doc into an
+    // oplog entry below. Store the commit timestamp so it can be attached to the forged image doc
+    // later, if there is one.
+    const auto [inputOplogBson,
+                commitTxnTs] = [&]() -> std::pair<BSONObj, boost::optional<Timestamp>> {
+        if (!_includeCommitTransactionTimestamp) {
+            return {inputDoc.toBson(), boost::none};
+        }
+
+        const auto commitTxnTs =
+            inputDoc.getField(CommitTransactionOplogObject::kCommitTimestampFieldName);
+        if (commitTxnTs.missing()) {
+            return {inputDoc.toBson(), boost::none};
+        }
+        tassert(6387806,
+                str::stream() << "'" << CommitTransactionOplogObject::kCommitTimestampFieldName
+                              << "' field is not a BSON Timestamp",
+                commitTxnTs.getType() == BSONType::bsonTimestamp);
+        MutableDocument mutableInputDoc(inputDoc);
+        mutableInputDoc.remove(CommitTransactionOplogObject::kCommitTimestampFieldName);
+        return {mutableInputDoc.freeze().toBson(), commitTxnTs.getTimestamp()};
+    }();
+
+    const auto inputOplogEntry = uassertStatusOK(repl::OplogEntry::parse(inputOplogBson));
     const auto sessionId = inputOplogEntry.getSessionId();
     const auto txnNumber = inputOplogEntry.getTxnNumber();
 
@@ -267,7 +313,14 @@ boost::optional<Document> DocumentSourceFindAndModifyImageLookup::_forgeNoopImag
                                               Value{downCovertedApplyOpsCmdObj});
                     _stashedFindAndModifyDoc = Document(downConvertedDoc.freeze());
 
-                    return Document{forgedNoopOplogEntry->getEntry().toBSON()};
+                    MutableDocument forgedNoopDoc{
+                        Document{forgedNoopOplogEntry->getEntry().toBSON()}};
+                    if (commitTxnTs) {
+                        forgedNoopDoc.setField(
+                            CommitTransactionOplogObject::kCommitTimestampFieldName,
+                            Value{*commitTxnTs});
+                    }
+                    return forgedNoopDoc.freeze();
                 }
                 return boost::none;
             }

@@ -39,14 +39,19 @@ namespace mongo {
  * the 'needsRetryImage' field or each 'applyOps' oplog entry with a 'findAndModify' operation entry
  * that has the 'needsRetryImage' field. This stage also downconverts 'findAndModify' or 'applyOps'
  * oplog entry documents by stripping the 'needsRetryImage' field and appending the appropriate
- * 'preImageOpTime' or 'postImageOpTime' field.
+ * 'preImageOpTime' or 'postImageOpTime' field. If 'includeCommitTransactionTimestamp' is true,
+ * the forged pre- or post-image oplog entry document for each 'applyOps' oplog entry document that
+ * comes with a transaction commit timestamp will have the commit timestamp attached to it.
  */
 class DocumentSourceFindAndModifyImageLookup : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$_internalFindAndModifyImageLookup"_sd;
+    static constexpr StringData kIncludeCommitTransactionTimestampFieldName =
+        "includeCommitTransactionTimestamp"_sd;
 
     static boost::intrusive_ptr<DocumentSourceFindAndModifyImageLookup> create(
-        const boost::intrusive_ptr<ExpressionContext>&);
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        bool includeCommitTransactionTimestamp = false);
 
     static boost::intrusive_ptr<DocumentSourceFindAndModifyImageLookup> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
@@ -71,11 +76,16 @@ protected:
     DocumentSource::GetNextResult doGetNext() override;
 
 private:
-    DocumentSourceFindAndModifyImageLookup(const boost::intrusive_ptr<ExpressionContext>& expCtx);
+    DocumentSourceFindAndModifyImageLookup(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                           bool includeCommitTransactionTimestamp);
 
     // Forges the no-op pre- or post-image document to be returned. Also downconverts the original
     // 'findAndModify' or 'applyOps' oplog entry document and stashes it.
     boost::optional<Document> _forgeNoopImageDoc(Document inputDoc, OperationContext* opCtx);
+
+    // Set to true if the input oplog entry documents can have a transaction commit timestamp
+    // attached to it.
+    bool _includeCommitTransactionTimestamp;
 
     // Represents the stashed 'findAndModify' or 'applyOps' oplog entry document. This indicates
     // that the previous document emitted was a forged pre- or post-image.

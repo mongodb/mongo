@@ -38,16 +38,26 @@ namespace mongo {
  * whenever an oplog entry commits a transaction. When the stage observes an applyOps or commit
  * command that commits a transaction, it emits one document for each applyOps in the transaction.
  *
- * Because it tracks whether or not a given oplog event is within a transaction, this stage is also
- * responsible for generating resharding's {clusterTime: <txn commit time or optime>, ts: <optime>}
- * _id field for *all* events, transaction or otherwise.
+ * If 'includeCommitTransactionTimestamp' is true, this stage is responsible for attaching the
+ * transaction commit timestamp to each applyOps oplog entry document that it emits and a
+ * downstream stage is expected to use this timestamp when generating the resharding's _id field
+ * for the document (as described below).
+ *
+ * If 'includeCommitTransactionTimestamp' is false, this stage is responsible for generating
+ * the resharding's _id field for each oplog entry document that it emits. For a document that
+ * corresponds to an applyOps oplog entry for a committed transaction, this will be
+ * {clusterTime: <transaction commit timestamp>, ts: <applyOps optime.ts>}. For all other documents,
+ * this will be {clusterTime: <optime.ts>, ts: <optime.ts>}.
  */
 class DocumentSourceReshardingIterateTransaction : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$_internalReshardingIterateTransaction"_sd;
+    static constexpr StringData kIncludeCommitTransactionTimestampFieldName =
+        "includeCommitTransactionTimestamp"_sd;
 
     static boost::intrusive_ptr<DocumentSourceReshardingIterateTransaction> create(
-        const boost::intrusive_ptr<ExpressionContext>&);
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        bool includeCommitTransactionTimestamp = false);
 
     static boost::intrusive_ptr<DocumentSourceReshardingIterateTransaction> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
@@ -73,7 +83,8 @@ protected:
 
 private:
     DocumentSourceReshardingIterateTransaction(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx);
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        bool includeCommitTransactionTimestamp);
 
     /**
      * Validates if the supplied document contains transaction details.
@@ -96,7 +107,8 @@ private:
 
         TransactionOpIterator(OperationContext* opCtx,
                               std::shared_ptr<MongoProcessInterface> mongoProcessInterface,
-                              const Document& input);
+                              const Document& input,
+                              bool includeCommitTransactionTimestamp);
 
         Timestamp clusterTime() const {
             return _clusterTime;
@@ -147,7 +159,14 @@ private:
 
         // Used for traversing the oplog with TransactionHistoryInterface.
         std::shared_ptr<MongoProcessInterface> _mongoProcessInterface;
+
+        bool _includeCommitTransactionTimestamp;
     };
+
+    // Set to true if this stage should attach the transaction commit timestamp to the applyOps
+    // oplog entry documents that it emits instead of generating a resharding id for the documents
+    // that it emits.
+    bool _includeCommitTransactionTimestamp;
 
     // Represents the current transaction we're unwinding, if any.
     boost::optional<TransactionOpIterator> _txnIterator;

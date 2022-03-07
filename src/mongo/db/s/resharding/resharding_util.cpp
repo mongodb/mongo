@@ -47,6 +47,7 @@
 #include "mongo/db/pipeline/document_source_find_and_modify_image_lookup.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/resharding/document_source_resharding_add_resume_id.h"
 #include "mongo/db/s/resharding/document_source_resharding_iterate_transaction.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -254,12 +255,28 @@ std::unique_ptr<Pipeline, PipelineDeleter> createOplogFetchingPipelineForReshard
             .toBson(),
         expCtx));
 
-    // Converts oplog entries with kNeedsRetryImageFieldName into the old style pair of
-    // update/delete oplog and pre/post image no-op oplog.
-    stages.emplace_back(DocumentSourceFindAndModifyImageLookup::create(expCtx));
+    // TODO (SERVER-62375): Remove upgrade/downgrade code for internal transactions.
+    if (serverGlobalParams.featureCompatibility.isLessThan(
+            multiversion::FeatureCompatibilityVersion::kVersion_6_0)) {
+        // Converts oplog entries with kNeedsRetryImageFieldName into the old style pair of
+        // update/delete oplog and pre/post image no-op oplog.
+        stages.emplace_back(DocumentSourceFindAndModifyImageLookup::create(expCtx));
 
-    // Emits transaction entries chronologically, and adds _id to all events in the stream.
-    stages.emplace_back(DocumentSourceReshardingIterateTransaction::create(expCtx));
+        // Emits transaction entries chronologically, and adds _id to all events in the stream.
+        stages.emplace_back(DocumentSourceReshardingIterateTransaction::create(expCtx));
+    } else {
+        // Emits transaction entries chronologically.
+        stages.emplace_back(DocumentSourceReshardingIterateTransaction::create(
+            expCtx, true /* includeCommitTransactionTimestamp */));
+
+        // Converts oplog entries with kNeedsRetryImageFieldName into the old style pair of
+        // update/delete oplog and pre/post image no-op oplog.
+        stages.emplace_back(DocumentSourceFindAndModifyImageLookup::create(
+            expCtx, true /* includeCommitTransactionTimestamp */));
+
+        // Adds _id to all events in the stream.
+        stages.emplace_back(DocumentSourceReshardingAddResumeId::create(expCtx));
+    }
 
     // Filter out applyOps entries which do not contain any relevant operations.
     stages.emplace_back(DocumentSourceMatch::create(

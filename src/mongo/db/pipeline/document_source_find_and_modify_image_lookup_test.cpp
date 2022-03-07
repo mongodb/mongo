@@ -32,6 +32,7 @@
 
 #include <vector>
 
+#include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/logical_session_id_helpers.h"
@@ -311,14 +312,17 @@ TEST_F(FindAndModifyImageLookupTest, ShouldForgeImageEntryWhenMatchingImageDocIs
         LOGV2(6344105,
               "ForgeImageEntryTestCase",
               "imageType"_attr = repl::RetryImage_serializer(imageType));
-        auto imageLookup = DocumentSourceFindAndModifyImageLookup::create(getExpCtx());
+        auto imageLookup = DocumentSourceFindAndModifyImageLookup::create(
+            getExpCtx(), true /* includeCommitTransactionTimestamp */);
         const auto sessionId = makeLogicalSessionIdWithTxnNumberAndUUIDForTest();
         const auto txnNum = 1LL;
         OperationSessionInfo sessionInfo;
         sessionInfo.setSessionId(sessionId);
         sessionInfo.setTxnNumber(txnNum);
-        const auto ts = Timestamp(2, 1);
-        const auto opTime = repl::OpTime(ts, 1);
+        const auto applyOpsTs = Timestamp(2, 1);
+        const auto applyOpsOpTime = repl::OpTime(applyOpsTs, 1);
+        const auto commitTxnTs = Timestamp(3, 1);
+        const auto commitTxnTsFieldName = CommitTransactionOplogObject::kCommitTimestampFieldName;
 
         // Define an applyOps oplog entry containing a findAndModify/update operation entry with
         // the 'needsRetryImage' field set.
@@ -335,9 +339,10 @@ TEST_F(FindAndModifyImageLookupTest, ShouldForgeImageEntryWhenMatchingImageDocIs
         applyOpsBuilder.append("applyOps", BSON_ARRAY(insertOp.toBSON() << updateOp.toBSON()));
         auto oplogEntryBson =
             makeOplogEntry(
-                opTime, repl::OpTypeEnum::kCommand, {}, applyOpsBuilder.obj(), sessionInfo)
+                applyOpsOpTime, repl::OpTypeEnum::kCommand, {}, applyOpsBuilder.obj(), sessionInfo)
                 .getEntry()
-                .toBSON();
+                .toBSON()
+                .addFields(BSON(commitTxnTsFieldName << commitTxnTs));
 
         auto mock = DocumentSourceMock::createForTest(Document(oplogEntryBson), getExpCtx());
         imageLookup->setSource(mock.get());
@@ -346,24 +351,29 @@ TEST_F(FindAndModifyImageLookupTest, ShouldForgeImageEntryWhenMatchingImageDocIs
         repl::ImageEntry imageEntry;
         imageEntry.set_id(sessionId);
         imageEntry.setTxnNumber(txnNum);
-        imageEntry.setTs(ts);
+        imageEntry.setTs(applyOpsTs);
         imageEntry.setImageKind(imageType);
         imageEntry.setImage(prePostImage);
         // Mock out the foreign collection.
         getExpCtx()->mongoProcessInterface = std::make_unique<MockMongoInterface>(
             std::vector<Document>{Document{imageEntry.toBSON()}});
 
-        // The next doc should be the doc for the forged image oplog entry.
+        // The next doc should be the doc for the forged image oplog entry and it should contain the
+        // commit transaction timestamp.
         auto next = imageLookup->getNext();
         ASSERT_TRUE(next.isAdvanced());
+        const auto forgedNoopOplogEntryBson = next.releaseDocument().toBson();
+        ASSERT(forgedNoopOplogEntryBson.hasField(commitTxnTsFieldName));
+        ASSERT_EQ(commitTxnTs, forgedNoopOplogEntryBson.getField(commitTxnTsFieldName).timestamp());
         const auto forgedImageEntry =
-            repl::OplogEntry::parse(next.releaseDocument().toBson()).getValue();
+            repl::OplogEntry::parse(forgedNoopOplogEntryBson.removeField(commitTxnTsFieldName))
+                .getValue();
         ASSERT_BSONOBJ_EQ(prePostImage, forgedImageEntry.getObject());
         ASSERT_EQUALS(txnNum, forgedImageEntry.getTxnNumber().get());
         ASSERT_EQUALS(sessionId, forgedImageEntry.getSessionId().get());
         ASSERT_EQUALS("n", repl::OpType_serializer(forgedImageEntry.getOpType()));
         ASSERT_EQUALS(0LL, forgedImageEntry.getStatementIds().front());
-        ASSERT_EQUALS(ts - 1, forgedImageEntry.getTimestamp());
+        ASSERT_EQUALS(applyOpsTs - 1, forgedImageEntry.getTimestamp());
         ASSERT_EQUALS(1, forgedImageEntry.getTerm().get());
 
         // The next doc should be the doc for original applyOps oplog entry but the

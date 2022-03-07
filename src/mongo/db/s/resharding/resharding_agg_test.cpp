@@ -30,9 +30,11 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/image_collection_entry_gen.h"
 #include "mongo/db/repl/mock_repl_coord_server_fixture.h"
 #include "mongo/db/repl/oplog_entry.h"
@@ -208,6 +210,48 @@ repl::MutableOplogEntry makePrePostImageOplog(const NamespaceString& nss,
                                               const ReshardingDonorOplogId& _id,
                                               const BSONObj& prePostImage) {
     return makeOplog(nss, timestamp, uuid, shardId, repl::OpTypeEnum::kNoop, prePostImage, {}, _id);
+}
+
+repl::DurableOplogEntry makeApplyOpsOplog(std::vector<BSONObj> operations,
+                                          repl::OpTime opTime,
+                                          repl::OpTime prevOpTime,
+                                          OperationSessionInfo sessionInfo,
+                                          bool isPrepare,
+                                          bool isPartial) {
+    BSONObjBuilder applyOpsBuilder;
+    BSONArrayBuilder opsArrayBuilder = applyOpsBuilder.subarrayStart("applyOps");
+    for (const auto& operation : operations) {
+        opsArrayBuilder.append(operation);
+    }
+    opsArrayBuilder.done();
+
+    if (isPrepare) {
+        applyOpsBuilder.append(repl::ApplyOpsCommandInfoBase::kPrepareFieldName, true);
+    }
+    if (isPartial) {
+        applyOpsBuilder.append(repl::ApplyOpsCommandInfoBase::kPartialTxnFieldName, true);
+    }
+
+    return {opTime,
+            boost::none /* hash */,
+            repl::OpTypeEnum::kCommand,
+            boost::none /* tenant id */,
+            {},
+            UUID::gen(),
+            false /* fromMigrate */,
+            0 /* version */,
+            applyOpsBuilder.obj(), /* o */
+            boost::none,           /* o2 */
+            sessionInfo,
+            boost::none /* upsert */,
+            {} /* date */,
+            {}, /* statementIds */
+            prevOpTime /* prevWriteOpTime */,
+            boost::none /* preImage */,
+            boost::none /* postImage */,
+            boost::none /* destinedRecipient */,
+            boost::none /* idField */,
+            boost::none /* needsRetryImage */};
 }
 
 bool validateOplogId(const Timestamp& clusterTime,
@@ -1690,6 +1734,7 @@ TEST_F(ReshardingAggWithStorageTest, RetryableFindAndModifyWithImageLookup) {
     auto updateOplog = updateOplogStatus.getValue();
     ASSERT_LT(preImageOplog.getOpTime(), updateOplog.getOpTime());
     ASSERT_TRUE(updateOplog.getPreImageOpTime());
+    ASSERT_FALSE(updateOplog.getNeedsRetryImage());
     ASSERT_EQ(preImageOplog.getOpTime(), *updateOplog.getPreImageOpTime());
     ASSERT_EQ(OpType_serializer(repl::OpTypeEnum::kUpdate),
               OpType_serializer(updateOplog.getOpType()));
@@ -1703,6 +1748,150 @@ TEST_F(ReshardingAggWithStorageTest, RetryableFindAndModifyWithImageLookup) {
                       updateOplog.getOperationSessionInfo().toBSON());
 
     ASSERT_FALSE(pipeline->getNext());
+}
+
+TEST_F(ReshardingAggWithStorageTest,
+       RetryableFindAndModifyInsideInternalTransactionWithImageLookup) {
+    const NamespaceString kCrudNs("foo", "bar");
+    const UUID kCrudUUID = UUID::gen();
+    const ShardId kMyShardId{"shard1"};
+
+    const auto lsid = makeLogicalSessionIdWithTxnNumberAndUUIDForTest();
+    const TxnNumber txnNum(45);
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(lsid);
+    sessionInfo.setTxnNumber(txnNum);
+
+    const repl::OpTime applyOpsOpTime1(Timestamp(1, 1), 1);
+    const repl::OpTime applyOpsOpTime2(Timestamp(2, 2), 1);  // applyOps with 'needsRetryImage'.
+    const repl::OpTime applyOpsOpTime3(Timestamp(3, 3), 1);
+
+    auto inputInnerOp1 = repl::MutableOplogEntry::makeInsertOperation(
+        kCrudNs, kCrudUUID, BSON("_id" << 1 << "a" << 1), BSON("_id" << 1));
+    inputInnerOp1.setDestinedRecipient(kMyShardId);
+    auto inputApplyOpsOplog1 = makeApplyOpsOplog(
+        {inputInnerOp1.toBSON()}, applyOpsOpTime1, repl::OpTime(), sessionInfo, false, true);
+
+    auto inputInnerOp2 = repl::MutableOplogEntry::makeUpdateOperation(
+        kCrudNs, kCrudUUID, BSON("$set" << BSON("a" << 2)), BSON("_id" << 2));
+    inputInnerOp2.setDestinedRecipient(kMyShardId);
+    inputInnerOp2.setNeedsRetryImage(repl::RetryImageEnum::kPreImage);
+    auto inputApplyOpsOplog2 = makeApplyOpsOplog(
+        {inputInnerOp2.toBSON()}, applyOpsOpTime2, applyOpsOpTime1, sessionInfo, false, true);
+
+    auto inputInnerOp3 = repl::MutableOplogEntry::makeInsertOperation(
+        kCrudNs, kCrudUUID, BSON("_id" << 3 << "a" << 3), BSON("_id" << 3));
+    inputInnerOp3.setDestinedRecipient(kMyShardId);
+    auto inputApplyOpsOplog3 = makeApplyOpsOplog(
+        {inputInnerOp3.toBSON()}, applyOpsOpTime3, applyOpsOpTime2, sessionInfo, false, false);
+
+    const BSONObj preImage(BSON("_id" << 2));
+    repl::ImageEntry imageEntry;
+    imageEntry.set_id(lsid);
+    imageEntry.setTxnNumber(txnNum);
+    imageEntry.setTs(applyOpsOpTime2.getTimestamp());
+    imageEntry.setImageKind(repl::RetryImageEnum::kPreImage);
+    imageEntry.setImage(preImage);
+
+    DBDirectClient client(opCtx());
+    client.insert(NamespaceString::kConfigImagesNamespace.ns(), imageEntry.toBSON());
+
+    auto createPipeline = [&](ReshardingDonorOplogId startAt) {
+        std::deque<DocumentSource::GetNextResult> pipelineSource{
+            Document{inputApplyOpsOplog1.toBSON()},
+            Document(inputApplyOpsOplog2.toBSON()),
+            Document{inputApplyOpsOplog3.toBSON()}};
+
+        auto expCtx = createExpressionContext(opCtx());
+        expCtx->ns = NamespaceString::kRsOplogNamespace;
+
+        {
+            auto mockMongoInterface = std::make_shared<MockMongoInterface>(pipelineSource);
+            // Register a dummy uuid just to not make test crash. The stub for findSingleDoc ignores
+            // the UUID so it doesn't matter what the value here is.
+            mockMongoInterface->setCollectionOptions(NamespaceString::kConfigImagesNamespace,
+                                                     BSON("uuid" << UUID::gen()));
+            expCtx->mongoProcessInterface = std::move(mockMongoInterface);
+        }
+
+        auto pipeline =
+            createOplogFetchingPipelineForResharding(expCtx, startAt, kCrudUUID, kMyShardId);
+        pipeline->addInitialSource(DocumentSourceMock::createForTest(pipelineSource, expCtx));
+        return pipeline;
+    };
+
+    // Create a pipeline and verify that it outputs the doc for the forged noop oplog entry
+    // immediately before the downcoverted doc for the applyOps with the 'needsRetryImage' field.
+    auto pipeline = createPipeline(ReshardingDonorOplogId(Timestamp::min(), Timestamp::min()));
+
+    auto applyOpsOplogDoc1 = pipeline->getNext();
+    ASSERT_TRUE(applyOpsOplogDoc1);
+    auto swOutputApplyOpsOplog1 = repl::DurableOplogEntry::parse(applyOpsOplogDoc1->toBson());
+    ASSERT_OK(swOutputApplyOpsOplog1);
+    auto outputApplyOpsOplog1 = swOutputApplyOpsOplog1.getValue();
+    ASSERT_BSONOBJ_EQ(inputApplyOpsOplog1.toBSON().removeField(repl::OplogEntry::kObjectFieldName),
+                      outputApplyOpsOplog1.toBSON().removeFields(StringDataSet{
+                          repl::OplogEntry::kObjectFieldName, repl::OplogEntry::k_idFieldName}));
+
+    auto preImageOplogDoc = pipeline->getNext();
+    ASSERT_TRUE(preImageOplogDoc);
+    auto swPreImageOplog = repl::DurableOplogEntry::parse(preImageOplogDoc->toBson());
+    ASSERT_OK(swPreImageOplog);
+    auto preImageOplog = swPreImageOplog.getValue();
+    ASSERT_BSONOBJ_EQ(preImage, preImageOplog.getObject());
+    ASSERT_EQ(OpType_serializer(repl::OpTypeEnum::kNoop),
+              OpType_serializer(preImageOplog.getOpType()));
+
+    auto applyOpsOplogDoc2 = pipeline->getNext();
+    ASSERT_TRUE(applyOpsOplogDoc2);
+    auto swOutputApplyOpsOplog2 = repl::DurableOplogEntry::parse(applyOpsOplogDoc2->toBson());
+    ASSERT_OK(swOutputApplyOpsOplog2);
+    auto outputApplyOpsOplog2 = swOutputApplyOpsOplog2.getValue();
+    ASSERT_BSONOBJ_EQ(inputApplyOpsOplog2.toBSON().removeField(repl::OplogEntry::kObjectFieldName),
+                      outputApplyOpsOplog2.toBSON().removeFields(StringDataSet{
+                          repl::OplogEntry::kObjectFieldName, repl::OplogEntry::k_idFieldName}));
+
+    auto applyOpsInfo = repl::ApplyOpsCommandInfo::parse(outputApplyOpsOplog2.getObject());
+    auto operationDocs = applyOpsInfo.getOperations();
+    ASSERT_EQ(operationDocs.size(), 1U);
+    auto outputInnerOp2 = repl::DurableReplOperation::parse(
+        {"RetryableFindAndModifyInsideInternalTransactionWithImageLookup"}, operationDocs[0]);
+    ASSERT_TRUE(outputInnerOp2.getPreImageOpTime());
+    ASSERT_FALSE(outputInnerOp2.getNeedsRetryImage());
+    ASSERT_EQ(preImageOplog.getOpTime(), *outputInnerOp2.getPreImageOpTime());
+    ASSERT_EQ(OpType_serializer(repl::OpTypeEnum::kUpdate),
+              OpType_serializer(outputInnerOp2.getOpType()));
+    ASSERT_BSONOBJ_EQ(inputInnerOp2.getObject(), outputInnerOp2.getObject());
+    ASSERT_TRUE(outputInnerOp2.getObject2());
+    ASSERT_BSONOBJ_EQ(*inputInnerOp2.getObject2(), *outputInnerOp2.getObject2());
+
+    auto applyOpsOplogDoc3 = pipeline->getNext();
+    ASSERT_TRUE(applyOpsOplogDoc3);
+    auto swOutputApplyOpsOplog3 = repl::DurableOplogEntry::parse(applyOpsOplogDoc3->toBson());
+    ASSERT_OK(swOutputApplyOpsOplog3);
+    auto outputApplyOpsOplog3 = swOutputApplyOpsOplog3.getValue();
+    ASSERT_BSONOBJ_EQ(inputApplyOpsOplog3.toBSON().removeField(repl::OplogEntry::kObjectFieldName),
+                      outputApplyOpsOplog3.toBSON().removeFields(StringDataSet{
+                          repl::OplogEntry::kObjectFieldName, repl::OplogEntry::k_idFieldName}));
+
+    ASSERT_FALSE(pipeline->getNext());
+
+    // Create another pipeline and start fetching from after the doc for the pre-image, and verify
+    // that the pipeline does not re-output the applyOps doc that comes before the pre-image doc.
+    const auto startAt = ReshardingDonorOplogId::parse(
+        {"RetryableFindAndModifyInsideInternalTransactionWithImageLookup"},
+        preImageOplog.get_id()->getDocument().toBson());
+    auto newPipeline = createPipeline(startAt);
+
+    auto next = newPipeline->getNext();
+    ASSERT_TRUE(next);
+    ASSERT_DOCUMENT_EQ(*next, *applyOpsOplogDoc2);
+
+    next = newPipeline->getNext();
+    ASSERT_TRUE(next);
+    ASSERT_DOCUMENT_EQ(*next, *applyOpsOplogDoc3);
+
+    ASSERT_FALSE(newPipeline->getNext());
 }
 
 }  // namespace

@@ -33,6 +33,7 @@
 
 #include "mongo/db/s/resharding/document_source_resharding_iterate_transaction.h"
 
+#include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/transaction_history_iterator.h"
 
 namespace mongo {
@@ -60,22 +61,42 @@ REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalReshardingIterateTransaction,
 
 boost::intrusive_ptr<DocumentSourceReshardingIterateTransaction>
 DocumentSourceReshardingIterateTransaction::create(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    return new DocumentSourceReshardingIterateTransaction(expCtx);
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, bool includeCommitTransactionTimestamp) {
+    return new DocumentSourceReshardingIterateTransaction(expCtx,
+                                                          includeCommitTransactionTimestamp);
 }
 
 boost::intrusive_ptr<DocumentSourceReshardingIterateTransaction>
 DocumentSourceReshardingIterateTransaction::createFromBson(
     const BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(5730300,
-            str::stream() << "the '" << kStageName << "' spec must be an empty object",
-            elem.type() == BSONType::Object && elem.Obj().isEmpty());
-    return new DocumentSourceReshardingIterateTransaction(expCtx);
+            str::stream() << "the '" << kStageName << "' spec must be an object",
+            elem.type() == BSONType::Object);
+
+    bool _includeCommitTransactionTimestamp = false;
+    for (auto&& subElem : elem.Obj()) {
+        if (subElem.fieldNameStringData() == kIncludeCommitTransactionTimestampFieldName) {
+            uassert(6387808,
+                    str::stream() << "expected a boolean for the "
+                                  << kIncludeCommitTransactionTimestampFieldName << " option to "
+                                  << kStageName << " stage, got " << typeName(subElem.type()),
+                    subElem.type() == Bool);
+            _includeCommitTransactionTimestamp = subElem.Bool();
+        } else {
+            uasserted(6387809,
+                      str::stream() << "unrecognized option to " << kStageName
+                                    << " stage: " << subElem.fieldNameStringData());
+        }
+    }
+
+    return new DocumentSourceReshardingIterateTransaction(expCtx,
+                                                          _includeCommitTransactionTimestamp);
 }
 
 DocumentSourceReshardingIterateTransaction::DocumentSourceReshardingIterateTransaction(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx)
-    : DocumentSource(kStageName, expCtx) {}
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, bool includeCommitTransactionTimestamp)
+    : DocumentSource(kStageName, expCtx),
+      _includeCommitTransactionTimestamp(includeCommitTransactionTimestamp) {}
 
 StageConstraints DocumentSourceReshardingIterateTransaction::constraints(
     Pipeline::SplitState pipeState) const {
@@ -92,7 +113,10 @@ StageConstraints DocumentSourceReshardingIterateTransaction::constraints(
 
 Value DocumentSourceReshardingIterateTransaction::serialize(
     boost::optional<ExplainOptions::Verbosity> explain) const {
-    return Value(Document{{kStageName, Value(Document{})}});
+    return Value(
+        Document{{kStageName,
+                  Value(Document{{kIncludeCommitTransactionTimestampFieldName,
+                                  _includeCommitTransactionTimestamp ? Value(true) : Value()}})}});
 }
 
 DepsTracker::State DocumentSourceReshardingIterateTransaction::getDependencies(
@@ -140,6 +164,9 @@ DocumentSource::GetNextResult DocumentSourceReshardingIterateTransaction::doGetN
         // If the oplog entry is not part of a transaction, allow it to pass through after appending
         // a resharding _id to the document.
         if (!_isTransactionOplogEntry(doc)) {
+            if (_includeCommitTransactionTimestamp) {
+                return doc;
+            }
             return appendReshardingId(std::move(doc), boost::none);
         }
 
@@ -154,7 +181,10 @@ DocumentSource::GetNextResult DocumentSourceReshardingIterateTransaction::doGetN
         // call 'getNextTransactionOp' on it. Note that is possible for the transaction iterator
         // to be empty of any relevant operations, meaning that this loop may need to execute
         // multiple times before it encounters a relevant change to return.
-        _txnIterator.emplace(pExpCtx->opCtx, pExpCtx->mongoProcessInterface, doc);
+        _txnIterator.emplace(pExpCtx->opCtx,
+                             pExpCtx->mongoProcessInterface,
+                             doc,
+                             _includeCommitTransactionTimestamp);
     }
 }
 
@@ -175,8 +205,10 @@ bool DocumentSourceReshardingIterateTransaction::_isTransactionOplogEntry(const 
 DocumentSourceReshardingIterateTransaction::TransactionOpIterator::TransactionOpIterator(
     OperationContext* opCtx,
     std::shared_ptr<MongoProcessInterface> mongoProcessInterface,
-    const Document& input)
-    : _mongoProcessInterface(mongoProcessInterface) {
+    const Document& input,
+    bool includeCommitTransactionTimestamp)
+    : _mongoProcessInterface(mongoProcessInterface),
+      _includeCommitTransactionTimestamp(includeCommitTransactionTimestamp) {
     Value lsidValue = input["lsid"];
     tassert(5730306, "oplog entry with non-object lsid", lsidValue.getType() == BSONType::Object);
     _lsid = lsidValue.getDocument();
@@ -243,7 +275,15 @@ DocumentSourceReshardingIterateTransaction::TransactionOpIterator::getNextApplyO
         auto applyOpsEntry = _lookUpOplogEntryByOpTime(opCtx, _txnOplogEntries.top());
         _txnOplogEntries.pop();
 
-        // Generate the _id for the new event as {clusterTime: txnCommitTime, ts: applyOpsTs}.
+        if (_includeCommitTransactionTimestamp) {
+            // Attach the transaction commit timestamp so it can be used by a downstream stage to
+            // generate the _id for the document.
+            MutableDocument doc{Document{applyOpsEntry.getEntry().toBSON()}};
+            doc.addField(CommitTransactionOplogObject::kCommitTimestampFieldName,
+                         Value{_clusterTime});
+            return doc.freeze();
+        }
+        // Generate the _id for the document as {clusterTime: txnCommitTime, ts: applyOpsTs}.
         return appendReshardingId(Document{applyOpsEntry.getEntry().toBSON()}, _clusterTime);
     }
 }
