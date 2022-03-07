@@ -153,12 +153,15 @@ void mongo::sdam::TopologyStateMachine::initTransitionTable() {
 void TopologyStateMachine::onServerDescription(TopologyDescription& topologyDescription,
                                                const ServerDescriptionPtr& serverDescription) {
     if (!topologyDescription.containsServerAddress(serverDescription->getAddress())) {
-        LOGV2_DEBUG(20219,
-                    kLogLevel,
-                    "Ignoring isMaster reply from server that is not in the topology: "
-                    "{serverAddress}",
-                    "Ignoring isMaster reply from server that is not in the topology",
-                    "serverAddress"_attr = serverDescription->getAddress());
+        const auto& setName = topologyDescription.getSetName();
+        LOGV2_DEBUG(
+            20219,
+            kLogLevel,
+            "{replSetName}: Ignoring isMaster reply from server that is not in the topology: "
+            "{serverAddress}",
+            "Ignoring isMaster reply from server that is not in the topology",
+            "replicaSet"_attr = setName ? *setName : std::string(""),
+            "serverAddress"_attr = serverDescription->getAddress());
         return;
     }
 
