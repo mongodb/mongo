@@ -1,7 +1,7 @@
 /*
  * Test that $group and $setWindowFields spill to the WT RecordStore on secondaries with
  * writeConcern greater than w:1.
- * @tags: [requires_replication]
+ * @tags: [requires_replication, requires_majority_read_concern]
  */
 (function() {
 "use strict";
