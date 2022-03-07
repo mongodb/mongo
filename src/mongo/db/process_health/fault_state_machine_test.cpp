@@ -362,6 +362,7 @@ TEST_F(FaultManagerTest, HealthCheckWithOffFacetCreatesNoFaultInOk) {
 
 TEST_F(FaultManagerTest, DNSHealthCheckWithBadHostNameFailsAndGoodHostNameSuccess) {
     RAIIServerParameterControllerForTest _controller{"featureFlagHealthMonitoring", true};
+    RAIIServerParameterControllerForTest serverParamController{"activeFaultDurationSecs", 10};
     const auto faultFacetType = FaultFacetType::kDns;
     auto config = std::make_unique<FaultManagerConfig>();
     config->setIntensityForType(faultFacetType, HealthObserverIntensityEnum::kCritical);
