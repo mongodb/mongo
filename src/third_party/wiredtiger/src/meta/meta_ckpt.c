@@ -713,21 +713,21 @@ __wt_meta_ckptlist_get(
     char *config;
 
     *ckptbasep = NULL;
-
     if (allocated != NULL)
         *allocated = 0;
 
-    btree = S2BT(session);
     config = NULL;
 
     /*
-     * Get the list of checkpoints for this file: We try to cache the ckptlist between each rebuild
-     * from the metadata. But there might not be one, as there are operations that can invalidate a
-     * ckptlist. So, use a cached ckptlist if there is one. Otherwise go through slow path of
-     * re-generating the ckptlist by reading the metadata. Also, we avoid using a cached checkpoint
-     * list for metadata itself.
+     * Get the list of checkpoints for this file. We try to cache the ckptlist between each rebuild
+     * from the metadata, but there might not be one, as there are operations that can invalidate a
+     * ckptlist. So, use a cached ckptlist if there is one. Otherwise re-generate the ckptlist by
+     * reading the metadata. Finally, we avoid using a cached ckptlist for the metadata itself, and
+     * there may not be a tree available in all cases, specifically when called from the wt utility
+     * list command.
      */
-    if (!WT_IS_METADATA(session->dhandle) && btree->ckpt != NULL) {
+    btree = S2BT_SAFE(session);
+    if (btree != NULL && btree->ckpt != NULL && !WT_IS_METADATA(session->dhandle)) {
         *ckptbasep = btree->ckpt;
         if (update)
             WT_ERR(__meta_ckptlist_allocate_new_ckpt(
