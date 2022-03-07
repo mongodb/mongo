@@ -8,7 +8,7 @@ const Aws::String region = Aws::Region::AP_SOUTHEAST_2;
 const double throughputTargetGbps = 5;
 const uint64_t partSize = 8 * 1024 * 1024;  /* 8 MB. */
 static std::string bucketName("s3testext"); // Can be overridden with environment variables.
-static std::string objPrefix("s3test_artefacts/unit_"); // To be concatenated with a random string.
+static std::string objPrefix("s3test_artefacts--unit_"); // To be concatenated with a random string.
 } // namespace TestDefaults
 
 #define TEST_SUCCESS 0
@@ -49,7 +49,7 @@ randomizeTestPrefix()
     std::default_random_engine myRandomEngine(seed);
 
     TestDefaults::objPrefix += '_' + std::to_string(myRandomEngine());
-    TestDefaults::objPrefix += '/';
+    TestDefaults::objPrefix += "--";
 
     return (TEST_SUCCESS);
 }

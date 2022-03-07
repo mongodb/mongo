@@ -44,7 +44,7 @@ def get_auth_token(storage_source):
         access_key = os.getenv('AWS_ACCESS_KEY_ID')
         secret_key = os.getenv('AWS_SECRET_ACCESS_KEY')
         if access_key and secret_key:
-            auth_token = access_key + "," + secret_key
+            auth_token = access_key + ";" + secret_key
     return auth_token
 
 # Get a list of buckets available for the storage source.
@@ -60,13 +60,13 @@ def get_bucket_info(storage_source):
 def generate_s3_prefix(test_name = ''):
     # Generates a unique prefix to be used with the object keys, eg:
     # "s3test_artefacts/python_2022-31-01-16-34-10_623843294/"
-    prefix = 's3test_artefacts/python_'
+    prefix = 's3test_artefacts--python_'
     prefix += datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
     # Range upto int32_max, matches that of C++'s std::default_random_engine
-    prefix += '_' + str(random.randrange(1, 2147483646)) + '/'
+    prefix += '_' + str(random.randrange(1, 2147483646)) + '--'
 
     if test_name:
-        prefix += test_name + '/'
+        prefix += test_name + '--'
 
     return prefix
 
