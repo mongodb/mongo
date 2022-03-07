@@ -2268,8 +2268,7 @@ TEST_F(StorageInterfaceImplTest, DeleteByFilterReturnsBadValueWhenFilterContains
     ASSERT_STRING_CONTAINS(status.reason(), "unknown operator: $unknownFilterOp");
 }
 
-TEST_F(StorageInterfaceImplTest, DeleteByFilterReturnsIllegalOperationOnCappedCollection) {
-    // User operations are not allowed to delete from capped collections.
+TEST_F(StorageInterfaceImplTest, DeleteByFilterOnCappedCollection) {
     transport::TransportLayerMock transportLayerMock;
     auto userClient = getOperationContext()->getServiceContext()->makeClient(
         "user", transportLayerMock.createSession());
@@ -2285,10 +2284,7 @@ TEST_F(StorageInterfaceImplTest, DeleteByFilterReturnsIllegalOperationOnCappedCo
     ASSERT_OK(storage.createCollection(opCtx.get(), nss, options));
 
     auto filter = BSON("x" << 1);
-    auto status = storage.deleteByFilter(opCtx.get(), nss, filter);
-    ASSERT_EQUALS(ErrorCodes::IllegalOperation, status);
-    ASSERT_STRING_CONTAINS(status.reason(),
-                           str::stream() << "cannot remove from a capped collection: " << nss.ns());
+    ASSERT_OK(storage.deleteByFilter(opCtx.get(), nss, filter));
 }
 
 TEST_F(

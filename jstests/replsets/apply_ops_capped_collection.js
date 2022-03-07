@@ -1,7 +1,12 @@
 /**
  * Tests the applyOps command on a capped collection that needs capped deletes.
+ * Tests that a delete applyOps command against a capped collection works.
  *
- * @tags: [requires_capped, requires_replication]
+ * @tags: [
+ *     multiversion_incompatible,
+ *     requires_capped,
+ *     requires_replication,
+ * ]
  */
 (function() {
 "use strict";
@@ -28,6 +33,10 @@ for (let i = 0; i < 20; i++) {
 }
 
 assert.commandWorked(db.runCommand({applyOps: ops}));
+
+// Test that capped deletes via applyOps are permitted.
+assert.commandWorked(db.runCommand(
+    {applyOps: [{op: "d", ns: nss(dbName, collName), ts: Timestamp(20, 0), o: {_id: 19}}]}));
 
 rst.stopSet();
 }());

@@ -1138,11 +1138,9 @@ void CollectionImpl::deleteDocument(OperationContext* opCtx,
                                     bool fromMigrate,
                                     bool noWarn,
                                     Collection::StoreDeletedDoc storeDeletedDoc) const {
-    if (isCapped() && opCtx->isEnforcingConstraints()) {
-        // System operations such as tenant migration or secondary batch application can delete from
-        // capped collections.
-        LOGV2(20291, "failing remove on a capped ns", "namespace"_attr = _ns);
-        uasserted(10089, "cannot remove from a capped collection");
+    if (isCapped() && opCtx->inMultiDocumentTransaction()) {
+        uasserted(ErrorCodes::IllegalOperation,
+                  "Cannot remove from a capped collection in a multi-document transaction");
     }
 
     std::vector<OplogSlot> oplogSlots;
