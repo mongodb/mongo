@@ -265,12 +265,12 @@ ALIASES                = "arch_page_table{2}=<div class= arch_head><table><tr><t
                          "arch_page_top{2}=@page \1 \2" \
                          "arch_page_caution=<b>Caution: the Architecture Guide is not updated in lockstep with the code base and is not necessarily correct or complete for any specific release.</b>" \
                          "config{3}=  @row{<tt>\1</tt>,\2,\3}" \
-                         "configempty{2}=@param config configuration string, see @ref config_strings.  No values currently permitted." \
+                         "configempty{2}=@param config configuration string, see @ref config_strings. No values currently permitted." \
                          "configend=  </table>" \
                          "configstart{2}=@param config configuration string, see @ref config_strings. Permitted values:\n  <table>@hrow{Name,Effect,Values}" \
-                         "ebusy_errors=@returns zero on success, EBUSY if the object is not available for exclusive access, and a non-zero error code on failure.  See @ref error_handling \"Error handling\" for details." \
-                         "errors=@returns zero on success and a non-zero error code on failure.  See @ref error_handling \"Error handling\" for details." \
-                         "exclusive=This method requires exclusive access to the specified data source(s).  If any cursors are open with the specified name(s) or a data source is otherwise in use, the call will fail and return \c EBUSY.\n\n" \
+                         "ebusy_errors=@returns zero on success, EBUSY if the object is not available for exclusive access, and a non-zero error code on failure. See @ref error_handling \"Error handling\" for details." \
+                         "errors=@returns zero on success and a non-zero error code on failure. See @ref error_handling \"Error handling\" for details." \
+                         "exclusive=This method requires exclusive access to the specified data source(s). If any cursors are open with the specified name(s) or a data source is otherwise in use, the call will fail and return \c EBUSY. See @ref error_handling \"Error handling\" for details.\n\n" \
                          "not_transactional=This method is not transactional, and will not guarantee ACID properties, see @ref transactions for more details." \
                          "ex_ref{1}=@ref \1 \"\1\"" \
                          "hrow{1}=<tr><th>\1</th></tr>" \

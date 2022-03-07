@@ -53,10 +53,10 @@ ENOTSUP
 EXTLIST
 EmpId
 Encryptors
+FIXME
 FSTREAM
 Facebook
 Facebook's
-FIXME
 FlameGraph
 FlameGraphs
 FlexeLint
@@ -110,10 +110,10 @@ NUMA
 NoSQL
 OPTYPE
 PMU
-Powershell
 PPC
 PRELOAD
 PROFDATA
+Powershell
 README
 RLE
 RedHat
@@ -128,10 +128,10 @@ SYSV
 Sanitizer
 Seward's
 SiH
-Timestamping
 TSC
 TXID
 TXT
+Timestamping
 UBSAN
 UNC
 URIs
@@ -294,6 +294,7 @@ dt
 dumpfile
 dup
 dups
+ebusy
 encrypt
 encryptor
 encryptor's

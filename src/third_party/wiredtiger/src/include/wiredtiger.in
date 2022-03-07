@@ -1088,7 +1088,7 @@ struct __wt_session {
 	 * options: \c "always"\, \c "key_consistent"\, \c "mixed_mode"\, \c "never"\, \c "none"\,
 	 * \c "ordered"; default \c none.}
 	 * @configend
-	 * @errors
+	 * @ebusy_errors
 	 */
 	int __F(alter)(WT_SESSION *session,
 	    const char *name, const char *config);
@@ -1396,7 +1396,7 @@ struct __wt_session {
 	    const char *name, const char *config);
 
 	/*!
-	 * Drop (delete) an object.
+	 * Drop (delete) a table.
 	 *
 	 * @exclusive
 	 *
@@ -1539,7 +1539,7 @@ struct __wt_session {
 	int __F(reset)(WT_SESSION *session);
 
 	/*!
-	 * Salvage a table or file.
+	 * Salvage a table.
 	 *
 	 * Salvage rebuilds the file, or files of which a table is comprised,
 	 * discarding any corrupted file blocks.
@@ -1617,7 +1617,7 @@ struct __wt_session {
 	    const char *config);
 
 	/*!
-	 * Upgrade a table or file.
+	 * Upgrade a table.
 	 *
 	 * Upgrade upgrades a table or file, if upgrade is required.
 	 *
@@ -1634,7 +1634,7 @@ struct __wt_session {
 	    const char *name, const char *config);
 
 	/*!
-	 * Verify a table or file.
+	 * Verify a table.
 	 *
 	 * Verify reports if a file, or the files of which a table is
 	 * comprised, have been corrupted.  The WT_SESSION::salvage method

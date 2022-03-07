@@ -6,19 +6,33 @@ positive error codes are standard error codes as described for
 POSIX-like systems (for example, \c EINVAL or \c EBUSY), negative error
 codes are WiredTiger-specific (for example, \c WT_ROLLBACK).
 
-WiredTiger-specific error codes always appear in the -31,800 to -31,999
-range, inclusive.
+@section error_ebusy EBUSY errors
 
 WiredTiger returns \c EBUSY for operations requiring exclusive access, when
-an object is not available for exclusive access. For example, the
-WT_SESSION::drop or WT_SESSION::verify methods will fail if the object
-has open cursors. Note that internal WiredTiger threads may temporarily
-open cursors on objects (for example, threads performing operations like
-statistics logging), and operations may temporarily fail and return \c EBUSY
-when there are no application cursors open on the object.
+an object is not available for exclusive access. These operations include the
+WT_SESSION::alter, WT_SESSION::drop, WT_SESSION::rename, WT_SESSION::salvage,
+WT_SESSION::upgrade and WT_SESSION::verify methods, all of which will return
+\c EBUSY and fail if there are open cursors on the target object. Internal
+WiredTiger threads may temporarily open cursors on objects (for example,
+threads performing operations like statistics logging), and in that case
+operations may temporarily fail and return \c EBUSY when there are no
+application cursors open on the object. In this case, simply retrying the
+operation should be sufficient.
 
-The following is a complete list of the WiredTiger-specific return
-values:
+Additionally, unwritten data in the WiredTiger cache will prevent exclusive
+access to objects. In this case, calling the WT_SESSION:checkpoint method to
+perform a database checkpoint should resolve the problem, allowing a subsequent
+retry of the operation requiring exclusive access to succeed. Further
+failures imply other threads of control simultaneously updating the object
+in cache. Repeatedly calling checkpoint will race with those threads,
+and it's unspecified when or even if exclusive access to the object will be
+granted. Generally, applications will not call WiredTiger methods requiring
+exclusive access when the objects might be in active use by other threads.
+
+@section error_list WiredTiger-specific errors
+
+WiredTiger-specific error codes are allocated from -31,800 to -31,999,
+inclusive. The following is a list of the WiredTiger-specific return values:
 
 @if IGNORE_BUILT_BY_API_ERR_BEGIN
 @endif
