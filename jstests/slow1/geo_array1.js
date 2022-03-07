@@ -1,6 +1,7 @@
 // Make sure many locations in one doc works, in the form of an array
 // @tags: [
 //   does_not_support_stepdowns,
+//   requires_replication,
 //   resource_intensive,
 // ]
 
