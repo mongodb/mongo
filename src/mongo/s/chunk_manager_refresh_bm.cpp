@@ -77,7 +77,7 @@ CollectionMetadata makeChunkManagerWithShardSelector(int nShards,
     for (uint32_t i = 0; i < nChunks; ++i) {
         chunks.emplace_back(collUuid,
                             getRangeForChunk(i, nChunks),
-                            ChunkVersion{i + 1, 0, collEpoch, Timestamp()},
+                            ChunkVersion{i + 1, 0, collEpoch, Timestamp(1, 0)},
                             selectShard(i, nShards, nChunks));
     }
 
@@ -87,14 +87,14 @@ CollectionMetadata makeChunkManagerWithShardSelector(int nShards,
                                            nullptr,
                                            true,
                                            collEpoch,
-                                           Timestamp(),
+                                           Timestamp(1, 0),
                                            boost::none /* timeseriesFields */,
                                            boost::none,
                                            boost::none /* chunkSizeBytes */,
                                            true,
                                            chunks);
     return CollectionMetadata(ChunkManager(ShardId("Shard0"),
-                                           DatabaseVersion(UUID::gen(), Timestamp()),
+                                           DatabaseVersion(UUID::gen(), Timestamp(1, 0)),
                                            makeStandaloneRoutingTableHistory(std::move(rt)),
                                            boost::none),
                               ShardId("shard0"));
@@ -125,7 +125,7 @@ MONGO_COMPILER_NOINLINE auto runIncrementalUpdate(const CollectionMetadata& cm,
     auto rt = cm.getChunkManager()->getRoutingTableHistory_ForTest().makeUpdated(
         boost::none /* timeseriesFields */, boost::none, boost::none, true, newChunks);
     return CollectionMetadata(ChunkManager(ShardId("shard0"),
-                                           DatabaseVersion(UUID::gen(), Timestamp()),
+                                           DatabaseVersion(UUID::gen(), Timestamp(1, 0)),
                                            makeStandaloneRoutingTableHistory(std::move(rt)),
                                            boost::none),
                               ShardId("shard0"));
@@ -169,7 +169,7 @@ auto BM_FullBuildOfChunkManager(benchmark::State& state, ShardSelectorFn selectS
     for (uint32_t i = 0; i < nChunks; ++i) {
         chunks.emplace_back(collUuid,
                             getRangeForChunk(i, nChunks),
-                            ChunkVersion{i + 1, 0, collEpoch, Timestamp()},
+                            ChunkVersion{i + 1, 0, collEpoch, Timestamp(1, 0)},
                             selectShard(i, nShards, nChunks));
     }
 
@@ -180,7 +180,7 @@ auto BM_FullBuildOfChunkManager(benchmark::State& state, ShardSelectorFn selectS
                                                nullptr,
                                                true,
                                                collEpoch,
-                                               Timestamp(),
+                                               Timestamp(1, 0),
                                                boost::none /* timeseriesFields */,
                                                boost::none,
                                                boost::none /* chunkSizeBytes */,
@@ -188,7 +188,7 @@ auto BM_FullBuildOfChunkManager(benchmark::State& state, ShardSelectorFn selectS
                                                chunks);
         benchmark::DoNotOptimize(
             CollectionMetadata(ChunkManager(ShardId("shard0"),
-                                            DatabaseVersion(UUID::gen(), Timestamp()),
+                                            DatabaseVersion(UUID::gen(), Timestamp(1, 0)),
                                             makeStandaloneRoutingTableHistory(std::move(rt)),
                                             boost::none),
                                ShardId("shard0")));
