@@ -298,6 +298,43 @@ TEST_F(CatalogRAIITestFixture, AutoGetCollectionSecondaryNamespacesSingleDb) {
     ASSERT(!opCtx1->lockState()->isLocked());  // Global lock check
 }
 
+// Test multiple collections being locked with MODE_IX. Multi-document transaction reads use MODE_IX
+// instead of MODE_IS.
+TEST_F(CatalogRAIITestFixture, AutoGetCollectionMultiNamespacesMODEIX) {
+    auto opCtx1 = client1.second.get();
+
+    std::vector<NamespaceStringOrUUID> secondaryNamespaces{NamespaceStringOrUUID(kSecondaryNss1),
+                                                           NamespaceStringOrUUID(kSecondaryNss2)};
+
+    boost::optional<AutoGetCollection> autoGetColl;
+    autoGetColl.emplace(opCtx1,
+                        nss,
+                        MODE_IX,
+                        AutoGetCollectionViewMode::kViewsForbidden,
+                        Date_t::max(),
+                        secondaryNamespaces);
+
+    ASSERT(opCtx1->lockState()->isRSTLLocked());
+    ASSERT(opCtx1->lockState()->isWriteLocked());  // Global lock check
+    ASSERT(opCtx1->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
+    ASSERT(opCtx1->lockState()->isDbLockedForMode(kSecondaryNss1.db(), MODE_IX));
+    ASSERT(opCtx1->lockState()->isDbLockedForMode(kSecondaryNss2.db(), MODE_IX));
+    ASSERT(opCtx1->lockState()->isCollectionLockedForMode(nss, MODE_IX));
+    ASSERT(opCtx1->lockState()->isCollectionLockedForMode(kSecondaryNss1, MODE_IX));
+    ASSERT(opCtx1->lockState()->isCollectionLockedForMode(kSecondaryNss2, MODE_IX));
+
+    ASSERT(!opCtx1->lockState()->isRSTLExclusive());
+    ASSERT(!opCtx1->lockState()->isGlobalLockedRecursively());
+    ASSERT(!opCtx1->lockState()->isDbLockedForMode(kSecondaryNssOtherDb1.db(), MODE_IX));
+    ASSERT(!opCtx1->lockState()->isDbLockedForMode(kSecondaryNssOtherDb2.db(), MODE_IX));
+    ASSERT(!opCtx1->lockState()->isCollectionLockedForMode(kSecondaryNssOtherDb1, MODE_IX));
+    ASSERT(!opCtx1->lockState()->isCollectionLockedForMode(kSecondaryNssOtherDb2, MODE_IX));
+
+    // All the locks should release.
+    autoGetColl.reset();
+    ASSERT(!opCtx1->lockState()->isLocked());  // Global lock check
+}
+
 TEST_F(CatalogRAIITestFixture, AutoGetCollectionSecondaryNamespacesMultiDb) {
     auto opCtx1 = client1.second.get();
 
@@ -533,29 +570,6 @@ TEST_F(ReadSourceScopeTest, RestoreReadSource) {
     }
     ASSERT_EQ(opCtx()->recoveryUnit()->getTimestampReadSource(), ReadSource::kProvided);
     ASSERT_EQ(opCtx()->recoveryUnit()->getPointInTimeReadTimestamp(opCtx()), Timestamp(1, 2));
-}
-
-// Placing DEATH_TESTs at the end of the file avoids causing problems for debuggers.
-
-DEATH_TEST_F(CatalogRAIITestFixture, AutoGetDbMultiIntentWriteLock, "invariant") {
-    AutoGetDb autoGetDb(
-        client1.second.get(), nss.db(), MODE_IX, Date_t::max(), {kSecondaryNss1.db()});
-
-    // This invariants because only MODE_IS is supported for multi namespace locking.
-}
-
-DEATH_TEST_F(CatalogRAIITestFixture, AutoGetDbMultiStrongWriteLock, "invariant") {
-    AutoGetDb autoGetDb(
-        client1.second.get(), nss.db(), MODE_X, Date_t::max(), {kSecondaryNss1.db()});
-
-    // This invariants because only MODE_IS is supported for multi namespace locking.
-}
-
-DEATH_TEST_F(CatalogRAIITestFixture, AutoGetDbMultiStrongReadLock, "invariant") {
-    AutoGetDb autoGetDb(
-        client1.second.get(), nss.db(), MODE_S, Date_t::max(), {kSecondaryNss1.db()});
-
-    // This invariants because only MODE_IS is supported for multi namespace locking.
 }
 
 }  // namespace

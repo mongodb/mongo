@@ -659,11 +659,8 @@ Status runAggregate(OperationContext* opCtx,
     // to be aware of.
     std::vector<NamespaceStringOrUUID> secondaryExecNssList;
 
-    // Taking locks over multiple collections is not supported in a transaction, nor is it
-    // supported outside of $lookup pushdown.
-    // TODO SERVER-64038: Remove this clause once MODE_IX multi-collection locking is supported.
-    if (!opCtx->inMultiDocumentTransaction() &&
-        feature_flags::gFeatureFlagSBELookupPushdown.isEnabledAndIgnoreFCV()) {
+    // Taking locks over multiple collections is not supported outside of $lookup pushdown.
+    if (feature_flags::gFeatureFlagSBELookupPushdown.isEnabledAndIgnoreFCV()) {
         secondaryExecNssList = liteParsedPipeline.getForeignExecutionNamespaces();
     }
 

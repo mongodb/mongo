@@ -169,9 +169,6 @@ AutoGetDb::AutoGetDb(OperationContext* opCtx,
           auto databaseHolder = DatabaseHolder::get(opCtx);
           return databaseHolder->getDb(opCtx, tenantDbName);
       }()) {
-    // Locking multiple databases is only supported in intent read mode (MODE_IS).
-    invariant(secondaryDbNames.empty() || mode == MODE_IS);
-
     // Take the secondary dbs' database locks only: no global or RSTL, as they are already acquired
     // above. Note: no consistent ordering is when acquiring database locks because there are no
     // occasions where multiple strong locks are acquired to make ordering matter (deadlock
@@ -192,8 +189,6 @@ AutoGetDb::AutoGetDb(OperationContext* opCtx,
 }
 
 Database* AutoGetDb::ensureDbExists(OperationContext* opCtx) {
-    invariant(_secondaryDbLocks.empty());
-
     if (_db) {
         return _db;
     }
@@ -217,7 +212,6 @@ AutoGetCollection::AutoGetCollection(
     Date_t deadline,
     const std::vector<NamespaceStringOrUUID>& secondaryNssOrUUIDs) {
     invariant(!opCtx->isLockFreeReadsOp());
-    invariant(secondaryNssOrUUIDs.empty() || modeColl == MODE_IS);
 
     // Get a unique list of 'secondary' database names to pass into AutoGetDb below.
     std::set<StringData> secondaryDbNames;
