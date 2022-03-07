@@ -11,8 +11,7 @@
 load("jstests/sharding/libs/internal_transaction_resharding_test.js");
 
 const transactionTest = new InternalTransactionReshardingTest({reshardInPlace: false});
-const abortOnInitialTry = true;
 transactionTest.runTestForInsertUpdateDeleteBeforeResharding(
-    transactionTest.InternalTxnType.kRetryable, abortOnInitialTry);
+    transactionTest.InternalTxnType.kRetryable, true /* abortOnInitialTry */);
 transactionTest.stop();
 })();
