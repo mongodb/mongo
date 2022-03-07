@@ -83,7 +83,6 @@ void updatePlanCache(OperationContext* opCtx,
         feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
         auto key = plan_cache_key_factory::make<sbe::PlanCacheKey>(query, collection);
         auto plan = std::make_unique<sbe::CachedSbePlan>(root.clone(), data);
-        resetRuntimeEnvironmentBeforeCaching(&plan->planStageData);
         sbe::getPlanCache(opCtx).setPinned(
             std::move(key),
             std::move(plan),
@@ -181,22 +180,6 @@ plan_cache_debug_info::DebugInfoSBE buildDebugInfo(const QuerySolution* solution
     debugInfo.planSummary = solution->summaryString();
 
     return debugInfo;
-}
-
-void resetRuntimeEnvironmentBeforeCaching(stage_builder::PlanStageData* data) {
-    tassert(6183501, "PlanStageData should not be null", data);
-
-    // Manually reset "shardFilterer" to "Nothing" because we should not store
-    // "shardFilterer" which holds a "ScopedCollectionFilter" preventing data that
-    // may have been migrated from being deleted.
-    if (auto shardFiltererSlot = data->env->getSlotIfExists("shardFilterer"_sd)) {
-        data->env->resetSlot(*shardFiltererSlot, sbe::value::TypeTags::Nothing, 0, true);
-    }
-
-    // Reset all the parameterized slots.
-    for (auto [paramId, slotId] : data->inputParamToSlotMap) {
-        data->env->resetSlot(slotId, sbe::value::TypeTags::Nothing, 0, true);
-    }
 }
 }  // namespace plan_cache_util
 }  // namespace mongo

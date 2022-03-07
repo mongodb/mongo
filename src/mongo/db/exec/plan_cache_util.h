@@ -87,11 +87,6 @@ plan_cache_debug_info::DebugInfo buildDebugInfo(
 plan_cache_debug_info::DebugInfoSBE buildDebugInfo(const QuerySolution* solution);
 
 /**
- * Resets all the parameterized slots in the RuntimeEnvironment of 'data'.
- */
-void resetRuntimeEnvironmentBeforeCaching(stage_builder::PlanStageData* data);
-
-/**
  * Caches the best candidate plan, chosen from the given 'candidates' based on the 'ranking'
  * decision, if the 'query' is of a type that can be cached. Otherwise, does nothing.
  *
@@ -107,8 +102,7 @@ void updatePlanCache(
     PlanCachingMode cachingMode,
     const CanonicalQuery& query,
     std::unique_ptr<plan_ranker::PlanRankingDecision> ranking,
-    const std::vector<plan_ranker::BaseCandidatePlan<PlanStageType, ResultType, Data>>&
-        candidates) {
+    std::vector<plan_ranker::BaseCandidatePlan<PlanStageType, ResultType, Data>>& candidates) {
     auto winnerIdx = ranking->candidateOrder[0];
     invariant(winnerIdx >= 0 && winnerIdx < candidates.size());
     auto& winningPlan = candidates[winnerIdx];
@@ -205,11 +199,13 @@ void updatePlanCache(
         if (winningPlan.solution->cacheData != nullptr) {
             if constexpr (std::is_same_v<PlanStageType, std::unique_ptr<sbe::PlanStage>>) {
                 if (feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
+                    tassert(6142201,
+                            "The winning CandidatePlan should contain the original plan",
+                            winningPlan.clonedPlan);
                     // Clone the winning SBE plan and its auxiliary data.
                     auto cachedPlan = std::make_unique<sbe::CachedSbePlan>(
-                        winningPlan.root->clone(), winningPlan.data);
-
-                    resetRuntimeEnvironmentBeforeCaching(&cachedPlan->planStageData);
+                        std::move(winningPlan.clonedPlan->first),
+                        std::move(winningPlan.clonedPlan->second));
 
                     PlanCacheLoggingCallbacks<sbe::PlanCacheKey,
                                               sbe::CachedSbePlan,

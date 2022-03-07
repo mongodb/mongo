@@ -69,24 +69,10 @@ buildSlotBasedExecutableTree(OperationContext* opCtx,
     auto sbeYieldPolicy = dynamic_cast<PlanYieldPolicySBE*>(yieldPolicy);
     invariant(sbeYieldPolicy);
 
-    auto shardFilterer =
-        std::make_unique<ShardFiltererFactoryImpl>(collections.getMainCollection());
-
-    auto builder = std::make_unique<SlotBasedStageBuilder>(
-        opCtx, collections, cq, solution, sbeYieldPolicy, shardFilterer.get());
+    auto builder =
+        std::make_unique<SlotBasedStageBuilder>(opCtx, collections, cq, solution, sbeYieldPolicy);
     auto root = builder->build(solution.root());
     auto data = builder->getPlanStageData();
-
-    root->attachToOperationContext(opCtx);
-
-    auto expCtx = cq.getExpCtxRaw();
-    tassert(5327100, "No expression context", expCtx);
-    if (expCtx->explain || expCtx->mayDbProfile) {
-        root->markShouldCollectTimingInfo();
-    }
-
-    // Register this plan to yield according to the configured policy.
-    sbeYieldPolicy->registerPlan(root.get());
 
     return {std::move(root), std::move(data)};
 }

@@ -266,7 +266,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
     auto [seekRecordIdSlot, seekRecordIdExpression] =
         [&]() -> std::pair<boost::optional<sbe::value::SlotId>, std::unique_ptr<sbe::EExpression>> {
         if (isTailableResumeBranch) {
-            auto resumeRecordIdSlot = state.env->getSlot("resumeRecordId"_sd);
+            auto resumeRecordIdSlot = state.data->env->getSlot("resumeRecordId"_sd);
             return {resumeRecordIdSlot, makeVariable(resumeRecordIdSlot)};
         } else if (csn->resumeAfterRecordId) {
             auto [tag, val] = sbe::value::makeCopyRecordId(*csn->resumeAfterRecordId);
@@ -289,7 +289,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
     const auto shouldTrackLatestOplogTimestamp =
         (csn->maxRecord || csn->shouldTrackLatestOplogTimestamp);
     auto&& [fields, slots, tsSlot] = makeOplogTimestampSlotsIfNeeded(
-        state.env, state.slotIdGenerator, shouldTrackLatestOplogTimestamp);
+        state.data->env, state.slotIdGenerator, shouldTrackLatestOplogTimestamp);
 
     sbe::ScanCallbacks callbacks({}, {}, makeOpenCallbackIfNeeded(collection, csn));
     auto stage = sbe::makeS<sbe::ScanStage>(collection->uuid(),
@@ -490,7 +490,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
             recordIdSlot = state.slotId();
 
             std::tie(fields, slots, tsSlot) = makeOplogTimestampSlotsIfNeeded(
-                state.env, state.slotIdGenerator, shouldTrackLatestOplogTimestamp);
+                state.data->env, state.slotIdGenerator, shouldTrackLatestOplogTimestamp);
 
             stage = sbe::makeS<sbe::LoopJoinStage>(
                 sbe::makeS<sbe::LimitSkipStage>(std::move(stage), 1, boost::none, csn->nodeId()),
@@ -554,7 +554,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateGenericCollSc
             auto [tag, val] = sbe::value::makeCopyRecordId(*csn->resumeAfterRecordId);
             return {state.slotId(), makeConstant(tag, val)};
         } else if (isTailableResumeBranch) {
-            auto resumeRecordIdSlot = state.env->getSlot("resumeRecordId"_sd);
+            auto resumeRecordIdSlot = state.data->env->getSlot("resumeRecordId"_sd);
             return {resumeRecordIdSlot, makeVariable(resumeRecordIdSlot)};
         }
         return {};
@@ -562,7 +562,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateGenericCollSc
 
     // See if we need to project out an oplog latest timestamp.
     auto&& [fields, slots, tsSlot] = makeOplogTimestampSlotsIfNeeded(
-        state.env, state.slotIdGenerator, csn->shouldTrackLatestOplogTimestamp);
+        state.data->env, state.slotIdGenerator, csn->shouldTrackLatestOplogTimestamp);
 
     sbe::ScanCallbacks callbacks({}, {}, makeOpenCallbackIfNeeded(collection, csn));
     auto stage = sbe::makeS<sbe::ScanStage>(collection->uuid(),

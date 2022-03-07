@@ -33,6 +33,7 @@
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/accumulator_for_window_functions.h"
 #include "mongo/db/pipeline/accumulator_js_reduce.h"
+#include "mongo/db/query/sbe_stage_builder.h"
 #include "mongo/db/query/sbe_stage_builder_accumulator.h"
 #include "mongo/db/query/sbe_stage_builder_expression.h"
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
@@ -59,7 +60,7 @@ std::pair<std::vector<std::unique_ptr<sbe::EExpression>>, EvalStage> buildAccumu
     EvalStage inputStage,
     PlanNodeId planNodeId) {
     std::vector<std::unique_ptr<sbe::EExpression>> aggs;
-    auto collatorSlot = state.env->getSlotIfExists("collator"_sd);
+    auto collatorSlot = state.data->env->getSlotIfExists("collator"_sd);
     if (collatorSlot) {
         aggs.push_back(makeFunction("collMin"_sd,
                                     sbe::makeE<sbe::EVariable>(*collatorSlot),
@@ -93,7 +94,7 @@ std::pair<std::vector<std::unique_ptr<sbe::EExpression>>, EvalStage> buildAccumu
     EvalStage inputStage,
     PlanNodeId planNodeId) {
     std::vector<std::unique_ptr<sbe::EExpression>> aggs;
-    auto collatorSlot = state.env->getSlotIfExists("collator"_sd);
+    auto collatorSlot = state.data->env->getSlotIfExists("collator"_sd);
     if (collatorSlot) {
         aggs.push_back(makeFunction("collMax"_sd,
                                     sbe::makeE<sbe::EVariable>(*collatorSlot),
@@ -309,7 +310,7 @@ std::pair<std::vector<std::unique_ptr<sbe::EExpression>>, EvalStage> buildAccumu
     EvalStage inputStage,
     PlanNodeId planNodeId) {
     std::vector<std::unique_ptr<sbe::EExpression>> aggs;
-    auto collatorSlot = state.env->getSlotIfExists("collator"_sd);
+    auto collatorSlot = state.data->env->getSlotIfExists("collator"_sd);
     if (collatorSlot) {
         aggs.push_back(makeFunction(
             "collAddToSet"_sd, sbe::makeE<sbe::EVariable>(*collatorSlot), std::move(arg)));

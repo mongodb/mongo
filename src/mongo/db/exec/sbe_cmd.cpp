@@ -120,6 +120,7 @@ public:
         }
 
         root->attachToOperationContext(opCtx);
+        root->prepare(data.ctx);
         exec = uassertStatusOK(
             plan_executor_factory::make(opCtx,
                                         std::move(cq),

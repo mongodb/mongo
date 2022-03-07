@@ -91,7 +91,6 @@
 #include "mongo/db/query/sbe_multi_planner.h"
 #include "mongo/db/query/sbe_sub_planner.h"
 #include "mongo/db/query/sbe_utils.h"
-#include "mongo/db/query/shard_filterer_factory_impl.h"
 #include "mongo/db/query/stage_builder_util.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/db/query/wildcard_multikey_paths.h"
@@ -448,33 +447,6 @@ bool shouldWaitForOplogVisibility(OperationContext* opCtx,
     // batch that would never complete because it couldn't reacquire its own lock, the global lock
     // held by the waiting reader.
     return repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(opCtx, "admin");
-}
-
-void prepareExecutionTree(OperationContext* opCtx,
-                          const CollectionPtr& collection,
-                          const CanonicalQuery& cq,
-                          stage_builder::PlanStageData* stageData) {
-    tassert(6183502, "PlanStageData should not be null", stageData);
-    // Populate/renew "shardFilterer" if there exists a "shardFilterer" slot. The slot value
-    // should have been reset to "Nothing" on caching.
-    //
-    // TODO SERVER-61422: Populate the "shardFilterer" when preparing SBE plan.
-    if (auto shardFiltererSlot = stageData->env->getSlotIfExists("shardFilterer"_sd)) {
-        tassert(6108307,
-                "Setting shard filterer slot on un-sharded collection",
-                collection.isSharded());
-
-        auto shardFiltererFactory = std::make_unique<ShardFiltererFactoryImpl>(collection);
-        auto shardFilterer = shardFiltererFactory->makeShardFilterer(opCtx);
-        stageData->env->resetSlot(*shardFiltererSlot,
-                                  sbe::value::TypeTags::shardFilterer,
-                                  sbe::value::bitcastFrom<ShardFilterer*>(shardFilterer.release()),
-                                  true);
-    }
-
-    // If the cached plan is parameterized, bind new values for the parameters into the runtime
-    // environment.
-    input_params::bind(cq, stageData->inputParamToSlotMap, stageData->env);
 }
 
 namespace {
@@ -1098,22 +1070,6 @@ protected:
         auto stageData = std::move(cachedPlan->planStageData);
         stageData.debugInfo = std::move(cacheEntry->debugInfo);
 
-        root->attachToOperationContext(_opCtx);
-        root->attachNewYieldPolicy(_yieldPolicy);
-
-        auto expCtx = _cq->getExpCtxRaw();
-        tassert(5968200, "No expression context", expCtx);
-        if (expCtx->explain || expCtx->mayDbProfile) {
-            root->markShouldCollectTimingInfo();
-        }
-
-        // Register this plan to yield according to the configured policy.
-        auto sbeYieldPolicy = dynamic_cast<PlanYieldPolicySBE*>(_yieldPolicy);
-        invariant(sbeYieldPolicy);
-        sbeYieldPolicy->registerPlan(root.get());
-
-        prepareExecutionTree(_opCtx, _collections.getMainCollection(), *_cq, &stageData);
-
         auto result = makeResult();
         result->setDecisionWorks(cacheEntry->decisionWorks);
         result->setRecoveredPinnedCacheEntry(cacheEntry->isPinned());
@@ -1358,11 +1314,16 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
             fillOutSecondaryCollectionsInformation(opCtx, collections, cq.get()));
         roots[0] = helper.buildExecutableTree(*(solutions[0]));
     }
+    auto&& [root, data] = roots[0];
     if (!planningResult->recoveredPinnedCacheEntry()) {
-        auto&& [root, data] = roots[0];
         plan_cache_util::updatePlanCache(
             opCtx, collections.getMainCollection(), *cq, *solutions[0], *root, data);
     }
+
+    // Prepare the SBE tree for execution.
+    stage_builder::prepareSlotBasedExecutableTree(
+        opCtx, root.get(), &data, *cq, *mainColl, yieldPolicy.get());
+
     return plan_executor_factory::make(opCtx,
                                        std::move(cq),
                                        std::move(solutions[0]),

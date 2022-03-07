@@ -396,7 +396,9 @@ public:
             child->attachNewYieldPolicy(yieldPolicy);
         }
 
-        _yieldPolicy = yieldPolicy;
+        if (_yieldPolicy) {
+            _yieldPolicy = yieldPolicy;
+        }
     }
 
 protected:

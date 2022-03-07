@@ -91,7 +91,8 @@ BaseRuntimePlanner::prepareExecutionPlan(PlanStage* root,
     invariant(root);
     invariant(data);
 
-    root->prepare(data->ctx);
+    stage_builder::prepareSlotBasedExecutableTree(
+        _opCtx, root, data, _cq, _collections.getMainCollection(), _yieldPolicy);
 
     value::SlotAccessor* resultSlot{nullptr};
     if (auto slot = data->outputs.getIfExists(stage_builder::PlanStageSlots::kResult); slot) {
@@ -187,6 +188,11 @@ std::vector<plan_ranker::CandidatePlan> BaseRuntimePlanner::collectExecutionStat
         for (auto planIndex : planIndexes) {
             // Prepare the plan.
             auto&& [root, data] = roots[planIndex];
+            // Make a copy of the original plan. This pristine copy will be inserted into the plan
+            // cache if this candidate becomes the winner.
+            auto origPlan =
+                std::make_pair<std::unique_ptr<PlanStage>, stage_builder::PlanStageData>(
+                    root->clone(), stage_builder::PlanStageData(data));
 
             // Attach a unique TrialRunTracker to the plan, which is configured to use at most
             // 'maxNumReads' reads.
@@ -200,6 +206,8 @@ std::vector<plan_ranker::CandidatePlan> BaseRuntimePlanner::collectExecutionStat
                                   false /* exitedEarly */,
                                   Status::OK()});
             auto& currentCandidate = candidates.back();
+            // Store the original plan in the CandidatePlan.
+            currentCandidate.clonedPlan.emplace(std::move(origPlan));
             executeCandidateTrial(&currentCandidate, maxNumResults);
 
             // Reduce the number of reads the next candidates are allocated if this candidate is

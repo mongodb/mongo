@@ -263,6 +263,7 @@ static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> optimizeAndCreateExe
                                              std::make_unique<YieldPolicyCallbacksImpl>(nss),
                                              false /*useExperimentalCommitTxnBehavior*/);
 
+    sbePlan->prepare(data.ctx);
     auto planExec = uassertStatusOK(plan_executor_factory::make(
         opCtx,
         nullptr /*cq*/,

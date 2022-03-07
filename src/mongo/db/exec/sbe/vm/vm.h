@@ -306,7 +306,6 @@ struct Instruction {
         isMinKey,
         isMaxKey,
         isTimestamp,
-        typeMatch,
 
         function,
         functionSmall,
@@ -450,8 +449,6 @@ struct Instruction {
                 return "isMaxKey";
             case isTimestamp:
                 return "isTimestamp";
-            case typeMatch:
-                return "typeMatch";
             case function:
                 return "function";
             case functionSmall:
@@ -567,6 +564,7 @@ enum class Builtin : uint8_t {
     generateSortKey,
     tsSecond,
     tsIncrement,
+    typeMatch,
 };
 
 /**
@@ -747,7 +745,6 @@ public:
     void appendIsTimestamp() {
         appendSimpleInstruction(Instruction::isTimestamp);
     }
-    void appendTypeMatch(uint32_t typeMask);
     void appendFunction(Builtin f, ArityType arity);
     void appendJump(int jumpOffset);
     void appendJumpTrue(int jumpOffset);
@@ -1165,6 +1162,7 @@ private:
     std::tuple<bool, value::TypeTags, value::Value> builtinGenerateSortKey(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinTsSecond(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinTsIncrement(ArityType arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinTypeMatch(ArityType arity);
 
     std::tuple<bool, value::TypeTags, value::Value> dispatchBuiltin(Builtin f, ArityType arity);
 

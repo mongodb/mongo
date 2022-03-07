@@ -254,7 +254,12 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::transport(
                 "Second argument to typeMatch() must be a 32-bit integer constant",
                 constPtr != nullptr && constPtr->isValueInt32());
 
-        return sbe::makeE<sbe::ETypeMatch>(std::move(args.at(0)), constPtr->getValueInt32());
+        return sbe::makeE<sbe::EFunction>(
+            "typeMatch",
+            sbe::makeEs(std::move(args.at(0)),
+                        sbe::makeE<sbe::EConstant>(
+                            sbe::value::TypeTags::NumberInt64,
+                            sbe::value::bitcastFrom<int64_t>(constPtr->getValueInt32()))));
     }
 
     // TODO - this is an open question how to do the name mappings.

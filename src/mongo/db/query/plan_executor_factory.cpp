@@ -135,8 +135,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
                 "slots"_attr = data.debugString(),
                 "stages"_attr = sbe::DebugPrinter{}.print(*rootStage));
 
-    rootStage->prepare(data.ctx);
-
     return {{new PlanExecutorSBE(
                  opCtx,
                  std::move(cq),

@@ -499,6 +499,7 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
      BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::generateSortKey, false}},
     {"tsSecond", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::tsSecond, false}},
     {"tsIncrement", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::tsIncrement, false}},
+    {"typeMatch", BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::typeMatch, false}},
 };
 
 /**
@@ -886,40 +887,6 @@ std::vector<DebugPrinter::Block> ENumericConvert::debugPrint() const {
 size_t ENumericConvert::estimateSize() const {
     return sizeof(*this) + size_estimator::estimate(_nodes);
 }
-
-std::unique_ptr<EExpression> ETypeMatch::clone() const {
-    return std::make_unique<ETypeMatch>(_nodes[0]->clone(), _typeMask);
-}
-
-vm::CodeFragment ETypeMatch::compileDirect(CompileCtx& ctx) const {
-    auto code = _nodes[0]->compileDirect(ctx);
-    code.appendTypeMatch(_typeMask);
-
-    return code;
-}
-
-std::vector<DebugPrinter::Block> ETypeMatch::debugPrint() const {
-    std::vector<DebugPrinter::Block> ret;
-
-    DebugPrinter::addKeyword(ret, "typeMatch");
-
-    ret.emplace_back("(`");
-
-    DebugPrinter::addBlocks(ret, _nodes[0]->debugPrint());
-    ret.emplace_back("`,");
-    std::stringstream ss;
-    ss << "0x" << std::setfill('0') << std::uppercase << std::setw(8) << std::hex << _typeMask;
-    ret.emplace_back(ss.str());
-
-    ret.emplace_back("`)");
-
-    return ret;
-}
-
-size_t ETypeMatch::estimateSize() const {
-    return sizeof(*this) + size_estimator::estimate(_nodes);
-}
-
 
 RuntimeEnvironment::RuntimeEnvironment(const RuntimeEnvironment& other)
     : _state{other._state}, _isSmp{other._isSmp} {

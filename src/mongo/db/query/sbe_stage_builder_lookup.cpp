@@ -56,7 +56,11 @@ using namespace sbe::value;
 
 std::unique_ptr<EExpression> replaceUndefinedWithNullOrPassthrough(SlotId slot) {
     return makeE<EIf>(
-        makeE<ETypeMatch>(makeVariable(slot), getBSONTypeMask(TypeTags::bsonUndefined)),
+        makeFunction("typeMatch",
+                     makeVariable(slot),
+                     sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64,
+                                                sbe::value::bitcastFrom<int64_t>(
+                                                    getBSONTypeMask(TypeTags::bsonUndefined)))),
         makeConstant(TypeTags::Null, 0),
         makeVariable(slot));
 }

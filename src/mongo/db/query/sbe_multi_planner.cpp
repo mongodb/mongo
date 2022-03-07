@@ -100,20 +100,36 @@ CandidatePlans MultiPlanner::finalizeExecutionPlans(
         candidates[planIdx].root->close();
     }
 
-    // If the winning stage has exited early but has not fetched all results, clear the results
-    // queue and reopen the plan stage tree, as we cannot resume such execution tree from where
-    // the trial run has stopped, and, as a result, we cannot stash the results returned so far
-    // in the plan executor.
-    if (!winner.root->getCommonStats()->isEOF && winner.exitedEarly) {
+    // An SBE tree that exited early by throwing an exception cannot be reused by design. To work
+    // around this limitation, we clone the tree from the original tree. If there is a pipeline in
+    // "_cq" the winning candidate will be extended by building a new SBE tree below, so we don't
+    // need to clone a new copy here if the winner exited early.
+    if (winner.exitedEarly && _cq.pipeline().empty()) {
+        // Remove all the registered plans from _yieldPolicy's list of trees.
+        _yieldPolicy->clearRegisteredPlans();
+
+        tassert(6142204,
+                "The winning CandidatePlan should contain the original plan",
+                winner.clonedPlan);
+        // Clone a new copy of the original plan to use for execution so that the 'clonedPlan' in
+        // 'winner' can be inserted into the plan cache while in a clean state.
+        winner.data = stage_builder::PlanStageData(winner.clonedPlan->second);
+        // When we clone the tree below, the new tree's stats will be zeroed out. If this is an
+        // explain operation, save the stats from the old tree before we discard it.
         if (_cq.getExplain()) {
-            // We save the stats on early exit if it's either an explain operation, as closing and
-            // re-opening the winning plan (below) changes the stats.
             winner.data.savedStatsOnEarlyExit = winner.root->getStats(true /* includeDebugInfo  */);
         }
-        winner.root->close();
-        winner.root->open(false);
+        winner.root = winner.clonedPlan->first->clone();
+
+        stage_builder::prepareSlotBasedExecutableTree(_opCtx,
+                                                      winner.root.get(),
+                                                      &winner.data,
+                                                      _cq,
+                                                      _collections.getMainCollection(),
+                                                      _yieldPolicy);
         // Clear the results queue.
-        winner.results = decltype(winner.results){};
+        winner.results = {};
+        winner.root->open(false);
     }
 
     // Writes a cache entry for the winning plan to the plan cache if possible.
@@ -135,7 +151,8 @@ CandidatePlans MultiPlanner::finalizeExecutionPlans(
             _cq, std::move(winner.solution), _queryParams.secondaryCollectionsInfo);
         auto [rootStage, data] = stage_builder::buildSlotBasedExecutableTree(
             _opCtx, _collections, _cq, *solution, _yieldPolicy);
-        rootStage->prepare(data.ctx);
+        stage_builder::prepareSlotBasedExecutableTree(
+            _opCtx, rootStage.get(), &data, _cq, _collections.getMainCollection(), _yieldPolicy);
         candidates[winnerIdx] = sbe::plan_ranker::CandidatePlan{
             std::move(solution), std::move(rootStage), std::move(data)};
         candidates[winnerIdx].root->open(false);

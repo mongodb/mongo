@@ -50,6 +50,18 @@ std::unique_ptr<sbe::RuntimeEnvironment> makeRuntimeEnvironment(
     OperationContext* opCtx,
     sbe::value::SlotIdGenerator* slotIdGenerator);
 
+/**
+ * This function prepares the SBE tree for execution, such as attaching the OperationContext,
+ * ensuring that the SBE tree is registered with the PlanYieldPolicySBE and populating the
+ * "RuntimeEnvironment".
+ */
+void prepareSlotBasedExecutableTree(OperationContext* opCtx,
+                                    sbe::PlanStage* root,
+                                    PlanStageData* data,
+                                    const CanonicalQuery& cq,
+                                    const CollectionPtr& collection,
+                                    PlanYieldPolicySBE* yieldPolicy);
+
 class PlanStageReqs;
 
 /**
@@ -342,8 +354,7 @@ public:
                           const MultipleCollectionAccessor& collections,
                           const CanonicalQuery& cq,
                           const QuerySolution& solution,
-                          PlanYieldPolicySBE* yieldPolicy,
-                          ShardFiltererFactoryInterface* shardFilterer);
+                          PlanYieldPolicySBE* yieldPolicy);
 
     std::unique_ptr<sbe::PlanStage> build(const QuerySolutionNode* root) final;
 
@@ -475,9 +486,6 @@ private:
 
     bool _buildHasStarted{false};
     bool _shouldProduceRecordIdSlot{true};
-
-    // A factory to construct shard filters.
-    ShardFiltererFactoryInterface* _shardFiltererFactory;
 
     // Common parameters to SBE stage builder functions.
     StageBuilderState _state;

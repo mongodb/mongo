@@ -30,6 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_mock.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/mock_yield_policies.h"
@@ -60,15 +61,30 @@ SbeStageBuilderTestFixture::buildPlanStage(
         CanonicalQuery::canonicalize(opCtx(), std::move(findCommand), false, expCtx);
     ASSERT_OK(statusWithCQ.getStatus());
 
-    stage_builder::SlotBasedStageBuilder builder{opCtx(),
-                                                 _collections,
-                                                 *statusWithCQ.getValue(),
-                                                 *querySolution,
-                                                 nullptr /* YieldPolicy */,
-                                                 shardFiltererInterface.get()};
+    CollectionMock coll(TenantNamespace(boost::none, _nss));
+    CollectionPtr collPtr(&coll);
+    MultipleCollectionAccessor& colls = _collections;
+    if (shardFiltererInterface) {
+        auto shardFilterer = shardFiltererInterface->makeShardFilterer(opCtx());
+        collPtr.setShardKeyPattern(shardFilterer->getKeyPattern().toBSON());
+        colls = MultipleCollectionAccessor(collPtr);
+    }
+
+    stage_builder::SlotBasedStageBuilder builder{
+        opCtx(), colls, *statusWithCQ.getValue(), *querySolution, nullptr /* YieldPolicy */};
 
     auto stage = builder.build(querySolution->root());
     auto data = builder.getPlanStageData();
+
+    // Reset "shardFilterer".
+    if (auto shardFiltererSlot = data.env->getSlotIfExists("shardFilterer"_sd);
+        shardFiltererSlot && shardFiltererInterface) {
+        auto shardFilterer = shardFiltererInterface->makeShardFilterer(opCtx());
+        data.env->resetSlot(*shardFiltererSlot,
+                            sbe::value::TypeTags::shardFilterer,
+                            sbe::value::bitcastFrom<ShardFilterer*>(shardFilterer.release()),
+                            true);
+    }
 
     auto slots = sbe::makeSV();
     if (hasRecordId) {

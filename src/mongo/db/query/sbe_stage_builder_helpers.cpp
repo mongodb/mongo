@@ -31,6 +31,9 @@
 
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
 
+#include <iterator>
+#include <numeric>
+
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/stages/branch.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
@@ -43,8 +46,7 @@
 #include "mongo/db/exec/sbe/stages/unwind.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/matcher/matcher_type_set.h"
-#include <iterator>
-#include <numeric>
+#include "mongo/db/query/sbe_stage_builder.h"
 
 namespace mongo::stage_builder {
 
@@ -107,9 +109,12 @@ std::unique_ptr<sbe::EExpression> makeIsMember(std::unique_ptr<sbe::EExpression>
 std::unique_ptr<sbe::EExpression> generateNullOrMissing(const sbe::EVariable& var) {
     return makeBinaryOp(sbe::EPrimBinary::logicOr,
                         makeNot(makeFunction("exists", var.clone())),
-                        sbe::makeE<sbe::ETypeMatch>(var.clone(),
-                                                    getBSONTypeMask(BSONType::jstNULL) |
-                                                        getBSONTypeMask(BSONType::Undefined)));
+                        makeFunction("typeMatch",
+                                     var.clone(),
+                                     makeConstant(sbe::value::TypeTags::NumberInt64,
+                                                  sbe::value::bitcastFrom<int64_t>(
+                                                      getBSONTypeMask(BSONType::jstNULL) |
+                                                      getBSONTypeMask(BSONType::Undefined)))));
 }
 
 std::unique_ptr<sbe::EExpression> generateNullOrMissing(const sbe::FrameId frameId,
@@ -121,9 +126,12 @@ std::unique_ptr<sbe::EExpression> generateNullOrMissing(const sbe::FrameId frame
 std::unique_ptr<sbe::EExpression> generateNullOrMissing(std::unique_ptr<sbe::EExpression> arg) {
     return makeBinaryOp(sbe::EPrimBinary::logicOr,
                         makeNot(makeFunction("exists", arg->clone())),
-                        sbe::makeE<sbe::ETypeMatch>(arg->clone(),
-                                                    getBSONTypeMask(BSONType::jstNULL) |
-                                                        getBSONTypeMask(BSONType::Undefined)));
+                        makeFunction("typeMatch",
+                                     arg->clone(),
+                                     makeConstant(sbe::value::TypeTags::NumberInt64,
+                                                  sbe::value::bitcastFrom<int64_t>(
+                                                      getBSONTypeMask(BSONType::jstNULL) |
+                                                      getBSONTypeMask(BSONType::Undefined)))));
 }
 
 std::unique_ptr<sbe::EExpression> generateNonNumericCheck(const sbe::EVariable& var) {
@@ -133,8 +141,11 @@ std::unique_ptr<sbe::EExpression> generateNonNumericCheck(const sbe::EVariable& 
 std::unique_ptr<sbe::EExpression> generateLongLongMinCheck(const sbe::EVariable& var) {
     return makeBinaryOp(
         sbe::EPrimBinary::logicAnd,
-        sbe::makeE<sbe::ETypeMatch>(var.clone(),
-                                    MatcherTypeSet{BSONType::NumberLong}.getBSONTypeMask()),
+        makeFunction("typeMatch",
+                     var.clone(),
+                     makeConstant(sbe::value::TypeTags::NumberInt64,
+                                  sbe::value::bitcastFrom<int64_t>(
+                                      MatcherTypeSet{BSONType::NumberLong}.getBSONTypeMask()))),
         makeBinaryOp(sbe::EPrimBinary::eq,
                      var.clone(),
                      sbe::makeE<sbe::EConstant>(
@@ -779,8 +790,17 @@ sbe::value::SlotId StageBuilderState::getGlobalVariableSlot(Variables::Id variab
     // Convert value of variable into SBE value.
     auto [tag, val] = makeValue(variables.getValue(variableId));
 
-    auto slotId = env->registerSlot(tag, val, true, slotIdGenerator);
+    auto slotId = data->env->registerSlot(tag, val, true, slotIdGenerator);
     globalVariables.emplace(variableId, slotId);
     return slotId;
 }
+
+sbe::value::SlotId StageBuilderState::registerInputParamSlot(
+    MatchExpression::InputParamId paramId) {
+    auto slotId = data->env->registerSlot(
+        sbe::value::TypeTags::Nothing, 0, false /* owned */, slotIdGenerator);
+    data->inputParamToSlotMap.emplace(paramId, slotId);
+    return slotId;
+}
+
 }  // namespace mongo::stage_builder

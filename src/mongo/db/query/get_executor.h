@@ -111,15 +111,6 @@ void fillOutPlannerParams(OperationContext* opCtx,
                           QueryPlannerParams* plannerParams);
 
 /**
- * Prepare the "PlanStageData" for execution by populating necessary value to "RuntimeEnvironment"
- * and binding parameterized values with corresponding slots.
- */
-void prepareExecutionTree(OperationContext* opCtx,
-                          const CollectionPtr& collection,
-                          const CanonicalQuery& cq,
-                          stage_builder::PlanStageData* data);
-
-/**
  * Return whether or not any component of the path 'path' is multikey given an index key pattern
  * and multikeypaths. If no multikey metdata is available for the index, and the index is marked
  * multikey, conservatively assumes that a component of 'path' _is_ multikey. The 'isMultikey'

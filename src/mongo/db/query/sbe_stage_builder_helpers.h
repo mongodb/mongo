@@ -865,13 +865,15 @@ std::pair<sbe::IndexKeysInclusionSet, std::vector<std::string>> makeIndexKeyIncl
     return {std::move(indexKeyBitset), std::move(keyFieldNames)};
 }
 
+struct PlanStageData;
+
 /**
  * Common parameters to SBE stage builder functions extracted into separate class to simplify
  * argument passing. Also contains a mapping of global variable ids to slot ids.
  */
 struct StageBuilderState {
     StageBuilderState(OperationContext* opCtx,
-                      sbe::RuntimeEnvironment* env,
+                      PlanStageData* data,
                       const Variables& variables,
                       sbe::value::SlotIdGenerator* slotIdGenerator,
                       sbe::value::FrameIdGenerator* frameIdGenerator,
@@ -882,7 +884,7 @@ struct StageBuilderState {
           frameIdGenerator{frameIdGenerator},
           spoolIdGenerator{spoolIdGenerator},
           opCtx{opCtx},
-          env{env},
+          data{data},
           variables{variables},
           needsMerge{needsMerge},
           allowDiskUse{allowDiskUse} {}
@@ -903,12 +905,20 @@ struct StageBuilderState {
         return spoolIdGenerator->generate();
     }
 
+    /**
+     * Register a Slot in the 'RuntimeEnvironment'. The newly registered Slot should be associated
+     * with 'paramId' and tracked in the 'InputParamToSlotMap' for auto-parameterization use. The
+     * slot is set to 'Nothing' on registration and will be populated with the real value when
+     * preparing the SBE plan for execution.
+     */
+    sbe::value::SlotId registerInputParamSlot(MatchExpression::InputParamId paramId);
+
     sbe::value::SlotIdGenerator* const slotIdGenerator;
     sbe::value::FrameIdGenerator* const frameIdGenerator;
     sbe::value::SpoolIdGenerator* const spoolIdGenerator;
 
     OperationContext* const opCtx;
-    sbe::RuntimeEnvironment* const env;
+    PlanStageData* const data;
 
     const Variables& variables;
     stdx::unordered_map<Variables::Id, sbe::value::SlotId> globalVariables;

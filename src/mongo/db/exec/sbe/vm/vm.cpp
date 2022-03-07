@@ -136,7 +136,6 @@ int Instruction::stackOffset[Instruction::Tags::lastInstruction] = {
     0,  // isMinKey
     0,  // isMaxKey
     0,  // isTimestamp
-    0,  // typeMatch
 
     0,  // function is special, the stack offset is encoded in the instruction itself
     0,  // functionSmall is special, the stack offset is encoded in the instruction itself
@@ -275,12 +274,6 @@ std::string CodeFragment::toString() const {
                 auto tag = readFromMemory<value::TypeTags>(pcPointer);
                 pcPointer += sizeof(tag);
                 ss << "tag: " << tag;
-                break;
-            }
-            case Instruction::typeMatch: {
-                auto typeMask = readFromMemory<uint32_t>(pcPointer);
-                pcPointer += sizeof(typeMask);
-                ss << "typeMask: " << typeMask;
                 break;
             }
             case Instruction::function:
@@ -570,17 +563,6 @@ void CodeFragment::appendIsInfinity() {
 
 void CodeFragment::appendIsRecordId() {
     appendSimpleInstruction(Instruction::isRecordId);
-}
-
-void CodeFragment::appendTypeMatch(uint32_t typeMask) {
-    Instruction i;
-    i.tag = Instruction::typeMatch;
-    adjustStackSimple(i);
-
-    auto offset = allocateSpace(sizeof(Instruction) + sizeof(typeMask));
-
-    offset += writeToMemory(offset, i);
-    offset += writeToMemory(offset, typeMask);
 }
 
 void CodeFragment::appendFunction(Builtin f, ArityType arity) {
@@ -3948,6 +3930,21 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinHash(ArityType 
     return {false, value::TypeTags::NumberInt64, value::bitcastFrom<decltype(hashVal)>(hashVal)};
 }
 
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinTypeMatch(ArityType arity) {
+    invariant(arity == 2);
+
+    auto [inputOwn, inputTag, inputVal] = getFromStack(0);
+    auto [typeMaskOwn, typeMaskTag, typeMaskVal] = getFromStack(1);
+
+    if (inputTag != value::TypeTags::Nothing && typeMaskTag == value::TypeTags::NumberInt64) {
+        bool matches =
+            static_cast<bool>(getBSONTypeMask(inputTag) & value::bitcastTo<int64_t>(typeMaskVal));
+        return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(matches)};
+    }
+
+    return {false, value::TypeTags::Nothing, 0};
+}
+
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin f,
                                                                           ArityType arity) {
     switch (f) {
@@ -4139,6 +4136,8 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builti
             return builtinTsSecond(arity);
         case Builtin::tsIncrement:
             return builtinTsIncrement(arity);
+        case Builtin::typeMatch:
+            return builtinTypeMatch(arity);
     }
 
     MONGO_UNREACHABLE;
@@ -5159,23 +5158,6 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                         topStack(false,
                                  value::TypeTags::Boolean,
                                  value::bitcastFrom<bool>(tag == value::TypeTags::Timestamp));
-                    }
-
-                    if (owned) {
-                        value::releaseValue(tag, val);
-                    }
-                    break;
-                }
-                case Instruction::typeMatch: {
-                    auto typeMask = readFromMemory<uint32_t>(pcPointer);
-                    pcPointer += sizeof(typeMask);
-
-                    auto [owned, tag, val] = getFromStack(0);
-
-                    if (tag != value::TypeTags::Nothing) {
-                        bool matches = static_cast<bool>(getBSONTypeMask(tag) & typeMask);
-                        topStack(
-                            false, value::TypeTags::Boolean, value::bitcastFrom<bool>(matches));
                     }
 
                     if (owned) {

@@ -62,6 +62,7 @@
 #include "mongo/db/pipeline/abt/field_map_builder.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_visitor.h"
+#include "mongo/db/query/bind_input_params.h"
 #include "mongo/db/query/expression_walker.h"
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
 #include "mongo/db/query/optimizer/rewrites/path_lower.h"
@@ -71,6 +72,7 @@
 #include "mongo/db/query/sbe_stage_builder_filter.h"
 #include "mongo/db/query/sbe_stage_builder_index_scan.h"
 #include "mongo/db/query/sbe_stage_builder_projection.h"
+#include "mongo/db/query/shard_filterer_factory_impl.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/storage/execution_context.h"
@@ -391,6 +393,51 @@ std::unique_ptr<sbe::RuntimeEnvironment> makeRuntimeEnvironment(
     return env;
 }
 
+void prepareSlotBasedExecutableTree(OperationContext* opCtx,
+                                    sbe::PlanStage* root,
+                                    PlanStageData* data,
+                                    const CanonicalQuery& cq,
+                                    const CollectionPtr& collection,
+                                    PlanYieldPolicySBE* yieldPolicy) {
+    tassert(6183502, "PlanStage cannot be null", root);
+    tassert(6142205, "PlanStageData cannot be null", data);
+    tassert(6142206, "yieldPolicy cannot be null", yieldPolicy);
+
+    root->attachToOperationContext(opCtx);
+    root->attachNewYieldPolicy(yieldPolicy);
+
+    // Call markShouldCollectTimingInfo() if appropriate.
+    auto expCtx = cq.getExpCtxRaw();
+    tassert(6142207, "No expression context", expCtx);
+    if (expCtx->explain || expCtx->mayDbProfile) {
+        root->markShouldCollectTimingInfo();
+    }
+
+    // Register this plan to yield according to the configured policy.
+    yieldPolicy->registerPlan(root);
+
+    root->prepare(data->ctx);
+
+    // Populate/renew "shardFilterer" if there exists a "shardFilterer" slot. The slot value should
+    // be set to Nothing in the plan cache to avoid extending the lifetime of the ownership filter.
+    if (auto shardFiltererSlot = data->env->getSlotIfExists("shardFilterer"_sd)) {
+        tassert(6108307,
+                "Setting shard filterer slot on un-sharded collection",
+                collection.isSharded());
+
+        auto shardFiltererFactory = std::make_unique<ShardFiltererFactoryImpl>(collection);
+        auto shardFilterer = shardFiltererFactory->makeShardFilterer(opCtx);
+        data->env->resetSlot(*shardFiltererSlot,
+                             sbe::value::TypeTags::shardFilterer,
+                             sbe::value::bitcastFrom<ShardFilterer*>(shardFilterer.release()),
+                             true);
+    }
+
+    // If the cached plan is parameterized, bind new values for the parameters into the runtime
+    // environment.
+    input_params::bind(cq, data->inputParamToSlotMap, data->env);
+}
+
 PlanStageSlots::PlanStageSlots(const PlanStageReqs& reqs,
                                sbe::value::SlotIdGenerator* slotIdGenerator) {
     for (auto&& [slotName, isRequired] : reqs._slots) {
@@ -652,16 +699,14 @@ SlotBasedStageBuilder::SlotBasedStageBuilder(OperationContext* opCtx,
                                              const MultipleCollectionAccessor& collections,
                                              const CanonicalQuery& cq,
                                              const QuerySolution& solution,
-                                             PlanYieldPolicySBE* yieldPolicy,
-                                             ShardFiltererFactoryInterface* shardFiltererFactory)
+                                             PlanYieldPolicySBE* yieldPolicy)
     : StageBuilder(opCtx, cq, solution),
       _collections(collections),
       _mainNss(cq.nss()),
       _yieldPolicy(yieldPolicy),
       _data(makeRuntimeEnvironment(_cq, _opCtx, &_slotIdGenerator)),
-      _shardFiltererFactory(shardFiltererFactory),
       _state(_opCtx,
-             _data.env,
+             &_data,
              _cq.getExpCtxRaw()->variables,
              &_slotIdGenerator,
              &_frameIdGenerator,
@@ -2633,7 +2678,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto groupEvalStage = makeHashAgg(std::move(accProjEvalStage),
                                       dedupedGroupBySlots,
                                       std::move(accSlotToExprMap),
-                                      _state.env->getSlotIfExists("collator"_sd),
+                                      _state.data->env->getSlotIfExists("collator"_sd),
                                       _cq.getExpCtx()->allowDiskUse,
                                       nodeId);
 
@@ -2926,15 +2971,12 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // there are orphaned documents from aborted migrations. To check if the document is owned by
     // the shard, we need to own a 'ShardFilterer', and extract the document's shard key as a
     // BSONObj.
-    // TODO SERVER-61422: Should not construct the "ShardFilterer" here.
-    auto shardFilterer = _shardFiltererFactory->makeShardFilterer(_opCtx);
-    auto shardKeyPattern = shardFilterer->getKeyPattern().toBSON();
-    auto shardFiltererSlot =
-        _data.env->registerSlot("shardFilterer"_sd,
-                                sbe::value::TypeTags::shardFilterer,
-                                sbe::value::bitcastFrom<ShardFilterer*>(shardFilterer.release()),
-                                true,
-                                &_slotIdGenerator);
+    auto shardKeyPattern = _collections.getMainCollection().getShardKeyPattern();
+    // We register the "shardFilterer" slot but not construct the ShardFilterer here is because once
+    // constructed the ShardFilterer will prevent orphaned documents from being deleted. We will
+    // construct the 'ShardFiltered' later while preparing the SBE tree for execution.
+    auto shardFiltererSlot = _data.env->registerSlot(
+        "shardFilterer"_sd, sbe::value::TypeTags::Nothing, 0, false, &_slotIdGenerator);
 
     // Determine if our child is an index scan and extract it's key pattern, or empty BSONObj if our
     // child is not an IXSCAN node.

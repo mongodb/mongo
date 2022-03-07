@@ -50,6 +50,7 @@
 #include "mongo/db/pipeline/expression_walker.h"
 #include "mongo/db/query/expression_walker.h"
 #include "mongo/db/query/projection_parser.h"
+#include "mongo/db/query/sbe_stage_builder.h"
 #include "mongo/db/query/sbe_stage_builder_eval_frame.h"
 #include "mongo/util/str.h"
 
@@ -251,7 +252,11 @@ void generateStringCaseConversionExpression(ExpressionVisitorContext* _context,
                          getBSONTypeMask(sbe::value::TypeTags::NumberDecimal) |
                          getBSONTypeMask(sbe::value::TypeTags::Date) |
                          getBSONTypeMask(sbe::value::TypeTags::Timestamp));
-    auto checkValidTypeExpr = sbe::makeE<sbe::ETypeMatch>(inputRef.clone(), typeMask);
+    auto checkValidTypeExpr =
+        makeFunction("typeMatch",
+                     inputRef.clone(),
+                     makeConstant(sbe::value::TypeTags::NumberInt64,
+                                  sbe::value::bitcastFrom<int64_t>(typeMask)));
     auto checkNullorMissing = generateNullOrMissing(inputRef);
     auto [emptyStrTag, emptyStrVal] = sbe::value::makeNewString("");
 
@@ -1071,7 +1076,7 @@ public:
         // comparisons (for example, a number will always compare as less than a string). The other
         // comparison primitives are designed for comparing values of the same type.
         auto cmp3w = makeBinaryOp(
-            sbe::EPrimBinary::cmp3w, lhsRef.clone(), rhsRef.clone(), _context->state.env);
+            sbe::EPrimBinary::cmp3w, lhsRef.clone(), rhsRef.clone(), _context->state.data->env);
         auto cmp = (comparisonOperator == sbe::EPrimBinary::cmp3w)
             ? std::move(cmp3w)
             : makeBinaryOp(comparisonOperator,
@@ -1086,10 +1091,14 @@ public:
         // We also need to explicitly check for 'bsonUndefined' type because it is considered equal
         // to "Nothing" according to MQL semantics.
         auto generateExists = [&](const sbe::EVariable& var) {
+            auto undefinedTypeMask = static_cast<int64_t>(getBSONTypeMask(BSONType::Undefined));
             return makeBinaryOp(
                 sbe::EPrimBinary::logicAnd,
                 makeFunction("exists", var.clone()),
-                sbe::makeE<sbe::ETypeMatch>(var.clone(), ~getBSONTypeMask(BSONType::Undefined)));
+                makeFunction("typeMatch",
+                             var.clone(),
+                             makeConstant(sbe::value::TypeTags::NumberInt64,
+                                          sbe::value::bitcastFrom<int64_t>(~undefinedTypeMask))));
         };
 
         auto nothingFallbackCmp =
@@ -1197,7 +1206,7 @@ public:
                                     sbe::makeSV(unionOutputSlot),
                                     _context->planNodeId);
 
-        auto collatorSlot = _context->state.env->getSlotIfExists("collator"_sd);
+        auto collatorSlot = _context->state.data->env->getSlotIfExists("collator"_sd);
 
         // Build a filter that will throw an 'EFail' if any element coming from the union is NOT
         // an array.
@@ -1297,7 +1306,7 @@ public:
         auto endDateExpression = _context->popExpr();
         auto startDateExpression = _context->popExpr();
 
-        auto timezoneDBSlot = _context->state.env->getSlot("timeZoneDB"_sd);
+        auto timezoneDBSlot = _context->state.data->env->getSlot("timeZoneDB"_sd);
 
         //  Set parameters for an invocation of built-in "dateDiff" function.
         arguments.push_back(sbe::makeE<sbe::EVariable>(timezoneDBSlot));
@@ -1666,7 +1675,7 @@ public:
         // for datetime computation. This global object is registered as an unowned value in the
         // runtime environment so we pass the corresponding slot to the datePartsWeekYear and
         // dateParts functions as a variable.
-        auto timeZoneDBSlot = _context->state.env->getSlot("timeZoneDB"_sd);
+        auto timeZoneDBSlot = _context->state.data->env->getSlot("timeZoneDB"_sd);
         auto computeDate = makeFunction(isIsoWeekYear ? "datePartsWeekYear" : "dateParts",
                                         sbe::makeE<sbe::EVariable>(timeZoneDBSlot),
                                         yearRef.clone(),
@@ -1734,9 +1743,10 @@ public:
         }
 
         // Add timezoneDB to arguments.
-        args.push_back(sbe::makeE<sbe::EVariable>(_context->state.env->getSlot("timeZoneDB"_sd)));
+        args.push_back(
+            sbe::makeE<sbe::EVariable>(_context->state.data->env->getSlot("timeZoneDB"_sd)));
         isoargs.push_back(
-            sbe::makeE<sbe::EVariable>(_context->state.env->getSlot("timeZoneDB"_sd)));
+            sbe::makeE<sbe::EVariable>(_context->state.data->env->getSlot("timeZoneDB"_sd)));
 
         // Add date to arguments.
         operands.push_back(std::move(date));
@@ -1770,21 +1780,30 @@ public:
             CaseValuePair{makeNot(makeFunction("isString", timezoneRef.clone())),
                           sbe::makeE<sbe::EFail>(ErrorCodes::Error{4997701},
                                                  "$dateToParts timezone must be a string")},
-            CaseValuePair{makeNot(makeFunction("isTimezone",
-                                               sbe::makeE<sbe::EVariable>(
-                                                   _context->state.env->getSlot("timeZoneDB"_sd)),
-                                               timezoneRef.clone())),
-                          sbe::makeE<sbe::EFail>(ErrorCodes::Error{4997704},
-                                                 "$dateToParts timezone must be a valid timezone")},
+            CaseValuePair{
+                makeNot(makeFunction(
+                    "isTimezone",
+                    sbe::makeE<sbe::EVariable>(_context->state.data->env->getSlot("timeZoneDB"_sd)),
+                    timezoneRef.clone())),
+                sbe::makeE<sbe::EFail>(ErrorCodes::Error{4997704},
+                                       "$dateToParts timezone must be a valid timezone")},
             CaseValuePair{generateNullOrMissing(frameId, 2),
                           sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0)},
-            CaseValuePair{makeNot(sbe::makeE<sbe::ETypeMatch>(isoflagRef.clone(), isoTypeMask)),
-                          sbe::makeE<sbe::EFail>(ErrorCodes::Error{4997702},
-                                                 "$dateToParts iso8601 must be a boolean")},
+            CaseValuePair{
+                makeNot(makeFunction("typeMatch",
+                                     isoflagRef.clone(),
+                                     makeConstant(sbe::value::TypeTags::NumberInt64,
+                                                  sbe::value::bitcastFrom<int64_t>(isoTypeMask)))),
+                sbe::makeE<sbe::EFail>(ErrorCodes::Error{4997702},
+                                       "$dateToParts iso8601 must be a boolean")},
             CaseValuePair{generateNullOrMissing(frameId, 0),
                           sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0)},
             CaseValuePair{
-                makeNot(sbe::makeE<sbe::ETypeMatch>(dateRef.clone(), dateTypeMask())),
+                makeNot(makeFunction(
+                    "typeMatch",
+                    dateRef.clone(),
+                    makeConstant(sbe::value::TypeTags::NumberInt64,
+                                 sbe::value::bitcastFrom<int64_t>(dateTypeMask())))),
                 sbe::makeE<sbe::EFail>(ErrorCodes::Error{4997703},
                                        "$dateToParts date must have the format of a date")},
             std::move(checkIsoflagValue));
@@ -1879,7 +1898,7 @@ public:
                         "Encountered unexpected system variable ID",
                         it != Variables::kIdToBuiltinVarName.end());
 
-                auto variableSlot = _context->state.env->getSlotIfExists(it->second);
+                auto variableSlot = _context->state.data->env->getSlotIfExists(it->second);
                 uassert(5611301,
                         str::stream()
                             << "Builtin variable '$$" << it->second << "' is not available",
@@ -2316,10 +2335,17 @@ public:
             CaseValuePair{
                 makeBinaryOp(
                     sbe::EPrimBinary::logicAnd,
-                    sbe::makeE<sbe::ETypeMatch>(
-                        rhsVar.clone(), getBSONTypeMask(sbe::value::TypeTags::NumberDouble)),
-                    makeNot(sbe::makeE<sbe::ETypeMatch>(
-                        lhsVar.clone(), getBSONTypeMask(sbe::value::TypeTags::NumberDouble)))),
+                    makeFunction("typeMatch",
+                                 rhsVar.clone(),
+                                 makeConstant(sbe::value::TypeTags::NumberInt64,
+                                              sbe::value::bitcastFrom<int64_t>(getBSONTypeMask(
+                                                  sbe::value::TypeTags::NumberDouble)))),
+                    makeNot(
+                        makeFunction("typeMatch",
+                                     lhsVar.clone(),
+                                     makeConstant(sbe::value::TypeTags::NumberInt64,
+                                                  sbe::value::bitcastFrom<int64_t>(getBSONTypeMask(
+                                                      sbe::value::TypeTags::NumberDouble)))))),
                 makeFunction("fillEmpty", std::move(numericConvert32), rhsVar.clone())},
             rhsVar.clone());
 
@@ -2582,7 +2608,7 @@ public:
         auto isEmptyFindStr = makeBinaryOp(sbe::EPrimBinary::eq,
                                            findRef.clone(),
                                            sbe::makeE<sbe::EConstant>(emptyStrTag, emptyStrVal),
-                                           _context->state.env);
+                                           _context->state.data->env);
 
         auto replaceOrReturnInputExpr = sbe::makeE<sbe::EIf>(
             std::move(isEmptyFindStr),
@@ -2660,7 +2686,7 @@ public:
         auto [specTag, specVal] = makeValue(expr->getSortPattern());
         auto specConstant = makeConstant(specTag, specVal);
 
-        auto collatorSlot = _context->state.env->getSlotIfExists("collator"_sd);
+        auto collatorSlot = _context->state.data->env->getSlotIfExists("collator"_sd);
 
         auto argumentIsNotArray = makeNot(makeFunction("isArray", inputRef.clone()));
         auto exprSortArr = buildMultiBranchConditional(
@@ -2730,7 +2756,7 @@ public:
             return makeBinaryOp(sbe::EPrimBinary::eq,
                                 var.clone(),
                                 sbe::makeE<sbe::EConstant>(emptyStrTag, emptyStrVal),
-                                _context->state.env);
+                                _context->state.data->env);
         };
 
         auto checkIsNullOrMissing = makeBinaryOp(sbe::EPrimBinary::logicOr,
@@ -3204,7 +3230,7 @@ private:
         }();
         auto date = _context->popExpr();
 
-        auto timeZoneDBSlot = _context->state.env->getSlot("timeZoneDB"_sd);
+        auto timeZoneDBSlot = _context->state.data->env->getSlot("timeZoneDB"_sd);
         args.push_back(sbe::makeE<sbe::EVariable>(timeZoneDBSlot));
 
         // Add date to arguments.
@@ -3231,10 +3257,14 @@ private:
                                                      << " timezone must be a valid timezone")},
             CaseValuePair{generateNullOrMissing(dateRef),
                           sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0)},
-            CaseValuePair{makeNot(sbe::makeE<sbe::ETypeMatch>(dateRef.clone(), dateTypeMask())),
-                          sbe::makeE<sbe::EFail>(ErrorCodes::Error{4998202},
-                                                 str::stream()
-                                                     << "$" << exprName.toString()
+            CaseValuePair{
+                makeNot(
+                    makeFunction("typeMatch",
+                                 dateRef.clone(),
+                                 makeConstant(sbe::value::TypeTags::NumberInt64,
+                                              sbe::value::bitcastFrom<int64_t>(dateTypeMask())))),
+                sbe::makeE<sbe::EFail>(ErrorCodes::Error{4998202},
+                                       str::stream() << "$" << exprName.toString()
                                                      << " date must have a format of a date")},
             sbe::makeE<sbe::EFunction>(exprName.toString(), std::move(args)));
         _context->pushExpr(
@@ -3254,11 +3284,15 @@ private:
                                                           ErrorCodes::Error errorCode,
                                                           StringData expressionName,
                                                           StringData parameterName) {
-        return {makeNot(sbe::makeE<sbe::ETypeMatch>(dateRef.clone(), dateTypeMask())),
-                sbe::makeE<sbe::EFail>(errorCode,
-                                       str::stream()
-                                           << expressionName << " parameter '" << parameterName
-                                           << "' must be coercible to date")};
+        return {
+            makeNot(makeFunction("typeMatch",
+                                 dateRef.clone(),
+                                 makeConstant(sbe::value::TypeTags::NumberInt64,
+                                              sbe::value::bitcastFrom<int64_t>(dateTypeMask())))),
+            sbe::makeE<sbe::EFail>(errorCode,
+                                   str::stream()
+                                       << expressionName << " parameter '" << parameterName
+                                       << "' must be coercible to date")};
     }
 
     /**
@@ -3522,7 +3556,7 @@ private:
         checkExprsNull.reserve(arity);
         checkExprsNotArray.reserve(arity);
 
-        auto collatorSlot = _context->state.env->getSlotIfExists("collator"_sd);
+        auto collatorSlot = _context->state.data->env->getSlotIfExists("collator"_sd);
 
         auto [operatorName, setFunctionName] = [setOp, collatorSlot]() {
             switch (setOp) {
@@ -3665,18 +3699,24 @@ private:
             auto patternArgument = buildMultiBranchConditional(
                 CaseValuePair{makeFunction("isString", patternVar.clone()),
                               std::move(patternNullBytesCheck)},
-                CaseValuePair{sbe::makeE<sbe::ETypeMatch>(patternVar.clone(),
-                                                          getBSONTypeMask(BSONType::RegEx)),
+                CaseValuePair{makeFunction("typeMatch",
+                                           patternVar.clone(),
+                                           makeConstant(sbe::value::TypeTags::NumberInt64,
+                                                        sbe::value::bitcastFrom<int64_t>(
+                                                            getBSONTypeMask(BSONType::RegEx)))),
                               makeFunction("getRegexPattern", patternVar.clone())},
                 makeError(5126601, "regex pattern must have either string or BSON RegEx type"));
 
             if (!optionsVar) {
                 // If no options are passed to the expression, try to extract them from the pattern.
-                auto optionsArgument =
-                    sbe::makeE<sbe::EIf>(sbe::makeE<sbe::ETypeMatch>(
-                                             patternVar.clone(), getBSONTypeMask(BSONType::RegEx)),
-                                         makeFunction("getRegexFlags", patternVar.clone()),
-                                         makeConstant(""));
+                auto optionsArgument = sbe::makeE<sbe::EIf>(
+                    makeFunction("typeMatch",
+                                 patternVar.clone(),
+                                 makeConstant(sbe::value::TypeTags::NumberInt64,
+                                              sbe::value::bitcastFrom<int64_t>(
+                                                  getBSONTypeMask(BSONType::RegEx)))),
+                    makeFunction("getRegexFlags", patternVar.clone()),
+                    makeConstant(""));
                 auto compiledRegex = makeFunction(
                     "regexCompile", std::move(patternArgument), std::move(optionsArgument));
                 return sbe::makeE<sbe::EIf>(makeFunction("isNull", patternVar.clone()),
@@ -3745,8 +3785,11 @@ private:
                             makeFunction("getRegexFlags", patternVar.clone()));
 
                         return sbe::makeE<sbe::EIf>(
-                            sbe::makeE<sbe::ETypeMatch>(patternVar.clone(),
-                                                        getBSONTypeMask(BSONType::RegEx)),
+                            makeFunction("typeMatch",
+                                         patternVar.clone(),
+                                         makeConstant(sbe::value::TypeTags::NumberInt64,
+                                                      sbe::value::bitcastFrom<int64_t>(
+                                                          getBSONTypeMask(BSONType::RegEx)))),
                             std::move(checkBsonRegexOptions),
                             stringOptions.clone());
                     },
@@ -3825,7 +3868,7 @@ private:
         binds.push_back(std::move(convertedAmountInt64));
 
         sbe::EExpression::Vector args;
-        auto timeZoneDBSlot = _context->state.env->getSlot("timeZoneDB"_sd);
+        auto timeZoneDBSlot = _context->state.data->env->getSlot("timeZoneDB"_sd);
         args.push_back(sbe::makeE<sbe::EVariable>(timeZoneDBSlot));
         args.push_back(startDateRef.clone());
         args.push_back(unitRef.clone());
@@ -3862,15 +3905,19 @@ private:
                                                  str::stream() << "$" << dateExprName
                                                                << " expects a valid timezone")},
             CaseValuePair{
-                makeNot(sbe::makeE<sbe::ETypeMatch>(startDateRef.clone(), dateTypeMask())),
+                makeNot(
+                    makeFunction("typeMatch",
+                                 startDateRef.clone(),
+                                 makeConstant(sbe::value::TypeTags::NumberInt64,
+                                              sbe::value::bitcastFrom<int64_t>(dateTypeMask())))),
                 sbe::makeE<sbe::EFail>(ErrorCodes::Error{5166603},
                                        str::stream()
                                            << "$" << dateExprName
                                            << " must have startDate argument convertable to date")},
-            CaseValuePair{generateNonStringCheck(unitRef),
-                          sbe::makeE<sbe::EFail>(ErrorCodes::Error{5166604},
-                                                 str::stream()
-                                                     << "$" << dateExprName
+            CaseValuePair{
+                generateNonStringCheck(unitRef),
+                sbe::makeE<sbe::EFail>(ErrorCodes::Error{5166604},
+                                       str::stream() << "$" << dateExprName
                                                      << " expects unit argument of type string")},
             CaseValuePair{makeNot(makeFunction("isTimeUnit", unitRef.clone())),
                           sbe::makeE<sbe::EFail>(ErrorCodes::Error{5166605},
@@ -3899,9 +3946,12 @@ private:
 
 std::unique_ptr<sbe::EExpression> generateCoerceToBoolExpression(sbe::EVariable branchRef) {
     auto makeNotNullOrUndefinedCheck = [&branchRef]() {
-        return makeNot(sbe::makeE<sbe::ETypeMatch>(branchRef.clone(),
-                                                   getBSONTypeMask(BSONType::jstNULL) |
-                                                       getBSONTypeMask(BSONType::Undefined)));
+        return makeNot(makeFunction(
+            "typeMatch",
+            branchRef.clone(),
+            makeConstant(sbe::value::TypeTags::NumberInt64,
+                         sbe::value::bitcastFrom<int64_t>(getBSONTypeMask(BSONType::jstNULL) |
+                                                          getBSONTypeMask(BSONType::Undefined)))));
     };
 
     auto makeNeqFalseCheck = [&branchRef]() {
