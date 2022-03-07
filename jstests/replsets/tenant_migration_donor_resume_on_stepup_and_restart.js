@@ -362,7 +362,9 @@ function testStateDocPersistenceOnFailover(interruptFunc, fpName, isShutdown = f
 (() => {
     jsTest.log("Test that the migration resumes after restart");
     testDonorStartMigrationInterrupt((donorRst) => {
-        donorRst.stopSet(null /* signal */, true /*forRestart */);
+        // Skip validation on shutdown because the full validation can conflict with the tenant
+        // migration and cause it to fail.
+        donorRst.stopSet(null /* signal */, true /*forRestart */, {skipValidation: true});
         donorRst.startSet({restart: true});
     }, {donorRestarted: true, disableForShardMerge: true});
 })();
@@ -381,7 +383,9 @@ function testStateDocPersistenceOnFailover(interruptFunc, fpName, isShutdown = f
 (() => {
     jsTest.log("Test that the donorForgetMigration command can be retried after restart");
     testDonorForgetMigrationInterrupt((donorRst) => {
-        donorRst.stopSet(null /* signal */, true /*forRestart */);
+        // Skip validation on shutdown because the full validation can conflict with the tenant
+        // migration and cause it to fail.
+        donorRst.stopSet(null /* signal */, true /*forRestart */, {skipValidation: true});
         donorRst.startSet({restart: true});
     });
 })();
@@ -397,7 +401,9 @@ function testStateDocPersistenceOnFailover(interruptFunc, fpName, isShutdown = f
         }
 
         testDonorAbortMigrationInterrupt((donorRst) => {
-            donorRst.stopSet(null /* signal */, true /*forRestart */);
+            // Skip validation on shutdown because the full validation can conflict with the tenant
+            // migration and cause it to fail.
+            donorRst.stopSet(null /* signal */, true /*forRestart */, {skipValidation: true});
             donorRst.startSet({restart: true});
         }, fpName, true);
     });
@@ -432,7 +438,9 @@ function testStateDocPersistenceOnFailover(interruptFunc, fpName, isShutdown = f
         }
 
         testStateDocPersistenceOnFailover((donorRst) => {
-            donorRst.stopSet(null /* signal */, true /*forRestart */);
+            // Skip validation on shutdown because the full validation can conflict with the tenant
+            // migration and cause it to fail.
+            donorRst.stopSet(null /* signal */, true /*forRestart */, {skipValidation: true});
             donorRst.startSet({restart: true});
         }, fpName, true);
     });
