@@ -50,6 +50,9 @@ const expectedParamDefaults = {
     internalQueryIgnoreUnknownJSONSchemaKeywords: false,
     internalQueryProhibitBlockingMergeOnMongoS: false,
     internalQuerySlotBasedExecutionMaxStaticIndexScanIntervals: 1000,
+    internalQueryCollectionMaxNoOfDocumentsToChooseHashJoin: 10 * 1000,
+    internalQueryCollectionMaxDataSizeBytesToChooseHashJoin: 100 * 1024 * 1024,
+    internalQueryCollectionMaxStorageSizeBytesToChooseHashJoin: 100 * 1024 * 1024,
 };
 
 function assertDefaultParameterValues() {
@@ -208,6 +211,18 @@ assertSetParameterFails("internalQuerySlotBasedExecutionMaxStaticIndexScanInterv
 
 assertSetParameterSucceeds("internalQueryForceClassicEngine", true);
 assertSetParameterSucceeds("internalQueryForceClassicEngine", false);
+
+assertSetParameterSucceeds("internalQueryCollectionMaxNoOfDocumentsToChooseHashJoin", 1);
+assertSetParameterFails("internalQueryCollectionMaxNoOfDocumentsToChooseHashJoin", 0);
+assertSetParameterFails("internalQueryCollectionMaxNoOfDocumentsToChooseHashJoin", -1);
+
+assertSetParameterSucceeds("internalQueryCollectionMaxDataSizeBytesToChooseHashJoin", 100);
+assertSetParameterFails("internalQueryCollectionMaxDataSizeBytesToChooseHashJoin", 0);
+assertSetParameterFails("internalQueryCollectionMaxDataSizeBytesToChooseHashJoin", -1);
+
+assertSetParameterSucceeds("internalQueryCollectionMaxStorageSizeBytesToChooseHashJoin", 100);
+assertSetParameterFails("internalQueryCollectionMaxStorageSizeBytesToChooseHashJoin", 0);
+assertSetParameterFails("internalQueryCollectionMaxStorageSizeBytesToChooseHashJoin", -1);
 
 MongoRunner.stopMongod(conn);
 })();

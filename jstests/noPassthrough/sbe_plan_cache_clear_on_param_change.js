@@ -31,6 +31,9 @@ const paramList = [
     {name: "internalQueryMaxBlockingSortMemoryUsageBytes", value: 1024},
     {name: "internalQuerySlotBasedExecutionMaxStaticIndexScanIntervals", value: 20},
     {name: "internalQueryDefaultDOP", value: 2},
+    {name: "internalQueryCollectionMaxNoOfDocumentsToChooseHashJoin", value: 1},
+    {name: "internalQueryCollectionMaxDataSizeBytesToChooseHashJoin", value: 100},
+    {name: "internalQueryCollectionMaxStorageSizeBytesToChooseHashJoin", value: 100},
 ];
 
 const conn = MongoRunner.runMongod();

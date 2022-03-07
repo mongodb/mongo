@@ -759,6 +759,42 @@ server_parameters:
     cpp_vartype: AtomicWord<bool>
     default: false
 
+  internalQueryCollectionMaxNoOfDocumentsToChooseHashJoin:
+    description: "Up to what number of documents do we choose the hash join algorithm when $lookup
+    is translated to a SBE plan."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryCollectionMaxNoOfDocumentsToChooseHashJoin"
+    cpp_vartype: AtomicWord<long long>
+    default:
+      expr: 10 * 1000
+    validator:
+        gt: 0
+    on_update: plan_cache_util::clearSbeCacheOnParameterChange
+
+  internalQueryCollectionMaxDataSizeBytesToChooseHashJoin:
+    description: "Up to what data size do we choose the hash join algorithm when $lookup
+    is translated to a SBE plan."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryCollectionMaxDataSizeBytesToChooseHashJoin"
+    cpp_vartype: AtomicWord<long long>
+    default:
+        expr: 100 * 1024 * 1024
+    validator:
+        gt: 0
+    on_update: plan_cache_util::clearSbeCacheOnParameterChange
+
+  internalQueryCollectionMaxStorageSizeBytesToChooseHashJoin:
+    description: "Up to what storage size do we choose the hash join algorithm when $lookup
+    is translated to a SBE plan."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryCollectionMaxStorageSizeBytesToChooseHashJoin"
+    cpp_vartype: AtomicWord<long long>
+    default:
+        expr: 100 * 1024 * 1024
+    validator:
+        gt: 0
+    on_update: plan_cache_util::clearSbeCacheOnParameterChange
+
 # Note for adding additional query knobs:
 #
 # When adding a new query knob, you should consider whether or not you need to add an 'on_update'

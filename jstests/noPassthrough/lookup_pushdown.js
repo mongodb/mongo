@@ -344,6 +344,83 @@ runTest(coll,
 
 MongoRunner.stopMongod(conn);
 
+(function testHashJoinQueryKnobs() {
+    // Create a new scope and start a new mongod so that the mongod-wide global state changes do not
+    // affect subsequent tests if any.
+    const conn = MongoRunner.runMongod({setParameter: "featureFlagSBELookupPushdown=true"});
+    const db = conn.getDB(name);
+    const lcoll = db.query_knobs_local;
+    const fcoll = db.query_knobs_foreign;
+
+    assert.commandWorked(lcoll.insert({a: 1}));
+    assert.commandWorked(fcoll.insert([{a: 1}, {a: 1}]));
+
+    // The foreign collection is very small and first verifies that the HJ is chosen under the
+    // default query knob values.
+    runTest(lcoll,
+            [{$lookup: {from: fcoll.getName(), localField: "a", foreignField: "a", as: "out"}}],
+            JoinAlgorithm.HJ,
+            {allowDiskUse: true});
+
+    // The fcollStats.count means the number of documents in a collection, the fcollStats.size means
+    // the collection's data size, and the fcollStats.storageSize means the allocated storage size.
+    const fcollStats = assert.commandWorked(fcoll.stats());
+    assert.commandWorked(db.adminCommand({
+        setParameter: 1,
+        internalQueryCollectionMaxNoOfDocumentsToChooseHashJoin: fcollStats.count,
+        internalQueryCollectionMaxDataSizeBytesToChooseHashJoin: fcollStats.size,
+        internalQueryCollectionMaxStorageSizeBytesToChooseHashJoin: fcollStats.storageSize
+    }));
+
+    // Verifies that the HJ is still chosen.
+    runTest(lcoll,
+            [{$lookup: {from: fcoll.getName(), localField: "a", foreignField: "a", as: "out"}}],
+            JoinAlgorithm.HJ,
+            {allowDiskUse: true});
+
+    // Setting the 'internalQueryCollectionMaxNoOfDocumentsToChooseHashJoin' to count - 1 results in
+    // choosing the NLJ algorithm.
+    assert.commandWorked(db.adminCommand({
+        setParameter: 1,
+        internalQueryCollectionMaxNoOfDocumentsToChooseHashJoin: fcollStats.count - 1
+    }));
+
+    runTest(lcoll,
+            [{$lookup: {from: fcoll.getName(), localField: "a", foreignField: "a", as: "out"}}],
+            JoinAlgorithm.NLJ,
+            {allowDiskUse: true});
+
+    // Reverting back 'internalQueryCollectionMaxNoOfDocumentsToChooseHashJoin' to the previous
+    // value. Setting the 'internalQueryCollectionMaxDataSizeBytesToChooseHashJoin' to size - 1
+    // results in choosing the NLJ algorithm.
+    assert.commandWorked(db.adminCommand({
+        setParameter: 1,
+        internalQueryCollectionMaxNoOfDocumentsToChooseHashJoin: fcollStats.count,
+        internalQueryCollectionMaxDataSizeBytesToChooseHashJoin: fcollStats.size - 1
+    }));
+
+    runTest(lcoll,
+            [{$lookup: {from: fcoll.getName(), localField: "a", foreignField: "a", as: "out"}}],
+            JoinAlgorithm.NLJ,
+            {allowDiskUse: true});
+
+    // Reverting back 'internalQueryCollectionMaxDataSizeBytesToChooseHashJoin' to the previous
+    // value. Setting the 'internalQueryCollectionMaxStorageSizeBytesToChooseHashJoin' to
+    // storageSize - 1 results in choosing the NLJ algorithm.
+    assert.commandWorked(db.adminCommand({
+        setParameter: 1,
+        internalQueryCollectionMaxDataSizeBytesToChooseHashJoin: fcollStats.size,
+        internalQueryCollectionMaxStorageSizeBytesToChooseHashJoin: fcollStats.storageSize - 1
+    }));
+
+    runTest(lcoll,
+            [{$lookup: {from: fcoll.getName(), localField: "a", foreignField: "a", as: "out"}}],
+            JoinAlgorithm.NLJ,
+            {allowDiskUse: true});
+
+    MongoRunner.stopMongod(conn);
+}());
+
 // Sharded cases.
 const st = new ShardingTest({
     shards: 2,

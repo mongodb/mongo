@@ -47,8 +47,14 @@ struct SecondaryCollectionInfo {
     std::vector<IndexEntry> indexes{};
     bool exists{true};
 
+    // The number of records in the collection.
+    long long noOfRecords{0};
+
     // The approximate size of the collection in bytes.
-    long long approximateCollectionSizeBytes{0};
+    long long approximateDataSizeBytes{0};
+
+    // The allocated storage size in bytes.
+    long long storageSizeBytes{0};
 };
 
 struct QueryPlannerParams {

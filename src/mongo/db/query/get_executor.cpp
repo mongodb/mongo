@@ -393,7 +393,10 @@ std::map<NamespaceString, SecondaryCollectionInfo> fillOutSecondaryCollectionsIn
         if (secondaryColl) {
             fillOutIndexEntries(
                 opCtx, apiStrict, canonicalQuery, secondaryColl, secondaryInfo.indexes);
-            secondaryInfo.approximateCollectionSizeBytes = secondaryColl.get()->dataSize(opCtx);
+            auto recordStore = secondaryColl->getRecordStore();
+            secondaryInfo.noOfRecords = recordStore->numRecords(opCtx);
+            secondaryInfo.approximateDataSizeBytes = recordStore->dataSize(opCtx);
+            secondaryInfo.storageSizeBytes = recordStore->storageSize(opCtx);
         } else {
             secondaryInfo.exists = false;
         }

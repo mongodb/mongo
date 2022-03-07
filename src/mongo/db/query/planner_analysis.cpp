@@ -613,6 +613,17 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::removeProjectSimpleBelowGro
     return soln;
 }
 
+// Checks if the foreign collection is eligible for the hash join algorithm. We conservatively
+// choose the hash join algorithm for cases when the hash table is unlikely to spill data.
+bool isEligibleForHashJoin(const SecondaryCollectionInfo& foreignCollInfo) {
+    return foreignCollInfo.noOfRecords <=
+        internalQueryCollectionMaxNoOfDocumentsToChooseHashJoin.load() &&
+        foreignCollInfo.approximateDataSizeBytes <=
+        internalQueryCollectionMaxDataSizeBytesToChooseHashJoin.load() &&
+        foreignCollInfo.storageSizeBytes <=
+        internalQueryCollectionMaxStorageSizeBytesToChooseHashJoin.load();
+}
+
 // static
 void QueryPlannerAnalysis::determineLookupStrategy(
     EqLookupNode* eqLookupNode,
@@ -655,15 +666,10 @@ void QueryPlannerAnalysis::determineLookupStrategy(
         return boost::none;
     }();
 
-    // TODO SERVER-63449: make this setting configurable and tighten the HJ check to cover the
-    // number of records and the storage size of the collection.
-    static constexpr auto kMaxHashJoinCollectionSize = 100 * 1024 * 1024;
-
     if (foreignIndex) {
         eqLookupNode->lookupStrategy = EqLookupNode::LookupStrategy::kIndexedLoopJoin;
         eqLookupNode->idxEntry = foreignIndex;
-    } else if (allowDiskUse &&
-               foreignCollItr->second.approximateCollectionSizeBytes < kMaxHashJoinCollectionSize) {
+    } else if (allowDiskUse && isEligibleForHashJoin(foreignCollItr->second)) {
         eqLookupNode->lookupStrategy = EqLookupNode::LookupStrategy::kHashJoin;
     } else {
         eqLookupNode->lookupStrategy = EqLookupNode::LookupStrategy::kNestedLoopJoin;
