@@ -29,12 +29,14 @@ var $config = (function() {
         }
         // TODO (SERVER-44673): Use assert.commandWorkedOrFailedWithCode without special handling.
         const res = db.runCommand({insert: collName, documents: docs, ordered: ordered});
-        if (res.hasOwnProperty('writeErrors') && res.writeErrors.length > 0) {
-            assert.eq(res.writeErrors[0].code, ErrorCodes.Interrupted);
+        if (res.hasOwnProperty('writeErrors')) {
+            for (const writeError of res.writeErrors) {
+                assert.eq(writeError.code, ErrorCodes.Interrupted, tojson(res));
+            }
         } else if (res.hasOwnProperty('writeConcernError')) {
-            assert.eq(res.writeConcernError.code, ErrorCodes.Interrupted);
+            assert.eq(res.writeConcernError.code, ErrorCodes.Interrupted, tojson(res));
         } else {
-            assert.commandWorkedOrFailedWithCode(res, ErrorCodes.Interrupted);
+            assert.commandWorkedOrFailedWithCode(res, ErrorCodes.Interrupted, tojson(res));
         }
     };
 
