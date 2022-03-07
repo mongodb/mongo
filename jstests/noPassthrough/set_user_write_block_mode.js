@@ -48,4 +48,9 @@ rst.initiate();
 const primary = rst.getPrimary();
 runTest(primary, primary);
 rst.stopSet();
+
+// Test on a sharded cluster
+const st = new ShardingTest({shards: 1, mongos: 1, config: 1});
+runTest(st.s0, st.rs0.getPrimary());
+st.stop();
 })();

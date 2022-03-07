@@ -2015,19 +2015,12 @@ env.Library(
     source=[
         'client_metadata_propagation_egress_hook.cpp',
     ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/rpc/client_metadata',
-        '$BUILD_DIR/mongo/rpc/metadata_impersonated_user',
-    ],
-)
-
-env.Library(
-    target='write_block_bypass_propagation_egress_hook',
-    source=[
-        'write_block_bypass_propagation_egress_hook.cpp',
-    ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/idl/feature_flag',
+        '$BUILD_DIR/mongo/rpc/client_metadata',
         '$BUILD_DIR/mongo/rpc/metadata',
+        '$BUILD_DIR/mongo/rpc/metadata_impersonated_user',
+        'server_feature_flags',
     ],
 )
 

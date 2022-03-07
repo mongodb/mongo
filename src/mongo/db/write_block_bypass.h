@@ -29,6 +29,9 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/operation_context.h"
 
 namespace mongo {
@@ -36,8 +39,13 @@ class WriteBlockBypass {
 public:
     static WriteBlockBypass& get(OperationContext* opCtx);
 
+    static constexpr StringData fieldName() {
+        return "mayBypassWriteBlocking"_sd;
+    }
+
     bool isWriteBlockBypassEnabled() const;
     void setFromMetadata(OperationContext* opCtx, const BSONElement& elem);
+    void writeAsMetadata(BSONObjBuilder* builder);
 
 private:
     bool _writeBlockBypassEnabled = false;

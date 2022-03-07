@@ -64,6 +64,10 @@ void WriteBlockBypass::setFromMetadata(OperationContext* opCtx, const BSONElemen
     }
 }
 
+void WriteBlockBypass::writeAsMetadata(BSONObjBuilder* builder) {
+    builder->append(fieldName(), _writeBlockBypassEnabled);
+}
+
 WriteBlockBypass& WriteBlockBypass::get(OperationContext* opCtx) {
     return getWriteBlockBypass(opCtx);
 }

@@ -101,6 +101,8 @@ generic_argument_lists:
                 forward_to_shards: false
             txnRetryCounter:
                 forward_to_shards: true
+            mayBypassWriteBlocking:
+                forward_to_shards: true
 
 generic_reply_field_lists:
     generic_reply_fields_api_v1:

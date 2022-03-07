@@ -40,7 +40,6 @@
 #include "mongo/db/multitenancy.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/db/write_block_bypass.h"
-#include "mongo/db/write_block_bypass_propagation_egress_hook.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/metadata/impersonated_user_metadata.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
@@ -75,7 +74,7 @@ void readRequestMetadata(OperationContext* opCtx, const OpMsg& opMsg, bool cmdRe
             impersonationElem = metadataElem;
         } else if (fieldName == "clientOperationKey"_sd) {
             clientOperationKeyElem = metadataElem;
-        } else if (fieldName == kMayBypassWriteBlockingFieldName) {
+        } else if (fieldName == WriteBlockBypass::fieldName()) {
             mayBypassWriteBlockingElem = metadataElem;
         }
     }
