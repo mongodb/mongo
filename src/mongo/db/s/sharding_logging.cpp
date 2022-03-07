@@ -181,32 +181,35 @@ Status ShardingLogging::_createCappedConfigCollection(OperationContext* opCtx,
         BSON("create" << collName << "capped" << true << "size" << cappedSize
                       << WriteConcernOptions::kWriteConcernField << writeConcern.toBSON());
 
-    auto result =
-        Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
-            opCtx,
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            "config",
-            createCmd,
-            Shard::kDefaultConfigCommandTimeout,
-            Shard::RetryPolicy::kIdempotent);
+    while (true) {
+        auto result =
+            Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
+                opCtx,
+                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                "config",
+                createCmd,
+                Shard::kDefaultConfigCommandTimeout,
+                Shard::RetryPolicy::kIdempotent);
 
-    if (!result.isOK()) {
-        return result.getStatus();
-    }
-
-    if (!result.getValue().commandStatus.isOK()) {
-        if (result.getValue().commandStatus == ErrorCodes::NamespaceExists) {
-            if (result.getValue().writeConcernStatus.isOK()) {
-                return Status::OK();
-            } else {
-                return result.getValue().writeConcernStatus;
-            }
-        } else {
-            return result.getValue().commandStatus;
+        if (!result.isOK()) {
+            return result.getStatus();
         }
-    }
 
-    return result.getValue().writeConcernStatus;
+        if (!result.getValue().commandStatus.isOK()) {
+            if (result.getValue().commandStatus == ErrorCodes::NamespaceExists) {
+                if (result.getValue().writeConcernStatus.isOK()) {
+                    return Status::OK();
+                } else {
+                    // Retry command in case of config server step down
+                    continue;
+                }
+            } else {
+                return result.getValue().commandStatus;
+            }
+        }
+
+        return result.getValue().writeConcernStatus;
+    }
 }
 
 }  // namespace mongo
