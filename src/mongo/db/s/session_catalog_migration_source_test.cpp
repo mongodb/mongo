@@ -72,12 +72,18 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
                                 BSONObj object,
                                 boost::optional<BSONObj> object2,
                                 Date_t wallClockTime,
+                                LogicalSessionId sessionId,
+                                TxnNumber txnNumber,
                                 const std::vector<StmtId>& stmtIds,
                                 repl::OpTime prevWriteOpTimeInTransaction,
                                 boost::optional<repl::OpTime> preImageOpTime,
                                 boost::optional<repl::OpTime> postImageOpTime,
-                                boost::optional<OperationSessionInfo> osi,
+
                                 boost::optional<repl::RetryImageEnum> needsRetryImage) {
+    OperationSessionInfo osi;
+    osi.setSessionId(sessionId);
+    osi.setTxnNumber(txnNumber);
+
     return repl::DurableOplogEntry(
         opTime,                           // optime
         0,                                // hash
@@ -89,7 +95,7 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
         repl::OplogEntry::kOplogVersion,  // version
         object,                           // o
         object2,                          // o2
-        osi.get_value_or({}),             // sessionInfo
+        osi,                              // sessionInfo
         boost::none,                      // upsert
         wallClockTime,                    // wall clock time
         stmtIds,                          // statement ids
@@ -107,11 +113,13 @@ repl::OplogEntry makeOplogEntry(
     BSONObj object,
     boost::optional<BSONObj> object2,
     Date_t wallClockTime,
+    LogicalSessionId sessionId,
+    TxnNumber txnNumber,
     const std::vector<StmtId>& stmtIds,
     repl::OpTime prevWriteOpTimeInTransaction,
     boost::optional<repl::OpTime> preImageOpTime = boost::none,
     boost::optional<repl::OpTime> postImageOpTime = boost::none,
-    boost::optional<OperationSessionInfo> osi = boost::none,
+
     boost::optional<repl::RetryImageEnum> needsRetryImage = boost::none) {
     return makeOplogEntry(opTime,
                           opType,
@@ -119,37 +127,36 @@ repl::OplogEntry makeOplogEntry(
                           object,
                           object2,
                           wallClockTime,
+                          sessionId,
+                          txnNumber,
                           stmtIds,
                           prevWriteOpTimeInTransaction,
                           preImageOpTime,
                           postImageOpTime,
-                          osi,
                           needsRetryImage);
 }
 
-repl::OplogEntry makeSentinelOplogEntry(const LogicalSessionId& lsid,
+repl::OplogEntry makeSentinelOplogEntry(const LogicalSessionId& sessionId,
                                         const TxnNumber& txnNumber,
                                         Date_t wallClockTime) {
-    OperationSessionInfo sessionInfo;
-    sessionInfo.setSessionId(lsid);
-    sessionInfo.setTxnNumber(txnNumber);
-
     return makeOplogEntry({},                                        // optime
                           repl::OpTypeEnum::kNoop,                   // op type
                           {},                                        // o
                           TransactionParticipant::kDeadEndSentinel,  // o2
                           wallClockTime,                             // wall clock time
-                          {kIncompleteHistoryStmtId},                // statement id
+                          sessionId,
+                          txnNumber,
+                          {kIncompleteHistoryStmtId},  // statement id
                           repl::OpTime(Timestamp(0, 0), 0),
                           boost::none,
-                          boost::none,
-                          sessionInfo  // session info
-    );
+                          boost::none);
 }
 
 repl::OplogEntry makeRewrittenOplogInSession(repl::OpTime opTime,
                                              repl::OpTime previousWriteOpTime,
                                              BSONObj object,
+                                             LogicalSessionId sessionId,
+                                             TxnNumber txnNumber,
                                              int statementId) {
     auto original =
         makeOplogEntry(opTime,                     // optime
@@ -157,7 +164,9 @@ repl::OplogEntry makeRewrittenOplogInSession(repl::OpTime opTime,
                        object,                     // o
                        boost::none,                // o2
                        Date_t::now(),              // wall clock time
-                       {statementId},              // statement ids
+                       sessionId,
+                       txnNumber,
+                       {statementId},         // statement ids
                        previousWriteOpTime);  // optime of previous write within same transaction
 
     return makeOplogEntry(original.getOpTime(),                                         // optime
@@ -165,7 +174,9 @@ repl::OplogEntry makeRewrittenOplogInSession(repl::OpTime opTime,
                           BSON(SessionCatalogMigration::kSessionMigrateOplogTag << 1),  // o
                           original.getEntry().toBSON(),                                 // o2
                           original.getWallClockTime(),  // wall clock time
-                          original.getStatementIds(),   // statement ids
+                          *original.getSessionId(),
+                          *original.getTxnNumber(),
+                          original.getStatementIds(),  // statement ids
                           original.getPrevWriteOpTimeInTransaction()
                               .get());  // optime of previous write within same transaction
 };
@@ -180,14 +191,19 @@ TEST_F(SessionCatalogMigrationSourceTest, NoSessionsToTransferShouldNotHaveOplog
 }
 
 TEST_F(SessionCatalogMigrationSourceTest, OneSessionWithTwoWrites) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    const auto txnNumber = TxnNumber{1};
+
     auto entry1 = makeOplogEntry(
         repl::OpTime(Timestamp(52, 345), 2),  // optime
         repl::OpTypeEnum::kInsert,            // op type
         BSON("x" << 30),                      // o
         boost::none,                          // o2
-        Date_t::now(),                        // wall clock time
-        {0},                                  // statement ids
-        repl::OpTime(Timestamp(0, 0), 0));    // optime of previous write within same transaction
+        Date_t::now(),                        // wall clock time,
+        sessionId,
+        txnNumber,
+        {0},                                // statement ids
+        repl::OpTime(Timestamp(0, 0), 0));  // optime of previous write within same transaction
     insertOplogEntry(entry1);
 
     auto entry2 =
@@ -195,14 +211,16 @@ TEST_F(SessionCatalogMigrationSourceTest, OneSessionWithTwoWrites) {
                        repl::OpTypeEnum::kInsert,              // op type
                        BSON("x" << 50),                        // o
                        boost::none,                            // o2
-                       Date_t::now(),                          // wall clock time
-                       {1},                                    // statement ids
+                       Date_t::now(),                          // wall clock time,
+                       sessionId,
+                       txnNumber,
+                       {1},                  // statement ids
                        entry1.getOpTime());  // optime of previous write within same transaction
     insertOplogEntry(entry2);
 
     SessionTxnRecord sessionRecord;
-    sessionRecord.setSessionId(makeLogicalSessionIdForTest());
-    sessionRecord.setTxnNum(1);
+    sessionRecord.setSessionId(sessionId);
+    sessionRecord.setTxnNum(txnNumber);
     sessionRecord.setLastWriteOpTime(entry2.getOpTime());
     sessionRecord.setLastWriteDate(entry2.getWallClockTime());
 
@@ -234,14 +252,19 @@ TEST_F(SessionCatalogMigrationSourceTest, OneSessionWithTwoWrites) {
 }
 
 TEST_F(SessionCatalogMigrationSourceTest, OneSessionWithTwoWritesMultiStmtIds) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    const auto txnNumber = TxnNumber{1};
+
     auto entry1 = makeOplogEntry(
         repl::OpTime(Timestamp(52, 345), 2),  // optime
         repl::OpTypeEnum::kInsert,            // op type
         BSON("x" << 30),                      // o
         boost::none,                          // o2
-        Date_t::now(),                        // wall clock time
-        {0, 1},                               // statement ids
-        repl::OpTime(Timestamp(0, 0), 0));    // optime of previous write within same transaction
+        Date_t::now(),                        // wall clock time,
+        sessionId,
+        txnNumber,
+        {0, 1},                             // statement ids
+        repl::OpTime(Timestamp(0, 0), 0));  // optime of previous write within same transaction
     insertOplogEntry(entry1);
 
     auto entry2 =
@@ -249,14 +272,16 @@ TEST_F(SessionCatalogMigrationSourceTest, OneSessionWithTwoWritesMultiStmtIds) {
                        repl::OpTypeEnum::kInsert,              // op type
                        BSON("x" << 50),                        // o
                        boost::none,                            // o2
-                       Date_t::now(),                          // wall clock time
-                       {2, 3},                                 // statement ids
+                       Date_t::now(),                          // wall clock time,
+                       sessionId,
+                       txnNumber,
+                       {2, 3},               // statement ids
                        entry1.getOpTime());  // optime of previous write within same transaction
     insertOplogEntry(entry2);
 
     SessionTxnRecord sessionRecord;
-    sessionRecord.setSessionId(makeLogicalSessionIdForTest());
-    sessionRecord.setTxnNum(1);
+    sessionRecord.setSessionId(sessionId);
+    sessionRecord.setTxnNum(txnNumber);
     sessionRecord.setLastWriteOpTime(entry2.getOpTime());
     sessionRecord.setLastWriteDate(entry2.getWallClockTime());
 
@@ -288,27 +313,36 @@ TEST_F(SessionCatalogMigrationSourceTest, OneSessionWithTwoWritesMultiStmtIds) {
 }
 
 TEST_F(SessionCatalogMigrationSourceTest, TwoSessionWithTwoWrites) {
+    const auto sessionId1 = makeLogicalSessionIdForTest();
+    const auto txnNumber1 = TxnNumber{1};
+    const auto sessionId2 = makeLogicalSessionIdForTest();
+    const auto txnNumber2 = TxnNumber{1};
+
     auto entry1a = makeOplogEntry(
         repl::OpTime(Timestamp(52, 345), 2),  // optime
         repl::OpTypeEnum::kInsert,            // op type
         BSON("x" << 30),                      // o
         boost::none,                          // o2
-        Date_t::now(),                        // wall clock time
-        {0},                                  // statement ids
-        repl::OpTime(Timestamp(0, 0), 0));    // optime of previous write within same transaction
+        Date_t::now(),                        // wall clock time,
+        sessionId1,
+        txnNumber1,
+        {0},                                // statement ids
+        repl::OpTime(Timestamp(0, 0), 0));  // optime of previous write within same transaction
 
     auto entry1b =
         makeOplogEntry(repl::OpTime(Timestamp(67, 54801), 2),  // optime
                        repl::OpTypeEnum::kInsert,              // op type
                        BSON("x" << 50),                        // o
                        boost::none,                            // o2
-                       Date_t::now(),                          // wall clock time
-                       {1},                                    // statement ids
+                       Date_t::now(),                          // wall clock time,
+                       sessionId1,
+                       txnNumber1,
+                       {1},                   // statement ids
                        entry1a.getOpTime());  // optime of previous write within same transaction
 
     SessionTxnRecord sessionRecord1;
-    sessionRecord1.setSessionId(makeLogicalSessionIdForTest());
-    sessionRecord1.setTxnNum(1);
+    sessionRecord1.setSessionId(sessionId1);
+    sessionRecord1.setTxnNum(txnNumber1);
     sessionRecord1.setLastWriteOpTime(entry1b.getOpTime());
     sessionRecord1.setLastWriteDate(entry1b.getWallClockTime());
 
@@ -322,21 +356,25 @@ TEST_F(SessionCatalogMigrationSourceTest, TwoSessionWithTwoWrites) {
         BSON("x" << 30),                     // o
         boost::none,                         // o2
         Date_t::now(),                       // wall clock time
-        {3},                                 // statement ids
-        repl::OpTime(Timestamp(0, 0), 0));   // optime of previous write within same transaction
+        sessionId2,
+        txnNumber2,
+        {3},                                // statement ids
+        repl::OpTime(Timestamp(0, 0), 0));  // optime of previous write within same transaction
 
     auto entry2b =
         makeOplogEntry(repl::OpTime(Timestamp(789, 13), 2),  // optime
                        repl::OpTypeEnum::kDelete,            // op type
                        BSON("x" << 50),                      // o
                        boost::none,                          // o2
-                       Date_t::now(),                        // wall clock time
-                       {4},                                  // statement ids
+                       Date_t::now(),                        // wall clock time,
+                       sessionId2,
+                       txnNumber2,
+                       {4},                   // statement ids
                        entry2a.getOpTime());  // optime of previous write within same transaction
 
     SessionTxnRecord sessionRecord2;
-    sessionRecord2.setSessionId(makeLogicalSessionIdForTest());
-    sessionRecord2.setTxnNum(1);
+    sessionRecord2.setSessionId(sessionId2);
+    sessionRecord2.setTxnNum(txnNumber2);
     sessionRecord2.setLastWriteOpTime(entry2b.getOpTime());
     sessionRecord2.setLastWriteDate(entry2b.getWallClockTime());
 
@@ -394,14 +432,19 @@ TEST_F(SessionCatalogMigrationSourceTest, TwoSessionWithTwoWrites) {
 // It is currently not possible to have 2 findAndModify operations in one transaction, but this
 // will test the oplog buffer more.
 TEST_F(SessionCatalogMigrationSourceTest, OneSessionWithFindAndModifyPreImageAndPostImage) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    const auto txnNumber = TxnNumber{1};
+
     auto entry1 = makeOplogEntry(
         repl::OpTime(Timestamp(52, 345), 2),  // optime
         repl::OpTypeEnum::kNoop,              // op type
         BSON("x" << 30),                      // o
         boost::none,                          // o2
-        Date_t::now(),                        // wall clock time
-        {0},                                  // statement ids
-        repl::OpTime(Timestamp(0, 0), 0));    // optime of previous write within same transaction
+        Date_t::now(),                        // wall clock time,
+        sessionId,
+        txnNumber,
+        {0},                                // statement ids
+        repl::OpTime(Timestamp(0, 0), 0));  // optime of previous write within same transaction
     insertOplogEntry(entry1);
 
     auto entry2 = makeOplogEntry(
@@ -409,10 +452,12 @@ TEST_F(SessionCatalogMigrationSourceTest, OneSessionWithFindAndModifyPreImageAnd
         repl::OpTypeEnum::kDelete,            // op type
         BSON("x" << 50),                      // o
         boost::none,                          // o2
-        Date_t::now(),                        // wall clock time
-        {1},                                  // statement ids
-        repl::OpTime(Timestamp(0, 0), 0),     // optime of previous write within same transaction
-        entry1.getOpTime());                  // pre-image optime
+        Date_t::now(),                        // wall clock time,
+        sessionId,
+        txnNumber,
+        {1},                               // statement ids
+        repl::OpTime(Timestamp(0, 0), 0),  // optime of previous write within same transaction
+        entry1.getOpTime());               // pre-image optime
     insertOplogEntry(entry2);
 
     auto entry3 = makeOplogEntry(
@@ -421,6 +466,8 @@ TEST_F(SessionCatalogMigrationSourceTest, OneSessionWithFindAndModifyPreImageAnd
         BSON("x" << 20),                    // o
         boost::none,                        // o2
         Date_t::now(),                      // wall clock time
+        sessionId,
+        txnNumber,
         {2},                                // statement ids
         repl::OpTime(Timestamp(0, 0), 0));  // optime of previous write within same transaction
     insertOplogEntry(entry3);
@@ -431,15 +478,17 @@ TEST_F(SessionCatalogMigrationSourceTest, OneSessionWithFindAndModifyPreImageAnd
                        BSON("$inc" << BSON("x" << 1)),     // o
                        BSON("x" << 19),                    // o2
                        Date_t::now(),                      // wall clock time
-                       {3},                                // statement ids
+                       sessionId,
+                       txnNumber,
+                       {3},                  // statement ids
                        entry2.getOpTime(),   // optime of previous write within same transaction
                        boost::none,          // pre-image optime
                        entry3.getOpTime());  // post-image optime
     insertOplogEntry(entry4);
 
     SessionTxnRecord sessionRecord;
-    sessionRecord.setSessionId(makeLogicalSessionIdForTest());
-    sessionRecord.setTxnNum(1);
+    sessionRecord.setSessionId(sessionId);
+    sessionRecord.setTxnNum(txnNumber);
     sessionRecord.setLastWriteOpTime(entry4.getOpTime());
     sessionRecord.setLastWriteDate(entry4.getWallClockTime());
 
@@ -465,14 +514,19 @@ TEST_F(SessionCatalogMigrationSourceTest, OneSessionWithFindAndModifyPreImageAnd
 
 TEST_F(SessionCatalogMigrationSourceTest,
        OneSessionWithFindAndModifyPreImageAndPostImageMultiStmtIds) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    const auto txnNumber = TxnNumber{1};
+
     auto entry1 = makeOplogEntry(
         repl::OpTime(Timestamp(52, 345), 2),  // optime
         repl::OpTypeEnum::kNoop,              // op type
         BSON("x" << 30),                      // o
         boost::none,                          // o2
-        Date_t::now(),                        // wall clock time
-        {0, 1},                               // statement ids
-        repl::OpTime(Timestamp(0, 0), 0));    // optime of previous write within same transaction
+        Date_t::now(),                        // wall clock time,
+        sessionId,
+        txnNumber,
+        {0, 1},                             // statement ids
+        repl::OpTime(Timestamp(0, 0), 0));  // optime of previous write within same transaction
     insertOplogEntry(entry1);
 
     auto entry2 = makeOplogEntry(
@@ -480,10 +534,12 @@ TEST_F(SessionCatalogMigrationSourceTest,
         repl::OpTypeEnum::kDelete,            // op type
         BSON("x" << 50),                      // o
         boost::none,                          // o2
-        Date_t::now(),                        // wall clock time
-        {2, 3},                               // statement ids
-        repl::OpTime(Timestamp(0, 0), 0),     // optime of previous write within same transaction
-        entry1.getOpTime());                  // pre-image optime
+        Date_t::now(),                        // wall clock time,
+        sessionId,
+        txnNumber,
+        {2, 3},                            // statement ids
+        repl::OpTime(Timestamp(0, 0), 0),  // optime of previous write within same transaction
+        entry1.getOpTime());               // pre-image optime
     insertOplogEntry(entry2);
 
     auto entry3 = makeOplogEntry(
@@ -492,6 +548,8 @@ TEST_F(SessionCatalogMigrationSourceTest,
         BSON("x" << 20),                    // o
         boost::none,                        // o2
         Date_t::now(),                      // wall clock time
+        sessionId,
+        txnNumber,
         {4, 5},                             // statement ids
         repl::OpTime(Timestamp(0, 0), 0));  // optime of previous write within same transaction
     insertOplogEntry(entry3);
@@ -502,15 +560,17 @@ TEST_F(SessionCatalogMigrationSourceTest,
                        BSON("$inc" << BSON("x" << 1)),     // o
                        BSON("x" << 19),                    // o2
                        Date_t::now(),                      // wall clock time
-                       {6, 7},                             // statement ids
+                       sessionId,
+                       txnNumber,
+                       {6, 7},               // statement ids
                        entry2.getOpTime(),   // optime of previous write within same transaction
                        boost::none,          // pre-image optime
                        entry3.getOpTime());  // post-image optime
     insertOplogEntry(entry4);
 
     SessionTxnRecord sessionRecord;
-    sessionRecord.setSessionId(makeLogicalSessionIdForTest());
-    sessionRecord.setTxnNum(1);
+    sessionRecord.setSessionId(sessionId);
+    sessionRecord.setTxnNum(txnNumber);
     sessionRecord.setLastWriteOpTime(entry4.getOpTime());
     sessionRecord.setLastWriteDate(entry4.getWallClockTime());
 
@@ -537,18 +597,14 @@ TEST_F(SessionCatalogMigrationSourceTest,
 TEST_F(SessionCatalogMigrationSourceTest, ForgeImageEntriesWhenFetchingEntriesWithNeedsRetryImage) {
     repl::ImageEntry imageEntry;
     const auto preImage = BSON("_id" << 1 << "x" << 50);
-    const auto lsid = makeLogicalSessionIdForTest();
+    const auto sessionId = makeLogicalSessionIdForTest();
     const repl::OpTime imageEntryOpTime = repl::OpTime(Timestamp(52, 346), 2);
     const auto txnNumber = 1LL;
-    imageEntry.set_id(lsid);
+    imageEntry.set_id(sessionId);
     imageEntry.setTxnNumber(txnNumber);
     imageEntry.setTs(imageEntryOpTime.getTimestamp());
     imageEntry.setImageKind(repl::RetryImageEnum::kPreImage);
     imageEntry.setImage(preImage);
-
-    OperationSessionInfo osi;
-    osi.setTxnNumber(txnNumber);
-    osi.setSessionId(lsid);
 
     DBDirectClient client(opCtx());
     client.insert(NamespaceString::kConfigImagesNamespace.ns(), imageEntry.toBSON());
@@ -559,18 +615,19 @@ TEST_F(SessionCatalogMigrationSourceTest, ForgeImageEntriesWhenFetchingEntriesWi
         repl::OpTypeEnum::kDelete,            // op type
         BSON("x" << 50),                      // o
         boost::none,                          // o2
-        Date_t::now(),                        // wall clock time
-        {1},                                  // statement id
-        repl::OpTime(Timestamp(0, 0), 0),     // optime of previous write within same transaction
-        boost::none,                          // pre-image optime
-        boost::none,                          // post-image optime
-        osi,                                  // operation session info
-        repl::RetryImageEnum::kPreImage);     // needsRetryImage
+        Date_t::now(),                        // wall clock time,
+        sessionId,
+        txnNumber,
+        {1},                               // statement id
+        repl::OpTime(Timestamp(0, 0), 0),  // optime of previous write within same transaction
+        boost::none,                       // pre-image optime
+        boost::none,                       // post-image optime
+        repl::RetryImageEnum::kPreImage);  // needsRetryImage
     insertOplogEntry(entry);
 
     SessionTxnRecord sessionRecord;
-    sessionRecord.setSessionId(lsid);
-    sessionRecord.setTxnNum(1);
+    sessionRecord.setSessionId(sessionId);
+    sessionRecord.setTxnNum(txnNumber);
     sessionRecord.setLastWriteOpTime(entry.getOpTime());
     sessionRecord.setLastWriteDate(entry.getWallClockTime());
 
@@ -586,7 +643,7 @@ TEST_F(SessionCatalogMigrationSourceTest, ForgeImageEntriesWhenFetchingEntriesWi
     // fields when it processes the incoming entries.
     ASSERT_BSONOBJ_EQ(preImage, nextOplogResult.oplog->getObject());
     ASSERT_EQUALS(txnNumber, nextOplogResult.oplog->getTxnNumber().get());
-    ASSERT_EQUALS(lsid, nextOplogResult.oplog->getSessionId().get());
+    ASSERT_EQUALS(sessionId, nextOplogResult.oplog->getSessionId().get());
     ASSERT_EQUALS("n", repl::OpType_serializer(nextOplogResult.oplog->getOpType()));
     ASSERT_EQUALS(0LL, nextOplogResult.oplog->getStatementIds().front());
 
@@ -598,19 +655,26 @@ TEST_F(SessionCatalogMigrationSourceTest, ForgeImageEntriesWhenFetchingEntriesWi
 }
 
 TEST_F(SessionCatalogMigrationSourceTest, OplogWithOtherNsShouldBeIgnored) {
+    const auto sessionId1 = makeLogicalSessionIdForTest();
+    const auto txnNumber1 = TxnNumber{1};
+    const auto sessionId2 = makeLogicalSessionIdForTest();
+    const auto txnNumber2 = TxnNumber{1};
+
     auto entry1 = makeOplogEntry(
         repl::OpTime(Timestamp(52, 345), 2),  // optime
         repl::OpTypeEnum::kInsert,            // op type
         BSON("x" << 30),                      // o
         boost::none,                          // o2
-        Date_t::now(),                        // wall clock time
-        {0},                                  // statement ids
-        repl::OpTime(Timestamp(0, 0), 0));    // optime of previous write within same transaction
+        Date_t::now(),                        // wall clock time,
+        sessionId1,
+        txnNumber1,
+        {0},                                // statement ids
+        repl::OpTime(Timestamp(0, 0), 0));  // optime of previous write within same transaction
     insertOplogEntry(entry1);
 
     SessionTxnRecord sessionRecord1;
-    sessionRecord1.setSessionId(makeLogicalSessionIdForTest());
-    sessionRecord1.setTxnNum(1);
+    sessionRecord1.setSessionId(sessionId1);
+    sessionRecord1.setTxnNum(txnNumber1);
     sessionRecord1.setLastWriteOpTime(entry1.getOpTime());
     sessionRecord1.setLastWriteDate(entry1.getWallClockTime());
 
@@ -626,17 +690,18 @@ TEST_F(SessionCatalogMigrationSourceTest, OplogWithOtherNsShouldBeIgnored) {
         BSON("x" << 30),                     // o
         boost::none,                         // o2
         Date_t::now(),                       // wall clock time
-        {1},                                 // statement ids
-        repl::OpTime(Timestamp(0, 0), 0),    // optime of previous write within same transaction
-        boost::none,                         // pre-image optime
-        boost::none,                         // post-image optime
-        boost::none,                         // operation session info
-        boost::none);                        // needsRetryImage
+        sessionId2,
+        txnNumber2,
+        {1},                               // statement ids
+        repl::OpTime(Timestamp(0, 0), 0),  // optime of previous write within same transaction
+        boost::none,                       // pre-image optime
+        boost::none,                       // post-image optime
+        boost::none);                      // needsRetryImage
     insertOplogEntry(entry2);
 
     SessionTxnRecord sessionRecord2;
-    sessionRecord2.setSessionId(makeLogicalSessionIdForTest());
-    sessionRecord2.setTxnNum(1);
+    sessionRecord2.setSessionId(sessionId2);
+    sessionRecord2.setTxnNum(txnNumber2);
     sessionRecord2.setLastWriteOpTime(entry2.getOpTime());
     sessionRecord2.setLastWriteDate(entry2.getWallClockTime());
 
@@ -657,20 +722,27 @@ TEST_F(SessionCatalogMigrationSourceTest, OplogWithOtherNsShouldBeIgnored) {
 }
 
 TEST_F(SessionCatalogMigrationSourceTest, SessionDumpWithMultipleNewWrites) {
+    const auto sessionId1 = makeLogicalSessionIdForTest();
+    const auto txnNumber1 = TxnNumber{1};
+    const auto sessionId2 = makeLogicalSessionIdForTest();
+    const auto txnNumber2 = TxnNumber{1};
+
     auto entry1 = makeOplogEntry(
         repl::OpTime(Timestamp(52, 345), 2),  // optime
         repl::OpTypeEnum::kInsert,            // op type
         BSON("x" << 30),                      // o
         boost::none,                          // o2
-        Date_t::now(),                        // wall clock time
-        {0},                                  // statement ids
-        repl::OpTime(Timestamp(0, 0), 0));    // optime of previous write within same transaction
+        Date_t::now(),                        // wall clock time,
+        sessionId1,
+        txnNumber1,
+        {0},                                // statement ids
+        repl::OpTime(Timestamp(0, 0), 0));  // optime of previous write within same transaction
 
     insertOplogEntry(entry1);
 
     SessionTxnRecord sessionRecord1;
-    sessionRecord1.setSessionId(makeLogicalSessionIdForTest());
-    sessionRecord1.setTxnNum(1);
+    sessionRecord1.setSessionId(sessionId1);
+    sessionRecord1.setTxnNum(txnNumber1);
     sessionRecord1.setLastWriteOpTime(entry1.getOpTime());
     sessionRecord1.setLastWriteDate(entry1.getWallClockTime());
 
@@ -684,8 +756,10 @@ TEST_F(SessionCatalogMigrationSourceTest, SessionDumpWithMultipleNewWrites) {
         BSON("x" << 30),                     // o
         boost::none,                         // o2
         Date_t::now(),                       // wall clock time
-        {1},                                 // statement ids
-        repl::OpTime(Timestamp(0, 0), 0));   // optime of previous write within same transaction
+        sessionId2,
+        txnNumber2,
+        {1},                                // statement ids
+        repl::OpTime(Timestamp(0, 0), 0));  // optime of previous write within same transaction
     insertOplogEntry(entry2);
 
     auto entry3 = makeOplogEntry(
@@ -694,8 +768,10 @@ TEST_F(SessionCatalogMigrationSourceTest, SessionDumpWithMultipleNewWrites) {
         BSON("x" << 40),                     // o
         boost::none,                         // o2
         Date_t::now(),                       // wall clock time
-        {2},                                 // statement ids
-        repl::OpTime(Timestamp(0, 0), 0));   // optime of previous write within same transaction
+        sessionId2,
+        txnNumber2,
+        {2},                                // statement ids
+        repl::OpTime(Timestamp(0, 0), 0));  // optime of previous write within same transaction
     insertOplogEntry(entry3);
 
     SessionCatalogMigrationSource migrationSource(opCtx(), kNs, kChunkRange, kShardKey);
@@ -746,6 +822,9 @@ TEST_F(SessionCatalogMigrationSourceTest, ShouldAssertIfOplogCannotBeFound) {
 }
 
 TEST_F(SessionCatalogMigrationSourceTest, ShouldBeAbleInsertNewWritesAfterBufferWasDepleted) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    const auto txnNumber = TxnNumber{1};
+
     SessionCatalogMigrationSource migrationSource(opCtx(), kNs, kChunkRange, kShardKey);
     ASSERT_FALSE(migrationSource.fetchNextOplog(opCtx()));
 
@@ -755,8 +834,10 @@ TEST_F(SessionCatalogMigrationSourceTest, ShouldBeAbleInsertNewWritesAfterBuffer
             repl::OpTypeEnum::kInsert,            // op type
             BSON("x" << 30),                      // o
             boost::none,                          // o2
-            Date_t::now(),                        // wall clock time
-            {0},                                  // statement ids
+            Date_t::now(),                        // wall clock time,
+            sessionId,
+            txnNumber,
+            {0},                                // statement ids
             repl::OpTime(Timestamp(0, 0), 0));  // optime of previous write within same transaction
         insertOplogEntry(entry);
 
@@ -781,8 +862,10 @@ TEST_F(SessionCatalogMigrationSourceTest, ShouldBeAbleInsertNewWritesAfterBuffer
             BSON("x" << 30),                     // o
             boost::none,                         // o2
             Date_t::now(),                       // wall clock time
-            {1},                                 // statement ids
-            repl::OpTime(Timestamp(0, 0), 0));   // optime of previous write within same transaction
+            sessionId,
+            txnNumber,
+            {1},                                // statement ids
+            repl::OpTime(Timestamp(0, 0), 0));  // optime of previous write within same transaction
         insertOplogEntry(entry);
 
         migrationSource.notifyNewWriteOpTime(
@@ -805,8 +888,10 @@ TEST_F(SessionCatalogMigrationSourceTest, ShouldBeAbleInsertNewWritesAfterBuffer
             BSON("x" << 40),                     // o
             boost::none,                         // o2
             Date_t::now(),                       // wall clock time
-            {2},                                 // statement ids
-            repl::OpTime(Timestamp(0, 0), 0));   // optime of previous write within same transaction
+            sessionId,
+            txnNumber,
+            {2},                                // statement ids
+            repl::OpTime(Timestamp(0, 0), 0));  // optime of previous write within same transaction
         insertOplogEntry(entry);
 
         migrationSource.notifyNewWriteOpTime(
@@ -824,21 +909,24 @@ TEST_F(SessionCatalogMigrationSourceTest, ShouldBeAbleInsertNewWritesAfterBuffer
 }
 
 TEST_F(SessionCatalogMigrationSourceTest, ReturnsDeadEndSentinelForIncompleteHistory) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    const auto txnNumber = TxnNumber{1};
+
     auto entry = makeOplogEntry(
         repl::OpTime(Timestamp(52, 345), 2),  // optime
         repl::OpTypeEnum::kInsert,            // op type
         BSON("x" << 30),                      // o
         boost::none,                          // o2
-        Date_t::now(),                        // wall clock time
-        {0},                                  // statement ids
-        repl::OpTime(Timestamp(40, 1), 2));   // optime of previous write within same transaction
+        Date_t::now(),                        // wall clock time,
+        sessionId,
+        txnNumber,
+        {0},                                 // statement ids
+        repl::OpTime(Timestamp(40, 1), 2));  // optime of previous write within same transaction
     insertOplogEntry(entry);
-
-    const auto sessionId = makeLogicalSessionIdForTest();
 
     SessionTxnRecord sessionRecord;
     sessionRecord.setSessionId(sessionId);
-    sessionRecord.setTxnNum(31);
+    sessionRecord.setTxnNum(txnNumber);
     sessionRecord.setLastWriteOpTime(entry.getOpTime());
     sessionRecord.setLastWriteDate(entry.getWallClockTime());
 
@@ -873,7 +961,7 @@ TEST_F(SessionCatalogMigrationSourceTest, ReturnsDeadEndSentinelForIncompleteHis
         ASSERT_TRUE(sessionInfo.getSessionId());
         ASSERT_EQ(sessionId, *sessionInfo.getSessionId());
         ASSERT_TRUE(sessionInfo.getTxnNumber());
-        ASSERT_EQ(31, *sessionInfo.getTxnNumber());
+        ASSERT_EQ(txnNumber, *sessionInfo.getTxnNumber());
     }
 
     ASSERT_FALSE(migrationSource.fetchNextOplog(opCtx()));
@@ -881,21 +969,24 @@ TEST_F(SessionCatalogMigrationSourceTest, ReturnsDeadEndSentinelForIncompleteHis
 }
 
 TEST_F(SessionCatalogMigrationSourceTest, ShouldAssertWhenRollbackDetected) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    const auto txnNumber = TxnNumber{1};
+
     auto entry = makeOplogEntry(
         repl::OpTime(Timestamp(52, 345), 2),  // optime
         repl::OpTypeEnum::kInsert,            // op type
         BSON("x" << 30),                      // o
         boost::none,                          // o2
-        Date_t::now(),                        // wall clock time
-        {0},                                  // statement ids
-        repl::OpTime(Timestamp(40, 1), 2));   // optime of previous write within same transaction
+        Date_t::now(),                        // wall clock time,
+        sessionId,
+        txnNumber,
+        {0},                                 // statement ids
+        repl::OpTime(Timestamp(40, 1), 2));  // optime of previous write within same transaction
     insertOplogEntry(entry);
-
-    const auto sessionId = makeLogicalSessionIdForTest();
 
     SessionTxnRecord sessionRecord;
     sessionRecord.setSessionId(sessionId);
-    sessionRecord.setTxnNum(31);
+    sessionRecord.setTxnNum(txnNumber);
     sessionRecord.setLastWriteOpTime(entry.getOpTime());
     sessionRecord.setLastWriteDate(entry.getWallClockTime());
 
@@ -1007,27 +1098,34 @@ TEST_F(SessionCatalogMigrationSourceTest, AbortedTransactionEntriesShouldBeIgnor
 
 TEST_F(SessionCatalogMigrationSourceTest,
        MixedTransactionEntriesAndRetryableWritesEntriesReturnCorrectResults) {
+    const auto sessionId1 = makeLogicalSessionIdForTest();
+    const auto txnNumber1 = TxnNumber{1};
+    const auto sessionId2 = makeLogicalSessionIdForTest();
+    const auto txnNumber2 = TxnNumber{1};
+
     // Create an entry corresponding to a retryable write.
     auto insertOplog = makeOplogEntry(
         repl::OpTime(Timestamp(52, 345), 2),  // optime
         repl::OpTypeEnum::kInsert,            // op type
         BSON("x" << 30),                      // o
         boost::none,                          // o2
-        Date_t::now(),                        // wall clock time
-        {0},                                  // statement ids
-        repl::OpTime(Timestamp(0, 0), 0));    // optime of previous write within same transaction
+        Date_t::now(),                        // wall clock time,
+        sessionId1,
+        txnNumber1,
+        {0},                                // statement ids
+        repl::OpTime(Timestamp(0, 0), 0));  // optime of previous write within same transaction
 
     // Create a config.transaction entry pointing to the insert oplog entry.
     SessionTxnRecord retryableWriteRecord;
-    retryableWriteRecord.setSessionId(makeLogicalSessionIdForTest());
-    retryableWriteRecord.setTxnNum(1);
+    retryableWriteRecord.setSessionId(sessionId1);
+    retryableWriteRecord.setTxnNum(txnNumber1);
     retryableWriteRecord.setLastWriteOpTime(insertOplog.getOpTime());
     retryableWriteRecord.setLastWriteDate(insertOplog.getWallClockTime());
 
     // Create a config.transaction entry pointing to an imaginary commitTransaction entry.
     SessionTxnRecord txnRecord;
-    txnRecord.setSessionId(makeLogicalSessionIdForTest());
-    txnRecord.setTxnNum(1);
+    txnRecord.setSessionId(sessionId2);
+    txnRecord.setTxnNum(txnNumber2);
     txnRecord.setLastWriteOpTime(repl::OpTime(Timestamp(12, 34), 2));
     txnRecord.setLastWriteDate(Date_t::now());
     txnRecord.setState(DurableTxnStateEnum::kCommitted);
@@ -1069,7 +1167,7 @@ TEST_F(SessionCatalogMigrationSourceTest,
 
     // Logical session ids are generated randomly and the migration source queries in order of
     // logical session id, so we need to change the order of the checks depending on the ordering of
-    // the lsids between the retryable write record and the transaction record.
+    // the sessionIds between the retryable write record and the transaction record.
     if (retryableWriteRecord.getSessionId().toBSON().woCompare(txnRecord.getSessionId().toBSON()) <
         0) {
         checkTxnEntry();
@@ -1083,14 +1181,19 @@ TEST_F(SessionCatalogMigrationSourceTest,
 }
 
 TEST_F(SessionCatalogMigrationSourceTest, FindAndModifyDeleteNotTouchingChunkIsIgnored) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    const auto txnNumber = TxnNumber{1};
+
     auto entry1 = makeOplogEntry(
         repl::OpTime(Timestamp(52, 345), 2),  // optime
         repl::OpTypeEnum::kNoop,              // op type
         BSON("x" << -50),                     // o
         boost::none,                          // o2
-        Date_t::now(),                        // wall clock time
-        {0},                                  // statement ids
-        repl::OpTime(Timestamp(0, 0), 0));    // optime of previous write within same transaction
+        Date_t::now(),                        // wall clock time,
+        sessionId,
+        txnNumber,
+        {0},                                // statement ids
+        repl::OpTime(Timestamp(0, 0), 0));  // optime of previous write within same transaction
     insertOplogEntry(entry1);
 
     auto entry2 = makeOplogEntry(
@@ -1098,15 +1201,17 @@ TEST_F(SessionCatalogMigrationSourceTest, FindAndModifyDeleteNotTouchingChunkIsI
         repl::OpTypeEnum::kDelete,            // op type
         BSON("x" << -50),                     // o
         boost::none,                          // o2
-        Date_t::now(),                        // wall clock time
-        {1},                                  // statement ids
-        repl::OpTime(Timestamp(0, 0), 0),     // optime of previous write within same transaction
-        entry1.getOpTime());                  // pre-image optime
+        Date_t::now(),                        // wall clock time,
+        sessionId,
+        txnNumber,
+        {1},                               // statement ids
+        repl::OpTime(Timestamp(0, 0), 0),  // optime of previous write within same transaction
+        entry1.getOpTime());               // pre-image optime
     insertOplogEntry(entry2);
 
     SessionTxnRecord sessionRecord;
-    sessionRecord.setSessionId(makeLogicalSessionIdForTest());
-    sessionRecord.setTxnNum(1);
+    sessionRecord.setSessionId(sessionId);
+    sessionRecord.setTxnNum(txnNumber);
     sessionRecord.setLastWriteOpTime(entry2.getOpTime());
     sessionRecord.setLastWriteDate(entry2.getWallClockTime());
 
@@ -1118,14 +1223,19 @@ TEST_F(SessionCatalogMigrationSourceTest, FindAndModifyDeleteNotTouchingChunkIsI
 }
 
 TEST_F(SessionCatalogMigrationSourceTest, FindAndModifyUpdatePrePostNotTouchingChunkIsIgnored) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    const auto txnNumber = TxnNumber{1};
+
     auto entry1 = makeOplogEntry(
         repl::OpTime(Timestamp(52, 345), 2),  // optime
         repl::OpTypeEnum::kNoop,              // op type
         BSON("x" << -5),                      // o
         boost::none,                          // o2
-        Date_t::now(),                        // wall clock time
-        {0},                                  // statement ids
-        repl::OpTime(Timestamp(0, 0), 0));    // optime of previous write within same transaction
+        Date_t::now(),                        // wall clock time,
+        sessionId,
+        txnNumber,
+        {0},                                // statement ids
+        repl::OpTime(Timestamp(0, 0), 0));  // optime of previous write within same transaction
     insertOplogEntry(entry1);
 
     auto entry2 = makeOplogEntry(
@@ -1133,15 +1243,17 @@ TEST_F(SessionCatalogMigrationSourceTest, FindAndModifyUpdatePrePostNotTouchingC
         repl::OpTypeEnum::kUpdate,            // op type
         BSON("$set" << BSON("y" << 1)),       // o
         BSON("x" << -5),                      // o2
-        Date_t::now(),                        // wall clock time
-        {1},                                  // statement ids
-        repl::OpTime(Timestamp(0, 0), 0),     // optime of previous write within same transaction
-        entry1.getOpTime());                  // pre-image optime
+        Date_t::now(),                        // wall clock time,
+        sessionId,
+        txnNumber,
+        {1},                               // statement ids
+        repl::OpTime(Timestamp(0, 0), 0),  // optime of previous write within same transaction
+        entry1.getOpTime());               // pre-image optime
     insertOplogEntry(entry2);
 
     SessionTxnRecord sessionRecord;
-    sessionRecord.setSessionId(makeLogicalSessionIdForTest());
-    sessionRecord.setTxnNum(1);
+    sessionRecord.setSessionId(sessionId);
+    sessionRecord.setTxnNum(txnNumber);
     sessionRecord.setLastWriteOpTime(entry2.getOpTime());
     sessionRecord.setLastWriteDate(entry2.getWallClockTime());
 
@@ -1154,14 +1266,19 @@ TEST_F(SessionCatalogMigrationSourceTest, FindAndModifyUpdatePrePostNotTouchingC
 
 TEST_F(SessionCatalogMigrationSourceTest,
        UpdatePreImageTouchingPostNotTouchingChunkShouldNotBeIgnored) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    const auto txnNumber = TxnNumber{1};
+
     auto entry1 = makeOplogEntry(
         repl::OpTime(Timestamp(52, 345), 2),  // optime
         repl::OpTypeEnum::kNoop,              // op type
         BSON("x" << -50),                     // o
         boost::none,                          // o2
-        Date_t::now(),                        // wall clock time
-        {0},                                  // statement ids
-        repl::OpTime(Timestamp(0, 0), 0));    // optime of previous write within same transaction
+        Date_t::now(),                        // wall clock time,
+        sessionId,
+        txnNumber,
+        {0},                                // statement ids
+        repl::OpTime(Timestamp(0, 0), 0));  // optime of previous write within same transaction
     insertOplogEntry(entry1);
 
     auto entry2 = makeOplogEntry(
@@ -1169,16 +1286,18 @@ TEST_F(SessionCatalogMigrationSourceTest,
         repl::OpTypeEnum::kUpdate,            // op type
         BSON("$set" << BSON("x" << -50)),     // o
         BSON("x" << 10),                      // o2
-        Date_t::now(),                        // wall clock time
-        {1},                                  // statement ids
-        repl::OpTime(Timestamp(0, 0), 0),     // optime of previous write within same transaction
-        boost::none,                          // pre-image optime
-        entry1.getOpTime());                  // post-image optime
+        Date_t::now(),                        // wall clock time,
+        sessionId,
+        txnNumber,
+        {1},                               // statement ids
+        repl::OpTime(Timestamp(0, 0), 0),  // optime of previous write within same transaction
+        boost::none,                       // pre-image optime
+        entry1.getOpTime());               // post-image optime
     insertOplogEntry(entry2);
 
     SessionTxnRecord sessionRecord;
-    sessionRecord.setSessionId(makeLogicalSessionIdForTest());
-    sessionRecord.setTxnNum(1);
+    sessionRecord.setSessionId(sessionId);
+    sessionRecord.setTxnNum(txnNumber);
     sessionRecord.setLastWriteOpTime(entry2.getOpTime());
     sessionRecord.setLastWriteDate(entry2.getWallClockTime());
 
@@ -1204,14 +1323,19 @@ TEST_F(SessionCatalogMigrationSourceTest,
 
 TEST_F(SessionCatalogMigrationSourceTest,
        UpdatePreImageNotTouchingPostTouchingChunkShouldBeIgnored) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    const auto txnNumber = TxnNumber{1};
+
     auto entry1 = makeOplogEntry(
         repl::OpTime(Timestamp(52, 345), 2),  // optime
         repl::OpTypeEnum::kNoop,              // op type
         BSON("x" << 50),                      // o
         boost::none,                          // o2
-        Date_t::now(),                        // wall clock time
-        {0},                                  // statement ids
-        repl::OpTime(Timestamp(0, 0), 0));    // optime of previous write within same transaction
+        Date_t::now(),                        // wall clock time,
+        sessionId,
+        txnNumber,
+        {0},                                // statement ids
+        repl::OpTime(Timestamp(0, 0), 0));  // optime of previous write within same transaction
     insertOplogEntry(entry1);
 
     auto entry2 = makeOplogEntry(
@@ -1219,16 +1343,18 @@ TEST_F(SessionCatalogMigrationSourceTest,
         repl::OpTypeEnum::kUpdate,            // op type
         BSON("$set" << BSON("x" << 50)),      // o
         BSON("x" << -10),                     // o2
-        Date_t::now(),                        // wall clock time
-        {1},                                  // statement ids
-        repl::OpTime(Timestamp(0, 0), 0),     // optime of previous write within same transaction
-        boost::none,                          // pre-image optime
-        entry1.getOpTime());                  // post-image optime
+        Date_t::now(),                        // wall clock time,
+        sessionId,
+        txnNumber,
+        {1},                               // statement ids
+        repl::OpTime(Timestamp(0, 0), 0),  // optime of previous write within same transaction
+        boost::none,                       // pre-image optime
+        entry1.getOpTime());               // post-image optime
     insertOplogEntry(entry2);
 
     SessionTxnRecord sessionRecord;
-    sessionRecord.setSessionId(makeLogicalSessionIdForTest());
-    sessionRecord.setTxnNum(1);
+    sessionRecord.setSessionId(sessionId);
+    sessionRecord.setTxnNum(txnNumber);
     sessionRecord.setLastWriteOpTime(entry2.getOpTime());
     sessionRecord.setLastWriteDate(entry2.getWallClockTime());
 
@@ -1240,14 +1366,19 @@ TEST_F(SessionCatalogMigrationSourceTest,
 }
 
 TEST_F(SessionCatalogMigrationSourceTest, FindAndModifyUpdateNotTouchingChunkShouldBeIgnored) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    const auto txnNumber = TxnNumber{1};
+
     auto entry1 = makeOplogEntry(
         repl::OpTime(Timestamp(52, 345), 2),  // optime
         repl::OpTypeEnum::kNoop,              // op type
         BSON("x" << -10 << "y" << 50),        // o
         boost::none,                          // o2
-        Date_t::now(),                        // wall clock time
-        {0},                                  // statement ids
-        repl::OpTime(Timestamp(0, 0), 0));    // optime of previous write within same transaction
+        Date_t::now(),                        // wall clock time,
+        sessionId,
+        txnNumber,
+        {0},                                // statement ids
+        repl::OpTime(Timestamp(0, 0), 0));  // optime of previous write within same transaction
     insertOplogEntry(entry1);
 
     auto entry2 = makeOplogEntry(
@@ -1255,16 +1386,18 @@ TEST_F(SessionCatalogMigrationSourceTest, FindAndModifyUpdateNotTouchingChunkSho
         repl::OpTypeEnum::kUpdate,            // op type
         BSON("$set" << BSON("y" << 50)),      // o
         BSON("x" << -10),                     // o2
-        Date_t::now(),                        // wall clock time
-        {1},                                  // statement ids
-        repl::OpTime(Timestamp(0, 0), 0),     // optime of previous write within same transaction
-        boost::none,                          // pre-image optime
-        entry1.getOpTime());                  // post-image optime
+        Date_t::now(),                        // wall clock time,
+        sessionId,
+        txnNumber,
+        {1},                               // statement ids
+        repl::OpTime(Timestamp(0, 0), 0),  // optime of previous write within same transaction
+        boost::none,                       // pre-image optime
+        entry1.getOpTime());               // post-image optime
     insertOplogEntry(entry2);
 
     SessionTxnRecord sessionRecord;
-    sessionRecord.setSessionId(makeLogicalSessionIdForTest());
-    sessionRecord.setTxnNum(1);
+    sessionRecord.setSessionId(sessionId);
+    sessionRecord.setTxnNum(txnNumber);
     sessionRecord.setLastWriteOpTime(entry2.getOpTime());
     sessionRecord.setLastWriteDate(entry2.getWallClockTime());
 
@@ -1276,8 +1409,9 @@ TEST_F(SessionCatalogMigrationSourceTest, FindAndModifyUpdateNotTouchingChunkSho
 }
 
 TEST_F(SessionCatalogMigrationSourceTest, TwoSessionWithTwoWritesContainingWriteNotInChunk) {
-    auto sessionId1 = makeLogicalSessionIdForTest();
-    auto sessionId2 = makeLogicalSessionIdForTest();
+    const auto sessionId1 = makeLogicalSessionIdForTest();
+    const auto sessionId2 = makeLogicalSessionIdForTest();
+    const auto txnNumber = TxnNumber{1};
 
     auto cmpResult = sessionId1.toBSON().woCompare(sessionId2.toBSON());
     auto lowerSessionId = (cmpResult < 0) ? sessionId1 : sessionId2;
@@ -1288,22 +1422,26 @@ TEST_F(SessionCatalogMigrationSourceTest, TwoSessionWithTwoWritesContainingWrite
         repl::OpTypeEnum::kInsert,            // op type
         BSON("x" << 30),                      // o
         boost::none,                          // o2
-        Date_t::now(),                        // wall clock time
-        {0},                                  // statement ids
-        repl::OpTime(Timestamp(0, 0), 0));    // optime of previous write within same transaction
+        Date_t::now(),                        // wall clock time,
+        higherSessionId,
+        txnNumber,
+        {0},                                // statement ids
+        repl::OpTime(Timestamp(0, 0), 0));  // optime of previous write within same transaction
 
     auto entry1b =
         makeOplogEntry(repl::OpTime(Timestamp(67, 54801), 2),  // optime
                        repl::OpTypeEnum::kInsert,              // op type
                        BSON("x" << -50),                       // o
                        boost::none,                            // o2
-                       Date_t::now(),                          // wall clock time
-                       {1},                                    // statement ids
+                       Date_t::now(),                          // wall clock time,
+                       higherSessionId,
+                       txnNumber,
+                       {1},                   // statement ids
                        entry1a.getOpTime());  // optime of previous write within same transaction
 
     SessionTxnRecord sessionRecord1;
     sessionRecord1.setSessionId(higherSessionId);
-    sessionRecord1.setTxnNum(1);
+    sessionRecord1.setTxnNum(txnNumber);
     sessionRecord1.setLastWriteOpTime(entry1b.getOpTime());
     sessionRecord1.setLastWriteDate(entry1b.getWallClockTime());
 
@@ -1317,21 +1455,25 @@ TEST_F(SessionCatalogMigrationSourceTest, TwoSessionWithTwoWritesContainingWrite
         BSON("x" << 30),                     // o
         boost::none,                         // o2
         Date_t::now(),                       // wall clock time
-        {3},                                 // statement ids
-        repl::OpTime(Timestamp(0, 0), 0));   // optime of previous write within same transaction
+        lowerSessionId,
+        txnNumber,
+        {3},                                // statement ids
+        repl::OpTime(Timestamp(0, 0), 0));  // optime of previous write within same transaction
 
     auto entry2b =
         makeOplogEntry(repl::OpTime(Timestamp(789, 13), 2),  // optime
                        repl::OpTypeEnum::kDelete,            // op type
                        BSON("x" << 50),                      // o
                        boost::none,                          // o2
-                       Date_t::now(),                        // wall clock time
-                       {4},                                  // statement ids
+                       Date_t::now(),                        // wall clock time,
+                       lowerSessionId,
+                       txnNumber,
+                       {4},                   // statement ids
                        entry2a.getOpTime());  // optime of previous write within same transaction
 
     SessionTxnRecord sessionRecord2;
     sessionRecord2.setSessionId(lowerSessionId);
-    sessionRecord2.setTxnNum(1);
+    sessionRecord2.setTxnNum(txnNumber);
     sessionRecord2.setLastWriteOpTime(entry2b.getOpTime());
     sessionRecord2.setLastWriteDate(entry2b.getWallClockTime());
 
@@ -1361,6 +1503,9 @@ TEST_F(SessionCatalogMigrationSourceTest, TwoSessionWithTwoWritesContainingWrite
 }
 
 TEST_F(SessionCatalogMigrationSourceTest, UntransferredDataSizeWithCommittedWrites) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    const auto txnNumber = TxnNumber{1};
+
     DBDirectClient client(opCtx());
     client.createCollection(NamespaceString::kSessionTransactionsTableNamespace.ns());
     // Enter an oplog entry before creating SessionCatalogMigrationSource to set config.transactions
@@ -1370,14 +1515,16 @@ TEST_F(SessionCatalogMigrationSourceTest, UntransferredDataSizeWithCommittedWrit
         repl::OpTypeEnum::kInsert,            // op type
         BSON("x" << 0),                       // o
         boost::none,                          // o2
-        Date_t::now(),                        // wall clock time
-        {0},                                  // statement ids
-        repl::OpTime(Timestamp(0, 0), 0));    // optime of previous write within same transaction
+        Date_t::now(),                        // wall clock time,
+        sessionId,
+        txnNumber,
+        {0},                                // statement ids
+        repl::OpTime(Timestamp(0, 0), 0));  // optime of previous write within same transaction
     insertOplogEntry(entry);
 
     SessionTxnRecord sessionRecord;
-    sessionRecord.setSessionId(makeLogicalSessionIdForTest());
-    sessionRecord.setTxnNum(1);
+    sessionRecord.setSessionId(sessionId);
+    sessionRecord.setTxnNum(txnNumber);
     sessionRecord.setLastWriteOpTime(entry.getOpTime());
     sessionRecord.setLastWriteDate(entry.getWallClockTime());
 
@@ -1421,6 +1568,9 @@ TEST_F(SessionCatalogMigrationSourceTest, UntransferredDataSizeWithCommittedWrit
 }
 
 TEST_F(SessionCatalogMigrationSourceTest, UntransferredDataSizeWithNoCommittedWrites) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    const auto txnNumber = TxnNumber{1};
+
     SessionCatalogMigrationSource migrationSource(opCtx(), kNs, kChunkRange, kShardKey);
 
     auto entry = makeOplogEntry(
@@ -1428,9 +1578,11 @@ TEST_F(SessionCatalogMigrationSourceTest, UntransferredDataSizeWithNoCommittedWr
         repl::OpTypeEnum::kInsert,            // op type
         BSON("x" << 0),                       // o
         boost::none,                          // o2
-        Date_t::now(),                        // wall clock time
-        {0},                                  // statement ids
-        repl::OpTime(Timestamp(0, 0), 0));    // optime of previous write within same transaction
+        Date_t::now(),                        // wall clock time,
+        sessionId,
+        txnNumber,
+        {0},                                // statement ids
+        repl::OpTime(Timestamp(0, 0), 0));  // optime of previous write within same transaction
     insertOplogEntry(entry);
     migrationSource.notifyNewWriteOpTime(
         entry.getOpTime(), SessionCatalogMigrationSource::EntryAtOpTimeType::kRetryableWrite);
@@ -1444,6 +1596,8 @@ TEST_F(SessionCatalogMigrationSourceTest, UntransferredDataSizeWithNoCommittedWr
 }
 
 TEST_F(SessionCatalogMigrationSourceTest, FilterRewrittenOplogEntriesOutsideChunkRange) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    const auto txnNumber = TxnNumber{1};
 
     auto data = {std::make_pair(BSON("x" << 30), repl::OpTime(Timestamp(52, 345), 2)),
                  std::make_pair(BSON("x" << -50), repl::OpTime(Timestamp(67, 54801), 2)),
@@ -1451,31 +1605,39 @@ TEST_F(SessionCatalogMigrationSourceTest, FilterRewrittenOplogEntriesOutsideChun
                  std::make_pair(BSON("x" << 50), repl::OpTime(Timestamp(789, 13), 2))};
 
     std::vector<repl::OplogEntry> entries;
-    std::transform(data.begin(), data.end(), std::back_inserter(entries), [](const auto& pair) {
-        auto original =
-            makeOplogEntry(pair.second,                // optime
+    std::transform(data.begin(),
+                   data.end(),
+                   std::back_inserter(entries),
+                   [sessionId, txnNumber](const auto& pair) {
+                       auto original = makeOplogEntry(
+                           pair.second,                // optime
                            repl::OpTypeEnum::kInsert,  // op type
                            pair.first,                 // o
                            boost::none,                // o2
                            Date_t::now(),              // wall clock time
-                           {0},                        // statement ids
+                           sessionId,
+                           txnNumber,
+                           {0},  // statement ids
                            repl::OpTime(Timestamp(0, 0),
                                         0));  // optime of previous write within same transaction
-        return makeOplogEntry(pair.second,    // optime
-                              repl::OpTypeEnum::kNoop,  // op type
-                              BSON(SessionCatalogMigration::kSessionMigrateOplogTag << 1),  // o
-                              original.getEntry().toBSON(),                                 // o2
-                              original.getWallClockTime(),  // wall clock time
-                              {0},                          // statement ids
-                              repl::OpTime(Timestamp(0, 0),
-                                           0));  // optime of previous write within same transaction
-    });
+                       return makeOplogEntry(
+                           pair.second,                                                  // optime
+                           repl::OpTypeEnum::kNoop,                                      // op type
+                           BSON(SessionCatalogMigration::kSessionMigrateOplogTag << 1),  // o
+                           original.getEntry().toBSON(),                                 // o2
+                           original.getWallClockTime(),  // wall clock time
+                           sessionId,
+                           txnNumber,
+                           {0},  // statement ids
+                           repl::OpTime(Timestamp(0, 0),
+                                        0));  // optime of previous write within same transaction
+                   });
 
 
     DBDirectClient client(opCtx());
     for (auto entry : entries) {
         SessionTxnRecord sessionRecord(
-            makeLogicalSessionIdForTest(), 1, entry.getOpTime(), entry.getWallClockTime());
+            sessionId, txnNumber, entry.getOpTime(), entry.getWallClockTime());
 
         client.insert(NamespaceString::kSessionTransactionsTableNamespace.ns(),
                       sessionRecord.toBSON());
@@ -1498,19 +1660,27 @@ TEST_F(SessionCatalogMigrationSourceTest, FilterRewrittenOplogEntriesOutsideChun
 
 TEST_F(SessionCatalogMigrationSourceTest,
        FilterSingleSessionRewrittenOplogEntriesOutsideChunkRange) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    const auto txnNumber = TxnNumber{1};
 
-    auto rewrittenEntryOne = makeRewrittenOplogInSession(
-        repl::OpTime(Timestamp(52, 345), 2), repl::OpTime(Timestamp(0, 0), 0), BSON("x" << 30), 0);
+    auto rewrittenEntryOne = makeRewrittenOplogInSession(repl::OpTime(Timestamp(52, 345), 2),
+                                                         repl::OpTime(Timestamp(0, 0), 0),
+                                                         BSON("x" << 30),
+                                                         sessionId,
+                                                         txnNumber,
+                                                         0);
 
-    auto rewrittenEntryTwo = makeRewrittenOplogInSession(
-        repl::OpTime(Timestamp(67, 54801), 2), rewrittenEntryOne.getOpTime(), BSON("x" << -50), 1);
+    auto rewrittenEntryTwo = makeRewrittenOplogInSession(repl::OpTime(Timestamp(67, 54801), 2),
+                                                         rewrittenEntryOne.getOpTime(),
+                                                         BSON("x" << -50),
+                                                         sessionId,
+                                                         txnNumber,
+                                                         1);
 
     std::vector<repl::OplogEntry> entries = {rewrittenEntryOne, rewrittenEntryTwo};
 
-    SessionTxnRecord sessionRecord1(makeLogicalSessionIdForTest(),
-                                    1,
-                                    rewrittenEntryTwo.getOpTime(),
-                                    rewrittenEntryTwo.getWallClockTime());
+    SessionTxnRecord sessionRecord1(
+        sessionId, txnNumber, rewrittenEntryTwo.getOpTime(), rewrittenEntryTwo.getWallClockTime());
     DBDirectClient client(opCtx());
     client.insert(NamespaceString::kSessionTransactionsTableNamespace.ns(),
                   sessionRecord1.toBSON());
@@ -1538,6 +1708,8 @@ TEST_F(SessionCatalogMigrationSourceTest,
 
 TEST_F(SessionCatalogMigrationSourceTest,
        ShouldSkipOplogEntryReturnsTrueForCrudOplogEntryOutsideChunkRange) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    const auto txnNumber = TxnNumber{1};
     const auto shardKeyPattern = ShardKeyPattern(kShardKey);
 
     auto skippedEntry = makeOplogEntry(
@@ -1545,9 +1717,11 @@ TEST_F(SessionCatalogMigrationSourceTest,
         repl::OpTypeEnum::kInsert,            // op type
         BSON("x" << -30),                     // o
         boost::none,                          // o2
-        Date_t::now(),                        // wall clock time
-        {0},                                  // statement ids
-        repl::OpTime(Timestamp(0, 0), 0));    // optime of previous write within same transaction
+        Date_t::now(),                        // wall clock time,
+        sessionId,
+        txnNumber,
+        {0},                                // statement ids
+        repl::OpTime(Timestamp(0, 0), 0));  // optime of previous write within same transaction
 
     ASSERT_TRUE(SessionCatalogMigrationSource::shouldSkipOplogEntry(
         skippedEntry, shardKeyPattern, kChunkRange));
@@ -1555,6 +1729,8 @@ TEST_F(SessionCatalogMigrationSourceTest,
 
 TEST_F(SessionCatalogMigrationSourceTest,
        ShouldSkipOplogEntryReturnsFalseForCrudOplogEntryInChunkRange) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    const auto txnNumber = TxnNumber{1};
     const auto shardKeyPattern = ShardKeyPattern(kShardKey);
 
     auto processedEntry = makeOplogEntry(
@@ -1562,9 +1738,11 @@ TEST_F(SessionCatalogMigrationSourceTest,
         repl::OpTypeEnum::kInsert,            // op type
         BSON("x" << 30),                      // o
         boost::none,                          // o2
-        Date_t::now(),                        // wall clock time
-        {0},                                  // statement ids
-        repl::OpTime(Timestamp(0, 0), 0));    // optime of previous write within same transaction
+        Date_t::now(),                        // wall clock time,
+        sessionId,
+        txnNumber,
+        {0},                                // statement ids
+        repl::OpTime(Timestamp(0, 0), 0));  // optime of previous write within same transaction
 
     ASSERT_FALSE(SessionCatalogMigrationSource::shouldSkipOplogEntry(
         processedEntry, shardKeyPattern, kChunkRange));
@@ -1572,6 +1750,8 @@ TEST_F(SessionCatalogMigrationSourceTest,
 
 TEST_F(SessionCatalogMigrationSourceTest,
        ShouldSkipOplogEntryReturnsFalseForUserDocumentWithSessionMigrateOplogTag) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    const auto txnNumber = TxnNumber{1};
     const auto shardKeyPattern = ShardKeyPattern(kShardKey);
 
     // This oplogEntry represents the preImage document stored in a no-op oplogEntry.
@@ -1579,9 +1759,11 @@ TEST_F(SessionCatalogMigrationSourceTest,
         repl::OpTime(Timestamp(52, 345), 2),  // optime
         repl::OpTypeEnum::kNoop,              // op type
         BSON("_id" << 5 << "x" << 30 << SessionCatalogMigration::kSessionMigrateOplogTag
-                   << 1),                   // o
-        BSONObj(),                          // o2
-        Date_t::now(),                      // wall clock time
+                   << 1),  // o
+        BSONObj(),         // o2
+        Date_t::now(),     // wall clock time
+        sessionId,
+        txnNumber,
         {0},                                // statement ids
         repl::OpTime(Timestamp(0, 0), 0));  // optime of previous write within same transaction
 
@@ -1591,11 +1773,17 @@ TEST_F(SessionCatalogMigrationSourceTest,
 
 TEST_F(SessionCatalogMigrationSourceTest,
        ShouldSkipOplogEntryReturnsFalseForRewrittenOplogInChunkRange) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    const auto txnNumber = TxnNumber{1};
     const auto shardKeyPattern = ShardKeyPattern(kShardKey);
     BSONObj emptyObject;
 
-    auto rewrittenEntryOne = makeRewrittenOplogInSession(
-        repl::OpTime(Timestamp(52, 345), 2), repl::OpTime(Timestamp(0, 0), 0), BSON("x" << 30), 0);
+    auto rewrittenEntryOne = makeRewrittenOplogInSession(repl::OpTime(Timestamp(52, 345), 2),
+                                                         repl::OpTime(Timestamp(0, 0), 0),
+                                                         BSON("x" << 30),
+                                                         sessionId,
+                                                         txnNumber,
+                                                         0);
 
     ASSERT_FALSE(SessionCatalogMigrationSource::shouldSkipOplogEntry(
         rewrittenEntryOne, shardKeyPattern, kChunkRange));
@@ -1603,11 +1791,17 @@ TEST_F(SessionCatalogMigrationSourceTest,
 
 TEST_F(SessionCatalogMigrationSourceTest,
        ShouldSkipOplogEntryReturnsTrueForRewrittenOplogInChunkRange) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    const auto txnNumber = TxnNumber{1};
     const auto shardKeyPattern = ShardKeyPattern(kShardKey);
     BSONObj emptyObject;
 
-    auto rewrittenEntryOne = makeRewrittenOplogInSession(
-        repl::OpTime(Timestamp(52, 345), 2), repl::OpTime(Timestamp(0, 0), 0), BSON("x" << -30), 0);
+    auto rewrittenEntryOne = makeRewrittenOplogInSession(repl::OpTime(Timestamp(52, 345), 2),
+                                                         repl::OpTime(Timestamp(0, 0), 0),
+                                                         BSON("x" << -30),
+                                                         sessionId,
+                                                         txnNumber,
+                                                         0);
 
     ASSERT_TRUE(SessionCatalogMigrationSource::shouldSkipOplogEntry(
         rewrittenEntryOne, shardKeyPattern, kChunkRange));
@@ -1623,6 +1817,8 @@ TEST_F(SessionCatalogMigrationSourceTest, ShouldSkipOplogEntryReturnsFalseForDea
 }
 
 TEST_F(SessionCatalogMigrationSourceTest, ShouldSkipOplogEntryWorksWithNestedShardKeys) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    const auto txnNumber = TxnNumber{1};
     const auto shardKeyPattern = ShardKeyPattern(kNestedShardKey);
 
     auto processedEntry = makeOplogEntry(
@@ -1630,20 +1826,26 @@ TEST_F(SessionCatalogMigrationSourceTest, ShouldSkipOplogEntryWorksWithNestedSha
         repl::OpTypeEnum::kInsert,            // op type
         BSON("x" << BSON("y" << 30)),         // o
         boost::none,                          // o2
-        Date_t::now(),                        // wall clock time
-        {0},                                  // statement ids
-        repl::OpTime(Timestamp(0, 0), 0));    // optime of previous write within same transaction
+        Date_t::now(),                        // wall clock time,
+        sessionId,
+        txnNumber,
+        {0},                                // statement ids
+        repl::OpTime(Timestamp(0, 0), 0));  // optime of previous write within same transaction
 
     ASSERT_FALSE(SessionCatalogMigrationSource::shouldSkipOplogEntry(
         processedEntry, shardKeyPattern, kNestedChunkRange));
 }
 
 TEST_F(SessionCatalogMigrationSourceTest, ShouldSkipOplogEntryWorksWithRewrittenNestedShardKeys) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    const auto txnNumber = TxnNumber{1};
     const auto shardKeyPattern = ShardKeyPattern(kNestedShardKey);
 
     auto rewrittenEntryOne = makeRewrittenOplogInSession(repl::OpTime(Timestamp(52, 345), 2),
                                                          repl::OpTime(Timestamp(0, 0), 0),
                                                          BSON("x" << BSON("y" << 30)),
+                                                         sessionId,
+                                                         txnNumber,
                                                          0);
 
     ASSERT_FALSE(SessionCatalogMigrationSource::shouldSkipOplogEntry(
