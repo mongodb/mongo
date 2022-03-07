@@ -569,8 +569,9 @@ __wt_txn_set_commit_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t commit_ts
               __wt_timestamp_to_string(commit_ts, ts_string[0]),
               __wt_timestamp_to_string(stable_ts, ts_string[1]));
 #else
+        /* Don't change this error message, MongoDB servers check for it. */
         if (has_stable_ts && commit_ts < stable_ts)
-            WT_RET_MSG(session, EINVAL, "commit timestamp %s is before the stable timestamp %s",
+            WT_RET_MSG(session, EINVAL, "commit timestamp %s is less than the stable timestamp %s",
               __wt_timestamp_to_string(commit_ts, ts_string[0]),
               __wt_timestamp_to_string(stable_ts, ts_string[1]));
 #endif
