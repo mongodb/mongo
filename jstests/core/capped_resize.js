@@ -2,6 +2,7 @@
  * Tests updates on the size and max document fields of capped collections.
  *
  * @tags: [
+ *     requires_fcv_60,
  *     requires_capped,
  *     requires_collstats,
  *     requires_fastcount,
