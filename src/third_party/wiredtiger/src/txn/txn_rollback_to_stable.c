@@ -1406,7 +1406,7 @@ __rollback_to_stable_check(WT_SESSION_IMPL *session)
 #endif
 
     if (txn_active)
-        WT_RET_MSG(session, EINVAL, "rollback_to_stable illegal with active transactions");
+        WT_RET_MSG(session, EBUSY, "rollback_to_stable illegal with active transactions");
 
     return (ret);
 }
