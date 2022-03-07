@@ -193,11 +193,12 @@ ShardServerCatalogCacheLoaderTest::makeCombinedOriginalFiveChunksAndThreeNewChun
 
 CollectionType ShardServerCatalogCacheLoaderTest::makeCollectionType(
     const ChunkVersion& collVersion) {
-    CollectionType coll(
-        kNss, collVersion.epoch(), collVersion.getTimestamp(), Date_t::now(), UUID::gen());
-    coll.setKeyPattern(kKeyPattern);
-    coll.setUnique(false);
-    return coll;
+    return {kNss,
+            collVersion.epoch(),
+            collVersion.getTimestamp(),
+            Date_t::now(),
+            UUID::gen(),
+            kKeyPattern};
 }
 
 std::pair<CollectionType, vector<ChunkType>>

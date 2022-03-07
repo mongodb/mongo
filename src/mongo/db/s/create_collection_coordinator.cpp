@@ -885,9 +885,8 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx) {
                         _initialChunks.collVersion().epoch(),
                         _initialChunks.collVersion().getTimestamp(),
                         Date_t::now(),
-                        *_collectionUUID);
-
-    coll.setKeyPattern(_shardKeyPattern->getKeyPattern());
+                        *_collectionUUID,
+                        _shardKeyPattern->getKeyPattern());
 
     if (_doc.getCreateCollectionRequest().getTimeseries()) {
         TypeCollectionTimeseriesFields timeseriesFields;

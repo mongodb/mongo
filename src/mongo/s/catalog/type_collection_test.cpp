@@ -44,9 +44,11 @@ TEST(CollectionType, Empty) {
 
 TEST(CollectionType, Basic) {
     const OID oid = OID::gen();
+    const UUID uuid = UUID::gen();
     const Timestamp timestamp(1, 1);
     CollectionType coll(BSON(CollectionType::kNssFieldName
                              << "db.coll" << CollectionType::kEpochFieldName << oid
+                             << CollectionType::kUuidFieldName << uuid
                              << CollectionType::kTimestampFieldName << timestamp
                              << CollectionType::kUpdatedAtFieldName
                              << Date_t::fromMillisSinceEpoch(1)
@@ -58,6 +60,7 @@ TEST(CollectionType, Basic) {
 
     ASSERT(coll.getNss() == NamespaceString{"db.coll"});
     ASSERT_EQUALS(coll.getEpoch(), oid);
+    ASSERT_EQUALS(coll.getUuid(), uuid);
     ASSERT_EQUALS(coll.getTimestamp(), timestamp);
     ASSERT_EQUALS(coll.getUpdatedAt(), Date_t::fromMillisSinceEpoch(1));
     ASSERT_BSONOBJ_EQ(coll.getKeyPattern().toBSON(), BSON("a" << 1));
@@ -106,12 +109,13 @@ TEST(CollectionType, AllFieldsPresent) {
 TEST(CollectionType, MissingDefaultCollationParses) {
     const OID oid = OID::gen();
     const Timestamp timestamp(1, 1);
-    CollectionType coll(BSON(
-        CollectionType::kNssFieldName
-        << "db.coll" << CollectionType::kEpochFieldName << oid
-        << CollectionType::kTimestampFieldName << timestamp << CollectionType::kUpdatedAtFieldName
-        << Date_t::fromMillisSinceEpoch(1) << CollectionType::kKeyPatternFieldName << BSON("a" << 1)
-        << CollectionType::kUniqueFieldName << true));
+    CollectionType coll(
+        BSON(CollectionType::kNssFieldName
+             << "db.coll" << CollectionType::kEpochFieldName << oid
+             << CollectionType::kUuidFieldName << UUID::gen() << CollectionType::kTimestampFieldName
+             << timestamp << CollectionType::kUpdatedAtFieldName << Date_t::fromMillisSinceEpoch(1)
+             << CollectionType::kKeyPatternFieldName << BSON("a" << 1)
+             << CollectionType::kUniqueFieldName << true));
     ASSERT_BSONOBJ_EQ(coll.getDefaultCollation(), BSONObj());
 }
 
@@ -120,6 +124,7 @@ TEST(CollectionType, DefaultCollationSerializesCorrectly) {
     const Timestamp timestamp(1, 1);
     CollectionType coll(BSON(CollectionType::kNssFieldName
                              << "db.coll" << CollectionType::kEpochFieldName << oid
+                             << CollectionType::kUuidFieldName << UUID::gen()
                              << CollectionType::kTimestampFieldName << timestamp
                              << CollectionType::kUpdatedAtFieldName
                              << Date_t::fromMillisSinceEpoch(1)
@@ -137,8 +142,9 @@ TEST(CollectionType, DefaultCollationSerializesCorrectly) {
 TEST(CollectionType, Pre22Format) {
     CollectionType coll(BSON("_id"
                              << "db.coll" << CollectionType::kTimestampFieldName << Timestamp(1, 1)
-                             << "lastmod" << Date_t::fromMillisSinceEpoch(1) << "dropped" << false
-                             << "key" << BSON("a" << 1) << "unique" << false));
+                             << CollectionType::kUuidFieldName << UUID::gen() << "lastmod"
+                             << Date_t::fromMillisSinceEpoch(1) << "dropped" << false << "key"
+                             << BSON("a" << 1) << "unique" << false));
 
     ASSERT(coll.getNss() == NamespaceString{"db.coll"});
     ASSERT(!coll.getEpoch().isSet());

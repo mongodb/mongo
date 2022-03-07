@@ -136,8 +136,12 @@ ChunkManager CatalogCacheTestFixture::makeChunkManager(
 
     const auto uuid = UUID::gen();
     const BSONObj collectionBSON = [&]() {
-        CollectionType coll(nss, version.epoch(), version.getTimestamp(), Date_t::now(), uuid);
-        coll.setKeyPattern(shardKeyPattern.getKeyPattern());
+        CollectionType coll(nss,
+                            version.epoch(),
+                            version.getTimestamp(),
+                            Date_t::now(),
+                            uuid,
+                            shardKeyPattern.getKeyPattern());
         coll.setUnique(unique);
 
         if (defaultCollator) {
@@ -203,9 +207,8 @@ void CatalogCacheTestFixture::expectGetCollection(NamespaceString nss,
                                                   UUID uuid,
                                                   const ShardKeyPattern& shardKeyPattern) {
     expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
-        CollectionType collType(nss, epoch, timestamp, Date_t::now(), uuid);
-        collType.setKeyPattern(shardKeyPattern.toBSON());
-        collType.setUnique(false);
+        CollectionType collType(
+            nss, epoch, timestamp, Date_t::now(), uuid, shardKeyPattern.toBSON());
         return std::vector<BSONObj>{collType.toBSON()};
     }());
 }
@@ -218,9 +221,8 @@ void CatalogCacheTestFixture::expectCollectionAndChunksAggregation(
     const ShardKeyPattern& shardKeyPattern,
     const std::vector<ChunkType>& chunks) {
     expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
-        CollectionType collType(nss, epoch, timestamp, Date_t::now(), uuid);
-        collType.setKeyPattern(shardKeyPattern.toBSON());
-        collType.setUnique(false);
+        CollectionType collType(
+            nss, epoch, timestamp, Date_t::now(), uuid, shardKeyPattern.toBSON());
 
         std::vector<BSONObj> aggResult{collType.toBSON()};
         std::transform(chunks.begin(),
@@ -265,9 +267,8 @@ ChunkManager CatalogCacheTestFixture::loadRoutingTableWithTwoChunksAndTwoShardsI
         }
     }
     expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
-        CollectionType collType(nss, epoch, timestamp, Date_t::now(), uuid);
-        collType.setKeyPattern(shardKeyPattern.toBSON());
-        collType.setUnique(false);
+        CollectionType collType(
+            nss, epoch, timestamp, Date_t::now(), uuid, shardKeyPattern.toBSON());
 
         ChunkVersion version(1, 0, epoch, timestamp);
 

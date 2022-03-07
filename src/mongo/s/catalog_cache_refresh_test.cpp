@@ -99,10 +99,7 @@ protected:
     CollectionType getDefaultCollectionType(OID epoch,
                                             Timestamp timestamp,
                                             const ShardKeyPattern& shardKeyPattern) {
-        CollectionType collType(kNss, epoch, timestamp, Date_t::now(), UUID::gen());
-        collType.setKeyPattern(shardKeyPattern.toBSON());
-        collType.setUnique(false);
-        return collType;
+        return {kNss, epoch, timestamp, Date_t::now(), UUID::gen(), shardKeyPattern.toBSON()};
     }
 };
 

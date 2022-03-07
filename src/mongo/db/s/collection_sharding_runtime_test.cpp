@@ -261,9 +261,7 @@ public:
     }
 
     CollectionType createCollection(const OID& epoch, const Timestamp& timestamp) {
-        CollectionType res(kNss, epoch, timestamp, Date_t::now(), kCollUUID);
-        res.setKeyPattern(BSON(kShardKey << 1));
-        res.setUnique(false);
+        CollectionType res(kNss, epoch, timestamp, Date_t::now(), kCollUUID, BSON(kShardKey << 1));
         res.setAllowMigrations(false);
         return res;
     }

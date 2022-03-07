@@ -571,10 +571,9 @@ CollectionType createTempReshardingCollectionType(
                             chunkVersion.epoch(),
                             chunkVersion.getTimestamp(),
                             opCtx->getServiceContext()->getPreciseClockSource()->now(),
-                            coordinatorDoc.getReshardingUUID());
-    collType.setKeyPattern(coordinatorDoc.getReshardingKey());
+                            coordinatorDoc.getReshardingUUID(),
+                            coordinatorDoc.getReshardingKey());
     collType.setDefaultCollation(collation);
-    collType.setUnique(false);
 
     TypeCollectionReshardingFields tempEntryReshardingFields(coordinatorDoc.getReshardingUUID());
     tempEntryReshardingFields.setState(coordinatorDoc.getState());

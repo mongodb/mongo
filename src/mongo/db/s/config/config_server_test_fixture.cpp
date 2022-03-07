@@ -335,9 +335,8 @@ void ConfigServerTestFixture::setupCollection(const NamespaceString& nss,
                         chunks[0].getVersion().epoch(),
                         chunks[0].getVersion().getTimestamp(),
                         Date_t::now(),
-                        chunks[0].getCollectionUUID());
-    coll.setTimestamp(chunks.front().getVersion().getTimestamp());
-    coll.setKeyPattern(shardKey);
+                        chunks[0].getCollectionUUID(),
+                        shardKey);
     ASSERT_OK(
         insertToConfigCollection(operationContext(), CollectionType::ConfigNS, coll.toBSON()));
 

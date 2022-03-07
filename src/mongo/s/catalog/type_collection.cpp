@@ -43,12 +43,19 @@ namespace mongo {
 
 const NamespaceString CollectionType::ConfigNS("config.collections");
 
-CollectionType::CollectionType(
-    NamespaceString nss, OID epoch, Timestamp creationTime, Date_t updatedAt, UUID uuid)
-    : CollectionTypeBase(std::move(nss), std::move(updatedAt), std::move(creationTime)) {
+CollectionType::CollectionType(NamespaceString nss,
+                               OID epoch,
+                               Timestamp creationTime,
+                               Date_t updatedAt,
+                               UUID uuid,
+                               KeyPattern keyPattern)
+    : CollectionTypeBase(std::move(nss),
+                         std::move(updatedAt),
+                         std::move(creationTime),
+                         std::move(uuid),
+                         std::move(keyPattern)) {
     invariant(creationTime != Timestamp(0, 0));
     setEpoch(std::move(epoch));
-    setUuid(std::move(uuid));
 }
 
 CollectionType::CollectionType(const BSONObj& obj) {
@@ -60,7 +67,6 @@ CollectionType::CollectionType(const BSONObj& obj) {
     if (!getPre22CompatibleEpoch()) {
         setPre22CompatibleEpoch(OID());
     }
-    uassert(ErrorCodes::NoSuchKey, "Shard key is missing", getPre50CompatibleKeyPattern());
 }
 
 std::string CollectionType::toString() const {
@@ -71,17 +77,12 @@ void CollectionType::setEpoch(OID epoch) {
     setPre22CompatibleEpoch(std::move(epoch));
 }
 
-void CollectionType::setUuid(UUID uuid) {
-    setPre50CompatibleUuid(std::move(uuid));
-}
-
-void CollectionType::setKeyPattern(KeyPattern keyPattern) {
-    setPre50CompatibleKeyPattern(std::move(keyPattern));
-}
-
 void CollectionType::setDefaultCollation(const BSONObj& defaultCollation) {
-    if (!defaultCollation.isEmpty())
-        setPre50CompatibleDefaultCollation(defaultCollation);
+    if (!defaultCollation.isEmpty()) {
+        CollectionTypeBase::setDefaultCollation(defaultCollation);
+    } else {
+        CollectionTypeBase::setDefaultCollation(boost::none);
+    }
 }
 
 void CollectionType::setMaxChunkSizeBytes(int64_t value) {

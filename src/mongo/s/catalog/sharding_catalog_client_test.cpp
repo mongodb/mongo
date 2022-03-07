@@ -86,9 +86,12 @@ using ShardingCatalogClientTest = ShardingTestFixture;
 TEST_F(ShardingCatalogClientTest, GetCollectionExisting) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
-    CollectionType expectedColl(
-        NamespaceString("TestDB.TestNS"), OID::gen(), Timestamp(1, 1), Date_t::now(), UUID::gen());
-    expectedColl.setKeyPattern(BSON("KeyName" << 1));
+    CollectionType expectedColl(NamespaceString("TestDB.TestNS"),
+                                OID::gen(),
+                                Timestamp(1, 1),
+                                Date_t::now(),
+                                UUID::gen(),
+                                BSON("KeyName" << 1));
 
     const OpTime newOpTime(Timestamp(7, 6), 5);
 
@@ -777,20 +780,19 @@ TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandNotWritablePrimar
 TEST_F(ShardingCatalogClientTest, GetCollectionsValidResultsNoDb) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
-    CollectionType coll1(
-        NamespaceString{"test.coll1"}, OID::gen(), Timestamp(1, 1), network()->now(), UUID::gen());
-    coll1.setKeyPattern(KeyPattern{BSON("_id" << 1)});
-    coll1.setUnique(false);
-
+    CollectionType coll1(NamespaceString{"test.coll1"},
+                         OID::gen(),
+                         Timestamp(1, 1),
+                         network()->now(),
+                         UUID::gen(),
+                         BSON("_id" << 1));
 
     CollectionType coll2(NamespaceString{"anotherdb.coll1"},
                          OID::gen(),
                          Timestamp(1, 1),
                          network()->now(),
-                         UUID::gen());
-    coll2.setKeyPattern(KeyPattern{BSON("_id" << 1)});
-    coll2.setUnique(false);
-
+                         UUID::gen(),
+                         BSON("_id" << 1));
 
     const OpTime newOpTime(Timestamp(7, 6), 5);
 
@@ -831,19 +833,25 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsValidResultsNoDb) {
     ASSERT_EQ(2U, actualColls.size());
     ASSERT_BSONOBJ_EQ(coll1.toBSON(), actualColls[0].toBSON());
     ASSERT_BSONOBJ_EQ(coll2.toBSON(), actualColls[1].toBSON());
-}
+}  // namespace
 
 TEST_F(ShardingCatalogClientTest, GetCollectionsValidResultsWithDb) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
-    CollectionType coll1(
-        NamespaceString{"test.coll1"}, OID::gen(), Timestamp(1, 1), network()->now(), UUID::gen());
-    coll1.setKeyPattern(KeyPattern{BSON("_id" << 1)});
+    CollectionType coll1(NamespaceString{"test.coll1"},
+                         OID::gen(),
+                         Timestamp(1, 1),
+                         network()->now(),
+                         UUID::gen(),
+                         BSON("_id" << 1));
     coll1.setUnique(true);
 
-    CollectionType coll2(
-        NamespaceString{"test.coll2"}, OID::gen(), Timestamp(1, 1), network()->now(), UUID::gen());
-    coll2.setKeyPattern(KeyPattern{BSON("_id" << 1)});
+    CollectionType coll2(NamespaceString{"test.coll2"},
+                         OID::gen(),
+                         Timestamp(1, 1),
+                         network()->now(),
+                         UUID::gen(),
+                         BSON("_id" << 1));
     coll2.setUnique(false);
 
     auto future =
@@ -884,9 +892,12 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsInvalidCollectionType) {
         ASSERT_THROWS(catalogClient()->getCollections(operationContext(), "test"), DBException);
     });
 
-    CollectionType validColl(
-        NamespaceString{"test.coll1"}, OID::gen(), Timestamp(1, 1), network()->now(), UUID::gen());
-    validColl.setKeyPattern(KeyPattern{BSON("_id" << 1)});
+    CollectionType validColl(NamespaceString{"test.coll1"},
+                             OID::gen(),
+                             Timestamp(1, 1),
+                             network()->now(),
+                             UUID::gen(),
+                             BSON("_id" << 1));
     validColl.setUnique(true);
 
     onFindCommand([this, validColl](const RemoteCommandRequest& request) {

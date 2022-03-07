@@ -83,7 +83,7 @@ public:
         _coll.setEpoch(_epoch);
         _coll.setUpdatedAt(Date_t::fromMillisSinceEpoch(ChunkVersion(1, 3, _epoch).toLong()));
         _coll.setKeyPattern(BSON("_id" << 1));
-        _coll.setUnique(false);
+        _coll.setUique(false);
         ASSERT_OK(_coll.validate());
 
         // Set up the shard

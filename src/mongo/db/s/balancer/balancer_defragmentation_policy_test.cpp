@@ -182,8 +182,7 @@ TEST_F(BalancerDefragmentationPolicyTest, TestGetNextActionIsNotReadyWhenNotDefr
 }
 
 TEST_F(BalancerDefragmentationPolicyTest, TestAddCollectionWhenCollectionRemovedFailsGracefully) {
-    CollectionType coll(kNss, OID::gen(), Timestamp(1, 1), Date_t::now(), kUuid);
-    coll.setKeyPattern(kShardKeyPattern);
+    CollectionType coll(kNss, OID::gen(), Timestamp(1, 1), Date_t::now(), kUuid, kShardKeyPattern);
     coll.setDefragmentCollection(true);
     // Collection entry is not persisted (to simulate collection dropped), defragmentation should
     // not begin.

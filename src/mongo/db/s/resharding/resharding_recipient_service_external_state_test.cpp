@@ -146,9 +146,8 @@ public:
         auto future = scheduleRoutingInfoForcedRefresh(tempNss);
 
         expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
-            CollectionType coll(tempNss, epoch, timestamp, Date_t::now(), uuid);
-            coll.setKeyPattern(skey.getKeyPattern());
-            coll.setUnique(false);
+            CollectionType coll(
+                tempNss, epoch, timestamp, Date_t::now(), uuid, skey.getKeyPattern());
             coll.setDefaultCollation(collation);
 
             TypeCollectionReshardingFields reshardingFields;
@@ -186,9 +185,8 @@ public:
                                             OID epoch,
                                             Timestamp timestamp) {
         expectFindSendBSONObjVector(kConfigHostAndPort, [&] {
-            CollectionType coll(origNss, epoch, timestamp, Date_t::now(), uuid);
-            coll.setKeyPattern(skey.getKeyPattern());
-            coll.setUnique(false);
+            CollectionType coll(
+                origNss, epoch, timestamp, Date_t::now(), uuid, skey.getKeyPattern());
 
             ChunkVersion version(2, 0, epoch, timestamp);
 

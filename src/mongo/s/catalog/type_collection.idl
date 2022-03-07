@@ -83,35 +83,19 @@ structs:
                               in the collection. This field will replace Epoch, which are not
                               comparable."
             uuid:
-                cpp_name: pre50CompatibleUuid
+                cpp_name: uuid
                 type: uuid
                 description: "The UUID that will be used to create the local collection on each of
-                              the shards which have chunks.
-
-                              It is optional for parsing purposes, because in versions of MongoDB
-                              prior to 5.0, this value would be missing for entries where 'dropped'
-                              is set to true, because dropped collections' entries were being
-                              written as dropped with certain fields missing instead of deleted."
-                optional: true
+                              the shards which have chunks."
+                optional: false
             key:
-                cpp_name: pre50CompatibleKeyPattern
+                cpp_name: KeyPattern
                 type: KeyPattern
-                description: "The shard key pattern for the collection.
-
-                              It is optional for parsing purposes, because in versions of MongoDB
-                              prior to 5.0, this value would be missing for entries where 'dropped'
-                              is set to true, because dropped collections' entries were being
-                              written as dropped with certain fields missing instead of deleted."
-                optional: true
+                description: "The shard key pattern for the collection."
             defaultCollation:
-                cpp_name: pre50CompatibleDefaultCollation
                 type: object_owned
                 description: "Optional collection default collation. If missing or set to the empty
-                              BSON, implies simple collation.
-
-                              It is optional for serialisation purposes, because in versions of
-                              MongoDB prior to 5.0, this value must be missing for the default
-                              (empty BSON) collation."
+                              BSON, implies simple collation."
                 optional: true
             unique:
                 type: bool
@@ -146,16 +130,12 @@ structs:
                               collection is the temporary resharding collection."
                 optional: true
             allowMigrations:
-                cpp_name: pre50CompatibleAllowMigrations
                 type: bool
                 description: "Whether this collection allows chunks to move. It is required by
                               almost all DDL operations in order to guarantee that the set of
                               shards, which comprise a collection will not change.
 
-                              If the flag is not present it defaults to true.
-
-                              It is optional for serialisation purposes, because in versions of
-                              MongoDB prior to 5.0, this value would be missing."
+                              If the flag is not present it defaults to true."
                 optional: true
             timeseriesFields:
                 type: TypeCollectionTimeseriesFields

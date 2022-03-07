@@ -213,10 +213,12 @@ protected:
             {ShardId{kShardList[0].getName()}, ShardId{kShardList[1].getName()}}});
         reshardingFields.setState(CoordinatorStateEnum::kPreparingToDonate);
 
-        CollectionType coll(
-            kNss, env.version.epoch(), env.version.getTimestamp(), Date_t::now(), UUID::gen());
-        coll.setKeyPattern(BSON(kShardKey << 1));
-        coll.setUnique(false);
+        CollectionType coll(kNss,
+                            env.version.epoch(),
+                            env.version.getTimestamp(),
+                            Date_t::now(),
+                            UUID::gen(),
+                            BSON(kShardKey << 1));
         coll.setAllowMigrations(false);
 
         _mockCatalogCacheLoader->setDatabaseRefreshReturnValue(

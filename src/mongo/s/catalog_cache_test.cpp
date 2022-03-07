@@ -161,11 +161,12 @@ protected:
     }
 
     CollectionType makeCollectionType(const ChunkVersion& collVersion) {
-        CollectionType coll(
-            kNss, collVersion.epoch(), collVersion.getTimestamp(), Date_t::now(), kUUID);
-        coll.setKeyPattern(kShardKeyPattern.getKeyPattern());
-        coll.setUnique(false);
-        return coll;
+        return {kNss,
+                collVersion.epoch(),
+                collVersion.getTimestamp(),
+                Date_t::now(),
+                kUUID,
+                kShardKeyPattern.getKeyPattern()};
     }
 
     const NamespaceString kNss{"catalgoCacheTestDB.foo"};

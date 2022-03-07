@@ -342,9 +342,8 @@ public:
                                 std::move(epoch),
                                 Timestamp(1, 2),
                                 lastUpdated,
-                                std::move(uuid));
-        collType.setKeyPattern(shardKey);
-        collType.setUnique(false);
+                                std::move(uuid),
+                                shardKey);
         if (reshardingFields)
             collType.setReshardingFields(std::move(reshardingFields.get()));
 

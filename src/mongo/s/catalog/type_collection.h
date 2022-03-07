@@ -78,14 +78,13 @@ using ReshardingFields = TypeCollectionReshardingFields;
 class CollectionType : private CollectionTypeBase {
 public:
     // Make field names accessible.
-    static constexpr auto kDefaultCollationFieldName = kPre50CompatibleDefaultCollationFieldName;
     static constexpr auto kEpochFieldName = kPre22CompatibleEpochFieldName;
-    static constexpr auto kKeyPatternFieldName = kPre50CompatibleKeyPatternFieldName;
-    static constexpr auto kUuidFieldName = kPre50CompatibleUuidFieldName;
-    static constexpr auto kAllowMigrationsFieldName = kPre50CompatibleAllowMigrationsFieldName;
 
+    using CollectionTypeBase::kAllowMigrationsFieldName;
+    using CollectionTypeBase::kDefaultCollationFieldName;
     using CollectionTypeBase::kDefragmentationPhaseFieldName;
     using CollectionTypeBase::kDefragmentCollectionFieldName;
+    using CollectionTypeBase::kKeyPatternFieldName;
     using CollectionTypeBase::kMaxChunkSizeBytesFieldName;
     using CollectionTypeBase::kNoAutoSplitFieldName;
     using CollectionTypeBase::kNssFieldName;
@@ -95,9 +94,11 @@ public:
     using CollectionTypeBase::kTimestampFieldName;
     using CollectionTypeBase::kUniqueFieldName;
     using CollectionTypeBase::kUpdatedAtFieldName;
+    using CollectionTypeBase::kUuidFieldName;
 
     // Make getters and setters accessible.
     using CollectionTypeBase::getDefragmentationPhase;
+    using CollectionTypeBase::getKeyPattern;
     using CollectionTypeBase::getMaxChunkSizeBytes;
     using CollectionTypeBase::getNss;
     using CollectionTypeBase::getReshardingFields;
@@ -105,21 +106,28 @@ public:
     using CollectionTypeBase::getTimestamp;
     using CollectionTypeBase::getUnique;
     using CollectionTypeBase::getUpdatedAt;
+    using CollectionTypeBase::getUuid;
     using CollectionTypeBase::setDefragmentationPhase;
     using CollectionTypeBase::setDefragmentCollection;
+    using CollectionTypeBase::setKeyPattern;
     using CollectionTypeBase::setNss;
     using CollectionTypeBase::setReshardingFields;
     using CollectionTypeBase::setTimeseriesFields;
     using CollectionTypeBase::setTimestamp;
     using CollectionTypeBase::setUnique;
     using CollectionTypeBase::setUpdatedAt;
+    using CollectionTypeBase::setUuid;
     using CollectionTypeBase::toBSON;
 
     // Name of the collections collection in the config server.
     static const NamespaceString ConfigNS;
 
-    CollectionType(
-        NamespaceString nss, OID epoch, Timestamp creationTime, Date_t updatedAt, UUID uuid);
+    CollectionType(NamespaceString nss,
+                   OID epoch,
+                   Timestamp creationTime,
+                   Date_t updatedAt,
+                   UUID uuid,
+                   KeyPattern keyPattern);
 
     explicit CollectionType(const BSONObj& obj);
 
@@ -132,18 +140,8 @@ public:
     }
     void setEpoch(OID epoch);
 
-    const UUID& getUuid() const {
-        return *getPre50CompatibleUuid();
-    }
-    void setUuid(UUID uuid);
-
-    const KeyPattern& getKeyPattern() const {
-        return *getPre50CompatibleKeyPattern();
-    }
-    void setKeyPattern(KeyPattern keyPattern);
-
     BSONObj getDefaultCollation() const {
-        return getPre50CompatibleDefaultCollation().get_value_or(BSONObj());
+        return CollectionTypeBase::getDefaultCollation().get_value_or(BSONObj());
     }
     void setDefaultCollation(const BSONObj& defaultCollation);
 
@@ -162,14 +160,14 @@ public:
     }
 
     bool getAllowMigrations() const {
-        return getPre50CompatibleAllowMigrations().get_value_or(true);
+        return CollectionTypeBase::getAllowMigrations().get_value_or(true);
     }
 
     void setAllowMigrations(bool allowMigrations) {
         if (allowMigrations)
-            setPre50CompatibleAllowMigrations(boost::none);
+            CollectionTypeBase::setAllowMigrations(boost::none);
         else
-            setPre50CompatibleAllowMigrations(false);
+            CollectionTypeBase::setAllowMigrations(false);
     }
 
     // TODO SERVER-61033: remove after permitMigrations have been merge with allowMigrations.
