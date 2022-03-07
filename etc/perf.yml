@@ -21,17 +21,17 @@ variables:
   ###
   # **Or**: Leave this section uncommented to bypass/skip compile.
   # This file ↓ came from a microbenchmarks waterfall run.
-  # https://evergreen.mongodb.com/version/performance_996dcdc3d96346d71f012388eccc79c691619340
+  # https://evergreen.mongodb.com/version/performance_c0a8cbe58cc46253a94130d2cb64cdd8089b3551
   # Artifacts eventually expire. If this fails, grab the compile artifacts url and update this.
 #  _skip_remote_file: &_remote_file
-#      perf/5f6ca2392fbabe40badf39c4/c39af144b2370be0537410d9bc79be66a1a5f3c7/linux/mongodb-5f6ca2392fbabe40badf39c4.tar.gz
+#      /perf/performance_c0a8cbe58cc46253a94130d2cb64cdd8089b3551/c0a8cbe58cc46253a94130d2cb64cdd8089b3551/linux/mongodb-performance_c0a8cbe58cc46253a94130d2cb64cdd8089b3551.tar.gz
 #  _skip_compile: &_compile
 #      []
 #  _skip_expansions: &_expansion_updates
 #    - key: mdb_binary_for_server
-#      value: https://mciuploads.s3.amazonaws.com/perf/5f6ca2392fbabe40badf39c4/c39af144b2370be0537410d9bc79be66a1a5f3c7/linux/mongodb-5f6ca2392fbabe40badf39c4.tar.gz
+#      value: https://mciuploads.s3.amazonaws.com/perf/performance_c0a8cbe58cc46253a94130d2cb64cdd8089b3551/c0a8cbe58cc46253a94130d2cb64cdd8089b3551/linux/mongodb-performance_c0a8cbe58cc46253a94130d2cb64cdd8089b3551.tar.gz
 #    - key: mdb_binary_for_client
-#      value: https://mciuploads.s3.amazonaws.com/perf/5f6ca2392fbabe40badf39c4/c39af144b2370be0537410d9bc79be66a1a5f3c7/linux/mongodb-5f6ca2392fbabe40badf39c4.tar.gz
+#      value: https://mciuploads.s3.amazonaws.com/perf/performance_c0a8cbe58cc46253a94130d2cb64cdd8089b3551/c0a8cbe58cc46253a94130d2cb64cdd8089b3551/linux/mongodb-performance_c0a8cbe58cc46253a94130d2cb64cdd8089b3551.tar.gz
   ###
 
   _src_dir: &src_dir src/mongo
