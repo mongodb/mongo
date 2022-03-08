@@ -917,54 +917,6 @@ private:
                                         const OpTime& lastOpTimeFetched,
                                         ReadPreference readPreference);
 
-    // Does preliminary checkes to see if a new sync source should be chosen
-    // * Do we have a valid configuration -- if so, we do not change sync source.
-    // * Are we in initial sync -- if so, we do not change sync source.
-    // * Do we have a new forced sync source -- if so, we do change sync source.
-    // Returns decision and current sync source candidate if decision is kMaybe.
-    // (kMaybe indicates to continue with further checks).
-    enum class ChangeSyncSourceDecision { kNo, kYes, kMaybe };
-    std::pair<ChangeSyncSourceDecision, int> _shouldChangeSyncSourceInitialChecks(
-        const HostAndPort& currentSource) const;
-
-    // Returns true if we should choose a new sync source because chaining is disabled
-    // and there is a new primary.
-    bool _shouldChangeSyncSourceDueToNewPrimary(const HostAndPort& currentSource,
-                                                int currentSourceIndex) const;
-
-    // Change sync source if they are not ahead of us, and don't have a sync source.
-    // Note 'syncSourceIndex' is the index of our sync source's sync source. The 'currentSource'
-    // is our sync source.
-    bool _shouldChangeSyncSourceDueToSourceNotAhead(const HostAndPort& currentSource,
-                                                    int syncSourceIndex,
-                                                    bool syncSourceIsPrimary,
-                                                    const OpTime& currentSourceOpTime,
-                                                    const OpTime& lastOpTimeFetched) const;
-
-    // Change sync source if our sync source is also syncing from us when we are in primary
-    // catchup mode, forming a sync source selection cycle, and the sync source is not ahead
-    // of us.
-    // Note 'syncSourceHost' and 'syncSourceIndex' are the host and index of ourb sync source's
-    // sync source. The 'currentSource' is our sync source.
-    bool _shouldChangeSyncSourceToBreakCycle(const HostAndPort& currentSource,
-                                             const std::string& syncSourceHost,
-                                             int syncSourceIndex,
-                                             const OpTime& currentSourceOpTime,
-                                             const OpTime& lastOpTimeFetched) const;
-
-    // Returns true if we should choose a new sync source due to our current sync source being
-    // greater than maxSyncSourceLagSeconds and a better source being available.
-    bool _shouldChangeSyncSourceDueToLag(const HostAndPort& currentSource,
-                                         const OpTime& currentSourceOpTime,
-                                         const OpTime& lastOpTimeFetched,
-                                         Date_t now) const;
-
-    // Returns true if we should choose a new sync source because our current sync source does
-    // not match our strict criteria for sync source candidates, but another member does.
-    bool _shouldChangeSyncSourceDueToBetterEligibleSource(const HostAndPort& currentSource,
-                                                          int currentSourceIndex,
-                                                          const OpTime& lastOpTimeFetched,
-                                                          Date_t now) const;
     /*
      * Clear this node's sync source.
      */
