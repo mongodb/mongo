@@ -427,12 +427,6 @@ descend:
                  */
                 if (LF_ISSET(WT_READ_NO_WAIT) && current_state != WT_REF_MEM)
                     break;
-            } else if (current_state == WT_REF_DELETED) {
-                /*
-                 * Try to skip deleted pages visible to us.
-                 */
-                if (__wt_delete_page_skip(session, ref, LF_ISSET(WT_READ_VISIBLE_ALL)))
-                    break;
             } else if (LF_ISSET(WT_READ_TRUNCATE)) {
                 /*
                  * If deleting a range, try to delete the page without instantiating it. (Note this
@@ -442,6 +436,12 @@ descend:
                 if (skip)
                     break;
                 empty_internal = false;
+            } else if (current_state == WT_REF_DELETED) {
+                /*
+                 * Try to skip deleted pages visible to us.
+                 */
+                if (__wt_delete_page_skip(session, ref, LF_ISSET(WT_READ_VISIBLE_ALL)))
+                    break;
             }
 
             /* See if our caller wants to skip this page. */
