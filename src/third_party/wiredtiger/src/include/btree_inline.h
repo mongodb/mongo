@@ -45,6 +45,38 @@ __wt_ref_cas_state_int(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t old_state,
 }
 
 /*
+ * __wt_btree_disable_bulk --
+ *     Disable bulk loads into a tree.
+ */
+static inline void
+__wt_btree_disable_bulk(WT_SESSION_IMPL *session)
+{
+    WT_BTREE *btree;
+
+    btree = S2BT(session);
+
+    /*
+     * Once a tree (other than the LSM primary) is no longer empty, eviction should pay attention to
+     * it, and it's no longer possible to bulk-load into it.
+     */
+    if (!btree->original)
+        return;
+    if (btree->lsm_primary) {
+        btree->original = 0; /* Make the next test faster. */
+        return;
+    }
+
+    /*
+     * We use a compare-and-swap here to avoid races among the first inserts into a tree. Eviction
+     * is disabled when an empty tree is opened, and it must only be enabled once.
+     */
+    if (__wt_atomic_cas8(&btree->original, 1, 0)) {
+        btree->evict_disabled_open = false;
+        __wt_evict_file_exclusive_off(session);
+    }
+}
+
+/*
  * __wt_page_is_empty --
  *     Return if the page is empty.
  */

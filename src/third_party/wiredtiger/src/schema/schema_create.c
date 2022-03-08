@@ -291,10 +291,13 @@ __create_file(
      * we just wrote the collapsed configuration into the metadata file, and it's going to be
      * read/used by underlying functions.
      *
-     * Keep the handle exclusive until it is released at the end of the call, otherwise we could
-     * race with a drop.
+     * Turn off bulk-load for imported files.
      */
     WT_ERR(__wt_session_get_dhandle(session, uri, NULL, NULL, WT_DHANDLE_EXCLUSIVE));
+
+    if (import)
+        __wt_btree_disable_bulk(session);
+
     if (WT_META_TRACKING(session))
         WT_ERR(__wt_meta_track_handle_lock(session, true));
     else

@@ -887,7 +887,7 @@ __curhs_insert(WT_CURSOR *cursor)
      * Disable bulk loads into history store. This would normally occur when updating a record with
      * a cursor however the history store doesn't use cursor update, so we do it here.
      */
-    __wt_cursor_disable_bulk(session);
+    __wt_btree_disable_bulk(session);
 
     /*
      * The actual record to be inserted into the history store. Set the current update start time
