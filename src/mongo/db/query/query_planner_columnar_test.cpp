@@ -65,7 +65,7 @@ TEST_F(QueryPlannerColumnarTest, InclusionProjectionUsesColumnarIndex) {
 
     assertNumSolutions(1U);
     assertSolutionExists(
-        "{proj: {spec: {a: 1, _id: 0}, node: {column_ixscan: {filter: {a: {$gt: 3}},"
+        "{proj: {spec: {a: 1, _id: 0}, node: {column_ixscan: {filtersByPath: {a: {a: {$gt: 3}}},"
         "fields: {a: 1}}}}}");
 }
 
@@ -105,5 +105,76 @@ TEST_F(QueryPlannerColumnarTest, StandardIndexPreferredOverColumnarIndex) {
 
     assertNumSolutions(1U);
     assertSolutionExists("{proj: {spec: {a:1, _id: 0}, node: {ixscan: {pattern: {a: 1}}}}}");
+}
+
+TEST_F(QueryPlannerColumnarTest, DisqualifyingPredicatesPreventUseOfColumnarIndex) {
+    addColumnarIndex();
+
+    runQuerySortProj(BSON("a" << BSONNULL), BSONObj(), BSON("a" << 1 << "_id" << 0));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {a: 1, _id: 0}, node: {cscan: {dir: 1, filter: {a: {$eq: null}}}}}}");
+}
+
+TEST_F(QueryPlannerColumnarTest, MultiplePredicatesAllowedWithColumnarIndex) {
+    addColumnarIndex();
+
+    runQuerySortProj(BSON("a" << 2 << "b" << 3), BSONObj(), BSON("a" << 1 << "_id" << 0));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {a: 1, _id: 0}, node: {column_ixscan: {"
+        " filtersByPath: {"
+        "  a: {a: {$eq: 2}},"
+        "  b: {b: {$eq: 3}}"
+        " },"
+        " fields: {a: 1}"
+        " }}}"
+        "}}");
+}
+
+TEST_F(QueryPlannerColumnarTest, ComplexPredicateSplitDemo) {
+    addColumnarIndex();
+
+    auto complexPredicate =
+        BSON("a" << BSON("$gte" << 0 << "$lt" << 10) << "addresses.zip"
+                 << BSON("$in" << BSON_ARRAY("12345"
+                                             << "01234"))
+                 << "unsubscribed" << false << "specialAddress" << BSON("$exists" << true));
+    runQuerySortProj(complexPredicate, BSONObj(), BSON("a" << 1 << "_id" << 0));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {a: 1, _id: 0}, node: {column_ixscan: {"
+        " filtersByPath: {"
+        "  a: {$and: [{a: {$gte: 0}}, {a: {$lt: 10}}]},"
+        "  'addresses.zip': {'addresses.zip': {$in: ['12345', '01234']}},"
+        "  unsubscribed: {unsubscribed: {$eq: false}},"
+        "  specialAddress: {specialAddress: {$exists: true}}"
+        " },"
+        " fields: {a: 1}"
+        " }}}"
+        "}}");
+}
+
+TEST_F(QueryPlannerColumnarTest, ComplexPredicateSplitFailureDemo) {
+    addColumnarIndex();
+
+    // Same predicate as above, except with exists: false, which disqualifies the whole thing.
+    auto complexPredicate =
+        BSON("a" << BSON("$gte" << 0 << "$lt" << 10) << "addresses.zip"
+                 << BSON("$in" << BSON_ARRAY("12345"
+                                             << "01234"))
+                 << "unsubscribed" << false << "specialAddress" << BSON("$exists" << false));
+    runQuerySortProj(complexPredicate, BSONObj(), BSON("a" << 1 << "_id" << 0));
+    assertSolutionExists("{proj: {spec: {a: 1, _id: 0}, node: {cscan: {dir: 1}}}}");
+}
+
+TEST_F(QueryPlannerColumnarTest, EmptyQueryPredicateIsEligible) {
+    addColumnarIndex();
+
+    runQuerySortProj(BSONObj(), BSONObj(), BSON("a" << 1 << "_id" << 0));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {a: 1, _id: 0}, node: {"
+        " column_ixscan: {filtersByPath: {}, fields: {a: 1}}}}}");
 }
 }  // namespace mongo

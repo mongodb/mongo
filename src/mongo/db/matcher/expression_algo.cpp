@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 #include "mongo/platform/basic.h"
 
@@ -40,11 +39,11 @@
 #include "mongo/db/matcher/expression_internal_bucket_geo_within.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
+#include "mongo/db/matcher/expression_type.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/logv2/log.h"
 
 namespace mongo {
 
@@ -438,6 +437,191 @@ std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitMatchEx
     }
 }
 
+bool tryAddExprHelper(StringData path,
+                      std::unique_ptr<MatchExpression> me,
+                      StringMap<std::unique_ptr<MatchExpression>>& out) {
+    auto& entryForPath = out[path];
+    if (!entryForPath) {
+        // First predicate for this path, just put it in directly.
+        entryForPath = std::move(me);
+    } else {
+        // We have at least one predicate for this path already. Put all the predicates for the path
+        // into a giant $and clause. Note this might have to change once we start supporting $or
+        // predicates.
+        if (entryForPath->matchType() != MatchExpression::AND) {
+            // This is the second predicate, we need to make the $and and put in both predicates:
+            // {$and: [<existing>, 'me']}.
+            auto andME = std::make_unique<AndMatchExpression>();
+            andME->add(std::move(entryForPath));
+            entryForPath = std::move(andME);
+        }
+        auto andME = checked_cast<AndMatchExpression*>(entryForPath.get());
+        andME->add(std::move(me));
+    }
+    return true;
+}
+
+bool tryAddExpr(StringData path,
+                const MatchExpression* me,
+                StringMap<std::unique_ptr<MatchExpression>>& out) {
+    if (FieldRef(path).hasNumericPathComponents())
+        return false;
+
+    return tryAddExprHelper(path, me->shallowClone(), out);
+}
+
+bool splitMatchExpressionForColumns(const MatchExpression* me,
+                                    StringMap<std::unique_ptr<MatchExpression>>& out) {
+    auto canCompareWith = [](const BSONElement& elem, bool isEQ) {
+        // Here we check whether the comparison can work with the given value. Objects and arrays
+        // are generally not permitted. Objects can't work because the paths will be split apart in
+        // the columnar index. We could do arrays of scalars since we would have all that
+        // information in the index, but it proved complex to integrate due to the interface with
+        // the matcher. It expects to get a BSONElement for the whole Array but we'd like to avoid
+        // materializing that.
+        //
+        // One exception to the above: We can support EQ with empty objects and empty arrays since
+        // those are more obviously correct. Maybe could also support LT and LTE, but those don't
+        // seem as important so are left for future work.
+        if (elem.type() == BSONType::Array || elem.type() == BSONType::Object) {
+            return isEQ && elem.Obj().isEmpty();
+        }
+
+        // We support all other types, except null, since it is equivalent to x==null || !exists(x).
+        return !elem.isNull();
+    };
+    switch (me->matchType()) {
+        // These are always safe since they will never match documents missing their field, or where
+        // the element is an object or array.
+        case MatchExpression::REGEX:
+        case MatchExpression::MOD:
+        case MatchExpression::BITS_ALL_SET:
+        case MatchExpression::BITS_ALL_CLEAR:
+        case MatchExpression::BITS_ANY_SET:
+        case MatchExpression::BITS_ANY_CLEAR:
+        case MatchExpression::EXISTS: {
+            auto sub = checked_cast<const PathMatchExpression*>(me);
+            return tryAddExpr(sub->path(), me, out);
+        }
+
+        case MatchExpression::LT:
+        case MatchExpression::GT:
+        case MatchExpression::EQ:
+        case MatchExpression::LTE:
+        case MatchExpression::GTE: {
+            auto sub = checked_cast<const ComparisonMatchExpressionBase*>(me);
+            if (!canCompareWith(sub->getData(), me->matchType() == MatchExpression::EQ))
+                return false;
+            return tryAddExpr(sub->path(), me, out);
+        }
+
+
+        case MatchExpression::MATCH_IN: {
+            auto sub = checked_cast<const InMatchExpression*>(me);
+            // Note that $in treats regexes specially and stores them separately than the rest of
+            // the 'equalities'. We actually don't need to look at them here since any regex should
+            // be OK. A regex could only match a string, symbol, or other regex, any of which would
+            // be present in the columnar storage.
+            for (auto&& elem : sub->getEqualities()) {
+                if (!canCompareWith(elem, true))
+                    return false;
+            }
+            return tryAddExpr(sub->path(), me, out);
+        }
+
+        case MatchExpression::TYPE_OPERATOR: {
+            auto sub = checked_cast<const TypeMatchExpression*>(me);
+            if (sub->typeSet().hasType(BSONType::EOO) || sub->typeSet().hasType(BSONType::Object) ||
+                sub->typeSet().hasType(BSONType::Array))
+                return false;
+            return tryAddExpr(sub->path(), me, out);
+        }
+
+        case MatchExpression::AND: {
+            auto sub = checked_cast<const AndMatchExpression*>(me);
+            for (size_t i = 0, end = sub->numChildren(); i != end; i++) {
+                if (!splitMatchExpressionForColumns(sub->getChild(i), out)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+
+        case MatchExpression::NOT: {
+            // {$ne: null} pattern is known to be important in cases like those in SERVER-27646 and
+            // SERVER-36465.
+            auto notExpr = checked_cast<const NotMatchExpression*>(me);
+            auto withinNot = notExpr->getChild(0);
+
+            // Oddly, we parse {$ne: null} to a NOT -> EQ, but we parse {$not: {$eq: null}} into a
+            // more complex NOT -> AND -> EQ. Let's support both.
+            auto tryAddNENull = [&](const MatchExpression* negatedPred) {
+                if (negatedPred->matchType() != MatchExpression::EQ) {
+                    return false;
+                }
+                auto eqPred = checked_cast<const EqualityMatchExpression*>(negatedPred);
+                if (eqPred->getData().isNull()) {
+                    return tryAddExpr(eqPred->path(), me, out);
+                }
+                return false;
+            };
+            if (tryAddNENull(withinNot)) {
+                // {$ne: null}. We had equality just under NOT.
+                return true;
+            } else if (withinNot->matchType() == MatchExpression::AND &&
+                       withinNot->numChildren() == 1 && tryAddNENull(withinNot->getChild(0))) {
+                // {$not: {$eq: null}}: NOT -> AND -> EQ.
+                return true;
+            }
+            // May be other cases, but left as future work.
+            return false;
+        }
+
+        // We don't currently handle any of these cases, but some may be possible in the future.
+        case MatchExpression::ALWAYS_FALSE:
+        case MatchExpression::ALWAYS_TRUE:
+        case MatchExpression::ELEM_MATCH_OBJECT:
+        case MatchExpression::ELEM_MATCH_VALUE:  // This one should be feasible. May be valuable.
+        case MatchExpression::EXPRESSION:
+        case MatchExpression::GEO:
+        case MatchExpression::GEO_NEAR:
+        case MatchExpression::INTERNAL_2D_POINT_IN_ANNULUS:
+        case MatchExpression::INTERNAL_BUCKET_GEO_WITHIN:
+        case MatchExpression::INTERNAL_EXPR_EQ:  // This one could be valuable for $lookup
+        case MatchExpression::INTERNAL_EXPR_GT:
+        case MatchExpression::INTERNAL_EXPR_GTE:
+        case MatchExpression::INTERNAL_EXPR_LT:
+        case MatchExpression::INTERNAL_EXPR_LTE:
+        case MatchExpression::INTERNAL_SCHEMA_ALLOWED_PROPERTIES:
+        case MatchExpression::INTERNAL_SCHEMA_ALL_ELEM_MATCH_FROM_INDEX:
+        case MatchExpression::INTERNAL_SCHEMA_BIN_DATA_ENCRYPTED_TYPE:
+        case MatchExpression::INTERNAL_SCHEMA_BIN_DATA_SUBTYPE:
+        case MatchExpression::INTERNAL_SCHEMA_COND:
+        case MatchExpression::INTERNAL_SCHEMA_EQ:
+        case MatchExpression::INTERNAL_SCHEMA_FMOD:
+        case MatchExpression::INTERNAL_SCHEMA_MATCH_ARRAY_INDEX:
+        case MatchExpression::INTERNAL_SCHEMA_MAX_ITEMS:
+        case MatchExpression::INTERNAL_SCHEMA_MAX_LENGTH:
+        case MatchExpression::INTERNAL_SCHEMA_MAX_PROPERTIES:
+        case MatchExpression::INTERNAL_SCHEMA_MIN_ITEMS:
+        case MatchExpression::INTERNAL_SCHEMA_MIN_LENGTH:
+        case MatchExpression::INTERNAL_SCHEMA_MIN_PROPERTIES:
+        case MatchExpression::INTERNAL_SCHEMA_OBJECT_MATCH:
+        case MatchExpression::INTERNAL_SCHEMA_ROOT_DOC_EQ:
+        case MatchExpression::INTERNAL_SCHEMA_TYPE:
+        case MatchExpression::INTERNAL_SCHEMA_UNIQUE_ITEMS:
+        case MatchExpression::INTERNAL_SCHEMA_XOR:
+        case MatchExpression::NOR:
+        case MatchExpression::OR:
+        case MatchExpression::SIZE:
+        case MatchExpression::TEXT:
+        case MatchExpression::WHERE:
+            return false;
+    }
+    MONGO_UNREACHABLE;
+}
+
 }  // namespace
 
 namespace expression {
@@ -718,6 +902,25 @@ bool isPathPrefixOf(StringData first, StringData second) {
 bool bidirectionalPathPrefixOf(StringData first, StringData second) {
     return first == second || expression::isPathPrefixOf(first, second) ||
         expression::isPathPrefixOf(second, first);
+}
+
+boost::optional<StringMap<std::unique_ptr<MatchExpression>>> splitMatchExpressionForColumns(
+    const MatchExpression* me) {
+    boost::optional<StringMap<std::unique_ptr<MatchExpression>>> out;
+    out.emplace();
+    if (!mongo::splitMatchExpressionForColumns(me, *out))
+        out = {};
+    return out;
+}
+
+std::string filterMapToString(const StringMap<std::unique_ptr<MatchExpression>>& filterMap) {
+    StringBuilder sb;
+    sb << "{";
+    for (auto&& [path, matchExpr] : filterMap) {
+        sb << path << ": " << matchExpr->toString() << ", ";
+    }
+    sb << "}";
+    return sb.str();
 }
 }  // namespace expression
 }  // namespace mongo

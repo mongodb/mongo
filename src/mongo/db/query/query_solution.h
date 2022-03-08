@@ -523,6 +523,7 @@ struct ColumnIndexScanNode : public QuerySolutionNode {
 
     ColumnIndexEntry indexEntry;
 
+    StringMap<std::unique_ptr<MatchExpression>> filtersByPath;
     std::vector<std::string> fields;
 };
 

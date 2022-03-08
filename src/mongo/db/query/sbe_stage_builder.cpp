@@ -955,9 +955,16 @@ std::unique_ptr<sbe::EExpression> abtToExpr(optimizer::ABT& abt, optimizer::Slot
 }  // namespace
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildColumnScan(
     const QuerySolutionNode* root, const PlanStageReqs& reqs) {
-    invariant(!reqs.getIndexKeyBitset());
+    tassert(6312404,
+            "Unexpected index key bitset provided for column scan stage",
+            !reqs.getIndexKeyBitset());
 
     auto csn = static_cast<const ColumnIndexScanNode*>(root);
+    tassert(6312405,
+            "Unexpected filter provided for column scan stage. Expected 'filtersByPath' to be used "
+            "instead.",
+            !csn->filter);
+
     PlanStageSlots outputs;
 
     auto recordSlot = _slotIdGenerator.generate();

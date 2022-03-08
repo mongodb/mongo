@@ -157,5 +157,22 @@ splitMatchExpressionBy(std::unique_ptr<MatchExpression> expr,
  * {new: {$gt: 3}}.
  */
 void applyRenamesToExpression(MatchExpression* expr, const StringMap<std::string>& renames);
+
+/**
+ * Split a MatchExpression into subexpressions targeted to separate columns. A document will match
+ * the query if all of the sub expressions match. Returns an empty optional if the entire match
+ * cannot be handled by the column store.
+ *
+ * This API will need to change in order to support more complex queries, such as $or and
+ * $elemMatch.
+ */
+boost::optional<StringMap<std::unique_ptr<MatchExpression>>> splitMatchExpressionForColumns(
+    const MatchExpression* me);
+
+/**
+ * Serializes this complex data structure for debugging purposes.
+ */
+std::string filterMapToString(const StringMap<std::unique_ptr<MatchExpression>>&);
+
 }  // namespace expression
 }  // namespace mongo
