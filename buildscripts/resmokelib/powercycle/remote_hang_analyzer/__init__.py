@@ -48,7 +48,7 @@ class RunHangAnalyzerOnRemoteInstance(PowercycleCommand):
         # we don't want to evaluate the local python variable, but instead pass the python string
         # so the remote host will use the right python when the virtualenv is sourced.
         cmds = f"{cmds}; cd {remote_dir}"
-        cmds = f"{cmds}; PATH=\"/opt/mongodbtoolchain/v3/bin:$PATH\" python buildscripts/resmoke.py hang-analyzer {hang_analyzer_option}"
+        cmds = f"{cmds}; PATH=\"$PATH:/opt/mongodbtoolchain/v3/bin\" python buildscripts/resmoke.py hang-analyzer {hang_analyzer_option}"
         self.remote_op.operation(SSHOperation.SHELL, cmds, None)
 
         file_param = []
