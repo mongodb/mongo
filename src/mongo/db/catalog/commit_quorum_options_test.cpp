@@ -54,7 +54,7 @@ TEST(CommitQuorumOptionsTest, ParseReturnsFailedToParseIfCommitQuorumIsANegative
     BSONObj obj = BSON("commitQuorum" << -1);
     auto status = CommitQuorumOptions().parse(obj.getField("commitQuorum"));
     ASSERT_EQUALS(ErrorCodes::FailedToParse, status);
-    ASSERT_EQUALS("commitQuorum has to be a non-negative number and not greater than 7",
+    ASSERT_EQUALS("commitQuorum has to be a non-negative number and not greater than 50",
                   status.reason());
 }
 
@@ -63,7 +63,7 @@ TEST(CommitQuorumOptionsTest,
     BSONObj obj = BSON("commitQuorum" << 70);
     auto status = CommitQuorumOptions().parse(obj.getField("commitQuorum"));
     ASSERT_EQUALS(ErrorCodes::FailedToParse, status);
-    ASSERT_EQUALS("commitQuorum has to be a non-negative number and not greater than 7",
+    ASSERT_EQUALS("commitQuorum has to be a non-negative number and not greater than 50",
                   status.reason());
 }
 

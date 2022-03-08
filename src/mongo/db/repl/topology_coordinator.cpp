@@ -3666,7 +3666,7 @@ Status TopologyCoordinator::checkIfCommitQuorumCanBeSatisfied(
     }
 
     return {ErrorCodes::UnsatisfiableCommitQuorum,
-            "Not enough data-bearing voting nodes to satisfy commit quorum"};
+            "Not enough data-bearing nodes to satisfy commit quorum"};
 }
 
 }  // namespace repl
