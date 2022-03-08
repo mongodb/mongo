@@ -53,6 +53,7 @@ const expectedParamDefaults = {
     internalQueryCollectionMaxNoOfDocumentsToChooseHashJoin: 10 * 1000,
     internalQueryCollectionMaxDataSizeBytesToChooseHashJoin: 100 * 1024 * 1024,
     internalQueryCollectionMaxStorageSizeBytesToChooseHashJoin: 100 * 1024 * 1024,
+    internalQueryDisableLookupExecutionUsingHashJoin: false,
 };
 
 function assertDefaultParameterValues() {
@@ -223,6 +224,9 @@ assertSetParameterFails("internalQueryCollectionMaxDataSizeBytesToChooseHashJoin
 assertSetParameterSucceeds("internalQueryCollectionMaxStorageSizeBytesToChooseHashJoin", 100);
 assertSetParameterFails("internalQueryCollectionMaxStorageSizeBytesToChooseHashJoin", 0);
 assertSetParameterFails("internalQueryCollectionMaxStorageSizeBytesToChooseHashJoin", -1);
+
+assertSetParameterSucceeds("internalQueryDisableLookupExecutionUsingHashJoin", true);
+assertSetParameterSucceeds("internalQueryDisableLookupExecutionUsingHashJoin", false);
 
 MongoRunner.stopMongod(conn);
 })();

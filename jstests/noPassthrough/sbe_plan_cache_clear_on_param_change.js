@@ -34,6 +34,7 @@ const paramList = [
     {name: "internalQueryCollectionMaxNoOfDocumentsToChooseHashJoin", value: 1},
     {name: "internalQueryCollectionMaxDataSizeBytesToChooseHashJoin", value: 100},
     {name: "internalQueryCollectionMaxStorageSizeBytesToChooseHashJoin", value: 100},
+    {name: "internalQueryDisableLookupExecutionUsingHashJoin", value: true},
 ];
 
 const conn = MongoRunner.runMongod();

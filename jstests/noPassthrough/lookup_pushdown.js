@@ -378,6 +378,30 @@ MongoRunner.stopMongod(conn);
             JoinAlgorithm.HJ,
             {allowDiskUse: true});
 
+    // Setting the 'internalQueryDisableLookupExecutionUsingHashJoin' knob to true will disable
+    // HJ plans from being chosen and since the pipeline is SBE compatible it will fallback to
+    // NLJ.
+    assert.commandWorked(db.adminCommand({
+        setParameter: 1,
+        internalQueryDisableLookupExecutionUsingHashJoin: true,
+    }));
+
+    runTest(lcoll,
+            [{$lookup: {from: fcoll.getName(), localField: "a", foreignField: "a", as: "out"}}],
+            JoinAlgorithm.NLJ,
+            {allowDiskUse: true});
+
+    // Test that we can go back to generating HJ plans.
+    assert.commandWorked(db.adminCommand({
+        setParameter: 1,
+        internalQueryDisableLookupExecutionUsingHashJoin: false,
+    }));
+
+    runTest(lcoll,
+            [{$lookup: {from: fcoll.getName(), localField: "a", foreignField: "a", as: "out"}}],
+            JoinAlgorithm.HJ,
+            {allowDiskUse: true});
+
     // Setting the 'internalQueryCollectionMaxNoOfDocumentsToChooseHashJoin' to count - 1 results in
     // choosing the NLJ algorithm.
     assert.commandWorked(db.adminCommand({

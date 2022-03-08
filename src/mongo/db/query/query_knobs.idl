@@ -795,6 +795,15 @@ server_parameters:
         gt: 0
     on_update: plan_cache_util::clearSbeCacheOnParameterChange
 
+  internalQueryDisableLookupExecutionUsingHashJoin:
+    description: "Disable lookup execution using hash join algorithm, this will cause the plans,
+    eligible for the hash join strategy, to fall back to using the nested loop join strategy."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryDisableLookupExecutionUsingHashJoin"
+    cpp_vartype: AtomicWord<bool>
+    default: false
+    on_update: plan_cache_util::clearSbeCacheOnParameterChange
+
 # Note for adding additional query knobs:
 #
 # When adding a new query knob, you should consider whether or not you need to add an 'on_update'
