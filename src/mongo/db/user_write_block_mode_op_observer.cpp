@@ -32,8 +32,20 @@
 #include "mongo/db/user_write_block_mode_op_observer.h"
 
 #include "mongo/db/s/global_user_write_block_state.h"
+#include "mongo/db/s/user_writes_critical_section_document_gen.h"
+#include "mongo/db/s/user_writes_recoverable_critical_section_service.h"
 
 namespace mongo {
+namespace {
+
+const auto documentIdDecoration = OperationContext::declareDecoration<BSONObj>();
+
+bool isStandaloneOrPrimary(OperationContext* opCtx) {
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    return replCoord->canAcceptWritesForDatabase(opCtx, NamespaceString::kAdminDb);
+}
+
+}  // namespace
 
 void UserWriteBlockModeOpObserver::onInserts(OperationContext* opCtx,
                                              const NamespaceString& nss,
@@ -42,11 +54,78 @@ void UserWriteBlockModeOpObserver::onInserts(OperationContext* opCtx,
                                              std::vector<InsertStatement>::const_iterator last,
                                              bool fromMigrate) {
     _checkWriteAllowed(opCtx, nss);
+
+    if (nss == NamespaceString::kUserWritesCriticalSectionsNamespace) {
+        for (auto it = first; it != last; ++it) {
+            const auto& insertedDoc = it->doc;
+
+            auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+            if (!replCoord->isReplEnabled() ||
+                (!replCoord->getMemberState().recovering() &&
+                 !replCoord->getMemberState().rollback())) {
+                const auto collCSDoc = UserWriteBlockingCriticalSectionDocument::parse(
+                    IDLParserErrorContext("UserWriteBlockOpObserver"), insertedDoc);
+                opCtx->recoveryUnit()->onCommit(
+                    [opCtx,
+                     blockShardedDDL = collCSDoc.getBlockNewUserShardedDDL(),
+                     blockWrites = collCSDoc.getBlockUserWrites(),
+                     insertedNss = collCSDoc.getNss()](boost::optional<Timestamp>) {
+                        invariant(insertedNss.isEmpty());
+                        boost::optional<Lock::GlobalLock> globalLockIfNotPrimary;
+                        if (!isStandaloneOrPrimary(opCtx)) {
+                            globalLockIfNotPrimary.emplace(opCtx, MODE_IX);
+                        }
+                        if (blockWrites) {
+                            GlobalUserWriteBlockState::get(opCtx)->enableUserWriteBlocking(opCtx);
+                        }
+                    });
+            }
+        }
+    }
 }
 
 void UserWriteBlockModeOpObserver::onUpdate(OperationContext* opCtx,
                                             const OplogUpdateEntryArgs& args) {
     _checkWriteAllowed(opCtx, args.nss);
+
+    if (args.nss == NamespaceString::kUserWritesCriticalSectionsNamespace) {
+        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+        if (!replCoord->isReplEnabled() ||
+            (!replCoord->getMemberState().recovering() &&
+             !replCoord->getMemberState().rollback())) {
+            const auto collCSDoc = UserWriteBlockingCriticalSectionDocument::parse(
+                IDLParserErrorContext("UserWriteBlockOpObserver"), args.updateArgs->updatedDoc);
+
+            opCtx->recoveryUnit()->onCommit(
+                [opCtx,
+                 updatedNss = collCSDoc.getNss(),
+                 blockShardedDDL = collCSDoc.getBlockNewUserShardedDDL(),
+                 blockWrites = collCSDoc.getBlockUserWrites(),
+                 insertedNss = collCSDoc.getNss()](boost::optional<Timestamp>) {
+                    invariant(updatedNss.isEmpty());
+                    boost::optional<Lock::GlobalLock> globalLockIfNotPrimary;
+                    if (!isStandaloneOrPrimary(opCtx)) {
+                        globalLockIfNotPrimary.emplace(opCtx, MODE_IX);
+                    }
+
+                    if (blockWrites) {
+                        GlobalUserWriteBlockState::get(opCtx)->enableUserWriteBlocking(opCtx);
+                    } else {
+                        GlobalUserWriteBlockState::get(opCtx)->disableUserWriteBlocking(opCtx);
+                    }
+                });
+        }
+    }
+}
+
+void UserWriteBlockModeOpObserver::aboutToDelete(OperationContext* opCtx,
+                                                 NamespaceString const& nss,
+                                                 const UUID& uuid,
+                                                 BSONObj const& doc) {
+
+    if (nss == NamespaceString::kUserWritesCriticalSectionsNamespace) {
+        documentIdDecoration(opCtx) = doc;
+    }
 }
 
 void UserWriteBlockModeOpObserver::onDelete(OperationContext* opCtx,
@@ -55,11 +134,47 @@ void UserWriteBlockModeOpObserver::onDelete(OperationContext* opCtx,
                                             StmtId stmtId,
                                             const OplogDeleteEntryArgs& args) {
     _checkWriteAllowed(opCtx, nss);
+
+    if (nss == NamespaceString::kUserWritesCriticalSectionsNamespace) {
+        auto& documentId = documentIdDecoration(opCtx);
+        invariant(!documentId.isEmpty());
+
+        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+        if (!replCoord->isReplEnabled() ||
+            (!replCoord->getMemberState().recovering() &&
+             !replCoord->getMemberState().rollback())) {
+            const auto& deletedDoc = documentId;
+            const auto collCSDoc = UserWriteBlockingCriticalSectionDocument::parse(
+                IDLParserErrorContext("UserWriteBlockOpObserver"), deletedDoc);
+
+            opCtx->recoveryUnit()->onCommit(
+                [opCtx, deletedNss = collCSDoc.getNss()](boost::optional<Timestamp>) {
+                    invariant(deletedNss.isEmpty());
+                    boost::optional<Lock::GlobalLock> globalLockIfNotPrimary;
+                    if (!isStandaloneOrPrimary(opCtx)) {
+                        globalLockIfNotPrimary.emplace(opCtx, MODE_IX);
+                    }
+
+                    GlobalUserWriteBlockState::get(opCtx)->disableUserWriteBlocking(opCtx);
+                });
+        }
+    }
+}
+
+void UserWriteBlockModeOpObserver::_onReplicationRollback(OperationContext* opCtx,
+                                                          const RollbackObserverInfo& rbInfo) {
+    if (rbInfo.rollbackNamespaces.find(NamespaceString::kUserWritesCriticalSectionsNamespace) !=
+        rbInfo.rollbackNamespaces.end()) {
+        UserWritesRecoverableCriticalSectionService::get(opCtx)->recoverRecoverableCriticalSections(
+            opCtx);
+    }
 }
 
 void UserWriteBlockModeOpObserver::_checkWriteAllowed(OperationContext* opCtx,
                                                       const NamespaceString& nss) {
-    GlobalUserWriteBlockState::get(opCtx)->checkUserWritesAllowed(opCtx, nss);
+    if (isStandaloneOrPrimary(opCtx)) {
+        GlobalUserWriteBlockState::get(opCtx)->checkUserWritesAllowed(opCtx, nss);
+    }
 }
 
 }  // namespace mongo

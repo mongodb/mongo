@@ -32,10 +32,10 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/set_user_write_block_mode_gen.h"
-#include "mongo/db/s/global_user_write_block_state.h"
+#include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/s/user_writes_recoverable_critical_section_service.h"
 #include "mongo/logv2/log.h"
 
 
@@ -62,12 +62,29 @@ public:
 
         void typedRun(OperationContext* opCtx) {
             {
-                Lock::GlobalLock lk(opCtx, MODE_X);
                 if (request().getGlobal()) {
-                    GlobalUserWriteBlockState::get(opCtx)->enableUserWriteBlocking(opCtx);
+                    UserWritesRecoverableCriticalSectionService::get(opCtx)
+                        ->acquireRecoverableCriticalSectionBlockingUserWrites(
+                            opCtx,
+                            UserWritesRecoverableCriticalSectionService::
+                                kGlobalUserWritesNamespace);
                 } else {
-                    GlobalUserWriteBlockState::get(opCtx)->disableUserWriteBlocking(opCtx);
+                    UserWritesRecoverableCriticalSectionService::get(opCtx)
+                        ->releaseRecoverableCriticalSection(
+                            opCtx,
+                            UserWritesRecoverableCriticalSectionService::
+                                kGlobalUserWritesNamespace);
                 }
+
+                // Wait for the writes to the UserWritesRecoverableCriticalSection collection to be
+                // majority commited.
+                auto& replClient = repl::ReplClientInfo::forClient(opCtx->getClient());
+                WriteConcernResult writeConcernResult;
+                WriteConcernOptions majority(WriteConcernOptions::kMajority,
+                                             WriteConcernOptions::SyncMode::UNSET,
+                                             WriteConcernOptions::kWriteConcernTimeoutUserCommand);
+                uassertStatusOK(waitForWriteConcern(
+                    opCtx, replClient.getLastOp(), majority, &writeConcernResult));
             }
         }
 

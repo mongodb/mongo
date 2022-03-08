@@ -165,6 +165,22 @@ env.Library(
 )
 
 env.Library(
+    target='user_writes_recoverable_critical_section',
+    source=[
+        'user_writes_critical_section_document.idl',
+        'user_writes_recoverable_critical_section_service.cpp',
+    ],
+    LIBDEPS=[
+        'sharding_api_d',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/dbdirectclient',
+        '$BUILD_DIR/mongo/db/repl/replica_set_aware_service',
+        '$BUILD_DIR/mongo/db/rw_concern_d',
+    ]
+)
+
+env.Library(
     target='transaction_coordinator',
     source=[
         'server_transaction_coordinators_metrics.cpp',

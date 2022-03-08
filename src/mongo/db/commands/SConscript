@@ -462,6 +462,20 @@ env.Library(
 )
 
 env.Library(
+    target='set_user_write_block_mode_command',
+    source=[
+        'set_user_write_block_mode_command.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/commands',
+        '$BUILD_DIR/mongo/db/rw_concern_d',
+        '$BUILD_DIR/mongo/db/s/user_writes_recoverable_critical_section',
+        'set_user_write_block_mode_idl',
+    ],
+)
+
+env.Library(
     target='set_user_write_block_mode_idl',
     source=[
         'set_user_write_block_mode.idl',
@@ -527,7 +541,6 @@ env.Library(
         'rwc_defaults_commands.cpp',
         "set_feature_compatibility_version_command.cpp",
         "set_index_commit_quorum_command.cpp",
-        'set_user_write_block_mode_command.cpp',
         "shutdown_d.cpp",
         "snapshot_management.cpp",
         "tenant_migration_donor_cmds.cpp",
@@ -596,7 +609,6 @@ env.Library(
         'servers',
         'set_feature_compatibility_version_idl',
         'set_index_commit_quorum_idl',
-        'set_user_write_block_mode_idl',
         'shell_protocol',
         'shutdown_idl',
         'standalone',

@@ -48,12 +48,10 @@ GlobalUserWriteBlockState* GlobalUserWriteBlockState::get(OperationContext* opCt
 }
 
 void GlobalUserWriteBlockState::enableUserWriteBlocking(OperationContext* opCtx) {
-    invariant(opCtx->lockState()->isLockHeldForMode(resourceIdGlobal, MODE_X));
     _globalUserWritesBlocked = true;
 }
 
 void GlobalUserWriteBlockState::disableUserWriteBlocking(OperationContext* opCtx) {
-    invariant(opCtx->lockState()->isLockHeldForMode(resourceIdGlobal, MODE_X));
     _globalUserWritesBlocked = false;
 }
 
