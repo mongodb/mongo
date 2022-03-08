@@ -126,6 +126,10 @@ protected:
             msgs.begin(), msgs.end(), [&](const auto& s) { return stringContains(s, needle); });
     }
 
+    int64_t countLogLinesWithId(int32_t id) {
+        return countBSONFormatLogLinesIsSubset(BSON("id" << id));
+    }
+
     void makeSelfPrimary(const Timestamp& electionTimestamp = Timestamp(0, 0)) {
         getTopoCoord().changeMemberState_forTest(MemberState::RS_PRIMARY, electionTimestamp);
         getTopoCoord().setCurrentPrimary_forTest(_selfIndex, electionTimestamp);
@@ -3725,6 +3729,7 @@ TEST_F(HeartbeatResponseTestV1,
     OpTime staleOpTime = OpTime(Timestamp(4, 0), 0);
     // ahead by more than maxSyncSourceLagSecs (30)
     OpTime freshOpTime = OpTime(Timestamp(3005, 0), 0);
+    setSelfMemberState(MemberState::RS_SECONDARY);
 
     updateConfig(BSON("_id"
                       << "rs0"
@@ -3753,6 +3758,7 @@ TEST_F(HeartbeatResponseTestV1,
         now()));
     stopCapturingLogMessages();
     ASSERT_EQUALS(1, countLogLinesContaining("Choosing new sync source"));
+    ASSERT_EQUALS(1, countLogLinesWithId(21834));
 }
 
 TEST_F(HeartbeatResponseTestV1,
@@ -3764,6 +3770,7 @@ TEST_F(HeartbeatResponseTestV1,
 
     // Set lastOpTimeFetched to be before the sync source's OpTime.
     OpTime lastOpTimeFetched = OpTime(Timestamp(300, 0), 0);
+    setSelfMemberState(MemberState::RS_SECONDARY);
 
     HeartbeatResponseAction nextAction = receiveUpHeartbeat(
         HostAndPort("host2"), "rs0", MemberState::RS_PRIMARY, election, syncSourceOpTime);
@@ -3809,6 +3816,8 @@ TEST_F(HeartbeatResponseTestV1, ShouldChangeSyncSourceWhenSyncSourceFormsCycleAn
     // when it is not ahead of us and it selects us to be its sync source, forming a sync source
     // cycle and we are currently in primary catchup.
     setSelfMemberState(MemberState::RS_PRIMARY);
+    getTopoCoord().setPrimaryIndex(0);
+
     OpTime election = OpTime();
     OpTime syncSourceOpTime = OpTime(Timestamp(400, 0), 0);
 
@@ -3833,6 +3842,7 @@ TEST_F(HeartbeatResponseTestV1, ShouldChangeSyncSourceWhenSyncSourceFormsCycleAn
     nextAction = receiveUpHeartbeat(
         HostAndPort("host2"), "rs0", MemberState::RS_SECONDARY, election, syncSourceOpTime);
     ASSERT_NO_ACTION(nextAction.getAction());
+    setSelfMemberState(MemberState::RS_SECONDARY);
     getTopoCoord().setPrimaryIndex(2);
     ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(
         HostAndPort("host2"),
@@ -3845,7 +3855,8 @@ TEST_F(HeartbeatResponseTestV1, ShouldChangeSyncSourceWhenSyncSourceFormsCycleAn
         lastOpTimeFetched,
         now()));
 
-    // Show that we also like host2 while it has some progress beyond our own.
+    // Show that we also like host2 while we are primary and it has some progress beyond our own.
+    setSelfMemberState(MemberState::RS_PRIMARY);
     getTopoCoord().setPrimaryIndex(0);
     OpTime olderThanSyncSourceOpTime = OpTime(Timestamp(300, 0), 0);
     nextAction = receiveUpHeartbeat(
@@ -3903,6 +3914,7 @@ TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceWhenFresherMemberIsDown
     OpTime syncSourceOpTime = OpTime(Timestamp(400, 1), 0);
     // ahead by more than maxSyncSourceLagSecs (30)
     OpTime fresherSyncSourceOpTime = OpTime(Timestamp(3005, 0), 0);
+    setSelfMemberState(MemberState::RS_SECONDARY);
 
     HeartbeatResponseAction nextAction = receiveUpHeartbeat(
         HostAndPort("host3"), "rs0", MemberState::RS_SECONDARY, election, fresherSyncSourceOpTime);
@@ -3937,6 +3949,7 @@ TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceWhileFresherMemberIsDen
     OpTime syncSourceOpTime = OpTime(Timestamp(400, 1), 0);
     // ahead by more than maxSyncSourceLagSecs (30)
     OpTime fresherSyncSourceOpTime = OpTime(Timestamp(3005, 0), 0);
+    setSelfMemberState(MemberState::RS_SECONDARY);
 
     HeartbeatResponseAction nextAction = receiveUpHeartbeat(
         HostAndPort("host3"), "rs0", MemberState::RS_SECONDARY, election, fresherSyncSourceOpTime);
@@ -3968,6 +3981,7 @@ TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceWhileFresherMemberIsDen
                                                       now()));
     stopCapturingLogMessages();
     ASSERT_EQUALS(1, countLogLinesContaining("Choosing new sync source"));
+    ASSERT_EQUALS(1, countLogLinesWithId(21834));
 }
 
 TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceIfNodeIsFreshByHeartbeatButNotMetadata) {
@@ -4034,8 +4048,12 @@ TEST_F(HeartbeatResponseTestV1, ShouldChangeSyncSourceWhenFresherMemberExists) {
     OpTime staleOpTime = OpTime(Timestamp(4, 0), 0);
     // ahead by more than maxSyncSourceLagSecs (30)
     OpTime freshOpTime = OpTime(Timestamp(3005, 0), 0);
+    setSelfMemberState(MemberState::RS_SECONDARY);
 
     HeartbeatResponseAction nextAction = receiveUpHeartbeat(
+        HostAndPort("host2"), "rs0", MemberState::RS_SECONDARY, election, staleOpTime);
+    ASSERT_NO_ACTION(nextAction.getAction());
+    nextAction = receiveUpHeartbeat(
         HostAndPort("host3"), "rs0", MemberState::RS_SECONDARY, election, freshOpTime);
     ASSERT_NO_ACTION(nextAction.getAction());
 
@@ -4049,6 +4067,35 @@ TEST_F(HeartbeatResponseTestV1, ShouldChangeSyncSourceWhenFresherMemberExists) {
         now()));
     stopCapturingLogMessages();
     ASSERT_EQUALS(1, countLogLinesContaining("Choosing new sync source"));
+    ASSERT_EQUALS(1, countLogLinesWithId(21834));
+}
+
+TEST_F(HeartbeatResponseTestV1, ShouldChangeSyncSourceWhenSyncSourceIsDown) {
+    // In this test, the TopologyCoordinator should tell us to change sync sources away from
+    // "host2" and to "host3" since "host2" is down.
+    OpTime election = OpTime();
+    OpTime oldSyncSourceOpTime = OpTime(Timestamp(4, 0), 0);
+    // ahead by less than maxSyncSourceLagSecs (30)
+    OpTime freshOpTime = OpTime(Timestamp(5, 0), 0);
+    setSelfMemberState(MemberState::RS_SECONDARY);
+
+    HeartbeatResponseAction nextAction = receiveDownHeartbeat(HostAndPort("host2"), "rs0");
+    ASSERT_NO_ACTION(nextAction.getAction());
+    nextAction = receiveUpHeartbeat(
+        HostAndPort("host3"), "rs0", MemberState::RS_SECONDARY, election, freshOpTime);
+    ASSERT_NO_ACTION(nextAction.getAction());
+
+    // set up complete, time for actual check
+    startCapturingLogMessages();
+    ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(
+        HostAndPort("host2"),
+        makeReplSetMetadata(),
+        makeOplogQueryMetadata(oldSyncSourceOpTime, -1 /* primaryIndex */, 1 /* syncSourceIndex */),
+        oldSyncSourceOpTime,
+        now()));
+    stopCapturingLogMessages();
+    ASSERT_EQUALS(1, countLogLinesContaining("Choosing new sync source"));
+    ASSERT_EQUALS(1, countLogLinesWithId(5929000));
 }
 
 TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceFromStalePrimary) {
@@ -4090,12 +4137,17 @@ TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceWhenMemberHasYetToHeart
                                                        now()));
 }
 
-TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceWhenMemberNotInConfig) {
+TEST_F(HeartbeatResponseTestV1, ShouldChangeSyncSourceWhenMemberNotInConfig) {
     // In this test, the TopologyCoordinator should tell us to change sync sources away from
     // "host4" since "host4" is absent from the config of version 10.
     ReplSetMetadata replMetadata(0, {OpTime(), Date_t()}, OpTime(), 10, 0, OID(), -1, false);
+
+    startCapturingLogMessages();
     ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(
         HostAndPort("host4"), replMetadata, makeOplogQueryMetadata(), OpTime(), now()));
+    stopCapturingLogMessages();
+    ASSERT_EQUALS(1, countLogLinesContaining("Choosing new sync source"));
+    ASSERT_EQUALS(1, countLogLinesWithId(21831));
 }
 
 TEST_F(HeartbeatResponseTestV1,
@@ -4103,6 +4155,7 @@ TEST_F(HeartbeatResponseTestV1,
     // In this test, the TopologyCoordinator should not tell us to change sync sources away from
     // "host2" since we are not aware of who the new primary is.
 
+    setSelfMemberState(MemberState::RS_SECONDARY);
     updateConfig(BSON("_id"
                       << "rs0"
                       << "version" << 5 << "term" << 1 << "members"
@@ -4132,6 +4185,7 @@ TEST_F(HeartbeatResponseTestV1,
     // In this test, the TopologyCoordinator should tell us to change sync sources away from
     // "host2" since "host3" is the new primary and chaining is disabled.
 
+    setSelfMemberState(MemberState::RS_SECONDARY);
     updateConfig(BSON("_id"
                       << "rs0"
                       << "version" << 5 << "term" << 1 << "members"
@@ -4145,13 +4199,21 @@ TEST_F(HeartbeatResponseTestV1,
                       << BSON("heartbeatTimeoutSecs" << 5 << "chainingAllowed" << false)),
                  0);
 
-    OpTime election = OpTime(Timestamp(1, 0), 0);
-    OpTime staleOpTime = OpTime(Timestamp(4, 0), 0);
-    OpTime freshOpTime = OpTime(Timestamp(5, 0), 0);
+    OpTime oldElection = OpTime(Timestamp(1, 1), 1);
+    OpTime curElection = OpTime(Timestamp(4, 2), 2);
+    OpTime staleOpTime = OpTime(Timestamp(4, 1), 1);
+    OpTime freshOpTime = OpTime(Timestamp(5, 1), 2);
+
+    // Old host should still be up; this is a stale heartbeat.
+    HeartbeatResponseAction nextAction = receiveUpHeartbeat(
+        HostAndPort("host2"), "rs0", MemberState::RS_PRIMARY, oldElection, staleOpTime);
+    ASSERT_NO_ACTION(nextAction.getAction());
+
+    getTopoCoord().updateTerm(2, now());
 
     // Set that host3 is the new primary.
-    HeartbeatResponseAction nextAction = receiveUpHeartbeat(
-        HostAndPort("host3"), "rs0", MemberState::RS_PRIMARY, election, freshOpTime);
+    nextAction = receiveUpHeartbeat(
+        HostAndPort("host3"), "rs0", MemberState::RS_PRIMARY, curElection, freshOpTime);
     ASSERT_NO_ACTION(nextAction.getAction());
 
     startCapturingLogMessages();
@@ -4163,6 +4225,52 @@ TEST_F(HeartbeatResponseTestV1,
         now()));
     stopCapturingLogMessages();
     ASSERT_EQUALS(1, countLogLinesContaining("Choosing new sync source"));
+    ASSERT_EQUALS(1, countLogLinesWithId(3962100));
+}
+
+TEST_F(HeartbeatResponseTestV1,
+       ShouldNotChangeSyncSourceWhenNotSyncingFromPrimaryChainingDisabledAndTwoPrimaries) {
+    // In this test, the TopologyCoordinator should not tell us to change sync sources away from
+    // "host2" since, though "host3" is the new primary, "host2" also thinks it is primary.
+
+    setSelfMemberState(MemberState::RS_SECONDARY);
+    updateConfig(BSON("_id"
+                      << "rs0"
+                      << "version" << 5 << "term" << 1 << "members"
+                      << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                               << "host1:27017")
+                                    << BSON("_id" << 1 << "host"
+                                                  << "host2:27017")
+                                    << BSON("_id" << 2 << "host"
+                                                  << "host3:27017"))
+                      << "protocolVersion" << 1 << "settings"
+                      << BSON("heartbeatTimeoutSecs" << 5 << "chainingAllowed" << false)),
+                 0);
+
+    OpTime oldElection = OpTime(Timestamp(1, 1), 1);
+    OpTime curElection = OpTime(Timestamp(4, 2), 2);
+    OpTime staleOpTime = OpTime(Timestamp(4, 1), 1);
+    OpTime freshOpTime = OpTime(Timestamp(5, 1), 2);
+
+    // Old host should still be up, and thinks it is primary.
+    HeartbeatResponseAction nextAction = receiveUpHeartbeat(
+        HostAndPort("host2"), "rs0", MemberState::RS_PRIMARY, oldElection, staleOpTime);
+    ASSERT_NO_ACTION(nextAction.getAction());
+
+    getTopoCoord().updateTerm(2, now());
+
+    // Set that host3 is the new primary.
+    nextAction = receiveUpHeartbeat(
+        HostAndPort("host3"), "rs0", MemberState::RS_PRIMARY, curElection, freshOpTime);
+    ASSERT_NO_ACTION(nextAction.getAction());
+
+    ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(
+        HostAndPort("host2"),
+        // Indicate host2 still thinks it is primary.
+        makeReplSetMetadata(freshOpTime, true /* isPrimary */),
+        makeOplogQueryMetadata(freshOpTime, 1 /* primaryIndex */, -1 /* syncSourceIndex */),
+        staleOpTime,  // lastOpTimeFetched so that we are behind host2 and host3
+        now()));
 }
 
 TEST_F(HeartbeatResponseTestV1, ShouldntChangeSyncSourceWhenChainingDisabledAndWeArePrimary) {
@@ -4183,7 +4291,7 @@ TEST_F(HeartbeatResponseTestV1, ShouldntChangeSyncSourceWhenChainingDisabledAndW
     OpTime freshOpTime = OpTime(Timestamp(5, 0), 0);
 
     // Set that we are primary.
-    getTopoCoord().setPrimaryIndex(0);
+    makeSelfPrimary();
 
     ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(
         HostAndPort("host2"),
