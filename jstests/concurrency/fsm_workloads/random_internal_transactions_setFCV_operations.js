@@ -8,6 +8,8 @@
  *  requires_sharding,
  *  assumes_balancer_off,
  *  uses_transactions,
+ *  # Requires all nodes to be running the latest binary.
+ *  multiversion_incompatible,
  * ]
  */
 
