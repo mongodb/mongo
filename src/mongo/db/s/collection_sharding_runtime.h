@@ -168,7 +168,7 @@ public:
      */
     enum CleanWhen { kNow, kDelayed };
     SharedSemiFuture<void> cleanUpRange(ChunkRange const& range,
-                                        boost::optional<UUID> migrationId,
+                                        const UUID& migrationId,
                                         CleanWhen when);
 
     /**

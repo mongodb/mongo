@@ -294,7 +294,7 @@ ExecutorFuture<void> deleteRangeInBatches(const std::shared_ptr<executor::TaskEx
                                           const UUID& collectionUuid,
                                           const BSONObj& keyPattern,
                                           const ChunkRange& range,
-                                          const boost::optional<UUID>& migrationId,
+                                          const UUID& migrationId,
                                           int numDocsToRemovePerBatch,
                                           Milliseconds delayBetweenBatches) {
     return AsyncTry([=] {
@@ -308,8 +308,7 @@ ExecutorFuture<void> deleteRangeInBatches(const std::shared_ptr<executor::TaskEx
                                    "numDocsToRemovePerBatch"_attr = numDocsToRemovePerBatch,
                                    "delayBetweenBatches"_attr = delayBetweenBatches);
 
-                       invariant(migrationId);
-                       ensureRangeDeletionTaskStillExists(opCtx, *migrationId);
+                       ensureRangeDeletionTaskStillExists(opCtx, migrationId);
 
                        AutoGetCollection collection(opCtx, nss, MODE_IX);
 
@@ -328,7 +327,7 @@ ExecutorFuture<void> deleteRangeInBatches(const std::shared_ptr<executor::TaskEx
                                                                          range,
                                                                          numDocsToRemovePerBatch));
                        migrationutil::persistUpdatedNumOrphans(
-                           opCtx, BSON("_id" << *migrationId), -numDeleted);
+                           opCtx, BSON("_id" << migrationId), -numDeleted);
 
                        if (MONGO_unlikely(hangAfterDoingDeletion.shouldFail())) {
                            hangAfterDoingDeletion.pauseWhileSet(opCtx);
@@ -506,7 +505,7 @@ SharedSemiFuture<void> removeDocumentsInRange(
     const UUID& collectionUuid,
     const BSONObj& keyPattern,
     const ChunkRange& range,
-    boost::optional<UUID> migrationId,
+    const UUID& migrationId,
     int numDocsToRemovePerBatch,
     Seconds delayForActiveQueriesOnSecondariesToComplete) {
     return std::move(waitForActiveQueriesToComplete)
@@ -586,16 +585,15 @@ SharedSemiFuture<void> removeDocumentsInRange(
                 return Status::OK();
             }
 
-            if (!migrationId ||
-                (!s.isOK() &&
-                 s.code() !=
-                     ErrorCodes::RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist)) {
+            if (!s.isOK() &&
+                s.code() !=
+                    ErrorCodes::RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist) {
                 // Propagate any errors to callers waiting on the result.
                 return s;
             }
 
             try {
-                removePersistentRangeDeletionTask(nss, std::move(*migrationId));
+                removePersistentRangeDeletionTask(nss, migrationId);
             } catch (const DBException& e) {
                 LOGV2_ERROR(23770,
                             "Failed to delete range deletion task for range {range} in collection "

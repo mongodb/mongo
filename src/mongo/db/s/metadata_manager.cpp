@@ -259,7 +259,7 @@ void MetadataManager::append(BSONObjBuilder* builder) const {
 }
 
 SharedSemiFuture<void> MetadataManager::cleanUpRange(ChunkRange const& range,
-                                                     boost::optional<UUID> migrationId,
+                                                     const UUID& migrationId,
                                                      bool shouldDelayBeforeDeletion) {
     stdx::lock_guard<Latch> lg(_managerLock);
     invariant(!_metadata.empty());
@@ -291,7 +291,7 @@ SharedSemiFuture<void> MetadataManager::cleanUpRange(ChunkRange const& range,
         return _submitRangeForDeletion(lg,
                                        overlapMetadata->onDestructionPromise.getFuture().semi(),
                                        range,
-                                       std::move(migrationId),
+                                       migrationId,
                                        delayForActiveQueriesOnSecondariesToComplete);
     } else {
         // No running queries can depend on this range, so queue it for deletion immediately.
@@ -305,7 +305,7 @@ SharedSemiFuture<void> MetadataManager::cleanUpRange(ChunkRange const& range,
         return _submitRangeForDeletion(lg,
                                        SemiFuture<void>::makeReady(),
                                        range,
-                                       std::move(migrationId),
+                                       migrationId,
                                        delayForActiveQueriesOnSecondariesToComplete);
     }
 }
@@ -371,7 +371,7 @@ SharedSemiFuture<void> MetadataManager::_submitRangeForDeletion(
     const WithLock&,
     SemiFuture<void> waitForActiveQueriesToComplete,
     const ChunkRange& range,
-    boost::optional<UUID> migrationId,
+    const UUID& migrationId,
     Seconds delayForActiveQueriesOnSecondariesToComplete) {
 
     int maxToDelete = rangeDeleterBatchSize.load();
@@ -386,7 +386,7 @@ SharedSemiFuture<void> MetadataManager::_submitRangeForDeletion(
                                _metadata.back()->metadata->getChunkManager()->getUUID(),
                                _metadata.back()->metadata->getKeyPattern().getOwned(),
                                range,
-                               std::move(migrationId),
+                               migrationId,
                                maxToDelete,
                                delayForActiveQueriesOnSecondariesToComplete);
 

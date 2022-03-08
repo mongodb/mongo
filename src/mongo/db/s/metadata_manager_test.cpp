@@ -330,13 +330,15 @@ TEST_F(MetadataManagerTest, BeginReceiveWithOverlappingRange) {
 // Tests membership functions for _rangesToClean
 TEST_F(MetadataManagerTest, RangesToCleanMembership) {
     ChunkRange cr(BSON("key" << 0), BSON("key" << 10));
+    const auto task =
+        insertRangeDeletionTask(operationContext(), kNss, _manager->getCollectionUuid(), cr, 0);
 
     ASSERT_EQ(0UL, _manager->numberOfRangesToClean());
 
     // Enable fail point to suspendRangeDeletion.
     globalFailPointRegistry().find("suspendRangeDeletion")->setMode(FailPoint::alwaysOn);
 
-    auto notifn = _manager->cleanUpRange(cr, boost::none, false /*delayBeforeDeleting*/);
+    auto notifn = _manager->cleanUpRange(cr, task.getId(), false /*delayBeforeDeleting*/);
     ASSERT(!notifn.isReady());
     ASSERT_EQ(1UL, _manager->numberOfRangesToClean());
 

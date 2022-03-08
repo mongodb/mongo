@@ -120,7 +120,7 @@ public:
      * Returns a future that will be fulfilled when the range deletion completes or fails.
      */
     SharedSemiFuture<void> cleanUpRange(ChunkRange const& range,
-                                        boost::optional<UUID> migrationId,
+                                        const UUID& migrationId,
                                         bool shouldDelayBeforeDeletion);
 
     /**
@@ -226,7 +226,7 @@ private:
         const WithLock&,
         SemiFuture<void> waitForActiveQueriesToComplete,
         const ChunkRange& range,
-        boost::optional<UUID> migrationId,
+        const UUID& migrationId,
         Seconds delayForActiveQueriesOnSecondariesToComplete);
 
     // ServiceContext from which to obtain instances of global support objects

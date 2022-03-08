@@ -900,8 +900,12 @@ TEST_F(RangeDeleterTest,
 
 // The input future should never have an error.
 DEATH_TEST_F(RangeDeleterTest, RemoveDocumentsInRangeCrashesIfInputFutureHasError, "invariant") {
+    const ChunkRange range = ChunkRange(BSON(kShardKey << 0), BSON(kShardKey << 10));
     DBDirectClient dbclient(_opCtx);
     dbclient.insert(kNss.toString(), BSON(kShardKey << 5));
+
+    // Insert range deletion task for this collection and range.
+    auto t = insertRangeDeletionTask(_opCtx, uuid(), range);
 
     auto queriesCompletePf = makePromiseFuture<void>();
     auto cleanupComplete =
@@ -910,8 +914,8 @@ DEATH_TEST_F(RangeDeleterTest, RemoveDocumentsInRangeCrashesIfInputFutureHasErro
                                kNss,
                                uuid(),
                                kShardKeyPattern,
-                               ChunkRange(BSON(kShardKey << 0), BSON(kShardKey << 10)),
-                               boost::none,
+                               range,
+                               t.getId(),
                                10 /* numDocsToRemovePerBatch */,
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete */);
 

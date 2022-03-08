@@ -71,7 +71,7 @@ SharedSemiFuture<void> removeDocumentsInRange(
     const UUID& collectionUuid,
     const BSONObj& keyPattern,
     const ChunkRange& range,
-    boost::optional<UUID> migrationId,
+    const UUID& migrationId,
     int numDocsToRemovePerBatch,
     Seconds delayForActiveQueriesOnSecondariesToComplete);
 
