@@ -82,18 +82,6 @@ struct __wt_session;	    typedef struct __wt_session WT_SESSION;
 struct __wt_storage_source; typedef struct __wt_storage_source WT_STORAGE_SOURCE;
 #endif
 
-#if defined(SWIGJAVA)
-#define	WT_HANDLE_NULLABLE(typename)	typename##_NULLABLE
-#define	WT_HANDLE_CLOSED(typename)	typename##_CLOSED
-typedef WT_CURSOR			WT_CURSOR_NULLABLE;
-typedef WT_CURSOR			WT_CURSOR_CLOSED;
-typedef WT_SESSION			WT_SESSION_CLOSED;
-typedef WT_CONNECTION			WT_CONNECTION_CLOSED;
-#elif !defined(DOXYGEN)
-#define	WT_HANDLE_NULLABLE(typename)	typename
-#define	WT_HANDLE_CLOSED(typename)	typename
-#endif
-
 /*!
  * A raw item of data to be managed, including a pointer to the data and a
  * length.
@@ -642,7 +630,7 @@ struct __wt_cursor {
 	 * @param cursor the cursor handle
 	 * @errors
 	 */
-	int __F(close)(WT_HANDLE_CLOSED(WT_CURSOR) *cursor);
+	int __F(close)(WT_CURSOR *cursor);
 
 	/*!
 	 * Get the table's largest key, ignoring visibility. This method is only supported by
@@ -782,8 +770,7 @@ struct __wt_session {
 	 * @configempty{WT_SESSION.close, see dist/api_data.py}
 	 * @errors
 	 */
-	int __F(close)(WT_HANDLE_CLOSED(WT_SESSION) *session,
-	    const char *config);
+	int __F(close)(WT_SESSION *session, const char *config);
 
 	/*!
 	 * Reconfigure a session handle.
@@ -1013,8 +1000,7 @@ struct __wt_session {
 	 * @errors
 	 */
 	int __F(open_cursor)(WT_SESSION *session,
-	    const char *uri, WT_HANDLE_NULLABLE(WT_CURSOR) *to_dup,
-	    const char *config, WT_CURSOR **cursorp);
+	    const char *uri, WT_CURSOR *to_dup, const char *config, WT_CURSOR **cursorp);
 	/*! @} */
 
 	/*!
@@ -1611,10 +1597,7 @@ struct __wt_session {
 	 * @errors
 	 */
 	int __F(truncate)(WT_SESSION *session,
-	    const char *name,
-	    WT_HANDLE_NULLABLE(WT_CURSOR) *start,
-	    WT_HANDLE_NULLABLE(WT_CURSOR) *stop,
-	    const char *config);
+	    const char *name, WT_CURSOR *start, WT_CURSOR *stop, const char *config);
 
 	/*!
 	 * Upgrade a table.
@@ -2047,8 +2030,7 @@ struct __wt_connection {
 	 * @configend
 	 * @errors
 	 */
-	int __F(close)(WT_HANDLE_CLOSED(WT_CONNECTION) *connection,
-	    const char *config);
+	int __F(close)(WT_CONNECTION *connection, const char *config);
 
 #ifndef DOXYGEN
 	/*!
