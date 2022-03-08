@@ -208,6 +208,14 @@ public:
                 "Please see http://dochub.mongodb.org/core/transaction-distinct for a recommended "
                 "alternative.",
                 !opCtx->inMultiDocumentTransaction() || !ctx->getCollection().isSharded());
+
+            // Similarly, we ban readConcern level snapshot for sharded collections.
+            uassert(
+                ErrorCodes::InvalidOptions,
+                "Cannot run 'distinct' on a sharded collection with readConcern level 'snapshot'",
+                repl::ReadConcernArgs::get(opCtx).getLevel() !=
+                        repl::ReadConcernLevel::kSnapshotReadConcern ||
+                    !ctx->getCollection().isSharded());
         }
 
         const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);

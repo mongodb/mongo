@@ -205,14 +205,6 @@ public:
         }
 
         const auto cm = uassertStatusOK(std::move(swCM));
-        if (repl::ReadConcernArgs::get(opCtx).getLevel() ==
-                repl::ReadConcernLevel::kSnapshotReadConcern &&
-            !opCtx->inMultiDocumentTransaction() && cm.isSharded()) {
-            uasserted(ErrorCodes::InvalidOptions,
-                      "readConcern level \"snapshot\" prohibited for \"distinct\" command on"
-                      " sharded collection");
-        }
-
         std::vector<AsyncRequestsSender::Response> shardResponses;
         try {
             shardResponses = scatterGatherVersionedTargetByRoutingTable(
