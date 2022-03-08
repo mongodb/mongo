@@ -196,8 +196,7 @@ assert.soon(() => db.await_data.findOne({_id: "signal parent shell"}) !== null);
 // Now issue a getMore which will match the parallel shell's currentOp filter, signalling it to
 // write a non-matching document into the collection. Confirm that we do not receive this
 // document and that we subsequently time out.
-cmdRes = db.runCommand(
-    {getMore: cmdRes.cursor.id, collection: collName, maxTimeMS: ReplSetTest.kDefaultTimeoutMS});
+cmdRes = db.runCommand({getMore: cmdRes.cursor.id, collection: collName, maxTimeMS: 4000});
 assert.commandWorked(cmdRes);
 jsTestLog("Waiting insertion shell to terminate...");
 assert.eq(insertshell(), 0);
