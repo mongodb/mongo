@@ -5627,10 +5627,10 @@ var authCommandsLib = {
               }
           ]
         },
-        {
+        { // TODO: Temporarily disabled until an appropriate parameter is configured for testing (SERVER-62261)
           testname: "setClusterParameter",
           command: {setClusterParameter: {param: true}},
-          skipTest: (conn) => !TestData.setParameters.featureFlagClusterWideConfig,
+          skipTest: (conn) => true || !TestData.setParameters.featureFlagClusterWideConfig,
           testcases: [
               {
                 runOnDb: adminDbName,

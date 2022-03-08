@@ -623,7 +623,7 @@ env.Library(
         'rwc_defaults_commands',
         'server_status',
         'servers',
-        'set_cluster_parameter_idl',
+        'set_cluster_parameter_invocation',
         'set_feature_compatibility_version_idl',
         'set_index_commit_quorum_idl',
         'set_user_write_block_mode_idl',
@@ -633,6 +633,18 @@ env.Library(
         'tenant_migration_cmds_request',
         'test_commands_enabled',
         'txn_cmd_request',
+    ],
+)
+
+env.Library(
+    target='set_cluster_parameter_invocation',
+    source=[
+        'set_cluster_parameter_invocation.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/s/write_ops/cluster_write_ops',
+        'set_cluster_parameter_idl'
     ],
 )
 
@@ -814,6 +826,7 @@ env.CppUnitTest(
         "mr_test.cpp" if get_option('js-engine') != 'none' else [],
         "parse_log_component_settings_test.cpp",
         "plan_cache_commands_test.cpp",
+        "set_cluster_parameter_invocation_test.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/auth/authmocks",
@@ -834,6 +847,7 @@ env.CppUnitTest(
         "create_command",
         "mongod",
         "servers",
+        "set_cluster_parameter_invocation",
         "standalone",
     ],
 )

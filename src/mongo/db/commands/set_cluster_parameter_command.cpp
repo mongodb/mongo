@@ -27,14 +27,13 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/set_cluster_parameter_gen.h"
-#include "mongo/logv2/log.h"
+#include "mongo/db/commands/set_cluster_parameter_invocation.h"
+#include "mongo/idl/cluster_server_parameter_gen.h"
 
 namespace mongo {
 
@@ -60,17 +59,32 @@ public:
     public:
         using InvocationBase::InvocationBase;
 
-        void typedRun(OperationContext*) {
-            LOGV2(6226501, "Received setClusterParameter on node");
+        void typedRun(OperationContext* opCtx) {
+
+            uassert(ErrorCodes::IllegalOperation,
+                    "Cannot set cluster parameter, gFeatureFlagClusterWideConfig is not enabled",
+                    gFeatureFlagClusterWideConfig.isEnabledAndIgnoreFCV());
+
+            std::unique_ptr<ServerParameterService> parameterService =
+                std::make_unique<ClusterParameterService>();
+
+            DBDirectClient dbClient(opCtx);
+            ClusterParameterDBClientService dbService(dbClient);
+
+            SetClusterParameterInvocation invocation{std::move(parameterService), dbService};
+
+            invocation.invoke(opCtx, request());
         }
 
     private:
         bool supportsWriteConcern() const override {
             return false;
         }
+
         NamespaceString ns() const override {
             return NamespaceString();
         }
+
         void doCheckAuthorization(OperationContext* opCtx) const override {
             uassert(ErrorCodes::Unauthorized,
                     "Unauthorized",
