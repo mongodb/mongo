@@ -61,3 +61,7 @@ extern void __wt_stream_set_line_buffer(FILE *fp);
 extern void __wt_stream_set_no_buffer(FILE *fp);
 extern void __wt_thread_id(uintmax_t *id);
 extern void __wt_yield(void);
+
+#ifdef HAVE_UNITTEST
+
+#endif

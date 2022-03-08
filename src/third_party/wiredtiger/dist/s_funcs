@@ -22,7 +22,9 @@ sed -n '/{/,/^}/p' $l | fgrep -wo "$search"
 
 sed -n '/^#define/,/[^\\]$/p' ../src/include/*.h ../src/include/*.in |
     fgrep -who "$search"
-) | sort | uniq -u > $t
+) \
+    | grep -v '^__ut_' \
+    | sort | uniq -u > $t
 
 test -s $t && cat $t
 

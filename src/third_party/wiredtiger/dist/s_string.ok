@@ -47,6 +47,7 @@ BZ
 Barack
 BerkeleyDB
 Bitfield
+Bitstring
 Bitwise
 BlqR
 BqRt
@@ -205,6 +206,7 @@ HOTBACKUP
 HSdump
 Hendrik
 HyperLevelDB
+IC
 ID's
 IEC
 IEEE
@@ -334,6 +336,7 @@ Optane
 Outfmt
 PARAM
 PFX
+POS
 POSIX
 PPC
 PREDEFINE
@@ -480,6 +483,7 @@ Vc
 Vfprintf
 Vigenere
 Vixie
+VloaY
 Vo
 VxWorks
 WAL
@@ -527,6 +531,7 @@ Zlib's
 Zstandard
 Zstd
 Zstd's
+aa
 aaa
 abcdef
 abcdefghijklmnopqrstuvwxyz
@@ -549,6 +554,7 @@ arg
 argc
 args
 argv
+asdf
 asm
 aspell
 assertfmt
@@ -579,6 +585,7 @@ bitcnt
 bitfield
 bitfields
 bitpos
+bitstr
 bitstring
 bitwise
 blk
@@ -693,6 +700,7 @@ copyout
 countp
 cp
 cplusplus
+cpp
 cpuid
 crc
 create's
@@ -1028,6 +1036,7 @@ json
 kB
 kb
 kbits
+kepQFQ
 keycmp
 keyid
 keyids

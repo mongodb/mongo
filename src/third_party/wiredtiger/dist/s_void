@@ -86,6 +86,9 @@ func_ok()
 	    -e '/int __wt_txn_read_upd_list$/d' \
 	    -e '/int __wt_txn_rollback_required$/d' \
 	    -e '/int __wt_win_directory_list_free$/d' \
+	    -e '/int __ut_ckpt_add_blkmod_entry$/d' \
+	    -e '/int __ut_ovfl_discard_verbose$/d' \
+	    -e '/int __ut_ovfl_discard_wrapup$/d' \
 	    -e '/int LLVMFuzzerTestOneInput$/d' \
 	    -e '/int bdb_compare_reverse$/d' \
 	    -e '/int check_timing$/d' \

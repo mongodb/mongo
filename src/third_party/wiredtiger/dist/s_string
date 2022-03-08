@@ -33,7 +33,8 @@ check() {
 	# Strip out git hashes, which are seven character hex strings.
 	# Strip out double quote char literals ('"'), they confuse aspell.
 	# Strip out calls to __wt_getopt so the option lists don't have to be spelling words.
-	sed -e 's/ [0-9a-f]\{7\} / /g' -e "s/'\"'//g" -e 's/__wt_getopt([^()]*)//' ../$2 |
+	# Strip out C-style hex constants.
+	sed -e 's/ [0-9a-f]\{7\} / /g' -e "s/'\"'//g" -e 's/__wt_getopt([^()]*)//' ../$2 -e 's/0x[[:xdigit:]]\+//' |
 	aspell --lang=en_US $1 list |
 	sort -u |
 	comm -23 /dev/stdin s_string.ok > $t
@@ -46,7 +47,7 @@ check() {
 # List of files to spellchk.
 l=`(cd .. &&
     find bench examples ext src test -name '*.[chsy]' &&
-    find src -name '*.in' && find test -name '*.cxx')`
+    find src -name '*.in' && find test -name '*.cxx' && find test -name '*.cpp')`
 
 usage()
 {

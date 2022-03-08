@@ -15,6 +15,10 @@ def missing_comment():
         if skip_re.search(s):
             continue
         for m in func_re.finditer(s):
+            if m.group(2).startswith('__ut_'):
+                # This is just re-exposing an internal function for unit
+                # tests, no comment needed in this case.
+                continue
             if not m.group(1) or \
                not m.group(1).startswith('/*\n * %s --\n' % m.group(2)):
                    print("%s:%d: missing or malformed comment for %s" % \

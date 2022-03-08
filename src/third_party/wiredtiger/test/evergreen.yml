@@ -945,6 +945,20 @@ tasks:
         vars:
           directory: bench/wtperf
 
+  - name: unittest-test
+    tags: ["pull_request"]
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+        vars:
+          posix_configure_flags: -DENABLE_STRICT=1 -DHAVE_DIAGNOSTIC=1 -DENABLE_LZ4=1 -DENABLE_SNAPPY=1 -DENABLE_ZLIB=1 -DHAVE_UNITTEST=1
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/cmake_build"
+          script: |
+            set -o errexit
+            set -o verbose
+            test/unittest/unittests
   # End of normal make check test tasks
 
   # Start of cppsuite test tasks.
@@ -3566,6 +3580,7 @@ buildvariants:
     - name: data-validation-stress-test-checkpoint-fp-hs-insert-s5
     - name: data-validation-stress-test-checkpoint-fp-hs-insert-s5-no-timestamp
     - name: data-validation-stress-test-checkpoint-no-timestamp
+    - name: unittest-test
     - name: tiered-storage-extensions-test
 
 - name: ubuntu2004-asan

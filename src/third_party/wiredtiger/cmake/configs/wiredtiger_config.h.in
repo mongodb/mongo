@@ -33,6 +33,9 @@
 /* Define to 1 for diagnostic tests. */
 #cmakedefine HAVE_DIAGNOSTIC 1
 
+/* Define to 1 for unit tests. */
+#cmakedefine HAVE_UNITTEST 0
+
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #cmakedefine HAVE_DLFCN_H 1
 
