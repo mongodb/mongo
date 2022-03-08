@@ -64,6 +64,8 @@ enum class FieldAvailability {
     kFullyProvided,
 };
 
+std::ostream& operator<<(std::ostream& os, FieldAvailability value);
+
 /**
  * Represents the set of sort orders satisfied by the data returned from a particular
  * QuerySolutionNode.
@@ -108,6 +110,10 @@ private:
     // collations fields since they can contribute to the sort order.
     std::set<std::string> _ignoredFields;
 };
+
+std::ostream& operator<<(std::ostream& os, const ProvidedSortSet& value);
+bool operator==(const ProvidedSortSet& lhs, const ProvidedSortSet& rhs);
+bool operator!=(const ProvidedSortSet& lhs, const ProvidedSortSet& rhs);
 
 /**
  * An empty ProvidedSortSet that can be used in QSNs that have no children and don't derive from
