@@ -36,12 +36,15 @@
 #include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/persistent_task_store.h"
 #include "mongo/db/s/metadata_manager.h"
+#include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/client/shard_registry.h"
@@ -183,13 +186,44 @@ protected:
     std::shared_ptr<MetadataManager> _manager;
 };
 
+// The 'pending' field must not be set in order for a range deletion task to succeed, but the
+// ShardServerOpObserver will submit the task for deletion upon seeing an insert without the
+// 'pending' field. The tests call removeDocumentsFromRange directly, so we want to avoid having
+// the op observer also submit the task. The ShardServerOpObserver will ignore replacement
+//  updates on the range deletions namespace though, so we can get around the issue by inserting
+// the task with the 'pending' field set, and then remove the field using a replacement update
+// after.
+RangeDeletionTask insertRangeDeletionTask(OperationContext* opCtx,
+                                          const NamespaceString& nss,
+                                          const UUID& uuid,
+                                          const ChunkRange& range,
+                                          int64_t numOrphans) {
+    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
+    auto migrationId = UUID::gen();
+    RangeDeletionTask t(migrationId, nss, uuid, ShardId("donor"), range, CleanWhenEnum::kDelayed);
+    t.setPending(true);
+    t.setNumOrphanDocs(numOrphans);
+    const auto currentTime = VectorClock::get(opCtx)->getTime();
+    t.setTimestamp(currentTime.clusterTime().asTimestamp());
+    store.add(opCtx, t);
+
+    auto query = BSON(RangeDeletionTask::kIdFieldName << migrationId);
+    t.setPending(boost::none);
+    auto update = t.toBSON();
+    store.update(opCtx, query, update);
+
+    return t;
+}
+
 TEST_F(MetadataManagerTest, TrackOrphanedDataCleanupBlocksOnScheduledRangeDeletions) {
     ChunkRange cr1(BSON("key" << 0), BSON("key" << 10));
+    const auto task =
+        insertRangeDeletionTask(operationContext(), kNss, _manager->getCollectionUuid(), cr1, 0);
 
     // Enable fail point to suspendRangeDeletion.
     globalFailPointRegistry().find("suspendRangeDeletion")->setMode(FailPoint::alwaysOn);
 
-    auto notifn1 = _manager->cleanUpRange(cr1, boost::none, false /*delayBeforeDeleting*/);
+    auto notifn1 = _manager->cleanUpRange(cr1, task.getId(), false /*delayBeforeDeleting*/);
     ASSERT_FALSE(notifn1.isReady());
     ASSERT_EQ(_manager->numberOfRangesToClean(), 1UL);
 
@@ -202,6 +236,9 @@ TEST_F(MetadataManagerTest, TrackOrphanedDataCleanupBlocksOnScheduledRangeDeleti
 
 TEST_F(MetadataManagerTest, CleanupNotificationsAreSignaledWhenMetadataManagerIsDestroyed) {
     const ChunkRange rangeToClean(BSON("key" << 20), BSON("key" << 30));
+    const auto task = insertRangeDeletionTask(
+        operationContext(), kNss, _manager->getCollectionUuid(), rangeToClean, 0);
+
 
     _manager->setFilteringMetadata(cloneMetadataPlusChunk(
         _manager->getActiveMetadata(boost::none)->get(), {BSON("key" << 0), BSON("key" << 20)}));
@@ -216,7 +253,7 @@ TEST_F(MetadataManagerTest, CleanupNotificationsAreSignaledWhenMetadataManagerIs
     _manager->setFilteringMetadata(
         cloneMetadataMinusChunk(_manager->getActiveMetadata(boost::none)->get(), rangeToClean));
 
-    auto notif = _manager->cleanUpRange(rangeToClean, boost::none, false /*delayBeforeDeleting*/);
+    auto notif = _manager->cleanUpRange(rangeToClean, task.getId(), false /*delayBeforeDeleting*/);
     ASSERT(!notif.isReady());
 
     auto optNotif = _manager->trackOrphanedDataCleanup(rangeToClean);

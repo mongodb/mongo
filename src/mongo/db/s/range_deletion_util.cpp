@@ -74,6 +74,7 @@ const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
                                                 WriteConcernOptions::kWriteConcernTimeoutSharding);
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeDoingDeletion);
+MONGO_FAIL_POINT_DEFINE(hangAfterDoingDeletion);
 MONGO_FAIL_POINT_DEFINE(suspendRangeDeletion);
 MONGO_FAIL_POINT_DEFINE(throwWriteConflictExceptionInDeleteRange);
 MONGO_FAIL_POINT_DEFINE(throwInternalErrorInDeleteRange);
@@ -307,9 +308,8 @@ ExecutorFuture<void> deleteRangeInBatches(const std::shared_ptr<executor::TaskEx
                                    "numDocsToRemovePerBatch"_attr = numDocsToRemovePerBatch,
                                    "delayBetweenBatches"_attr = delayBetweenBatches);
 
-                       if (migrationId) {
-                           ensureRangeDeletionTaskStillExists(opCtx, *migrationId);
-                       }
+                       invariant(migrationId);
+                       ensureRangeDeletionTaskStillExists(opCtx, *migrationId);
 
                        AutoGetCollection collection(opCtx, nss, MODE_IX);
 
@@ -327,6 +327,13 @@ ExecutorFuture<void> deleteRangeInBatches(const std::shared_ptr<executor::TaskEx
                                                                          keyPattern,
                                                                          range,
                                                                          numDocsToRemovePerBatch));
+                       migrationutil::persistUpdatedNumOrphans(
+                           opCtx, BSON("_id" << *migrationId), -numDeleted);
+
+                       if (MONGO_unlikely(hangAfterDoingDeletion.shouldFail())) {
+                           hangAfterDoingDeletion.pauseWhileSet(opCtx);
+                       }
+
                        LOGV2_DEBUG(
                            23769,
                            1,
