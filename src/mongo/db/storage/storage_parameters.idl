@@ -191,6 +191,10 @@ feature_flags:
         description: "When enabled, allow the use of the $listCatalog aggregation stage"
         cpp_varname: feature_flags::gDocumentSourceListCatalog
         default: false
+    featureFlagDatabaseRenameDuringRestore:
+        description: "When enabled, allow renaming databases during restore"
+        cpp_varname: feature_flags::gDatabaseRenameDuringRestore
+        default: false
 
 enums:
     QueueingPolicy:
