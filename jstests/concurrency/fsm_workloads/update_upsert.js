@@ -4,6 +4,8 @@
  * update_upsert_multi.js
  *
  * Tests updates that specify upsert=true.
+ *
+ * @tags: [__TEMPORARILY_DISABLED__]
  */
 let $config = (function() {
     let states = {
