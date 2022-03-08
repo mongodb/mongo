@@ -46,6 +46,7 @@ namespace crypto {
  */
 
 constexpr size_t kFieldLevelEncryptionKeySize = 96;
+constexpr size_t kFieldLevelEncryption2KeySize = 64;
 constexpr size_t kAeadAesHmacKeySize = 64;
 
 /**
@@ -82,12 +83,30 @@ Status aeadEncryptWithIV(ConstDataRange key,
                          DataRange out);
 
 /**
+ * Internal call for FLE2 aeadEncryption algorithm.
+ * Note: parameter "iv" is not required and only used for unit testing
+ */
+Status fle2AeadEncrypt(ConstDataRange key,
+                       ConstDataRange in,
+                       ConstDataRange iv,
+                       ConstDataRange associatedData,
+                       DataRange out);
+
+/**
  * Internal call for the aeadDecryption algorithm. Only used for testing.
  */
 StatusWith<std::size_t> aeadDecrypt(const SymmetricKey& key,
                                     ConstDataRange ciphertext,
                                     ConstDataRange associatedData,
                                     DataRange out);
+
+/**
+ * Internal call for FLE2 aeadDecryption algorithm.
+ */
+StatusWith<std::size_t> fle2AeadDecrypt(ConstDataRange key,
+                                        ConstDataRange in,
+                                        ConstDataRange associatedData,
+                                        DataRange out);
 
 /**
  * Decrypts the cipherText using AEAD_AES_256_CBC_HMAC_SHA_512 decryption. Writes output
