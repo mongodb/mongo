@@ -1,0 +1,83 @@
+/*! @page explain_durability Tutorial: durability models
+
+<i>Durability</i> refers to the property that a transaction, once committed,
+should be permanent and changes will never be lost.  This can mean a number of
+things depending on context: for example, in-memory databases do not survive
+system crashes by definition, but commits to them are still durable in the sense
+that such commits are not rolled back or lost while the database is running.
+Traditionally data updates are durable when they have been stored on stable
+storage in a way that survives application and system crashes.
+
+For WiredTiger, the situation is more complicated because WiredTiger is designed
+to be able to participate in application-level distributed transaction schemes,
+which implies the ability to roll back committed transactions when so instructed
+by the application. In this manual we use the following terminology:
+
+- A transaction is <i>committed</i> when
+WT_SESSION::commit_transaction has been called and has returned successfully.
+- A transaction is <i>durable</i> when all changes in it have been written to
+stable storage such that failures will not cause it to be lost.
+- A transaction is <i>stable</i> when it is durable, and furthermore cannot
+be rolled back by application-level transaction management activity.
+
+This page describes both the points at which transactions
+proceed from one of these states to the next, and also what kinds of
+failures transactions are protected from.
+
+In general, there is a trade-off between write performance and
+durability guarantees: weaker guarantees require fewer round
+trips to storage devices.
+
+@section explain_durability_in_memory In-memory databases
+
+For in-memory databases, there is no disk-level durability and no protection
+against system or application crashes.
+
+@section explain_durability_checkpoint Checkpoint durability (without timestamps)
+
+For objects using checkpoint durability, the object is checkpointed periodically
+(a checkpoint is a complete self-consistent capture of the database state saved
+to stable storage) and transactions become durable with the completion of the
+next checkpoint after they commit.  The interval between checkpoints bounds the
+possible data loss.  Locally durable and stable are the same.
+
+@section explain_durability_commit Commit-level durability (without timestamps)
+
+Changes to objects with commit-level durability have log records written and
+flushed to disk before WT_SESSION::commit_transaction returns. Such transactions
+are immediately durable and will survive both application and system failure.
+For objects using commit-level durability, transactions become durable when they
+are committed. Locally durable and stable are the same.
+
+It is possible to skip the flush-to-disk; this makes transactions immediately
+durable against application crashes, but not against system crashes.
+Transactions then become durable against system crashes when the operating system
+writes them out. (If the operating system were to never write the log records,
+the object would revert to checkpoint durability.)
+
+@section explain_durability_timestamp Adding timestamps
+
+For databases using WiredTiger's timestamped data model, the durability model is
+extended with the notion of a <i>stable timestamp</i>.  The stable timestamp is
+an application-managed point in time that governs when durable data becomes
+stable. That is, transactions commit at times after the stable timestamp, and
+become durable according to the underlying durability model, but can still be
+rolled back (and are thus considered <i>unstable</i>) until the stable timestamp
+is advanced past their commit timestamp.
+
+Applications can roll back all unstable transactions by calling
+WT_CONNECTION::rollback_to_stable (or running recovery as part of database
+open).
+
+Objects in a timestamp system are generally configured for checkpoint-level
+durability in which case the application's stable timestamp is saved with each
+checkpoint and used for crash recovery. Thus, to be stable a transaction must
+commit, the stable timestamp must be advanced past its durable timestamp, and
+then a checkpoint must complete. (Data written as part of checkpoints that
+complete between transaction commit and advancing the stable timestamp become
+durable but not stable.)
+
+Objects in a timestamp system that are configured for commit-level durability operate as
+they do without timestamps, and timestamps are ignored for those objects.
+
+*/

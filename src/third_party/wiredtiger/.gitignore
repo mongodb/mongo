@@ -2,4 +2,4 @@
 *.swp
 build/
 dist/clang-format
-docs/
+/docs/

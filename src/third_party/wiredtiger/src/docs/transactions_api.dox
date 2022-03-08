@@ -1,0 +1,148 @@
+/*! @page transactions_api Transactional API calls
+
+Operations in WiredTiger are inherently transactional and durable when the table
+is closed, so the checkpoint durability model of making an application
+transactional and its data durable only requires:
+
+- Optionally grouping operations into explicit transactions,
+- Optionally adding checkpoint calls for additional durability points.
+
+@section transactions_grouping Explicit transactions
+
+An explicit transaction is a transaction that starts with a begin transaction
+operation and ends with either a commit transaction or rollback transaction
+operation. Any operation having multiple related updates should be enclosed in
+an explicit transaction to ensure the updates are applied atomically.
+
+In WiredTiger, transaction operations are methods of the WT_SESSION class.
+
+Applications call WT_SESSION::begin_transaction to start a new transaction.
+Operations subsequently performed using that WT_SESSION handle, including
+operations on any cursors open in that WT_SESSION handle (whether opened before
+or after the WT_SESSION::begin_transaction call), are part of the transaction.
+The transaction is committed by calling WT_SESSION::commit_transaction.  The
+effects may be discarded by calling WT_SESSION::rollback_transaction. If
+WT_SESSION::commit_transaction returns any error, the transaction was rolled
+back, not committed.
+
+A data operation executed within a transaction can fail if it conflicts with an
+operation in another concurrently running transaction.  (A conflict occurs
+between two operations when letting both of them continue would lead to a
+violation of consistency or isolation.) Failures of this form produce the error
+::WT_ROLLBACK. If this error occurs, the application should roll back its
+current transaction using WT_SESSION::rollback_transaction, and either abandon
+the operation or retry the entire operation by starting a new transaction.
+
+The WT_SESSION::rollback_transaction method resets all cursors in the session
+(as if the WT_CURSOR::reset method was called), discarding any cursor position
+as well as any currently set keys or values they may have.
+
+@snippet ex_all.c transaction commit/rollback
+
+@section transactions_implicit Implicit transactions
+
+While any operation consisting of multiple related updates should be enclosed in
+an explicit transaction to ensure the updates are applied atomically, it is not
+necessary to start explicit transactions for single operations.  If no explicit
+transaction is started, each update operation is automatically committed before
+it returns.
+
+If an implicit transaction successfully commits, the cursors in the WT_SESSION::
+remain positioned.  If an implicit transaction fails, it is rolled back, and
+all cursors in the
+WT_SESSION:: are reset discarding any position or key/value information they may
+have.
+
+@section transactions_concurrency Concurrency control
+
+WiredTiger uses optimistic concurrency control algorithms.  Writes do not block
+other writes, although concurrent transactions updating the same value will fail with
+::WT_ROLLBACK.  Some applications may benefit from application-level
+synchronization to avoid repeated attempts to update and then roll back the same
+value.
+
+Both read and write transactions may fail with the ::WT_ROLLBACK error if a
+resource cannot be allocated. For example, if cache resources cannot be
+allocated to hold the data required to satisfy transactional readers, operations
+may fail and return ::WT_ROLLBACK.
+
+\warning
+As read transactions rarely fail, application developers may fail to correctly
+handle a read transaction return of ::WT_ROLLBACK. Applications must be written
+to anticipate read failure.
+
+@section isolation_levels Isolation levels
+
+@copydoc doc_isolation_levels
+
+Snapshot isolation is recommended in almost all situations, and
+all updates must be performed using snapshot isolation. Only read operations may
+be performed at lower isolation levels. In cases where greater read performance
+is more important than exact consistency, or loss of consistency is acceptable,
+it can make sense to use a weaker isolation model.  If you are unfamiliar with
+isolation levels in general, or for detailed descriptions of these models, see
+@ref explain_isolation.
+
+The transaction isolation level can be configured on a per-transaction basis.
+
+@snippet ex_all.c transaction isolation
+
+Additionally, the default isolation level for all transactions can be configured
+and re-configured on a per-session basis:
+
+@snippet ex_all.c session isolation configuration
+
+@snippet ex_all.c session isolation re-configuration
+
+@section cursors_transactions Cursors and transactions
+
+If there is a transaction active in a session, cursors operate in the context of
+that transaction.  Reads performed while a transaction is active operate at the
+isolation level of the transaction, and updates performed within a transaction
+are made durable by calling WT_SESSION::commit_transaction, or discarded by
+calling WT_SESSION::rollback_transaction.
+
+If no transaction is active, cursor reads are performed at the isolation level
+of the session, set with the \c isolation configuration key to
+WT_CONNECTION::open_session, and successful updates are automatically committed
+before the update operation completes.
+
+At \c read-committed isolation, committed changes from concurrent transactions
+become visible only when no cursor is positioned.  In other words, at this
+isolation level, all cursors in a session read from a stable snapshot while any
+cursor in the session remains positioned.  A call to WT_CURSOR::next or
+WT_CURSOR::prev on a positioned cursor will not update the snapshot.
+
+At \c snapshot isolation when using implicit transactions, the same behavior
+applies for reads: when a read is performed, a snapshot is taken, and
+all cursors will read from that snapshot as long
+as any cursor remains positioned or until a write operation is performed.
+Further reads after that point (or a call to WT_SESSION::reset_snapshot) will
+acquire a new snapshot.
+
+<!--
+XXX:
+The last two paragraphs are not at all clear.
+-->
+
+Cursor positions survive transaction boundaries, unless a transaction is rolled
+back. If a transaction is rolled back for any reason (either implicitly because
+WT_SESSION::commit_transaction failed, or explicitly because the application
+called WT_SESSION::rollback_transaction), all cursors in the session are reset
+as if the WT_CURSOR::reset method was called, discarding any cursor position as
+well as any key and value that may have been set.
+
+@section snapshot_reset Resetting the session snapshot
+
+Snapshot-isolation transactions can pin a large amount of data into the database
+cache in order to be able to satisfy potential reads at the snapshot.
+WT_SESSION::reset_snapshot releases the current snapshot and gets a new (more
+recent) snapshot to avoid pinning content in the cache that is no longer needed.
+Applications may see different search results compared to earlier after updating
+the snapshot. It is an error to call WT_SESSION::reset_snapshot at any isolation
+level other than snapshot, or if the current transaction has performed any write
+operations.
+
+@snippet ex_all.c reset snapshot
+
+*/

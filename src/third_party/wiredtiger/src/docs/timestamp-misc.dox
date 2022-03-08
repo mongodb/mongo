@@ -1,0 +1,85 @@
+/*! @page timestamp_misc Miscellaneous timestamp topics
+
+@section timestamp_read_roundup Rounding up the read timestamp
+
+Applications setting timestamps for a transaction have to comply with the
+constraints based on the global timestamp state. In order to be compliant with
+the constraints applications will need to query the global timestamp state and
+check their timestamps for compliance and adjust timestamps if required, and
+this creates obvious races with other threads. To reduce application burden,
+WiredTiger supports automatic timestamp rounding in some scenarios.
+
+Applications can configure
+<code>roundup_timestamps=(prepared=true,read=true)</code> with
+the WT_SESSION::begin_transaction method.
+
+Configuring <code>roundup_timestamps=(read=true)</code> causes the read
+timestamp to be rounded up to the oldest timestamp. If the read timestamp is
+greater than the oldest timestamp no change will be made.
+
+@section timestamp_misc_rts Using rollback-to-stable with timestamps
+
+Applications can explicitly roll back the system to a specific stable timestamp
+by calling the WT_CONNECTION::rollback_to_stable method. Applications must first
+set the \c stable timestamp using WT_CONNECTION::set_timestamp and then call
+WT_CONNECTION::rollback_to_stable, which will discard all updates to
+checkpoint-durable tables that have commit timestamps more recent than the set
+stable timestamp.
+
+Logged tables and updates made without an associated commit timestamp are
+unaffected.
+
+The database must be quiescent during this process. Applications should close
+or reset all open cursors before calling the WT_CONNECTION::rollback_to_stable
+method.
+
+@section timestamp_misc_diagnostic Using diagnostic configurations to enforce timestamp usage
+
+The WT_SESSION::create method supports additional checking of timestamp
+usage on a per-key or per-table basis. While these usage checks can decrease
+application performance, and applications may not choose to configure them
+in production settings, they are strongly recommended during development.
+
+Setting the \c write_timestamp_usage configuration specifies how timestamps
+are expected to be used by the table:
+
+| Configuration | Description |
+|---------------|-------------|
+| always | Require all updates to the table have a commit timestamp. |
+| never | Require no updates to the table have a commit timestamp. |
+| ordered | Allow updates both with and without a commit timestamp, but once a commit timestamp is used when updating a key in the table, all future updates to the key require a commit timestamp as well; each update must have a commit timestamp after the previous update. |
+| mixed_mode | Allow updates both with and without a commit timestamp; each update must have a commit timestamp after the previous update, or no timestamp at all. |
+
+The \c write_timestamp_usage configuration is expected to be used
+with the WT_SESSION::create method's \c assert configuration. The
+\c "assert(read_timestamp)" configuration requires timestamps always or never
+be used on reads in the table. The \c "assert(write_timestamp)" configuration
+requires update timestamps conform to the \c write_timestamp_usage setting. If
+WiredTiger detects a violation of the configured policy, an error message
+will be logged, in all cases. Additionally, in diagnostic builds, the library
+will fail and drop core at the failing check.
+
+\warning
+These are best-effort checks by WiredTiger, and there are cases where
+application misbehavior will not be detected.
+
+@section timestamp_misc_reset_snapshot Resetting the snapshot
+
+Transactions that have not set \c read_timestamp can use
+WT_SESSION::reset_snapshot with timestamped tables as with
+non-timestamped tables, to get a new snapshot of the database to read
+from. See @ref snapshot_reset.
+Transactions that have set \c read_timestamp can also call
+WT_SESSION::reset_snapshot, but it will have no effect.
+
+@section timestamps_misc_in_memory In-memory configurations and timestamps
+
+Timestamps are supported for in-memory databases, but must be configured as in
+ordinary databases, and the same APIs are used in both cases for historical
+reasons. By default, in-memory database objects behave like commit-level
+objects in ordinary databases, that is, timestamps are ignored. If logging
+is disabled for the object, using the \c log=(enabled=false) configuration,
+then the timestamps will not be ignored and will behave as with objects in
+ordinary databases where logging has been disabled.
+
+*/

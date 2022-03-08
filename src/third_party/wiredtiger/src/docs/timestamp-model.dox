@@ -1,0 +1,98 @@
+/*! @page timestamp_model Timestamp overview
+
+Some applications have their own notion of time, for example, wanting to read
+earlier data after a commit, or wanting to enforce an expected commit order for
+transactions
+different from the order otherwise assigned by WiredTiger. For such applications,
+WiredTiger provides interfaces so applications can impose their time ordering on
+the library. Additionally, timestamps allow applications to prepare
+transactions, read the database as of a given timestamp, and choose a timestamp
+for recovery after failure.
+
+All transactions where timestamps are configured must run at snapshot isolation;
+reduced isolation levels are not permitted.
+
+@section timestamps_global Global timestamps
+
+Applications using timestamps need to manage some global timestamp state. These
+timestamps are queried using the WT_CONNECTION::query_timestamp method and set
+using the WT_CONNECTION::set_timestamp method. See @ref timestamp_global_api
+for a full explanation.
+
+@section timestamp_transactions Timestamps and transactions
+
+Individual transactions also have timestamp state. These timestamps are queried
+using WT_SESSION::query_timestamp but are potentially set in a variety of
+methods, to allow configuration at various stages of the transaction:
+WT_SESSION::begin_transaction, WT_SESSION::commit_transaction,
+WT_SESSION::prepare_transaction and WT_SESSION::timestamp_transaction.  See @ref
+timestamp_txn_api for a full explanation.
+
+@section timestamps_format Timestamp format
+
+Timestamps are 64-bit unsigned integers naming a point in application time.
+WiredTiger does not interpret timestamps other than expecting larger timestamps
+to correspond to "later" times. Timestamp 0 is reserved, so timestamps must
+start at 1 or greater. It is not necessary for timestamp values to be clock time
+of any kind; an expected timestamp source is a global counter shared by
+instances of an application distributed across a network, individually running
+local WiredTiger databases.
+
+Timestamps are read from and written to the WiredTiger API as hexadecimal
+strings without any leading prefix like "0x".  Applications using timestamps
+must format those time values as hexadecimal when querying or setting
+timestamps in WiredTiger:
+
+@snippet ex_all.c hexadecimal timestamp
+
+@section timestamps_durability_commit Logged objects, commit-level durability and timestamps
+
+\warning
+For all objects for which logging is configured, that is, objects configured for
+commit-level durability, timestamps are ignored and durability behaves as if
+timestamps were not set. This means timestamps do not change run-time behavior
+for logged objects. (For example, it is not possible to read historical data and
+attempts to do so are ignored.) Commits are written into the log and
+subsequently restored as part of database recovery, as they are without
+timestamps.
+
+In general, timestamp-based WiredTiger applications will mostly not
+use commit-level durability. However, commit-level durability with
+timestamps makes sense when there is an object in the database that acts as a
+higher-level application write-ahead-log. In that case, the application's
+high-level log is recovered to the most recent commit and then that log is used
+to restore other objects in the system which used checkpoint-level durability.
+The log itself cannot be timestamped, but can be used to store timestamps for
+other data.
+
+For that reason, it is not an error to modify both logged and non-logged objects
+in transactions configured with timestamps, as the atomicity, consistency and
+isolation features of ACID for all objects in the transaction are supported.
+However, because the underlying objects will have different durability models,
+applications must be prepared to handle the inconsistencies between logged and
+non-logged objects that will be seen after recovery.
+
+\warning Using both commit-level and checkpoint-level durability in the same
+database requires caution. Configuring logging for the database will
+automatically configure logging for each object in the database unless logging
+is explicitly turned off when the object is created.
+
+@section timestamps_durability_checkpoint Checkpoint durability and timestamps
+
+Checkpoint durability is the expected choice for most objects when
+timestamps are configured. The change from checkpoint durability without
+timestamps is applications can set a maximum value for the timestamp of
+each checkpoint (the "stable timestamp"), and during recovery objects
+are returned to the stable timestamp
+associated with the most recent checkpoint.  This gives the application
+fine-grained control over the point to which recovery moves after failure.
+
+\warning As in checkpoint durability without timestamps, transactions committed
+after a checkpoint will be rolled back as part of recovery. However, with the
+introduction of the stable timestamp as the checkpoint's timestamp, it becomes
+possible for a transaction to be committed, followed by a checkpoint, and then
+recovery would still roll back the transaction if the commit timestamp were
+after the checkpoint's stable timestamp. Applications are therefore responsible
+for ensuring such committed transactions are restored or abandoned as desired.
+
+*/
