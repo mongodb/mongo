@@ -455,6 +455,25 @@ runTest(coll,
         [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
         JoinAlgorithm.Classic /* expectedJoinAlgorithm */);
 
+// Sharded main collection, unsharded right side. Here, we are targeting a single shard, so there
+// will be no leading $mergeCursors stage. We should still avoid pushing down $lookup.
+const singleShardPipeline = [
+    {$match: {shardKey: 1}},
+    {$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}
+];
+runTest(coll, singleShardPipeline, JoinAlgorithm.Classic /* expectedJoinAlgorithm */);
+
+// Verify that the above pipeline targets a single shard and doesn't use a $mergeCursors stage.
+const singleShardExplain = coll.explain().aggregate(singleShardPipeline);
+assert(!aggPlanHasStage(
+    singleShardExplain, "$mergeCursors", "found $mergeCursors in " + tojson(singleShardExplain)));
+assert(singleShardExplain.hasOwnProperty("shards"),
+       "should have shards property in explain: " + tojson(singleShardExplain));
+assert.eq(Object.keys(singleShardExplain["shards"]).length,
+          1,
+          "sharded explain should only" +
+              " target one shard " + tojson(singleShardExplain));
+
 // Both collections are sharded.
 runTest(coll,
         [{$lookup: {from: name, localField: "a", foreignField: "b", as: "out"}}],

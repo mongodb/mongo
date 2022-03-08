@@ -142,6 +142,12 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> extractSbeCompatibleSt
         serverGlobalParams.featureCompatibility);
     const auto lookupFeatureFlagEnabled =
         feature_flags::gFeatureFlagSBELookupPushdown.isEnabledAndIgnoreFCV();
+
+    bool isMainCollectionSharded = false;
+    if (const auto& mainColl = collections.getMainCollection()) {
+        isMainCollectionSharded = mainColl.isSharded();
+    }
+
     for (auto itr = sources.begin(); itr != sources.end();) {
         // $group pushdown logic.
         if (auto groupStage = dynamic_cast<DocumentSourceGroup*>(itr->get())) {
@@ -157,31 +163,23 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> extractSbeCompatibleSt
 
         // $lookup pushdown logic.
         if (auto lookupStage = dynamic_cast<DocumentSourceLookUp*>(itr->get())) {
-            // If lookup pushdown isn't enabled, then neither this stage nor any subsequent stages
-            // will be eligible for pushdown. As such, we early return to avoid unnecessary work.
-            if (!lookupFeatureFlagEnabled) {
-                break;
-            }
-
-            bool isForeignSharded = false;
-            const auto& fromNs = lookupStage->getFromNs();
-            const auto& foreignColl = collections.lookupCollection(fromNs);
-            if (foreignColl) {
-                isForeignSharded = foreignColl.isSharded();
-            }
-
+            // If lookup pushdown isn't enabled or the main collection is sharded or any of the
+            // secondary namespaces are sharded or are a view, then neither this stage nor any
+            // subsequent stages will be eligible for pushdown. As such, we early return to avoid
+            // unnecessary work.
+            //
             // When acquiring locks for multiple collections, it is the case that we can only
             // determine whether any secondary collection is a view or is sharded, not which ones
             // are a view or are sharded and which ones aren't. As such, if any secondary collection
             // is a view or is sharded, no $lookup will be eligible for pushdown.
-            // Note that we still check 'isForeignSharded' because this flag will be accurate in
-            // the event that the main collection is a secondary collection.
-            // Also note that 'lookupStage->sbeCompatible()' encodes whether the foreign
-            // collection is a view.
-            bool lookupEligibleForPushdown = lookupFeatureFlagEnabled &&
-                lookupStage->sbeCompatible() && !isForeignSharded &&
-                !collections.isAnySecondaryNamespaceAViewOrSharded();
-            if (lookupEligibleForPushdown) {
+            if (!lookupFeatureFlagEnabled || isMainCollectionSharded ||
+                collections.isAnySecondaryNamespaceAViewOrSharded()) {
+                break;
+            }
+
+            // Note that 'lookupStage->sbeCompatible()' encodes whether the foreign collection is a
+            // view.
+            if (lookupStage->sbeCompatible()) {
                 stagesForPushdown.push_back(std::make_unique<InnerPipelineStageImpl>(lookupStage));
                 sources.erase(itr++);
                 continue;
