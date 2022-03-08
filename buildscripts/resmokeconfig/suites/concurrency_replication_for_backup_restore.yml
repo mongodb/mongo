@@ -27,6 +27,10 @@ selector:
   - jstests/concurrency/fsm_workloads/invalidated_cursors.js
   - jstests/concurrency/fsm_workloads/globally_managed_cursors.js
 
+  # These workloads use a verbose log level.
+  - jstests/concurrency/fsm_workloads/collection_uuid.js
+  - jstests/concurrency/fsm_workloads/random_moveChunk_update_shard_key.js
+
   exclude_with_any_tags:
   # The ability to shut down a node while its in the middle of applying ops is required for
   # backup_restore. The workloads which perform certain operations which can cause the test to fail
