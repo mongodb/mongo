@@ -337,13 +337,13 @@ def check_reply_field_type_recursive(ctxt: IDLCompatibilityContext,
     # If bson_serialization_type switches from 'any' to non-any type.
     if "any" in old_field_type.bson_serialization_type and "any" not in new_field_type.bson_serialization_type:
         ctxt.add_old_reply_field_bson_any_error(cmd_name, field_name, old_field_type.name,
-                                                old_field.idl_file_path)
+                                                new_field_type.name, old_field.idl_file_path)
         return
 
     # If bson_serialization_type switches from non-any to 'any' type.
     if "any" not in old_field_type.bson_serialization_type and "any" in new_field_type.bson_serialization_type:
         ctxt.add_new_reply_field_bson_any_error(cmd_name, field_name, old_field_type.name,
-                                                new_field.idl_file_path)
+                                                new_field_type.name, new_field.idl_file_path)
         return
 
     allow_name: str = cmd_name + "-reply-" + field_name
@@ -351,7 +351,7 @@ def check_reply_field_type_recursive(ctxt: IDLCompatibilityContext,
     if "any" in old_field_type.bson_serialization_type:
         # If 'any' is not explicitly allowed as the bson_serialization_type.
         if allow_name not in ALLOW_ANY_TYPE_LIST:
-            ctxt.add_reply_field_bson_any_not_allowed_error(
+            ctxt.add_old_reply_field_bson_any_not_allowed_error(
                 cmd_name, field_name, old_field_type.name, old_field.idl_file_path)
             return
 
@@ -605,7 +605,7 @@ def check_reply_fields(ctxt: IDLCompatibilityContext, old_reply: syntax.Struct,
                 # If 'any' is not explicitly allowed as the bson_serialization_type.
                 any_allow = allow_name in ALLOW_ANY_TYPE_LIST or new_field_type.name == 'optionalBool'
                 if not any_allow:
-                    ctxt.add_reply_field_bson_any_not_allowed_error(
+                    ctxt.add_new_reply_field_bson_any_not_allowed_error(
                         cmd_name, new_field.name, new_field_type.name, new_idl_file_path)
 
 
@@ -641,20 +641,22 @@ def check_param_or_command_type_recursive(ctxt: IDLCompatibilityContext,
 
     # If bson_serialization_type switches from 'any' to non-any type.
     if "any" in old_type.bson_serialization_type and "any" not in new_type.bson_serialization_type:
-        ctxt.add_old_command_or_param_type_bson_any_error(
-            cmd_name, old_type.name, old_field.idl_file_path, param_name, is_command_parameter)
+        ctxt.add_old_command_or_param_type_bson_any_error(cmd_name, old_type.name, new_type.name,
+                                                          old_field.idl_file_path, param_name,
+                                                          is_command_parameter)
         return
 
     # If bson_serialization_type switches from non-any to 'any' type.
     if "any" not in old_type.bson_serialization_type and "any" in new_type.bson_serialization_type:
-        ctxt.add_new_command_or_param_type_bson_any_error(
-            cmd_name, new_type.name, new_field.idl_file_path, param_name, is_command_parameter)
+        ctxt.add_new_command_or_param_type_bson_any_error(cmd_name, old_type.name, new_type.name,
+                                                          new_field.idl_file_path, param_name,
+                                                          is_command_parameter)
         return
 
     if "any" in old_type.bson_serialization_type:
         # If 'any' is not explicitly allowed as the bson_serialization_type.
         if allow_name not in ALLOW_ANY_TYPE_LIST:
-            ctxt.add_command_or_param_type_bson_any_not_allowed_error(
+            ctxt.add_old_command_or_param_type_bson_any_not_allowed_error(
                 cmd_name, old_type.name, old_field.idl_file_path, param_name, is_command_parameter)
             return
 
@@ -905,7 +907,7 @@ def check_command_params_or_type_struct_fields(
                 # If 'any' is not explicitly allowed as the bson_serialization_type.
                 any_allow = any_allow_name in ALLOW_ANY_TYPE_LIST or new_field_type.name == 'optionalBool'
                 if not any_allow:
-                    ctxt.add_command_or_param_type_bson_any_not_allowed_error(
+                    ctxt.add_new_command_or_param_type_bson_any_not_allowed_error(
                         cmd_name, new_field_type.name, old_idl_file_path, new_field.name,
                         is_command_parameter)
 

@@ -164,8 +164,7 @@ class IDLCompatibilityError(object):
         Error in compatibility_test_pass_new/file.idl: ID0001: 'command' has an invalid API
         version '2'.
         """
-        msg = "Comparing %s and %s: Error in %s: %s: %s" % (os.path.basename(self.old_idl_dir),
-                                                            os.path.basename(self.new_idl_dir),
+        msg = "Comparing %s and %s: Error in %s: %s: %s" % (self.old_idl_dir, self.new_idl_dir,
                                                             self.file, self.error_id, self.msg)
         return msg
 
@@ -270,14 +269,16 @@ class IDLCompatibilityContext(object):
 
     def add_command_removed_error(self, command_name: str, file: str) -> None:
         """Add an error about a command that was removed."""
-        self._add_error(ERROR_ID_REMOVED_COMMAND, command_name,
-                        "Old command '%s' was removed from new commands." % (command_name), file)
+        self._add_error(
+            ERROR_ID_REMOVED_COMMAND, command_name,
+            "The command '%s' was present in the stable API but was removed." % (command_name),
+            file)
 
     def add_command_strict_true_error(self, command_name: str, file: str) -> None:
         """Add an error about a command that changes from strict: false to strict: true."""
         self._add_error(
             ERROR_ID_COMMAND_STRICT_TRUE_ERROR, command_name,
-            "'%s' changes from strict: false in the old version to strict: true in the new version."
+            "'%s' changes from strict: false in the old definition to strict: true in the new definition."
             % (command_name), file)
 
     def add_duplicate_command_name_error(self, command_name: str, dir_name: str, file: str) -> None:
@@ -291,7 +292,7 @@ class IDLCompatibilityContext(object):
         self._add_error(
             ERROR_ID_REPLY_FIELD_NOT_SUBSET, command_name,
             "'%s' has a reply field or sub-field '%s' with type '%s' "
-            "that is not a subset of the other version "
+            "that is not a subset of the type of the older definition "
             "of this reply field." % (command_name, field_name, type_name), file)
 
     def add_command_or_param_type_invalid_error(self, command_name: str, file: str,
@@ -317,13 +318,17 @@ class IDLCompatibilityContext(object):
         if is_command_parameter:
             self._add_error(
                 ERROR_ID_COMMAND_PARAMETER_TYPE_NOT_SUPERSET, command_name,
-                "The command '%s' has field or sub-field '%s' with type '%s' that is not a superset of the "
-                "older version of this field type." % (command_name, field_name, type_name), file)
+                "The new definition of command '%s' has field or sub-field '%s' with type '%s' "
+                "that is not a superset of the "
+                "type of the existing definition of the field." % (command_name, field_name,
+                                                                   type_name), file)
         else:
             self._add_error(
                 ERROR_ID_COMMAND_TYPE_NOT_SUPERSET, command_name,
-                "The command '%s' or its sub-struct has type '%s' that is not a superset of "
-                "the older version of this struct type." % (command_name, type_name), file)
+                "The new definition of command '%s' or its sub-struct has type '%s' that is not a "
+                "superset of "
+                "the type of the existing definition of this command/struct." % (command_name,
+                                                                                 type_name), file)
 
     def add_command_or_param_type_contains_validator_error(self, command_name: str, field_name: str,
                                                            file: str, type_name: Optional[str],
@@ -338,14 +343,14 @@ class IDLCompatibilityContext(object):
         if is_command_parameter:
             self._add_error(
                 ERROR_ID_COMMAND_PARAMETER_CONTAINS_VALIDATOR, command_name,
-                "Field or sub-field '%s' for new command '%s' contains a validator "
-                "while the old field does not." % (field_name, command_name), file)
+                "The new definition of the field or sub-field '%s' for the command '%s' contains a validator "
+                "while the old definition does not." % (field_name, command_name), file)
         else:
             self._add_error(
                 ERROR_ID_COMMAND_TYPE_CONTAINS_VALIDATOR, command_name,
-                "The command '%s' or its sub-struct has type '%s' with field '%s' that "
-                "contains a validator while "
-                "the old struct type does not." % (command_name, type_name, field_name), file)
+                "The new definition of the command '%s' or its sub-struct has type '%s' with field '%s' that "
+                "contains a validator when "
+                "the old definition did not." % (command_name, type_name, field_name), file)
 
     def add_command_or_param_type_validators_not_equal_error(
             self, command_name: str, field_name: str, file: str, type_name: Optional[str],
@@ -355,24 +360,24 @@ class IDLCompatibilityContext(object):
         if is_command_parameter:
             self._add_error(
                 ERROR_ID_COMMAND_PARAMETER_VALIDATORS_NOT_EQUAL, command_name,
-                "Validator for field or sub-field '%s' in old command '%s' is not equal "
-                "to the validator in the new version of the field" % (field_name, command_name),
+                "Validator for field or sub-field '%s' in old definition of command '%s' is not equal "
+                "to the validator in the new definition of the field" % (field_name, command_name),
                 file)
         else:
             self._add_error(
                 ERROR_ID_COMMAND_TYPE_VALIDATORS_NOT_EQUAL, command_name,
-                "Validator for field '%s' in type '%s' in old command '%s' or its "
-                "sub-struct is not equal to the validator in the new struct type." %
-                (field_name, type_name, command_name), file)
+                "Validator for field '%s' in type '%s' in old definition of command '%s' or its "
+                "sub-struct is not equal to the validator in the new defition of the command/struct."
+                % (field_name, type_name, command_name), file)
 
     def add_missing_error_reply_struct_error(self, file: str) -> None:
         """Add an error about the file missing the ErrorReply struct."""
         self._add_error(ERROR_ID_MISSING_ERROR_REPLY_STRUCT, "n/a",
                         ("'%s' is missing the ErrorReply struct") % (file), file)
 
-    def add_new_command_or_param_type_bson_any_error(self, command_name: str, new_type: str,
-                                                     file: str, field_name: Optional[str],
-                                                     is_command_parameter: bool) -> None:
+    def add_new_command_or_param_type_bson_any_error(
+            self, command_name: str, old_type: str, new_type: str, file: str,
+            field_name: Optional[str], is_command_parameter: bool) -> None:
         # pylint: disable=too-many-arguments
         """
         Add an error about BSON serialization type.
@@ -384,14 +389,17 @@ class IDLCompatibilityContext(object):
         if is_command_parameter:
             self._add_error(
                 ERROR_ID_NEW_COMMAND_PARAMETER_TYPE_BSON_SERIALIZATION_TYPE_ANY, command_name,
-                "The '%s' command has field or sub-field '%s' that has type '%s' "
-                "that has a bson serialization type 'any'" % (command_name, field_name, new_type),
-                file)
+                "The new definition of '%s' command has field or sub-field '%s' that has type '%s' "
+                "that has a bson serialization type 'any', while the existing older definition had type %s"
+                " that did not have bson serialization type 'any'" % (command_name, field_name,
+                                                                      new_type, old_type), file)
         else:
             self._add_error(
                 ERROR_ID_NEW_COMMAND_TYPE_BSON_SERIALIZATION_TYPE_ANY, command_name,
-                "The '%s' command or its sub-struct has type '%s' that "
-                "has a bson serialization type 'any'" % (command_name, new_type), file)
+                "The new definition of '%s' command or its sub-struct has type '%s' that "
+                "has a bson serialization type 'any', while the existing older definition had type %s"
+                " that did not have bson serialization type 'any'" % (command_name, new_type,
+                                                                      old_type), file)
 
     def add_new_command_or_param_type_enum_or_struct_error(
             self, command_name: str, new_type: str, old_type: str, file: str,
@@ -407,15 +415,15 @@ class IDLCompatibilityContext(object):
             self._add_error(
                 ERROR_ID_NEW_COMMAND_PARAMETER_TYPE_ENUM_OR_STRUCT, command_name,
                 "The command '%s' has field or sub-field '%s' of type '%s' that is an enum or "
-                "struct while the corresponding old field type is a non-enum or "
+                "struct while the old definition of the field type is a non-enum or "
                 "non-struct of type '%s'." % (command_name, field_name, new_type, old_type), file)
         else:
             self._add_error(
                 ERROR_ID_NEW_COMMAND_TYPE_ENUM_OR_STRUCT, command_name,
                 "The command '%s' or its sub-struct has type '%s' that is an enum "
-                "or struct while the corresponding"
-                "old type was a non-enum or struct of type '%s'." % (command_name, new_type,
-                                                                     old_type), file)
+                "or struct while the old definition of the"
+                "type was a non-enum or struct of type '%s'." % (command_name, new_type, old_type),
+                file)
 
     def add_new_param_or_command_type_field_added_required_error(
             self, command_name: str, field_name: str, file: str, type_name: str,
@@ -431,14 +439,15 @@ class IDLCompatibilityContext(object):
         if is_command_parameter:
             self._add_error(
                 ERROR_ID_ADDED_REQUIRED_COMMAND_PARAMETER, command_name,
-                "New field or sub-field '%s' for command '%s' is required when it should "
+                "New definition of field or sub-field '%s' for command '%s' is required when it should "
                 "be optional." % (field_name, command_name), file)
         else:
             self._add_error(
                 ERROR_ID_NEW_COMMAND_TYPE_FIELD_ADDED_REQUIRED, command_name,
-                "The command '%s' or its sub-struct has type '%s' with an added and "
+                "The new definition of command '%s' or its sub-struct has type '%s' with an added and "
                 "required type field '%s' that did not exist "
-                "in the old struct type." % (command_name, type_name, field_name), file)
+                "in the old definition of struct type." % (command_name, type_name, field_name),
+                file)
 
     def add_new_param_or_command_type_field_missing_error(self, command_name: str, field_name: str,
                                                           file: str, type_name: str,
@@ -448,14 +457,14 @@ class IDLCompatibilityContext(object):
         if is_command_parameter:
             self._add_error(
                 ERROR_ID_REMOVED_COMMAND_PARAMETER, command_name,
-                "Field or sub-field '%s' for old command '%s' was removed from the corresponding new"
-                "struct." % (field_name, command_name), file)
+                "Field or sub-field '%s' for command '%s' was removed from the new definition of the"
+                "command." % (field_name, command_name), file)
         else:
             self._add_error(
                 ERROR_ID_NEW_COMMAND_TYPE_FIELD_MISSING, command_name,
                 "The command '%s' or its sub-struct has type '%s' that is missing a "
-                "field '%s' that exists in the old struct type." % (command_name, type_name,
-                                                                    field_name), file)
+                "field '%s' that exists in the old definition of the command/struct." %
+                (command_name, type_name, field_name), file)
 
     def add_new_param_or_command_type_field_required_error(self, command_name: str, field_name: str,
                                                            file: str, type_name: Optional[str],
@@ -470,14 +479,14 @@ class IDLCompatibilityContext(object):
         if is_command_parameter:
             self._add_error(
                 ERROR_ID_COMMAND_PARAMETER_REQUIRED, command_name,
-                "'%s' has a required field or sub-field '%s' that was optional in the old struct." %
-                (command_name, field_name), file)
+                "'%s' has a required field or sub-field '%s' that was optional in the old "
+                "definition of the struct." % (command_name, field_name), file)
         else:
             self._add_error(
                 ERROR_ID_NEW_COMMAND_TYPE_FIELD_REQUIRED, command_name,
                 "'%s' or its sub-struct has type '%s' with a required type field '%s' "
-                "that was optional in the old struct type." % (command_name, type_name, field_name),
-                file)
+                "that was optional in the old definition of the struct type." %
+                (command_name, type_name, field_name), file)
 
     def add_new_param_or_command_type_field_stable_required_no_default_error(
             self, struct_name: str, field_name: str, file: str, type_name: Optional[str],
@@ -494,15 +503,15 @@ class IDLCompatibilityContext(object):
             self._add_error(
                 ERROR_ID_COMMAND_PARAMETER_STABLE_REQUIRED_NO_DEFAULT, struct_name,
                 "'%s' has a stable required field '%s' with no default that was unstable in the"
-                " old struct."
-                "The new field should be optional or have a default value" % (struct_name,
-                                                                              field_name), file)
+                " old definition of the struct."
+                "The new definition of the field should be optional or have a default value" %
+                (struct_name, field_name), file)
         else:
             self._add_error(
                 ERROR_ID_NEW_COMMAND_TYPE_FIELD_STABLE_REQUIRED_NO_DEFAULT, struct_name,
                 ("'%s' has type '%s' with a stable and required type field '%s' with no default "
-                 "that was unstable in the old struct type."
-                 "The new field should be optional or have a default value") %
+                 "that was unstable in the old definition of the struct type."
+                 "The new definition of the field should be optional or have a default value") %
                 (struct_name, type_name, field_name), file)
 
     def add_new_param_or_command_type_field_unstable_error(self, command_name: str, field_name: str,
@@ -518,13 +527,13 @@ class IDLCompatibilityContext(object):
         if is_command_parameter:
             self._add_error(
                 ERROR_ID_COMMAND_PARAMETER_UNSTABLE, command_name,
-                "'%s' has an unstable field or sub-field '%s' that was stable in the old struct." %
-                (command_name, field_name), file)
+                "'%s' has an unstable field or sub-field '%s' that was stable in the old definition"
+                " of the struct." % (command_name, field_name), file)
         else:
             self._add_error(
                 ERROR_ID_NEW_COMMAND_TYPE_FIELD_UNSTABLE, command_name,
                 "'%s' or its sub-struct has type '%s' with an unstable "
-                "field '%s' that was stable in the old "
+                "field '%s' that was stable in the old definition of the "
                 "struct type." % (command_name, type_name, field_name), file)
 
     def add_new_command_or_param_type_not_enum_error(
@@ -541,13 +550,13 @@ class IDLCompatibilityContext(object):
             self._add_error(
                 ERROR_ID_NEW_COMMAND_PARAMETER_TYPE_NOT_ENUM, command_name,
                 "The '%s' command has field or sub-field '%s' of type '%s' that is "
-                "not an enum while the corresponding old field type was an enum of type '%s'." %
+                "not an enum while the old definition of the field type was an enum of type '%s'." %
                 (command_name, field_name, new_type, old_type), file)
         else:
             self._add_error(
                 ERROR_ID_NEW_COMMAND_TYPE_NOT_ENUM, command_name,
-                "'%s' or its sub-struct has type '%s' that is not an enum while the corresponding "
-                "old type was an enum of type '%s'." % (command_name, new_type, old_type), file)
+                "'%s' or its sub-struct has type '%s' that is not an enum while the old definition of the type was an enum of type '%s'."
+                % (command_name, new_type, old_type), file)
 
     def add_new_command_or_param_type_not_struct_error(
             self, command_name: str, new_type: str, old_type: str, file: str,
@@ -558,14 +567,14 @@ class IDLCompatibilityContext(object):
             self._add_error(
                 ERROR_ID_NEW_COMMAND_PARAMETER_TYPE_NOT_STRUCT, command_name,
                 "The '%s' command has field or sub-field '%s' of type '%s' that is "
-                "not a struct while the corresponding old "
+                "not a struct while the old definition of the "
                 "field type was a struct of type '%s'." % (command_name, field_name, new_type,
                                                            old_type), file)
         else:
             self._add_error(
                 ERROR_ID_NEW_COMMAND_TYPE_NOT_STRUCT, command_name,
                 "'%s' or its sub-struct has type '%s' that is not a "
-                "struct while the corresponding old type was a struct of type '%s'." %
+                "struct while the old definition of the type was a struct of type '%s'." %
                 (command_name, new_type, old_type), file)
 
     def add_new_command_or_param_type_not_variant_type_error(self, command_name: str, new_type: str,
@@ -582,13 +591,14 @@ class IDLCompatibilityContext(object):
         if is_command_parameter:
             self._add_error(ERROR_ID_NEW_COMMAND_PARAMETER_TYPE_NOT_VARIANT, command_name,
                             ("The '%s' command has field or sub-field '%s' of type '%s' that is "
-                             "not variant while the corresponding old field type is variant.") %
-                            (command_name, field_name, new_type), file)
+                             "not variant while the older definition of the field type is variant.")
+                            % (command_name, field_name, new_type), file)
         else:
             self._add_error(ERROR_ID_NEW_COMMAND_TYPE_NOT_VARIANT, command_name,
                             ("'%s' or its sub-struct has type '%s' that is not "
-                             "variant while the corresponding "
-                             "old type is variant.") % (command_name, new_type), file)
+                             "variant while the "
+                             "older definition of the type is variant.") % (command_name, new_type),
+                            file)
 
     def add_new_command_or_param_variant_type_not_superset_error(
             self, command_name: str, variant_type_name: str, file: str, field_name: Optional[str],
@@ -604,16 +614,17 @@ class IDLCompatibilityContext(object):
             self._add_error(
                 ERROR_ID_NEW_COMMAND_PARAMETER_VARIANT_TYPE_NOT_SUPERSET, command_name,
                 ("The '%s' command has field or sub-field '%s' of variant types that is not "
-                 "a superset of the corresponding old field variant types: "
-                 "The type '%s' is in the old field types but not the new field types.") %
-                (command_name, field_name, variant_type_name), file)
+                 "a superset of the older definition of the field variant types: "
+                 "The type '%s' is in the old definition of the field types but not the new "
+                 "definition of the field types.") % (command_name, field_name, variant_type_name),
+                file)
         else:
-            self._add_error(ERROR_ID_NEW_COMMAND_VARIANT_TYPE_NOT_SUPERSET, command_name,
-                            ("'%s' or its sub-struct has variant types that is not a supserset "
-                             "of the corresponding"
-                             " old command variant types: The type '%s' "
-                             "is in the old command types but not the new command types.") %
-                            (command_name, variant_type_name), file)
+            self._add_error(
+                ERROR_ID_NEW_COMMAND_VARIANT_TYPE_NOT_SUPERSET, command_name,
+                ("'%s' or its sub-struct has variant types that is not a supserset "
+                 "of the older definition of the command variant types: The type '%s' "
+                 "is in the old definition of the command types but not the new definition of "
+                 "the command types.") % (command_name, variant_type_name), file)
 
     def add_new_command_or_param_chained_type_not_superset_error(
             self, command_name: str, chained_type_name: str, file: str, field_name: Optional[str],
@@ -629,32 +640,34 @@ class IDLCompatibilityContext(object):
             self._add_error(
                 ERROR_ID_NEW_COMMAND_PARAMETER_CHAINED_TYPE_NOT_SUPERSET, command_name,
                 ("The '%s' command has field or sub-field '%s' of chained types that is not "
-                 "a superset of the corresponding old field chained types: "
-                 "The type '%s' is in the old field types but not the new field types.") %
-                (command_name, field_name, chained_type_name), file)
+                 "a superset of the corresponding old definition of the field's chained types: "
+                 "The type '%s' is in the old definition of the field types but not the new "
+                 "definition of the field types.") % (command_name, field_name, chained_type_name),
+                file)
         else:
-            self._add_error(ERROR_ID_NEW_COMMAND_CHAINED_TYPE_NOT_SUPERSET, command_name,
-                            ("'%s' or its sub-struct has chained types that is not a supserset "
-                             "of the corresponding"
-                             " old command chained types: The type '%s' "
-                             "is in the old command types but not the new command types.") %
-                            (command_name, chained_type_name), file)
+            self._add_error(
+                ERROR_ID_NEW_COMMAND_CHAINED_TYPE_NOT_SUPERSET, command_name,
+                ("'%s' or its sub-struct has chained types that is not a supserset "
+                 "of the corresponding old definition of the command chained types: The type '%s' "
+                 "is in the old definition of the command types but not the new definition of the "
+                 "command types.") % (command_name, chained_type_name), file)
 
     def add_new_namespace_incompatible_error(self, command_name: str, old_namespace: str,
                                              new_namespace: str, file: str) -> None:
         """Add an error about the new namespace being incompatible with the old namespace."""
         self._add_error(
             ERROR_ID_NEW_NAMESPACE_INCOMPATIBLE, command_name,
-            "'%s' has namespace '%s' that is incompatible with the old namespace '%s'." %
-            (command_name, new_namespace, old_namespace), file)
+            "The new definition of '%s' has namespace '%s' that is incompatible with the old definition "
+            " of the command with namespace '%s'." % (command_name, new_namespace, old_namespace),
+            file)
 
     def add_new_reply_field_missing_error(self, command_name: str, field_name: str,
                                           file: str) -> None:
         """Add an error about the new command missing a reply field that exists in the old command."""
         self._add_error(
             ERROR_ID_NEW_REPLY_FIELD_MISSING, command_name,
-            "'%s' is missing a reply field or sub-field '%s' that exists in the old command." %
-            (command_name, field_name), file)
+            "'%s' is missing a reply field or sub-field '%s' that exists in the old definition of "
+            "the command." % (command_name, field_name), file)
 
     def add_new_reply_field_optional_error(self, command_name: str, field_name: str,
                                            file: str) -> None:
@@ -662,58 +675,78 @@ class IDLCompatibilityContext(object):
         self._add_error(
             ERROR_ID_NEW_REPLY_FIELD_OPTIONAL, command_name,
             "'%s' has an optional reply field or sub-field '%s' "
-            "that was non-optional in the old command." % (command_name, field_name), file)
+            "that was non-optional in the old definition of the command." % (command_name,
+                                                                             field_name), file)
 
     def add_new_reply_field_bson_any_error(self, command_name: str, field_name: str,
-                                           new_field_type: str, file: str) -> None:
+                                           old_field_type: str, new_field_type: str,
+                                           file: str) -> None:
         """
         Add an error about the new reply field type's 'any' bson serialization type.
 
         Add an error about the new reply field type's bson serialization type being of type
         'any' when it was not 'any' in the old type or it is not explicitly allowed.
         """
-        self._add_error(ERROR_ID_NEW_REPLY_FIELD_BSON_SERIALIZATION_TYPE_ANY, command_name,
-                        ("'%s' has a new reply field or sub-field '%s' of type '%s' "
-                         "that has a bson serialization type 'any'") % (command_name, field_name,
-                                                                        new_field_type), file)
+        self._add_error(
+            ERROR_ID_NEW_REPLY_FIELD_BSON_SERIALIZATION_TYPE_ANY, command_name,
+            ("The new definition of '%s' has a reply field or sub-field '%s' of type '%s' "
+             "that has a bson serialization type 'any', while the old definition"
+             " had type '%s' that did not have bson serialization type 'any'") %
+            (command_name, field_name, new_field_type, old_field_type), file)
 
-    def add_reply_field_bson_any_not_allowed_error(self, command_name: str, field_name: str,
-                                                   type_name: str, file: str) -> None:
+    def add_old_reply_field_bson_any_not_allowed_error(self, command_name: str, field_name: str,
+                                                       type_name: str, file: str) -> None:
         """
-        Add an error about the reply field bson serialization_type being 'any'.
+        Add an error about the old reply field bson serialization type being 'any'.
 
         Add an error about the reply field type's bson serialization type being of
         type 'any' when it is not explicitly allowed.
         """
-        self._add_error(ERROR_ID_REPLY_FIELD_BSON_SERIALIZATION_TYPE_ANY_NOT_ALLOWED, command_name,
-                        ("'%s' has a reply field or sub-field '%s' of type '%s' "
-                         "that has a bson serialization type 'any' when it "
-                         "is not explicitly allowed.") % (command_name, field_name, type_name),
-                        file)
+        self._add_error(
+            ERROR_ID_REPLY_FIELD_BSON_SERIALIZATION_TYPE_ANY_NOT_ALLOWED, command_name,
+            ("The old definition of '%s' has a reply field or sub-field '%s' of type '%s' "
+             "that has a bson serialization type 'any' when it "
+             "is not explicitly allowed.") % (command_name, field_name, type_name), file)
+
+    def add_new_reply_field_bson_any_not_allowed_error(self, command_name: str, field_name: str,
+                                                       type_name: str, file: str) -> None:
+        """
+        Add an error about the new reply field bson serialization type being 'any'.
+
+        Add an error about the reply field type's bson serialization type being of
+        type 'any' when it is not explicitly allowed.
+        """
+        self._add_error(
+            ERROR_ID_REPLY_FIELD_BSON_SERIALIZATION_TYPE_ANY_NOT_ALLOWED, command_name,
+            ("The new definition of '%s' has a reply field or sub-field '%s' of type '%s' "
+             "that has a bson serialization type 'any' when it "
+             "is not explicitly allowed.") % (command_name, field_name, type_name), file)
 
     def add_reply_field_cpp_type_not_equal_error(self, command_name: str, field_name: str,
                                                  type_name: str, file: str) -> None:
         """Add an error about the old and new reply field cpp_type not being equal."""
         self._add_error(ERROR_ID_REPLY_FIELD_CPP_TYPE_NOT_EQUAL, command_name,
                         ("'%s' has a reply field or sub-field '%s' of type '%s' that has cpp_type "
-                         "that is not equal in the old and new versions.") %
+                         "that is not equal in the old and new definitions of this command.") %
                         (command_name, field_name, type_name), file)
 
     def add_reply_field_serializer_not_equal_error(self, command_name: str, field_name: str,
                                                    type_name: str, file: str) -> None:
         """Add an error about the old and new reply field serializer not being equal."""
-        self._add_error(ERROR_ID_REPLY_FIELD_SERIALIZER_NOT_EQUAL, command_name,
-                        ("'%s' has a reply field or sub-field '%s' of type '%s' that has "
-                         "serializer that is not equal in the old and new versions.") %
-                        (command_name, field_name, type_name), file)
+        self._add_error(
+            ERROR_ID_REPLY_FIELD_SERIALIZER_NOT_EQUAL, command_name,
+            ("'%s' has a reply field or sub-field '%s' of type '%s' that has "
+             "serializer that is not equal in the old and new definitions of this command.") %
+            (command_name, field_name, type_name), file)
 
     def add_reply_field_deserializer_not_equal_error(self, command_name: str, field_name: str,
                                                      type_name: str, file: str) -> None:
         """Add an error about the old and new reply field deserializer not being equal."""
-        self._add_error(ERROR_ID_REPLY_FIELD_DESERIALIZER_NOT_EQUAL, command_name,
-                        ("'%s' has a reply field or sub-field '%s' of type '%s' that has "
-                         "deserializer that is not equal in the old and new versions.") %
-                        (command_name, field_name, type_name), file)
+        self._add_error(
+            ERROR_ID_REPLY_FIELD_DESERIALIZER_NOT_EQUAL, command_name,
+            ("'%s' has a reply field or sub-field '%s' of type '%s' that has "
+             "deserializer that is not equal in the old and new definitions of this command.") %
+            (command_name, field_name, type_name), file)
 
     def add_new_reply_field_type_not_enum_error(self, command_name: str, field_name: str,
                                                 new_field_type: str, old_field_type: str,
@@ -723,7 +756,7 @@ class IDLCompatibilityContext(object):
         self._add_error(ERROR_ID_NEW_REPLY_FIELD_TYPE_NOT_ENUM, command_name,
                         ("'%s' has a reply field or sub-field '%s' of type '%s' "
                          "that is not an enum while the corresponding "
-                         "old reply field was an enum of type '%s'.") %
+                         "old definition of the reply field was an enum of type '%s'.") %
                         (command_name, field_name, new_field_type, old_field_type), file)
 
     def add_new_reply_field_type_not_struct_error(self, command_name: str, field_name: str,
@@ -734,7 +767,7 @@ class IDLCompatibilityContext(object):
         self._add_error(ERROR_ID_NEW_REPLY_FIELD_TYPE_NOT_STRUCT, command_name,
                         ("'%s' has a reply field or sub-field '%s' of type '%s' "
                          "that is not a struct while the corresponding "
-                         "old reply field was a struct of type '%s'.") %
+                         "old definition of the reply field was a struct of type '%s'.") %
                         (command_name, field_name, new_field_type, old_field_type), file)
 
     def add_new_reply_field_type_enum_or_struct_error(self, command_name: str, field_name: str,
@@ -750,8 +783,8 @@ class IDLCompatibilityContext(object):
         self._add_error(ERROR_ID_NEW_REPLY_FIELD_TYPE_ENUM_OR_STRUCT, command_name,
                         ("'%s' has a reply field or sub-field '%s' of type '%s' that is an "
                          "enum or struct while the corresponding "
-                         "old reply field was a non-enum or struct of type '%s'.") %
-                        (command_name, field_name, new_field_type, old_field_type), file)
+                         "old definition of the reply field was a non-enum or struct of type '%s'.")
+                        % (command_name, field_name, new_field_type, old_field_type), file)
 
     def add_new_reply_field_unstable_error(self, command_name: str, field_name: str,
                                            file: str) -> None:
@@ -759,7 +792,8 @@ class IDLCompatibilityContext(object):
         self._add_error(
             ERROR_ID_NEW_REPLY_FIELD_UNSTABLE, command_name,
             "'%s' has an unstable reply field or sub-field '%s' "
-            "that was stable in the old command." % (command_name, field_name), file)
+            "that was stable in the old definition of the command." % (command_name, field_name),
+            file)
 
     def add_new_reply_field_variant_type_error(self, command_name: str, field_name: str,
                                                old_field_type: str, file: str) -> None:
@@ -768,8 +802,8 @@ class IDLCompatibilityContext(object):
         self._add_error(ERROR_ID_NEW_REPLY_FIELD_VARIANT_TYPE, command_name,
                         ("'%s' has a reply field or sub-field '%s' that has a variant "
                          "type while the corresponding "
-                         "old reply field type '%s' is not variant.") % (command_name, field_name,
-                                                                         old_field_type), file)
+                         "old definition of the reply field type '%s' is not variant.") %
+                        (command_name, field_name, old_field_type), file)
 
     def add_new_reply_field_variant_type_not_subset_error(
             self, command_name: str, field_name: str, variant_type_name: str, file: str) -> None:
@@ -784,8 +818,8 @@ class IDLCompatibilityContext(object):
             ERROR_ID_NEW_REPLY_FIELD_VARIANT_TYPE_NOT_SUBSET, command_name,
             ("'%s' has a reply field or sub-field '%s' with variant types that is "
              "not a subset of the corresponding "
-             "old reply field types: The type '%s' is not in the old reply field types.") %
-            (command_name, field_name, variant_type_name), file)
+             "old definition of the reply field types: The type '%s' is not in the old definition "
+             "of the reply field types.") % (command_name, field_name, variant_type_name), file)
 
     def add_new_reply_chained_type_not_subset_error(self, command_name: str, reply_name: str,
                                                     chained_type_name: str, file: str) -> None:
@@ -800,12 +834,13 @@ class IDLCompatibilityContext(object):
             ERROR_ID_NEW_REPLY_CHAINED_TYPE_NOT_SUBSET, command_name,
             ("'%s' has a reply '%s' with chained types that is "
              "not a subset of the corresponding "
-             "old reply chained types: The type '%s' is not in the old reply chained types.") %
-            (command_name, reply_name, chained_type_name), file)
+             "old definition of the reply chained types: The type '%s' is not in the old "
+             "definition of the reply chained types.") % (command_name, reply_name,
+                                                          chained_type_name), file)
 
-    def add_old_command_or_param_type_bson_any_error(self, command_name: str, old_type: str,
-                                                     file: str, field_name: Optional[str],
-                                                     is_command_parameter: bool) -> None:
+    def add_old_command_or_param_type_bson_any_error(
+            self, command_name: str, old_type: str, new_type: str, file: str,
+            field_name: Optional[str], is_command_parameter: bool) -> None:
         # pylint: disable=too-many-arguments
         """
         Add an error about BSON serialization type.
@@ -817,20 +852,23 @@ class IDLCompatibilityContext(object):
         if is_command_parameter:
             self._add_error(
                 ERROR_ID_OLD_COMMAND_PARAMETER_TYPE_BSON_SERIALIZATION_TYPE_ANY, command_name,
-                "The '%s'' command has field or sub-field '%s' that has type '%s' "
-                "that has a bson serialization type 'any'" % (command_name, field_name, old_type),
-                file)
+                "The old definition of the '%s' command has field or sub-field '%s' that has type '%s' "
+                "that has a bson serialization type 'any', while the new definition of the command"
+                " has type '%s' that does not have bson serialization type 'any'" %
+                (command_name, field_name, old_type, new_type), file)
         else:
-            self._add_error(ERROR_ID_OLD_COMMAND_TYPE_BSON_SERIALIZATION_TYPE_ANY, command_name,
-                            ("'%s' or its sub-struct has type '%s' that has a "
-                             "bson serialization type 'any'") % (command_name, old_type), file)
+            self._add_error(ERROR_ID_OLD_COMMAND_TYPE_BSON_SERIALIZATION_TYPE_ANY, command_name, (
+                "The old definition of the command '%s' or its sub-struct has type '%s' that has a "
+                "bson serialization type 'any', while the new definition has type '%s' "
+                "that does not have bson serialization type 'any'") % (command_name, old_type,
+                                                                       new_type), file)
 
-    def add_command_or_param_type_bson_any_not_allowed_error(
+    def add_old_command_or_param_type_bson_any_not_allowed_error(
             self, command_name: str, type_name: str, file: str, field_name: Optional[str],
             is_command_parameter: bool) -> None:
         # pylint: disable=too-many-arguments,invalid-name
         """
-        Add an error about the command or param type bson serialization_type being 'any'.
+        Add an error about the old command or param type bson serialization type being 'any'.
 
         Add an error about the command or parameter type's bson serialization type
         being of type 'any' when it is not explicitly allowed.
@@ -838,14 +876,38 @@ class IDLCompatibilityContext(object):
         if is_command_parameter:
             self._add_error(ERROR_ID_COMMAND_PARAMETER_BSON_SERIALIZATION_TYPE_ANY_NOT_ALLOWED,
                             command_name,
-                            ("'%s' has a field or sub-field '%s' of type "
+                            ("The old definition of '%s' has a field or sub-field '%s' of type "
                              "'%s' that has a bson "
                              "serialization type 'any' when it is not explicitly allowed.") %
                             (command_name, field_name, type_name), file)
         else:
             self._add_error(
                 ERROR_ID_COMMAND_TYPE_BSON_SERIALIZATION_TYPE_ANY_NOT_ALLOWED, command_name,
-                ("'%s' or its sub-struct has a type '%s' that has a bson "
+                ("The old definition of '%s' or its sub-struct has a type '%s' that has a bson "
+                 "serialization type 'any' when it is not explicitly allowed.") % (command_name,
+                                                                                   type_name), file)
+
+    def add_new_command_or_param_type_bson_any_not_allowed_error(
+            self, command_name: str, type_name: str, file: str, field_name: Optional[str],
+            is_command_parameter: bool) -> None:
+        # pylint: disable=too-many-arguments,invalid-name
+        """
+        Add an error about the new command or param type bson serialization type being 'any'.
+
+        Add an error about the command or parameter type's bson serialization type
+        being of type 'any' when it is not explicitly allowed.
+        """
+        if is_command_parameter:
+            self._add_error(ERROR_ID_COMMAND_PARAMETER_BSON_SERIALIZATION_TYPE_ANY_NOT_ALLOWED,
+                            command_name,
+                            ("The new definition of '%s' has a field or sub-field '%s' of type "
+                             "'%s' that has a bson "
+                             "serialization type 'any' when it is not explicitly allowed.") %
+                            (command_name, field_name, type_name), file)
+        else:
+            self._add_error(
+                ERROR_ID_COMMAND_TYPE_BSON_SERIALIZATION_TYPE_ANY_NOT_ALLOWED, command_name,
+                ("The new definition of '%s' or its sub-struct has a type '%s' that has a bson "
                  "serialization type 'any' when it is not explicitly allowed.") % (command_name,
                                                                                    type_name), file)
 
@@ -857,13 +919,14 @@ class IDLCompatibilityContext(object):
         if is_command_parameter:
             self._add_error(ERROR_ID_COMMAND_PARAMETER_CPP_TYPE_NOT_EQUAL, command_name,
                             ("'%s' has field or sub-field '%s' of type '%s' that has  "
-                             "cpp_type that is not equal in the old and new versions") %
+                             "cpp_type that is not equal in the old and new definitions") %
                             (command_name, field_name, type_name), file)
         else:
             self._add_error(
                 ERROR_ID_COMMAND_CPP_TYPE_NOT_EQUAL, command_name,
                 ("'%s' or its sub-struct has command type '%s' that has cpp_type "
-                 "that is not equal in the old and new versions") % (command_name, type_name), file)
+                 "that is not equal in the old and new definitions") % (command_name, type_name),
+                file)
 
     def add_command_or_param_serializer_not_equal_error(self, command_name: str, type_name: str,
                                                         file: str, field_name: Optional[str],
@@ -873,13 +936,14 @@ class IDLCompatibilityContext(object):
         if is_command_parameter:
             self._add_error(ERROR_ID_COMMAND_PARAMETER_SERIALIZER_NOT_EQUAL, command_name,
                             ("'%s' has field or sub-field '%s' of type '%s' that has  "
-                             "serializer that is not equal in the old and new versions") %
+                             "serializer that is not equal in the old and new definitions") %
                             (command_name, field_name, type_name), file)
         else:
             self._add_error(
                 ERROR_ID_COMMAND_SERIALIZER_NOT_EQUAL, command_name,
                 ("'%s' or its sub-struct has command type '%s' that has serializer "
-                 "that is not equal in the old and new versions") % (command_name, type_name), file)
+                 "that is not equal in the old and new definitions") % (command_name, type_name),
+                file)
 
     def add_command_or_param_deserializer_not_equal_error(self, command_name: str, type_name: str,
                                                           file: str, field_name: Optional[str],
@@ -889,42 +953,48 @@ class IDLCompatibilityContext(object):
         if is_command_parameter:
             self._add_error(ERROR_ID_COMMAND_PARAMETER_DESERIALIZER_NOT_EQUAL, command_name,
                             ("'%s' has field or sub-field '%s' of type '%s' that has  "
-                             "deserializer that is not equal in the old and new versions") %
+                             "deserializer that is not equal in the old and new definitions") %
                             (command_name, field_name, type_name), file)
         else:
             self._add_error(
                 ERROR_ID_COMMAND_DESERIALIZER_NOT_EQUAL, command_name,
                 ("'%s' or its sub-struct has command type '%s' that has deserializer "
-                 "that is not equal in the old and new versions") % (command_name, type_name), file)
+                 "that is not equal in the old and new definitions") % (command_name, type_name),
+                file)
 
     def add_old_reply_field_bson_any_error(self, command_name: str, field_name: str,
-                                           old_field_type: str, file: str) -> None:
+                                           old_field_type: str, new_field_type: str,
+                                           file: str) -> None:
         """
         Add an about the old reply field type's 'any' bson serialization type.
 
         Add an error about the old reply field type's bson serialization type being of type
         'any' when the new type is non-any or when it is not explicitly allowed.
         """
-        self._add_error(ERROR_ID_OLD_REPLY_FIELD_BSON_SERIALIZATION_TYPE_ANY, command_name,
-                        ("'%s' has an old reply field or sub-field '%s' of type '%s' "
-                         "that has a bson serialization type 'any'") % (command_name, field_name,
-                                                                        old_field_type), file)
+        self._add_error(
+            ERROR_ID_OLD_REPLY_FIELD_BSON_SERIALIZATION_TYPE_ANY, command_name,
+            ("The old definition of '%s' has a reply field or sub-field '%s' of type '%s' "
+             "that has a bson serialization type 'any', while the new definition has"
+             " type '%s' that does not have bson serialization type 'any'") %
+            (command_name, field_name, old_field_type, new_field_type), file)
 
     def add_reply_field_contains_validator_error(self, command_name: str, field_name: str,
                                                  file: str) -> None:
         """Add an error about the reply field containing a validator."""
-        self._add_error(ERROR_ID_REPLY_FIELD_CONTAINS_VALIDATOR, command_name,
-                        ("The new version of the command '%s' has a reply field or sub-field '%s' "
-                         "that contains a validator while the old version does not") %
-                        (command_name, field_name), file)
+        self._add_error(
+            ERROR_ID_REPLY_FIELD_CONTAINS_VALIDATOR, command_name,
+            ("The new definition of the command '%s' has a reply field or sub-field '%s' "
+             "that contains a validator while the old definition does not") % (command_name,
+                                                                               field_name), file)
 
     def add_reply_field_validators_not_equal_error(self, command_name: str, field_name: str,
                                                    file: str) -> None:
         """Add an error about the reply field containing a validator."""
-        self._add_error(ERROR_ID_REPLY_FIELD_VALIDATORS_NOT_EQUAL, command_name,
-                        ("Validator for reply field or sub-field '%s' in old command '%s' "
-                         "is not equal to the validator in the new version of the reply field") %
-                        (command_name, field_name), file)
+        self._add_error(
+            ERROR_ID_REPLY_FIELD_VALIDATORS_NOT_EQUAL, command_name,
+            ("Validator for reply field or sub-field '%s' in old definition of command '%s' "
+             "is not equal to the validator in the new definition of the reply field") %
+            (command_name, field_name), file)
 
     def add_reply_field_type_invalid_error(self, command_name: str, field_name: str,
                                            file: str) -> None:
@@ -936,22 +1006,25 @@ class IDLCompatibilityContext(object):
     def add_check_not_equal_error(self, command_name: str, old_check: str, new_check: str,
                                   file: str) -> None:
         """Add an error about the command access_check check not being equal."""
-        self._add_error(ERROR_ID_CHECK_NOT_EQUAL, command_name,
-                        ("'%s' has a new check '%s' that is not equal to the old check '%s'") %
-                        (command_name, new_check, old_check), file)
+        self._add_error(ERROR_ID_CHECK_NOT_EQUAL, command_name, (
+            "The new definition of '%s' has a check '%s' that is not equal to the check '%s' in the old definition"
+            " of the command.") % (command_name, new_check, old_check), file)
 
     def add_resource_pattern_not_equal_error(self, command_name: str, old_resource_pattern: str,
                                              new_resource_pattern: str, file: str) -> None:
         """Add an error about the command access_check resource_pattern not being equal."""
-        self._add_error(ERROR_ID_RESOURCE_PATTERN_NOT_EQUAL, command_name, (
-            "'%s' has a new resource pattern '%s' that is not equal to the old resource pattern '%s'"
-        ) % (command_name, new_resource_pattern, old_resource_pattern), file)
+        self._add_error(
+            ERROR_ID_RESOURCE_PATTERN_NOT_EQUAL, command_name,
+            ("The new definition of '%s' has a resource pattern '%s' that is not equal to the "
+             "the resource pattern '%s' in the old definition of the command.") %
+            (command_name, new_resource_pattern, old_resource_pattern), file)
 
     def add_new_action_types_not_subset_error(self, command_name: str, file: str) -> None:
         """Add an error about the new access_check action types not being a subset of the old ones."""
-        self._add_error(ERROR_ID_NEW_ACTION_TYPES_NOT_SUBSET, command_name,
-                        ("'%s' has new action types that are not a subset of the old action types")
-                        % (command_name), file)
+        self._add_error(
+            ERROR_ID_NEW_ACTION_TYPES_NOT_SUBSET, command_name,
+            ("The new definition of '%s' has action types that are not a subset of the action"
+             " types in the old definition") % (command_name), file)
 
     def add_type_not_array_error(self, symbol: str, command_name: str, symbol_name: str,
                                  new_type: str, old_type: str, file: str) -> None:
@@ -964,22 +1037,22 @@ class IDLCompatibilityContext(object):
         """
         self._add_error(
             ERROR_ID_TYPE_NOT_ARRAY, command_name,
-            "The command '%s' has %s: '%s' with new type '%s' while the older type was '%s'." %
-            (command_name, symbol, symbol_name, new_type, old_type), file)
+            "The new definition of command '%s' has %s: '%s' with type '%s' that is not an ArrayType while the old definition had type '%s' which was an ArrayType."
+            % (command_name, symbol, symbol_name, new_type, old_type), file)
 
     def add_access_check_type_not_equal_error(self, command_name: str, old_type: str, new_type: str,
                                               file: str) -> None:
         """Add an error about the command access_check types not being equal."""
-        self._add_error(
-            ERROR_ID_ACCESS_CHECK_TYPE_NOT_EQUAL, command_name,
-            ("'%s' has access_check of type %s in the old version and access_check of type '%s'"
-             "in the new version.") % (command_name, old_type, new_type), file)
+        self._add_error(ERROR_ID_ACCESS_CHECK_TYPE_NOT_EQUAL, command_name, (
+            "'%s' has access_check of type %s in the old definition that is not equal to the access_check of type '%s'"
+            "in the new definition.") % (command_name, old_type, new_type), file)
 
     def add_new_complex_checks_not_subset_error(self, command_name: str, file: str) -> None:
         """Add an error about the complex access_check checks not being a subset of the old ones."""
         self._add_error(
             ERROR_ID_NEW_COMPLEX_CHECKS_NOT_SUBSET, command_name,
-            ("'%s' has new complex access_checks checks that are not a subset of the old complex"
+            ("The new definition of '%s' has complex access_checks checks that are not a subset "
+             " of the old definition's complex"
              " access_check checks.") % (command_name), file)
 
     def add_new_complex_privileges_not_subset_error(self, command_name: str, file: str) -> None:
@@ -987,46 +1060,48 @@ class IDLCompatibilityContext(object):
         self._add_error(
             ERROR_ID_NEW_COMPLEX_PRIVILEGES_NOT_SUBSET, command_name,
             ("'%s' has complex access_checks privileges that have changed the resource_pattern"
-             " or changed/added an action_type in the new command.") % (command_name), file)
+             " or changed/added an action_type in the new definition of the command.") %
+            (command_name), file)
 
     def add_new_additional_complex_access_check_error(self, command_name: str, file: str) -> None:
         """Add an error about an additional complex access_check being added."""
-        self._add_error(ERROR_ID_NEW_ADDITIONAL_COMPLEX_ACCESS_CHECK, command_name, (
-            "'%s' has additional complex access_checks in the new command that are not in the old command"
-        ) % (command_name), file)
+        self._add_error(
+            ERROR_ID_NEW_ADDITIONAL_COMPLEX_ACCESS_CHECK, command_name,
+            ("'%s' has additional complex access_checks in the new definition of the command that "
+             "are not in the old definition of the command") % (command_name), file)
 
     def add_removed_access_check_field_error(self, command_name: str, file: str) -> None:
         """Add an error the new command removing the access_check field."""
-        self._add_error(ERROR_ID_REMOVED_ACCESS_CHECK_FIELD, command_name, (
-            "'%s' has removed the access_check field in the new command when it exists in the old command"
-        ) % (command_name), file)
+        self._add_error(
+            ERROR_ID_REMOVED_ACCESS_CHECK_FIELD, command_name,
+            ("'%s' has removed the access_check field in the new definition of the command when it "
+             "exists in the old definition of the command") % (command_name), file)
 
     def add_added_access_check_field_error(self, command_name: str, file: str) -> None:
         """Add an error the new command adding the access_check field when the api_version is '1'."""
         self._add_error(ERROR_ID_ADDED_ACCESS_CHECK_FIELD, command_name, (
-            "'%s' has added the access_check field in the new command when it did not exist in the "
-            "old command and the api_version is '1'") % (command_name), file)
+            "The new definition of '%s' has added the access_check field when it did not exist in the "
+            "old definition of the command, while the api_version is '1'") % (command_name), file)
 
     def add_generic_argument_removed(self, field_name: str, file: str) -> None:
         """Add an error about a generic argument that was removed."""
-        self._add_error(
-            ERROR_ID_GENERIC_ARGUMENT_REMOVED, field_name,
-            ("The generic argument '%s' was removed from the new generic_argument.idl file") %
-            (field_name), file)
+        self._add_error(ERROR_ID_GENERIC_ARGUMENT_REMOVED, field_name,
+                        ("The generic argument '%s' was removed from the new definition of the "
+                         "generic_argument.idl file") % (field_name), file)
 
     def add_generic_argument_removed_reply_field(self, field_name: str, file: str) -> None:
         """Add an error about a generic reply field that was removed."""
-        self._add_error(
-            ERROR_ID_GENERIC_ARGUMENT_REMOVED_REPLY_FIELD, field_name,
-            ("The generic reply field '%s' was removed from the new generic_argument.idl file") %
-            (field_name), file)
+        self._add_error(ERROR_ID_GENERIC_ARGUMENT_REMOVED_REPLY_FIELD, field_name,
+                        ("The generic reply field '%s' was removed from the new definition of the "
+                         "generic_argument.idl file") % (field_name), file)
 
     def add_new_reply_field_requires_unstable_error(self, command_name: str, field_name: str,
                                                     file: str) -> None:
         """Add an error that a new reply field requires the 'unstable' field."""
-        self._add_error(ERROR_ID_NEW_REPLY_FIELD_REQUIRES_UNSTABLE, command_name, (
-            "'%s' has new reply field '%s' that requires specifying a value for the 'unstable' field"
-        ) % (command_name, field_name), file)
+        self._add_error(
+            ERROR_ID_NEW_REPLY_FIELD_REQUIRES_UNSTABLE, command_name,
+            ("The new definition of '%s' has reply field '%s' that requires specifying a value "
+             "for the 'unstable' field") % (command_name, field_name), file)
 
     def add_new_param_or_command_type_field_requires_unstable_error(
             self, command_name: str, field_name: str, file: str,
@@ -1034,13 +1109,15 @@ class IDLCompatibilityContext(object):
         # pylint: disable=invalid-name
         """Add an error that a new param or command type field requires the 'unstable' field."""
         if is_command_parameter:
-            self._add_error(ERROR_ID_NEW_PARAMETER_REQUIRES_UNSTABLE, command_name, (
-                "'%s' has new parameter '%s' that requires specifying a value for the 'unstable' field"
-            ) % (command_name, field_name), file)
+            self._add_error(
+                ERROR_ID_NEW_PARAMETER_REQUIRES_UNSTABLE, command_name,
+                ("The new definition of '%s' has parameter '%s' that requires specifying a value "
+                 "for the 'unstable' field") % (command_name, field_name), file)
         else:
-            self._add_error(ERROR_ID_NEW_COMMAND_TYPE_FIELD_REQUIRES_UNSTABLE, command_name, (
-                "'%s' has new command type field '%s' that requires specifying a value for the 'unstable' field"
-            ) % (command_name, field_name), file)
+            self._add_error(
+                ERROR_ID_NEW_COMMAND_TYPE_FIELD_REQUIRES_UNSTABLE, command_name,
+                ("The new definition of '%s' has command type field '%s' that requires specifying "
+                 "a value for the 'unstable' field") % (command_name, field_name), file)
 
 
 def _assert_unique_error_messages() -> None:
