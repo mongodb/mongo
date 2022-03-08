@@ -178,7 +178,6 @@ selector:
   - jstests/sharding/auth_add_shard.js
   - jstests/sharding/remove3.js
   - jstests/sharding/authCommands.js
-  - jstests/sharding/cwwc_conflict_add_shard.js
   #  - jstests/sharding/addshard2.js
   #  - jstests/sharding/configsvr_metadata_commands_require_majority_write_concern.js
   #  - jstests/sharding/convert_to_and_from_sharded.js
