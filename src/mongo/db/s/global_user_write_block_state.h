@@ -42,7 +42,8 @@ public:
     static GlobalUserWriteBlockState* get(OperationContext* opCtx);
 
     /**
-     * Methods to control the global user write blocking state.
+     * Methods to control the global user write blocking state. Callers must be hold the GlobalLock
+     * in MODE_X.
      */
     void enableUserWriteBlocking(OperationContext* opCtx);
     void disableUserWriteBlocking(OperationContext* opCtx);
@@ -54,6 +55,8 @@ public:
     void checkUserWritesAllowed(OperationContext* opCtx, const NamespaceString& nss) const;
 
 private:
+    // Modifying the state below requires holding the GlobalLock in X mode; holding the DBLock in
+    // any mode is acceptable for reading it.
     bool _globalUserWritesBlocked{false};
 };
 
