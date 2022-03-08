@@ -359,10 +359,7 @@ public:
             JS::ObjectValue(T::installType == InstallType::OverNative ? *_constructor : *_proto));
         JS::RootedObject result(_context);
 
-        // TODO SERVER-61008 JS::Construct returns a boolean. What does it mean if it's 'false'?
-        JS::Construct(_context, fVal, args, &result);
-
-        out.set(_assertPtr(result.get()));
+        out.set(_assertPtr(JS::Construct(_context, fVal, args, &result) ? result.get() : nullptr));
     }
 
     void newInstance(JS::MutableHandleValue out) {
@@ -380,10 +377,8 @@ public:
             JS::ObjectValue(T::installType == InstallType::OverNative ? *_constructor : *_proto));
         JS::RootedObject result(_context);
 
-        // TODO SERVER-61008 JS::Construct returns a boolean. What does it mean if it's 'false'?
-        JS::Construct(_context, fVal, args, &result);
-
-        out.setObjectOrNull(_assertPtr(result.get()));
+        out.setObjectOrNull(
+            _assertPtr(JS::Construct(_context, fVal, args, &result) ? result.get() : nullptr));
     }
 
     // instanceOf doesn't go up the prototype tree.  It's a lower level more specific match
