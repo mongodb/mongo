@@ -54,7 +54,7 @@ if (!checkSBEEnabled(db, ["featureFlagSbePlanCache"])) {
 assert.commandWorked(db.dropDatabase());
 
 const coll = db.coll;
-assert.commandWorked(coll.createIndex({a: 1}));
+assert.commandWorked(coll.createIndexes([{a: 1}, {a: 1, b: 1}]));
 
 const filter = {
     a: 1,
@@ -63,7 +63,8 @@ const filter = {
 const cacheKey = getPlanCacheKeyFromShape({query: filter, collection: coll, db: db});
 
 function createCacheEntry() {
-    assert.eq(0, coll.find(filter).itcount());
+    // Run the query twice so that the cache entry gets activated.
+    [...Array(2)].forEach(() => assert.eq(0, coll.find(filter).itcount()));
     const cacheContents =
         coll.aggregate([{$planCacheStats: {}}, {$match: {planCacheKey: cacheKey}}]).toArray();
     // We expect to see a single SBE cache entry.
@@ -71,7 +72,7 @@ function createCacheEntry() {
     const cacheEntry = cacheContents[0];
     assert.eq(cacheEntry.version, "2", cacheContents);
     assert.eq(cacheEntry.isActive, true, cacheContents);
-    assert.eq(cacheEntry.isPinned, true, cacheContents);
+    assert.eq(cacheEntry.isPinned, false, cacheContents);
 }
 
 function assertCacheCleared() {

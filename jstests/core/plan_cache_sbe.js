@@ -27,7 +27,8 @@ const isSbePlanCacheEnabled = checkSBEEnabled(db, ["featureFlagSbePlanCache"]);
 assert.commandWorked(coll.insert({a: 1, b: 1}));
 
 // Check that a new entry is added to the plan cache even for single plans.
-if (isSbePlanCacheEnabled) {
+// TODO SERVER-64315: re-enable the test for single solution plans
+if (false /*isSbePlanCacheEnabled*/) {
     assert.eq(1, coll.find({a: 1}).itcount());
     // Validate sbe plan cache stats entry.
     const allStats = coll.aggregate([{$planCacheStats: {}}]).toArray();
