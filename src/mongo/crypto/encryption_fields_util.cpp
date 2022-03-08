@@ -26,68 +26,22 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#pragma once
 
-#include <boost/optional.hpp>
+#include "mongo/crypto/encryption_fields_util.h"
 
-#include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsontypes.h"
-#include "mongo/crypto/encryption_fields_gen.h"
-#include "mongo/db/field_ref.h"
-#include "mongo/util/assert_util.h"
+#include <algorithm>
 
 namespace mongo {
 
-inline bool isFLE2EqualityIndexedSupportedType(BSONType type) {
-    switch (type) {
-        case BinData:
-        case Code:
-        case RegEx:
-        case String:
-
-        case NumberInt:
-        case NumberLong:
-        case Bool:
-        case bsonTimestamp:
-        case Date:
-        case jstOID:
-            return true;
-
-        // Deprecated
-        case Symbol:
-        case CodeWScope:
-        case DBRef:
-
-        // Non-deterministic
-        case Array:
-        case Object:
-        case NumberDecimal:
-        case NumberDouble:
-
-        // Singletons
-        case EOO:
-        case jstNULL:
-        case MaxKey:
-        case MinKey:
-        case Undefined:
-            return false;
-        default:
-            MONGO_UNREACHABLE;
-    }
-}
-
-// Unindexed is the same as equality
-inline bool isFLE2UnindexedSupportedType(BSONType type) {
-    return isFLE2EqualityIndexedSupportedType(type);
-}
-
-struct EncryptedFieldMatchResult {
-    FieldRef encryptedField;
-    bool keyIsPrefixOrEqual;
-};
-
 boost::optional<EncryptedFieldMatchResult> findMatchingEncryptedField(
-    const FieldRef& key, const std::vector<FieldRef>& encryptedFields);
+    const FieldRef& key, const std::vector<FieldRef>& encryptedFields) {
+    auto itr = std::find_if(encryptedFields.begin(),
+                            encryptedFields.end(),
+                            [&key](const auto& field) { return key.fullyOverlapsWith(field); });
+    if (itr == encryptedFields.end()) {
+        return boost::none;
+    }
+    return {{*itr, key.numParts() <= itr->numParts()}};
+}
 
 }  // namespace mongo

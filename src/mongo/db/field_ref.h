@@ -141,6 +141,11 @@ public:
     bool isPrefixOfOrEqualTo(const FieldRef& other) const;
 
     /**
+     * Returns true if 'this' is a prefix of, or equal to, 'other', or vice versa.
+     */
+    bool fullyOverlapsWith(const FieldRef& other) const;
+
+    /**
      * Returns the number of field parts in the prefix that 'this' and 'other' share.
      */
     FieldIndex commonPrefixSize(const FieldRef& other) const;

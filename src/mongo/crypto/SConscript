@@ -91,9 +91,11 @@ env.Library(
 env.Library(
     target="fle_crypto",
     source=[
+        "encryption_fields_util.cpp",
         "fle_crypto.cpp",
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/idl/idl_parser',
     ],
     LIBDEPS_PRIVATE=[
@@ -120,9 +122,10 @@ env.CppUnitTest(
     target='crypto_test',
     source=[
         'aead_encryption_test.cpp',
+        'encryption_fields_util_test.cpp',
+        'fle_crypto_test.cpp',
         'mechanism_scram_test.cpp',
         'sha1_block_test.cpp',
-        'fle_crypto_test.cpp',
         'sha256_block_test.cpp',
         'sha512_block_test.cpp',
         'symmetric_crypto_test.cpp',

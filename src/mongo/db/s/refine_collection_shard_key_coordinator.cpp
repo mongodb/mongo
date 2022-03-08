@@ -35,6 +35,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/s/dist_lock_manager.h"
+#include "mongo/db/s/shard_key_util.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog_cache.h"
@@ -129,6 +130,9 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
                         opCtx, nss(), MODE_IS, AutoGetCollectionViewMode::kViewsPermitted};
                     checkCollectionUUIDMismatch(opCtx, nss(), *coll, _doc.getCollectionUUID());
                 }
+
+                shardkeyutil::validateShardKeyIsNotEncrypted(
+                    opCtx, nss(), ShardKeyPattern(_newShardKey.toBSON()));
 
                 const auto cm = uassertStatusOK(
                     Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(

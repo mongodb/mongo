@@ -35,7 +35,7 @@
 #include <vector>
 
 #include "mongo/base/string_data.h"
-#include "mongo/crypto/encryption_fields_gen.h"
+#include "mongo/crypto/encryption_fields_util.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/collection.h"
@@ -243,23 +243,18 @@ void checkEncryptedFieldIndexRestrictions(OperationContext* opCtx,
         // Do not allow unique indexes on encrypted fields, or prefixes of encrypted fields.
         auto keyObject = index[IndexDescriptor::kKeyPatternFieldName].Obj();
         for (const auto& keyElement : keyObject) {
-
-            FieldRef keyFieldRef(keyElement.fieldNameStringData());
-
-            for (const auto& encryptedFieldRef : encryptedFieldRefs) {
-                auto common = keyFieldRef.commonPrefixSize(encryptedFieldRef);
-                uassert(
-                    6346502,
+            auto match = findMatchingEncryptedField(FieldRef(keyElement.fieldNameStringData()),
+                                                    encryptedFieldRefs);
+            uassert(6346502,
                     str::stream()
                         << "Unique indexes are not allowed on, or a prefix of, the encrypted field "
-                        << encryptedFieldRef.dottedField(),
-                    common != keyFieldRef.numParts());
-                uassert(6346503,
-                        str::stream() << "Unique indexes are not allowed on keys whose prefix is "
-                                         "the encrypted field "
-                                      << encryptedFieldRef.dottedField(),
-                        common != encryptedFieldRef.numParts());
-            }
+                        << match->encryptedField.dottedField(),
+                    !match || !match->keyIsPrefixOrEqual);
+            uassert(6346503,
+                    str::stream() << "Unique indexes are not allowed on keys whose prefix is "
+                                     "the encrypted field "
+                                  << match->encryptedField.dottedField(),
+                    !match || match->keyIsPrefixOrEqual);
         }
     }
 }

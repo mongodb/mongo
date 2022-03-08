@@ -759,6 +759,8 @@ void CreateCollectionCoordinator::_createCollectionAndIndexes(OperationContext* 
         }
     }
 
+    shardkeyutil::validateShardKeyIsNotEncrypted(opCtx, nss(), *_shardKeyPattern);
+
     const auto indexCreated = shardkeyutil::validateShardKeyIndexExistsOrCreateIfPossible(
         opCtx,
         nss(),

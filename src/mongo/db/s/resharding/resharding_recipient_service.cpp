@@ -522,6 +522,10 @@ void ReshardingRecipientService::RecipientStateMachine::
             _metadata.getTempReshardingNss(),
             "validating shard key index for reshardCollection"_sd,
             [&] {
+                shardkeyutil::validateShardKeyIsNotEncrypted(
+                    opCtx.get(),
+                    _metadata.getTempReshardingNss(),
+                    ShardKeyPattern(_metadata.getReshardingKey()));
                 shardkeyutil::validateShardKeyIndexExistsOrCreateIfPossible(
                     opCtx.get(),
                     _metadata.getTempReshardingNss(),

@@ -230,6 +230,37 @@ TEST(PrefixSize, Empty) {
     ASSERT_EQUALS(empty.commonPrefixSize(fieldA), 0U);
 }
 
+TEST(FullyOverlapsWith, Normal) {
+    FieldRef fieldA("a"), fieldB("a.b"), fieldC("a.b.c");
+    FieldRef fieldD("a.b.d");
+    ASSERT(fieldA.fullyOverlapsWith(fieldA));
+    ASSERT(fieldA.fullyOverlapsWith(fieldB));
+    ASSERT(fieldA.fullyOverlapsWith(fieldC));
+    ASSERT(fieldA.fullyOverlapsWith(fieldD));
+    ASSERT(fieldB.fullyOverlapsWith(fieldA));
+    ASSERT(fieldB.fullyOverlapsWith(fieldB));
+    ASSERT(fieldB.fullyOverlapsWith(fieldC));
+    ASSERT(fieldB.fullyOverlapsWith(fieldD));
+    ASSERT(fieldC.fullyOverlapsWith(fieldA));
+    ASSERT(fieldC.fullyOverlapsWith(fieldB));
+    ASSERT(fieldC.fullyOverlapsWith(fieldC));
+
+    ASSERT_FALSE(fieldD.fullyOverlapsWith(fieldC));
+    ASSERT_FALSE(fieldC.fullyOverlapsWith(fieldD));
+}
+
+TEST(FullyOverlapsWith, NoCommonality) {
+    FieldRef fieldA("a.b.c"), fieldB("b.c.d");
+    ASSERT_FALSE(fieldA.fullyOverlapsWith(fieldB));
+    ASSERT_FALSE(fieldB.fullyOverlapsWith(fieldA));
+}
+
+TEST(FullyOverlapsWith, Empty) {
+    FieldRef field("a"), empty;
+    ASSERT_FALSE(field.fullyOverlapsWith(empty));
+    ASSERT_FALSE(empty.fullyOverlapsWith(field));
+}
+
 TEST(Equality, Simple1) {
     FieldRef a("a.b");
     ASSERT(a.equalsDottedField("a.b"));

@@ -221,6 +221,11 @@ bool FieldRef::isPrefixOfOrEqualTo(const FieldRef& other) const {
     return isPrefixOf(other) || *this == other;
 }
 
+bool FieldRef::fullyOverlapsWith(const FieldRef& other) const {
+    auto common = commonPrefixSize(other);
+    return common && (common == numParts() || common == other.numParts());
+}
+
 FieldIndex FieldRef::commonPrefixSize(const FieldRef& other) const {
     if (_parts.size() == 0 || other._parts.size() == 0) {
         return 0;

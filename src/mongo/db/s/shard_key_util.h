@@ -165,5 +165,10 @@ bool validShardKeyIndexExists(OperationContext* opCtx,
                               const boost::optional<BSONObj>& defaultCollation,
                               bool unique,
                               const ShardKeyValidationBehaviors& behaviors);
+
+void validateShardKeyIsNotEncrypted(OperationContext* opCtx,
+                                    const NamespaceString& nss,
+                                    const ShardKeyPattern& shardKeyPattern);
+
 }  // namespace shardkeyutil
 }  // namespace mongo
