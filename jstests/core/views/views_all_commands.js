@@ -674,6 +674,7 @@ let viewsCommandTests = {
     waitForOngoingChunkSplits: {skip: isUnrelated},
     voteCommitImportCollection: {skip: isUnrelated},
     voteCommitIndexBuild: {skip: isUnrelated},
+    voteCommitMigrationProgress: {skip: isUnrelated},  // TODO (SERVER-64296): Remove in 6.1.
     voteCommitTransaction: {skip: isUnrelated},
     voteAbortTransaction: {skip: isUnrelated},
     waitForFailPoint: {skip: isUnrelated},
