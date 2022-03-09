@@ -388,8 +388,8 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
     if (WT_IS_METADATA(btree->dhandle))
         F_SET(btree, WT_BTREE_IGNORE_CACHE);
 
-    F_SET(btree, WT_BTREE_NO_LOGGING);
-    if (FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED)) {
+    F_SET(btree, WT_BTREE_NO_LOGGING); /* Timestamps apply. */
+    if (FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED) || F_ISSET(conn, WT_CONN_IN_MEMORY)) {
         WT_RET(__wt_config_gets(session, cfg, "log.enabled", &cval));
         if (cval.val)
             F_CLR(btree, WT_BTREE_NO_LOGGING);
