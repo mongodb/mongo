@@ -16,6 +16,7 @@ const commandsAddedToMongosSinceLastLTS = [
     "cleanupReshardCollection",
     "commitReshardCollection",
     "configureCollectionBalancing",
+    "moveRange",
     "reshardCollection",
     "rotateCertificates",
     "setAllowMigrations",

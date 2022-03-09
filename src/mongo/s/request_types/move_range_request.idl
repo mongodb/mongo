@@ -28,6 +28,8 @@
 
 global:
     cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/s/catalog/types_validators.h"
 
 imports:
     - "mongo/idl/basic_types.idl"
@@ -42,37 +44,22 @@ enums:
             kForceManual: 1   # manual moveChunk command specified `forceJumbo: true`
             kForceBalancer: 2 # balancer specified `forceJumbo: true`
 
-commands:
-    moveRange:
-        command_name: moveRange
-        command_alias: moveChunk
-        cpp_name: ShardsvrMoveRange
-        description: "Definition of the moveRange command called on shards."
-        namespace: type
-        type: namespacestring
-        api_version: ""
+structs:
+    MoveRangeRequest:
+        description: "Definition of the moveRange request fields shared by several commands."
         strict: false
         fields:
-            epoch:
-                type: objectid
-                description: "Epoch of the collection"
-                default: mongo::OID()
-            fromShard:
-                type: shard_id
-                description: "ID of the donor shard"
             toShard:
                 type: shard_id
                 description: "ID of the recipient shard"
+                validator:
+                    callback: "validateShardId"
             min:
                 type: object
                 description: "The min key of the range to move"
-            max:
+            max: # TODO SERVER-64148 make this bound optional
                 type: object
                 description: "The max key of the range to move"
-            maxChunkSizeBytes:
-                type: safeInt64
-                description: "Max size of data to move"
-                optional: true
             waitForDelete:
                 type: bool
                 description: "If set, wait for the chunk migration to finish before returning"
@@ -85,3 +72,52 @@ commands:
                 type: bool
                 description: "Secondary throttle policy to adopt during the migration"
                 default: false
+
+commands:
+    clusterMoveRange:
+        command_name: moveRange
+        cpp_name: ClusterMoveRange
+        description: "Definition of the moveRange command called on routers."
+        namespace: type
+        type: namespacestring
+        api_version: ""
+        strict: false
+        chained_structs:
+            MoveRangeRequest: MoveRangeRequest
+
+    _configsvrMoveRange:
+        command_name: _configsvrMoveRange
+        cpp_name: ConfigsvrMoveRange
+        description: "Definition of the moveRange command called from routers on the config server."
+        namespace: type
+        type: namespacestring
+        api_version: ""
+        strict: false
+        chained_structs:
+            MoveRangeRequest: MoveRangeRequest
+
+    _shardsvrMoveRange:
+        command_name: _shardsvrMoveRange
+        command_alias: moveChunk
+        cpp_name: ShardsvrMoveRange
+        description: "Definition of the moveRange command called from the config server on shards."
+        namespace: type
+        type: namespacestring
+        api_version: ""
+        strict: false
+        chained_structs:
+            MoveRangeRequest: MoveRangeRequest
+        fields:
+            epoch:
+                type: objectid
+                description: "Epoch of the collection"
+                default: mongo::OID()
+            fromShard:
+                type: shard_id
+                description: "ID of the donor shard"
+                validator:
+                    callback: "validateShardId"
+            maxChunkSizeBytes:
+                type: safeInt64
+                description: "Max size of data to move"
+                optional: true

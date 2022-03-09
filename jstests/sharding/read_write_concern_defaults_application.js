@@ -107,6 +107,7 @@ let testCases = {
     _configsvrEnsureChunkVersionIsGreaterThan: {skip: "internal command"},
     _configsvrMoveChunk: {skip: "internal command"},
     _configsvrMovePrimary: {skip: "internal command"},  // Can be removed once 6.0 is last LTS
+    _configsvrMoveRange: {skip: "internal command"},
     _configsvrRefineCollectionShardKey: {skip: "internal command"},
     _configsvrRemoveChunks: {skip: "internal command"},
     _configsvrRemoveShard: {skip: "internal command"},
@@ -152,6 +153,10 @@ let testCases = {
     _shardsvrDropDatabase: {skip: "internal command"},
     _shardsvrDropDatabaseParticipant: {skip: "internal command"},
     _shardsvrMovePrimary: {skip: "internal command"},
+    _shardsvrMoveRange: {
+        skip:
+            "does not accept read or write concern (accepts writeConcern, but only explicitly and when _secondaryThrottle is true)"
+    },
     _shardsvrRefineCollectionShardKey: {skip: "internal command"},
     _shardsvrRenameCollection: {skip: "internal command"},
     _shardsvrRenameCollectionParticipant: {skip: "internal command"},

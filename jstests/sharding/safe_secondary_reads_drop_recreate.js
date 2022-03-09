@@ -66,6 +66,7 @@ let testCases = {
     _configsvrMoveChunk: {skip: "primary only"},
     _configsvrMovePrimary:
         {skip: "primary only"},  // TODO SERVER-58843: Remove once 6.0 becomes last LTS
+    _configsvrMoveRange: {skip: "primary only"},
     _configsvrRemoveShardFromZone: {skip: "primary only"},
     _configsvrReshardCollection: {skip: "primary only"},
     _configsvrShardCollection:
@@ -82,6 +83,7 @@ let testCases = {
     _mergeAuthzCollections: {skip: "primary only"},
     _migrateClone: {skip: "primary only"},
     _shardsvrMovePrimary: {skip: "primary only"},
+    _shardsvrMoveRange: {skip: "primary only"},
     _recvChunkAbort: {skip: "primary only"},
     _recvChunkCommit: {skip: "primary only"},
     _recvChunkReleaseCritSec: {skip: "primary only"},

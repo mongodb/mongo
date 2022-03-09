@@ -248,7 +248,7 @@ public:
         }
     };
 
-} moveRangeCmd;
+} _shardsvrMoveRangeCmd;
 
 }  // namespace
 }  // namespace mongo
