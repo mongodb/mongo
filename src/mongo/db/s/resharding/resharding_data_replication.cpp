@@ -188,6 +188,7 @@ std::vector<std::unique_ptr<ReshardingOplogApplier>> ReshardingDataReplication::
             std::make_unique<ReshardingOplogApplier::Env>(
                 opCtx->getServiceContext(), metrics, metricsNew),
             std::move(sourceId),
+            oplogBufferNss,
             metadata.getTempReshardingNss(),
             stashCollections,
             i,

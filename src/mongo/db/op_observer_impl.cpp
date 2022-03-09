@@ -1506,11 +1506,14 @@ int logOplogEntriesForTransaction(
         ++currOplogSlot;
 
         MutableOplogEntry imageEntry;
+        imageEntry.setSessionId(*opCtx->getLogicalSessionId());
+        imageEntry.setTxnNumber(*opCtx->getTxnNumber());
         imageEntry.setOpType(repl::OpTypeEnum::kNoop);
         imageEntry.setObject(imageDoc);
         imageEntry.setNss(statement.getNss());
         imageEntry.setUuid(statement.getUuid());
         imageEntry.setOpTime(slot);
+        imageEntry.setDestinedRecipient(statement.getDestinedRecipient());
 
         return logOperation(opCtx, &imageEntry);
     };

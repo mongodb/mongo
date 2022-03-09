@@ -350,66 +350,10 @@ protected:
                          deleteWithPreOplogId);
     }
 
-    /**
-     * Returns (postImageOplog, updateOplog) pair.
-     */
-    std::pair<repl::MutableOplogEntry, repl::MutableOplogEntry> makeUpdateWithPostImage() {
-        const Timestamp postImageTs(10, 5);
-        const ReshardingDonorOplogId postImageId(postImageTs, postImageTs);
-        auto postImageOplog = makePrePostImageOplog(_crudNss,
-                                                    postImageTs,
-                                                    _reshardingCollUUID,
-                                                    _destinedRecipient,
-                                                    postImageId,
-                                                    BSON("post" << 1 << "y" << 4));
-
-        auto updateWithPostOplog = makeUpdateOplog();
-        updateWithPostOplog.setPostImageOpTime(repl::OpTime(postImageTs, _term));
-        return std::make_pair(postImageOplog, updateWithPostOplog);
-    }
-
-    /**
-     * Returns (preImageOplog, deleteOplog) pair.
-     */
-    std::pair<repl::MutableOplogEntry, repl::MutableOplogEntry> makeDeleteWithPreImage() {
-        const Timestamp preImageTs(7, 35);
-        const ReshardingDonorOplogId preImageId(preImageTs, preImageTs);
-        auto preImageOplog = makePrePostImageOplog(_crudNss,
-                                                   preImageTs,
-                                                   _reshardingCollUUID,
-                                                   _destinedRecipient,
-                                                   preImageId,
-                                                   BSON("pre" << 1 << "z" << 4));
-
-        auto deleteWithPreOplog = makeDeleteOplog();
-        deleteWithPreOplog.setPreImageOpTime(repl::OpTime(preImageTs, _term));
-
-        return std::make_pair(preImageOplog, deleteWithPreOplog);
-    }
 
     ReshardingDonorOplogId getOplogId(const repl::MutableOplogEntry& oplog) {
         return ReshardingDonorOplogId::parse(IDLParserErrorContext("ReshardingAggTest::getOplogId"),
                                              oplog.get_id()->getDocument().toBson());
-    }
-
-    BSONObj addExpectedFields(const repl::MutableOplogEntry& op,
-                              const boost::optional<repl::MutableOplogEntry>& preImageOp,
-                              const boost::optional<repl::MutableOplogEntry>& postImageOp) {
-        BSONObjBuilder builder;
-
-        builder.append(ReshardingDonorOplogIterator::kActualOpFieldName, op.toBSON());
-
-        if (preImageOp) {
-            builder.append(ReshardingDonorOplogIterator::kPreImageOpFieldName,
-                           preImageOp->toBSON());
-        }
-
-        if (postImageOp) {
-            builder.append(ReshardingDonorOplogIterator::kPostImageOpFieldName,
-                           postImageOp->toBSON());
-        }
-
-        return builder.obj();
     }
 
     std::unique_ptr<Pipeline, PipelineDeleter> createPipeline(
@@ -452,16 +396,13 @@ TEST_F(ReshardingAggTest, OplogPipelineBasicCRUDOnly) {
     auto pipeline = makePipelineForReshardingDonorOplogIterator(std::move(mockResults));
 
     auto next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(insertOplog, boost::none, boost::none),
-                             next->toBson());
+    ASSERT_BSONOBJ_BINARY_EQ(insertOplog.toBSON(), next->toBson());
 
     next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(updateOplog, boost::none, boost::none),
-                             next->toBson());
+    ASSERT_BSONOBJ_BINARY_EQ(updateOplog.toBSON(), next->toBson());
 
     next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(deleteOplog, boost::none, boost::none),
-                             next->toBson());
+    ASSERT_BSONOBJ_BINARY_EQ(deleteOplog.toBSON(), next->toBson());
 
     ASSERT(!pipeline->getNext());
 }
@@ -483,12 +424,10 @@ TEST_F(ReshardingAggTest, OplogPipelineWithResumeToken) {
                                                                 getOplogId(insertOplog));
 
     auto next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(updateOplog, boost::none, boost::none),
-                             next->toBson());
+    ASSERT_BSONOBJ_BINARY_EQ((updateOplog.toBSON()), next->toBson());
 
     next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(deleteOplog, boost::none, boost::none),
-                             next->toBson());
+    ASSERT_BSONOBJ_BINARY_EQ(deleteOplog.toBSON(), next->toBson());
 
     ASSERT(!pipeline->getNext());
 }
@@ -519,183 +458,10 @@ TEST_F(ReshardingAggTest, OplogPipelineWithResumeTokenClusterTimeNotEqualTs) {
                                                                 getOplogId(insertOplog));
 
     auto next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(updateOplog, boost::none, boost::none),
-                             next->toBson());
+    ASSERT_BSONOBJ_BINARY_EQ(updateOplog.toBSON(), next->toBson());
 
     next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(deleteOplog, boost::none, boost::none),
-                             next->toBson());
-
-    ASSERT(!pipeline->getNext());
-}
-
-TEST_F(ReshardingAggTest, OplogPipelineWithPostImage) {
-    auto insertOplog = makeInsertOplog();
-
-    repl::MutableOplogEntry postImageOplog, updateWithPostOplog;
-    std::tie(postImageOplog, updateWithPostOplog) = makeUpdateWithPostImage();
-
-    std::deque<DocumentSource::GetNextResult> mockResults;
-    mockResults.emplace_back(Document(insertOplog.toBSON()));
-    mockResults.emplace_back(Document(postImageOplog.toBSON()));
-    mockResults.emplace_back(Document(updateWithPostOplog.toBSON()));
-
-    auto pipeline = makePipelineForReshardingDonorOplogIterator(std::move(mockResults));
-
-    auto next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(postImageOplog, boost::none, boost::none),
-                             next->toBson());
-
-    next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(insertOplog, boost::none, boost::none),
-                             next->toBson());
-
-    next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(updateWithPostOplog, boost::none, postImageOplog),
-                             next->toBson());
-
-    ASSERT(!pipeline->getNext());
-}
-
-TEST_F(ReshardingAggTest, OplogPipelineWithLargeBSONPostImage) {
-    auto insertOplog = makeInsertOplog();
-
-    repl::MutableOplogEntry postImageOplog, updateWithPostOplog;
-    std::tie(postImageOplog, updateWithPostOplog) = makeUpdateWithPostImage();
-
-    // Modify default fixture docs with large BSON documents.
-    const std::string::size_type bigSize = 12 * 1024 * 1024;
-    std::string bigStr(bigSize, 'x');
-    postImageOplog.setObject(BSON("bigVal" << bigStr));
-    updateWithPostOplog.setObject2(BSON("bigVal" << bigStr));
-
-    std::deque<DocumentSource::GetNextResult> mockResults;
-    mockResults.emplace_back(Document(insertOplog.toBSON()));
-    mockResults.emplace_back(Document(postImageOplog.toBSON()));
-    mockResults.emplace_back(Document(updateWithPostOplog.toBSON()));
-
-    auto pipeline = makePipelineForReshardingDonorOplogIterator(std::move(mockResults));
-
-    // Check only _id because attempting to call toBson will trigger BSON too large assertion.
-    auto next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(
-        postImageOplog.get_id()->getDocument().toBson(),
-        next->getNestedField(ReshardingDonorOplogIterator::kActualOpFieldName + "._id")
-            .getDocument()
-            .toBson());
-
-    next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(
-        insertOplog.get_id()->getDocument().toBson(),
-        next->getNestedField(ReshardingDonorOplogIterator::kActualOpFieldName + "._id")
-            .getDocument()
-            .toBson());
-
-    next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(
-        updateWithPostOplog.get_id()->getDocument().toBson(),
-        next->getNestedField(ReshardingDonorOplogIterator::kActualOpFieldName + "._id")
-            .getDocument()
-            .toBson());
-
-    ASSERT(!pipeline->getNext());
-}
-
-/**
- * Test with 3 oplog: postImage -> insert -> update, then resume from point after postImage.
- */
-TEST_F(ReshardingAggTest, OplogPipelineResumeAfterPostImage) {
-    auto insertOplog = makeInsertOplog();
-
-    repl::MutableOplogEntry postImageOplog, updateWithPostOplog;
-    std::tie(postImageOplog, updateWithPostOplog) = makeUpdateWithPostImage();
-
-    std::deque<DocumentSource::GetNextResult> mockResults;
-    mockResults.emplace_back(Document(insertOplog.toBSON()));
-    mockResults.emplace_back(Document(postImageOplog.toBSON()));
-    mockResults.emplace_back(Document(updateWithPostOplog.toBSON()));
-
-    auto pipeline = makePipelineForReshardingDonorOplogIterator(std::move(mockResults),
-                                                                getOplogId(postImageOplog));
-
-    auto next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(insertOplog, boost::none, boost::none),
-                             next->toBson());
-
-    next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(updateWithPostOplog, boost::none, postImageOplog),
-                             next->toBson());
-
-    ASSERT(!pipeline->getNext());
-}
-
-TEST_F(ReshardingAggTest, OplogPipelineWithPreImage) {
-    auto insertOplog = makeInsertOplog();
-
-    repl::MutableOplogEntry preImageOplog, deleteWithPreOplog;
-    std::tie(preImageOplog, deleteWithPreOplog) = makeDeleteWithPreImage();
-
-    std::deque<DocumentSource::GetNextResult> mockResults;
-    mockResults.emplace_back(Document(insertOplog.toBSON()));
-    mockResults.emplace_back(Document(preImageOplog.toBSON()));
-    mockResults.emplace_back(Document(deleteWithPreOplog.toBSON()));
-
-    auto pipeline = makePipelineForReshardingDonorOplogIterator(std::move(mockResults));
-
-    auto next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(preImageOplog, boost::none, boost::none),
-                             next->toBson());
-
-    next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(insertOplog, boost::none, boost::none),
-                             next->toBson());
-
-    next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(deleteWithPreOplog, preImageOplog, boost::none),
-                             next->toBson());
-
-    ASSERT(!pipeline->getNext());
-}
-
-/**
- * Oplog _id order in this test is:
- * delPreImage -> updatePostImage -> unrelatedInsert -> update -> delete
- */
-TEST_F(ReshardingAggTest, OplogPipelineWithPreAndPostImage) {
-    auto insertOplog = makeInsertOplog();
-
-    repl::MutableOplogEntry postImageOplog, updateWithPostOplog, preImageOplog, deleteWithPreOplog;
-    std::tie(postImageOplog, updateWithPostOplog) = makeUpdateWithPostImage();
-    std::tie(preImageOplog, deleteWithPreOplog) = makeDeleteWithPreImage();
-
-    std::deque<DocumentSource::GetNextResult> mockResults;
-    mockResults.emplace_back(Document(insertOplog.toBSON()));
-    mockResults.emplace_back(Document(postImageOplog.toBSON()));
-    mockResults.emplace_back(Document(updateWithPostOplog.toBSON()));
-    mockResults.emplace_back(Document(preImageOplog.toBSON()));
-    mockResults.emplace_back(Document(deleteWithPreOplog.toBSON()));
-
-    auto pipeline = makePipelineForReshardingDonorOplogIterator(std::move(mockResults));
-
-    auto next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(preImageOplog, boost::none, boost::none),
-                             next->toBson());
-
-    next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(postImageOplog, boost::none, boost::none),
-                             next->toBson());
-
-    next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(insertOplog, boost::none, boost::none),
-                             next->toBson());
-
-    next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(updateWithPostOplog, boost::none, postImageOplog),
-                             next->toBson());
-
-    next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(deleteWithPreOplog, preImageOplog, boost::none),
-                             next->toBson());
+    ASSERT_BSONOBJ_BINARY_EQ(deleteOplog.toBSON(), next->toBson());
 
     ASSERT(!pipeline->getNext());
 }

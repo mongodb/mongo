@@ -125,7 +125,8 @@ public:
                 _metrics.get(),
                 _metricsNew.get());
 
-            _sessionApplication = std::make_unique<ReshardingOplogSessionApplication>();
+            _sessionApplication =
+                std::make_unique<ReshardingOplogSessionApplication>(_myOplogBufferNss);
 
             _batchApplier = std::make_unique<ReshardingOplogBatchApplier>(*_crudApplication,
                                                                           *_sessionApplication);
@@ -226,10 +227,13 @@ public:
         op.setObject(AbortTransactionOplogObject{}.toBSON());
         op.setSessionId(std::move(lsid));
         op.setTxnNumber(std::move(txnNumber));
+        op.setOpTime({{}, {}});
+        op.set_id(Value{
+            Document{{ReshardingDonorOplogId::kClusterTimeFieldName, op.getOpTime().getTimestamp()},
+                     {ReshardingDonorOplogId::kTsFieldName, op.getOpTime().getTimestamp()}}});
 
         // These are unused by ReshardingOplogSessionApplication but required by IDL parsing.
         op.setNss({});
-        op.setOpTime({{}, {}});
         op.setWallClockTime({});
 
         return {op.toBSON()};
@@ -342,6 +346,7 @@ private:
     const NamespaceString _myStashNss = getLocalConflictStashNamespace(_sourceUUID, _myDonorId);
     const NamespaceString _otherStashNss =
         getLocalConflictStashNamespace(_sourceUUID, _otherDonorId);
+    const NamespaceString _myOplogBufferNss = getLocalOplogBufferNamespace(_sourceUUID, _myDonorId);
 
     std::unique_ptr<ReshardingMetrics> _metrics;
     std::unique_ptr<ReshardingMetricsNew> _metricsNew;

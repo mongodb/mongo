@@ -1934,6 +1934,12 @@ protected:
             ASSERT_FALSE(preImageOpTime.isNull());
             OplogEntry preImage = *findByTimestamp(oplogs, preImageOpTime);
             ASSERT_BSONOBJ_EQ(update.updateArgs->preImageDoc.get(), preImage.getObject());
+            if (updateOplogEntry.getSessionId()) {
+                ASSERT_EQ(*updateOplogEntry.getSessionId(), *preImage.getSessionId());
+            }
+            if (updateOplogEntry.getTxnNumber()) {
+                ASSERT_EQ(*updateOplogEntry.getTxnNumber(), *preImage.getTxnNumber());
+            }
         } else {
             ASSERT_FALSE(updateOplogEntry.getPreImageOpTime());
         }
@@ -1957,6 +1963,12 @@ protected:
             ASSERT_FALSE(postImageOpTime.isNull());
             OplogEntry postImage = *findByTimestamp(oplogs, postImageOpTime);
             ASSERT_BSONOBJ_EQ(update.updateArgs->updatedDoc, postImage.getObject());
+            if (updateOplogEntry.getSessionId()) {
+                ASSERT_EQ(*updateOplogEntry.getSessionId(), *postImage.getSessionId());
+            }
+            if (updateOplogEntry.getTxnNumber()) {
+                ASSERT_EQ(*updateOplogEntry.getTxnNumber(), *postImage.getTxnNumber());
+            }
         } else {
             ASSERT_FALSE(updateOplogEntry.getPostImageOpTime());
         }
@@ -2337,6 +2349,12 @@ protected:
             ASSERT_FALSE(preImageOpTime.isNull());
             OplogEntry preImage = *findByTimestamp(oplogs, preImageOpTime);
             ASSERT_BSONOBJ_EQ(_deletedDoc, preImage.getObject());
+            if (deleteOplogEntry.getSessionId()) {
+                ASSERT_EQ(*deleteOplogEntry.getSessionId(), *preImage.getSessionId());
+            }
+            if (deleteOplogEntry.getTxnNumber()) {
+                ASSERT_EQ(*deleteOplogEntry.getTxnNumber(), *preImage.getTxnNumber());
+            }
         } else {
             ASSERT_FALSE(deleteOplogEntry.getPreImageOpTime());
         }

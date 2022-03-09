@@ -260,6 +260,10 @@ public:
                                         boost::none /* needsRetryImage) */)};
     }
 
+    const NamespaceString& oplogBufferNs() {
+        return kOplogNs;
+    }
+
     const NamespaceString& appliedToNs() {
         return kAppliedToNs;
     }
@@ -375,6 +379,7 @@ TEST_F(ReshardingOplogApplierTest, NothingToIterate) {
 
     applier.emplace(makeApplierEnv(),
                     sourceId(),
+                    oplogBufferNs(),
                     appliedToNs(),
                     stashCollections(),
                     0U /* myStashIdx */,
@@ -410,6 +415,7 @@ TEST_F(ReshardingOplogApplierTest, ApplyBasicCrud) {
     boost::optional<ReshardingOplogApplier> applier;
     applier.emplace(makeApplierEnv(),
                     sourceId(),
+                    oplogBufferNs(),
                     appliedToNs(),
                     stashCollections(),
                     0U /* myStashIdx */,
@@ -455,6 +461,7 @@ TEST_F(ReshardingOplogApplierTest, CanceledApplyingBatch) {
 
     applier.emplace(makeApplierEnv(),
                     sourceId(),
+                    oplogBufferNs(),
                     appliedToNs(),
                     stashCollections(),
                     0U /* myStashIdx */,
@@ -484,6 +491,7 @@ TEST_F(ReshardingOplogApplierTest, InsertTypeOplogAppliedInMultipleBatches) {
     boost::optional<ReshardingOplogApplier> applier;
     applier.emplace(makeApplierEnv(),
                     sourceId(),
+                    oplogBufferNs(),
                     appliedToNs(),
                     stashCollections(),
                     0U /* myStashIdx */,
@@ -524,6 +532,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorDuringFirstBatchApply) {
     boost::optional<ReshardingOplogApplier> applier;
     applier.emplace(makeApplierEnv(),
                     sourceId(),
+                    oplogBufferNs(),
                     appliedToNs(),
                     stashCollections(),
                     0U /* myStashIdx */,
@@ -566,6 +575,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorDuringSecondBatchApply) {
     boost::optional<ReshardingOplogApplier> applier;
     applier.emplace(makeApplierEnv(),
                     sourceId(),
+                    oplogBufferNs(),
                     appliedToNs(),
                     stashCollections(),
                     0U /* myStashIdx */,
@@ -607,6 +617,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstOplog) {
     boost::optional<ReshardingOplogApplier> applier;
     applier.emplace(makeApplierEnv(),
                     sourceId(),
+                    oplogBufferNs(),
                     appliedToNs(),
                     stashCollections(),
                     0U /* myStashIdx */,
@@ -643,6 +654,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstBatch) {
     boost::optional<ReshardingOplogApplier> applier;
     applier.emplace(makeApplierEnv(),
                     sourceId(),
+                    oplogBufferNs(),
                     appliedToNs(),
                     stashCollections(),
                     0U /* myStashIdx */,
@@ -683,6 +695,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingSecondBatch) {
     boost::optional<ReshardingOplogApplier> applier;
     applier.emplace(makeApplierEnv(),
                     sourceId(),
+                    oplogBufferNs(),
                     appliedToNs(),
                     stashCollections(),
                     0U /* myStashIdx */,
@@ -722,6 +735,7 @@ TEST_F(ReshardingOplogApplierTest, ExecutorIsShutDown) {
     boost::optional<ReshardingOplogApplier> applier;
     applier.emplace(makeApplierEnv(),
                     sourceId(),
+                    oplogBufferNs(),
                     appliedToNs(),
                     stashCollections(),
                     0U /* myStashIdx */,
@@ -763,6 +777,7 @@ TEST_F(ReshardingOplogApplierTest, UnsupportedCommandOpsShouldError) {
     boost::optional<ReshardingOplogApplier> applier;
     applier.emplace(makeApplierEnv(),
                     sourceId(),
+                    oplogBufferNs(),
                     appliedToNs(),
                     stashCollections(),
                     0U /* myStashIdx */,
@@ -799,6 +814,7 @@ TEST_F(ReshardingOplogApplierTest, DropSourceCollectionCmdShouldError) {
     boost::optional<ReshardingOplogApplier> applier;
     applier.emplace(makeApplierEnv(),
                     sourceId(),
+                    oplogBufferNs(),
                     appliedToNs(),
                     stashCollections(),
                     0U /* myStashIdx */,
@@ -830,6 +846,7 @@ TEST_F(ReshardingOplogApplierTest, MetricsAreReported) {
         2);
     ReshardingOplogApplier applier(makeApplierEnv(),
                                    sourceId(),
+                                   oplogBufferNs(),
                                    appliedToNs(),
                                    stashCollections(),
                                    0U /* myStashIdx */,

@@ -97,9 +97,6 @@ public:
 
     /**
      * Returns a pipeline for iterating the buffered copy of the donor's oplog.
-     *
-     * The documents returned by the pipeline have the oplog entries linked together with their
-     * preImage/postImage entries.
      */
     std::unique_ptr<Pipeline, PipelineDeleter> makePipeline(
         OperationContext* opCtx, std::shared_ptr<MongoProcessInterface> mongoProcessInterface);
@@ -110,10 +107,6 @@ public:
         CancelableOperationContextFactory factory) override;
 
     void dispose(OperationContext* opCtx) override;
-
-    static constexpr auto kActualOpFieldName = "actualOp"_sd;
-    static constexpr auto kPreImageOpFieldName = "preImageOp"_sd;
-    static constexpr auto kPostImageOpFieldName = "postImageOp"_sd;
 
 private:
     std::vector<repl::OplogEntry> _fillBatch(Pipeline& pipeline);

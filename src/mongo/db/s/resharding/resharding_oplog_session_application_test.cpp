@@ -35,15 +35,19 @@
 #include <vector>
 
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/logical_session_id.h"
+#include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/session_update_tracker.h"
 #include "mongo/db/repl/storage_interface_impl.h"
+#include "mongo/db/s/resharding/donor_oplog_id_gen.h"
 #include "mongo/db/s/resharding/resharding_oplog_session_application.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/transaction_participant.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -96,6 +100,11 @@ public:
         return opTime;
     }
 
+    void insertOp(OperationContext* opCtx, const BSONObj& oplogBson) {
+        DBDirectClient client(opCtx);
+        client.insert(_oplogBufferNss.toString(), oplogBson);
+    }
+
     repl::OpTime makePreparedTxn(OperationContext* opCtx,
                                  LogicalSessionId lsid,
                                  TxnNumber txnNumber) {
@@ -134,12 +143,35 @@ public:
         txnParticipant.stashTransactionResources(opCtx);
     }
 
+    repl::OplogEntry makeNoopOp(BSONObj object,
+                                LogicalSessionId lsid,
+                                TxnNumber txnNumber,
+                                repl::OpTime opTime) {
+        repl::MutableOplogEntry op;
+        op.setOpType(repl::OpTypeEnum::kNoop);
+        op.setObject(object);
+        op.setSessionId(std::move(lsid));
+        op.setTxnNumber(std::move(txnNumber));
+        op.setOpTime(opTime);
+        op.set_id(
+            Value{Document{{ReshardingDonorOplogId::kClusterTimeFieldName, opTime.getTimestamp()},
+                           {ReshardingDonorOplogId::kTsFieldName, opTime.getTimestamp()}}});
+
+        // These are unused by ReshardingOplogSessionApplication but required by IDL parsing.
+        op.setNss({});
+        op.setWallClockTime({});
+
+        return {op.toBSON()};
+    }
+
     repl::OplogEntry makeUpdateOp(
         BSONObj document,
         LogicalSessionId lsid,
         TxnNumber txnNumber,
         const std::vector<StmtId>& stmtIds,
-        boost::optional<repl::RetryImageEnum> needsRetryImage = boost::none) {
+        boost::optional<repl::RetryImageEnum> needsRetryImage = boost::none,
+        boost::optional<repl::OpTime> preImageOpTime = boost::none,
+        boost::optional<repl::OpTime> postImageOpTime = boost::none) {
         repl::MutableOplogEntry op;
         op.setOpType(repl::OpTypeEnum::kUpdate);
         op.setObject2(document["_id"].wrap().getOwned());
@@ -148,10 +180,15 @@ public:
         op.setTxnNumber(std::move(txnNumber));
         op.setStatementIds(stmtIds);
         op.setNeedsRetryImage(needsRetryImage);
+        op.setPreImageOpTime(preImageOpTime);
+        op.setPostImageOpTime(postImageOpTime);
+        op.setOpTime({{}, {}});
+        op.set_id(Value{
+            Document{{ReshardingDonorOplogId::kClusterTimeFieldName, op.getOpTime().getTimestamp()},
+                     {ReshardingDonorOplogId::kTsFieldName, op.getOpTime().getTimestamp()}}});
 
         // These are unused by ReshardingOplogSessionApplication but required by IDL parsing.
         op.setNss({});
-        op.setOpTime({{}, {}});
         op.setWallClockTime({});
 
         return {op.toBSON()};
@@ -166,10 +203,13 @@ public:
         op.setObject(AbortTransactionOplogObject{}.toBSON());
         op.setSessionId(std::move(lsid));
         op.setTxnNumber(std::move(txnNumber));
+        op.setOpTime({{}, {}});
+        op.set_id(Value{
+            Document{{ReshardingDonorOplogId::kClusterTimeFieldName, op.getOpTime().getTimestamp()},
+                     {ReshardingDonorOplogId::kTsFieldName, op.getOpTime().getTimestamp()}}});
 
         // These are unused by ReshardingOplogSessionApplication but required by IDL parsing.
         op.setNss({});
-        op.setOpTime({{}, {}});
         op.setWallClockTime({});
 
         return {op.toBSON()};
@@ -265,6 +305,16 @@ public:
             opCtx, {txnNumber}, boost::none /* autocommit */, boost::none /* startTransaction */);
         ASSERT_TRUE(bool(txnParticipant.checkStatementExecuted(opCtx, stmtId)));
     }
+
+    const NamespaceString& oplogBufferNss() {
+        return _oplogBufferNss;
+    }
+
+private:
+    // Used for pre/post image oplog entry lookup.
+    const ShardId _donorShardId{"donor-0"};
+    const NamespaceString _oplogBufferNss{NamespaceString::kReshardingLocalOplogBufferPrefix +
+                                          _donorShardId.toString()};
 };
 
 TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteForNewSession) {
@@ -282,7 +332,7 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteForNewSessio
 
     {
         auto opCtx = makeOperationContext();
-        ReshardingOplogSessionApplication applier;
+        ReshardingOplogSessionApplication applier{oplogBufferNss()};
         auto hitPreparedTxn = applier.tryApplyOperation(opCtx.get(), oplogEntry);
         ASSERT_FALSE(bool(hitPreparedTxn));
     }
@@ -320,7 +370,7 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteForNewSessio
 
     {
         auto opCtx = makeOperationContext();
-        ReshardingOplogSessionApplication applier;
+        ReshardingOplogSessionApplication applier{oplogBufferNss()};
         auto hitPreparedTxn = applier.tryApplyOperation(opCtx.get(), oplogEntry);
         ASSERT_FALSE(bool(hitPreparedTxn));
     }
@@ -361,7 +411,7 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteHasHigherTxn
 
     {
         auto opCtx = makeOperationContext();
-        ReshardingOplogSessionApplication applier;
+        ReshardingOplogSessionApplication applier{oplogBufferNss()};
         auto hitPreparedTxn = applier.tryApplyOperation(opCtx.get(), oplogEntry);
         ASSERT_FALSE(bool(hitPreparedTxn));
     }
@@ -404,7 +454,7 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteHasLowerTxnN
 
     {
         auto opCtx = makeOperationContext();
-        ReshardingOplogSessionApplication applier;
+        ReshardingOplogSessionApplication applier{oplogBufferNss()};
         auto hitPreparedTxn = applier.tryApplyOperation(opCtx.get(), oplogEntry);
         ASSERT_FALSE(bool(hitPreparedTxn));
     }
@@ -447,7 +497,7 @@ TEST_F(ReshardingOplogSessionApplicationTest,
 
     {
         auto opCtx = makeOperationContext();
-        ReshardingOplogSessionApplication applier;
+        ReshardingOplogSessionApplication applier{oplogBufferNss()};
         auto hitPreparedTxn = applier.tryApplyOperation(opCtx.get(), oplogEntry);
         ASSERT_FALSE(bool(hitPreparedTxn));
     }
@@ -487,7 +537,7 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteHasEqualTxnN
 
     {
         auto opCtx = makeOperationContext();
-        ReshardingOplogSessionApplication applier;
+        ReshardingOplogSessionApplication applier{oplogBufferNss()};
         auto hitPreparedTxn = applier.tryApplyOperation(opCtx.get(), oplogEntry);
         ASSERT_FALSE(bool(hitPreparedTxn));
     }
@@ -517,7 +567,7 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteStmtAlreadyE
 
     {
         auto opCtx = makeOperationContext();
-        ReshardingOplogSessionApplication applier;
+        ReshardingOplogSessionApplication applier{oplogBufferNss()};
         auto hitPreparedTxn = applier.tryApplyOperation(opCtx.get(), oplogEntry);
         ASSERT_FALSE(bool(hitPreparedTxn));
     }
@@ -550,7 +600,7 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteStmtsAlready
 
     {
         auto opCtx = makeOperationContext();
-        ReshardingOplogSessionApplication applier;
+        ReshardingOplogSessionApplication applier{oplogBufferNss()};
         auto hitPreparedTxn = applier.tryApplyOperation(opCtx.get(), oplogEntry);
         ASSERT_FALSE(bool(hitPreparedTxn));
     }
@@ -585,7 +635,7 @@ TEST_F(ReshardingOplogSessionApplicationTest,
 
     auto hitPreparedTxn = [&] {
         auto opCtx = makeOperationContext();
-        ReshardingOplogSessionApplication applier;
+        ReshardingOplogSessionApplication applier{oplogBufferNss()};
         return applier.tryApplyOperation(opCtx.get(), oplogEntry);
     }();
 
@@ -621,17 +671,22 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteHasPreImage)
         return insertSessionRecord(opCtx.get(), makeLogicalSessionIdForTest(), 100, {3});
     }();
 
-    auto oplogEntry = makeUpdateOp(BSON("_id" << 1), lsid, incomingTxnNumber, {incomingStmtId});
-
-    repl::MutableOplogEntry noopEntry =
-        unittest::assertGet(repl::MutableOplogEntry::parse(oplogEntry.getEntry().toBSON()));
-    noopEntry.setOpType(repl::OpTypeEnum::kNoop);
-    noopEntry.setObject(BSON("_id" << 1 << "preImage" << true));
-    oplogEntry.setPreImageOp(noopEntry.toBSON());
+    auto preImageOplogEntry =
+        makeNoopOp(BSON("_id" << 1 << "preImage" << true), lsid, incomingTxnNumber, {{1, 0}, 1});
+    {
+        auto opCtx = makeOperationContext();
+        insertOp(opCtx.get(), preImageOplogEntry.getEntry().toBSON());
+    }
+    auto oplogEntry = makeUpdateOp(BSON("_id" << 1),
+                                   lsid,
+                                   incomingTxnNumber,
+                                   {incomingStmtId},
+                                   boost::none /* needsRetryImage */,
+                                   preImageOplogEntry.getOpTime() /* preImageOpTime */);
 
     {
         auto opCtx = makeOperationContext();
-        ReshardingOplogSessionApplication applier;
+        ReshardingOplogSessionApplication applier{oplogBufferNss()};
         auto hitPreparedTxn = applier.tryApplyOperation(opCtx.get(), oplogEntry);
         ASSERT_FALSE(bool(hitPreparedTxn));
     }
@@ -655,6 +710,52 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteHasPreImage)
     }
 }
 
+DEATH_TEST_REGEX_F(ReshardingOplogSessionApplicationTest,
+                   IncomingRetryableWriteHasPreImageThatCannotBeFound,
+                   "Tripwire assertion.*6344401") {
+    auto lsid = makeLogicalSessionIdForTest();
+
+    TxnNumber incomingTxnNumber = 100;
+    StmtId incomingStmtId = 2;
+
+    auto opTime = [&] {
+        auto opCtx = makeOperationContext();
+        return insertSessionRecord(opCtx.get(), makeLogicalSessionIdForTest(), 100, {3});
+    }();
+
+    repl::OpTime preImageOpTime{{1, 0}, 1};
+    auto oplogEntry = makeUpdateOp(BSON("_id" << 1),
+                                   lsid,
+                                   incomingTxnNumber,
+                                   {incomingStmtId},
+                                   boost::none /* needsRetryImage */,
+                                   preImageOpTime);
+
+    {
+        auto opCtx = makeOperationContext();
+        ReshardingOplogSessionApplication applier{oplogBufferNss()};
+        auto hitPreparedTxn = applier.tryApplyOperation(opCtx.get(), oplogEntry);
+        ASSERT_FALSE(bool(hitPreparedTxn));
+    }
+
+    {
+        auto opCtx = makeOperationContext();
+        auto foundOps = findOplogEntriesNewerThan(opCtx.get(), opTime.getTimestamp());
+        ASSERT_EQ(foundOps.size(), 1U);
+        checkGeneratedNoop(foundOps[0], lsid, incomingTxnNumber, {incomingStmtId});
+        ASSERT_FALSE(foundOps[0].getPreImageOpTime());
+
+        auto sessionTxnRecord = findSessionRecord(opCtx.get(), lsid);
+        ASSERT_TRUE(bool(sessionTxnRecord));
+        checkSessionTxnRecord(*sessionTxnRecord, foundOps[0]);
+    }
+
+    {
+        auto opCtx = makeOperationContext();
+        checkStatementExecuted(opCtx.get(), lsid, incomingTxnNumber, incomingStmtId);
+    }
+}
+
 TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteHasPostImage) {
     auto lsid = makeLogicalSessionIdForTest();
 
@@ -666,17 +767,23 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteHasPostImage
         return insertSessionRecord(opCtx.get(), makeLogicalSessionIdForTest(), 100, {3});
     }();
 
-    auto oplogEntry = makeUpdateOp(BSON("_id" << 1), lsid, incomingTxnNumber, {incomingStmtId});
-
-    repl::MutableOplogEntry noopEntry =
-        unittest::assertGet(repl::MutableOplogEntry::parse(oplogEntry.getEntry().toBSON()));
-    noopEntry.setOpType(repl::OpTypeEnum::kNoop);
-    noopEntry.setObject(BSON("_id" << 1 << "postImage" << true));
-    oplogEntry.setPostImageOp(noopEntry.toBSON());
+    auto postImageOplogEntry =
+        makeNoopOp(BSON("_id" << 1 << "postImage" << true), lsid, incomingTxnNumber, {{1, 0}, 1});
+    {
+        auto opCtx = makeOperationContext();
+        insertOp(opCtx.get(), postImageOplogEntry.getEntry().toBSON());
+    }
+    auto oplogEntry = makeUpdateOp(BSON("_id" << 1),
+                                   lsid,
+                                   incomingTxnNumber,
+                                   {incomingStmtId},
+                                   boost::none /* needsRetryImage */,
+                                   boost::none /* preImageOpTime */,
+                                   postImageOplogEntry.getOpTime() /* postImageOpTime */);
 
     {
         auto opCtx = makeOperationContext();
-        ReshardingOplogSessionApplication applier;
+        ReshardingOplogSessionApplication applier{oplogBufferNss()};
         auto hitPreparedTxn = applier.tryApplyOperation(opCtx.get(), oplogEntry);
         ASSERT_FALSE(bool(hitPreparedTxn));
     }
@@ -692,6 +799,53 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteHasPostImage
         auto sessionTxnRecord = findSessionRecord(opCtx.get(), lsid);
         ASSERT_TRUE(bool(sessionTxnRecord));
         checkSessionTxnRecord(*sessionTxnRecord, foundOps[1]);
+    }
+
+    {
+        auto opCtx = makeOperationContext();
+        checkStatementExecuted(opCtx.get(), lsid, incomingTxnNumber, incomingStmtId);
+    }
+}
+
+DEATH_TEST_REGEX_F(ReshardingOplogSessionApplicationTest,
+                   IncomingRetryableWriteHasPostImageThatCannotBeFound,
+                   "Tripwire assertion.*6344401") {
+    auto lsid = makeLogicalSessionIdForTest();
+
+    TxnNumber incomingTxnNumber = 100;
+    StmtId incomingStmtId = 2;
+
+    auto opTime = [&] {
+        auto opCtx = makeOperationContext();
+        return insertSessionRecord(opCtx.get(), makeLogicalSessionIdForTest(), 100, {3});
+    }();
+
+    repl::OpTime postImageOpTime{{1, 0}, 1};
+    auto oplogEntry = makeUpdateOp(BSON("_id" << 1),
+                                   lsid,
+                                   incomingTxnNumber,
+                                   {incomingStmtId},
+                                   boost::none /* needsRetryImage */,
+                                   boost::none /* preImageOpTime */,
+                                   postImageOpTime);
+
+    {
+        auto opCtx = makeOperationContext();
+        ReshardingOplogSessionApplication applier{oplogBufferNss()};
+        auto hitPreparedTxn = applier.tryApplyOperation(opCtx.get(), oplogEntry);
+        ASSERT_FALSE(bool(hitPreparedTxn));
+    }
+
+    {
+        auto opCtx = makeOperationContext();
+        auto foundOps = findOplogEntriesNewerThan(opCtx.get(), opTime.getTimestamp());
+        ASSERT_EQ(foundOps.size(), 1U);
+        checkGeneratedNoop(foundOps[0], lsid, incomingTxnNumber, {incomingStmtId});
+        ASSERT_FALSE(foundOps[0].getPostImageOpTime());
+
+        auto sessionTxnRecord = findSessionRecord(opCtx.get(), lsid);
+        ASSERT_TRUE(bool(sessionTxnRecord));
+        checkSessionTxnRecord(*sessionTxnRecord, foundOps[0]);
     }
 
     {
@@ -722,7 +876,7 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteHasNeedsRetr
 
     {
         auto opCtx = makeOperationContext();
-        ReshardingOplogSessionApplication applier;
+        ReshardingOplogSessionApplication applier{oplogBufferNss()};
         auto hitPreparedTxn = applier.tryApplyOperation(opCtx.get(), oplogEntry);
         ASSERT_FALSE(bool(hitPreparedTxn));
     }
@@ -761,7 +915,7 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingTxnForNewSession) {
 
     {
         auto opCtx = makeOperationContext();
-        ReshardingOplogSessionApplication applier;
+        ReshardingOplogSessionApplication applier{oplogBufferNss()};
         auto hitPreparedTxn = applier.tryApplyOperation(opCtx.get(), oplogEntry);
         ASSERT_FALSE(bool(hitPreparedTxn));
     }
@@ -794,7 +948,7 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingTxnHasHigherTxnNumber) {
 
     {
         auto opCtx = makeOperationContext();
-        ReshardingOplogSessionApplication applier;
+        ReshardingOplogSessionApplication applier{oplogBufferNss()};
         auto hitPreparedTxn = applier.tryApplyOperation(opCtx.get(), oplogEntry);
         ASSERT_FALSE(bool(hitPreparedTxn));
     }
@@ -827,7 +981,7 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingTxnHasLowerTxnNumber) {
 
     {
         auto opCtx = makeOperationContext();
-        ReshardingOplogSessionApplication applier;
+        ReshardingOplogSessionApplication applier{oplogBufferNss()};
         auto hitPreparedTxn = applier.tryApplyOperation(opCtx.get(), oplogEntry);
         ASSERT_FALSE(bool(hitPreparedTxn));
     }
@@ -860,7 +1014,7 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingTxnHasEqualTxnNumberAsRetr
 
     {
         auto opCtx = makeOperationContext();
-        ReshardingOplogSessionApplication applier;
+        ReshardingOplogSessionApplication applier{oplogBufferNss()};
         auto hitPreparedTxn = applier.tryApplyOperation(opCtx.get(), oplogEntry);
         ASSERT_FALSE(bool(hitPreparedTxn));
     }
@@ -894,7 +1048,7 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingTxnHasEqualTxnNumberAsTxn)
 
     {
         auto opCtx = makeOperationContext();
-        ReshardingOplogSessionApplication applier;
+        ReshardingOplogSessionApplication applier{oplogBufferNss()};
         auto hitPreparedTxn = applier.tryApplyOperation(opCtx.get(), oplogEntry);
         ASSERT_FALSE(bool(hitPreparedTxn));
     }
@@ -924,7 +1078,7 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingTxnHasHigherTxnNumberThanP
 
     auto hitPreparedTxn = [&] {
         auto opCtx = makeOperationContext();
-        ReshardingOplogSessionApplication applier;
+        ReshardingOplogSessionApplication applier{oplogBufferNss()};
         return applier.tryApplyOperation(opCtx.get(), oplogEntry);
     }();
 
@@ -964,7 +1118,7 @@ TEST_F(ReshardingOplogSessionApplicationTest, IgnoreIncomingAbortedRetryableInte
 
     {
         auto opCtx = makeOperationContext();
-        ReshardingOplogSessionApplication applier;
+        ReshardingOplogSessionApplication applier{oplogBufferNss()};
         auto hitPreparedTxn = applier.tryApplyOperation(opCtx.get(), oplogEntry);
         ASSERT_FALSE(bool(hitPreparedTxn));
     }
@@ -995,7 +1149,7 @@ TEST_F(ReshardingOplogSessionApplicationTest, IgnoreIncomingNonRetryableInternal
 
     {
         auto opCtx = makeOperationContext();
-        ReshardingOplogSessionApplication applier;
+        ReshardingOplogSessionApplication applier{oplogBufferNss()};
         auto hitPreparedTxn = applier.tryApplyOperation(opCtx.get(), oplogEntry);
         ASSERT_FALSE(bool(hitPreparedTxn));
     }

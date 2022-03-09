@@ -538,34 +538,11 @@ std::string OplogEntry::toStringForLogging() const {
 BSONObj OplogEntry::toBSONForLogging() const {
     BSONObjBuilder builder;
     auto entry = _entry.toBSON();
-    auto estimatedTotalSize = entry.objsize();
-
-    const auto sizeTooBig = 0.9 * BSONObj::DefaultSizeTrait::MaxSize;
 
     builder.append("oplogEntry", entry);
 
     if (_isForCappedCollection) {
         builder.append("isForCappedCollection", _isForCappedCollection);
-    }
-
-    if (_preImageOp) {
-        auto op = _preImageOp->toBSON();
-        if (estimatedTotalSize + op.objsize() > sizeTooBig) {
-            builder.append("preImageOp", "<too large to display>");
-        } else {
-            builder.append("preImageOp", op);
-            estimatedTotalSize += op.objsize();
-        }
-    }
-
-    if (_postImageOp) {
-        auto op = _postImageOp->toBSON();
-        if (estimatedTotalSize + op.objsize() > sizeTooBig) {
-            builder.append("postImageOp", "<too large to display>");
-        } else {
-            builder.append("postImageOp", op);
-            estimatedTotalSize += op.objsize();
-        }
     }
 
     return builder.obj();
@@ -577,32 +554,6 @@ bool OplogEntry::isForCappedCollection() const {
 
 void OplogEntry::setIsForCappedCollection(bool isForCappedCollection) {
     _isForCappedCollection = isForCappedCollection;
-}
-
-std::shared_ptr<DurableOplogEntry> OplogEntry::getPreImageOp() const {
-    return _preImageOp;
-}
-
-void OplogEntry::setPreImageOp(std::shared_ptr<DurableOplogEntry> preImageOp) {
-    _preImageOp = std::move(preImageOp);
-}
-
-void OplogEntry::setPreImageOp(const BSONObj& preImageOp) {
-    setPreImageOp(
-        std::make_shared<DurableOplogEntry>(uassertStatusOK(DurableOplogEntry::parse(preImageOp))));
-}
-
-std::shared_ptr<DurableOplogEntry> OplogEntry::getPostImageOp() const {
-    return _postImageOp;
-}
-
-void OplogEntry::setPostImageOp(std::shared_ptr<DurableOplogEntry> postImageOp) {
-    _postImageOp = std::move(postImageOp);
-}
-
-void OplogEntry::setPostImageOp(const BSONObj& postImageOp) {
-    setPostImageOp(std::make_shared<DurableOplogEntry>(
-        uassertStatusOK(DurableOplogEntry::parse(postImageOp))));
 }
 
 const boost::optional<mongo::Value>& OplogEntry::get_id() const& {

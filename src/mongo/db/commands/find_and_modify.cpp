@@ -644,6 +644,12 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
         if (auto entry = txnParticipant.checkStatementExecuted(opCtx, stmtId)) {
             RetryableWritesStats::get(opCtx)->incrementRetriedCommandsCount();
             RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
+
+            // Use a SideTransactionBlock since 'parseOplogEntryForFindAndModify' might need to
+            // fetch a pre/post image from the oplog and if this is a retry inside an in-progress
+            // retryable internal transaction, this 'opCtx' would have an active WriteUnitOfWork
+            // and it is illegal to read the the oplog when there is an active WriteUnitOfWork.
+            TransactionParticipant::SideTransactionBlock sideTxn(opCtx);
             auto findAndModifyReply = parseOplogEntryForFindAndModify(opCtx, req, *entry);
             findAndModifyReply.setRetriedStmtId(stmtId);
 

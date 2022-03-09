@@ -42,14 +42,18 @@ namespace mongo {
 namespace {
 
 /**
- * Fetches the pre- or post-image entry for the given oplog entry from the findAndModify image
- * collection, and returns a forged noop oplog entry containing the image. Returns none if no
- * matching image entry is not found.
+ * Fetches the pre- or post-image entry for the given 'findAndModify' oplog entry or for the given
+ * inner op in the given 'applyOps' oplog entry from the findAndModify image collection, and returns
+ * a forged noop oplog entry containing the image. Returns none if no matching image entry is not
+ * found.
  */
 boost::optional<repl::OplogEntry> forgeNoopImageOplogEntry(
     OperationContext* opCtx,
     const boost::intrusive_ptr<ExpressionContext> pExpCtx,
-    const repl::OplogEntry oplogEntry) {
+    const repl::OplogEntry oplogEntry,
+    boost::optional<repl::DurableReplOperation> innerOp = boost::none) {
+    invariant(!innerOp ||
+              (oplogEntry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps));
     const auto sessionId = *oplogEntry.getSessionId();
 
     auto localImageCollInfo = pExpCtx->mongoProcessInterface->getCollectionOptions(
@@ -100,8 +104,8 @@ boost::optional<repl::OplogEntry> forgeNoopImageOplogEntry(
     forgedNoop.setObject(image.getImage());
     forgedNoop.setOpType(repl::OpTypeEnum::kNoop);
     forgedNoop.setWallClockTime(oplogEntry.getWallClockTime());
-    forgedNoop.setNss(oplogEntry.getNss());
-    forgedNoop.setUuid(*oplogEntry.getUuid());
+    forgedNoop.setNss(innerOp ? innerOp->getNss() : oplogEntry.getNss());
+    forgedNoop.setUuid(innerOp ? innerOp->getUuid() : *oplogEntry.getUuid());
     // TODO (SERVER-63976): TenantMigrationOplogApplier expects pre/post image noop oplog entries
     // to have a statement id.
     forgedNoop.setStatementIds({0});
@@ -292,7 +296,7 @@ boost::optional<Document> DocumentSourceFindAndModifyImageLookup::_forgeNoopImag
             if (const auto imageType = op.getNeedsRetryImage()) {
                 // This operation has a retry image.
                 if (const auto forgedNoopOplogEntry =
-                        forgeNoopImageOplogEntry(opCtx, pExpCtx, inputOplogEntry)) {
+                        forgeNoopImageOplogEntry(opCtx, pExpCtx, inputOplogEntry, op)) {
                     const auto imageOpTime = forgedNoopOplogEntry->getOpTime();
 
                     // Downcovert the document for this applyOps oplog entry by downcoverting this

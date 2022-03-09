@@ -17,11 +17,18 @@ load("jstests/libs/discover_topology.js");
 load("jstests/sharding/libs/resharding_test_fixture.js");
 load('jstests/sharding/libs/sharded_transactions_helpers.js');
 
-function InternalTransactionReshardingTest({reshardInPlace}) {
-    jsTest.log(`Running resharding test with options ${tojson({reshardInPlace})}`);
+function InternalTransactionReshardingTest(
+    {reshardInPlace, storeFindAndModifyImagesInSideCollection}) {
+    jsTest.log(`Running resharding test with options ${
+        tojson({reshardInPlace, storeFindAndModifyImagesInSideCollection})}`);
 
-    const reshardingTest =
-        new ReshardingTest({numDonors: 2, numRecipients: 1, reshardInPlace, oplogSize: 256});
+    const reshardingTest = new ReshardingTest({
+        numDonors: 2,
+        numRecipients: 1,
+        reshardInPlace,
+        storeFindAndModifyImagesInSideCollection,
+        oplogSize: 256
+    });
     reshardingTest.setup();
 
     const donorShardNames = reshardingTest.donorShardNames;
@@ -41,6 +48,7 @@ function InternalTransactionReshardingTest({reshardInPlace}) {
 
     const kSize10MB = 10 * 1024 * 1024;
     const kInternalTxnType = {kRetryable: 1, kNonRetryable: 2};
+    const kImageType = {kPreImage: 1, kPostImage: 2};
 
     const kDbName = "testDb";
     const kCollName = "testColl";
@@ -156,6 +164,77 @@ function InternalTransactionReshardingTest({reshardInPlace}) {
             assert.eq(coll.find(docToDelete).itcount(), isTxnCommitted ? 0 : 1, tojson(docs));
 
             additionalDocsToInsert.forEach(docToInsert => {
+                assert.eq(coll.find(docToInsert).itcount(), isTxnCommitted ? 1 : 0, tojson(docs));
+            });
+        };
+
+        return testCase;
+    }
+
+    function makeTransactionOptionsForFindAndModifyTest(
+        {imageType, isPreparedTxn, isLargeTxn, abortOnInitialTry}) {
+        const testId = ++lastTestId;
+
+        const testCase = makeSessionOptionsForTest(testId);
+        testCase.id = testId;
+        testCase.isPreparedTxn = isPreparedTxn;
+        testCase.isLargeTxn = isLargeTxn;
+        testCase.abortOnInitialTry = abortOnInitialTry;
+        testCase.imageType = imageType;
+        testCase.lastUsedStmtId = -1;
+
+        testCase.commands = [];
+
+        // Define the retryable findAndModify statement to be run in the test internal transaction.
+        // Prior to resharding, the write statement will be routed to donor0.
+        const docToUpdate = {findAndModifyOp: -testId, oldShardKey: -testId, newShardKey: -testId};
+        const findAndModifyCmdObj = {
+            findAndModify: kCollName,
+            query: docToUpdate,
+            update: {$mul: {findAndModifyOp: 100}},
+            stmtId: NumberInt(++testCase.lastUsedStmtId)
+        };
+        if (imageType == kImageType.kPostImage) {
+            findAndModifyCmdObj.new = true;
+        }
+        testCase.commands.push({
+            cmdObj: findAndModifyCmdObj,
+            checkResponseFunc: (res) => {
+                assert.eq(res.lastErrorObject.n, 1);
+                if (imageType == kImageType.kNone) {
+                    assert.eq(res.lastErrorObject.updatedExisting, false);
+                } else {
+                    assert.eq(res.lastErrorObject.updatedExisting, true);
+                    delete res.value._id;
+                    assert.eq(res.value,
+                              imageType == kImageType.kPreImage ? docToUpdate : updatedDoc);
+                }
+            }
+        });
+        const updatedDoc = {
+            findAndModifyOp: -testId * 100,
+            oldShardKey: -testId,
+            newShardKey: -testId
+        };
+
+        // If testing a prepared and/or large transaction, define additional insert statements to
+        // make the transaction a prepared and/or large transaction.
+        const docsToInsert =
+            makeInsertCommandsIfTestingPreparedOrLargeTransaction(testId, testCase);
+
+        testCase.setUpFunc = () => {
+            const coll = mongosConn.getCollection(kNs);
+            assert.commandWorked(coll.insert(docToUpdate));
+        };
+
+        testCase.checkDocsFunc = (isTxnCommitted) => {
+            const coll = mongosConn.getCollection(kNs);
+            const docs = coll.find().toArray();
+
+            assert.eq(coll.find(docToUpdate).itcount(), isTxnCommitted ? 0 : 1, tojson(docs));
+            assert.eq(coll.find(updatedDoc).itcount(), isTxnCommitted ? 1 : 0, tojson(docs));
+
+            docsToInsert.forEach(docToInsert => {
                 assert.eq(coll.find(docToInsert).itcount(), isTxnCommitted ? 1 : 0, tojson(docs));
             });
         };
@@ -401,7 +480,7 @@ function InternalTransactionReshardingTest({reshardInPlace}) {
     /*
      * Runs the commands defined in each 'testCase' inside an internal transaction of the specified
      * type while resharding is running in the background.
-     * - If the type is non-retryable, verifies that none of the transactions have a
+     * - If the type is non-retryable, verifies that none of the transactions has a
      *   config.transactions entry on the recipient if the recipient is not also a donor.
      * - If the type is retryable, verifies that the retryable write statements in each transaction
      *   are retryable on the recipient after resharding completes regardless of whether the
@@ -475,10 +554,10 @@ function InternalTransactionReshardingTest({reshardInPlace}) {
     /*
      * Runs the commands specified in each 'testCase' inside an internal transaction of the
      * specified and then runs resharding to completion.
-     * - If the type is non-retryable, verifies that none of the transactions have a
+     * - If the type is non-retryable, verifies that none of the transactions has a
      *   config.transactions entry on the recipient if the recipient is not also a donor.
      * - If the type is retryable, verifies that none of the retryable write statements in each
-     *   transaction are retryable on the recipient unless the transaction aborts without prepare
+     *   transaction is retryable on the recipient unless the transaction aborts without prepare
      *   on the donor.
      */
     function testTransactionsBeforeResharding(txnType, testCases) {
@@ -571,6 +650,20 @@ function InternalTransactionReshardingTest({reshardInPlace}) {
             }
         }
         testTransactionsBeforeResharding(txnType, testCases);
+    };
+
+    this.runTestForFindAndModifyDuringResharding = function(txnType, abortOnInitialTry) {
+        const testCases = [];
+        for (let imageTypeName in kImageType) {
+            const imageType = kImageType[imageTypeName];
+            for (let isPreparedTxn of [true, false]) {
+                for (let isLargeTxn of [true, false]) {
+                    testCases.push(makeTransactionOptionsForFindAndModifyTest(
+                        {isPreparedTxn, isLargeTxn, abortOnInitialTry, imageType}));
+                }
+            }
+        }
+        testTransactionsDuringResharding(txnType, testCases);
     };
 
     this.stop = function() {

@@ -33,6 +33,7 @@
 
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
@@ -42,8 +43,32 @@
 
 namespace mongo {
 
-repl::OpTime ReshardingOplogSessionApplication::_logPrePostImage(
-    OperationContext* opCtx, const repl::DurableOplogEntry& prePostImageOp) const {
+ReshardingOplogSessionApplication::ReshardingOplogSessionApplication(NamespaceString oplogBufferNss)
+    : _oplogBufferNss(std::move(oplogBufferNss)) {}
+
+
+boost::optional<repl::OpTime> ReshardingOplogSessionApplication::_logPrePostImage(
+    OperationContext* opCtx,
+    const ReshardingDonorOplogId& opId,
+    const repl::OpTime& prePostImageOpTime) const {
+    DBDirectClient client(opCtx);
+
+    auto prePostImageTxnOpId =
+        ReshardingDonorOplogId{opId.getClusterTime(), prePostImageOpTime.getTimestamp()};
+    auto prePostImageNonTxnOpId = ReshardingDonorOplogId{prePostImageOpTime.getTimestamp(),
+                                                         prePostImageOpTime.getTimestamp()};
+    auto result =
+        client.findOne(_oplogBufferNss,
+                       BSON(repl::OplogEntry::k_idFieldName
+                            << BSON("$in" << BSON_ARRAY(prePostImageTxnOpId.toBSON()
+                                                        << prePostImageNonTxnOpId.toBSON()))));
+
+    tassert(6344401,
+            str::stream() << "Could not find pre/post image oplog entry with op time "
+                          << redact(prePostImageOpTime.toBSON()),
+            !result.isEmpty());
+
+    auto prePostImageOp = uassertStatusOK(repl::DurableOplogEntry::parse(result));
     uassert(4990408,
             str::stream() << "Expected a no-op oplog entry for pre/post image oplog entry: "
                           << redact(prePostImageOp.toBSON()),
@@ -81,6 +106,7 @@ boost::optional<SharedSemiFuture<void>> ReshardingOplogSessionApplication::tryAp
     OperationContext* opCtx, const mongo::repl::OplogEntry& op) const {
     invariant(op.getSessionId());
     invariant(op.getTxnNumber());
+    invariant(op.get_id());
 
     auto lsid = *op.getSessionId();
     if (isInternalSessionForNonRetryableWrite(lsid)) {
@@ -111,14 +137,17 @@ boost::optional<SharedSemiFuture<void>> ReshardingOplogSessionApplication::tryAp
         isRetryableWrite ? op.getStatementIds() : std::vector<StmtId>{kIncompleteHistoryStmtId};
     invariant(!stmtIds.empty());
 
+    auto opId = ReshardingDonorOplogId::parse({"ReshardingOplogSessionApplication"},
+                                              op.get_id()->getDocument().toBson());
+
     boost::optional<repl::OpTime> preImageOpTime;
-    if (auto preImageOp = op.getPreImageOp()) {
-        preImageOpTime = _logPrePostImage(opCtx, *preImageOp);
+    if (auto originalPreImageOpTime = op.getPreImageOpTime()) {
+        preImageOpTime = _logPrePostImage(opCtx, opId, *originalPreImageOpTime);
     }
 
     boost::optional<repl::OpTime> postImageOpTime;
-    if (auto postImageOp = op.getPostImageOp()) {
-        postImageOpTime = _logPrePostImage(opCtx, *postImageOp);
+    if (auto originalPostImageOpTime = op.getPostImageOpTime()) {
+        postImageOpTime = _logPrePostImage(opCtx, opId, *originalPostImageOpTime);
     }
 
     return resharding::data_copy::withSessionCheckedOut(

@@ -33,7 +33,8 @@ var ReshardingTest = class {
         writePeriodicNoops: writePeriodicNoops = undefined,
         enableElections: enableElections = false,
         logComponentVerbosity: logComponentVerbosity = undefined,
-        oplogSize = undefined
+        storeFindAndModifyImagesInSideCollection: storeFindAndModifyImagesInSideCollection = true,
+        oplogSize: oplogSize = undefined
     } = {}) {
         // The @private JSDoc comments cause VS Code to not display the corresponding properties and
         // methods in its autocomplete list. This makes it simpler for test authors to know what the
@@ -61,6 +62,7 @@ var ReshardingTest = class {
         /** @private */
         this._logComponentVerbosity = logComponentVerbosity;
         /** @private */
+        this._storeFindAndModifyImagesInSideCollection = storeFindAndModifyImagesInSideCollection;
         this._oplogSize = oplogSize;
 
         // Properties set by setup().
@@ -99,7 +101,12 @@ var ReshardingTest = class {
     setup() {
         const mongosOptions = {setParameter: {}};
         const configOptions = {setParameter: {}};
-        const rsOptions = {setParameter: {storeFindAndModifyImagesInSideCollection: true}};
+        const rsOptions = {
+            setParameter: {
+                storeFindAndModifyImagesInSideCollection:
+                    this._storeFindAndModifyImagesInSideCollection
+            }
+        };
         if (this._oplogSize) {
             rsOptions.oplogSize = this._oplogSize;
         }

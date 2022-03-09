@@ -106,11 +106,16 @@ function RetryableInternalTransactionTest(collectionOptions = {}) {
         assert.commandWorked(mongosTestDB.adminCommand(commitCmdObj));
     }
 
-    function testRetryBasic(
-        cmdObj,
-        lsid,
-        txnNumber,
-        {expectRetryToSucceed, expectFindAndModifyImage, txnOptions, testMode, checkFunc}) {
+    function testRetryBasic(cmdObj, lsid, txnNumber, {
+        expectRetryToSucceed,
+        expectFindAndModifyImageInOplog,
+        expectFindAndModifyImageInSideCollection,
+        txnOptions,
+        testMode,
+        checkFunc
+    }) {
+        assert(!expectFindAndModifyImageInOplog || !expectFindAndModifyImageInSideCollection);
+
         const cmdObjToRetry = Object.assign(cmdObj, {
             lsid: lsid,
             txnNumber: NumberLong(txnNumber),
@@ -123,10 +128,10 @@ function RetryableInternalTransactionTest(collectionOptions = {}) {
 
         const txnStateBeforeRetry = getTransactionState(lsid, txnNumber);
         assert.eq(txnStateBeforeRetry.oplogEntries.length,
-                  txnOptions.isPreparedTxn ? 2 : 1,
+                  (txnOptions.isPreparedTxn ? 2 : 1) + (expectFindAndModifyImageInOplog ? 1 : 0),
                   txnStateBeforeRetry.oplogEntries);
         assert.eq(txnStateBeforeRetry.imageEntries.length,
-                  expectFindAndModifyImage ? 1 : 0,
+                  expectFindAndModifyImageInSideCollection ? 1 : 0,
                   txnStateBeforeRetry.imageEntries);
         assertConsistentImageEntries(lsid, txnNumber);
 
@@ -149,8 +154,15 @@ function RetryableInternalTransactionTest(collectionOptions = {}) {
         assert.commandWorked(mongosTestColl.remove({}));
     }
 
-    function testRetryLargeTxn(
-        cmdObj, lsid, txnNumber, {expectFindAndModifyImage, txnOptions, testMode, checkFunc}) {
+    function testRetryLargeTxn(cmdObj, lsid, txnNumber, {
+        expectFindAndModifyImageInOplog,
+        expectFindAndModifyImageInSideCollection,
+        txnOptions,
+        testMode,
+        checkFunc
+    }) {
+        assert(!expectFindAndModifyImageInOplog || !expectFindAndModifyImageInSideCollection);
+
         jsTest.log(
             "Testing retrying a retryable internal transaction with more than one applyOps oplog entry");
 
@@ -212,8 +224,11 @@ function RetryableInternalTransactionTest(collectionOptions = {}) {
 
         const txnStateBeforeRetry = getTransactionState(lsid, txnNumber);
         assert.eq(txnStateBeforeRetry.oplogEntries.length,
-                  txnOptions.isPreparedTxn ? insertCmdObjs.length + 1 : insertCmdObjs.length);
-        assert.eq(txnStateBeforeRetry.imageEntries.length, expectFindAndModifyImage ? 1 : 0);
+                  (txnOptions.isPreparedTxn ? insertCmdObjs.length + 1 : insertCmdObjs.length) +
+                      (expectFindAndModifyImageInOplog ? 1 : 0));
+        assert.eq(txnStateBeforeRetry.imageEntries.length,
+                  expectFindAndModifyImageInSideCollection ? 1 : 0,
+                  txnStateBeforeRetry.imageEntries);
         assertConsistentImageEntries(lsid, txnNumber);
 
         setUpTestMode(testMode);
@@ -234,17 +249,23 @@ function RetryableInternalTransactionTest(collectionOptions = {}) {
         assert.commandWorked(mongosTestColl.remove({}));
     }
 
-    function testRetry(
-        cmdObj,
-        lsid,
-        txnNumber,
-        {expectRetryToSucceed, expectFindAndModifyImage, txnOptions, testMode, checkFunc}) {
+    function testRetry(cmdObj, lsid, txnNumber, {
+        expectRetryToSucceed,
+        expectFindAndModifyImageInOplog,
+        expectFindAndModifyImageInSideCollection,
+        txnOptions,
+        testMode,
+        checkFunc
+    }) {
         const testRetryFunc = txnOptions.isLargeTxn ? testRetryLargeTxn : testRetryBasic;
-        testRetryFunc(
-            cmdObj,
-            lsid,
-            txnNumber,
-            {expectRetryToSucceed, expectFindAndModifyImage, txnOptions, testMode, checkFunc});
+        testRetryFunc(cmdObj, lsid, txnNumber, {
+            expectRetryToSucceed,
+            expectFindAndModifyImageInOplog,
+            expectFindAndModifyImageInSideCollection,
+            txnOptions,
+            testMode,
+            checkFunc
+        });
     }
 
     function testRetryInserts(lsid, txnNumber, {expectRetryToSucceed, txnOptions, testMode}) {
@@ -323,11 +344,17 @@ function RetryableInternalTransactionTest(collectionOptions = {}) {
             assert.eq(initialRes.lastErrorObject, retryRes.lastErrorObject);
             assert.eq(initialRes.value, retryRes.value);
         };
-        testRetry(
-            findAndModifyCmdObj,
-            lsid,
-            txnNumber,
-            {expectRetryToSucceed, expectFindAndModifyImage, txnOptions, testMode, checkFunc});
+
+        testRetry(findAndModifyCmdObj, lsid, txnNumber, {
+            expectRetryToSucceed,
+            expectFindAndModifyImageInOplog: expectRetryToSucceed && expectFindAndModifyImage &&
+                !enableFindAndModifyImageCollection,
+            expectFindAndModifyImageInSideCollection: expectRetryToSucceed &&
+                expectFindAndModifyImage && enableFindAndModifyImageCollection,
+            txnOptions,
+            testMode,
+            checkFunc
+        });
     }
 
     function testRetryFindAndModifyUpsert(lsid, txnNumber, {
@@ -372,7 +399,7 @@ function RetryableInternalTransactionTest(collectionOptions = {}) {
             query: {_id: -1, x: -1},
             update: {$inc: {x: -10}},
         };
-        const expectFindAndModifyImage = expectRetryToSucceed && enableFindAndModifyImageCollection;
+        const expectFindAndModifyImage = true;
         testRetryFindAndModify(findAndModifyCmdObj, lsid, txnNumber, {
             expectRetryToSucceed,
             expectFindAndModifyImage,
@@ -399,7 +426,7 @@ function RetryableInternalTransactionTest(collectionOptions = {}) {
             update: {$inc: {x: -10}},
             new: true,
         };
-        const expectFindAndModifyImage = expectRetryToSucceed && enableFindAndModifyImageCollection;
+        const expectFindAndModifyImage = true;
         testRetryFindAndModify(findAndModifyCmdObj, lsid, txnNumber, {
             expectRetryToSucceed,
             expectFindAndModifyImage,
@@ -425,7 +452,7 @@ function RetryableInternalTransactionTest(collectionOptions = {}) {
             query: {_id: -1, x: -1},
             remove: true,
         };
-        const expectFindAndModifyImage = expectRetryToSucceed && enableFindAndModifyImageCollection;
+        const expectFindAndModifyImage = true;
         testRetryFindAndModify(findAndModifyCmdObj, lsid, txnNumber, {
             expectRetryToSucceed,
             enableFindAndModifyImageCollection,

@@ -54,6 +54,7 @@ MONGO_FAIL_POINT_DEFINE(reshardingApplyOplogBatchTwice);
 ReshardingOplogApplier::ReshardingOplogApplier(
     std::unique_ptr<Env> env,
     ReshardingSourceId sourceId,
+    NamespaceString oplogBufferNss,
     NamespaceString outputNss,
     std::vector<NamespaceString> allStashNss,
     size_t myStashIdx,
@@ -69,7 +70,7 @@ ReshardingOplogApplier::ReshardingOplogApplier(
                        std::move(sourceChunkMgr),
                        _env->metrics(),
                        _env->metricsNew()},
-      _sessionApplication{},
+      _sessionApplication{std::move(oplogBufferNss)},
       _batchApplier{_crudApplication, _sessionApplication},
       _oplogIter(std::move(oplogIterator)) {}
 

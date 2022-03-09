@@ -89,6 +89,7 @@ public:
 
     ReshardingOplogApplier(std::unique_ptr<Env> env,
                            ReshardingSourceId sourceId,
+                           NamespaceString oplogBufferNss,
                            NamespaceString outputNss,
                            std::vector<NamespaceString> allStashNss,
                            size_t myStashIdx,

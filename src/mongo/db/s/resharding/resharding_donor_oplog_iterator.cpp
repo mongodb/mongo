@@ -108,33 +108,6 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingDonorOplogIterator::makePip
 
     stages.emplace_back(DocumentSourceSort::create(expCtx, BSON("_id" << 1)));
 
-    stages.emplace_back(DocumentSourceReplaceRoot::createFromBson(
-        BSON("$replaceWith" << BSON(kActualOpFieldName << "$$ROOT")).firstElement(), expCtx));
-
-    for (const auto& [tsFieldName, opFieldName] :
-         std::initializer_list<std::pair<std::string, StringData>>{
-             {"$" + kActualOpFieldName + ".preImageOpTime.ts", kPreImageOpFieldName},
-             {"$" + kActualOpFieldName + ".postImageOpTime.ts", kPostImageOpFieldName}}) {
-
-        stages.emplace_back(DocumentSourceLookUp::createFromBson(
-            Doc{{"$lookup",
-                 Doc{{"from", _oplogBufferNss.coll()},
-                     {"let",
-                      Doc{{"preOrPostImageId",
-                           Doc{{"clusterTime", tsFieldName}, {"ts", tsFieldName}}}}},
-                     {"pipeline", Arr{V{Doc(fromjson("{$match: {$expr: {\
-                        $eq: ['$_id', '$$preOrPostImageId']}}}"))}}},
-                     {"as", opFieldName}}}}
-                .toBson()
-                .firstElement(),
-            expCtx));
-
-        stages.emplace_back(DocumentSourceUnwind::create(expCtx,
-                                                         opFieldName.toString(),
-                                                         true /* preserveNullAndEmptyArrays */,
-                                                         boost::none /* includeArrayIndex */));
-    }
-
     return Pipeline::create(std::move(stages), std::move(expCtx));
 }
 
@@ -148,44 +121,9 @@ std::vector<repl::OplogEntry> ReshardingDonorOplogIterator::_fillBatch(Pipeline&
             break;
         }
 
-        Value actualOp, preImageOp, postImageOp;
-        auto iter = doc->fieldIterator();
-        while (iter.more()) {
-            StringData field;
-            Value value;
-            std::tie(field, value) = iter.next();
 
-            if (kActualOpFieldName == field) {
-                actualOp = std::move(value);
-            } else if (kPreImageOpFieldName == field) {
-                preImageOp = std::move(value);
-            } else if (kPostImageOpFieldName == field) {
-                postImageOp = std::move(value);
-            } else {
-                uasserted(4990404,
-                          str::stream() << "Unexpected top-level field from pipeline for iterating"
-                                           " donor's oplog buffer: "
-                                        << field);
-            }
-        }
-
-        uassert(4990405, "Expected nested document for 'actualOp' field", actualOp.isObject());
-
-        auto obj = actualOp.getDocument().toBson();
+        auto obj = doc->toBson();
         auto& entry = batch.emplace_back(obj.getOwned());
-
-        if (!preImageOp.missing()) {
-            uassert(
-                4990406, "Expected nested document for 'preImageOp' field", preImageOp.isObject());
-            entry.setPreImageOp(preImageOp.getDocument().toBson());
-        }
-
-        if (!postImageOp.missing()) {
-            uassert(4990407,
-                    "Expected nested document for 'postImageOp' field",
-                    postImageOp.isObject());
-            entry.setPostImageOp(postImageOp.getDocument().toBson());
-        }
 
         numBytes += obj.objsize();
 

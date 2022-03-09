@@ -649,14 +649,6 @@ public:
     bool isForCappedCollection() const;
     void setIsForCappedCollection(bool isForCappedCollection);
 
-    std::shared_ptr<DurableOplogEntry> getPreImageOp() const;
-    void setPreImageOp(std::shared_ptr<DurableOplogEntry> preImageOp);
-    void setPreImageOp(const BSONObj& preImageOp);
-
-    std::shared_ptr<DurableOplogEntry> getPostImageOp() const;
-    void setPostImageOp(std::shared_ptr<DurableOplogEntry> postImageOp);
-    void setPostImageOp(const BSONObj& postImageOp);
-
     std::string toStringForLogging() const;
 
     /**
@@ -751,12 +743,6 @@ public:
 
 private:
     DurableOplogEntry _entry;
-
-
-    // We use std::shared_ptr<DurableOplogEntry> rather than boost::optional<DurableOplogEntry> here
-    // so that OplogEntries are cheaper to copy.
-    std::shared_ptr<DurableOplogEntry> _preImageOp;
-    std::shared_ptr<DurableOplogEntry> _postImageOp;
 
     // An index of this oplog entry in the associated "applyOps" oplog entry when this entry is
     // extracted from an "applyOps" oplog entry. Otherwise, the index value must be 0.
