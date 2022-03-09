@@ -12,6 +12,8 @@ const shard = st.shard0;
 const kDbName = 'db';
 const kCollName = 'foo';
 const kNsName = kDbName + '.' + kCollName;
+const kCachedCollectionsNs = 'config.cache.collections';
+const kCacheChunksNs = 'config.cache.chunks.' + kNsName;
 const oldKeyDoc = {
     a: 1,
     b: 1
@@ -39,9 +41,8 @@ assert.commandWorked(mongos.adminCommand({split: kNsName, middle: {a: 5, b: 5}})
 // before refineCollectionShardKey.
 assert.commandWorked(shard.adminCommand({_flushRoutingTableCacheUpdates: kNsName}));
 
-let collEntry = st.config.collections.findOne({_id: kNsName});
-let configCacheChunks = "config.cache.chunks." + kNsName;
-let chunkArr = shard.getCollection(configCacheChunks).find({}).sort({min: 1}).toArray();
+let collEntry = shard.getCollection(kCachedCollectionsNs).findOne({_id: kNsName});
+let chunkArr = shard.getCollection(kCacheChunksNs).find({}).sort({min: 1}).toArray();
 assert.eq(3, chunkArr.length);
 assert.eq({a: MinKey, b: MinKey}, chunkArr[0]._id);
 assert.eq({a: 0, b: 0}, chunkArr[0].max);
@@ -52,16 +53,16 @@ assert.eq({a: MaxKey, b: MaxKey}, chunkArr[2].max);
 
 assert.commandWorked(mongos.adminCommand({refineCollectionShardKey: kNsName, key: newKeyDoc}));
 
-// Verify that 'config.cache.chunks.db.foo' is as expected after refineCollectionShardKey. NOTE: We
-// use assert.soon here because refineCollectionShardKey doesn't block for each shard to refresh.
+// refineCollectionShardKey doesn't block for each shard to refresh, so wait until the cached
+// information is fully up to date.
 assert.soon(() => {
-    let collectionCacheArr =
-        shard.getCollection('config.cache.collections').find({_id: kNsName}).toArray();
-
-    chunkArr = shard.getCollection(configCacheChunks).find({}).sort({min: 1}).toArray();
-    return collectionCacheArr.length === 1 && collectionCacheArr[0].epoch != collEntry.epoch &&
-        3 === chunkArr.length;
+    let newCollEntry = shard.getCollection(kCachedCollectionsNs).findOne({_id: kNsName});
+    return newCollEntry.epoch != collEntry.epoch && !newCollEntry.refreshing;
 });
+
+// Verify that 'config.cache.chunks.db.foo' is as expected after refineCollectionShardKey.
+chunkArr = shard.getCollection(kCacheChunksNs).find({}).sort({min: 1}).toArray();
+assert.eq(3, chunkArr.length);
 assert.eq({a: MinKey, b: MinKey, c: MinKey, d: MinKey}, chunkArr[0]._id);
 assert.eq({a: 0, b: 0, c: MinKey, d: MinKey}, chunkArr[0].max);
 assert.eq({a: 0, b: 0, c: MinKey, d: MinKey}, chunkArr[1]._id);
