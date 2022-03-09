@@ -69,8 +69,6 @@ typedef struct {
     int status;                           /* Exit status */
     bool sweep_stress;                    /* Sweep stress test */
     bool failpoint_hs_delete_key_from_ts; /* Failpoint for hs key deletion. */
-    bool failpoint_hs_insert_1;           /* Failpoint for hs insertion. */
-    bool failpoint_hs_insert_2;           /* Failpoint for hs insertion. */
     bool hs_checkpoint_timing_stress;     /* History store checkpoint timing stress */
     bool reserved_txnid_timing_stress;    /* Reserved transaction id timing stress */
     bool checkpoint_slow_timing_stress;   /* Checkpoint slow timing stress */
@@ -78,7 +76,7 @@ typedef struct {
     uint64_t ts_stable;                   /* Current stable timestamp */
     bool mixed_mode_deletes;              /* Run with mixed mode deletes */
     bool use_timestamps;                  /* Use txn timestamps */
-    bool race_timetamps;                  /* Async update to oldest timestamp */
+    bool race_timestamps;                 /* Async update to oldest timestamp */
     bool prepare;                         /* Use prepare transactions */
     COOKIE *cookies;                      /* Per-thread info */
     WT_RWLOCK clock_lock;                 /* Clock synchronization */

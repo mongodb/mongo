@@ -165,7 +165,7 @@ main(int argc, char *argv[])
             g.use_timestamps = true;
             break;
         case 'X':
-            g.use_timestamps = g.race_timetamps = true;
+            g.use_timestamps = g.race_timestamps = true;
             break;
         default:
             return (usage());
@@ -267,9 +267,8 @@ wt_connect(const char *config_open)
     bool timing_stress;
 
     timing_stress = false;
-    if (g.sweep_stress || g.failpoint_hs_delete_key_from_ts || g.failpoint_hs_insert_1 ||
-      g.failpoint_hs_insert_2 || g.hs_checkpoint_timing_stress || g.reserved_txnid_timing_stress ||
-      g.checkpoint_slow_timing_stress) {
+    if (g.sweep_stress || g.failpoint_hs_delete_key_from_ts || g.hs_checkpoint_timing_stress ||
+      g.reserved_txnid_timing_stress || g.checkpoint_slow_timing_stress) {
         timing_stress = true;
         testutil_check(__wt_snprintf(timing_stress_config, sizeof(timing_stress_config),
           ",timing_stress_for_test=[%s%s%s%s%s]", g.sweep_stress ? "aggressive_sweep" : "",

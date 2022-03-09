@@ -43,7 +43,7 @@ set_stable(void)
 {
     char buf[128];
 
-    if (g.race_timetamps)
+    if (g.race_timestamps)
         testutil_check(__wt_snprintf(buf, sizeof(buf),
           "stable_timestamp=%" PRIx64 ",oldest_timestamp=%" PRIx64, g.ts_stable, g.ts_stable));
     else
