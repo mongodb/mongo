@@ -86,6 +86,15 @@ Status insertStateDoc(OperationContext* opCtx, const ShardSplitDonorDocument& st
  */
 Status updateStateDoc(OperationContext* opCtx, const ShardSplitDonorDocument& stateDoc);
 
+
+/**
+ * Deletes a state documents in the database for a recipient if the state is blocking at startup.
+ *
+ * Returns 'NamespaceNotFound' if no matching namespace is found. Returns true if the doc was
+ * removed.
+ */
+StatusWith<bool> deleteStateDoc(OperationContext* opCtx, const UUID& shardSplitId);
+
 /**
  * Returns the state doc matching the document with shardSplitId from the disk if it
  * exists. Reads at "no" timestamp i.e, reading with the "latest" snapshot reflecting up to date
@@ -98,6 +107,15 @@ Status updateStateDoc(OperationContext* opCtx, const ShardSplitDonorDocument& st
  */
 StatusWith<ShardSplitDonorDocument> getStateDocument(OperationContext* opCtx,
                                                      const UUID& shardSplitId);
+
+/**
+ * Returns true if the state document should be removed for a shard split recipient which is based
+ * on having a local state doc in kBlocking state and having matching recipientSetName matching the
+ * config.replSetName.
+ */
+bool shouldRemoveStateDocumentOnRecipient(OperationContext* opCtx,
+                                          const ShardSplitDonorDocument& stateDocument);
+
 
 }  // namespace serverless
 }  // namespace mongo

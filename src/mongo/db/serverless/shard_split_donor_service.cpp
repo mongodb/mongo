@@ -107,6 +107,7 @@ void checkForTokenInterrupt(const CancellationToken& token) {
 MONGO_FAIL_POINT_DEFINE(pauseShardSplitBeforeBlocking);
 MONGO_FAIL_POINT_DEFINE(pauseShardSplitAfterBlocking);
 MONGO_FAIL_POINT_DEFINE(skipShardSplitWaitForSplitAcceptance);
+MONGO_FAIL_POINT_DEFINE(pauseShardSplitBeforeRecipientCleanup);
 
 const std::string kTTLIndexName = "ShardSplitDonorTTLIndex";
 
@@ -293,7 +294,6 @@ Status ShardSplitDonorService::DonorStateMachine::checkIfOptionsConflict(
 
 SemiFuture<void> ShardSplitDonorService::DonorStateMachine::run(
     ScopedTaskExecutorPtr executor, const CancellationToken& primaryToken) noexcept {
-
     auto abortToken = [&]() {
         stdx::lock_guard<Latch> lg(_mutex);
         _abortSource = CancellationSource(primaryToken);
@@ -306,6 +306,32 @@ SemiFuture<void> ShardSplitDonorService::DonorStateMachine::run(
 
     _markKilledExecutor->startup();
     _cancelableOpCtxFactory.emplace(primaryToken, _markKilledExecutor);
+
+    const bool shouldRemoveStateDocumentOnRecipient = [&]() {
+        auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+        stdx::lock_guard<Latch> lg(_mutex);
+        return serverless::shouldRemoveStateDocumentOnRecipient(opCtx.get(), _stateDoc);
+    }();
+
+    if (shouldRemoveStateDocumentOnRecipient) {
+        LOGV2(6309000,
+              "Cancelling and cleaning up shard split operation on recipient in blocking state.",
+              "id"_attr = _migrationId);
+        pauseShardSplitBeforeRecipientCleanup.pauseWhileSet();
+        _decisionPromise.setWith([&] {
+            return ExecutorFuture(**executor)
+                .then([this, executor, primaryToken] {
+                    return _cleanRecipientStateDoc(executor, primaryToken);
+                })
+                .unsafeToInlineFuture();
+        });
+
+        _completionPromise.setFrom(
+            _decisionPromise.getFuture().semi().ignoreValue().unsafeToInlineFuture());
+
+        return _completionPromise.getFuture().semi();
+    }
+
     _initiateTimeout(executor, abortToken);
 
     LOGV2(6086506,
@@ -831,6 +857,33 @@ ShardSplitDonorService::DonorStateMachine::_waitForForgetCmdThenMarkGarbageColle
         })
         .then([this, self = shared_from_this(), executor, token](repl::OpTime opTime) {
             return _waitForMajorityWriteConcern(executor, std::move(opTime), token);
+        });
+}
+
+ExecutorFuture<ShardSplitDonorService::DonorStateMachine::DurableState>
+ShardSplitDonorService::DonorStateMachine::_cleanRecipientStateDoc(
+    const ScopedTaskExecutorPtr& executor, const CancellationToken& token) {
+
+    return AsyncTry([this, self = shared_from_this()] {
+               auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+               auto deleted =
+                   uassertStatusOK(serverless::deleteStateDoc(opCtx.get(), _migrationId));
+               uassert(ErrorCodes::ConflictingOperationInProgress,
+                       str::stream()
+                           << "Did not find active shard split with migration id " << _migrationId,
+                       deleted);
+               return repl::ReplClientInfo::forClient(opCtx.get()->getClient()).getLastOp();
+           })
+        .until([](StatusWith<repl::OpTime> swOpTime) { return swOpTime.getStatus().isOK(); })
+        .withBackoffBetweenIterations(kExponentialBackoff)
+        .on(**executor, token)
+        .ignoreValue()
+        .then([this, executor]() {
+            LOGV2(6236607,
+                  "Cleanup stale shard split operation on recipient.",
+                  "migrationId"_attr = _migrationId);
+            stdx::lock_guard<Latch> lg(_mutex);
+            return DurableState{_stateDoc.getState()};
         });
 }
 

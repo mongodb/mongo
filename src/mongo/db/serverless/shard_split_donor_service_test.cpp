@@ -316,7 +316,8 @@ TEST_F(ShardSplitDonorServiceTest, CreateInstanceInAbortState) {
 
     test::shard_split::ScopedTenantAccessBlocker scopedTenants(_tenantIds, opCtx.get());
 
-    auto stateDocument = defaultStateDocument();
+    auto stateDocument = ShardSplitDonorDocument::parse(
+        {"donor.document"}, BSON("_id" << _uuid << "tenantIds" << _tenantIds));
     stateDocument.setState(ShardSplitDonorStateEnum::kAborted);
 
     auto serviceInstance = ShardSplitDonorService::DonorStateMachine::getOrCreate(
@@ -408,7 +409,6 @@ TEST_F(ShardSplitDonorServiceTest, StepUpWithkCommitted) {
     test::shard_split::reconfigToAddRecipientNodes(
         getServiceContext(), _recipientTagName, _replSet.getHosts(), _recipientSet.getHosts());
 
-    auto nss = NamespaceString::kTenantSplitDonorsNamespace;
     auto stateDocument = defaultStateDocument();
     stateDocument.setState(ShardSplitDonorStateEnum::kUninitialized);
 
@@ -443,6 +443,32 @@ TEST_F(ShardSplitDonorServiceTest, StepUpWithkCommitted) {
     // complete.
     ASSERT_OK(serviceInstance->completionFuture().getNoThrow());
     ASSERT_TRUE(serviceInstance->isGarbageCollectable());
+}
+
+TEST_F(ShardSplitDonorServiceTest, DeleteStateDocMarkedGarbageCollectable) {
+    auto opCtx = makeOperationContext();
+
+    test::shard_split::ScopedTenantAccessBlocker scopedTenants(_tenantIds, opCtx.get());
+    test::shard_split::reconfigToAddRecipientNodes(
+        getServiceContext(), _recipientTagName, _replSet.getHosts(), _recipientSet.getHosts());
+
+    auto stateDocument = defaultStateDocument();
+    stateDocument.setState(ShardSplitDonorStateEnum::kUninitialized);
+    boost::optional<mongo::Date_t> expireAt = getServiceContext()->getFastClockSource()->now() +
+        Milliseconds{repl::shardSplitGarbageCollectionDelayMS.load()};
+    stateDocument.setExpireAt(expireAt);
+
+    // insert the document for the first time.
+    ASSERT_OK(serverless::insertStateDoc(opCtx.get(), stateDocument));
+
+    // deletes a document that was marked as garbage collectable and succeeds.
+    StatusWith<bool> deleted = serverless::deleteStateDoc(opCtx.get(), stateDocument.getId());
+
+    ASSERT_OK(deleted.getStatus());
+    ASSERT_TRUE(deleted.getValue());
+
+    ASSERT_EQ(serverless::getStateDocument(opCtx.get(), _uuid).getStatus().code(),
+              ErrorCodes::NoMatchingDocument);
 }
 
 class SplitReplicaSetObserverTest : public ServiceContextTest {
@@ -552,6 +578,79 @@ TEST_F(SplitReplicaSetObserverTest, ExecutorCanceled) {
     // Ensure the test does not hang.
     source.cancel();
     ASSERT_EQ(future.getNoThrow().code(), ErrorCodes::ShutdownInProgress);
+}
+
+class ShardSplitRecipientCleanupTest : public ShardSplitDonorServiceTest {
+public:
+    void setUpPersistence(OperationContext* opCtx) override {
+
+        // We need to allow writes during the test's setup.
+        auto replCoord = dynamic_cast<repl::ReplicationCoordinatorMock*>(
+            repl::ReplicationCoordinator::get(opCtx->getServiceContext()));
+        replCoord->alwaysAllowWrites(true);
+
+        BSONArrayBuilder members;
+        members.append(BSON("_id" << 1 << "host"
+                                  << "node1"
+                                  << "tags" << BSON("recipientTagName" << UUID::gen().toString())));
+
+        auto newConfig = repl::ReplSetConfig::parse(BSON("_id" << _recipientSetName << "version"
+                                                               << 1 << "protocolVersion" << 1
+                                                               << "members" << members.arr()));
+        replCoord->setGetConfigReturnValue(newConfig);
+
+        auto stateDocument = defaultStateDocument();
+        stateDocument.setBlockTimestamp(Timestamp(1, 1));
+        stateDocument.setState(ShardSplitDonorStateEnum::kBlocking);
+
+        _recStateDoc = stateDocument;
+        uassertStatusOK(serverless::insertStateDoc(opCtx, stateDocument));
+
+        _pauseBeforeRecipientCleanupFp =
+            std::make_unique<FailPointEnableBlock>("pauseShardSplitBeforeRecipientCleanup");
+
+        _initialTimesEntered = _pauseBeforeRecipientCleanupFp->initialTimesEntered();
+    }
+
+protected:
+    ShardSplitDonorDocument _recStateDoc;
+    std::unique_ptr<FailPointEnableBlock> _pauseBeforeRecipientCleanupFp;
+    FailPoint::EntryCountT _initialTimesEntered;
+};
+
+TEST_F(ShardSplitRecipientCleanupTest, ShardSplitRecipientCleanup) {
+    auto opCtx = makeOperationContext();
+    test::shard_split::ScopedTenantAccessBlocker scopedTenants(_tenantIds, opCtx.get());
+
+    ASSERT_OK(serverless::getStateDocument(opCtx.get(), _uuid).getStatus());
+
+    auto decisionFuture = [&]() {
+        ASSERT(_pauseBeforeRecipientCleanupFp);
+        (*(_pauseBeforeRecipientCleanupFp.get()))->waitForTimesEntered(_initialTimesEntered + 1);
+
+        auto splitService = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
+                                ->lookupServiceByName(ShardSplitDonorService::kServiceName);
+        auto optionalDonor = ShardSplitDonorService::DonorStateMachine::lookup(
+            opCtx.get(), splitService, BSON("_id" << _uuid));
+
+        ASSERT_TRUE(optionalDonor);
+        auto serviceInstance = optionalDonor.get();
+        ASSERT(serviceInstance.get());
+
+        _pauseBeforeRecipientCleanupFp.reset();
+
+        return serviceInstance->decisionFuture();
+    }();
+
+    auto result = decisionFuture.get();
+
+    // We set the promise before the future chain. State will stay kBlocking with no abort.
+    ASSERT(!result.abortReason);
+    ASSERT_EQ(result.state, mongo::ShardSplitDonorStateEnum::kBlocking);
+
+    // deleted the local state doc so this should return NoMatchingDocument
+    ASSERT_EQ(serverless::getStateDocument(opCtx.get(), _uuid).getStatus().code(),
+              ErrorCodes::NoMatchingDocument);
 }
 
 }  // namespace mongo

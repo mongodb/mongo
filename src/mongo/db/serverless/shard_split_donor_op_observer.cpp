@@ -374,10 +374,13 @@ void ShardSplitDonorOpObserver::aboutToDelete(OperationContext* opCtx,
     }
 
     auto donorStateDoc = parseAndValidateDonorDocument(doc);
+
     uassert(ErrorCodes::IllegalOperation,
             str::stream() << "cannot delete a donor's state document " << doc
-                          << " since it has not been marked as garbage collectable.",
-            donorStateDoc.getExpireAt());
+                          << " since it has not been marked as garbage collectable and is not a"
+                          << " recipient garbage collectable.",
+            donorStateDoc.getExpireAt() ||
+                serverless::shouldRemoveStateDocumentOnRecipient(opCtx, donorStateDoc));
 
     if (donorStateDoc.getTenantIds()) {
         auto tenantIds = *donorStateDoc.getTenantIds();

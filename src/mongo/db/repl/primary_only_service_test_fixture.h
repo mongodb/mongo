@@ -62,7 +62,18 @@ protected:
 
     virtual std::unique_ptr<repl::PrimaryOnlyService> makeService(
         ServiceContext* serviceContext) = 0;
+
+    /**
+     * Used to add your own op observer to the op observer registry during setUp prior to running
+     * your tests.
+     */
     virtual void setUpOpObserverRegistry(OpObserverRegistry* opObserverRegistry){};
+
+    /**
+     * Used in order to set persistent data (such as state doc on disk) during setUp prior to
+     * running your tests.
+     */
+    virtual void setUpPersistence(OperationContext* opCtx){};
 
     OpObserverRegistry* _opObserverRegistry = nullptr;
     repl::PrimaryOnlyServiceRegistry* _registry = nullptr;

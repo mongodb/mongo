@@ -57,6 +57,10 @@ void PrimaryOnlyServiceMongoDTest::setUp() {
 
         repl::createOplog(opCtx.get());
 
+        // This method was added in order to write data on disk during setUp which is called
+        // during a test case construction.
+        setUpPersistence(opCtx.get());
+
         // Set up OpObserverImpl so that repl::logOp() will store the oplog entry's optime in
         // ReplClientInfo.
         _opObserverRegistry = dynamic_cast<OpObserverRegistry*>(serviceContext->getOpObserver());

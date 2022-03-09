@@ -33,6 +33,7 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/ops/delete.h"
 #include "mongo/db/repl/repl_set_config.h"
 
 namespace mongo {
@@ -188,8 +189,11 @@ StatusWith<ShardSplitDonorDocument> getStateDocument(OperationContext* opCtx,
     }
 
     BSONObj result;
-    auto foundDoc = Helpers::findOne(
-        opCtx, collection.getCollection(), BSON("_id" << shardSplitId), result, true);
+    auto foundDoc = Helpers::findOne(opCtx,
+                                     collection.getCollection(),
+                                     BSON(ShardSplitDonorDocument::kIdFieldName << shardSplitId),
+                                     result,
+                                     true);
 
     if (!foundDoc) {
         return Status(ErrorCodes::NoMatchingDocument,
@@ -207,6 +211,32 @@ StatusWith<ShardSplitDonorDocument> getStateDocument(OperationContext* opCtx,
     }
 }
 
+StatusWith<bool> deleteStateDoc(OperationContext* opCtx, const UUID& shardSplitId) {
+    const auto nss = NamespaceString::kTenantSplitDonorsNamespace;
+    AutoGetCollection collection(opCtx, nss, MODE_IX);
+
+    if (!collection) {
+        return Status(ErrorCodes::NamespaceNotFound,
+                      str::stream() << nss.ns() << " does not exist");
+    }
+    auto query = BSON(ShardSplitDonorDocument::kIdFieldName << shardSplitId);
+    return writeConflictRetry(opCtx, "ShardSplitDonorDeleteStateDoc", nss.ns(), [&]() -> bool {
+        auto nDeleted =
+            deleteObjects(opCtx, collection.getCollection(), nss, query, true /* justOne */);
+        return nDeleted > 0;
+    });
+}
+
+bool shouldRemoveStateDocumentOnRecipient(OperationContext* opCtx,
+                                          const ShardSplitDonorDocument& stateDocument) {
+    if (!stateDocument.getRecipientSetName()) {
+        return false;
+    }
+    auto recipientSetName = *stateDocument.getRecipientSetName();
+    auto config = repl::ReplicationCoordinator::get(cc().getServiceContext())->getConfig();
+    return recipientSetName == config.getReplSetName() &&
+        stateDocument.getState() == ShardSplitDonorStateEnum::kBlocking;
+}
 
 }  // namespace serverless
 }  // namespace mongo
