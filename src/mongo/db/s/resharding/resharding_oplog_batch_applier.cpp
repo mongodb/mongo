@@ -85,11 +85,11 @@ SemiFuture<void> ReshardingOplogBatchApplier::applyBatch(
                            // attach shard version IGNORED to the write operations and retry once
                            // on a StaleConfig exception to allow the collection metadata
                            // information to be recovered.
-                           auto& oss = OperationShardingState::get(opCtx.get());
-                           oss.initializeClientRoutingVersions(
+                           ScopedSetShardRole scopedSetShardRole(
+                               opCtx.get(),
                                _crudApplication.getOutputNss(),
                                ChunkVersion::IGNORED() /* shardVersion */,
-                               boost::none /* dbVersion */);
+                               boost::none /* databaseVersion */);
 
                            resharding::data_copy::withOneStaleConfigRetry(opCtx.get(), [&] {
                                uassertStatusOK(

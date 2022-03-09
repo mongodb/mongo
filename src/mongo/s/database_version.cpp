@@ -52,4 +52,8 @@ bool DatabaseVersion::operator<(const DatabaseVersion& other) const {
     }
 }
 
+std::string DatabaseVersion::toString() const {
+    return BSON("dbVersion" << toBSON()).toString();
+}
+
 }  // namespace mongo

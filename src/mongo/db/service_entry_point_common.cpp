@@ -1575,8 +1575,8 @@ void ExecCommandDatabase::_initiateCommand() {
             databaseVersion = DatabaseVersion(databaseVersionElem.Obj());
         }
 
-        OperationShardingState::get(opCtx).initializeClientRoutingVersions(
-            namespaceForSharding, shardVersion, databaseVersion);
+        OperationShardingState::setShardRole(
+            opCtx, namespaceForSharding, shardVersion, databaseVersion);
     }
 
     _scoped = _execContext->behaviors->scopedOperationCompletionShardingActions(opCtx);

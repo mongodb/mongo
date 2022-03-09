@@ -841,8 +841,10 @@ Status runAggregate(OperationContext* opCtx,
 
             // Set this operation's shard version for the underlying collection to unsharded.
             // This is prerequisite for future shard versioning checks.
-            OperationShardingState::get(opCtx).initializeClientRoutingVersions(
-                resolvedView.getNamespace(), ChunkVersion::UNSHARDED(), boost::none);
+            ScopedSetShardRole scopedSetShardRole(opCtx,
+                                                  resolvedView.getNamespace(),
+                                                  ChunkVersion::UNSHARDED() /* shardVersion */,
+                                                  boost::none /* databaseVersion */);
 
             bool collectionIsSharded = [opCtx, &resolvedView]() {
                 AutoGetCollection autoColl(opCtx,

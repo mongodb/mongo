@@ -120,8 +120,8 @@ public:
                         makeStandaloneRoutingTableHistory(std::move(rt)),
                         boost::none);
         if (!OperationShardingState::isOperationVersioned(_opCtx)) {
-            OperationShardingState::get(_opCtx).initializeClientRoutingVersions(
-                kNss, cm.getVersion(ShardId("dummyShardId")), boost::none);
+            OperationShardingState::setShardRole(
+                _opCtx, kNss, cm.getVersion(ShardId("dummyShardId")), boost::none);
         }
         AutoGetDb autoDb(_opCtx, kNss.db(), MODE_IX);
         Lock::CollectionLock collLock(_opCtx, kNss, MODE_IX);

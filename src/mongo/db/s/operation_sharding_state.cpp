@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/s/operation_sharding_state.h"
+
+#include "mongo/logv2/log_debug.h"
 
 namespace mongo {
 namespace {
@@ -60,26 +60,35 @@ bool OperationShardingState::isOperationVersioned(OperationContext* opCtx) {
     return !oss._shardVersions.empty();
 }
 
-void OperationShardingState::initializeClientRoutingVersions(
-    NamespaceString nss,
-    const boost::optional<ChunkVersion>& shardVersion,
-    const boost::optional<DatabaseVersion>& dbVersion) {
+void OperationShardingState::setShardRole(OperationContext* opCtx,
+                                          const NamespaceString& nss,
+                                          const boost::optional<ChunkVersion>& shardVersion,
+                                          const boost::optional<DatabaseVersion>& databaseVersion) {
+    auto& oss = OperationShardingState::get(opCtx);
+
     if (shardVersion) {
-        // Changing the shardVersion expected for a namespace is not safe to happen in the
-        // middle of execution, but for the cases where operation is retried on the same
-        // OperationContext it can be set twice to the same value.
-        if (_shardVersionsChecked.contains(nss.ns())) {
-            invariant(_shardVersions[nss.ns()] == *shardVersion,
-                      str::stream()
-                          << "Trying to set " << shardVersion->toString() << " for " << nss.ns()
-                          << " but it already has " << _shardVersions[nss.ns()].toString());
-        } else {
-            _shardVersions.emplace(nss.ns(), *shardVersion);
+        auto emplaceResult = oss._shardVersions.try_emplace(nss.ns(), *shardVersion);
+        auto& tracker = emplaceResult.first->second;
+        if (!emplaceResult.second) {
+            uassert(640570,
+                    str::stream() << "Illegal attempt to change the expected shard version for "
+                                  << nss << " from " << tracker.v << " to " << *shardVersion,
+                    tracker.v == *shardVersion);
         }
+        invariant(++tracker.recursion > 0);
     }
-    if (dbVersion) {
-        const auto [_, inserted] = _databaseVersions.emplace(nss.db(), *dbVersion);
-        invariant(inserted);
+
+    if (databaseVersion) {
+        auto emplaceResult = oss._databaseVersions.try_emplace(nss.db(), *databaseVersion);
+        auto& tracker = emplaceResult.first->second;
+        if (!emplaceResult.second) {
+            uassert(640571,
+                    str::stream() << "Illegal attempt to change the expected database version for "
+                                  << nss.db() << " from " << tracker.v << " to "
+                                  << *databaseVersion,
+                    tracker.v == *databaseVersion);
+        }
+        invariant(++tracker.recursion > 0);
     }
 }
 
@@ -93,12 +102,10 @@ bool OperationShardingState::hasShardVersion(const NamespaceString& nss) const {
 }
 
 boost::optional<ChunkVersion> OperationShardingState::getShardVersion(const NamespaceString& nss) {
-    _shardVersionsChecked.insert(nss.ns());
     const auto it = _shardVersions.find(nss.ns());
     if (it != _shardVersions.end()) {
-        return it->second;
+        return it->second.v;
     }
-
     return boost::none;
 }
 
@@ -106,13 +113,12 @@ bool OperationShardingState::hasDbVersion() const {
     return !_databaseVersions.empty();
 }
 
-boost::optional<DatabaseVersion> OperationShardingState::getDbVersion(
-    const StringData dbName) const {
+boost::optional<DatabaseVersion> OperationShardingState::getDbVersion(StringData dbName) const {
     const auto it = _databaseVersions.find(dbName);
-    if (it == _databaseVersions.end()) {
-        return boost::none;
+    if (it != _databaseVersions.end()) {
+        return it->second.v;
     }
-    return it->second;
+    return boost::none;
 }
 
 bool OperationShardingState::waitForMigrationCriticalSectionSignal(OperationContext* opCtx) {
@@ -194,6 +200,39 @@ ScopedAllowImplicitCollectionCreate_UNSAFE::~ScopedAllowImplicitCollectionCreate
     auto& oss = get(_opCtx);
     invariant(oss._allowCollectionCreation);
     oss._allowCollectionCreation = false;
+}
+
+ScopedSetShardRole::ScopedSetShardRole(OperationContext* opCtx,
+                                       NamespaceString nss,
+                                       boost::optional<ChunkVersion> shardVersion,
+                                       boost::optional<DatabaseVersion> databaseVersion)
+    : _opCtx(opCtx),
+      _nss(std::move(nss)),
+      _shardVersion(std::move(shardVersion)),
+      _databaseVersion(std::move(databaseVersion)) {
+    OperationShardingState::setShardRole(_opCtx, _nss, _shardVersion, _databaseVersion);
+}
+
+ScopedSetShardRole::~ScopedSetShardRole() {
+    auto& oss = OperationShardingState::get(_opCtx);
+
+    if (_shardVersion) {
+        auto it = oss._shardVersions.find(_nss.ns());
+        invariant(it != oss._shardVersions.end());
+        auto& tracker = it->second;
+        invariant(--tracker.recursion >= 0);
+        if (tracker.recursion == 0)
+            oss._shardVersions.erase(it);
+    }
+
+    if (_databaseVersion) {
+        auto it = oss._databaseVersions.find(_nss.db());
+        invariant(it != oss._databaseVersions.end());
+        auto& tracker = it->second;
+        invariant(--tracker.recursion >= 0);
+        if (tracker.recursion == 0)
+            oss._databaseVersions.erase(it);
+    }
 }
 
 }  // namespace mongo

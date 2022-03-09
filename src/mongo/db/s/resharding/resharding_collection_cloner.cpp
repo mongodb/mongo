@@ -279,9 +279,10 @@ bool ReshardingCollectionCloner::doOneBatch(OperationContext* opCtx, Pipeline& p
     // the temporary resharding collection. We attach shard version IGNORED to the insert operations
     // and retry once on a StaleConfig exception to allow the collection metadata information to be
     // recovered.
-    auto& oss = OperationShardingState::get(opCtx);
-    oss.initializeClientRoutingVersions(
-        _outputNss, ChunkVersion::IGNORED() /* shardVersion */, boost::none /* dbVersion */);
+    ScopedSetShardRole scopedSetShardRole(opCtx,
+                                          _outputNss,
+                                          ChunkVersion::IGNORED() /* shardVersion */,
+                                          boost::none /* databaseVersion */);
 
     int bytesInserted = resharding::data_copy::withOneStaleConfigRetry(
         opCtx, [&] { return resharding::data_copy::insertBatch(opCtx, _outputNss, batch); });

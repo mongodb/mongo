@@ -81,8 +81,8 @@ protected:
                         boost::none);
 
         if (!OperationShardingState::isOperationVersioned(opCtx)) {
-            OperationShardingState::get(opCtx).initializeClientRoutingVersions(
-                kTestNss, cm.getVersion(ShardId("0")), boost::none);
+            OperationShardingState::setShardRole(
+                opCtx, kTestNss, cm.getVersion(ShardId("0")), boost::none);
         }
 
         return CollectionMetadata(std::move(cm), ShardId("0"));
@@ -123,7 +123,6 @@ TEST_F(CollectionShardingRuntimeTest,
 TEST_F(
     CollectionShardingRuntimeTest,
     GetCurrentMetadataIfKnownReturnsUnshardedAfterSetFilteringMetadataIsCalledWithUnshardedMetadata) {
-
     CollectionShardingRuntime csr(getServiceContext(), kTestNss, executor());
     csr.setFilteringMetadata(operationContext(), CollectionMetadata());
     const auto optCurrMetadata = csr.getCurrentMetadataIfKnown();
@@ -135,7 +134,6 @@ TEST_F(
 TEST_F(
     CollectionShardingRuntimeTest,
     GetCurrentMetadataIfKnownReturnsShardedAfterSetFilteringMetadataIsCalledWithShardedMetadata) {
-
     CollectionShardingRuntime csr(getServiceContext(), kTestNss, executor());
     OperationContext* opCtx = operationContext();
     auto metadata = makeShardedMetadata(opCtx);

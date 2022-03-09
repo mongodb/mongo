@@ -295,8 +295,7 @@ TEST_F(DestinedRecipientTest, TestGetDestinedRecipient) {
     auto env = setupReshardingEnv(opCtx, true);
 
     AutoGetCollection coll(opCtx, kNss, MODE_IX);
-    OperationShardingState::get(opCtx).initializeClientRoutingVersions(
-        kNss, env.version, env.dbVersion);
+    OperationShardingState::setShardRole(opCtx, kNss, env.version, env.dbVersion);
     ShardingWriteRouter shardingWriteRouter(opCtx, kNss, Grid::get(opCtx)->catalogCache());
 
     auto destShardId =
@@ -311,8 +310,7 @@ TEST_F(DestinedRecipientTest, TestGetDestinedRecipientThrowsOnBlockedRefresh) {
 
     {
         AutoGetCollection coll(opCtx, kNss, MODE_IX);
-        OperationShardingState::get(opCtx).initializeClientRoutingVersions(
-            kNss, env.version, env.dbVersion);
+        OperationShardingState::setShardRole(opCtx, kNss, env.version, env.dbVersion);
 
         FailPointEnableBlock failPoint("blockCollectionCacheLookup");
         ASSERT_THROWS_WITH_CHECK(ShardingWriteRouter(opCtx, kNss, Grid::get(opCtx)->catalogCache()),
@@ -332,8 +330,7 @@ TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnInserts) {
     auto opCtx = operationContext();
     auto env = setupReshardingEnv(opCtx, true);
 
-    OperationShardingState::get(opCtx).initializeClientRoutingVersions(
-        kNss, env.version, env.dbVersion);
+    OperationShardingState::setShardRole(opCtx, kNss, env.version, env.dbVersion);
     writeDoc(opCtx, kNss, BSON("_id" << 0 << "x" << 2 << "y" << 10), env);
 
     auto entry = getLastOplogEntry(opCtx);
@@ -347,8 +344,7 @@ TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnInsertsInTran
     auto opCtx = operationContext();
     auto env = setupReshardingEnv(opCtx, true);
 
-    OperationShardingState::get(opCtx).initializeClientRoutingVersions(
-        kNss, env.version, env.dbVersion);
+    OperationShardingState::setShardRole(opCtx, kNss, env.version, env.dbVersion);
     runInTransaction(
         opCtx, [&]() { writeDoc(opCtx, kNss, BSON("_id" << 0 << "x" << 2 << "y" << 10), env); });
 
@@ -375,8 +371,7 @@ TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnUpdates) {
 
     auto env = setupReshardingEnv(opCtx, true);
 
-    OperationShardingState::get(opCtx).initializeClientRoutingVersions(
-        kNss, env.version, env.dbVersion);
+    OperationShardingState::setShardRole(opCtx, kNss, env.version, env.dbVersion);
     updateDoc(opCtx, kNss, BSON("_id" << 0), BSON("$set" << BSON("z" << 50)), env);
 
     auto entry = getLastOplogEntry(opCtx);
@@ -395,8 +390,7 @@ TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnMultiUpdates)
 
     auto env = setupReshardingEnv(opCtx, true);
 
-    OperationShardingState::get(opCtx).initializeClientRoutingVersions(
-        kNss, ChunkVersion::IGNORED(), env.dbVersion);
+    OperationShardingState::setShardRole(opCtx, kNss, ChunkVersion::IGNORED(), env.dbVersion);
     client.update(kNss.ns(),
                   BSON("x" << 0),
                   BSON("$set" << BSON("z" << 5)),
@@ -418,8 +412,7 @@ TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnUpdatesOutOfP
 
     auto env = setupReshardingEnv(opCtx, true);
 
-    OperationShardingState::get(opCtx).initializeClientRoutingVersions(
-        kNss, env.version, env.dbVersion);
+    OperationShardingState::setShardRole(opCtx, kNss, env.version, env.dbVersion);
     updateDoc(opCtx, kNss, BSON("_id" << 0), BSON("$set" << BSON("z" << 50)), env);
 
     auto entry = getLastOplogEntry(opCtx);
@@ -437,8 +430,7 @@ TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnUpdatesInTran
 
     auto env = setupReshardingEnv(opCtx, true);
 
-    OperationShardingState::get(opCtx).initializeClientRoutingVersions(
-        kNss, env.version, env.dbVersion);
+    OperationShardingState::setShardRole(opCtx, kNss, env.version, env.dbVersion);
     runInTransaction(opCtx, [&]() {
         updateDoc(opCtx, kNss, BSON("_id" << 0), BSON("$set" << BSON("z" << 50)), env);
     });
@@ -466,8 +458,7 @@ TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnDeletes) {
 
     auto env = setupReshardingEnv(opCtx, true);
 
-    OperationShardingState::get(opCtx).initializeClientRoutingVersions(
-        kNss, env.version, env.dbVersion);
+    OperationShardingState::setShardRole(opCtx, kNss, env.version, env.dbVersion);
     deleteDoc(opCtx, kNss, BSON("_id" << 0), env);
 
     auto entry = getLastOplogEntry(opCtx);
@@ -485,8 +476,7 @@ TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnDeletesInTran
 
     auto env = setupReshardingEnv(opCtx, true);
 
-    OperationShardingState::get(opCtx).initializeClientRoutingVersions(
-        kNss, env.version, env.dbVersion);
+    OperationShardingState::setShardRole(opCtx, kNss, env.version, env.dbVersion);
     runInTransaction(opCtx, [&]() { deleteDoc(opCtx, kNss, BSON("_id" << 0), env); });
 
     // Look for destined recipient in latest oplog entry. Since this write was done in a
@@ -512,8 +502,7 @@ TEST_F(DestinedRecipientTest, TestUpdateChangesOwningShardThrows) {
 
     auto env = setupReshardingEnv(opCtx, true);
 
-    OperationShardingState::get(opCtx).initializeClientRoutingVersions(
-        kNss, env.version, env.dbVersion);
+    OperationShardingState::setShardRole(opCtx, kNss, env.version, env.dbVersion);
     ASSERT_THROWS(runInTransaction(opCtx,
                                    [&]() {
                                        updateDoc(opCtx,
@@ -533,8 +522,7 @@ TEST_F(DestinedRecipientTest, TestUpdateSameOwningShard) {
 
     auto env = setupReshardingEnv(opCtx, true);
 
-    OperationShardingState::get(opCtx).initializeClientRoutingVersions(
-        kNss, env.version, env.dbVersion);
+    OperationShardingState::setShardRole(opCtx, kNss, env.version, env.dbVersion);
     runInTransaction(opCtx, [&]() {
         updateDoc(opCtx, kNss, BSON("_id" << 0 << "x" << 2), BSON("$set" << BSON("y" << 3)), env);
     });

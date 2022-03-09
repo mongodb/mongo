@@ -269,8 +269,11 @@ private:
 };
 
 inline std::ostream& operator<<(std::ostream& s, const ChunkVersion& v) {
-    s << v.toString();
-    return s;
+    return s << v.toString();
+}
+
+inline StringBuilder& operator<<(StringBuilder& s, const ChunkVersion& v) {
+    return s << v.toString();
 }
 
 }  // namespace mongo

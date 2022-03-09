@@ -147,8 +147,8 @@ std::unique_ptr<CatalogCacheMock> createCatalogCacheMock(OperationContext* opCtx
         opCtx->getServiceContext(),
         std::make_unique<CollectionShardingStateFactoryShard>(opCtx->getServiceContext()));
 
-    OperationShardingState::get(opCtx).initializeClientRoutingVersions(
-        kNss, chunkManager.getVersion(originatorShard), boost::none);
+    OperationShardingState::setShardRole(
+        opCtx, kNss, chunkManager.getVersion(originatorShard), boost::none);
 
     // Configuring the filtering metadata such that calls to getCollectionDescription return what we
     // want. Specifically the reshardingFields are what we use. Its specified by the chunkManager.

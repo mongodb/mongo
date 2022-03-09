@@ -48,8 +48,7 @@ void setCollectionFilteringMetadata(OperationContext* opCtx, CollectionMetadata 
     CollectionShardingRuntime::get(opCtx, kTestNss)
         ->setFilteringMetadata(opCtx, std::move(metadata));
 
-    OperationShardingState::get(opCtx).initializeClientRoutingVersions(
-        kTestNss, version, boost::none);
+    OperationShardingState::setShardRole(opCtx, kTestNss, version, boost::none);
 }
 
 class DocumentKeyStateTest : public ShardServerTestFixture {

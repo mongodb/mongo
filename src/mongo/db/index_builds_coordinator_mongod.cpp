@@ -279,8 +279,6 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
     const auto nss = CollectionCatalog::get(opCtx)->resolveNamespaceStringOrUUID(opCtx, nssOrUuid);
 
     auto& oss = OperationShardingState::get(opCtx);
-    const auto shardVersion = oss.getShardVersion(nss);
-    const auto dbVersion = oss.getDbVersion(dbName);
 
     // Task in thread pool should have similar CurOp representation to the caller so that it can be
     // identified as a createIndexes operation.
@@ -323,8 +321,8 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
         replState,
         startPromise = std::move(startPromise),
         startTimestamp,
-        shardVersion,
-        dbVersion,
+        shardVersion = oss.getShardVersion(nss),
+        dbVersion = oss.getDbVersion(dbName),
         resumeInfo,
         impersonatedClientAttrs = std::move(impersonatedClientAttrs)
     ](auto status) mutable noexcept {
@@ -344,14 +342,13 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
         auto opCtx = Client::getCurrent()->makeOperationContext();
 
         // Load the external client's attributes into this thread's client for auditing.
-        auto authSession = AuthorizationSession::get(Client::getCurrent());
+        auto authSession = AuthorizationSession::get(opCtx->getClient());
         if (authSession) {
             authSession->setImpersonatedUserData(std::move(impersonatedClientAttrs.userNames),
                                                  std::move(impersonatedClientAttrs.roleNames));
         }
 
-        auto& oss = OperationShardingState::get(opCtx.get());
-        oss.initializeClientRoutingVersions(nss, shardVersion, dbVersion);
+        ScopedSetShardRole scopedSetShardRole(opCtx.get(), nss, shardVersion, dbVersion);
 
         {
             stdx::unique_lock<Client> lk(*opCtx->getClient());

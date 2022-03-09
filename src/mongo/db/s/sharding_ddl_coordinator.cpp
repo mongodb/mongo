@@ -196,8 +196,12 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
                 auto* opCtx = opCtxHolder.get();
                 invariant(metadata().getDatabaseVersion());
 
-                OperationShardingState::get(opCtx).initializeClientRoutingVersions(
-                    nss(), boost::none /* ChunkVersion */, metadata().getDatabaseVersion());
+                ScopedSetShardRole scopedSetShardRole(
+                    opCtx,
+                    nss(),
+                    boost::none /* shardVersion */,
+                    metadata().getDatabaseVersion() /* databaseVersion */);
+
                 // Check under the dbLock if this is still the primary shard for the database
                 DatabaseShardingState::checkIsPrimaryShardForDb(opCtx, nss().db());
             };
