@@ -162,6 +162,7 @@ of the documentation.
 - @subpage arch-toc-mem-disk
     - @ref arch-block
     - @ref arch-data-file
+    - @ref arch-s3-extension
 
 - @subpage arch-toc-on-disk
     - @ref arch-checkpoint
@@ -267,6 +268,10 @@ The block manager manages the reading and writing of disk blocks.
 @subpage arch-data-file
 
 The format of the data file is given by structures in \c block.h .
+
+@subpage arch-s3-extension
+
+The S3 storage source extension manages flushing the data files to and reading from the S3 cloud object store.
 
 */
 

@@ -4,6 +4,8 @@ ADDR
 APIs
 ASAN
 ASan
+AWS
+AWS's
 ActiveState
 Adler's
 Atomicity
@@ -123,6 +125,8 @@ RocksDB
 Roelofs
 RrVv
 Rrx
+SDK
+SDK's
 SCons
 SYSV
 Sanitizer
@@ -168,6 +172,7 @@ allocator
 allocators
 allocsize
 ao
+ap
 api
 apiflags
 ar
@@ -250,6 +255,7 @@ customerABC
 customizability
 cv
 cyclomatic
+de
 dN
 dNLen
 dNOff
@@ -264,6 +270,7 @@ dbc
 dbformat
 dbm
 dbt
+deallocated
 decl
 decrement
 decrementing
@@ -329,10 +336,12 @@ fileFontColor
 fileID
 fileShadowing
 fileformats
+filehandle
 fileid
 filename
 filesystem
 filesystems
+filesystem's
 fillfactor
 firstname
 flamegraph
@@ -384,6 +393,7 @@ indices
 init
 inmemory
 insn
+instantiation
 intl
 intpack
 inuse
