@@ -9,6 +9,9 @@
 
 // SERVER-15033 truncate on a regular collection
 
+(function() {
+'use strict';
+
 var t = db.getCollection('collection_truncate');
 t.drop();
 
@@ -59,3 +62,4 @@ assertEmpty();
 // Already empty case.
 truncate();
 assertEmpty();
+}());
