@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/pipeline/change_stream_event_transform.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 
 namespace mongo {
@@ -75,17 +76,10 @@ private:
 
     DocumentSourceChangeStreamSpec _changeStreamSpec;
 
-    // Records the documentKey fields from the client's resume token, if present.
-    boost::optional<std::pair<UUID, std::vector<FieldPath>>> _documentKeyCache;
+    ChangeStreamEventTransformer _transformer;
 
     // Set to true if this transformation stage can be run on the collectionless namespace.
     bool _isIndependentOfAnyCollection;
-
-    // Set to true if the pre-image should be included in the output documents.
-    bool _preImageRequested = false;
-
-    // Set to true if the post-image should be included in the output documents.
-    bool _postImageRequested = false;
 };
 
 }  // namespace mongo

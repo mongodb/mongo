@@ -413,6 +413,7 @@ env.Library(
     target="change_stream_pipeline",
     source=[
         'change_stream_document_diff_parser.cpp',
+        'change_stream_event_transform.cpp',
         'change_stream_filter_helpers.cpp',
         'change_stream_helpers_legacy.cpp',
         'change_stream_rewrite_helpers.cpp',
@@ -516,6 +517,18 @@ env.Library(
     ]
 )
 
+env.Library(
+    target="change_stream_test_helpers",
+    source=[
+        "change_stream_test_helpers.cpp",
+    ],
+    LIBDEPS=[
+        "change_stream_pipeline",
+    ],
+    LIBDEPS_PRIVATE=[
+    ],
+)
+
 env.CppUnitTest(
     target='db_pipeline_test',
     source=[
@@ -523,14 +536,15 @@ env.CppUnitTest(
         'accumulator_js_test.cpp' if get_option('js-engine') != 'none' else [],
         'accumulator_test.cpp',
         'aggregation_request_test.cpp',
+        'change_stream_event_transform_test.cpp',
         'change_stream_expired_pre_image_remover_test.cpp',
+        'change_stream_rewrites_test.cpp',
         'dependencies_test.cpp',
         'dispatch_shard_pipeline_test.cpp',
         'document_path_support_test.cpp',
         'document_source_add_fields_test.cpp',
         'document_source_bucket_auto_test.cpp',
         'document_source_bucket_test.cpp',
-        'document_source_change_stream_rewrites_test.cpp',
         'document_source_change_stream_test.cpp',
         'document_source_check_resume_token_test.cpp',
         'document_source_count_test.cpp',
@@ -658,6 +672,7 @@ env.CppUnitTest(
         'accumulator',
         'aggregation_request_helper',
         'change_stream_pipeline',
+        'change_stream_test_helpers',
         'document_source_internal_apply_oplog_update',
         'document_source_mock',
         'document_sources_idl',
