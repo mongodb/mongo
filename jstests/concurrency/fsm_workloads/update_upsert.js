@@ -4,17 +4,20 @@
  * update_upsert_multi.js
  *
  * Tests updates that specify upsert=true.
- *
- * @tags: [__TEMPORARILY_DISABLED__]
  */
-let $config = (function() {
+
+var $config = (function() {
     let states = {
         update: function update(db, collName) {
             const docId = Random.randInt(5) * 4;
             let updateRes =
                 assert.writeOK(db[collName].update({_id: docId}, {$inc: {x: 1}}, {upsert: true}));
-            assertAlways.eq(1, updateRes.nModified);
-            assertAlways.eq(1, updateRes.nMatched + updateRes.nUpserted);
+            assertAlways.eq(1,
+                            updateRes.nMatched + updateRes.nUpserted,
+                            "unexpected matched count: " + updateRes);
+            assertAlways.eq(1,
+                            updateRes.nModified + updateRes.nUpserted,
+                            "unexpected modified count: " + updateRes);
         },
     };
 
