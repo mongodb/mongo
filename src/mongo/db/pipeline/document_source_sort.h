@@ -218,7 +218,12 @@ private:
     };
     struct Comp {
         int operator()(SortableDate x, SortableDate y) const {
-            return x.date.toMillisSinceEpoch() - y.date.toMillisSinceEpoch();
+            // compare(x, y) op 0 means x op y, for any comparator 'op'.
+            if (x.date.toMillisSinceEpoch() < y.date.toMillisSinceEpoch())
+                return -1;
+            if (x.date.toMillisSinceEpoch() > y.date.toMillisSinceEpoch())
+                return 1;
+            return 0;
         }
     };
     using TimeSorter = BoundedSorter<SortableDate, Document, Comp, BoundMaker>;
