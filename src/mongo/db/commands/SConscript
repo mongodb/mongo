@@ -329,6 +329,17 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='set_cluster_parameter_idl',
+    source=[
+        'set_cluster_parameter.idl',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/idl/cluster_server_parameter',
+    ],
+)
+
 # Commands that are present in both mongod and embedded
 env.Library(
     target="standalone",
@@ -608,6 +619,7 @@ env.Library(
         'rwc_defaults_commands',
         'server_status',
         'servers',
+        'set_cluster_parameter_idl',
         'set_feature_compatibility_version_idl',
         'set_index_commit_quorum_idl',
         'shell_protocol',
