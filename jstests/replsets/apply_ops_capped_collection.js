@@ -6,6 +6,7 @@
  *     multiversion_incompatible,
  *     requires_capped,
  *     requires_replication,
+ *     requires_fcv_50,
  * ]
  */
 (function() {

@@ -1138,9 +1138,23 @@ void CollectionImpl::deleteDocument(OperationContext* opCtx,
                                     bool fromMigrate,
                                     bool noWarn,
                                     Collection::StoreDeletedDoc storeDeletedDoc) const {
-    if (isCapped() && opCtx->inMultiDocumentTransaction()) {
-        uasserted(ErrorCodes::IllegalOperation,
-                  "Cannot remove from a capped collection in a multi-document transaction");
+    if (isCapped()) {
+        const auto isFCV50 = serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+            serverGlobalParams.featureCompatibility.getVersion() ==
+                ServerGlobalParams::FeatureCompatibility::Version::kVersion50;
+
+        if (isFCV50) {
+            if (opCtx->inMultiDocumentTransaction()) {
+                // User deletes outside of multi-document transacations can only happen in FCV 5.0.
+                uasserted(ErrorCodes::IllegalOperation,
+                          "Cannot remove from a capped collection in a multi-document transaction");
+            }
+        } else if (opCtx->isEnforcingConstraints()) {
+            // System operations such as tenant migration or secondary batch application can delete
+            // from capped collections.
+            LOGV2(20291, "failing remove on a capped ns", "namespace"_attr = _ns);
+            uasserted(10089, "cannot remove from a capped collection");
+        }
     }
 
     std::vector<OplogSlot> oplogSlots;
