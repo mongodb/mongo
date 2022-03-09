@@ -140,13 +140,22 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> extractSbeCompatibleSt
 
     const auto groupFeatureFlagEnabled = feature_flags::gFeatureFlagSBEGroupPushdown.isEnabled(
         serverGlobalParams.featureCompatibility);
-    const auto lookupFeatureFlagEnabled =
-        feature_flags::gFeatureFlagSBELookupPushdown.isEnabledAndIgnoreFCV();
 
     bool isMainCollectionSharded = false;
     if (const auto& mainColl = collections.getMainCollection()) {
         isMainCollectionSharded = mainColl.isSharded();
     }
+
+    // If lookup pushdown isn't enabled or the main collection is sharded or any of the secondary
+    // namespaces are sharded or are a view, then no $lookup stage will be eligible for pushdown.
+    //
+    // When acquiring locks for multiple collections, it is the case that we can only determine
+    // whether any secondary collection is a view or is sharded, not which ones are a view or are
+    // sharded and which ones aren't. As such, if any secondary collection is a view or is sharded,
+    // no $lookup will be eligible for pushdown.
+    const bool disallowLookupPushdown =
+        !feature_flags::gFeatureFlagSBELookupPushdown.isEnabledAndIgnoreFCV() ||
+        isMainCollectionSharded || collections.isAnySecondaryNamespaceAViewOrSharded();
 
     for (auto itr = sources.begin(); itr != sources.end();) {
         // $group pushdown logic.
@@ -163,17 +172,7 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> extractSbeCompatibleSt
 
         // $lookup pushdown logic.
         if (auto lookupStage = dynamic_cast<DocumentSourceLookUp*>(itr->get())) {
-            // If lookup pushdown isn't enabled or the main collection is sharded or any of the
-            // secondary namespaces are sharded or are a view, then neither this stage nor any
-            // subsequent stages will be eligible for pushdown. As such, we early return to avoid
-            // unnecessary work.
-            //
-            // When acquiring locks for multiple collections, it is the case that we can only
-            // determine whether any secondary collection is a view or is sharded, not which ones
-            // are a view or are sharded and which ones aren't. As such, if any secondary collection
-            // is a view or is sharded, no $lookup will be eligible for pushdown.
-            if (!lookupFeatureFlagEnabled || isMainCollectionSharded ||
-                collections.isAnySecondaryNamespaceAViewOrSharded()) {
+            if (disallowLookupPushdown) {
                 break;
             }
 

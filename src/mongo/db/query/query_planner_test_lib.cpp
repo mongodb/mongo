@@ -1325,6 +1325,115 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
         }
 
         return Status::OK();
+    } else if (STAGE_EQ_LOOKUP == trueSoln->getType()) {
+        const auto* actualEqLookupNode = static_cast<const EqLookupNode*>(trueSoln);
+        auto expectedElem = testSoln["eq_lookup"];
+        if (expectedElem.eoo() || !expectedElem.isABSONObj()) {
+            return {ErrorCodes::Error{6267500},
+                    "found a 'eq_lookup' object in the test solution but no corresponding "
+                    "'eq_lookup' object in the expected JSON"};
+        }
+
+        auto expectedEqLookupSoln = expectedElem.Obj();
+        auto expectedForeignCollection = expectedEqLookupSoln["foreignCollection"];
+        if (expectedForeignCollection.eoo() ||
+            expectedForeignCollection.type() != BSONType::String) {
+            return {ErrorCodes::Error{6267501},
+                    str::stream() << "Test solution for eq_lookup should have a "
+                                     "'foreignCollection' field that is "
+                                     "a string; "
+                                  << testSoln.toString()};
+        }
+
+        if (expectedForeignCollection.str() != actualEqLookupNode->foreignCollection) {
+            return {
+                ErrorCodes::Error{6267502},
+                str::stream() << "Test solution 'foreignCollection' does not match actual; test "
+                                 ""
+                              << expectedForeignCollection.str() << " != actual "
+                              << actualEqLookupNode->foreignCollection};
+        }
+
+        auto expectedLocalField = expectedEqLookupSoln["joinFieldLocal"];
+        if (expectedLocalField.eoo() || expectedLocalField.type() != BSONType::String) {
+            return {
+                ErrorCodes::Error{6267503},
+                str::stream()
+                    << "Test solution for eq_lookup should have a 'joinFieldLocal' field that is "
+                       "a string; "
+                    << testSoln.toString()};
+        }
+
+
+        if (expectedLocalField.str() != actualEqLookupNode->joinFieldLocal) {
+            return {ErrorCodes::Error{6267504},
+                    str::stream() << "Test solution 'joinFieldLocal' does not match actual; test "
+                                     ""
+                                  << expectedLocalField.str() << " != actual "
+                                  << actualEqLookupNode->joinFieldLocal};
+        }
+
+        auto expectedForeignField = expectedEqLookupSoln["joinFieldForeign"];
+        if (expectedForeignField.eoo() || expectedForeignField.type() != BSONType::String) {
+            return {
+                ErrorCodes::Error{6267505},
+                str::stream()
+                    << "Test solution for eq_lookup should have a 'joinFieldForeign' field that is "
+                       "a string; "
+                    << testSoln.toString()};
+        }
+
+        if (expectedForeignField.str() != actualEqLookupNode->joinFieldForeign) {
+            return {ErrorCodes::Error{6267506},
+                    str::stream() << "Test solution 'joinFieldForeign' does not match actual; test "
+                                     ""
+                                  << expectedForeignField.str() << " != actual "
+                                  << actualEqLookupNode->joinFieldForeign};
+        }
+
+        auto expectedAsField = expectedEqLookupSoln["joinField"];
+        if (expectedAsField.eoo() || expectedAsField.type() != BSONType::String) {
+            return {ErrorCodes::Error{6267507},
+                    str::stream()
+                        << "Test solution for eq_lookup should have a 'joinField' field that is "
+                           "a string; "
+                        << testSoln.toString()};
+        }
+
+        if (expectedAsField.str() != actualEqLookupNode->joinField) {
+            return {ErrorCodes::Error{6267508},
+                    str::stream() << "Test solution 'joinField' does not match actual; test "
+                                     ""
+                                  << expectedAsField.str() << " != actual "
+                                  << actualEqLookupNode->joinField};
+        }
+
+        auto expectedStrategy = expectedEqLookupSoln["strategy"];
+        if (expectedStrategy.eoo() || expectedStrategy.type() != BSONType::String) {
+            return {ErrorCodes::Error{6267509},
+                    str::stream()
+                        << "Test solution for eq_lookup should have a 'strategy' field that is "
+                           "a string; "
+                        << testSoln.toString()};
+        }
+
+        auto actualLookupStrategy =
+            EqLookupNode::serializeLookupStrategy(actualEqLookupNode->lookupStrategy);
+        if (expectedStrategy.str() != actualLookupStrategy) {
+            return {ErrorCodes::Error{6267510},
+                    str::stream() << "Test solution 'expectedStrategy' does not match actual; test "
+                                  << expectedStrategy.str() << " != actual "
+                                  << actualLookupStrategy};
+        }
+
+        auto child = expectedEqLookupSoln["node"];
+        if (child.eoo() || !child.isABSONObj()) {
+            return {ErrorCodes::Error{6267511},
+                    "found a eq_lookup stage in the solution but no 'node' sub-object in "
+                    "the provided JSON"};
+        }
+        return solutionMatches(child.Obj(), actualEqLookupNode->children[0], relaxBoundsCheck)
+            .withContext("mismatch below eq_lookup stage");
     }
     return {ErrorCodes::Error{5698301},
             str::stream() << "Unknown query solution node found: " << trueSoln->toString()};
