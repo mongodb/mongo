@@ -234,6 +234,16 @@ if (typeof _threadInject != "undefined") {
             // These tests rely on no writes happening that would force oplog truncation.
             "write_change_stream_pit_preimage_in_transaction.js",
             "write_change_stream_pit_preimage.js",
+
+            // These tests convert a non-unique index to a unique one, which is not compatible
+            // when running against inMemory storage engine variants. Since this test only fails
+            // in the parallel tester, which does not respect test tags, we omit the tests
+            // instead of manually checking TestData values in the mongo shell for the Evergreen
+            // variant.
+            "collmod_convert_index_uniqueness.js",
+            "collmod_convert_to_unique_apply_ops.js",
+            "collmod_convert_to_unique_violations.js",
+            "collmod_convert_to_unique_violations_size_limit.js",
         ]);
 
         // Get files, including files in subdirectories.
