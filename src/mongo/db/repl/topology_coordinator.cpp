@@ -3636,16 +3636,16 @@ Status TopologyCoordinator::checkIfCommitQuorumCanBeSatisfied(
         }
     }
 
-    bool votingBuildIndexesFalseNodes = false;
+    bool buildIndexesFalseNodes = false;
     for (auto&& member : _rsConfig.members()) {
         // Only count data-bearing nodes.
         if (member.isArbiter()) {
             continue;
         }
 
-        // Only count voting nodes that build indexes.
-        if (member.isVoter() && !member.shouldBuildIndexes()) {
-            votingBuildIndexesFalseNodes = true;
+        // Only count nodes that build indexes.
+        if (!member.shouldBuildIndexes()) {
+            buildIndexesFalseNodes = true;
             continue;
         }
 
@@ -3655,14 +3655,13 @@ Status TopologyCoordinator::checkIfCommitQuorumCanBeSatisfied(
         }
     }
 
-    // Voting, buildIndexes:false nodes can be included in a commitQuorum but never actually build
+    // buildIndexes:false should not be included in a commitQuorum because they never actually build
     // indexes and vote to commit. Provide a helpful error message to prevent users from starting
     // index builds that will never commit.
-    if (votingBuildIndexesFalseNodes) {
+    if (buildIndexesFalseNodes) {
         return {ErrorCodes::UnsatisfiableCommitQuorum,
-                str::stream()
-                    << "Commit quorum cannot depend on voting buildIndexes:false nodes; "
-                    << "use a commit quorum that excludes these nodes or do not give them votes"};
+                str::stream() << "Commit quorum cannot depend on buildIndexes:false nodes; "
+                              << "use a commit quorum that excludes these nodes"};
     }
 
     return {ErrorCodes::UnsatisfiableCommitQuorum,
