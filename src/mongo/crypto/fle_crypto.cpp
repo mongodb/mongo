@@ -123,6 +123,11 @@ constexpr auto kId = "_id";
 constexpr auto kValue = "value";
 constexpr auto kFieldName = "fieldName";
 
+constexpr auto kDollarPush = "$push";
+constexpr auto kDollarPull = "$pull";
+constexpr auto kDollarEach = "$each";
+constexpr auto kDollarIn = "$in";
+
 constexpr auto kEncryptedFields = "encryptedFields";
 
 #ifdef FLE2_DEBUG_STATE_COLLECTIONS
@@ -1051,7 +1056,7 @@ void serializeDeletePayload(UUID keyId, FLEKeyVault* keyVault, BSONObjBuilder* b
     payload.serialize(builder);
 }
 
-BSONObj getDeleteTokensBSON(EncryptedFieldConfig& ef, FLEKeyVault* keyVault) {
+BSONObj getDeleteTokensBSON(const EncryptedFieldConfig& ef, FLEKeyVault* keyVault) {
     BSONObjBuilder builder;
     for (const auto& field : ef.getFields()) {
         if (field.getQueries().has_value()) {
@@ -1061,6 +1066,21 @@ BSONObj getDeleteTokensBSON(EncryptedFieldConfig& ef, FLEKeyVault* keyVault) {
     }
 
     return builder.obj();
+}
+
+void collectFieldValidationInfo(stdx::unordered_map<std::string, ConstDataRange>* pFields,
+                                ConstDataRange cdr,
+                                StringData fieldPath) {
+    pFields->insert({fieldPath.toString(), cdr});
+}
+
+stdx::unordered_map<std::string, EncryptedField> toFieldMap(const EncryptedFieldConfig& efc) {
+    stdx::unordered_map<std::string, EncryptedField> fields;
+    for (const auto& field : efc.getFields()) {
+        fields.insert({field.getPath().toString(), field});
+    }
+
+    return fields;
 }
 
 }  // namespace
@@ -1255,6 +1275,101 @@ BSONObj FLEClientCrypto::decryptDocument(BSONObj& doc, FLEKeyVault* keyVault) {
     builder.appendElements(obj);
 
     return builder.obj();
+}
+
+void FLEClientCrypto::validateTagsArray(BSONObj& doc) {
+    BSONElement safeContent = doc[kSafeContent];
+
+    uassert(6371506,
+            str::stream() << "Found indexed encrypted fields but could not find " << kSafeContent,
+            !safeContent.eoo());
+
+    uassert(
+        6371507, str::stream() << kSafeContent << " must be an array", safeContent.type() == Array);
+}
+
+void FLEClientCrypto::validateDocument(BSONObj& doc,
+                                       const EncryptedFieldConfig& efc,
+                                       FLEKeyVault* keyVault) {
+    stdx::unordered_map<std::string, ConstDataRange> validateFields;
+
+    visitEncryptedBSON(doc, [&validateFields](ConstDataRange cdr, StringData fieldPath) {
+        collectFieldValidationInfo(&validateFields, cdr, fieldPath);
+    });
+
+    auto configMap = toFieldMap(efc);
+
+    stdx::unordered_map<PrfBlock, std::string> tags;
+
+    // Ensure all encrypted fields are in EncryptedFieldConfig
+    // It is ok for fields to be in EncryptedFieldConfig but not present
+    for (const auto& field : validateFields) {
+        auto configField = configMap.find(field.first);
+        uassert(6371508,
+                str::stream() << "Field '" << field.first
+                              << "' is encrypted by not marked as an encryptedField",
+                configField != configMap.end());
+
+        auto [encryptedTypeBinding, subCdr] = fromEncryptedConstDataRange(field.second);
+
+        // Check we can decrypt it?
+        /* ignore */ FLEClientCrypto::decrypt(field.second, keyVault);
+
+        if (configField->second.getQueries().has_value()) {
+            uassert(6371509,
+                    str::stream() << "Field '" << field.first
+                                  << "' is marked as equality but not indexed",
+                    encryptedTypeBinding == EncryptedBinDataType::kFLE2EqualityIndexedValue);
+
+            auto indexKeyId = uassertStatusOK(FLE2IndexedEqualityEncryptedValue::readKeyId(subCdr));
+
+            auto indexKey = keyVault->getIndexKeyById(indexKeyId);
+
+            auto serverDataToken =
+                FLELevel1TokenGenerator::generateServerDataEncryptionLevel1Token(indexKey.key);
+
+            auto ieev = uassertStatusOK(
+                FLE2IndexedEqualityEncryptedValue::decryptAndParse(serverDataToken, subCdr));
+
+            auto tag = EDCServerCollection::generateTag(ieev);
+            tags.insert({tag, field.first});
+        }
+
+        // TODO - support unindexed
+    }
+
+    BSONElement safeContent = doc[kSafeContent];
+
+    // If there are no tags and no safeContent, then this document is not FLE 2 and is therefore
+    // fine
+    if (tags.size() == 0 && safeContent.eoo()) {
+        return;
+    }
+
+    validateTagsArray(doc);
+
+    size_t count = 0;
+    for (const auto& element : safeContent.Obj()) {
+        uassert(6371515,
+                str::stream() << "Field'" << element.fieldNameStringData()
+                              << "' must be a bindata and general subtype",
+                element.isBinData(BinDataType::BinDataGeneral));
+
+        auto vec = element._binDataVector();
+        auto block = PrfBlockfromCDR(vec);
+
+        uassert(6371510,
+                str::stream() << "Missing tag for encrypted indexed field '"
+                              << element.fieldNameStringData() << "'",
+                tags.count(block) == 1);
+
+        ++count;
+    }
+
+    uassert(6371516,
+            str::stream() << "Mismatch in expected count of tags, Expected: '" << tags.size()
+                          << "', Actual: '" << count << "'",
+            count == tags.size());
 }
 
 PrfBlock ESCCollection::generateId(ESCTwiceDerivedTagToken tagToken,
@@ -1526,7 +1641,7 @@ boost::optional<uint64_t> ECCCollection::emuBinary(FLEStateCollectionReader* rea
         reader, tagToken, valueToken);
 }
 
-BSONObj ECOCollection::generateDocument(StringData fieldName, ConstDataRange payload) {
+BSONObj ECOCCollection::generateDocument(StringData fieldName, ConstDataRange payload) {
     BSONObjBuilder builder;
     builder.append(kId, OID::gen());
     builder.append(kFieldName, fieldName);
@@ -1534,7 +1649,7 @@ BSONObj ECOCollection::generateDocument(StringData fieldName, ConstDataRange pay
     return builder.obj();
 }
 
-ECOCCompactionDocument ECOCollection::parseAndDecrypt(BSONObj& doc, ECOCToken token) {
+ECOCCompactionDocument ECOCCollection::parseAndDecrypt(const BSONObj& doc, ECOCToken token) {
     IDLParserErrorContext ctx("root");
     auto ecocDoc = EcocDocument::parse(ctx, doc);
 
@@ -1744,6 +1859,12 @@ PrfBlock EDCServerCollection::generateTag(const EDCServerPayloadInfo& payload) {
     return generateTag(edcTwiceDerived, payload.count);
 }
 
+PrfBlock EDCServerCollection::generateTag(const FLE2IndexedEqualityEncryptedValue& indexedValue) {
+    auto edcTwiceDerived =
+        FLETwiceDerivedTokenGenerator::generateEDCTwiceDerivedToken(indexedValue.edc);
+    return generateTag(edcTwiceDerived, indexedValue.count);
+}
+
 BSONObj EDCServerCollection::finalizeForInsert(
     const BSONObj& doc, const std::vector<EDCServerPayloadInfo>& serverPayload) {
 
@@ -1798,6 +1919,138 @@ BSONObj EDCServerCollection::finalizeForInsert(
     return builder.obj();
 }
 
+BSONObj EDCServerCollection::finalizeForUpdate(
+    const BSONObj& doc, const std::vector<EDCServerPayloadInfo>& serverPayload) {
+    std::vector<TagInfo> tags;
+    // TODO - improve size estimate after range is supported since it no longer be 1 to 1
+    tags.reserve(serverPayload.size());
+
+    ConstVectorIteratorPair<EDCServerPayloadInfo> it(serverPayload);
+
+    // First: transform all the markings
+    auto obj = transformBSON(
+        doc, [&tags, &it](ConstDataRange cdr, BSONObjBuilder* builder, StringData fieldPath) {
+            convertServerPayload(&tags, it, builder, fieldPath);
+        });
+
+    BSONObjBuilder builder;
+
+    // Second: reuse an existing array if present if we have tags to append.
+    bool appendElements = true;
+    for (const auto& element : obj) {
+        // Only need to process $push if we have tags ato append
+        if (tags.size() > 0 && element.fieldNameStringData() == kDollarPush) {
+            uassert(6371511,
+                    str::stream() << "Field '" << kDollarPush << "' was found but not an object",
+                    element.type() == Object);
+            BSONObjBuilder subBuilder(builder.subobjStart(kDollarPush));
+
+            // Append existing fields elements
+            for (const auto& subElement : element.Obj()) {
+                // Since we cannot be sure if the $push the server wants to perform (i.e. a $push
+                // with $each) we can stop the client from sending $push. They can always submit it
+                // via an unencrypted client.
+                uassert(6371512,
+                        str::stream() << "Cannot $push to " << kSafeContent,
+                        subElement.fieldNameStringData() != kSafeContent);
+                subBuilder.append(subElement);
+            }
+
+            // Build {$push: { _safeContent__ : {$each: [tag...]} }
+            BSONObjBuilder pushBuilder(subBuilder.subobjStart(kSafeContent));
+            {
+                BSONArrayBuilder arrayBuilder(pushBuilder.subarrayStart(kDollarEach));
+
+                // Add new tags
+                for (auto const& tag : tags) {
+                    appendTag(tag.tag, &arrayBuilder);
+                }
+            }
+
+            appendElements = false;
+        } else {
+            builder.append(element);
+        }
+    }
+
+    // Third: append the tags array if it does not exist
+    if (appendElements && tags.size() > 0) {
+        // Build {$push: { _safeContent__ : {$each: [tag...]} }
+        BSONObjBuilder subBuilder(builder.subobjStart(kDollarPush));
+        BSONObjBuilder pushBuilder(subBuilder.subobjStart(kSafeContent));
+        {
+            BSONArrayBuilder arrayBuilder(pushBuilder.subarrayStart(kDollarEach));
+
+            // Add new tags
+            for (auto const& tag : tags) {
+                appendTag(tag.tag, &arrayBuilder);
+            }
+        }
+    }
+
+    return builder.obj();
+}
+
+BSONObj EDCServerCollection::generateUpdateToRemoveTags(
+    const std::vector<EDCIndexedFields>& removedFields, const StringMap<FLEDeleteToken>& tokenMap) {
+    std::vector<TagInfo> tags;
+
+    for (const auto& field : removedFields) {
+        auto tokenIt = tokenMap.find(field.fieldPathName);
+        uassert(6371513,
+                str::stream() << "Could not find field'" << field.fieldPathName
+                              << "' in delete token map.",
+                tokenIt != tokenMap.end());
+        auto token = *tokenIt;
+
+        auto [encryptedTypeBinding, subCdr] = fromEncryptedConstDataRange(field.value);
+        auto localEncryptedTypeBinding =
+            encryptedTypeBinding;  // Workaround the fact that we cannot pass a structured binding
+                                   // variable into a lambda
+        uassert(6371514,
+                str::stream() << "Field'" << field.fieldPathName
+                              << "' in not a supported encrypted type: "
+                              << EncryptedBinDataType_serializer(localEncryptedTypeBinding),
+                encryptedTypeBinding == EncryptedBinDataType::kFLE2EqualityIndexedValue);
+
+        auto ieev = uassertStatusOK(FLE2IndexedEqualityEncryptedValue::decryptAndParse(
+            token.second.serverEncryptionToken, subCdr));
+        auto tag = EDCServerCollection::generateTag(ieev);
+
+        tags.push_back({tag});
+    }
+
+    // Build { $pull : {__safeContent__ : {$in : [tag..] } } }
+    BSONObjBuilder builder;
+    {
+        BSONObjBuilder subBuilder(builder.subobjStart(kDollarPull));
+        BSONObjBuilder pushBuilder(subBuilder.subobjStart(kSafeContent));
+        BSONArrayBuilder arrayBuilder(pushBuilder.subarrayStart(kDollarIn));
+
+        // Add new tags
+        for (auto const& tag : tags) {
+            appendTag(tag.tag, &arrayBuilder);
+        }
+    }
+
+    return builder.obj();
+}
+
+std::vector<EDCIndexedFields> EDCServerCollection::getRemovedTags(
+    std::vector<EDCIndexedFields>& originalDocument, std::vector<EDCIndexedFields>& newDocument) {
+    std::sort(originalDocument.begin(), originalDocument.end());
+    std::sort(newDocument.begin(), newDocument.end());
+
+    std::vector<EDCIndexedFields> removedTags;
+    std::set_difference(originalDocument.begin(),
+                        originalDocument.end(),
+                        newDocument.begin(),
+                        newDocument.end(),
+                        std::back_inserter(removedTags));
+
+    return removedTags;
+}
+
 std::vector<EDCIndexedFields> EDCServerCollection::getEncryptedIndexedFields(BSONObj& obj) {
     std::vector<EDCIndexedFields> fields;
 
@@ -1808,13 +2061,17 @@ std::vector<EDCIndexedFields> EDCServerCollection::getEncryptedIndexedFields(BSO
     return fields;
 }
 
+BSONObj EncryptionInformationHelpers::encryptionInformationSerialize(
+    const NamespaceString& nss, const EncryptedFieldConfig& ef) {
+    return EncryptionInformationHelpers::encryptionInformationSerialize(nss, ef.toBSON());
+}
 
-BSONObj EncryptionInformationHelpers::encryptionInformationSerialize(NamespaceString& nss,
-                                                                     EncryptedFieldConfig& ef) {
+BSONObj EncryptionInformationHelpers::encryptionInformationSerialize(
+    const NamespaceString& nss, const BSONObj& encryptedFields) {
     EncryptionInformation ei;
     ei.setType(kEncryptionInformationSchemaVersion);
 
-    ei.setSchema(BSON(nss.toString() << ef.toBSON()));
+    ei.setSchema(BSON(nss.toString() << encryptedFields));
 
     return ei.toBSON();
 }
@@ -1848,7 +2105,7 @@ std::pair<EncryptedBinDataType, ConstDataRange> fromEncryptedConstDataRange(Cons
 }
 
 BSONObj EncryptionInformationHelpers::encryptionInformationSerializeForDelete(
-    NamespaceString& nss, EncryptedFieldConfig& ef, FLEKeyVault* keyVault) {
+    const NamespaceString& nss, const EncryptedFieldConfig& ef, FLEKeyVault* keyVault) {
 
     EncryptionInformation ei;
     ei.setType(kEncryptionInformationSchemaVersion);

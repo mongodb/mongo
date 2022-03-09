@@ -51,6 +51,7 @@
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/matcher/schema/encrypt_schema_gen.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
@@ -65,27 +66,40 @@
 
 namespace mongo {
 namespace {
+
 class FLEQueryTestImpl : public FLEQueryInterface {
 public:
     FLEQueryTestImpl(OperationContext* opCtx, repl::StorageInterface* storage)
         : _opCtx(opCtx), _storage(storage) {}
     ~FLEQueryTestImpl() = default;
 
-    BSONObj getById(const NamespaceString& nss, PrfBlock block) final;
+    BSONObj getById(const NamespaceString& nss, BSONElement element) final;
+
+    BSONObj getById(const NamespaceString& nss, PrfBlock block) {
+        auto doc = BSON("v" << BSONBinData(block.data(), block.size(), BinDataGeneral));
+        BSONElement element = doc.firstElement();
+        return getById(nss, element);
+    }
 
     uint64_t countDocuments(const NamespaceString& nss) final;
 
     void insertDocument(const NamespaceString& nss, BSONObj obj, bool translateDuplicateKey) final;
 
-    BSONObj deleteWithPreimage(const NamespaceString& nss, BSONObj query) final;
+    BSONObj deleteWithPreimage(const NamespaceString& nss,
+                               const EncryptionInformation& ei,
+                               const write_ops::DeleteCommandRequest& deleteRequest) final;
+
+    BSONObj updateWithPreimage(const NamespaceString& nss,
+                               const EncryptionInformation& ei,
+                               const write_ops::UpdateCommandRequest& updateRequest) final;
 
 private:
     OperationContext* _opCtx;
     repl::StorageInterface* _storage;
 };
 
-BSONObj FLEQueryTestImpl::getById(const NamespaceString& nss, PrfBlock block) {
-    auto obj = BSON("_id" << BSONBinData(block.data(), block.size(), BinDataGeneral));
+BSONObj FLEQueryTestImpl::getById(const NamespaceString& nss, BSONElement element) {
+    auto obj = BSON("_id" << element);
     auto swDoc = _storage->findById(_opCtx, nss, obj.firstElement());
     if (swDoc.getStatus() == ErrorCodes::NoSuchKey) {
         return BSONObj();
@@ -109,15 +123,44 @@ void FLEQueryTestImpl::insertDocument(const NamespaceString& nss,
     uassertStatusOK(status);
 }
 
-BSONObj FLEQueryTestImpl::deleteWithPreimage(const NamespaceString& nss, BSONObj query) {
+BSONObj FLEQueryTestImpl::deleteWithPreimage(const NamespaceString& nss,
+                                             const EncryptionInformation& ei,
+                                             const write_ops::DeleteCommandRequest& deleteRequest) {
     // A limit of the API, we can delete by _id and get the pre-image so we limit our unittests to
     // this
-    ASSERT_EQ("_id"_sd, query.firstElementFieldNameStringData());
+    ASSERT_EQ(deleteRequest.getDeletes().size(), 1);
+    auto deleteOpEntry = deleteRequest.getDeletes()[0];
+    ASSERT_EQ("_id"_sd, deleteOpEntry.getQ().firstElementFieldNameStringData());
 
-    auto doc = uassertStatusOK(_storage->deleteById(_opCtx, nss, query.firstElement()));
+    auto swDoc = _storage->deleteById(_opCtx, nss, deleteOpEntry.getQ().firstElement());
 
-    return doc;
+    // Some of the unit tests delete documents that do not exist
+    if (swDoc.getStatus() == ErrorCodes::NoSuchKey) {
+        return BSONObj();
+    }
+
+    return uassertStatusOK(swDoc);
 }
+
+BSONObj FLEQueryTestImpl::updateWithPreimage(const NamespaceString& nss,
+                                             const EncryptionInformation& ei,
+                                             const write_ops::UpdateCommandRequest& updateRequest) {
+    // A limit of the API, we can delete by _id and get the pre-image so we limit our unittests to
+    // this
+    ASSERT_EQ(updateRequest.getUpdates().size(), 1);
+    auto updateOpEntry = updateRequest.getUpdates()[0];
+    ASSERT_EQ("_id"_sd, updateOpEntry.getQ().firstElementFieldNameStringData());
+
+    BSONObj preimage = getById(nss, updateOpEntry.getQ().firstElement());
+
+    uassertStatusOK(_storage->upsertById(_opCtx,
+                                         nss,
+                                         updateOpEntry.getQ().firstElement(),
+                                         updateOpEntry.getU().getUpdateModifier()));
+
+    return preimage;
+}
+
 
 FLEIndexKey indexKey(KeyMaterial{0x6e, 0xda, 0x88, 0xc8, 0x49, 0x6e, 0xc9, 0x90, 0xf5, 0xd5, 0x51,
                                  0x8d, 0xd2, 0xad, 0x6f, 0x3d, 0x9c, 0x33, 0xb6, 0x05, 0x59, 0x04,
@@ -194,9 +237,15 @@ protected:
 
     void doSingleDelete(int id);
 
+    void doSingleUpdate(int id, BSONElement element);
+    void doSingleUpdate(int id, BSONObj obj);
+    void doSingleUpdateWithUpdateDoc(int id, BSONObj update);
+
     using ValueGenerator = std::function<std::string(StringData fieldName, uint64_t row)>;
 
     void doSingleWideInsert(int id, uint64_t fieldCount, ValueGenerator func);
+
+    void validateDocument(int id, boost::optional<BSONObj> doc);
 
     ESCTwiceDerivedTagToken getTestESCToken(BSONElement value);
     ESCTwiceDerivedTagToken getTestESCToken(BSONObj obj);
@@ -402,6 +451,28 @@ void FleCrudTest::doSingleWideInsert(int id, uint64_t fieldCount, ValueGenerator
     processInsert(_queryImpl.get(), _edcNs, serverPayload, efc, result);
 }
 
+
+void FleCrudTest::validateDocument(int id, boost::optional<BSONObj> doc) {
+
+    auto doc1 = BSON("_id" << id);
+    auto updatedDoc = _queryImpl->getById(_edcNs, doc1.firstElement());
+
+    std::cout << "Updated Doc: " << updatedDoc << std::endl;
+
+    auto efc = getTestEncryptedFieldConfig();
+    FLEClientCrypto::validateDocument(updatedDoc, efc, &_keyVault);
+
+    // Decrypt document
+    auto decryptedDoc = FLEClientCrypto::decryptDocument(updatedDoc, &_keyVault);
+
+    if (doc.has_value()) {
+        // Remove this so the round-trip is clean
+        decryptedDoc = decryptedDoc.removeField(kSafeContent);
+
+        ASSERT_BSONOBJ_EQ(doc.value(), decryptedDoc);
+    }
+}
+
 // Use different keys for index and user
 std::vector<char> generateSinglePlaceholder(BSONElement value) {
     FLE2EncryptionPlaceholder ep;
@@ -426,6 +497,7 @@ void FleCrudTest::doSingleInsert(int id, BSONElement element) {
     auto buf = generateSinglePlaceholder(element);
     BSONObjBuilder builder;
     builder.append("_id", id);
+    builder.append("counter", 1);
     builder.append("plainText", "sample");
     builder.appendBinData("encrypted", buf.size(), BinDataType::Encrypt, buf.data());
 
@@ -444,6 +516,40 @@ void FleCrudTest::doSingleInsert(int id, BSONObj obj) {
     doSingleInsert(id, obj.firstElement());
 }
 
+void FleCrudTest::doSingleUpdate(int id, BSONObj obj) {
+    doSingleUpdate(id, obj.firstElement());
+}
+
+void FleCrudTest::doSingleUpdate(int id, BSONElement element) {
+    auto buf = generateSinglePlaceholder(element);
+    BSONObjBuilder builder;
+    builder.append("$inc", BSON("counter" << 1));
+    builder.append("$set",
+                   BSON("encrypted" << BSONBinData(buf.data(), buf.size(), BinDataType::Encrypt)));
+    auto clientDoc = builder.obj();
+    auto result = FLEClientCrypto::generateInsertOrUpdateFromPlaceholders(clientDoc, &_keyVault);
+
+    doSingleUpdateWithUpdateDoc(id, result);
+}
+
+void FleCrudTest::doSingleUpdateWithUpdateDoc(int id, BSONObj update) {
+    auto efc = getTestEncryptedFieldConfig();
+    auto doc = EncryptionInformationHelpers::encryptionInformationSerializeForDelete(
+        _edcNs, efc, &_keyVault);
+    auto ei = EncryptionInformation::parse(IDLParserErrorContext("test"), doc);
+
+    write_ops::UpdateOpEntry entry;
+    entry.setQ(BSON("_id" << id));
+    entry.setU(
+        write_ops::UpdateModification(update, write_ops::UpdateModification::ClassicTag{}, false));
+
+    write_ops::UpdateCommandRequest updateRequest(_edcNs);
+    updateRequest.setUpdates({entry});
+    updateRequest.getWriteCommandRequestBase().setEncryptionInformation(ei);
+
+    processUpdate(_queryImpl.get(), updateRequest);
+}
+
 void FleCrudTest::doSingleDelete(int id) {
 
     auto efc = getTestEncryptedFieldConfig();
@@ -453,7 +559,15 @@ void FleCrudTest::doSingleDelete(int id) {
 
     auto ei = EncryptionInformation::parse(IDLParserErrorContext("test"), doc);
 
-    processDelete(_queryImpl.get(), _edcNs, ei, BSON("_id" << id));
+    write_ops::DeleteOpEntry entry;
+    entry.setQ(BSON("_id" << id));
+    entry.setMulti(false);
+
+    write_ops::DeleteCommandRequest deleteRequest(_edcNs);
+    deleteRequest.setDeletes({entry});
+    deleteRequest.getWriteCommandRequestBase().setEncryptionInformation(ei);
+
+    processDelete(_queryImpl.get(), deleteRequest);
 }
 
 // Insert one document
@@ -652,6 +766,96 @@ TEST_F(FleCrudTest, InsertTwoDifferentAndDeleteTwo) {
                    1,
                    1,
                    1);
+}
+
+// Insert one document but delete another document
+TEST_F(FleCrudTest, InsertOneButDeleteAnother) {
+
+    doSingleInsert(1,
+                   BSON("encrypted"
+                        << "secret"));
+    assertDocumentCounts(1, 1, 0, 1);
+
+    doSingleDelete(2);
+
+    assertDocumentCounts(1, 1, 0, 1);
+}
+
+// Update one document
+TEST_F(FleCrudTest, UpdateOne) {
+
+    doSingleInsert(1,
+                   BSON("encrypted"
+                        << "secret"));
+
+    assertDocumentCounts(1, 1, 0, 1);
+
+    doSingleUpdate(1,
+                   BSON("encrypted"
+                        << "top secret"));
+
+    assertDocumentCounts(1, 2, 1, 3);
+
+    validateDocument(1,
+                     BSON("_id" << 1 << "counter" << 2 << "plainText"
+                                << "sample"
+                                << "encrypted"
+                                << "top secret"));
+}
+
+// Update one document but to the same value
+TEST_F(FleCrudTest, UpdateOneSameValue) {
+
+    doSingleInsert(1,
+                   BSON("encrypted"
+                        << "secret"));
+
+    assertDocumentCounts(1, 1, 0, 1);
+
+    doSingleUpdate(1,
+                   BSON("encrypted"
+                        << "secret"));
+
+    assertDocumentCounts(1, 2, 1, 3);
+
+    validateDocument(1,
+                     BSON("_id" << 1 << "counter" << 2 << "plainText"
+                                << "sample"
+                                << "encrypted"
+                                << "secret"));
+}
+
+// Rename safeContent
+TEST_F(FleCrudTest, RenameSafeContent) {
+
+    doSingleInsert(1,
+                   BSON("encrypted"
+                        << "secret"));
+
+    assertDocumentCounts(1, 1, 0, 1);
+
+    BSONObjBuilder builder;
+    builder.append("$inc", BSON("counter" << 1));
+    builder.append("$rename", BSON(kSafeContent << "foo"));
+    auto result = builder.obj();
+
+    ASSERT_THROWS_CODE(doSingleUpdateWithUpdateDoc(1, result), DBException, 6371506);
+}
+
+// Mess with __safeContent__ and ensure the update errors
+TEST_F(FleCrudTest, SetSafeContent) {
+    doSingleInsert(1,
+                   BSON("encrypted"
+                        << "secret"));
+
+    assertDocumentCounts(1, 1, 0, 1);
+
+    BSONObjBuilder builder;
+    builder.append("$inc", BSON("counter" << 1));
+    builder.append("$set", BSON(kSafeContent << "foo"));
+    auto result = builder.obj();
+
+    ASSERT_THROWS_CODE(doSingleUpdateWithUpdateDoc(1, result), DBException, 6371507);
 }
 
 }  // namespace

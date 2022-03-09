@@ -572,14 +572,13 @@ BSONObj encryptDocument(BSONObj obj, FLEKeyVault* keyVault) {
     // Start Server Side
     auto serverPayload = EDCServerCollection::getEncryptedFieldInfo(result);
 
-    // TODO set count based on EmuBinary
     for (auto& payload : serverPayload) {
         payload.count = 1;
     }
 
     // Finalize document for insert
     auto finalDoc = EDCServerCollection::finalizeForInsert(result, serverPayload);
-    ASSERT_EQ(finalDoc["__safeContent__"].type(), Array);
+    ASSERT_EQ(finalDoc[kSafeContent].type(), Array);
     return finalDoc;
 }
 
@@ -610,7 +609,7 @@ void roundTripTest(BSONObj doc, BSONType type) {
     auto decryptedDoc = FLEClientCrypto::decryptDocument(finalDoc, &keyVault);
 
     // Remove this so the round-trip is clean
-    decryptedDoc = decryptedDoc.removeField("__safeContent__");
+    decryptedDoc = decryptedDoc.removeField(kSafeContent);
 
     ASSERT_BSONOBJ_EQ(inputDoc, decryptedDoc);
 }
@@ -897,16 +896,16 @@ TEST(FLE_EDC, DuplicateSafeContent_CompatibleType) {
     auto doc = BSON("value"
                     << "123456");
     auto element = doc.firstElement();
-    auto inputDoc = BSON("__safeContent__" << BSON_ARRAY(1 << 2 << 4) << "encrypted" << element);
+    auto inputDoc = BSON(kSafeContent << BSON_ARRAY(1 << 2 << 4) << "encrypted" << element);
 
     auto buf = generatePlaceholder(element);
     BSONObjBuilder builder;
-    builder.append("__safeContent__", BSON_ARRAY(1 << 2 << 4));
+    builder.append(kSafeContent, BSON_ARRAY(1 << 2 << 4));
     builder.appendBinData("encrypted", buf.size(), BinDataType::Encrypt, buf.data());
 
     auto finalDoc = encryptDocument(builder.obj(), &keyVault);
 
-    ASSERT_EQ(finalDoc["__safeContent__"].type(), Array);
+    ASSERT_EQ(finalDoc[kSafeContent].type(), Array);
     ASSERT_EQ(finalDoc["encrypted"].type(), BinData);
     ASSERT_TRUE(finalDoc["encrypted"].isBinData(BinDataType::Encrypt));
 
@@ -915,7 +914,7 @@ TEST(FLE_EDC, DuplicateSafeContent_CompatibleType) {
 
     std::cout << "Final Doc: " << decryptedDoc << std::endl;
 
-    auto elements = finalDoc["__safeContent__"].Array();
+    auto elements = finalDoc[kSafeContent].Array();
     ASSERT_EQ(elements.size(), 4);
     ASSERT_EQ(elements[0].safeNumberInt(), 1);
     ASSERT_EQ(elements[1].safeNumberInt(), 2);
@@ -934,7 +933,7 @@ TEST(FLE_EDC, DuplicateSafeContent_IncompatibleType) {
 
     auto buf = generatePlaceholder(element);
     BSONObjBuilder builder;
-    builder.append("__safeContent__", 123456);
+    builder.append(kSafeContent, 123456);
     builder.appendBinData("encrypted", buf.size(), BinDataType::Encrypt, buf.data());
 
     ASSERT_THROWS_CODE(encryptDocument(builder.obj(), &keyVault), DBException, 6373510);
@@ -1056,11 +1055,11 @@ TEST(IndexedFields, FetchTwoLevels) {
     auto doc = BSON("value"
                     << "123456");
     auto element = doc.firstElement();
-    auto inputDoc = BSON("__safeContent__" << BSON_ARRAY(1 << 2 << 4) << "encrypted" << element);
+    auto inputDoc = BSON(kSafeContent << BSON_ARRAY(1 << 2 << 4) << "encrypted" << element);
 
     auto buf = generatePlaceholder(element);
     BSONObjBuilder builder;
-    builder.append("__safeContent__", BSON_ARRAY(1 << 2 << 4));
+    builder.append(kSafeContent, BSON_ARRAY(1 << 2 << 4));
     builder.appendBinData("encrypted", buf.size(), BinDataType::Encrypt, buf.data());
     {
         BSONObjBuilder sub(builder.subobjStart("nested"));
@@ -1144,6 +1143,317 @@ TEST(DeleteTokens, CorruptDelete) {
                                                   << "b")));
 
     ASSERT_THROWS_CODE(EncryptionInformationHelpers::getDeleteTokens(ns, ei), DBException, 6371310);
+}
+
+// Verify we can compare two list of tags correctly
+TEST(TagDelta, Basic) {
+    auto empty = ConstDataRange(nullptr, nullptr);
+    auto v1 = ConstDataRange(testValue);
+    auto v2 = ConstDataRange(testValue2);
+    std::vector<EDCIndexedFields> emptyFields = {};
+    std::vector<EDCIndexedFields> origFields = {{empty, "a"}, {empty, "b"}};
+    std::vector<EDCIndexedFields> newFields = {{empty, "a"}, {empty, "b"}, {empty, "c"}};
+    std::vector<EDCIndexedFields> newFieldsReverse = {{empty, "c"}, {empty, "b"}, {empty, "a"}};
+    std::vector<EDCIndexedFields> origFields2 = {{empty, "a"}, {v2, "b"}};
+    std::vector<EDCIndexedFields> origFields3 = {{v1, "a"}, {v2, "b"}};
+    std::vector<EDCIndexedFields> origFields4 = {{v2, "a"}, {v1, "b"}};
+
+    {
+        auto removedFields = EDCServerCollection::getRemovedTags(origFields, origFields);
+        ASSERT_EQ(removedFields.size(), 0);
+    }
+
+    {
+        auto removedFields = EDCServerCollection::getRemovedTags(origFields, newFields);
+        ASSERT_EQ(removedFields.size(), 0);
+    }
+
+    {
+        auto removedFields = EDCServerCollection::getRemovedTags(newFields, origFields);
+        ASSERT_EQ(removedFields.size(), 1);
+        ASSERT_EQ(removedFields[0].fieldPathName, "c");
+    }
+
+    {
+        auto removedFields = EDCServerCollection::getRemovedTags(emptyFields, origFields);
+        ASSERT_EQ(removedFields.size(), 0);
+    }
+
+    {
+        auto removedFields = EDCServerCollection::getRemovedTags(newFields, emptyFields);
+        ASSERT_EQ(removedFields.size(), 3);
+    }
+
+    {
+        auto removedFields = EDCServerCollection::getRemovedTags(newFields, newFieldsReverse);
+        ASSERT_EQ(removedFields.size(), 0);
+    }
+
+    {
+        auto removedFields = EDCServerCollection::getRemovedTags(origFields, origFields2);
+        ASSERT_EQ(removedFields.size(), 1);
+        ASSERT_EQ(removedFields[0].fieldPathName, "b");
+    }
+
+
+    {
+        auto removedFields = EDCServerCollection::getRemovedTags(origFields, origFields2);
+        ASSERT_EQ(removedFields.size(), 1);
+        ASSERT_EQ(removedFields[0].fieldPathName, "b");
+    }
+
+
+    {
+        auto removedFields = EDCServerCollection::getRemovedTags(origFields2, origFields3);
+        ASSERT_EQ(removedFields.size(), 1);
+        ASSERT_EQ(removedFields[0].fieldPathName, "a");
+    }
+
+    {
+        auto removedFields = EDCServerCollection::getRemovedTags(origFields3, origFields3);
+        ASSERT_EQ(removedFields.size(), 0);
+    }
+
+    {
+        auto removedFields = EDCServerCollection::getRemovedTags(origFields3, origFields4);
+        ASSERT_EQ(removedFields.size(), 2);
+        ASSERT_EQ(removedFields[0].fieldPathName, "a");
+        ASSERT_EQ(removedFields[1].fieldPathName, "b");
+    }
+}
+
+TEST(EDC, ValidateDocument) {
+    EncryptedFieldConfig efc = getTestEncryptedFieldConfig();
+
+    TestKeyVault keyVault;
+
+    BSONObjBuilder builder;
+    builder.append("plainText", "sample");
+    {
+        auto doc = BSON("a"
+                        << "secret");
+        auto element = doc.firstElement();
+        auto buf = generatePlaceholder(element);
+        builder.appendBinData("encrypted", buf.size(), BinDataType::Encrypt, buf.data());
+    }
+    {
+        auto doc = BSON("a"
+                        << "top secret");
+        auto element = doc.firstElement();
+
+        BSONObjBuilder sub(builder.subobjStart("nested"));
+        auto buf = generatePlaceholder(element);
+        builder.appendBinData("encrypted", buf.size(), BinDataType::Encrypt, buf.data());
+        // TODO - add support for unindexed
+    }
+
+    auto finalDoc = encryptDocument(builder.obj(), &keyVault);
+
+    // Positive - Encrypted Doc
+    FLEClientCrypto::validateDocument(finalDoc, efc, &keyVault);
+
+    // Positive - Unencrypted Doc
+    auto unencryptedDocument = BSON("a" << 123);
+    FLEClientCrypto::validateDocument(unencryptedDocument, efc, &keyVault);
+
+    // Remove all tags
+    {
+        auto testDoc = finalDoc.removeField(kSafeContent);
+
+        ASSERT_THROWS_CODE(
+            FLEClientCrypto::validateDocument(testDoc, efc, &keyVault), DBException, 6371506);
+    }
+
+    // Remove an encrypted field
+    {
+        auto testDoc = finalDoc.removeField("encrypted");
+        ASSERT_THROWS_CODE(
+            FLEClientCrypto::validateDocument(testDoc, efc, &keyVault), DBException, 6371510);
+    }
+
+    // Remove a tag
+    {
+        BSONObj sc2 = BSON(kSafeContent << BSON_ARRAY(finalDoc[kSafeContent].Array()[0]));
+        auto testDoc = finalDoc.addFields(sc2);
+        ASSERT_THROWS_CODE(
+            FLEClientCrypto::validateDocument(testDoc, efc, &keyVault), DBException, 6371516);
+    }
+
+    // Make safecontent an int
+    {
+        BSONObj sc2 = BSON(kSafeContent << 1234);
+        auto testDoc = finalDoc.addFields(sc2);
+        ASSERT_THROWS_CODE(
+            FLEClientCrypto::validateDocument(testDoc, efc, &keyVault), DBException, 6371507);
+    }
+
+    // Replace a tag
+    {
+        PrfBlock block;
+        BSONObj sc2 = BSON(kSafeContent
+                           << BSON_ARRAY(finalDoc[kSafeContent].Array()[0] << BSONBinData(
+                                             &block, sizeof(block), BinDataType::BinDataGeneral)));
+        auto testDoc = finalDoc.addFields(sc2);
+
+        ASSERT_THROWS_CODE(
+            FLEClientCrypto::validateDocument(testDoc, efc, &keyVault), DBException, 6371510);
+    }
+
+    // Wrong tag type
+    {
+        BSONObj sc2 = BSON(kSafeContent << BSON_ARRAY(123));
+        auto testDoc = finalDoc.addFields(sc2);
+
+        ASSERT_THROWS_CODE(
+            FLEClientCrypto::validateDocument(testDoc, efc, &keyVault), DBException, 6371515);
+    }
+}
+
+BSONObj encryptUpdateDocument(BSONObj obj, FLEKeyVault* keyVault) {
+    auto result = FLEClientCrypto::generateInsertOrUpdateFromPlaceholders(obj, keyVault);
+
+    // Start Server Side
+    auto serverPayload = EDCServerCollection::getEncryptedFieldInfo(result);
+
+    for (auto& payload : serverPayload) {
+        payload.count = 1;
+    }
+
+    return EDCServerCollection::finalizeForUpdate(result, serverPayload);
+}
+
+// Test update with no $push
+TEST(FLE_Update, Basic) {
+    TestKeyVault keyVault;
+
+    auto doc = BSON("value"
+                    << "123456");
+    auto element = doc.firstElement();
+
+    auto buf = generatePlaceholder(element);
+    auto inputDoc = BSON(
+        "$set" << BSON("encrypted" << BSONBinData(buf.data(), buf.size(), BinDataType::Encrypt)));
+    auto finalDoc = encryptUpdateDocument(inputDoc, &keyVault);
+
+    std::cout << finalDoc << std::endl;
+
+    ASSERT_TRUE(finalDoc["$set"]["encrypted"].isBinData(BinDataType::Encrypt));
+    ASSERT_TRUE(finalDoc["$push"][kSafeContent]["$each"].type() == Array);
+    ASSERT_EQ(finalDoc["$push"][kSafeContent]["$each"].Array().size(), 1);
+    ASSERT_TRUE(
+        finalDoc["$push"][kSafeContent]["$each"].Array()[0].isBinData(BinDataType::BinDataGeneral));
+}
+
+// Test update with no crypto
+TEST(FLE_Update, Empty) {
+    TestKeyVault keyVault;
+
+    auto inputDoc = BSON("$set" << BSON("count" << 1));
+    auto finalDoc = encryptUpdateDocument(inputDoc, &keyVault);
+
+    std::cout << finalDoc << std::endl;
+
+    ASSERT_EQ(finalDoc["$set"]["count"].type(), NumberInt);
+    ASSERT(finalDoc["$push"].eoo());
+}
+
+TEST(FLE_Update, BadPush) {
+    TestKeyVault keyVault;
+
+    auto doc = BSON("value"
+                    << "123456");
+    auto element = doc.firstElement();
+
+    auto buf = generatePlaceholder(element);
+    auto inputDoc = BSON(
+        "$push" << 123 << "$set"
+                << BSON("encrypted" << BSONBinData(buf.data(), buf.size(), BinDataType::Encrypt)));
+    ASSERT_THROWS_CODE(encryptUpdateDocument(inputDoc, &keyVault), DBException, 6371511);
+}
+
+TEST(FLE_Update, PushToSafeContent) {
+    TestKeyVault keyVault;
+
+    auto doc = BSON("value"
+                    << "123456");
+    auto element = doc.firstElement();
+
+    auto buf = generatePlaceholder(element);
+    auto inputDoc = BSON(
+        "$push" << 123 << "$set"
+                << BSON("encrypted" << BSONBinData(buf.data(), buf.size(), BinDataType::Encrypt)));
+    ASSERT_THROWS_CODE(encryptUpdateDocument(inputDoc, &keyVault), DBException, 6371511);
+}
+
+TEST(FLE_Update, PushToOtherfield) {
+    TestKeyVault keyVault;
+
+    auto doc = BSON("value"
+                    << "123456");
+    auto element = doc.firstElement();
+
+    auto buf = generatePlaceholder(element);
+    auto inputDoc = BSON(
+        "$push" << BSON("abc" << 123) << "$set"
+                << BSON("encrypted" << BSONBinData(buf.data(), buf.size(), BinDataType::Encrypt)));
+    auto finalDoc = encryptUpdateDocument(inputDoc, &keyVault);
+    std::cout << finalDoc << std::endl;
+
+    ASSERT_TRUE(finalDoc["$set"]["encrypted"].isBinData(BinDataType::Encrypt));
+    ASSERT_TRUE(finalDoc["$push"]["abc"].type() == NumberInt);
+    ASSERT_TRUE(finalDoc["$push"][kSafeContent]["$each"].type() == Array);
+    ASSERT_EQ(finalDoc["$push"][kSafeContent]["$each"].Array().size(), 1);
+    ASSERT_TRUE(
+        finalDoc["$push"][kSafeContent]["$each"].Array()[0].isBinData(BinDataType::BinDataGeneral));
+}
+
+TEST(FLE_Update, PullTokens) {
+    TestKeyVault keyVault;
+    NamespaceString ns("test.test");
+    EncryptedFieldConfig efc = getTestEncryptedFieldConfig();
+
+    auto obj =
+        EncryptionInformationHelpers::encryptionInformationSerializeForDelete(ns, efc, &keyVault);
+
+    auto tokenMap = EncryptionInformationHelpers::getDeleteTokens(
+        ns, EncryptionInformation::parse(IDLParserErrorContext("foo"), obj));
+
+    ASSERT_EQ(tokenMap.size(), 2);
+
+    ASSERT(tokenMap.contains("nested.encrypted"));
+    ASSERT(tokenMap.contains("encrypted"));
+
+
+    auto doc = BSON("value"
+                    << "123456");
+    auto element = doc.firstElement();
+    auto inputDoc = BSON(kSafeContent << BSON_ARRAY(1 << 2 << 4) << "encrypted" << element);
+
+    auto buf = generatePlaceholder(element);
+    BSONObjBuilder builder;
+    builder.append(kSafeContent, BSON_ARRAY(1 << 2 << 4));
+    builder.appendBinData("encrypted", buf.size(), BinDataType::Encrypt, buf.data());
+    {
+        BSONObjBuilder sub(builder.subobjStart("nested"));
+        sub.appendBinData("encrypted", buf.size(), BinDataType::Encrypt, buf.data());
+    }
+    auto encDoc = encryptDocument(builder.obj(), &keyVault);
+
+    auto removedFields = EDCServerCollection::getEncryptedIndexedFields(encDoc);
+
+    auto pullUpdate1 = EDCServerCollection::generateUpdateToRemoveTags(removedFields, tokenMap);
+
+    std::cout << "PULL: " << pullUpdate1 << std::endl;
+
+    ASSERT_EQ(pullUpdate1["$pull"].type(), Object);
+    ASSERT_EQ(pullUpdate1["$pull"][kSafeContent].type(), Object);
+    ASSERT_EQ(pullUpdate1["$pull"][kSafeContent]["$in"].type(), Array);
+
+    // Verify we fail when we are missing tokens for affected fields
+    tokenMap.clear();
+    ASSERT_THROWS_CODE(EDCServerCollection::generateUpdateToRemoveTags(removedFields, tokenMap),
+                       DBException,
+                       6371513);
 }
 
 }  // namespace mongo

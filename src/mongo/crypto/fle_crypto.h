@@ -727,6 +727,23 @@ public:
      * Decrypts a document. Only supports FLE2.
      */
     static BSONObj decryptDocument(BSONObj& doc, FLEKeyVault* keyVault);
+
+    /**
+     * Validate the tags array exists and is of the right type.
+     */
+    static void validateTagsArray(BSONObj& doc);
+
+    /**
+     * Validate document
+     *
+     * Checks performed
+     * 1. Fields, if present, are indexed the way specified
+     * 2. All fields can be decrypted successfully
+     * 3. There is a tag for each field and no extra tags
+     */
+    static void validateDocument(BSONObj& doc,
+                                 const EncryptedFieldConfig& efc,
+                                 FLEKeyVault* keyVault);
 };
 
 /*
@@ -779,11 +796,11 @@ struct ECOCCompactionDocument {
  * Note:
  * - ECOC is a set of documents, they are unordered
  */
-class ECOCollection {
+class ECOCCollection {
 public:
     static BSONObj generateDocument(StringData fieldName, ConstDataRange payload);
 
-    static ECOCCompactionDocument parseAndDecrypt(BSONObj& doc, ECOCToken token);
+    static ECOCCompactionDocument parseAndDecrypt(const BSONObj& doc, ECOCToken token);
 };
 
 
@@ -854,6 +871,26 @@ struct EDCIndexedFields {
     std::string fieldPathName;
 };
 
+inline bool operator<(const EDCIndexedFields& left, const EDCIndexedFields& right) {
+    if (left.fieldPathName == right.fieldPathName) {
+        if (left.value.length() != right.value.length()) {
+            return left.value.length() < right.value.length();
+        }
+
+        if (left.value.length() == 0 && right.value.length() == 0) {
+            return false;
+        }
+
+        return memcmp(left.value.data(), right.value.data(), left.value.length()) < 0;
+    }
+    return left.fieldPathName < right.fieldPathName;
+}
+
+struct FLEDeleteToken {
+    ECOCToken ecocToken;
+    ServerDataEncryptionLevel1Token serverEncryptionToken;
+};
+
 /**
  * Manipulates the EDC collection.
  *
@@ -877,6 +914,7 @@ public:
      */
     static PrfBlock generateTag(EDCTwiceDerivedToken edcTwiceDerived, FLECounter count);
     static PrfBlock generateTag(const EDCServerPayloadInfo& payload);
+    static PrfBlock generateTag(const FLE2IndexedEqualityEncryptedValue& indexedValue);
 
     /**
      * Consumes a payload from a MongoDB client for insert.
@@ -888,15 +926,47 @@ public:
                                      const std::vector<EDCServerPayloadInfo>& serverPayload);
 
     /**
+     * Consumes a payload from a MongoDB client for update, modifier update style.
+     *
+     * Converts any FLE2InsertUpdatePayload found to the final insert payload. Adds or updates the
+     * the existing $push to add __safeContent__ tags.
+     */
+    static BSONObj finalizeForUpdate(const BSONObj& doc,
+                                     const std::vector<EDCServerPayloadInfo>& serverPayload);
+
+    /**
+     * Generate an update modifier document with $pull to remove stale tags.
+     *
+     * Generates:
+     *
+     * { $pull : {__safeContent__ : {$in : [tag..] } } }
+     */
+    static BSONObj generateUpdateToRemoveTags(const std::vector<EDCIndexedFields>& removedFields,
+                                              const StringMap<FLEDeleteToken>& tokenMap);
+
+    /**
      * Get a list of encrypted, indexed fields.
      */
     static std::vector<EDCIndexedFields> getEncryptedIndexedFields(BSONObj& obj);
+
+    /**
+     * Get a list of tags to remove and add.
+     *
+     * An update is performed in two steps:
+     * 1. Perform the update of the encrypted fields
+     *    - After step 1, the updated fields are correct, new tags have been added to
+     *    __safeContent__ but the __safeContent__ still contains stale tags.
+     * 2. Remove the old tags
+     *
+     * To do step 2, we need a list of removed tags. To do this we get a list of indexed encrypted
+     * fields in both and subtract the fields in the newDocument from originalDocument. The
+     * remaining fields are the ones we need to remove.
+     */
+    static std::vector<EDCIndexedFields> getRemovedTags(
+        std::vector<EDCIndexedFields>& originalDocument,
+        std::vector<EDCIndexedFields>& newDocument);
 };
 
-struct FLEDeleteToken {
-    ECOCToken ecocToken;
-    ServerDataEncryptionLevel1Token serverEncryptionToken;
-};
 
 class EncryptionInformationHelpers {
 public:
@@ -904,14 +974,17 @@ public:
      * Serialize EncryptedFieldConfig to a EncryptionInformation with
      * EncryptionInformation.schema = { nss: EncryptedFieldConfig}
      */
-    static BSONObj encryptionInformationSerialize(NamespaceString& nss, EncryptedFieldConfig& ef);
+    static BSONObj encryptionInformationSerialize(const NamespaceString& nss,
+                                                  const EncryptedFieldConfig& ef);
+    static BSONObj encryptionInformationSerialize(const NamespaceString& nss,
+                                                  const BSONObj& encryptedFields);
 
     /**
      * Serialize EncryptionInformation with EncryptionInformation.schema and a map of delete tokens
      * for each field in EncryptedFieldConfig.
      */
-    static BSONObj encryptionInformationSerializeForDelete(NamespaceString& nss,
-                                                           EncryptedFieldConfig& ef,
+    static BSONObj encryptionInformationSerializeForDelete(const NamespaceString& nss,
+                                                           const EncryptedFieldConfig& ef,
                                                            FLEKeyVault* keyVault);
 
     /**

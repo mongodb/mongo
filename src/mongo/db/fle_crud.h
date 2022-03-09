@@ -72,12 +72,12 @@ public:
     virtual ~FLEQueryInterface();
 
     /**
-     * Retrieve a single document by _id == PrfBlock from nss.
+     * Retrieve a single document by _id == BSONElement from nss.
      *
      * Returns an empty BSONObj if no document is found.
      * Expected to throw an error if it detects more then one documents.
      */
-    virtual BSONObj getById(const NamespaceString& nss, PrfBlock block) = 0;
+    virtual BSONObj getById(const NamespaceString& nss, BSONElement element) = 0;
 
     /**
      * Count the documents in the collection.
@@ -90,7 +90,7 @@ public:
      * Insert a document into the given collection.
      *
      * If translateDuplicateKey == true and the insert returns DuplicateKey, returns
-     * FLEStateCollectionContention instead
+     * FLEStateCollectionContention instead.
      */
     virtual void insertDocument(const NamespaceString& nss,
                                 BSONObj obj,
@@ -99,9 +99,22 @@ public:
     /**
      * Delete a single document with the given query.
      *
-     * Returns the pre-image of the deleted document.
+     * Returns the pre-image of the deleted document. If no documents were deleted, returns an empty
+     * BSON object.
      */
-    virtual BSONObj deleteWithPreimage(const NamespaceString& nss, BSONObj query) = 0;
+    virtual BSONObj deleteWithPreimage(const NamespaceString& nss,
+                                       const EncryptionInformation& ei,
+                                       const write_ops::DeleteCommandRequest& deleteRequest) = 0;
+
+    /**
+     * Update a single document with the given query and update operators.
+     *
+     * Returns the pre-image of the updated document. If no documents were updated, returns an empty
+     * BSON object.
+     */
+    virtual BSONObj updateWithPreimage(const NamespaceString& nss,
+                                       const EncryptionInformation& ei,
+                                       const write_ops::UpdateCommandRequest& updateRequest) = 0;
 };
 
 /**
@@ -120,8 +133,15 @@ void processInsert(FLEQueryInterface* queryImpl,
  *
  * Used by unit tests.
  */
-void processDelete(FLEQueryInterface* queryImpl,
-                   const NamespaceString& edcNss,
-                   const EncryptionInformation& ei,
-                   BSONObj deleteQuery);
+uint64_t processDelete(FLEQueryInterface* queryImpl,
+                       const write_ops::DeleteCommandRequest& deleteRequest);
+
+/**
+ * Process a FLE Update with the query interface
+ *
+ * Used by unit tests.
+ */
+uint64_t processUpdate(FLEQueryInterface* queryImpl,
+                       const write_ops::UpdateCommandRequest& updateRequest);
+
 }  // namespace mongo
