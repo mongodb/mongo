@@ -490,8 +490,8 @@ __wt_rec_time_window_clear_obsolete(
       session, (upd_select != NULL && vpack == NULL) || (upd_select == NULL && vpack != NULL));
     tw = upd_select != NULL ? &upd_select->tw : &vpack->tw;
 
-    /* Return if the time window is empty. */
-    if (WT_TIME_WINDOW_IS_EMPTY(tw))
+    /* Return if the start time window is empty. */
+    if (!WT_TIME_WINDOW_HAS_START(tw))
         return;
 
     /*
