@@ -148,6 +148,9 @@ const NamespaceString NamespaceString::kConfigImagesNamespace(NamespaceString::k
 const NamespaceString NamespaceString::kConfigsvrCoordinatorsNamespace(
     NamespaceString::kConfigDb, "sharding_configsvr_coordinators");
 
+const NamespaceString NamespaceString::kUserWritesCriticalSectionsNamespace(
+    NamespaceString::kConfigDb, "user_writes_critical_sections");
+
 bool NamespaceString::isListCollectionsCursorNS() const {
     return coll() == listCollectionsCursorCol;
 }

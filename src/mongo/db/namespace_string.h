@@ -207,6 +207,9 @@ public:
     // Namespace used for persisting ConfigsvrCoordinator state documents.
     static const NamespaceString kConfigsvrCoordinatorsNamespace;
 
+    // Namespace for storing user write blocking critical section documents
+    static const NamespaceString kUserWritesCriticalSectionsNamespace;
+
     /**
      * Constructs an empty NamespaceString.
      */

@@ -100,7 +100,7 @@ public:
     void aboutToDelete(OperationContext* opCtx,
                        const NamespaceString& nss,
                        const UUID& uuid,
-                       const BSONObj& doc) final {}
+                       const BSONObj& doc) final;
 
     void onInternalOpMessage(OperationContext* opCtx,
                              const NamespaceString& nss,
@@ -209,8 +209,7 @@ public:
                                      const repl::OpTime& newCommitPoint) final {}
 
 private:
-    void _onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo) final {
-    }
+    void _onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo) final;
 
     // uasserts that a write to the given namespace is allowed under the current user write blocking
     // setting.
