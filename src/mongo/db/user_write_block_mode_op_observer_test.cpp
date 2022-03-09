@@ -163,10 +163,8 @@ TEST_F(UserWriteBlockModeOpObserverTest, WriteBlockingEnabledWithBypass) {
     WriteBlockBypass::get(opCtx.get()).setFromMetadata(opCtx.get(), BSONElement());
     ASSERT(WriteBlockBypass::get(opCtx.get()).isWriteBlockBypassEnabled());
 
-    // Ensure user writes still fail under these conditions
-    // TODO SERVER-63456 After implementing bypass into OpObservers, this expectation will change to
-    // success.
-    runCUD(opCtx.get(), NamespaceString("a.b"), false);
+    // Ensure user writes succeed
+    runCUD(opCtx.get(), NamespaceString("a.b"), true);
     runCUD(opCtx.get(), NamespaceString("admin"), true);
     runCUD(opCtx.get(), NamespaceString("local"), true);
     runCUD(opCtx.get(), NamespaceString("config"), true);

@@ -32,6 +32,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/s/global_user_write_block_state.h"
+#include "mongo/db/write_block_bypass.h"
 
 namespace mongo {
 
@@ -60,7 +61,8 @@ void GlobalUserWriteBlockState::checkUserWritesAllowed(OperationContext* opCtx,
     invariant(opCtx->lockState()->isLocked());
     uassert(ErrorCodes::OperationFailed,
             "User writes blocked",
-            !_globalUserWritesBlocked || nss.isOnInternalDb());
+            !_globalUserWritesBlocked || WriteBlockBypass::get(opCtx).isWriteBlockBypassEnabled() ||
+                nss.isOnInternalDb());
 }
 
 }  // namespace mongo
