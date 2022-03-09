@@ -40,8 +40,12 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/database_sharding_state.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/storage/snapshot_helper.h"
 #include "mongo/logv2/log.h"
+
+MONGO_FAIL_POINT_DEFINE(hangBeforeAutoGetShardVersionCheck);
+MONGO_FAIL_POINT_DEFINE(reachedAutoGetLockFreeShardConsistencyRetry);
 
 namespace mongo {
 namespace {
@@ -809,10 +813,56 @@ AutoGetCollectionForReadCommandBase<AutoGetCollectionForReadType>::
           deadline,
           secondaryNssOrUUIDs) {
 
+    hangBeforeAutoGetShardVersionCheck.executeIf(
+        [&](auto&) { hangBeforeAutoGetShardVersionCheck.pauseWhileSet(opCtx); },
+        [&](const BSONObj& data) {
+            return opCtx->getLogicalSessionId() &&
+                opCtx->getLogicalSessionId()->getId() == UUID::fromCDR(data["lsid"].uuid());
+        });
+
     if (!_autoCollForRead.getView()) {
         auto css =
             CollectionShardingState::getSharedForLockFreeReads(opCtx, _autoCollForRead.getNss());
         css->checkShardVersionOrThrow(opCtx);
+    }
+}
+
+AutoGetCollectionForReadCommandLockFree::AutoGetCollectionForReadCommandLockFree(
+    OperationContext* opCtx,
+    const NamespaceStringOrUUID& nsOrUUID,
+    AutoGetCollectionViewMode viewMode,
+    Date_t deadline,
+    AutoStatsTracker::LogMode logMode,
+    const std::vector<NamespaceStringOrUUID>& secondaryNssOrUUIDs) {
+    _autoCollForReadCommandBase.emplace(
+        opCtx, nsOrUUID, viewMode, deadline, logMode, secondaryNssOrUUIDs);
+    auto receivedShardVersion =
+        OperationShardingState::get(opCtx).getShardVersion(_autoCollForReadCommandBase->getNss());
+
+    while (_autoCollForReadCommandBase->getCollection() &&
+           _autoCollForReadCommandBase->getCollection().isSharded() && receivedShardVersion &&
+           receivedShardVersion.get() == ChunkVersion::UNSHARDED()) {
+        reachedAutoGetLockFreeShardConsistencyRetry.executeIf(
+            [&](auto&) { reachedAutoGetLockFreeShardConsistencyRetry.pauseWhileSet(opCtx); },
+            [&](const BSONObj& data) {
+                return opCtx->getLogicalSessionId() &&
+                    opCtx->getLogicalSessionId()->getId() == UUID::fromCDR(data["lsid"].uuid());
+            });
+
+        // A request may arrive with an UNSHARDED shard version for the namespace, and then running
+        // lock-free it is possible that the lock-free state finds a sharded collection but
+        // subsequently the namespace was dropped and recreated UNSHARDED again, in time for the SV
+        // check performed in AutoGetCollectionForReadCommandBase. We must check here whether
+        // sharded state was found by the lock-free state setup, and make sure that the collection
+        // state in-use matches the shard version in the request. If there is an issue, we can
+        // simply retry: the scenario is very unlikely.
+        //
+        // It's possible for there to be no SV for the namespace in the command request. That's OK
+        // because shard versioning isn't needed in that case. See SERVER-63009 for more details.
+        _autoCollForReadCommandBase.emplace(
+            opCtx, nsOrUUID, viewMode, deadline, logMode, secondaryNssOrUUIDs);
+        receivedShardVersion = OperationShardingState::get(opCtx).getShardVersion(
+            _autoCollForReadCommandBase->getNss());
     }
 }
 

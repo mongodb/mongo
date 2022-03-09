@@ -40,6 +40,8 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
 
+MONGO_FAIL_POINT_DEFINE(hangBeforeAutoGetCollectionLockFreeShardedStateAccess);
+
 namespace mongo {
 namespace {
 
@@ -366,6 +368,13 @@ AutoGetCollectionLockFree::AutoGetCollectionLockFree(OperationContext* opCtx,
         auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss.get());
         dss->checkDbVersion(opCtx, dssLock);
     }
+
+    hangBeforeAutoGetCollectionLockFreeShardedStateAccess.executeIf(
+        [&](auto&) { hangBeforeAutoGetCollectionLockFreeShardedStateAccess.pauseWhileSet(opCtx); },
+        [&](const BSONObj& data) {
+            return opCtx->getLogicalSessionId() &&
+                opCtx->getLogicalSessionId()->getId() == UUID::fromCDR(data["lsid"].uuid());
+        });
 
     if (_collection) {
         // Fetch and store the sharding collection description data needed for use during the
