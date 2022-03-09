@@ -298,6 +298,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
         '$BUILD_DIR/mongo/db/storage/journal_flusher',
         '$BUILD_DIR/mongo/db/storage/storage_control',
         '$BUILD_DIR/mongo/db/storage/storage_options',

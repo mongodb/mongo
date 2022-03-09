@@ -201,7 +201,7 @@ Status ActiveIndexBuilds::registerIndexBuild(
     return Status::OK();
 }
 
-size_t ActiveIndexBuilds::getActiveIndexBuilds() {
+size_t ActiveIndexBuilds::getActiveIndexBuilds() const {
     stdx::unique_lock<Latch> lk(_mutex);
     return _allIndexBuilds.size();
 }

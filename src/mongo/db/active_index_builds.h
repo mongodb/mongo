@@ -98,7 +98,7 @@ public:
     /**
      * Get the number of in-progress index builds.
      */
-    size_t getActiveIndexBuilds();
+    size_t getActiveIndexBuilds() const;
 
     /**
      * When _sleepForTest is true, this function will sleep for 100ms and then check the value
