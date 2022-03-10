@@ -460,7 +460,14 @@ public:
                 // is always the backing collection namespace), but will use the namespace provided
                 // in the user request for profiling.
                 // Otherwise, these two namespaces will match.
-                readLock.emplace(opCtx, cursorPin->getExecutor()->nss());
+                // Note that some pipelines which were optimized away may require locking multiple
+                // namespaces. As such, we pass any secondary namespaces required by the pinned
+                // cursor's executor when constructing 'readLock'.
+                readLock.emplace(opCtx,
+                                 cursorPin->getExecutor()->nss(),
+                                 AutoGetCollectionViewMode::kViewsForbidden,
+                                 Date_t::max(),
+                                 cursorPin->getExecutor()->getSecondaryNamespaces());
 
                 statsTracker.emplace(
                     opCtx,
@@ -522,17 +529,23 @@ public:
             // repeatedly release and re-acquire the collection readLock at regular intervals until
             // the failpoint is released. This is done in order to avoid deadlocks caused by the
             // pinned-cursor failpoints in this file (see SERVER-21997).
-            std::function<void()> dropAndReacquireReadLockIfLocked = [&readLock, opCtx, nss]() {
-                if (!readLock) {
-                    // This function is a no-op if 'readLock' is not held in the first place.
-                    return;
-                }
+            std::function<void()> dropAndReacquireReadLockIfLocked =
+                [&readLock, opCtx, &cursorPin]() {
+                    if (!readLock) {
+                        // This function is a no-op if 'readLock' is not held in the first place.
+                        return;
+                    }
 
-                // Make sure an interrupted operation does not prevent us from reacquiring the lock.
-                UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-                readLock.reset();
-                readLock.emplace(opCtx, nss);
-            };
+                    // Make sure an interrupted operation does not prevent us from reacquiring the
+                    // lock.
+                    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+                    readLock.reset();
+                    readLock.emplace(opCtx,
+                                     cursorPin->getExecutor()->nss(),
+                                     AutoGetCollectionViewMode::kViewsForbidden,
+                                     Date_t::max(),
+                                     cursorPin->getExecutor()->getSecondaryNamespaces());
+                };
             if (MONGO_unlikely(waitAfterPinningCursorBeforeGetMoreBatch.shouldFail())) {
                 CurOpFailpointHelpers::waitWhileFailPointEnabled(
                     &waitAfterPinningCursorBeforeGetMoreBatch,
