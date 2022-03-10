@@ -85,7 +85,7 @@ public:
                                                                req.getMin(),
                                                                req.getMax(),
                                                                req.getMaxChunkSizeBytes());
-            Response autoSplitVectorResponse(splitPoints);
+            Response autoSplitVectorResponse(std::move(splitPoints));
             autoSplitVectorResponse.setContinuation(continuation);
             return autoSplitVectorResponse;
         }

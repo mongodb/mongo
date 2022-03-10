@@ -351,7 +351,7 @@ std::pair<std::vector<BSONObj>, bool> autoSplitVector(OperationContext* opCtx,
                       "duration"_attr = Milliseconds(elapsedMillisToFindSplitPoints));
     }
 
-    return std::make_pair(splitKeys, reachedMaxBSONSize);
+    return std::make_pair(std::move(splitKeys), reachedMaxBSONSize);
 }
 
 }  // namespace mongo
