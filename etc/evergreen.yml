@@ -3853,7 +3853,7 @@ tasks:
 ## jstestfuzz file copy based initial sync replica set ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_replication_fcbis_gen
-  tags: ["jstestfuzz", "initsync", "require_npm", "random_name"]
+  tags: ["jstestfuzz", "initsync", "fcbis", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -4877,7 +4877,7 @@ tasks:
 
 - <<: *gen_task_template
   name: replica_sets_fcbis_jscore_passthrough_gen
-  tags: ["replica_sets", "large"]
+  tags: ["replica_sets", "fcbis", "large"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -7701,7 +7701,7 @@ buildvariants:
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: .ocsp
   - name: .read_write_concern
-  - name: .replica_sets !.encrypt !.ignore_non_generated_replica_sets_jscore_passthrough
+  - name: .replica_sets !.encrypt !.ignore_non_generated_replica_sets_jscore_passthrough !.fcbis
   - name: replica_sets_jscore_passthrough_gen
   - name: replica_sets_reconfig_jscore_passthrough_gen
   - name: replica_sets_reconfig_jscore_stepdown_passthrough_gen
@@ -8998,8 +8998,8 @@ buildvariants:
     - windows-vsCurrent-large
   - name: .read_only
   - name: .rollbackfuzzer
-  - name: .replica_sets !.large !.encrypt !.auth
-  - name: .replica_sets .large
+  - name: .replica_sets !.large !.encrypt !.auth !.fcbis
+  - name: .replica_sets .large !.fcbis
     distros:
     - windows-vsCurrent-large
   - name: .resharding_fuzzer
