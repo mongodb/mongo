@@ -31,9 +31,13 @@
 
 #include "mongo/idl/server_parameter.h"
 
+#include <fmt/format.h>
+
 #include "mongo/logv2/log.h"
+#include "mongo/util/static_immortal.h"
 
 namespace mongo {
+using namespace fmt::literals;
 using SPT = ServerParameterType;
 
 MONGO_INITIALIZER_GROUP(BeginServerParameterRegistration, (), ("EndServerParameterRegistration"))
@@ -41,13 +45,8 @@ MONGO_INITIALIZER_GROUP(EndServerParameterRegistration,
                         ("BeginServerParameterRegistration"),
                         ("BeginStartupOptionHandling"))
 
-ServerParameter::ServerParameter(StringData name, ServerParameterType spt, NoRegistrationTag)
-    : _name(name.toString()), _type(spt) {}
-
 ServerParameter::ServerParameter(StringData name, ServerParameterType spt)
-    : ServerParameter(name, spt, NoRegistrationTag{}) {
-    ServerParameterSet::getParameterSet(spt)->add(this);
-}
+    : _name{name}, _type(spt) {}
 
 void ServerParameter::setClusterParameterTime(const LogicalTime& clusterParameterTime) {
     uassert(6225101,
@@ -56,57 +55,49 @@ void ServerParameter::setClusterParameterTime(const LogicalTime& clusterParamete
     _clusterParameterTime = clusterParameterTime;
 }
 
-namespace {
-class NodeParameterSet : public ServerParameterSet {
-public:
-    void add(ServerParameter* sp) final {
-        uassert(6225102,
-                str::stream() << "Registering cluster-wide parameter '" << sp->name()
-                              << "' as node-local server parameter",
-                sp->isNodeLocal());
-        ServerParameter*& x = _map[sp->name()];
-        uassert(23784,
-                str::stream() << "Duplicate server parameter registration for '" << x->name()
-                              << "'",
-                !x);
-        x = sp;
-    }
-};
-NodeParameterSet* gNodeServerParameters = nullptr;
-
-class ClusterParameterSet : public ServerParameterSet {
-public:
-    void add(ServerParameter* sp) final {
-        uassert(6225103,
-                str::stream() << "Registering node-local parameter '" << sp->name()
-                              << "' as cluster-wide server parameter",
-                sp->isClusterWide());
-        ServerParameter*& x = _map[sp->name()];
-        uassert(6225104,
-                str::stream() << "Duplicate cluster-wide server parameter registration for '"
-                              << x->name() << "'",
-                !x);
-        x = sp;
-    }
-};
-ClusterParameterSet* gClusterServerParameters;
-}  // namespace
+Status ServerParameter::set(const BSONElement& newValueElement) {
+    auto swValue = _coerceToString(newValueElement);
+    if (!swValue.isOK())
+        return swValue.getStatus();
+    return setFromString(swValue.getValue());
+}
 
 ServerParameterSet* ServerParameterSet::getNodeParameterSet() {
-    if (!gNodeServerParameters) {
-        gNodeServerParameters = new NodeParameterSet();
-    }
-    return gNodeServerParameters;
+    static StaticImmortal obj = [] {
+        ServerParameterSet sps;
+        sps.setValidate([](ServerParameter* sp) {
+            uassert(6225102,
+                    "Registering cluster-wide parameter '{}' as node-local server parameter"
+                    ""_format(sp->name()),
+                    sp->isNodeLocal());
+        });
+        return sps;
+    }();
+    return &*obj;
 }
 
 ServerParameterSet* ServerParameterSet::getClusterParameterSet() {
-    if (!gClusterServerParameters) {
-        gClusterServerParameters = new ClusterParameterSet();
-    }
-    return gClusterServerParameters;
+    static StaticImmortal obj = [] {
+        ServerParameterSet sps;
+        sps.setValidate([](ServerParameter* sp) {
+            uassert(6225103,
+                    "Registering node-local parameter '{}' as cluster-wide server parameter"
+                    ""_format(sp->name()),
+                    sp->isClusterWide());
+        });
+        return sps;
+    }();
+    return &*obj;
 }
 
-StatusWith<std::string> ServerParameter::coerceToString(const BSONElement& element, bool redact) {
+void ServerParameterSet::add(ServerParameter* sp) {
+    if (_validate)
+        _validate(sp);
+    auto [it, ok] = _map.insert({sp->name(), sp});
+    uassert(23784, "Duplicate server parameter registration for '{}'"_format(sp->name()), ok);
+}
+
+StatusWith<std::string> ServerParameter::_coerceToString(const BSONElement& element) {
     switch (element.type()) {
         case NumberDouble:
             return std::to_string(element.Double());
@@ -120,7 +111,7 @@ StatusWith<std::string> ServerParameter::coerceToString(const BSONElement& eleme
             return dateToISOStringLocal(element.Date());
         default:
             std::string diag;
-            if (redact) {
+            if (isRedact()) {
                 diag = "###";
             } else {
                 diag = element.toString();
@@ -132,7 +123,7 @@ StatusWith<std::string> ServerParameter::coerceToString(const BSONElement& eleme
 }
 
 void ServerParameterSet::remove(const std::string& name) {
-    invariant(1 == _map.erase(name));
+    invariant(1 == _map.erase(name), "Failed to erase key \"{}\""_format(name));
 }
 
 IDLServerParameterDeprecatedAlias::IDLServerParameterDeprecatedAlias(StringData name,
@@ -184,10 +175,8 @@ Status IDLServerParameterDeprecatedAlias::setFromString(const std::string& str) 
 namespace {
 class DisabledTestParameter : public ServerParameter {
 public:
-    DisabledTestParameter() = delete;
-
-    DisabledTestParameter(ServerParameter* sp)
-        : ServerParameter(sp->name(), sp->getServerParameterType(), NoRegistrationTag{}), _sp(sp) {
+    explicit DisabledTestParameter(ServerParameter* sp)
+        : ServerParameter(sp->name(), sp->getServerParameterType()), _sp(sp) {
         setTestOnly();
     }
 
@@ -216,6 +205,10 @@ void ServerParameterSet::disableTestParameters() {
             sp = new DisabledTestParameter(sp);
         }
     }
+}
+
+void registerServerParameter(ServerParameter* p) {
+    ServerParameterSet::getParameterSet(p->getServerParameterType())->add(p);
 }
 
 }  // namespace mongo

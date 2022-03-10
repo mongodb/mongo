@@ -205,7 +205,7 @@ BSONObj makeSettingsDoc(const LogicalTime& cpTime, int intValue, StringData strV
 }
 
 MONGO_INITIALIZER(RegisterCSPTest)(InitializerContext*) {
-    [[maybe_unused]] auto* csp = new CSPTest();
+    registerServerParameter(new CSPTest());
 }
 
 class ClusterServerParameterOpObserverTest : public ServiceContextMongoDTest {

@@ -148,7 +148,9 @@ public:
         return Status::OK();
     }
 
-    virtual Status set(const BSONElement& newValueElement) = 0;
+    // This base implementation calls `setFromString(coerceToString(newValueElement))`.
+    // Derived classes may customize the behavior by specifying `override_set` in IDL.
+    virtual Status set(const BSONElement& newValueElement);
 
     virtual Status setFromString(const std::string& str) = 0;
 
@@ -160,45 +162,37 @@ public:
         _testOnly = true;
     }
 
+    bool isRedact() const {
+        return _redact;
+    }
+
+    void setRedact() {
+        _redact = true;
+    }
+
 protected:
     // Helper for translating setParameter values from BSON to string.
-    StatusWith<std::string> coerceToString(const BSONElement&, bool redact);
-
-    // Used by DisabledTestParameter to avoid re-registering the server parameter.
-    struct NoRegistrationTag {};
-    ServerParameter(StringData name, ServerParameterType spt, NoRegistrationTag);
+    StatusWith<std::string> _coerceToString(const BSONElement&);
 
 private:
     std::string _name;
     LogicalTime _clusterParameterTime;
     ServerParameterType _type;
     bool _testOnly = false;
+    bool _redact = false;
 };
 
 class ServerParameterSet {
 public:
     using Map = ServerParameter::Map;
 
-    virtual ~ServerParameterSet() = default;
-
-    virtual void add(ServerParameter* sp) = 0;
+    void add(ServerParameter* sp);
     void remove(const std::string& name);
 
     const Map& getMap() const {
         return _map;
     }
 
-    // Singleton instances of ServerParameterSet
-    // used for retreiving the local or cluster-wide maps.
-    static ServerParameterSet* getNodeParameterSet();
-    static ServerParameterSet* getClusterParameterSet();
-    static ServerParameterSet* getParameterSet(ServerParameterType spt) {
-        if (spt == ServerParameterType::kClusterWide) {
-            return getClusterParameterSet();
-        } else {
-            return getNodeParameterSet();
-        }
-    }
     void disableTestParameters();
 
     template <typename T = ServerParameter>
@@ -217,9 +211,41 @@ public:
         return ret;
     }
 
-protected:
+    // A ServerParameterSet can be picky about which ServerParameters can be
+    // added to it. `func` will be called whenever a `ServerParameter` is added
+    // to this set. It will throw to reject that ServerParameter. This can be
+    // because of ServerParameterType, or other criteria.
+    void setValidate(std::function<void(ServerParameter*)> func) {
+        _validate = std::move(func);
+    }
+
+    // Singleton instances of ServerParameterSet
+    // used for retrieving the local or cluster-wide maps.
+    static ServerParameterSet* getNodeParameterSet();
+    static ServerParameterSet* getClusterParameterSet();
+    static ServerParameterSet* getParameterSet(ServerParameterType spt) {
+        if (spt == ServerParameterType::kClusterWide) {
+            return getClusterParameterSet();
+        } else {
+            return getNodeParameterSet();
+        }
+    }
+
+private:
+    std::function<void(ServerParameter*)> _validate;
     Map _map;
 };
+
+void registerServerParameter(ServerParameter* p);
+
+// Create an instance of Param, which must be derived from ServerParameter,
+// and register it with a ServerParameterSet.
+template <typename Param>
+Param* makeServerParameter(StringData name, ServerParameterType spt) {
+    auto p = std::make_unique<Param>(std::string{name}, spt);
+    registerServerParameter(&*p);
+    return p.release();
+}
 
 /**
  * Proxy instance for deprecated aliases of set parameters.
@@ -236,5 +262,12 @@ private:
     std::once_flag _warnOnce;
     ServerParameter* _sp;
 };
+
+inline IDLServerParameterDeprecatedAlias* makeIDLServerParameterDeprecatedAlias(
+    StringData name, ServerParameter* sp) {
+    auto p = std::make_unique<IDLServerParameterDeprecatedAlias>(name, sp);
+    registerServerParameter(p.get());
+    return p.release();
+}
 
 }  // namespace mongo

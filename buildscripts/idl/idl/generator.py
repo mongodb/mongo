@@ -838,7 +838,8 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
 
             self._writer.write_line(
                 'void append(OperationContext*, BSONObjBuilder&, const std::string&) final;')
-            self._writer.write_line('Status set(const BSONElement&) final;')
+            if cls.override_set:
+                self._writer.write_line('Status set(const BSONElement&) final;')
             self._writer.write_line('Status setFromString(const std::string&) final;')
 
             if cls.data is not None:
@@ -2284,15 +2285,18 @@ class _CppSourceFileWriter(_CppFileWriterBase):
     def _gen_server_parameter_specialized(self, param):
         # type: (ast.ServerParameter) -> None
         """Generate a specialized ServerParameter."""
-        self._writer.write_line(
-            'return new %s(%s, %s);' % (param.cpp_class.name, _encaps(param.name), param.set_at))
+        self._writer.write_line('auto sp = makeServerParameter<%s>(%s, %s);' %
+                                (param.cpp_class.name, _encaps(param.name), param.set_at))
+        if param.redact:
+            self._writer.write_line('sp->setRedact();')
+        self._writer.write_line('return sp;')
 
     def _gen_server_parameter_class_definitions(self, param):
         # type: (ast.ServerParameter) -> None
         """Generate storage for default and/or append method for a specialized ServerParameter."""
         cls = param.cpp_class
 
-        if param.default or param.redact or not cls.override_set:
+        if param.default or param.redact:
             self.gen_description_comment("%s: %s" % (param.name, param.description))
 
         if param.default:
@@ -2307,23 +2311,13 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 self._writer.write_line('b << name << "###";')
             self.write_empty_line()
 
-        if not cls.override_set:
-            with self._block('Status %s::set(const BSONElement& newValueElement) {' % (cls.name),
-                             '}'):
-                self._writer.write_line('auto swValue = coerceToString(newValueElement, %s);' %
-                                        ('true' if param.redact else 'false'))
-                with self._predicate('!swValue.isOK()'):
-                    self._writer.write_line('return swValue.getStatus();')
-                self._writer.write_line('return setFromString(swValue.getValue());')
-            self.write_empty_line()
-
     def _gen_server_parameter_with_storage(self, param):
         # type: (ast.ServerParameter) -> None
         """Generate a single IDLServerParameterWithStorage."""
         if param.feature_flag:
             self._writer.write_line(
                 common.template_args(
-                    'auto* ret = new FeatureFlagServerParameter(${name}, ${storage});',
+                    'auto* ret = makeFeatureFlagServerParameter(${name}, ${storage});',
                     storage=param.cpp_varname, name=_encaps(param.name)))
         else:
             self._writer.write_line(
@@ -2368,7 +2362,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         for alias_no, alias in enumerate(param.deprecated_name):
             self._writer.write_line(
                 common.template_args(
-                    '${unused} auto* ${alias_var} = new IDLServerParameterDeprecatedAlias(${name}, ${param_var});',
+                    '${unused} auto* ${alias_var} = makeIDLServerParameterDeprecatedAlias(${name}, ${param_var});',
                     unused='[[maybe_unused]]', alias_var='scp_%d_%d' % (param_no, alias_no),
                     name=_encaps(alias), param_var='scp_%d' % (param_no)))
 

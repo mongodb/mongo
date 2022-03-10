@@ -163,9 +163,13 @@ used. If `true`, then the implementer must provide a
 `{name}::{name}(StringData serverParameterName, ServerParameterType type)` constructor. In addition 
 to any other work, this custom constructor must invoke its parent's constructor.
 
-`override_set`: If `false`, a default `Status {name}::set(const BSONElement& val)` implementation 
-will be provided which invokes `setFromString()` using `val.String()`, handling exceptions due to 
-invalid BSON field types as appropriate. If `true`, the implementer must provide these methods.
+`override_set`: If `true`, the implementer must provide a `set` member function as:
+```cpp
+Status {name}::set(const BSONElement& val);
+```
+Otherwise the base class implementation `ServerParameter::set` is used. It
+invokes `setFromString` using a string representation of `val`, if the `val` is
+holding one of the supported types.
 
 If `param.redact` was specified as `true`, then a standard append method will be provided which 
 injects a placeholder value. If `param.redact` was not specified as `true`, then an implementation 

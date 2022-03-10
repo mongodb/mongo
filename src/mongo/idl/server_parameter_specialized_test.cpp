@@ -31,6 +31,7 @@
 
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
 #include "mongo/idl/server_parameter_specialized_test_gen.h"
+#include "mongo/unittest/assert_that.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -314,29 +315,71 @@ Status SpecializedRuntimeOnly::setFromString(const std::string& value) {
     return Status::OK();
 }
 
+Status SpecializedRedactedSettable::setFromString(const std::string& value) {
+    std::cout << "Setting to: " << value << "\n";
+    _data = value;
+    return Status::OK();
+}
+
+TEST(SpecializedServerParameter, SpecializedRedactedSettable) {
+    using namespace std::literals;
+    using namespace unittest::match;
+
+    auto* sp = getServerParameter("specializedRedactedSettable");
+    ASSERT(sp);
+    auto down = dynamic_cast<SpecializedRedactedSettable*>(sp);
+    ASSERT(down);
+    auto& dataMember = down->_data;
+
+    auto store = [&](auto&& name, auto&& value) {
+        return sp->set(BSON(name << value).firstElement());
+    };
+    auto load = [&] {
+        BSONObjBuilder bob;
+        sp->append(nullptr, bob, sp->name());
+        return bob.obj();
+    };
+
+    ASSERT_OK(store("", "hello"));
+    ASSERT_THAT(load(), BSONObjHas(BSONElementIs(Eq(sp->name()), Eq(String), Eq("###"))))
+        << "value redacted by append";
+    ASSERT_THAT(dataMember, Eq("hello")) << "value preseved in _data member";
+
+    ASSERT_THAT(store("", std::vector{"zzzzz"s}),
+                StatusIs(Eq(ErrorCodes::BadValue),
+                         AllOf(ContainsRegex("[uU]nsupported type"),
+                               ContainsRegex("###"),
+                               Not(ContainsRegex("zzzzz")))))
+        << "value redacted in `set` Status when failing from unsupported element type";
+    ASSERT_THAT(dataMember, Eq("hello")) << "Unchanged by failed `set` call";
+}
+
 TEST(SpecializedServerParameter, withScope) {
     using SPT = ServerParameterType;
 
     auto* nodeSet = ServerParameterSet::getNodeParameterSet();
     auto* clusterSet = ServerParameterSet::getClusterParameterSet();
 
-    constexpr auto kSpecializedWithOptions = "specializedWithOptions"_sd;
+    static constexpr auto kSpecializedWithOptions = "specializedWithOptions"_sd;
     auto* nodeSWO = nodeSet->getIfExists(kSpecializedWithOptions);
     ASSERT(nullptr != nodeSWO);
     ASSERT(nullptr == clusterSet->getIfExists(kSpecializedWithOptions));
 
-    auto* clusterSWO = new SpecializedWithOptions(kSpecializedWithOptions, SPT::kClusterWide);
+    auto* clusterSWO =
+        makeServerParameter<SpecializedWithOptions>(kSpecializedWithOptions, SPT::kClusterWide);
     ASSERT(clusterSWO != nodeSWO);
     ASSERT(clusterSWO == clusterSet->getIfExists(kSpecializedWithOptions));
 
     // Duplicate key
-    ASSERT_THROWS_CODE(new SpecializedWithOptions(kSpecializedWithOptions, SPT::kClusterWide),
-                       DBException,
-                       6225104);
+    ASSERT_THROWS_CODE(
+        makeServerParameter<SpecializedWithOptions>(kSpecializedWithOptions, SPT::kClusterWide),
+        DBException,
+        23784);
 
     // Require runtime only.
-    constexpr auto kSpecializedRuntimeOnly = "specializedRuntimeOnly"_sd;
-    auto* clusterSRO = new SpecializedRuntimeOnly(kSpecializedRuntimeOnly, SPT::kClusterWide);
+    static constexpr auto kSpecializedRuntimeOnly = "specializedRuntimeOnly"_sd;
+    auto* clusterSRO =
+        makeServerParameter<SpecializedRuntimeOnly>(kSpecializedRuntimeOnly, SPT::kClusterWide);
     ASSERT(nullptr != clusterSRO);
     // Pointer now belongs to ServerParameterSet, no need to delete.
 }

@@ -596,7 +596,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
     Locker::setGlobalThrottling(TicketHolders::openReadTransaction.get(),
                                 TicketHolders::openWriteTransaction.get());
 
-    _runTimeConfigParam.reset(new WiredTigerEngineRuntimeConfigParameter(
+    _runTimeConfigParam.reset(makeServerParameter<WiredTigerEngineRuntimeConfigParameter>(
         "wiredTigerEngineRuntimeConfig", ServerParameterType::kRuntimeOnly));
     _runTimeConfigParam->_data.second = this;
 }

@@ -872,11 +872,6 @@ public:
             bob.append(name, val);
         }
 
-        Status set(const BSONElement& bse) final {
-            auto swStr = coerceToString(bse, false);
-            return swStr.isOK() ? setFromString(swStr.getValue()) : swStr.getStatus();
-        }
-
         Status setFromString(const std::string& str) final {
             int value;
             Status status = NumberParser{}(str, &value);
@@ -888,28 +883,21 @@ public:
 
         int val;
     };
-
-    static inline TestServerParameter p1{
-        "ServerOptionsTestServerParameter1", ServerParameterType::kStartupOnly, 123};
-    static inline TestServerParameter p2{
-        "ServerOptionsTestServerParameter2", ServerParameterType::kStartupOnly, 234};
 };
 
 TEST_F(SetParameterOptionTest, ApplySetParameters) {
-    p1.val = 123;
-    p2.val = 234;
-    auto swObj = server_options_detail::applySetParameterOptions(
-        {
-            {"ServerOptionsTestServerParameter1", "555"},
-            {"ServerOptionsTestServerParameter2", "666"},
-        },
-        *ServerParameterSet::getNodeParameterSet());
+    TestServerParameter p1{"p1", ServerParameterType::kStartupOnly, 123};
+    TestServerParameter p2{"p2", ServerParameterType::kStartupOnly, 234};
+    ServerParameterSet paramSet;
+    paramSet.add(&p1);
+    paramSet.add(&p2);
+
+    auto swObj =
+        server_options_detail::applySetParameterOptions({{"p1", "555"}, {"p2", "666"}}, paramSet);
     ASSERT_OK(swObj);
     ASSERT_BSONOBJ_EQ(swObj.getValue(),
-                      BSON("ServerOptionsTestServerParameter1"
-                           << BSON("default" << 123 << "value" << 555)
-                           << "ServerOptionsTestServerParameter2"
-                           << BSON("default" << 234 << "value" << 666)));
+                      BSON("p1" << BSON("default" << 123 << "value" << 555) << "p2"
+                                << BSON("default" << 234 << "value" << 666)));
     ASSERT_EQ(p1.val, 555);
     ASSERT_EQ(p2.val, 666);
 }

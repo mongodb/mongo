@@ -237,7 +237,7 @@ public:
      * of SCP settings.
      */
     void append(OperationContext* opCtx, BSONObjBuilder& b, const std::string& name) final {
-        if (_redact) {
+        if (isRedact()) {
             b.append(name, "###");
         } else {
             b.append(name, getValue());
@@ -322,16 +322,11 @@ public:
         });
     }
 
-    void setRedact() {
-        _redact = true;
-    }
-
 private:
     T& _storage;
 
     std::vector<std::function<validator_t>> _validators;
     std::function<onUpdate_t> _onUpdate;
-    bool _redact = false;
 };
 
 // MSVC has trouble resolving T=decltype(param) through the above class template.
@@ -339,7 +334,9 @@ private:
 template <ServerParameterType paramType, typename T>
 IDLServerParameterWithStorage<paramType, T>* makeIDLServerParameterWithStorage(StringData name,
                                                                                T& storage) {
-    return new IDLServerParameterWithStorage<paramType, T>(name, storage);
+    auto p = std::make_unique<IDLServerParameterWithStorage<paramType, T>>(name, storage);
+    registerServerParameter(&*p);
+    return p.release();
 }
 
 }  // namespace mongo

@@ -338,8 +338,7 @@ void FailPointRegistry::freeze() {
 
 void FailPointRegistry::registerAllFailPointsAsServerParameters() {
     for (const auto& [name, ptr] : _fpMap) {
-        // Intentionally leaked.
-        new FailPointServerParameter(name, ServerParameterType::kStartupOnly);
+        makeServerParameter<FailPointServerParameter>(name, ServerParameterType::kStartupOnly);
     }
 }
 

@@ -91,3 +91,11 @@ server_parameters:
         description: "Only settable at runtime."
         set_at: runtime
         cpp_class: SpecializedRuntimeOnly
+    specializedRedactedSettable:
+        description: "Redacted and runtime-settable."
+        set_at: runtime
+        cpp_class:
+            name: SpecializedRedactedSettable
+            data: std::string
+        redact: true
+        test_only: false
