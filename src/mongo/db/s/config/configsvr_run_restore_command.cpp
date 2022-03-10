@@ -73,6 +73,7 @@ ShouldRestoreDocument shouldRestoreDocument(OperationContext* opCtx,
                                                    : ShouldRestoreDocument::kNo;
 }
 
+// Modifications to this map should add new testing in 'sharded_backup_restore.js'.
 // { config collection namespace -> ( optional nss field name, optional UUID field name ) }
 const stdx::unordered_map<NamespaceString,
                           std::pair<boost::optional<std::string>, boost::optional<std::string>>>
