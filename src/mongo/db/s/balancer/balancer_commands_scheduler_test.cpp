@@ -206,6 +206,7 @@ TEST_F(BalancerCommandsSchedulerTest, SuccessfulAutoSplitVectorCommand) {
     splitKeys.append(BSON("x" << 7));
     splitKeys.append(BSON("x" << 9));
     splitKeys.done();
+    autoSplitVectorResponse.append("continuation", false);
     auto networkResponseFuture = launchAsync([&]() {
         onCommand([&](const executor::RemoteCommandRequest& request) {
             return autoSplitVectorResponse.obj();
@@ -218,12 +219,14 @@ TEST_F(BalancerCommandsSchedulerTest, SuccessfulAutoSplitVectorCommand) {
                                                             splitChunk.getMin(),
                                                             splitChunk.getMax(),
                                                             4);
-    auto swReceivedSplitKeys = futureResponse.getNoThrow();
-    ASSERT_OK(swReceivedSplitKeys.getStatus());
-    auto receivedSplitKeys = swReceivedSplitKeys.getValue();
+    auto swAutoSplitVectorResponse = futureResponse.getNoThrow();
+    ASSERT_OK(swAutoSplitVectorResponse.getStatus());
+    auto receivedSplitKeys = swAutoSplitVectorResponse.getValue().getSplitKeys();
+    auto continuation = swAutoSplitVectorResponse.getValue().getContinuation();
     ASSERT_EQ(receivedSplitKeys.size(), 2);
     ASSERT_BSONOBJ_EQ(receivedSplitKeys[0], BSON("x" << 7));
     ASSERT_BSONOBJ_EQ(receivedSplitKeys[1], BSON("x" << 9));
+    ASSERT_FALSE(continuation);
     networkResponseFuture.default_timed_get();
     _scheduler.stop();
 }

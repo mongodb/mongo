@@ -93,9 +93,10 @@ public:
                                         MergeInfo action,
                                         const Status& result) = 0;
 
-    virtual void acknowledgeAutoSplitVectorResult(OperationContext* opCtx,
-                                                  AutoSplitVectorInfo action,
-                                                  const StatusWith<SplitPoints>& result) = 0;
+    virtual void acknowledgeAutoSplitVectorResult(
+        OperationContext* opCtx,
+        AutoSplitVectorInfo action,
+        const StatusWith<AutoSplitVectorResponse>& result) = 0;
 
     virtual void acknowledgeSplitResult(OperationContext* opCtx,
                                         SplitInfoWithKeyPattern action,

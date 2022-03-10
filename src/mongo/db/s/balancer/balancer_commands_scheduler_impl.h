@@ -527,13 +527,13 @@ public:
                                         const ChunkRange& chunkRange,
                                         const ChunkVersion& version) override;
 
-    SemiFuture<SplitPoints> requestAutoSplitVector(OperationContext* opCtx,
-                                                   const NamespaceString& nss,
-                                                   const ShardId& shardId,
-                                                   const BSONObj& keyPattern,
-                                                   const BSONObj& minKey,
-                                                   const BSONObj& maxKey,
-                                                   int64_t maxChunkSizeBytes) override;
+    SemiFuture<AutoSplitVectorResponse> requestAutoSplitVector(OperationContext* opCtx,
+                                                               const NamespaceString& nss,
+                                                               const ShardId& shardId,
+                                                               const BSONObj& keyPattern,
+                                                               const BSONObj& minKey,
+                                                               const BSONObj& maxKey,
+                                                               int64_t maxChunkSizeBytes) override;
 
     SemiFuture<void> requestSplitChunk(OperationContext* opCtx,
                                        const NamespaceString& nss,

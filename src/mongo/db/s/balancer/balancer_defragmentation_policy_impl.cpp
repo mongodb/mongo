@@ -1266,12 +1266,6 @@ public:
         return boost::none;
     }
 
-    bool moreSplitPointsToReceive(const SplitPoints& splitPoints) {
-        auto addBSONSize = [](const int& size, const BSONObj& obj) { return size + obj.objsize(); };
-        int totalSize = std::accumulate(splitPoints.begin(), splitPoints.end(), 0, addBSONSize);
-        return totalSize >= BSONObjMaxUserSize - 4096;
-    }
-
     void applyActionResult(OperationContext* opCtx,
                            const DefragmentationAction& action,
                            const DefragmentationActionResponse& response) override {
@@ -1288,7 +1282,8 @@ public:
                     uasserted(ErrorCodes::BadValue, "Unexpected action type");
                 },
                 [&](const AutoSplitVectorInfo& autoSplitVectorAction) {
-                    auto& splitVectorResponse = stdx::get<StatusWith<SplitPoints>>(response);
+                    auto& splitVectorResponse =
+                        stdx::get<StatusWith<AutoSplitVectorResponse>>(response);
                     handleActionResult(
                         opCtx,
                         _nss,
@@ -1296,16 +1291,15 @@ public:
                         getType(),
                         splitVectorResponse.getStatus(),
                         [&]() {
-                            auto& splitPoints = splitVectorResponse.getValue();
+                            auto& splitPoints = splitVectorResponse.getValue().getSplitKeys();
                             if (!splitPoints.empty()) {
                                 auto& pendingActions =
                                     _pendingActionsByShards[autoSplitVectorAction.shardId];
                                 pendingActions.rangesToSplit.push_back(
                                     std::make_pair(ChunkRange(autoSplitVectorAction.minKey,
                                                               autoSplitVectorAction.maxKey),
-                                                   splitVectorResponse.getValue()));
-                                // TODO (SERVER-61678): replace with check for continuation flag
-                                if (moreSplitPointsToReceive(splitPoints)) {
+                                                   splitPoints));
+                                if (splitVectorResponse.getValue().getContinuation()) {
                                     pendingActions.rangesToFindSplitPoints.emplace_back(
                                         splitPoints.back(), autoSplitVectorAction.maxKey);
                                 }
@@ -1625,7 +1619,9 @@ void BalancerDefragmentationPolicyImpl::acknowledgeDataSizeResult(
 }
 
 void BalancerDefragmentationPolicyImpl::acknowledgeAutoSplitVectorResult(
-    OperationContext* opCtx, AutoSplitVectorInfo action, const StatusWith<SplitPoints>& result) {
+    OperationContext* opCtx,
+    AutoSplitVectorInfo action,
+    const StatusWith<AutoSplitVectorResponse>& result) {
     stdx::lock_guard<Latch> lk(_stateMutex);
     // Check if collection defragmentation has been canceled
     if (!_defragmentationStates.contains(action.uuid)) {

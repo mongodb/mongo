@@ -89,9 +89,10 @@ public:
                                 MergeInfo action,
                                 const Status& result) override;
 
-    void acknowledgeAutoSplitVectorResult(OperationContext* opCtx,
-                                          AutoSplitVectorInfo action,
-                                          const StatusWith<SplitPoints>& result) override;
+    void acknowledgeAutoSplitVectorResult(
+        OperationContext* opCtx,
+        AutoSplitVectorInfo action,
+        const StatusWith<AutoSplitVectorResponse>& result) override;
 
     void acknowledgeSplitResult(OperationContext* opCtx,
                                 SplitInfoWithKeyPattern action,

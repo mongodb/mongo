@@ -38,6 +38,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/balancer/cluster_statistics.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/request_types/auto_split_vector_gen.h"
 #include "mongo/s/request_types/move_chunk_request.h"
 #include "mongo/s/shard_id.h"
 
@@ -205,7 +206,7 @@ typedef stdx::variant<MergeInfo,
                       EndOfActionStream>
     DefragmentationAction;
 
-typedef stdx::variant<Status, StatusWith<SplitPoints>, StatusWith<DataSizeResponse>>
+typedef stdx::variant<Status, StatusWith<AutoSplitVectorResponse>, StatusWith<DataSizeResponse>>
     DefragmentationActionResponse;
 
 typedef std::vector<ClusterStatistics::ShardStatistics> ShardStatisticsVector;

@@ -75,7 +75,7 @@ protected:
                 ReadPreferenceSetting(ReadPreference::PrimaryPreferred).toContainingBSON(),
                 rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
-            return BSON("ok" << 1 << "splitKeys" << splitPoints);
+            return BSON("ok" << 1 << "splitKeys" << splitPoints << "continuation" << false);
         });
     }
 

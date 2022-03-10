@@ -461,7 +461,7 @@ void Balancer::_consumeActionStreamLoop() {
                                                      splitVectorAction.maxChunkSizeBytes)
                             .thenRunOn(*executor)
                             .onCompletion([this, command = std::move(splitVectorAction)](
-                                              const StatusWith<std::vector<BSONObj>>&
+                                              const StatusWith<AutoSplitVectorResponse>&
                                                   swSplitPoints) {
                                 ThreadClient tc(
                                     "BalancerDefragmentationPolicy::acknowledgeSplitVectorResult",

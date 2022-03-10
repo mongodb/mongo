@@ -79,14 +79,15 @@ public:
                                   << kSmallestChunkSizeSupported,
                     req.getMaxChunkSizeBytes() >= kSmallestChunkSizeSupported);
 
-            auto splitKeys = autoSplitVector(opCtx,
-                                             ns(),
-                                             req.getKeyPattern(),
-                                             req.getMin(),
-                                             req.getMax(),
-                                             req.getMaxChunkSizeBytes());
-
-            return splitKeys;
+            auto [splitPoints, continuation] = autoSplitVector(opCtx,
+                                                               ns(),
+                                                               req.getKeyPattern(),
+                                                               req.getMin(),
+                                                               req.getMax(),
+                                                               req.getMaxChunkSizeBytes());
+            Response autoSplitVectorResponse(splitPoints);
+            autoSplitVectorResponse.setContinuation(continuation);
+            return autoSplitVectorResponse;
         }
 
     private:

@@ -245,7 +245,7 @@ SemiFuture<void> BalancerCommandsSchedulerImpl::requestMergeChunks(OperationCont
         .semi();
 }
 
-SemiFuture<SplitPoints> BalancerCommandsSchedulerImpl::requestAutoSplitVector(
+SemiFuture<AutoSplitVectorResponse> BalancerCommandsSchedulerImpl::requestAutoSplitVector(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const ShardId& shardId,
@@ -257,14 +257,13 @@ SemiFuture<SplitPoints> BalancerCommandsSchedulerImpl::requestAutoSplitVector(
         nss, shardId, keyPattern, minKey, maxKey, maxChunkSizeBytes);
     return _buildAndEnqueueNewRequest(opCtx, std::move(commandInfo))
         .then([](const executor::RemoteCommandResponse& remoteResponse)
-                  -> StatusWith<std::vector<BSONObj>> {
+                  -> StatusWith<AutoSplitVectorResponse> {
             auto responseStatus = processRemoteResponse(remoteResponse);
             if (!responseStatus.isOK()) {
                 return responseStatus;
             }
-            const auto payload = AutoSplitVectorResponse::parse(
-                IDLParserErrorContext("AutoSplitVectorResponse"), std::move(remoteResponse.data));
-            return payload.getSplitKeys();
+            return AutoSplitVectorResponse::parse(IDLParserErrorContext("AutoSplitVectorResponse"),
+                                                  std::move(remoteResponse.data));
         })
         .semi();
 }

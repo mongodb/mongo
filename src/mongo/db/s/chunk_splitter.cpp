@@ -345,12 +345,12 @@ void ChunkSplitter::_runAutosplit(std::shared_ptr<ChunkSplitStateDriver> chunkSp
                     "maxChunkSizeBytes"_attr = maxChunkSizeBytes);
 
         chunkSplitStateDriver->prepareSplit();
-        auto splitPoints = autoSplitVector(opCtx.get(),
-                                           nss,
-                                           shardKeyPattern.toBSON(),
-                                           chunk.getMin(),
-                                           chunk.getMax(),
-                                           maxChunkSizeBytes);
+        auto [splitPoints, _] = autoSplitVector(opCtx.get(),
+                                                nss,
+                                                shardKeyPattern.toBSON(),
+                                                chunk.getMin(),
+                                                chunk.getMax(),
+                                                maxChunkSizeBytes);
 
         if (splitPoints.empty()) {
             LOGV2_DEBUG(21907,

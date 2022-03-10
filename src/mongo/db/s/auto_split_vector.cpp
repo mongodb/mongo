@@ -90,13 +90,14 @@ auto orderShardKeyFields(const BSONObj& keyPattern, BSONObj& key) {
 
 }  // namespace
 
-std::vector<BSONObj> autoSplitVector(OperationContext* opCtx,
-                                     const NamespaceString& nss,
-                                     const BSONObj& keyPattern,
-                                     const BSONObj& min,
-                                     const BSONObj& max,
-                                     long long maxChunkSizeBytes) {
+std::pair<std::vector<BSONObj>, bool> autoSplitVector(OperationContext* opCtx,
+                                                      const NamespaceString& nss,
+                                                      const BSONObj& keyPattern,
+                                                      const BSONObj& min,
+                                                      const BSONObj& max,
+                                                      long long maxChunkSizeBytes) {
     std::vector<BSONObj> splitKeys;
+    bool reachedMaxBSONSize = false;  // True if the split points vector becomes too big
 
     int elapsedMillisToFindSplitPoints;
 
@@ -201,7 +202,6 @@ std::vector<BSONObj> autoSplitVector(OperationContext* opCtx,
         BSONObj currentKey;               // Last key seen during the index scan
         long long numScannedKeys = 1;     // minKeyInOriginalChunk has already been scanned
         std::size_t resultArraySize = 0;  // Approximate size in bytes of the split points array
-        bool reachedMaxBSONSize = false;  // True if the split points vector becomes too big
 
         // Lambda to check whether the split points vector would exceed BSONObjMaxUserSize in case
         // of additional split key of the specified size.
@@ -351,7 +351,7 @@ std::vector<BSONObj> autoSplitVector(OperationContext* opCtx,
                       "duration"_attr = Milliseconds(elapsedMillisToFindSplitPoints));
     }
 
-    return splitKeys;
+    return std::make_pair(splitKeys, reachedMaxBSONSize);
 }
 
 }  // namespace mongo

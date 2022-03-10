@@ -36,7 +36,10 @@ namespace mongo {
 
 /**
  * Given a chunk, determines whether it satisfies the requisites to be auto-splitted and - if so -
- * returns the split points (shard keys representing the lower bounds of the new chunks to create).
+ * returns the split points (shard keys representing the lower bounds of the new chunks to create)
+ * along with a bool representing whether or not the max bson size for the vector of split points
+ * was reached. If the bool returns true, this function should be called on the same range again to
+ * retrieve the rest of the split points.
  *
  * The logic implemented can be summarized as follows: given a `maxChunkSize` of `x` MB, the
  * algorithm aims to choose the split points so that the resulting chunks' size would be around
@@ -74,6 +77,7 @@ namespace mongo {
  * (2.1) `S >= 80% maxChunkSize`, so keep the current split points.
  *
  * Returned split points: [99].
+ * Returned continuation flag: false.
  *
  * ========= EXAMPLE (CASE 2.2) ========
  * `maxChunkSize` = 100MB
@@ -89,6 +93,7 @@ namespace mongo {
  * 67% maxChunkSize. Recalculate.
  *
  * Returned split points: [69].
+ * Returned continuation flag: false.
  *
  * ========= EXAMPLE (CASE 2.3) ========
  * `maxChunkSize` = 100MB
@@ -104,13 +109,14 @@ namespace mongo {
  * >= 67% maxChunkSize. So remove the last split point.
  *
  * Returned split points: [].
+ * Returned continuation flag: false.
  */
-std::vector<BSONObj> autoSplitVector(OperationContext* opCtx,
-                                     const NamespaceString& nss,
-                                     const BSONObj& keyPattern,
-                                     const BSONObj& min,
-                                     const BSONObj& max,
-                                     long long maxChunkSizeBytes);
+std::pair<std::vector<BSONObj>, bool> autoSplitVector(OperationContext* opCtx,
+                                                      const NamespaceString& nss,
+                                                      const BSONObj& keyPattern,
+                                                      const BSONObj& min,
+                                                      const BSONObj& max,
+                                                      long long maxChunkSizeBytes);
 
 /*
  * Utility function for deserializing autoSplitVector/splitVector responses.
