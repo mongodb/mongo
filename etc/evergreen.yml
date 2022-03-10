@@ -4561,6 +4561,9 @@ tasks:
         - "src/evergreen/external_auth_pip.sh"
   - func: "run tests"
     vars:
+      # TODO SERVER-64323
+      # restore concurrency for this suite when the issue on windows is resolved.
+      resmoke_jobs_max: 1
       resmoke_args: --excludeWithAnyTags=requires_domain_controller
 
 - <<: *task_template
