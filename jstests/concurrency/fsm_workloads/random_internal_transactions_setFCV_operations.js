@@ -26,20 +26,6 @@ var $config = extendWorkload($config, function($config, $super) {
     // with a setFCV command, so we want to be able to catch those as acceptable killSession errors.
     $config.data.retryOnKilledSession = true;
 
-    const baseIsUpdateShardKeyErrorAcceptable =
-        $config.data.isUpdateShardKeyErrorAcceptable.bind($config.data);
-
-    $config.data.isUpdateShardKeyErrorAcceptable = function isUpdateShardKeyAcceptable(
-        errCode, errMsg, errorLabels) {
-        // TODO: SERVER-63498 Remove this when InternalTransactionNotSupported errors are
-        // upconverted to a retryable error.
-        if (this.areInternalTransactionsEnabled &&
-            errCode == ErrorCodes.InternalTransactionNotSupported) {
-            return true;
-        }
-        return baseIsUpdateShardKeyErrorAcceptable(errCode, errMsg, errorLabels);
-    };
-
     $config.states.setFCV = function(db, collName, connCache) {
         const fcvValues = [lastLTSFCV, lastContinuousFCV, latestFCV];
         const targetFCV = fcvValues[Random.randInt(3)];

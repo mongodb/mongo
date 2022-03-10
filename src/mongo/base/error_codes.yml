@@ -455,7 +455,7 @@ error_codes:
 
     - {code: 357, name: InvalidBSONType}
 
-    - {code: 358, name: InternalTransactionNotSupported}
+    - {code: 358, name: InternalTransactionNotSupported, categories: [RetriableError]}
 
     - {code: 359, name: CannotConvertIndexToUnique, extra: CannotConvertIndexToUniqueInfo}
 
