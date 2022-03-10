@@ -50,7 +50,7 @@ public:
           _received(received),
           _wanted(wanted),
           _shardId(shardId),
-          _criticalSectionSignal(criticalSectionSignal) {}
+          _criticalSectionSignal(std::move(criticalSectionSignal)) {}
 
     const auto& getNss() const {
         return _nss;
@@ -117,8 +117,7 @@ protected:
     boost::optional<ChunkVersion> _wanted;
     ShardId _shardId;
 
-    // This signal does not get serialized and therefore does not get propagated
-    // to the router.
+    // This signal does not get serialized and therefore does not get propagated to the router
     boost::optional<SharedSemiFuture<void>> _criticalSectionSignal;
 };
 
@@ -154,10 +153,15 @@ class StaleDbRoutingVersion final : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::StaleDbVersion;
 
-    StaleDbRoutingVersion(std::string db,
-                          DatabaseVersion received,
-                          boost::optional<DatabaseVersion> wanted)
-        : _db(std::move(db)), _received(received), _wanted(wanted) {}
+    StaleDbRoutingVersion(
+        std::string db,
+        DatabaseVersion received,
+        boost::optional<DatabaseVersion> wanted,
+        boost::optional<SharedSemiFuture<void>> criticalSectionSignal = boost::none)
+        : _db(std::move(db)),
+          _received(received),
+          _wanted(wanted),
+          _criticalSectionSignal(std::move(criticalSectionSignal)) {}
 
     const auto& getDb() const {
         return _db;
@@ -171,6 +175,10 @@ public:
         return _wanted;
     }
 
+    auto getCriticalSectionSignal() const {
+        return _criticalSectionSignal;
+    }
+
     void serialize(BSONObjBuilder* bob) const override;
     static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj&);
     static StaleDbRoutingVersion parseFromCommandError(const BSONObj& commandError);
@@ -179,6 +187,9 @@ private:
     std::string _db;
     DatabaseVersion _received;
     boost::optional<DatabaseVersion> _wanted;
+
+    // This signal does not get serialized and therefore does not get propagated to the router
+    boost::optional<SharedSemiFuture<void>> _criticalSectionSignal;
 };
 
 }  // namespace mongo

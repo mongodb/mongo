@@ -64,14 +64,6 @@ void onShardVersionMismatch(OperationContext* opCtx,
                             boost::optional<ChunkVersion> shardVersionReceived);
 
 /**
- * Starts the RecoverRefreshThread to set the current metadata on the CSR. This function will also
- * recover any ongoing migrations if runRecover is true.
- */
-SharedSemiFuture<void> recoverRefreshShardVersion(ServiceContext* serviceContext,
-                                                  NamespaceString nss,
-                                                  bool runRecover);
-
-/**
  * Unconditionally get the shard's filtering metadata from the config server on the calling thread.
  * Returns the metadata if the nss is sharded, otherwise default unsharded metadata.
  *
@@ -95,11 +87,9 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
  * Invalidates the cached database version, schedules a refresh of the database info, waits for the
  * refresh to complete, and updates the cached database version.
  */
-Status onDbVersionMismatchNoExcept(
-    OperationContext* opCtx,
-    StringData dbName,
-    const DatabaseVersion& clientDbVersion,
-    const boost::optional<DatabaseVersion>& serverDbVersion) noexcept;
+Status onDbVersionMismatchNoExcept(OperationContext* opCtx,
+                                   StringData dbName,
+                                   boost::optional<DatabaseVersion> clientDbVersion) noexcept;
 
 void forceDatabaseRefresh(OperationContext* opCtx, StringData dbName);
 

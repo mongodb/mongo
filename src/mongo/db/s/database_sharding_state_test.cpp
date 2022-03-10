@@ -142,12 +142,10 @@ TEST_F(DatabaseShardingStateTestWithMockedLoader, OnDbVersionMismatch) {
             return dss->getDbVersion(opCtx, dssLock);
         };
 
-        boost::optional<DatabaseVersion> activeDbVersion = getActiveDbVersion();
-
         _mockCatalogCacheLoader->setDatabaseRefreshReturnValue(newDb);
-        ASSERT_OK(onDbVersionMismatchNoExcept(opCtx, kDbName, newDbVersion, activeDbVersion));
+        ASSERT_OK(onDbVersionMismatchNoExcept(opCtx, kDbName, newDbVersion));
 
-        activeDbVersion = getActiveDbVersion();
+        auto activeDbVersion = getActiveDbVersion();
         ASSERT_TRUE(activeDbVersion);
         if (expectRefresh) {
             ASSERT_EQUALS(newDbVersion.getTimestamp(), activeDbVersion->getTimestamp());

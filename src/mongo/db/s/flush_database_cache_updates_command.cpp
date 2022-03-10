@@ -117,7 +117,7 @@ public:
                     "Can't call _flushDatabaseCacheUpdates if in read-only mode",
                     !storageGlobalParams.readOnly);
 
-            auto& oss = OperationShardingState::get(opCtx);
+            boost::optional<SharedSemiFuture<void>> criticalSectionSignal;
 
             {
                 AutoGetDb autoDb(opCtx, _dbName(), MODE_IS);
@@ -129,14 +129,12 @@ public:
                 // consistency guarantee.
                 const auto dss = DatabaseShardingState::get(opCtx, _dbName());
                 auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
-
-                if (auto criticalSectionSignal = dss->getCriticalSectionSignal(
-                        ShardingMigrationCriticalSection::kRead, dssLock)) {
-                    oss.setMigrationCriticalSectionSignal(criticalSectionSignal);
-                }
+                criticalSectionSignal =
+                    dss->getCriticalSectionSignal(ShardingMigrationCriticalSection::kRead, dssLock);
             }
 
-            oss.waitForMigrationCriticalSectionSignal(opCtx);
+            if (criticalSectionSignal)
+                criticalSectionSignal->get(opCtx);
 
             if (Base::request().getSyncFromConfig()) {
                 LOGV2_DEBUG(21981,
@@ -144,7 +142,7 @@ public:
                             "Forcing remote routing table refresh for {db}",
                             "Forcing remote routing table refresh",
                             "db"_attr = _dbName());
-                forceDatabaseRefresh(opCtx, _dbName());
+                uassertStatusOK(onDbVersionMismatchNoExcept(opCtx, _dbName(), boost::none));
             }
 
             CatalogCacheLoader::get(opCtx).waitForDatabaseFlush(opCtx, _dbName());
@@ -162,21 +160,23 @@ public:
 class FlushDatabaseCacheUpdatesCmd final
     : public FlushDatabaseCacheUpdatesCmdBase<FlushDatabaseCacheUpdatesCmd> {
 public:
-    using Request = _flushDatabaseCacheUpdates;
+    using Request = FlushDatabaseCacheUpdates;
 
     static bool supportsWriteConcern() {
         return false;
     }
+
 } _flushDatabaseCacheUpdates;
 
 class FlushDatabaseCacheUpdatesWithWriteConcernCmd final
     : public FlushDatabaseCacheUpdatesCmdBase<FlushDatabaseCacheUpdatesWithWriteConcernCmd> {
 public:
-    using Request = _flushDatabaseCacheUpdatesWithWriteConcern;
+    using Request = FlushDatabaseCacheUpdatesWithWriteConcern;
 
     static bool supportsWriteConcern() {
         return true;
     }
+
 } _flushDatabaseCacheUpdatesWithWriteConcern;
 
 }  // namespace

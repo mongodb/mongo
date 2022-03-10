@@ -146,37 +146,15 @@ public:
     boost::optional<DatabaseVersion> getDbVersion(StringData dbName) const;
 
     /**
-     * This call is a no op if there isn't a currently active migration critical section. Otherwise
-     * it will wait for the critical section to complete up to the remaining operation time.
+     * This method implements a best-effort attempt to wait for the critical section to complete
+     * before returning to the router at the previous step in order to prevent it from busy spinning
+     * while the critical section is in progress.
      *
-     * Returns true if the call actually waited because of migration critical section (regardless if
-     * whether it timed out or not), false if there was no active migration critical section.
+     * All waits for migration critical section should go through this code path, because it also
+     * accounts for transactions and locking.
      */
-    bool waitForMigrationCriticalSectionSignal(OperationContext* opCtx);
-
-    /**
-     * Setting this value indicates that when the version check failed, there was an active
-     * migration for the namespace and that it would be prudent to wait for the critical section to
-     * complete before retrying so the router doesn't make wasteful requests.
-     */
-    void setMigrationCriticalSectionSignal(boost::optional<SharedSemiFuture<void>> critSecSignal);
-
-    /**
-     * This call is a no op if there isn't a currently active movePrimary critical section.
-     * Otherwise it will wait for the critical section to complete up to the remaining operation
-     * time.
-     *
-     * Returns true if the call actually waited because of movePrimary critical section (regardless
-     * whether it timed out or not), false if there was no active movePrimary critical section.
-     */
-    bool waitForMovePrimaryCriticalSectionSignal(OperationContext* opCtx);
-
-    /**
-     * Setting this value indicates that when the version check failed, there was an active
-     * movePrimary for the namespace and that it would be prudent to wait for the critical section
-     * to complete before retrying so the router doesn't make wasteful requests.
-     */
-    void setMovePrimaryCriticalSectionSignal(boost::optional<SharedSemiFuture<void>> critSecSignal);
+    static Status waitForCriticalSectionToComplete(OperationContext* opCtx,
+                                                   SharedSemiFuture<void> critSecSignal) noexcept;
 
     /**
      * Stores the failed status in _shardingOperationFailedStatus.
@@ -220,15 +198,6 @@ private:
         int recursion{0};
     };
     StringMap<DatabaseVersionTracker> _databaseVersions;
-
-    // This value will only be non-null if version check during the operation execution failed due
-    // to stale version and there was a migration for that namespace, which was in critical section.
-    boost::optional<SharedSemiFuture<void>> _migrationCriticalSectionSignal;
-
-    // This value will only be non-null if version check during the operation execution failed due
-    // to stale version and there was a movePrimary for that namespace, which was in critical
-    // section.
-    boost::optional<SharedSemiFuture<void>> _movePrimaryCriticalSectionSignal;
 
     // This value can only be set when a rerouting exception occurs during a write operation, and
     // must be handled before this object gets destructed.

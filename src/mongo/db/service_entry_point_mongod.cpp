@@ -237,9 +237,7 @@ public:
 
     bool refreshDatabase(OperationContext* opCtx, const StaleDbRoutingVersion& se) const
         noexcept override {
-        return onDbVersionMismatchNoExcept(
-                   opCtx, se.getDb(), se.getVersionReceived(), se.getVersionWanted())
-            .isOK();
+        return onDbVersionMismatchNoExcept(opCtx, se.getDb(), se.getVersionReceived()).isOK();
     }
 
     bool refreshCollection(OperationContext* opCtx, const StaleConfigInfo& se) const

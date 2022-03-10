@@ -29,8 +29,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 
 #include "mongo/db/catalog/database_holder.h"
@@ -43,9 +41,7 @@
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
-#include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_state.h"
-#include "mongo/db/s/sharding_statistics.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/database_version.h"
@@ -61,22 +57,28 @@ MONGO_FAIL_POINT_DEFINE(hangInRecoverRefreshThread);
 
 void onDbVersionMismatch(OperationContext* opCtx,
                          const StringData dbName,
-                         const DatabaseVersion& clientDbVersion,
-                         const boost::optional<DatabaseVersion>& serverDbVersion) {
+                         boost::optional<DatabaseVersion> clientDbVersion) {
     invariant(!opCtx->lockState()->isLocked());
     invariant(!opCtx->getClient()->isInDirectClient());
-
     invariant(ShardingState::get(opCtx)->canAcceptShardedCommands());
 
-    if (clientDbVersion <= serverDbVersion) {
-        // The client was stale; do not trigger server-side refresh.
-        return;
+    {
+        // Take the DBLock directly rather than using AutoGetDb, to prevent a recursive call into
+        // checkDbVersion().
+        //
+        // TODO: It is not safe here to read the DB version without checking for critical section
+        //
+        if (clientDbVersion) {
+            Lock::DBLock dbLock(opCtx, dbName, MODE_IS);
+            auto dss = DatabaseShardingState::get(opCtx, dbName);
+            auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
+            const auto serverDbVersion = dss->getDbVersion(opCtx, dssLock);
+            if (clientDbVersion <= serverDbVersion) {
+                // The client was stale
+                return;
+            }
+        }
     }
-
-    // Ensure any ongoing movePrimary's have completed before trying to do the refresh. This wait is
-    // just an optimization so that mongos does not exhaust its maximum number of
-    // StaleDatabaseVersion retry attempts while the movePrimary is being committed.
-    OperationShardingState::get(opCtx).waitForMovePrimaryCriticalSectionSignal(opCtx);
 
     if (MONGO_unlikely(skipDatabaseVersionMetadataRefresh.shouldFail())) {
         return;
@@ -90,8 +92,7 @@ bool joinShardVersionOperation(OperationContext* opCtx,
                                CollectionShardingRuntime* csr,
                                boost::optional<Lock::DBLock>* dbLock,
                                boost::optional<Lock::CollectionLock>* collLock,
-                               boost::optional<CollectionShardingRuntime::CSRLock>* csrLock,
-                               Milliseconds criticalSectionMaxWait) {
+                               boost::optional<CollectionShardingRuntime::CSRLock>* csrLock) {
     invariant(collLock->has_value());
     invariant(csrLock->has_value());
 
@@ -108,11 +109,8 @@ bool joinShardVersionOperation(OperationContext* opCtx,
         dbLock->reset();
 
         if (critSecSignal) {
-            const auto deadline = criticalSectionMaxWait == Milliseconds::max()
-                ? Date_t::max()
-                : opCtx->getServiceContext()->getFastClockSource()->now() + criticalSectionMaxWait;
-            opCtx->runWithDeadline(
-                deadline, ErrorCodes::ExceededTimeLimit, [&] { critSecSignal->get(opCtx); });
+            uassertStatusOK(
+                OperationShardingState::waitForCriticalSectionToComplete(opCtx, *critSecSignal));
         } else {
             try {
                 inRecoverOrRefresh->get(opCtx);
@@ -127,8 +125,6 @@ bool joinShardVersionOperation(OperationContext* opCtx,
 
     return false;
 }
-
-}  // namespace
 
 SharedSemiFuture<void> recoverRefreshShardVersion(ServiceContext* serviceContext,
                                                   const NamespaceString nss,
@@ -235,6 +231,8 @@ SharedSemiFuture<void> recoverRefreshShardVersion(ServiceContext* serviceContext
         .share();
 }
 
+}  // namespace
+
 void onShardVersionMismatch(OperationContext* opCtx,
                             const NamespaceString& nss,
                             boost::optional<ChunkVersion> shardVersionReceived) {
@@ -246,8 +244,6 @@ void onShardVersionMismatch(OperationContext* opCtx,
         return;
     }
 
-    ShardingStatistics::get(opCtx).countStaleConfigErrors.addAndFetch(1);
-
     LOGV2_DEBUG(22061,
                 2,
                 "Metadata refresh requested for {namespace} at shard version "
@@ -255,17 +251,6 @@ void onShardVersionMismatch(OperationContext* opCtx,
                 "Metadata refresh requested for collection",
                 "namespace"_attr = nss,
                 "shardVersionReceived"_attr = shardVersionReceived);
-
-    // If we are in a transaction, limit the time we can wait behind the critical section. This
-    // is needed in order to prevent distributed deadlocks in situations where a DDL operation
-    // needs to acquire the critical section on several shards. In that case, a shard running a
-    // transaction could be waiting for the critical section to be exited, while on another
-    // shard the transaction has already executed some statement and stashed locks which prevent
-    // the critical section from being acquired in that node. Limiting the wait behind the
-    // critical section will ensure that the transaction will eventually get aborted.
-    const auto criticalSectionMaxWait = opCtx->inMultiDocumentTransaction()
-        ? Milliseconds(metadataRefreshInTransactionMaxWaitBehindCritSecMS.load())
-        : Milliseconds::max();
 
     while (true) {
         boost::optional<SharedSemiFuture<void>> inRecoverOrRefresh;
@@ -279,8 +264,7 @@ void onShardVersionMismatch(OperationContext* opCtx,
             boost::optional<CollectionShardingRuntime::CSRLock> csrLock =
                 CollectionShardingRuntime::CSRLock::lockShared(opCtx, csr);
 
-            if (joinShardVersionOperation(
-                    opCtx, csr, &dbLock, &collLock, &csrLock, criticalSectionMaxWait)) {
+            if (joinShardVersionOperation(opCtx, csr, &dbLock, &collLock, &csrLock)) {
                 continue;
             }
 
@@ -302,8 +286,7 @@ void onShardVersionMismatch(OperationContext* opCtx,
 
             // If there is no ongoing shard version operation, initialize the RecoverRefreshThread
             // thread and associate it to the CSR.
-            if (!joinShardVersionOperation(
-                    opCtx, csr, &dbLock, &collLock, &csrLock, criticalSectionMaxWait)) {
+            if (!joinShardVersionOperation(opCtx, csr, &dbLock, &collLock, &csrLock)) {
                 // If the shard doesn't yet know its filtering metadata, recovery needs to be run
                 const bool runRecover = metadata ? false : true;
                 CancellationSource cancellationSource;
@@ -472,13 +455,11 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
     return newShardVersion;
 }
 
-Status onDbVersionMismatchNoExcept(
-    OperationContext* opCtx,
-    const StringData dbName,
-    const DatabaseVersion& clientDbVersion,
-    const boost::optional<DatabaseVersion>& serverDbVersion) noexcept {
+Status onDbVersionMismatchNoExcept(OperationContext* opCtx,
+                                   const StringData dbName,
+                                   boost::optional<DatabaseVersion> clientDbVersion) noexcept {
     try {
-        onDbVersionMismatch(opCtx, dbName, clientDbVersion, serverDbVersion);
+        onDbVersionMismatch(opCtx, dbName, clientDbVersion);
         return Status::OK();
     } catch (const DBException& ex) {
         LOGV2(22065,

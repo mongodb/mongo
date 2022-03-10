@@ -356,21 +356,20 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
 
     const auto& currentMetadata = optCurrentMetadata->get();
 
-    auto wantedShardVersion = currentMetadata.getShardVersion();
-
     {
         auto criticalSectionSignal = _critSec.getSignal(
             opCtx->lockState()->isWriteLocked() ? ShardingMigrationCriticalSection::kWrite
                                                 : ShardingMigrationCriticalSection::kRead);
-
         uassert(StaleConfigInfo(_nss,
                                 receivedShardVersion,
-                                wantedShardVersion,
+                                boost::none,
                                 ShardingState::get(opCtx)->shardId(),
                                 std::move(criticalSectionSignal)),
                 str::stream() << "migration commit in progress for " << _nss.ns(),
                 !criticalSectionSignal);
     }
+
+    auto wantedShardVersion = currentMetadata.getShardVersion();
 
     if (wantedShardVersion.isWriteCompatibleWith(receivedShardVersion) ||
         ChunkVersion::isIgnoredVersion(receivedShardVersion))

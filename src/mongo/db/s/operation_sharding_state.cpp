@@ -29,19 +29,13 @@
 
 #include "mongo/db/s/operation_sharding_state.h"
 
-#include "mongo/logv2/log_debug.h"
+#include "mongo/db/s/sharding_api_d_params_gen.h"
 
 namespace mongo {
 namespace {
 
 const OperationContext::Decoration<OperationShardingState> shardingMetadataDecoration =
     OperationContext::declareDecoration<OperationShardingState>();
-
-// Max time to wait for the migration critical section to complete
-const Milliseconds kMaxWaitForMigrationCriticalSection = Minutes(5);
-
-// Max time to wait for the movePrimary critical section to complete
-const Milliseconds kMaxWaitForMovePrimaryCriticalSection = Minutes(5);
 
 }  // namespace
 
@@ -121,54 +115,36 @@ boost::optional<DatabaseVersion> OperationShardingState::getDbVersion(StringData
     return boost::none;
 }
 
-bool OperationShardingState::waitForMigrationCriticalSectionSignal(OperationContext* opCtx) {
+Status OperationShardingState::waitForCriticalSectionToComplete(
+    OperationContext* opCtx, SharedSemiFuture<void> critSecSignal) noexcept {
     // Must not block while holding a lock
     invariant(!opCtx->lockState()->isLocked());
 
-    if (_migrationCriticalSectionSignal) {
-        auto deadline = opCtx->getServiceContext()->getFastClockSource()->now() +
-            std::min(opCtx->getRemainingMaxTimeMillis(), kMaxWaitForMigrationCriticalSection);
-
-        opCtx->runWithDeadline(deadline, ErrorCodes::ExceededTimeLimit, [&] {
-            _migrationCriticalSectionSignal->wait(opCtx);
-        });
-
-        _migrationCriticalSectionSignal = boost::none;
-        return true;
+    // If we are in a transaction, limit the time we can wait behind the critical section. This is
+    // needed in order to prevent distributed deadlocks in situations where a DDL operation needs to
+    // acquire the critical section on several shards.
+    //
+    // In such cases, shard running a transaction could be waiting for the critical section to be
+    // exited, while on another shard the transaction has already executed some statement and
+    // stashed locks which prevent the critical section from being acquired in that node. Limiting
+    // the wait behind the critical section will ensure that the transaction will eventually get
+    // aborted.
+    if (opCtx->inMultiDocumentTransaction()) {
+        try {
+            opCtx->runWithDeadline(
+                opCtx->getServiceContext()->getFastClockSource()->now() +
+                    Milliseconds(metadataRefreshInTransactionMaxWaitBehindCritSecMS.load()),
+                ErrorCodes::ExceededTimeLimit,
+                [&] { critSecSignal.wait(opCtx); });
+            return Status::OK();
+        } catch (const DBException& ex) {
+            // This is a best-effort attempt to wait for the critical section to complete, so no
+            // need to handle any exceptions
+            return ex.toStatus();
+        }
+    } else {
+        return critSecSignal.waitNoThrow(opCtx);
     }
-
-    return false;
-}
-
-void OperationShardingState::setMigrationCriticalSectionSignal(
-    boost::optional<SharedSemiFuture<void>> critSecSignal) {
-    invariant(critSecSignal);
-    _migrationCriticalSectionSignal = std::move(critSecSignal);
-}
-
-bool OperationShardingState::waitForMovePrimaryCriticalSectionSignal(OperationContext* opCtx) {
-    // Must not block while holding a lock
-    invariant(!opCtx->lockState()->isLocked());
-
-    if (_movePrimaryCriticalSectionSignal) {
-        auto deadline = opCtx->getServiceContext()->getFastClockSource()->now() +
-            std::min(opCtx->getRemainingMaxTimeMillis(), kMaxWaitForMovePrimaryCriticalSection);
-
-        opCtx->runWithDeadline(deadline, ErrorCodes::ExceededTimeLimit, [&] {
-            _movePrimaryCriticalSectionSignal->wait(opCtx);
-        });
-
-        _movePrimaryCriticalSectionSignal = boost::none;
-        return true;
-    }
-
-    return false;
-}
-
-void OperationShardingState::setMovePrimaryCriticalSectionSignal(
-    boost::optional<SharedSemiFuture<void>> critSecSignal) {
-    invariant(critSecSignal);
-    _movePrimaryCriticalSectionSignal = std::move(critSecSignal);
 }
 
 void OperationShardingState::setShardingOperationFailedStatus(const Status& status) {

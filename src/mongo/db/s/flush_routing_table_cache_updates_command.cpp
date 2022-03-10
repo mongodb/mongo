@@ -112,7 +112,7 @@ public:
                                   << " if in read-only mode",
                     !storageGlobalParams.readOnly);
 
-            auto& oss = OperationShardingState::get(opCtx);
+            boost::optional<SharedSemiFuture<void>> criticalSectionSignal;
 
             {
                 AutoGetCollection autoColl(opCtx, ns(), MODE_IS);
@@ -123,14 +123,12 @@ public:
                 // propagated back to this shard. This ensures the read your own writes causal
                 // consistency guarantee.
                 auto const csr = CollectionShardingRuntime::get(opCtx, ns());
-                auto criticalSectionSignal =
+                criticalSectionSignal =
                     csr->getCriticalSectionSignal(opCtx, ShardingMigrationCriticalSection::kWrite);
-                if (criticalSectionSignal) {
-                    oss.setMigrationCriticalSectionSignal(criticalSectionSignal);
-                }
             }
 
-            oss.waitForMigrationCriticalSectionSignal(opCtx);
+            if (criticalSectionSignal)
+                criticalSectionSignal->get(opCtx);
 
             if (Base::request().getSyncFromConfig()) {
                 LOGV2_DEBUG(21982,

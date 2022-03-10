@@ -247,10 +247,10 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                         const auto db = catalogClient->getDatabase(
                             opCtx, _dbName, repl::ReadConcernLevel::kMajorityReadConcern);
                         if (_doc.getDatabaseVersion()->getUuid() != db.getVersion().getUuid()) {
-                            return;  // skip to _flushDatabaseCacheUpdates
+                            return;  // skip to FlushDatabaseCacheUpdates
                         }
                     } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-                        return;  // skip to _flushDatabaseCacheUpdates
+                        return;  // skip to FlushDatabaseCacheUpdates
                     }
                 }
 
@@ -349,8 +349,8 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                     std::remove(participants.begin(), participants.end(), primaryShardId),
                     participants.end());
                 // Send _flushDatabaseCacheUpdates to all shards
-                auto flushDbCacheUpdatesCmd =
-                    _flushDatabaseCacheUpdatesWithWriteConcern(_dbName.toString());
+                FlushDatabaseCacheUpdatesWithWriteConcern flushDbCacheUpdatesCmd(
+                    _dbName.toString());
                 flushDbCacheUpdatesCmd.setSyncFromConfig(true);
                 flushDbCacheUpdatesCmd.setDbName(_dbName);
 

@@ -29,8 +29,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/service_entry_point_common.h"
 
 #include <fmt/format.h>
@@ -80,6 +78,7 @@
 #include "mongo/db/request_execution_context.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/s/sharding_statistics.h"
 #include "mongo/db/s/transaction_coordinator_factory.h"
 #include "mongo/db/service_entry_point_common.h"
 #include "mongo/db/session_catalog_mongod.h"
@@ -1654,14 +1653,28 @@ Future<void> ExecCommandDatabase::_commandExec() {
                 !_refreshedDatabase) {
                 auto sce = s.extraInfo<StaleDbRoutingVersion>();
                 invariant(sce);
-                if (sce->getVersionWanted() < sce->getVersionReceived()) {
-                    const auto refreshed = _execContext->behaviors->refreshDatabase(opCtx, *sce);
-                    if (refreshed) {
-                        _refreshedDatabase = true;
-                        if (!opCtx->isContinuingMultiDocumentTransaction()) {
-                            _resetLockerStateAfterShardingUpdate(opCtx);
-                            return _commandExec();
-                        }
+
+                if (sce->getCriticalSectionSignal()) {
+                    // The shard is in a critical section, so we cannot retry locally
+                    OperationShardingState::waitForCriticalSectionToComplete(
+                        opCtx, *sce->getCriticalSectionSignal())
+                        .ignore();
+                    return s;
+                }
+
+                if (sce->getVersionWanted() &&
+                    sce->getVersionReceived() < sce->getVersionWanted()) {
+                    // The shard is recovered and the router is staler than the shard, so we cannot
+                    // retry locally
+                    return s;
+                }
+
+                const auto refreshed = _execContext->behaviors->refreshDatabase(opCtx, *sce);
+                if (refreshed) {
+                    _refreshedDatabase = true;
+                    if (!opCtx->isContinuingMultiDocumentTransaction()) {
+                        _resetLockerStateAfterShardingUpdate(opCtx);
+                        return _commandExec();
                     }
                 }
             }
@@ -1670,15 +1683,23 @@ Future<void> ExecCommandDatabase::_commandExec() {
         })
         .onErrorCategory<ErrorCategory::StaleShardVersionError>([this](Status s) -> Future<void> {
             auto opCtx = _execContext->getOpCtx();
+            ShardingStatistics::get(opCtx).countStaleConfigErrors.addAndFetch(1);
 
             if (!opCtx->getClient()->isInDirectClient() &&
                 serverGlobalParams.clusterRole != ClusterRole::ConfigServer &&
                 !_refreshedCollection) {
                 if (auto sce = s.extraInfo<StaleConfigInfo>()) {
+                    if (sce->getCriticalSectionSignal()) {
+                        // The shard is in a critical section, so we cannot retry locally
+                        OperationShardingState::waitForCriticalSectionToComplete(
+                            opCtx, *sce->getCriticalSectionSignal())
+                            .ignore();
+                        return s;
+                    }
+
                     if (sce->getVersionWanted() &&
-                        sce->getVersionReceived().isOlderThan(sce->getVersionWanted().get())) {
-                        // If the local shard version is newer than the received one return the
-                        // error to the router without retrying locally.
+                        sce->getVersionReceived().isOlderThan(*sce->getVersionWanted())) {
+                        // Shard is recovered and the router is staler than the shard
                         return s;
                     }
 

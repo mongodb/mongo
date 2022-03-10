@@ -29,19 +29,17 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/s/scoped_operation_completion_sharding_actions.h"
 
 #include "mongo/db/curop.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/s/sharding_statistics.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/stale_exception.h"
 
 namespace mongo {
-
 namespace {
 
 const auto shardingOperationCompletionActionsRegistered =
@@ -71,11 +69,20 @@ ScopedOperationCompletionShardingActions::~ScopedOperationCompletionShardingActi
     }
 
     if (auto staleInfo = status->extraInfo<StaleConfigInfo>()) {
+        ShardingStatistics::get(_opCtx).countStaleConfigErrors.addAndFetch(1);
+
         if (staleInfo->getCriticalSectionSignal()) {
-            // Set migration critical section on operation sharding state: operation will wait for
-            // the migration to finish before returning.
-            auto& oss = OperationShardingState::get(_opCtx);
-            oss.setMigrationCriticalSectionSignal(staleInfo->getCriticalSectionSignal());
+            // The shard is in a critical section
+            OperationShardingState::waitForCriticalSectionToComplete(
+                _opCtx, *staleInfo->getCriticalSectionSignal())
+                .ignore();
+            return;
+        }
+
+        if (staleInfo->getVersionWanted() &&
+            staleInfo->getVersionReceived().isOlderThan(*staleInfo->getVersionWanted())) {
+            // Shard is recovered and the router is staler than the shard
+            return;
         }
 
         auto handleMismatchStatus = onShardVersionMismatchNoExcept(
@@ -87,10 +94,22 @@ ScopedOperationCompletionShardingActions::~ScopedOperationCompletionShardingActi
                   "Failed to handle stale version exception as part of the current operation",
                   "error"_attr = redact(handleMismatchStatus));
     } else if (auto staleInfo = status->extraInfo<StaleDbRoutingVersion>()) {
-        auto handleMismatchStatus = onDbVersionMismatchNoExcept(_opCtx,
-                                                                staleInfo->getDb(),
-                                                                staleInfo->getVersionReceived(),
-                                                                staleInfo->getVersionWanted());
+        if (staleInfo->getCriticalSectionSignal()) {
+            // The shard is in a critical section
+            OperationShardingState::waitForCriticalSectionToComplete(
+                _opCtx, *staleInfo->getCriticalSectionSignal())
+                .ignore();
+            return;
+        }
+
+        if (staleInfo->getVersionWanted() &&
+            staleInfo->getVersionReceived() < staleInfo->getVersionWanted()) {
+            // Shard is recovered and the router is staler than the shard
+            return;
+        }
+
+        auto handleMismatchStatus = onDbVersionMismatchNoExcept(
+            _opCtx, staleInfo->getDb(), staleInfo->getVersionReceived());
         if (!handleMismatchStatus.isOK())
             LOGV2(22054,
                   "Failed to handle database version exception as part of the current operation: "

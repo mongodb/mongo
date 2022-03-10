@@ -1,4 +1,4 @@
-# Copyright (C) 2018-present MongoDB, Inc.
+# Copyright (C) 2022-present MongoDB, Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the Server Side Public License, version 1,
@@ -24,41 +24,18 @@
 # delete this exception statement from your version. If you delete this
 # exception statement from all source files in the program, then also delete
 # it in the license file.
-#
-
-# _flushDatabaseCacheUpdates IDL File
 
 global:
-    cpp_namespace: "mongo"
+    cpp_namespace: mongo
 
-imports:
-    - "mongo/idl/basic_types.idl"
-
-commands:
-    _flushDatabaseCacheUpdates:
-        description: "An internal command to wait for the last routing table cache refresh for a particular database to be persisted to disk"
-        command_name: _flushDatabaseCacheUpdates
-        cpp_name: FlushDatabaseCacheUpdates
-        strict: true
-        namespace: type
-        api_version: ""
-        type: string
-        fields:
-            syncFromConfig:
-                type: bool
-                description: "If true, forces a refresh of the cache entry from the config server before waiting for updates to be persist"
-                default: true
-
-    _flushDatabaseCacheUpdatesWithWriteConcern:
-        description: "The same behavior as _flushDatabaseCacheUpdates but accepts writeConcern"
-        command_name: _flushDatabaseCacheUpdatesWithWriteConcern
-        cpp_name: FlushDatabaseCacheUpdatesWithWriteConcern
-        strict: true
-        namespace: type
-        api_version: ""
-        type: string
-        fields:
-            syncFromConfig:
-                type: bool
-                description: "If true, forces a refresh of the cache entry from the config server before waiting for updates to be persist"
-                default: true
+server_parameters:
+    metadataRefreshInTransactionMaxWaitBehindCritSecMS:
+        description: >-
+          Maximum time in milliseconds to wait behind the critical section when refreshing the
+          filtering metadata within a transaction.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: metadataRefreshInTransactionMaxWaitBehindCritSecMS
+        validator:
+          gte: 0
+        default: 500
