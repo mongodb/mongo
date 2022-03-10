@@ -33,6 +33,7 @@ global:
 
 imports:
     - "mongo/idl/basic_types.idl"
+    - "mongo/crypto/fle_field_schema.idl"
     - "mongo/db/query/hint.idl"
 
 types:
@@ -100,4 +101,8 @@ commands:
                 description: "Unwrapped read preference."
                 cpp_name: queryOptions
                 type: object
+                optional: true
+            encryptionInformation:
+                description: "Encryption Information schema and other tokens for CRUD commands"
+                type: EncryptionInformation
                 optional: true

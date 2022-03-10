@@ -34,6 +34,7 @@ global:
         - "mongo/db/query/explain_options.h"
 
 imports:
+    - "mongo/crypto/fle_field_schema.idl"
     - "mongo/db/auth/action_type.idl"
     - "mongo/db/auth/access_checks.idl"
     - "mongo/idl/basic_types.idl"
@@ -254,5 +255,10 @@ commands:
                 description: "An optional internal parameter for this request. If a shard key is specified, then that specific shard will be targeted."
                 type: PassthroughToShardOptions
                 cpp_name: passthroughToShard
+                optional: true
+                unstable: true
+            encryptionInformation:
+                description: "Encryption Information schema and other tokens for CRUD commands"
+                type: EncryptionInformation
                 optional: true
                 unstable: true
