@@ -3,6 +3,7 @@
  *
  * @tags: [
  *    featureFlagNoMoreAutoSplitter,
+ *    requires_fcv_60,
  * ]
  */
 'use strict';
