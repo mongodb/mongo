@@ -1533,6 +1533,33 @@ bool WiredTigerIndexUnique::isDup(OperationContext* opCtx,
     MONGO_UNREACHABLE;
 }
 
+void WiredTigerIndexUnique::insertWithRecordIdInValue_forTest(OperationContext* opCtx,
+                                                              const KeyString::Value& keyString,
+                                                              RecordId rid) {
+    WiredTigerCursor curwrap(_uri, _tableId, false, opCtx);
+    curwrap.assertInActiveTxn();
+    WT_CURSOR* c = curwrap.get();
+
+    // Now create the table key/value, the actual data record.
+    WiredTigerItem keyItem(keyString.getBuffer(), keyString.getSize());
+
+    BufBuilder bufBuilder;
+    KeyString::Builder valueBuilder(keyString.getVersion(), rid);
+    valueBuilder.appendTypeBits(keyString.getTypeBits());
+
+    WiredTigerItem valueItem(valueBuilder.getBuffer(), valueBuilder.getSize());
+    setKey(c, keyItem.Get());
+    c->set_value(c, valueItem.Get());
+    int ret = WT_OP_CHECK(wiredTigerCursorInsert(opCtx, c));
+
+    invariantWTOK(
+        ret,
+        c->session,
+        fmt::format("WiredTigerIndexUnique::insertWithRecordIdInValue_forTest: {}; uri: {}",
+                    _indexName,
+                    _uri));
+}
+
 WiredTigerIdIndex::WiredTigerIdIndex(OperationContext* ctx,
                                      const std::string& uri,
                                      StringData ident,

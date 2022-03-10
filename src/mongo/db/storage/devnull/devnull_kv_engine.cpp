@@ -244,6 +244,12 @@ public:
     virtual Status initAsEmpty(OperationContext* opCtx) {
         return Status::OK();
     }
+
+    void insertWithRecordIdInValue_forTest(OperationContext* opCtx,
+                                           const KeyString::Value& keyString,
+                                           RecordId rid) override {
+        MONGO_UNREACHABLE;
+    }
 };
 
 DevNullKVEngine::DevNullKVEngine() {

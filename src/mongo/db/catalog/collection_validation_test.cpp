@@ -27,15 +27,17 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/catalog/collection_validation.h"
 
+#include "mongo/bson/util/builder.h"
 #include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/index/index_access_method.h"
+#include "mongo/db/operation_context.h"  // for UnreplicatedWritesBlock
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/bufreader.h"
 #include "mongo/util/fail_point.h"
 
 namespace mongo {
@@ -73,7 +75,7 @@ private:
  * Test fixture for testing background collection validation on the wiredTiger engine, which is
  * currently the only storage engine that supports background collection validation.
  *
- * Collection kNss will be created for each unit test, curtesy of inheritance from
+ * Collection kNss will be created for each unit test, courtesy of inheritance from
  * CollectionValidationTest.
  */
 class BackgroundCollectionValidationTest : public CollectionValidationTest {
@@ -90,8 +92,10 @@ public:
 /**
  * Calls validate on collection kNss with both kValidateFull and kValidateNormal validation levels
  * and verifies the results.
+ *
+ * Returns list of validate results.
  */
-void foregroundValidate(
+std::vector<std::pair<BSONObj, ValidateResults>> foregroundValidate(
     OperationContext* opCtx,
     bool valid,
     int numRecords,
@@ -101,18 +105,28 @@ void foregroundValidate(
         {CollectionValidation::ValidateMode::kForeground,
          CollectionValidation::ValidateMode::kForegroundFull},
     CollectionValidation::RepairMode repairMode = CollectionValidation::RepairMode::kNone) {
+    std::vector<std::pair<BSONObj, ValidateResults>> results;
     for (auto mode : modes) {
         ValidateResults validateResults;
         BSONObjBuilder output;
         ASSERT_OK(CollectionValidation::validate(
             opCtx, kNss, mode, repairMode, &validateResults, &output));
-        ASSERT_EQ(validateResults.valid, valid);
-        ASSERT_EQ(validateResults.errors.size(), static_cast<long unsigned int>(numErrors));
-
         BSONObj obj = output.obj();
-        ASSERT_EQ(obj.getIntField("nrecords"), numRecords);
-        ASSERT_EQ(obj.getIntField("nInvalidDocuments"), numInvalidDocuments);
+        BSONObjBuilder validateResultsBuilder;
+        validateResults.appendToResultObj(&validateResultsBuilder, true /* debugging */);
+        auto validateResultsObj = validateResultsBuilder.obj();
+
+        ASSERT_EQ(validateResults.valid, valid) << obj << validateResultsObj;
+        ASSERT_EQ(validateResults.errors.size(), static_cast<long unsigned int>(numErrors))
+            << obj << validateResultsObj;
+
+        ASSERT_EQ(obj.getIntField("nrecords"), numRecords) << obj << validateResultsObj;
+        ASSERT_EQ(obj.getIntField("nInvalidDocuments"), numInvalidDocuments)
+            << obj << validateResultsObj;
+
+        results.push_back(std::make_pair(obj, validateResults));
     }
+    return results;
 }
 
 /**
@@ -314,6 +328,125 @@ TEST_F(BackgroundCollectionValidationTest, BackgroundValidateRunsConcurrentlyWit
                        /*numRecords*/ numRecords + numRecords2,
                        0,
                        0);
+}
+
+/**
+ * Generates a KeyString suitable for positioning a cursor at the beginning of an index.
+ */
+KeyString::Value makeFirstKeyString(const SortedDataInterface& sortedDataInterface) {
+    KeyString::Builder firstKeyStringBuilder(sortedDataInterface.getKeyStringVersion(),
+                                             BSONObj(),
+                                             sortedDataInterface.getOrdering(),
+                                             KeyString::Discriminator::kExclusiveBefore);
+    return firstKeyStringBuilder.getValueCopy();
+}
+
+/**
+ * Extracts KeyString without RecordId.
+ */
+KeyString::Value makeKeyStringWithoutRecordId(const KeyString::Value& keyStringWithRecordId,
+                                              KeyString::Version version) {
+    BufBuilder bufBuilder;
+    keyStringWithRecordId.serializeWithoutRecordIdLong(bufBuilder);
+    auto builderSize = bufBuilder.len();
+
+    auto buffer = bufBuilder.release();
+
+    BufReader bufReader(buffer.get(), builderSize);
+    return KeyString::Value::deserialize(bufReader, version);
+}
+
+// Verify calling validate() on a collection with old (pre-4.2) keys in a WT unique index.
+TEST_F(BackgroundCollectionValidationTest, ValidateOldUniqueIndexKeyWarning) {
+    auto opCtx = operationContext();
+
+    {
+        // Durable catalog expects metadata updates to be timestamped but this is
+        // not necessary in our case - we just want to check the contents of the index table.
+        // The alternative here would be to provide a commit timestamp with a TimestamptBlock.
+        repl::UnreplicatedWritesBlock uwb(opCtx);
+        auto uniqueIndexSpec = BSON("v" << 2 << "name"
+                                        << "a_1"
+                                        << "key" << BSON("a" << 1) << "unique" << true);
+        ASSERT_OK(
+            storageInterface()->createIndexesOnEmptyCollection(opCtx, kNss, {uniqueIndexSpec}));
+    }
+
+    // Insert single document with the default (new) index key that includes a record id.
+    ASSERT_OK(storageInterface()->insertDocument(opCtx,
+                                                 kNss,
+                                                 {BSON("_id" << 1 << "a" << 1), Timestamp()},
+                                                 repl::OpTime::kUninitializedTerm));
+
+    // Validate the collection here as a sanity check before we modify the index contents in-place.
+    foregroundValidate(
+        opCtx, /*valid*/ true, /*numRecords*/ 1, /*numInvalidDocuments*/ 0, /*numErrors*/ 0);
+
+    // Update existing entry in index to pre-4.2 format without record id in key string.
+    {
+        AutoGetCollection autoColl(opCtx, kNss, MODE_IX);
+
+        auto indexCatalog = autoColl->getIndexCatalog();
+        auto descriptor = indexCatalog->findIndexByName(opCtx, "a_1");
+        ASSERT(descriptor) << "Cannot find a_1 in index catalog";
+        auto entry = indexCatalog->getEntry(descriptor);
+        ASSERT(entry) << "Cannot look up index catalog entry for index a_1";
+
+        auto sortedDataInterface = entry->accessMethod()->asSortedData()->getSortedDataInterface();
+        ASSERT_FALSE(sortedDataInterface->isEmpty(opCtx)) << "index a_1 should not be empty";
+
+        // Check key in index for only document.
+        auto firstKeyString = makeFirstKeyString(*sortedDataInterface);
+        KeyString::Value keyStringWithRecordId;
+        RecordId recordId;
+        {
+            auto cursor = sortedDataInterface->newCursor(opCtx);
+            auto indexEntry = cursor->seekForKeyString(firstKeyString);
+            ASSERT(indexEntry);
+            keyStringWithRecordId = indexEntry->keyString;
+            recordId = indexEntry->loc;
+            ASSERT_FALSE(cursor->nextKeyString());
+        }
+
+        auto keyStringWithoutRecordId = makeKeyStringWithoutRecordId(
+            keyStringWithRecordId, sortedDataInterface->getKeyStringVersion());
+
+        // Replace key with old format (without record id).
+        {
+            WriteUnitOfWork wuow(opCtx);
+            bool dupsAllowed = false;
+            sortedDataInterface->unindex(opCtx, keyStringWithRecordId, dupsAllowed);
+            sortedDataInterface->insertWithRecordIdInValue_forTest(
+                opCtx, keyStringWithoutRecordId, recordId);
+            wuow.commit();
+        }
+
+        // Confirm that key in index is in old format.
+        {
+            auto cursor = sortedDataInterface->newCursor(opCtx);
+            auto indexEntry = cursor->seekForKeyString(firstKeyString);
+            ASSERT(indexEntry);
+            ASSERT_EQ(indexEntry->keyString.compareWithoutRecordIdLong(keyStringWithRecordId), 0);
+            ASSERT_FALSE(cursor->nextKeyString());
+        }
+    }
+
+    auto results = foregroundValidate(opCtx,
+                                      /*valid*/ true,
+                                      /*numRecords*/ 1,
+                                      /*numInvalidDocuments*/ 0,
+                                      /*numErrors*/ 0);
+    ASSERT_EQ(results.size(), 2);
+
+    for (const auto& result : results) {
+        const auto& validateResults = result.second;
+        BSONObjBuilder builder;
+        bool debugging = true;
+        validateResults.appendToResultObj(&builder, debugging);
+        auto obj = builder.obj();
+        ASSERT(validateResults.valid) << obj;
+        ASSERT_EQ(validateResults.warnings.size(), 0) << obj;
+    }
 }
 
 }  // namespace

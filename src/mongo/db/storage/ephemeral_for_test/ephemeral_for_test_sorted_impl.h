@@ -94,6 +94,11 @@ public:
     Status initAsEmpty(OperationContext* opCtx) override;
     boost::optional<RecordId> findLoc(OperationContext* opCtx,
                                       const KeyString::Value& keyString) const override;
+    void insertWithRecordIdInValue_forTest(OperationContext* opCtx,
+                                           const KeyString::Value& keyString,
+                                           RecordId rid) override {
+        MONGO_UNREACHABLE;
+    }
 
 protected:
     // These two are the same as before.

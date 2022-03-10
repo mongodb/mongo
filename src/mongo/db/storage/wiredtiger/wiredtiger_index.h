@@ -159,6 +159,11 @@ public:
                        const KeyString::Value& keyString) = 0;
     virtual bool unique() const = 0;
     virtual bool isTimestampSafeUniqueIdx() const = 0;
+    void insertWithRecordIdInValue_forTest(OperationContext* opCtx,
+                                           const KeyString::Value& keyString,
+                                           RecordId rid) override {
+        MONGO_UNREACHABLE;
+    }
 
 protected:
     virtual StatusWith<bool> _insert(OperationContext* opCtx,
@@ -233,6 +238,10 @@ public:
     bool isTimestampSafeUniqueIdx() const override;
 
     bool isDup(OperationContext* opCtx, WT_CURSOR* c, const KeyString::Value& keyString) override;
+
+    void insertWithRecordIdInValue_forTest(OperationContext* opCtx,
+                                           const KeyString::Value& keyString,
+                                           RecordId rid) override;
 
 protected:
     StatusWith<bool> _insert(OperationContext* opCtx,
