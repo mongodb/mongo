@@ -3,7 +3,8 @@ load("jstests/libs/parallelTester.js");  // for Thread.
 function backupData(mongo, destinationDirectory) {
     let backupCursor = openBackupCursor(mongo);
     let metadata = getBackupCursorMetadata(backupCursor);
-    copyBackupCursorFiles(backupCursor, metadata.dbpath, destinationDirectory);
+    copyBackupCursorFiles(
+        backupCursor, /*namespacesToSkip=*/[], metadata.dbpath, destinationDirectory);
     backupCursor.close();
     return metadata;
 }
@@ -60,16 +61,19 @@ function getBackupCursorMetadata(backupCursor) {
  * is true, this function will spawn a Thread doing the copy work and return the thread along
  * with the backup cursor metadata. The caller should `join` the thread when appropriate.
  */
-function copyBackupCursorFiles(backupCursor, dbpath, destinationDirectory, async) {
+function copyBackupCursorFiles(
+    backupCursor, namespacesToSkip, dbpath, destinationDirectory, async, fileCopiedCallback) {
     resetDbpath(destinationDirectory);
     mkdir(destinationDirectory + "/journal");
 
-    let copyThread = copyBackupCursorExtendFiles(backupCursor, dbpath, destinationDirectory, async);
+    let copyThread = copyBackupCursorExtendFiles(
+        backupCursor, namespacesToSkip, dbpath, destinationDirectory, async, fileCopiedCallback);
     return copyThread;
 }
 
-function copyBackupCursorExtendFiles(cursor, dbpath, destinationDirectory, async) {
-    let files = _cursorToFiles(cursor);
+function copyBackupCursorExtendFiles(
+    cursor, namespacesToSkip, dbpath, destinationDirectory, async, fileCopiedCallback) {
+    let files = _cursorToFiles(cursor, namespacesToSkip, fileCopiedCallback);
     let copyThread;
     if (async) {
         copyThread = new Thread(_copyFiles, files, dbpath, destinationDirectory, _copyFileHelper);
@@ -88,11 +92,21 @@ function copyBackupCursorExtendFiles(cursor, dbpath, destinationDirectory, async
     return copyThread;
 }
 
-function _cursorToFiles(cursor) {
+function _cursorToFiles(cursor, namespacesToSkip, fileCopiedCallback) {
     let files = [];
     while (cursor.hasNext()) {
         let doc = cursor.next();
         assert(doc.hasOwnProperty("filename"));
+
+        if (namespacesToSkip.includes(doc.ns)) {
+            jsTestLog("Skipping file during backup: " + tojson(doc));
+            continue;
+        }
+
+        if (fileCopiedCallback) {
+            fileCopiedCallback(doc);
+        }
+
         files.push(doc.filename);
     }
     return files;
