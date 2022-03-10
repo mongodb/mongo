@@ -82,7 +82,7 @@ std::size_t RouterStagePipeline::getNumRemotes() const {
     return 0;
 }
 
-BSONObj RouterStagePipeline::getPostBatchResumeToken() const {
+BSONObj RouterStagePipeline::getPostBatchResumeToken() {
     return _mergeCursorsStage ? _mergeCursorsStage->getHighWaterMark() : BSONObj();
 }
 
