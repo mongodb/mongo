@@ -642,13 +642,14 @@ void setOrphanCountersOnRangeDeletionTasks(OperationContext* opCtx) {
                 return true;
             }
 
+            KeyPattern keyPattern;
+            uassertStatusOK(deletionTask.getRange().extractKeyPattern(&keyPattern));
             auto catalog = collection->getIndexCatalog();
             auto shardKeyIdx = catalog->findShardKeyPrefixedIndex(
-                opCtx, *collection, (*collection).getShardKeyPattern(), /*requireSingleKey=*/false);
+                opCtx, *collection, keyPattern.toBSON(), /*requireSingleKey=*/false);
 
             uassert(ErrorCodes::IndexNotFound,
-                    str::stream() << "couldn't find index over shard key "
-                                  << (*collection).getShardKeyPattern().clientReadable().toString()
+                    str::stream() << "couldn't find index over shard key " << keyPattern.toBSON()
                                   << " for collection " << deletionTask.getNss()
                                   << " (uuid: " << deletionTask.getCollectionUuid() << ")",
                     shardKeyIdx);
@@ -685,10 +686,14 @@ void setOrphanCountersOnRangeDeletionTasks(OperationContext* opCtx) {
 void clearOrphanCountersFromRangeDeletionTasks(OperationContext* opCtx) {
     BSONObj allDocsQuery;
     PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
-    store.update(opCtx,
-                 allDocsQuery,
-                 BSON("$unset" << BSON(RangeDeletionTask::kNumOrphanDocsFieldName << "")),
-                 WriteConcerns::kMajorityWriteConcernNoTimeout);
+    try {
+        store.update(opCtx,
+                     allDocsQuery,
+                     BSON("$unset" << BSON(RangeDeletionTask::kNumOrphanDocsFieldName << "")),
+                     WriteConcerns::kMajorityWriteConcernNoTimeout);
+    } catch (const ExceptionFor<ErrorCodes::NoMatchingDocument>&) {
+        // There may be no range deletion tasks, so it is possible no document is updated
+    }
 }
 
 }  // namespace mongo

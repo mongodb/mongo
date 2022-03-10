@@ -395,10 +395,10 @@ public:
                 invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
                 // TODO SERVER-64162 Destroy the BalancerStatsRegistry
                 if (actualVersion > requestedVersion &&
-                    feature_flags::gNoMoreAutoSplitter.isEnabled(
-                        serverGlobalParams.featureCompatibility)) {
+                    !feature_flags::gNoMoreAutoSplitter.isEnabledOnVersion(requestedVersion)) {
                     clearOrphanCountersFromRangeDeletionTasks(opCtx);
                 }
+
                 // TODO (SERVER-62325): Remove collMod draining mechanism after 6.0 branching.
                 if (actualVersion > requestedVersion &&
                     requestedVersion < multiversion::FeatureCompatibilityVersion::kVersion_5_3) {
@@ -571,7 +571,7 @@ private:
 
         if (serverGlobalParams.clusterRole == ClusterRole::ShardServer &&
             request.getPhase() == SetFCVPhaseEnum::kComplete &&
-            feature_flags::gNoMoreAutoSplitter.isEnabled(serverGlobalParams.featureCompatibility)) {
+            feature_flags::gNoMoreAutoSplitter.isEnabledOnVersion(requestedVersion)) {
             // TODO SERVER-64162 Initialize the BalancerStatsRegistry
             setOrphanCountersOnRangeDeletionTasks(opCtx);
         }

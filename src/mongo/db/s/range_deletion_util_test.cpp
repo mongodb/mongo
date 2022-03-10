@@ -119,10 +119,6 @@ public:
                         DatabaseVersion(UUID::gen(), Timestamp(1, 1)),
                         makeStandaloneRoutingTableHistory(std::move(rt)),
                         boost::none);
-        if (!OperationShardingState::isOperationVersioned(_opCtx)) {
-            OperationShardingState::setShardRole(
-                _opCtx, kNss, cm.getVersion(ShardId("dummyShardId")), boost::none);
-        }
         AutoGetDb autoDb(_opCtx, kNss.db(), MODE_IX);
         Lock::CollectionLock collLock(_opCtx, kNss, MODE_IX);
         CollectionMetadata collMetadata(std::move(cm), ShardId("dummyShardId"));
