@@ -117,12 +117,14 @@ const expectedGlobalVars = [
     "version",
 ];
 
-const targetArch = buildInfo().buildEnvironment.target_arch;
-if (targetArch !== 'aarch64' && targetArch !== 'ppc64le' && targetArch !== 's390x') {
-    // WebAssembly is not supported on ARM and PPC platforms. It is not compiled in to the JS
-    // environment, so isn't expected in this output.
-    expectedGlobalVars.push("WebAssembly");
-}
+// Symbols in 'optionalGlobalVars' may appear in the global property list, but this test does not
+// require them and will not fail if they are missing.
+const optionalGlobalVars = [
+    // Not all platforms support WebAssembly, and it is possible to compile the JavaScript engine
+    // without WebAssembly included, in which case, this "WebAssembly" symbol will be missing.
+    "WebAssembly",
+];
+
 // Note: it is important that this is sorted to compare to sorted variable names below.
 expectedGlobalVars.sort();
 
@@ -137,6 +139,7 @@ const props =
     coll.aggregate([
             {$replaceWith: {varName: {$function: {lang: "js", args: [], body: getGlobalProps}}}},
             {$unwind: "$varName"},
+            {$match: {varName: {$nin: optionalGlobalVars}}},
             {$sort: {varName: 1}},
         ])
         .toArray();
@@ -176,7 +179,9 @@ assert.eq(
             $where: "const global = function() { return this; }();\n" +
                 "printjsononeline(Object.getOwnPropertyNames(global));\n" +
                 `printjsononeline(${tojsononeline(expectedVarsInWhere)});\n` +
-                "const found = new Set(Object.getOwnPropertyNames(global));\n" +
+                `const optional = ${tojsononeline(optionalGlobalVars)};\n` +
+                "const found = new Set(Object.getOwnPropertyNames(global)\n" +
+                "  .filter(varName => !optional.includes(varName)));\n" +
                 `const expected = new Set(${tojsononeline(expectedVarsInWhere)});\n` +
                 "for (let foundItem of found) {\n" +
                 // __returnValue is a special case that we allow. This is populated _after_ we call
