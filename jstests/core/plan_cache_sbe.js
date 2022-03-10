@@ -12,6 +12,8 @@
  *   assumes_read_concern_unchanged,
  *   assumes_read_preference_unchanged,
  *   assumes_unsharded_collection,
+ *   # Single solution plans can be cached in SBE plan cache after V6.0.
+ *   requires_fcv_60,
  * ]
  */
 (function() {
