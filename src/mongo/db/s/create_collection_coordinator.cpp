@@ -390,9 +390,7 @@ void _writeOplogMessage(OperationContext* opCtx,
 
 
     BSONObjBuilder cmdBuilder;
-    BSONObj shardCollCmd = BSON("shardCollection" << nss.ns());
-
-    cmdBuilder.appendElements(shardCollCmd);
+    cmdBuilder.append("shardCollection", nss.ns());
     cmdBuilder.appendElements(cmd);
 
     BSONObj fullCmd = cmdBuilder.obj();

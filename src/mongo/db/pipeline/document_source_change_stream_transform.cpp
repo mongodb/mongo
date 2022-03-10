@@ -369,6 +369,15 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
             break;
         }
         case repl::OpTypeEnum::kNoop: {
+            // Check whether this is a shardCollection oplog entry.
+            if (!input.getNestedField("o2.shardCollection").missing()) {
+                const auto o2Field = input[repl::OplogEntry::kObject2FieldName].getDocument();
+                operationType = DocumentSourceChangeStream::kShardCollectionOpType;
+                operationDescription = Value(copyDocExceptFields(o2Field, {"shardCollection"_sd}));
+                break;
+            }
+
+            // Otherwise, o2.type determines the message type.
             auto o2Type = input.getNestedField("o2.type");
             tassert(5052200, "o2.type is missing from noop oplog event", !o2Type.missing());
 

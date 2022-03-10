@@ -251,6 +251,12 @@ std::unique_ptr<MatchExpression> buildInternalOpFilter(
     for (const auto& eventName : internalOpTypes) {
         internalOpTypeOrBuilder.append(BSON("o2.type" << eventName));
     }
+
+    // Also filter for shardCollection events, which are recorded as {op: 'n'} in the oplog.
+    auto nsRegex = DocumentSourceChangeStream::getNsRegexForChangeStream(expCtx->ns);
+    internalOpTypeOrBuilder.append(BSON("o2.shardCollection" << BSONRegEx(nsRegex)));
+
+    // Finalize the array of $or filter predicates.
     internalOpTypeOrBuilder.done();
 
     return MatchExpressionParser::parseAndNormalize(BSON("op"
