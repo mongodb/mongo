@@ -98,6 +98,10 @@ public:
         return *this;
     }
 
+    std::string toString() const {
+        return std::to_string(_i);
+    }
+
 private:
     int _i;
 };
@@ -140,6 +144,9 @@ public:
         _current += _increment;
         return out;
     }
+    const IWPair& current() {
+        MONGO_UNREACHABLE;
+    }
 
 private:
     int _current;
@@ -156,6 +163,9 @@ public:
     }
     Data next() {
         verify(false);
+    }
+    const Data& current() {
+        MONGO_UNREACHABLE;
     }
 };
 
@@ -176,6 +186,9 @@ public:
         verify(more());
         _remaining--;
         return _source->next();
+    }
+    const Data& current() {
+        MONGO_UNREACHABLE;
     }
 
 private:
@@ -213,6 +226,38 @@ void _assertIteratorsEquivalent(It1 it1, It2 it2, int line) {
     }
 }
 #define ASSERT_ITERATORS_EQUIVALENT(it1, it2) _assertIteratorsEquivalent(it1, it2, __LINE__)
+
+template <typename It1, typename It2>
+void _assertIteratorsEquivalentForNSteps(It1 it1, It2 it2, int maxSteps, int line) {
+    int iteration;
+    try {
+        it1->openSource();
+        it2->openSource();
+        for (iteration = 0; iteration < maxSteps; iteration++) {
+            ASSERT_EQUALS(it1->more(), it2->more());
+            ASSERT_EQUALS(it1->more(), it2->more());  // make sure more() is safe to call twice
+            if (!it1->more())
+                return;
+
+            IWPair pair1 = it1->next();
+            IWPair pair2 = it2->next();
+            ASSERT_EQUALS(pair1.first, pair2.first);
+            ASSERT_EQUALS(pair1.second, pair2.second);
+        }
+        it1->closeSource();
+        it2->closeSource();
+    } catch (...) {
+        LOGV2(6409300,
+              "Failure from line {line} on iteration {iteration}",
+              "line"_attr = line,
+              "iteration"_attr = iteration);
+        it1->closeSource();
+        it2->closeSource();
+        throw;
+    }
+}
+#define ASSERT_ITERATORS_EQUIVALENT_FOR_N_STEPS(it1, it2, n) \
+    _assertIteratorsEquivalentForNSteps(it1, it2, n, __LINE__)
 
 template <int N>
 std::shared_ptr<IWIterator> makeInMemIterator(const int (&array)[N]) {
@@ -266,6 +311,9 @@ public:
                     IWPair ret(unsorted[_pos], -unsorted[_pos]);
                     _pos++;
                     return ret;
+                }
+                const IWPair& current() {
+                    MONGO_UNREACHABLE;
                 }
                 size_t _pos;
             } unsortedIter;
@@ -365,6 +413,27 @@ public:
             ASSERT_ITERATORS_EQUIVALENT(
                 mergeIterators(iterators, ASC, SortOptions().Limit(10)),
                 std::make_shared<LimitIterator>(10, std::make_shared<IntIterator>(0, 20, 1)));
+        }
+
+        {  // test ASC with additional merging
+            auto itFull = std::make_shared<IntIterator>(0, 20, 1);
+
+            auto itA = std::make_shared<IntIterator>(0, 5, 1);    // 0, 1, ... 4
+            auto itB = std::make_shared<IntIterator>(5, 10, 1);   // 5, 6, ... 9
+            auto itC = std::make_shared<IntIterator>(10, 15, 1);  // 10, 11, ... 14
+            auto itD = std::make_shared<IntIterator>(15, 20, 1);  // 15, 16, ... 19
+
+            std::shared_ptr<IWIterator> iteratorsAD[] = {itD, itA};
+            auto mergedAD = mergeIterators(iteratorsAD, ASC);
+            ASSERT_ITERATORS_EQUIVALENT_FOR_N_STEPS(mergedAD, itFull, 5);
+
+            std::shared_ptr<IWIterator> iteratorsABD[] = {mergedAD, itB};
+            auto mergedABD = mergeIterators(iteratorsABD, ASC);
+            ASSERT_ITERATORS_EQUIVALENT_FOR_N_STEPS(mergedABD, itFull, 5);
+
+            std::shared_ptr<IWIterator> iteratorsABCD[] = {itC, mergedABD};
+            auto mergedABCD = mergeIterators(iteratorsABCD, ASC);
+            ASSERT_ITERATORS_EQUIVALENT_FOR_N_STEPS(mergedABCD, itFull, 5);
         }
     }
 };
@@ -876,12 +945,25 @@ TEST_F(SorterMakeFromExistingRangesTest, RoundTrip) {
 
 class BoundedSorterTest : public unittest::Test {
 public:
-    using Key = int;
+    using Key = IntWrapper;
     struct Doc {
         Key time;
 
         bool operator==(const Doc& other) {
             return time == other.time;
+        }
+
+        void serializeForSorter(BufBuilder& buf) const {
+            time.serializeForSorter(buf);
+        }
+
+        struct SorterDeserializeSettings {};  // unused
+        static Doc deserializeForSorter(BufReader& buf, const SorterDeserializeSettings&) {
+            return {IntWrapper::deserializeForSorter(buf, {})};
+        }
+
+        int memUsageForSorter() const {
+            return sizeof(Doc);
         }
     };
     struct Comparator {
@@ -899,7 +981,7 @@ public:
     /**
      * Feed the input into the sorter one-by-one, taking any output as soon as it's available.
      */
-    std::vector<Doc> sort(std::vector<Doc> input) {
+    std::vector<Doc> sort(std::vector<Doc> input, int expectedSize = -1) {
         std::vector<Doc> output;
         auto push = [&](Doc doc) { output.push_back(doc); };
 
@@ -914,7 +996,7 @@ public:
             push(sorter.next().second);
         ASSERT(sorter.getState() == S::State::kDone);
 
-        ASSERT(output.size() == input.size());
+        ASSERT_EQ(output.size(), expectedSize == -1 ? input.size() : expectedSize);
         return output;
     }
 
@@ -926,7 +1008,7 @@ public:
         }
     }
 
-    S sorter{{}, {}};
+    S sorter{{}, {}, {}};
 };
 TEST_F(BoundedSorterTest, Empty) {
     ASSERT(sorter.getState() == S::State::kWait);
@@ -1011,12 +1093,195 @@ TEST_F(BoundedSorterTest, WrongInput) {
     ASSERT_EQ(output[6].time, 16);
 
     // Test that by default, bad input like this would be detected.
-    sorter = S{{}, {}};
+    sorter = S{{}, {}, {}};
     ASSERT(sorter.checkInput);
     ASSERT_THROWS_CODE(sort(input), DBException, 6369910);
+}
+
+TEST_F(BoundedSorterTest, MemoryLimitsNoExtSortAllowed) {
+    auto options = SortOptions().MaxMemoryUsageBytes(16);
+    sorter = S(options, {}, {});
+
+    std::vector<Doc> input = {
+        {0},
+        {3},
+        {10},
+        {11},
+        {12},
+        {13},
+        {14},
+        {15},
+        {16},
+    };
+
+    ASSERT_THROWS_CODE(
+        sort(input), DBException, ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed);
+}
+
+TEST_F(BoundedSorterTest, SpillSorted) {
+    auto options =
+        SortOptions().ExtSortAllowed().TempDir("unused_temp_dir").MaxMemoryUsageBytes(16);
+    sorter = S(options, {}, {});
+
+    auto output = sort({
+        {0},
+        {3},
+        {10},
+        {11},
+        {12},
+        {13},
+        {14},
+        {15},
+        {16},
+    });
+    assertSorted(output);
+
+    ASSERT_EQ(sorter.numSpills(), 3);
+}
+
+TEST_F(BoundedSorterTest, SpillSortedExceptOne) {
+    auto options =
+        SortOptions().ExtSortAllowed().TempDir("unused_temp_dir").MaxMemoryUsageBytes(16);
+    sorter = S(options, {}, {});
+
+    auto output = sort({
+        {0},
+        {3},
+        {10},
+        // Swap 11 and 12.
+        {12},
+        {11},
+        {13},
+        {14},
+        {15},
+        {16},
+    });
+    assertSorted(output);
+
+    ASSERT_EQ(sorter.numSpills(), 3);
+}
+
+TEST_F(BoundedSorterTest, SpillAlmostSorted) {
+    auto options =
+        SortOptions().ExtSortAllowed().TempDir("unused_temp_dir").MaxMemoryUsageBytes(16);
+    sorter = S(options, {}, {});
+
+    auto output = sort({
+        // 0 and 11 cannot swap.
+        {0},
+        {11},
+        {13},
+        {10},
+        {12},
+        // 3 and 14 cannot swap.
+        {3},
+        {14},
+        {15},
+        {16},
+    });
+    assertSorted(output);
+
+    ASSERT_EQ(sorter.numSpills(), 2);
+}
+
+TEST_F(BoundedSorterTest, SpillWrongInput) {
+    auto options =
+        SortOptions().ExtSortAllowed().TempDir("unused_temp_dir").MaxMemoryUsageBytes(16);
+    sorter = S(options, {}, {});
+
+    std::vector<Doc> input = {
+        {3},
+        {4},
+        {5},
+        {10},
+        {15},
+        // This 1 is too far out of order: it's more than 10 away from 15.
+        // So it will appear too late in the output.
+        // We will still be hanging on to anything in the range [5, inf).
+        // So we will have already returned 3, 4.
+        {1},
+        {16},
+    };
+
+    // Disable input order checking so we can see what happens.
+    sorter.checkInput = false;
+    auto output = sort(input);
+    ASSERT_EQ(output.size(), 7);
+
+    ASSERT_EQ(output[0].time, 3);
+    ASSERT_EQ(output[1].time, 4);
+    ASSERT_EQ(output[2].time, 1);  // Out of order.
+    ASSERT_EQ(output[3].time, 5);
+    ASSERT_EQ(output[4].time, 10);
+    ASSERT_EQ(output[5].time, 15);
+    ASSERT_EQ(output[6].time, 16);
+
+    ASSERT_EQ(sorter.numSpills(), 2);
+
+    // Test that by default, bad input like this would be detected.
+    sorter = S{options, {}, {}};
+    ASSERT(sorter.checkInput);
+    ASSERT_THROWS_CODE(sort(input), DBException, 6369910);
+}
+
+TEST_F(BoundedSorterTest, LimitNoSpill) {
+    auto options =
+        SortOptions().ExtSortAllowed().TempDir("unused_temp_dir").MaxMemoryUsageBytes(40).Limit(2);
+    sorter = S(options, {}, {});
+
+    auto output = sort(
+        {
+            // 0 and 11 cannot swap.
+            {0},
+            {11},
+            {13},
+            {10},
+            {12},
+            // 3 and 14 cannot swap.
+            {3},
+            {14},
+            {15},
+            {16},
+        },
+        2);
+    assertSorted(output);
+
+    ASSERT_EQ(sorter.numSpills(), 0);
+}
+
+TEST_F(BoundedSorterTest, LimitSpill) {
+    auto options =
+        SortOptions().ExtSortAllowed().TempDir("unused_temp_dir").MaxMemoryUsageBytes(40).Limit(3);
+    sorter = S(options, {}, {});
+
+    auto output = sort(
+        {
+            // 0 and 11 cannot swap.
+            {0},
+            {11},
+            {13},
+            {10},
+            {12},
+            // 3 and 14 cannot swap.
+            {3},
+            {14},
+            {15},
+            {16},
+        },
+        3);
+    assertSorted(output);
+
+    ASSERT_EQ(sorter.numSpills(), 1);
 }
 
 
 }  // namespace
 }  // namespace sorter
 }  // namespace mongo
+
+template class ::mongo::Sorter<::mongo::sorter::BoundedSorterTest::Key,
+                               ::mongo::sorter::BoundedSorterTest::Doc>;
+template class ::mongo::BoundedSorter<::mongo::sorter::BoundedSorterTest::Key,
+                                      ::mongo::sorter::BoundedSorterTest::Doc,
+                                      ::mongo::sorter::BoundedSorterTest::Comparator,
+                                      ::mongo::sorter::BoundedSorterTest::BoundMaker>;

@@ -108,7 +108,7 @@ DocumentSource::GetNextResult DocumentSourceSort::doGetNext() {
                     uassert(6369909,
                             "$_internalBoundedSort only handles Date values",
                             time.getType() == Date);
-                    _timeSorter->add(time.getDate(), doc);
+                    _timeSorter->add({time.getDate()}, doc);
                     continue;
             }
         }
@@ -289,8 +289,15 @@ intrusive_ptr<DocumentSourceSort> DocumentSourceSort::parseBoundedSort(
     BSONElement bound = args["bound"];
     int boundN = uassertStatusOK(bound.parseIntegerElementToNonNegativeLong());
 
+    SortOptions opts;
+    opts.maxMemoryUsageBytes = internalQueryMaxBlockingSortMemoryUsageBytes.load();
+    if (expCtx->allowDiskUse) {
+        opts.extSortAllowed = true;
+        opts.tempDir = expCtx->tempDir;
+    }
+
     auto ds = DocumentSourceSort::create(expCtx, pat);
-    ds->_timeSorter.reset(new TimeSorter{{}, BoundMaker{Seconds{boundN}}});
+    ds->_timeSorter.reset(new TimeSorter{opts, {}, BoundMaker{Seconds{boundN}}});
     return ds;
 }
 
@@ -372,4 +379,25 @@ bool DocumentSourceSort::canRunInParallelBeforeWriteStage(
     return false;
 }
 
+namespace {
+/**
+ * Generates a new file name on each call using a static, atomic and monotonically increasing
+ * number.
+ *
+ * Each user of the Sorter must implement this function to ensure that all temporary files that the
+ * Sorter instances produce are uniquely identified using a unique file name extension with separate
+ * atomic variable. This is necessary because the sorter.cpp code is separately included in multiple
+ * places, rather than compiled in one place and linked, and so cannot provide a globally unique ID.
+ */
+std::string nextFileName() {
+    static AtomicWord<unsigned> sortExecutorFileCounter;
+    return "extsort-time-sorter." + std::to_string(sortExecutorFileCounter.fetchAndAdd(1));
+}
+}  // namespace
 }  // namespace mongo
+
+#include "mongo/db/sorter/sorter.cpp"
+template class ::mongo::BoundedSorter<::mongo::DocumentSourceSort::SortableDate,
+                                      ::mongo::Document,
+                                      ::mongo::DocumentSourceSort::Comp,
+                                      ::mongo::DocumentSourceSort::BoundMaker>;

@@ -216,6 +216,7 @@ public:
 
     virtual bool more() = 0;
     virtual std::pair<Key, Value> next() = 0;
+    virtual const std::pair<Key, Value>& current() = 0;
 
     virtual ~SortIteratorInterface() {}
 
@@ -272,8 +273,8 @@ public:
     };
 
     /**
-     * Represents the file that a Sorter uses to spill to disk. Supports reading after writing (or
-     * reading without any writing), but does not support writing after any reading has been done.
+     * Represents the file that a Sorter uses to spill to disk. Supports reading and writing
+     * (append-only).
      */
     class File {
     public:
@@ -314,13 +315,16 @@ public:
     private:
         void _open();
 
+        /**
+         * Ensures that the file is open and that _offset is set to the end of the file.
+         */
         void _ensureOpenForWriting();
 
         boost::filesystem::path _path;
         std::fstream _file;
 
-        // The current offset of the end of the file, or -1 if the file either has not yet been
-        // opened or is already being read.
+        // The current offset of the end of the file if there may be unflushed data, or -1 if the
+        // file either has not yet been opened or has been flushed.
         std::streamoff _offset = -1;
 
         // Whether to keep the on-disk file even after this in-memory object has been destructed.
@@ -422,24 +426,11 @@ public:
         Comparator compare;
     };
 
-    BoundedSorter(Comparator comp, BoundMaker makeBound)
-        : compare(comp), makeBound(makeBound), _heap(Greater{comp}) {}
+    BoundedSorter(const SortOptions& opts, Comparator comp, BoundMaker makeBound);
 
     // Feed one item of input to the sorter.
     // Together, add() and done() represent the input stream.
-    void add(Key key, Value value) {
-        invariant(!_done);
-        // If a new value violates what we thought was our min bound, something has gone wrong.
-        if (checkInput && _min)
-            uassert(6369910, "BoundedSorter input is too out-of-order.", compare(*_min, key) <= 0);
-
-        // Each new item can potentially give us a tighter bound (a higher min).
-        Key newMin = makeBound(key);
-        if (!_min || compare(*_min, newMin) < 0)
-            _min = newMin;
-
-        _heap.emplace(std::move(key), std::move(value));
-    }
+    void add(Key key, Value value);
 
     // Indicate that no more input will arrive.
     // Together, add() and done() represent the input stream.
@@ -458,38 +449,15 @@ public:
     };
     // Together, state() and next() represent the output stream.
     // See BoundedSorter::State for the meaning of each case.
-    State getState() const {
-        if (_done) {
-            // No more input will arrive, so we're never in state kWait.
-            return _heap.empty() ? State::kDone : State::kReady;
-        } else {
-            if (_heap.empty())
-                return State::kWait;
-            dassert(_min);
-
-            // _heap.top() is the min of _heap, but we also need to consider whether a smaller input
-            // will arrive later. So _heap.top() is safe to return only if heap.top() < _min.
-            if (compare(_heap.top().first, *_min) < 0)
-                return State::kReady;
-
-            // A later call to add() may improve _min. Or in the worst case, after done() is called
-            // we will return everything in _heap.
-            return State::kWait;
-        }
-    }
+    State getState() const;
 
     // Remove and return one item of output.
     // Only valid to call when getState() == kReady.
     // Together, state() and next() represent the output stream.
-    std::pair<Key, Value> next() {
-        dassert(getState() == State::kReady);
-        auto result = _heap.top();
-        _heap.pop();
-        return result;
-    }
+    std::pair<Key, Value> next();
 
-    size_t size() const {
-        return _heap.size();
+    size_t numSpills() const {
+        return _numSpills;
     }
 
     // By default, uassert that the input meets our assumptions of being almost-sorted.
@@ -501,11 +469,29 @@ public:
     BoundMaker makeBound;
 
 private:
+    using SpillIterator = SortIteratorInterface<Key, Value>;
+    using PairComparator =
+        std::function<int(const std::pair<Key, Value>&, const std::pair<Key, Value>&)>;
+
+    void _spill();
+
+    PairComparator _comparePairs;
+
+    size_t _numSorted = 0;              // Keeps track of the number of keys sorted.
+    uint64_t _totalDataSizeSorted = 0;  // Keeps track of the total size of data sorted.
+
+    SortOptions _opts;
+
     using KV = std::pair<Key, Value>;
     std::priority_queue<KV, std::vector<KV>, Greater> _heap;
 
+    std::shared_ptr<typename Sorter<Key, Value>::File> _file;
+    std::shared_ptr<SpillIterator> _spillIter;
+    std::size_t _numSpills = 0;  // Keeps track of the number of spills that have happened.
+
     boost::optional<Key> _min;
     bool _done = false;
+    size_t _memUsed = 0;
 };
 
 /**
