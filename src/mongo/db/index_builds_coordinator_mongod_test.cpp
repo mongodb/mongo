@@ -37,6 +37,7 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/serverless/serverless_types_gen.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -388,8 +389,10 @@ TEST_F(IndexBuildsCoordinatorMongodTest, AbortBuildIndexDueToTenantMigration) {
 
     // This call may see the index build active and wait for it to be unregistered, or the index
     // build may already have been unregistered.
-    _indexBuildsCoord->abortTenantIndexBuilds(
-        operationContext(), _tenantId.toString(), "tenant migration");
+    _indexBuildsCoord->abortTenantIndexBuilds(operationContext(),
+                                              MigrationProtocolEnum::kMultitenantMigrations,
+                                              _tenantId.toString(),
+                                              "tenant migration");
 
     ASSERT_EQ(0, _indexBuildsCoord->getActiveIndexBuildCount(operationContext()));
 

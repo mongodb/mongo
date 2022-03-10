@@ -144,10 +144,12 @@ protected:
         const std::vector<std::string>& tenants,
         OperationContext* opCtx,
         const std::string& connectionStr) {
+        auto uuid = UUID::gen();
         std::vector<std::shared_ptr<TenantMigrationDonorAccessBlocker>> blockers;
         for (auto& tenant : tenants) {
             auto mtab = std::make_shared<TenantMigrationDonorAccessBlocker>(
                 _opCtx->getServiceContext(),
+                uuid,
                 tenant,
                 MigrationProtocolEnum::kMultitenantMigrations,
                 _connectionStr);

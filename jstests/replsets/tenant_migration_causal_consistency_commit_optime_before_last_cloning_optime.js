@@ -29,7 +29,7 @@ function assertCanFindWithReadConcern(conn, dbName, collName, expectedDoc, readC
 
 let counter = 0;
 let makeTenantId = function() {
-    return "tenant_" + counter++;
+    return "tenant-" + counter++;
 };
 
 // Local read concern case.

@@ -47,7 +47,7 @@ const createIndexesFailPoint =
 const createIdx = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {a: 1});
 
 try {
-    createIndexesFailPoint.wait(30 * 1000);
+    createIndexesFailPoint.wait({maxTimeMS: 30 * 1000});
 
     // PREPARE collection drop.
     twoPhaseDropTest.prepareDropCollection(collName);

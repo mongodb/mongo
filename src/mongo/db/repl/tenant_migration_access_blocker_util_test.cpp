@@ -65,7 +65,11 @@ TEST_F(TenantMigrationAccessBlockerUtilTest, HasActiveTenantMigrationInitiallyFa
 
 TEST_F(TenantMigrationAccessBlockerUtilTest, HasActiveTenantMigrationTrueWithDonor) {
     auto donorMtab = std::make_shared<TenantMigrationDonorAccessBlocker>(
-        getServiceContext(), kTenantId, MigrationProtocolEnum::kMultitenantMigrations, kConnString);
+        getServiceContext(),
+        UUID::gen(),
+        kTenantId,
+        MigrationProtocolEnum::kMultitenantMigrations,
+        kConnString);
     TenantMigrationAccessBlockerRegistry::get(getServiceContext()).add(kTenantId, donorMtab);
 
     ASSERT(tenant_migration_access_blocker::hasActiveTenantMigration(opCtx(), kTenantDB));
@@ -73,9 +77,8 @@ TEST_F(TenantMigrationAccessBlockerUtilTest, HasActiveTenantMigrationTrueWithDon
 
 TEST_F(TenantMigrationAccessBlockerUtilTest, HasActiveShardMergeTrueWithDonor) {
     auto donorMtab = std::make_shared<TenantMigrationDonorAccessBlocker>(
-        getServiceContext(), "", MigrationProtocolEnum::kShardMerge, kConnString);
-    TenantMigrationAccessBlockerRegistry::get(getServiceContext()).add("", donorMtab);
-
+        getServiceContext(), UUID::gen(), "", MigrationProtocolEnum::kShardMerge, kConnString);
+    TenantMigrationAccessBlockerRegistry::get(getServiceContext()).addDonorAccessBlocker(donorMtab);
     ASSERT(tenant_migration_access_blocker::hasActiveTenantMigration(opCtx(), "anyDb"_sd));
 }
 
@@ -109,27 +112,35 @@ TEST_F(TenantMigrationAccessBlockerUtilTest, HasActiveTenantMigrationTrueWithBot
     TenantMigrationAccessBlockerRegistry::get(getServiceContext()).add(kTenantId, recipientMtab);
 
     auto donorMtab = std::make_shared<TenantMigrationDonorAccessBlocker>(
-        getServiceContext(), kTenantId, MigrationProtocolEnum::kMultitenantMigrations, kConnString);
+        getServiceContext(),
+        UUID::gen(),
+        kTenantId,
+        MigrationProtocolEnum::kMultitenantMigrations,
+        kConnString);
     TenantMigrationAccessBlockerRegistry::get(getServiceContext()).add(kTenantId, donorMtab);
 
     ASSERT(tenant_migration_access_blocker::hasActiveTenantMigration(opCtx(), kTenantDB));
 }
 
 TEST_F(TenantMigrationAccessBlockerUtilTest, HasActiveShardMergeTrueWithBoth) {
+    auto uuid = UUID::gen();
     auto recipientMtab = std::make_shared<TenantMigrationRecipientAccessBlocker>(
-        getServiceContext(), UUID::gen(), "", MigrationProtocolEnum::kShardMerge, kConnString);
+        getServiceContext(), uuid, "", MigrationProtocolEnum::kShardMerge, kConnString);
     TenantMigrationAccessBlockerRegistry::get(getServiceContext()).add("", recipientMtab);
 
     auto donorMtab = std::make_shared<TenantMigrationDonorAccessBlocker>(
-        getServiceContext(), "", MigrationProtocolEnum::kShardMerge, kConnString);
-    TenantMigrationAccessBlockerRegistry::get(getServiceContext()).add("", donorMtab);
-
+        getServiceContext(), uuid, "", MigrationProtocolEnum::kShardMerge, kConnString);
+    TenantMigrationAccessBlockerRegistry::get(getServiceContext()).addDonorAccessBlocker(donorMtab);
     ASSERT(tenant_migration_access_blocker::hasActiveTenantMigration(opCtx(), "anyDb"_sd));
 }
 
 TEST_F(TenantMigrationAccessBlockerUtilTest, HasActiveTenantMigrationFalseForNoDbName) {
     auto donorMtab = std::make_shared<TenantMigrationDonorAccessBlocker>(
-        getServiceContext(), kTenantId, MigrationProtocolEnum::kMultitenantMigrations, kConnString);
+        getServiceContext(),
+        UUID::gen(),
+        kTenantId,
+        MigrationProtocolEnum::kMultitenantMigrations,
+        kConnString);
     TenantMigrationAccessBlockerRegistry::get(getServiceContext()).add(kTenantId, donorMtab);
 
     ASSERT_FALSE(tenant_migration_access_blocker::hasActiveTenantMigration(opCtx(), StringData()));
@@ -137,9 +148,8 @@ TEST_F(TenantMigrationAccessBlockerUtilTest, HasActiveTenantMigrationFalseForNoD
 
 TEST_F(TenantMigrationAccessBlockerUtilTest, HasActiveShardMergeFalseForNoDbName) {
     auto donorMtab = std::make_shared<TenantMigrationDonorAccessBlocker>(
-        getServiceContext(), "", MigrationProtocolEnum::kShardMerge, kConnString);
-    TenantMigrationAccessBlockerRegistry::get(getServiceContext()).add("", donorMtab);
-
+        getServiceContext(), UUID::gen(), "", MigrationProtocolEnum::kShardMerge, kConnString);
+    TenantMigrationAccessBlockerRegistry::get(getServiceContext()).addDonorAccessBlocker(donorMtab);
     ASSERT_FALSE(tenant_migration_access_blocker::hasActiveTenantMigration(opCtx(), StringData()));
 }
 
@@ -153,7 +163,11 @@ TEST_F(TenantMigrationAccessBlockerUtilTest, HasActiveTenantMigrationFalseForUnr
     TenantMigrationAccessBlockerRegistry::get(getServiceContext()).add(kTenantId, recipientMtab);
 
     auto donorMtab = std::make_shared<TenantMigrationDonorAccessBlocker>(
-        getServiceContext(), kTenantId, MigrationProtocolEnum::kMultitenantMigrations, kConnString);
+        getServiceContext(),
+        UUID::gen(),
+        kTenantId,
+        MigrationProtocolEnum::kMultitenantMigrations,
+        kConnString);
     TenantMigrationAccessBlockerRegistry::get(getServiceContext()).add(kTenantId, donorMtab);
 
     ASSERT_FALSE(tenant_migration_access_blocker::hasActiveTenantMigration(opCtx(), "otherDb"_sd));
@@ -169,7 +183,11 @@ TEST_F(TenantMigrationAccessBlockerUtilTest, HasActiveTenantMigrationFalseAfterR
     TenantMigrationAccessBlockerRegistry::get(getServiceContext()).add(kTenantId, recipientMtab);
 
     auto donorMtab = std::make_shared<TenantMigrationDonorAccessBlocker>(
-        getServiceContext(), kTenantId, MigrationProtocolEnum::kMultitenantMigrations, kConnString);
+        getServiceContext(),
+        UUID::gen(),
+        kTenantId,
+        MigrationProtocolEnum::kMultitenantMigrations,
+        kConnString);
     TenantMigrationAccessBlockerRegistry::get(getServiceContext()).add(kTenantId, donorMtab);
 
     ASSERT(tenant_migration_access_blocker::hasActiveTenantMigration(opCtx(), kTenantDB));
@@ -195,7 +213,11 @@ TEST_F(TenantMigrationAccessBlockerUtilTest, HasActiveShardMergeFalseAfterRemove
     TenantMigrationAccessBlockerRegistry::get(getServiceContext()).add(kTenantId, recipientMtab);
 
     auto donorMtab = std::make_shared<TenantMigrationDonorAccessBlocker>(
-        getServiceContext(), kTenantId, MigrationProtocolEnum::kMultitenantMigrations, kConnString);
+        getServiceContext(),
+        UUID::gen(),
+        kTenantId,
+        MigrationProtocolEnum::kMultitenantMigrations,
+        kConnString);
     TenantMigrationAccessBlockerRegistry::get(getServiceContext()).add(kTenantId, donorMtab);
 
     ASSERT(tenant_migration_access_blocker::hasActiveTenantMigration(opCtx(), kTenantDB));

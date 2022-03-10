@@ -21,6 +21,14 @@ load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/replsets/libs/tenant_migration_util.js");
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
+// TODO (SERVER-63517): This test assumes the donor blocks only some tenants. Replace this test with
+// tenant_migration_buildindex_shard_merge.js.
+if (TenantMigrationUtil.isShardMergeEnabled(
+        tenantMigrationTest.getDonorPrimary().getDB("adminDB"))) {
+    jsTestLog("Skip: incompatible with featureFlagShardMerge");
+    tenantMigrationTest.stop();
+    return;
+}
 
 const kTenantId = "testTenantId1";
 const kUnrelatedTenantId = "testTenantId2";

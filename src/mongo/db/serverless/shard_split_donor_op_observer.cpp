@@ -140,6 +140,7 @@ void onBlockerInitialization(OperationContext* opCtx,
     for (const auto& tenantId : optionalTenants.get()) {
         auto mtab = std::make_shared<TenantMigrationDonorAccessBlocker>(
             opCtx->getServiceContext(),
+            donorStateDoc.getId(),
             tenantId.toString(),
             MigrationProtocolEnum::kMultitenantMigrations,
             recipientConnectionString.toString());

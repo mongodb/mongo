@@ -181,9 +181,14 @@ class TenantMigrationDonorAccessBlocker
       public TenantMigrationAccessBlocker {
 public:
     TenantMigrationDonorAccessBlocker(ServiceContext* serviceContext,
+                                      UUID migrationId,
                                       std::string tenantId,
                                       MigrationProtocolEnum protocol,
                                       std::string recipientConnString);
+
+    const UUID& getMigrationId() const {
+        return _migrationId;
+    }
 
     //
     // Called by all writes and reads against the database.
@@ -321,6 +326,7 @@ private:
     void _onMajorityCommitAbortOpTime(stdx::unique_lock<Latch>& lk);
 
     ServiceContext* _serviceContext;
+    const UUID _migrationId;
     const std::string _tenantId;
     const MigrationProtocolEnum _protocol;
     const std::string _recipientConnString;

@@ -778,6 +778,7 @@ void IndexBuildsCoordinator::abortDatabaseIndexBuilds(OperationContext* opCtx,
 }
 
 void IndexBuildsCoordinator::abortTenantIndexBuilds(OperationContext* opCtx,
+                                                    MigrationProtocolEnum protocol,
                                                     StringData tenantId,
                                                     const std::string& reason) {
     LOGV2(4886203,
@@ -787,7 +788,9 @@ void IndexBuildsCoordinator::abortTenantIndexBuilds(OperationContext* opCtx,
 
     auto builds = [&]() -> std::vector<std::shared_ptr<ReplIndexBuildState>> {
         auto indexBuildFilter = [=](const auto& replState) {
-            return repl::ClonerUtils::isDatabaseForTenant(replState.dbName, tenantId);
+            // Abort *all* index builds at the start of shard merge.
+            return protocol == MigrationProtocolEnum::kShardMerge ||
+                repl::ClonerUtils::isDatabaseForTenant(replState.dbName, tenantId);
         };
         return activeIndexBuilds.filterIndexBuilds(indexBuildFilter);
     }();
@@ -812,8 +815,7 @@ void IndexBuildsCoordinator::abortTenantIndexBuilds(OperationContext* opCtx,
     }
     for (const auto& replState : buildsWaitingToFinish) {
         LOGV2(6221600,
-              "Waiting on the index build to unregister before continuing the tenant "
-              " migration.",
+              "Waiting on the index build to unregister before continuing the tenant migration.",
               "tenantId"_attr = tenantId,
               "buildUUID"_attr = replState->buildUUID,
               "db"_attr = replState->dbName,

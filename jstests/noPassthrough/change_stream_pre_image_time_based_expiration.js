@@ -155,7 +155,7 @@ function testTimeBasedPreImageRetentionPolicy(conn, primary) {
                            {currentTimeForTimeBasedExpiration: currentTime});
 
     // Wait until at least 1 complete cycle of pre-image removal job is completed.
-    currentTimeFailPoint.wait(kDefaultWaitForFailPointTimeout, 2);
+    currentTimeFailPoint.wait({timesEntered: 2});
 
     // Verify that when time-based pre-image expiration disabled, no pre-images are not deleted.
     verifyPreImages(preImageColl, allDocs, collectionsInfo);

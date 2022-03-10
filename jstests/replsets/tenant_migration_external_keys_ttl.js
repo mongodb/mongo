@@ -31,7 +31,7 @@ const ttlMonitorOptions = {
 
 let counter = 0;
 let makeTenantId = function() {
-    return kTenantIdPrefix + "_" + counter++;
+    return kTenantIdPrefix + "-" + counter++;
 };
 
 function waitForExternalKeysTTLIndex(conn) {

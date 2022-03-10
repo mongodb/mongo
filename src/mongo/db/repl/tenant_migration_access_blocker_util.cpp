@@ -310,6 +310,7 @@ void recoverTenantMigrationAccessBlockers(OperationContext* opCtx) {
 
         auto mtab = std::make_shared<TenantMigrationDonorAccessBlocker>(
             opCtx->getServiceContext(),
+            doc.getId(),
             doc.getTenantId().toString(),
             doc.getProtocol().value_or(MigrationProtocolEnum::kMultitenantMigrations),
             doc.getRecipientConnectionString().toString());

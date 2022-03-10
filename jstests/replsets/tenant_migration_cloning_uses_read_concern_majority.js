@@ -32,6 +32,14 @@ const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
 const donorRst = tenantMigrationTest.getDonorRst();
 const donorTestColl = donorPrimary.getDB(dbName).getCollection(collName);
 
+// TODO (SERVER-63517): Remove this test, it requires failover, and the ability to write to the
+// donor during migration, and it tests a cloning method superseded by Shard Merge.
+if (TenantMigrationUtil.isShardMergeEnabled(donorRst.getPrimary().getDB("adminDB"))) {
+    jsTestLog("Skip: featureFlagShardMerge enabled, but shard merge does not survive failover");
+    tenantMigrationTest.stop();
+    return;
+}
+
 // The default WC is majority and stopReplicationOnSecondaries will prevent satisfying any majority
 assert.commandWorked(recipientPrimary.adminCommand(
     {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));

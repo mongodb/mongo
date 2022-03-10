@@ -209,6 +209,8 @@ var TenantMigrationUtil = (function() {
                         primary = rst.getPrimary();
                         return false;
                     }
+                    const cmdName = Object.keys(localCmdObj)[0];
+                    jsTestLog(`Error from ${cmdName}: ${tojson(res)}`);
                     return true;
                 }
 

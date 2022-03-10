@@ -935,7 +935,7 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
         })
         .then([this, self = shared_from_this(), executor, recipientTargeterRS, abortToken] {
             LOGV2(6104905,
-                  "Waiting for receipient to reach the block timestamp.",
+                  "Waiting for recipient to reach the block timestamp.",
                   "migrationId"_attr = _migrationUuid,
                   "tenantId"_attr = _tenantId);
             return _waitForRecipientToReachBlockTimestampAndEnterCommittedState(
@@ -1028,7 +1028,8 @@ void TenantMigrationDonorService::Instance::_abortIndexBuilds(const Cancellation
         auto opCtxHolder = cc().makeOperationContext();
         auto* opCtx = opCtxHolder.get();
         auto* indexBuildsCoordinator = IndexBuildsCoordinator::get(opCtx);
-        indexBuildsCoordinator->abortTenantIndexBuilds(opCtx, _tenantId, "tenant migration");
+        indexBuildsCoordinator->abortTenantIndexBuilds(
+            opCtx, _protocol, _tenantId, "tenant migration");
     }
 }
 

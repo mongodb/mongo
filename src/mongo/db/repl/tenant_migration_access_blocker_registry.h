@@ -36,6 +36,9 @@
 
 namespace mongo {
 
+// TODO (SERVER-63517): There's only one donor access blocker for "shard merge", so remove
+// DonorRecipientAccessBlockerPair. Keep the donor blocker in _donorAccessBlocker, and recipient
+// blockers in a map tenantId |-> TenantMigrationRecipientAccessBlocker.
 class TenantMigrationAccessBlockerRegistry {
     TenantMigrationAccessBlockerRegistry(const TenantMigrationAccessBlockerRegistry&) = delete;
     TenantMigrationAccessBlockerRegistry& operator=(const TenantMigrationAccessBlockerRegistry&) =
@@ -94,14 +97,26 @@ public:
     /**
      * Adds an entry for (tenantId, mtab). Throws ConflictingOperationInProgress if an entry for
      * tenantId already exists.
+     *
+     * TODO (SERVER-63517): Rename to addRecipientAccessBlocker, take a
+     * std::shared_ptr<TenantMigrationRecipientAccessBlocker>.
      */
     void add(StringData tenantId, std::shared_ptr<TenantMigrationAccessBlocker> mtab);
+
+    /**
+     * Adds donor access blocker, throws ConflictingOperationInProgress if one exists.
+     */
+    void addDonorAccessBlocker(std::shared_ptr<TenantMigrationDonorAccessBlocker> mtab);
 
     /**
      * Invariants that an entry for tenantId exists, and then removes the entry for (tenantId, mtab)
      */
     void remove(StringData tenantId, TenantMigrationAccessBlocker::BlockerType type);
-    void _remove(WithLock, StringData tenantId, TenantMigrationAccessBlocker::BlockerType type);
+
+    /**
+     * Removes the donor access blocker, if any.
+     */
+    void removeDonorAccessBlocker(const UUID& migrationId);
 
     /**
      * Removes all mtabs of the given type.
@@ -156,10 +171,16 @@ public:
     std::shared_ptr<executor::TaskExecutor> getAsyncBlockingOperationsExecutor();
 
 private:
+    std::shared_ptr<TenantMigrationDonorAccessBlocker> _donorAccessBlocker;
+
     using TenantMigrationAccessBlockersMap = StringMap<DonorRecipientAccessBlockerPair>;
 
     boost::optional<DonorRecipientAccessBlockerPair> _getTenantMigrationAccessBlockersForDbName(
         StringData dbName, WithLock);
+
+    bool _hasDonorAccessBlocker(WithLock, StringData dbName);
+
+    void _remove(WithLock, StringData tenantId, TenantMigrationAccessBlocker::BlockerType type);
 
     std::shared_ptr<executor::TaskExecutor> _asyncBlockingOperationsExecutor;
 

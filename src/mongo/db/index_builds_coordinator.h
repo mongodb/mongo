@@ -49,6 +49,7 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl_index_build_state.h"
 #include "mongo/db/resumable_index_builds_gen.h"
+#include "mongo/db/serverless/serverless_types_gen.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/platform/mutex.h"
@@ -259,7 +260,10 @@ public:
      *
      * Does not stop new index builds from starting. Caller must make that guarantee.
      */
-    void abortTenantIndexBuilds(OperationContext* opCtx, StringData db, const std::string& reason);
+    void abortTenantIndexBuilds(OperationContext* opCtx,
+                                MigrationProtocolEnum protocol,
+                                StringData db,
+                                const std::string& reason);
     /**
      * Signals all of the index builds to abort and then waits until the index builds are no longer
      * running. The provided 'reason' will be used in the error message that the index builders

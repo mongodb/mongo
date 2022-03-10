@@ -73,11 +73,13 @@ const StringMap<int> commandDenyListAfterMigration = {
 
 TenantMigrationDonorAccessBlocker::TenantMigrationDonorAccessBlocker(
     ServiceContext* serviceContext,
+    UUID migrationId,
     std::string tenantId,
     MigrationProtocolEnum protocol,
     std::string recipientConnString)
     : TenantMigrationAccessBlocker(BlockerType::kDonor, protocol),
       _serviceContext(serviceContext),
+      _migrationId(migrationId),
       _tenantId(std::move(tenantId)),
       _protocol(protocol),
       _recipientConnString(std::move(recipientConnString)) {

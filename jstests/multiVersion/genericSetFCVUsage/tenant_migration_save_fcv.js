@@ -56,8 +56,7 @@ function runTest(downgradeFCV) {
     migrationThread.start();
     hangAfterSavingFCV.wait();
 
-    const isRunningMergeProtocol =
-        (TenantMigrationUtil.isShardMergeEnabled(recipientDb)) ? true : false;
+    const isRunningMergeProtocol = TenantMigrationUtil.isShardMergeEnabled(recipientDb);
 
     // Downgrade the FCV for the recipient set.
     assert.commandWorked(
