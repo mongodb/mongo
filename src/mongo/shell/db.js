@@ -1810,11 +1810,22 @@ DB.prototype.getSession = function() {
 })(Object.prototype.hasOwnProperty);
 
 DB.prototype.createEncryptedCollection = function(name, opts) {
+    assert.neq(
+        opts, undefined, `createEncryptedCollection expected an opts object, it is undefined`);
+    assert(options.hasOwnProperty("encryptedFields") && typeof options.encryptedFields == "object",
+           `opts must contain an encryptedFields document'`);
+
     const res = assert.commandWorked(this.createCollection(name, opts));
 
-    const ci = this.getCollectionInfos({"name": name})[0];
+    const cis = this.getCollectionInfos({"name": name});
+    assert.eq(cis.length(), 1, `Expected to find one collection named '${name}'`);
 
-    const ef = ci.options.encryptedFields;
+    const ci = cis[0];
+    assert(ci.hasOwnProperty("options"), `Expected collection '${name}' to have 'options'`);
+    const options = ci.options;
+    assert(options.hasOwnProperty("encryptedFields"),
+           `Expected collection '${name}' to have 'encryptedFields'`);
+    const ef = options.encryptedFields;
 
     assert.commandWorked(this.getCollection(name).createIndex({__safeContent__: 1}));
 

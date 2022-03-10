@@ -92,9 +92,16 @@ class EncryptedClient {
      * @param {number} ecoc Number of documents in ECOC
      */
     assertEncryptedCollectionCounts(name, expectedEdc, expectedEsc, expectedEcc, expectedEcoc) {
-        const ci = this._edb.getCollectionInfos({"name": name})[0];
+        const cis = this._edb.getCollectionInfos({"name": name});
+        assert.eq(cis.length(), 1, `Expected to find one collection named '${name}'`);
 
-        const ef = ci.options.encryptedFields;
+        const ci = cis[0];
+        assert(ci.hasOwnProperty("options"), `Expected collection '${name}' to have 'options'`);
+        const options = ci.options;
+        assert(options.hasOwnProperty("encryptedFields"),
+               `Expected collection '${name}' to have 'encryptedFields'`);
+
+        const ef = options.encryptedFields;
 
         const actualEdc = this._edb.getCollection(name).count();
         assert.eq(actualEdc,
@@ -126,26 +133,27 @@ class EncryptedClient {
      * @param {object} fields
      */
     assertOneEncryptedDocumentFields(coll, query, fields) {
-        let rawDocs = this._db.getCollection(coll).find(query).toArray();
-        assert.eq(rawDocs.length, 1);
-        let encryptedDocs = this._edb.getCollection(coll).find(query).toArray();
+        let encryptedDocs = this._db.getCollection(coll).find(query).toArray();
         assert.eq(encryptedDocs.length, 1);
+        let unEncryptedDocs = this._edb.getCollection(coll).find(query).toArray();
+        assert.eq(unEncryptedDocs.length, 1);
 
-        let rawDoc = rawDocs[0];
         let encryptedDoc = encryptedDocs[0];
+        let unEncryptedDoc = unEncryptedDocs[0];
 
-        assert(rawDoc["__safeContent__"] !== undefined);
+        assert(encryptedDoc["__safeContent__"] !== undefined);
 
         for (let field in fields) {
-            assert(rawDoc.hasOwnProperty(field), `Could not find ${field} in raw ${tojson(rawDoc)}`)
             assert(encryptedDoc.hasOwnProperty(field),
-                   `Could not find ${field} in encrypted ${tojson(encryptedDoc)}`)
+                   `Could not find ${field} in raw ${tojson(encryptedDoc)}`)
+            assert(unEncryptedDoc.hasOwnProperty(field),
+                   `Could not find ${field} in unEncrypted ${tojson(unEncryptedDoc)}`)
 
-            let rawField = rawDoc[field];
-            assertIsIndexedEncryptedField(rawField);
+            let rawField = encryptedDoc[field];
+            assertIsIndexedunEncryptedField(rawField);
 
-            let encryptedField = encryptedDoc[field];
-            assert.eq(encryptedField, fields[field]);
+            let unEncryptedField = unEncryptedDoc[field];
+            assert.eq(unEncryptedField, fields[field]);
         }
     }
 };
