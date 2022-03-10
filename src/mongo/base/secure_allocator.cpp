@@ -51,9 +51,10 @@
 #include "mongo/util/processinfo.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/secure_zero_memory.h"
+#include "mongo/util/static_immortal.h"
 #include "mongo/util/text.h"
 
-namespace mongo {
+namespace mongo::secure_allocator_details {
 
 namespace {
 
@@ -329,12 +330,30 @@ private:
     std::size_t _remaining;  // Remaining bytes
 };
 
-// See secure_allocator_details::allocate for a more detailed comment on what these are used for
-stdx::mutex allocatorMutex;  // Protects the values below
-stdx::unordered_map<void*, std::shared_ptr<Allocation>> secureTable;
-std::shared_ptr<Allocation> lastAllocation = nullptr;
 
-}  // namespace
+/**
+ * To save on allocations, we try to serve multiple requests out of the same
+ * mlocked page where possible. We do this by invoking the system allocator in
+ * multiples of a full page, and keep the last page around, giving out pointers
+ * from that page if its possible to do so.  We also keep an unordered_map of
+ * all the allocations we've handed out, which hold shared_ptrs that get rid of
+ * pages when we're not using them anymore.
+ */
+class GlobalSecureAllocator {
+public:
+    void* allocate(std::size_t bytes, std::size_t alignOf);
+
+    /**
+     * Deallocates a secure allocation.
+     * We zero memory before derefing the associated allocation.
+     */
+    void deallocate(void* ptr, std::size_t bytes);
+
+private:
+    stdx::mutex allocatorMutex;  // NOLINT
+    stdx::unordered_map<void*, std::shared_ptr<Allocation>> secureTable;
+    std::shared_ptr<Allocation> lastAllocation;
+};
 
 MONGO_INITIALIZER_GENERAL(SecureAllocator, (), ())
 (InitializerContext* context) {
@@ -344,16 +363,7 @@ MONGO_INITIALIZER_GENERAL(SecureAllocator, (), ())
 #endif
 }
 
-namespace secure_allocator_details {
-
-/**
- * To save on allocations, we try to serve multiple requests out of the same mlocked page where
- * possible.  We do this by invoking the system allocator in multiples of a full page, and keep the
- * last page around, giving out pointers from that page if its possible to do so.  We also keep an
- * unordered_map of all the allocations we've handed out, which hold shared_ptrs that get rid of
- * pages when we're not using them anymore.
- */
-void* allocate(std::size_t bytes, std::size_t alignOf) {
+void* GlobalSecureAllocator::allocate(std::size_t bytes, std::size_t alignOf) {
     stdx::lock_guard<stdx::mutex> lk(allocatorMutex);
 
     if (lastAllocation) {
@@ -371,12 +381,7 @@ void* allocate(std::size_t bytes, std::size_t alignOf) {
     return out;
 }
 
-/**
- * Deallocates a secure allocation.
- *
- * We zero memory before derefing the associated allocation.
- */
-void deallocate(void* ptr, std::size_t bytes) {
+void GlobalSecureAllocator::deallocate(void* ptr, std::size_t bytes) {
     secureZeroMemory(ptr, bytes);
 
     stdx::lock_guard<stdx::mutex> lk(allocatorMutex);
@@ -384,8 +389,19 @@ void deallocate(void* ptr, std::size_t bytes) {
     secureTable.erase(ptr);
 }
 
-}  // namespace secure_allocator_details
+GlobalSecureAllocator& gSecureAllocator() {
+    static StaticImmortal<GlobalSecureAllocator> obj;
+    return *obj;
+}
 
-constexpr StringData SecureAllocatorAuthDomainTrait::DomainType;
+}  // namespace
 
-}  // namespace mongo
+void* allocate(std::size_t bytes, std::size_t alignOf) {
+    return gSecureAllocator().allocate(bytes, alignOf);
+}
+
+void deallocate(void* ptr, std::size_t bytes) {
+    return gSecureAllocator().deallocate(ptr, bytes);
+}
+
+}  // namespace mongo::secure_allocator_details
