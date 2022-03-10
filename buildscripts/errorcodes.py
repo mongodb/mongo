@@ -308,7 +308,9 @@ def main():
         "--ticket", dest="ticket", type="str", action="store", default=0,
         help="Generate error codes for a given SERVER ticket number. Inputs can be of"
         " the form: `--ticket=12345` or `--ticket=SERVER-12345`.")
-    (options, _) = parser.parse_args()
+    options, extra = parser.parse_args()
+    if extra:
+        parser.error(f"Unrecognized arguments: {' '.join(extra)}")
 
     global list_files  # pylint: disable=global-statement,invalid-name
     list_files = options.list_files
