@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/exec/batched_delete_stage_gen.h"
 #include "mongo/db/exec/delete_stage.h"
 #include "mongo/db/exec/write_stage_common.h"
 #include "mongo/db/jsobj.h"
@@ -41,14 +42,16 @@ namespace mongo {
  */
 struct BatchedDeleteStageBatchParams {
     BatchedDeleteStageBatchParams()
-        : targetBatchBytes(50 * 1024 * 1024), targetBatchDocs(100), targetBatchTimeMS(5) {}
+        : targetBatchBytes(gBatchedDeletesTargetBatchBytes.load()),
+          targetBatchDocs(gBatchedDeletesTargetBatchDocs.load()),
+          targetBatchTimeMS(Milliseconds(gBatchedDeletesTargetBatchTimeMS.load())) {}
 
     // Documents staged for deletions are processed in a batch once this batch size target is met.
     // Accounts for documents and indexes. A value of zero means unlimited.
-    size_t targetBatchBytes = 0;
+    long long targetBatchBytes = 0;
     // Documents staged for deletions are processed in a batch once this document count target is
     // met. A value of zero means unlimited.
-    size_t targetBatchDocs = 0;
+    long long targetBatchDocs = 0;
     // A batch is committed as soon as this target execution time is met. Zero means unlimited.
     Milliseconds targetBatchTimeMS = Milliseconds(0);
 };

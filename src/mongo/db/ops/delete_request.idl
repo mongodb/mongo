@@ -38,6 +38,14 @@ imports:
     - "mongo/idl/basic_types.idl"
     - "mongo/db/query/hint.idl"
 
+server_parameters:
+    internalBatchUserMultiDeletesForTest:
+        description: "When set, it enables user-initiated multi-document deletes on namespace __internalBatchedDeletesTesting.Collection0. For test only"
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: gInternalBatchUserMultiDeletesForTest
+        default: false
+
 types:
     yield_policy:
         bson_serialization_type: string

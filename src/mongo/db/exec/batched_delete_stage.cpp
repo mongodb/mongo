@@ -121,6 +121,10 @@ BatchedDeleteStage::BatchedDeleteStage(ExpressionContext* expCtx,
             "'targetBatchBytes', 'targetBatchDocs', 'targetBatchTimeMS'",
             _batchParams->targetBatchBytes || _batchParams->targetBatchDocs ||
                 _batchParams->targetBatchTimeMS != Milliseconds(0));
+    tassert(6303807,
+            "batch size parameters must be greater than or equal to zero",
+            _batchParams->targetBatchBytes >= 0 && _batchParams->targetBatchDocs >= 0 &&
+                _batchParams->targetBatchTimeMS >= Milliseconds(0));
 }
 
 BatchedDeleteStage::~BatchedDeleteStage() {}
@@ -235,7 +239,8 @@ PlanStage::StageState BatchedDeleteStage::doWork(WorkingSetID* out) {
     // Do the write, unless this is an explain.
     if (!_params->isExplain) {
         _ridBuffer.emplace_back(recordId);
-        if (_batchParams->targetBatchDocs && _ridBuffer.size() >= _batchParams->targetBatchDocs) {
+        if (_batchParams->targetBatchDocs &&
+            _ridBuffer.size() >= static_cast<unsigned long long>(_batchParams->targetBatchDocs)) {
             return _deleteBatch(out);
         }
     }

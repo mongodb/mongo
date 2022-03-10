@@ -109,7 +109,6 @@
 
 namespace mongo {
 MONGO_FAIL_POINT_DEFINE(includeFakeColumnarIndex);
-MONGO_FAIL_POINT_DEFINE(batchUserMultiDeletes);
 
 boost::intrusive_ptr<ExpressionContext> makeExpressionContextForGetExecutor(
     OperationContext* opCtx, const BSONObj& requestCollation, const NamespaceString& nss) {
@@ -1623,12 +1622,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
 
     deleteStageParams->canonicalQuery = cq.get();
 
-    bool makeBatchedDeleteStage = false;
-    batchUserMultiDeletes.executeIf(
-        [&](const BSONObj& data) { makeBatchedDeleteStage = true; },
-        [&](const BSONObj& data) { return data["ns"].String() == nss.ns(); });
-
-    if (MONGO_unlikely(makeBatchedDeleteStage)) {
+    if (MONGO_unlikely(gInternalBatchUserMultiDeletesForTest.load() &&
+                       nss.ns() == "__internalBatchedDeletesTesting.Collection0")) {
         root =
             std::make_unique<BatchedDeleteStage>(cq->getExpCtxRaw(),
                                                  std::move(deleteStageParams),
