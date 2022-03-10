@@ -977,6 +977,114 @@ TEST_F(ReplCoordHBV1ReconfigTest,
     ASSERT_EQ(myConfig.getConfigTerm(), UninitializedTerm);
 }
 
+TEST_F(ReplCoordHBV1ReconfigTest, ConfigWithTermAndVersionChangeOnlyDoesntCallIsSelf) {
+    // Config with newer term and newer version.
+    ReplSetConfig rsConfig =
+        makeRSConfigWithVersionAndTerm(initConfigVersion + 1, initConfigTerm + 1);
+
+    // Receive a heartbeat request that tells us about a newer config.
+    receiveHeartbeatFrom(rsConfig, 1, HostAndPort("h1", 1));
+
+    getNet()->enterNetwork();
+    ReplSetHeartbeatArgsV1 hbArgs;
+    auto noi = getNet()->getNextReadyRequest();
+    const RemoteCommandRequest& hbrequest = noi->getRequest();
+    ASSERT_EQUALS(HostAndPort("h1", 1), hbrequest.target);
+    ASSERT_OK(hbArgs.initialize(hbrequest.cmdObj));
+    ASSERT_EQUALS("mySet", hbArgs.getSetName());
+    ASSERT_EQUALS(initConfigVersion, hbArgs.getConfigVersion());
+    ASSERT_EQUALS(initConfigTerm, hbArgs.getConfigTerm());
+    ASSERT_EQUALS(OpTime::kInitialTerm, hbArgs.getTerm());
+
+    // Construct the heartbeat response containing the newer config.
+    ReplSetHeartbeatResponse hbResp;
+    hbResp.setSetName("mySet");
+    hbResp.setState(MemberState::RS_PRIMARY);
+    hbResp.setConfigVersion(rsConfig.getConfigVersion());
+    hbResp.setConfigTerm(rsConfig.getConfigTerm());
+    // The smallest valid optime in PV1.
+    OpTime opTime(Timestamp(), 0);
+    hbResp.setAppliedOpTimeAndWallTime({opTime, Date_t()});
+    hbResp.setDurableOpTimeAndWallTime({opTime, Date_t()});
+    BSONObjBuilder responseBuilder;
+    responseBuilder << "ok" << 1;
+    hbResp.addToBSON(&responseBuilder);
+    // Add the raw config object.
+    responseBuilder << "config" << rsConfig.toBSON();
+    auto origResObj = responseBuilder.obj();
+
+    // Make isSelf not work.
+    getExternalState()->clearSelfHosts();
+
+    // Schedule and deliver the heartbeat response.
+    getNet()->scheduleResponse(noi, getNet()->now(), makeResponseStatus(origResObj));
+    getNet()->runReadyNetworkOperations();
+
+    ASSERT_EQ(getReplCoord()->getConfigTerm(), initConfigTerm + 1);
+    ASSERT_EQ(getReplCoord()->getConfigVersion(), initConfigVersion + 1);
+
+    // If we couldn't find ourselves in the config, we're REMOVED.  That means we made an
+    // unnecessary isSelf call which failed because we cleared selfHosts.
+    ASSERT(getReplCoord()->getMemberState().secondary())
+        << "Member state is actually " << getReplCoord()->getMemberState();
+}
+
+TEST_F(ReplCoordHBV1ReconfigTest, ConfigWithSignificantChangeDoesCallIsSelf) {
+    // Config with members 1 (self) and 2 swapped.
+    ReplSetConfig rsConfig = makeRSConfigWithVersionAndTerm(initConfigVersion + 1, initConfigTerm);
+    auto mutableConfig = rsConfig.getMutable();
+    auto members = mutableConfig.getMembers();
+    std::swap(members[1], members[2]);
+    mutableConfig.setMembers(members);
+    rsConfig = ReplSetConfig(std::move(mutableConfig));
+
+    // Receive a heartbeat request that tells us about a newer config.
+    receiveHeartbeatFrom(rsConfig, 1, HostAndPort("h1", 1));
+
+    getNet()->enterNetwork();
+    ReplSetHeartbeatArgsV1 hbArgs;
+    auto noi = getNet()->getNextReadyRequest();
+    const RemoteCommandRequest& hbrequest = noi->getRequest();
+    ASSERT_EQUALS(HostAndPort("h1", 1), hbrequest.target);
+    ASSERT_OK(hbArgs.initialize(hbrequest.cmdObj));
+    ASSERT_EQUALS("mySet", hbArgs.getSetName());
+    ASSERT_EQUALS(initConfigVersion, hbArgs.getConfigVersion());
+    ASSERT_EQUALS(initConfigTerm, hbArgs.getConfigTerm());
+    ASSERT_EQUALS(OpTime::kInitialTerm, hbArgs.getTerm());
+
+    // Construct the heartbeat response containing the newer config.
+    ReplSetHeartbeatResponse hbResp;
+    hbResp.setSetName("mySet");
+    hbResp.setState(MemberState::RS_PRIMARY);
+    hbResp.setConfigVersion(rsConfig.getConfigVersion());
+    hbResp.setConfigTerm(rsConfig.getConfigTerm());
+    // The smallest valid optime in PV1.
+    OpTime opTime(Timestamp(), 0);
+    hbResp.setAppliedOpTimeAndWallTime({opTime, Date_t()});
+    hbResp.setDurableOpTimeAndWallTime({opTime, Date_t()});
+    BSONObjBuilder responseBuilder;
+    responseBuilder << "ok" << 1;
+    hbResp.addToBSON(&responseBuilder);
+    // Add the raw config object.
+    responseBuilder << "config" << rsConfig.toBSON();
+    auto origResObj = responseBuilder.obj();
+
+    // Schedule and deliver the heartbeat response.
+    getNet()->scheduleResponse(noi, getNet()->now(), makeResponseStatus(origResObj));
+    getNet()->runReadyNetworkOperations();
+
+    ASSERT_EQ(getReplCoord()->getConfigTerm(), initConfigTerm);
+    ASSERT_EQ(getReplCoord()->getConfigVersion(), initConfigVersion + 1);
+
+    // We should remain secondary.
+    ASSERT(getReplCoord()->getMemberState().secondary())
+        << "Member state is actually " << getReplCoord()->getMemberState();
+
+    // We should be the member in slot 2, not slot 1.
+    ASSERT_NE(rsConfig.getMemberAt(1).getId().getData(), getReplCoord()->getMyId());
+    ASSERT_EQ(rsConfig.getMemberAt(2).getId().getData(), getReplCoord()->getMyId());
+}
+
 TEST_F(ReplCoordHBV1Test, RejectHeartbeatReconfigDuringElection) {
     auto severityGuard = unittest::MinimumLoggedSeverityGuard{
         logv2::LogComponent::kReplicationHeartbeats, logv2::LogSeverity::Debug(1)};
@@ -1793,6 +1901,7 @@ void HBStepdownAndReconfigTest::sendHBResponse(int targetIndex,
     if (includeConfig) {
         auto configDoc = MutableDocument(Document(_initialConfig));
         configDoc["version"] = Value(configVersion);
+        configDoc["term"] = Value(configTerm);
         auto newConfig = ReplSetConfig::parse(configDoc.freeze().toBson());
         hbResp.setConfig(newConfig);
     }
