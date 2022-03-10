@@ -94,6 +94,7 @@ const allCommands = {
     _shardsvrReshardingOperationTime: {skip: isPrimaryOnly},
     _shardsvrRefineCollectionShardKey: {skip: isPrimaryOnly},
     _shardsvrSetAllowMigrations: {skip: isPrimaryOnly},
+    _shardsvrSetUserWriteBlockMode: {skip: isPrimaryOnly},
     _shardsvrCollMod: {skip: isPrimaryOnly},
     _shardsvrCollModParticipant: {skip: isAnInternalCommand},
     _transferMods: {skip: isPrimaryOnly},

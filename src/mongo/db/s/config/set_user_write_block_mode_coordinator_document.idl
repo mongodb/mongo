@@ -37,11 +37,18 @@ imports:
 
 enums:
     SetUserWriteBlockModeCoordinatorPhase:
-        description: "Current refine collection shard key coordinator's operation state."
+        description: "Current SetUserWriteBlockMode coordinator phase"
         type: string
         values:
             kUnset: "unset"
-            kSetUserWriteBlockMode: "setUserWriteBlockMode"
+            # When enabling user write blocking, kPrepare will instruct the shards to start blocking
+            # new sharded DDL operations. When disabling user write blocking, kPrepare will instruct
+            # the shards to start accepting user writes again.
+            kPrepare: "prepare"
+            # When enabling user write blocking, kComplete will instruct the shards to start
+            # blocking user writes. When disabling user write blocking, kComplete will instruct the
+            # shards to start accepting sharded DDL operations again.
+            kComplete: "complete"
 
 structs:
     SetUserWriteBlockModeCoordinatorDocument:

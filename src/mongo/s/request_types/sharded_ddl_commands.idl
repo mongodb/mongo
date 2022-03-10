@@ -51,6 +51,20 @@ types:
         serializer: "mongo::CollectionType::toBSON"
         deserializer: "mongo::CollectionType"
 
+enums:
+    ShardsvrSetUserWriteBlockModePhase:
+        description: "Phase for the _shardsvrSetUserWriteBlockMode command."
+        type: string
+        values:
+            # When enabling user write blocking, kPrepare means the shard will start blocking
+            # sharded DDL operations. When disabling user write blocking, kPrepare means the shard
+            # will to start accepting user writes again.
+            kPrepare: "prepare"
+            # When enabling user write blocking, kComplete means the shard will start blocking
+            # user writes. When disabling user write blocking, kComplete means the shard
+            # will to start accepting sharded DDL operations again.
+            kComplete: "complete"
+
 structs:
 
     ConfigsvrCreateDatabaseResponse:
@@ -398,6 +412,21 @@ commands:
         strict: false
         chained_structs:
             SetUserWriteBlockModeRequest: SetUserWriteBlockModeRequest
+
+    _shardsvrSetUserWriteBlockMode:
+        command_name: _shardsvrSetUserWriteBlockMode
+        cpp_name: ShardsvrSetUserWriteBlockMode
+        description: "internal _shardsvrSetUserWriteBlockMode command"
+        namespace: ignored
+        api_version: ""
+        strict: false
+        chained_structs:
+            SetUserWriteBlockModeRequest: SetUserWriteBlockModeRequest
+        fields:
+            phase:
+                type: ShardsvrSetUserWriteBlockModePhase
+                description: "Determines the phase of the blocking/unblocking procedure to be
+                              executed."
 
     _configsvrSetClusterParameter:
         command_name: _configsvrSetClusterParameter

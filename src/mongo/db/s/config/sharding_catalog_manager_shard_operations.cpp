@@ -998,6 +998,10 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
             boost::optional<RemoveShardProgress::DrainingShardUsage>(boost::none)};
 }
 
+Lock::SharedLock ShardingCatalogManager::enterStableTopologyRegion(OperationContext* opCtx) {
+    return Lock::SharedLock(opCtx->lockState(), _kShardMembershipLock);
+}
+
 void ShardingCatalogManager::appendConnectionStats(executor::ConnectionPoolStats* stats) {
     _executorForAddShard->appendConnectionStats(stats);
 }

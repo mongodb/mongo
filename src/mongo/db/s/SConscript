@@ -176,13 +176,11 @@ env.Library(
         'user_writes_critical_section_document.idl',
         'user_writes_recoverable_critical_section_service.cpp',
     ],
-    LIBDEPS=[
-        'sharding_api_d',
-    ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/repl/replica_set_aware_service',
         '$BUILD_DIR/mongo/db/rw_concern_d',
+        'sharding_api_d',
     ]
 )
 
@@ -457,6 +455,19 @@ env.Library(
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_impl',
         'sharding_api_d',
     ],
+)
+
+env.Library(
+    target='shardsvr_set_user_write_block_mode_command',
+    source=[
+        'shardsvr_set_user_write_block_mode_command.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/auth/auth',
+        '$BUILD_DIR/mongo/db/commands',
+        '$BUILD_DIR/mongo/s/common_s',
+        'user_writes_recoverable_critical_section',
+    ]
 )
 
 env.Library(

@@ -3,9 +3,10 @@
 // @tags: [
 //   creates_and_authenticates_user,
 //   requires_auth,
-//   requires_fcv_53,
+//   requires_fcv_60,
 //   requires_non_retryable_commands,
 //   requires_replication,
+//   featureFlagUserWriteBlocking,
 // ]
 
 (function() {
@@ -40,10 +41,10 @@ const bypassUser = "adminUser";
 const noBypassUser = "user";
 const password = "password";
 
-function runTest(frontend, backend) {
+function runTest(frontend) {
     const db = frontend.getDB(jsTestName());
     const coll = db.test;
-    const admin = backend.getDB('admin');
+    const admin = frontend.getDB('admin');
 
     function asUser(user, fun) {
         assert(admin.auth(user, password));
@@ -103,7 +104,7 @@ function runTest(frontend, backend) {
 
 // Test on standalone
 const conn = MongoRunner.runMongod({auth: "", bind_ip: "127.0.0.1"});
-runTest(conn, conn);
+runTest(conn);
 MongoRunner.stopMongod(conn);
 
 const keyfile = "jstests/libs/key1";
@@ -113,12 +114,11 @@ const rst = new ReplSetTest({nodes: 3, nodeOptions: {auth: "", bind_ip_all: ""},
 rst.startSet();
 rst.initiate();
 const primary = rst.getPrimary();
-runTest(primary, primary);
+runTest(primary);
 rst.stopSet();
 
-// TODO: SERVER-64245 reenable this test case
-// // Test on a sharded cluster
-// const st = new ShardingTest({shards: 1, mongos: 1, config: 1});
-// runTest(st.s0, st.rs0.getPrimary());
-// st.stop();
+// Test on a sharded cluster
+const st = new ShardingTest({shards: 1, mongos: 1, config: 1, auth: "", other: {keyFile: keyfile}});
+runTest(st.s);
+st.stop();
 })();

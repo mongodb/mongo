@@ -61,6 +61,11 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
+            uassert(ErrorCodes::IllegalOperation,
+                    str::stream() << Request::kCommandName
+                                  << " cannot be run on shardsvrs nor configsvrs",
+                    serverGlobalParams.clusterRole == ClusterRole::None);
+
             {
                 if (request().getGlobal()) {
                     UserWritesRecoverableCriticalSectionService::get(opCtx)

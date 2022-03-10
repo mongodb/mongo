@@ -2388,6 +2388,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/change_stream_options_manager',
         '$BUILD_DIR/mongo/db/commands/set_user_write_block_mode_command',
         '$BUILD_DIR/mongo/db/pipeline/change_stream_expired_pre_image_remover',
+        '$BUILD_DIR/mongo/db/s/shardsvr_set_user_write_block_mode_command',
         '$BUILD_DIR/mongo/idl/cluster_server_parameter',
         '$BUILD_DIR/mongo/idl/cluster_server_parameter_op_observer',
         '$BUILD_DIR/mongo/s/grid',

@@ -467,6 +467,12 @@ public:
      */
     RemoveShardProgress removeShard(OperationContext* opCtx, const ShardId& shardId);
 
+    /**
+     * Returns a scoped lock object, which holds the _kShardMembershipLock in shared mode. While
+     * this lock is held no topology changes can occur.
+     */
+    Lock::SharedLock enterStableTopologyRegion(OperationContext* opCtx);
+
     //
     // Cluster Upgrade Operations
     //

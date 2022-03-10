@@ -35,10 +35,52 @@
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/db/persistent_task_store.h"
+#include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/sharding_util.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/client/shard_registry.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 
 namespace mongo {
+
+namespace {
+
+ShardsvrSetUserWriteBlockMode makeShardsvrSetUserWriteBlockModeCommand(
+    bool block, ShardsvrSetUserWriteBlockModePhaseEnum phase) {
+    ShardsvrSetUserWriteBlockMode shardsvrSetUserWriteBlockModeCmd;
+    shardsvrSetUserWriteBlockModeCmd.setDbName(NamespaceString::kAdminDb);
+    SetUserWriteBlockModeRequest setUserWriteBlockModeRequest(block /* global */);
+    shardsvrSetUserWriteBlockModeCmd.setSetUserWriteBlockModeRequest(
+        std::move(setUserWriteBlockModeRequest));
+    shardsvrSetUserWriteBlockModeCmd.setPhase(phase);
+
+    return shardsvrSetUserWriteBlockModeCmd;
+}
+
+void sendSetUserWriteBlockModeCmdToAllShards(OperationContext* opCtx,
+                                             std::shared_ptr<executor::TaskExecutor> executor,
+                                             bool block,
+                                             ShardsvrSetUserWriteBlockModePhaseEnum phase) {
+    // Ensure the topology is stable so we don't miss propagating the write blocking
+    // state to any concurrently added shard.
+    Lock::SharedLock stableTopologyRegion =
+        ShardingCatalogManager::get(opCtx)->enterStableTopologyRegion(opCtx);
+
+    const auto allShards = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+
+    const auto shardsvrSetUserWriteBlockModeCmd =
+        makeShardsvrSetUserWriteBlockModeCommand(block, phase);
+
+    sharding_util::sendCommandToShards(
+        opCtx,
+        shardsvrSetUserWriteBlockModeCmd.getDbName(),
+        CommandHelpers::appendMajorityWriteConcern(shardsvrSetUserWriteBlockModeCmd.toBSON({})),
+        allShards,
+        executor);
+}
+
+}  // namespace
 
 bool SetUserWriteBlockModeCoordinator::hasSameOptions(const BSONObj& otherDocBSON) const {
     const auto otherDoc = StateDoc::parse(
@@ -90,8 +132,29 @@ ExecutorFuture<void> SetUserWriteBlockModeCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
     return ExecutorFuture<void>(**executor)
-        .then(_executePhase(Phase::kSetUserWriteBlockMode, [this, anchor = shared_from_this()] {
-            // TODO Implement
+        .then(_executePhase(Phase::kPrepare,
+                            [this, anchor = shared_from_this()] {
+                                auto opCtxHolder = cc().makeOperationContext();
+                                auto* opCtx = opCtxHolder.get();
+                                auto executor =
+                                    Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+
+                                sendSetUserWriteBlockModeCmdToAllShards(
+                                    opCtx,
+                                    executor,
+                                    _doc.getBlock(),
+                                    ShardsvrSetUserWriteBlockModePhaseEnum::kPrepare);
+                            }))
+        .then(_executePhase(Phase::kComplete, [this, anchor = shared_from_this()] {
+            auto opCtxHolder = cc().makeOperationContext();
+            auto* opCtx = opCtxHolder.get();
+            auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+
+            sendSetUserWriteBlockModeCmdToAllShards(
+                opCtx,
+                executor,
+                _doc.getBlock(),
+                ShardsvrSetUserWriteBlockModePhaseEnum::kComplete);
         }));
 }
 
