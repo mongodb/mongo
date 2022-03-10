@@ -644,9 +644,9 @@ TEST_F(ShardSplitRecipientCleanupTest, ShardSplitRecipientCleanup) {
 
     auto result = decisionFuture.get();
 
-    // We set the promise before the future chain. State will stay kBlocking with no abort.
+    // We set the promise before the future chain. Cleanup will return kCommitted as a result.
     ASSERT(!result.abortReason);
-    ASSERT_EQ(result.state, mongo::ShardSplitDonorStateEnum::kBlocking);
+    ASSERT_EQ(result.state, mongo::ShardSplitDonorStateEnum::kCommitted);
 
     // deleted the local state doc so this should return NoMatchingDocument
     ASSERT_EQ(serverless::getStateDocument(opCtx.get(), _uuid).getStatus().code(),

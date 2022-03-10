@@ -326,8 +326,9 @@ SemiFuture<void> ShardSplitDonorService::DonorStateMachine::run(
                 .unsafeToInlineFuture();
         });
 
-        _completionPromise.setFrom(
-            _decisionPromise.getFuture().semi().ignoreValue().unsafeToInlineFuture());
+        _completionPromise.setWith([&, anchor = shared_from_this()] {
+            return _decisionPromise.getFuture().semi().ignoreValue().unsafeToInlineFuture();
+        });
 
         return _completionPromise.getFuture().semi();
     }
@@ -882,8 +883,7 @@ ShardSplitDonorService::DonorStateMachine::_cleanRecipientStateDoc(
             LOGV2(6236607,
                   "Cleanup stale shard split operation on recipient.",
                   "migrationId"_attr = _migrationId);
-            stdx::lock_guard<Latch> lg(_mutex);
-            return DurableState{_stateDoc.getState()};
+            return DurableState{ShardSplitDonorStateEnum::kCommitted};
         });
 }
 
