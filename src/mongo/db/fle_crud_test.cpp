@@ -51,6 +51,7 @@
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/matcher/schema/encrypt_schema_gen.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface.h"
@@ -170,11 +171,6 @@ std::array<uint8_t, 32> userVec = {0x1b, 0xd4, 0x32, 0xd4, 0xce, 0x54, 0x7d, 0xd
                                    0x9a, 0xea, 0xd6, 0xc6, 0x95, 0xfe, 0x53, 0xff, 0xe9, 0xc4, 0xb1,
                                    0xc4, 0xf0, 0x6f, 0x36, 0x3c, 0xf0, 0x7b, 0x00, 0x28, 0xaf};
 
-FLEIndexKey indexKey(KeyMaterial(indexVec.begin(), indexVec.end()));
-
-FLEUserKey userKey(KeyMaterial(userVec.begin(), userVec.end()));
-
-
 constexpr auto kIndexKeyId = "12345678-1234-9876-1234-123456789012"_sd;
 constexpr auto kUserKeyId = "ABCDEFAB-1234-9876-1234-123456789012"_sd;
 static UUID indexKeyId = uassertStatusOK(UUID::parse(kIndexKeyId.toString()));
@@ -186,6 +182,10 @@ std::vector<char> testValue2 = {0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 
 class TestKeyVault : public FLEKeyVault {
 public:
     TestKeyVault() : _random(123456) {}
+
+    FLEIndexKey indexKey{KeyMaterial(indexVec.begin(), indexVec.end())};
+
+    FLEUserKey userKey{KeyMaterial(userVec.begin(), userVec.end())};
 
     KeyMaterial getKey(const UUID& uuid) override;
 

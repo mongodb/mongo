@@ -245,3 +245,8 @@ commands:
         type: uuid
         optional: true
         unstable: true
+      encryptionInformation:
+        description: "Encryption Information schema and other tokens for CRUD commands"
+        type: EncryptionInformation
+        optional: true
+        unstable: true

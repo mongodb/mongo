@@ -121,9 +121,6 @@ std::array<uint8_t, 32> userVec = {0x1b, 0xd4, 0x32, 0xd4, 0xce, 0x54, 0x7d, 0xd
                                    0x9a, 0xea, 0xd6, 0xc6, 0x95, 0xfe, 0x53, 0xff, 0xe9, 0xc4, 0xb1,
                                    0xc4, 0xf0, 0x6f, 0x36, 0x3c, 0xf0, 0x7b, 0x00, 0x28, 0xaf};
 
-FLEIndexKey indexKey(KeyMaterial(indexVec.begin(), indexVec.end()));
-
-FLEUserKey userKey(KeyMaterial(userVec.begin(), userVec.end()));
 
 constexpr auto kIndexKeyId = "12345678-1234-9876-1234-123456789012"_sd;
 constexpr auto kUserKeyId = "ABCDEFAB-1234-9876-1234-123456789012"_sd;
@@ -136,6 +133,10 @@ std::vector<char> testValue2 = {0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 
 class TestKeyVault : public FLEKeyVault {
 public:
     KeyMaterial getKey(const UUID& uuid) override;
+
+    FLEIndexKey indexKey{KeyMaterial(indexVec.begin(), indexVec.end())};
+
+    FLEUserKey userKey{KeyMaterial(userVec.begin(), userVec.end())};
 };
 
 KeyMaterial TestKeyVault::getKey(const UUID& uuid) {
@@ -150,18 +151,20 @@ KeyMaterial TestKeyVault::getKey(const UUID& uuid) {
 }
 
 TEST(FLETokens, TestVectors) {
-
+    TestKeyVault keyVault;
 
     // Level 1
-    auto collectionToken = FLELevel1TokenGenerator::generateCollectionsLevel1Token(indexKey);
+    auto collectionToken =
+        FLELevel1TokenGenerator::generateCollectionsLevel1Token(keyVault.indexKey);
 
     ASSERT_EQUALS(CollectionsLevel1Token(decodePrf(
                       "ff2103ff205a36f39704f643c270c129919f008c391d9589a6d2c86a7429d0d3"_sd)),
                   collectionToken);
 
-    ASSERT_EQUALS(ServerDataEncryptionLevel1Token(decodePrf(
-                      "d915ccc1eb81687fb5fc5b799f48c99fbe17e7a011a46a48901b9ae3d790656b"_sd)),
-                  FLELevel1TokenGenerator::generateServerDataEncryptionLevel1Token(indexKey));
+    ASSERT_EQUALS(
+        ServerDataEncryptionLevel1Token(
+            decodePrf("d915ccc1eb81687fb5fc5b799f48c99fbe17e7a011a46a48901b9ae3d790656b"_sd)),
+        FLELevel1TokenGenerator::generateServerDataEncryptionLevel1Token(keyVault.indexKey));
 
     // Level 2
     auto edcToken = FLECollectionTokenGenerator::generateEDCToken(collectionToken);
@@ -263,10 +266,11 @@ TEST(FLETokens, TestVectors) {
 
 
 TEST(FLE_ESC, RoundTrip) {
+    TestKeyVault keyVault;
 
     ConstDataRange value(testValue);
 
-    auto c1 = FLELevel1TokenGenerator::generateCollectionsLevel1Token(indexKey);
+    auto c1 = FLELevel1TokenGenerator::generateCollectionsLevel1Token(keyVault.indexKey);
     auto escToken = FLECollectionTokenGenerator::generateESCToken(c1);
 
     ESCDerivedFromDataToken escDatakey =
@@ -324,10 +328,11 @@ TEST(FLE_ESC, RoundTrip) {
 }
 
 TEST(FLE_ECC, RoundTrip) {
+    TestKeyVault keyVault;
 
     ConstDataRange value(testValue);
 
-    auto c1 = FLELevel1TokenGenerator::generateCollectionsLevel1Token(indexKey);
+    auto c1 = FLELevel1TokenGenerator::generateCollectionsLevel1Token(keyVault.indexKey);
     auto token = FLECollectionTokenGenerator::generateECCToken(c1);
 
     ECCDerivedFromDataToken datakey =
@@ -411,11 +416,12 @@ private:
 
 // Test Empty Collection
 TEST(FLE_ESC, EmuBinary_Empty) {
+    TestKeyVault keyVault;
 
     TestDocumentCollection coll;
     ConstDataRange value(testValue);
 
-    auto c1 = FLELevel1TokenGenerator::generateCollectionsLevel1Token(indexKey);
+    auto c1 = FLELevel1TokenGenerator::generateCollectionsLevel1Token(keyVault.indexKey);
     auto escToken = FLECollectionTokenGenerator::generateESCToken(c1);
 
     ESCDerivedFromDataToken escDatakey =
@@ -438,11 +444,12 @@ TEST(FLE_ESC, EmuBinary_Empty) {
 
 // Test one new field in esc
 TEST(FLE_ESC, EmuBinary) {
+    TestKeyVault keyVault;
 
     TestDocumentCollection coll;
     ConstDataRange value(testValue);
 
-    auto c1 = FLELevel1TokenGenerator::generateCollectionsLevel1Token(indexKey);
+    auto c1 = FLELevel1TokenGenerator::generateCollectionsLevel1Token(keyVault.indexKey);
     auto escToken = FLECollectionTokenGenerator::generateESCToken(c1);
 
     ESCDerivedFromDataToken escDatakey =
@@ -470,11 +477,12 @@ TEST(FLE_ESC, EmuBinary) {
 
 // Test two new fields in esc
 TEST(FLE_ESC, EmuBinary2) {
+    TestKeyVault keyVault;
 
     TestDocumentCollection coll;
     ConstDataRange value(testValue);
 
-    auto c1 = FLELevel1TokenGenerator::generateCollectionsLevel1Token(indexKey);
+    auto c1 = FLELevel1TokenGenerator::generateCollectionsLevel1Token(keyVault.indexKey);
     auto escToken = FLECollectionTokenGenerator::generateESCToken(c1);
 
 
@@ -524,11 +532,12 @@ TEST(FLE_ESC, EmuBinary2) {
 
 // Test Emulated Binary with null record
 TEST(FLE_ESC, EmuBinary_NullRecord) {
+    TestKeyVault keyVault;
 
     TestDocumentCollection coll;
     ConstDataRange value(testValue);
 
-    auto c1 = FLELevel1TokenGenerator::generateCollectionsLevel1Token(indexKey);
+    auto c1 = FLELevel1TokenGenerator::generateCollectionsLevel1Token(keyVault.indexKey);
     auto escToken = FLECollectionTokenGenerator::generateESCToken(c1);
 
     ESCDerivedFromDataToken escDatakey =
@@ -827,14 +836,17 @@ TEST(FLE_EDC, Disallowed_Types_FLE2InsertUpdatePayload) {
 
 
 TEST(FLE_EDC, ServerSide_Payloads) {
+    TestKeyVault keyVault;
+
     auto doc = BSON("sample" << 123456);
     auto element = doc.firstElement();
 
     auto value = ConstDataRange(element.value(), element.value() + element.valuesize());
 
-    auto collectionToken = FLELevel1TokenGenerator::generateCollectionsLevel1Token(indexKey);
+    auto collectionToken =
+        FLELevel1TokenGenerator::generateCollectionsLevel1Token(keyVault.indexKey);
     auto serverEncryptToken =
-        FLELevel1TokenGenerator::generateServerDataEncryptionLevel1Token(indexKey);
+        FLELevel1TokenGenerator::generateServerDataEncryptionLevel1Token(keyVault.indexKey);
     auto edcToken = FLECollectionTokenGenerator::generateEDCToken(collectionToken);
     auto escToken = FLECollectionTokenGenerator::generateESCToken(collectionToken);
     auto eccToken = FLECollectionTokenGenerator::generateECCToken(collectionToken);

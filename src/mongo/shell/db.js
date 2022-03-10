@@ -1808,6 +1808,39 @@ DB.prototype.getSession = function() {
     return this._session;
 };
 })(Object.prototype.hasOwnProperty);
+
+DB.prototype.createEncryptedCollection = function(name, opts) {
+    const res = assert.commandWorked(this.createCollection(name, opts));
+
+    const ci = this.getCollectionInfos({"name": name})[0];
+
+    const ef = ci.options.encryptedFields;
+
+    assert.commandWorked(this.getCollection(name).createIndex({__safeContent__: 1}));
+
+    assert.commandWorked(this.createCollection(ef.escCollection));
+    assert.commandWorked(this.createCollection(ef.eccCollection));
+    assert.commandWorked(this.createCollection(ef.ecocCollection));
+
+    return res;
+};
+
+DB.prototype.dropEncryptedCollection = function(name) {
+    const ci = db.getCollectionInfos({name: name})[0];
+    if (ci == undefined) {
+        throw `Encrypted Collection '${name}' not found`;
+    }
+
+    const ef = ci.options.encryptedFields;
+    if (ef == undefined) {
+        throw `Encrypted Collection '${name}' not found`;
+    }
+
+    this.getCollection(ef.escCollection).drop();
+    this.getCollection(ef.eccCollection).drop();
+    this.getCollection(ef.ecocCollection).drop();
+    return this.getCollection(name).drop();
+}
 }());
 
 DB.prototype._sbe = function(query) {

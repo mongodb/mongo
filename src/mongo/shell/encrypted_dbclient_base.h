@@ -35,6 +35,7 @@
 #include "mongo/client/dbclient_base.h"
 #include "mongo/config.h"
 #include "mongo/crypto/aead_encryption.h"
+#include "mongo/crypto/fle_crypto.h"
 #include "mongo/crypto/symmetric_crypto.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
@@ -78,7 +79,9 @@ constexpr std::array<StringData, 11> kEncryptedCommands = {"aggregate"_sd,
                                                            "insert"_sd,
                                                            "update"_sd};
 
-class EncryptedDBClientBase : public DBClientBase, public mozjs::EncryptionCallbacks {
+class EncryptedDBClientBase : public DBClientBase,
+                              public mozjs::EncryptionCallbacks,
+                              public FLEKeyVault {
 public:
     using DBClientBase::find;
     using DBClientBase::query_DEPRECATED;
@@ -150,6 +153,8 @@ public:
     bool isTLS() final;
 #endif
 
+    KeyMaterial getKey(const UUID& uuid) final;
+
 protected:
     BSONObj _decryptResponsePayload(BSONObj& reply, StringData databaseName, bool isFLE2);
 
@@ -194,6 +199,7 @@ private:
                                        BinDataType type);
 
     std::shared_ptr<SymmetricKey> getDataKeyFromDisk(const UUID& uuid);
+    SecureVector<uint8_t> getKeyMaterialFromDisk(const UUID& uuid);
 
 protected:
     std::unique_ptr<DBClientBase> _conn;

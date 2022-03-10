@@ -5,12 +5,12 @@
  *  featureFlagFLE2,
  * ]
  */
+load("jstests/fle2/libs/encrypted_client_util.js");
+
 (function() {
 'use strict';
 
-const isFLE2Enabled = TestData == undefined || TestData.setParameters.featureFlagFLE2;
-
-if (!isFLE2Enabled) {
+if (!isFLE2Enabled()) {
     return;
 }
 

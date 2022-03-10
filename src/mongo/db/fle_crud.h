@@ -29,11 +29,15 @@
 
 #pragma once
 
+#include <cstdint>
+
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
 #include "mongo/crypto/fle_crypto.h"
+#include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/s/write_ops/batch_write_exec.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 
