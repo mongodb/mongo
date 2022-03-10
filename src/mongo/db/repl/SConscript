@@ -275,6 +275,7 @@ env.Library(
         'oplog_interface_local',
         'repl_server_parameters',
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
         '$BUILD_DIR/mongo/db/storage/journal_flusher',
         '$BUILD_DIR/mongo/db/storage/storage_options',
     ],

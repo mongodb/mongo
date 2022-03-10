@@ -327,6 +327,11 @@ public:
     void recoverIndexBuilds();
 
     /**
+     * Returns true if there are no index builds in progress.
+     */
+    bool noIndexBuildInProgress() const;
+
+    /**
      * Returns the number of index builds that are running on the specified database.
      */
     int numInProgForDb(StringData db) const;

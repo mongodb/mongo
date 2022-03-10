@@ -1364,6 +1364,13 @@ void IndexBuildsCoordinator::restartIndexBuildsForRecovery(OperationContext* opC
     }
 }
 
+bool IndexBuildsCoordinator::noIndexBuildInProgress() const {
+    stdx::unique_lock<Latch> lk(_mutex);
+    auto indexBuildFilter = [](const auto& replState) { return true; };
+    auto indexBuilds = _filterIndexBuilds_inlock(lk, indexBuildFilter);
+    return indexBuilds.size() == 0;
+}
+
 int IndexBuildsCoordinator::numInProgForDb(StringData db) const {
     stdx::unique_lock<Latch> lk(_mutex);
     auto indexBuildFilter = [db](const auto& replState) { return db == replState.dbName; };
