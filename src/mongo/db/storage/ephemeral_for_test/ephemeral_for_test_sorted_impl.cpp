@@ -525,6 +525,9 @@ public:
     void setSaveStorageCursorOnDetachFromOperationContext(bool) override {
         // Noop for EFT, since we always keep the cursor's contents valid across save/restore.
     }
+    bool isRecordIdAtEndOfKeyString() const override {
+        return true;
+    }
 
 private:
     // CRTP Interface

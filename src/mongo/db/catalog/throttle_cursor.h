@@ -111,6 +111,10 @@ public:
         _cursor->reattachToOperationContext(opCtx);
     }
 
+    bool isRecordIdAtEndOfKeyString() const {
+        return _cursor->isRecordIdAtEndOfKeyString();
+    }
+
 private:
     std::unique_ptr<SortedDataInterface::Cursor> _cursor;
     DataThrottle* _dataThrottle;

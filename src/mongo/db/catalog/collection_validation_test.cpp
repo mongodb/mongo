@@ -403,6 +403,7 @@ TEST_F(BackgroundCollectionValidationTest, ValidateOldUniqueIndexKeyWarning) {
             auto cursor = sortedDataInterface->newCursor(opCtx);
             auto indexEntry = cursor->seekForKeyString(firstKeyString);
             ASSERT(indexEntry);
+            ASSERT(cursor->isRecordIdAtEndOfKeyString());
             keyStringWithRecordId = indexEntry->keyString;
             recordId = indexEntry->loc;
             ASSERT_FALSE(cursor->nextKeyString());
@@ -426,6 +427,7 @@ TEST_F(BackgroundCollectionValidationTest, ValidateOldUniqueIndexKeyWarning) {
             auto cursor = sortedDataInterface->newCursor(opCtx);
             auto indexEntry = cursor->seekForKeyString(firstKeyString);
             ASSERT(indexEntry);
+            ASSERT_FALSE(cursor->isRecordIdAtEndOfKeyString());
             ASSERT_EQ(indexEntry->keyString.compareWithoutRecordIdLong(keyStringWithRecordId), 0);
             ASSERT_FALSE(cursor->nextKeyString());
         }

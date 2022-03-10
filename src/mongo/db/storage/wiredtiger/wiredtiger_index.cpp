@@ -1038,6 +1038,10 @@ public:
         _saveStorageCursorOnDetachFromOperationContext = saveCursor;
     }
 
+    bool isRecordIdAtEndOfKeyString() const override {
+        return true;
+    }
+
 protected:
     // Called after _key has been filled in, ie a new key to be processed has been fetched.
     // Must not throw WriteConflictException, throwing a WriteConflictException will retry the
@@ -1400,6 +1404,11 @@ public:
                 LOGV2_TRACE_CURSOR(20092, "restore _lastMoveSkippedKey changed to false.");
             }
         }
+    }
+
+    bool isRecordIdAtEndOfKeyString() const override {
+        return _key.getSize() !=
+            KeyString::getKeySize(_key.getBuffer(), _key.getSize(), _idx.getOrdering(), _typeBits);
     }
 
 private:
