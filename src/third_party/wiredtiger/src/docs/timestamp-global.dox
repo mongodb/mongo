@@ -40,9 +40,9 @@ WT_CONNECTION::set_timestamp method, including constraints.
 
 | Timestamp | Constraints | Description |
 |-----------|-------------|-------------|
-| durable_timestamp | <= oldest | Reset the maximum durable timestamp. |
-| oldest_timestamp | <= stable; may not move backward | Inform the system future reads and writes will never be earlier than the specified timestamp. |
-| stable_timestamp | may not move backward | Inform the system checkpoints should not include commits newer than the specified timestamp. |
+| durable_timestamp | <= oldest | Reset the maximum durable timestamp |
+| oldest_timestamp | <= stable; may not move backward, set to the value as of the last checkpoint during recovery | Inform the system future reads and writes will never be earlier than the specified timestamp. |
+| stable_timestamp | may not move backward, set to the recovery timestamp during recovery | Inform the system checkpoints should not include commits newer than the specified timestamp. |
 
 @subsection timestamp_global_set_api_durable_timestamp Setting the global "durable_timestamp" timestamp
 
@@ -70,6 +70,9 @@ application update the oldest timestamp
 frequently as retaining history can be expensive in terms of both cache and
 I/O resources.
 
+During recovery, the \c oldest_timestamp is set to its value as of the checkpoint
+to which recovery is done.
+
 Attempting to set the \c oldest_timestamp to a value earlier than its current
 value will be silently ignored.
 
@@ -82,6 +85,9 @@ other words, updates to an object after the stable timestamp will not be include
 future checkpoint. Because tables in a timestamp world are generally using
 checkpoint durability, the \c stable_timestamp also determines to point to which
 recovery will be done after failures.
+
+During recovery, the \c stable_timestamp is set to the value to which recovery is
+performed.
 
 The use of the \c stable_timestamp for checkpoints can be overridden in the call
 to WT_SESSION::checkpoint.
