@@ -29,6 +29,7 @@
 
 #include "mongo/db/exec/sbe/vm/vm.h"
 
+#include "mongo/db/exec/sbe/accumulator_sum_value_enum.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/platform/overflow_arithmetic.h"
 #include "mongo/util/represent_as.h"

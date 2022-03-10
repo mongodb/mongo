@@ -276,6 +276,7 @@ public:
 
 private:
     BSONType totalType = NumberInt;
+    BSONType nonDecimalTotalType = NumberInt;
     DoubleDoubleSummation nonDecimalTotal;
     Decimal128 decimalTotal;
 };

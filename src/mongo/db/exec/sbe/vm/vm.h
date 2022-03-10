@@ -505,6 +505,7 @@ enum class Builtin : uint8_t {
     aggDoubleDoubleSum,
     doubleDoubleSumFinalize,
     doubleDoubleMergeSumFinalize,
+    doubleDoublePartialSumFinalize,
     aggStdDev,
     stdDevPopFinalize,
     stdDevSampFinalize,
@@ -565,29 +566,6 @@ enum class Builtin : uint8_t {
     tsSecond,
     tsIncrement,
     typeMatch,
-};
-
-/**
- * This enum defines indices into an 'Array' that accumulates $sum results.
- *
- * The array might contain up to four elements:
- * - The element at index `kNonDecimalTotalTag` keeps track of the widest type of the sum of
- * non-decimal values.
- * - The elements at indices `kNonDecimalTotalSum` and `kNonDecimalTotalAddend` together represent
- * non-decimal value which is the sum of all non-decimal values.
- * - The element at index `kDecimalTotal` is optional and represents the sum of all decimal values
- * if any such values are encountered.
- *
- * See 'builtinAggDoubleDoubleSumImpl()' / 'builtInAggDoubleDoubleSum()' /
- * 'builtinDoubleDoubleSumFinalize()' for more details.
- */
-enum AggSumValueElems {
-    kNonDecimalTotalTag,
-    kNonDecimalTotalSum,
-    kNonDecimalTotalAddend,
-    kDecimalTotal,
-    // This is actually not an index but represents the maximum number of elements.
-    kMaxSizeOfArray
 };
 
 /**
@@ -1103,6 +1081,8 @@ private:
     // This is only for compatibility with mongos/sharding and we will revisit this later.
     template <bool keepIntegerPrecision = false>
     std::tuple<bool, value::TypeTags, value::Value> builtinDoubleDoubleSumFinalize(ArityType arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinDoubleDoublePartialSumFinalize(
+        ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinAggStdDev(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinStdDevPopFinalize(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinStdDevSampFinalize(ArityType arity);

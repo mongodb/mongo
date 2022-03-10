@@ -32,6 +32,7 @@
 #include <cmath>
 #include <limits>
 
+#include "mongo/db/exec/sbe/accumulator_sum_value_enum.h"
 #include "mongo/db/pipeline/accumulator.h"
 
 #include "mongo/db/exec/document_value/value.h"
@@ -63,17 +64,75 @@ const char subTotalErrorName[] = "subTotalError";  // Used for extra precision.
 
 void AccumulatorSum::processInternal(const Value& input, bool merging) {
     if (!input.numeric()) {
-        if (merging && input.getType() == Object) {
-            // Process merge document, see getValue() below.
-            nonDecimalTotal.addDouble(
-                input[subTotalName].getDouble());              // Sum without adjusting type.
-            processInternal(input[subTotalErrorName], false);  // Sum adjusting for type of error.
+        // Ignore non-numeric inputs when not merging.
+        if (!merging) {
+            return;
+        }
+
+        switch (input.getType()) {
+            // TODO SERVER-64227: Remove 'Object' case which is no longer necessary when we
+            // branch for 6.1.
+            case Object:
+                // Process merge document, see getValue() below.
+                nonDecimalTotal.addDouble(
+                    input[subTotalName].getDouble());  // Sum without adjusting type.
+                processInternal(input[subTotalErrorName],
+                                false);  // Sum adjusting for type of error.
+                break;
+            // The merge-side must be ready to process the full state of a partial sum from a
+            // shard-side if a shard chooses to do so. See Accumulator::getValue() for details.
+            case Array: {
+                auto&& arr = input.getArray();
+                tassert(6294002,
+                        "The partial sum's first element must be an int",
+                        arr[AggSumValueElems::kNonDecimalTotalTag].getType() == NumberInt);
+                nonDecimalTotalType = Value::getWidestNumeric(
+                    nonDecimalTotalType,
+                    static_cast<BSONType>(arr[AggSumValueElems::kNonDecimalTotalTag].getInt()));
+                totalType = Value::getWidestNumeric(totalType, nonDecimalTotalType);
+
+                tassert(6294003,
+                        "The partial sum's second element must be a double",
+                        arr[AggSumValueElems::kNonDecimalTotalSum].getType() == NumberDouble);
+                tassert(6294004,
+                        "The partial sum's third element must be a double",
+                        arr[AggSumValueElems::kNonDecimalTotalAddend].getType() == NumberDouble);
+
+                auto sum = arr[AggSumValueElems::kNonDecimalTotalSum].getDouble();
+                auto addend = arr[AggSumValueElems::kNonDecimalTotalAddend].getDouble();
+                nonDecimalTotal.addDouble(sum);
+                // If sum is +=INF and addend is +=NAN, 'nonDecimalTotal' becomes NAN after adding
+                // INF and NAN, which is different from the unsharded behavior. So, does not add
+                // 'addend' when sum == INF and addend == NAN. Does not add this logic to
+                // 'DoubleDoubleSummation' because this behavior is specific to sharded $sum.
+                if (std::isfinite(sum) || !std::isnan(addend)) {
+                    nonDecimalTotal.addDouble(addend);
+                }
+
+                if (arr.size() == AggSumValueElems::kMaxSizeOfArray) {
+                    totalType = NumberDecimal;
+                    tassert(6294005,
+                            "The partial sum's last element must be a decimal",
+                            arr[AggSumValueElems::kDecimalTotal].getType() == NumberDecimal);
+                    decimalTotal =
+                        decimalTotal.add(arr[AggSumValueElems::kDecimalTotal].getDecimal());
+                }
+                break;
+            }
+            default:
+                MONGO_UNREACHABLE;
         }
         return;
     }
 
     // Upgrade to the widest type required to hold the result.
     totalType = Value::getWidestNumeric(totalType, input.getType());
+
+    // Keep the nonDecimalTotal's type so that the type information can be serialized too for
+    // 'toBeMerged' scenarios.
+    if (totalType != NumberDecimal) {
+        nonDecimalTotalType = totalType;
+    }
     switch (input.getType()) {
         case NumberLong:
             nonDecimalTotal.addLong(input.getLong());
@@ -97,14 +156,52 @@ intrusive_ptr<AccumulatorState> AccumulatorSum::create(ExpressionContext* const 
 }
 
 Value AccumulatorSum::getValue(bool toBeMerged) {
+    // Serialize the full state of the partial sum result to avoid incorrect results for certain
+    // data set which are composed of 'NumberDecimal' values which cancel each other when being
+    // summed and other numeric type values which contribute mostly to sum result and a partial sum
+    // of some of 'NumberDecimal' values and other numeric type values happen to lose precision
+    // because 'NumberDecimal' can't represent the partial sum precisely, or the other way around.
+    //
+    // For example, [{n: 1e+34}, {n: NumberDecimal("0,1")}, {n: NumberDecimal("0.11")}, {n:
+    // -1e+34}].
+    //
+    // More fundamentally, addition is neither commutative nor associative on computer. So, it's
+    // desirable to keep the full state of the partial sum along the way to maintain the result as
+    // close to the real truth as possible until all additions are done.
+    //
+    // This requires changing over-the-wire data format from a shard-side to a merge-side and is
+    // incompatible change and is gated with FCV until 6.0.
+    //
+    // TODO SERVER-64227: Remove FCV gating which is unnecessary when we branch for 6.1.
+    auto&& fcv = serverGlobalParams.featureCompatibility;
+    auto canUseNewPartialResultFormat = fcv.isVersionInitialized() &&
+        fcv.isGreaterThanOrEqualTo(multiversion::FeatureCompatibilityVersion::kVersion_6_0);
+    if (canUseNewPartialResultFormat && toBeMerged) {
+        auto [sum, addend] = nonDecimalTotal.getDoubleDouble();
+
+        // The partial sum is serialized in the following form.
+        //
+        // [nonDecimalTotalType, sum, addend, decimalTotal]
+        //
+        // Presence of the 'decimalTotal' element indicates that the total type of the partial sum
+        // is 'NumberDecimal'.
+        auto valueArrayStream = ValueArrayStream();
+        valueArrayStream << static_cast<int>(nonDecimalTotalType) << sum << addend;
+        if (totalType == NumberDecimal) {
+            valueArrayStream << decimalTotal;
+        }
+        return valueArrayStream.done();
+    }
+
     switch (totalType) {
         case NumberInt:
             if (nonDecimalTotal.fitsLong())
                 return Value::createIntOrLong(nonDecimalTotal.getLong());
-        // Fallthrough.
+            [[fallthrough]];
         case NumberLong:
             if (nonDecimalTotal.fitsLong())
                 return Value(nonDecimalTotal.getLong());
+            // TODO SERVER-64227: Remove the following 'if' block which is buggy.
             if (toBeMerged) {
                 // The value was too large for a NumberLong, so output a document with two values
                 // adding up to the desired total. Older MongoDB versions used to ignore signed
@@ -121,8 +218,7 @@ Value AccumulatorSum::getValue(bool toBeMerged) {
                 return Value(DOC(subTotalName << total << subTotalErrorName << llerror));
             }
             // Sum doesn't fit a NumberLong, so return a NumberDouble instead.
-            return Value(nonDecimalTotal.getDouble());
-
+            [[fallthrough]];
         case NumberDouble:
             return Value(nonDecimalTotal.getDouble());
         case NumberDecimal: {
@@ -140,6 +236,7 @@ AccumulatorSum::AccumulatorSum(ExpressionContext* const expCtx) : AccumulatorSta
 
 void AccumulatorSum::reset() {
     totalType = NumberInt;
+    nonDecimalTotalType = NumberInt;
     nonDecimalTotal = {};
     decimalTotal = {};
 }
