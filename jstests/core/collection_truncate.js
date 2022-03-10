@@ -1,13 +1,17 @@
-// @tags: [
-//   requires_collstats,
-//   requires_non_retryable_commands,
-//   uses_testing_only_commands,
-//   requires_emptycapped,
-//   uses_full_validation,
-//   no_selinux,
-// ]
-
-// SERVER-15033 truncate on a regular collection
+/*
+ * SERVER-15033 truncate on a regular collection
+ *
+ * @tags: [
+ *   requires_collstats,
+ *   requires_non_retryable_commands,
+ *   uses_testing_only_commands,
+ *   requires_emptycapped,
+ *   uses_full_validation,
+ *   no_selinux,
+ *   # TODO SERVER-60823 re-add transaction support
+ *   does_not_support_transactions,
+ * ]
+ */
 
 (function() {
 'use strict';
