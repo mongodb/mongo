@@ -1467,6 +1467,10 @@ void IndexBuildsCoordinator::restartIndexBuildsForRecovery(
     }
 }
 
+bool IndexBuildsCoordinator::noIndexBuildInProgress() const {
+    return activeIndexBuilds.getActiveIndexBuilds() == 0;
+}
+
 int IndexBuildsCoordinator::numInProgForDb(StringData db) const {
     auto indexBuildFilter = [db](const auto& replState) { return db == replState.dbName; };
     auto dbIndexBuilds = activeIndexBuilds.filterIndexBuilds(indexBuildFilter);

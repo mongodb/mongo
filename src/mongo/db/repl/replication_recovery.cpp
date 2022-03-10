@@ -38,6 +38,7 @@
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/apply_ops.h"
@@ -356,10 +357,14 @@ void ReplicationRecoveryImpl::recoverFromOplogAsStandalone(OperationContext* opC
 
     reconstructPreparedTransactions(opCtx, OplogApplication::Mode::kRecovering);
 
-    LOGV2_WARNING(21558,
-                  "Setting mongod to readOnly mode as a result of specifying "
-                  "'recoverFromOplogAsStandalone'");
-    storageGlobalParams.readOnly = true;
+    // Two-phase index builds are built in the background, which may still be in-progress after
+    // recovering from the oplog. To prevent crashing the server, skip enabling read-only mode.
+    if (IndexBuildsCoordinator::get(opCtx)->noIndexBuildInProgress()) {
+        LOGV2_WARNING(21558,
+                      "Setting mongod to readOnly mode as a result of specifying "
+                      "'recoverFromOplogAsStandalone'");
+        storageGlobalParams.readOnly = true;
+    }
 }
 
 void ReplicationRecoveryImpl::recoverFromOplogUpTo(OperationContext* opCtx, Timestamp endPoint) {
