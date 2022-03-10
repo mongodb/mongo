@@ -170,6 +170,42 @@ TEST_F(BalancerCommandsSchedulerTest, SuccessfulMoveChunkCommand) {
     _scheduler.stop();
 }
 
+TEST_F(BalancerCommandsSchedulerTest, SuccessfulMoveRangeCommand) {
+    auto deferredCleanupCompletedCheckpoint =
+        globalFailPointRegistry().find("deferredCleanupCompletedCheckpoint");
+    auto timesEnteredFailPoint =
+        deferredCleanupCompletedCheckpoint->setMode(FailPoint::alwaysOn, 0);
+    _scheduler.start(operationContext(), getMigrationRecoveryDefaultValues());
+    ShardsvrMoveRange shardsvrRequest(kNss);
+    shardsvrRequest.setDbName(NamespaceString::kAdminDb);
+    shardsvrRequest.setFromShard(kShardId0);
+    auto& moveRangeRequest = shardsvrRequest.getMoveRangeRequest();
+    moveRangeRequest.setToShard(kShardId1);
+    moveRangeRequest.setMin({});
+    moveRangeRequest.setMax({});
+
+    auto networkResponseFuture = launchAsync([&]() {
+        onCommand(
+            [&](const executor::RemoteCommandRequest& request) { return BSON("ok" << true); });
+    });
+    auto futureResponse = _scheduler.requestMoveRange(
+        operationContext(), shardsvrRequest, false /* issuedByRemoteUser */);
+    ASSERT_OK(futureResponse.getNoThrow());
+    networkResponseFuture.default_timed_get();
+    deferredCleanupCompletedCheckpoint->waitForTimesEntered(timesEnteredFailPoint + 1);
+    // Ensure DistLock is released correctly
+    {
+        auto opCtx = Client::getCurrent()->getOperationContext();
+        const std::string whyMessage(str::stream()
+                                     << "Test acquisition of distLock for " << kNss.ns());
+        auto scopedDistLock = DistLockManager::get(opCtx)->lock(
+            opCtx, kNss.ns(), whyMessage, DistLockManager::kSingleLockAttemptTimeout);
+        ASSERT_OK(scopedDistLock.getStatus());
+    }
+    deferredCleanupCompletedCheckpoint->setMode(FailPoint::off, 0);
+    _scheduler.stop();
+}
+
 TEST_F(BalancerCommandsSchedulerTest, SuccessfulMergeChunkCommand) {
     _scheduler.start(operationContext(), getMigrationRecoveryDefaultValues());
     auto networkResponseFuture = launchAsync([&]() {

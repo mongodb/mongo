@@ -201,6 +201,17 @@ Status processManualMigrationOutcome(OperationContext* opCtx,
     return outcome;
 }
 
+
+uint64_t getMaxChunkSizeBytes(OperationContext* opCtx, const CollectionType& coll) {
+    const auto balancerConfig = Grid::get(opCtx)->getBalancerConfiguration();
+    uassertStatusOK(balancerConfig->refreshAndCheck(opCtx));
+    return coll.getMaxChunkSizeBytes().value_or(balancerConfig->getMaxChunkSizeBytes());
+}
+
+const int64_t getMaxChunkSizeMB(OperationContext* opCtx, const CollectionType& coll) {
+    return getMaxChunkSizeBytes(opCtx, coll) / (1024 * 1024);
+};
+
 const auto _balancerDecoration = ServiceContext::declareDecoration<Balancer>();
 
 const ReplicaSetAwareServiceRegistry::Registerer<Balancer> _balancerRegisterer("Balancer");
@@ -351,16 +362,7 @@ Status Balancer::moveSingleChunk(OperationContext* opCtx,
 
     auto coll = Grid::get(opCtx)->catalogClient()->getCollection(
         opCtx, nss, repl::ReadConcernLevel::kMajorityReadConcern);
-    auto maxChunkSize = coll.getMaxChunkSizeBytes().value_or(-1);
-    if (maxChunkSize <= 0) {
-        auto balancerConfig = Grid::get(opCtx)->getBalancerConfiguration();
-        Status refreshStatus = balancerConfig->refreshAndCheck(opCtx);
-        if (!refreshStatus.isOK()) {
-            return refreshStatus;
-        }
-
-        maxChunkSize = balancerConfig->getMaxChunkSizeBytes();
-    }
+    const auto maxChunkSize = getMaxChunkSizeBytes(opCtx, coll);
 
     MoveChunkSettings settings(maxChunkSize, secondaryThrottle, waitForDelete);
     MigrateInfo migrateInfo(newShardId,
@@ -374,6 +376,40 @@ Status Balancer::moveSingleChunk(OperationContext* opCtx,
             ->requestMoveChunk(opCtx, migrateInfo, settings, true /* issuedByRemoteUser */)
             .getNoThrow();
     return processManualMigrationOutcome(opCtx, chunk.getMin(), nss, newShardId, response);
+}
+
+Status Balancer::moveRange(OperationContext* opCtx,
+                           const NamespaceString& nss,
+                           const MoveRangeRequest& request,
+                           bool issuedByRemoteUser) {
+    auto coll = Grid::get(opCtx)->catalogClient()->getCollection(
+        opCtx, nss, repl::ReadConcernLevel::kMajorityReadConcern);
+    const auto maxChunkSize = getMaxChunkSizeBytes(opCtx, coll);
+
+    const auto chunk = [&]() {
+        const auto cm =
+            Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfo(opCtx, nss);
+        return cm.findIntersectingChunkWithSimpleCollation(request.getMin());
+    }();
+
+    // TODO SERVER-64148 handle `moveRange` with bound(s) not necessarily matching a chunk
+    bool validBounds = request.getMin().woCompare(chunk.getMin()) == 0 &&
+        request.getMax().woCompare(chunk.getMax()) == 0;
+    uassert(ErrorCodes::CommandFailed,
+            "No chunk found with the provided shard key bounds",
+            validBounds);
+
+    ShardsvrMoveRange shardSvrRequest(nss);
+    shardSvrRequest.setDbName(NamespaceString::kAdminDb);
+    shardSvrRequest.setMoveRangeRequest(request);
+    shardSvrRequest.setMaxChunkSizeBytes(maxChunkSize);
+    shardSvrRequest.setFromShard(chunk.getShardId());
+    shardSvrRequest.setEpoch(coll.getEpoch());
+
+    auto response = _commandScheduler->requestMoveRange(opCtx, shardSvrRequest, issuedByRemoteUser)
+                        .getNoThrow();
+    return processManualMigrationOutcome(
+        opCtx, chunk.getMin(), nss, shardSvrRequest.getToShard(), std::move(response));
 }
 
 void Balancer::report(OperationContext* opCtx, BSONObjBuilder* builder) {
@@ -957,17 +993,7 @@ BalancerCollectionStatusResponse Balancer::getBalancerStatusForNs(OperationConte
         uasserted(ErrorCodes::NamespaceNotSharded, "Collection unsharded or undefined");
     }
 
-    const auto maxChunkSizeMB = [&]() -> int64_t {
-        int64_t value = 0;
-        if (const auto& collOverride = coll.getMaxChunkSizeBytes(); collOverride.is_initialized()) {
-            value = *collOverride;
-        } else {
-            auto balancerConfig = Grid::get(opCtx)->getBalancerConfiguration();
-            uassertStatusOK(balancerConfig->refreshAndCheck(opCtx));
-            value = balancerConfig->getMaxChunkSizeBytes();
-        }
-        return value / (1024 * 1024);
-    }();
+    const auto maxChunkSizeMB = getMaxChunkSizeMB(opCtx, coll);
     BalancerCollectionStatusResponse response(maxChunkSizeMB, true /*balancerCompliant*/);
     auto setViolationOnResponse = [&response](const StringData& reason,
                                               const boost::optional<BSONObj>& details =

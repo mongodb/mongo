@@ -229,6 +229,22 @@ SemiFuture<void> BalancerCommandsSchedulerImpl::requestMoveChunk(
         .semi();
 }
 
+SemiFuture<void> BalancerCommandsSchedulerImpl::requestMoveRange(OperationContext* opCtx,
+                                                                 ShardsvrMoveRange& request,
+                                                                 bool issuedByRemoteUser) {
+    auto externalClientInfo =
+        issuedByRemoteUser ? boost::optional<ExternalClientInfo>(opCtx) : boost::none;
+
+    auto commandInfo = std::make_shared<MoveRangeCommandInfo>(
+        request, opCtx->getWriteConcern(), std::move(externalClientInfo));
+
+    return _buildAndEnqueueNewRequest(opCtx, std::move(commandInfo))
+        .then([](const executor::RemoteCommandResponse& remoteResponse) {
+            return processRemoteResponse(remoteResponse);
+        })
+        .semi();
+}
+
 SemiFuture<void> BalancerCommandsSchedulerImpl::requestMergeChunks(OperationContext* opCtx,
                                                                    const NamespaceString& nss,
                                                                    const ShardId& shardId,

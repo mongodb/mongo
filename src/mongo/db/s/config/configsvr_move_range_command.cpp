@@ -85,44 +85,8 @@ public:
                 Grid::get(opCtx)->shardRegistry()->getShard(opCtx, req.getToShard()),
                 "Could not find destination shard");
 
-            const auto cm =
-                Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfo(opCtx, nss);
-            const auto chunk = cm.findIntersectingChunkWithSimpleCollation(req.getMin());
-
-            bool validBounds = req.getMin().woCompare(chunk.getMin()) == 0 &&
-                req.getMax().woCompare(chunk.getMax()) == 0;
-            uassert(ErrorCodes::CommandFailed,
-                    "No chunk found with the provided shard key bounds",
-                    validBounds);
-
-            ChunkType chunkType;
-            chunkType.setCollectionUUID(cm.getUUID());
-            chunkType.setMin(chunk.getMin());
-            chunkType.setMax(chunk.getMax());
-            chunkType.setShard(chunk.getShardId());
-            chunkType.setVersion(cm.getVersion());
-
-            {
-                // TODO SERVER-64324 replace this scope calling moveRange instead of moveChunk
-                MigrationSecondaryThrottleOptions secondaryThrottle = [&]() {
-                    if (!req.getSecondaryThrottle()) {
-                        return MigrationSecondaryThrottleOptions::create(
-                            MigrationSecondaryThrottleOptions::kOff);
-                    }
-
-                    return MigrationSecondaryThrottleOptions::createWithWriteConcern(
-                        opCtx->getWriteConcern());
-                }();
-
-                const bool forceJumbo = req.getForceJumbo() != ForceJumbo::kDoNotForce;
-                uassertStatusOK(Balancer::get(opCtx)->moveSingleChunk(opCtx,
-                                                                      nss,
-                                                                      chunkType,
-                                                                      req.getToShard(),
-                                                                      secondaryThrottle,
-                                                                      req.getWaitForDelete(),
-                                                                      forceJumbo));
-            }
+            uassertStatusOK(Balancer::get(opCtx)->moveRange(
+                opCtx, nss, req.getMoveRangeRequest(), true /* issuedByRemoteUser */));
         }
 
     private:

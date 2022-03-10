@@ -113,6 +113,36 @@ private:
     boost::optional<ExternalClientInfo> _clientInfo;
 };
 
+class MoveRangeCommandInfo : public CommandInfo {
+public:
+    MoveRangeCommandInfo(const ShardsvrMoveRange& request,
+                         const WriteConcernOptions& writeConcern,
+                         boost::optional<ExternalClientInfo>&& clientInfo)
+        : CommandInfo(request.getFromShard(), request.getCommandParameter(), std::move(clientInfo)),
+          _request(request),
+          _wc(writeConcern) {}
+
+    const ShardsvrMoveRange& getMoveRangeRequest() {
+        return _request;
+    }
+
+    BSONObj serialise() const override {
+        BSONObjBuilder commandBuilder;
+        _request.serialize(BSON(WriteConcernOptions::kWriteConcernField << _wc.toBSON()),
+                           &commandBuilder);
+        appendCommandMetadataTo(&commandBuilder);
+        return commandBuilder.obj();
+    }
+
+    bool requiresDistributedLock() const override {
+        return true;
+    }
+
+private:
+    const ShardsvrMoveRange _request;
+    const WriteConcernOptions _wc;
+};
+
 /**
  * Set of command-specific subclasses of CommandInfo.
  */
@@ -519,6 +549,10 @@ public:
     SemiFuture<void> requestMoveChunk(OperationContext* opCtx,
                                       const MigrateInfo& migrateInfo,
                                       const MoveChunkSettings& commandSettings,
+                                      bool issuedByRemoteUser) override;
+
+    SemiFuture<void> requestMoveRange(OperationContext* opCtx,
+                                      ShardsvrMoveRange& request,
                                       bool issuedByRemoteUser) override;
 
     SemiFuture<void> requestMergeChunks(OperationContext* opCtx,

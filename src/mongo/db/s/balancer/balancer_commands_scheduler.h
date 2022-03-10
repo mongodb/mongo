@@ -33,6 +33,7 @@
 #include "mongo/db/s/balancer/balancer_policy.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/request_types/move_chunk_request.h"
+#include "mongo/s/request_types/move_range_request_gen.h"
 #include "mongo/s/shard_id.h"
 
 namespace mongo {
@@ -148,6 +149,10 @@ public:
                                                          const ChunkVersion& version,
                                                          const KeyPattern& keyPattern,
                                                          bool estimatedValue) = 0;
+
+    virtual SemiFuture<void> requestMoveRange(OperationContext* opCtx,
+                                              ShardsvrMoveRange& request,
+                                              bool issuedByRemoteUser) = 0;
 };
 
 }  // namespace mongo
