@@ -1,3 +1,4 @@
+// @tags: [requires_fcv_52]
 (function() {
 "use strict";
 const collName = "distinct1";
