@@ -38,6 +38,7 @@ public:
     static constexpr size_t kRoleCount = 3;
     enum class Role { kCoordinator, kDonor, kRecipient };
     static StringData getRoleName(Role role);
+    static bool isEnabled();
 };
 
 }  // namespace mongo

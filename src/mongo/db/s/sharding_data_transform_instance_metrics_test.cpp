@@ -41,14 +41,17 @@ namespace {
 
 class InstanceMetricsWithObserverMock {
 public:
-    InstanceMetricsWithObserverMock(int64_t startTime,
+    InstanceMetricsWithObserverMock(Date_t startTime,
                                     int64_t timeRemaining,
+                                    ClockSource* clockSource,
                                     ShardingDataTransformCumulativeMetrics* cumulativeMetrics)
         : _impl{UUID::gen(),
-                NamespaceString("test.source"),
-                ShardingDataTransformInstanceMetrics::Role::kDonor,
                 BSON("command"
                      << "test"),
+                NamespaceString("test.source"),
+                ShardingDataTransformInstanceMetrics::Role::kDonor,
+                startTime,
+                clockSource,
                 cumulativeMetrics,
                 std::make_unique<ObserverMock>(startTime, timeRemaining)} {}
 
@@ -61,17 +64,24 @@ class ShardingDataTransformInstanceMetricsTest : public ShardingDataTransformMet
 public:
     std::unique_ptr<ShardingDataTransformInstanceMetrics> createInstanceMetrics(
         UUID instanceId = UUID::gen(), Role role = Role::kDonor) {
-        return std::make_unique<ShardingDataTransformInstanceMetrics>(
-            instanceId, kTestCommand, kTestNamespace, role, &_cumulativeMetrics);
+        return std::make_unique<ShardingDataTransformInstanceMetrics>(instanceId,
+                                                                      kTestCommand,
+                                                                      kTestNamespace,
+                                                                      role,
+                                                                      getClockSource()->now(),
+                                                                      getClockSource(),
+                                                                      &_cumulativeMetrics);
     }
 
     std::unique_ptr<ShardingDataTransformInstanceMetrics> createInstanceMetrics(
         std::unique_ptr<ObserverMock> mock) {
         return std::make_unique<ShardingDataTransformInstanceMetrics>(
             UUID::gen(),
+            kTestCommand,
             kTestNamespace,
             ShardingDataTransformInstanceMetrics::Role::kDonor,
-            kTestCommand,
+            getClockSource()->now(),
+            getClockSource(),
             &_cumulativeMetrics,
             std::move(mock));
     }
@@ -179,6 +189,22 @@ TEST_F(ShardingDataTransformInstanceMetricsTest,
 
     report = metrics->reportForCurrentOp();
     ASSERT_EQ(report.getIntField("oplogEntriesApplied"), 100);
+}
+
+TEST_F(ShardingDataTransformInstanceMetricsTest, CurrentOpReportsRunningTime) {
+    auto uuid = UUID::gen();
+    auto now = getClockSource()->now();
+    constexpr auto kTimeElapsed = 15;
+    auto start = now - Seconds(kTimeElapsed);
+    auto metrics = std::make_unique<ShardingDataTransformInstanceMetrics>(uuid,
+                                                                          kTestCommand,
+                                                                          kTestNamespace,
+                                                                          Role::kCoordinator,
+                                                                          start,
+                                                                          getClockSource(),
+                                                                          &_cumulativeMetrics);
+    auto report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("totalOperationTimeElapsedSecs"), kTimeElapsed);
 }
 
 }  // namespace

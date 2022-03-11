@@ -38,6 +38,7 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/clock_source_mock.h"
 #include "mongo/util/future.h"
 #include "mongo/util/static_immortal.h"
 
@@ -46,9 +47,9 @@ namespace mongo {
 class ObserverMock : public ShardingDataTransformMetricsObserverInterface {
 public:
     constexpr static auto kDefaultRole = ShardingDataTransformMetrics::Role::kCoordinator;
-    ObserverMock(int64_t startTime, int64_t timeRemaining)
+    ObserverMock(Date_t startTime, int64_t timeRemaining)
         : ObserverMock{startTime, timeRemaining, timeRemaining, kDefaultRole} {}
-    ObserverMock(int64_t startTime,
+    ObserverMock(Date_t startTime,
                  int64_t timeRemainingHigh,
                  int64_t timeRemainingLow,
                  ShardingDataTransformMetrics::Role role)
@@ -72,7 +73,7 @@ public:
         return _timeRemainingLow;
     }
 
-    virtual int64_t getStartTimestamp() const override {
+    virtual Date_t getStartTimestamp() const override {
         return _startTime;
     }
 
@@ -82,7 +83,7 @@ public:
 
 private:
     UUID _uuid;
-    int64_t _startTime;
+    Date_t _startTime;
     int64_t _timeRemainingHigh;
     int64_t _timeRemainingLow;
     ShardingDataTransformMetrics::Role _role;
@@ -91,8 +92,12 @@ private:
 class ShardingDataTransformMetricsTestFixture : public unittest::Test {
 protected:
     constexpr static auto kTestMetricsName = "testMetrics";
-    constexpr static int64_t kYoungestTime = std::numeric_limits<int64_t>::max();
-    constexpr static int64_t kOldestTime = 1;
+    constexpr static auto kYoungestTime =
+        Date_t::fromMillisSinceEpoch(std::numeric_limits<int64_t>::max());
+    constexpr static int64_t kYoungestTimeLeft = 5000;
+    constexpr static auto kOldestTime =
+        Date_t::fromMillisSinceEpoch(std::numeric_limits<int64_t>::min());
+    constexpr static int64_t kOldestTimeLeft = 3000;
     using Role = ShardingDataTransformInstanceMetrics::Role;
     const NamespaceString kTestNamespace = NamespaceString("test.source");
     const BSONObj kTestCommand = BSON("command"
@@ -101,13 +106,18 @@ protected:
     ShardingDataTransformMetricsTestFixture() : _cumulativeMetrics{kTestMetricsName} {}
 
     const ObserverMock* getYoungestObserver() {
-        static StaticImmortal<ObserverMock> youngest{kYoungestTime, kYoungestTime};
+        static StaticImmortal<ObserverMock> youngest{kYoungestTime, kYoungestTimeLeft};
         return &youngest.value();
     }
 
     const ObserverMock* getOldestObserver() {
-        static StaticImmortal<ObserverMock> oldest{kOldestTime, kOldestTime};
+        static StaticImmortal<ObserverMock> oldest{kOldestTime, kOldestTimeLeft};
         return &oldest.value();
+    }
+
+    ClockSourceMock* getClockSource() {
+        static StaticImmortal<ClockSourceMock> clock;
+        return &clock.value();
     }
 
     using SpecialIndexBehaviorMap = stdx::unordered_map<int, std::function<void()>>;
@@ -130,9 +140,14 @@ protected:
             return (rng.nextInt32(kThresholdScale)) < kRemovalThreshold;
         };
         auto performInsertion = [&] {
-            auto time = rng.nextInt64(kYoungestTime - 1) + 1;
+            auto timeLeft = rng.nextInt64(std::numeric_limits<int64_t>::max());
+            auto startTime = rng.nextInt64();
+            startTime = (startTime == kOldestTime.asInt64()) ? startTime + 1 : startTime;
             inserted.emplace_back(
-                std::make_unique<ScopedObserverType>(time, time, &_cumulativeMetrics));
+                std::make_unique<ScopedObserverType>(Date_t::fromMillisSinceEpoch(startTime),
+                                                     timeLeft,
+                                                     getClockSource(),
+                                                     &_cumulativeMetrics));
         };
         auto performRemoval = [&] {
             auto i = rng.nextInt32(inserted.size());
@@ -167,7 +182,7 @@ protected:
                                 registerAtIndex(rng.nextInt32(kIterations), getOldestObserver()));
         ASSERT_EQ(_cumulativeMetrics.getOldestOperationHighEstimateRemainingTimeMillis(
                       ObserverMock::kDefaultRole),
-                  kOldestTime);
+                  kOldestTimeLeft);
     }
 
     template <typename ScopedObserverType>
@@ -204,7 +219,7 @@ protected:
         }
         ASSERT_EQ(_cumulativeMetrics.getOldestOperationHighEstimateRemainingTimeMillis(
                       ObserverMock::kDefaultRole),
-                  kOldestTime);
+                  kOldestTimeLeft);
         size_t expectedCount = 1;  // Special insert for kOldest is not counted in vector size.
         for (auto& v : threadStorage) {
             expectedCount += v.size();

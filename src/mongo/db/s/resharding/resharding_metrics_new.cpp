@@ -32,34 +32,77 @@
 
 namespace mongo {
 namespace {
+
+inline ReshardingMetricsNew::State getDefaultState(ReshardingMetricsNew::Role role) {
+    using Role = ReshardingMetricsNew::Role;
+    switch (role) {
+        case Role::kCoordinator:
+            return CoordinatorStateEnum::kUnused;
+        case Role::kRecipient:
+            return RecipientStateEnum::kUnused;
+        case Role::kDonor:
+            return DonorStateEnum::kUnused;
+    }
+    MONGO_UNREACHABLE;
+}
+
 // Returns the originalCommand with the createIndexes, key and unique fields added.
-BSONObj createOriginalCommand(const NamespaceString& nss, BSONObj keyPattern, bool unique) {
+BSONObj createOriginalCommand(const NamespaceString& nss, BSONObj shardKey) {
 
     using Doc = Document;
     using Arr = std::vector<Value>;
     using V = Value;
 
-    return Doc{{"originatingCommand",
-                V{Doc{{"reshardCollection", V{StringData{nss.toString()}}},
-                      {"key", std::move(keyPattern)},
-                      {"unique", V{unique}},
-                      {"collation", V{Doc{{"locale", V{StringData{"simple"}}}}}}}}}}
+    return Doc{{"reshardCollection", V{StringData{nss.toString()}}},
+               {"key", std::move(shardKey)},
+               {"unique", V{StringData{"false"}}},
+               {"collation", V{Doc{{"locale", V{StringData{"simple"}}}}}}}
         .toBson();
 }
+
+Date_t readStartTime(const CommonReshardingMetadata& metadata, ClockSource* fallbackSource) {
+    try {
+        const auto& startTime = metadata.getStartTime();
+        tassert(6363400,
+                "Metadata is missing start time despite feature flag being enabled",
+                startTime.has_value());
+        return startTime.get();
+    } catch (const DBException&) {
+        return fallbackSource->now();
+    }
+}
+
 }  // namespace
 
 ReshardingMetricsNew::ReshardingMetricsNew(
-    UUID uuid,
+    UUID instanceId,
+    BSONObj shardKey,
     NamespaceString nss,
     Role role,
-    BSONObj shardKey,
-    bool unique,
+    Date_t startTime,
+    ClockSource* clockSource,
     ShardingDataTransformCumulativeMetrics* cumulativeMetrics)
-    : ShardingDataTransformInstanceMetrics(std::move(uuid),
-                                           createOriginalCommand(nss, std::move(shardKey), unique),
-                                           std::move(nss),
+    : ShardingDataTransformInstanceMetrics{std::move(instanceId),
+                                           createOriginalCommand(nss, std::move(shardKey)),
+                                           nss,
                                            role,
-                                           cumulativeMetrics) {}
+                                           startTime,
+                                           clockSource,
+                                           cumulativeMetrics},
+      _state{getDefaultState(role)} {}
+
+ReshardingMetricsNew::ReshardingMetricsNew(
+    const CommonReshardingMetadata& metadata,
+    Role role,
+    ClockSource* clockSource,
+    ShardingDataTransformCumulativeMetrics* cumulativeMetrics)
+    : ReshardingMetricsNew{metadata.getReshardingUUID(),
+                           metadata.getReshardingKey().toBSON(),
+                           metadata.getSourceNss(),
+                           role,
+                           readStartTime(metadata, clockSource),
+                           clockSource,
+                           cumulativeMetrics} {}
 
 std::string ReshardingMetricsNew::createOperationDescription() const noexcept {
     return fmt::format("ReshardingMetrics{}Service {}",
@@ -69,15 +112,29 @@ std::string ReshardingMetricsNew::createOperationDescription() const noexcept {
 
 std::unique_ptr<ReshardingMetricsNew> ReshardingMetricsNew::makeInstance(
     UUID instanceId,
+    BSONObj shardKey,
     NamespaceString nss,
     Role role,
-    BSONObj shardKey,
-    bool unique,
+    Date_t startTime,
     ServiceContext* serviceContext) {
     auto cumulativeMetrics =
         ShardingDataTransformCumulativeMetrics::getForResharding(serviceContext);
-
-    return std::make_unique<ReshardingMetricsNew>(
-        instanceId, nss, role, std::move(shardKey), unique, cumulativeMetrics);
+    return std::make_unique<ReshardingMetricsNew>(instanceId,
+                                                  createOriginalCommand(nss, std::move(shardKey)),
+                                                  std::move(nss),
+                                                  role,
+                                                  startTime,
+                                                  serviceContext->getFastClockSource(),
+                                                  cumulativeMetrics);
 }
+
+StringData ReshardingMetricsNew::getStateString() const noexcept {
+    return stdx::visit(
+        visit_helper::Overloaded{
+            [](CoordinatorStateEnum state) { return CoordinatorState_serializer(state); },
+            [](RecipientStateEnum state) { return RecipientState_serializer(state); },
+            [](DonorStateEnum state) { return DonorState_serializer(state); }},
+        _state.load());
+}
+
 }  // namespace mongo

@@ -40,7 +40,7 @@ public:
     ShardingDataTransformMetricsObserver(ShardingDataTransformInstanceMetrics* metrics);
     int64_t getHighEstimateRemainingTimeMillis() const override;
     int64_t getLowEstimateRemainingTimeMillis() const override;
-    int64_t getStartTimestamp() const override;
+    Date_t getStartTimestamp() const override;
     const UUID& getUuid() const override;
     ShardingDataTransformMetrics::Role getRole() const override;
 

@@ -107,3 +107,7 @@ structs:
             recipientFields:
                 type: TypeCollectionRecipientFields
                 optional: true
+            startTime:
+                type: date
+                description: "Start time of the operation."
+                optional: true

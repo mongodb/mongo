@@ -44,30 +44,37 @@ ShardingDataTransformInstanceMetrics::ShardingDataTransformInstanceMetrics(
     BSONObj originalCommand,
     NamespaceString sourceNs,
     Role role,
+    Date_t startTime,
+    ClockSource* clockSource,
     ShardingDataTransformCumulativeMetrics* cumulativeMetrics)
     : ShardingDataTransformInstanceMetrics{
           std::move(instanceId),
+          std::move(originalCommand),
           std::move(sourceNs),
           role,
-          std::move(originalCommand),
+          startTime,
+          clockSource,
           cumulativeMetrics,
           std::make_unique<ShardingDataTransformMetricsObserver>(this)} {}
 
 ShardingDataTransformInstanceMetrics::ShardingDataTransformInstanceMetrics(
     UUID instanceId,
+    BSONObj originalCommand,
     NamespaceString sourceNs,
     Role role,
-    BSONObj originalCommand,
+    Date_t startTime,
+    ClockSource* clockSource,
     ShardingDataTransformCumulativeMetrics* cumulativeMetrics,
     ObserverPtr observer)
     : _instanceId{std::move(instanceId)},
+      _originalCommand{std::move(originalCommand)},
       _sourceNs{std::move(sourceNs)},
       _role{role},
-      _originalCommand{std::move(originalCommand)},
+      _clockSource{clockSource},
       _observer{std::move(observer)},
       _cumulativeMetrics{cumulativeMetrics},
       _deregister{_cumulativeMetrics->registerInstanceMetrics(_observer.get())},
-      _placeholderUuidForTesting(UUID::gen()),
+      _startTime{startTime},
       _insertsApplied{0},
       _updatesApplied{0},
       _deletesApplied{0},
@@ -87,12 +94,12 @@ int64_t ShardingDataTransformInstanceMetrics::getLowEstimateRemainingTimeMillis(
     return kPlaceholderTimeRemainingForTesting;
 }
 
-int64_t ShardingDataTransformInstanceMetrics::getStartTimestamp() const {
-    return kPlaceholderTimestampForTesting;
+Date_t ShardingDataTransformInstanceMetrics::getStartTimestamp() const {
+    return _startTime;
 }
 
-const UUID& ShardingDataTransformInstanceMetrics::getUuid() const {
-    return _placeholderUuidForTesting;
+const UUID& ShardingDataTransformInstanceMetrics::getInstanceId() const {
+    return _instanceId;
 }
 
 ShardingDataTransformInstanceMetrics::Role ShardingDataTransformInstanceMetrics::getRole() const {
@@ -105,6 +112,10 @@ std::string ShardingDataTransformInstanceMetrics::createOperationDescription() c
                        _instanceId.toString());
 }
 
+StringData ShardingDataTransformInstanceMetrics::getStateString() const noexcept {
+    return "Unknown";
+}
+
 BSONObj ShardingDataTransformInstanceMetrics::reportForCurrentOp() const noexcept {
 
     BSONObjBuilder builder;
@@ -113,25 +124,25 @@ BSONObj ShardingDataTransformInstanceMetrics::reportForCurrentOp() const noexcep
     builder.append(kOp, "command");
     builder.append(kNamespace, _sourceNs.toString());
     builder.append(kOriginalCommand, _originalCommand);
-    builder.append(kOpTimeElapsed, TEMP_VALUE);
+    builder.append(kOpTimeElapsed, getOperationRunningTimeSecs());
 
     switch (_role) {
         case Role::kCoordinator:
             builder.append(kAllShardsHighestRemainingOperationTimeEstimatedSecs, TEMP_VALUE);
             builder.append(kAllShardsLowestRemainingOperationTimeEstimatedSecs, TEMP_VALUE);
-            builder.append(kCoordinatorState, TEMP_VALUE);
+            builder.append(kCoordinatorState, getStateString());
             builder.append(kApplyTimeElapsed, TEMP_VALUE);
             builder.append(kCopyTimeElapsed, TEMP_VALUE);
             builder.append(kCriticalSectionTimeElapsed, TEMP_VALUE);
             break;
         case Role::kDonor:
-            builder.append(kDonorState, TEMP_VALUE);
+            builder.append(kDonorState, getStateString());
             builder.append(kCriticalSectionTimeElapsed, TEMP_VALUE);
             builder.append(kCountWritesDuringCriticalSection, TEMP_VALUE);
             builder.append(kCountReadsDuringCriticalSection, TEMP_VALUE);
             break;
         case Role::kRecipient:
-            builder.append(kRecipientState, TEMP_VALUE);
+            builder.append(kRecipientState, getStateString());
             builder.append(kApplyTimeElapsed, TEMP_VALUE);
             builder.append(kCopyTimeElapsed, TEMP_VALUE);
             builder.append(kRemainingOpTimeEstimated, TEMP_VALUE);
@@ -167,6 +178,11 @@ void ShardingDataTransformInstanceMetrics::onDeleteApplied() {
 
 void ShardingDataTransformInstanceMetrics::onOplogEntriesApplied(int64_t numEntries) {
     _oplogEntriesApplied.addAndFetch(numEntries);
+}
+
+
+inline int64_t ShardingDataTransformInstanceMetrics::getOperationRunningTimeSecs() const {
+    return durationCount<Seconds>(_clockSource->now() - _startTime);
 }
 
 }  // namespace mongo

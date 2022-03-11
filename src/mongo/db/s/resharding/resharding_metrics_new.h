@@ -31,30 +31,70 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/s/resharding/resharding_metrics_helpers.h"
 #include "mongo/db/s/sharding_data_transform_instance_metrics.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
 
-
 class ReshardingMetricsNew : public ShardingDataTransformInstanceMetrics {
 public:
-    ReshardingMetricsNew(UUID uuid,
+    using State = stdx::variant<CoordinatorStateEnum, RecipientStateEnum, DonorStateEnum>;
+
+    ReshardingMetricsNew(UUID instanceId,
+                         BSONObj shardKey,
                          NamespaceString nss,
                          Role role,
-                         BSONObj shardKey,
-                         bool unique,
+                         Date_t startTime,
+                         ClockSource* clockSource,
+                         ShardingDataTransformCumulativeMetrics* cumulativeMetrics);
+    ReshardingMetricsNew(const CommonReshardingMetadata& metadata,
+                         Role role,
+                         ClockSource* clockSource,
                          ShardingDataTransformCumulativeMetrics* cumulativeMetrics);
 
     static std::unique_ptr<ReshardingMetricsNew> makeInstance(UUID instanceId,
+                                                              BSONObj shardKey,
                                                               NamespaceString nss,
                                                               Role role,
-                                                              BSONObj shardKey,
-                                                              bool unique,
+                                                              Date_t startTime,
                                                               ServiceContext* serviceContext);
+
+    template <typename T>
+    static auto initializeFrom(const T& document,
+                               ClockSource* clockSource,
+                               ShardingDataTransformCumulativeMetrics* cumulativeMetrics) {
+        static_assert(resharding_metrics::isStateDocument<T>);
+        auto result =
+            std::make_unique<ReshardingMetricsNew>(document.getCommonReshardingMetadata(),
+                                                   resharding_metrics::getRoleForStateDocument<T>(),
+                                                   clockSource,
+                                                   cumulativeMetrics);
+        result->setState(resharding_metrics::getState(document));
+        return result;
+    }
+
+    template <typename T>
+    static auto initializeFrom(const T& document, ServiceContext* serviceContext) {
+        return initializeFrom(
+            document,
+            serviceContext->getFastClockSource(),
+            ShardingDataTransformCumulativeMetrics::getForResharding(serviceContext));
+    }
+
+    template <typename T>
+    void setState(T state) {
+        static_assert(std::is_assignable_v<State, T>);
+        _state.store(state);
+    }
+
+protected:
+    virtual StringData getStateString() const noexcept override;
 
 private:
     std::string createOperationDescription() const noexcept override;
+
+    AtomicWord<State> _state;
 };
 
 }  // namespace mongo

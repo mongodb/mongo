@@ -29,33 +29,47 @@
 
 #pragma once
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/namespace_string.h"
+#include "mongo/db/s/resharding/coordinator_document_gen.h"
+#include "mongo/db/s/resharding/donor_document_gen.h"
+#include "mongo/db/s/resharding/recipient_document_gen.h"
 #include "mongo/db/s/sharding_data_transform_instance_metrics.h"
-#include "mongo/util/uuid.h"
+#include <type_traits>
 
 namespace mongo {
 
+namespace resharding_metrics {
 
-class GlobalIndexMetrics : public ShardingDataTransformInstanceMetrics {
-public:
-    GlobalIndexMetrics(UUID instanceId,
-                       BSONObj originatingCommand,
-                       NamespaceString nss,
-                       Role role,
-                       Date_t startTime,
-                       ClockSource* clockSource,
-                       ShardingDataTransformCumulativeMetrics* cumulativeMetrics);
+template <class T>
+inline constexpr bool isStateDocument =
+    std::disjunction<std::is_same<T, ReshardingRecipientDocument>,
+                     std::is_same<T, ReshardingCoordinatorDocument>,
+                     std::is_same<T, ReshardingDonorDocument>>::value;
 
-    static std::unique_ptr<GlobalIndexMetrics> makeInstance(UUID uuid,
-                                                            NamespaceString nss,
-                                                            Role role,
-                                                            BSONObj keyPattern,
-                                                            bool unique,
-                                                            ServiceContext* serviceContext);
 
-private:
-    std::string createOperationDescription() const noexcept override;
-};
+template <typename T>
+inline constexpr auto getState(const T& document) {
+    static_assert(isStateDocument<T>);
+    if constexpr (std::is_same_v<T, ReshardingCoordinatorDocument>) {
+        return document.getState();
+    } else {
+        return document.getMutableState().getState();
+    }
+}
+
+template <typename T>
+inline constexpr ShardingDataTransformMetrics::Role getRoleForStateDocument() {
+    static_assert(isStateDocument<T>);
+    using Role = ShardingDataTransformMetrics::Role;
+    if constexpr (std::is_same_v<T, ReshardingCoordinatorDocument>) {
+        return Role::kCoordinator;
+    } else if constexpr (std::is_same_v<T, ReshardingDonorDocument>) {
+        return Role::kDonor;
+    } else if constexpr (std::is_same_v<T, ReshardingRecipientDocument>) {
+        return Role::kRecipient;
+    }
+    MONGO_UNREACHABLE;
+}
+
+}  // namespace resharding_metrics
 
 }  // namespace mongo

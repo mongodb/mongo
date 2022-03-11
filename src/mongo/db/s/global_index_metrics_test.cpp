@@ -43,10 +43,16 @@ namespace {
 class GlobalIndexMetricsTest : public ShardingDataTransformMetricsTestFixture {
 
 public:
-    std::unique_ptr<GlobalIndexMetrics> createInstanceMetrics(UUID instanceId = UUID::gen(),
+    std::unique_ptr<GlobalIndexMetrics> createInstanceMetrics(ClockSource* clockSource,
+                                                              UUID instanceId = UUID::gen(),
                                                               Role role = Role::kDonor) {
-        return std::make_unique<GlobalIndexMetrics>(
-            instanceId, kTestNamespace, role, kTestCommand, true, &_cumulativeMetrics);
+        return std::make_unique<GlobalIndexMetrics>(instanceId,
+                                                    kTestCommand,
+                                                    kTestNamespace,
+                                                    role,
+                                                    clockSource->now(),
+                                                    clockSource,
+                                                    &_cumulativeMetrics);
     }
 };
 
@@ -56,7 +62,7 @@ TEST_F(GlobalIndexMetricsTest, ReportForCurrentOpShouldHaveGlobalIndexDescriptio
 
     std::for_each(roles.begin(), roles.end(), [&](Role role) {
         auto instanceId = UUID::gen();
-        auto metrics = createInstanceMetrics(instanceId, role);
+        auto metrics = createInstanceMetrics(getClockSource(), instanceId, role);
         auto report = metrics->reportForCurrentOp();
 
         ASSERT_EQ(report.getStringField("desc").toString(),

@@ -43,12 +43,12 @@ int64_t ShardingDataTransformMetricsObserver::getLowEstimateRemainingTimeMillis(
     return _metrics->getLowEstimateRemainingTimeMillis();
 }
 
-int64_t ShardingDataTransformMetricsObserver::getStartTimestamp() const {
+Date_t ShardingDataTransformMetricsObserver::getStartTimestamp() const {
     return _metrics->getStartTimestamp();
 }
 
 const UUID& ShardingDataTransformMetricsObserver::getUuid() const {
-    return _metrics->getUuid();
+    return _metrics->getInstanceId();
 }
 
 ShardingDataTransformMetrics::Role ShardingDataTransformMetricsObserver::getRole() const {

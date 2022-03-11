@@ -238,7 +238,7 @@ void ReshardingOplogApplier::_clearAppliedOpsAndStoreProgress(OperationContext* 
         BSON(ReshardingOplogApplierProgress::kOplogSourceIdFieldName << _sourceId.toBSON()),
         builder.obj());
     _env->metrics()->onOplogEntriesApplied(_currentBatchToApply.size());
-    if (feature_flags::gFeatureFlagShardingDataTransformMetrics.isEnabledAndIgnoreFCV()) {
+    if (ShardingDataTransformMetrics::isEnabled()) {
         _env->metricsNew()->onOplogEntriesApplied(_currentBatchToApply.size());
     }
 

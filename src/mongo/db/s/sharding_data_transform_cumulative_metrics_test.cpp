@@ -47,8 +47,9 @@ class ScopedObserverMock {
 public:
     using Ptr = std::unique_ptr<ScopedObserverMock>;
 
-    ScopedObserverMock(int64_t startTime,
+    ScopedObserverMock(Date_t startTime,
                        int64_t timeRemaining,
+                       ClockSource* clockSource,
                        ShardingDataTransformCumulativeMetrics* parent)
         : _mock{startTime, timeRemaining}, _deregister{parent->registerInstanceMetrics(&_mock)} {}
 
@@ -78,7 +79,7 @@ TEST_F(ShardingDataTransformCumulativeMetricsTest, MetricsReportsOldestWhenInser
     auto deregisterYoungest = _cumulativeMetrics.registerInstanceMetrics(getYoungestObserver());
     ASSERT_EQ(_cumulativeMetrics.getOldestOperationHighEstimateRemainingTimeMillis(
                   ObserverMock::kDefaultRole),
-              kOldestTime);
+              kOldestTimeLeft);
 }
 
 TEST_F(ShardingDataTransformCumulativeMetricsTest, MetricsReportsOldestWhenInsertedLast) {
@@ -86,7 +87,7 @@ TEST_F(ShardingDataTransformCumulativeMetricsTest, MetricsReportsOldestWhenInser
     auto deregisterOldest = _cumulativeMetrics.registerInstanceMetrics(getOldestObserver());
     ASSERT_EQ(_cumulativeMetrics.getOldestOperationHighEstimateRemainingTimeMillis(
                   ObserverMock::kDefaultRole),
-              kOldestTime);
+              kOldestTimeLeft);
 }
 
 TEST_F(ShardingDataTransformCumulativeMetricsTest, RemainingTimeReports0WhenEmpty) {
@@ -101,21 +102,21 @@ TEST_F(ShardingDataTransformCumulativeMetricsTest, UpdatesOldestWhenOldestIsRemo
     auto deregisterOldest = _cumulativeMetrics.registerInstanceMetrics(getOldestObserver());
     ASSERT_EQ(_cumulativeMetrics.getOldestOperationHighEstimateRemainingTimeMillis(
                   ObserverMock::kDefaultRole),
-              kOldestTime);
+              kOldestTimeLeft);
     deregisterOldest();
     ASSERT_EQ(_cumulativeMetrics.getOldestOperationHighEstimateRemainingTimeMillis(
                   ObserverMock::kDefaultRole),
-              kYoungestTime);
+              kYoungestTimeLeft);
 }
 
 TEST_F(ShardingDataTransformCumulativeMetricsTest, InsertsTwoWithSameStartTime) {
     auto deregisterOldest = _cumulativeMetrics.registerInstanceMetrics(getOldestObserver());
-    ObserverMock sameAsOldest{kOldestTime, kOldestTime};
+    ObserverMock sameAsOldest{kOldestTime, kOldestTimeLeft};
     auto deregisterOldest2 = _cumulativeMetrics.registerInstanceMetrics(&sameAsOldest);
     ASSERT_EQ(_cumulativeMetrics.getObservedMetricsCount(), 2);
     ASSERT_EQ(_cumulativeMetrics.getOldestOperationHighEstimateRemainingTimeMillis(
                   ObserverMock::kDefaultRole),
-              kOldestTime);
+              kOldestTimeLeft);
 }
 
 TEST_F(ShardingDataTransformCumulativeMetricsTest, StillReportsOldestAfterRandomOperations) {
@@ -130,10 +131,10 @@ TEST_F(ShardingDataTransformCumulativeMetricsTest,
 TEST_F(ShardingDataTransformCumulativeMetricsTest, ReportsOldestByRole) {
     using Role = ShardingDataTransformMetrics::Role;
     auto& metrics = _cumulativeMetrics;
-    ObserverMock oldDonor{100, 100, 100, Role::kDonor};
-    ObserverMock youngDonor{200, 200, 200, Role::kDonor};
-    ObserverMock oldRecipient{300, 300, 300, Role::kRecipient};
-    ObserverMock youngRecipient{400, 400, 400, Role::kRecipient};
+    ObserverMock oldDonor{Date_t::fromMillisSinceEpoch(100), 100, 100, Role::kDonor};
+    ObserverMock youngDonor{Date_t::fromMillisSinceEpoch(200), 200, 200, Role::kDonor};
+    ObserverMock oldRecipient{Date_t::fromMillisSinceEpoch(300), 300, 300, Role::kRecipient};
+    ObserverMock youngRecipient{Date_t::fromMillisSinceEpoch(400), 400, 400, Role::kRecipient};
     auto removeOldD = metrics.registerInstanceMetrics(&oldDonor);
     auto removeYoungD = metrics.registerInstanceMetrics(&youngDonor);
     auto removeOldR = metrics.registerInstanceMetrics(&oldRecipient);
@@ -156,8 +157,8 @@ TEST_F(ShardingDataTransformCumulativeMetricsTest, ReportsOldestByRole) {
 
 TEST_F(ShardingDataTransformCumulativeMetricsTest, ReportContainsTimeEstimates) {
     using Role = ShardingDataTransformMetrics::Role;
-    ObserverMock recipient{100, 100, 100, Role::kRecipient};
-    ObserverMock coordinator{200, 400, 300, Role::kCoordinator};
+    ObserverMock recipient{Date_t::fromMillisSinceEpoch(100), 100, 100, Role::kRecipient};
+    ObserverMock coordinator{Date_t::fromMillisSinceEpoch(200), 400, 300, Role::kCoordinator};
     auto ignore = _cumulativeMetrics.registerInstanceMetrics(&recipient);
     ignore = _cumulativeMetrics.registerInstanceMetrics(&coordinator);
 

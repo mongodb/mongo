@@ -45,12 +45,16 @@ public:
                                          BSONObj originalCommand,
                                          NamespaceString sourceNs,
                                          Role role,
+                                         Date_t startTime,
+                                         ClockSource* clockSource,
                                          ShardingDataTransformCumulativeMetrics* cumulativeMetrics);
 
     ShardingDataTransformInstanceMetrics(UUID instanceId,
+                                         BSONObj originalCommand,
                                          NamespaceString sourceNs,
                                          Role role,
-                                         BSONObj originalCommand,
+                                         Date_t startTime,
+                                         ClockSource* clockSource,
                                          ShardingDataTransformCumulativeMetrics* cumulativeMetrics,
                                          ObserverPtr observer);
     virtual ~ShardingDataTransformInstanceMetrics();
@@ -58,8 +62,8 @@ public:
     BSONObj reportForCurrentOp() const noexcept;
     int64_t getHighEstimateRemainingTimeMillis() const;
     int64_t getLowEstimateRemainingTimeMillis() const;
-    int64_t getStartTimestamp() const;
-    const UUID& getUuid() const;
+    Date_t getStartTimestamp() const;
+    const UUID& getInstanceId() const;
     void onInsertApplied();
     void onUpdateApplied();
     void onDeleteApplied();
@@ -68,10 +72,11 @@ public:
 
 protected:
     virtual std::string createOperationDescription() const noexcept;
-    UUID _instanceId;
-    NamespaceString _sourceNs;
-    Role _role;
-    BSONObj _originalCommand;
+    virtual StringData getStateString() const noexcept;
+    const UUID _instanceId;
+    const BSONObj _originalCommand;
+    const NamespaceString _sourceNs;
+    const Role _role;
     static constexpr auto kType = "type";
     static constexpr auto kDescription = "desc";
     static constexpr auto kNamespace = "ns";
@@ -103,11 +108,14 @@ protected:
         "allShardsHighestRemainingOperationTimeEstimatedSecs";
 
 private:
+    inline int64_t getOperationRunningTimeSecs() const;
+
+    ClockSource* _clockSource;
     ObserverPtr _observer;
     ShardingDataTransformCumulativeMetrics* _cumulativeMetrics;
     ShardingDataTransformCumulativeMetrics::DeregistrationFunction _deregister;
 
-    UUID _placeholderUuidForTesting;
+    const Date_t _startTime;
     AtomicWord<int64_t> _insertsApplied;
     AtomicWord<int64_t> _updatesApplied;
     AtomicWord<int64_t> _deletesApplied;

@@ -47,18 +47,20 @@ BSONObj createOriginalCommand(const NamespaceString& nss, BSONObj keyPattern, bo
 }
 }  // namespace
 
-GlobalIndexMetrics::GlobalIndexMetrics(UUID uuid,
+GlobalIndexMetrics::GlobalIndexMetrics(UUID instanceId,
+                                       BSONObj originatingCommand,
                                        NamespaceString nss,
                                        Role role,
-                                       BSONObj keyPattern,
-                                       bool unique,
+                                       Date_t startTime,
+                                       ClockSource* clockSource,
                                        ShardingDataTransformCumulativeMetrics* cumulativeMetrics)
-    : ShardingDataTransformInstanceMetrics(
-          std::move(uuid),
-          createOriginalCommand(nss, std::move(keyPattern), unique),
-          std::move(nss),
-          role,
-          cumulativeMetrics) {}
+    : ShardingDataTransformInstanceMetrics{std::move(instanceId),
+                                           std::move(originatingCommand),
+                                           std::move(nss),
+                                           role,
+                                           startTime,
+                                           clockSource,
+                                           cumulativeMetrics} {}
 
 std::string GlobalIndexMetrics::createOperationDescription() const noexcept {
     return fmt::format("GlobalIndexMetrics{}Service {}",

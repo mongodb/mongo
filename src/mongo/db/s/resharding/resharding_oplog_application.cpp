@@ -174,24 +174,21 @@ Status ReshardingOplogApplicationRules::applyOperation(OperationContext* opCtx,
                 case repl::OpTypeEnum::kInsert:
                     _applyInsert_inlock(
                         opCtx, autoCollOutput.getDb(), *autoCollOutput, *autoCollStash, op);
-                    if (feature_flags::gFeatureFlagShardingDataTransformMetrics
-                            .isEnabledAndIgnoreFCV()) {
+                    if (ShardingDataTransformMetrics::isEnabled()) {
                         _metricsNew->onInsertApplied();
                     }
                     break;
                 case repl::OpTypeEnum::kUpdate:
                     _applyUpdate_inlock(
                         opCtx, autoCollOutput.getDb(), *autoCollOutput, *autoCollStash, op);
-                    if (feature_flags::gFeatureFlagShardingDataTransformMetrics
-                            .isEnabledAndIgnoreFCV()) {
+                    if (ShardingDataTransformMetrics::isEnabled()) {
                         _metricsNew->onUpdateApplied();
                     }
                     break;
                 case repl::OpTypeEnum::kDelete:
                     _applyDelete_inlock(
                         opCtx, autoCollOutput.getDb(), *autoCollOutput, *autoCollStash, op);
-                    if (feature_flags::gFeatureFlagShardingDataTransformMetrics
-                            .isEnabledAndIgnoreFCV()) {
+                    if (ShardingDataTransformMetrics::isEnabled()) {
                         _metricsNew->onDeleteApplied();
                     }
                     break;

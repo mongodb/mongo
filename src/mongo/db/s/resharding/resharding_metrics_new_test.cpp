@@ -32,6 +32,8 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/s/resharding/resharding_metrics_new.h"
+#include "mongo/db/s/resharding/resharding_service_test_helpers.h"
+#include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/s/sharding_data_transform_cumulative_metrics.h"
 #include "mongo/db/s/sharding_data_transform_metrics_test_fixture.h"
 #include "mongo/unittest/unittest.h"
@@ -39,14 +41,59 @@
 namespace mongo {
 namespace {
 
+constexpr auto kRunningTime = Seconds(12345);
+const auto kShardKey = BSON("newKey" << 1);
 
 class ReshardingMetricsTest : public ShardingDataTransformMetricsTestFixture {
 
 public:
-    std::unique_ptr<ReshardingMetricsNew> createInstanceMetrics(UUID instanceId = UUID::gen(),
+    std::unique_ptr<ReshardingMetricsNew> createInstanceMetrics(ClockSource* clockSource,
+                                                                UUID instanceId = UUID::gen(),
                                                                 Role role = Role::kDonor) {
-        return std::make_unique<ReshardingMetricsNew>(
-            instanceId, kTestNamespace, role, BSON("y" << 1), false, &_cumulativeMetrics);
+        return std::make_unique<ReshardingMetricsNew>(instanceId,
+                                                      BSON("y" << 1),
+                                                      kTestNamespace,
+                                                      role,
+                                                      clockSource->now(),
+                                                      clockSource,
+                                                      &_cumulativeMetrics);
+    }
+
+    const UUID& getSourceCollectionId() {
+        static UUID id = UUID::gen();
+        return id;
+    }
+
+    template <typename T>
+    BSONObj getReportFromStateDocument(T document) {
+        auto metrics =
+            ReshardingMetricsNew::initializeFrom(document, getClockSource(), &_cumulativeMetrics);
+        return metrics->reportForCurrentOp();
+    }
+
+    CommonReshardingMetadata createCommonReshardingMetadata(const UUID& operationId) {
+        CommonReshardingMetadata metadata{
+            operationId,
+            kTestNamespace,
+            getSourceCollectionId(),
+            constructTemporaryReshardingNss(kTestNamespace.db(), getSourceCollectionId()),
+            kShardKey};
+        metadata.setStartTime(getClockSource()->now() - kRunningTime);
+        return metadata;
+    }
+
+    void verifyCommonCurrentOpFields(const BSONObj& report) {
+        ASSERT_EQ(report.getStringField("type"), "op");
+        ASSERT_EQ(report.getStringField("command"), "command");
+        auto originalCommand = report.getObjectField("originalCommand");
+        ASSERT_EQ(originalCommand.getStringField("reshardCollection"), kTestNamespace.toString());
+        ASSERT_EQ(originalCommand.getObjectField("key").woCompare(kShardKey), 0);
+        ASSERT_EQ(originalCommand.getStringField("unique"), "false");
+        ASSERT_EQ(originalCommand.getObjectField("collation")
+                      .woCompare(BSON("locale"
+                                      << "simple")),
+                  0);
+        ASSERT_EQ(report.getIntField("totalOperationTimeElapsedSecs"), kRunningTime.count());
     }
 };
 
@@ -56,7 +103,7 @@ TEST_F(ReshardingMetricsTest, ReportForCurrentOpShouldHaveGlobalIndexDescription
 
     std::for_each(roles.begin(), roles.end(), [&](Role role) {
         auto instanceId = UUID::gen();
-        auto metrics = createInstanceMetrics(instanceId, role);
+        auto metrics = createInstanceMetrics(getClockSource(), instanceId, role);
         auto report = metrics->reportForCurrentOp();
 
         ASSERT_EQ(report.getStringField("desc").toString(),
@@ -64,6 +111,49 @@ TEST_F(ReshardingMetricsTest, ReportForCurrentOpShouldHaveGlobalIndexDescription
                               ShardingDataTransformMetrics::getRoleName(role),
                               instanceId.toString()));
     });
+}
+
+TEST_F(ReshardingMetricsTest, RestoresFromRecipientStateDocument) {
+    RecipientShardContext recipientCtx;
+    auto state = RecipientStateEnum::kAwaitingFetchTimestamp;
+    recipientCtx.setState(state);
+    ReshardingRecipientDocument doc{std::move(recipientCtx), {ShardId{"donor1"}}, 5};
+    auto opId = UUID::gen();
+    doc.setCommonReshardingMetadata(createCommonReshardingMetadata(opId));
+    auto report = getReportFromStateDocument(std::move(doc));
+
+    verifyCommonCurrentOpFields(report);
+    ASSERT_EQ(report.getStringField("desc"),
+              "ReshardingMetricsRecipientService " + opId.toString());
+    ASSERT_EQ(report.getStringField("recipientState").toString(), RecipientState_serializer(state));
+}
+
+TEST_F(ReshardingMetricsTest, RestoresFromDonorStateDocument) {
+    DonorShardContext donorCtx;
+    auto state = DonorStateEnum::kDonatingInitialData;
+    donorCtx.setState(state);
+    ReshardingDonorDocument doc{std::move(donorCtx), {ShardId{"recipient1"}}};
+    auto opId = UUID::gen();
+    doc.setCommonReshardingMetadata(createCommonReshardingMetadata(opId));
+    auto report = getReportFromStateDocument(std::move(doc));
+
+    verifyCommonCurrentOpFields(report);
+    ASSERT_EQ(report.getStringField("desc"), "ReshardingMetricsDonorService " + opId.toString());
+    ASSERT_EQ(report.getStringField("donorState").toString(), DonorState_serializer(state));
+}
+
+TEST_F(ReshardingMetricsTest, RestoresFromCoordinatorStateDocument) {
+    auto state = CoordinatorStateEnum::kPreparingToDonate;
+    ReshardingCoordinatorDocument doc{state, {}, {}};
+    auto opId = UUID::gen();
+    doc.setCommonReshardingMetadata(createCommonReshardingMetadata(opId));
+    auto report = getReportFromStateDocument(std::move(doc));
+
+    verifyCommonCurrentOpFields(report);
+    ASSERT_EQ(report.getStringField("desc"),
+              "ReshardingMetricsCoordinatorService " + opId.toString());
+    ASSERT_EQ(report.getStringField("coordinatorState").toString(),
+              CoordinatorState_serializer(state));
 }
 
 }  // namespace

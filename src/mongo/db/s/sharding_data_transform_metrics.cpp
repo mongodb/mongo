@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/s/sharding_data_transform_metrics.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/stdx/unordered_map.h"
 
 namespace mongo {
@@ -44,6 +45,11 @@ StringData ShardingDataTransformMetrics::getRoleName(Role role) {
     auto it = roleToName.find(role);
     invariant(it != roleToName.end());
     return it->second;
+}
+
+bool ShardingDataTransformMetrics::isEnabled() {
+    return feature_flags::gFeatureFlagShardingDataTransformMetrics.isEnabled(
+        serverGlobalParams.featureCompatibility);
 }
 
 }  // namespace mongo

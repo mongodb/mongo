@@ -52,6 +52,7 @@
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
+#include "mongo/db/s/sharding_data_transform_metrics.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_util.h"
@@ -265,6 +266,9 @@ BSONObj createReshardingFieldsUpdateForOriginalNss(
             TypeCollectionReshardingFields originalEntryReshardingFields(
                 coordinatorDoc.getReshardingUUID());
             originalEntryReshardingFields.setState(coordinatorDoc.getState());
+            if (ShardingDataTransformMetrics::isEnabled()) {
+                originalEntryReshardingFields.setStartTime(coordinatorDoc.getStartTime());
+            }
 
             return BSON("$set" << BSON(CollectionType::kReshardingFieldsFieldName
                                        << originalEntryReshardingFields.toBSON()
@@ -577,6 +581,9 @@ CollectionType createTempReshardingCollectionType(
 
     TypeCollectionReshardingFields tempEntryReshardingFields(coordinatorDoc.getReshardingUUID());
     tempEntryReshardingFields.setState(coordinatorDoc.getState());
+    if (ShardingDataTransformMetrics::isEnabled()) {
+        tempEntryReshardingFields.setStartTime(coordinatorDoc.getStartTime());
+    }
 
     auto recipientFields = constructRecipientFields(coordinatorDoc);
     tempEntryReshardingFields.setRecipientFields(std::move(recipientFields));

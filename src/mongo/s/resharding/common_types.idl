@@ -116,6 +116,10 @@ structs:
             reshardingKey:
                 type: KeyPattern
                 description: "The index specification document to use as the new shard key."
+            startTime:
+                type: date
+                description: "Operation start time."
+                optional: true
 
     AbortReason:
         description: "Not meant to be used directly. Only use internal fields."

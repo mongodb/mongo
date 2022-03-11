@@ -155,12 +155,13 @@ public:
         _cm = createChunkManagerForOriginalColl();
 
         _metrics = std::make_unique<ReshardingMetrics>(getServiceContext());
-        _metricsNew = ReshardingMetricsNew::makeInstance(kCrudUUID,
-                                                         kCrudNs,
-                                                         ReshardingMetricsNew::Role::kRecipient,
-                                                         BSON("y" << 1),
-                                                         false,
-                                                         getServiceContext());
+        _metricsNew =
+            ReshardingMetricsNew::makeInstance(kCrudUUID,
+                                               BSON("y" << 1),
+                                               kCrudNs,
+                                               ReshardingMetricsNew::Role::kRecipient,
+                                               getServiceContext()->getFastClockSource()->now(),
+                                               getServiceContext());
         _metrics->onStart(ReshardingMetrics::Role::kRecipient,
                           getServiceContext()->getFastClockSource()->now());
         _metrics->setRecipientState(RecipientStateEnum::kApplying);

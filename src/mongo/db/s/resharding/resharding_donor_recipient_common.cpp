@@ -250,6 +250,9 @@ ReshardingDonorDocument constructDonorDocumentFromReshardingFields(
                                  sourceUUID,
                                  reshardingFields.getDonorFields()->getTempReshardingNss(),
                                  reshardingFields.getDonorFields()->getReshardingKey().toBSON());
+    if (ShardingDataTransformMetrics::isEnabled()) {
+        commonMetadata.setStartTime(reshardingFields.getStartTime());
+    }
     donorDoc.setCommonReshardingMetadata(std::move(commonMetadata));
 
     return donorDoc;
@@ -279,6 +282,9 @@ ReshardingRecipientDocument constructRecipientDocumentFromReshardingFields(
                                                    sourceUUID,
                                                    nss,
                                                    metadata.getShardKeyPattern().toBSON());
+    if (ShardingDataTransformMetrics::isEnabled()) {
+        commonMetadata.setStartTime(reshardingFields.getStartTime());
+    }
     recipientDoc.setCommonReshardingMetadata(std::move(commonMetadata));
 
     return recipientDoc;

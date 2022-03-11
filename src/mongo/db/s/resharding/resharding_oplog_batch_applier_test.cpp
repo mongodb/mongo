@@ -111,10 +111,10 @@ public:
             _metrics = std::make_unique<ReshardingMetrics>(serviceContext);
             _metricsNew =
                 ReshardingMetricsNew::makeInstance(UUID::gen(),
+                                                   BSON("y" << 1),
                                                    _outputNss,
                                                    ShardingDataTransformMetrics::Role::kRecipient,
-                                                   BSON("y" << 1),
-                                                   false,
+                                                   serviceContext->getFastClockSource()->now(),
                                                    serviceContext);
             _crudApplication = std::make_unique<ReshardingOplogApplicationRules>(
                 _outputNss,
