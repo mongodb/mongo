@@ -423,18 +423,6 @@ private:
     std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildAndSorted(
         const QuerySolutionNode* root, const PlanStageReqs& reqs);
 
-    std::tuple<sbe::value::SlotId, sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>>
-    makeLoopJoinForFetch(std::unique_ptr<sbe::PlanStage> inputStage,
-                         sbe::value::SlotId recordIdSlot,
-                         sbe::value::SlotId snapshotIdSlot,
-                         sbe::value::SlotId indexIdSlot,
-                         sbe::value::SlotId indexKeySlot,
-                         sbe::value::SlotId indexKeyPatternSlot,
-                         const CollectionPtr& collToFetch,
-                         StringMap<const IndexAccessMethod*> iamMap,
-                         PlanNodeId planNodeId,
-                         sbe::value::SlotVector slotsToForward = {});
-
     std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> makeUnionForTailableCollScan(
         const QuerySolutionNode* root, const PlanStageReqs& reqs);
 

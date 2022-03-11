@@ -55,6 +55,10 @@ public:
         bits = r.bits;
     }
 
+    uint32_t getBits() const {
+        return bits;
+    }
+
     /** so, for key pattern { a : 1, b : -1 }
      *   get(0) == 1
      *   get(1) == -1

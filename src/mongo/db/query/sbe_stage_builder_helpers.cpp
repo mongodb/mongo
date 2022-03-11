@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
@@ -41,12 +43,16 @@
 #include "mongo/db/exec/sbe/stages/limit_skip.h"
 #include "mongo/db/exec/sbe/stages/loop_join.h"
 #include "mongo/db/exec/sbe/stages/project.h"
+#include "mongo/db/exec/sbe/stages/scan.h"
 #include "mongo/db/exec/sbe/stages/traverse.h"
 #include "mongo/db/exec/sbe/stages/union.h"
 #include "mongo/db/exec/sbe/stages/unwind.h"
 #include "mongo/db/exec/sbe/values/bson.h"
+#include "mongo/db/index/index_access_method.h"
 #include "mongo/db/matcher/matcher_type_set.h"
 #include "mongo/db/query/sbe_stage_builder.h"
+#include "mongo/db/storage/execution_context.h"
+#include "mongo/logv2/log.h"
 
 namespace mongo::stage_builder {
 
@@ -793,6 +799,203 @@ sbe::value::SlotId StageBuilderState::getGlobalVariableSlot(Variables::Id variab
     auto slotId = data->env->registerSlot(tag, val, true, slotIdGenerator);
     globalVariables.emplace(variableId, slotId);
     return slotId;
+}
+
+/**
+ * Callback function that logs a message and uasserts if it detects a corrupt index key. An index
+ * key is considered corrupt if it has no corresponding Record.
+ */
+void indexKeyCorruptionCheckCallback(OperationContext* opCtx,
+                                     sbe::value::SlotAccessor* snapshotIdAccessor,
+                                     sbe::value::SlotAccessor* indexKeyAccessor,
+                                     sbe::value::SlotAccessor* indexKeyPatternAccessor,
+                                     const RecordId& rid,
+                                     const NamespaceString& nss) {
+    // Having a recordId but no record is only an issue when we are not ignoring prepare conflicts.
+    if (opCtx->recoveryUnit()->getPrepareConflictBehavior() == PrepareConflictBehavior::kEnforce) {
+        tassert(5113700, "Should have snapshot id accessor", snapshotIdAccessor);
+        auto currentSnapshotId = opCtx->recoveryUnit()->getSnapshotId();
+        auto [snapshotIdTag, snapshotIdVal] = snapshotIdAccessor->getViewOfValue();
+        const auto msgSnapshotIdTag = snapshotIdTag;
+        tassert(5113701,
+                str::stream() << "SnapshotId is of wrong type: " << msgSnapshotIdTag,
+                snapshotIdTag == sbe::value::TypeTags::NumberInt64);
+        auto snapshotId = sbe::value::bitcastTo<uint64_t>(snapshotIdVal);
+
+        // If we have a recordId but no corresponding record, this means that said record has been
+        // deleted. This can occur during yield, in which case the snapshot id would be incremented.
+        // If, on the other hand, the current snapshot id matches that of the recordId, this
+        // indicates an error as no yield could have taken place.
+        if (snapshotId == currentSnapshotId.toNumber()) {
+            tassert(5113703, "Should have index key accessor", indexKeyAccessor);
+            tassert(5113704, "Should have key pattern accessor", indexKeyPatternAccessor);
+
+            auto [ksTag, ksVal] = indexKeyAccessor->getViewOfValue();
+            auto [kpTag, kpVal] = indexKeyPatternAccessor->getViewOfValue();
+
+            const auto msgKsTag = ksTag;
+            tassert(5113706,
+                    str::stream() << "KeyString is of wrong type: " << msgKsTag,
+                    ksTag == sbe::value::TypeTags::ksValue);
+
+            const auto msgKpTag = kpTag;
+            tassert(5113707,
+                    str::stream() << "Index key pattern is of wrong type: " << msgKpTag,
+                    kpTag == sbe::value::TypeTags::bsonObject);
+
+            auto keyString = sbe::value::getKeyStringView(ksVal);
+            tassert(5113708, "KeyString does not exist", keyString);
+
+            BSONObj bsonKeyPattern(sbe::value::bitcastTo<const char*>(kpVal));
+            auto bsonKeyString = KeyString::toBson(*keyString, Ordering::make(bsonKeyPattern));
+            auto hydratedKey = IndexKeyEntry::rehydrateKey(bsonKeyPattern, bsonKeyString);
+
+            LOGV2_ERROR_OPTIONS(
+                5113709,
+                {logv2::UserAssertAfterLog(ErrorCodes::DataCorruptionDetected)},
+                "Erroneous index key found with reference to non-existent record id. Consider "
+                "dropping and then re-creating the index and then running the validate command "
+                "on the collection.",
+                "namespace"_attr = nss,
+                "recordId"_attr = rid,
+                "indexKeyData"_attr = hydratedKey);
+        }
+    }
+}
+
+/**
+ * Callback function that returns true if a given index key is valid, false otherwise. An index key
+ * is valid if either the snapshot id of the underlying index scan matches the current snapshot id,
+ * or that the index keys are still part of the underlying index.
+ */
+bool indexKeyConsistencyCheckCallback(OperationContext* opCtx,
+                                      StringMap<const IndexAccessMethod*> iamTable,
+                                      sbe::value::SlotAccessor* snapshotIdAccessor,
+                                      sbe::value::SlotAccessor* indexIdAccessor,
+                                      sbe::value::SlotAccessor* indexKeyAccessor,
+                                      const CollectionPtr& collection,
+                                      const Record& nextRecord) {
+    if (snapshotIdAccessor) {
+        auto currentSnapshotId = opCtx->recoveryUnit()->getSnapshotId();
+        auto [snapshotIdTag, snapshotIdVal] = snapshotIdAccessor->getViewOfValue();
+        const auto msgSnapshotIdTag = snapshotIdTag;
+        tassert(5290704,
+                str::stream() << "SnapshotId is of wrong type: " << msgSnapshotIdTag,
+                snapshotIdTag == sbe::value::TypeTags::NumberInt64);
+
+        auto snapshotId = sbe::value::bitcastTo<uint64_t>(snapshotIdVal);
+        if (currentSnapshotId.toNumber() != snapshotId) {
+            tassert(5290707, "Should have index key accessor", indexKeyAccessor);
+            tassert(5290714, "Should have index id accessor", indexIdAccessor);
+
+            auto [indexIdTag, indexIdVal] = indexIdAccessor->getViewOfValue();
+            auto [ksTag, ksVal] = indexKeyAccessor->getViewOfValue();
+
+            const auto msgIndexIdTag = indexIdTag;
+            tassert(5290708,
+                    str::stream() << "Index name is of wrong type: " << msgIndexIdTag,
+                    sbe::value::isString(indexIdTag));
+
+            const auto msgKsTag = ksTag;
+            tassert(5290710,
+                    str::stream() << "KeyString is of wrong type: " << msgKsTag,
+                    ksTag == sbe::value::TypeTags::ksValue);
+
+            auto keyString = sbe::value::getKeyStringView(ksVal);
+            auto indexId = sbe::value::getStringView(indexIdTag, indexIdVal);
+            tassert(5290712, "KeyString does not exist", keyString);
+
+            auto it = iamTable.find(indexId);
+            tassert(5290713,
+                    str::stream() << "IndexAccessMethod not found for index " << indexId,
+                    it != iamTable.end());
+
+            auto iam = it->second->asSortedData();
+            tassert(5290709,
+                    str::stream() << "Expected to find SortedDataIndexAccessMethod for index "
+                                  << indexId,
+                    iam);
+
+            auto& executionCtx = StorageExecutionContext::get(opCtx);
+            auto keys = executionCtx.keys();
+            SharedBufferFragmentBuilder pooledBuilder(
+                KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
+
+            // There's no need to compute the prefixes of the indexed fields that cause the
+            // index to be multikey when ensuring the keyData is still valid.
+            KeyStringSet* multikeyMetadataKeys = nullptr;
+            MultikeyPaths* multikeyPaths = nullptr;
+
+            iam->getKeys(opCtx,
+                         collection,
+                         pooledBuilder,
+                         nextRecord.data.toBson(),
+                         InsertDeleteOptions::ConstraintEnforcementMode::kEnforceConstraints,
+                         SortedDataIndexAccessMethod::GetKeysContext::kValidatingKeys,
+                         keys.get(),
+                         multikeyMetadataKeys,
+                         multikeyPaths,
+                         nextRecord.id);
+
+            return keys->count(*keyString);
+        }
+    }
+    return true;
+}
+
+std::tuple<sbe::value::SlotId, sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>>
+makeLoopJoinForFetch(std::unique_ptr<sbe::PlanStage> inputStage,
+                     sbe::value::SlotId seekKeySlot,
+                     sbe::value::SlotId snapshotIdSlot,
+                     sbe::value::SlotId indexIdSlot,
+                     sbe::value::SlotId indexKeySlot,
+                     sbe::value::SlotId indexKeyPatternSlot,
+                     const CollectionPtr& collToFetch,
+                     StringMap<const IndexAccessMethod*> iamMap,
+                     PlanNodeId planNodeId,
+                     sbe::value::SlotVector slotsToForward,
+                     sbe::value::SlotIdGenerator& slotIdGenerator) {
+    // It is assumed that we are generating a fetch loop join over the main collection. If we are
+    // generating a fetch over a secondary collection, it is the responsibility of a parent node
+    // in the QSN tree to indicate which collection we are fetching over.
+    tassert(6355301, "Cannot fetch from a collection that doesn't exist", collToFetch);
+
+    auto resultSlot = slotIdGenerator.generate();
+    auto recordIdSlot = slotIdGenerator.generate();
+
+    using namespace std::placeholders;
+    sbe::ScanCallbacks callbacks(
+        indexKeyCorruptionCheckCallback,
+        std::bind(indexKeyConsistencyCheckCallback, _1, std::move(iamMap), _2, _3, _4, _5, _6));
+
+    // Scan the collection in the range [seekKeySlot, Inf).
+    auto scanStage = sbe::makeS<sbe::ScanStage>(collToFetch->uuid(),
+                                                resultSlot,
+                                                recordIdSlot,
+                                                snapshotIdSlot,
+                                                indexIdSlot,
+                                                indexKeySlot,
+                                                indexKeyPatternSlot,
+                                                boost::none,
+                                                std::vector<std::string>{},
+                                                sbe::makeSV(),
+                                                seekKeySlot,
+                                                true,
+                                                nullptr,
+                                                planNodeId,
+                                                std::move(callbacks));
+
+    // Get the recordIdSlot from the outer side (e.g., IXSCAN) and feed it to the inner side,
+    // limiting the result set to 1 row.
+    auto stage = sbe::makeS<sbe::LoopJoinStage>(
+        std::move(inputStage),
+        sbe::makeS<sbe::LimitSkipStage>(std::move(scanStage), 1, boost::none, planNodeId),
+        std::move(slotsToForward),
+        sbe::makeSV(seekKeySlot, snapshotIdSlot, indexIdSlot, indexKeySlot, indexKeyPatternSlot),
+        nullptr,
+        planNodeId);
+
+    return {resultSlot, recordIdSlot, std::move(stage)};
 }
 
 sbe::value::SlotId StageBuilderState::registerInputParamSlot(

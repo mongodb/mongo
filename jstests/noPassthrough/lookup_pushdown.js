@@ -12,9 +12,10 @@ load("jstests/libs/analyze_plan.js");  // For 'getAggPlanStages()' and 'hasRejec
 const JoinAlgorithm = {
     Classic: 0,
     NLJ: 1,
+    INLJ: 2,
     // These two joins aren't implemented yet and will throw errors with the corresponding codes.
     HJ: 5842602,
-    INLJ: 5842603,
+    INLJHashedIndex: 6357203,
 };
 
 // Standalone cases.
@@ -27,9 +28,11 @@ const viewName = "view_lookup_pushdown";
 function runTest(coll,
                  pipeline,
                  expectedJoinAlgorithm,
+                 indexKeyPattern = null,
                  aggOptions = {},
                  errMsgRegex = null,
-                 checkMultiPlanning = false) {
+                 checkMultiPlanning = false,
+                 eqLookupNodeIndex = 0) {
     const options = Object.assign({pipeline, cursor: {}}, aggOptions);
     const response = coll.runCommand("aggregate", options);
 
@@ -45,7 +48,7 @@ function runTest(coll,
                   0,
                   "there should be no lowered EQ_LOOKUP stages; got " + tojson(explain));
     } else if (expectedJoinAlgorithm === JoinAlgorithm.HJ ||
-               expectedJoinAlgorithm === JoinAlgorithm.INLJ) {
+               expectedJoinAlgorithm === JoinAlgorithm.INLJHashedIndex) {
         const result = assert.commandFailedWithCode(response, expectedJoinAlgorithm);
         if (errMsgRegex) {
             const errorMessage = result.errmsg;
@@ -58,22 +61,36 @@ function runTest(coll,
         const explain = coll.explain().aggregate(pipeline, aggOptions);
         const eqLookupNodes = getAggPlanStages(explain, "EQ_LOOKUP");
 
-        // Verify via explain that $lookup was lowered and NLJ was chosen.
+        // Verify via explain that $lookup was lowered and appropriate join algorithm was chosen.
         assert.gt(eqLookupNodes.length,
                   0,
                   "expected at least one EQ_LOOKUP node; got " + tojson(explain));
 
-        // Fetch the deepest EQ_LOOKUP node.
-        const eqLookupNode = eqLookupNodes[eqLookupNodes.length - 1];
+        // Verify that we're selecting an EQ_LOOKUP node within range.
+        assert(eqLookupNodeIndex >= 0 && eqLookupNodeIndex < eqLookupNodes.length,
+               "expected eqLookupNodeIndex within range of available EQ_LOOKUP nodes; got " +
+                   tojson(explain));
+
+        // Fetch the requested EQ_LOOKUP node.
+        const eqLookupNode = eqLookupNodes[eqLookupNodes.length - 1 - eqLookupNodeIndex];
         assert(eqLookupNode, "expected EQ_LOOKUP node; explain: " + tojson(explain));
         const strategy = eqLookupNode.strategy;
         assert(strategy, "expected EQ_LOOKUP node to have a strategy " + tojson(eqLookupNode));
-        assert.eq("NestedLoopJoin",
-                  strategy,
-                  "Incorrect strategy; expected NestedLoopJoin, got " + tojson(strategy));
+        if (strategy === "IndexedLoopJoin") {
+            assert(indexKeyPattern,
+                   "expected indexKeyPattern should be set for IndexedLoopJoin algorithm");
+            assert.docEq(eqLookupNode.indexKeyPattern,
+                         indexKeyPattern,
+                         "expected IndexedLoopJoin node to have index " + tojson(indexKeyPattern) +
+                             ", got plan " + tojson(eqLookupNode));
+        } else {
+            assert.eq("NestedLoopJoin",
+                      strategy,
+                      "Incorrect strategy; expected NestedLoopJoin, got " + tojson(strategy));
+        }
 
-        // Verify that multiplanning took place by verifying that there was at least one rejected
-        // plan.
+        // Verify that multiplanning took place by verifying that there was at least one
+        // rejected plan.
         if (checkMultiPlanning) {
             assert(hasRejectedPlans(explain), explain);
         }
@@ -89,9 +106,11 @@ if (!checkSBEEnabled(db, ["featureFlagSBELookupPushdown"])) {
 }
 
 let coll = db[name];
-assert.commandWorked(coll.insert({_id: 1, a: 2}));
+const localDocs = [{_id: 1, a: 2}];
+assert.commandWorked(coll.insert(localDocs));
 let foreignColl = db[foreignCollName];
-assert.commandWorked(foreignColl.insert({_id: 0, b: 2, c: 2}));
+const foreignDocs = [{_id: 0, b: 2, c: 2}];
+assert.commandWorked(foreignColl.insert(foreignDocs));
 assert.commandWorked(db.createView(viewName, foreignCollName, [{$match: {b: {$gte: 0}}}]));
 let view = db[viewName];
 
@@ -230,6 +249,7 @@ let view = db[viewName];
     runTest(coll,
             [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
             JoinAlgorithm.HJ /* expectedJoinAlgorithm */,
+            null /* indexKeyPattern */,
             {allowDiskUse: true});
 }());
 
@@ -241,8 +261,7 @@ let view = db[viewName];
     runTest(coll,
             [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
             JoinAlgorithm.INLJ /* expectedJoinAlgorithm */,
-            {} /* aggOptions */,
-            /\(b_1, \)$//* errMsgRegex */);
+            {b: 1} /* indexKeyPattern */);
     assert.commandWorked(foreignColl.dropIndexes());
 })();
 
@@ -253,9 +272,10 @@ let view = db[viewName];
     assert.commandWorked(foreignColl.createIndex({b: 'hashed'}));
     runTest(coll,
             [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
-            JoinAlgorithm.INLJ /* expectedJoinAlgorithm */,
+            JoinAlgorithm.INLJHashedIndex /* expectedJoinAlgorithm */,
+            null /* indexKeyPattern */,
             {} /* aggOptions */,
-            /\(b_hashed, \)$//* errMsgRegex */);
+            /b_hashed//* errMsgRegex */);
     assert.commandWorked(foreignColl.dropIndexes());
 })();
 
@@ -278,8 +298,7 @@ let view = db[viewName];
     runTest(coll,
             [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
             JoinAlgorithm.INLJ /* expectedJoinAlgorithm */,
-            {} /* aggOptions */,
-            /\(b_1_c_1_a_1, \)$//* errMsgRegex */);
+            {b: 1, c: 1, a: 1} /* indexKeyPattern */);
     assert.commandWorked(foreignColl.dropIndexes());
 })();
 
@@ -292,8 +311,7 @@ let view = db[viewName];
     runTest(coll,
             [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
             JoinAlgorithm.INLJ /* expectedJoinAlgorithm */,
-            {} /* aggOptions */,
-            /\(b_1_a_1, \)$//* errMsgRegex */);
+            {b: 1, a: 1} /* indexKeyPattern */);
     assert.commandWorked(foreignColl.dropIndexes());
 }());
 
@@ -306,8 +324,7 @@ let view = db[viewName];
     runTest(coll,
             [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
             JoinAlgorithm.INLJ /* expectedJoinAlgorithm */,
-            {} /* aggOptions */,
-            /\(b_1, \)$//* errMsgRegex */);
+            {b: 1} /* indexKeyPattern */);
     assert.commandWorked(foreignColl.dropIndexes());
 }());
 
@@ -319,9 +336,10 @@ let view = db[viewName];
     assert.commandWorked(foreignColl.createIndex({b: 'hashed'}));
     runTest(coll,
             [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
-            JoinAlgorithm.INLJ /* expectedJoinAlgorithm */,
+            JoinAlgorithm.INLJHashedIndex /* expectedJoinAlgorithm */,
+            null /* indexKeyPattern */,
             {} /* aggOptions */,
-            /\(b_hashed, \)$//* errMsgRegex */);
+            /b_hashed//* errMsgRegex */);
     assert.commandWorked(foreignColl.dropIndexes());
 }());
 
@@ -334,8 +352,7 @@ let view = db[viewName];
     runTest(coll,
             [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
             JoinAlgorithm.INLJ /* expectedJoinAlgorithm */,
-            {} /* aggOptions */,
-            /\(b_1_a_1, \)$//* errMsgRegex */);
+            {b: 1, a: 1});
     assert.commandWorked(foreignColl.dropIndexes());
 }());
 
@@ -362,34 +379,42 @@ let view = db[viewName];
 }());
 
 // Multiple $lookup stages in a pipeline that should pick different physical joins.
-(
-    function
-        testMultipleLookupStagesPickDifferentPhysicalJoins() {
-            assert.commandWorked(foreignColl.dropIndexes());
-            assert.commandWorked(foreignColl.createIndex({b: 1}));
+(function testMultipleLookupStagesPickDifferentPhysicalJoins() {
+    assert.commandWorked(foreignColl.dropIndexes());
+    assert.commandWorked(foreignColl.createIndex({b: 1}));
 
-            // The stage with foreignField 'c' will be built first and use NLJ with no error while
-            // the stage with foreignField 'b' will use INLJ and throw an error.
-            runTest(
-                coll,
-                [
-                    {
-                        $lookup:
-                            {from: foreignCollName, localField: "a", foreignField: "b", as: "b_out"}
-                    },
-                    {
-                        $lookup:
-                            {from: foreignCollName, localField: "a", foreignField: "c", as: "c_out"}
-                    }
-                ],
-                JoinAlgorithm.INLJ /* expectedJoinAlgorithm */);
+    let pipeline = [
+        {$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "b_out"}},
+        {$lookup: {from: foreignCollName, localField: "a", foreignField: "c", as: "c_out"}}
+    ];
+    runTest(coll, pipeline, JoinAlgorithm.INLJ /* expectedJoinAlgorithm */, {
+        b: 1
+    } /* indexKeyPattern */);
+    runTest(coll,
+            pipeline,
+            JoinAlgorithm.NLJ /* expectedJoinAlgorithm */,
+            null /* indexKeyPattern */,
+            {} /* aggOptions */,
+            null /* errMsgRegex */,
+            false /* checkMultiPlanning */,
+            1 /* eqLookupNodeIndex */);
 
-            runTest(coll, [
+    pipeline = [
         {$lookup: {from: foreignCollName, localField: "a", foreignField: "c", as: "c_out"}},
         {$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "b_out"}}
-        ], JoinAlgorithm.INLJ /* expectedJoinAlgorithm for the second stage, because it's built first */);
-            assert.commandWorked(foreignColl.dropIndexes());
-        })();
+    ];
+    runTest(coll, pipeline, JoinAlgorithm.NLJ /* expectedJoinAlgorithm */);
+    runTest(coll,
+            pipeline,
+            JoinAlgorithm.INLJ /* expectedJoinAlgorithm */,
+            {b: 1} /* indexKeyPattern */,
+            {} /* aggOptions */,
+            null /* errMsgRegex */,
+            false /* checkMultiPlanning */,
+            1 /* eqLookupNodeIndex */);
+
+    assert.commandWorked(foreignColl.dropIndexes());
+})();
 
 (function testNumericComponentsBehaviorForPushdown() {
     // "localField" contains a numeric component (unsupported by SBE).
@@ -424,13 +449,13 @@ let view = db[viewName];
                 {$lookup: {from: foreignCollName, localField: "a", foreignField: "c", as: "c_out"}}
             ],
             JoinAlgorithm.NLJ, /* expectedJoinAlgorithm */
+            null,              /* indexKeyPattern */
             {},                /* aggOptions */
             null,              /* errMsgRegex */
             true /* checkMultiplanning */);
 
         // Verify that multiple $lookups will still get pushed down when the pipeline prefix is
         // pushed down and undergoes multi-planning.
-        // TODO SERVER-63572 Update this test case to check multiplanning once INLJ runs end to end.
         runTest(
             coll,
             [
@@ -438,8 +463,11 @@ let view = db[viewName];
                 {$lookup: {from: foreignCollName, localField: "a", foreignField: "c", as: "c_out"}},
                 {$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "b_out"}}
             ],
-            JoinAlgorithm.NLJ
-            /* expectedJoinAlgorithm for the second stage, because it's built first */);
+            JoinAlgorithm.NLJ, /* expectedJoinAlgorithm */
+            null,              /* indexKeyPattern */
+            {},                /* aggOptions */
+            null,              /* errMsgRegex */
+            true /* checkMultiplanning */);
 
         // Verify that $lookup and $group both get pushed down in the presence of multiplanning.
         runTest(
@@ -457,6 +485,7 @@ let view = db[viewName];
                 }
             ],
             JoinAlgorithm.NLJ, /* expectedJoinAlgorithm */
+            null, /* indexKeyPattern */
             {},                /* aggOptions */
             null,              /* errMsgRegex */
             true /* checkMultiplanning */);
@@ -469,6 +498,7 @@ let view = db[viewName];
                 {$group: {_id: "$c_out", groupOut: {$sum: 1}}},
             ],
             JoinAlgorithm.NLJ, /* expectedJoinAlgorithm */
+            null,              /* indexKeyPattern */
             {},                /* aggOptions */
             null,              /* errMsgRegex */
             true /* checkMultiplanning */);
@@ -492,6 +522,7 @@ MongoRunner.stopMongod(conn);
     runTest(lcoll,
             [{$lookup: {from: fcoll.getName(), localField: "a", foreignField: "a", as: "out"}}],
             JoinAlgorithm.HJ,
+            null /* indexKeyPattern */,
             {allowDiskUse: true});
 
     // The fcollStats.count means the number of documents in a collection, the fcollStats.size means
@@ -508,6 +539,7 @@ MongoRunner.stopMongod(conn);
     runTest(lcoll,
             [{$lookup: {from: fcoll.getName(), localField: "a", foreignField: "a", as: "out"}}],
             JoinAlgorithm.HJ,
+            null /* indexKeyPattern */,
             {allowDiskUse: true});
 
     // Setting the 'internalQueryDisableLookupExecutionUsingHashJoin' knob to true will disable
@@ -521,6 +553,7 @@ MongoRunner.stopMongod(conn);
     runTest(lcoll,
             [{$lookup: {from: fcoll.getName(), localField: "a", foreignField: "a", as: "out"}}],
             JoinAlgorithm.NLJ,
+            null /* indexKeyPattern */,
             {allowDiskUse: true});
 
     // Test that we can go back to generating HJ plans.
@@ -532,6 +565,7 @@ MongoRunner.stopMongod(conn);
     runTest(lcoll,
             [{$lookup: {from: fcoll.getName(), localField: "a", foreignField: "a", as: "out"}}],
             JoinAlgorithm.HJ,
+            null /* indexKeyPattern */,
             {allowDiskUse: true});
 
     // Setting the 'internalQueryCollectionMaxNoOfDocumentsToChooseHashJoin' to count - 1 results in
@@ -544,6 +578,7 @@ MongoRunner.stopMongod(conn);
     runTest(lcoll,
             [{$lookup: {from: fcoll.getName(), localField: "a", foreignField: "a", as: "out"}}],
             JoinAlgorithm.NLJ,
+            null /* indexKeyPattern */,
             {allowDiskUse: true});
 
     // Reverting back 'internalQueryCollectionMaxNoOfDocumentsToChooseHashJoin' to the previous
@@ -558,6 +593,7 @@ MongoRunner.stopMongod(conn);
     runTest(lcoll,
             [{$lookup: {from: fcoll.getName(), localField: "a", foreignField: "a", as: "out"}}],
             JoinAlgorithm.NLJ,
+            null /* indexKeyPattern */,
             {allowDiskUse: true});
 
     // Reverting back 'internalQueryCollectionMaxDataSizeBytesToChooseHashJoin' to the previous
@@ -572,6 +608,7 @@ MongoRunner.stopMongod(conn);
     runTest(lcoll,
             [{$lookup: {from: fcoll.getName(), localField: "a", foreignField: "a", as: "out"}}],
             JoinAlgorithm.NLJ,
+            null /* indexKeyPattern */,
             {allowDiskUse: true});
 
     MongoRunner.stopMongod(conn);

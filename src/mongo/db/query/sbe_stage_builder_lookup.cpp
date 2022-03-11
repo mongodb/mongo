@@ -35,8 +35,11 @@
 
 #include <fmt/format.h>
 
+#include "mongo/db/exec/sbe/stages/hash_agg.h"
+#include "mongo/db/exec/sbe/stages/ix_scan.h"
 #include "mongo/db/exec/sbe/stages/loop_join.h"
 #include "mongo/db/exec/sbe/stages/scan.h"
+#include "mongo/db/index/index_access_method.h"
 #include "mongo/db/query/sbe_stage_builder_coll_scan.h"
 #include "mongo/db/query/sbe_stage_builder_expression.h"
 #include "mongo/db/query/sbe_stage_builder_filter.h"
@@ -100,16 +103,31 @@ std::pair<SlotId /*localKey*/, std::unique_ptr<sbe::PlanStage>> buildLocalLookup
     return std::make_pair(localKeySlot, std::move(localKeyStage));
 }
 
-// $lookup is an _outer_ left join that returns an empty array for "as" field rather than dropping
-// the unmatched local records. The branch that accumulates the matched records into an array
-// returns either 1 or 0 results, so to return an empty array for no-matches case we union this
-// branch with a const scan that produces an empty array but limit it to 1, so if the given branch
-// does produce a record, only that record is returned.
-std::pair<SlotId /*resultSlot*/, std::unique_ptr<sbe::PlanStage>> childResultOrEmptyArray(
-    std::unique_ptr<sbe::PlanStage> child,
-    SlotId childResultSlot,
+// Creates stages for grouping matched foreign records into an array. If there's no match, the
+// stages return an empty array instead.
+std::pair<SlotId /*resultSlot*/, std::unique_ptr<sbe::PlanStage>> buildForeignMatchedArray(
+    EvalStage innerBranch,
+    SlotId foreignRecordSlot,
     const PlanNodeId nodeId,
     SlotIdGenerator& slotIdGenerator) {
+    // $lookup's aggregates the matching records into an array. We currently don't have a stage
+    // that could do this grouping _after_ Nlj, so we achieve it by having a hash_agg inside the
+    // inner branch that aggregates all matched records into a single accumulator. When there
+    // are no matches, return an empty array.
+    SlotId accumulatorSlot = slotIdGenerator.generate();
+    innerBranch = makeHashAgg(
+        std::move(innerBranch),
+        makeSV(), /*groupBy slots*/
+        makeEM(accumulatorSlot, makeFunction("addToArray"_sd, makeVariable(foreignRecordSlot))),
+        {} /*collatorSlot*/,
+        false /*allowDiskUse*/,
+        nodeId);
+
+    // $lookup is an _outer_ left join that returns an empty array for "as" field rather than
+    // dropping the unmatched local records. The branch that accumulates the matched records into an
+    // array returns either 1 or 0 results, so to return an empty array for no-matches case we union
+    // this branch with a const scan that produces an empty array but limit it to 1, so if the given
+    // branch does produce a record, only that record is returned.
     auto [emptyArrayTag, emptyArrayVal] = makeNewArray();
     // Immediately take ownership of the new array (we could use a ValueGuard here but we'll
     // need the constant below anyway).
@@ -121,9 +139,9 @@ std::pair<SlotId /*resultSlot*/, std::unique_ptr<sbe::PlanStage>> childResultOrE
 
     SlotId unionOutputSlot = slotIdGenerator.generate();
     EvalStage unionStage =
-        makeUnion(makeVector(EvalStage{std::move(child), SlotVector{}},
+        makeUnion(makeVector(EvalStage{std::move(innerBranch.stage), SlotVector{}},
                              EvalStage{std::move(emptyArrayStage), SlotVector{}}),
-                  {makeSV(childResultSlot), makeSV(emptyArraySlot)} /*inputs*/,
+                  {makeSV(accumulatorSlot), makeSV(emptyArraySlot)} /*inputs*/,
                   makeSV(unionOutputSlot),
                   nodeId);
 
@@ -146,7 +164,8 @@ std::pair<SlotId /*matched docs*/, std::unique_ptr<sbe::PlanStage>> buildNljLook
     auto [localKeySlot, outerRootStage] = buildLocalLookupBranch(
         state, std::move(localStage), localRecordSlot, localFieldName, nodeId, slotIdGenerator);
 
-    // Build the inner branch. It involves getting the key and then building the nested lookup join.
+    // Build the inner branch. It involves getting the key and then building the nested lookup
+    // join.
     auto [foreignKeySlot, foreignKeyStage] = buildLookupKey(
         std::move(foreignStage), foreignRecordSlot, foreignFieldName, nodeId, slotIdGenerator);
     EvalStage innerBranch{std::move(foreignKeyStage), SlotVector{}};
@@ -193,20 +212,11 @@ std::pair<SlotId /*matched docs*/, std::unique_ptr<sbe::PlanStage>> buildNljLook
             std::move(innerBranch), std::move(predicate), nodeId);
     }
 
-    // $lookup's aggregates the matching records into an array. We currently don't have a stage
-    // that could do this grouping _after_ NLJ, so we achieve it by having a hash_agg inside the
-    // inner branch that aggregates all matched records into a single accumulator. When there are
-    // no matches, return an empty array.
-    SlotId accumulatorSlot = slotIdGenerator.generate();
-    innerBranch = makeHashAgg(
-        std::move(innerBranch),
-        makeSV(), /*groupBy slots*/
-        makeEM(accumulatorSlot, makeFunction("addToArray"_sd, makeVariable(foreignRecordSlot))),
-        {} /*collatorSlot*/,
-        false /*allowDiskUse*/,
-        nodeId);
-    auto [innerResultSlot, innerRootStage] = childResultOrEmptyArray(
-        std::move(innerBranch.stage), accumulatorSlot, nodeId, slotIdGenerator);
+    // Group the matched foreign documents into a list, stored in the 'innerResultSlot'.
+    // It creates a union stage internally so that when there's no matching foreign records, an
+    // empty array will be returned.
+    auto [innerResultSlot, innerRootStage] = buildForeignMatchedArray(
+        std::move(innerBranch), foreignRecordSlot, nodeId, slotIdGenerator);
 
     // Connect the two branches with a nested loop join. For each outer record with a corresponding
     // value in the 'localKeySlot', the inner branch will be executed and will place the result into
@@ -221,6 +231,182 @@ std::pair<SlotId /*matched docs*/, std::unique_ptr<sbe::PlanStage>> buildNljLook
 
     return {innerResultSlot, std::move(nlj)};
 }
+
+/*
+ * Build $lookup stage using index join strategy. Below is an example plan for the aggregation
+ * [{$lookup: {localField: "a", foreignField: "b"}}] with an index {b: 1} on the foreign
+ * collection.
+ *
+ * nlj [localRecord]
+ * left
+ *     project [localField = getField (localRecord, "a")]
+ *     scan localRecord
+ * right
+ *     limit 1
+ *     union [foreignGroup] [
+ *         group [] [foreignGroupOrNothing = addToArray (foreignRecord)]
+ *         nlj []
+ *         left
+ *             nlj [indexId, indexKeyPattern]
+ *             left
+ *                 project [lowKey = ks (localField, _, _, kExclusiveBefore),
+ *                          highKey = ks (localField, _, _, kExclusiveAfter),
+ *                          indexId = "b_1",
+ *                          indexKeyPattern = {"b" : 1}]
+ *                 limit 1
+ *                 coscan
+ *             right
+ *                 ixseek lowKey highKey indexKey foreignRecordId snapshotId _ @"b_1"
+ *         right
+ *             limit 1
+ *             seek foreignRecordId foreignRecord _ snapshotId indexId indexKey indexKeyPattern
+ *         ,
+ *         project [emptyArray = []]
+ *         limit 1
+ *         coscan
+ *     ]
+ *
+ */
+std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
+    StageBuilderState& state,
+    std::unique_ptr<sbe::PlanStage> localStage,
+    SlotId localRecordSlot,
+    std::string localFieldName,
+    std::string joinFieldName,
+    const CollectionPtr& foreignColl,
+    const IndexEntry& index,
+    StringMap<const IndexAccessMethod*>& iamMap,
+    PlanYieldPolicySBE* yieldPolicy,
+    const PlanNodeId nodeId,
+    SlotIdGenerator& slotIdGenerator) {
+    const auto foreignCollUUID = foreignColl->uuid();
+    const auto indexName = index.identifier.catalogName;
+    const auto indexDescriptor =
+        foreignColl->getIndexCatalog()->findIndexByName(state.opCtx, indexName);
+    const auto indexAccessMethod =
+        foreignColl->getIndexCatalog()->getEntry(indexDescriptor)->accessMethod()->asSortedData();
+    const auto indexVersion = indexAccessMethod->getSortedDataInterface()->getKeyStringVersion();
+    const auto indexOrdering = indexAccessMethod->getSortedDataInterface()->getOrdering();
+    iamMap.insert({indexName, indexAccessMethod});
+
+    // Build the outer side of the index join which extracts the local join field. The local
+    // field is stored in 'localFieldSlot' and made available to the inner side of the join.
+    auto [localFieldSlot, localFieldStage] = buildLocalLookupBranch(
+        state, std::move(localStage), localRecordSlot, localFieldName, nodeId, slotIdGenerator);
+
+    // Calculate the low key and high key of each individual local field. They are stored in
+    // 'lowKeySlot' and 'highKeySlot', respectively. These two slots will be made available in
+    // the loop join stage to perform index seek. We also set 'indexIdSlot' and
+    // 'indexKeyPatternSlot' constants for the seek stage later to perform consistency check.
+    auto lowKeySlot = slotIdGenerator.generate();
+    auto highKeySlot = slotIdGenerator.generate();
+    auto indexIdSlot = slotIdGenerator.generate();
+    auto indexKeyPatternSlot = slotIdGenerator.generate();
+    auto [_, indexKeyPatternValue] =
+        sbe::value::copyValue(sbe::value::TypeTags::bsonObject,
+                              sbe::value::bitcastFrom<const char*>(index.keyPattern.objdata()));
+    auto indexBoundKeyStage = makeProjectStage(
+        makeLimitCoScanTree(nodeId, 1),
+        nodeId,
+        lowKeySlot,
+        makeFunction(
+            "ks"_sd,
+            makeConstant(value::TypeTags::NumberInt64, static_cast<int64_t>(indexVersion)),
+            makeConstant(value::TypeTags::NumberInt32, indexOrdering.getBits()),
+            makeVariable(localFieldSlot),
+            makeConstant(value::TypeTags::NumberInt64,
+                         static_cast<int64_t>(KeyString::Discriminator::kExclusiveBefore))),
+        highKeySlot,
+        makeFunction("ks"_sd,
+                     makeConstant(value::TypeTags::NumberInt64, static_cast<int64_t>(indexVersion)),
+                     makeConstant(value::TypeTags::NumberInt32, indexOrdering.getBits()),
+                     makeVariable(localFieldSlot),
+                     makeConstant(value::TypeTags::NumberInt64,
+                                  static_cast<int64_t>(KeyString::Discriminator::kExclusiveAfter))),
+        indexIdSlot,
+        makeConstant(indexName),
+        indexKeyPatternSlot,
+        makeConstant(value::TypeTags::bsonObject, indexKeyPatternValue));
+
+    // Perform the index seek based on the 'lowKeySlot' and 'highKeySlot' from the outer side.
+    // The foreign record id of the seek is stored in 'foreignRecordIdSlot'. We also keep
+    // 'indexKeySlot' and 'snapshotIdSlot' for the seek stage later to perform consistency
+    // check.
+    auto foreignRecordIdSlot = slotIdGenerator.generate();
+    auto indexKeySlot = slotIdGenerator.generate();
+    auto snapshotIdSlot = slotIdGenerator.generate();
+    auto ixScanStage = makeS<IndexScanStage>(foreignCollUUID,
+                                             indexName,
+                                             true /* forward */,
+                                             indexKeySlot,
+                                             foreignRecordIdSlot,
+                                             snapshotIdSlot,
+                                             IndexKeysInclusionSet{} /* indexKeysToInclude */,
+                                             makeSV() /* vars */,
+                                             lowKeySlot,
+                                             highKeySlot,
+                                             yieldPolicy,
+                                             nodeId);
+
+    // Loop join the low key and high key generation with the index seek stage to produce the
+    // foreign record id to seek.
+    auto ixScanNljStage =
+        makeS<LoopJoinStage>(std::move(indexBoundKeyStage),
+                             std::move(ixScanStage),
+                             makeSV(indexIdSlot, indexKeyPatternSlot) /* outerProjects */,
+                             makeSV(lowKeySlot, highKeySlot) /* outerCorrelated */,
+                             nullptr /* predicate */,
+                             nodeId);
+
+    // Loop join the foreign record id produced by the index seek on the outer side with seek
+    // stage on the inner side to get matched foreign documents. The foreign documents are
+    // stored in 'foreignRecordSlot'. We also pass in 'snapshotIdSlot', 'indexIdSlot',
+    // 'indexKeySlot' and 'indexKeyPatternSlot' to perform index consistency check during the
+    // seek.
+    auto [foreignRecordSlot, __, scanNljStage] = makeLoopJoinForFetch(std::move(ixScanNljStage),
+                                                                      foreignRecordIdSlot,
+                                                                      snapshotIdSlot,
+                                                                      indexIdSlot,
+                                                                      indexKeySlot,
+                                                                      indexKeyPatternSlot,
+                                                                      foreignColl,
+                                                                      iamMap,
+                                                                      nodeId,
+                                                                      makeSV() /* slotsToForward */,
+                                                                      slotIdGenerator);
+
+    // Group the matched foreign documents into a list, stored in the 'foreignGroupSlot'.
+    // It creates a union stage internally so that when there's no matching foreign records, an
+    // empty array will be returned.
+    auto [foreignGroupSlot, foreignGroupStage] = buildForeignMatchedArray(
+        {std::move(scanNljStage), makeSV()}, foreignRecordSlot, nodeId, slotIdGenerator);
+
+    // The top level loop join stage that joins each local field with the matched foreign
+    // documents.
+    auto nljStage = makeS<LoopJoinStage>(std::move(localFieldStage),
+                                         std::move(foreignGroupStage),
+                                         makeSV(localRecordSlot) /* outerProjects */,
+                                         makeSV(localFieldSlot) /* outerCorrelated */,
+                                         nullptr,
+                                         nodeId);
+
+    // TODO(SERVER-63753): Remove mkbson stage here as it's temporarily added to enable testing
+    // index join.
+    auto resultSlot = slotIdGenerator.generate();
+    auto resultStage = makeS<MakeBsonObjStage>(
+        std::move(nljStage),
+        resultSlot,
+        localRecordSlot,
+        MakeObjFieldBehavior::drop /* fieldBehavior */,
+        std::vector<std::string>{} /* fields */,
+        std::vector<std::string>{std::move(joinFieldName)} /* projectFields */,
+        makeSV(foreignGroupSlot) /* projectVars */,
+        true,
+        false,
+        nodeId);
+
+    return {resultSlot, std::move(resultStage)};
+}
 }  // namespace
 
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildLookup(
@@ -234,12 +420,43 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             uasserted(5842602, "$lookup planning logic picked hash join");
             break;
         case EqLookupNode::LookupStrategy::kIndexedLoopJoin: {
+            tassert(6357201,
+                    "$lookup using index join should have one child and a populated index entry",
+                    eqLookupNode->children.size() == 1 && eqLookupNode->idxEntry);
+
+            const NamespaceString foreignCollNs(eqLookupNode->foreignCollection);
+            const auto& foreignColl = _collections.lookupCollection(foreignCollNs);
+            tassert(6357202,
+                    str::stream() << "$lookup using index join with unknown foreign collection '"
+                                  << foreignCollNs << "'",
+                    foreignColl);
             const auto& index = *eqLookupNode->idxEntry;
-            uasserted(5842603,
-                      str::stream()
-                          << "$lookup planning logic picked indexed loop join with index: "
-                          << index.identifier.toString());
-            break;
+
+            uassert(6357203,
+                    str::stream() << "$lookup using index join doesn't work for hashed index '"
+                                  << index.identifier.catalogName << "'",
+                    index.type != INDEX_HASHED);
+
+            const auto& localRoot = eqLookupNode->children[0];
+            auto [localStage, localOutputs] = build(localRoot, reqs);
+            sbe::value::SlotId localScanSlot = localOutputs.get(PlanStageSlots::kResult);
+
+            auto [resultSlot, indexJoinStage] =
+                buildIndexJoinLookupStage(_state,
+                                          std::move(localStage),
+                                          localScanSlot,
+                                          eqLookupNode->joinFieldLocal,
+                                          eqLookupNode->joinField,
+                                          foreignColl,
+                                          index,
+                                          _data.iamMap,
+                                          _yieldPolicy,
+                                          eqLookupNode->nodeId(),
+                                          _slotIdGenerator);
+
+            PlanStageSlots outputs;
+            outputs.set(kResult, resultSlot);
+            return {std::move(indexJoinStage), std::move(outputs)};
         }
         case EqLookupNode::LookupStrategy::kNestedLoopJoin: {
             auto numChildren = eqLookupNode->children.size();

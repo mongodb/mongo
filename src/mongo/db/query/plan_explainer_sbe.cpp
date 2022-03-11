@@ -178,9 +178,6 @@ void statsToBSON(const QuerySolutionNode* node,
             bob->append("asField", eln->joinField);
             bob->append("strategy", EqLookupNode::serializeLookupStrategy(eln->lookupStrategy));
             if (eln->idxEntry) {
-                // TODO SERVER-63572: Determine whether the tassert below is necessary.
-                tassert(
-                    6355303, "Indexed loop join should have a valid index entry", eln->idxEntry);
                 bob->append("indexName", eln->idxEntry->identifier.catalogName);
                 bob->append("indexKeyPattern", eln->idxEntry->keyPattern);
             }
