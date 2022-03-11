@@ -390,6 +390,13 @@ public:
      */
     std::unique_ptr<QuerySolutionNode> extractRoot();
 
+    /**
+     * Returns a vector containing all of the secondary namespaces referenced by this tree, except
+     * for 'mainNss'. This vector is used to track which secondary namespaces we should acquire
+     * locks for. Note that the namespaces are returned in sorted order.
+     */
+    std::vector<NamespaceStringOrUUID> getAllSecondaryNamespaces(const NamespaceString& mainNss);
+
     // There are two known scenarios in which a query solution might potentially block:
     //
     // Sort stage:

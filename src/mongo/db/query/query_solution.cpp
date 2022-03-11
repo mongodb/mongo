@@ -95,6 +95,26 @@ bool rangeCanContainString(const BSONElement& startKey,
     IndexBoundsBuilder::intersectize(rangeOil, &stringBoundsOil);
     return !stringBoundsOil.intervals.empty();
 }
+
+// Helper for 'getAllSecondaryNamespaces' that deduplicates namespaces.
+void getAllSecondaryNamespacesHelper(const QuerySolutionNode* qsn,
+                                     const NamespaceString& mainNss,
+                                     std::set<NamespaceString>& secondaryNssSet) {
+    if (!qsn) {
+        return;
+    }
+
+    if (auto eqLookupNode = dynamic_cast<const EqLookupNode*>(qsn)) {
+        NamespaceString nss(eqLookupNode->foreignCollection);
+        if (nss != mainNss) {
+            secondaryNssSet.emplace(std::move(nss));
+        }
+    }
+
+    for (auto child : qsn->children) {
+        getAllSecondaryNamespacesHelper(child, mainNss, secondaryNssSet);
+    }
+}
 }  // namespace
 
 bool ProvidedSortSet::contains(BSONObj input) const {
@@ -270,6 +290,13 @@ void QuerySolution::setRoot(std::unique_ptr<QuerySolutionNode> root) {
 
 std::unique_ptr<QuerySolutionNode> QuerySolution::extractRoot() {
     return std::move(_root);
+}
+
+std::vector<NamespaceStringOrUUID> QuerySolution::getAllSecondaryNamespaces(
+    const NamespaceString& mainNss) {
+    std::set<NamespaceString> secondaryNssSet;
+    getAllSecondaryNamespacesHelper(_root.get(), mainNss, secondaryNssSet);
+    return {secondaryNssSet.begin(), secondaryNssSet.end()};
 }
 
 //

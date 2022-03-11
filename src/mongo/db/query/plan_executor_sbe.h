@@ -49,7 +49,6 @@ public:
                     sbe::CandidatePlans candidates,
                     bool returnOwnedBson,
                     NamespaceString nss,
-                    std::vector<NamespaceStringOrUUID> secondaryNssVector,
                     bool isOpen,
                     std::unique_ptr<PlanYieldPolicySBE> yieldPolicy);
 

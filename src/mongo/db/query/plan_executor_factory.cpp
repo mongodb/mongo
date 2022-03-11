@@ -144,7 +144,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
                   0},
                  plannerOptions & QueryPlannerParams::RETURN_OWNED_DATA,
                  std::move(nss),
-                 collections.getSecondaryCollectionVector(),
                  false,
                  std::move(yieldPolicy)),
              PlanExecutor::Deleter{opCtx}}};
@@ -171,7 +170,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
                                  std::move(candidates),
                                  plannerOptions & QueryPlannerParams::RETURN_OWNED_DATA,
                                  std::move(nss),
-                                 collections.getSecondaryCollectionVector(),
                                  true,
                                  std::move(yieldPolicy)),
              PlanExecutor::Deleter{opCtx}}};

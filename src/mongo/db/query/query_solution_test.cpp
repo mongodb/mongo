@@ -108,6 +108,18 @@ IndexEntry buildSimpleIndexEntry(const BSONObj& kp) {
             nullptr};
 }
 
+void assertNamespaceVectorsAreEqual(const std::vector<NamespaceStringOrUUID>& secondaryNssVector,
+                                    const std::vector<NamespaceStringOrUUID>& expectedNssVector) {
+    ASSERT_EQ(secondaryNssVector.size(), expectedNssVector.size());
+    for (size_t i = 0; i < secondaryNssVector.size(); ++i) {
+        auto secondary = secondaryNssVector[i].nss();
+        auto expected = expectedNssVector[i].nss();
+        ASSERT(secondary != boost::none);
+        ASSERT(expected != boost::none);
+        ASSERT_EQ(*secondary, *expected);
+    }
+}
+
 // Index: {a: 1, b: 1, c: 1, d: 1, e: 1}
 // Min: {a: 1, b: 1, c: 1, d: 1, e: 1}
 // Max: {a: 1, b: 1, c: 1, d: 1, e: 1}
@@ -1208,4 +1220,72 @@ TEST(QuerySolutionTest, FieldAvailabilityOutputStreamOperator) {
     ASSERT_EQ(ex3.str(), "HashedValueProvided");
 }
 
+TEST(QuerySolutionTest, GetSecondaryNamespaceVectorOverSingleEqLookupNode) {
+    auto scanNode = std::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("a" << 1)));
+    const NamespaceString mainNss("db.main");
+    const auto foreignColl = "db.col";
+    auto root =
+        std::make_unique<EqLookupNode>(std::move(scanNode), foreignColl, "local", "remote", "b");
+
+    QuerySolution qs;
+    qs.setRoot(std::move(root));
+
+    // The output vector should only contain 'foreignColl'.
+    std::vector<NamespaceStringOrUUID> expectedNssVector{NamespaceString(foreignColl)};
+    assertNamespaceVectorsAreEqual(qs.getAllSecondaryNamespaces(mainNss), expectedNssVector);
+}
+
+TEST(QuerySolutionTest, GetSecondaryNamespaceVectorDeduplicatesMainNss) {
+    auto scanNode = std::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("a" << 1)));
+    const NamespaceString mainNss("db.main");
+    auto root = std::make_unique<EqLookupNode>(
+        std::move(scanNode), mainNss.toString(), "local", "remote", "b");
+
+    QuerySolution qs;
+    qs.setRoot(std::move(root));
+
+    // There should be no secondary namespaces as 'mainNss' is ignored in
+    // 'getAllSecondaryNamespaces'.
+    std::vector<NamespaceStringOrUUID> expectedNssVector{};
+    assertNamespaceVectorsAreEqual(qs.getAllSecondaryNamespaces(mainNss), expectedNssVector);
+}
+
+TEST(QuerySolutionTest, GetSecondaryNamespaceVectorOverNestedEqLookupNodes) {
+    auto scanNode = std::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("a" << 1)));
+    const NamespaceString mainNss("db.main");
+    const auto foreignCollOne = "db.col";
+    const auto foreignCollTwo = "db.foo";
+    auto childEqLookupNode =
+        std::make_unique<EqLookupNode>(std::move(scanNode), foreignCollOne, "local", "remote", "b");
+    auto parentEqLookupNode = std::make_unique<EqLookupNode>(
+        std::move(childEqLookupNode), foreignCollTwo, "local", "remote", "b");
+
+    QuerySolution qs;
+    qs.setRoot(std::move(parentEqLookupNode));
+
+    // The foreign collections are unique, so our output vector should contain both of them. Note
+    // that because 'getAllSecondaryNamespaces' uses a set internally, these namespaces are
+    // expected to be in sorted order in the output vector.
+    std::vector<NamespaceStringOrUUID> expectedNssVector{NamespaceString(foreignCollOne),
+                                                         NamespaceString(foreignCollTwo)};
+    assertNamespaceVectorsAreEqual(qs.getAllSecondaryNamespaces(mainNss), expectedNssVector);
+}
+
+TEST(QuerySolutionTest, GetSecondaryNamespaceVectorDeduplicatesNestedEqLookupNodes) {
+    auto scanNode = std::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("a" << 1)));
+    const NamespaceString mainNss("db.main");
+    const auto foreignColl = "db.col";
+    auto childEqLookupNode =
+        std::make_unique<EqLookupNode>(std::move(scanNode), foreignColl, "local", "remote", "b");
+    auto parentEqLookupNode = std::make_unique<EqLookupNode>(
+        std::move(childEqLookupNode), foreignColl, "local", "remote", "b");
+
+    QuerySolution qs;
+    qs.setRoot(std::move(parentEqLookupNode));
+
+    // Both nodes reference the same foreign collection. Therefore, our output vector should contain
+    // a single copy of that namespace.
+    std::vector<NamespaceStringOrUUID> expectedNssVector{NamespaceString(foreignColl)};
+    assertNamespaceVectorsAreEqual(qs.getAllSecondaryNamespaces(mainNss), expectedNssVector);
+}
 }  // namespace

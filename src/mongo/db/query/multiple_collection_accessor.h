@@ -83,14 +83,6 @@ public:
         return _secondaryColls;
     }
 
-    std::vector<NamespaceStringOrUUID> getSecondaryCollectionVector() const {
-        std::vector<NamespaceStringOrUUID> secondaryCollectionList;
-        for (const auto& [nss, _] : _secondaryColls) {
-            secondaryCollectionList.emplace_back(nss);
-        }
-        return secondaryCollectionList;
-    }
-
     bool isAnySecondaryNamespaceAViewOrSharded() const {
         return _isAnySecondaryNamespaceAViewOrSharded;
     }

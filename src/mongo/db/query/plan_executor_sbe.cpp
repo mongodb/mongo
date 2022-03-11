@@ -52,13 +52,11 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
                                  sbe::CandidatePlans candidates,
                                  bool returnOwnedBson,
                                  NamespaceString nss,
-                                 std::vector<NamespaceStringOrUUID> secondaryNssVector,
                                  bool isOpen,
                                  std::unique_ptr<PlanYieldPolicySBE> yieldPolicy)
     : _state{isOpen ? State::kOpened : State::kClosed},
       _opCtx(opCtx),
       _nss(std::move(nss)),
-      _secondaryNssVector(std::move(secondaryNssVector)),
       _mustReturnOwnedBson(returnOwnedBson),
       _root{std::move(candidates.winner().root)},
       _rootData{std::move(candidates.winner().data)},
@@ -111,6 +109,10 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
     } else {
         // Keep only rejected candidate plans.
         candidates.plans.erase(candidates.plans.begin() + candidates.winnerIdx);
+    }
+
+    if (_solution) {
+        _secondaryNssVector = _solution->getAllSecondaryNamespaces(_nss);
     }
 
     _planExplainer = plan_explainer_factory::make(_root.get(),
@@ -396,5 +398,4 @@ sbe::PlanState fetchNext(sbe::PlanStage* root,
     }
     return state;
 }
-
 }  // namespace mongo
