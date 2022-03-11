@@ -272,7 +272,24 @@ public:
     }
 
     void visit(const SizeMatchExpression* expr) override {
-        unsupportedExpression(expr);
+        const std::string lambdaProjName = _prefixId.getNextId("lambda_sizeMatch");
+        ABT result = make<PathLambda>(make<LambdaAbstraction>(
+            lambdaProjName,
+            make<BinaryOp>(
+                Operations::Eq,
+                make<FunctionCall>("getArraySize", makeSeq(make<Variable>(lambdaProjName))),
+                Constant::int64(expr->getData()))));
+
+        if (!expr->path().empty()) {
+            // No traverse.
+            result = translateFieldPath(
+                FieldPath(expr->path().toString()),
+                std::move(result),
+                [](const std::string& fieldName, const bool /*isLastElement*/, ABT input) {
+                    return make<PathGet>(fieldName, std::move(input));
+                });
+        }
+        _ctx.push(std::move(result));
     }
 
     void visit(const TextMatchExpression* expr) override {

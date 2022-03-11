@@ -394,7 +394,7 @@ public:
     }
 
     void visit(const ExpressionSize* expr) override final {
-        unsupportedExpression(expr->getOpName());
+        pushSingleArgFunctionFromTop("getArraySize");
     }
 
     void visit(const ExpressionReverseArray* expr) override final {
