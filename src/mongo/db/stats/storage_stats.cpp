@@ -36,8 +36,10 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/dbdirectclient.h"  // TODO (SERVER-64162) remove
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"  // TODO (SERVER-64162) remove
 #include "mongo/db/timeseries/bucket_catalog.h"
 #include "mongo/db/timeseries/timeseries_stats.h"
 #include "mongo/logv2/log.h"
@@ -46,10 +48,42 @@
 
 namespace mongo {
 
+namespace {
+int countOrphanDocsForCollection(OperationContext* opCtx, const UUID& uuid) {
+    // TODO (SERVER-64162): move this function to range_deletion_util.cpp and replace
+    // "collectionUuid" and "numOrphanDocs" with RangeDeletionTask field names.
+    DBDirectClient client(opCtx);
+    std::vector<BSONObj> pipeline;
+    pipeline.push_back(BSON("$match" << BSON("collectionUuid" << uuid)));
+    pipeline.push_back(BSON("$group" << BSON("_id"
+                                             << "numOrphans"
+                                             << "count"
+                                             << BSON("$sum"
+                                                     << "$numOrphanDocs"))));
+    AggregateCommandRequest aggRequest(NamespaceString::kRangeDeletionNamespace, pipeline);
+    auto swCursor = DBClientCursor::fromAggregationRequest(
+        &client, aggRequest, false /* secondaryOk */, true /* useExhaust */);
+    if (!swCursor.isOK()) {
+        return 0;
+    }
+    auto cursor = std::move(swCursor.getValue());
+    if (!cursor->more()) {
+        return 0;
+    }
+    auto res = cursor->nextSafe();
+    invariant(!cursor->more());
+    auto numOrphans = res.getField("count");
+    invariant(numOrphans);
+    return numOrphans.numberInt();
+}
+}  // namespace
+
 Status appendCollectionStorageStats(OperationContext* opCtx,
                                     const NamespaceString& nss,
                                     const StorageStatsSpec& storageStatsSpec,
                                     BSONObjBuilder* result) {
+    const std::string kOrphanCountField = "orphanCount";
+
     auto scale = storageStatsSpec.getScale().value_or(1);
     bool verbose = storageStatsSpec.getVerbose();
     bool waitForLock = storageStatsSpec.getWaitForLock();
@@ -76,6 +110,7 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
     if (!collection) {
         result->appendNumber("size", 0);
         result->appendNumber("count", 0);
+        result->appendNumber(kOrphanCountField, 0);
         result->appendNumber("storageSize", 0);
         result->append("totalSize", 0);
         result->append("nindexes", 0);
@@ -106,6 +141,9 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
             result->append("avgObjSize", collection->averageObjectSize(opCtx));
         }
     }
+
+    result->appendNumber(kOrphanCountField,
+                         countOrphanDocsForCollection(opCtx, collection->uuid()));
 
     const RecordStore* recordStore = collection->getRecordStore();
     auto storageSize =
