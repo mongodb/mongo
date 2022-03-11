@@ -211,7 +211,8 @@ void ReshardingCoordinatorCleaner::_cleanOnParticipantShards(
         NamespaceString::kAdminDb,
         createShardCleanupRequests(_originalCollectionNss, _reshardingUUID, doc),
         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        Shard::RetryPolicy::kIdempotent);
+        Shard::RetryPolicy::kIdempotent,
+        nullptr /* resourceYielder */);
 
     while (!ars.done()) {
         auto arsResponse = ars.next();

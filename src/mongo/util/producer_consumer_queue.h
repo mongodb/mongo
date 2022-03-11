@@ -586,6 +586,13 @@ public:
         return _popRunner([&](stdx::unique_lock<Latch>& lk) { return _tryPop(lk); });
     }
 
+    // Waits until there is at least one item in the queue.
+    void waitForNonEmpty(Interruptible* interruptible) {
+        stdx::unique_lock<Latch> lk(_mutex);
+        _checkConsumerClosed(lk);
+        return _waitForNonEmpty(lk, interruptible);
+    }
+
     // Closes the producer end. Consumers will continue to consume until the queue is exhausted, at
     // which time they will begin to throw with an interruption dbexception
     void closeProducerEnd() {

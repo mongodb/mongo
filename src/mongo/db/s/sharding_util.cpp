@@ -82,7 +82,8 @@ std::vector<AsyncRequestsSender::Response> sendCommandToShards(
                                 dbName,
                                 requests,
                                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                Shard::RetryPolicy::kIdempotentOrCursorInvalidated);
+                                Shard::RetryPolicy::kIdempotentOrCursorInvalidated,
+                                nullptr /* resourceYielder */);
 
         while (!ars.done()) {
             // Retrieve the responses and throw at the first failure.

@@ -67,13 +67,15 @@ AsyncRequestsSender::AsyncRequestsSender(OperationContext* opCtx,
                                          StringData dbName,
                                          const std::vector<AsyncRequestsSender::Request>& requests,
                                          const ReadPreferenceSetting& readPreference,
-                                         Shard::RetryPolicy retryPolicy)
+                                         Shard::RetryPolicy retryPolicy,
+                                         std::unique_ptr<ResourceYielder> resourceYielder)
     : _opCtx(opCtx),
       _db(dbName.toString()),
       _readPreference(readPreference),
       _retryPolicy(retryPolicy),
       _subExecutor(std::move(executor)),
-      _subBaton(opCtx->getBaton()->makeSubBaton()) {
+      _subBaton(opCtx->getBaton()->makeSubBaton()),
+      _resourceYielder(std::move(resourceYielder)) {
 
     _remotesLeft = requests.size();
 
@@ -111,7 +113,22 @@ AsyncRequestsSender::Response AsyncRequestsSender::next() noexcept {
 
     // Try to pop a value from the queue
     try {
-        return _responseQueue.pop(_opCtx);
+        if (_resourceYielder) {
+            _resourceYielder->yield(_opCtx);
+        }
+
+        // Only wait for the next result without popping it, so an error unyielding doesn't discard
+        // an already popped response.
+        _responseQueue.waitForNonEmpty(_opCtx);
+
+        if (_resourceYielder) {
+            _resourceYielder->unyield(_opCtx);
+        }
+
+        // There should always be a response ready after the wait above.
+        auto response = _responseQueue.tryPop();
+        invariant(response);
+        return *response;
     } catch (const DBException& ex) {
         // If we're interrupted, save that value and overwrite all outstanding requests (that we're
         // not going to wait to collect)

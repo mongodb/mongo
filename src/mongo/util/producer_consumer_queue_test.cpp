@@ -280,15 +280,32 @@ PRODUCER_CONSUMER_QUEUE_TEST(closeProducerEndImmediate, runPermutations<false, f
 
                        ASSERT_THROWS_CODE(
                            pcq.pop(opCtx), DBException, ErrorCodes::ProducerConsumerQueueConsumed);
+                       ASSERT_THROWS_CODE(pcq.waitForNonEmpty(opCtx),
+                                          DBException,
+                                          ErrorCodes::ProducerConsumerQueueConsumed);
                    })
         .join();
 }
 
-PRODUCER_CONSUMER_QUEUE_TEST(closeProducerEndBlocking, runPermutations<false, false>) {
+PRODUCER_CONSUMER_QUEUE_TEST(closeProducerEndBlockingPop, runPermutations<false, false>) {
     typename Helper::template ProducerConsumerQueue<MoveOnly> pcq{};
 
     auto consumer = helper.runThread("Consumer", [&](OperationContext* opCtx) {
         ASSERT_THROWS_CODE(pcq.pop(opCtx), DBException, ErrorCodes::ProducerConsumerQueueConsumed);
+    });
+
+    pcq.closeProducerEnd();
+
+    consumer.join();
+}
+
+PRODUCER_CONSUMER_QUEUE_TEST(closeProducerEndBlockingWaitForNonEmpty,
+                             runPermutations<false, false>) {
+    typename Helper::template ProducerConsumerQueue<MoveOnly> pcq{};
+
+    auto consumer = helper.runThread("Consumer", [&](OperationContext* opCtx) {
+        ASSERT_THROWS_CODE(
+            pcq.waitForNonEmpty(opCtx), DBException, ErrorCodes::ProducerConsumerQueueConsumed);
     });
 
     pcq.closeProducerEnd();
@@ -310,6 +327,34 @@ PRODUCER_CONSUMER_QUEUE_TEST(popsWithTimeout, runTimeoutPermutations<false, fals
                 ASSERT_THROWS_CODE(
                     pcq.popManyUpTo(1000, opCtx), DBException, ErrorCodes::ExceededTimeLimit);
             })
+        .join();
+
+    ASSERT_EQUALS(pcq.getStats().queueDepth, 0ul);
+}
+
+PRODUCER_CONSUMER_QUEUE_TEST(waitForNonEmptyBasic, runPermutations<false, false>) {
+    typename Helper::template ProducerConsumerQueue<MoveOnly> pcq{};
+
+    helper.runThread("Producer", [&](OperationContext* opCtx) { pcq.push(MoveOnly(1), opCtx); })
+        .join();
+
+    ASSERT_EQUALS(pcq.getStats().queueDepth, 1ul);
+
+    helper.runThread("Consumer", [&](OperationContext* opCtx) { pcq.waitForNonEmpty(opCtx); })
+        .join();
+
+    ASSERT_EQUALS(pcq.getStats().queueDepth, 1ul);
+}
+
+PRODUCER_CONSUMER_QUEUE_TEST(waitForNonEmptyWithTimeout, runTimeoutPermutations<false, false>) {
+    typename Helper::template ProducerConsumerQueue<MoveOnly> pcq{};
+
+    helper
+        .runThread("Consumer",
+                   [&](OperationContext* opCtx) {
+                       ASSERT_THROWS_CODE(
+                           pcq.waitForNonEmpty(opCtx), DBException, ErrorCodes::ExceededTimeLimit);
+                   })
         .join();
 
     ASSERT_EQUALS(pcq.getStats().queueDepth, 0ul);

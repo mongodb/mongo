@@ -86,7 +86,8 @@ MultiStatementTransactionRequestsSender::MultiStatementTransactionRequestsSender
                                                  dbName,
                                                  attachTxnDetails(opCtx, requests),
                                                  readPreference,
-                                                 retryPolicy)) {}
+                                                 retryPolicy,
+                                                 nullptr /* resourceYielder */)) {}
 
 MultiStatementTransactionRequestsSender::~MultiStatementTransactionRequestsSender() {
     invariant(_opCtx);

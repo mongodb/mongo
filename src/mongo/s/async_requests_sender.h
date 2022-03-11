@@ -36,6 +36,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/baton.h"
+#include "mongo/db/resource_yielder.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/scoped_task_executor.h"
 #include "mongo/executor/task_executor.h"
@@ -135,7 +136,8 @@ public:
                         StringData dbName,
                         const std::vector<AsyncRequestsSender::Request>& requests,
                         const ReadPreferenceSetting& readPreference,
-                        Shard::RetryPolicy retryPolicy);
+                        Shard::RetryPolicy retryPolicy,
+                        std::unique_ptr<ResourceYielder> resourceYielder);
 
     /**
      * Returns true if responses for all requests have been returned via next().
@@ -294,6 +296,10 @@ private:
     // Scoped baton holder which ensures any callbacks which touch this ARS are called with a
     // not-okay status (or not run, in the case of ExecutorFuture continuations).
     Baton::SubBatonHolder _subBaton;
+
+    // Interface for yielding and unyielding resources while waiting on results from the network.
+    // Null if yielding isn't necessary.
+    std::unique_ptr<ResourceYielder> _resourceYielder;
 };
 
 }  // namespace mongo

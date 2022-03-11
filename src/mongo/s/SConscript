@@ -600,6 +600,7 @@ env.CppUnitTest(
     target='s_test',
     source=[
         'append_raw_responses_test.cpp',
+        'async_requests_sender_test.cpp',
         'balancer_configuration_test.cpp',
         'catalog_cache_refresh_test.cpp',
         'catalog_cache_test.cpp',
