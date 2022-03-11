@@ -213,8 +213,12 @@ bool MergeSortStage::StageWithValueComparison::operator()(const MergingRef& lhs,
             // One of the sort key parts was extracted from fetched documents. Encode that part
             // using the query's collation.
             auto& keyPartFetchedFromDocument = rhsIsFromIndexKey ? lhsElt : rhsElt;
-            collationEncodedKeyPart = encodeKeyPartWithCollation(keyPartFetchedFromDocument);
-            keyPartFetchedFromDocument = collationEncodedKeyPart.firstElement();
+
+            // Encode the sort key part only if it contains some value.
+            if (keyPartFetchedFromDocument.ok()) {
+                collationEncodedKeyPart = encodeKeyPartWithCollation(keyPartFetchedFromDocument);
+                keyPartFetchedFromDocument = collationEncodedKeyPart.firstElement();
+            }
         }
 
         // false means don't compare field name.
