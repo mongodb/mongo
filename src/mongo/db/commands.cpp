@@ -134,14 +134,14 @@ const StringMap<int> txnCmdAllowlist = {{"abortTransaction", 1},
                                         {"prepareTransaction", 1},
                                         {"update", 1}};
 
-auto getCommandInvocationHooksHandle =
-    ServiceContext::declareDecoration<std::shared_ptr<CommandInvocationHooks>>();
+auto getCommandInvocationHooks =
+    ServiceContext::declareDecoration<std::unique_ptr<CommandInvocationHooks>>();
 
 }  // namespace
 
 void CommandInvocationHooks::set(ServiceContext* serviceContext,
-                                 std::shared_ptr<CommandInvocationHooks> hooks) {
-    getCommandInvocationHooksHandle(serviceContext) = std::move(hooks);
+                                 std::unique_ptr<CommandInvocationHooks> hooks) {
+    getCommandInvocationHooks(serviceContext) = std::move(hooks);
 }
 
 //////////////////////////////////////////////////////////////
@@ -193,7 +193,7 @@ void CommandHelpers::runCommandInvocation(OperationContext* opCtx,
                                           const OpMsgRequest& request,
                                           CommandInvocation* invocation,
                                           rpc::ReplyBuilderInterface* response) {
-    auto hooks = getCommandInvocationHooksHandle(opCtx->getServiceContext());
+    auto&& hooks = getCommandInvocationHooks(opCtx->getServiceContext());
 
     if (hooks) {
         hooks->onBeforeRun(opCtx, request, invocation);
@@ -209,10 +209,10 @@ void CommandHelpers::runCommandInvocation(OperationContext* opCtx,
 Future<void> CommandHelpers::runCommandInvocationAsync(
     std::shared_ptr<RequestExecutionContext> rec,
     std::shared_ptr<CommandInvocation> invocation) try {
-    auto hooks = getCommandInvocationHooksHandle(rec->getOpCtx()->getServiceContext());
+    auto&& hooks = getCommandInvocationHooks(rec->getOpCtx()->getServiceContext());
     if (hooks)
         hooks->onBeforeAsyncRun(rec, invocation.get());
-    return invocation->runAsync(rec).then([rec, hooks, invocation] {
+    return invocation->runAsync(rec).then([rec, hooks = hooks.get(), invocation] {
         if (hooks)
             hooks->onAfterAsyncRun(rec, invocation.get());
     });

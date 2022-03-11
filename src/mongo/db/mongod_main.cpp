@@ -315,7 +315,7 @@ void initializeCommandHooks(ServiceContext* serviceContext) {
     };
 
     MirrorMaestro::init(serviceContext);
-    CommandInvocationHooks::set(serviceContext, std::make_shared<MongodCommandInvocationHooks>());
+    CommandInvocationHooks::set(serviceContext, std::make_unique<MongodCommandInvocationHooks>());
 }
 
 void registerPrimaryOnlyServices(ServiceContext* serviceContext) {

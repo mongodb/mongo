@@ -85,9 +85,9 @@ class Document;
 class CommandInvocationHooks {
 public:
     /**
-     * Set the current hooks
+     * Set `hooks` as the `CommandInvocationHooks` decoration of `serviceContext`
      */
-    static void set(ServiceContext* serviceContext, std::shared_ptr<CommandInvocationHooks> hooks);
+    static void set(ServiceContext* serviceContext, std::unique_ptr<CommandInvocationHooks> hooks);
 
     virtual ~CommandInvocationHooks() = default;
 
