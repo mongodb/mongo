@@ -269,8 +269,8 @@ public:
      * The first command in a transaction to target at least one shard must select a cluster time
      * timestamp before targeting, but may change the timestamp before contacting any shards to
      * allow optimizing the timestamp based on the targeted shards. If the first command encounters
-     * a retryable error, e.g. StaleShardVersion or SnapshotTooOld, the retry may also select a new
-     * timestamp. Once the first command has successfully completed, the timestamp cannot be
+     * a retryable error, e.g. "retargeting needed" or SnapshotTooOld, the retry may also select a
+     * new timestamp. Once the first command has successfully completed, the timestamp cannot be
      * changed.
      */
     class AtClusterTime {

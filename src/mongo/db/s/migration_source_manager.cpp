@@ -29,8 +29,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kShardingMigration
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/s/migration_source_manager.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
@@ -175,6 +173,7 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
     // Make sure the latest shard version is recovered as of the time of the invocation of the
     // command.
     onShardVersionMismatch(_opCtx, _args.getNss(), boost::none);
+    const auto shardId = ShardingState::get(opCtx)->shardId();
 
     // Complete any unfinished migration pending recovery
     {
@@ -202,12 +201,20 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
         const auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(_opCtx, csr);
 
         auto optMetadata = csr->getCurrentMetadataIfKnown();
-        uassert(ErrorCodes::ConflictingOperationInProgress,
+        uassert(StaleConfigInfo(_args.getNss(),
+                                ChunkVersion::IGNORED() /* receivedVersion */,
+                                boost::none /* wantedVersion */,
+                                shardId,
+                                boost::none),
                 "The collection's sharding state was cleared by a concurrent operation",
                 optMetadata);
 
         auto& metadata = *optMetadata;
-        uassert(ErrorCodes::IncompatibleShardingMetadata,
+        uassert(StaleConfigInfo(_args.getNss(),
+                                ChunkVersion::IGNORED() /* receivedVersion */,
+                                ChunkVersion::UNSHARDED() /* wantedVersion */,
+                                shardId,
+                                boost::none),
                 "Cannot move chunks for an unsharded collection",
                 metadata.isSharded());
 
@@ -227,26 +234,47 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
     const auto collectionVersion = collectionMetadata.getCollVersion();
     const auto shardVersion = collectionMetadata.getShardVersion();
 
-    // If the shard major version is zero, this means we do not have any chunks locally to migrate
-    uassert(ErrorCodes::IncompatibleShardingMetadata,
-            str::stream() << "cannot move chunk " << _args.toString()
-                          << " because the shard doesn't contain any chunks",
-            shardVersion.majorVersion() > 0);
-
-    uassert(ErrorCodes::StaleEpoch,
+    uassert(StaleConfigInfo(_args.getNss(),
+                            ChunkVersion::IGNORED() /* receivedVersion */,
+                            shardVersion /* wantedVersion */,
+                            shardId,
+                            boost::none),
             str::stream() << "cannot move chunk " << _args.toString()
                           << " because collection may have been dropped. "
                           << "current epoch: " << collectionVersion.epoch()
                           << ", cmd epoch: " << _args.getVersionEpoch(),
             _args.getVersionEpoch() == collectionVersion.epoch());
 
-    ChunkType chunkToMove;
-    chunkToMove.setMin(_args.getMinKey());
-    chunkToMove.setMax(_args.getMaxKey());
+    uassert(StaleConfigInfo(_args.getNss(),
+                            ChunkVersion::IGNORED() /* receivedVersion */,
+                            shardVersion /* wantedVersion */,
+                            shardId,
+                            boost::none),
+            str::stream() << "cannot move chunk " << _args.toString()
+                          << " because the shard doesn't contain any chunks",
+            shardVersion.majorVersion() > 0);
 
-    uassertStatusOKWithContext(collectionMetadata.checkChunkIsValid(chunkToMove),
-                               str::stream() << "Unable to move chunk with arguments '"
-                                             << redact(_args.toString()));
+    ChunkType existingChunk;
+    uassert(StaleConfigInfo(_args.getNss(),
+                            ChunkVersion::IGNORED() /* receivedVersion */,
+                            shardVersion /* wantedVersion */,
+                            shardId,
+                            boost::none),
+            str::stream() << "Chunk with bounds "
+                          << ChunkRange(_args.getMinKey(), _args.getMaxKey()).toString()
+                          << " is not owned by this shard.",
+            collectionMetadata.getNextChunk(_args.getMinKey(), &existingChunk));
+    uassert(StaleConfigInfo(_args.getNss(),
+                            ChunkVersion::IGNORED() /* receivedVersion */,
+                            shardVersion /* wantedVersion */,
+                            shardId,
+                            boost::none),
+            str::stream() << "Chunk with bounds "
+                          << ChunkRange(_args.getMinKey(), _args.getMaxKey()).toString()
+                          << " does not exist. The closest owned chunk is "
+                          << ChunkRange(existingChunk.getMin(), existingChunk.getMax()).toString(),
+            existingChunk.getMin().woCompare(_args.getMinKey()) == 0 &&
+                existingChunk.getMax().woCompare(_args.getMaxKey()) == 0);
 
     _collectionEpoch = collectionVersion.epoch();
     _collectionUUID = collectionUUID;

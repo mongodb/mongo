@@ -103,7 +103,7 @@ public:
 
     // Number of round trips required for the batch
     int numRounds;
-    // Number of stale batches due to StaleShardVersion
+    // Number of stale batches due to "retargeting needed" errors
     int numStaleShardBatches;
     // Number of stale batches due to StaleDbVersion
     int numStaleDbBatches;

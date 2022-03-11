@@ -472,8 +472,8 @@ Status BatchWriteOp::targetBatch(
 
         // For unordered writes, the router must return an entry for each failed write. This
         // constant is a pessimistic attempt to ensure that if a request to a shard hits
-        // StaleShardVersion and has to return number of errors equivalent to the number of writes
-        // in the batch, the response size will not exceed the max BSON size.
+        // "retargeting needed" error and has to return number of errors equivalent to the number of
+        // writes in the batch, the response size will not exceed the max BSON size.
         //
         // The constant of 272 is chosen as an approximation of the size of the BSON representation
         // of the StaleConfigInfo (which contains the shard id) and the adjacent error message.

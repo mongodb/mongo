@@ -97,8 +97,8 @@ public:
     static void appendInfoForServerStatus(OperationContext* opCtx, BSONObjBuilder* builder);
 
     /**
-     * If the shard currently doesn't know whether the collection is sharded or not, it will throw
-     * StaleShardVersion.
+     * If the shard currently doesn't know whether the collection is sharded or not, it will throw a
+     * StaleConfig exception.
      *
      * If the request doesn't have a shard version all collections will be treated as UNSHARDED.
      *
@@ -112,7 +112,7 @@ public:
      *
      * If the shard currently doesn't know whether the collection is sharded or not, or if the
      * expected shard version doesn't match with the one in the OperationShardingState, it will
-     * throw StaleShardVersion.
+     * throw a StaleConfig exception.
      *
      * If the operation context contains an 'atClusterTime', the returned filtering object will be
      * tied to a specific point in time. Otherwise, it will reference the latest cluster time

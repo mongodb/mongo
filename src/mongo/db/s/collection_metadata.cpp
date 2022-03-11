@@ -181,30 +181,6 @@ bool CollectionMetadata::getNextChunk(const BSONObj& lookupKey, ChunkType* chunk
     return true;
 }
 
-Status CollectionMetadata::checkChunkIsValid(const ChunkType& chunk) const {
-    invariant(isSharded());
-
-    ChunkType existingChunk;
-
-    if (!getNextChunk(chunk.getMin(), &existingChunk)) {
-        return {ErrorCodes::StaleShardVersion,
-                str::stream() << "Chunk with bounds "
-                              << ChunkRange(chunk.getMin(), chunk.getMax()).toString()
-                              << " is not owned by this shard."};
-    }
-
-    if (existingChunk.getMin().woCompare(chunk.getMin()) ||
-        existingChunk.getMax().woCompare(chunk.getMax())) {
-        return {ErrorCodes::StaleShardVersion,
-                str::stream() << "Unable to find chunk with the exact bounds "
-                              << chunk.getRange().toString() << " at collection version "
-                              << getCollVersion().toString()
-                              << " found existing chunk: " << existingChunk.toString()};
-    }
-
-    return Status::OK();
-}
-
 bool CollectionMetadata::currentShardHasAnyChunks() const {
     invariant(isSharded());
     std::set<ShardId> shards;

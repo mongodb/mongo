@@ -893,9 +893,8 @@ void NetworkInterfaceTL::RequestState::resolve(Future<RemoteCommandResponse> fut
 
             const auto commandStatus = getStatusFromCommandResult(response.data);
             if (isHedge) {
-                // Ignore maxTimeMS expiration, StaleDbVersion or any error belonging to
-                // StaleShardVersionError
-                //  error category for hedged reads without triggering the finish line.
+                // Ignore maxTimeMS expiration or any sharding "retargeting needed" error category
+                // for hedged reads without triggering the finish line.
                 if (commandStatus == ErrorCodes::MaxTimeMSExpired ||
                     commandStatus == ErrorCodes::StaleDbVersion ||
                     ErrorCodes::isStaleShardVersionError(commandStatus)) {

@@ -1698,6 +1698,14 @@ Future<void> ExecCommandDatabase::_commandExec() {
                     }
 
                     if (sce->getVersionWanted() &&
+                        ChunkVersion::isIgnoredVersion(sce->getVersionReceived())) {
+                        // Shard is recovered, but the router didn't sent a shard version, therefore
+                        // we just need to tell the router how much it needs to advance to
+                        // (getVersionWanted).
+                        return s;
+                    }
+
+                    if (sce->getVersionWanted() &&
                         sce->getVersionReceived().isOlderThan(*sce->getVersionWanted())) {
                         // Shard is recovered and the router is staler than the shard
                         return s;

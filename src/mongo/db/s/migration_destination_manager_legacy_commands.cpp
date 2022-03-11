@@ -29,8 +29,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -116,15 +114,19 @@ public:
         // We force a refresh immediately after registering this migration to guarantee that this
         // shard will not receive a chunk after refreshing.
         onShardVersionMismatch(opCtx, nss, boost::none);
+        const auto shardId = ShardingState::get(opCtx)->shardId();
 
         const auto collectionEpoch = [&] {
             AutoGetCollection autoColl(opCtx, nss, MODE_IS);
             auto const optMetadata =
                 CollectionShardingRuntime::get(opCtx, nss)->getCurrentMetadataIfKnown();
-            uassert(
-                ErrorCodes::StaleShardVersion,
-                "Collection's metadata have been found UNKNOWN after a refresh on the recipient",
-                optMetadata);
+            uassert(StaleConfigInfo(nss,
+                                    ChunkVersion::IGNORED() /* receivedVersion */,
+                                    boost::none /* wantedVersion */,
+                                    shardId,
+                                    boost::none),
+                    "The collection's sharding state was cleared by a concurrent operation",
+                    optMetadata);
             return optMetadata->getShardVersion().epoch();
         }();
 

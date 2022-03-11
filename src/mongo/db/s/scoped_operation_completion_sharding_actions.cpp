@@ -80,6 +80,13 @@ ScopedOperationCompletionShardingActions::~ScopedOperationCompletionShardingActi
         }
 
         if (staleInfo->getVersionWanted() &&
+            ChunkVersion::isIgnoredVersion(staleInfo->getVersionReceived())) {
+            // Shard is recovered, but the router didn't sent a shard version, therefore we just
+            // need to tell the router how much it needs to advance to (getVersionWanted).
+            return;
+        }
+
+        if (staleInfo->getVersionWanted() &&
             staleInfo->getVersionReceived().isOlderThan(*staleInfo->getVersionWanted())) {
             // Shard is recovered and the router is staler than the shard
             return;

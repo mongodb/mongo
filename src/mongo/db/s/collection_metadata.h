@@ -204,11 +204,6 @@ public:
     bool getNextChunk(const BSONObj& lookupKey, ChunkType* chunk) const;
 
     /**
-     * Validates that the passed-in chunk's bounds exactly match a chunk in the metadata cache.
-     */
-    Status checkChunkIsValid(const ChunkType& chunk) const;
-
-    /**
      * Returns true if the argument range overlaps any chunk.
      */
     bool rangeOverlapsChunk(const ChunkRange& range) const {

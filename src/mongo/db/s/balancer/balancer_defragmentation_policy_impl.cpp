@@ -90,9 +90,21 @@ ZoneInfo getCollectionZones(OperationContext* opCtx, const CollectionType& coll)
     return zones;
 }
 
-bool isRetriableForDefragmentation(const Status& error) {
-    return (ErrorCodes::isA<ErrorCategory::RetriableError>(error) ||
-            error == ErrorCodes::StaleConfig);
+bool isRetriableForDefragmentation(const Status& status) {
+    if (ErrorCodes::isA<ErrorCategory::RetriableError>(status))
+        return true;
+
+    if (status == ErrorCodes::StaleConfig) {
+        if (auto staleInfo = status.extraInfo<StaleConfigInfo>()) {
+            // If the staleInfo error contains a "wanted" version, this means the donor shard which
+            // returned this error has its versioning information up-to-date (as opposed to UNKNOWN)
+            // and it couldn't find the chunk that the defragmenter expected. Such a situation can
+            // only arise as a result of manual split/merge/move concurrently with the defragmenter.
+            return !staleInfo->getVersionWanted();
+        }
+    }
+
+    return false;
 }
 
 void handleActionResult(OperationContext* opCtx,
