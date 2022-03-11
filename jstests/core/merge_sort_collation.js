@@ -261,33 +261,33 @@ const testCases = [
         // collation of the indexes. Also, the second/third operands to $or queries on fields
         // 'e'/'g' that are not covered by the indexes therefore triggers addition of a FETCH stage
         // between MERGE_SORT and IXSCAN. This tests comparison of index versus fetched document
-        // provided sort keys. In addition to that, some documents have objects as sort attribute
-        // values.
+        // provided sort keys. In addition to that, some documents have missing values and objects
+        // as sort attribute values.
         indexes: [{a: 1, b: 1, c: 1}, {d: 1, c: 1}, {f: 1, c: 1}],
         indexOptions: {collation: {locale: "en", strength: 2}},
         filter: {$or: [{a: {$in: ["1", "2"]}, b: "1"}, {d: "3", e: "3"}, {f: "4", g: "3"}]},
         sort: {c: 1},
         findCollation: {locale: "en", strength: 2},
         inputDocuments: [
-            {_id: 0, a: "1", b: "1", c: "a"},
-            {_id: 1, a: "1", b: "1", c: "d"},
-            {_id: 2, a: "2", b: "1", c: "b"},
-            {_id: 3, a: "2", b: "1", c: "e"},
-            {_id: 6, a: "2", b: "1", c: {a: "B"}},
+            {_id: 0, d: "3", e: "3", c: "a"},
+            {_id: 1, d: "3", e: "3", c: "b"},
+            {_id: 2, d: "3", e: "3"},
+            {_id: 3, d: "3", e: "3", c: {}},
             {_id: 4, d: "3", e: "3", c: "c"},
-            {_id: 5, d: "3", e: "3", c: "f"},
+            {_id: 5, d: "3", e: "3", c: 1},
+            {_id: 6, a: "2", b: "1", c: {a: "B"}},
             {_id: 7, d: "3", e: "3", c: {a: "A"}},
             {_id: 8, d: "3", e: "3", c: {a: "C"}},
-            {_id: 9, f: "4", g: "3", c: "g"},
+            {_id: 9, f: "4", g: "3", c: "d"},
         ],
         expectedResults: [
-            {_id: 0, a: "1", b: "1", c: "a"},
-            {_id: 2, a: "2", b: "1", c: "b"},
+            {_id: 2, d: "3", e: "3"},
+            {_id: 5, d: "3", e: "3", c: 1},
+            {_id: 0, d: "3", e: "3", c: "a"},
+            {_id: 1, d: "3", e: "3", c: "b"},
             {_id: 4, d: "3", e: "3", c: "c"},
-            {_id: 1, a: "1", b: "1", c: "d"},
-            {_id: 3, a: "2", b: "1", c: "e"},
-            {_id: 5, d: "3", e: "3", c: "f"},
-            {_id: 9, f: "4", g: "3", c: "g"},
+            {_id: 9, f: "4", g: "3", c: "d"},
+            {_id: 3, d: "3", e: "3", c: {}},
             {_id: 7, d: "3", e: "3", c: {a: "A"}},
             {_id: 6, a: "2", b: "1", c: {a: "B"}},
             {_id: 8, d: "3", e: "3", c: {a: "C"}},
