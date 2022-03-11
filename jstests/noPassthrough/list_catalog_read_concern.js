@@ -1,6 +1,7 @@
 /**
  * Tests listCatalog aggregation stage with local and majority read concerns.
  * @tags: [
+ *     requires_majority_read_concern,
  *     requires_replication,
  * ]
  */
