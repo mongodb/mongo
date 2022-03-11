@@ -730,8 +730,8 @@ public:
      *   e : ServerDataEncryptionLevel1Token,
      * }
      */
-    static BSONObj generateInsertOrUpdateFromPlaceholders(const BSONObj& obj,
-                                                          FLEKeyVault* keyVault);
+    static BSONObj transformPlaceholders(const BSONObj& obj,
+                                         FLEKeyVault* keyVault);
 
 
     /**

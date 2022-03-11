@@ -449,7 +449,7 @@ void FleCrudTest::doSingleWideInsert(int id, uint64_t fieldCount, ValueGenerator
 
     auto clientDoc = builder.obj();
 
-    auto result = FLEClientCrypto::generateInsertOrUpdateFromPlaceholders(clientDoc, &_keyVault);
+    auto result = FLEClientCrypto::transformPlaceholders(clientDoc, &_keyVault);
 
     auto serverPayload = EDCServerCollection::getEncryptedFieldInfo(result);
 
@@ -510,7 +510,7 @@ void FleCrudTest::doSingleInsert(int id, BSONElement element) {
 
     auto clientDoc = builder.obj();
 
-    auto result = FLEClientCrypto::generateInsertOrUpdateFromPlaceholders(clientDoc, &_keyVault);
+    auto result = FLEClientCrypto::transformPlaceholders(clientDoc, &_keyVault);
 
     auto serverPayload = EDCServerCollection::getEncryptedFieldInfo(result);
 
@@ -534,7 +534,7 @@ void FleCrudTest::doSingleUpdate(int id, BSONElement element) {
     builder.append("$set",
                    BSON("encrypted" << BSONBinData(buf.data(), buf.size(), BinDataType::Encrypt)));
     auto clientDoc = builder.obj();
-    auto result = FLEClientCrypto::generateInsertOrUpdateFromPlaceholders(clientDoc, &_keyVault);
+    auto result = FLEClientCrypto::transformPlaceholders(clientDoc, &_keyVault);
 
     doSingleUpdateWithUpdateDoc(id, result);
 }
