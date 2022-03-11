@@ -1068,7 +1068,7 @@ public:
 
     StatusWith<std::vector<BackupBlock>> getNextBatch(OperationContext* opCtx,
                                                       const std::size_t batchSize) {
-        int wtRet;
+        int wtRet = 0;
         std::vector<BackupBlock> backupBlocks;
 
         stdx::lock_guard<Latch> backupCursorLk(_wtBackup->wtBackupCursorMutex);
@@ -1136,7 +1136,7 @@ public:
             }
         }
 
-        if (wtRet != WT_NOTFOUND && backupBlocks.size() != batchSize) {
+        if (wtRet && wtRet != WT_NOTFOUND && backupBlocks.size() != batchSize) {
             return wtRCToStatus(wtRet, _session);
         }
 
