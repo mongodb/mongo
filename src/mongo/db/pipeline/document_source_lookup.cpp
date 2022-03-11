@@ -381,15 +381,22 @@ void DocumentSourceLookUp::determineSbeCompatibility() {
     _sbeCompatible =
         // This stage is SBE-compatible only if the context is compatible.
         pExpCtx->sbeCompatible
-        // We currently only support lowering equi-join that uses localField/foreignField syntax.
-        && !_userPipeline
+        // We currently only support lowering equi-join that uses localField/foreignField
+        // syntax.
+        && !_userPipeline && _localField &&
+        _foreignField
+        // SERVER-64423: disable lowering of $lookup with paths in local/foreign fields until
+        // SERVER-63690 is implemented (this check subsumes the one about numeric componets, but
+        // because it's temporary, we are keeping both for now).
+        && FieldRef(_localField->fullPath()).numParts() == 1 &&
+        FieldRef(_foreignField->fullPath()).numParts() == 1
         // SBE doesn't support match-like paths with numeric components. (Note: "as" field is a
-        // project-like field and numbers in it are treated as literal names of fields rather than
-        // indexes into arrays, which is compatible with SBE.)
-        && _localField && !FieldRef(_localField->fullPath()).hasNumericPathComponents() &&
-        _foreignField &&
+        // project-like field and numbers in it are treated as literal names of fields rather
+        // than indexes into arrays, which is compatible with SBE.)
+        && !FieldRef(_localField->fullPath()).hasNumericPathComponents() &&
         !FieldRef(_foreignField->fullPath()).hasNumericPathComponents()
-        // We currently don't lower $lookup against views ('_fromNs' does not correspond to a view).
+        // We currently don't lower $lookup against views ('_fromNs' does not correspond to a
+        // view).
         && pExpCtx->getResolvedNamespace(_fromNs).pipeline.empty();
 }
 

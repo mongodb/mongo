@@ -434,6 +434,24 @@ let view = db[viewName];
             JoinAlgorithm.NLJ /* expectedJoinAlgorithm */);
 }());
 
+// Until SERVER-63690 is implemented, lowering of $lookup with paths into SBE is disabled.
+(function testLocalOrForeignFieldsWithPaths() {
+    // "localField" is a path.
+    runTest(coll,
+            [{$lookup: {from: name, localField: "a.b", foreignField: "a", as: "out"}}],
+            JoinAlgorithm.Classic /* expectedJoinAlgorithm */);
+
+    // "foreignField" is a path.
+    runTest(coll,
+            [{$lookup: {from: name, localField: "a", foreignField: "a.b", as: "out"}}],
+            JoinAlgorithm.Classic /* expectedJoinAlgorithm */);
+
+    // SERVER-63690 doesn't apply to the "as" field.
+    runTest(coll,
+            [{$lookup: {from: name, localField: "a", foreignField: "a", as: "out.b"}}],
+            JoinAlgorithm.NLJ /* expectedJoinAlgorithm */);
+}());
+
 // Verify that $lookup pushdown works correctly in the presence of multi-planning.
 (
     function testLookupPushdownWorksWithMultiplanning() {
