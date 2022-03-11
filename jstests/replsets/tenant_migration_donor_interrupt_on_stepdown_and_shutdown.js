@@ -178,7 +178,9 @@ function testDonorAbortMigrationInterrupt(interruptFunc, verifyCmdResponseFunc, 
  */
 function assertCmdSucceededOrInterruptedDueToStepDown(cmdThread) {
     const res = cmdThread.returnData();
-    assert(res.ok || ErrorCodes.isNotPrimaryError(res.code));
+    assert(res.ok || res.code === ErrorCodes.TenantMigrationCommitted ||
+               ErrorCodes.isNotPrimaryError(res.code),
+           res);
 }
 
 /**
@@ -187,8 +189,9 @@ function assertCmdSucceededOrInterruptedDueToStepDown(cmdThread) {
 function assertCmdSucceededOrInterruptedDueToShutDown(cmdThread) {
     const res = cmdThread.returnData();
     try {
-        assert(res.ok || ErrorCodes.isNotPrimaryError(res.code) ||
-               ErrorCodes.isShutdownError(res.code));
+        assert(res.ok || res.code === ErrorCodes.TenantMigrationCommitted ||
+                   ErrorCodes.isNotPrimaryError(res.code) || ErrorCodes.isShutdownError(res.code),
+               res);
     } catch (e) {
         if (isNetworkError(e)) {
             jsTestLog(`Ignoring network error due to node shutting down ${tojson(e)}`);
