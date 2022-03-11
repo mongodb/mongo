@@ -37,10 +37,12 @@
 
 namespace mongo {
 
+// These are initialized by IDL as server parameters.
+AtomicWord<long long> TemporarilyUnavailableException::maxRetryAttempts;
+AtomicWord<long long> TemporarilyUnavailableException::retryBackoffBaseMs;
+
 TemporarilyUnavailableException::TemporarilyUnavailableException(StringData context)
-    : DBException(Status(ErrorCodes::TemporarilyUnavailable, context)) {
-    invariant(gLoadShedding);
-}
+    : DBException(Status(ErrorCodes::TemporarilyUnavailable, context)) {}
 
 void TemporarilyUnavailableException::handle(OperationContext* opCtx,
                                              int attempts,
@@ -49,23 +51,29 @@ void TemporarilyUnavailableException::handle(OperationContext* opCtx,
                                              const TemporarilyUnavailableException& e) {
     opCtx->recoveryUnit()->abandonSnapshot();
     if (opCtx->getClient()->isFromUserConnection() &&
-        attempts > TemporarilyUnavailableException::kMaxRetryAttempts) {
+        attempts > TemporarilyUnavailableException::maxRetryAttempts.load()) {
         LOGV2_DEBUG(6083901,
                     1,
                     "Too many TemporarilyUnavailableException's, giving up",
+                    "reason"_attr = e.reason(),
                     "attempts"_attr = attempts,
                     "operation"_attr = opStr,
                     logAttrs(NamespaceString(ns)));
         throw e;
     }
+
+    // Back off linearly with the retry attempt number.
+    auto sleepFor =
+        Milliseconds(TemporarilyUnavailableException::retryBackoffBaseMs.load()) * attempts;
     LOGV2_DEBUG(6083900,
                 1,
                 "Caught TemporarilyUnavailableException",
+                "reason"_attr = e.reason(),
                 "attempts"_attr = attempts,
                 "operation"_attr = opStr,
+                "sleepFor"_attr = sleepFor,
                 logAttrs(NamespaceString(ns)));
-    // Back off linearly with the retry attempt number.
-    opCtx->sleepFor(TemporarilyUnavailableException::kRetryBackoff * attempts);
+    opCtx->sleepFor(sleepFor);
 }
 
 }  // namespace mongo

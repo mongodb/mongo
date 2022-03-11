@@ -171,8 +171,7 @@ Status wtRCToStatus_slow(int retCode, WT_SESSION* session, StringData prefix) {
             return false;
         }();
 
-        const bool loadShedding = gLoadShedding;
-        if (loadShedding && reasonIsCachePressure) {
+        if (reasonIsCachePressure) {
             str::stream s;
             if (!prefix.empty())
                 s << prefix << " ";

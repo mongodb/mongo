@@ -35,3 +35,21 @@ server_parameters:
         description: 'Call printStackTrace on every WriteConflictException created'
         set_at: [ startup, runtime ]
         cpp_varname: 'WriteConflictException::trace'
+
+    temporarilyUnavailableMaxRetries:
+        description: 'The number of times to retry a TemporarilyUnavailable error internally'
+        set_at: [ startup, runtime ]
+        cpp_varname: 'TemporarilyUnavailableException::maxRetryAttempts'
+        default: 10
+        validator:
+          gte: 0
+
+    temporarilyUnavailableBackoffBaseMs:
+        description: 'The base period of time to wait between each TemporarilyUnavailable retry
+                      attempt. The backoff time is linear such that the Nth retry waits for N times
+                      the base backoff period.'
+        set_at: [ startup, runtime ]
+        cpp_varname: 'TemporarilyUnavailableException::retryBackoffBaseMs'
+        default: 1000
+        validator:
+          gte: 0

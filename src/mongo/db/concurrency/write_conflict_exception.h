@@ -71,9 +71,12 @@ private:
 
 /**
  * Runs the argument function f as many times as needed for f to complete or throw an exception
- * other than WriteConflictException.  For each time f throws a WriteConflictException, logs the
- * error, waits a spell, cleans up, and then tries f again.  Imposes no upper limit on the number
- * of times to re-try f, so any required timeout behavior must be enforced within f.
+ * other than WriteConflictException or TemporarilyUnavailableException. For each time f throws an
+ * one of these exceptions, logs the error, waits a spell, cleans up, and then tries f again.
+ * Imposes no upper limit on the number of times to re-try f after a WriteConflictException, so any
+ * required timeout behavior must be enforced within f. When retrying a
+ * TemporarilyUnavailableException, f is called a finite number of times before we eventually let
+ * the error escape.
  *
  * If we are already in a WriteUnitOfWork, we assume that we are being called within a
  * WriteConflictException retry loop up the call stack. Hence, this retry loop is reduced to an
@@ -91,7 +94,18 @@ auto writeConflictRetry(OperationContext* opCtx, StringData opStr, StringData ns
     bool userSkipWriteConflictRetry = MONGO_unlikely(skipWriteConflictRetries.shouldFail()) &&
         opCtx->getClient()->isFromUserConnection();
     if (opCtx->lockState()->inAWriteUnitOfWork() || userSkipWriteConflictRetry) {
-        return f();
+        try {
+            return f();
+        } catch (TemporarilyUnavailableException const& e) {
+            if (opCtx->inMultiDocumentTransaction()) {
+                // Since WriteConflicts are tagged as TransientTransactionErrors and
+                // TemporarilyUnavailable errors are not, we convert the error to a WriteConflict to
+                // allow users of multi-document transactions to retry without changing any
+                // behavior. Otherwise, we let the error escape as usual.
+                throw WriteConflictException(e.reason());
+            }
+            throw;
+        }
     }
 
     int attempts = 0;

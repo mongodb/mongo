@@ -38,13 +38,14 @@ namespace mongo {
 
 /**
  * This exception is thrown if an operation aborts due to the server being temporarily
- * unavailable, e.g. due to excessive load. May only be used when loadShedding is
- * enabled.
+ * unavailable, e.g. due to excessive load. For user-originating operations, this will be retried
+ * internally by the writeConflictRetry helper a finite number of times before eventually being
+ * returned.
  */
 class TemporarilyUnavailableException final : public DBException {
 public:
-    static constexpr int kMaxRetryAttempts = 3;
-    static constexpr auto kRetryBackoff = Milliseconds(100);
+    static AtomicWord<long long> maxRetryAttempts;
+    static AtomicWord<long long> retryBackoffBaseMs;
 
     TemporarilyUnavailableException(StringData context);
 
