@@ -777,7 +777,9 @@ Status IndexBuildsCoordinatorMongod::setCommitQuorum(OperationContext* opCtx,
                           << nss << "' without providing any indexes.");
     }
 
-    AutoGetCollectionForRead collection(opCtx, nss);
+    // Take the MODE_IX lock now, so that when we actually persist the value later, we don't need to
+    // upgrade the lock.
+    AutoGetCollection collection(opCtx, nss, MODE_IX);
     if (!collection) {
         return Status(ErrorCodes::NamespaceNotFound,
                       str::stream() << "Collection '" << nss << "' was not found.");
