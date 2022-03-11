@@ -221,6 +221,35 @@ TEST_F(FaultManagerTest,
     resetManager();  // Before fields above go out of scope.
 }
 
+TEST_F(FaultManagerTest, SchedulingDuplicateHealthChecksRejected) {
+    static constexpr int kLoops = 1000;
+    resetManager(std::make_unique<FaultManagerConfig>());
+    registerMockHealthObserver(FaultFacetType::kMock1, [] { return Severity::kOk; });
+    auto initialHealthCheckFuture = manager().startPeriodicHealthChecks();
+    waitForTransitionIntoState(FaultState::kOk);
+
+    auto observer = manager().getHealthObserversTest()[0];
+    auto initialStats = observer->getStats();
+
+    for (int i = 0; i < kLoops; ++i) {
+        // A check will not be scheduled if another check is running.
+        // Default interval is 1 sec so only 1/500 of checks will be scheduled.
+        scheduleNextImmediateCheck<HealthObserverMock>(FaultFacetType::kMock1);
+        sleepFor(Milliseconds(2));
+    }
+
+    // Sleep time here is not introducing flakiness - it only shows that even after
+    // waiting the total count of completed tests is lower than the total we scheduled.
+    sleepFor(Milliseconds(100));
+    auto finalStats = observer->getStats();
+
+    const auto totalCompletedCount =
+        finalStats.completedChecksCount - initialStats.completedChecksCount;
+    ASSERT_LT(totalCompletedCount, kLoops);
+    ASSERT_GT(totalCompletedCount, 0);
+    LOGV2(6418205, "Total completed checks count", "count"_attr = totalCompletedCount);
+}
+
 }  // namespace
 }  // namespace process_health
 }  // namespace mongo

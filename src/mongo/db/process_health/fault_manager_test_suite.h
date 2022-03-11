@@ -114,6 +114,10 @@ public:
     FaultState acceptTest(const HealthCheckStatus& message) {
         return accept(message);
     }
+
+    void scheduleNextImmediateCheckForTest(HealthObserver* observer) {
+        scheduleNextHealthCheck(observer, CancellationToken::uncancelable(), true);
+    }
 };
 
 /**
@@ -191,6 +195,12 @@ public:
     void registerMockHealthObserver(FaultFacetType mockType,
                                     std::function<Severity()> getSeverityCallback) {
         registerMockHealthObserver(mockType, getSeverityCallback, Milliseconds(Seconds(30)));
+    }
+
+    template <typename Observer>
+    void scheduleNextImmediateCheck(FaultFacetType type) {
+        auto& obsrv = observer<Observer>(type);
+        manager().scheduleNextImmediateCheckForTest(&obsrv);
     }
 
     template <typename Observer>

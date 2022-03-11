@@ -153,6 +153,10 @@ protected:
 
     void progressMonitorCheckForTests(std::function<void(std::string cause)> crashCb);
 
+    void scheduleNextHealthCheck(HealthObserver* observer,
+                                 CancellationToken token,
+                                 bool immediately);
+
 private:
     // One time init.
     void _init();
@@ -202,12 +206,17 @@ private:
 
     std::unique_ptr<ProgressMonitor> _progressMonitor;
     stdx::unordered_set<FaultFacetType> _healthyObservations;
+
+    // The stages of health check context modifications:
+    // 1. Schedule and set callbackHandle
+    // 2. When scheduled check starts, reset callbackHandle and set result future
+    // 3. When result is ready, repeat
     struct HealthCheckContext {
-        std::unique_ptr<ExecutorFuture<HealthCheckStatus>> result;
-        boost::optional<executor::TaskExecutor::CallbackHandle> resultStatus;
-        HealthCheckContext(std::unique_ptr<ExecutorFuture<HealthCheckStatus>> future,
+        std::unique_ptr<SharedSemiFuture<HealthCheckStatus>> result;
+        boost::optional<executor::TaskExecutor::CallbackHandle> callbackHandle;
+        HealthCheckContext(std::unique_ptr<SharedSemiFuture<HealthCheckStatus>> future,
                            boost::optional<executor::TaskExecutor::CallbackHandle> cbHandle)
-            : result(std::move(future)), resultStatus(cbHandle){};
+            : result(std::move(future)), callbackHandle(cbHandle){};
     };
 
     stdx::unordered_map<FaultFacetType, HealthCheckContext> _healthCheckContexts;
