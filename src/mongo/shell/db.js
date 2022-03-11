@@ -1808,6 +1808,50 @@ DB.prototype.getSession = function() {
     return this._session;
 };
 })(Object.prototype.hasOwnProperty);
+
+DB.prototype.createEncryptedCollection = function(name, opts) {
+    assert.neq(
+        opts, undefined, `createEncryptedCollection expected an opts object, it is undefined`);
+    assert(opts.hasOwnProperty("encryptedFields") && typeof opts.encryptedFields == "object",
+           `opts must contain an encryptedFields document'`);
+
+    const res = assert.commandWorked(this.createCollection(name, opts));
+
+    const cis = this.getCollectionInfos({"name": name});
+    assert.eq(cis.length, 1, `Expected to find one collection named '${name}'`);
+
+    const ci = cis[0];
+    assert(ci.hasOwnProperty("options"), `Expected collection '${name}' to have 'options'`);
+    const options = ci.options;
+    assert(options.hasOwnProperty("encryptedFields"),
+           `Expected collection '${name}' to have 'encryptedFields'`);
+    const ef = options.encryptedFields;
+
+    assert.commandWorked(this.getCollection(name).createIndex({__safeContent__: 1}));
+
+    assert.commandWorked(this.createCollection(ef.escCollection));
+    assert.commandWorked(this.createCollection(ef.eccCollection));
+    assert.commandWorked(this.createCollection(ef.ecocCollection));
+
+    return res;
+};
+
+DB.prototype.dropEncryptedCollection = function(name) {
+    const ci = db.getCollectionInfos({name: name})[0];
+    if (ci == undefined) {
+        throw `Encrypted Collection '${name}' not found`;
+    }
+
+    const ef = ci.options.encryptedFields;
+    if (ef == undefined) {
+        throw `Encrypted Collection '${name}' not found`;
+    }
+
+    this.getCollection(ef.escCollection).drop();
+    this.getCollection(ef.eccCollection).drop();
+    this.getCollection(ef.ecocCollection).drop();
+    return this.getCollection(name).drop();
+};
 }());
 
 DB.prototype._sbe = function(query) {

@@ -64,10 +64,11 @@ using std::vector;
 const std::set<std::string> kSetShellParameterAllowlist = {
     "awsEC2InstanceMetadataUrl",
     "awsECSInstanceMetadataUrl",
-    "ocspEnabled",
-    "ocspClientHttpTimeoutSecs",
     "disabledSecureAllocatorDomains",
+    "featureFlagFLE2",
     "newLineAfterPasswordPromptForTest",
+    "ocspClientHttpTimeoutSecs",
+    "ocspEnabled",
     "skipShellCursorFinalize",
     "tlsOCSPSlowResponderWarningSecs",
 };

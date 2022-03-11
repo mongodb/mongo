@@ -43,7 +43,6 @@
 #include "mongo/crypto/fle_crypto.h"
 #include "mongo/crypto/fle_data_frames.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
-#include "mongo/crypto/fle_key_vault_shell.h"
 #include "mongo/crypto/symmetric_crypto.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
@@ -210,9 +209,8 @@ std::pair<rpc::UniqueReply, DBClientBase*> EncryptedDBClientBase::processRespons
 std::pair<rpc::UniqueReply, DBClientBase*> EncryptedDBClientBase::processResponseFLE2(
     rpc::UniqueReply result, const StringData databaseName) {
     auto rawReply = result->getCommandReply();
-    FLEKeyVaultShellImpl vault(_encryptionOptions, getCollectionNS(), _conn.get());
     return prepareReply(
-        std::move(result), databaseName, FLEClientCrypto::decryptDocument(rawReply, &vault));
+        std::move(result), databaseName, FLEClientCrypto::decryptDocument(rawReply, this));
 }
 
 std::pair<rpc::UniqueReply, DBClientBase*> EncryptedDBClientBase::prepareReply(
@@ -646,7 +644,7 @@ std::shared_ptr<SymmetricKey> EncryptedDBClientBase::getDataKey(const UUID& uuid
     return key;
 }
 
-std::shared_ptr<SymmetricKey> EncryptedDBClientBase::getDataKeyFromDisk(const UUID& uuid) {
+SecureVector<uint8_t> EncryptedDBClientBase::getKeyMaterialFromDisk(const UUID& uuid) {
     NamespaceString fullNameNS = getCollectionNS();
     FindCommandRequest findCmd{fullNameNS};
     findCmd.setFilter(BSON("_id" << uuid));
@@ -677,8 +675,22 @@ std::shared_ptr<SymmetricKey> EncryptedDBClientBase::getDataKeyFromDisk(const UU
         _encryptionOptions.getKmsProviders().toBSON(), keyStoreRecord.getMasterKey());
     SecureVector<uint8_t> decryptedKey =
         kmsService->decrypt(dataKey, keyStoreRecord.getMasterKey());
+    return decryptedKey;
+}
+
+std::shared_ptr<SymmetricKey> EncryptedDBClientBase::getDataKeyFromDisk(const UUID& uuid) {
+    auto decryptedKey = getKeyMaterialFromDisk(uuid);
     return std::make_shared<SymmetricKey>(
         std::move(decryptedKey), crypto::aesAlgorithm, "kms_encryption");
+}
+
+KeyMaterial EncryptedDBClientBase::getKey(const UUID& uuid) {
+    auto decryptedKey = getKeyMaterialFromDisk(uuid);
+
+    KeyMaterial km;
+    km->resize(decryptedKey->size());
+    std::copy(decryptedKey->data(), decryptedKey->data() + decryptedKey->size(), km->data());
+    return km;
 }
 
 #ifdef MONGO_CONFIG_SSL

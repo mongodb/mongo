@@ -43,11 +43,12 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/crypto/aead_encryption.h"
 #include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/crypto/symmetric_crypto.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/util/uuid.h"
-
 
 namespace mongo {
 
@@ -83,7 +84,7 @@ struct FLEKey {
         uassert(6364500,
                 str::stream() << "Length of KeyMaterial is expected to be 32 bytes, found "
                               << data->size(),
-                data->size() == crypto::sym256KeySize);
+                data->size() == crypto::kFieldLevelEncryptionKeySize);
     }
 
     ConstDataRange toCDR() const {
@@ -641,13 +642,13 @@ public:
      * Decrypt the null document.
      */
     static StatusWith<ECCNullDocument> decryptNullDocument(ECCTwiceDerivedValueToken valueToken,
-                                                           BSONObj& doc);
+                                                           const BSONObj& doc);
 
     /**
      * Decrypt a regular document.
      */
     static StatusWith<ECCDocument> decryptDocument(ECCTwiceDerivedValueToken valueToken,
-                                                   BSONObj& doc);
+                                                   const BSONObj& doc);
 
     /**
      * Search for the highest document id for a given field/value pair based on the token.
@@ -738,7 +739,7 @@ public:
     /**
      * Validate the tags array exists and is of the right type.
      */
-    static void validateTagsArray(BSONObj& doc);
+    static void validateTagsArray(const BSONObj& doc);
 
     /**
      * Validate document
@@ -748,7 +749,7 @@ public:
      * 2. All fields can be decrypted successfully
      * 3. There is a tag for each field and no extra tags
      */
-    static void validateDocument(BSONObj& doc,
+    static void validateDocument(const BSONObj& doc,
                                  const EncryptedFieldConfig& efc,
                                  FLEKeyVault* keyVault);
 };

@@ -33,12 +33,14 @@
 #include <cmath>
 #include <cstdint>
 #include <functional>
+#include <iterator>
 #include <limits>
 #include <memory>
 #include <stack>
 #include <string>
 #include <tuple>
 #include <type_traits>
+#include <unordered_map>
 #include <variant>
 #include <vector>
 
@@ -66,6 +68,7 @@
 #include "mongo/crypto/symmetric_key.h"
 #include "mongo/idl/basic_types.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/platform/random.h"
 #include "mongo/rpc/object_check.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
@@ -297,14 +300,12 @@ StatusWith<std::vector<uint8_t>> encryptDataWithAssociatedData(ConstDataRange ke
     std::vector<uint8_t> out;
     out.resize(crypto::aeadCipherOutputLength(plainText.length()));
 
-    // TODO - key is too short, we have 32, need 64. The new API should only 32 bytes and this can
-    // be removed
-    std::array<uint8_t, 64> bigToken;
-    std::copy(key.data(), key.data() + key.length(), bigToken.data());
-    std::copy(key.data(), key.data() + key.length(), bigToken.data() + key.length());
+    if (key.length() == 96) {
+        key = ConstDataRange(key.data(), key.data() + 64);
+    }
 
     auto s = crypto::aeadEncryptWithIV(
-        bigToken, plainText, ConstDataRange(0, 0), associatedData, dataLenBitsEncoded, out);
+        key, plainText, ConstDataRange(0, 0), associatedData, dataLenBitsEncoded, out);
     if (!s.isOK()) {
         return s;
     }
@@ -315,7 +316,11 @@ StatusWith<std::vector<uint8_t>> encryptDataWithAssociatedData(ConstDataRange ke
 // TODO (SERVER-63780) - replace with call to CTR algorithm, NOT CTR AEAD
 StatusWith<std::vector<uint8_t>> encryptData(ConstDataRange key, ConstDataRange plainText) {
 
-    return encryptDataWithAssociatedData(key, ConstDataRange(0, 0), plainText);
+    std::array<uint8_t, 64> bigToken;
+    std::copy(key.data(), key.data() + key.length(), bigToken.data());
+    std::copy(key.data(), key.data() + key.length(), bigToken.data() + key.length());
+
+    return encryptDataWithAssociatedData(bigToken, ConstDataRange(0, 0), plainText);
 }
 
 // TODO (SERVER-63780) - replace with call to CTR algorithm, NOT CTR AEAD
@@ -333,15 +338,11 @@ StatusWith<std::vector<uint8_t>> decryptDataWithAssociatedData(ConstDataRange ke
                                                                ConstDataRange cipherText) {
     // TODO - key is too short, we have 32, need 64. The new API should only 32 bytes and this can
     // be removed
-    std::array<uint8_t, 64> bigToken;
-    std::copy(key.data(), key.data() + key.length(), bigToken.data());
-    std::copy(key.data(), key.data() + key.length(), bigToken.data() + key.length());
+    if (key.length() == 96) {
+        key = ConstDataRange(key.data(), key.data() + 64);
+    }
 
-    SymmetricKey sk(reinterpret_cast<const uint8_t*>(bigToken.data()),
-                    bigToken.size(),
-                    0,
-                    SymmetricKeyId("ignore"),
-                    0);
+    SymmetricKey sk(key.data<uint8_t>(), key.length(), 0, SymmetricKeyId("ignore"), 0);
 
     auto swLen = aeadGetMaximumPlainTextLength(cipherText.length());
     if (!swLen.isOK()) {
@@ -360,7 +361,11 @@ StatusWith<std::vector<uint8_t>> decryptDataWithAssociatedData(ConstDataRange ke
 
 // TODO (SERVER-63780) - replace with call to CTR algorithm, NOT CTR AEAD
 StatusWith<std::vector<uint8_t>> decryptData(ConstDataRange key, ConstDataRange cipherText) {
-    return decryptDataWithAssociatedData(key, ConstDataRange(0, 0), cipherText);
+    std::array<uint8_t, 64> bigToken;
+    std::copy(key.data(), key.data() + key.length(), bigToken.data());
+    std::copy(key.data(), key.data() + key.length(), bigToken.data() + key.length());
+
+    return decryptDataWithAssociatedData(bigToken, ConstDataRange(0, 0), cipherText);
 }
 
 // TODO (SERVER-63780) - replace with call to CTR algorithm, NOT CTR AEAD
@@ -630,7 +635,7 @@ public:
     static FLE2InsertUpdatePayload serialize(FLEIndexKeyAndId indexKey,
                                              FLEUserKeyAndId userKey,
                                              BSONElement element,
-                                             uint64_t maxContentionCounter);
+                                             uint64_t maxContentionFactor);
 };
 
 FLE2InsertUpdatePayload EDCClientPayload::parse(ConstDataRange cdr) {
@@ -640,7 +645,7 @@ FLE2InsertUpdatePayload EDCClientPayload::parse(ConstDataRange cdr) {
 FLE2InsertUpdatePayload EDCClientPayload::serialize(FLEIndexKeyAndId indexKey,
                                                     FLEUserKeyAndId userKey,
                                                     BSONElement element,
-                                                    uint64_t maxContentionCounter) {
+                                                    uint64_t maxContentionFactor) {
     auto value = ConstDataRange(element.value(), element.value() + element.valuesize());
 
     auto collectionToken = FLELevel1TokenGenerator::generateCollectionsLevel1Token(indexKey.key);
@@ -658,18 +663,21 @@ FLE2InsertUpdatePayload EDCClientPayload::serialize(FLEIndexKeyAndId indexKey,
     ECCDerivedFromDataToken eccDatakey =
         FLEDerivedFromDataTokenGenerator::generateECCDerivedFromDataToken(eccToken, value);
 
+    uint64_t contentionFactor = 0;
+    if (maxContentionFactor > 0) {
+        // Generate a number between [1,maxContentionFactor]
+        contentionFactor = SecureRandom().nextInt64(maxContentionFactor) + 1;
+    }
+
     EDCDerivedFromDataTokenAndContentionFactorToken edcDataCounterkey =
         FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
-            generateEDCDerivedFromDataTokenAndContentionFactorToken(edcDatakey,
-                                                                    maxContentionCounter);
+            generateEDCDerivedFromDataTokenAndContentionFactorToken(edcDatakey, contentionFactor);
     ESCDerivedFromDataTokenAndContentionFactorToken escDataCounterkey =
         FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
-            generateESCDerivedFromDataTokenAndContentionFactorToken(escDatakey,
-                                                                    maxContentionCounter);
+            generateESCDerivedFromDataTokenAndContentionFactorToken(escDatakey, contentionFactor);
     ECCDerivedFromDataTokenAndContentionFactorToken eccDataCounterkey =
         FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
-            generateECCDerivedFromDataTokenAndContentionFactorToken(eccDatakey,
-                                                                    maxContentionCounter);
+            generateECCDerivedFromDataTokenAndContentionFactorToken(eccDatakey, contentionFactor);
 
 
     FLE2InsertUpdatePayload iupayload;
@@ -1202,7 +1210,6 @@ StatusWith<std::vector<uint8_t>> EncryptedStateCollectionTokens::serialize(ECOCT
 
 FLEKeyVault::~FLEKeyVault() {}
 
-
 std::vector<uint8_t> FLEClientCrypto::encrypt(BSONElement element,
                                               FLEIndexKeyAndId indexKey,
                                               FLEUserKeyAndId userKey,
@@ -1284,7 +1291,7 @@ BSONObj FLEClientCrypto::decryptDocument(BSONObj& doc, FLEKeyVault* keyVault) {
     return builder.obj();
 }
 
-void FLEClientCrypto::validateTagsArray(BSONObj& doc) {
+void FLEClientCrypto::validateTagsArray(const BSONObj& doc) {
     BSONElement safeContent = doc[kSafeContent];
 
     uassert(6371506,
@@ -1295,7 +1302,7 @@ void FLEClientCrypto::validateTagsArray(BSONObj& doc) {
         6371507, str::stream() << kSafeContent << " must be an array", safeContent.type() == Array);
 }
 
-void FLEClientCrypto::validateDocument(BSONObj& doc,
+void FLEClientCrypto::validateDocument(const BSONObj& doc,
                                        const EncryptedFieldConfig& efc,
                                        FLEKeyVault* keyVault) {
     stdx::unordered_map<std::string, ConstDataRange> validateFields;
@@ -1599,7 +1606,7 @@ BSONObj ECCCollection::generateCompactionDocument(ECCTwiceDerivedTagToken tagTok
 
 
 StatusWith<ECCNullDocument> ECCCollection::decryptNullDocument(ECCTwiceDerivedValueToken valueToken,
-                                                               BSONObj& doc) {
+                                                               const BSONObj& doc) {
     BSONElement encryptedValue;
     auto status = bsonExtractTypedField(doc, kValue, BinData, &encryptedValue);
     if (!status.isOK()) {
@@ -1619,7 +1626,7 @@ StatusWith<ECCNullDocument> ECCCollection::decryptNullDocument(ECCTwiceDerivedVa
 
 
 StatusWith<ECCDocument> ECCCollection::decryptDocument(ECCTwiceDerivedValueToken valueToken,
-                                                       BSONObj& doc) {
+                                                       const BSONObj& doc) {
     BSONElement encryptedValue;
     auto status = bsonExtractTypedField(doc, kValue, BinData, &encryptedValue);
     if (!status.isOK()) {
@@ -1718,7 +1725,6 @@ StatusWith<UUID> FLE2IndexedEqualityEncryptedValue::readKeyId(
 
 StatusWith<FLE2IndexedEqualityEncryptedValue> FLE2IndexedEqualityEncryptedValue::decryptAndParse(
     ServerDataEncryptionLevel1Token token, ConstDataRange serializedServerValue) {
-
     ConstDataRangeCursor serializedServerCdrc(serializedServerValue);
 
     auto swIndexKeyId = serializedServerCdrc.readAndAdvanceNoThrow<UUIDBuf>();
@@ -1852,6 +1858,8 @@ std::vector<EDCServerPayloadInfo> EDCServerCollection::getEncryptedFieldInfo(BSO
         collectEDCServerInfo(&fields, cdr, fieldPath);
     });
 
+    // TODO - unique key ids
+
     return fields;
 }
 
@@ -1874,7 +1882,6 @@ PrfBlock EDCServerCollection::generateTag(const FLE2IndexedEqualityEncryptedValu
 
 BSONObj EDCServerCollection::finalizeForInsert(
     const BSONObj& doc, const std::vector<EDCServerPayloadInfo>& serverPayload) {
-
     std::vector<TagInfo> tags;
     // TODO - improve size estimate after range is supported since it no longer be 1 to 1
     tags.reserve(serverPayload.size());
@@ -2126,7 +2133,6 @@ BSONObj EncryptionInformationHelpers::encryptionInformationSerializeForDelete(
 
 StringMap<FLEDeleteToken> EncryptionInformationHelpers::getDeleteTokens(
     const NamespaceString& nss, const EncryptionInformation& ei) {
-
     uassert(6371308, "DeleteTokens is empty", ei.getDeleteTokens().has_value());
 
     BSONObj deleteTokens = ei.getDeleteTokens().value();
