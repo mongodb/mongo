@@ -7,8 +7,6 @@
 (function() {
 'use strict';
 
-// TODO (SERVER-63258): Resolve inconsistency around the write to the image collection
-// for prepared internal transactions.
 // For the test case where we abort a prepared internal transaction for retryable findAndModify with
 // a pre/post image, the image collection on the primary is expected to be inconsistent with the
 // image collection on secondaries. The reason is that for prepared transactions, the pre/post image
