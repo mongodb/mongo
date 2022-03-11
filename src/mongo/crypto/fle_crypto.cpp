@@ -1873,7 +1873,16 @@ std::vector<EDCServerPayloadInfo> EDCServerCollection::getEncryptedFieldInfo(BSO
         collectEDCServerInfo(&fields, cdr, fieldPath);
     });
 
-    // TODO - unique key ids
+    // Create collection checks for unique index key ids but users can supply schema client-side
+    // We check here at runtime that all fields index keys are unique.
+    stdx::unordered_set<UUID, UUID::Hash> indexKeyIds;
+    for (const auto& field : fields) {
+        auto indexKeyId = field.payload.getIndexKeyId();
+        uassert(6371407,
+                "Index key ids must be unique across fields in a document",
+                !indexKeyIds.contains(indexKeyId));
+        indexKeyIds.insert(indexKeyId);
+    }
 
     return fields;
 }

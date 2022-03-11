@@ -40,6 +40,7 @@
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/update_metrics.h"
+#include "mongo/db/fle_crud.h"
 #include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
@@ -440,6 +441,10 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
+
+        if (processFLEFindAndModify(opCtx, dbName, cmdObj, result) == FLEBatchResult::kProcessed) {
+            return true;
+        }
 
         // Collect metrics.
         _updateMetrics.collectMetrics(cmdObj);

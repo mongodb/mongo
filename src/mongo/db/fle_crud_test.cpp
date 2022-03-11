@@ -94,6 +94,11 @@ public:
                                const EncryptionInformation& ei,
                                const write_ops::UpdateCommandRequest& updateRequest) final;
 
+    write_ops::FindAndModifyCommandReply findAndModify(
+        const NamespaceString& nss,
+        const EncryptionInformation& ei,
+        const write_ops::FindAndModifyCommandRequest& findAndModifyRequest) final;
+
 private:
     OperationContext* _opCtx;
     repl::StorageInterface* _storage;
@@ -160,6 +165,35 @@ BSONObj FLEQueryTestImpl::updateWithPreimage(const NamespaceString& nss,
                                          updateOpEntry.getU().getUpdateModifier()));
 
     return preimage;
+}
+
+write_ops::FindAndModifyCommandReply FLEQueryTestImpl::findAndModify(
+    const NamespaceString& nss,
+    const EncryptionInformation& ei,
+    const write_ops::FindAndModifyCommandRequest& findAndModifyRequest) {
+    // Repl storage interface does not have find and modify support directly. We emulate it, poorly
+    ASSERT_EQ("_id"_sd, findAndModifyRequest.getQuery().firstElementFieldNameStringData());
+    ASSERT_EQ(findAndModifyRequest.getNew().get_value_or(false), false);
+
+    BSONObj preimage = getById(nss, findAndModifyRequest.getQuery().firstElement());
+
+    if (findAndModifyRequest.getRemove().get_value_or(false)) {
+        // Remove
+        auto swDoc =
+            _storage->deleteById(_opCtx, nss, findAndModifyRequest.getQuery().firstElement());
+        uassertStatusOK(swDoc);
+
+    } else {
+        uassertStatusOK(
+            _storage->upsertById(_opCtx,
+                                 nss,
+                                 findAndModifyRequest.getQuery().firstElement(),
+                                 findAndModifyRequest.getUpdate()->getUpdateModifier()));
+    }
+
+    write_ops::FindAndModifyCommandReply reply;
+    reply.setValue(preimage);
+    return reply;
 }
 
 constexpr auto kIndexKeyId = "12345678-1234-9876-1234-123456789012"_sd;
@@ -247,6 +281,8 @@ protected:
     void doSingleUpdate(int id, BSONElement element);
     void doSingleUpdate(int id, BSONObj obj);
     void doSingleUpdateWithUpdateDoc(int id, BSONObj update);
+
+    void doFindAndModify(write_ops::FindAndModifyCommandRequest& request);
 
     using ValueGenerator = std::function<std::string(StringData fieldName, uint64_t row)>;
 
@@ -577,6 +613,17 @@ void FleCrudTest::doSingleDelete(int id) {
     processDelete(_queryImpl.get(), deleteRequest);
 }
 
+void FleCrudTest::doFindAndModify(write_ops::FindAndModifyCommandRequest& request) {
+    auto efc = getTestEncryptedFieldConfig();
+    auto doc = EncryptionInformationHelpers::encryptionInformationSerializeForDelete(
+        _edcNs, efc, &_keyVault);
+    auto ei = EncryptionInformation::parse(IDLParserErrorContext("test"), doc);
+
+    request.setEncryptionInformation(ei);
+
+    processFindAndModify(_queryImpl.get(), request);
+}
+
 // Insert one document
 TEST_F(FleCrudTest, InsertOne) {
     auto doc = BSON("encrypted"
@@ -864,6 +911,108 @@ TEST_F(FleCrudTest, SetSafeContent) {
 
     ASSERT_THROWS_CODE(doSingleUpdateWithUpdateDoc(1, result), DBException, 6371507);
 }
+
+// Update one document via findAndModify
+TEST_F(FleCrudTest, FindAndModify_UpdateOne) {
+
+    doSingleInsert(1,
+                   BSON("encrypted"
+                        << "secret"));
+
+    assertDocumentCounts(1, 1, 0, 1);
+
+    auto doc = BSON("encrypted"
+                    << "top secret");
+    auto element = doc.firstElement();
+    auto buf = generateSinglePlaceholder(element);
+    BSONObjBuilder builder;
+    builder.append("$inc", BSON("counter" << 1));
+    builder.append("$set",
+                   BSON("encrypted" << BSONBinData(buf.data(), buf.size(), BinDataType::Encrypt)));
+    auto clientDoc = builder.obj();
+    auto result = FLEClientCrypto::generateInsertOrUpdateFromPlaceholders(clientDoc, &_keyVault);
+
+
+    write_ops::FindAndModifyCommandRequest req(_edcNs);
+    req.setQuery(BSON("_id" << 1));
+    req.setUpdate(
+        write_ops::UpdateModification(result, write_ops::UpdateModification::ClassicTag{}, false));
+    doFindAndModify(req);
+
+    assertDocumentCounts(1, 2, 1, 3);
+
+    validateDocument(1,
+                     BSON("_id" << 1 << "counter" << 2 << "plainText"
+                                << "sample"
+                                << "encrypted"
+                                << "top secret"));
+}
+
+// Insert and delete one document via findAndModify
+TEST_F(FleCrudTest, FindAndModify_InsertAndDeleteOne) {
+    auto doc = BSON("encrypted"
+                    << "secret");
+    auto element = doc.firstElement();
+
+    doSingleInsert(1, element);
+
+    assertDocumentCounts(1, 1, 0, 1);
+
+
+    write_ops::FindAndModifyCommandRequest req(_edcNs);
+    req.setQuery(BSON("_id" << 1));
+    req.setRemove(true);
+    doFindAndModify(req);
+
+    assertDocumentCounts(0, 1, 1, 2);
+
+    getECCDocument(getTestECCToken(element), 1);
+}
+
+// Rename safeContent
+TEST_F(FleCrudTest, FindAndModify_RenameSafeContent) {
+
+    doSingleInsert(1,
+                   BSON("encrypted"
+                        << "secret"));
+
+    assertDocumentCounts(1, 1, 0, 1);
+
+    BSONObjBuilder builder;
+    builder.append("$inc", BSON("counter" << 1));
+    builder.append("$rename", BSON(kSafeContent << "foo"));
+    auto result = builder.obj();
+
+    write_ops::FindAndModifyCommandRequest req(_edcNs);
+    req.setQuery(BSON("_id" << 1));
+    req.setUpdate(
+        write_ops::UpdateModification(result, write_ops::UpdateModification::ClassicTag{}, false));
+
+    ASSERT_THROWS_CODE(doFindAndModify(req), DBException, 6371506);
+}
+
+// Mess with __safeContent__ and ensure the update errors
+TEST_F(FleCrudTest, FindAndModify_SetSafeContent) {
+    doSingleInsert(1,
+                   BSON("encrypted"
+                        << "secret"));
+
+    assertDocumentCounts(1, 1, 0, 1);
+
+    BSONObjBuilder builder;
+    builder.append("$inc", BSON("counter" << 1));
+    builder.append("$set", BSON(kSafeContent << "foo"));
+    auto result = builder.obj();
+
+    write_ops::FindAndModifyCommandRequest req(_edcNs);
+    req.setQuery(BSON("_id" << 1));
+    req.setUpdate(
+        write_ops::UpdateModification(result, write_ops::UpdateModification::ClassicTag{}, false));
+
+
+    ASSERT_THROWS_CODE(doFindAndModify(req), DBException, 6371507);
+}
+
 
 }  // namespace
 }  // namespace mongo

@@ -110,8 +110,12 @@ std::basic_ostream<char>& operator<<(std::basic_ostream<char>& os, const FLEToke
 }
 
 constexpr auto kIndexKeyId = "12345678-1234-9876-1234-123456789012"_sd;
+constexpr auto kIndexKey2Id = "12345678-1234-9876-1234-123456789013"_sd;
+constexpr auto kIndexKey3Id = "12345678-1234-9876-1234-123456789014"_sd;
 constexpr auto kUserKeyId = "ABCDEFAB-1234-9876-1234-123456789012"_sd;
 static UUID indexKeyId = uassertStatusOK(UUID::parse(kIndexKeyId.toString()));
+static UUID indexKey2Id = uassertStatusOK(UUID::parse(kIndexKey2Id.toString()));
+static UUID indexKey3Id = uassertStatusOK(UUID::parse(kIndexKey3Id.toString()));
 static UUID userKeyId = uassertStatusOK(UUID::parse(kUserKeyId.toString()));
 
 std::vector<char> testValue = {0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19};
@@ -124,9 +128,23 @@ const FLEIndexKey& getIndexKey() {
     return indexKey;
 }
 
+const FLEIndexKey& getIndex2Key() {
+    static std::string index2Vec = hexblob::decode(
+        "1f65c3223d5653cdbd73c11a8f85587aafcbd5be7e4c308d357b2f01bbcf76a9802930e5f233923bbc3f5ebd0be1db9807f04aa870c896092180dd8b05816b8f7568ff762a1a4efd35bbc02826394eb30f36cd8e0c646ae2f43df420e50a19eb"_sd);
+    static FLEIndexKey index2Key(KeyMaterial(index2Vec.begin(), index2Vec.end()));
+    return index2Key;
+}
+
+const FLEIndexKey& getIndex3Key() {
+    static std::string index3Vec = hexblob::decode(
+        "1f65c3223d5653cdbd73c11a8f85587aafcbd5be7e4c308d357b2f01bbcf76a9802930e5f233923bbc3f5ebd0be1db9807f04aa870c896092180dd8b05816b8f7568ff762a1a4efd35bbc02826394eb30f36cd8e0c646ae2f43df420e50a19eb"_sd);
+    static FLEIndexKey index3Key(KeyMaterial(index3Vec.begin(), index3Vec.end()));
+    return index3Key;
+}
+
 const FLEUserKey& getUserKey() {
     static std::string userVec = hexblob::decode(
-        "e6d43e476dc400c2ce44afcaf8c6a0e589702ff5e6cd98f87fbedbc55621184fa918d65e5c5b44d73c645b7520f9683dfe601afdf03e4e7d9d6226a79e519572c9cd61e3f9b6e0a87d186fe4ad763cb673064a6072b03dffc88b744e6f024807"_sd);
+        "a7ddbc4c8be00d51f68d9d8e485f351c8edc8d2206b24d8e0e1816d005fbe520e489125047d647b0d8684bfbdbf09c304085ed086aba6c2b2b1677ccc91ced8847a733bf5e5682c84b3ee7969e4a5fe0e0c21e5e3ee190595a55f83147d8de2a"_sd);
     static FLEUserKey userKey(KeyMaterial(userVec.begin(), userVec.end()));
     return userKey;
 }
@@ -139,6 +157,10 @@ public:
 KeyMaterial TestKeyVault::getKey(const UUID& uuid) {
     if (uuid == indexKeyId) {
         return getIndexKey().data;
+    } else if (uuid == indexKey2Id) {
+        return getIndex2Key().data;
+    } else if (uuid == indexKey3Id) {
+        return getIndex3Key().data;
     } else if (uuid == userKeyId) {
         return getUserKey().data;
     } else {
@@ -556,12 +578,12 @@ TEST(FLE_ESC, EmuBinary_NullRecord) {
 }
 
 
-std::vector<char> generatePlaceholder(BSONElement value) {
+std::vector<char> generatePlaceholder(BSONElement value, boost::optional<UUID> key = boost::none) {
     FLE2EncryptionPlaceholder ep;
 
     ep.setAlgorithm(mongo::Fle2AlgorithmInt::kEquality);
     ep.setUserKeyId(userKeyId);
-    ep.setIndexKeyId(indexKeyId);
+    ep.setIndexKeyId(key.value_or(indexKeyId));
     ep.setValue(value);
     ep.setType(mongo::Fle2PlaceholderType::kInsert);
     ep.setMaxContentionCounter(0);
@@ -976,7 +998,7 @@ EncryptedFieldConfig getTestEncryptedFieldConfig() {
         {
             "keyId":
                             {
-                                "$uuid": "12345678-1234-9876-1234-123456789012"
+                                "$uuid": "12345678-1234-9876-1234-123456789013"
                             }
                         ,
             "path": "nested.encrypted",
@@ -987,7 +1009,7 @@ EncryptedFieldConfig getTestEncryptedFieldConfig() {
         {
             "keyId":
                             {
-                                "$uuid": "12345678-1234-9876-1234-123456789012"
+                                "$uuid": "12345678-1234-9876-1234-123456789014"
                             }
                         ,
             "path": "nested.notindexed",
@@ -1074,10 +1096,12 @@ TEST(IndexedFields, FetchTwoLevels) {
     builder.appendBinData("encrypted", buf.size(), BinDataType::Encrypt, buf.data());
     {
         BSONObjBuilder sub(builder.subobjStart("nested"));
-        sub.appendBinData("encrypted", buf.size(), BinDataType::Encrypt, buf.data());
+        auto buf2 = generatePlaceholder(element, indexKey2Id);
+        sub.appendBinData("encrypted", buf2.size(), BinDataType::Encrypt, buf2.data());
         {
             BSONObjBuilder sub2(sub.subobjStart("nested2"));
-            sub2.appendBinData("encrypted", buf.size(), BinDataType::Encrypt, buf.data());
+            auto buf3 = generatePlaceholder(element, indexKey3Id);
+            sub2.appendBinData("encrypted", buf3.size(), BinDataType::Encrypt, buf3.data());
         }
     }
 
@@ -1101,6 +1125,27 @@ TEST(IndexedFields, FetchTwoLevels) {
     ASSERT(vectorContains(indexedFields, [](EDCIndexedFields i) {
         return i.fieldPathName == "nested.nested2.encrypted";
     }));
+}
+
+// Error if the user tries to reuse the same index key across fields
+TEST(IndexedFields, DuplicateIndexKeyIds) {
+    TestKeyVault keyVault;
+
+    auto doc = BSON("value"
+                    << "123456");
+    auto element = doc.firstElement();
+    auto inputDoc = BSON(kSafeContent << BSON_ARRAY(1 << 2 << 4) << "encrypted" << element);
+
+    auto buf = generatePlaceholder(element);
+    BSONObjBuilder builder;
+    builder.append(kSafeContent, BSON_ARRAY(1 << 2 << 4));
+    builder.appendBinData("encrypted", buf.size(), BinDataType::Encrypt, buf.data());
+    {
+        BSONObjBuilder sub(builder.subobjStart("nested"));
+        sub.appendBinData("encrypted", buf.size(), BinDataType::Encrypt, buf.data());
+    }
+
+    ASSERT_THROWS_CODE(encryptDocument(builder.obj(), &keyVault), DBException, 6371407);
 }
 
 TEST(DeleteTokens, Basic) {
@@ -1253,7 +1298,7 @@ TEST(EDC, ValidateDocument) {
         auto element = doc.firstElement();
 
         BSONObjBuilder sub(builder.subobjStart("nested"));
-        auto buf = generatePlaceholder(element);
+        auto buf = generatePlaceholder(element, indexKey2Id);
         builder.appendBinData("encrypted", buf.size(), BinDataType::Encrypt, buf.data());
         // TODO - add support for unindexed
     }
@@ -1446,7 +1491,8 @@ TEST(FLE_Update, PullTokens) {
     builder.appendBinData("encrypted", buf.size(), BinDataType::Encrypt, buf.data());
     {
         BSONObjBuilder sub(builder.subobjStart("nested"));
-        sub.appendBinData("encrypted", buf.size(), BinDataType::Encrypt, buf.data());
+        auto buf2 = generatePlaceholder(element, indexKey2Id);
+        sub.appendBinData("encrypted", buf2.size(), BinDataType::Encrypt, buf2.data());
     }
     auto encDoc = encryptDocument(builder.obj(), &keyVault);
 

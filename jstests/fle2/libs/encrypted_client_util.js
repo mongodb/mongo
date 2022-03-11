@@ -134,7 +134,10 @@ class EncryptedClient {
      */
     assertOneEncryptedDocumentFields(coll, query, fields) {
         let encryptedDocs = this._db.getCollection(coll).find(query).toArray();
-        assert.eq(encryptedDocs.length, 1);
+        assert.eq(encryptedDocs.length,
+                  1,
+                  `Expected query ${tojson(query)} to only return one document. Found ${
+                      encryptedDocs.length}`);
         let unEncryptedDocs = this._edb.getCollection(coll).find(query).toArray();
         assert.eq(unEncryptedDocs.length, 1);
 
@@ -145,7 +148,7 @@ class EncryptedClient {
 
         for (let field in fields) {
             assert(encryptedDoc.hasOwnProperty(field),
-                   `Could not find ${field} in raw ${tojson(encryptedDoc)}`);
+                   `Could not find ${field} in encrypted ${tojson(encryptedDoc)}`);
             assert(unEncryptedDoc.hasOwnProperty(field),
                    `Could not find ${field} in unEncrypted ${tojson(unEncryptedDoc)}`);
 
@@ -155,6 +158,71 @@ class EncryptedClient {
             let unEncryptedField = unEncryptedDoc[field];
             assert.eq(unEncryptedField, fields[field]);
         }
+    }
+
+    /**
+     * Take a snapshot of a collection sorted by _id, run a operation, take a second snapshot.
+     *
+     * Ensure that the documents listed by index in unchangedDocumentIndexArray remain unchanged.
+     * Ensure that the documents listed by index in changedDocumentIndexArray are changed.
+     *
+     * @param {string} collName
+     * @param {Array} unchangedDocumentIndexArray
+     * @param {Array} changedDocumentIndexArray
+     * @param {Function} func
+     * @returns
+     */
+    assertDocumentChanges(collName, unchangedDocumentIndexArray, changedDocumentIndexArray, func) {
+        let coll = this._edb.getCollection(collName);
+
+        let beforeDocuments = coll.find({}).sort({_id: 1}).toArray();
+
+        let x = func();
+
+        let afterDocuments = coll.find({}).sort({_id: 1}).toArray();
+
+        for (let unchangedDocumentIndex of unchangedDocumentIndexArray) {
+            assert.eq(beforeDocuments[unchangedDocumentIndex],
+                      afterDocuments[unchangedDocumentIndex],
+                      "Expected document index '" + unchangedDocumentIndex + "' to be the same." +
+                          tojson(beforeDocuments[unchangedDocumentIndex]) + "\n==========\n" +
+                          tojson(afterDocuments[unchangedDocumentIndex]));
+        }
+
+        for (let changedDocumentIndex of changedDocumentIndexArray) {
+            assert.neq(
+                beforeDocuments[changedDocumentIndex],
+                afterDocuments[changedDocumentIndex],
+                "Expected document index '" + changedDocumentIndex +
+                    "' to be different. == " + tojson(beforeDocuments[changedDocumentIndex]) +
+                    "\n==========\n" + tojson(afterDocuments[changedDocumentIndex]));
+        }
+
+        return x;
+    }
+
+    /**
+     * Take a snapshot of a collection sorted by _id, run a operation, take a second snapshot.
+     *
+     * Ensure that the documents listed by index in unchangedDocumentIndexArray remain unchanged.
+     * Ensure that the documents listed by index in changedDocumentIndexArray are changed.
+     *
+     * @param {string} collName
+     * @param {Array} unchangedDocumentIndexArray
+     * @param {Array} changedDocumentIndexArray
+     * @param {Function} func
+     * @returns
+     */
+    assertEncryptedCollectionDocuments(collName, docs) {
+        let coll = this._edb.getCollection(collName);
+
+        let onDiskDocs = coll.find({}).sort({_id: 1}).toArray();
+
+        for (let doc of onDiskDocs) {
+            delete doc.__safeContent__;
+        }
+
+        assert.docEq(onDiskDocs, docs);
     }
 }
 

@@ -138,7 +138,7 @@ assert.commandFailedWithCode(
                 return 1;
             }
         },
-        delete: true,
+        remove: true,
         apiVersion: "1",
         apiStrict: true
     }),

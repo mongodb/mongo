@@ -69,6 +69,14 @@ FLEBatchResult processFLEBatch(OperationContext* opCtx,
                                boost::optional<OID> targetEpoch);
 
 /**
+ * Process a findAndModify request from mongos
+ */
+FLEBatchResult processFLEFindAndModify(OperationContext* opCtx,
+                                       const std::string& dbName,
+                                       const BSONObj& cmdObj,
+                                       BSONObjBuilder& result);
+
+/**
  * Abstraction layer for FLE
  */
 class FLEQueryInterface {
@@ -119,6 +127,16 @@ public:
     virtual BSONObj updateWithPreimage(const NamespaceString& nss,
                                        const EncryptionInformation& ei,
                                        const write_ops::UpdateCommandRequest& updateRequest) = 0;
+
+    /**
+     * Do a single findAndModify request.
+     *
+     * TODO
+     */
+    virtual write_ops::FindAndModifyCommandReply findAndModify(
+        const NamespaceString& nss,
+        const EncryptionInformation& ei,
+        const write_ops::FindAndModifyCommandRequest& findAndModifyRequest) = 0;
 };
 
 /**
@@ -147,5 +165,14 @@ uint64_t processDelete(FLEQueryInterface* queryImpl,
  */
 uint64_t processUpdate(FLEQueryInterface* queryImpl,
                        const write_ops::UpdateCommandRequest& updateRequest);
+
+/**
+ * Process a FLE Find And Modify with the query interface
+ *
+ * Used by unit tests.
+ */
+write_ops::FindAndModifyCommandReply processFindAndModify(
+    FLEQueryInterface* queryImpl,
+    const write_ops::FindAndModifyCommandRequest& findAndModifyRequest);
 
 }  // namespace mongo
