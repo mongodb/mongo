@@ -308,15 +308,20 @@ void recoverTenantMigrationAccessBlockers(OperationContext* opCtx) {
             return true;
         }
 
+        auto protocol = doc.getProtocol().value_or(MigrationProtocolEnum::kMultitenantMigrations);
         auto mtab = std::make_shared<TenantMigrationDonorAccessBlocker>(
             opCtx->getServiceContext(),
             doc.getId(),
             doc.getTenantId().toString(),
-            doc.getProtocol().value_or(MigrationProtocolEnum::kMultitenantMigrations),
+            protocol,
             doc.getRecipientConnectionString().toString());
 
-        TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-            .add(doc.getTenantId(), mtab);
+        auto& registry = TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext());
+        if (protocol == MigrationProtocolEnum::kMultitenantMigrations) {
+            registry.add(doc.getTenantId(), mtab);
+        } else {
+            registry.addDonorAccessBlocker(mtab);
+        }
 
         switch (doc.getState()) {
             case TenantMigrationDonorStateEnum::kAbortingIndexBuilds:

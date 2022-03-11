@@ -70,7 +70,7 @@ void TenantMigrationAccessBlockerRegistry::add(StringData tenantId,
     stdx::lock_guard<Latch> lg(_mutex);
     auto mtabType = mtab->getType();
     tassert(8423351,
-            "addDonorAccessBlocker called with new-style shard merge blocker",
+            "add called with new-style blocker, use addDonorAccessBlocker instead",
             mtabType != MtabType::kDonor ||
                 mtab->getProtocol() != MigrationProtocolEnum::kShardMerge);
 
