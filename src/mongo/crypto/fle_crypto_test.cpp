@@ -60,10 +60,6 @@
 #include "mongo/util/time_support.h"
 
 
-// TODO (SERVER-63780) - remove once we stop using AEAD for ECC crypto with empty associated data
-// Tomcrypt SHA implementation cannot accept it so we skip these tests for now
-#ifdef MONGO_CONFIG_SSL
-
 namespace mongo {
 
 template <FLETokenType tt>
@@ -113,22 +109,6 @@ std::basic_ostream<char>& operator<<(std::basic_ostream<char>& os, const FLEToke
     return os << "{" << static_cast<int>(right.type) << "," << hexdump(right.data) << "}";
 }
 
-std::array<uint8_t, 96> indexVec = {
-    0x44, 0xba, 0xd4, 0x1d, 0x6a, 0x9b, 0xdd, 0x38, 0x60, 0xc8, 0xfa, 0x9d, 0xf1, 0x1b, 0x8a, 0x75,
-    0x30, 0x61, 0x91, 0xb4, 0xd0, 0x17, 0x2e, 0xa7, 0x15, 0x18, 0xf1, 0x36, 0xc4, 0xef, 0x71, 0x68,
-    0x7e, 0xad, 0x69, 0xb7, 0x64, 0xcf, 0x37, 0x9a, 0xaa, 0x82, 0x22, 0xf7, 0x3a, 0xf5, 0xfa, 0x7a,
-    0x6b, 0xf2, 0xbf, 0x99, 0x52, 0xa5, 0xcf, 0x51, 0xee, 0xdf, 0xa6, 0x06, 0xb5, 0x0f, 0xa3, 0x49,
-    0x4d, 0x41, 0x7f, 0x53, 0xfd, 0xa2, 0x63, 0x5d, 0xa2, 0xcd, 0x3d, 0x78, 0x18, 0x32, 0x1e, 0x35,
-    0x1c, 0x74, 0xca, 0x19, 0x92, 0x3a, 0x1d, 0xc6, 0x2a, 0x7f, 0x72, 0x52, 0x0b, 0xce, 0x59, 0x6d};
-
-std::array<uint8_t, 96> userVec = {
-    0x7c, 0xc9, 0x46, 0xd8, 0x6b, 0x19, 0x3b, 0x75, 0xfb, 0xcf, 0x0d, 0xd1, 0xf1, 0xd3, 0xb1, 0x3a,
-    0x61, 0x99, 0xaa, 0xb3, 0x1c, 0x7e, 0x6a, 0xe1, 0xe3, 0x8a, 0xd0, 0x4b, 0xd6, 0xa3, 0xcb, 0xaa,
-    0x13, 0x86, 0x15, 0xfc, 0xcf, 0x45, 0xe7, 0xd1, 0x4a, 0x69, 0x44, 0xff, 0x01, 0x85, 0xb1, 0x88,
-    0x2a, 0xa3, 0x96, 0xbb, 0xd4, 0x92, 0x0c, 0x02, 0x0f, 0xe7, 0x22, 0xf6, 0xf7, 0x68, 0x49, 0x93,
-    0x1c, 0xff, 0x62, 0x4f, 0x8e, 0xdd, 0x4c, 0x70, 0x53, 0x78, 0x0e, 0xf9, 0x20, 0x0f, 0xba, 0xa1,
-    0xe7, 0x82, 0x84, 0x36, 0x2e, 0x28, 0x0e, 0xca, 0xfd, 0x16, 0x65, 0xbd, 0xa3, 0x7e, 0xa4, 0xb0};
-
 constexpr auto kIndexKeyId = "12345678-1234-9876-1234-123456789012"_sd;
 constexpr auto kUserKeyId = "ABCDEFAB-1234-9876-1234-123456789012"_sd;
 static UUID indexKeyId = uassertStatusOK(UUID::parse(kIndexKeyId.toString()));
@@ -137,20 +117,30 @@ static UUID userKeyId = uassertStatusOK(UUID::parse(kUserKeyId.toString()));
 std::vector<char> testValue = {0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19};
 std::vector<char> testValue2 = {0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29};
 
+const FLEIndexKey& getIndexKey() {
+    static std::string indexVec = hexblob::decode(
+        "7dbfebc619aa68a659f64b8e23ccd21644ac326cb74a26840c3d2420176c40ae088294d00ad6cae9684237b21b754cf503f085c25cd320bf035c3417416e1e6fe3d9219f79586582112740b2add88e1030d91926ae8afc13ee575cfb8bb965b7"_sd);
+    static FLEIndexKey indexKey(KeyMaterial(indexVec.begin(), indexVec.end()));
+    return indexKey;
+}
+
+const FLEUserKey& getUserKey() {
+    static std::string userVec = hexblob::decode(
+        "e6d43e476dc400c2ce44afcaf8c6a0e589702ff5e6cd98f87fbedbc55621184fa918d65e5c5b44d73c645b7520f9683dfe601afdf03e4e7d9d6226a79e519572c9cd61e3f9b6e0a87d186fe4ad763cb673064a6072b03dffc88b744e6f024807"_sd);
+    static FLEUserKey userKey(KeyMaterial(userVec.begin(), userVec.end()));
+    return userKey;
+}
+
 class TestKeyVault : public FLEKeyVault {
 public:
     KeyMaterial getKey(const UUID& uuid) override;
-
-    FLEIndexKey indexKey{KeyMaterial(indexVec.begin(), indexVec.end())};
-
-    FLEUserKey userKey{KeyMaterial(userVec.begin(), userVec.end())};
 };
 
 KeyMaterial TestKeyVault::getKey(const UUID& uuid) {
     if (uuid == indexKeyId) {
-        return indexKey.data;
+        return getIndexKey().data;
     } else if (uuid == userKeyId) {
-        return userKey.data;
+        return getUserKey().data;
     } else {
         FAIL("not implemented");
         return KeyMaterial();
@@ -158,128 +148,125 @@ KeyMaterial TestKeyVault::getKey(const UUID& uuid) {
 }
 
 // TODO (SERVER-63594) - regenerate test vectors and reimplement test
-#if 0
-TEST(FLETokens, TestVectors) {
-    TestKeyVault keyVault;
+//
+// TEST(FLETokens, TestVectors) {
 
-    // Level 1
-    auto collectionToken =
-        FLELevel1TokenGenerator::generateCollectionsLevel1Token(keyVault.indexKey);
+//     // Level 1
+//     auto collectionToken =
+//     FLELevel1TokenGenerator::generateCollectionsLevel1Token(getIndexKey());
 
-    ASSERT_EQUALS(CollectionsLevel1Token(decodePrf(
-                      "ff2103ff205a36f39704f643c270c129919f008c391d9589a6d2c86a7429d0d3"_sd)),
-                  collectionToken);
+//     ASSERT_EQUALS(CollectionsLevel1Token(decodePrf(
+//                       "ff2103ff205a36f39704f643c270c129919f008c391d9589a6d2c86a7429d0d3"_sd)),
+//                   collectionToken);
 
-    ASSERT_EQUALS(
-        ServerDataEncryptionLevel1Token(
-            decodePrf("d915ccc1eb81687fb5fc5b799f48c99fbe17e7a011a46a48901b9ae3d790656b"_sd)),
-        FLELevel1TokenGenerator::generateServerDataEncryptionLevel1Token(keyVault.indexKey));
+//     ASSERT_EQUALS(ServerDataEncryptionLevel1Token(decodePrf(
+//                       "d915ccc1eb81687fb5fc5b799f48c99fbe17e7a011a46a48901b9ae3d790656b"_sd)),
+//                   FLELevel1TokenGenerator::generateServerDataEncryptionLevel1Token(getIndexKey()));
 
-    // Level 2
-    auto edcToken = FLECollectionTokenGenerator::generateEDCToken(collectionToken);
-    ASSERT_EQUALS(
-        EDCToken(decodePrf("167d2d2ff8e4144df37ff759db593fde0ecc7d9636f96d62dacad672eccad349"_sd)),
+//     // Level 2
+//     auto edcToken = FLECollectionTokenGenerator::generateEDCToken(collectionToken);
+//     ASSERT_EQUALS(
+//         EDCToken(decodePrf("167d2d2ff8e4144df37ff759db593fde0ecc7d9636f96d62dacad672eccad349"_sd)),
 
-        edcToken);
-    auto escToken = FLECollectionTokenGenerator::generateESCToken(collectionToken);
-    ASSERT_EQUALS(
-        ESCToken(decodePrf("bfd480f1658f49f48985734737bc07d0bc36b88210277605c55ff3c9c3ef50b0"_sd)),
-        escToken);
-    auto eccToken = FLECollectionTokenGenerator::generateECCToken(collectionToken);
-    ASSERT_EQUALS(
-        ECCToken(decodePrf("9d34f9c182d75a5a3347c2f903e3e647105c651d52cf9555c9420ba07ddd3aa2"_sd)),
-        eccToken);
-    ASSERT_EQUALS(
-        ECOCToken(decodePrf("e354e3b05e81e08b970ca061cb365163fd33dec2f982ddf9440e742ed288a8f8"_sd)),
-        FLECollectionTokenGenerator::generateECOCToken(collectionToken));
+//         edcToken);
+//     auto escToken = FLECollectionTokenGenerator::generateESCToken(collectionToken);
+//     ASSERT_EQUALS(
+//         ESCToken(decodePrf("bfd480f1658f49f48985734737bc07d0bc36b88210277605c55ff3c9c3ef50b0"_sd)),
+//         escToken);
+//     auto eccToken = FLECollectionTokenGenerator::generateECCToken(collectionToken);
+//     ASSERT_EQUALS(
+//         ECCToken(decodePrf("9d34f9c182d75a5a3347c2f903e3e647105c651d52cf9555c9420ba07ddd3aa2"_sd)),
+//         eccToken);
+//     ASSERT_EQUALS(
+//         ECOCToken(decodePrf("e354e3b05e81e08b970ca061cb365163fd33dec2f982ddf9440e742ed288a8f8"_sd)),
+//         FLECollectionTokenGenerator::generateECOCToken(collectionToken));
 
 
-    // Level 3
-    std::vector<uint8_t> sampleValue = {0xc0, 0x7c, 0x0d, 0xf5, 0x12, 0x57, 0x94, 0x8e,
-                                        0x1a, 0x0f, 0xc7, 0x0d, 0xd4, 0x56, 0x8e, 0x3a,
-                                        0xf9, 0x9b, 0x23, 0xb3, 0x43, 0x4c, 0x98, 0x58,
-                                        0x23, 0x7c, 0xa7, 0xdb, 0x62, 0xdb, 0x97, 0x66};
+//     // Level 3
+//     std::vector<uint8_t> sampleValue = {0xc0, 0x7c, 0x0d, 0xf5, 0x12, 0x57, 0x94, 0x8e,
+//                                         0x1a, 0x0f, 0xc7, 0x0d, 0xd4, 0x56, 0x8e, 0x3a,
+//                                         0xf9, 0x9b, 0x23, 0xb3, 0x43, 0x4c, 0x98, 0x58,
+//                                         0x23, 0x7c, 0xa7, 0xdb, 0x62, 0xdb, 0x97, 0x66};
 
-    auto edcDataToken =
-        FLEDerivedFromDataTokenGenerator::generateEDCDerivedFromDataToken(edcToken, sampleValue);
-    ASSERT_EQUALS(EDCDerivedFromDataToken(decodePrf(
-                      "53eaa4c23a3ff65e6b7c7dbc4b1389cf0a6151b1ede5383a0673ff9c67855ff9"_sd)),
-                  edcDataToken);
+//     auto edcDataToken =
+//         FLEDerivedFromDataTokenGenerator::generateEDCDerivedFromDataToken(edcToken, sampleValue);
+//     ASSERT_EQUALS(EDCDerivedFromDataToken(decodePrf(
+//                       "53eaa4c23a3ff65e6b7c7dbc4b1389cf0a6151b1ede5383a0673ff9c67855ff9"_sd)),
+//                   edcDataToken);
 
-    auto escDataToken =
-        FLEDerivedFromDataTokenGenerator::generateESCDerivedFromDataToken(escToken, sampleValue);
-    ASSERT_EQUALS(ESCDerivedFromDataToken(decodePrf(
-                      "acb3fab332131bbeaf112814f29ae0f2b10e97dc94b62db56c594661248e7467"_sd)),
-                  escDataToken);
+//     auto escDataToken =
+//         FLEDerivedFromDataTokenGenerator::generateESCDerivedFromDataToken(escToken, sampleValue);
+//     ASSERT_EQUALS(ESCDerivedFromDataToken(decodePrf(
+//                       "acb3fab332131bbeaf112814f29ae0f2b10e97dc94b62db56c594661248e7467"_sd)),
+//                   escDataToken);
 
-    auto eccDataToken =
-        FLEDerivedFromDataTokenGenerator::generateECCDerivedFromDataToken(eccToken, sampleValue);
-    ASSERT_EQUALS(ECCDerivedFromDataToken(decodePrf(
-                      "826cfd35c35dcc7d4fbe13f33a3520749853bd1ea4c47919482252fba3a70cec"_sd)),
-                  eccDataToken);
+//     auto eccDataToken =
+//         FLEDerivedFromDataTokenGenerator::generateECCDerivedFromDataToken(eccToken, sampleValue);
+//     ASSERT_EQUALS(ECCDerivedFromDataToken(decodePrf(
+//                       "826cfd35c35dcc7d4fbe13f33a3520749853bd1ea4c47919482252fba3a70cec"_sd)),
+//                   eccDataToken);
 
-    // Level 4
-    FLECounter counter = 1234567890;
+//     // Level 4
+//     FLECounter counter = 1234567890;
 
-    auto edcDataCounterToken = FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
-        generateEDCDerivedFromDataTokenAndContentionFactorToken(edcDataToken, counter);
-    ASSERT_EQUALS(EDCDerivedFromDataTokenAndContentionFactorToken(decodePrf(
-                      "70fb9a3f760996f2f1438c5bf2a4d52bcba01b0badc3596276f49ffb2f0b136e"_sd)),
-                  edcDataCounterToken);
-
-
-    auto escDataCounterToken = FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
-        generateESCDerivedFromDataTokenAndContentionFactorToken(escDataToken, counter);
-    ASSERT_EQUALS(ESCDerivedFromDataTokenAndContentionFactorToken(decodePrf(
-                      "7076c7b05fb4be4fe585eed930b852a6d088a0c55f3c96b50069e8a26ebfb347"_sd)),
-                  escDataCounterToken);
+//     auto edcDataCounterToken = FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
+//         generateEDCDerivedFromDataTokenAndContentionFactorToken(edcDataToken, counter);
+//     ASSERT_EQUALS(EDCDerivedFromDataTokenAndContentionFactorToken(decodePrf(
+//                       "70fb9a3f760996f2f1438c5bf2a4d52bcba01b0badc3596276f49ffb2f0b136e"_sd)),
+//                   edcDataCounterToken);
 
 
-    auto eccDataCounterToken = FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
-        generateECCDerivedFromDataTokenAndContentionFactorToken(eccDataToken, counter);
-    ASSERT_EQUALS(ECCDerivedFromDataTokenAndContentionFactorToken(decodePrf(
-                      "6c6a349956c19f9c5e638e612011a71fbb71921edb540310c17cd0208b7f548b"_sd)),
-                  eccDataCounterToken);
+//     auto escDataCounterToken = FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
+//         generateESCDerivedFromDataTokenAndContentionFactorToken(escDataToken, counter);
+//     ASSERT_EQUALS(ESCDerivedFromDataTokenAndContentionFactorToken(decodePrf(
+//                       "7076c7b05fb4be4fe585eed930b852a6d088a0c55f3c96b50069e8a26ebfb347"_sd)),
+//                   escDataCounterToken);
 
 
-    // Level 5
-    auto edcTwiceToken =
-        FLETwiceDerivedTokenGenerator::generateEDCTwiceDerivedToken(edcDataCounterToken);
-    ASSERT_EQUALS(EDCTwiceDerivedToken(decodePrf(
-                      "3643fd370e2719c03234cdeec787dfdc7d8fceecafa8a992e3c1f9d4d53449fe"_sd)),
-                  edcTwiceToken);
-
-    auto escTwiceTagToken =
-        FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedTagToken(escDataCounterToken);
-    ASSERT_EQUALS(ESCTwiceDerivedTagToken(decodePrf(
-                      "c73bc4ff5e70222c653140b2b4998b4d62db973f20f116f66ff811a9a907a78f"_sd)),
-                  escTwiceTagToken);
-    auto escTwiceValueToken =
-        FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedValueToken(escDataCounterToken);
-    ASSERT_EQUALS(ESCTwiceDerivedValueToken(decodePrf(
-                      "34150c6f5ab56dc39ddb935accb7f53e5276322fa937650b76a4dda9723d6fba"_sd)),
-                  escTwiceValueToken);
+//     auto eccDataCounterToken = FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
+//         generateECCDerivedFromDataTokenAndContentionFactorToken(eccDataToken, counter);
+//     ASSERT_EQUALS(ECCDerivedFromDataTokenAndContentionFactorToken(decodePrf(
+//                       "6c6a349956c19f9c5e638e612011a71fbb71921edb540310c17cd0208b7f548b"_sd)),
+//                   eccDataCounterToken);
 
 
-    auto eccTwiceTagToken =
-        FLETwiceDerivedTokenGenerator::generateECCTwiceDerivedTagToken(eccDataCounterToken);
-    ASSERT_EQUALS(ECCTwiceDerivedTagToken(decodePrf(
-                      "0bc36f73062f5182c2403bffd155ec06eccfde0df8de5facaca4cc1cb320a385"_sd)),
-                  eccTwiceTagToken);
-    auto eccTwiceValueToken =
-        FLETwiceDerivedTokenGenerator::generateECCTwiceDerivedValueToken(eccDataCounterToken);
-    ASSERT_EQUALS(ECCTwiceDerivedValueToken(decodePrf(
-                      "2d7e08d58afa9f5ad215636e566d38584cbb48467d1bc9ff376eeca01fbfda6f"_sd)),
-                  eccTwiceValueToken);
-}
-#endif
+//     // Level 5
+//     auto edcTwiceToken =
+//         FLETwiceDerivedTokenGenerator::generateEDCTwiceDerivedToken(edcDataCounterToken);
+//     ASSERT_EQUALS(EDCTwiceDerivedToken(decodePrf(
+//                       "3643fd370e2719c03234cdeec787dfdc7d8fceecafa8a992e3c1f9d4d53449fe"_sd)),
+//                   edcTwiceToken);
+
+//     auto escTwiceTagToken =
+//         FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedTagToken(escDataCounterToken);
+//     ASSERT_EQUALS(ESCTwiceDerivedTagToken(decodePrf(
+//                       "c73bc4ff5e70222c653140b2b4998b4d62db973f20f116f66ff811a9a907a78f"_sd)),
+//                   escTwiceTagToken);
+//     auto escTwiceValueToken =
+//         FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedValueToken(escDataCounterToken);
+//     ASSERT_EQUALS(ESCTwiceDerivedValueToken(decodePrf(
+//                       "34150c6f5ab56dc39ddb935accb7f53e5276322fa937650b76a4dda9723d6fba"_sd)),
+//                   escTwiceValueToken);
+
+
+//     auto eccTwiceTagToken =
+//         FLETwiceDerivedTokenGenerator::generateECCTwiceDerivedTagToken(eccDataCounterToken);
+//     ASSERT_EQUALS(ECCTwiceDerivedTagToken(decodePrf(
+//                       "0bc36f73062f5182c2403bffd155ec06eccfde0df8de5facaca4cc1cb320a385"_sd)),
+//                   eccTwiceTagToken);
+//     auto eccTwiceValueToken =
+//         FLETwiceDerivedTokenGenerator::generateECCTwiceDerivedValueToken(eccDataCounterToken);
+//     ASSERT_EQUALS(ECCTwiceDerivedValueToken(decodePrf(
+//                       "2d7e08d58afa9f5ad215636e566d38584cbb48467d1bc9ff376eeca01fbfda6f"_sd)),
+//                   eccTwiceValueToken);
+// }
 
 TEST(FLE_ESC, RoundTrip) {
     TestKeyVault keyVault;
 
     ConstDataRange value(testValue);
 
-    auto c1 = FLELevel1TokenGenerator::generateCollectionsLevel1Token(keyVault.indexKey);
+    auto c1 = FLELevel1TokenGenerator::generateCollectionsLevel1Token(getIndexKey());
     auto escToken = FLECollectionTokenGenerator::generateESCToken(c1);
 
     ESCDerivedFromDataToken escDatakey =
@@ -341,7 +328,7 @@ TEST(FLE_ECC, RoundTrip) {
 
     ConstDataRange value(testValue);
 
-    auto c1 = FLELevel1TokenGenerator::generateCollectionsLevel1Token(keyVault.indexKey);
+    auto c1 = FLELevel1TokenGenerator::generateCollectionsLevel1Token(getIndexKey());
     auto token = FLECollectionTokenGenerator::generateECCToken(c1);
 
     ECCDerivedFromDataToken datakey =
@@ -430,7 +417,7 @@ TEST(FLE_ESC, EmuBinary_Empty) {
     TestDocumentCollection coll;
     ConstDataRange value(testValue);
 
-    auto c1 = FLELevel1TokenGenerator::generateCollectionsLevel1Token(keyVault.indexKey);
+    auto c1 = FLELevel1TokenGenerator::generateCollectionsLevel1Token(getIndexKey());
     auto escToken = FLECollectionTokenGenerator::generateESCToken(c1);
 
     ESCDerivedFromDataToken escDatakey =
@@ -458,7 +445,7 @@ TEST(FLE_ESC, EmuBinary) {
     TestDocumentCollection coll;
     ConstDataRange value(testValue);
 
-    auto c1 = FLELevel1TokenGenerator::generateCollectionsLevel1Token(keyVault.indexKey);
+    auto c1 = FLELevel1TokenGenerator::generateCollectionsLevel1Token(getIndexKey());
     auto escToken = FLECollectionTokenGenerator::generateESCToken(c1);
 
     ESCDerivedFromDataToken escDatakey =
@@ -491,7 +478,7 @@ TEST(FLE_ESC, EmuBinary2) {
     TestDocumentCollection coll;
     ConstDataRange value(testValue);
 
-    auto c1 = FLELevel1TokenGenerator::generateCollectionsLevel1Token(keyVault.indexKey);
+    auto c1 = FLELevel1TokenGenerator::generateCollectionsLevel1Token(getIndexKey());
     auto escToken = FLECollectionTokenGenerator::generateESCToken(c1);
 
 
@@ -546,7 +533,7 @@ TEST(FLE_ESC, EmuBinary_NullRecord) {
     TestDocumentCollection coll;
     ConstDataRange value(testValue);
 
-    auto c1 = FLELevel1TokenGenerator::generateCollectionsLevel1Token(keyVault.indexKey);
+    auto c1 = FLELevel1TokenGenerator::generateCollectionsLevel1Token(getIndexKey());
     auto escToken = FLECollectionTokenGenerator::generateESCToken(c1);
 
     ESCDerivedFromDataToken escDatakey =
@@ -852,10 +839,9 @@ TEST(FLE_EDC, ServerSide_Payloads) {
 
     auto value = ConstDataRange(element.value(), element.value() + element.valuesize());
 
-    auto collectionToken =
-        FLELevel1TokenGenerator::generateCollectionsLevel1Token(keyVault.indexKey);
+    auto collectionToken = FLELevel1TokenGenerator::generateCollectionsLevel1Token(getIndexKey());
     auto serverEncryptToken =
-        FLELevel1TokenGenerator::generateServerDataEncryptionLevel1Token(keyVault.indexKey);
+        FLELevel1TokenGenerator::generateServerDataEncryptionLevel1Token(getIndexKey());
     auto edcToken = FLECollectionTokenGenerator::generateEDCToken(collectionToken);
     auto escToken = FLECollectionTokenGenerator::generateESCToken(collectionToken);
     auto eccToken = FLECollectionTokenGenerator::generateECCToken(collectionToken);
@@ -1482,5 +1468,3 @@ TEST(FLE_Update, PullTokens) {
 }
 
 }  // namespace mongo
-
-#endif

@@ -62,6 +62,17 @@ inline StatusWith<size_t> fle2AeadGetPlainTextLength(size_t cipherTextLen) {
 }
 
 /**
+ * Returns the length of the plaintext output given the ciphertext length. Only for FLE2.
+ */
+inline StatusWith<size_t> fle2GetPlainTextLength(size_t cipherTextLen) {
+    if (cipherTextLen > (crypto::aesCTRIVSize)) {
+        return cipherTextLen - crypto::aesCTRIVSize;
+    }
+
+    return Status(ErrorCodes::BadValue, "Invalid cipher text length");
+}
+
+/**
  * This class is a helper for encryption. It holds a ConstDataRange over the
  * plaintext to be encrypted and owns a buffer where the BinData subtype 6 is
  * written out to. The encrypt function can only be called after the constructor

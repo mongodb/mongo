@@ -132,6 +132,8 @@ constexpr auto kDollarIn = "$in";
 
 constexpr auto kEncryptedFields = "encryptedFields";
 
+constexpr size_t kHmacKeyOffset = 64;
+
 #ifdef FLE2_DEBUG_STATE_COLLECTIONS
 constexpr auto kDebugId = "_debug_id";
 constexpr auto kDebugValuePosition = "_debug_value_position";
@@ -145,7 +147,7 @@ using UUIDBuf = std::array<uint8_t, UUID::kNumBytes>;
 
 static_assert(sizeof(PrfBlock) == SHA256Block::kHashLength);
 
-PrfBlock blockToArray(SHA256Block& block) {
+PrfBlock blockToArray(const SHA256Block& block) {
     PrfBlock data;
     memcpy(data.data(), block.data(), sizeof(PrfBlock));
     return data;
@@ -159,7 +161,15 @@ PrfBlock PrfBlockfromCDR(ConstDataRange block) {
     return ret;
 }
 
+ConstDataRange hmacKey(const KeyMaterial& keyMaterial) {
+    static_assert(kHmacKeyOffset + crypto::sym256KeySize <= crypto::kFieldLevelEncryptionKeySize);
+    invariant(crypto::kFieldLevelEncryptionKeySize == keyMaterial->size());
+    return {keyMaterial->data() + kHmacKeyOffset, crypto::sym256KeySize};
+}
+
 PrfBlock prf(ConstDataRange key, ConstDataRange cdr) {
+    uassert(6378002, "Invalid key length", key.length() == crypto::sym256KeySize);
+
     SHA256Block block;
     SHA256Block::computeHmac(key.data<uint8_t>(), key.length(), {cdr}, &block);
     return blockToArray(block);
@@ -173,6 +183,8 @@ PrfBlock prf(ConstDataRange key, uint64_t value) {
 }
 
 PrfBlock prf(ConstDataRange key, uint64_t value, int64_t value2) {
+    uassert(6378003, "Invalid key length", key.length() == crypto::sym256KeySize);
+
     SHA256Block block;
 
     std::array<char, sizeof(uint64_t)> bufValue;
@@ -287,43 +299,31 @@ FLEToken<TokenT> FLETokenFromCDR(ConstDataRange cdr) {
  * Block size = 16 bytes
  * SHA-256 - block size = 256 bits = 32 bytes
  */
-// TODO (SERVER-63780) - replace with call to CTR AEAD algorithm
 StatusWith<std::vector<uint8_t>> encryptDataWithAssociatedData(ConstDataRange key,
                                                                ConstDataRange associatedData,
                                                                ConstDataRange plainText) {
+    std::vector<uint8_t> out(crypto::fle2AeadCipherOutputLength(plainText.length()));
 
-    std::array<uint8_t, sizeof(uint64_t)> dataLenBitsEncodedStorage;
-    DataRange dataLenBitsEncoded(dataLenBitsEncodedStorage);
-    dataLenBitsEncoded.write<BigEndian<uint64_t>>(
-        static_cast<uint64_t>(associatedData.length() * 8));
-
-    std::vector<uint8_t> out;
-    out.resize(crypto::aeadCipherOutputLength(plainText.length()));
-
-    if (key.length() == 96) {
-        key = ConstDataRange(key.data(), key.data() + 64);
-    }
-
-    auto s = crypto::aeadEncryptWithIV(
-        key, plainText, ConstDataRange(0, 0), associatedData, dataLenBitsEncoded, out);
-    if (!s.isOK()) {
-        return s;
+    auto k = key.slice(crypto::kFieldLevelEncryption2KeySize);
+    auto status = crypto::fle2AeadEncrypt(k, plainText, ConstDataRange(0, 0), associatedData, out);
+    if (!status.isOK()) {
+        return status;
     }
 
     return {out};
 }
 
-// TODO (SERVER-63780) - replace with call to CTR algorithm, NOT CTR AEAD
 StatusWith<std::vector<uint8_t>> encryptData(ConstDataRange key, ConstDataRange plainText) {
+    std::vector<uint8_t> out(crypto::fle2CipherOutputLength(plainText.length()));
 
-    std::array<uint8_t, 64> bigToken;
-    std::copy(key.data(), key.data() + key.length(), bigToken.data());
-    std::copy(key.data(), key.data() + key.length(), bigToken.data() + key.length());
+    auto status = crypto::fle2Encrypt(key, plainText, ConstDataRange(0, 0), out);
+    if (!status.isOK()) {
+        return status;
+    }
 
-    return encryptDataWithAssociatedData(bigToken, ConstDataRange(0, 0), plainText);
+    return {out};
 }
 
-// TODO (SERVER-63780) - replace with call to CTR algorithm, NOT CTR AEAD
 StatusWith<std::vector<uint8_t>> encryptData(ConstDataRange key, uint64_t value) {
 
     std::array<char, sizeof(uint64_t)> bufValue;
@@ -332,43 +332,44 @@ StatusWith<std::vector<uint8_t>> encryptData(ConstDataRange key, uint64_t value)
     return encryptData(key, bufValue);
 }
 
-// TODO (SERVER-63780) - replace with call to CTR AEAD algorithm
 StatusWith<std::vector<uint8_t>> decryptDataWithAssociatedData(ConstDataRange key,
                                                                ConstDataRange associatedData,
                                                                ConstDataRange cipherText) {
-    // TODO - key is too short, we have 32, need 64. The new API should only 32 bytes and this can
-    // be removed
-    if (key.length() == 96) {
-        key = ConstDataRange(key.data(), key.data() + 64);
-    }
-
-    SymmetricKey sk(key.data<uint8_t>(), key.length(), 0, SymmetricKeyId("ignore"), 0);
-
-    auto swLen = aeadGetMaximumPlainTextLength(cipherText.length());
+    auto swLen = fle2AeadGetPlainTextLength(cipherText.length());
     if (!swLen.isOK()) {
         return swLen.getStatus();
     }
-    std::vector<uint8_t> out;
-    out.resize(swLen.getValue());
+    std::vector<uint8_t> out(static_cast<size_t>(swLen.getValue()));
 
-    auto swOutLen = crypto::aeadDecrypt(sk, cipherText, associatedData, out);
+    auto k = key.slice(crypto::kFieldLevelEncryption2KeySize);
+    auto swOutLen = crypto::fle2AeadDecrypt(k, cipherText, associatedData, out);
     if (!swOutLen.isOK()) {
         return swOutLen.getStatus();
     }
-    out.resize(swOutLen.getValue());
+
+    if (out.size() != swOutLen.getValue()) {
+        return {ErrorCodes::InternalError, "Data length mismatch for AES-CTR-HMAC256-AEAD."};
+    }
+
     return out;
 }
 
-// TODO (SERVER-63780) - replace with call to CTR algorithm, NOT CTR AEAD
 StatusWith<std::vector<uint8_t>> decryptData(ConstDataRange key, ConstDataRange cipherText) {
-    std::array<uint8_t, 64> bigToken;
-    std::copy(key.data(), key.data() + key.length(), bigToken.data());
-    std::copy(key.data(), key.data() + key.length(), bigToken.data() + key.length());
+    auto plainTextLength = fle2GetPlainTextLength(cipherText.length());
+    if (!plainTextLength.isOK()) {
+        return plainTextLength.getStatus();
+    }
 
-    return decryptDataWithAssociatedData(bigToken, ConstDataRange(0, 0), cipherText);
+    std::vector<uint8_t> out(static_cast<size_t>(plainTextLength.getValue()));
+
+    auto status = crypto::fle2Decrypt(key, cipherText, out);
+    if (!status.isOK()) {
+        return status.getStatus();
+    }
+
+    return {out};
 }
 
-// TODO (SERVER-63780) - replace with call to CTR algorithm, NOT CTR AEAD
 StatusWith<uint64_t> decryptUInt64(ConstDataRange key, ConstDataRange cipherText) {
     auto swPlainText = decryptData(key, cipherText);
     if (!swPlainText.isOK()) {
@@ -1100,12 +1101,12 @@ stdx::unordered_map<std::string, EncryptedField> toFieldMap(const EncryptedField
 
 CollectionsLevel1Token FLELevel1TokenGenerator::generateCollectionsLevel1Token(
     FLEIndexKey indexKey) {
-    return prf(indexKey.toCDR(), kLevel1Collection);
+    return prf(hmacKey(indexKey.data), kLevel1Collection);
 }
 
 ServerDataEncryptionLevel1Token FLELevel1TokenGenerator::generateServerDataEncryptionLevel1Token(
     FLEIndexKey indexKey) {
-    return prf(indexKey.toCDR(), kLevelServerDataEncryption);
+    return prf(hmacKey(indexKey.data), kLevelServerDataEncryption);
 }
 
 

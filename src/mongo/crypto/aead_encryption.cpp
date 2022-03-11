@@ -206,6 +206,10 @@ size_t fle2AeadCipherOutputLength(size_t plainTextLen) {
     return plainTextLen + aesCTRIVSize + kHmacOutSize;
 }
 
+size_t fle2CipherOutputLength(size_t plainTextLen) {
+    return plainTextLen + aesCTRIVSize;
+}
+
 Status aeadEncryptLocalKMS(const SymmetricKey& key, ConstDataRange in, DataRange out) {
     if (key.getKeySize() != kFieldLevelEncryptionKeySize) {
         return Status(ErrorCodes::BadValue,
@@ -313,8 +317,8 @@ Status aeadEncryptWithIV(ConstDataRange key,
         ivProvided = true;
     }
 
-    const auto* macKey = reinterpret_cast<const std::uint8_t*>(key.data());
-    const auto* encKey = reinterpret_cast<const std::uint8_t*>(key.data() + sym256KeySize);
+    const auto* macKey = key.data<uint8_t>();
+    const auto* encKey = key.data<uint8_t>() + sym256KeySize;
 
     SymmetricKey symEncKey(encKey, sym256KeySize, aesAlgorithm, "aesKey", 1);
     std::size_t aesOutLen = out.length() - kHmacOutSize;
@@ -375,8 +379,8 @@ Status fle2AeadEncrypt(ConstDataRange key,
         ivProvided = true;
     }
 
-    auto encKey = reinterpret_cast<const std::uint8_t*>(key.data());
-    auto macKey = reinterpret_cast<const std::uint8_t*>(key.data() + sym256KeySize);
+    auto encKey = key.data<uint8_t>();
+    auto macKey = key.data<uint8_t>() + sym256KeySize;
 
     SymmetricKey symEncKey(encKey, sym256KeySize, aesAlgorithm, "aesKey", 1);
     std::size_t aesOutLen = out.length() - kHmacOutSize;
@@ -397,6 +401,41 @@ Status fle2AeadEncrypt(ConstDataRange key,
     uassert(ErrorCodes::InternalError, "HMAC size mismatch", kHmacOutSize == hmacOutput.size());
 
     outCursor.writeAndAdvance(hmacOutput);
+
+    return Status::OK();
+}
+
+Status fle2Encrypt(ConstDataRange key, ConstDataRange in, ConstDataRange iv, DataRange out) {
+    if (key.length() != sym256KeySize) {
+        return Status(ErrorCodes::BadValue, "Invalid key size.");
+    }
+
+    if (!in.length()) {
+        return Status(ErrorCodes::BadValue, "Invalid buffer length.");
+    }
+
+    if (0 != iv.length() && aesCTRIVSize != iv.length()) {
+        return Status(ErrorCodes::BadValue, "Invalid IV length.");
+    }
+
+    if (out.length() != fle2CipherOutputLength(in.length())) {
+        return Status(ErrorCodes::BadValue, "Invalid output buffer size.");
+    }
+
+    bool ivProvided = false;
+    if (iv.length() != 0) {
+        invariant(iv.length() == aesCTRIVSize);
+        out.write(iv);
+        ivProvided = true;
+    }
+
+    auto encKey = key.data<uint8_t>();
+    SymmetricKey symEncKey(encKey, sym256KeySize, aesAlgorithm, "aesKey", 1);
+
+    auto swEncrypt = _aesEncrypt(symEncKey, aesMode::ctr, in, out, ivProvided);
+    if (!swEncrypt.isOK()) {
+        return swEncrypt.getStatus();
+    }
 
     return Status::OK();
 }
@@ -487,8 +526,8 @@ StatusWith<std::size_t> fle2AeadDecrypt(ConstDataRange key,
                           << kMaxAssociatedDataLength << " bytes.");
     }
 
-    auto encKey = reinterpret_cast<const std::uint8_t*>(key.data());
-    auto macKey = reinterpret_cast<const std::uint8_t*>(key.data() + sym256KeySize);
+    auto encKey = key.data<uint8_t>();
+    auto macKey = key.data<uint8_t>() + sym256KeySize;
 
     auto [ivAndCipherText, hmacRange] = in.split(in.length() - kHmacOutSize);
     SHA256Block hmacOutput =
@@ -501,6 +540,25 @@ StatusWith<std::size_t> fle2AeadDecrypt(ConstDataRange key,
 
     SymmetricKey symEncKey(encKey, sym256KeySize, aesAlgorithm, "aesKey", 1);
     return _aesDecrypt(symEncKey, aesMode::ctr, ivAndCipherText, out);
+}
+
+StatusWith<std::size_t> fle2Decrypt(ConstDataRange key, ConstDataRange in, DataRange out) {
+    if (key.length() != sym256KeySize) {
+        return Status(ErrorCodes::BadValue, "Invalid key size.");
+    }
+
+    if (in.length() <= aesCTRIVSize) {
+        return Status(ErrorCodes::BadValue, "Ciphertext is not long enough.");
+    }
+
+    size_t expectedPlainTextSize = uassertStatusOK(fle2GetPlainTextLength(in.length()));
+    if (out.length() != expectedPlainTextSize) {
+        return Status(ErrorCodes::BadValue, "Output buffer must be as long as the cipherText.");
+    }
+
+    auto encKey = key.data<uint8_t>();
+    SymmetricKey symEncKey(encKey, sym256KeySize, aesAlgorithm, "aesKey", 1);
+    return _aesDecrypt(symEncKey, aesMode::ctr, in, out);
 }
 
 Status aeadDecryptDataFrame(FLEDecryptionFrame& dataframe) {

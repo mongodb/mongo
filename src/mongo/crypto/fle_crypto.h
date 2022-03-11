@@ -81,8 +81,10 @@ struct FLEKey {
     FLEKey() = default;
 
     FLEKey(KeyMaterial dataIn) : data(std::move(dataIn)) {
+        // This is not a mistake; same keys will be used in FLE2 as in FLE1
         uassert(6364500,
-                str::stream() << "Length of KeyMaterial is expected to be 32 bytes, found "
+                str::stream() << "Length of KeyMaterial is expected to be "
+                              << crypto::kFieldLevelEncryptionKeySize << " bytes, found "
                               << data->size(),
                 data->size() == crypto::kFieldLevelEncryptionKeySize);
     }
