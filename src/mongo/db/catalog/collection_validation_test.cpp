@@ -447,7 +447,10 @@ TEST_F(BackgroundCollectionValidationTest, ValidateOldUniqueIndexKeyWarning) {
         validateResults.appendToResultObj(&builder, debugging);
         auto obj = builder.obj();
         ASSERT(validateResults.valid) << obj;
-        ASSERT_EQ(validateResults.warnings.size(), 0) << obj;
+        ASSERT_EQ(validateResults.warnings.size(), 1U) << obj;
+        ASSERT_STRING_CONTAINS(validateResults.warnings[0],
+                               "Unique index a_1 has one or more keys in the old format")
+            << obj;
     }
 }
 

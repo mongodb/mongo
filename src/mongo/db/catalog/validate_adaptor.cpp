@@ -33,6 +33,8 @@
 
 #include "mongo/db/catalog/validate_adaptor.h"
 
+#include <fmt/format.h>
+
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/collection.h"
@@ -348,10 +350,24 @@ void ValidateAdaptor::traverseIndex(OperationContext* opCtx,
         index->accessMethod()->asSortedData()->getSortedDataInterface()->rsKeyFormat();
     const RecordId kWildcardMultikeyMetadataRecordId = record_id_helpers::reservedIdFor(
         record_id_helpers::ReservationId::kWildcardMultikeyMetadataId, keyFormat);
+
+    // Warn about unique indexes with keys in old format (without record id).
+    bool foundOldUniqueIndexKeys = false;
+
     while (indexEntry) {
         if (!isFirstEntry) {
             _validateKeyOrder(
                 opCtx, index, indexEntry->keyString, prevIndexKeyStringValue, &indexResults);
+        }
+
+        if (!foundOldUniqueIndexKeys && !descriptor->isIdIndex() && descriptor->unique() &&
+            !indexCursor->isRecordIdAtEndOfKeyString()) {
+            results->warnings.push_back(
+                fmt::format("Unique index {} has one or more keys in the old format (without "
+                            "embedded record id). First record: {}",
+                            indexInfo.indexName,
+                            indexEntry->loc.toString()));
+            foundOldUniqueIndexKeys = true;
         }
 
         bool isMetadataKey = indexEntry->loc == kWildcardMultikeyMetadataRecordId;
