@@ -120,7 +120,7 @@ void HealthMonitoringProgressMonitorServerParameter::append(OperationContext*,
 Status PeriodicHealthCheckIntervalsServerParameter::setFromString(const std::string& value) {
     const auto oldValue = **_data;
     auto newValue = HealthObserverIntervals::parse(
-        IDLParserErrorContext("health monitoring liveness"), fromjson(value));
+        IDLParserErrorContext("health monitoring interval"), fromjson(value));
     newValue = mergeConfigValues(oldValue, newValue);
     **_data = newValue;
     return Status::OK();
@@ -129,7 +129,7 @@ Status PeriodicHealthCheckIntervalsServerParameter::setFromString(const std::str
 Status PeriodicHealthCheckIntervalsServerParameter::set(const BSONElement& newValueElement) {
     const auto oldValue = **_data;
     auto newValue = HealthObserverIntervals::parse(
-        IDLParserErrorContext("health monitoring liveness"), newValueElement.Obj());
+        IDLParserErrorContext("health monitoring interval"), newValueElement.Obj());
     newValue = mergeConfigValues(oldValue, newValue);
     **_data = newValue;
     return Status::OK();

@@ -142,7 +142,8 @@ void FaultManager::healthMonitoringIntensitiesUpdated(HealthObserverIntensities 
                     if (auto* observer =
                             manager->getHealthObserver(toFaultFacetType(setting.getType()));
                         observer != nullptr) {
-                        manager->healthCheck(observer, cancellationToken);
+                        manager->scheduleNextHealthCheck(
+                            observer, cancellationToken, true /* immediate */);
                     }
                 } else if (newIntensity == HealthObserverIntensityEnum::kOff) {
                     // {critical, non-critical} -> off
@@ -432,7 +433,7 @@ void FaultManager::schedulePeriodicHealthCheckThread() {
             setState(FaultState::kActiveFault, HealthCheckStatus(observer->getType()));
             return;
         }
-        healthCheck(observer, token);
+        scheduleNextHealthCheck(observer, token, true /* immediate */);
     }
     LOGV2(5936804, "Health observers started", "detail"_attr = listOfActiveObservers);
 }
@@ -445,7 +446,7 @@ FaultManager::~FaultManager() {
     {
         stdx::lock_guard lock(_mutex);
         for (auto& pair : _healthCheckContexts) {
-            auto cbHandle = pair.second.resultStatus;
+            auto cbHandle = pair.second.callbackHandle;
             if (cbHandle) {
                 _taskExecutor->cancel(cbHandle.get());
             }
@@ -519,52 +520,74 @@ FaultPtr FaultManager::getOrCreateFault() {
     return _fault;
 }
 
-void FaultManager::healthCheck(HealthObserver* observer, CancellationToken token) {
-    auto schedulerCb = [this, observer, token] {
-        auto scheduledTime = _taskExecutor->now() +
-            _config->getPeriodicHealthCheckInterval(observer->getType()) +
+void FaultManager::scheduleNextHealthCheck(HealthObserver* observer,
+                                           CancellationToken token,
+                                           bool immediately) {
+    stdx::lock_guard lock(_mutex);
+
+    // Check that context callbackHandle is not set and if future exists, it is ready.
+    auto existingIt = _healthCheckContexts.find(observer->getType());
+    if (existingIt != _healthCheckContexts.end()) {
+        if (existingIt->second.callbackHandle) {
+            LOGV2_WARNING(6418201,
+                          "Cannot schedule health check while another one is in queue",
+                          "observerType"_attr = str::stream() << observer->getType());
+            return;
+        }
+        if (existingIt->second.result && !existingIt->second.result->isReady()) {
+            LOGV2_WARNING(6418202,
+                          "Cannot schedule health check while another one is currently executing",
+                          "observerType"_attr = str::stream() << observer->getType());
+            return;
+        }
+    }
+    _healthCheckContexts.insert_or_assign(observer->getType(),
+                                          HealthCheckContext(nullptr, boost::none));
+
+    auto scheduledTime = immediately
+        ? _taskExecutor->now()
+        : _taskExecutor->now() + _config->getPeriodicHealthCheckInterval(observer->getType()) +
             std::min(observer->healthCheckJitter(),
                      FaultManagerConfig::kPeriodicHealthCheckMaxJitter);
-        LOGV2_DEBUG(5939701,
-                    3,
-                    "Schedule next health check",
-                    "observerType"_attr = str::stream() << observer->getType(),
-                    "scheduledTime"_attr = scheduledTime);
+    LOGV2_DEBUG(5939701,
+                3,
+                "Schedule next health check",
+                "observerType"_attr = str::stream() << observer->getType(),
+                "scheduledTime"_attr = scheduledTime);
 
-        auto periodicThreadCbHandleStatus = _taskExecutor->scheduleWorkAt(
-            scheduledTime,
-            [this, observer, token](const mongo::executor::TaskExecutor::CallbackArgs& cbData) {
-                if (!cbData.status.isOK()) {
-                    LOGV2_DEBUG(5939702,
-                                1,
-                                "Fault manager received an error",
-                                "status"_attr = cbData.status);
-                    if (ErrorCodes::isA<ErrorCategory::CancellationError>(cbData.status.code())) {
-                        return;
-                    }
-                    // continue health checking otherwise
+    auto periodicThreadCbHandleStatus = _taskExecutor->scheduleWorkAt(
+        scheduledTime,
+        [this, observer, token](const mongo::executor::TaskExecutor::CallbackArgs& cbData) {
+            if (!cbData.status.isOK()) {
+                LOGV2_DEBUG(
+                    5939702, 1, "Fault manager received an error", "status"_attr = cbData.status);
+                if (ErrorCodes::isA<ErrorCategory::CancellationError>(cbData.status.code())) {
+                    return;
                 }
-                healthCheck(observer, token);
-            });
-
-        if (!periodicThreadCbHandleStatus.isOK()) {
-            if (ErrorCodes::isA<ErrorCategory::ShutdownError>(
-                    periodicThreadCbHandleStatus.getStatus().code())) {
-                return;
+                // continue health checking otherwise
             }
+            healthCheck(observer, token);
+        });
 
-            uassert(5936101,
-                    str::stream() << "Failed to schedule periodic health check for "
-                                  << observer->getType() << ": "
-                                  << periodicThreadCbHandleStatus.getStatus().codeString(),
-                    periodicThreadCbHandleStatus.isOK());
+    if (!periodicThreadCbHandleStatus.isOK()) {
+        if (ErrorCodes::isA<ErrorCategory::ShutdownError>(
+                periodicThreadCbHandleStatus.getStatus().code())) {
+            LOGV2_DEBUG(6418203, 1, "Not scheduling health check because of shutdown");
+            return;
         }
 
-        stdx::lock_guard lock(_mutex);
-        _healthCheckContexts.at(observer->getType()).resultStatus =
-            std::move(periodicThreadCbHandleStatus.getValue());
-    };
+        uassert(5936101,
+                str::stream() << "Failed to schedule periodic health check for "
+                              << observer->getType() << ": "
+                              << periodicThreadCbHandleStatus.getStatus().codeString(),
+                periodicThreadCbHandleStatus.isOK());
+    }
 
+    _healthCheckContexts.at(observer->getType()).callbackHandle =
+        std::move(periodicThreadCbHandleStatus.getValue());
+}
+
+void FaultManager::healthCheck(HealthObserver* observer, CancellationToken token) {
     auto acceptNotOKStatus = [this, observer](Status s) {
         auto healthCheckStatus =
             HealthCheckStatus(observer->getType(), Severity::kFailure, s.reason());
@@ -574,22 +597,34 @@ void FaultManager::healthCheck(HealthObserver* observer, CancellationToken token
         return healthCheckStatus;
     };
 
-    {
-        stdx::lock_guard lock(_mutex);
-        _healthCheckContexts.insert(
-            {observer->getType(), HealthCheckContext(nullptr, boost::none)});
-    }
 
     // Run asynchronous health check.  Send output to the state machine. Schedule next run.
-    auto healthCheckFuture =
-        observer->periodicCheck(_taskExecutor, token)
-            .thenRunOn(_taskExecutor)
-            .onCompletion([this, acceptNotOKStatus, schedulerCb, observer](
-                              StatusWith<HealthCheckStatus> status) {
-                ON_BLOCK_EXIT([this, schedulerCb, observer]() {
+    auto healthCheckFuture = observer->periodicCheck(_taskExecutor, token);
+
+    stdx::lock_guard lock(_mutex);
+    auto contextIt = _healthCheckContexts.find(observer->getType());
+    if (contextIt == _healthCheckContexts.end()) {
+        LOGV2_ERROR(6418204, "Unexpected failure during health check: context not found");
+        return;
+    }
+    contextIt->second.result =
+        std::make_unique<SharedSemiFuture<HealthCheckStatus>>(std::move(healthCheckFuture));
+
+    contextIt->second.result->thenRunOn(_taskExecutor)
+        .onCompletion(
+            [this, acceptNotOKStatus, observer, token](StatusWith<HealthCheckStatus> status) {
+                ON_BLOCK_EXIT([this, observer, token]() {
+                    {
+                        stdx::lock_guard lock(_mutex);
+                        // Rescheduling requires the previous handle to be cleaned.
+                        auto contextIt = _healthCheckContexts.find(observer->getType());
+                        if (contextIt != _healthCheckContexts.end()) {
+                            contextIt->second.callbackHandle = {};
+                        }
+                    }
                     if (!_config->periodicChecksDisabledForTests() &&
                         _config->isHealthObserverEnabled(observer->getType())) {
-                        schedulerCb();
+                        scheduleNextHealthCheck(observer, token, false /* immediate */);
                     }
                 });
 
@@ -599,11 +634,8 @@ void FaultManager::healthCheck(HealthObserver* observer, CancellationToken token
 
                 accept(status.getValue());
                 return status.getValue();
-            });
-
-    stdx::lock_guard lock(_mutex);
-    _healthCheckContexts.at(observer->getType()).result =
-        std::make_unique<ExecutorFuture<HealthCheckStatus>>(std::move(healthCheckFuture));
+            })
+        .getAsync([](StatusOrStatusWith<mongo::process_health::HealthCheckStatus>) {});
 }
 
 void FaultManager::updateWithCheckStatus(HealthCheckStatus&& checkStatus) {
