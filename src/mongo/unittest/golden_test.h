@@ -62,27 +62,7 @@ namespace mongo::unittest {
  *         ctx.outStream() << "print something else" << std::endl;
  *     }
  *
- * TODO: SERVER-63734, Replace with proper developer tooling to diff/update
- *
- * In order to diff the results, find the failed test(s) and run the diff command to show the
- * differences for tests that failed.
- *
- * Example:
- *     To obtain the expected and actual output folders:
- *     $> ninja -j400 +unittest_test | grep "^{" |\
- *        jq -s -c -r '.[] | select(.id == 6273501 ) | .attr.expectedOutputRoot + " "
- * +.attr.actualOutputRoot ' | sort | uniq
- *
- * you may need to adjust the command to work with your favorite diff tool.
- *
- * In order to accept the new test outputs as new "golden data", copy the actual outputs to golden
- * data folder.
- *
- * Example:
- *    To obtain the copy command:
- *    $> ninja -j400 +unittest_test | grep "^{" |\
- *       jq -s -c -r '.[] | select(.id == 6273501 ) | "cp -R " + .attr.actualOutputRoot + "/" + "*
- * ."' | sort | uniq
+ * For complete usage guide and documentation see: docs/golden_data_test_framework.md
  */
 
 /**
@@ -137,7 +117,6 @@ public:
 
 private:
     boost::filesystem::path _goldenDataRoot;
-    std::string _outputPathPrefix;
     boost::filesystem::path _actualOutputRoot;
     boost::filesystem::path _expectedOutputRoot;
 };
@@ -216,9 +195,6 @@ private:
 
     void throwAssertionFailureException(const std::string& message);
 
-    static std::string readFile(const boost::filesystem::path& path);
-    static void writeFile(const boost::filesystem::path& path, const std::string& contents);
-
     static std::string sanitizeName(const std::string& str);
     static std::string toSnakeCase(const std::string& str);
     static boost::filesystem::path toTestPath(const std::string& suiteName,
@@ -243,15 +219,19 @@ struct GoldenTestOptions {
     /**
      * Parses the options from environment variables that start with GOLDEN_TEST_ prefix.
      * Supported options:
-     *  - GOLDEN_TEST_OUTPUT: (optional) specifies the "output" data member.
+     *  - GOLDEN_TEST_CONFIG_PATH: (optional) specifies the yaml config file.
+     *    See config file reference:
+     * docs/golden_data_test_framework.md#appendix---config-file-reference
      */
     static GoldenTestOptions parseEnvironment();
 
     /**
-     * Path that will be used to write expected and actual test outputs.
-     * If not specified a temporary folder location will be used.
+     * Root path patten that will be used to write expected and actual test outputs for all tests in
+     * the test run. If not specified a temporary folder location will be used. Path pattern string
+     * may use '%' characters in the last part of the path. '%' characters will be replaced with
+     * random lowercase hexadecimal digits.
      */
-    boost::optional<std::string> output;
+    boost::optional<std::string> outputRootPattern;
 };
 
 }  // namespace mongo::unittest

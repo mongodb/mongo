@@ -4,7 +4,9 @@ Import("env")
 
 env = env.Clone()
 
-env.Library(
+utEnv = env.Clone()
+utEnv.InjectThirdParty(libraries=['yaml'])
+utEnv.Library(
     target="unittest",
     source=[
         'barrier.cpp',
@@ -24,6 +26,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
         '$BUILD_DIR/third_party/shim_pcrecpp',
+        '$BUILD_DIR/third_party/shim_yaml'
     ],
     AIB_COMPONENT='unittests'
 )
