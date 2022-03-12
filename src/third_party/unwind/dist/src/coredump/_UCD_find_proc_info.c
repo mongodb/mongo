@@ -21,7 +21,11 @@ LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 
-#include <elf.h>
+#if defined(HAVE_ELF_H)
+# include <elf.h>
+#elif defined(HAVE_SYS_ELF_H)
+# include <sys/elf.h>
+#endif
 
 #include "_UCD_lib.h"
 #include "_UCD_internal.h"
@@ -31,7 +35,7 @@ get_unwind_info(struct UCD_info *ui, unw_addr_space_t as, unw_word_t ip)
 {
   unsigned long segbase, mapoff;
 
-#if UNW_TARGET_IA64 && defined(__linux)
+#if UNW_TARGET_IA64 && defined(__linux__)
   if (!ui->edi.ktab.start_ip && _Uia64_get_kernel_table (&ui->edi.ktab) < 0)
     return -UNW_ENOINFO;
 

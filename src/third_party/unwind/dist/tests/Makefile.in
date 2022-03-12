@@ -123,17 +123,19 @@ target_triplet = @target@
 @BUILD_COREDUMP_TRUE@@OS_LINUX_TRUE@@REMOTE_ONLY_FALSE@am__append_14 = crasher test-coredump-unwind
 @BUILD_COREDUMP_TRUE@@HAVE_LZMA_TRUE@@OS_LINUX_TRUE@@REMOTE_ONLY_FALSE@am__append_15 = run-coredump-unwind-mdi
 check_PROGRAMS = $(am__EXEEXT_1) $(am__EXEEXT_7) $(am__EXEEXT_10)
-XFAIL_TESTS = $(am__append_17) $(am__append_18) $(am__EXEEXT_19)
+XFAIL_TESTS = $(am__append_17) $(am__append_18) $(am__append_19) \
+	$(am__EXEEXT_19)
 @ARCH_IA64_TRUE@am__append_16 = Gtest-dyn1 Ltest-dyn1
 @ARCH_MIPS_TRUE@am__append_17 = $(XFAIL_TESTS_PTRACE_SINGLESTEP)
+@ARCH_RISCV_TRUE@am__append_18 = $(XFAIL_TESTS_PTRACE_SINGLESTEP)
 
 # ARM Linux kernel >=2.6.39 removed PTRACE_SINGLESTEP emulation
-@ARCH_ARM_TRUE@am__append_18 = $(XFAIL_TESTS_PTRACE_SINGLESTEP)
+@ARCH_ARM_TRUE@am__append_19 = $(XFAIL_TESTS_PTRACE_SINGLESTEP)
 
 # This is meant for multilib binaries, -m32.
 # ptrace gives EBADREG when testing,
 # but generally everything else works.
-@NO_PTRACE_TEST_TRUE@am__append_19 = run-ptrace-mapper test-ptrace Ltest-init-local-signal
+@NO_PTRACE_TEST_TRUE@am__append_20 = run-ptrace-mapper test-ptrace Ltest-init-local-signal
 noinst_PROGRAMS = $(am__EXEEXT_11) $(am__EXEEXT_15) $(am__EXEEXT_18)
 subdir = tests
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
@@ -294,7 +296,7 @@ Ltest_concurrent_OBJECTS = Ltest-concurrent.$(OBJEXT)
 Ltest_concurrent_DEPENDENCIES = $(LIBUNWIND_local)
 am_Ltest_cxx_exceptions_OBJECTS = Ltest-cxx-exceptions.$(OBJEXT)
 Ltest_cxx_exceptions_OBJECTS = $(am_Ltest_cxx_exceptions_OBJECTS)
-Ltest_cxx_exceptions_LDADD = $(LDADD)
+Ltest_cxx_exceptions_DEPENDENCIES = $(LIBUNWIND_local)
 am_Ltest_dyn1_OBJECTS = Ltest-dyn1.$(OBJEXT) flush-cache.$(OBJEXT)
 Ltest_dyn1_OBJECTS = $(am_Ltest_dyn1_OBJECTS)
 Ltest_dyn1_DEPENDENCIES = $(LIBUNWIND_local)
@@ -902,6 +904,7 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 AM_CPPFLAGS = -I$(top_srcdir)/include
+AM_CFLAGS = -fno-optimize-sibling-calls
 EXTRA_DIST = run-ia64-test-dyn1 run-ptrace-mapper run-ptrace-misc	\
 		run-check-namespace run-coredump-unwind \
 		run-coredump-unwind-mdi check-namespace.sh.in \
@@ -1004,6 +1007,7 @@ Gtest_trace_LDADD = $(LIBUNWIND) $(LIBUNWIND_local)
 Gperf_trace_LDADD = $(LIBUNWIND) $(LIBUNWIND_local)
 Ltest_bt_LDADD = $(LIBUNWIND_local)
 Ltest_concurrent_LDADD = $(LIBUNWIND_local) -lpthread
+Ltest_cxx_exceptions_LDADD = $(LIBUNWIND_local)
 Ltest_dyn1_LDADD = $(LIBUNWIND_local)
 Ltest_exc_LDADD = $(LIBUNWIND_local)
 Ltest_init_LDADD = $(LIBUNWIND_local)

@@ -61,7 +61,7 @@ inlined_uc_addr (ucontext_t *uc, int reg, uint8_t *nat_bitnr)
     case UNW_IA64_NAT + 0:      addr = &unw.read_only.r0; break;
     case UNW_IA64_FR + 0:       addr = &unw.read_only.f0; break;
     case UNW_IA64_FR + 1:
-      if (__BYTE_ORDER == __BIG_ENDIAN)
+      if (target_is_big_endian())
         addr = &unw.read_only.f1_be;
       else
         addr = &unw.read_only.f1_le;

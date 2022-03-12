@@ -33,6 +33,7 @@ $SRC_DIR/configure \
     --disable-dependency-tracking \
     --disable-documentation \
     --disable-minidebuginfo \
+    --disable-zlibdebuginfo \
     --disable-ptrace \
     --disable-setjmp \
     --disable-shared \

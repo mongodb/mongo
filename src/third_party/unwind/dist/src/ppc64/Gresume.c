@@ -31,8 +31,6 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 
 #ifndef UNW_REMOTE_ONLY
 
-#include <sys/syscall.h>
-
 /* sigreturn() is a no-op on x86_64 glibc.  */
 
 static NORETURN inline long

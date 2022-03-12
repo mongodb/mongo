@@ -28,6 +28,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 
 /* For uint64_t */
 #include <stdint.h>
+#include <stdalign.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -76,11 +77,11 @@ typedef _Unwind_Reason_Code (*_Unwind_Stop_Fn) (int, _Unwind_Action,
    even on 32-bit machines for gcc compatibility.  */
 struct _Unwind_Exception
   {
-    uint64_t exception_class;
+    alignas(8) uint64_t exception_class;
     _Unwind_Exception_Cleanup_Fn exception_cleanup;
     unsigned long private_1;
     unsigned long private_2;
-  } __attribute__((__aligned__));
+  };
 
 extern _Unwind_Reason_Code _Unwind_RaiseException (struct _Unwind_Exception *);
 extern _Unwind_Reason_Code _Unwind_ForcedUnwind (struct _Unwind_Exception *,

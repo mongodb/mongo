@@ -2,8 +2,7 @@
 
 [![Build Status](https://travis-ci.org/libunwind/libunwind.svg?branch=master)](https://travis-ci.org/libunwind/libunwind)
 
-This is version 1.5 of the unwind library.  This library supports
-several architecture/operating-system combinations:
+This library supports several architecture/operating-system combinations:
 
 | System  | Architecture | Status |
 | :------ | :----------- | :----- |
@@ -11,12 +10,14 @@ several architecture/operating-system combinations:
 | Linux   | x86          | ✓      |
 | Linux   | ARM          | ✓      |
 | Linux   | AArch64      | ✓      |
+| Linux   | PPC32        | ✓      |
 | Linux   | PPC64        | ✓      |
 | Linux   | SuperH       | ✓      |
 | Linux   | IA-64        | ✓      |
 | Linux   | PARISC       | Works well, but C library missing unwind-info |
 | Linux   | Tilegx       | 64-bit mode only |
 | Linux   | MIPS         | Newly added |
+| Linux   | RISC-V       | 64-bit only |
 | HP-UX   | IA-64        | Mostly works, but known to have serious limitations |
 | FreeBSD | x86-64       | ✓      |
 | FreeBSD | x86          | ✓      |
@@ -34,7 +35,7 @@ such dependencies
  - p, provides its own implementation
  - empty, no requirement
 
-| Archtecture  | getcontext | setcontext |
+| Architecture | getcontext | setcontext |
 |--------------|------------|------------|
 |    aarch64   |     p      |            |
 |    arm       |     p      |            |
@@ -43,6 +44,7 @@ such dependencies
 |    mips      |     p      |            |
 |    ppc32     |     r      |            |
 |    ppc64     |     r      |      r     |
+|    riscv     |     p      |      p     |
 |    s390x     |     p      |      p     |
 |    sh        |     r      |            |
 |    tilegx    |     r      |      r     |
@@ -54,7 +56,7 @@ such dependencies
 In general, this library can be built and installed with the following
 commands:
 
-    $ ./autogen.sh # Needed only for building from git. Depends on libtool.
+    $ autoreconf -i # Needed only for building from git. Depends on libtool.
     $ ./configure
     $ make
     $ make install prefix=PREFIX

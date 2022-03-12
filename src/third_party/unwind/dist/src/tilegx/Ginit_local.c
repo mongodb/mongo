@@ -41,7 +41,7 @@ unw_init_local_common(unw_cursor_t *cursor, ucontext_t *uc, unsigned use_prev_in
 {
   struct cursor *c = (struct cursor *) cursor;
 
-  if (!tdep_init_done)
+  if (!atomic_load(&tdep_init_done))
     tdep_init ();
 
   memset(c, 0, sizeof(unw_cursor_t));

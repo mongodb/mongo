@@ -28,7 +28,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 
 __attribute__((weak))
 pthread_mutex_t tilegx_lock = PTHREAD_MUTEX_INITIALIZER;
-HIDDEN int tdep_init_done;
+HIDDEN atomic_bool tdep_init_done = 0;
 
 HIDDEN const uint8_t dwarf_to_unw_regnum_map[] =
   {
@@ -47,7 +47,7 @@ tdep_init (void)
 
   lock_acquire (&tilegx_lock, saved_mask);
 
-  if (tdep_init_done)
+  if (atomic_load(&tdep_init_done))
     /* another thread else beat us to it... */
     goto out;
 
@@ -57,7 +57,7 @@ tdep_init (void)
 #ifndef UNW_REMOTE_ONLY
   tilegx_local_addr_space_init ();
 #endif
-  tdep_init_done = 1;  /* signal that we're initialized... */
+  atomic_store(&tdep_init_done, 1);  /* signal that we're initialized... */
 
  out:
   lock_release (&tilegx_lock, saved_mask);

@@ -16,7 +16,7 @@
 	string "dyn-list"	/* lsda */
 	data8 @gprel(_U_dyn_info_list)
 
-	.section .IA_64.unwind, "a", "progbits"
+	.section .IA_64.unwind, "ao", "unwind"
 	data8 0, 0, @segrel(.info)
 
 #endif

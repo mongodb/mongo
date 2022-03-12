@@ -71,9 +71,6 @@ get_dyn_info_list_addr (unw_addr_space_t as, unw_word_t *dyn_info_list_addr,
   return 0;
 }
 
-#define PAGE_SIZE 4096
-#define PAGE_START(a)	((a) & ~(PAGE_SIZE-1))
-
 /* Cache of already validated addresses */
 #define NLGA 4
 static unw_word_t last_good_addr[NLGA];
@@ -83,14 +80,8 @@ static int
 validate_mem (unw_word_t addr)
 {
   int i, victim;
-  size_t len;
-
-  if (PAGE_START(addr + sizeof (unw_word_t) - 1) == PAGE_START(addr))
-    len = PAGE_SIZE;
-  else
-    len = PAGE_SIZE * 2;
-
-  addr = PAGE_START(addr);
+  size_t len = unw_page_size;
+  addr = uwn_page_start(addr);
 
   if (addr == 0)
     return -1;

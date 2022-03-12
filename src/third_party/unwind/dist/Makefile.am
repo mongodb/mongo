@@ -44,9 +44,15 @@ endif
 if ARCH_S390X
 include_HEADERS += include/libunwind-s390x.h
 endif
+if ARCH_RISCV
+include_HEADERS += include/libunwind-riscv.h
+endif
 
 if !REMOTE_ONLY
-include_HEADERS += include/libunwind.h include/unwind.h
+include_HEADERS += include/libunwind.h
+if BUILD_UNWIND_HEADER
+include_HEADERS += include/unwind.h
+endif
 endif
 
 nodist_include_HEADERS = include/libunwind-common.h
@@ -89,6 +95,8 @@ noinst_HEADERS = include/dwarf.h include/dwarf_i.h include/dwarf-eh.h	\
 	include/tdep-sh/jmpbuf.h include/tdep-sh/libunwind_i.h		\
 	include/tdep-s390x/dwarf-config.h				\
 	include/tdep-s390x/jmpbuf.h include/tdep-s390x/libunwind_i.h	\
+	include/tdep-riscv/dwarf-config.h				\
+	include/tdep-riscv/jmpbuf.h include/tdep-riscv/libunwind_i.h	\
 	include/tdep/libunwind_i.h					\
 	include/tdep/jmpbuf.h include/tdep/dwarf-config.h
 

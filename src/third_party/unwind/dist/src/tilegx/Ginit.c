@@ -147,7 +147,7 @@ __attribute__((weak)) void
 tilegx_local_addr_space_init (void)
 {
   memset (&local_addr_space, 0, sizeof (local_addr_space));
-  local_addr_space.big_endian = (__BYTE_ORDER == __BIG_ENDIAN);
+  local_addr_space.big_endian = target_is_big_endian();
 
   local_addr_space.abi = UNW_TILEGX_ABI_N64;
   local_addr_space.addr_size = sizeof (void *);

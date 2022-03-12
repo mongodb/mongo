@@ -52,8 +52,8 @@ static pthread_once_t trace_cache_once = PTHREAD_ONCE_INIT;
 static sig_atomic_t trace_cache_once_happen;
 static pthread_key_t trace_cache_key;
 static struct mempool trace_cache_pool;
-static __thread  unw_trace_cache_t *tls_cache;
-static __thread  int tls_cache_destroyed;
+static _Thread_local  unw_trace_cache_t *tls_cache;
+static _Thread_local  int tls_cache_destroyed;
 
 /* Free memory for a thread's trace cache. */
 static void

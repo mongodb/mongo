@@ -48,6 +48,7 @@ a notice will be included in
 | [timelib]                  | MIT               | 2021.06           |                      |                ✗                |
 | [TomCrypt]                 | Public Domain     | 1.18.2            |          ✗           |                ✗                |
 | [Unicode]                  | Unicode-DFS-2015  | 8.0.0             |          ✗           |                ✗                |
+| [libunwind]                | MIT               | 1.6.2 + changes   |                      |                ✗                |
 | [Valgrind]                 | BSD-3-Clause<sup>\[<a href="#note_vg" id="ref_vg">1</a>]</sup> | 3.17.0 | |             ✗                |
 | [variant]                  | BSL-1.0           | 1.4.0             |                      |                ✗                |
 | [wiredtiger]               |                   | <sup>\[<a href="#note_wt" id="ref_wt">2</a>]</sup> | ✗ |  ✗                |
@@ -81,6 +82,7 @@ a notice will be included in
 [timelib]: https://github.com/derickr/timelib
 [TomCrypt]: https://github.com/libtom/libtomcrypt/releases
 [Unicode]: http://www.unicode.org/versions/enumeratedversions.html
+[libunwind]: http://www.nongnu.org/libunwind/
 [Valgrind]: http://valgrind.org/downloads/current.html
 [variant]: https://github.com/mpark/variant
 [wiredtiger]: https://github.com/wiredtiger/wiredtiger

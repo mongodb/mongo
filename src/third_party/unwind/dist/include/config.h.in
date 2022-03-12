@@ -15,11 +15,11 @@
 /* Define to 1 if you want every memory access validated */
 #undef CONSERVATIVE_CHECKS
 
+/* Define to 1 if you have the <asm/ptrace.h> header file. */
+#undef HAVE_ASM_PTRACE_H
+
 /* Define to 1 if you have the <asm/ptrace_offsets.h> header file. */
 #undef HAVE_ASM_PTRACE_OFFSETS_H
-
-/* Define to 1 if you have the <atomic_ops.h> header file. */
-#undef HAVE_ATOMIC_OPS_H
 
 /* Define to 1 if you have the <byteswap.h> header file. */
 #undef HAVE_BYTESWAP_H
@@ -152,9 +152,6 @@
 /* Define to 1 if the system has the type `struct prstatus'. */
 #undef HAVE_STRUCT_PRSTATUS
 
-/* Defined if __sync atomics are available */
-#undef HAVE_SYNC_ATOMICS
-
 /* Define to 1 if you have the <sys/elf.h> header file. */
 #undef HAVE_SYS_ELF_H
 
@@ -164,6 +161,9 @@
 /* Define to 1 if you have the <sys/link.h> header file. */
 #undef HAVE_SYS_LINK_H
 
+/* Define to 1 if you have the <sys/param.h> header file. */
+#undef HAVE_SYS_PARAM_H
+
 /* Define to 1 if you have the <sys/procfs.h> header file. */
 #undef HAVE_SYS_PROCFS_H
 
@@ -172,6 +172,9 @@
 
 /* Define to 1 if you have the <sys/stat.h> header file. */
 #undef HAVE_SYS_STAT_H
+
+/* Define to 1 if you have the <sys/syscall.h> header file. */
+#undef HAVE_SYS_SYSCALL_H
 
 /* Define to 1 if you have the <sys/types.h> header file. */
 #undef HAVE_SYS_TYPES_H
@@ -194,8 +197,8 @@
 /* Defined if __builtin___clear_cache() is available */
 #undef HAVE__BUILTIN___CLEAR_CACHE
 
-/* Define to 1 if __thread keyword is supported by the C compiler. */
-#undef HAVE___THREAD
+/* Define to 1 if --enable-per-thread-cache */
+#undef HAVE___CACHE_PER_THREAD
 
 /* Define to the sub-directory where libtool stores uninstalled libraries. */
 #undef LT_OBJDIR

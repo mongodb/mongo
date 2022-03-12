@@ -41,7 +41,7 @@ tdep_get_elf_image (struct elf_image *ei, pid_t pid, unw_word_t ip,
   if (maps_init (&mi, pid) < 0)
     return -1;
 
-  while (maps_next (&mi, segbase, &hi, mapoff))
+  while (maps_next (&mi, segbase, &hi, mapoff, NULL))
     if (ip >= *segbase && ip < hi)
       {
         found = 1;

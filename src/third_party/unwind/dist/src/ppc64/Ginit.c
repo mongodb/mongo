@@ -48,13 +48,25 @@ uc_addr (ucontext_t *uc, int reg)
   void *addr;
 
   if ((unsigned) (reg - UNW_PPC64_R0) < 32)
+#if defined(__linux__)
     addr = &uc->uc_mcontext.gp_regs[reg - UNW_PPC64_R0];
+#elif defined(__FreeBSD__)
+    addr = &uc->uc_mcontext.mc_gpr[reg - UNW_PPC64_R0];
+#endif
 
   else if ((unsigned) (reg - UNW_PPC64_F0) < 32)
+#if defined(__linux__)
     addr = &uc->uc_mcontext.fp_regs[reg - UNW_PPC64_F0];
+#elif defined(__FreeBSD__)
+    addr = &uc->uc_mcontext.mc_fpreg[reg - UNW_PPC64_F0];
+#endif
 
   else if ((unsigned) (reg - UNW_PPC64_V0) < 32)
+#if defined(__linux__)
     addr = (uc->uc_mcontext.v_regs == 0) ? NULL : &uc->uc_mcontext.v_regs->vrregs[reg - UNW_PPC64_V0][0];
+#elif defined(__FreeBSD__)
+    addr = &uc->uc_mcontext.mc_avec[(reg - UNW_PPC64_V0)*2];
+#endif
 
   else
     {
@@ -80,7 +92,11 @@ uc_addr (ucontext_t *uc, int reg)
         default:
           return NULL;
         }
+#if defined(__linux__)
       addr = &uc->uc_mcontext.gp_regs[gregs_idx];
+#elif defined(__FreeBSD__)
+      addr = &uc->uc_mcontext.mc_gpr[gregs_idx];
+#endif
     }
   return addr;
 }
@@ -211,7 +227,7 @@ HIDDEN void
 ppc64_local_addr_space_init (void)
 {
   memset (&local_addr_space, 0, sizeof (local_addr_space));
-  local_addr_space.big_endian = (__BYTE_ORDER == __BIG_ENDIAN);
+  local_addr_space.big_endian = target_is_big_endian();
 #if _CALL_ELF == 2
   local_addr_space.abi = UNW_PPC64_ABI_ELFv2;
 #else

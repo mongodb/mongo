@@ -62,7 +62,7 @@
 #else
   extern int backtrace (void **, int);
 #endif
-#include <sys/ucontext.h>
+#include <ucontext.h>
 
 #include <libunwind-coredump.h>
 
@@ -322,7 +322,7 @@ main(int argc UNUSED, char **argv)
       if (*colon != ':')
         error_msg_and_die("Bad format: '%s'", *argv);
       if (_UCD_add_backing_file_at_vaddr(ui, vaddr, colon + 1) < 0)
-        error_msg_and_die("Can't add backing file '%s'", colon + 1);
+        error_msg("Can't add backing file '%s'", colon + 1);
       argv++;
     }
 
@@ -338,11 +338,16 @@ main(int argc UNUSED, char **argv)
       if (ret < 0)
         error_msg_and_die("unw_get_proc_info(ip=0x%lx) failed: ret=%d\n", (long) ip, ret);
 
-      if (!testcase)
-        printf("\tip=0x%08lx proc=%08lx-%08lx handler=0x%08lx lsda=0x%08lx\n",
+      if (!testcase) {
+        char proc_name[128];
+        unw_word_t off;
+        unw_get_proc_name(&c, proc_name, sizeof(proc_name), &off);
+
+        printf("\tip=0x%08lx proc=%08lx-%08lx handler=0x%08lx lsda=0x%08lx %s\n",
 				(long) ip,
 				(long) pi.start_ip, (long) pi.end_ip,
-				(long) pi.handler, (long) pi.lsda);
+				(long) pi.handler, (long) pi.lsda, proc_name);
+	  }
 
       if (testcase && test_cur < TEST_FRAMES)
         {

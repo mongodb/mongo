@@ -34,7 +34,7 @@ aarch64_local_resume (unw_addr_space_t as, unw_cursor_t *cursor, void *arg)
 {
 #ifdef __linux__
   struct cursor *c = (struct cursor *) cursor;
-  unw_tdep_context_t *uc = c->dwarf.as_arg;
+  unw_tdep_context_t *uc = c->uc;
 
   if (c->sigcontext_format == AARCH64_SCF_NONE)
     {

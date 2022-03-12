@@ -24,6 +24,7 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 
 #include "libunwind_i.h"
+#include <stdatomic.h>
 
 void
 unw_flush_cache (unw_addr_space_t as, unw_word_t lo, unw_word_t hi)
@@ -52,11 +53,5 @@ unw_flush_cache (unw_addr_space_t as, unw_word_t lo, unw_word_t hi)
      ignores the flush range arguments (lo-hi).  This is OK because
      unw_flush_cache() is allowed to flush more than the requested
      range. */
-
-#ifdef HAVE_FETCH_AND_ADD
-  fetch_and_add1 (&as->cache_generation);
-#else
-# warning unw_flush_cache(): need a way to atomically increment an integer.
-  ++as->cache_generation;
-#endif
+  atomic_fetch_add (&as->cache_generation, 1);
 }

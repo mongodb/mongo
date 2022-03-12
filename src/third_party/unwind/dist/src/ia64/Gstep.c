@@ -30,7 +30,7 @@ static inline int
 linux_sigtramp (struct cursor *c, ia64_loc_t prev_cfm_loc,
                 unw_word_t *num_regsp)
 {
-#if defined(UNW_LOCAL_ONLY) && !defined(__linux)
+#if defined(UNW_LOCAL_ONLY) && !defined(__linux__)
   return -UNW_EINVAL;
 #else
   unw_word_t sc_addr;
@@ -64,7 +64,7 @@ static inline int
 linux_interrupt (struct cursor *c, ia64_loc_t prev_cfm_loc,
                  unw_word_t *num_regsp, int marker)
 {
-#if defined(UNW_LOCAL_ONLY) && !(defined(__linux) && defined(__KERNEL__))
+#if defined(UNW_LOCAL_ONLY) && !(defined(__linux__) && defined(__KERNEL__))
   return -UNW_EINVAL;
 #else
   unw_word_t sc_addr, num_regs;

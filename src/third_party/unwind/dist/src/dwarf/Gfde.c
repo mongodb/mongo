@@ -48,6 +48,7 @@ parse_cie (unw_addr_space_t as, unw_accessors_t *a, unw_word_t addr,
            int is_debug_frame, void *arg)
 {
   uint8_t version, ch, augstr[5], fde_encoding, handler_encoding;
+  uint8_t address_size, segment_size;
   unw_word_t len, cie_end_addr, aug_size;
   uint32_t u32val;
   uint64_t u64val;
@@ -136,6 +137,15 @@ parse_cie (unw_addr_space_t as, unw_accessors_t *a, unw_word_t addr,
 
       if (i < sizeof (augstr) - 1)
         augstr[i++] = ch;
+    }
+
+  if (version > 3)
+    {
+      if((ret = dwarf_readu8(as, a, &addr, &address_size, arg)) < 0) 
+	return ret;
+
+      if((ret = dwarf_readu8(as, a, &addr, &segment_size, arg)) < 0) 
+	return ret;
     }
 
   if ((ret = dwarf_read_uleb128 (as, a, &addr, &dci->code_align, arg)) < 0

@@ -26,7 +26,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 #include "config.h"
 #endif
 
-#include <sys/ucontext.h>
+#include <ucontext.h>
 #include <machine/sigframe.h>
 #include <signal.h>
 #include <stddef.h>
@@ -133,6 +133,7 @@ x86_64_handle_signal_frame (unw_cursor_t *cursor)
     c->dwarf.loc[RCX] = c->dwarf.loc[R10];
     /*  rsp_loc = DWARF_LOC(c->dwarf.cfa - 8, 0);       */
     /*  rbp_loc = c->dwarf.loc[RBP];                    */
+    c->dwarf.loc[RSP] = DWARF_VAL_LOC (c, c->dwarf.cfa + 8);
     c->dwarf.loc[RIP] = DWARF_LOC (c->dwarf.cfa, 0);
     ret = dwarf_get (&c->dwarf, c->dwarf.loc[RIP], &c->dwarf.ip);
     Debug (1, "Frame Chain [RIP=0x%Lx] = 0x%Lx\n",
@@ -192,23 +193,23 @@ x86_64_sigreturn (unw_cursor_t *cursor)
   ucontext_t *uc = (ucontext_t *)(c->sigcontext_addr +
     offsetof(struct sigframe, sf_uc));
 
-  uc->uc_mcontext.mc_r8 = c->uc->uc_mcontext.mc_r8;
-  uc->uc_mcontext.mc_r9 = c->uc->uc_mcontext.mc_r9;
-  uc->uc_mcontext.mc_r10 = c->uc->uc_mcontext.mc_r10;
-  uc->uc_mcontext.mc_r11 = c->uc->uc_mcontext.mc_r11;
-  uc->uc_mcontext.mc_r12 = c->uc->uc_mcontext.mc_r12;
-  uc->uc_mcontext.mc_r13 = c->uc->uc_mcontext.mc_r13;
-  uc->uc_mcontext.mc_r14 = c->uc->uc_mcontext.mc_r14;
-  uc->uc_mcontext.mc_r15 = c->uc->uc_mcontext.mc_r15;
-  uc->uc_mcontext.mc_rdi = c->uc->uc_mcontext.mc_rdi;
-  uc->uc_mcontext.mc_rsi = c->uc->uc_mcontext.mc_rsi;
-  uc->uc_mcontext.mc_rbp = c->uc->uc_mcontext.mc_rbp;
-  uc->uc_mcontext.mc_rbx = c->uc->uc_mcontext.mc_rbx;
-  uc->uc_mcontext.mc_rdx = c->uc->uc_mcontext.mc_rdx;
-  uc->uc_mcontext.mc_rax = c->uc->uc_mcontext.mc_rax;
-  uc->uc_mcontext.mc_rcx = c->uc->uc_mcontext.mc_rcx;
-  uc->uc_mcontext.mc_rsp = c->uc->uc_mcontext.mc_rsp;
-  uc->uc_mcontext.mc_rip = c->uc->uc_mcontext.mc_rip;
+  uc->uc_mcontext.mc_r8 = dwarf_get_uc(&c->dwarf)->uc_mcontext.mc_r8;
+  uc->uc_mcontext.mc_r9 = dwarf_get_uc(&c->dwarf)->uc_mcontext.mc_r9;
+  uc->uc_mcontext.mc_r10 = dwarf_get_uc(&c->dwarf)->uc_mcontext.mc_r10;
+  uc->uc_mcontext.mc_r11 = dwarf_get_uc(&c->dwarf)->uc_mcontext.mc_r11;
+  uc->uc_mcontext.mc_r12 = dwarf_get_uc(&c->dwarf)->uc_mcontext.mc_r12;
+  uc->uc_mcontext.mc_r13 = dwarf_get_uc(&c->dwarf)->uc_mcontext.mc_r13;
+  uc->uc_mcontext.mc_r14 = dwarf_get_uc(&c->dwarf)->uc_mcontext.mc_r14;
+  uc->uc_mcontext.mc_r15 = dwarf_get_uc(&c->dwarf)->uc_mcontext.mc_r15;
+  uc->uc_mcontext.mc_rdi = dwarf_get_uc(&c->dwarf)->uc_mcontext.mc_rdi;
+  uc->uc_mcontext.mc_rsi = dwarf_get_uc(&c->dwarf)->uc_mcontext.mc_rsi;
+  uc->uc_mcontext.mc_rbp = dwarf_get_uc(&c->dwarf)->uc_mcontext.mc_rbp;
+  uc->uc_mcontext.mc_rbx = dwarf_get_uc(&c->dwarf)->uc_mcontext.mc_rbx;
+  uc->uc_mcontext.mc_rdx = dwarf_get_uc(&c->dwarf)->uc_mcontext.mc_rdx;
+  uc->uc_mcontext.mc_rax = dwarf_get_uc(&c->dwarf)->uc_mcontext.mc_rax;
+  uc->uc_mcontext.mc_rcx = dwarf_get_uc(&c->dwarf)->uc_mcontext.mc_rcx;
+  uc->uc_mcontext.mc_rsp = dwarf_get_uc(&c->dwarf)->uc_mcontext.mc_rsp;
+  uc->uc_mcontext.mc_rip = dwarf_get_uc(&c->dwarf)->uc_mcontext.mc_rip;
 
   Debug (8, "resuming at ip=%llx via sigreturn(%p)\n",
              (unsigned long long) c->dwarf.ip, uc);

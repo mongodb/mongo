@@ -138,6 +138,7 @@ x86_handle_signal_frame (unw_cursor_t *cursor)
     c->dwarf.loc[ST0] = DWARF_NULL_LOC;
   } else if (c->sigcontext_format == X86_SCF_FREEBSD_SYSCALL) {
     c->dwarf.loc[EIP] = DWARF_LOC (c->dwarf.cfa, 0);
+    c->dwarf.loc[ESP] = DWARF_VAL_LOC (c, c->dwarf.cfa + 4);
     c->dwarf.loc[EAX] = DWARF_NULL_LOC;
     c->dwarf.cfa += 4;
     c->dwarf.use_prev_instr = 1;

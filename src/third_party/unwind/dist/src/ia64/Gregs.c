@@ -30,7 +30,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 static inline ia64_loc_t
 linux_scratch_loc (struct cursor *c, unw_regnum_t reg, uint8_t *nat_bitnr)
 {
-#if !defined(UNW_LOCAL_ONLY) || defined(__linux)
+#if !defined(UNW_LOCAL_ONLY) || defined(__linux__)
   unw_word_t addr = c->sigcontext_addr, flags, tmp_addr;
   int i;
 

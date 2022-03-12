@@ -27,6 +27,7 @@ LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 
+#include "libunwind_i.h"
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
@@ -92,9 +93,6 @@ get_dyn_info_list_addr (unw_addr_space_t as, unw_word_t *dyn_info_list_addr,
   *dyn_info_list_addr = _U_dyn_info_list_addr ();
   return 0;
 }
-
-#define PAGE_SIZE 4096
-#define PAGE_START(a)   ((a) & ~(PAGE_SIZE-1))
 
 static int mem_validate_pipe[2] = {-1, -1};
 
@@ -163,7 +161,7 @@ static int mincore_validate (void *addr, size_t len)
       return -1;
     }
 
-  for (i = 0; i < (len + PAGE_SIZE - 1) / PAGE_SIZE; i++)
+    for (i = 0; i < (len + unw_page_size - 1) / unw_page_size; i++)
     {
       if (!(mvec[i] & 1)) return -1;
     }
@@ -183,11 +181,14 @@ tdep_init_mem_validate (void)
 
 #ifdef HAVE_MINCORE
   unsigned char present = 1;
-  unw_word_t addr = PAGE_START((unw_word_t)&present);
+  size_t len = unw_page_size;
+  unw_word_t addr = uwn_page_start((unw_word_t)&present);
   unsigned char mvec[1];
   int ret;
-  while ((ret = mincore ((void*)addr, PAGE_SIZE, mvec)) == -1 &&
-         errno == EAGAIN) {}
+  while ((ret = mincore((void *)addr, len, mvec)) == -1 &&
+         errno == EAGAIN)
+  {
+  }
   if (ret == 0 && (mvec[0] & 1))
     {
       Debug(1, "using mincore to validate memory\n");
@@ -210,14 +211,8 @@ static int
 validate_mem (unw_word_t addr)
 {
   int i, victim;
-  size_t len;
-
-  if (PAGE_START(addr + sizeof (unw_word_t) - 1) == PAGE_START(addr))
-    len = PAGE_SIZE;
-  else
-    len = PAGE_SIZE * 2;
-
-  addr = PAGE_START(addr);
+  size_t len = unw_page_size;
+  addr = uwn_page_start(addr);
 
   if (addr == 0)
     return -1;

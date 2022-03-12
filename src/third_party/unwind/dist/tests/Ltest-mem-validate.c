@@ -47,8 +47,11 @@ void * stack_start;
 
 void do_backtrace (void)
 {
-  void* buffer[1024];
-  int size = 1024;
+  /*
+    We make the assumption that we are able to rewind far enough
+    (steps > 5) before touching the forbidden region in the stack,
+    at which point the unwinding should stop gracefully.
+  */
   mprotect((void*)((uintptr_t)stack_start & ~(PAGE_SIZE - 1)),
            PAGE_SIZE, PROT_NONE);
 
@@ -68,6 +71,7 @@ void do_backtrace (void)
       unw_get_reg (&cursor, UNW_REG_SP, &sp);
 
       ret = unw_step (&cursor);
+	  printf("ip=%lx, sp=%lx -> %d\n", ip, sp, ret);
       if (ret < 0)
 	{
 	  unw_get_reg (&cursor, UNW_REG_IP, &ip);
@@ -78,14 +82,16 @@ void do_backtrace (void)
 
   if (steps < 5)
     {
+      printf("not enough steps: %d, need 5\n", steps);
       exit(-1);
     }
+  printf("success, steps: %d\n", steps);
 
   mprotect((void*)((uintptr_t)stack_start & ~(PAGE_SIZE - 1)),
            PAGE_SIZE, PROT_READ|PROT_WRITE);
 }
 
-void consume_and_run (int depth)
+void NOINLINE consume_and_run (int depth)
 {
   unw_cursor_t cursor;
   unw_context_t uc;
@@ -108,6 +114,14 @@ main (int argc, char **argv UNUSED)
 
   stack_start = &start;
 
+  /*
+    We need to make the frame at least the size protected by
+    the mprotect call so we are not forbidding access to
+    unrelated regions.
+  */
+  char string[PAGE_SIZE];
+  sprintf (string, "hello\n");
+
   // Initialize pipe mem validate check, opens file descriptors
   unw_getcontext(&uc);
   if (unw_init_local (&cursor, &uc) < 0)
@@ -121,7 +135,7 @@ main (int argc, char **argv UNUSED)
       if (!childpid)
         {
           /* Close fds and make sure we still work */
-          int ret = close(i);
+          close(i);
         }
 
       int status;

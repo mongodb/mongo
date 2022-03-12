@@ -64,9 +64,9 @@ _UCD_get_proc_name (unw_addr_space_t as, unw_word_t ip,
 {
   struct UCD_info *ui = arg;
 
-#if ELF_CLASS == ELFCLASS64
+#if UNW_ELF_CLASS == UNW_ELFCLASS64
   return _Uelf64_CD_get_proc_name (ui, as, ip, buf, buf_len, offp);
-#elif ELF_CLASS == ELFCLASS32
+#elif UNW_ELF_CLASS == UNW_ELFCLASS32
   return _Uelf32_CD_get_proc_name (ui, as, ip, buf, buf_len, offp);
 #else
   return -UNW_ENOINFO;

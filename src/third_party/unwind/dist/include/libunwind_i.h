@@ -37,7 +37,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 
 #include "compiler.h"
 
-#if defined(HAVE___THREAD) && HAVE___THREAD
+#if defined(HAVE___CACHE_PER_THREAD) && HAVE___CACHE_PER_THREAD
 #define UNWI_DEFAULT_CACHING_POLICY UNW_CACHE_PER_THREAD
 #else
 #define UNWI_DEFAULT_CACHING_POLICY UNW_CACHE_GLOBAL
@@ -55,6 +55,8 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 #include <string.h>
 #include <unistd.h>
 #include <sys/mman.h>
+#include <errno.h>
+#include <stdio.h>
 
 #if defined(HAVE_ELF_H)
 # include <elf.h>
@@ -63,37 +65,77 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 #else
 # error Could not locate <elf.h>
 #endif
+#if defined(ELFCLASS32)
+# define UNW_ELFCLASS32 ELFCLASS32
+#else
+# define UNW_ELFCLASS32 1
+#endif
+#if defined(ELFCLASS64)
+# define UNW_ELFCLASS64 ELFCLASS64
+#else
+# define UNW_ELFCLASS64 2
+#endif
 
 #if defined(HAVE_ENDIAN_H)
 # include <endian.h>
 #elif defined(HAVE_SYS_ENDIAN_H)
 # include <sys/endian.h>
-# if defined(_LITTLE_ENDIAN) && !defined(__LITTLE_ENDIAN)
-#   define __LITTLE_ENDIAN _LITTLE_ENDIAN
-# endif
-# if defined(_BIG_ENDIAN) && !defined(__BIG_ENDIAN)
-#   define __BIG_ENDIAN _BIG_ENDIAN
-# endif
-# if defined(_BYTE_ORDER) && !defined(__BYTE_ORDER)
-#   define __BYTE_ORDER _BYTE_ORDER
-# endif
+#elif defined(HAVE_SYS_PARAM_H)
+# include <sys/param.h>
+#endif
+
+#if defined(__LITTLE_ENDIAN)
+# define UNW_LITTLE_ENDIAN __LITTLE_ENDIAN
+#elif defined(_LITTLE_ENDIAN)
+# define UNW_LITTLE_ENDIAN _LITTLE_ENDIAN
+#elif defined(LITTLE_ENDIAN)
+# define UNW_LITTLE_ENDIAN LITTLE_ENDIAN
 #else
-# define __LITTLE_ENDIAN        1234
-# define __BIG_ENDIAN           4321
+# define UNW_LITTLE_ENDIAN 1234
+#endif
+
+#if defined(__BIG_ENDIAN)
+# define UNW_BIG_ENDIAN __BIG_ENDIAN
+#elif defined(_BIG_ENDIAN)
+# define UNW_BIG_ENDIAN _BIG_ENDIAN
+#elif defined(BIG_ENDIAN)
+# define UNW_BIG_ENDIAN BIG_ENDIAN
+#else
+# define UNW_BIG_ENDIAN 4321
+#endif
+
+#if defined(__BYTE_ORDER)
+# define UNW_BYTE_ORDER __BYTE_ORDER
+#elif defined(_BYTE_ORDER)
+# define UNW_BYTE_ORDER _BYTE_ORDER
+#elif defined(BIG_ENDIAN)
+# define UNW_BYTE_ORDER BYTE_ORDER
+#else
 # if defined(__hpux)
-#   define __BYTE_ORDER __BIG_ENDIAN
-# elif defined(__QNX__)
-#   if defined(__BIGENDIAN__)
-#     define __BYTE_ORDER __BIG_ENDIAN
-#   elif defined(__LITTLEENDIAN__)
-#     define __BYTE_ORDER __LITTLE_ENDIAN
-#   else
-#     error Host has unknown byte-order.
-#   endif
+#  define UNW_BYTE_ORDER UNW_BIG_ENDIAN
 # else
-#   error Host has unknown byte-order.
+#  error Target has unknown byte ordering.
 # endif
 #endif
+
+static inline int
+byte_order_is_valid(int byte_order)
+{
+    return byte_order != UNW_BIG_ENDIAN
+        && byte_order != UNW_LITTLE_ENDIAN;
+}
+
+static inline int
+byte_order_is_big_endian(int byte_order)
+{
+    return byte_order == UNW_BIG_ENDIAN;
+}
+
+static inline int
+target_is_big_endian()
+{
+    return byte_order_is_big_endian(UNW_BYTE_ORDER);
+}
 
 #if defined(HAVE__BUILTIN_UNREACHABLE)
 # define unreachable() __builtin_unreachable()
@@ -122,57 +164,6 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
         (pthread_mutex_lock != NULL ? pthread_mutex_lock (l) : 0)
 #define mutex_unlock(l)                                                 \
         (pthread_mutex_unlock != NULL ? pthread_mutex_unlock (l) : 0)
-
-#ifdef HAVE_ATOMIC_OPS_H
-# include <atomic_ops.h>
-static inline int
-cmpxchg_ptr (void *addr, void *old, void *new)
-{
-  union
-    {
-      void *vp;
-      AO_t *aop;
-    }
-  u;
-
-  u.vp = addr;
-  return AO_compare_and_swap(u.aop, (AO_t) old, (AO_t) new);
-}
-# define fetch_and_add1(_ptr)           AO_fetch_and_add1(_ptr)
-# define fetch_and_add(_ptr, value)     AO_fetch_and_add(_ptr, value)
-# define atomic_read(ptr) (AO_load(ptr))
-   /* GCC 3.2.0 on HP-UX crashes on cmpxchg_ptr() */
-#  if !(defined(__hpux) && __GNUC__ == 3 && __GNUC_MINOR__ == 2)
-#   define HAVE_CMPXCHG
-#  endif
-# define HAVE_FETCH_AND_ADD
-#elif defined(HAVE_SYNC_ATOMICS) || defined(HAVE_IA64INTRIN_H)
-# ifdef HAVE_IA64INTRIN_H
-#  include <ia64intrin.h>
-# endif
-static inline int
-cmpxchg_ptr (void *addr, void *old, void *new)
-{
-  union
-    {
-      void *vp;
-      long *vlp;
-    }
-  u;
-
-  u.vp = addr;
-  return __sync_bool_compare_and_swap(u.vlp, (long) old, (long) new);
-}
-# define fetch_and_add1(_ptr)           __sync_fetch_and_add(_ptr, 1)
-# define fetch_and_add(_ptr, value)     __sync_fetch_and_add(_ptr, value)
-# define atomic_read(ptr) (__atomic_load_n(ptr,__ATOMIC_RELAXED))
-# define HAVE_CMPXCHG
-# define HAVE_FETCH_AND_ADD
-#endif
-
-#ifndef atomic_read
-#define atomic_read(ptr)        (*(ptr))
-#endif
 
 #define UNWI_OBJ(fn)      UNW_PASTE(UNW_PREFIX,UNW_PASTE(I,fn))
 #define UNWI_ARCH_OBJ(fn) UNW_PASTE(UNW_PASTE(UNW_PASTE(_UI,UNW_TARGET),_), fn)
@@ -275,7 +266,7 @@ extern pthread_mutex_t _U_dyn_info_list_lock;
 extern long unwi_debug_level;
 
 # include <stdio.h>
-# define Debug(level,format...)                                         \
+# define Debug(level, /* format */ ...)                                 \
 do {                                                                    \
   if (unwi_debug_level >= level)                                        \
     {                                                                   \
@@ -283,19 +274,27 @@ do {                                                                    \
       if (_n > 16)                                                      \
         _n = 16;                                                        \
       fprintf (stderr, "%*c>%s: ", _n, ' ', __FUNCTION__);              \
-      fprintf (stderr, format);                                         \
+      fprintf (stderr, /* format */ __VA_ARGS__);                       \
     }                                                                   \
 } while (0)
-# define Dprintf(format...)         fprintf (stderr, format)
+# define Dprintf(/* format */ ...)                                      \
+  fprintf (stderr, /* format */ __VA_ARGS__)
 #else
-# define Debug(level,format...)
-# define Dprintf(format...)
+# define Debug(level, /* format */ ...)
+# define Dprintf( /* format */ ...)
 #endif
 
 static ALWAYS_INLINE int
 print_error (const char *string)
 {
   return write (2, string, strlen (string));
+}
+
+HIDDEN extern long unw_page_size;
+
+static inline unw_word_t uwn_page_start(unw_word_t addr)
+{
+  return addr & ~(unw_page_size - 1);
 }
 
 #define mi_init         UNWI_ARCH_OBJ(mi_init)
@@ -355,6 +354,10 @@ static inline void invalidate_edi (struct elf_dyn_info *edi)
 #endif /* !PT_ARM_EXIDX */
 
 #include "tdep/libunwind_i.h"
+
+#ifndef TDEP_DWARF_SP
+#define TDEP_DWARF_SP UNW_TDEP_SP
+#endif
 
 #ifndef tdep_get_func_addr
 # define tdep_get_func_addr(as,addr,v)          (*(v) = addr, 0)

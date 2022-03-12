@@ -92,14 +92,20 @@ struct UCD_info
     void *note_phdr; /* allocated or NULL */
     struct PRSTATUS_STRUCT *prstatus; /* points inside note_phdr */
     int n_threads;
-    struct PRSTATUS_STRUCT **threads;
-
+    struct PRSTATUS_STRUCT *threads;
     struct elf_dyn_info edi;
   };
 
-extern coredump_phdr_t * _UCD_get_elf_image(struct UCD_info *ui, unw_word_t ip);
 
-#define STRUCT_MEMBER_P(struct_p, struct_offset) ((void *) ((char*) (struct_p) + (long) (struct_offset)))
-#define STRUCT_MEMBER(member_type, struct_p, struct_offset) (*(member_type*) STRUCT_MEMBER_P ((struct_p), (struct_offset)))
+typedef int (*note_visitor_t)(uint32_t, uint32_t, uint32_t, char *, uint8_t *, void *);
+
+
+coredump_phdr_t * _UCD_get_elf_image(struct UCD_info *ui, unw_word_t ip);
+
+int _UCD_elf_read_segment(struct UCD_info *ui, coredump_phdr_t *phdr, uint8_t **segment, size_t *segment_size);
+int _UCD_elf_visit_notes(uint8_t *segment, size_t segment_size, note_visitor_t visit, void *arg);
+int _UCD_get_threadinfo(struct UCD_info *ui, coredump_phdr_t *phdrs, unsigned phdr_size);
+int _UCD_get_mapinfo(struct UCD_info *ui, coredump_phdr_t *phdrs, unsigned phdr_size);
+
 
 #endif

@@ -33,7 +33,7 @@ unw_init_remote (unw_cursor_t *cursor, unw_addr_space_t as, void *as_arg)
 #else /* !UNW_LOCAL_ONLY */
   struct cursor *c = (struct cursor *) cursor;
 
-  if (!tdep_init_done)
+  if (!atomic_load(&tdep_init_done))
     tdep_init ();
 
   Debug (1, "(cursor=%p)\n", c);

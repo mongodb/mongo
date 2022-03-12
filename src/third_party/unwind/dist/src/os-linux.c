@@ -25,6 +25,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 
 #include <limits.h>
 #include <stdio.h>
+#include <sys/stat.h>
 
 #include "libunwind_i.h"
 #include "os-linux.h"
@@ -37,11 +38,15 @@ tdep_get_elf_image (struct elf_image *ei, pid_t pid, unw_word_t ip,
   struct map_iterator mi;
   int found = 0, rc;
   unsigned long hi;
+  char root[sizeof ("/proc/0123456789/root")], *cp;
+  char *full_path;
+  struct stat st;
+
 
   if (maps_init (&mi, pid) < 0)
     return -1;
 
-  while (maps_next (&mi, segbase, &hi, mapoff))
+  while (maps_next (&mi, segbase, &hi, mapoff, NULL))
     if (ip >= *segbase && ip < hi)
       {
         found = 1;
@@ -53,11 +58,36 @@ tdep_get_elf_image (struct elf_image *ei, pid_t pid, unw_word_t ip,
       maps_close (&mi);
       return -1;
     }
+
+  full_path = mi.path;
+
+  /* Get process root */
+  memcpy (root, "/proc/", 6);
+  cp = unw_ltoa (root + 6, pid);
+  assert (cp + 6 < root + sizeof (root));
+  memcpy (cp, "/root", 6);
+
+  if (!stat(root, &st) && S_ISDIR(st.st_mode))
+    {
+      full_path = (char*) malloc (strlen (root) + strlen (mi.path) + 1);
+      if (!full_path)
+        full_path = mi.path;
+      else
+        {
+          strcpy (full_path, root);
+          strcat (full_path, mi.path);
+        }
+    }
+
   if (path)
     {
-      strncpy(path, mi.path, pathlen);
+      strncpy(path, full_path, pathlen);
     }
-  rc = elf_map_image (ei, mi.path);
+  rc = elf_map_image (ei, full_path);
+
+  if (full_path && full_path != mi.path)
+    free (full_path);
+
   maps_close (&mi);
   return rc;
 }
