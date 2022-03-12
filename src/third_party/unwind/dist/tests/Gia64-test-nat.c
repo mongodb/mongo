@@ -132,7 +132,7 @@ sighandler (int signal, void *siginfo, void *context)
   save_func_t **arg0;
   ucontext_t *uc = context;
 
-#if defined(__linux)
+#if defined(__linux__)
   {
     long sof;
     int sp;
@@ -159,7 +159,7 @@ sighandler (int signal, void *siginfo, void *context)
   (*arg0[0]) (arg0 + 1, arg1);
 
   /* skip over the instruction which triggered sighandler() */
-#if defined(__linux)
+#if defined(__linux__)
   ++uc->uc_mcontext.sc_ip;
 #elif defined(HAVE_SYS_UC_ACCESS_H)
   {

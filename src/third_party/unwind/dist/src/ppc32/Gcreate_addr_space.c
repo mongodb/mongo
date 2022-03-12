@@ -40,7 +40,7 @@ unw_create_addr_space (unw_accessors_t *a, int byte_order)
   /*
    * We support only big-endian on Linux ppc32.
    */
-  if (byte_order != 0 && byte_order != __BIG_ENDIAN)
+  if (byte_order != 0 && byte_order != UNW_BIG_ENDIAN)
     return NULL;
 
   as = malloc (sizeof (*as));

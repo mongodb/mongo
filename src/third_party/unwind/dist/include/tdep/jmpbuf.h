@@ -23,6 +23,8 @@
 # include "tdep-x86_64/jmpbuf.h"
 #elif defined __tilegx__
 # include "tdep-tilegx/jmpbuf.h"
+#elif defined __riscv || defined __riscv__
+# include "tdep-riscv/jmpbuf.h"
 #else
 # error "Unsupported arch"
 #endif

@@ -28,8 +28,55 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 
 #include <stddef.h>
 
+#ifdef HAVE_ASM_PTRACE_H
+# include <asm/ptrace.h>
+#endif
+
 #ifdef HAVE_ASM_PTRACE_OFFSETS_H
 # include <asm/ptrace_offsets.h>
+#endif
+
+#if defined(__powerpc64__) && defined(__FreeBSD__)
+#define PT_R0   0
+#define PT_R1   1
+#define PT_R2   2
+#define PT_R3   3
+#define PT_R4   4
+#define PT_R5   5
+#define PT_R6   6
+#define PT_R7   7
+#define PT_R8   8
+#define PT_R9   9
+#define PT_R10  10
+#define PT_R11  11
+#define PT_R12  12
+#define PT_R13  13
+#define PT_R14  14
+#define PT_R15  15
+#define PT_R16  16
+#define PT_R17  17
+#define PT_R18  18
+#define PT_R19  19
+#define PT_R20  20
+#define PT_R21  21
+#define PT_R22  22
+#define PT_R23  23
+#define PT_R24  24
+#define PT_R25  25
+#define PT_R26  26
+#define PT_R27  27
+#define PT_R28  28
+#define PT_R29  29
+#define PT_R30  30
+#define PT_R31  31
+#define PT_NIP  32
+#define PT_CTR  35
+#define PT_LNK  36
+#define PT_XER  37
+#define PT_FPR0  48
+#define PT_VR0  82
+#define PT_VSCR (PT_VR0 + 32*2 + 1)
+#define PT_VRSAVE (PT_VR0 + 33*2)
 #endif
 
 const int _UPT_reg_offset[UNW_REG_LAST + 1] =
@@ -666,6 +713,47 @@ const int _UPT_reg_offset[UNW_REG_LAST + 1] =
     [UNW_S390X_F14]     = 0x150,
     [UNW_S390X_F15]     = 0x150,
     [UNW_S390X_IP]      = 0x08
+#elif defined(UNW_TARGET_RISCV)
+
+#if __riscv_xlen == 64
+# define RISCV_REG_OFFSET(x) (8*x)
+#elif __riscv_xlen == 32
+# define RISCV_REG_OFFSET(x) (4*x)
+#else
+# error "Unsupported address size"
+#endif
+    [UNW_RISCV_PC]  = RISCV_REG_OFFSET(0),
+    [UNW_RISCV_X1]  = RISCV_REG_OFFSET(1),
+    [UNW_RISCV_X2]  = RISCV_REG_OFFSET(2),
+    [UNW_RISCV_X3]  = RISCV_REG_OFFSET(3),
+    [UNW_RISCV_X4]  = RISCV_REG_OFFSET(4),
+    [UNW_RISCV_X5]  = RISCV_REG_OFFSET(5),
+    [UNW_RISCV_X6]  = RISCV_REG_OFFSET(6),
+    [UNW_RISCV_X7]  = RISCV_REG_OFFSET(7),
+    [UNW_RISCV_X8]  = RISCV_REG_OFFSET(8),
+    [UNW_RISCV_X9]  = RISCV_REG_OFFSET(9),
+    [UNW_RISCV_X10] = RISCV_REG_OFFSET(10),
+    [UNW_RISCV_X11] = RISCV_REG_OFFSET(11),
+    [UNW_RISCV_X12] = RISCV_REG_OFFSET(12),
+    [UNW_RISCV_X13] = RISCV_REG_OFFSET(13),
+    [UNW_RISCV_X14] = RISCV_REG_OFFSET(14),
+    [UNW_RISCV_X15] = RISCV_REG_OFFSET(15),
+    [UNW_RISCV_X16] = RISCV_REG_OFFSET(16),
+    [UNW_RISCV_X17] = RISCV_REG_OFFSET(17),
+    [UNW_RISCV_X18] = RISCV_REG_OFFSET(18),
+    [UNW_RISCV_X19] = RISCV_REG_OFFSET(19),
+    [UNW_RISCV_X20] = RISCV_REG_OFFSET(20),
+    [UNW_RISCV_X21] = RISCV_REG_OFFSET(21),
+    [UNW_RISCV_X22] = RISCV_REG_OFFSET(22),
+    [UNW_RISCV_X23] = RISCV_REG_OFFSET(23),
+    [UNW_RISCV_X24] = RISCV_REG_OFFSET(24),
+    [UNW_RISCV_X25] = RISCV_REG_OFFSET(25),
+    [UNW_RISCV_X26] = RISCV_REG_OFFSET(26),
+    [UNW_RISCV_X27] = RISCV_REG_OFFSET(27),
+    [UNW_RISCV_X28] = RISCV_REG_OFFSET(28),
+    [UNW_RISCV_X29] = RISCV_REG_OFFSET(29),
+    [UNW_RISCV_X30] = RISCV_REG_OFFSET(30),
+    [UNW_RISCV_X31] = RISCV_REG_OFFSET(31),
 #else
 # error Fix me.
 #endif

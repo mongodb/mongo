@@ -653,28 +653,28 @@ Copyright (c) 2011, Intel Corp.
 
 All rights reserved.
 
-Redistribution and use in source and binary forms, with or without modification, 
+Redistribution and use in source and binary forms, with or without modification,
 are permitted provided that the following conditions are met:
 
    * Redistributions of source code must retain the above copyright notice, this
      list of conditions and the following disclaimer.
-   * Redistributions in binary form must reproduce the above copyright notice, 
-     his list of conditions and the following disclaimer in the documentation 
+   * Redistributions in binary form must reproduce the above copyright notice,
+     his list of conditions and the following disclaimer in the documentation
      and/or other materials provided with the distribution.
-   * Neither the name of Intel Corporation nor the names of its contributors 
-     may be used to endorse or promote products derived from this software 
+   * Neither the name of Intel Corporation nor the names of its contributors
+     may be used to endorse or promote products derived from this software
      without specific prior written permission.
 
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE 
-DISCLAIMED. 
-IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, 
-INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, 
-BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, 
-DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF 
-LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE 
-OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF 
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED.
+IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
+OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
@@ -683,7 +683,7 @@ ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -----------------------------------
 
 Copyright © 1991-2015 Unicode, Inc. All rights reserved.
-Distributed under the Terms of Use in 
+Distributed under the Terms of Use in
 http://www.unicode.org/copyright.html.
 
 Permission is hereby granted, free of charge, to any person obtaining
@@ -694,9 +694,9 @@ without restriction, including without limitation the rights to use,
 copy, modify, merge, publish, distribute, and/or sell copies of
 the Data Files or Software, and to permit persons to whom the Data Files
 or Software are furnished to do so, provided that
-(a) this copyright and permission notice appear with all copies 
+(a) this copyright and permission notice appear with all copies
 of the Data Files or Software,
-(b) this copyright and permission notice appear in associated 
+(b) this copyright and permission notice appear in associated
 documentation, and
 (c) there is clear notice in each modified Data File or in the Software
 as well as in the documentation associated with the Data File(s) or
@@ -743,16 +743,16 @@ are met:
 1. Redistributions of source code must retain the above copyright
    notice, this list of conditions and the following disclaimer.
 
-2. The origin of this software must not be misrepresented; you must 
-   not claim that you wrote the original software.  If you use this 
-   software in a product, an acknowledgment in the product 
+2. The origin of this software must not be misrepresented; you must
+   not claim that you wrote the original software.  If you use this
+   software in a product, an acknowledgment in the product
    documentation would be appreciated but is not required.
 
 3. Altered source versions must be plainly marked as such, and must
    not be misrepresented as being the original software.
 
-4. The name of the author may not be used to endorse or promote 
-   products derived from this software without specific prior written 
+4. The name of the author may not be used to endorse or promote
+   products derived from this software without specific prior written
    permission.
 
 THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS
@@ -774,7 +774,7 @@ Notice that the above BSD-style license applies to this one file
 the terms of the GNU General Public License, version 2.  See the
 COPYING file in the source distribution for details.
 
----------------------------------------------------------------- 
+----------------------------------------------------------------
 
 18) License notice for ICU4C
 ----------------------------
@@ -822,7 +822,7 @@ Third-Party Software Licenses
 
 This section contains third-party software notices and/or additional
 terms for licensed third-party software components included within ICU
-libraries. 
+libraries.
 
 1. Unicode Data Files and Software
 
@@ -868,7 +868,7 @@ written authorization of the copyright holder.
 
  #     The Google Chrome software developed by Google is licensed under
  # the BSD license. Other software included in this distribution is
- # provided under other licenses, as set forth below. 
+ # provided under other licenses, as set forth below.
  #
  #  The BSD License
  #  http://opensource.org/licenses/bsd-license.php
@@ -880,14 +880,14 @@ written authorization of the copyright holder.
  # modification, are permitted provided that the following conditions are met:
  #
  #  Redistributions of source code must retain the above copyright notice,
- # this list of conditions and the following disclaimer. 
+ # this list of conditions and the following disclaimer.
  #  Redistributions in binary form must reproduce the above
  # copyright notice, this list of conditions and the following
  # disclaimer in the documentation and/or other materials provided with
- # the distribution. 
+ # the distribution.
  #  Neither the name of  Google Inc. nor the names of its
  # contributors may be used to endorse or promote products derived from
- # this software without specific prior written permission. 
+ # this software without specific prior written permission.
  #
  #
  #  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND
@@ -901,13 +901,13 @@ written authorization of the copyright holder.
  # BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
  # LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
  # NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+ # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  #
  #
  #  The word list in cjdict.txt are generated by combining three word lists
  # listed below with further processing for compound word breaking. The
  # frequency is generated with an iterative training against Google web
- # corpora. 
+ # corpora.
  #
  #  * Libtabe (Chinese)
  #    - https://sourceforge.net/project/?group_id=1519
@@ -1079,13 +1079,13 @@ written authorization of the copyright holder.
  #              (copied below)
  #
  #  This file is derived from the above dictionary, with slight
- #  modifications. 
+ #  modifications.
  #  ----------------------------------------------------------------------
  #  Copyright (C) 2013 Brian Eugene Wilson, Robert Martin Campbell.
  #  All rights reserved.
  #
  #  Redistribution and use in source and binary forms, with or without
- #  modification, 
+ #  modification,
  #  are permitted provided that the following conditions are met:
  #
  #
@@ -1149,7 +1149,7 @@ written authorization of the copyright holder.
  #  THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  #  SUCH DAMAGE.
  #  --------------------------------------------------------------------------
- 
+
 5. Time Zone Database
 
   ICU uses the public domain data and code derived from Time Zone
@@ -1422,25 +1422,25 @@ THE SOFTWARE.
 ----------------------------
 
   BSD License
-  
+
   For Zstandard software
-  
+
   Copyright (c) 2016-present, Facebook, Inc. All rights reserved.
-  
+
   Redistribution and use in source and binary forms, with or without modification,
   are permitted provided that the following conditions are met:
-  
+
    * Redistributions of source code must retain the above copyright notice, this
      list of conditions and the following disclaimer.
-  
+
    * Redistributions in binary form must reproduce the above copyright notice,
      this list of conditions and the following disclaimer in the documentation
      and/or other materials provided with the distribution.
-  
+
    * Neither the name Facebook nor the names of its contributors may be used to
      endorse or promote products derived from this software without specific
      prior written permission.
-  
+
   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
   ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
   WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -1564,5 +1564,27 @@ https://github.com/ongardie/dissertation/blob/master/LICENSE
 Copyright 2014 Diego Ongaro.
 
 Some of our TLA+ specifications are based on the Raft TLA+ specification by Diego Ongaro.
+
+ 28)  License Notice for libunwind
+------------------------------
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 End

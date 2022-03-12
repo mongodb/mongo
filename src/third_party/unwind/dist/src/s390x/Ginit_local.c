@@ -43,7 +43,7 @@ unw_init_local_common (unw_cursor_t *cursor, ucontext_t *uc, unsigned use_prev_i
 {
   struct cursor *c = (struct cursor *) cursor;
 
-  if (unlikely (!tdep_init_done))
+  if (unlikely (!atomic_load(&tdep_init_done)))
     tdep_init ();
 
   Debug (1, "(cursor=%p)\n", c);

@@ -33,6 +33,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 
 #include <stdlib.h>
 #include <libunwind.h>
+#include <stdatomic.h>
 
 #include "elf64.h"
 #include "mempool.h"
@@ -42,11 +43,7 @@ struct unw_addr_space
   {
     struct unw_accessors acc;
     unw_caching_policy_t caching_policy;
-#ifdef HAVE_ATOMIC_OPS_H
-    AO_t cache_generation;
-#else
-    uint32_t cache_generation;
-#endif
+    _Atomic uint32_t cache_generation;
     unw_word_t dyn_generation;          /* see dyn-common.h */
     unw_word_t dyn_info_list_addr;      /* (cached) dyn_info_list_addr */
     struct dwarf_rs_cache global_cache;
@@ -167,16 +164,16 @@ dwarf_get (struct dwarf_cursor *c, dwarf_loc_t loc, unw_word_t *val)
   if (DWARF_IS_NULL_LOC (loc))
     return -UNW_EBADREG;
 
+  /* GPRs may be saved in FPRs */
+  if (DWARF_IS_FP_LOC (loc))
+    return (*c->as->acc.access_fpreg) (c->as, DWARF_GET_LOC (loc), (unw_fpreg_t*)val,
+                                       0, c->as_arg);
   if (DWARF_IS_REG_LOC (loc))
     return (*c->as->acc.access_reg) (c->as, DWARF_GET_LOC (loc), val,
                                      0, c->as_arg);
   if (DWARF_IS_MEM_LOC (loc))
     return (*c->as->acc.access_mem) (c->as, DWARF_GET_LOC (loc), val,
                                      0, c->as_arg);
-  /* GPRs may be saved in FPRs */
-  if (DWARF_IS_FP_LOC (loc))
-    return (*c->as->acc.access_fpreg) (c->as, DWARF_GET_LOC (loc), (unw_fpreg_t*)val,
-                                       0, c->as_arg);
   assert(DWARF_IS_VAL_LOC (loc));
   *val = DWARF_GET_LOC (loc);
   return 0;
@@ -191,13 +188,13 @@ dwarf_put (struct dwarf_cursor *c, dwarf_loc_t loc, unw_word_t val)
   if (DWARF_IS_NULL_LOC (loc))
     return -UNW_EBADREG;
 
-  if (DWARF_IS_REG_LOC (loc))
-    return (*c->as->acc.access_reg) (c->as, DWARF_GET_LOC (loc), &val,
-                                     1, c->as_arg);
   /* GPRs may be saved in FPRs */
   if (DWARF_IS_FP_LOC (loc))
     return (*c->as->acc.access_fpreg) (c->as, DWARF_GET_LOC (loc), (unw_fpreg_t*) &val,
                                        1, c->as_arg);
+  if (DWARF_IS_REG_LOC (loc))
+    return (*c->as->acc.access_reg) (c->as, DWARF_GET_LOC (loc), &val,
+                                     1, c->as_arg);
 
   assert(DWARF_IS_MEM_LOC (loc));
   return (*c->as->acc.access_mem) (c->as, DWARF_GET_LOC (loc), &val,
@@ -242,7 +239,7 @@ dwarf_put (struct dwarf_cursor *c, dwarf_loc_t loc, unw_word_t val)
 #define tdep_get_ip(c)                  ((c)->dwarf.ip)
 #define tdep_big_endian(as)             1
 
-extern int tdep_init_done;
+extern atomic_bool tdep_init_done;
 
 extern void tdep_init (void);
 extern void tdep_init_mem_validate (void);

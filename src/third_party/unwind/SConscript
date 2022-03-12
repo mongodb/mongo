@@ -93,7 +93,8 @@ env.Append(
         '-fcommon',
         '-fexceptions',
         '-Wno-unused-result',
-        '-Wno-unused-value',
+        '-Wno-pointer-sign',
+        '-Wno-incompatible-pointer-types',
         '-Wno-unused-variable',
     ])
 
@@ -111,10 +112,10 @@ env.Append(
 # propagates to consumers that Inject (depend on) unwind.
 env.RegisterConsumerModifications(
     CPPPATH=[unwind_platform.Dir("install/include")],
-    LIBS=['lzma'])
+    SYSLIBDEPS_PRIVATE=[env['LIBDEPS_LZMA_SYSLIBDEP']])
 
 env.Append(
-    LIBS=['lzma'])
+    SYSLIBDEPS_PRIVATE=[env['LIBDEPS_LZMA_SYSLIBDEP']])
 
 env.Append(
     CPPDEFINES=[

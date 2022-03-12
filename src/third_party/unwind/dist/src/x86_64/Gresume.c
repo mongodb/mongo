@@ -27,6 +27,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 
 #include <stdlib.h>
 
+#include "libunwind_i.h"
 #include "offsets.h"
 #include "unwind_i.h"
 
@@ -36,7 +37,7 @@ HIDDEN inline int
 x86_64_local_resume (unw_addr_space_t as, unw_cursor_t *cursor, void *arg)
 {
   struct cursor *c = (struct cursor *) cursor;
-  ucontext_t *uc = c->uc;
+  ucontext_t *uc = dwarf_get_uc(&c->dwarf);
 
   /* Ensure c->pi is up-to-date.  On x86-64, it's relatively common to
      be missing DWARF unwind info.  We don't want to fail in that

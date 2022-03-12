@@ -24,6 +24,8 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 /* This illustrates the basics of using the unwind interface for
    exception handling.  */
 
+#include "compiler.h"
+
 #ifdef HAVE_CONFIG_H
 # include "config.h"
 #endif
@@ -54,6 +56,8 @@ raise_exception (void)
   unw_cursor_t cursor;
   unw_context_t uc;
   int i;
+  unw_word_t ip;
+  unw_word_t sp;
 
   unw_getcontext (&uc);
   if (unw_init_local (&cursor, &uc) < 0)
@@ -62,12 +66,26 @@ raise_exception (void)
       return;
     }
 
+  if (verbose)
+    {
+      printf ("raise_exception(): sp=%p\n", (void*) &sp);
+      unw_get_reg (&cursor, UNW_REG_IP, &ip);
+      unw_get_reg (&cursor, UNW_REG_SP, &sp);
+      printf ("\t #%-3d ip=%p sp=%p\n", 0, (void*) ip, (void*) sp);
+    }
+
   /* unwind to top-most frame a(), skipping over b() and raise_exception(): */
   for (i = 0; i < depth + 2; ++i)
     if (unw_step (&cursor) < 0)
       {
 	panic ("unw_step() failed!\n");
 	return;
+      }
+    else if (verbose)
+      {
+	unw_get_reg (&cursor, UNW_REG_IP, &ip);
+	unw_get_reg (&cursor, UNW_REG_SP, &sp);
+	printf ("\t #%-3d ip=%p sp=%p\n", i + 1, (void*) ip, (void*) sp);
       }
   unw_resume (&cursor);	/* transfer control to exception handler */
 }
@@ -86,7 +104,7 @@ get_bsp (void)
 #endif
 }
 
-int
+int NOINLINE
 a (int n)
 {
   long stack;
@@ -118,7 +136,7 @@ a (int n)
   return result;
 }
 
-void
+void NOINLINE
 b (int n)
 {
   if ((n & 1) == 0)

@@ -43,9 +43,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 typedef struct dwarf_loc
   {
     unw_word_t val;
-#ifndef UNW_LOCAL_ONLY
     unw_word_t type;            /* see X86_LOC_TYPE_* macros.  */
-#endif
   }
 dwarf_loc_t;
 

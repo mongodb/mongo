@@ -214,11 +214,14 @@ unw_step (unw_cursor_t *cursor)
   if (unlikely (ret == -UNW_ESTOPUNWIND))
     return ret;
 
-#if _MIPS_SIM == _ABI64
   if (unlikely (ret < 0))
     {
+#if _MIPS_SIM == _ABI64
       return _step_n64(c);
-    }
+#else
+      return ret;
 #endif
+    }
+
   return (c->dwarf.ip == 0) ? 0 : 1;
 }
