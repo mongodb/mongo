@@ -369,7 +369,7 @@ TEST_F(FaultManagerTest, DNSHealthCheckWithBadHostNameFailsAndGoodHostNameSucces
     resetManager(std::move(config));
 
     auto serverParam =
-        ServerParameterSet::getNodeParameterSet()->get<PeriodicHealthCheckIntervalsServerParameter>(
+        ServerParameterSet::getGlobal()->get<PeriodicHealthCheckIntervalsServerParameter>(
             "healthMonitoringIntervals");
     auto bsonOBj = BSON("values" << BSON_ARRAY(BSON("type"
                                                     << "dns"

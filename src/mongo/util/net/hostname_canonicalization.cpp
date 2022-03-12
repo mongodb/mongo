@@ -102,7 +102,7 @@ StatusWith<std::vector<std::string>> getHostFQDNs(std::string hostName,
         return Status(ErrorCodes::BadValue, errorStr);
     }
 
-    const ScopeGuard guard(shim_freeaddrinfo);
+    const auto guard = makeGuard(shim_freeaddrinfo);
 
     if (mode == HostnameCanonicalizationMode::kForward) {
         results.emplace_back(shim_fromNativeString(info->ai_canonname));
