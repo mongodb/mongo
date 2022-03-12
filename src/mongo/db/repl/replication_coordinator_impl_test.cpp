@@ -72,6 +72,7 @@
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/transport/hello_metrics.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/ensure_fcv.h"
@@ -3634,6 +3635,66 @@ TEST_F(ReplCoordTest, HelloReturnsErrorOnEnteringQuiesceModeAfterWaitingTimesOut
     }
 
     getHelloThread.join();
+}
+
+TEST_F(ReplCoordTest, AlwaysDecrementNumAwaitingTopologyChangesOnErrorMongoD) {
+    init();
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("host"
+                                               << "node1:12345"
+                                               << "_id" << 0))),
+                       HostAndPort("node1", 12345));
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+
+    auto opCtx = makeOperationContext();
+    ASSERT_EQUALS(0, HelloMetrics::get(opCtx.get())->getNumAwaitingTopologyChanges());
+
+    auto hangFP = globalFailPointRegistry().find("hangAfterWaitingForTopologyChangeTimesOut");
+    auto timesEnteredHangFP = hangFP->setMode(FailPoint::alwaysOn);
+
+    // Use a novel error code to test this functionality.
+    auto expectedErrorCode = 6208201;
+    auto customErrorFP = globalFailPointRegistry().find("setCustomErrorInHelloResponseMongoD");
+    customErrorFP->setMode(FailPoint::alwaysOn, 0, BSON("errorType" << expectedErrorCode));
+    ON_BLOCK_EXIT([&] { customErrorFP->setMode(FailPoint::off, 0); });
+
+    auto deadline = getNet()->now() + Milliseconds(5000);
+    auto currentTopologyVersion = getTopoCoord().getTopologyVersion();
+
+    AtomicWord<bool> helloReturned{false};
+    stdx::thread getHelloThread([&] {
+        ASSERT_THROWS_CODE(
+            awaitHelloWithNewOpCtx(getReplCoord(), currentTopologyVersion, {}, deadline),
+            AssertionException,
+            ErrorCodes::Error(expectedErrorCode));
+        helloReturned.store(true);
+    });
+
+    getNet()->enterNetwork();
+    getNet()->advanceTime(deadline);
+    ASSERT_EQUALS(deadline, getNet()->now());
+    getNet()->exitNetwork();
+
+    hangFP->waitForTimesEntered(timesEnteredHangFP + 1);
+
+    // Observe that the counter has been incremented.
+    ASSERT_EQUALS(1, HelloMetrics::get(opCtx.get())->getNumAwaitingTopologyChanges());
+
+    hangFP->setMode(FailPoint::off, 0);
+
+    // Advance the clock so that pauseWhileSet() will wake up.
+    while (!helloReturned.load()) {
+        getNet()->enterNetwork();
+        getNet()->advanceTime(getNet()->now() + Milliseconds(100));
+        getNet()->exitNetwork();
+    }
+    getHelloThread.join();
+    ASSERT_TRUE(helloReturned.load());
+
+    // Make sure we still decremented the counter.
+    ASSERT_EQUALS(0, HelloMetrics::get(opCtx.get())->getNumAwaitingTopologyChanges());
 }
 
 TEST_F(ReplCoordTest, HelloReturnsErrorInQuiesceMode) {

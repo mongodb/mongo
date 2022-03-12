@@ -148,6 +148,8 @@ MONGO_FAIL_POINT_DEFINE(hangAfterReconfig);
 MONGO_FAIL_POINT_DEFINE(skipBeforeFetchingConfig);
 // Hang after grabbing the RSTL but before we start rejecting writes.
 MONGO_FAIL_POINT_DEFINE(stepdownHangAfterGrabbingRSTL);
+// Simulates returning a specified error in the hello response.
+MONGO_FAIL_POINT_DEFINE(setCustomErrorInHelloResponseMongoD);
 
 // Number of times we tried to go live as a secondary.
 Counter64 attemptsToBecomeSecondary;
@@ -2368,15 +2370,38 @@ std::shared_ptr<const HelloResponse> ReplicationCoordinatorImpl::awaitHelloRespo
         hangAfterWaitingForTopologyChangeTimesOut.pauseWhileSet(opCtx);
     }
 
-    if (status == ErrorCodes::ExceededTimeLimit) {
+    setCustomErrorInHelloResponseMongoD.execute([&](const BSONObj& data) {
+        auto errorCode = data["errorType"].safeNumberInt();
+        LOGV2(6208200,
+              "Triggered setCustomErrorInHelloResponseMongoD fail point.",
+              "errorCode"_attr = errorCode);
+
+        status = Status(ErrorCodes::Error(errorCode),
+                        "Set by setCustomErrorInHelloResponseMongoD fail point.");
+    });
+
+    if (!status.isOK()) {
+        LOGV2_DEBUG(6208204, 1, "Error while waiting for hello response", "status"_attr = status);
+
+        // We decrement the counter on most errors. Note that some errors may already be covered
+        // by calls to resetNumAwaitingTopologyChanges(), which sets the counter to zero, so we
+        // only decrement non-zero counters. This is safe so long as:
+        // 1) Increment + decrement calls always occur at a 1:1 ratio and in that order.
+        // 2) All callers to increment/decrement/reset take locks.
+        stdx::lock_guard lk(_mutex);
+        if (status != ErrorCodes::SplitHorizonChange &&
+            HelloMetrics::get(opCtx)->getNumAwaitingTopologyChanges() > 0) {
+            HelloMetrics::get(opCtx)->decrementNumAwaitingTopologyChanges();
+        }
+
         // Return a HelloResponse with the current topology version on timeout when waiting for
         // a topology change.
-        stdx::lock_guard lk(_mutex);
-        HelloMetrics::get(opCtx)->decrementNumAwaitingTopologyChanges();
-        // A topology change has not occured within the deadline so horizonString is still a good
-        // indicator of whether we have a valid config.
-        const bool hasValidConfig = horizonString != boost::none;
-        return _makeHelloResponse(horizonString, lk, hasValidConfig);
+        if (status == ErrorCodes::ExceededTimeLimit) {
+            // A topology change has not occured within the deadline so horizonString is still a
+            // good indicator of whether we have a valid config.
+            const bool hasValidConfig = horizonString != boost::none;
+            return _makeHelloResponse(horizonString, lk, hasValidConfig);
+        }
     }
 
     // A topology change has happened so we return a HelloResponse with the updated

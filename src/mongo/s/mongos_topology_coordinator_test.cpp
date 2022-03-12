@@ -35,6 +35,7 @@
 #include "mongo/platform/basic.h"
 #include "mongo/s/concurrency/locker_mongos_client_observer.h"
 #include "mongo/s/mongos_topology_coordinator.h"
+#include "mongo/transport/hello_metrics.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/fail_point.h"
@@ -292,6 +293,54 @@ TEST_F(MongosTopoCoordTest, HelloReturnsErrorOnEnteringQuiesceMode) {
                   getTopoCoord().getTopologyVersion().getCounter());
     waitForHelloFailPoint->setMode(FailPoint::off);
     getHelloThread.join();
+}
+
+TEST_F(MongosTopoCoordTest, AlwaysDecrementNumAwaitingTopologyChangesOnErrorMongoS) {
+    auto opCtx = makeOperationContext();
+    ASSERT_EQUALS(0, HelloMetrics::get(opCtx.get())->getNumAwaitingTopologyChanges());
+
+    auto hangFP = globalFailPointRegistry().find("hangWhileWaitingForHelloResponse");
+    auto timesEnteredHangFP = hangFP->setMode(FailPoint::alwaysOn);
+
+    // Use a novel error code to test this functionality.
+    auto expectedErrorCode = 6208203;
+    auto customErrorFP = globalFailPointRegistry().find("setCustomErrorInHelloResponseMongoS");
+    customErrorFP->setMode(FailPoint::alwaysOn, 0, BSON("errorType" << expectedErrorCode));
+    ON_BLOCK_EXIT([&] { customErrorFP->setMode(FailPoint::off, 0); });
+
+    auto maxAwaitTime = Milliseconds(5000);
+    auto deadline = now() + maxAwaitTime;
+    auto currentTopologyVersion = getTopoCoord().getTopologyVersion();
+
+    AtomicWord<bool> helloReturned{false};
+    stdx::thread getHelloThread([&] {
+        Client::setCurrent(getServiceContext()->makeClient("getHelloThread"));
+        auto threadOpCtx = cc().makeOperationContext();
+        ASSERT_THROWS_CODE(
+            getTopoCoord().awaitHelloResponse(threadOpCtx.get(), currentTopologyVersion, deadline),
+            AssertionException,
+            ErrorCodes::Error(expectedErrorCode));
+        helloReturned.store(true);
+    });
+
+    advanceTime(maxAwaitTime);
+
+    hangFP->waitForTimesEntered(timesEnteredHangFP + 1);
+
+    // Observe that the counter has been incremented.
+    ASSERT_EQUALS(1, HelloMetrics::get(opCtx.get())->getNumAwaitingTopologyChanges());
+
+    hangFP->setMode(FailPoint::off, 0);
+
+    // Advance the clock so that pauseWhileSet() will wake up.
+    while (!helloReturned.load()) {
+        advanceTime(Milliseconds(100));
+    }
+    getHelloThread.join();
+    ASSERT_TRUE(helloReturned.load());
+
+    // Make sure we still decremented the counter.
+    ASSERT_EQUALS(0, HelloMetrics::get(opCtx.get())->getNumAwaitingTopologyChanges());
 }
 
 }  // namespace

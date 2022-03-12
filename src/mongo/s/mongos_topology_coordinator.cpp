@@ -61,6 +61,8 @@ MONGO_FAIL_POINT_DEFINE(waitForHelloResponse);
 MONGO_FAIL_POINT_DEFINE(hangWhileWaitingForHelloResponse);
 // Failpoint for hanging during quiesce mode on mongos.
 MONGO_FAIL_POINT_DEFINE(hangDuringQuiesceMode);
+// Simulates returning a specified error in the hello response.
+MONGO_FAIL_POINT_DEFINE(setCustomErrorInHelloResponseMongoS);
 
 template <typename T>
 StatusOrStatusWith<T> futureGetNoThrowWithDeadline(OperationContext* opCtx,
@@ -174,12 +176,35 @@ std::shared_ptr<const MongosHelloResponse> MongosTopologyCoordinator::awaitHello
         futureGetNoThrowWithDeadline(opCtx, future, deadline.get(), opCtx->getTimeoutError());
     auto status = statusWithHello.getStatus();
 
-    if (status == ErrorCodes::ExceededTimeLimit) {
+    setCustomErrorInHelloResponseMongoS.execute([&](const BSONObj& data) {
+        auto errorCode = data["errorType"].safeNumberInt();
+        LOGV2(6208202,
+              "Triggered setCustomErrorInHelloResponseMongoS fail point.",
+              "errorCode"_attr = errorCode);
+
+        status = Status(ErrorCodes::Error(errorCode),
+                        "Set by setCustomErrorInHelloResponseMongoS fail point.");
+    });
+
+    if (!status.isOK()) {
+        LOGV2_DEBUG(6208205, 1, "Error while waiting for hello response", "status"_attr = status);
+
+        // We decrement the counter on most errors. Note that some errors may already be covered
+        // by calls to resetNumAwaitingTopologyChanges(), which sets the counter to zero, so we
+        // only decrement non-zero counters. This is safe so long as:
+        // 1) Increment + decrement calls always occur at a 1:1 ratio and in that order.
+        // 2) All callers to increment/decrement/reset take locks.
+        stdx::lock_guard lk(_mutex);
+        if (status != ErrorCodes::SplitHorizonChange &&
+            HelloMetrics::get(opCtx)->getNumAwaitingTopologyChanges() > 0) {
+            HelloMetrics::get(opCtx)->decrementNumAwaitingTopologyChanges();
+        }
+
         // Return a MongosHelloResponse with the current topology version on timeout when
         // waiting for a topology change.
-        stdx::lock_guard lk(_mutex);
-        HelloMetrics::get(opCtx)->decrementNumAwaitingTopologyChanges();
-        return _makeHelloResponse(lk);
+        if (status == ErrorCodes::ExceededTimeLimit) {
+            return _makeHelloResponse(lk);
+        }
     }
 
     // A topology change has happened so we return a MongosHelloResponse with the updated
