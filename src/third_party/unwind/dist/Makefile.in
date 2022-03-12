@@ -103,9 +103,11 @@ target_triplet = @target@
 @ARCH_PPC64_TRUE@am__append_12 = include/libunwind-ppc64.h
 @ARCH_SH_TRUE@am__append_13 = include/libunwind-sh.h
 @ARCH_S390X_TRUE@am__append_14 = include/libunwind-s390x.h
-@REMOTE_ONLY_FALSE@am__append_15 = include/libunwind.h include/unwind.h
-@CONFIG_TESTS_TRUE@am__append_16 = tests
-@CONFIG_DOCS_TRUE@am__append_17 = doc
+@ARCH_RISCV_TRUE@am__append_15 = include/libunwind-riscv.h
+@REMOTE_ONLY_FALSE@am__append_16 = include/libunwind.h
+@BUILD_UNWIND_HEADER_TRUE@@REMOTE_ONLY_FALSE@am__append_17 = include/unwind.h
+@CONFIG_TESTS_TRUE@am__append_18 = tests
+@CONFIG_DOCS_TRUE@am__append_19 = doc
 subdir = .
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/acinclude.m4 \
@@ -159,7 +161,7 @@ am__include_HEADERS_DIST = include/libunwind-dynamic.h \
 	include/libunwind-x86.h include/libunwind-x86_64.h \
 	include/libunwind-ppc32.h include/libunwind-ppc64.h \
 	include/libunwind-sh.h include/libunwind-s390x.h \
-	include/libunwind.h include/unwind.h
+	include/libunwind-riscv.h include/libunwind.h include/unwind.h
 am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
 am__vpath_adj = case $$p in \
     $(srcdir)/*) f=`echo "$$p" | sed "s|^$$srcdirstrip/||"`;; \
@@ -427,9 +429,10 @@ include_HEADERS = include/libunwind-dynamic.h $(am__append_1) \
 	$(am__append_5) $(am__append_6) $(am__append_7) \
 	$(am__append_8) $(am__append_9) $(am__append_10) \
 	$(am__append_11) $(am__append_12) $(am__append_13) \
-	$(am__append_14) $(am__append_15)
+	$(am__append_14) $(am__append_15) $(am__append_16) \
+	$(am__append_17)
 nodist_include_HEADERS = include/libunwind-common.h
-SUBDIRS = src $(am__append_16) $(am__append_17)
+SUBDIRS = src $(am__append_18) $(am__append_19)
 noinst_HEADERS = include/dwarf.h include/dwarf_i.h include/dwarf-eh.h	\
 	include/compiler.h include/libunwind_i.h include/mempool.h	\
 	include/remote.h						\
@@ -458,6 +461,8 @@ noinst_HEADERS = include/dwarf.h include/dwarf_i.h include/dwarf-eh.h	\
 	include/tdep-sh/jmpbuf.h include/tdep-sh/libunwind_i.h		\
 	include/tdep-s390x/dwarf-config.h				\
 	include/tdep-s390x/jmpbuf.h include/tdep-s390x/libunwind_i.h	\
+	include/tdep-riscv/dwarf-config.h				\
+	include/tdep-riscv/jmpbuf.h include/tdep-riscv/libunwind_i.h	\
 	include/tdep/libunwind_i.h					\
 	include/tdep/jmpbuf.h include/tdep/dwarf-config.h
 

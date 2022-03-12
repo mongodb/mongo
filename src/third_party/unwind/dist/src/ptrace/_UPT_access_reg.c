@@ -268,6 +268,16 @@ _UPT_access_reg (unw_addr_space_t as, unw_regnum_t reg, unw_word_t *val,
       }
 #endif /* End of IA64 */
 
+#if UNW_TARGET_RISCV
+  if (reg == UNW_RISCV_X0) {
+    if (write)
+      goto badreg;
+
+    *val = 0;
+    return 0;
+  }
+#endif /* End of RISCV */
+
   if ((unsigned) reg >= ARRAY_SIZE (_UPT_reg_offset))
     {
 #if UNW_DEBUG

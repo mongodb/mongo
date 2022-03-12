@@ -47,7 +47,7 @@ unw_step (unw_cursor_t *cursor)
     {
       /* DWARF failed, let's see if we can follow the frame-chain
          or skip over the signal trampoline.  */
-      struct dwarf_loc ebp_loc, eip_loc;
+      struct dwarf_loc ebp_loc, eip_loc, esp_loc;
 
       /* We could get here because of missing/bad unwind information.
          Validate all addresses before dereferencing. */
@@ -77,6 +77,7 @@ unw_step (unw_cursor_t *cursor)
                  c->dwarf.cfa);
 
           ebp_loc = DWARF_LOC (c->dwarf.cfa, 0);
+          esp_loc = DWARF_VAL_LOC (c, c->dwarf.cfa + 8);
           eip_loc = DWARF_LOC (c->dwarf.cfa + 4, 0);
           c->dwarf.cfa += 8;
 
@@ -87,6 +88,7 @@ unw_step (unw_cursor_t *cursor)
             c->dwarf.loc[i] = DWARF_NULL_LOC;
 
           c->dwarf.loc[EBP] = ebp_loc;
+          c->dwarf.loc[ESP] = esp_loc;
           c->dwarf.loc[EIP] = eip_loc;
           c->dwarf.use_prev_instr = 1;
         }

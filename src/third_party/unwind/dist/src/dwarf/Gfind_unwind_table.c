@@ -193,6 +193,7 @@ dwarf_find_unwind_table (struct elf_dyn_info *edi, unw_addr_space_t as,
 
       edi->di_cache.start_ip = start_ip;
       edi->di_cache.end_ip = end_ip;
+      edi->di_cache.load_offset = 0;
       edi->di_cache.format = UNW_INFO_FORMAT_REMOTE_TABLE;
       edi->di_cache.u.rti.name_ptr = 0;
       /* two 32-bit values (ip_offset/fde_offset) per table-entry: */

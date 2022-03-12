@@ -26,6 +26,7 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 
 #include "init.h"
+#include "libunwind_i.h"
 #include "unwind_i.h"
 
 int
@@ -36,7 +37,7 @@ unw_init_remote (unw_cursor_t *cursor, unw_addr_space_t as, void *as_arg)
 #else /* !UNW_LOCAL_ONLY */
   struct cursor *c = (struct cursor *) cursor;
 
-  if (!atomic_read(&tdep_init_done))
+  if (!atomic_load(&tdep_init_done))
     tdep_init ();
 
   Debug (1, "(cursor=%p)\n", c);
@@ -44,13 +45,11 @@ unw_init_remote (unw_cursor_t *cursor, unw_addr_space_t as, void *as_arg)
   c->dwarf.as = as;
   if (as == unw_local_addr_space)
     {
-      c->dwarf.as_arg = c;
-      c->uc = as_arg;
+      c->dwarf.as_arg = dwarf_build_as_arg(as_arg, /*validate*/ 0);
     }
   else
     {
       c->dwarf.as_arg = as_arg;
-      c->uc = NULL;
     }
   return common_init (c, 0);
 #endif /* !UNW_LOCAL_ONLY */

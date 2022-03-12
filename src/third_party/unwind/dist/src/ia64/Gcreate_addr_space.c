@@ -39,9 +39,7 @@ unw_create_addr_space (unw_accessors_t *a, int byte_order)
    * IA-64 supports only big or little-endian, not weird stuff like
    * PDP_ENDIAN.
    */
-  if (byte_order != 0
-      && byte_order != __LITTLE_ENDIAN
-      && byte_order != __BIG_ENDIAN)
+  if (byte_order != 0 && byte_order_is_valid(byte_order) == 0)
     return NULL;
 
   as = malloc (sizeof (*as));
@@ -55,9 +53,9 @@ unw_create_addr_space (unw_accessors_t *a, int byte_order)
 
   if (byte_order == 0)
     /* use host default: */
-    as->big_endian = (__BYTE_ORDER == __BIG_ENDIAN);
+    as->big_endian = target_is_big_endian();
   else
-    as->big_endian = (byte_order == __BIG_ENDIAN);
+    as->big_endian = byte_order_is_big_endian(byte_order);
   return as;
 #endif
 }

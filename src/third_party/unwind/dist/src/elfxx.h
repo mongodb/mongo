@@ -32,7 +32,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 
 #include "libunwind_i.h"
 
-#if ELF_CLASS == ELFCLASS32
+#if UNW_ELF_CLASS == UNW_ELFCLASS32
 # define ELF_W(x)       ELF32_##x
 # define Elf_W(x)       Elf32_##x
 # define elf_w(x)       _Uelf32_##x
@@ -64,7 +64,7 @@ elf_w (valid_object) (struct elf_image *ei)
     return 0;
 
   return (memcmp (ei->image, ELFMAG, SELFMAG) == 0
-          && ((uint8_t *) ei->image)[EI_CLASS] == ELF_CLASS
+          && ((uint8_t *) ei->image)[EI_CLASS] == UNW_ELF_CLASS
           && ((uint8_t *) ei->image)[EI_VERSION] != EV_NONE
           && ((uint8_t *) ei->image)[EI_VERSION] <= EV_CURRENT);
 }

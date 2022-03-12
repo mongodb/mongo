@@ -199,8 +199,6 @@ components:
     release_monitoring_id: 1748
     local_directory_path: src/third_party/unwind
     team_owner: "Service Architecture"
-    upgrade_suppression: TODO SERVER-61856
-    # Note: missing from README.third_party.md
 
   "Mozilla Firefox":
     homepage_url: https://www.mozilla.org/en-US/firefox/organizations/

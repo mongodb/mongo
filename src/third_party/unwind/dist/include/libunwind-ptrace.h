@@ -27,6 +27,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 #define libunwind_ptrace_h
 
 #include <libunwind.h>
+#include <sys/types.h>
 
 #if defined(__cplusplus) || defined(c_plusplus)
 extern "C" {

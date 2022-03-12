@@ -1578,7 +1578,7 @@ use_system_libunwind = use_system_version_of_library("libunwind")
 # Assume system libunwind works if it's installed and selected.
 # Vendored libunwind, however, works only on linux-x86_64.
 can_use_libunwind = (use_system_libunwind or
-    env.TargetOSIs('linux') and env['TARGET_ARCH'] == 'x86_64')
+    env.TargetOSIs('linux') and (env['TARGET_ARCH'] == 'x86_64' or env['TARGET_ARCH'] == 'aarch64'))
 
 if use_libunwind == "off":
     use_libunwind = False
@@ -4176,7 +4176,7 @@ def doConfigure(myenv):
         conf.FindSysLibDep("unwind", ["unwind"])
 
     if use_libunwind:
-        if not conf.CheckLib("lzma"):
+        if not conf.FindSysLibDep("lzma", ["lzma"]):
             myenv.ConfError("Cannot find system library 'lzma' required for use with libunwind")
 
     if use_system_version_of_library("intel_decimal128"):

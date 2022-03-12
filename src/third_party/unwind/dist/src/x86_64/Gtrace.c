@@ -22,6 +22,7 @@ LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 
+#include "libunwind_i.h"
 #include "unwind_i.h"
 #include "ucontext_i.h"
 #include <signal.h>
@@ -50,8 +51,8 @@ static pthread_once_t trace_cache_once = PTHREAD_ONCE_INIT;
 static sig_atomic_t trace_cache_once_happen;
 static pthread_key_t trace_cache_key;
 static struct mempool trace_cache_pool;
-static __thread  unw_trace_cache_t *tls_cache;
-static __thread  int tls_cache_destroyed;
+static _Thread_local  unw_trace_cache_t *tls_cache;
+static _Thread_local  int tls_cache_destroyed;
 
 /* Free memory for a thread's trace cache. */
 static void
@@ -206,10 +207,7 @@ trace_cache_get (void)
    RIP using current CFA, RBP and RSP values.  Modifies CURSOR to
    that location, performs one unw_step(), and fills F with what
    was discovered about the location.  Returns F.
-
-   FIXME: This probably should tell DWARF handling to never evaluate
-   or use registers other than RBP, RSP and RIP in case there is
-   highly unusual unwind info which uses these creatively. */
+*/
 static unw_tdep_frame_t *
 trace_init_addr (unw_tdep_frame_t *f,
                  unw_cursor_t *cursor,
@@ -237,6 +235,9 @@ trace_init_addr (unw_tdep_frame_t *f,
      their desired values. Then perform the step. */
   d->ip = rip + d->use_prev_instr;
   d->cfa = cfa;
+  for(int i = 0; i < DWARF_NUM_PRESERVED_REGS; i++) {
+    d->loc[i] = DWARF_NULL_LOC;
+  }
   d->loc[UNW_X86_64_RIP] = DWARF_REG_LOC (d, UNW_X86_64_RIP);
   d->loc[UNW_X86_64_RBP] = DWARF_REG_LOC (d, UNW_X86_64_RBP);
   d->loc[UNW_X86_64_RSP] = DWARF_REG_LOC (d, UNW_X86_64_RSP);
@@ -403,6 +404,7 @@ tdep_trace (unw_cursor_t *cursor, void **buffer, int *size)
   int maxdepth = 0;
   int depth = 0;
   int ret;
+  int validate = 0;
 
   /* Check input parametres. */
   if (unlikely(! cursor || ! buffer || ! size || (maxdepth = *size) <= 0))
@@ -473,14 +475,17 @@ tdep_trace (unw_cursor_t *cursor, void **buffer, int *size)
     {
     case UNW_X86_64_FRAME_GUESSED:
       /* Fall thru to standard processing after forcing validation. */
-      c->validate = 1;
+      if (d->as == unw_local_addr_space)
+        dwarf_set_validate(d, 1);
 
     case UNW_X86_64_FRAME_STANDARD:
       /* Advance standard traceable frame. */
       cfa = (f->cfa_reg_rsp ? rsp : rbp) + f->cfa_reg_offset;
-      ACCESS_MEM_FAST(ret, c->validate, d, cfa - 8, rip);
+      if (d->as == unw_local_addr_space)
+        validate = dwarf_get_validate(d);
+      ACCESS_MEM_FAST(ret, validate, d, cfa - 8, rip);
       if (likely(ret >= 0) && likely(f->rbp_cfa_offset != -1))
-        ACCESS_MEM_FAST(ret, c->validate, d, cfa + f->rbp_cfa_offset, rbp);
+        ACCESS_MEM_FAST(ret, validate, d, cfa + f->rbp_cfa_offset, rbp);
 
       /* Don't bother reading RSP from DWARF, CFA becomes new RSP. */
       rsp = cfa;
@@ -492,11 +497,13 @@ tdep_trace (unw_cursor_t *cursor, void **buffer, int *size)
     case UNW_X86_64_FRAME_SIGRETURN:
       cfa = cfa + f->cfa_reg_offset; /* cfa now points to ucontext_t.  */
 
-      ACCESS_MEM_FAST(ret, c->validate, d, cfa + UC_MCONTEXT_GREGS_RIP, rip);
+      if (d->as == unw_local_addr_space)
+        validate = dwarf_get_validate(d);
+      ACCESS_MEM_FAST(ret, validate, d, cfa + UC_MCONTEXT_GREGS_RIP, rip);
       if (likely(ret >= 0))
-        ACCESS_MEM_FAST(ret, c->validate, d, cfa + UC_MCONTEXT_GREGS_RBP, rbp);
+        ACCESS_MEM_FAST(ret, validate, d, cfa + UC_MCONTEXT_GREGS_RBP, rbp);
       if (likely(ret >= 0))
-        ACCESS_MEM_FAST(ret, c->validate, d, cfa + UC_MCONTEXT_GREGS_RSP, rsp);
+        ACCESS_MEM_FAST(ret, validate, d, cfa + UC_MCONTEXT_GREGS_RSP, rsp);
 
       /* Resume stack at signal restoration point. The stack is not
          necessarily continuous here, especially with sigaltstack(). */
@@ -510,11 +517,13 @@ tdep_trace (unw_cursor_t *cursor, void **buffer, int *size)
       /* Address of RIP was pushed on the stack via a simple
        * def_cfa_expr - result stack offset stored in cfa_reg_offset */
       cfa = (f->cfa_reg_rsp ? rsp : rbp) + f->cfa_reg_offset;
-      ACCESS_MEM_FAST(ret, c->validate, d, cfa, cfa);
+      if (d->as == unw_local_addr_space)
+        validate = dwarf_get_validate(d);
+      ACCESS_MEM_FAST(ret, validate, d, cfa, cfa);
       if (likely(ret >= 0))
-        ACCESS_MEM_FAST(ret, c->validate, d, cfa - 8, rip);
+        ACCESS_MEM_FAST(ret, validate, d, cfa - 8, rip);
       if (likely(ret >= 0))
-        ACCESS_MEM_FAST(ret, c->validate, d, rbp, rbp);
+        ACCESS_MEM_FAST(ret, validate, d, rbp, rbp);
 
       /* Don't bother reading RSP from DWARF, CFA becomes new RSP. */
       rsp = cfa;

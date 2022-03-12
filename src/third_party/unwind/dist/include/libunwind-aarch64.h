@@ -34,6 +34,15 @@ extern "C" {
 #include <inttypes.h>
 #include <stddef.h>
 #include <ucontext.h>
+#include <stdalign.h>
+
+#ifndef UNW_EMPTY_STRUCT
+#  ifdef __GNUC__
+#    define UNW_EMPTY_STRUCT
+#  else
+#    define UNW_EMPTY_STRUCT uint8_t unused;
+#  endif
+#endif
 
 #define UNW_TARGET      aarch64
 #define UNW_TARGET_AARCH64      1
@@ -60,6 +69,7 @@ typedef long double unw_tdep_fpreg_t;
 typedef struct
   {
     /* no aarch64-specific auxiliary proc-info */
+    UNW_EMPTY_STRUCT
   }
 unw_tdep_proc_info_t;
 
@@ -169,10 +179,11 @@ aarch64_regnum_t;
 typedef struct unw_tdep_save_loc
   {
     /* Additional target-dependent info on a save location.  */
+    UNW_EMPTY_STRUCT
   }
 unw_tdep_save_loc_t;
 
-
+#ifdef __linux__
 /* On AArch64, we can directly use ucontext_t as the unwind context,
  * however, the __reserved struct is quite large: tune it down to only
  * the necessary used fields.  */
@@ -184,7 +195,7 @@ struct unw_sigcontext
 	uint64_t sp;
 	uint64_t pc;
 	uint64_t pstate;
-	uint8_t __reserved[(34 * 8)] __attribute__((__aligned__(16)));
+	alignas(16) uint8_t __reserved[(66 * 8)];
 };
 
 typedef struct
@@ -192,7 +203,15 @@ typedef struct
 	unsigned long uc_flags;
 	struct ucontext *uc_link;
 	stack_t uc_stack;
+#ifndef __ANDROID__
 	sigset_t uc_sigmask;
+#else
+	union {
+		sigset_t uc_sigmask;
+		sigset64_t uc_sigmask64;
+	};
+	char __padding[128 - sizeof(sigset_t)];
+#endif
 	struct unw_sigcontext uc_mcontext;
   } unw_tdep_context_t;
 
@@ -204,16 +223,19 @@ typedef struct
 	uint32_t fpcr;
 	uint64_t vregs[64];
   } unw_fpsimd_context_t;
-
+#else
+/* On AArch64, we can directly use ucontext_t as the unwind context.  */
+typedef ucontext_t unw_tdep_context_t;
+#endif
 
 
 #include "libunwind-common.h"
 #include "libunwind-dynamic.h"
 
-#define unw_tdep_getcontext(uc) (({					\
+#define unw_tdep_getcontext(uc) ({					\
   unw_tdep_context_t *unw_ctx = (uc);					\
-  register uint64_t *unw_base __asm__ ("x0") = (uint64_t*) unw_ctx->uc_mcontext.regs;		\
-  __asm__ __volatile__ (						\
+  register uint64_t unw_base __asm__ ("x0") = (uint64_t) unw_ctx->uc_mcontext.regs; \
+  __asm__ __volatile__ (					        \
      "stp x0, x1, [%[base], #0]\n" \
      "stp x2, x3, [%[base], #16]\n" \
      "stp x4, x5, [%[base], #32]\n" \
@@ -229,11 +251,14 @@ typedef struct
      "stp x24, x25, [%[base], #192]\n" \
      "stp x26, x27, [%[base], #208]\n" \
      "stp x28, x29, [%[base], #224]\n" \
-     "str x30, [%[base], #240]\n" \
      "mov x1, sp\n" \
-     "stp x1, x30, [%[base], #248]\n" \
+     "stp x30, x1, [%[base], #240]\n" \
+     "adr x1, ret%=\n" \
+     "str x1, [%[base], #256]\n" \
+     "mov %[base], #0\n" \
+     "ret%=:\n" \
      : [base] "+r" (unw_base) : : "x1", "memory"); \
-  }), 0)
+  (int)unw_base; })
 #define unw_tdep_is_fpreg		UNW_ARCH_OBJ(is_fpreg)
 
 extern int unw_tdep_is_fpreg (int);

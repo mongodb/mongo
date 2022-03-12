@@ -1,4 +1,5 @@
 AM_CPPFLAGS = -I$(top_srcdir)/include
+AM_CFLAGS = -fno-optimize-sibling-calls
 
 EXTRA_DIST =	run-ia64-test-dyn1 run-ptrace-mapper run-ptrace-misc	\
 		run-check-namespace run-coredump-unwind \
@@ -115,6 +116,10 @@ if ARCH_MIPS
 XFAIL_TESTS += $(XFAIL_TESTS_PTRACE_SINGLESTEP)
 endif
 
+if ARCH_RISCV
+XFAIL_TESTS += $(XFAIL_TESTS_PTRACE_SINGLESTEP)
+endif
+
 if ARCH_ARM
 # ARM Linux kernel >=2.6.39 removed PTRACE_SINGLESTEP emulation
 XFAIL_TESTS += $(XFAIL_TESTS_PTRACE_SINGLESTEP)
@@ -216,6 +221,7 @@ Gperf_trace_LDADD = $(LIBUNWIND) $(LIBUNWIND_local)
 
 Ltest_bt_LDADD = $(LIBUNWIND_local)
 Ltest_concurrent_LDADD = $(LIBUNWIND_local) -lpthread
+Ltest_cxx_exceptions_LDADD = $(LIBUNWIND_local)
 Ltest_dyn1_LDADD = $(LIBUNWIND_local)
 Ltest_exc_LDADD = $(LIBUNWIND_local)
 Ltest_init_LDADD = $(LIBUNWIND_local)

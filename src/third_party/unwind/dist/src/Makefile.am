@@ -60,6 +60,7 @@ libunwind_coredump_la_SOURCES = \
 	coredump/_UCD_elf_map_image.c \
 	coredump/_UCD_find_proc_info.c \
 	coredump/_UCD_get_proc_name.c \
+	coredump/_UCD_corefile_elf.c \
 	\
 	coredump/_UPT_elf.c \
 	coredump/_UPT_access_fpreg.c \
@@ -146,7 +147,7 @@ libunwind_la_SOURCES_local =						\
 	$(libunwind_la_SOURCES_local_unwind)
 
 noinst_HEADERS += os-linux.h
-libunwind_la_SOURCES_os_linux = os-linux.c
+libunwind_la_SOURCES_os_linux = os-linux.c dl-iterate-phdr.c
 
 libunwind_la_SOURCES_os_hpux = os-hpux.c
 
@@ -246,6 +247,8 @@ noinst_HEADERS += ia64/init.h ia64/offsets.h ia64/regs.h		    \
 	ia64/ucontext_i.h ia64/unwind_decoder.h ia64/unwind_i.h
 libunwind_la_SOURCES_ia64_common = $(libunwind_la_SOURCES_common)	    \
 	ia64/regname.c
+libunwind_la_EXTRAS_ia64 = ia64/mk_cursor_i ia64/mk_Lcursor_i.c	    \
+	ia64/mk_Gcursor_i.c
 
 # The list of files that go into libunwind:
 libunwind_la_SOURCES_ia64 = $(libunwind_la_SOURCES_ia64_common)		     \
@@ -336,6 +339,26 @@ libunwind_tilegx_la_SOURCES_tilegx = $(libunwind_la_SOURCES_tilegx_common)	    \
 	tilegx/Gglobal.c tilegx/Ginit.c tilegx/Ginit_local.c tilegx/Ginit_remote.c	    \
 	tilegx/Gis_signal_frame.c tilegx/Gregs.c tilegx/Gresume.c tilegx/Gstep.c
 
+# The list of files that go info libunwind and libunwind-riscv:
+noinst_HEADERS += riscv/init.h riscv/offsets.h riscv/unwind_i.h riscv/asm.h
+libunwind_la_SOURCES_riscv_common = $(libunwind_la_SOURCES_common)	    \
+	riscv/is_fpreg.c riscv/regname.c
+
+# The list of files that go into libunwind:
+libunwind_la_SOURCES_riscv = $(libunwind_la_SOURCES_riscv_common)		    \
+	$(libunwind_la_SOURCES_local)					    \
+	riscv/getcontext.S riscv/setcontext.S \
+	riscv/Lapply_reg_state.c riscv/Lreg_states_iterate.c		    \
+	riscv/Lcreate_addr_space.c riscv/Lget_proc_info.c riscv/Lget_save_loc.c   \
+	riscv/Lglobal.c riscv/Linit.c riscv/Linit_local.c riscv/Linit_remote.c  \
+	riscv/Lis_signal_frame.c riscv/Lregs.c riscv/Lresume.c riscv/Lstep.c
+
+libunwind_riscv_la_SOURCES_riscv = $(libunwind_la_SOURCES_riscv_common)	    \
+	$(libunwind_la_SOURCES_generic)					    \
+	riscv/Gapply_reg_state.c riscv/Greg_states_iterate.c			     \
+	riscv/Gcreate_addr_space.c riscv/Gget_proc_info.c riscv/Gget_save_loc.c   \
+	riscv/Gglobal.c riscv/Ginit.c riscv/Ginit_local.c riscv/Ginit_remote.c	    \
+	riscv/Gis_signal_frame.c riscv/Gregs.c riscv/Gresume.c riscv/Gstep.c
 
 # The list of files that go both into libunwind and libunwind-x86:
 noinst_HEADERS += x86/init.h x86/offsets.h x86/unwind_i.h
@@ -520,6 +543,8 @@ if OS_LINUX
  libunwind_la_SOURCES_arm_os          = arm/Gos-linux.c
  libunwind_la_SOURCES_arm_os_local    = arm/Los-linux.c
  libunwind_coredump_la_SOURCES += coredump/_UCD_access_reg_linux.c
+ libunwind_coredump_la_SOURCES += coredump/_UCD_get_threadinfo_prstatus.c
+ libunwind_coredump_la_SOURCES += coredump/_UCD_get_mapinfo_linux.c
 endif
 
 if OS_HPUX
@@ -538,6 +563,8 @@ if OS_FREEBSD
  libunwind_la_SOURCES_arm_os          = arm/Gos-freebsd.c
  libunwind_la_SOURCES_arm_os_local    = arm/Los-freebsd.c
  libunwind_coredump_la_SOURCES += coredump/_UCD_access_reg_freebsd.c
+ libunwind_coredump_la_SOURCES += coredump/_UCD_get_threadinfo_prstatus.c
+ libunwind_coredump_la_SOURCES += coredump/_UCD_get_mapinfo_generic.c
 endif
 
 if OS_SOLARIS
@@ -635,6 +662,18 @@ if !REMOTE_ONLY
 endif
  libunwind_setjmp_la_SOURCES += tilegx/siglongjmp.S
 else
+if ARCH_RISCV
+ lib_LTLIBRARIES += libunwind-riscv.la
+ libunwind_la_SOURCES = $(libunwind_la_SOURCES_riscv)
+ libunwind_riscv_la_SOURCES = $(libunwind_riscv_la_SOURCES_riscv)
+ libunwind_riscv_la_LDFLAGS = $(COMMON_SO_LDFLAGS) -version-info $(SOVERSION)
+ libunwind_riscv_la_LIBADD = libunwind-dwarf-generic.la
+ libunwind_riscv_la_LIBADD += libunwind-elf64.la
+if !REMOTE_ONLY
+ libunwind_riscv_la_LIBADD += libunwind.la -lc
+endif
+ libunwind_setjmp_la_SOURCES += riscv/siglongjmp.S
+else
 if ARCH_X86
  lib_LTLIBRARIES += libunwind-x86.la
  libunwind_la_SOURCES = $(libunwind_la_SOURCES_x86) $(libunwind_x86_la_SOURCES_os)
@@ -712,6 +751,7 @@ endif # ARCH_PPC64
 endif # ARCH_PPC32
 endif # ARCH_X86_64
 endif # ARCH_X86
+endif # ARCH_RISCV
 endif # ARCH_TILEGX
 endif # ARCH_MIPS
 endif # ARCH_HPPA
@@ -742,6 +782,7 @@ EXTRA_DIST =	$(libunwind_la_SOURCES_aarch64)			\
 		$(libunwind_la_SOURCES_arm)			\
 		$(libunwind_la_SOURCES_hppa)			\
 		$(libunwind_la_SOURCES_ia64)			\
+		$(libunwind_la_EXTRAS_ia64)			\
 		$(libunwind_la_SOURCES_mips)			\
 		$(libunwind_la_SOURCES_sh)			\
 		$(libunwind_la_SOURCES_x86)			\

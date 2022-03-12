@@ -141,6 +141,7 @@ typedef struct unw_dyn_info
     unw_word_t gp;              /* global-pointer in effect for this entry */
     int32_t format;             /* real type: unw_dyn_info_format_t */
     int32_t pad;
+    unw_word_t load_offset;     /* ELF load offset */
     union
       {
         unw_dyn_proc_info_t pi;

@@ -30,47 +30,17 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 #if defined(HAVE_BYTESWAP_H)
 #include <byteswap.h>
 #endif
-#if defined(HAVE_ENDIAN_H)
-# include <endian.h>
-#elif defined(HAVE_SYS_ENDIAN_H)
-# include <sys/endian.h>
-#endif
-#if defined(__BYTE_ORDER) && __BYTE_ORDER == __BIG_ENDIAN
-# define WE_ARE_BIG_ENDIAN    1
-# define WE_ARE_LITTLE_ENDIAN 0
-#elif defined(__BYTE_ORDER) && __BYTE_ORDER == __LITTLE_ENDIAN
-# define WE_ARE_BIG_ENDIAN    0
-# define WE_ARE_LITTLE_ENDIAN 1
-#elif defined(_BYTE_ORDER) && _BYTE_ORDER == _BIG_ENDIAN
-# define WE_ARE_BIG_ENDIAN    1
-# define WE_ARE_LITTLE_ENDIAN 0
-#elif defined(_BYTE_ORDER) && _BYTE_ORDER == _LITTLE_ENDIAN
-# define WE_ARE_BIG_ENDIAN    0
-# define WE_ARE_LITTLE_ENDIAN 1
-#elif defined(BYTE_ORDER) && BYTE_ORDER == BIG_ENDIAN
-# define WE_ARE_BIG_ENDIAN    1
-# define WE_ARE_LITTLE_ENDIAN 0
-#elif defined(BYTE_ORDER) && BYTE_ORDER == LITTLE_ENDIAN
-# define WE_ARE_BIG_ENDIAN    0
-# define WE_ARE_LITTLE_ENDIAN 1
-#elif defined(__386__)
-# define WE_ARE_BIG_ENDIAN    0
-# define WE_ARE_LITTLE_ENDIAN 1
-#else
-# error "Can't determine endianness"
-#endif
 
-#include <elf.h>
+#if defined(HAVE_ELF_H)
+# include <elf.h>
+#elif defined(HAVE_SYS_ELF_H)
+# include <sys/elf.h>
+#endif
 #include <sys/procfs.h> /* struct elf_prstatus */
 
 #include "_UCD_lib.h"
 #include "_UCD_internal.h"
 
-#define NOTE_DATA(_hdr) STRUCT_MEMBER_P((_hdr), sizeof (Elf32_Nhdr) + UNW_ALIGN((_hdr)->n_namesz, 4))
-#define NOTE_SIZE(_hdr) (sizeof (Elf32_Nhdr) + UNW_ALIGN((_hdr)->n_namesz, 4) + UNW_ALIGN((_hdr)->n_descsz, 4))
-#define NOTE_NEXT(_hdr) STRUCT_MEMBER_P((_hdr), NOTE_SIZE(_hdr))
-#define NOTE_FITS_IN(_hdr, _size) ((_size) >= sizeof (Elf32_Nhdr) && (_size) >= NOTE_SIZE (_hdr))
-#define NOTE_FITS(_hdr, _end) NOTE_FITS_IN((_hdr), (unsigned long)((char *)(_end) - (char *)(_hdr)))
 
 struct UCD_info *
 _UCD_create(const char *filename)
@@ -118,7 +88,7 @@ _UCD_create(const char *filename)
       goto err;
     }
 
-  if (WE_ARE_LITTLE_ENDIAN != (elf_header32.e_ident[EI_DATA] == ELFDATA2LSB))
+  if (target_is_big_endian() && (elf_header32.e_ident[EI_DATA] == ELFDATA2LSB))
     {
       Debug(0, "'%s' is endian-incompatible\n", filename);
       goto err;
@@ -205,72 +175,42 @@ _UCD_create(const char *filename)
         }
     }
 
-    unsigned i = 0;
-    coredump_phdr_t *cur = phdrs;
-    while (i < size)
-      {
-        Debug(2, "phdr[%03d]: type:%d", i, cur->p_type);
-        if (cur->p_type == PT_NOTE)
-          {
-            Elf32_Nhdr *note_hdr, *note_end;
-            unsigned n_threads;
+    int ret = _UCD_get_threadinfo(ui, phdrs, size);
+    if (ret != UNW_ESUCCESS) {
+		Debug(0, "failure retrieving thread info from core file\n");
+		goto err;
+	}
 
-            ui->note_phdr = malloc(cur->p_filesz);
-            if (lseek(fd, cur->p_offset, SEEK_SET) != (off_t)cur->p_offset
-             || (uoff_t)read(fd, ui->note_phdr, cur->p_filesz) != cur->p_filesz)
-              {
-                    Debug(0, "Can't read PT_NOTE from '%s'\n", filename);
-                    goto err;
-              }
+    ret = _UCD_get_mapinfo(ui, phdrs, size);
+    if (ret != UNW_ESUCCESS) {
+		Debug(0, "failure retrieving file mapping from core file\n");
+		goto err;
+	}
 
-            note_end = STRUCT_MEMBER_P (ui->note_phdr, cur->p_filesz);
-
-            /* Count number of threads */
-            n_threads = 0;
-            note_hdr = (Elf32_Nhdr *)ui->note_phdr;
-            while (NOTE_FITS (note_hdr, note_end))
-              {
-                if (note_hdr->n_type == NT_PRSTATUS)
-                  n_threads++;
-
-                note_hdr = NOTE_NEXT (note_hdr);
-              }
-
-            ui->n_threads = n_threads;
-            ui->threads = malloc(sizeof (void *) * n_threads);
-
-            n_threads = 0;
-            note_hdr = (Elf32_Nhdr *)ui->note_phdr;
-            while (NOTE_FITS (note_hdr, note_end))
-              {
-                if (note_hdr->n_type == NT_PRSTATUS)
-                  ui->threads[n_threads++] = NOTE_DATA (note_hdr);
-
-                note_hdr = NOTE_NEXT (note_hdr);
-              }
-          }
-        if (cur->p_type == PT_LOAD)
-          {
-            Debug(2, " ofs:%08llx va:%08llx filesize:%08llx memsize:%08llx flg:%x",
-                                (unsigned long long) cur->p_offset,
-                                (unsigned long long) cur->p_vaddr,
-                                (unsigned long long) cur->p_filesz,
-                                (unsigned long long) cur->p_memsz,
-                                cur->p_flags
-            );
-            if (cur->p_filesz < cur->p_memsz)
-              {
-                Debug(2, " partial");
-              }
-            if (cur->p_flags & PF_X)
-              {
-                Debug(2, " executable");
-              }
-          }
-        Debug(2, "\n");
-        i++;
-        cur++;
-      }
+	coredump_phdr_t *cur = phdrs;
+	for (unsigned i = 0; i < size; ++i)
+	  {
+		if (cur->p_type == PT_LOAD)
+		  {
+			Debug(2, " ofs:%08llx va:%08llx filesize:%08llx memsize:%08llx flg:%x",
+								(unsigned long long) cur->p_offset,
+								(unsigned long long) cur->p_vaddr,
+								(unsigned long long) cur->p_filesz,
+								(unsigned long long) cur->p_memsz,
+								cur->p_flags
+			);
+			if (cur->p_filesz < cur->p_memsz)
+			  {
+				Debug(2, " partial");
+			  }
+			if (cur->p_flags & PF_X)
+			  {
+				Debug(2, " executable");
+			  }
+		  }
+		Debug(2, "\n");
+		cur++;
+	  }
 
     if (ui->n_threads == 0)
       {
@@ -278,7 +218,7 @@ _UCD_create(const char *filename)
         goto err;
       }
 
-    ui->prstatus = ui->threads[0];
+    ui->prstatus = &ui->threads[0];
 
   return ui;
 
@@ -295,7 +235,7 @@ int _UCD_get_num_threads(struct UCD_info *ui)
 void _UCD_select_thread(struct UCD_info *ui, int n)
 {
   if (n >= 0 && n < ui->n_threads)
-    ui->prstatus = ui->threads[n];
+    ui->prstatus = &ui->threads[n];
 }
 
 pid_t _UCD_get_pid(struct UCD_info *ui)
@@ -357,41 +297,6 @@ int _UCD_add_backing_file_at_segment(struct UCD_info *ui, int phdr_no, const cha
       );
     }
 //TODO: else loudly complain? Maybe even fail?
-
-  if (phdr->p_filesz != 0)
-    {
-//TODO: loop and compare in smaller blocks
-      char *core_buf = malloc(phdr->p_filesz);
-      char *file_buf = malloc(phdr->p_filesz);
-      if (lseek(ui->coredump_fd, phdr->p_offset, SEEK_SET) != (off_t)phdr->p_offset
-       || (uoff_t)read(ui->coredump_fd, core_buf, phdr->p_filesz) != phdr->p_filesz
-      )
-        {
-          Debug(0, "Error reading from coredump file\n");
- err_read:
-          free(core_buf);
-          free(file_buf);
-          goto err;
-        }
-      if ((uoff_t)read(fd, file_buf, phdr->p_filesz) != phdr->p_filesz)
-        {
-          Debug(0, "Error reading from '%s'\n", filename);
-          goto err_read;
-        }
-      int r = memcmp(core_buf, file_buf, phdr->p_filesz);
-      free(core_buf);
-      free(file_buf);
-      if (r != 0)
-        {
-          Debug(1, "Note: phdr[%u] first %lld bytes in core dump and in file do not match\n",
-                                phdr_no, (unsigned long long)phdr->p_filesz
-          );
-        } else {
-          Debug(1, "Note: phdr[%u] first %lld bytes in core dump and in file match\n",
-                                phdr_no, (unsigned long long)phdr->p_filesz
-          );
-        }
-    }
 
   /* Success */
   return 0;

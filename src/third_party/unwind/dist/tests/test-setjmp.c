@@ -149,6 +149,10 @@ main (int argc, char **argv UNUSED)
   if (argc > 1)
     verbose = 1;
 
+  memset (&sigset1, 0, sizeof (sigset1));
+  memset (&sigset2, 0, sizeof (sigset2));
+  memset (&sigset3, 0, sizeof (sigset3));
+
   sigemptyset ((sigset_t *) &sigset1);
   sigaddset ((sigset_t *) &sigset1, SIGUSR1);
   sigemptyset ((sigset_t *) &sigset2);

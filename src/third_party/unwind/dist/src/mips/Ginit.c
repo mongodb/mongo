@@ -183,7 +183,7 @@ HIDDEN void
 mips_local_addr_space_init (void)
 {
   memset (&local_addr_space, 0, sizeof (local_addr_space));
-  local_addr_space.big_endian = (__BYTE_ORDER == __BIG_ENDIAN);
+  local_addr_space.big_endian = target_is_big_endian();
 #if _MIPS_SIM == _ABIO32
   local_addr_space.abi = UNW_MIPS_ABI_O32;
 #elif _MIPS_SIM == _ABIN32

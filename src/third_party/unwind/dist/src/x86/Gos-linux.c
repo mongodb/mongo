@@ -298,12 +298,16 @@ x86_local_resume (unw_addr_space_t as, unw_cursor_t *cursor, void *arg)
       struct sigcontext *sc = (struct sigcontext *) c->sigcontext_addr;
 
       Debug (8, "resuming at ip=%x via sigreturn(%p)\n", c->dwarf.ip, sc);
+#if !defined(__ANDROID__)
       x86_sigreturn (sc);
+#endif
     }
   else
     {
       Debug (8, "resuming at ip=%x via setcontext()\n", c->dwarf.ip);
+#if !defined(__ANDROID__)
       setcontext (uc);
+#endif
     }
   return -UNW_EINVAL;
 }

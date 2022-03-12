@@ -16,11 +16,11 @@
 /* Define to 1 if you want every memory access validated */
 #define CONSERVATIVE_CHECKS 1
 
+/* Define to 1 if you have the <asm/ptrace.h> header file. */
+#define HAVE_ASM_PTRACE_H 1
+
 /* Define to 1 if you have the <asm/ptrace_offsets.h> header file. */
 /* #undef HAVE_ASM_PTRACE_OFFSETS_H */
-
-/* Define to 1 if you have the <atomic_ops.h> header file. */
-/* #undef HAVE_ATOMIC_OPS_H */
 
 /* Define to 1 if you have the <byteswap.h> header file. */
 #define HAVE_BYTESWAP_H 1
@@ -153,9 +153,6 @@
 /* Define to 1 if the system has the type `struct prstatus'. */
 /* #undef HAVE_STRUCT_PRSTATUS */
 
-/* Defined if __sync atomics are available */
-#define HAVE_SYNC_ATOMICS 1
-
 /* Define to 1 if you have the <sys/elf.h> header file. */
 /* #undef HAVE_SYS_ELF_H */
 
@@ -165,6 +162,9 @@
 /* Define to 1 if you have the <sys/link.h> header file. */
 /* #undef HAVE_SYS_LINK_H */
 
+/* Define to 1 if you have the <sys/param.h> header file. */
+#define HAVE_SYS_PARAM_H 1
+
 /* Define to 1 if you have the <sys/procfs.h> header file. */
 #define HAVE_SYS_PROCFS_H 1
 
@@ -173,6 +173,9 @@
 
 /* Define to 1 if you have the <sys/stat.h> header file. */
 #define HAVE_SYS_STAT_H 1
+
+/* Define to 1 if you have the <sys/syscall.h> header file. */
+#define HAVE_SYS_SYSCALL_H 1
 
 /* Define to 1 if you have the <sys/types.h> header file. */
 #define HAVE_SYS_TYPES_H 1
@@ -187,7 +190,7 @@
 #define HAVE_UNISTD_H 1
 
 /* Define if you have libz */
-#define HAVE_ZLIB 1
+/* #undef HAVE_ZLIB */
 
 /* Defined if __builtin_unreachable() is available */
 #define HAVE__BUILTIN_UNREACHABLE 1
@@ -195,8 +198,8 @@
 /* Defined if __builtin___clear_cache() is available */
 #define HAVE__BUILTIN___CLEAR_CACHE 1
 
-/* Define to 1 if __thread keyword is supported by the C compiler. */
-/* #undef HAVE___THREAD */
+/* Define to 1 if --enable-per-thread-cache */
+/* #undef HAVE___CACHE_PER_THREAD */
 
 /* Define to the sub-directory where libtool stores uninstalled libraries. */
 #define LT_OBJDIR ".libs/"
@@ -211,7 +214,7 @@
 #define PACKAGE_NAME "libunwind"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "libunwind 1.5.0"
+#define PACKAGE_STRING "libunwind 1.6.2"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "libunwind"
@@ -220,7 +223,7 @@
 #define PACKAGE_URL ""
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "1.5.0"
+#define PACKAGE_VERSION "1.6.2"
 
 /* The size of `off_t', as computed by sizeof. */
 #define SIZEOF_OFF_T 8
@@ -229,7 +232,7 @@
 #define STDC_HEADERS 1
 
 /* Version number of package */
-#define VERSION "1.5.0"
+#define VERSION "1.6.2"
 
 /* Define to empty if `const' does not conform to ANSI C. */
 /* #undef const */

@@ -58,7 +58,7 @@ fetch8 (unw_addr_space_t as, unw_accessors_t *a,
 
   ret = (*a->access_mem) (as, aligned_addr, &val, 0, arg);
 
-#if __BYTE_ORDER == __LITTLE_ENDIAN
+#if UNW_BYTE_ORDER == UNW_LITTLE_ENDIAN
   val >>= 8*off;
 #else
   val >>= 8*(WSIZE - 1 - off);
@@ -81,7 +81,7 @@ fetch16 (unw_addr_space_t as, unw_accessors_t *a,
 
   ret = (*a->access_mem) (as, aligned_addr, &val, 0, arg);
 
-#if __BYTE_ORDER == __LITTLE_ENDIAN
+#if UNW_BYTE_ORDER == UNW_LITTLE_ENDIAN
   val >>= 8*off;
 #else
   val >>= 8*(WSIZE - 2 - off);
@@ -104,7 +104,7 @@ fetch32 (unw_addr_space_t as, unw_accessors_t *a,
 
   ret = (*a->access_mem) (as, aligned_addr, &val, 0, arg);
 
-#if __BYTE_ORDER == __LITTLE_ENDIAN
+#if UNW_BYTE_ORDER == UNW_LITTLE_ENDIAN
   val >>= 8*off;
 #else
   val >>= 8*(WSIZE - 4 - off);

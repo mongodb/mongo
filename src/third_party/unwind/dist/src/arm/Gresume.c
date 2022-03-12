@@ -50,7 +50,7 @@ arm_local_resume (unw_addr_space_t as, unw_cursor_t *cursor, void *arg)
       regs[6] = uc->regs[10];
       regs[7] = uc->regs[11]; /* FP */
       regs[8] = uc->regs[13]; /* SP */
-      regs[9] = uc->regs[14]; /* LR */
+      regs[9] = uc->regs[15]; /* PC */
 
       struct regs_overlay {
               char x[sizeof(regs)];

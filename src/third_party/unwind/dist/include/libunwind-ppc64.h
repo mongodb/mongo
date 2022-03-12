@@ -72,7 +72,7 @@ typedef uint64_t unw_word_t;
 typedef int64_t unw_sword_t;
 #endif
 
-typedef long double unw_tdep_fpreg_t;
+typedef double unw_tdep_fpreg_t;
 
 /*
  * Vector register (in PowerPC64 used for AltiVec registers)

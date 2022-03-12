@@ -139,8 +139,8 @@ unw_step (unw_cursor_t * cursor)
           c->sigcontext_format = PPC_SCF_LINUX_RT_SIGFRAME;
           c->sigcontext_addr = ucontext;
 
-          sp_loc = DWARF_LOC (ucontext + UC_MCONTEXT_GREGS_R1, 0);
-          ip_loc = DWARF_LOC (ucontext + UC_MCONTEXT_GREGS_NIP, 0);
+          sp_loc = DWARF_LOC ((ucontext + UC_MCONTEXT_GREGS_R1), 0);
+          ip_loc = DWARF_LOC ((ucontext + UC_MCONTEXT_GREGS_NIP), 0);
 
           ret = dwarf_get (&c->dwarf, sp_loc, &c->dwarf.cfa);
           if (ret < 0)
@@ -311,8 +311,15 @@ unw_step (unw_cursor_t * cursor)
           /* Note that there is no .eh_section register column for the
              FPSCR register.  I don't know why this is.  */
 
+#if defined(__linux__)
           v_regs_loc = DWARF_LOC (ucontext + UC_MCONTEXT_V_REGS, 0);
           ret = dwarf_get (&c->dwarf, v_regs_loc, &v_regs_ptr);
+#elif defined(__FreeBSD__)
+          /* Offset into main structure. */
+          v_regs_ptr = (ucontext + UC_MCONTEXT_V_REGS);
+          ret = 0;
+#endif
+
           if (ret < 0)
             {
               Debug (2, "returning %d\n", ret);

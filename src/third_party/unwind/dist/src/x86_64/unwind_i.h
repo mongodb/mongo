@@ -33,7 +33,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 #include <libunwind-x86_64.h>
 
 #include "libunwind_i.h"
-#include <sys/ucontext.h>
+#include <ucontext.h>
 
 /* DWARF column numbers for x86_64: */
 #define RAX     0

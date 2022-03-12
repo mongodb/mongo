@@ -1427,8 +1427,10 @@ def setup_conftests(conf):
             context.did_show_result = 1
             if result:
                 context.env[var] = lib
-                return context.Result(result)
+                context.Result(result)
+                return result
         context.env[var] = _missing_syslib(name)
-        return context.Result(result)
+        context.Result(result)
+        return result
 
     conf.AddTest("FindSysLibDep", FindSysLibDep)
