@@ -353,7 +353,7 @@ variables:
   - enterprise-linux-64-amazon-ami
   - enterprise-macos
   - enterprise-rhel-70-64-bit
-  - enterprise-rhel-70-64-bit-kitchen-sink
+#  - enterprise-rhel-70-64-bit-kitchen-sink
   - enterprise-rhel-70-64-bit-no-libunwind
   - enterprise-rhel-81-ppc64le
   - enterprise-rhel-72-s390x
@@ -10663,18 +10663,18 @@ buildvariants:
   - name: generate_buildid_to_debug_symbols_mapping
 
 # This variant is to intentionally test uncommon features nightly
-- <<: *enterprise-rhel-70-64-bit-template
-  name: enterprise-rhel-70-64-bit-kitchen-sink
-  display_name: "~ Enterprise RHEL 7.0"
-  cron: "0 12 * * *" # Every day starting at 12:00
-  expansions:
-    <<: *enterprise-rhel-70-64-bit-expansions-template
-    compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-  tasks:
-  - name: compile_test_and_package_serial_TG
-    distros:
-    - rhel70
-  - name: jsCore
+#- <<: *enterprise-rhel-70-64-bit-template
+#  name: enterprise-rhel-70-64-bit-kitchen-sink
+#  display_name: "~ Enterprise RHEL 7.0"
+#  cron: "0 12 * * *" # Every day starting at 12:00
+#  expansions:
+#    <<: *enterprise-rhel-70-64-bit-expansions-template
+#    compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+#  tasks:
+#  - name: compile_test_and_package_serial_TG
+#    distros:
+#    - rhel70
+#  - name: jsCore
 
 - <<: *enterprise-rhel-70-64-bit-template
   name: hot_backups-rhel-70-64-bit
