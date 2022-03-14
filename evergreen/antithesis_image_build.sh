@@ -57,7 +57,7 @@ if [ "${is_patch}" = "true" ]; then
   tag="evergreen-patch"
 fi
 
-if [ -n "${antithesis_image_tag}" ]; then
+if [ -n "${antithesis_image_tag:-}" ]; then
   echo "Using provided tag: '$antithesis_image_tag' for docker pushes"
   tag=$antithesis_image_tag
 fi
