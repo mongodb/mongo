@@ -102,13 +102,13 @@ BSONObj makeCreateIndexesCmd(const NamespaceString& nss,
 
 }  // namespace
 
-void validateShardKeyIndexExistsOrCreateIfPossible(OperationContext* opCtx,
-                                                   const NamespaceString& nss,
-                                                   const BSONObj& proposedKey,
-                                                   const ShardKeyPattern& shardKeyPattern,
-                                                   const boost::optional<BSONObj>& defaultCollation,
-                                                   bool unique,
-                                                   const ShardKeyValidationBehaviors& behaviors) {
+bool validShardKeyIndexExists(OperationContext* opCtx,
+                              const NamespaceString& nss,
+                              const BSONObj& proposedKey,
+                              const ShardKeyPattern& shardKeyPattern,
+                              const boost::optional<BSONObj>& defaultCollation,
+                              bool requiresUnique,
+                              const ShardKeyValidationBehaviors& behaviors) {
     auto indexes = behaviors.loadIndexes(nss);
 
     // 1.  Verify consistency with existing unique indexes
@@ -145,7 +145,7 @@ void validateShardKeyIndexExistsOrCreateIfPossible(OperationContext* opCtx,
     }
 
     // 3. If proposed key is required to be unique, additionally check for exact match.
-    if (hasUsefulIndexForKey && unique) {
+    if (hasUsefulIndexForKey && requiresUnique) {
         BSONObj eqQuery = BSON("ns" << nss.ns() << "key" << proposedKey);
         BSONObj eqQueryResult;
 
@@ -174,6 +174,26 @@ void validateShardKeyIndexExistsOrCreateIfPossible(OperationContext* opCtx,
     if (hasUsefulIndexForKey) {
         // Check 2.iii Make sure that there is a useful, non-multikey index available.
         behaviors.verifyUsefulNonMultiKeyIndex(nss, proposedKey);
+    }
+
+    return hasUsefulIndexForKey;
+}
+
+void validateShardKeyIndexExistsOrCreateIfPossible(OperationContext* opCtx,
+                                                   const NamespaceString& nss,
+                                                   const BSONObj& proposedKey,
+                                                   const ShardKeyPattern& shardKeyPattern,
+                                                   const boost::optional<BSONObj>& defaultCollation,
+                                                   bool unique,
+                                                   bool enforceUniquenessCheck,
+                                                   const ShardKeyValidationBehaviors& behaviors) {
+    if (validShardKeyIndexExists(opCtx,
+                                 nss,
+                                 proposedKey,
+                                 shardKeyPattern,
+                                 defaultCollation,
+                                 unique && enforceUniquenessCheck,
+                                 behaviors)) {
         return;
     }
 

@@ -103,6 +103,12 @@ assert.commandFailed(
 assert.commandWorked(
     mongos.adminCommand({shardCollection: kDbName + '.shard_key_dotted_path', key: {'_id.a': 1}}));
 
+jsTestLog('Command should still verify index even if implicitlyCreateIndex is false.');
+assert.commandFailedWithCode(
+    mongos.adminCommand(
+        {shardCollection: kDbName + '.foo', key: {x: 1}, implicitlyCreateIndex: false}),
+    6373200);
+
 //
 // Test shardCollection's idempotency
 //
@@ -124,7 +130,31 @@ assert.commandFailed(
 
 assert.commandWorked(mongos.getDB(kDbName).dropDatabase());
 
-// Shard empty collections no index required.
+jsTestLog('Allow non-unique index if enforceUniquenessCheck is false');
+assert.commandWorked(mongos.getDB(kDbName).foo.createIndex({x: 1}));
+assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
+assert.commandWorked(mongos.adminCommand(
+    {shardCollection: kDbName + '.foo', key: {x: 1}, unique: true, enforceUniquenessCheck: false}));
+let collDoc = mongos.getDB('config').collections.findOne({_id: `${kDbName}.foo`});
+assert(collDoc);
+assert(collDoc.unique);
+assert.commandWorked(mongos.getDB(kDbName).dropDatabase());
+
+jsTestLog('mongosync unique key pattern use case');
+assert.commandWorked(mongos.getDB(kDbName).foo.createIndex({x: 1}));
+assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
+assert.commandWorked(mongos.adminCommand({
+    shardCollection: kDbName + '.foo',
+    key: {x: 1},
+    unique: true,
+    implicitlyCreateIndex: false,
+    enforceUniquenessCheck: false
+}));
+collDoc = mongos.getDB('config').collections.findOne({_id: `${kDbName}.foo`});
+assert(collDoc);
+assert(collDoc.unique);
+assert.commandWorked(mongos.getDB(kDbName).dropDatabase());
+
 testAndClenaupWithKeyNoIndexOK({_id: 1});
 testAndClenaupWithKeyNoIndexOK({_id: 'hashed'});
 
