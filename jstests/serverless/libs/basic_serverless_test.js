@@ -10,6 +10,7 @@ class BasicServerlessTest {
     }
 
     stop() {
+        this.removeAndStopRecipientNodes();
         // If we validate, it will try to list all collections and the migrated collections will
         // return a TenantMigrationCommitted error.
         this.donor.stopSet(undefined /* signal */, false /* forRestart */, {skipValidation: 1});
@@ -56,6 +57,13 @@ class BasicServerlessTest {
     removeAndStopRecipientNodes() {
         print("Removing and stopping recipient nodes");
         this.recipientNodes.forEach(node => this.donor.remove(node));
+    }
+
+    /**
+     * Crafts a tenant database name.
+     */
+    tenantDB(tenantId, dbName) {
+        return `${tenantId}_${dbName}`;
     }
 }
 

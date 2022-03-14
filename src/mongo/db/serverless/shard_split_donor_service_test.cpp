@@ -231,6 +231,8 @@ protected:
 };
 
 TEST_F(ShardSplitDonorServiceTest, BasicShardSplitDonorServiceInstanceCreation) {
+    FailPointEnableBlock fp("skipShardSplitWaitForSplitAcceptance");
+
     auto opCtx = makeOperationContext();
     test::shard_split::ScopedTenantAccessBlocker scopedTenants(_tenantIds, opCtx.get());
     test::shard_split::reconfigToAddRecipientNodes(
@@ -279,6 +281,9 @@ TEST_F(ShardSplitDonorServiceTest, BasicShardSplitDonorServiceInstanceCreation) 
 }
 
 TEST_F(ShardSplitDonorServiceTest, ShardSplitDonorServiceTimeout) {
+    FailPointEnableBlock fp("pauseShardSplitAfterBlocking");
+    FailPointEnableBlock fp2("skipShardSplitWaitForSplitAcceptance");
+
     auto opCtx = makeOperationContext();
     auto serviceContext = getServiceContext();
     test::shard_split::ScopedTenantAccessBlocker scopedTenants(_tenantIds, opCtx.get());
@@ -509,75 +514,71 @@ protected:
     std::string _recipientSetName{_validRepl.getURI().getSetName()};
 };
 
-TEST_F(SplitReplicaSetObserverTest, SupportsCancellation) {
-    test::shard_split::reconfigToAddRecipientNodes(
-        getServiceContext(), _recipientTagName, _validRepl.getHosts(), _recipientSet.getHosts());
+TEST_F(SplitReplicaSetObserverTest, FutureReady) {
+    auto listener =
+        mongo::serverless::RecipientAcceptSplitListener(_validRepl.getURI().connectionString());
 
-    CancellationSource source;
-    auto future = detail::makeRecipientAcceptSplitFuture(
-        _executor, source.token(), _recipientTagName, _recipientSetName);
+    for (const auto& host : _validRepl.getHosts()) {
+        ASSERT_FALSE(listener.getFuture().isReady());
+        listener.onServerHeartbeatSucceededEvent(host, BSON("setName" << _validRepl.getSetName()));
+    }
 
-    ASSERT_FALSE(future.isReady());
-    source.cancel();
-
-    ASSERT_EQ(future.getNoThrow().code(), ErrorCodes::CallbackCanceled);
+    ASSERT_TRUE(listener.getFuture().isReady());
 }
 
-TEST_F(SplitReplicaSetObserverTest, GetRecipientAcceptSplitFutureTest) {
-    test::shard_split::reconfigToAddRecipientNodes(
-        getServiceContext(), _recipientTagName, _validRepl.getHosts(), _recipientSet.getHosts());
+TEST_F(SplitReplicaSetObserverTest, FutureReadyNameChange) {
+    auto listener =
+        mongo::serverless::RecipientAcceptSplitListener(_validRepl.getURI().connectionString());
 
-    CancellationSource source;
-    auto future = detail::makeRecipientAcceptSplitFuture(
-        _executor, source.token(), _recipientTagName, _recipientSetName);
+    for (const auto& host : _validRepl.getHosts()) {
+        listener.onServerHeartbeatSucceededEvent(host,
+                                                 BSON("setName"
+                                                      << "donorSetName"));
+    }
 
-    std::shared_ptr<TopologyDescription> topologyDescriptionOld =
-        std::make_shared<sdam::TopologyDescription>(sdam::SdamConfiguration());
-    std::shared_ptr<TopologyDescription> topologyDescriptionNew =
-        makeRecipientTopologyDescription(_validRepl);
+    ASSERT_FALSE(listener.getFuture().isReady());
 
-    _publisher->onTopologyDescriptionChangedEvent(topologyDescriptionOld, topologyDescriptionNew);
+    for (const auto& host : _validRepl.getHosts()) {
+        listener.onServerHeartbeatSucceededEvent(host, BSON("setName" << _validRepl.getSetName()));
+    }
 
-    future.wait();
+    ASSERT_TRUE(listener.getFuture().isReady());
 }
 
 TEST_F(SplitReplicaSetObserverTest, FutureNotReadyMissingNodes) {
-    auto predicate =
-        detail::makeRecipientAcceptSplitPredicate(_validRepl.getURI().connectionString());
+    auto listener =
+        mongo::serverless::RecipientAcceptSplitListener(_validRepl.getURI().connectionString());
 
-    std::shared_ptr<TopologyDescription> topologyDescriptionNew =
-        makeRecipientTopologyDescription(_validRepl);
-    topologyDescriptionNew->removeServerDescription(_validRepl.getHosts()[0]);
+    for (size_t i = 0; i < _validRepl.getHosts().size() - 1; ++i) {
+        listener.onServerHeartbeatSucceededEvent(_validRepl.getHosts()[i],
+                                                 BSON("setName" << _validRepl.getSetName()));
+    }
 
-    ASSERT_FALSE(predicate(topologyDescriptionNew->getServers()));
+    ASSERT_FALSE(listener.getFuture().isReady());
+}
+
+TEST_F(SplitReplicaSetObserverTest, FutureNotReadyNoSetName) {
+    auto listener =
+        mongo::serverless::RecipientAcceptSplitListener(_validRepl.getURI().connectionString());
+
+    for (size_t i = 0; i < _validRepl.getHosts().size() - 1; ++i) {
+        listener.onServerHeartbeatSucceededEvent(_validRepl.getHosts()[i], BSONObj());
+    }
+
+    ASSERT_FALSE(listener.getFuture().isReady());
 }
 
 TEST_F(SplitReplicaSetObserverTest, FutureNotReadyWrongSet) {
-    auto predicate =
-        detail::makeRecipientAcceptSplitPredicate(_validRepl.getURI().connectionString());
+    auto listener =
+        mongo::serverless::RecipientAcceptSplitListener(_validRepl.getURI().connectionString());
 
-    std::shared_ptr<TopologyDescription> topologyDescriptionNew =
-        makeRecipientTopologyDescription(_invalidRepl);
+    for (const auto& host : _validRepl.getHosts()) {
+        listener.onServerHeartbeatSucceededEvent(host,
+                                                 BSON("setName"
+                                                      << "wrongSetName"));
+    }
 
-    ASSERT_FALSE(predicate(topologyDescriptionNew->getServers()));
-}
-
-TEST_F(SplitReplicaSetObserverTest, ExecutorCanceled) {
-    test::shard_split::reconfigToAddRecipientNodes(
-        getServiceContext(), _recipientTagName, _validRepl.getHosts(), _recipientSet.getHosts());
-
-    CancellationSource source;
-    auto future = detail::makeRecipientAcceptSplitFuture(
-        _executor, source.token(), _recipientTagName, _recipientSetName);
-
-    _executor->shutdown();
-    _executor->join();
-
-    ASSERT_FALSE(future.isReady());
-
-    // Ensure the test does not hang.
-    source.cancel();
-    ASSERT_EQ(future.getNoThrow().code(), ErrorCodes::ShutdownInProgress);
+    ASSERT_FALSE(listener.getFuture().isReady());
 }
 
 class ShardSplitRecipientCleanupTest : public ShardSplitDonorServiceTest {

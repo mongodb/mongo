@@ -79,8 +79,6 @@ function makeShardSplitTest() {
             6236600,
             `forgetShardSplit should reject when featureFlagShardSplit is disabled`);
 
-        // shut down recipient nodes
-        test.removeAndStopRecipientNodes();
         // shut down replica set
         test.stop();
     };

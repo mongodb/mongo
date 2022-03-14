@@ -41,13 +41,14 @@ namespace mongo {
 using ScopedTaskExecutorPtr = std::shared_ptr<executor::ScopedTaskExecutor>;
 
 namespace detail {
-std::function<bool(const std::vector<sdam::ServerDescriptionPtr>&)>
-makeRecipientAcceptSplitPredicate(const ConnectionString& recipientConnectionString);
 
-SemiFuture<void> makeRecipientAcceptSplitFuture(ExecutorPtr executor,
-                                                const CancellationToken& token,
-                                                const StringData& recipientTagName,
-                                                const StringData& recipientSetName);
+SemiFuture<void> makeRecipientAcceptSplitFuture(
+    ExecutorPtr executor,
+    std::shared_ptr<executor::TaskExecutor> taskExecutor,
+    const CancellationToken& token,
+    const StringData& recipientTagName,
+    const StringData& recipientSetName);
+
 };  // namespace detail
 
 class ShardSplitDonorService final : public repl::PrimaryOnlyService {
@@ -182,8 +183,7 @@ private:
     void _initiateTimeout(const ScopedTaskExecutorPtr& executor,
                           const CancellationToken& abortToken);
 
-    void _createReplicaSetMonitor(const ScopedTaskExecutorPtr& executor,
-                                  const CancellationToken& abortToken);
+    void _createReplicaSetMonitor(const CancellationToken& abortToken);
 
     ExecutorFuture<DurableState> _handleErrorOrEnterAbortedState(
         StatusWith<DurableState> durableState,

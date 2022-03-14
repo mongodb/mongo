@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/client/sdam/topology_listener.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/serverless/shard_split_state_machine_gen.h"
 
@@ -116,6 +117,29 @@ StatusWith<ShardSplitDonorDocument> getStateDocument(OperationContext* opCtx,
 bool shouldRemoveStateDocumentOnRecipient(OperationContext* opCtx,
                                           const ShardSplitDonorDocument& stateDocument);
 
+/**
+ * Listener that receives heartbeat events and fulfills a future once it sees the expected number
+ * of nodes in the recipient replica set to monitor.
+ */
+class RecipientAcceptSplitListener : public sdam::TopologyListener {
+public:
+    RecipientAcceptSplitListener(const ConnectionString& recipientConnectionString);
+
+    void onServerHeartbeatSucceededEvent(const HostAndPort& hostAndPort, BSONObj reply) final;
+
+    // Fulfilled when all nodes have accepted the split.
+    SharedSemiFuture<void> getFuture() const;
+
+private:
+    mutable Mutex _mutex =
+        MONGO_MAKE_LATCH("ShardSplitDonorService::getRecipientAcceptSplitFuture::_mutex");
+
+    AtomicWord<bool> _fulfilled{false};
+    const size_t _numberOfRecipient;
+    std::string _recipientSetName;
+    std::map<HostAndPort, std::string> _reportedSetNames;
+    SharedPromise<void> _promise;
+};
 
 }  // namespace serverless
 }  // namespace mongo

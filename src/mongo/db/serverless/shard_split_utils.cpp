@@ -238,5 +238,34 @@ bool shouldRemoveStateDocumentOnRecipient(OperationContext* opCtx,
         stateDocument.getState() == ShardSplitDonorStateEnum::kBlocking;
 }
 
+RecipientAcceptSplitListener::RecipientAcceptSplitListener(
+    const ConnectionString& recipientConnectionString)
+    : _numberOfRecipient(recipientConnectionString.getServers().size()),
+      _recipientSetName(recipientConnectionString.getSetName()) {}
+
+void RecipientAcceptSplitListener::onServerHeartbeatSucceededEvent(const HostAndPort& hostAndPort,
+                                                                   const BSONObj reply) {
+    if (_fulfilled.load() || !reply["setName"]) {
+        return;
+    }
+
+    stdx::lock_guard<Latch> lg(_mutex);
+    _reportedSetNames[hostAndPort] = reply["setName"].str();
+
+    auto allReportCorrectly =
+        std::all_of(_reportedSetNames.begin(),
+                    _reportedSetNames.end(),
+                    [&](const auto& entry) { return entry.second == _recipientSetName; }) &&
+        _reportedSetNames.size() == _numberOfRecipient;
+    if (allReportCorrectly) {
+        _fulfilled.store(true);
+        _promise.emplaceValue();
+    }
+}
+
+SharedSemiFuture<void> RecipientAcceptSplitListener::getFuture() const {
+    return _promise.getFuture();
+}
+
 }  // namespace serverless
 }  // namespace mongo

@@ -716,6 +716,11 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
     }
 
     const auto configToApply = statusWithConf.getValue();
+    if (isSplitRecipientConfig) {
+        LOGV2(6309200,
+              "Applying a recipient split config for a shard split operation.",
+              "config"_attr = configToApply);
+    }
 
     const StatusWith<int> myIndex = validateConfigForHeartbeatReconfig(
         _externalState.get(), configToApply, getGlobalServiceContext());
