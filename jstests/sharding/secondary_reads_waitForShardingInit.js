@@ -18,7 +18,7 @@ load("jstests/replsets/libs/sync_source.js");
 let st = new ShardingTest({shards: 1});
 
 // Set up replica set that we'll add as shard
-let replTest = new ReplSetTest({nodes: 3});
+let replTest = new ReplSetTest({nodes: 3, name: jsTest.name() + "-newReplSet"});
 replTest.startSet({shardsvr: ''});
 let nodeList = replTest.nodeList();
 
@@ -49,8 +49,9 @@ jsTest.log("Going to set sync source of secondary node to be primary.");
 const fpForceSyncSource = forceSyncSource(replTest, anotherSecondary, primary);
 
 jsTest.log("Going to add replica set as shard: " + tojson(replTest.getReplSetConfig()));
+const shardName = "newShard";
 assert.commandWorked(
-    st.s.getDB("admin").runCommand({addShard: replTest.getURL(), name: "newShard"}));
+    st.s.getDB("admin").runCommand({addShard: replTest.getURL(), name: shardName}));
 fpHangDuringShardInit.wait();
 
 jsTest.log("Check and wait for the sharding state to be initialized on primary.");
@@ -60,10 +61,14 @@ assert.soon(function() {
     return shardingStatePrimary.enabled == true;
 });
 
+const dbName = "testDB";
+const sessionDb = st.s.startSession().getDatabase(dbName);
+
 jsTest.log("Going to write a document to testDB.foo.");
-let testDB = st.s.getDB("testDB");
-const session = testDB.getSession();
-assert.commandWorked(testDB.foo.insert({x: 1}));
+// Make sure that the test db data is stored into the new shard.
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
+st.ensurePrimaryShard(dbName, shardName);
+assert.commandWorked(sessionDb.foo.insert({x: 1}));
 
 /**
  * Send a read request to the hanging secondary node. We expect it to fail as the sharding state is
@@ -79,8 +84,8 @@ assert.commandWorked(testDB.foo.insert({x: 1}));
  */
 jsTest.log(
     "Going to send a read request with maxTimeMS 100000 to secondary that is hanging in setting up sharding initialization.");
-const operationTime = session.getOperationTime();
-const error = testDB.runCommand({
+const operationTime = sessionDb.getSession().getOperationTime();
+const error = sessionDb.runCommand({
     find: "foo",
     maxTimeMS: 10000,
     $readPreference: {mode: "secondary", tags: [{"tag": "hanging"}]},
@@ -101,14 +106,14 @@ assert.soon(function() {
  * the read won't block waiting for read concern.
  */
 jsTest.log("Going to send the read request again.");
-assert.commandWorked(testDB.runCommand({
+assert.commandWorked(sessionDb.runCommand({
     find: "foo",
     $readPreference: {mode: "secondary", tags: [{"tag": "hanging"}]},
     readConcern: {level: "local", "afterClusterTime": operationTime}
 }));
 
 fpForceSyncSource.off();
-
+sessionDb.getSession().endSession();
 replTest.stopSet();
 
 st.stop();
