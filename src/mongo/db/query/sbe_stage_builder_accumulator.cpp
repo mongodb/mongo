@@ -185,10 +185,12 @@ std::pair<std::unique_ptr<sbe::EExpression>, EvalStage> buildFinalizeAvg(
         // To support the sharding behavior, the mongos splits $group into two separate $group
         // stages one at the mongos-side and the other at the shard-side. This stage builder builds
         // the shard-side plan. The shard-side $avg accumulator is responsible to return the partial
-        // avg in the form of {subTotal: val1, count: val2} when the type of sum is decimal or
-        // {subTotal: val1, count: val2, subTotalError: val3} when the type of sum is non-decimal.
+        // avg in the form of {subTotal: val1, count: val2, ps: array_val} when the type of sum is
+        // decimal or {subTotal: val1, count: val2, subTotalError: val3, ps: array_val} when the
+        // type of sum is non-decimal.
         auto sumResult = makeVariable(aggSlots[0]);
         auto countResult = makeVariable(aggSlots[1]);
+        auto partialSumExpr = makeFunction("doubleDoublePartialSumFinalize", sumResult->clone());
 
         // Existence of 'kDecimalTotal' element in the sum result means the type of sum result is
         // decimal.
@@ -198,14 +200,18 @@ std::pair<std::unique_ptr<sbe::EExpression>, EvalStage> buildFinalizeAvg(
                          sumResult->clone(),
                          makeConstant(sbe::value::TypeTags::NumberInt32,
                                       static_cast<int>(AggSumValueElems::kDecimalTotal))));
-        // Returns {subTotal: val1, count: val2} if the type of the sum result is decimal.
+        // Returns {subTotal: val1, count: val2, ps: array_val} if the type of the sum result is
+        // decimal.
+        // TODO SERVER-64227 Remove 'subTotal' and 'subTotalError' fields when we branch for 6.1
+        // because all nodes in a sharded cluster would use the new data format.
         auto thenExpr = makeNewObjFunction(
             FieldPair{"subTotal"_sd,
                       // 'doubleDoubleSumFinalize' returns the sum, adding decimal
                       // sum and non-decimal sum.
                       makeFunction("doubleDoubleSumFinalize", sumResult->clone())},
-            FieldPair{"count"_sd, countResult->clone()});
-        // Returns {subTotal: val1, count: val2: subTotalError: val3} otherwise.
+            FieldPair{"count"_sd, countResult->clone()},
+            FieldPair{"ps"_sd, partialSumExpr->clone()});
+        // Returns {subTotal: val1, count: val2: subTotalError: val3, ps: array_val} otherwise.
         auto elseExpr = makeNewObjFunction(
             FieldPair{"subTotal"_sd,
                       makeFunction(
@@ -219,7 +225,8 @@ std::pair<std::unique_ptr<sbe::EExpression>, EvalStage> buildFinalizeAvg(
                                    sumResult->clone(),
                                    makeConstant(sbe::value::TypeTags::NumberInt32,
                                                 static_cast<int>(
-                                                    AggSumValueElems::kNonDecimalTotalAddend)))});
+                                                    AggSumValueElems::kNonDecimalTotalAddend)))},
+            FieldPair{"ps"_sd, partialSumExpr->clone()});
         auto partialAvgFinalize =
             sbe::makeE<sbe::EIf>(std::move(ifCondExpr), std::move(thenExpr), std::move(elseExpr));
 

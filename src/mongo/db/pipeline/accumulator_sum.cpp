@@ -61,6 +61,46 @@ const char subTotalName[] = "subTotal";
 const char subTotalErrorName[] = "subTotalError";  // Used for extra precision.
 }  // namespace
 
+void applyPartialSum(const std::vector<Value>& arr,
+                     BSONType& nonDecimalTotalType,
+                     BSONType& totalType,
+                     DoubleDoubleSummation& nonDecimalTotal,
+                     Decimal128& decimalTotal) {
+    tassert(6294002,
+            "The partial sum's first element must be an int",
+            arr[AggSumValueElems::kNonDecimalTotalTag].getType() == NumberInt);
+    nonDecimalTotalType = Value::getWidestNumeric(
+        nonDecimalTotalType,
+        static_cast<BSONType>(arr[AggSumValueElems::kNonDecimalTotalTag].getInt()));
+    totalType = Value::getWidestNumeric(totalType, nonDecimalTotalType);
+
+    tassert(6294003,
+            "The partial sum's second element must be a double",
+            arr[AggSumValueElems::kNonDecimalTotalSum].getType() == NumberDouble);
+    tassert(6294004,
+            "The partial sum's third element must be a double",
+            arr[AggSumValueElems::kNonDecimalTotalAddend].getType() == NumberDouble);
+
+    auto sum = arr[AggSumValueElems::kNonDecimalTotalSum].getDouble();
+    auto addend = arr[AggSumValueElems::kNonDecimalTotalAddend].getDouble();
+    nonDecimalTotal.addDouble(sum);
+
+    // If sum is +=INF and addend is +=NAN, 'nonDecimalTotal' becomes NAN after adding
+    // INF and NAN, which is different from the unsharded behavior. So, does not add
+    // 'addend' when sum == INF and addend == NAN. Does not add this logic to
+    // 'DoubleDoubleSummation' because this behavior is specific to sharded $sum.
+    if (std::isfinite(sum) || !std::isnan(addend)) {
+        nonDecimalTotal.addDouble(addend);
+    }
+
+    if (arr.size() == AggSumValueElems::kMaxSizeOfArray) {
+        totalType = NumberDecimal;
+        tassert(6294005,
+                "The partial sum's last element must be a decimal",
+                arr[AggSumValueElems::kDecimalTotal].getType() == NumberDecimal);
+        decimalTotal = decimalTotal.add(arr[AggSumValueElems::kDecimalTotal].getDecimal());
+    }
+}
 
 void AccumulatorSum::processInternal(const Value& input, bool merging) {
     if (!input.numeric()) {
@@ -81,44 +121,13 @@ void AccumulatorSum::processInternal(const Value& input, bool merging) {
                 break;
             // The merge-side must be ready to process the full state of a partial sum from a
             // shard-side if a shard chooses to do so. See Accumulator::getValue() for details.
-            case Array: {
-                auto&& arr = input.getArray();
-                tassert(6294002,
-                        "The partial sum's first element must be an int",
-                        arr[AggSumValueElems::kNonDecimalTotalTag].getType() == NumberInt);
-                nonDecimalTotalType = Value::getWidestNumeric(
-                    nonDecimalTotalType,
-                    static_cast<BSONType>(arr[AggSumValueElems::kNonDecimalTotalTag].getInt()));
-                totalType = Value::getWidestNumeric(totalType, nonDecimalTotalType);
-
-                tassert(6294003,
-                        "The partial sum's second element must be a double",
-                        arr[AggSumValueElems::kNonDecimalTotalSum].getType() == NumberDouble);
-                tassert(6294004,
-                        "The partial sum's third element must be a double",
-                        arr[AggSumValueElems::kNonDecimalTotalAddend].getType() == NumberDouble);
-
-                auto sum = arr[AggSumValueElems::kNonDecimalTotalSum].getDouble();
-                auto addend = arr[AggSumValueElems::kNonDecimalTotalAddend].getDouble();
-                nonDecimalTotal.addDouble(sum);
-                // If sum is +=INF and addend is +=NAN, 'nonDecimalTotal' becomes NAN after adding
-                // INF and NAN, which is different from the unsharded behavior. So, does not add
-                // 'addend' when sum == INF and addend == NAN. Does not add this logic to
-                // 'DoubleDoubleSummation' because this behavior is specific to sharded $sum.
-                if (std::isfinite(sum) || !std::isnan(addend)) {
-                    nonDecimalTotal.addDouble(addend);
-                }
-
-                if (arr.size() == AggSumValueElems::kMaxSizeOfArray) {
-                    totalType = NumberDecimal;
-                    tassert(6294005,
-                            "The partial sum's last element must be a decimal",
-                            arr[AggSumValueElems::kDecimalTotal].getType() == NumberDecimal);
-                    decimalTotal =
-                        decimalTotal.add(arr[AggSumValueElems::kDecimalTotal].getDecimal());
-                }
+            case Array:
+                applyPartialSum(input.getArray(),
+                                nonDecimalTotalType,
+                                totalType,
+                                nonDecimalTotal,
+                                decimalTotal);
                 break;
-            }
             default:
                 MONGO_UNREACHABLE;
         }
@@ -130,8 +139,8 @@ void AccumulatorSum::processInternal(const Value& input, bool merging) {
 
     // Keep the nonDecimalTotal's type so that the type information can be serialized too for
     // 'toBeMerged' scenarios.
-    if (totalType != NumberDecimal) {
-        nonDecimalTotalType = totalType;
+    if (input.getType() != NumberDecimal) {
+        nonDecimalTotalType = Value::getWidestNumeric(nonDecimalTotalType, input.getType());
     }
     switch (input.getType()) {
         case NumberLong:
@@ -153,6 +162,27 @@ void AccumulatorSum::processInternal(const Value& input, bool merging) {
 
 intrusive_ptr<AccumulatorState> AccumulatorSum::create(ExpressionContext* const expCtx) {
     return new AccumulatorSum(expCtx);
+}
+
+Value serializePartialSum(BSONType nonDecimalTotalType,
+                          BSONType totalType,
+                          const DoubleDoubleSummation& nonDecimalTotal,
+                          const Decimal128& decimalTotal) {
+    auto [sum, addend] = nonDecimalTotal.getDoubleDouble();
+
+    // The partial sum is serialized in the following form.
+    //
+    // [nonDecimalTotalType, sum, addend, decimalTotal]
+    //
+    // Presence of the 'decimalTotal' element indicates that the total type of the partial sum
+    // is 'NumberDecimal'.
+    auto valueArrayStream = ValueArrayStream();
+    valueArrayStream << static_cast<int>(nonDecimalTotalType) << sum << addend;
+    if (totalType == NumberDecimal) {
+        valueArrayStream << decimalTotal;
+    }
+
+    return valueArrayStream.done();
 }
 
 Value AccumulatorSum::getValue(bool toBeMerged) {
@@ -177,20 +207,7 @@ Value AccumulatorSum::getValue(bool toBeMerged) {
     auto canUseNewPartialResultFormat = fcv.isVersionInitialized() &&
         fcv.isGreaterThanOrEqualTo(multiversion::FeatureCompatibilityVersion::kVersion_6_0);
     if (canUseNewPartialResultFormat && toBeMerged) {
-        auto [sum, addend] = nonDecimalTotal.getDoubleDouble();
-
-        // The partial sum is serialized in the following form.
-        //
-        // [nonDecimalTotalType, sum, addend, decimalTotal]
-        //
-        // Presence of the 'decimalTotal' element indicates that the total type of the partial sum
-        // is 'NumberDecimal'.
-        auto valueArrayStream = ValueArrayStream();
-        valueArrayStream << static_cast<int>(nonDecimalTotalType) << sum << addend;
-        if (totalType == NumberDecimal) {
-            valueArrayStream << decimalTotal;
-        }
-        return valueArrayStream.done();
+        return serializePartialSum(nonDecimalTotalType, totalType, nonDecimalTotal, decimalTotal);
     }
 
     switch (totalType) {
