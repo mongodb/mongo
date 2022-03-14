@@ -8537,13 +8537,13 @@ buildvariants:
     distros:
       - rhel80-xlarge
 
-- <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-template
-  name: enterprise-rhel80-dynamic-v4gcc-cxx20-debug-pm-1328-experimental
-  display_name: "~ Shared Library Enterprise RHEL 8.0 v4 Toolchain GCC C++20 DEBUG + PM-1328"
-  cron: "0 0 * * 0" # Every week starting 00:00 on Sunday
-  expansions:
-    <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-expansions
-    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --link-model=dynamic --variables-files=etc/scons/mongodbtoolchain_testing_gcc.vars --cxx-std=20 --experimental-optimization=* --experimental-runtime-hardening=* --disable-warnings-as-errors
+#- <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-template
+#  name: enterprise-rhel80-dynamic-v4gcc-cxx20-debug-pm-1328-experimental
+#  display_name: "~ Shared Library Enterprise RHEL 8.0 v4 Toolchain GCC C++20 DEBUG + PM-1328"
+#  cron: "0 0 * * 0" # Every week starting 00:00 on Sunday
+#  expansions:
+#    <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-expansions
+#    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --link-model=dynamic --variables-files=etc/scons/mongodbtoolchain_testing_gcc.vars --cxx-std=20 --experimental-optimization=* --experimental-runtime-hardening=* --disable-warnings-as-errors
 
 - <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-template
   name: enterprise-rhel80-dynamic-v4clang-cxx20-debug-pm-1328-experimental
@@ -10412,28 +10412,28 @@ buildvariants:
     - name: .multiversion !.future_git_tag_incompatible
     - name: .multiversion_future_git_tag
 
-- name: rhel-80-64-bit-nossl
-  display_name: "RHEL 8.0 Shared Library (No SSL)"
-  run_on:
-  - rhel80-small
-  cron: "0 12 * * *" # Every day starting at 12:00
-  expansions:
-    compile_flags: >-
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --ssl=off
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-      MONGO_DISTMOD=rhel80
-      --link-model=dynamic
-    multiversion_platform: rhel80
-    multiversion_edition: enterprise
-    scons_cache_scope: shared
-    build_mongoreplay: false
-    large_distro_name: rhel80-medium
-  tasks:
-  - name: compile_test_and_package_serial_TG
-    distros:
-    - rhel80-large
-  - name: jsCore
+#- name: rhel-80-64-bit-nossl
+#  display_name: "RHEL 8.0 Shared Library (No SSL)"
+#  run_on:
+#  - rhel80-small
+#  cron: "0 12 * * *" # Every day starting at 12:00
+#  expansions:
+#    compile_flags: >-
+#      -j$(grep -c ^processor /proc/cpuinfo)
+#      --ssl=off
+#      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+#      MONGO_DISTMOD=rhel80
+#      --link-model=dynamic
+#    multiversion_platform: rhel80
+#    multiversion_edition: enterprise
+#    scons_cache_scope: shared
+#    build_mongoreplay: false
+#    large_distro_name: rhel80-medium
+#  tasks:
+#  - name: compile_test_and_package_serial_TG
+#    distros:
+#    - rhel80-large
+#  - name: jsCore
 
 
 - &enterprise-rhel-70-64-bit-template
