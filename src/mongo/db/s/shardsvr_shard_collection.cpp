@@ -185,14 +185,13 @@ BSONObj makeCreateIndexesCmd(const NamespaceString& nss,
 /**
  * Compares the proposed shard key with the collection's existing indexes on the primary shard to
  * ensure they are a legal combination.
- *
- * If the collection is empty and no index on the shard key exists, creates the required index.
  */
-void createIndexesOrValidateExisting(OperationContext* opCtx,
-                                     const NamespaceString& nss,
-                                     const BSONObj& proposedKey,
-                                     const ShardKeyPattern& shardKeyPattern,
-                                     const ShardsvrShardCollection& request) {
+bool validShardKeyIndexExists(OperationContext* opCtx,
+                              const NamespaceString& nss,
+                              const BSONObj& proposedKey,
+                              const ShardKeyPattern& shardKeyPattern,
+                              const ShardsvrShardCollection& request) {
+
     // The proposed shard key must be validated against the set of existing indexes.
     // In particular, we must ensure the following constraints
     //
@@ -257,7 +256,7 @@ void createIndexesOrValidateExisting(OperationContext* opCtx,
 
     // 3. If proposed key is required to be unique, additionally check for exact match.
 
-    if (hasUsefulIndexForKey && request.getUnique()) {
+    if (hasUsefulIndexForKey && request.getUnique() && request.getEnforceUniquenessCheck()) {
         BSONObj eqQuery = BSON("ns" << nss.ns() << "key" << proposedKey);
         BSONObj eqQueryResult;
 
@@ -283,7 +282,23 @@ void createIndexesOrValidateExisting(OperationContext* opCtx,
         }
     }
 
-    if (hasUsefulIndexForKey) {
+    return hasUsefulIndexForKey;
+}
+
+/**
+ * Compares the proposed shard key with the collection's existing indexes on the primary shard to
+ * ensure they are a legal combination.
+ *
+ * If the collection is empty and no index on the shard key exists, creates the required index.
+ */
+void createIndexesOrValidateExisting(OperationContext* opCtx,
+                                     const NamespaceString& nss,
+                                     const BSONObj& proposedKey,
+                                     const ShardKeyPattern& shardKeyPattern,
+                                     const ShardsvrShardCollection& request) {
+    DBDirectClient localClient(opCtx);
+
+    if (validShardKeyIndexExists(opCtx, nss, proposedKey, shardKeyPattern, request)) {
         // Check 2.iii and 2.iv. Make sure no null entries in the sharding index
         // and that there is a useful, non-multikey index available
         BSONObjBuilder checkShardingIndexCmd;
@@ -707,7 +722,14 @@ UUID shardCollection(OperationContext* opCtx,
 
     const auto proposedKey(request.getKey().getOwned());
     const ShardKeyPattern shardKeyPattern(proposedKey);
-    createIndexesOrValidateExisting(opCtx, nss, proposedKey, shardKeyPattern, request);
+
+    if (request.getImplicitlyCreateIndex()) {
+        createIndexesOrValidateExisting(opCtx, nss, proposedKey, shardKeyPattern, request);
+    } else {
+        uassert(6373200,
+                "Must have an index compatible with the proposed shard key",
+                validShardKeyIndexExists(opCtx, nss, proposedKey, shardKeyPattern, request));
+    }
 
     {
         // From this point onward the collection can only be read, not written to, so it is safe to

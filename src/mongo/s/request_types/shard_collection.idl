@@ -62,6 +62,16 @@ structs:
                 type: object
                 description: "The collation to use for the shard key index."
                 optional: true
+            implicitlyCreateIndex:
+                description: "Creates an index on the shard key pattern if the collection is empty."
+                type: bool
+                default: true
+            enforceUniquenessCheck:
+                description: >-
+                    Controls whether this command verifies that any unique indexes are prefixed by the shard
+                    key pattern if unique is true. If true then it will verify and if false then it won't.
+                type: bool
+                default: true
 
     ConfigsvrShardCollectionRequest:
         description: "The request format of the internal shardCollection command on the config server"
@@ -93,6 +103,16 @@ structs:
             getUUIDfromPrimaryShard:
                 type: bool
                 description: "Whether the collection should be created on the primary shard. This should only be false when used in mapReduce."
+                default: true
+            implicitlyCreateIndex:
+                description: "Creates an index on the shard key pattern if the collection is empty."
+                type: bool
+                default: true
+            enforceUniquenessCheck:
+                description: >-
+                    Controls whether this command verifies that any unique indexes are prefixed by the shard
+                    key pattern if unique is true. If true then it will verify and if false then it won't.
+                type: bool
                 default: true
 
     ConfigsvrShardCollectionResponse:
@@ -137,6 +157,16 @@ structs:
             getUUIDfromPrimaryShard:
                 type: bool
                 description: "Whether the collection should be created on the primary shard. This should only be false when used in mapReduce."
+                default: true
+            implicitlyCreateIndex:
+                description: "Creates an index on the shard key pattern if the collection is empty."
+                type: bool
+                default: true
+            enforceUniquenessCheck:
+                description: >-
+                    Controls whether this command verifies that any unique indexes are prefixed by the shard
+                    key pattern if unique is true. If true then it will verify and if false then it won't.
+                type: bool
                 default: true
 
     ShardsvrShardCollectionResponse:

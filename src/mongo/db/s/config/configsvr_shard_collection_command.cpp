@@ -731,6 +731,9 @@ public:
         shardsvrShardCollectionRequest.setCollation(request.getCollation());
         shardsvrShardCollectionRequest.setGetUUIDfromPrimaryShard(
             request.getGetUUIDfromPrimaryShard());
+        shardsvrShardCollectionRequest.setImplicitlyCreateIndex(request.getImplicitlyCreateIndex());
+        shardsvrShardCollectionRequest.setEnforceUniquenessCheck(
+            request.getEnforceUniquenessCheck());
 
         auto cmdResponse = uassertStatusOK(primaryShard->runCommandWithFixedRetryAttempts(
             opCtx,

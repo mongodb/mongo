@@ -189,6 +189,8 @@ selector:
   - jstests/sharding/repair_sharded_collection_history.js
   # Will fail on 4.0 because the mongos version of appendOplogNote only exists on 4.2.
   - jstests/sharding/append_oplog_note_mongos.js
+  # Remove when SERVER-63732 is backported to 4.0.
+  - jstests/sharding/shard_collection_basic.js
 
   exclude_with_any_tags:
   - multiversion_incompatible

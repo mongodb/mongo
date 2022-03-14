@@ -117,6 +117,10 @@ public:
         configShardCollRequest.setUnique(shardCollRequest.getUnique());
         configShardCollRequest.setNumInitialChunks(shardCollRequest.getNumInitialChunks());
         configShardCollRequest.setCollation(shardCollRequest.getCollation());
+        configShardCollRequest.setImplicitlyCreateIndex(
+            shardCollRequest.getImplicitlyCreateIndex());
+        configShardCollRequest.setEnforceUniquenessCheck(
+            shardCollRequest.getEnforceUniquenessCheck());
 
         // Invalidate the routing table cache entry for this collection so that we reload the
         // collection the next time it's accessed, even if we receive a failure, e.g. NetworkError.
