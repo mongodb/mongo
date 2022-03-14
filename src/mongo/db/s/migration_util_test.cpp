@@ -668,47 +668,6 @@ TEST_F(SubmitRangeDeletionTaskTest,
 }
 
 TEST_F(SubmitRangeDeletionTaskTest,
-       SucceedsIfFilteringMetadataUUIDInitiallyDifferentFromTaskUUIDButMatchesAfterRefresh) {
-    auto opCtx = operationContext();
-
-    // Force a metadata refresh with an arbitrary UUID so that the node's filtering metadata is
-    // stale when the task is submitted.
-    const auto staleUUID = UUID::gen();
-    const auto staleEpoch = OID::gen();
-    const auto staleTimestamp = Timestamp(1, 0);
-    auto staleColl = makeCollectionType(staleUUID, staleEpoch, staleTimestamp);
-    _mockCatalogCacheLoader->setDatabaseRefreshReturnValue(kDefaultDatabaseType);
-    _mockCatalogCacheLoader->setCollectionRefreshReturnValue(staleColl);
-    _mockCatalogCacheLoader->setChunkRefreshReturnValue(
-        makeChangedChunks(ChunkVersion(1, 0, staleEpoch, staleTimestamp)));
-    _mockCatalogClient->setCollections({staleColl});
-    forceShardFilteringMetadataRefresh(opCtx, kTestNss);
-
-    auto collectionUUID = createCollectionAndGetUUID(kTestNss);
-    auto deletionTask = createDeletionTask(opCtx, kTestNss, collectionUUID, 0, 10, _myShardName);
-
-    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
-
-    store.add(opCtx, deletionTask);
-    ASSERT_EQ(store.count(opCtx), 1);
-    migrationutil::markAsReadyRangeDeletionTaskLocally(opCtx, deletionTask.getId());
-
-    // Make the refresh triggered by submitting the task return a UUID that matches the task's UUID.
-    auto matchingColl = makeCollectionType(collectionUUID, kEpoch, kDefaultTimestamp);
-    _mockCatalogCacheLoader->setCollectionRefreshReturnValue(matchingColl);
-    _mockCatalogCacheLoader->setChunkRefreshReturnValue(
-        makeChangedChunks(ChunkVersion(10, 0, kEpoch, kDefaultTimestamp)));
-    _mockCatalogClient->setCollections({matchingColl});
-
-    auto metadata = makeShardedMetadata(opCtx, collectionUUID);
-    csr().setFilteringMetadata(opCtx, metadata);
-
-    // The task should have been submitted successfully.
-    auto cleanupCompleteFuture = migrationutil::submitRangeDeletionTask(opCtx, deletionTask);
-    cleanupCompleteFuture.get(opCtx);
-}
-
-TEST_F(SubmitRangeDeletionTaskTest,
        FailsAndDeletesTaskIfFilteringMetadataUUIDDifferentFromTaskUUIDEvenAfterRefresh) {
     auto opCtx = operationContext();
 
