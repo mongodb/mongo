@@ -101,12 +101,6 @@ server_parameters:
         cpp_varname: gValidateTimeseriesCompression
         default: true
 
-    roundtripBsonColumnOnValidate:
-        description: 'Roundtrips collections content to BSONColumn to verify that we can compress/decompress without data loss.'
-        set_at: startup
-        cpp_vartype: bool
-        cpp_varname: gRoundtripBsonColumnOnValidate
-        default: false
     maintainValidCursorsAcrossSBEYieldandReadCommands:
         description: "Enable retaining valid cursor across SBE query yield and getMore"
         set_at: startup
