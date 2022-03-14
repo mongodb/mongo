@@ -22,7 +22,7 @@ function shardSplitApplySplitConfig() {
 
     const donorPrimary = test.donor.getPrimary();
     const migrationId = UUID();
-    const tenantIds = ["test_tenant_1", "test_tenant_2"];
+    const tenantIds = ["tenant1", "tenant2"];
 
     jsTestLog("Asserting no state document exist before command");
     assert.isnull(findMigration(donorPrimary, migrationId));

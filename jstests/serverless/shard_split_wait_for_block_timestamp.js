@@ -30,7 +30,7 @@ test.addRecipientNodes();
 
 const donorPrimary = test.donor.getPrimary();
 const adminDb = donorPrimary.getDB("admin");
-const tenantIds = ["test_tenant_1", "test_tenant_2"];
+const tenantIds = ["tenant1", "tenant2"];
 
 // Stop replication on recipient nodes, and write a lot of data to the set
 test.recipientNodes.forEach(node => stopServerReplication(node));
