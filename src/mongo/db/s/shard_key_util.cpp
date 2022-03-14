@@ -106,7 +106,7 @@ bool validShardKeyIndexExists(OperationContext* opCtx,
                               const NamespaceString& nss,
                               const ShardKeyPattern& shardKeyPattern,
                               const boost::optional<BSONObj>& defaultCollation,
-                              bool unique,
+                              bool requiresUnique,
                               const ShardKeyValidationBehaviors& behaviors) {
     auto indexes = behaviors.loadIndexes(nss);
 
@@ -146,7 +146,7 @@ bool validShardKeyIndexExists(OperationContext* opCtx,
     }
 
     // 3. If proposed key is required to be unique, additionally check for exact match.
-    if (hasUsefulIndexForKey && unique) {
+    if (hasUsefulIndexForKey && requiresUnique) {
         BSONObj eqQuery = BSON("ns" << nss.ns() << "key" << shardKeyPattern.toBSON());
         BSONObj eqQueryResult;
 
@@ -186,12 +186,16 @@ bool validateShardKeyIndexExistsOrCreateIfPossible(OperationContext* opCtx,
                                                    const ShardKeyPattern& shardKeyPattern,
                                                    const boost::optional<BSONObj>& defaultCollation,
                                                    bool unique,
+                                                   bool enforceUniquenessCheck,
                                                    const ShardKeyValidationBehaviors& behaviors) {
-    if (validShardKeyIndexExists(
-            opCtx, nss, shardKeyPattern, defaultCollation, unique, behaviors)) {
+    if (validShardKeyIndexExists(opCtx,
+                                 nss,
+                                 shardKeyPattern,
+                                 defaultCollation,
+                                 unique && enforceUniquenessCheck,
+                                 behaviors)) {
         return false;
     }
-
 
     // 4. If no useful index, verify we can create one.
     behaviors.verifyCanCreateShardKeyIndex(nss);

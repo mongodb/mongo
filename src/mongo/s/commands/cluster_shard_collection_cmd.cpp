@@ -102,6 +102,8 @@ public:
         requestParamsObj.setCollation(shardCollRequest.getCollation());
         requestParamsObj.setTimeseries(shardCollRequest.getTimeseries());
         requestParamsObj.setCollectionUUID(shardCollRequest.getCollectionUUID());
+        requestParamsObj.setImplicitlyCreateIndex(shardCollRequest.getImplicitlyCreateIndex());
+        requestParamsObj.setEnforceUniquenessCheck(shardCollRequest.getEnforceUniquenessCheck());
         shardsvrCollRequest.setCreateCollectionRequest(std::move(requestParamsObj));
         shardsvrCollRequest.setDbName(nss.db());
 

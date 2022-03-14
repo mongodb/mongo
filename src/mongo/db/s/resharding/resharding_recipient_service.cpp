@@ -532,6 +532,7 @@ void ReshardingRecipientService::RecipientStateMachine::
                     ShardKeyPattern{_metadata.getReshardingKey()},
                     CollationSpec::kSimpleSpec,
                     false /* unique */,
+                    true /* enforceUniquenessCheck */,
                     shardkeyutil::ValidationBehaviorsShardCollection(opCtx.get()));
             });
     }

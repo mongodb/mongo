@@ -128,6 +128,7 @@ public:
                                       newShardKeyPattern,
                                       boost::none,
                                       collType.getUnique(),
+                                      true /* enforceUniquenessCheck */,
                                       shardkeyutil::ValidationBehaviorsRefineShardKey(opCtx, nss));
                               });
 
