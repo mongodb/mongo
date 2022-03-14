@@ -56,29 +56,24 @@ CollectionAndChangedChunks getChangedChunks(OperationContext* opCtx,
                                             const NamespaceString& nss,
                                             ChunkVersion sinceVersion,
                                             bool avoidSnapshotForRefresh) {
-    const auto catalogClient = Grid::get(opCtx)->catalogClient();
+    const auto readConcern = [&]() -> repl::ReadConcernArgs {
+        // TODO SERVER-54394 always use snapshot read concern once
+        // ephemeral storage engine supports it
+        const auto readConcernLevel = !avoidSnapshotForRefresh
+            ? repl::ReadConcernLevel::kSnapshotReadConcern
+            : repl::ReadConcernLevel::kLocalReadConcern;
 
-    // TODO SERVER-54394 always use snapshot read concern once ephemeral storage engine supports it
-    const auto readConcernLevel = !avoidSnapshotForRefresh
-        ? repl::ReadConcernLevel::kSnapshotReadConcern
-        : repl::ReadConcernLevel::kLocalReadConcern;
-
-    const auto afterClusterTime = [&] {
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-            return repl::ReplicationCoordinator::get(opCtx)
-                ->getMyLastAppliedOpTime()
-                .getTimestamp();
-
+            return {readConcernLevel};
         } else {
             const auto vcTime = VectorClock::get(opCtx)->getTime();
-            return vcTime.configTime().asTimestamp();
+            return {vcTime.configTime(), readConcernLevel};
         }
     }();
 
-    const auto readConcern = repl::ReadConcernArgs(LogicalTime(afterClusterTime), readConcernLevel);
+    auto collAndChunks = Grid::get(opCtx)->catalogClient()->getCollectionAndChunks(
+        opCtx, nss, sinceVersion, readConcern);
 
-    auto collAndChunks =
-        catalogClient->getCollectionAndChunks(opCtx, nss, sinceVersion, readConcern);
     const auto& coll = collAndChunks.first;
     return CollectionAndChangedChunks{coll.getEpoch(),
                                       coll.getTimestamp(),
