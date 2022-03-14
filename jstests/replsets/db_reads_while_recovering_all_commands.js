@@ -348,6 +348,7 @@ const allCommands = {
     stopRecordingTraffic: {skip: isNotAUserDataRead},
     testDeprecation: {skip: isNotAUserDataRead},
     testDeprecationInVersion2: {skip: isNotAUserDataRead},
+    testInternalTransactions: {skip: isNotAUserDataRead},
     testRemoval: {skip: isNotAUserDataRead},
     testReshardCloneCollection: {skip: isNotAUserDataRead},
     testVersions1And2: {skip: isNotAUserDataRead},

@@ -45,7 +45,11 @@ using namespace fmt::literals;
 
 namespace {
 
-const StringMap<int> retryableWriteCommands = {{"delete", 1},
+// TODO SERVER-65101: Replace this with a property on each command.
+const StringMap<int> retryableWriteCommands = {{"clusterDelete", 1},
+                                               {"clusterInsert", 1},
+                                               {"clusterUpdate", 1},
+                                               {"delete", 1},
                                                {"findandmodify", 1},
                                                {"findAndModify", 1},
                                                {"insert", 1},
@@ -63,13 +67,17 @@ const StringMap<int> retryableWriteCommands = {{"delete", 1},
                                                {"_shardsvrCollModParticipant", 1},
                                                {"_shardsvrSetUserWriteBlockMode", 1}};
 
+// TODO SERVER-65101: Replace this with a property on each command.
 // Commands that can be sent with session info but should not check out a session.
 const StringMap<int> skipSessionCheckoutList = {
     {"coordinateCommitTransaction", 1}, {"_recvChunkStart", 1}, {"replSetStepDown", 1}};
 
-const StringMap<int> transactionCommands = {{"commitTransaction", 1},
+// TODO SERVER-65101: Replace this with a property on each command.
+const StringMap<int> transactionCommands = {{"abortTransaction", 1},
+                                            {"clusterAbortTransaction", 1},
+                                            {"clusterCommitTransaction", 1},
+                                            {"commitTransaction", 1},
                                             {"coordinateCommitTransaction", 1},
-                                            {"abortTransaction", 1},
                                             {"prepareTransaction", 1}};
 
 }  // namespace

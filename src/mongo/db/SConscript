@@ -902,6 +902,23 @@ env.Library(
 )
 
 env.Library(
+    target='cluster_transaction_api',
+    source=[
+        'cluster_transaction_api.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/rpc/rpc',
+        '$BUILD_DIR/mongo/s/startup_initialization',
+        '$BUILD_DIR/mongo/transport/service_entry_point',
+        'logical_session_id',
+        'logical_session_id_helpers',
+        'service_context',
+        'shared_request_handling',
+        'transaction_api',
+    ],
+)
+
+env.Library(
     target='dbdirectclient',
     source=[
         'dbdirectclient.cpp',

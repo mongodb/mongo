@@ -29,6 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/config.h"
 #include "mongo/db/error_labels.h"
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/operation_context.h"
@@ -277,8 +278,8 @@ protected:
         _threadPool = std::make_shared<ThreadPool>(std::move(options));
         _threadPool->startup();
 
-        auto mockClient =
-            std::make_unique<txn_api::details::MockTransactionClient>(opCtx(), _threadPool);
+        auto mockClient = std::make_unique<txn_api::details::MockTransactionClient>(
+            opCtx(), _threadPool, nullptr);
         _mockClient = mockClient.get();
         _txnWithRetries = std::make_unique<txn_api::TransactionWithRetries>(
             opCtx(), _threadPool, std::move(mockClient), nullptr /* resourceYielder */);
@@ -312,7 +313,7 @@ protected:
 
     void resetTxnWithRetries(std::unique_ptr<MockResourceYielder> resourceYielder = nullptr) {
         auto mockClient = std::make_unique<txn_api::details::MockTransactionClient>(
-            opCtx(), InlineQueuedCountingExecutor::make());
+            opCtx(), _threadPool, nullptr);
         _mockClient = mockClient.get();
         if (resourceYielder) {
             _resourceYielder = resourceYielder.get();
@@ -1286,7 +1287,10 @@ TEST_F(TxnAPITest, ClientRetryableWrite_UsesRetryableInternalSession) {
     ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "commitTransaction"_sd);
 }
 
-TEST_F(TxnAPITest, ClientRetryableWrite_RetryableWriteWithoutStmtIdFails) {
+#ifdef MONGO_CONFIG_DEBUG_BUILD
+DEATH_TEST_F(TxnAPITest,
+             ClientRetryableWrite_RetryableWriteWithoutStmtIdCrashesOnDebug,
+             "In a retryable write transaction every retryable write command should") {
     opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
     opCtx()->setTxnNumber(5);
     resetTxnWithRetries();
@@ -1305,6 +1309,7 @@ TEST_F(TxnAPITest, ClientRetryableWrite_RetryableWriteWithoutStmtIdFails) {
         });
     ASSERT_EQ(swResult.getStatus(), ErrorCodes::duplicateCodeForTest(6410500));
 }
+#endif
 
 TEST_F(TxnAPITest, ClientTransaction_UsesClientTransactionOptionsAndDoesNotCommitOnSuccess) {
     opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());

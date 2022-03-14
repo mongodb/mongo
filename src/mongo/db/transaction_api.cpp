@@ -249,10 +249,16 @@ void primeInternalClientAndOpCtx(Client* client, OperationContext* opCtx) {
     }
 }
 
-SemiFuture<BSONObj> SEPTransactionClient::runCommand(StringData dbName, BSONObj cmdObj) const {
-    BSONObjBuilder cmdBuilder(std::move(cmdObj));
+Future<DbResponse> DefaultSEPTransactionClientBehaviors::handleRequest(
+    OperationContext* opCtx, const Message& request) const {
+    auto serviceEntryPoint = opCtx->getServiceContext()->getServiceEntryPoint();
+    return serviceEntryPoint->handleRequest(opCtx, request);
+}
 
+SemiFuture<BSONObj> SEPTransactionClient::runCommand(StringData dbName, BSONObj cmdObj) const {
     invariant(_hooks, "Transaction metadata hooks must be injected before a command can be run");
+
+    BSONObjBuilder cmdBuilder(_behaviors->maybeModifyCommand(std::move(cmdObj)));
     _hooks->runRequestHook(&cmdBuilder);
 
     invariant(!haveClient());
@@ -261,10 +267,9 @@ SemiFuture<BSONObj> SEPTransactionClient::runCommand(StringData dbName, BSONObj 
     auto cancellableOpCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
     primeInternalClientAndOpCtx(&cc(), cancellableOpCtx.get());
 
-    auto sep = cc().getServiceContext()->getServiceEntryPoint();
     auto opMsgRequest = OpMsgRequest::fromDBAndBody(dbName, cmdBuilder.obj());
     auto requestMessage = opMsgRequest.serialize();
-    return sep->handleRequest(cancellableOpCtx.get(), requestMessage)
+    return _behaviors->handleRequest(cancellableOpCtx.get(), requestMessage)
         .then([this](DbResponse dbResponse) {
             auto reply = rpc::makeReply(&dbResponse.response)->getCommandReply().getOwned();
             _hooks->runReplyHook(reply);
@@ -485,16 +490,15 @@ void Transaction::prepareRequest(BSONObjBuilder* cmdBuilder) {
         // (aka -1), which indicates retry history should not be saved. If statement ids are not
         // explicitly sent, implicit ids may be inferred, which could lead to bugs if different
         // commands have the same ids inferred.
-        uassert(
-            6410500,
-            str::stream()
-                << "In a retryable write transaction every retryable write command should have an "
-                   "explicit statement id, command: "
-                << redact(cmdBuilder->asTempObj()),
+        dassert(
             !isRetryableWriteCommand(
                 cmdBuilder->asTempObj().firstElement().fieldNameStringData()) ||
                 (cmdBuilder->hasField(write_ops::WriteCommandRequestBase::kStmtIdsFieldName) ||
-                 cmdBuilder->hasField(write_ops::WriteCommandRequestBase::kStmtIdFieldName)));
+                 cmdBuilder->hasField(write_ops::WriteCommandRequestBase::kStmtIdFieldName)),
+            str::stream()
+                << "In a retryable write transaction every retryable write command should have an "
+                   "explicit statement id, command: "
+                << redact(cmdBuilder->asTempObj()));
     }
 
     stdx::lock_guard<Latch> lg(_mutex);

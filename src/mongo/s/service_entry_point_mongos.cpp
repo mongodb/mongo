@@ -202,10 +202,15 @@ Future<DbResponse> HandleRequest::run() {
     return future;
 }
 
-Future<DbResponse> ServiceEntryPointMongos::handleRequest(OperationContext* opCtx,
-                                                          const Message& message) noexcept {
+Future<DbResponse> ServiceEntryPointMongos::handleRequestImpl(OperationContext* opCtx,
+                                                              const Message& message) noexcept {
     auto hr = std::make_shared<HandleRequest>(opCtx, message);
     return hr->run();
+}
+
+Future<DbResponse> ServiceEntryPointMongos::handleRequest(OperationContext* opCtx,
+                                                          const Message& message) noexcept {
+    return handleRequestImpl(opCtx, message);
 }
 
 void ServiceEntryPointMongos::onClientConnect(Client* client) {

@@ -12,10 +12,16 @@ env.Library(
     source=[
         'flush_router_config_cmd.cpp',
         'get_shard_map_cmd.cpp',
+        'internal_transactions_test_commands.cpp',
+        'internal_transactions_test_commands.idl',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/cluster_transaction_api',
         '$BUILD_DIR/mongo/db/commands',
+        '$BUILD_DIR/mongo/db/transaction_api',
         '$BUILD_DIR/mongo/s/grid',
+        '$BUILD_DIR/mongo/s/sharding_router_api',
+        '$BUILD_DIR/mongo/s/startup_initialization',
     ]
 )
 
@@ -90,11 +96,9 @@ env.Library(
         'cluster_validate_db_metadata_cmd.cpp',
         'cluster_whats_my_uri_cmd.cpp',
         'cluster_write_cmd_s.cpp',
-        'internal_transactions_test_commands.cpp',
         'kill_sessions_remote.cpp',
         's_read_write_concern_defaults_server_status.cpp',
         'cluster_commands.idl',
-        'internal_transactions_test_commands.idl',
         'shard_collection.idl',
     ],
     LIBDEPS_PRIVATE=[

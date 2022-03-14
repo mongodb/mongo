@@ -32,9 +32,40 @@ global:
 imports:
   - "mongo/idl/basic_types.idl"
 
+structs:
+    TestInternalTransactionsReply:
+        description: "Response for testInternalTransactions command"
+        strict: false
+        fields:
+            responses:
+                type: array<object>
+
+    TestInternalTransactionsCommandInfo:
+        description: "A command, its database name, and other test options"
+        strict: false
+        fields:
+            dbName:
+                type: string
+            command:
+                type: object
+            assertSucceeds:
+                type: bool
+                default: true
+
 commands:
     testInternalTransactions:
         command_name: testInternalTransactions
         description: "The 'testInternalTransactions' command."
         namespace: ignored
         api_version: ""
+        fields:
+            useClusterClient:
+                description: "Whether the transaction API client used should opt into running the
+                             'cluster' versions of commands that enables a non-router node to run
+                             the router versions of commands. Only meaningful on mongod because a
+                             mongos will always run 'cluster' commands."
+                type: bool
+                default: false
+            commandInfos:
+                type: array<TestInternalTransactionsCommandInfo>
+        reply_type: TestInternalTransactionsReply

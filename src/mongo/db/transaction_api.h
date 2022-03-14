@@ -199,13 +199,52 @@ private:
 namespace details {
 
 /**
+ * Customization point for behaviors different in the default SEPTransactionClient and the one for
+ * running distributed transactions.
+ */
+class SEPTransactionClientBehaviors {
+public:
+    virtual ~SEPTransactionClientBehaviors() {}
+
+    /**
+     * Makes any necessary modifications to the given command, e.g. changing the name to the
+     * "cluster" version for the cluster behaviors.
+     */
+    virtual BSONObj maybeModifyCommand(BSONObj cmdObj) const = 0;
+
+    /**
+     * Returns a future with the result of running the given request.
+     */
+    virtual Future<DbResponse> handleRequest(OperationContext* opCtx,
+                                             const Message& request) const = 0;
+};
+
+/**
+ * Default behaviors that does not modify commands and runs them against the local process service
+ * entry point.
+ */
+class DefaultSEPTransactionClientBehaviors : public SEPTransactionClientBehaviors {
+public:
+    BSONObj maybeModifyCommand(BSONObj cmdObj) const override {
+        return cmdObj;
+    }
+
+    Future<DbResponse> handleRequest(OperationContext* opCtx,
+                                     const Message& request) const override;
+};
+
+/**
  * Default transaction client that runs given commands through the local process service entry
  * point.
  */
 class SEPTransactionClient : public TransactionClient {
 public:
-    SEPTransactionClient(OperationContext* opCtx, ExecutorPtr executor)
-        : _serviceContext(opCtx->getServiceContext()), _executor(executor) {
+    SEPTransactionClient(OperationContext* opCtx,
+                         ExecutorPtr executor,
+                         std::unique_ptr<SEPTransactionClientBehaviors> behaviors)
+        : _serviceContext(opCtx->getServiceContext()),
+          _executor(executor),
+          _behaviors(std::move(behaviors)) {
         _cancelableOpCtxFactory = std::make_unique<CancelableOperationContextFactory>(
             opCtx->getCancellationToken(), executor);
     }
@@ -233,6 +272,7 @@ public:
 private:
     ServiceContext* const _serviceContext;
     ExecutorPtr _executor;
+    std::unique_ptr<SEPTransactionClientBehaviors> _behaviors;
     std::unique_ptr<details::TxnMetadataHooks> _hooks;
     std::unique_ptr<CancelableOperationContextFactory> _cancelableOpCtxFactory;
 };
@@ -275,7 +315,8 @@ public:
      */
     Transaction(OperationContext* opCtx, ExecutorPtr executor)
         : _executor(executor),
-          _txnClient(std::make_unique<SEPTransactionClient>(opCtx, executor)),
+          _txnClient(std::make_unique<SEPTransactionClient>(
+              opCtx, executor, std::make_unique<DefaultSEPTransactionClientBehaviors>())),
           _service(opCtx->getServiceContext()) {
         _primeTransaction(opCtx);
         _txnClient->injectHooks(_makeTxnMetadataHooks());

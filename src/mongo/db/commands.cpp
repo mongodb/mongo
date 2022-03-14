@@ -116,9 +116,16 @@ bool checkAuthorizationImplPreParse(OperationContext* opCtx,
     return false;
 }
 
+// TODO SERVER-65101: Replace this with a property on each command.
 // The command names that are allowed in a multi-document transaction.
 const StringMap<int> txnCmdAllowlist = {{"abortTransaction", 1},
                                         {"aggregate", 1},
+                                        {"clusterAbortTransaction", 1},
+                                        {"clusterCommitTransaction", 1},
+                                        {"clusterDelete", 1},
+                                        {"clusterFind", 1},
+                                        {"clusterInsert", 1},
+                                        {"clusterUpdate", 1},
                                         {"commitTransaction", 1},
                                         {"coordinateCommitTransaction", 1},
                                         {"create", 1},

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2022-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,35 +29,23 @@
 
 #pragma once
 
-#include <vector>
+#include "mongo/db/operation_context.h"
+#include "mongo/db/transaction_api.h"
+#include "mongo/s/service_entry_point_mongos.h"
 
-#include "mongo/transport/service_entry_point_impl.h"
-
-namespace mongo {
+namespace mongo::txn_api::details {
 
 /**
- * The entry point from the TransportLayer into Mongos.
+ * Behaviors for running cluster commands from a non-router process, ie mongod.
  */
-class ServiceEntryPointMongos final : public ServiceEntryPointImpl {
-    ServiceEntryPointMongos(const ServiceEntryPointMongos&) = delete;
-    ServiceEntryPointMongos& operator=(const ServiceEntryPointMongos&) = delete;
-
+class ClusterSEPTransactionClientBehaviors : public SEPTransactionClientBehaviors {
 public:
-    using ServiceEntryPointImpl::ServiceEntryPointImpl;
+    ClusterSEPTransactionClientBehaviors(ServiceContext* service) {}
 
-    static Future<DbResponse> handleRequestImpl(OperationContext* opCtx,
-                                                const Message& request) noexcept;
+    BSONObj maybeModifyCommand(BSONObj cmdObj) const override;
 
     Future<DbResponse> handleRequest(OperationContext* opCtx,
-                                     const Message& request) noexcept override;
-
-    void appendStats(BSONObjBuilder* bob) const override;
-
-    void onClientConnect(Client* client) override;
-    void onClientDisconnect(Client* client) override;
-
-private:
-    Counter64 _loadBalancedConnections;
+                                     const Message& request) const override;
 };
 
-}  // namespace mongo
+}  // namespace mongo::txn_api::details
