@@ -98,11 +98,7 @@ auto writeConflictRetry(OperationContext* opCtx, StringData opStr, StringData ns
             return f();
         } catch (TemporarilyUnavailableException const& e) {
             if (opCtx->inMultiDocumentTransaction()) {
-                // Since WriteConflicts are tagged as TransientTransactionErrors and
-                // TemporarilyUnavailable errors are not, we convert the error to a WriteConflict to
-                // allow users of multi-document transactions to retry without changing any
-                // behavior. Otherwise, we let the error escape as usual.
-                throw WriteConflictException(e.reason());
+                TemporarilyUnavailableException::handleInTransaction(opCtx, opStr, ns, e);
             }
             throw;
         }

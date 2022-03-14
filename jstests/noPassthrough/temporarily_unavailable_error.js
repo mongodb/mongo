@@ -38,6 +38,7 @@ for (let j = 0; j < 50000; j++)
     doc.x.push("" + Math.random() + Math.random());
 
 (function temporarilyUnavailableNonTransaction() {
+    const serverStatusBefore = db.serverStatus();
     let caughtTUerror = false;
     let attempts;
     for (attempts = 1; attempts <= 20; attempts++) {
@@ -58,11 +59,17 @@ for (let j = 0; j < 50000; j++)
     assert(caughtTUerror,
            "did not return the expected TemporarilyUnavailable error after " + (attempts - 1) +
                " attempts");
+    const serverStatusAfter = db.serverStatus();
+    assert.gt(serverStatusAfter.metrics.operation.temporarilyUnavailableErrors,
+              serverStatusBefore.metrics.operation.temporarilyUnavailableErrors);
+    assert.gt(serverStatusAfter.metrics.operation.temporarilyUnavailableErrorsEscaped,
+              serverStatusBefore.metrics.operation.temporarilyUnavailableErrorsEscaped);
 })();
 
 (function temporarilyUnavailableInTransactionIsConvertedToWriteConflict() {
     // Inside a transaction, TemporarilyUnavailable errors should be converted to
     // WriteConflicts and tagged as TransientTransactionErrors.
+    const serverStatusBefore = db.serverStatus();
     let caughtWriteConflict = false;
     let attempts;
     let ret;
@@ -93,6 +100,15 @@ for (let j = 0; j < 50000; j++)
     assert(caughtWriteConflict,
            "did not return the expected WriteConflict error after " + (attempts - 1) +
                " attempts. Result: " + tojson(ret));
+
+    const serverStatusAfter = db.serverStatus();
+    assert.gt(
+        serverStatusAfter.metrics.operation.temporarilyUnavailableErrorsConvertedToWriteConflict,
+        serverStatusBefore.metrics.operation.temporarilyUnavailableErrorsConvertedToWriteConflict);
+    assert.eq(serverStatusAfter.metrics.operation.temporarilyUnavailableErrors,
+              serverStatusBefore.metrics.operation.temporarilyUnavailableErrors);
+    assert.eq(serverStatusAfter.metrics.operation.temporarilyUnavailableErrorsEscaped,
+              serverStatusBefore.metrics.operation.temporarilyUnavailableErrorsEscaped);
 })();
 
 replSet.stopSet();

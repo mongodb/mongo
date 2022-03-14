@@ -31,6 +31,8 @@
 
 #include "mongo/db/concurrency/temporarily_unavailable_exception.h"
 #include "mongo/base/string_data.h"
+#include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/server_options_general_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/duration.h"
@@ -41,6 +43,18 @@ namespace mongo {
 AtomicWord<long long> TemporarilyUnavailableException::maxRetryAttempts;
 AtomicWord<long long> TemporarilyUnavailableException::retryBackoffBaseMs;
 
+Counter64 temporarilyUnavailableErrors;
+Counter64 temporarilyUnavailableErrorsEscaped;
+Counter64 temporarilyUnavailableErrorsConvertedToWriteConflict;
+
+ServerStatusMetricField<Counter64> displayTemporarilyUnavailableErrors(
+    "operation.temporarilyUnavailableErrors", &temporarilyUnavailableErrors);
+ServerStatusMetricField<Counter64> displayTemporarilyUnavailableErrorsEscaped(
+    "operation.temporarilyUnavailableErrorsEscaped", &temporarilyUnavailableErrorsEscaped);
+ServerStatusMetricField<Counter64> displayTemporarilyUnavailableErrorsConverted(
+    "operation.temporarilyUnavailableErrorsConvertedToWriteConflict",
+    &temporarilyUnavailableErrorsConvertedToWriteConflict);
+
 TemporarilyUnavailableException::TemporarilyUnavailableException(StringData context)
     : DBException(Status(ErrorCodes::TemporarilyUnavailable, context)) {}
 
@@ -50,6 +64,7 @@ void TemporarilyUnavailableException::handle(OperationContext* opCtx,
                                              StringData ns,
                                              const TemporarilyUnavailableException& e) {
     opCtx->recoveryUnit()->abandonSnapshot();
+    temporarilyUnavailableErrors.increment(1);
     if (opCtx->getClient()->isFromUserConnection() &&
         attempts > TemporarilyUnavailableException::maxRetryAttempts.load()) {
         LOGV2_DEBUG(6083901,
@@ -59,6 +74,7 @@ void TemporarilyUnavailableException::handle(OperationContext* opCtx,
                     "attempts"_attr = attempts,
                     "operation"_attr = opStr,
                     logAttrs(NamespaceString(ns)));
+        temporarilyUnavailableErrorsEscaped.increment(1);
         throw e;
     }
 
@@ -74,6 +90,19 @@ void TemporarilyUnavailableException::handle(OperationContext* opCtx,
                 "sleepFor"_attr = sleepFor,
                 logAttrs(NamespaceString(ns)));
     opCtx->sleepFor(sleepFor);
+}
+
+void TemporarilyUnavailableException::handleInTransaction(
+    OperationContext* opCtx,
+    StringData opStr,
+    StringData ns,
+    const TemporarilyUnavailableException& e) {
+    // Since WriteConflicts are tagged as TransientTransactionErrors and TemporarilyUnavailable
+    // errors are not, we convert the error to a WriteConflict to allow users of multi-document
+    // transactions to retry without changing any behavior. Otherwise, we let the error escape as
+    // usual.
+    temporarilyUnavailableErrorsConvertedToWriteConflict.increment(1);
+    throw WriteConflictException(e.reason());
 }
 
 }  // namespace mongo

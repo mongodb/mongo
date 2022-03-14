@@ -49,11 +49,22 @@ public:
 
     TemporarilyUnavailableException(StringData context);
 
+    /**
+     * Handle a TemporarilyUnavailableException.
+     */
     static void handle(OperationContext* opCtx,
                        int attempts,
                        StringData opStr,
                        StringData ns,
                        const TemporarilyUnavailableException& e);
+
+    /**
+     * Handle a TemporarilyUnavailableException inside a multi-document transaction.
+     */
+    static void handleInTransaction(OperationContext* opCtx,
+                                    StringData opStr,
+                                    StringData ns,
+                                    const TemporarilyUnavailableException& e);
 
 private:
     void defineOnlyInFinalSubclassToPreventSlicing() final {}
