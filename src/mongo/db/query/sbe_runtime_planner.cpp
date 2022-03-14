@@ -92,7 +92,7 @@ BaseRuntimePlanner::prepareExecutionPlan(PlanStage* root,
     invariant(data);
 
     stage_builder::prepareSlotBasedExecutableTree(
-        _opCtx, root, data, _cq, _collections.getMainCollection(), _yieldPolicy);
+        _opCtx, root, data, _cq, _collections, _yieldPolicy);
 
     value::SlotAccessor* resultSlot{nullptr};
     if (auto slot = data->outputs.getIfExists(stage_builder::PlanStageSlots::kResult); slot) {

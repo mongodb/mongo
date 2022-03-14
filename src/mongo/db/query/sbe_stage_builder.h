@@ -59,7 +59,7 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
                                     sbe::PlanStage* root,
                                     PlanStageData* data,
                                     const CanonicalQuery& cq,
-                                    const CollectionPtr& collection,
+                                    const MultipleCollectionAccessor& collections,
                                     PlanYieldPolicySBE* yieldPolicy);
 
 class PlanStageReqs;

@@ -974,9 +974,6 @@ public:
 
     std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> buildExecutableTree(
         const QuerySolution& solution) const final {
-        // TODO SERVER-62677 We don't pass '_collections' to the function below because at the
-        // moment, no pushdown is actually happening. This should be changed once the logic for
-        // pushdown is implemented.
         return stage_builder::buildSlotBasedExecutableTree(
             _opCtx, _collections, *_cq, solution, _yieldPolicy);
     }
@@ -997,10 +994,9 @@ protected:
         }
 
         invariant(descriptor->getEntry());
-        const auto& mainColl = _collections.getMainCollection();
         std::unique_ptr<QuerySolutionNode> root = [&]() {
-            auto ixScan = std::make_unique<IndexScanNode>(
-                indexEntryFromIndexCatalogEntry(_opCtx, mainColl, *descriptor->getEntry(), _cq));
+            auto ixScan = std::make_unique<IndexScanNode>(indexEntryFromIndexCatalogEntry(
+                _opCtx, _collections.getMainCollection(), *descriptor->getEntry(), _cq));
 
             const auto bsonKey =
                 IndexBoundsBuilder::objFromElement(_cq->getQueryObj()["_id"], _cq->getCollator());
@@ -1325,7 +1321,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
 
     // Prepare the SBE tree for execution.
     stage_builder::prepareSlotBasedExecutableTree(
-        opCtx, root.get(), &data, *cq, *mainColl, yieldPolicy.get());
+        opCtx, root.get(), &data, *cq, collections, yieldPolicy.get());
 
     return plan_executor_factory::make(opCtx,
                                        std::move(cq),

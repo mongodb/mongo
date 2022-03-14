@@ -127,7 +127,7 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> extractSbeCompatibleSt
     std::vector<std::unique_ptr<InnerPipelineStageInterface>> stagesForPushdown;
 
     // This handles the case of unionWith against an unknown collection.
-    if (collections.getMainCollection() == nullptr) {
+    if (!collections.getMainCollection()) {
         return {};
     }
 
@@ -207,7 +207,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
     const size_t plannerOpts,
     const MatchExpressionParser::AllowedFeatureSet& matcherFeatures,
     Pipeline* pipeline) {
-    const auto& mainColl = collections.getMainCollection();
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
     query_request_helper::setTailableMode(expCtx->tailableMode, findCommand.get());
     findCommand->setFilter(queryObj.getOwned());
@@ -288,8 +287,10 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
         // 2) We not want a plan that will return separate values for each array element. For
         // example, if we have a document {a: [1,2]} and group by "a" a DISTINCT_SCAN on an "a"
         // index would produce one result for '1' and another for '2', which would be incorrect.
-        auto distinctExecutor = getExecutorDistinct(
-            &mainColl, plannerOpts | QueryPlannerParams::STRICT_DISTINCT_ONLY, &parsedDistinct);
+        auto distinctExecutor =
+            getExecutorDistinct(&collections.getMainCollection(),
+                                plannerOpts | QueryPlannerParams::STRICT_DISTINCT_ONLY,
+                                &parsedDistinct);
         if (!distinctExecutor.isOK()) {
             return distinctExecutor.getStatus().withContext(
                 "Unable to use distinct scan to optimize $group stage");
@@ -673,7 +674,6 @@ PipelineD::buildInnerQueryExecutor(const MultipleCollectionAccessor& collections
                                    const NamespaceString& nss,
                                    const AggregateCommandRequest* aggRequest,
                                    Pipeline* pipeline) {
-    const auto& collection = collections.getMainCollection();
     auto expCtx = pipeline->getContext();
 
     // We will be modifying the source vector as we go.
@@ -687,6 +687,7 @@ PipelineD::buildInnerQueryExecutor(const MultipleCollectionAccessor& collections
         // Try to inspect if the DocumentSourceSample or a DocumentSourceInternalUnpackBucket stage
         // can be optimized for sampling backed by a storage engine supplied random cursor.
         auto&& [sampleStage, unpackBucketStage] = extractSampleUnpackBucket(sources);
+        const auto& collection = collections.getMainCollection();
 
         // Optimize an initial $sample stage if possible.
         if (collection && sampleStage) {
@@ -714,12 +715,11 @@ void PipelineD::attachInnerQueryExecutorToPipeline(
     PipelineD::AttachExecutorCallback attachExecutorCallback,
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
     Pipeline* pipeline) {
-    auto& collection = collections.getMainCollection();
     // If the pipeline doesn't need a $cursor stage, there will be no callback function and
     // PlanExecutor provided in the 'attachExecutorCallback' object, so we don't need to do
     // anything.
     if (attachExecutorCallback && exec) {
-        attachExecutorCallback(collection, std::move(exec), pipeline);
+        attachExecutorCallback(collections.getMainCollection(), std::move(exec), pipeline);
     }
 }
 
@@ -955,6 +955,7 @@ PipelineD::buildInnerQueryExecutorGeoNear(const MultipleCollectionAccessor& coll
                                           const NamespaceString& nss,
                                           const AggregateCommandRequest* aggRequest,
                                           Pipeline* pipeline) {
+    // $geoNear can only run over the main collection.
     const auto& collection = collections.getMainCollection();
     uassert(ErrorCodes::NamespaceNotFound,
             str::stream() << "$geoNear requires a geo index to run, but " << nss.ns()

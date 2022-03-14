@@ -172,10 +172,10 @@ CandidatePlans CachedSolutionPlanner::replan(bool shouldCache, std::string reaso
     // Therefore, if any of the collection's indexes have been dropped, the query should fail with
     // a 'QueryPlanKilled' error.
     _indexExistenceChecker.check();
-    const auto& mainColl = _collections.getMainCollection();
 
     if (shouldCache) {
         // Deactivate the current cache entry.
+        const auto& mainColl = _collections.getMainCollection();
         auto cache = CollectionQueryInfo::get(mainColl).getPlanCache();
         cache->deactivate(plan_cache_key_factory::make<mongo::PlanCacheKey>(_cq, mainColl));
     }

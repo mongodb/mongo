@@ -121,12 +121,8 @@ CandidatePlans MultiPlanner::finalizeExecutionPlans(
         }
         winner.root = winner.clonedPlan->first->clone();
 
-        stage_builder::prepareSlotBasedExecutableTree(_opCtx,
-                                                      winner.root.get(),
-                                                      &winner.data,
-                                                      _cq,
-                                                      _collections.getMainCollection(),
-                                                      _yieldPolicy);
+        stage_builder::prepareSlotBasedExecutableTree(
+            _opCtx, winner.root.get(), &winner.data, _cq, _collections, _yieldPolicy);
         // Clear the results queue.
         winner.results = {};
         winner.root->open(false);
@@ -152,7 +148,7 @@ CandidatePlans MultiPlanner::finalizeExecutionPlans(
         auto [rootStage, data] = stage_builder::buildSlotBasedExecutableTree(
             _opCtx, _collections, _cq, *solution, _yieldPolicy);
         stage_builder::prepareSlotBasedExecutableTree(
-            _opCtx, rootStage.get(), &data, _cq, _collections.getMainCollection(), _yieldPolicy);
+            _opCtx, rootStage.get(), &data, _cq, _collections, _yieldPolicy);
         candidates[winnerIdx] = sbe::plan_ranker::CandidatePlan{
             std::move(solution), std::move(rootStage), std::move(data)};
         candidates[winnerIdx].root->open(false);

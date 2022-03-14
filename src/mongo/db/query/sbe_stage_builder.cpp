@@ -397,7 +397,7 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
                                     sbe::PlanStage* root,
                                     PlanStageData* data,
                                     const CanonicalQuery& cq,
-                                    const CollectionPtr& collection,
+                                    const MultipleCollectionAccessor& collections,
                                     PlanYieldPolicySBE* yieldPolicy) {
     tassert(6183502, "PlanStage cannot be null", root);
     tassert(6142205, "PlanStageData cannot be null", data);
@@ -421,6 +421,7 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
     // Populate/renew "shardFilterer" if there exists a "shardFilterer" slot. The slot value should
     // be set to Nothing in the plan cache to avoid extending the lifetime of the ownership filter.
     if (auto shardFiltererSlot = data->env->getSlotIfExists("shardFilterer"_sd)) {
+        const auto& collection = collections.getMainCollection();
         tassert(6108307,
                 "Setting shard filterer slot on un-sharded collection",
                 collection.isSharded());
