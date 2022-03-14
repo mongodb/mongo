@@ -47,4 +47,17 @@ assert(numberDecimalsEqual(NumberDecimal('10.20'), NumberDecimal('10.2')));
 assert.throws(
     () => numberDecimalsEqual(NumberDecimal('10.20'), NumberDecimal('10.2'), "Third parameter"));
 assert.throws(() => numberDecimalsEqual(NumberDecimal('10.20'), "Wrong parameter type"));
+
+// Verify the behavior of 'numberDecimalsAlmostEqual' helper.
+assert(numberDecimalsAlmostEqual(NumberDecimal("10001"), NumberDecimal("10002"), 3));
+assert.neq(numberDecimalsAlmostEqual(NumberDecimal("10001"), NumberDecimal("10002"), 5));
+
+// Regression tests for BF-24149.
+assert(numberDecimalsAlmostEqual(NumberDecimal("905721242210.0455427920454969568"),
+                                 NumberDecimal("905721242210.0453137831269007622941"),
+                                 15));
+
+assert.neq(numberDecimalsAlmostEqual(NumberDecimal("905721242210.0455427920454969568"),
+                                     NumberDecimal("905721242210.0453137831269007622941"),
+                                     16));
 }());

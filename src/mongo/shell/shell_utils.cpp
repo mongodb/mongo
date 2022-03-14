@@ -52,6 +52,7 @@
 #include "mongo/db/auth/security_token.h"
 #include "mongo/db/hasher.h"
 #include "mongo/logv2/log.h"
+#include "mongo/platform/decimal128.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/platform/random.h"
 #include "mongo/scripting/engine.h"
@@ -497,6 +498,47 @@ BSONObj numberDecimalsEqual(const BSONObj& input, void*) {
     return BSON("" << first.numberDecimal().isEqual(second.numberDecimal()));
 }
 
+BSONObj numberDecimalsAlmostEqual(const BSONObj& input, void*) {
+    if (input.nFields() != 3) {
+        return BSON("" << false);
+    }
+
+    BSONObjIterator i(input);
+    auto first = i.next();
+    auto second = i.next();
+    auto third = i.next();
+
+    // Type-check arguments before performing any calculations.
+    if (!(first.type() == BSONType::NumberDecimal && second.type() == BSONType::NumberDecimal &&
+          third.isNumber())) {
+        return BSON("" << false);
+    }
+
+    auto a = first.numberDecimal();
+    auto b = second.numberDecimal();
+
+    // 10.0 is used frequently in the rest of the function, so save it to a variable.
+    auto ten = Decimal128(10);
+    auto exponent = a.logarithm(ten).toAbs().round();
+
+    // Return early if arguments are not the same order of magnitude.
+    if (exponent != b.logarithm(ten).toAbs().round()) {
+        return BSON("" << false);
+    }
+
+    // Put the whole number behind the decimal point.
+    a = a.divide(ten.power(exponent));
+    b = b.divide(ten.power(exponent));
+
+    auto places = third.numberDecimal();
+    auto isErrorAcceptable = a.subtract(b)
+                                 .toAbs()
+                                 .multiply(ten.power(places, Decimal128::kRoundTowardZero))
+                                 .round(Decimal128::kRoundTowardZero) == Decimal128(0);
+
+    return BSON("" << isErrorAcceptable);
+}
+
 void installShellUtils(Scope& scope) {
     scope.injectNative("getMemInfo", JSGetMemInfo);
     scope.injectNative("_createSecurityToken", _createSecurityToken);
@@ -512,6 +554,7 @@ void installShellUtils(Scope& scope) {
     scope.injectNative("fileExists", fileExistsJS);
     scope.injectNative("isInteractive", isInteractive);
     scope.injectNative("numberDecimalsEqual", numberDecimalsEqual);
+    scope.injectNative("numberDecimalsAlmostEqual", numberDecimalsAlmostEqual);
 
     installShellUtilsLauncher(scope);
     installShellUtilsExtended(scope);
