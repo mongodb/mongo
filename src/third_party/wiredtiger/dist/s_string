@@ -34,7 +34,7 @@ check() {
 	# Strip out double quote char literals ('"'), they confuse aspell.
 	# Strip out calls to __wt_getopt so the option lists don't have to be spelling words.
 	# Strip out C-style hex constants.
-	sed -e 's/ [0-9a-f]\{7\} / /g' -e "s/'\"'//g" -e 's/__wt_getopt([^()]*)//' ../$2 -e 's/0x[[:xdigit:]]\+//' |
+	sed -e 's/ [0-9a-f]\{7\} / /g' -e "s/'\"'//g" -e 's/__wt_getopt([^()]*)//' -e 's/0x[[:xdigit:]]\{1,\}/ /g' ../$2 |
 	aspell --lang=en_US $1 list |
 	sort -u |
 	comm -23 /dev/stdin s_string.ok > $t
