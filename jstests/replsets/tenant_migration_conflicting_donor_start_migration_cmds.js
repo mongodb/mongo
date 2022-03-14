@@ -100,12 +100,16 @@ function setup() {
 
     const {tenantMigrationTest, recipientPrimary, teardown} = setup();
 
-    TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(migrationOpts));
-    TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(migrationOpts));
+    TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(
+        migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
+    TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(
+        migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
 
     // If the second donorStartMigration had started a duplicate migration, the recipient would have
     // received four recipientSyncData commands instead of two.
     checkNumRecipientSyncDataCmdExecuted(recipientPrimary, 2);
+
+    assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
     teardown();
 })();
 
