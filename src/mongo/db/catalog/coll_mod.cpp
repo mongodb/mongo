@@ -303,23 +303,22 @@ StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
             auto indexObjForOplog = indexObj;
 
             if (cmdIndex.getUnique()) {
-                // Disallow one-step unique convertion. The user has to set
-                // 'prepareUnique' to true first.
-                if (!cmrIndex->idx->prepareUnique()) {
-                    return Status(ErrorCodes::InvalidOptions,
-                                  "Cannot make index unique with 'prepareUnique=false'. "
-                                  "Run collMod to set it first.");
-                }
-
                 cmr.numModifications++;
                 if (bool unique = *cmdIndex.getUnique(); !unique) {
                     return Status(ErrorCodes::BadValue, "'Unique: false' option is not supported");
                 }
 
-                // Attempting to converting a unique index should be treated as a no-op.
+                // Attempting to convert a unique index should be treated as a no-op.
                 if (cmrIndex->idx->unique()) {
                     indexObjForOplog = indexObjForOplog.removeField(CollModIndex::kUniqueFieldName);
                 } else {
+                    // Disallow one-step unique convertion. The user has to set
+                    // 'prepareUnique' to true first.
+                    if (!cmrIndex->idx->prepareUnique()) {
+                        return Status(ErrorCodes::InvalidOptions,
+                                      "Cannot make index unique with 'prepareUnique=false'. "
+                                      "Run collMod to set it first.");
+                    }
                     cmrIndex->indexUnique = true;
                 }
             }
