@@ -117,19 +117,6 @@ TEST(CountCommandTest, LimitCannotBeMinLong) {
         CountCommandRequest::parse(ctxt, commandObj), AssertionException, ErrorCodes::BadValue);
 }
 
-TEST(CountCommandTest, FailLargerThan32BitMaxTimeMS) {
-    const long long kLargerThan32BitInt =
-        static_cast<long long>(std::numeric_limits<int>::max()) + 1;
-    auto commandObj = BSON("count"
-                           << "TestColl"
-                           << "$db"
-                           << "TestDB"
-                           << "maxTimeMS" << kLargerThan32BitInt);
-
-    ASSERT_THROWS_CODE(
-        CountCommandRequest::parse(ctxt, commandObj), AssertionException, ErrorCodes::BadValue);
-}
-
 TEST(CountCommandTest, FailParseBadSkipValue) {
     ASSERT_THROWS_CODE(CountCommandRequest::parse(ctxt,
                                                   BSON("count"
@@ -139,7 +126,7 @@ TEST(CountCommandTest, FailParseBadSkipValue) {
                                                        << "query" << BSON("a" << BSON("$gte" << 11))
                                                        << "skip" << -1000)),
                        AssertionException,
-                       51024);
+                       ErrorCodes::FailedToParse);
 }
 
 TEST(CountCommandTest, FailParseBadCollationType) {

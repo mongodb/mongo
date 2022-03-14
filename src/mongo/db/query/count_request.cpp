@@ -54,5 +54,15 @@ long long countParseLimit(const BSONElement& element) {
     return limit;
 }
 
+long long countParseSkip(const BSONElement& element) {
+    uassert(ErrorCodes::BadValue, "skip value is not a valid number", element.isNumber());
+    auto skip = uassertStatusOK(element.parseIntegerElementToNonNegativeLong());
+    return skip;
+}
+
+long long countParseMaxTime(const BSONElement& element) {
+    auto maxTimeVal = uassertStatusOK(parseMaxTimeMS(element));
+    return static_cast<long long>(maxTimeVal);
+}
 }  // namespace count_request
 }  // namespace mongo
