@@ -185,9 +185,7 @@ StatusWith<ResolvedView> resolveView(OperationContext* opCtx,
         }
 
         if (view->timeseries()) {
-            // Use the lock-free collection lookup, to ensure compatibility with lock-free read
-            // operations.
-            auto tsCollection = catalog->lookupCollectionByNamespaceForRead(opCtx, *resolvedNss);
+            auto tsCollection = catalog->lookupCollectionByNamespace(opCtx, *resolvedNss);
             uassert(6067201,
                     str::stream() << "expected time-series buckets collection " << *resolvedNss
                                   << " to exist",

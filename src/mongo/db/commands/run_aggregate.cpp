@@ -826,13 +826,6 @@ Status runAggregate(OperationContext* opCtx,
             auto timeSeriesCollator =
                 ctx->getView()->timeseries() ? request.getCollation() : boost::none;
 
-            // Check that the database still exists, in case this is a lock-free
-            // operation. It's possible for a view to disappear after we release locks below, so
-            // it's safe to quit early if the view disappears while running lock-free.
-            const TenantDatabaseName tenantDbName(boost::none, nss.db());
-            uassert(ErrorCodes::NamespaceNotFound,
-                    str::stream() << "Namespace '" << nss << "' no longer exists",
-                    DatabaseHolder::get(opCtx)->dbExists(opCtx, tenantDbName));
             auto resolvedView = uassertStatusOK(
                 view_catalog_helpers::resolveView(opCtx, catalog, nss, timeSeriesCollator));
 
