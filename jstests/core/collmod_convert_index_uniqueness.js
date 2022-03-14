@@ -11,6 +11,8 @@
  *  incompatible_with_eft,
  *  # TODO(SERVER-61182): Fix WiredTigerKVEngine::alterIdentMetadata() under inMemory.
  *  requires_persistence,
+ *  # The 'prepareUnique' field may cause the migration to fail.
+ *  tenant_migration_incompatible,
  * ]
  */
 
