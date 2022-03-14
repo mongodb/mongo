@@ -65,6 +65,7 @@ class test_tiered08(wttest.WiredTigerTestCase):
         if self.ss_name == 'local_store' and not os.path.exists(self.bucket):
             os.mkdir(self.bucket)
         return \
+          'debug_mode=(flush_checkpoint=true),' + \
           'statistics=(fast),' + \
           'tiered_storage=(auth_token=%s,' % self.auth_token + \
           'bucket=%s,' % self.bucket + \

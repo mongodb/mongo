@@ -76,6 +76,7 @@ class test_tiered04(wttest.WiredTigerTestCase):
             os.mkdir(self.bucket)
             os.mkdir(self.bucket1)
         self.saved_conn = \
+          'debug_mode=(flush_checkpoint=true),' + \
           'statistics=(all),' + \
           'tiered_storage=(auth_token=%s,' % self.auth_token + \
           'bucket=%s,' % self.bucket + \

@@ -2145,30 +2145,34 @@ struct __wt_connection {
 	 * not limited to not skewing newest\, not favoring leaf pages\, and modifying the eviction
 	 * score mechanism., a boolean flag; default \c false.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;
-	 * log_retention, adjust log removal to retain at least this number of log files\, ignored
-	 * if set to 0. (Warning: this option can remove log files required for recovery if no
-	 * checkpoints have yet been done and the number of log files exceeds the configured value.
-	 * As WiredTiger cannot detect the difference between a system that has not yet checkpointed
-	 * and one that will never checkpoint\, it might discard log files before any checkpoint is
-	 * done.)., an integer between 0 and 1024; default \c 0.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;
-	 * realloc_exact, if true\, reallocation of memory will only provide the exact amount
-	 * requested.  This will help with spotting memory allocation issues more easily., a boolean
+	 * flush_checkpoint, if true\, call a system wide checkpoint immediately after a flush_tier
+	 * completes to force objects out to disk so that a flush_tier can work single-threaded., a
+	 * boolean flag; default \c false.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;log_retention, adjust
+	 * log removal to retain at least this number of log files\, ignored if set to 0. (Warning:
+	 * this option can remove log files required for recovery if no checkpoints have yet been
+	 * done and the number of log files exceeds the configured value.  As WiredTiger cannot
+	 * detect the difference between a system that has not yet checkpointed and one that will
+	 * never checkpoint\, it might discard log files before any checkpoint is done.)., an
+	 * integer between 0 and 1024; default \c 0.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;realloc_exact,
+	 * if true\, reallocation of memory will only provide the exact amount requested.  This will
+	 * help with spotting memory allocation issues more easily., a boolean flag; default \c
+	 * false.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;rollback_error, return a WT_ROLLBACK error from a
+	 * transaction operation about every Nth operation to simulate a collision., an integer
+	 * between 0 and 10M; default \c 0.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;slow_checkpoint, if
+	 * true\, slow down checkpoint creation by slowing down internal page processing., a boolean
 	 * flag; default \c false.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;rollback_error, return a
-	 * WT_ROLLBACK error from a transaction operation about every Nth operation to simulate a
-	 * collision., an integer between 0 and 10M; default \c 0.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;
-	 * slow_checkpoint, if true\, slow down checkpoint creation by slowing down internal page
-	 * processing., a boolean flag; default \c false.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;
-	 * table_logging, if true\, write transaction related information to the log for all
-	 * operations\, even operations for tables with logging turned off.  This additional logging
-	 * information is intended for debugging and is informational only\, that is\, it is ignored
-	 * during recovery., a boolean flag; default \c false.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;
-	 * update_restore_evict, if true\, control all dirty page evictions through forcing update
-	 * restore eviction., a boolean flag; default \c false.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;table_logging, if true\, write
+	 * transaction related information to the log for all operations\, even operations for
+	 * tables with logging turned off.  This additional logging information is intended for
+	 * debugging and is informational only\, that is\, it is ignored during recovery., a boolean
+	 * flag; default \c false.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;update_restore_evict, if true\,
+	 * control all dirty page evictions through forcing update restore eviction., a boolean
+	 * flag; default \c false.}
 	 * @config{ ),,}
 	 * @config{error_prefix, prefix string for error messages., a string; default empty.}
 	 * @config{eviction = (, eviction configuration options., a set of related configuration
@@ -2863,15 +2867,19 @@ struct __wt_connection {
  * eviction, if true\, modify internal algorithms to change skew to force history store eviction to
  * happen more aggressively.  This includes but is not limited to not skewing newest\, not favoring
  * leaf pages\, and modifying the eviction score mechanism., a boolean flag; default \c false.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;log_retention, adjust log removal to retain at least this number
- * of log files\, ignored if set to 0. (Warning: this option can remove log files required for
- * recovery if no checkpoints have yet been done and the number of log files exceeds the configured
- * value.  As WiredTiger cannot detect the difference between a system that has not yet checkpointed
- * and one that will never checkpoint\, it might discard log files before any checkpoint is done.).,
- * an integer between 0 and 1024; default \c 0.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;realloc_exact, if
- * true\, reallocation of memory will only provide the exact amount requested.  This will help with
- * spotting memory allocation issues more easily., a boolean flag; default \c false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;flush_checkpoint, if true\, call a system wide checkpoint
+ * immediately after a flush_tier completes to force objects out to disk so that a flush_tier can
+ * work single-threaded., a boolean flag; default \c false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;
+ * log_retention, adjust log removal to retain at least this number of log files\, ignored if set to
+ * 0. (Warning: this option can remove log files required for recovery if no checkpoints have yet
+ * been done and the number of log files exceeds the configured value.  As WiredTiger cannot detect
+ * the difference between a system that has not yet checkpointed and one that will never
+ * checkpoint\, it might discard log files before any checkpoint is done.)., an integer between 0
+ * and 1024; default \c 0.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;realloc_exact, if true\, reallocation of
+ * memory will only provide the exact amount requested.  This will help with spotting memory
+ * allocation issues more easily., a boolean flag; default \c false.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;rollback_error, return a WT_ROLLBACK error from a transaction
  * operation about every Nth operation to simulate a collision., an integer between 0 and 10M;
  * default \c 0.}

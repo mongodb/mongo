@@ -626,6 +626,11 @@ connection_runtime_config = [
             is not limited to not skewing newest, not favoring leaf pages,
             and modifying the eviction score mechanism.''',
             type='boolean'),
+        Config('flush_checkpoint', 'false', r'''
+            if true, call a system wide checkpoint immediately after a flush_tier 
+            completes to force objects out to disk so that a flush_tier can work
+            single-threaded''',
+            type='boolean'),
         Config('log_retention', '0', r'''
             adjust log removal to retain at least this number of log files, ignored if set to 0.
             (Warning: this option can remove log files required for recovery if no checkpoints

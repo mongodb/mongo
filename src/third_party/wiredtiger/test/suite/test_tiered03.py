@@ -82,6 +82,7 @@ class test_tiered03(wttest.WiredTigerTestCase):
                 os.mkdir(self.absolute_bucket_dir)
             bucket_ret = self.absolute_bucket_dir
         return \
+          'debug_mode=(flush_checkpoint=true),' + \
           'tiered_storage=(auth_token=%s,' % self.auth_token + \
           'bucket=%s,' % bucket_ret  + \
           'cache_directory=%s,' % cache_dir + \

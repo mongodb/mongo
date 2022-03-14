@@ -1152,10 +1152,12 @@ err:
 static int
 __txn_checkpoint_wrapper(WT_SESSION_IMPL *session, const char *cfg[])
 {
+    WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     WT_TXN_GLOBAL *txn_global;
 
-    txn_global = &S2C(session)->txn_global;
+    conn = S2C(session);
+    txn_global = &conn->txn_global;
 
     WT_STAT_CONN_SET(session, txn_checkpoint_running, 1);
     txn_global->checkpoint_running = true;
@@ -1164,6 +1166,15 @@ __txn_checkpoint_wrapper(WT_SESSION_IMPL *session, const char *cfg[])
 
     WT_STAT_CONN_SET(session, txn_checkpoint_running, 0);
     txn_global->checkpoint_running = false;
+
+    /*
+     * Signal the tiered storage thread because it waits for the following checkpoint to complete to
+     * process flush units. Indicate that the checkpoint has completed.
+     */
+    if (conn->tiered_cond != NULL) {
+        conn->flush_ckpt_complete = true;
+        __wt_cond_signal(session, conn->tiered_cond);
+    }
 
     return (ret);
 }

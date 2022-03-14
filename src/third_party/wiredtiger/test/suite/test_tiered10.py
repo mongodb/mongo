@@ -76,6 +76,7 @@ class test_tiered10(wttest.WiredTigerTestCase):
         bucket += self.bucket
 
         self.saved_conn = \
+          'debug_mode=(flush_checkpoint=true),' + \
           'create,statistics=(all),' + \
           'tiered_storage=(auth_token=%s,' % self.auth_token + \
           'bucket=%s,' % bucket + \

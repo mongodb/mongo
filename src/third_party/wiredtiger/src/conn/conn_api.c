@@ -1157,7 +1157,6 @@ err:
      * the sweep server.
      */
     WT_TRET(__wt_sweep_destroy(session));
-    WT_TRET(__wt_tiered_storage_destroy(session));
 
     /*
      * Shut down the checkpoint and capacity server threads: we don't want to throttle writes and
@@ -1168,6 +1167,11 @@ err:
 
     /* Perform a final checkpoint and shut down the global transaction state. */
     WT_TRET(__wt_txn_global_shutdown(session, cfg));
+    /*
+     * Tiered storage needs to flush any work after the final checkpoint which happens when the
+     * global transaction state is shut down. So this shutdown must come after.
+     */
+    WT_TRET(__wt_tiered_storage_destroy(session));
 
     if (ret != 0) {
         __wt_err(session, ret, "failure during close, disabling further writes");
@@ -1974,6 +1978,12 @@ __wt_debug_mode_config(WT_SESSION_IMPL *session, const char *cfg[])
         F_SET(cache, WT_CACHE_EVICT_DEBUG_MODE);
     else
         F_CLR(cache, WT_CACHE_EVICT_DEBUG_MODE);
+
+    WT_RET(__wt_config_gets(session, cfg, "debug_mode.flush_checkpoint", &cval));
+    if (cval.val)
+        FLD_SET(conn->debug_flags, WT_CONN_DEBUG_FLUSH_CKPT);
+    else
+        FLD_CLR(conn->debug_flags, WT_CONN_DEBUG_FLUSH_CKPT);
 
     WT_RET(__wt_config_gets(session, cfg, "debug_mode.log_retention", &cval));
     conn->debug_log_cnt = (uint32_t)cval.val;
