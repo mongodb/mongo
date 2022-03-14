@@ -82,6 +82,7 @@ env.Library(
         "index_entry.cpp",
         "index_tag.cpp",
         "interval.cpp",
+        "interval_evaluation_tree.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
