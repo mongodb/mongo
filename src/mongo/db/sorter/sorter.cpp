@@ -1290,7 +1290,7 @@ BoundedSorter<Key, Value, Comparator, BoundMaker>::getState() const {
 
     // _heap.top() is the min of _heap, but we also need to consider whether a smaller input
     // will arrive later. So _heap.top() is safe to return only if _heap.top() < _min.
-    if (compare(_heap.top().first, *_min) < 0)
+    if (!_heap.empty() && compare(_heap.top().first, *_min) < 0)
         return State::kReady;
 
     // Similarly, we can return the next element from the spilled iterator if it's < _min.
