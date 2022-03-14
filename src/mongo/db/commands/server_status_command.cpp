@@ -85,6 +85,11 @@ public:
 
         const auto authSession = AuthorizationSession::get(Client::getCurrent());
 
+        // This command is important to observability, and like FTDC, does not need to acquire the
+        // PBWM lock to return correct results.
+        ShouldNotConflictWithSecondaryBatchApplicationBlock noPBWMBlock(opCtx->lockState());
+        opCtx->lockState()->skipAcquireTicket();
+
         // --- basic fields that are global
 
         result.append("host", prettyHostName());
