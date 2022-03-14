@@ -2504,5 +2504,65 @@ TEST(ABTTranslate, CommonExpressionElimination) {
         rootNode);
 }
 
+TEST(ABTTranslate, GroupByDependency) {
+    PrefixId prefixId;
+    Metadata metadata = {{{"test", {{}, {}}}}};
+
+    ABT translated =
+        translatePipeline(metadata,
+                          "[{$group: {_id: {}, b: {$addToSet: '$a'}}}, {$project: "
+                          "{_id: 0, b: {$size: '$b'}}}, {$project: {_id: 0, c: '$b'}}]",
+                          "test",
+                          prefixId);
+
+    OptPhaseManager phaseManager({OptPhaseManager::OptPhase::ConstEvalPre,
+                                  OptPhaseManager::OptPhase::PathFuse,
+                                  OptPhaseManager::OptPhase::MemoSubstitutionPhase,
+                                  OptPhaseManager::OptPhase::MemoExplorationPhase,
+                                  OptPhaseManager::OptPhase::MemoImplementationPhase},
+                                 prefixId,
+                                 metadata,
+                                 DebugInfo::kDefaultForTests);
+
+    ABT optimized = translated;
+    ASSERT_TRUE(phaseManager.optimize(optimized));
+
+    // Demonstrate that "c" is set to the array size (not the array itself coming from the group).
+    ASSERT_EXPLAIN_V2(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       combinedProjection_1\n"
+        "|   RefBlock: \n"
+        "|       Variable [combinedProjection_1]\n"
+        "Evaluation []\n"
+        "|   BindBlock:\n"
+        "|       [combinedProjection_1]\n"
+        "|           EvalPath []\n"
+        "|           |   Const [{}]\n"
+        "|           PathComposeM []\n"
+        "|           |   PathField [c]\n"
+        "|           |   PathConstant []\n"
+        "|           |   FunctionCall [getArraySize]\n"
+        "|           |   Variable [b_agg_0]\n"
+        "|           PathKeep []\n"
+        "GroupBy []\n"
+        "|   |   groupings: \n"
+        "|   |       RefBlock: \n"
+        "|   |           Variable [groupByProj_0]\n"
+        "|   aggregations: \n"
+        "|       [b_agg_0]\n"
+        "|           FunctionCall [$addToSet]\n"
+        "|           Variable [groupByInputProj_0]\n"
+        "Evaluation []\n"
+        "|   BindBlock:\n"
+        "|       [groupByProj_0]\n"
+        "|           Const [{}]\n"
+        "PhysicalScan [{'a': groupByInputProj_0}, test]\n"
+        "    BindBlock:\n"
+        "        [groupByInputProj_0]\n"
+        "            Source []\n",
+        optimized);
+}
+
 }  // namespace
 }  // namespace mongo

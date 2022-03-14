@@ -83,6 +83,8 @@ private:
     }
     bool fuse(ABT& lhs, const ABT& rhs);
 
+    void tryFuseComposition(ABT& n, const ABT& input);
+
     VariableEnvironment& _env;
     opt::unordered_map<const PathSyntaxSort*, CollectedInfo> _info;
     opt::unordered_set<const PathSyntaxSort*> _redundant;

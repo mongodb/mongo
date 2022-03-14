@@ -86,6 +86,14 @@ public:
         return _tag == sbe::value::TypeTags::Nothing;
     }
 
+    bool isObject() const {
+        return _tag == sbe::value::TypeTags::Object;
+    }
+
+    bool isArray() const {
+        return _tag == sbe::value::TypeTags::Array;
+    }
+
 private:
     sbe::value::TypeTags _tag;
     sbe::value::Value _val;

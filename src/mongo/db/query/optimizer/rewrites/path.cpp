@@ -44,12 +44,13 @@ ABT::reference_type PathFusion::follow(ABT::reference_type n) {
 
 bool PathFusion::fuse(ABT& lhs, const ABT& rhs) {
     if (auto rhsComposeM = rhs.cast<PathComposeM>(); rhsComposeM != nullptr) {
-        if (_info[rhsComposeM->getPath1().cast<PathSyntaxSort>()]._isConst) {
-            if (fuse(lhs, rhsComposeM->getPath1())) {
+        // Try to fuse first with right path, then left.
+        if (_info[rhsComposeM->getPath2().cast<PathSyntaxSort>()]._isConst) {
+            if (fuse(lhs, rhsComposeM->getPath2())) {
                 return true;
             }
-            if (_info[rhsComposeM->getPath2().cast<PathSyntaxSort>()]._isConst &&
-                fuse(lhs, rhsComposeM->getPath2())) {
+            if (_info[rhsComposeM->getPath1().cast<PathSyntaxSort>()]._isConst &&
+                fuse(lhs, rhsComposeM->getPath1())) {
                 return true;
             }
         }
@@ -110,14 +111,20 @@ bool PathFusion::fuse(ABT& lhs, const ABT& rhs) {
 }
 
 bool PathFusion::optimize(ABT& root) {
-    _changed = false;
-    algebra::transport<true>(root, *this);
+    for (;;) {
+        _changed = false;
+        algebra::transport<true>(root, *this);
 
-    if (_changed) {
+        if (!_changed) {
+            break;
+        }
+
         _env.rebuild(root);
+        _redundant.clear();
+        _info.clear();
     }
 
-    return _changed;
+    return false;
 }
 
 void PathFusion::transport(ABT& n, const PathConstant& path, ABT& c) {
@@ -152,6 +159,10 @@ void PathFusion::transport(ABT& n, const PathCompare& path, ABT& c) {
 }
 
 void PathFusion::transport(ABT& n, const PathGet& get, ABT& path) {
+    if (_changed) {
+        return;
+    }
+
     // Get "a" Const <c> -> Const <c>
     if (auto constPath = path.cast<PathConstant>(); constPath) {
         // Pull out the constant path
@@ -200,6 +211,10 @@ void PathFusion::transport(ABT& n, const PathTraverse& path, ABT& inner) {
 }
 
 void PathFusion::transport(ABT& n, const PathComposeM& path, ABT& p1, ABT& p2) {
+    if (_changed) {
+        return;
+    }
+
     if (auto p1Const = p1.cast<PathConstant>(); p1Const != nullptr) {
         switch (_kindCtx.back()) {
             case Kind::filter:
@@ -279,7 +294,103 @@ void PathFusion::transport(ABT& n, const PathComposeM& path, ABT& p1, ABT& p2) {
     }
 }
 
+void PathFusion::tryFuseComposition(ABT& n, const ABT& input) {
+    // Check to see if our flattened composition consists of constant branches containing only
+    // Field and Keep elements. If we have duplicate Field branches then retain only the
+    // latest one. For example:
+    //      (Field "a" ConstPath1) * (Field "b" ConstPath2) * Keep "a" -> Field "a" ConstPath1
+    //      (Field "a" ConstPath1) * (Field "a" ConstPath2) -> Field "a" ConstPath2
+    // TODO: handle Drop elements.
+
+    // Latest value per field.
+    opt::unordered_map<FieldNameType, ABT> fieldMap;
+    // Used to preserve the relative order in which fields are set on the result.
+    FieldPathType orderedFieldNames;
+    boost::optional<opt::unordered_set<FieldNameType>> toKeep;
+
+    Type inputType = Type::any;
+    if (auto constPtr = input.cast<Constant>(); constPtr != nullptr && constPtr->isObject()) {
+        inputType = Type::object;
+    }
+
+    bool updated = false;
+    for (const auto& branch : collectComposed(n)) {
+        auto info = _info.find(branch.cast<PathSyntaxSort>());
+        if (info == _info.cend()) {
+            return;
+        }
+
+        if (auto fieldPtr = branch.cast<PathField>()) {
+            if (!info->second._isConst) {
+                // Rewrite is valid only with constant paths.
+                return;
+            }
+
+            // Overwrite field with the latest value.
+            if (fieldMap.insert_or_assign(fieldPtr->name(), branch).second) {
+                orderedFieldNames.push_back(fieldPtr->name());
+            } else {
+                updated = true;
+            }
+        } else if (auto keepPtr = branch.cast<PathKeep>()) {
+            for (auto it = fieldMap.begin(); it != fieldMap.cend();) {
+                if (keepPtr->getNames().count(it->first) == 0) {
+                    // Field is not kept, erase.
+                    fieldMap.erase(it++);
+                    updated = true;
+                } else {
+                    it++;
+                }
+            }
+
+            auto newKeepSet = keepPtr->getNames();
+            if (toKeep) {
+                for (auto it = newKeepSet.begin(); it != newKeepSet.end();) {
+                    if (toKeep->count(*it) == 0) {
+                        // Field was not previously kept.
+                        newKeepSet.erase(it++);
+                        updated = true;
+                    } else {
+                        it++;
+                    }
+                }
+            }
+            toKeep = std::move(newKeepSet);
+        } else if (auto defaultPtr = branch.cast<PathDefault>(); defaultPtr != nullptr &&
+                   defaultPtr->getDefault().is<Constant>() &&
+                   defaultPtr->getDefault().cast<Constant>()->isObject() &&
+                   inputType == Type::object) {
+            // Skip over PathDefault with an empty object since our input is already an object.
+            updated = true;
+        } else {
+            return;
+        };
+    }
+    if (!updated) {
+        return;
+    }
+
+    ABT result = make<PathIdentity>();
+    if (toKeep) {
+        maybeComposePath(result, make<PathKeep>(std::move(*toKeep)));
+    }
+    for (const auto& fieldName : orderedFieldNames) {
+        auto it = fieldMap.find(fieldName);
+        if (it != fieldMap.cend()) {
+            // We may have removed the field name by virtue of not keeping.
+            maybeComposePath(result, it->second);
+        }
+    }
+
+    std::swap(n, result);
+    _changed = true;
+}
+
 void PathFusion::transport(ABT& n, const EvalPath& eval, ABT& path, ABT& input) {
+    if (_changed) {
+        return;
+    }
+
     auto realInput = follow(input);
     // If we are evaluating const path then we can simply replace the whole expression with the
     // result.
@@ -308,11 +419,18 @@ void PathFusion::transport(ABT& n, const EvalPath& eval, ABT& path, ABT& input) 
 
             _changed = true;
         }
+    } else {
+        tryFuseComposition(path, input);
     }
+
     _kindCtx.pop_back();
 }
 
 void PathFusion::transport(ABT& n, const EvalFilter& eval, ABT& path, ABT& input) {
+    if (_changed) {
+        return;
+    }
+
     auto realInput = follow(input);
     // If we are evaluating const path then we can simply replace the whole expression with the
     // result.
@@ -340,7 +458,10 @@ void PathFusion::transport(ABT& n, const EvalFilter& eval, ABT& path, ABT& input
 
             _changed = true;
         }
+    } else {
+        tryFuseComposition(path, input);
     }
+
     _kindCtx.pop_back();
 }
 }  // namespace mongo::optimizer
