@@ -201,8 +201,8 @@ private:
      * We need to call this method when we find out the replica set name is the same as the state
      * doc recipient set name and the current state doc state is blocking.
      */
-    ExecutorFuture<DurableState> _cleanRecipientStateDoc(const ScopedTaskExecutorPtr& executor,
-                                                         const CancellationToken& token);
+    ExecutorFuture<void> _cleanRecipientStateDoc(const ScopedTaskExecutorPtr& executor,
+                                                 const CancellationToken& token);
 
 private:
     const NamespaceString _stateDocumentsNS = NamespaceString::kTenantSplitDonorsNamespace;

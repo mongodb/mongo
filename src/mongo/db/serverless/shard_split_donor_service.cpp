@@ -320,13 +320,19 @@ SemiFuture<void> ShardSplitDonorService::DonorStateMachine::run(
         pauseShardSplitBeforeRecipientCleanup.pauseWhileSet();
         _decisionPromise.setWith([&] {
             return ExecutorFuture(**executor)
-                .then([this, executor, primaryToken] {
+                .then([this, executor, primaryToken, anchor = shared_from_this()] {
                     return _cleanRecipientStateDoc(executor, primaryToken);
+                })
+                .then([this, executor, migrationId = _migrationId]() {
+                    LOGV2(6236607,
+                          "Cleanup stale shard split operation on recipient.",
+                          "migrationId"_attr = migrationId);
+                    return DurableState{ShardSplitDonorStateEnum::kCommitted};
                 })
                 .unsafeToInlineFuture();
         });
 
-        _completionPromise.setWith([&, anchor = shared_from_this()] {
+        _completionPromise.setWith([&] {
             return _decisionPromise.getFuture().semi().ignoreValue().unsafeToInlineFuture();
         });
 
@@ -861,8 +867,7 @@ ShardSplitDonorService::DonorStateMachine::_waitForForgetCmdThenMarkGarbageColle
         });
 }
 
-ExecutorFuture<ShardSplitDonorService::DonorStateMachine::DurableState>
-ShardSplitDonorService::DonorStateMachine::_cleanRecipientStateDoc(
+ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_cleanRecipientStateDoc(
     const ScopedTaskExecutorPtr& executor, const CancellationToken& token) {
 
     return AsyncTry([this, self = shared_from_this()] {
@@ -878,13 +883,7 @@ ShardSplitDonorService::DonorStateMachine::_cleanRecipientStateDoc(
         .until([](StatusWith<repl::OpTime> swOpTime) { return swOpTime.getStatus().isOK(); })
         .withBackoffBetweenIterations(kExponentialBackoff)
         .on(**executor, token)
-        .ignoreValue()
-        .then([this, executor]() {
-            LOGV2(6236607,
-                  "Cleanup stale shard split operation on recipient.",
-                  "migrationId"_attr = _migrationId);
-            return DurableState{ShardSplitDonorStateEnum::kCommitted};
-        });
+        .ignoreValue();
 }
 
 }  // namespace mongo
