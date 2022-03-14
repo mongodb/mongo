@@ -572,14 +572,27 @@ CreateCollectionResponse shardCollection(OperationContext* opCtx,
 
         checkCollation(opCtx, request);
 
-        // Create the collection locally
-        shardkeyutil::validateShardKeyIndexExistsOrCreateIfPossible(
-            opCtx,
-            nss,
-            ShardKeyPattern(request.getKey()),
-            *request.getCollation(),
-            request.getUnique(),
-            shardkeyutil::ValidationBehaviorsShardCollection(opCtx));
+        if (request.getImplicitlyCreateIndex()) {
+            // Create the collection locally
+            shardkeyutil::validateShardKeyIndexExistsOrCreateIfPossible(
+                opCtx,
+                nss,
+                ShardKeyPattern(request.getKey()),
+                *request.getCollation(),
+                request.getUnique(),
+                request.getEnforceUniquenessCheck(),
+                shardkeyutil::ValidationBehaviorsShardCollection(opCtx));
+        } else {
+            uassert(
+                6373201,
+                "Must have an index compatible with the proposed shard key",
+                validShardKeyIndexExists(opCtx,
+                                         nss,
+                                         ShardKeyPattern(request.getKey()),
+                                         *request.getCollation(),
+                                         request.getUnique() && request.getEnforceUniquenessCheck(),
+                                         shardkeyutil::ValidationBehaviorsShardCollection(opCtx)));
+        }
 
         // Wait until the index is majority written, to prevent having the collection commited to
         // the config server, but the index creation rolled backed on stepdowns.

@@ -150,6 +150,7 @@ bool validateShardKeyIndexExistsOrCreateIfPossible(OperationContext* opCtx,
                                                    const ShardKeyPattern& shardKeyPattern,
                                                    const boost::optional<BSONObj>& defaultCollation,
                                                    bool unique,
+                                                   bool enforceUniquenessCheck,
                                                    const ShardKeyValidationBehaviors& behaviors);
 /**
  * Compares the proposed shard key with the collection's existing indexes to ensure they are a legal
@@ -163,7 +164,7 @@ bool validShardKeyIndexExists(OperationContext* opCtx,
                               const NamespaceString& nss,
                               const ShardKeyPattern& shardKeyPattern,
                               const boost::optional<BSONObj>& defaultCollation,
-                              bool unique,
+                              bool requiresUnique,
                               const ShardKeyValidationBehaviors& behaviors);
 }  // namespace shardkeyutil
 }  // namespace mongo
