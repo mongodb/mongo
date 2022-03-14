@@ -77,7 +77,13 @@ function waitForOneTTLPassAtNode(node) {
 }
 
 function getDocumentCount(dbName, node) {
-    return node.getDB(dbName)[collName].count();
+    // Use "countDocuments" instead of "count" to ensure that we get an accurate
+    // count instead of an approximate count from metadata. Otherwise, the count
+    // can be inaccurate if a TTL pass happens concurrently with the count call when
+    // the access blocker is blocking writes. In this case, the TTL delete will fail and
+    // be rolled back, but count calls before the rollback is applied will still reflect
+    // the delete.
+    return node.getDB(dbName)[collName].countDocuments({});
 }
 
 function assertTTLNotDeleteExpiredDocs(dbName, node) {
