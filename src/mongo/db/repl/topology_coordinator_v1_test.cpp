@@ -4101,6 +4101,30 @@ TEST_F(HeartbeatResponseTestV1, ShouldChangeSyncSourceWhenSyncSourceIsDown) {
     ASSERT_EQUALS(1, countLogLinesWithId(5929000));
 }
 
+TEST_F(HeartbeatResponseTestV1, ShouldChangeSyncSourceOnErrorWhenSyncSourceIsDown) {
+    // In this test, the TopologyCoordinator should tell us to change sync sources away from
+    // "host2" and to "host3" since "host2" is down.
+    OpTime election = OpTime();
+    OpTime oldSyncSourceOpTime = OpTime(Timestamp(4, 0), 0);
+    // ahead by less than maxSyncSourceLagSecs (30)
+    OpTime freshOpTime = OpTime(Timestamp(5, 0), 0);
+    setSelfMemberState(MemberState::RS_SECONDARY);
+
+    HeartbeatResponseAction nextAction = receiveDownHeartbeat(HostAndPort("host2"), "rs0");
+    ASSERT_NO_ACTION(nextAction.getAction());
+    nextAction = receiveUpHeartbeat(
+        HostAndPort("host3"), "rs0", MemberState::RS_SECONDARY, election, freshOpTime);
+    ASSERT_NO_ACTION(nextAction.getAction());
+
+    // set up complete, time for actual check
+    startCapturingLogMessages();
+    ASSERT_TRUE(getTopoCoord().shouldChangeSyncSourceOnError(
+        HostAndPort("host2"), oldSyncSourceOpTime, now()));
+    stopCapturingLogMessages();
+    ASSERT_EQUALS(1, countLogLinesContaining("Choosing new sync source"));
+    ASSERT_EQUALS(1, countLogLinesWithId(5929000));
+}
+
 TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceFromStalePrimary) {
     // In this test, the TopologyCoordinator should still sync to the primary, "host2", although
     // "host3" is fresher.
@@ -4148,6 +4172,19 @@ TEST_F(HeartbeatResponseTestV1, ShouldChangeSyncSourceWhenMemberNotInConfig) {
     startCapturingLogMessages();
     ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(
         HostAndPort("host4"), replMetadata, makeOplogQueryMetadata(), OpTime(), now()));
+    stopCapturingLogMessages();
+    ASSERT_EQUALS(1, countLogLinesContaining("Choosing new sync source"));
+    ASSERT_EQUALS(1, countLogLinesWithId(21831));
+}
+
+TEST_F(HeartbeatResponseTestV1, ShouldChangeSyncSourceOnErrorWhenMemberNotInConfig) {
+    // In this test, the TopologyCoordinator should tell us to change sync sources away from
+    // "host4" since "host4" is absent from the config of version 10.
+    ReplSetMetadata replMetadata(0, {OpTime(), Date_t()}, OpTime(), 10, 0, OID(), -1, false);
+
+    startCapturingLogMessages();
+    ASSERT_TRUE(
+        getTopoCoord().shouldChangeSyncSourceOnError(HostAndPort("host4"), OpTime(), now()));
     stopCapturingLogMessages();
     ASSERT_EQUALS(1, countLogLinesContaining("Choosing new sync source"));
     ASSERT_EQUALS(1, countLogLinesWithId(21831));
@@ -4232,6 +4269,80 @@ TEST_F(HeartbeatResponseTestV1,
 }
 
 TEST_F(HeartbeatResponseTestV1,
+       ShouldntChangeSyncSourceOnErrorWhenNotSyncingFromPrimaryAndChainingDisabledButNoNewPrimary) {
+    // In this test, the TopologyCoordinator should not tell us to change sync sources away from
+    // "host2" since we are not aware of who the new primary is.
+
+    setSelfMemberState(MemberState::RS_SECONDARY);
+    updateConfig(BSON("_id"
+                      << "rs0"
+                      << "version" << 5 << "term" << 1 << "members"
+                      << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                               << "host1:27017")
+                                    << BSON("_id" << 1 << "host"
+                                                  << "host2:27017")
+                                    << BSON("_id" << 2 << "host"
+                                                  << "host3:27017"))
+                      << "protocolVersion" << 1 << "settings"
+                      << BSON("heartbeatTimeoutSecs" << 5 << "chainingAllowed" << false)),
+                 0);
+
+    OpTime staleOpTime = OpTime(Timestamp(4, 0), 0);
+    OpTime freshOpTime = OpTime(Timestamp(5, 0), 0);
+
+    ASSERT_FALSE(getTopoCoord().shouldChangeSyncSourceOnError(
+        HostAndPort("host2"),
+        staleOpTime,  // lastOpTimeFetched so that we are behind host2
+        now()));
+}
+
+TEST_F(HeartbeatResponseTestV1,
+       ShouldChangeSyncSourceOnErrorWhenNotSyncingFromPrimaryChainingDisabledAndFoundNewPrimary) {
+    // In this test, the TopologyCoordinator should tell us to change sync sources away from
+    // "host2" since "host3" is the new primary and chaining is disabled.
+
+    setSelfMemberState(MemberState::RS_SECONDARY);
+    updateConfig(BSON("_id"
+                      << "rs0"
+                      << "version" << 5 << "term" << 1 << "members"
+                      << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                               << "host1:27017")
+                                    << BSON("_id" << 1 << "host"
+                                                  << "host2:27017")
+                                    << BSON("_id" << 2 << "host"
+                                                  << "host3:27017"))
+                      << "protocolVersion" << 1 << "settings"
+                      << BSON("heartbeatTimeoutSecs" << 5 << "chainingAllowed" << false)),
+                 0);
+
+    OpTime oldElection = OpTime(Timestamp(1, 1), 1);
+    OpTime curElection = OpTime(Timestamp(4, 2), 2);
+    OpTime staleOpTime = OpTime(Timestamp(4, 1), 1);
+    OpTime freshOpTime = OpTime(Timestamp(5, 1), 2);
+
+    // Old host should still be up; this is a stale heartbeat.
+    HeartbeatResponseAction nextAction = receiveUpHeartbeat(
+        HostAndPort("host2"), "rs0", MemberState::RS_PRIMARY, oldElection, staleOpTime);
+    ASSERT_NO_ACTION(nextAction.getAction());
+
+    getTopoCoord().updateTerm(2, now());
+
+    // Set that host3 is the new primary.
+    nextAction = receiveUpHeartbeat(
+        HostAndPort("host3"), "rs0", MemberState::RS_PRIMARY, curElection, freshOpTime);
+    ASSERT_NO_ACTION(nextAction.getAction());
+
+    startCapturingLogMessages();
+    ASSERT(getTopoCoord().shouldChangeSyncSourceOnError(
+        HostAndPort("host2"),
+        staleOpTime,  // lastOpTimeFetched so that we are behind host2 and host3
+        now()));
+    stopCapturingLogMessages();
+    ASSERT_EQUALS(1, countLogLinesContaining("Choosing new sync source"));
+    ASSERT_EQUALS(1, countLogLinesWithId(3962100));
+}
+
+TEST_F(HeartbeatResponseTestV1,
        ShouldNotChangeSyncSourceWhenNotSyncingFromPrimaryChainingDisabledAndTwoPrimaries) {
     // In this test, the TopologyCoordinator should not tell us to change sync sources away from
     // "host2" since, though "host3" is the new primary, "host2" also thinks it is primary.
@@ -4300,6 +4411,33 @@ TEST_F(HeartbeatResponseTestV1, ShouldntChangeSyncSourceWhenChainingDisabledAndW
         HostAndPort("host2"),
         makeReplSetMetadata(),
         makeOplogQueryMetadata(freshOpTime, -1 /* primaryIndex */, 2 /* syncSourceIndex */),
+        staleOpTime,  // lastOpTimeFetched so that we are behind host2
+        now()));
+}
+
+TEST_F(HeartbeatResponseTestV1,
+       ShouldntChangeSyncSourceOnErrorWhenChainingDisabledAndWeArePrimary) {
+    updateConfig(BSON("_id"
+                      << "rs0"
+                      << "version" << 5 << "term" << 1 << "members"
+                      << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                               << "host1:27017")
+                                    << BSON("_id" << 1 << "host"
+                                                  << "host2:27017")
+                                    << BSON("_id" << 2 << "host"
+                                                  << "host3:27017"))
+                      << "protocolVersion" << 1 << "settings"
+                      << BSON("heartbeatTimeoutSecs" << 5 << "chainingAllowed" << false)),
+                 0);
+
+    OpTime staleOpTime = OpTime(Timestamp(4, 0), 0);
+    OpTime freshOpTime = OpTime(Timestamp(5, 0), 0);
+
+    // Set that we are primary.
+    makeSelfPrimary();
+
+    ASSERT_FALSE(getTopoCoord().shouldChangeSyncSourceOnError(
+        HostAndPort("host2"),
         staleOpTime,  // lastOpTimeFetched so that we are behind host2
         now()));
 }

@@ -59,7 +59,10 @@ public:
                                               const rpc::ReplSetMetadata& replMetadata,
                                               const rpc::OplogQueryMetadata& oqMetadata,
                                               const OpTime& previousOpTimeFetched,
-                                              const OpTime& lastOpTimeFetched) override;
+                                              const OpTime& lastOpTimeFetched) const override;
+
+    ChangeSyncSourceAction shouldStopFetchingOnError(
+        const HostAndPort& source, const OpTime& lastOpTimeFetched) const override;
 
     std::unique_ptr<OplogBuffer> makeInitialSyncOplogBuffer(OperationContext* opCtx) const override;
 

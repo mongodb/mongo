@@ -61,7 +61,12 @@ ChangeSyncSourceAction SyncSourceSelectorMock::shouldChangeSyncSource(
     const rpc::ReplSetMetadata&,
     const rpc::OplogQueryMetadata& oqMetadata,
     const OpTime& previousOpTimeFetched,
-    const OpTime& lastOpTimeFetched) {
+    const OpTime& lastOpTimeFetched) const {
+    return ChangeSyncSourceAction::kContinueSyncing;
+}
+
+ChangeSyncSourceAction SyncSourceSelectorMock::shouldChangeSyncSourceOnError(
+    const HostAndPort&, const OpTime& lastOpTimeFetched) const {
     return ChangeSyncSourceAction::kContinueSyncing;
 }
 

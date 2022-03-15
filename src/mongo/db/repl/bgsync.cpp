@@ -114,7 +114,10 @@ public:
                                               const rpc::ReplSetMetadata& replMetadata,
                                               const rpc::OplogQueryMetadata& oqMetadata,
                                               const OpTime& previousOpTimeFetched,
-                                              const OpTime& lastOpTimeFetched) override;
+                                              const OpTime& lastOpTimeFetched) const final;
+
+    ChangeSyncSourceAction shouldStopFetchingOnError(const HostAndPort& source,
+                                                     const OpTime& lastOpTimeFetched) const final;
 
 private:
     BackgroundSync* _bgsync;
@@ -132,13 +135,22 @@ ChangeSyncSourceAction DataReplicatorExternalStateBackgroundSync::shouldStopFetc
     const rpc::ReplSetMetadata& replMetadata,
     const rpc::OplogQueryMetadata& oqMetadata,
     const OpTime& previousOpTimeFetched,
-    const OpTime& lastOpTimeFetched) {
+    const OpTime& lastOpTimeFetched) const {
     if (_bgsync->shouldStopFetching()) {
         return ChangeSyncSourceAction::kStopSyncingAndEnqueueLastBatch;
     }
 
     return DataReplicatorExternalStateImpl::shouldStopFetching(
         source, replMetadata, oqMetadata, previousOpTimeFetched, lastOpTimeFetched);
+}
+
+ChangeSyncSourceAction DataReplicatorExternalStateBackgroundSync::shouldStopFetchingOnError(
+    const HostAndPort& source, const OpTime& lastOpTimeFetched) const {
+    if (_bgsync->shouldStopFetching()) {
+        return ChangeSyncSourceAction::kStopSyncingAndDropLastBatchIfPresent;
+    }
+
+    return DataReplicatorExternalStateImpl::shouldStopFetchingOnError(source, lastOpTimeFetched);
 }
 
 size_t getSize(const BSONObj& o) {

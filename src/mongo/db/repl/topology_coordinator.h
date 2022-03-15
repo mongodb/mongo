@@ -272,6 +272,14 @@ public:
                                 Date_t now) const;
 
     /**
+     * Determines if a new sync source should be chosen when an error occurs. In this case
+     * we do not have current metadata from the sync source and so can only do a subset of
+     * the checks we do when we get a response.
+     */
+    bool shouldChangeSyncSourceOnError(const HostAndPort& currentSource,
+                                       const OpTime& lastOpTimeFetched,
+                                       Date_t now) const;
+    /**
      * Returns true if we find an eligible sync source that is significantly closer than our current
      * sync source.
      */

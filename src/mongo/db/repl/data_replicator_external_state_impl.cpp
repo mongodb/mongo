@@ -100,7 +100,7 @@ ChangeSyncSourceAction DataReplicatorExternalStateImpl::shouldStopFetching(
     const rpc::ReplSetMetadata& replMetadata,
     const rpc::OplogQueryMetadata& oqMetadata,
     const OpTime& previousOpTimeFetched,
-    const OpTime& lastOpTimeFetched) {
+    const OpTime& lastOpTimeFetched) const {
     // Re-evaluate quality of sync target.
     auto changeSyncSourceAction = _replicationCoordinator->shouldChangeSyncSource(
         source, replMetadata, oqMetadata, previousOpTimeFetched, lastOpTimeFetched);
@@ -114,6 +114,18 @@ ChangeSyncSourceAction DataReplicatorExternalStateImpl::shouldStopFetching(
               "syncSource"_attr = source,
               "lastAppliedOpTime"_attr = oqMetadata.getLastOpApplied(),
               "syncSourceIndex"_attr = oqMetadata.getSyncSourceIndex());
+    }
+    return changeSyncSourceAction;
+}
+
+ChangeSyncSourceAction DataReplicatorExternalStateImpl::shouldStopFetchingOnError(
+    const HostAndPort& source, const OpTime& lastOpTimeFetched) const {
+    auto changeSyncSourceAction =
+        _replicationCoordinator->shouldChangeSyncSourceOnError(source, lastOpTimeFetched);
+    if (changeSyncSourceAction != ChangeSyncSourceAction::kContinueSyncing) {
+        LOGV2(6341701,
+              "Canceling oplog query on fetch error. We have to choose a new sync source",
+              "syncSource"_attr = source);
     }
     return changeSyncSourceAction;
 }

@@ -5066,7 +5066,7 @@ bool ReplicationCoordinatorImpl::isReplEnabled() const {
     return getReplicationMode() != modeNone;
 }
 
-const ReadPreference ReplicationCoordinatorImpl::_getSyncSourceReadPreference(WithLock) {
+const ReadPreference ReplicationCoordinatorImpl::_getSyncSourceReadPreference(WithLock) const {
     // Always allow chaining while in catchup and drain mode.
     auto memberState = _getMemberState_inlock();
     ReadPreference readPreference = ReadPreference::Nearest;
@@ -5176,7 +5176,7 @@ ChangeSyncSourceAction ReplicationCoordinatorImpl::shouldChangeSyncSource(
     const rpc::ReplSetMetadata& replMetadata,
     const rpc::OplogQueryMetadata& oqMetadata,
     const OpTime& previousOpTimeFetched,
-    const OpTime& lastOpTimeFetched) {
+    const OpTime& lastOpTimeFetched) const {
     stdx::lock_guard<Latch> lock(_mutex);
     const auto now = _replExecutor->now();
 
@@ -5191,7 +5191,25 @@ ChangeSyncSourceAction ReplicationCoordinatorImpl::shouldChangeSyncSource(
         // We should drop the last batch if we find a significantly closer node. This is to
         // avoid advancing our 'lastFetched', which makes it more likely that we will be able to
         // choose the closer node as our sync source.
-        return ChangeSyncSourceAction::kStopSyncingAndDropLastBatch;
+        return ChangeSyncSourceAction::kStopSyncingAndDropLastBatchIfPresent;
+    }
+
+    return ChangeSyncSourceAction::kContinueSyncing;
+}
+
+ChangeSyncSourceAction ReplicationCoordinatorImpl::shouldChangeSyncSourceOnError(
+    const HostAndPort& currentSource, const OpTime& lastOpTimeFetched) const {
+    stdx::lock_guard<Latch> lock(_mutex);
+    const auto now = _replExecutor->now();
+
+    if (_topCoord->shouldChangeSyncSourceOnError(currentSource, lastOpTimeFetched, now)) {
+        return ChangeSyncSourceAction::kStopSyncingAndDropLastBatchIfPresent;
+    }
+
+    const auto readPreference = _getSyncSourceReadPreference(lock);
+    if (_topCoord->shouldChangeSyncSourceDueToPingTime(
+            currentSource, _getMemberState_inlock(), lastOpTimeFetched, now, readPreference)) {
+        return ChangeSyncSourceAction::kStopSyncingAndDropLastBatchIfPresent;
     }
 
     return ChangeSyncSourceAction::kContinueSyncing;

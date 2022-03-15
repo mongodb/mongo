@@ -101,7 +101,14 @@ public:
                                                       const rpc::ReplSetMetadata& replMetadata,
                                                       const rpc::OplogQueryMetadata& oqMetadata,
                                                       const OpTime& previousOpTimeFetched,
-                                                      const OpTime& lastOpTimeFetched) = 0;
+                                                      const OpTime& lastOpTimeFetched) const = 0;
+
+    /**
+     * Evaluates quality of sync source. This is intended to be called on error when no
+     * current metadata is available.
+     */
+    virtual ChangeSyncSourceAction shouldStopFetchingOnError(
+        const HostAndPort& source, const OpTime& lastOpTimeFetched) const = 0;
 
     /**
      * This function creates an oplog buffer of the type specified at server startup.

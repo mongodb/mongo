@@ -3078,6 +3078,32 @@ bool TopologyCoordinator::shouldChangeSyncSource(const HostAndPort& currentSourc
     return false;
 }
 
+bool TopologyCoordinator::shouldChangeSyncSourceOnError(const HostAndPort& currentSource,
+                                                        const OpTime& lastOpTimeFetched,
+                                                        Date_t now) const {
+    // We change sync source on error if
+    // 1) A forced sync source change has been requested.
+    // 2) Chaining is disabled and a new primary has been detected.
+    // 3) A more eligible node exists. Note this covers the case where our current sync source is
+    //    down.
+
+    auto [initialDecision, currentSourceIndex] =
+        _shouldChangeSyncSourceInitialChecks(currentSource);
+    if (initialDecision != ChangeSyncSourceDecision::kMaybe) {
+        return initialDecision == ChangeSyncSourceDecision::kYes;
+    }
+
+    if (_shouldChangeSyncSourceDueToNewPrimary(currentSource, currentSourceIndex)) {
+        return true;
+    }
+
+    if (_shouldChangeSyncSourceDueToBetterEligibleSource(
+            currentSource, currentSourceIndex, lastOpTimeFetched, now))
+        return true;
+
+    return false;
+}
+
 std::pair<TopologyCoordinator::ChangeSyncSourceDecision, int>
 TopologyCoordinator::_shouldChangeSyncSourceInitialChecks(const HostAndPort& currentSource) const {
     if (_selfIndex == -1) {

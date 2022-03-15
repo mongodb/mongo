@@ -50,7 +50,7 @@ struct SyncSourceResolverResponse;
 
 enum class ChangeSyncSourceAction {
     kContinueSyncing,
-    kStopSyncingAndDropLastBatch,
+    kStopSyncingAndDropLastBatchIfPresent,
     kStopSyncingAndEnqueueLastBatch
 };
 
@@ -90,11 +90,20 @@ public:
      *
      * "now" is used to skip over currently denylisted sync sources.
      */
-    virtual ChangeSyncSourceAction shouldChangeSyncSource(const HostAndPort& currentSource,
-                                                          const rpc::ReplSetMetadata& replMetadata,
-                                                          const rpc::OplogQueryMetadata& oqMetadata,
-                                                          const OpTime& previousOpTimeFetched,
-                                                          const OpTime& lastOpTimeFetched) = 0;
+    virtual ChangeSyncSourceAction shouldChangeSyncSource(
+        const HostAndPort& currentSource,
+        const rpc::ReplSetMetadata& replMetadata,
+        const rpc::OplogQueryMetadata& oqMetadata,
+        const OpTime& previousOpTimeFetched,
+        const OpTime& lastOpTimeFetched) const = 0;
+
+    /*
+     * Determines if a new sync source should be chosen when an error occures during fetching,
+     * without attempting retries on the same sync source.
+     * Because metadata is not available, checks are a subset of those in shouldChangeSyncSource.
+     */
+    virtual ChangeSyncSourceAction shouldChangeSyncSourceOnError(
+        const HostAndPort& currentSource, const OpTime& lastOpTimeFetched) const = 0;
 };
 
 }  // namespace repl
