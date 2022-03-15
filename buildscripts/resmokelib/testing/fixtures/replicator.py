@@ -1,6 +1,8 @@
 """Standalone replicator fixture to handle launching and stopping a replicator binary."""
 
+import json
 import time
+from urllib import request
 
 import buildscripts.resmokelib.testing.fixtures.interface as interface
 
@@ -24,13 +26,9 @@ class ReplicatorFixture(interface.Fixture):
         # The running replicator process.
         self.replicator = None
 
-        # This denotes whether the fixture itself is running, i.e. if it hasn't errored and hasn't
-        # been torn down. The replicator process itself may have been stopped.
-        self.fixture_is_running = False
-
     def setup(self):
         """Since launching the binary starts the replication, we do nothing here."""
-        self.fixture_is_running = True
+        self._launch_replicator_process()
 
     def pids(self):
         """:return: pids owned by this fixture if any."""
@@ -47,8 +45,8 @@ class ReplicatorFixture(interface.Fixture):
         """
         pass
 
-    def start(self):
-        """Launch the binary and start the replication process."""
+    def _launch_replicator_process(self):
+        """Launch the replicator binary."""
         if "sourceURI" not in self.cli_options or "destinationURI" not in self.cli_options:
             raise ValueError("Cannot launch the replicator without source and destination URIs.")
 
@@ -56,16 +54,34 @@ class ReplicatorFixture(interface.Fixture):
                                                      test_id=None, process_kwargs=None,
                                                      **self.cli_options)
         try:
-            self.logger.info("Starting replicator...\n%s", replicator.as_command())
+            self.logger.info("Launch replicator webserver...\n%s", replicator.as_command())
             replicator.start()
-            self.logger.info("Replicator started with pid %d.", replicator.pid)
+            self.logger.info("Replicator launched with pid %d on port %d.", replicator.pid,
+                             self.port)
         except Exception as err:
-            msg = "Failed to start replicator: {}".format(err)
+            msg = "Failed to launch replicator: {}".format(err)
             self.logger.exception(msg)
-            self.fixture_is_running = False
             raise self.fixturelib.ServerFailure(msg)
 
         self.replicator = replicator
+
+    def start(self):
+        """Start the replication process by sending the replicator a command."""
+        url = self.get_api_url() + '/api/v1/start'
+        # Right now we set reversible to false, at some point this could be an
+        # argument to start.
+        data = '{"reversible": false}'.encode('ascii')
+        headers = {'Content-Type': 'application/json'}
+
+        req = request.Request(url=url, data=data, headers=headers)
+        self.logger.info("Sending start command to replicator: %s", req.data)
+        response = request.urlopen(req).read().decode('ascii')
+        self.logger.info("Replicator start command response was: %s", response)
+
+        if not json.loads(response)["success"]:
+            msg = f"Replicator failed to start: {response}"
+            self.logger.exception(msg)
+            raise self.fixturelib.ServerFailure(msg)
 
     def stop(self, mode=None):
         """Stop the replicator binary."""
@@ -81,7 +97,6 @@ class ReplicatorFixture(interface.Fixture):
             msg = ("Replicator was expected to be running, but wasn't. "
                    "Process exited with code {:d}.").format(exit_code)
             self.logger.warning(msg)
-            self.fixture_is_running = False
             raise self.fixturelib.ServerFailure(msg)
 
         self.replicator.stop(mode)
@@ -99,8 +114,6 @@ class ReplicatorFixture(interface.Fixture):
 
     def _do_teardown(self, mode=None):
         """Teardown the fixture."""
-        self.fixture_is_running = False
-
         if not self._is_process_running():
             self.logger.info("Replicator already stopped; teardown is a NOOP.")
             return
@@ -114,7 +127,7 @@ class ReplicatorFixture(interface.Fixture):
 
     def is_running(self):
         """Return if the fixture is running or has not errorred."""
-        return self.fixture_is_running
+        return self._is_process_running()
 
     def get_internal_connection_string(self):
         """Return the internal connection string."""
@@ -123,6 +136,10 @@ class ReplicatorFixture(interface.Fixture):
     def get_driver_connection_url(self):
         """Return the driver connection URL."""
         raise NotImplementedError("Replicator cannot have a driver connection URL.")
+
+    def get_api_url(self):
+        """Return the URL used to send the replicator commands."""
+        return f'http://localhost:{self.port}'
 
     def get_node_info(self):
         """Return a list of NodeInfo objects."""
