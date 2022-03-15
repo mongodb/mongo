@@ -1143,6 +1143,12 @@ wiredtiger_open_common =\
     wiredtiger_open_log_configuration +\
     wiredtiger_open_tiered_storage_configuration +\
     wiredtiger_open_statistics_log_configuration + [
+    Config('backup_restore_target', '', r'''
+        If non-empty and restoring from a backup, restore only the table object targets listed.
+        WiredTiger will remove all the metadata entries for the tables that are not listed in th
+        list from the reconstructed metadata. The target list must include URIs matching of type
+        table:''', 
+        type='list'),
     Config('buffer_alignment', '-1', r'''
         in-memory alignment (in bytes) for buffers used for I/O.  The
         default value of -1 indicates a platform-specific alignment value

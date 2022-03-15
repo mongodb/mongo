@@ -147,6 +147,38 @@ class backup_base(wttest.WiredTigerTestCase, suite_subprocess):
         shutil.copy(copy_from, copy_to)
 
     #
+    # Uses a backup cursor to perform a selective backup, by iterating through the cursor
+    # grabbing files that do not exist in the remove list to copy over into a given directory. 
+    # When dealing with a test that performs multiple incremental backups, we need to perform a 
+    # proper backup on each incremental directory as a starting base.
+    #
+    def take_selective_backup(self, backup_dir, remove_list, backup_cur=None):
+        self.pr('Selective backup to ' + backup_dir + ': ')
+        bkup_c = backup_cur
+        if backup_cur == None:
+            config = None
+            if self.initial_backup:
+                config = 'incremental=(granularity=1M,enabled=true,this_id=ID0)'
+            bkup_c = self.session.open_cursor('backup:', None, config)
+        all_files = []
+
+        # We cannot use 'for newfile in bkup_c:' usage because backup cursors don't have
+        # values and adding in get_values returns ENOTSUP and causes the usage to fail.
+        # If that changes then this, and the use of the duplicate below can change.
+        while bkup_c.next() == 0:
+            newfile = bkup_c.get_key()
+            sz = os.path.getsize(newfile)
+            if (newfile in remove_list):
+                continue
+            self.pr('Copy from: ' + newfile + ' (' + str(sz) + ') to ' + self.dir)
+            self.copy_file(newfile, backup_dir)
+            all_files.append(newfile)
+
+        if backup_cur == None:
+            bkup_c.close()
+        return all_files
+
+    #
     # Uses a backup cursor to perform a full backup, by iterating through the cursor
     # grabbing files to copy over into a given directory. When dealing with a test
     # that performs multiple incremental backups, we initially perform a full backup

@@ -53,17 +53,54 @@ __metadata_init(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __metadata_backup_target_uri_search --
+ *     Search in the backup uri hash table if the given uri exists.
+ */
+static bool
+__metadata_backup_target_uri_search(
+  WT_SESSION_IMPL *session, WT_BACKUPHASH *backuphash, const char *uri)
+{
+    WT_BACKUP_TARGET *target_uri;
+    WT_CONNECTION_IMPL *conn;
+    uint64_t bucket, hash;
+    bool found;
+
+    conn = S2C(session);
+    found = false;
+
+    hash = __wt_hash_city64(uri, strlen(uri));
+    bucket = hash & (conn->hash_size - 1);
+
+    TAILQ_FOREACH (target_uri, &backuphash[bucket], hashq)
+        if (strcmp(uri, target_uri->name) == 0) {
+            found = true;
+            break;
+        }
+    return (found);
+}
+
+/*
  * __metadata_load_hot_backup --
  *     Load the contents of any hot backup file.
  */
 static int
-__metadata_load_hot_backup(WT_SESSION_IMPL *session)
+__metadata_load_hot_backup(WT_SESSION_IMPL *session, WT_BACKUPHASH *backuphash)
 {
+    WT_CONFIG_ITEM cval;
+    WT_CONNECTION_IMPL *conn;
     WT_DECL_ITEM(key);
     WT_DECL_ITEM(value);
     WT_DECL_RET;
     WT_FSTREAM *fs;
+    size_t allocated_name, file_len, max_len, slot;
+    char *filename, *metadata_conf, *metadata_key, **p, **partial_backup_names, *tablename;
+    const char *drop_cfg[] = {WT_CONFIG_BASE(session, WT_SESSION_drop), "remove_files=false", NULL};
     bool exist;
+
+    allocated_name = file_len = max_len = slot = 0;
+    conn = S2C(session);
+    filename = NULL;
+    partial_backup_names = NULL;
 
     /* Look for a hot backup file: if we find it, load it. */
     WT_RET(__wt_fs_exist(session, WT_METADATA_BACKUP, &exist));
@@ -81,12 +118,84 @@ __metadata_load_hot_backup(WT_SESSION_IMPL *session)
         WT_ERR(__wt_getline(session, fs, value));
         if (value->size == 0)
             WT_ERR_PANIC(session, EINVAL, "%s: zero-length value", WT_METADATA_BACKUP);
+        /*
+         * When performing partial backup restore, generate a list of tables that is not part of the
+         * target uri list so that we can drop all entries later. To do this, parse through all the
+         * table metadata entries and check if the metadata entry exists in the target uri hash
+         * table. If the metadata entry doesn't exist in the hash table, append the table name to
+         * the partial backup remove list.
+         */
+        metadata_key = (char *)key->data;
+        if (F_ISSET(conn, WT_CONN_BACKUP_PARTIAL_RESTORE) &&
+          WT_PREFIX_MATCH(metadata_key, "table:")) {
+            /* Assert that there should be no WiredTiger tables with a table format. */
+            WT_ASSERT(
+              session, __wt_name_check(session, (const char *)key->data, key->size, true) == 0);
+            /*
+             * The target uri will be the deciding factor if a specific metadata table entry needs
+             * to be dropped. If the metadata table entry does not exist in the target uri hash
+             * table, append the metadata key to the backup remove list.
+             */
+            if (__metadata_backup_target_uri_search(session, backuphash, metadata_key) == false) {
+                if (key->size > max_len)
+                    max_len = key->size;
+                WT_ERR(__wt_realloc_def(session, &allocated_name, slot + 2, &partial_backup_names));
+                p = &partial_backup_names[slot];
+                p[0] = p[1] = NULL;
+
+                WT_ERR(
+                  __wt_strndup(session, (char *)key->data, key->size, &partial_backup_names[slot]));
+                slot++;
+            }
+        }
+
+        /*
+         * In the case of partial backup restore, add the entry to the metadata even if the table
+         * entry doesn't exist so that we can correctly drop all related entries via the schema code
+         * later.
+         */
         WT_ERR(__wt_metadata_update(session, key->data, value->data));
     }
 
-    F_SET(S2C(session), WT_CONN_WAS_BACKUP);
+    F_SET(conn, WT_CONN_WAS_BACKUP);
+    if (F_ISSET(conn, WT_CONN_BACKUP_PARTIAL_RESTORE) && partial_backup_names != NULL) {
+        WT_ERR(__wt_calloc_def(session, slot + 1, &conn->partial_backup_remove_ids));
+        file_len = strlen("file:") + max_len + strlen(".wt") + 1;
+        WT_ERR(__wt_calloc_def(session, file_len, &filename));
+        /*
+         * Parse through the partial backup list and attempt to clean up all metadata references
+         * relating to the file. To do so, perform a schema drop operation on the table to cleanly
+         * remove all linked references. At the same time generate a list of btree ids to be used in
+         * recovery to truncate all the history store records.
+         */
+        for (slot = 0; partial_backup_names[slot] != NULL; ++slot) {
+            tablename = partial_backup_names[slot];
+            WT_PREFIX_SKIP_REQUIRED(session, tablename, "table:");
+            WT_ERR(__wt_snprintf(filename, file_len, "file:%s.wt", tablename));
+            WT_ERR(__wt_metadata_search(session, filename, &metadata_conf));
+            WT_ERR(__wt_config_getones(session, metadata_conf, "id", &cval));
+            conn->partial_backup_remove_ids[slot] = (uint32_t)cval.val;
+
+            WT_WITH_SCHEMA_LOCK(session,
+              WT_WITH_TABLE_WRITE_LOCK(
+                session, ret = __wt_schema_drop(session, partial_backup_names[slot], drop_cfg)));
+            WT_ERR(ret);
+        }
+    }
 
 err:
+    if (filename != NULL)
+        __wt_free(session, filename);
+
+    /*
+     * Free the partial backup names list. The backup id list is used in recovery to truncate the
+     * history store entries that do not exist as part of the database anymore.
+     */
+    if (partial_backup_names != NULL) {
+        for (slot = 0; partial_backup_names[slot] != NULL; ++slot)
+            __wt_free(session, partial_backup_names[slot]);
+        __wt_free(session, partial_backup_names);
+    }
     WT_TRET(__wt_fclose(session, &fs));
     __wt_scr_free(session, &key);
     __wt_scr_free(session, &value);
@@ -219,18 +328,97 @@ __wt_turtle_exists(WT_SESSION_IMPL *session, bool *existp)
 }
 
 /*
+ * __metadata_add_backup_target_uri --
+ *     Add the target uri to the backup uri hash table.
+ */
+static int
+__metadata_add_backup_target_uri(
+  WT_SESSION_IMPL *session, WT_BACKUPHASH *backuphash, const char *name, size_t len)
+{
+    WT_BACKUP_TARGET *new_target_uri;
+    WT_CONNECTION_IMPL *conn;
+    WT_DECL_RET;
+    uint64_t bucket, hash;
+
+    conn = S2C(session);
+
+    WT_ERR(__wt_calloc_one(session, &new_target_uri));
+    WT_ERR(__wt_strndup(session, name, len, &new_target_uri->name));
+
+    hash = __wt_hash_city64(name, len);
+    bucket = hash & (conn->hash_size - 1);
+    new_target_uri->name_hash = hash;
+    /* Insert target uri entry into hashtable. */
+    TAILQ_INSERT_HEAD(&backuphash[bucket], new_target_uri, hashq);
+
+    return (0);
+err:
+    if (new_target_uri != NULL)
+        __wt_free(session, new_target_uri->name);
+    __wt_free(session, new_target_uri);
+
+    return (ret);
+}
+
+/*
+ * __metadata_load_target_uri_list --
+ *     Load the list of target uris and construct a hashtable from it.
+ */
+static int
+__metadata_load_target_uri_list(
+  WT_SESSION_IMPL *session, bool exist_backup, const char *cfg[], WT_BACKUPHASH *backuphash)
+{
+    WT_CONFIG backup_config;
+    WT_CONFIG_ITEM cval, k, v;
+    WT_DECL_RET;
+
+    WT_TRET(__wt_config_gets(session, cfg, "backup_restore_target", &cval));
+    if (cval.len != 0) {
+        if (!exist_backup)
+            WT_RET_MSG(session, EINVAL,
+              "restoring a partial backup requires the WiredTiger metadata backup file.");
+        F_SET(S2C(session), WT_CONN_BACKUP_PARTIAL_RESTORE);
+
+        /*
+         * Check that the configuration string only has table schema formats in the target list and
+         * construct the target hash table.
+         */
+        __wt_config_subinit(session, &backup_config, &cval);
+        while ((ret = __wt_config_next(&backup_config, &k, &v)) == 0) {
+            if (!WT_PREFIX_MATCH(k.str, "table:"))
+                WT_RET_MSG(session, EINVAL,
+                  "partial backup restore only supports objects of type \"table\" formats in the "
+                  "target uri list, found %.*s instead.",
+                  (int)k.len, k.str);
+            WT_RET(__metadata_add_backup_target_uri(session, backuphash, (char *)k.str, k.len));
+        }
+        WT_RET_NOTFOUND_OK(ret);
+    }
+    return (0);
+}
+
+/*
  * __wt_turtle_init --
  *     Check the turtle file and create if necessary.
  */
 int
-__wt_turtle_init(WT_SESSION_IMPL *session, bool verify_meta)
+__wt_turtle_init(WT_SESSION_IMPL *session, bool verify_meta, const char *cfg[])
 {
+    WT_BACKUPHASH *backuphash;
+    WT_BACKUP_TARGET *target_uri;
+    WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
+    uint64_t i;
     char *metaconf, *unused_value;
     bool exist_backup, exist_incr, exist_isrc, exist_turtle;
     bool load, load_turtle, validate_turtle;
 
+    conn = S2C(session);
     load = load_turtle = validate_turtle = false;
+    /* Initialize target uri hashtable. */
+    WT_ERR(__wt_calloc_def(session, conn->hash_size, &backuphash));
+    for (i = 0; i < conn->hash_size; ++i)
+        TAILQ_INIT(&backuphash[i]);
 
     /*
      * Discard any turtle setup file left-over from previous runs. This doesn't matter for
@@ -241,7 +429,7 @@ __wt_turtle_init(WT_SESSION_IMPL *session, bool verify_meta)
         /* If we're a readonly database, we can skip discarding the leftover file. */
         if (ret == EACCES)
             ret = 0;
-        WT_RET(ret);
+        WT_ERR(ret);
     }
 
     /*
@@ -256,23 +444,23 @@ __wt_turtle_init(WT_SESSION_IMPL *session, bool verify_meta)
      * turtle file and an incremental backup file, that is an error. Otherwise, if there's already a
      * turtle file, we're done.
      */
-    WT_RET(__wt_fs_exist(session, WT_LOGINCR_BACKUP, &exist_incr));
-    WT_RET(__wt_fs_exist(session, WT_LOGINCR_SRC, &exist_isrc));
-    WT_RET(__wt_fs_exist(session, WT_METADATA_BACKUP, &exist_backup));
-    WT_RET(__wt_fs_exist(session, WT_METADATA_TURTLE, &exist_turtle));
+    WT_ERR(__wt_fs_exist(session, WT_LOGINCR_BACKUP, &exist_incr));
+    WT_ERR(__wt_fs_exist(session, WT_LOGINCR_SRC, &exist_isrc));
+    WT_ERR(__wt_fs_exist(session, WT_METADATA_BACKUP, &exist_backup));
+    WT_ERR(__wt_fs_exist(session, WT_METADATA_TURTLE, &exist_turtle));
 
     if (exist_turtle) {
         /*
          * Failure to read means a bad turtle file. Remove it and create a new turtle file.
          */
-        if (F_ISSET(S2C(session), WT_CONN_SALVAGE)) {
+        if (F_ISSET(conn, WT_CONN_SALVAGE)) {
             WT_WITH_TURTLE_LOCK(
               session, ret = __wt_turtle_read(session, WT_METAFILE_URI, &unused_value));
             __wt_free(session, unused_value);
         }
 
         if (ret != 0) {
-            WT_RET(__wt_remove_if_exists(session, WT_METADATA_TURTLE, false));
+            WT_ERR(__wt_remove_if_exists(session, WT_METADATA_TURTLE, false));
             load_turtle = true;
         } else
             /*
@@ -287,7 +475,7 @@ __wt_turtle_init(WT_SESSION_IMPL *session, bool verify_meta)
          * incremental backup file and a destination database that incorrectly ran recovery.
          */
         if (exist_incr && !exist_isrc)
-            WT_RET_MSG(session, EINVAL, "Incremental backup after running recovery is not allowed");
+            WT_ERR_MSG(session, EINVAL, "Incremental backup after running recovery is not allowed");
         /*
          * If we have a backup file and metadata and turtle files, we want to recreate the metadata
          * from the backup.
@@ -296,16 +484,16 @@ __wt_turtle_init(WT_SESSION_IMPL *session, bool verify_meta)
             __wt_verbose_notice(session, WT_VERB_METADATA,
               "Both %s and %s exist; recreating metadata from backup", WT_METADATA_TURTLE,
               WT_METADATA_BACKUP);
-            WT_RET(__wt_remove_if_exists(session, WT_METAFILE, false));
-            WT_RET(__wt_remove_if_exists(session, WT_METADATA_TURTLE, false));
+            WT_ERR(__wt_remove_if_exists(session, WT_METAFILE, false));
+            WT_ERR(__wt_remove_if_exists(session, WT_METADATA_TURTLE, false));
             load = true;
         } else if (validate_turtle)
-            WT_RET(__wt_turtle_validate_version(session));
+            WT_ERR(__wt_turtle_validate_version(session));
     } else
         load = true;
     if (load) {
         if (exist_incr)
-            F_SET(S2C(session), WT_CONN_WAS_BACKUP);
+            F_SET(conn, WT_CONN_WAS_BACKUP);
 
         /*
          * Verifying the metadata is incompatible with restarting from a backup because the verify
@@ -313,26 +501,39 @@ __wt_turtle_init(WT_SESSION_IMPL *session, bool verify_meta)
          * here before creating the metadata file and reading in the backup file.
          */
         if (verify_meta && exist_backup)
-            WT_RET_MSG(
+            WT_ERR_MSG(
               session, EINVAL, "restoring a backup is incompatible with metadata verification");
+        /* If partial backup target is non-empty, construct the target backup uri list. */
+        WT_ERR(__metadata_load_target_uri_list(session, exist_backup, cfg, backuphash));
 
         /* Create the metadata file. */
-        WT_RET(__metadata_init(session));
+        WT_ERR(__metadata_init(session));
 
         /* Load any hot-backup information. */
-        WT_RET(__metadata_load_hot_backup(session));
+        WT_ERR(__metadata_load_hot_backup(session, backuphash));
 
         /* Create any bulk-loaded file stubs. */
-        WT_RET(__metadata_load_bulk(session));
+        WT_ERR(__metadata_load_bulk(session));
     }
 
     if (load || load_turtle) {
         /* Create the turtle file. */
-        WT_RET(__metadata_config(session, &metaconf));
+        WT_ERR(__metadata_config(session, &metaconf));
         WT_WITH_TURTLE_LOCK(session, ret = __wt_turtle_update(session, WT_METAFILE_URI, metaconf));
         __wt_free(session, metaconf);
-        WT_RET(ret);
+        WT_ERR(ret);
     }
+
+err:
+    for (i = 0; i < conn->hash_size; ++i)
+        while (!TAILQ_EMPTY(&backuphash[i])) {
+            target_uri = TAILQ_FIRST(&backuphash[i]);
+            /* Remove target uri entry from the hashtable. */
+            TAILQ_REMOVE(&backuphash[i], target_uri, hashq);
+            __wt_free(session, target_uri->name);
+            __wt_free(session, target_uri);
+        }
+    __wt_free(session, backuphash);
 
     /* Remove the backup files, we'll never read them again. */
     return (__wt_backup_file_remove(session));

@@ -2760,6 +2760,10 @@ struct __wt_connection {
  * event handler is installed that writes error messages to stderr. See
  * @ref event_message_handling for more information.
  * @configstart{wiredtiger_open, see dist/api_data.py}
+ * @config{backup_restore_target, If non-empty and restoring from a backup\, restore only the table
+ * object targets listed.  WiredTiger will remove all the metadata entries for the tables that are
+ * not listed in th list from the reconstructed metadata.  The target list must include URIs
+ * matching of type table:., a list of strings; default empty.}
  * @config{block_cache = (, block cache configuration options., a set of related configuration
  * options defined below.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;blkcache_eviction_aggression, seconds an

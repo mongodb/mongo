@@ -1471,12 +1471,15 @@ __rollback_to_stable_hs_final_pass(WT_SESSION_IMPL *session, wt_timestamp_t roll
 {
     WT_CONFIG ckptconf;
     WT_CONFIG_ITEM cval, durableval, key;
+    WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     wt_timestamp_t max_durable_ts, newest_stop_durable_ts, newest_stop_ts;
+    size_t i;
     char *config;
     char ts_string[2][WT_TS_INT_STRING_SIZE];
 
     config = NULL;
+    conn = S2C(session);
 
     WT_RET(__wt_metadata_search(session, WT_HS_URI, &config));
 
@@ -1526,6 +1529,15 @@ __rollback_to_stable_hs_final_pass(WT_SESSION_IMPL *session, wt_timestamp_t roll
 
     WT_TRET(__wt_session_release_dhandle(session));
 
+    /*
+     * Truncate history store entries from the partial backup remove list. The list holds all of the
+     * btree ids that do not exist as part of the database anymore due to performing a selective
+     * restore from backup.
+     */
+    if (F_ISSET(conn, WT_CONN_BACKUP_PARTIAL_RESTORE) && conn->partial_backup_remove_ids != NULL)
+        for (i = 0; conn->partial_backup_remove_ids[i] != 0; ++i)
+            WT_ERR(
+              __rollback_to_stable_btree_hs_truncate(session, conn->partial_backup_remove_ids[i]));
 err:
     __wt_free(session, config);
     return (ret);

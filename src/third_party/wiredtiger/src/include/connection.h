@@ -211,6 +211,18 @@ struct __wt_name_flag {
     } while (0)
 
 /*
+ * WT_BACKUP_TARGET --
+ *	A target URI entry indicating this URI should be restored during a partial backup.
+ */
+struct __wt_backup_target {
+    const char *name; /* File name */
+
+    uint64_t name_hash;                    /* hash of name */
+    TAILQ_ENTRY(__wt_backup_target) hashq; /* internal hash queue */
+};
+typedef TAILQ_HEAD(__wt_backuphash, __wt_backup_target) WT_BACKUPHASH;
+
+/*
  * WT_CONNECTION_IMPL --
  *	Implementation of WT_CONNECTION
  */
@@ -338,6 +350,7 @@ struct __wt_connection_impl {
     WT_RWLOCK hot_backup_lock; /* Hot backup serialization */
     uint64_t hot_backup_start; /* Clock value of most recent checkpoint needed by hot backup */
     char **hot_backup_list;    /* Hot backup file list */
+    uint32_t *partial_backup_remove_ids; /* Remove btree id list for partial backup */
 
     WT_SESSION_IMPL *ckpt_session; /* Checkpoint thread session */
     wt_thread_t ckpt_tid;          /* Checkpoint thread */
@@ -618,28 +631,29 @@ struct __wt_connection_impl {
     uint32_t server_flags;
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
-#define WT_CONN_CACHE_CURSORS 0x000001u
-#define WT_CONN_CACHE_POOL 0x000002u
-#define WT_CONN_CKPT_GATHER 0x000004u
-#define WT_CONN_CKPT_SYNC 0x000008u
-#define WT_CONN_CLOSING 0x000010u
-#define WT_CONN_CLOSING_CHECKPOINT 0x000020u
-#define WT_CONN_CLOSING_NO_MORE_OPENS 0x000040u
-#define WT_CONN_COMPATIBILITY 0x000080u
-#define WT_CONN_DATA_CORRUPTION 0x000100u
-#define WT_CONN_EVICTION_RUN 0x000200u
-#define WT_CONN_HS_OPEN 0x000400u
-#define WT_CONN_INCR_BACKUP 0x000800u
-#define WT_CONN_IN_MEMORY 0x001000u
-#define WT_CONN_LEAK_MEMORY 0x002000u
-#define WT_CONN_LSM_MERGE 0x004000u
-#define WT_CONN_OPTRACK 0x008000u
-#define WT_CONN_PANIC 0x010000u
-#define WT_CONN_READONLY 0x020000u
-#define WT_CONN_RECONFIGURING 0x040000u
-#define WT_CONN_RECOVERING 0x080000u
-#define WT_CONN_SALVAGE 0x100000u
-#define WT_CONN_WAS_BACKUP 0x200000u
+#define WT_CONN_BACKUP_PARTIAL_RESTORE 0x000001u
+#define WT_CONN_CACHE_CURSORS 0x000002u
+#define WT_CONN_CACHE_POOL 0x000004u
+#define WT_CONN_CKPT_GATHER 0x000008u
+#define WT_CONN_CKPT_SYNC 0x000010u
+#define WT_CONN_CLOSING 0x000020u
+#define WT_CONN_CLOSING_CHECKPOINT 0x000040u
+#define WT_CONN_CLOSING_NO_MORE_OPENS 0x000080u
+#define WT_CONN_COMPATIBILITY 0x000100u
+#define WT_CONN_DATA_CORRUPTION 0x000200u
+#define WT_CONN_EVICTION_RUN 0x000400u
+#define WT_CONN_HS_OPEN 0x000800u
+#define WT_CONN_INCR_BACKUP 0x001000u
+#define WT_CONN_IN_MEMORY 0x002000u
+#define WT_CONN_LEAK_MEMORY 0x004000u
+#define WT_CONN_LSM_MERGE 0x008000u
+#define WT_CONN_OPTRACK 0x010000u
+#define WT_CONN_PANIC 0x020000u
+#define WT_CONN_READONLY 0x040000u
+#define WT_CONN_RECONFIGURING 0x080000u
+#define WT_CONN_RECOVERING 0x100000u
+#define WT_CONN_SALVAGE 0x200000u
+#define WT_CONN_WAS_BACKUP 0x400000u
     /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t flags;
 };
