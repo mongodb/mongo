@@ -98,16 +98,19 @@ public:
         const KeyType& key,
         const PlanCacheEntryBase<CachedPlanType, DebugInfoType>* oldEntry,
         size_t newWorks) const = 0;
+    virtual DebugInfoType buildDebugInfo() const = 0;
 };
 
 /**
  * Simple logging callbacks for the plan cache.
  */
 template <typename KeyType, typename CachedPlanType, typename DebugInfoType>
-class PlanCacheLoggingCallbacks
-    : public PlanCacheCallbacks<KeyType, CachedPlanType, DebugInfoType> {
+class PlanCacheCallbacksImpl : public PlanCacheCallbacks<KeyType, CachedPlanType, DebugInfoType> {
 public:
-    PlanCacheLoggingCallbacks(const CanonicalQuery& cq) : _cq{cq} {}
+    PlanCacheCallbacksImpl(const CanonicalQuery& cq) : _cq{cq} {}
+
+    PlanCacheCallbacksImpl(const CanonicalQuery& cq, std::function<DebugInfoType()> buildDebugInfo)
+        : _cq{cq}, _buildDebugInfoCallBack(buildDebugInfo) {}
 
     void onCreateInactiveCacheEntry(
         const KeyType& key,
@@ -171,6 +174,11 @@ public:
                                          newWorks);
     }
 
+    DebugInfoType buildDebugInfo() const final {
+        tassert(6407401, "_buildDebugInfoCallBack should be callable", _buildDebugInfoCallBack);
+        return _buildDebugInfoCallBack();
+    }
+
 private:
     auto hashes(const KeyType& key,
                 const PlanCacheEntryBase<CachedPlanType, DebugInfoType>* oldEntry) const {
@@ -182,5 +190,6 @@ private:
     }
 
     const CanonicalQuery& _cq;
+    std::function<DebugInfoType()> _buildDebugInfoCallBack;
 };
 }  // namespace mongo

@@ -151,15 +151,17 @@ void addQueryShapeToPlanCache(OperationContext* opCtx,
     cacheData->tree = std::make_unique<PlanCacheIndexTree>();
     auto decision = createDecision(1U);
     auto decisionPtr = decision.get();
-    PlanCacheLoggingCallbacks<PlanCacheKey, SolutionCacheData, plan_cache_debug_info::DebugInfo>
-        callbacks{*cq};
+    auto buildDebugInfoFn = [&]() -> plan_cache_debug_info::DebugInfo {
+        return plan_cache_util::buildDebugInfo(*cq, std::move(decision));
+    };
+    PlanCacheCallbacksImpl<PlanCacheKey, SolutionCacheData, plan_cache_debug_info::DebugInfo>
+        callbacks{*cq, buildDebugInfoFn};
     ASSERT_OK(planCache->set(makeKey(*cq),
                              std::move(cacheData),
                              *decisionPtr,
                              opCtx->getServiceContext()->getPreciseClockSource()->now(),
-                             plan_cache_util::buildDebugInfo(*cq, std::move(decision)),
-                             boost::none, /* worksGrowthCoefficient */
-                             &callbacks));
+                             &callbacks,
+                             boost::none /* worksGrowthCoefficient */));
 }
 
 /**

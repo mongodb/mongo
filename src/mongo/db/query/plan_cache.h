@@ -335,19 +335,18 @@ public:
      * an inactive cache entry.  If boost::none is provided, the function will use
      * 'internalQueryCacheWorksGrowthCoefficient'.
      *
-     * A 'callbacks' argument can be provided to perform some custom actions when the state of the
-     * plan cache or a plan cache entry has been changed.
+     * A 'callbacks' argument should be provided to perform some custom actions when the state of
+     * the plan cache or a plan cache entry has been changed. The 'callbacks' is also responsible
+     * for constructing DebugInfo.
      *
      * If the mapping was set successfully, returns Status::OK(), even if it evicted another entry.
      */
-    Status set(
-        const KeyType& key,
-        std::unique_ptr<CachedPlanType> cachedPlan,
-        const plan_ranker::PlanRankingDecision& why,
-        Date_t now,
-        DebugInfoType debugInfo,
-        boost::optional<double> worksGrowthCoefficient = boost::none,
-        const PlanCacheCallbacks<KeyType, CachedPlanType, DebugInfoType>* callbacks = nullptr) {
+    Status set(const KeyType& key,
+               std::unique_ptr<CachedPlanType> cachedPlan,
+               const plan_ranker::PlanRankingDecision& why,
+               Date_t now,
+               const PlanCacheCallbacks<KeyType, CachedPlanType, DebugInfoType>* callbacks,
+               boost::optional<double> worksGrowthCoefficient = boost::none) {
         invariant(cachedPlan);
 
         if (why.scores.size() != why.candidateOrder.size()) {
@@ -405,13 +404,15 @@ public:
             return Status::OK();
         }
 
+        // We use callback function here to build the 'DebugInfo' rather than pass in a constructed
+        // DebugInfo for performance.
         auto newEntry(Entry::create(std::move(cachedPlan),
                                     queryHash,
                                     planCacheKey,
                                     now,
                                     isNewEntryActive,
                                     newWorks,
-                                    std::move(debugInfo)));
+                                    callbacks->buildDebugInfo()));
 
         partition->add(key, newEntry.release());
         return Status::OK();
