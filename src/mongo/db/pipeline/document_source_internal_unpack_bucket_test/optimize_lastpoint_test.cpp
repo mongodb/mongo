@@ -172,7 +172,120 @@ TEST_F(InternalUnpackBucketOptimizeLastpointTest,
     ASSERT_BSONOBJ_EQ(serialized[3], fromjson("{$unwind: {path: '$metrics'}}"));
     ASSERT_BSONOBJ_EQ(
         serialized[4],
-        fromjson("{$replaceRoot: {newRoot: {_id: '$_id', b: '$metrics.b', c: '$metrics.c'}}}"));
+        fromjson("{$replaceRoot: {newRoot: {_id: '$_id', b: {$ifNull: ['$metrics.b', {$const: "
+                 "null}]}, c: {$ifNull: ['$metrics.c', {$const: null}]}}}}"));
+}
+
+TEST_F(InternalUnpackBucketOptimizeLastpointTest,
+       LastpointWithMetaSubfieldDescendingTimeDescending) {
+    RAIIServerParameterControllerForTest controller("featureFlagLastPointQuery", true);
+    auto pipeline = Pipeline::parse(
+        makeVector(fromjson("{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
+                            "'tags', bucketMaxSpanSeconds: 3600}}"),
+                   fromjson("{$sort: {'tags.a': -1, t: -1}}"),
+                   fromjson("{$group: {_id: '$tags.a', b: {$first: '$b'}, c: {$first: '$c'}}}")),
+        getExpCtx());
+    auto& container = pipeline->getSources();
+
+    ASSERT_EQ(container.size(), 3U);
+
+    auto success = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
+                       ->optimizeLastpoint(container.begin(), &container);
+    ASSERT_TRUE(success);
+
+    auto serialized = pipeline->serializeToBson();
+
+    ASSERT_EQ(serialized.size(), 5u);
+    ASSERT_BSONOBJ_EQ(
+        serialized[0],
+        fromjson("{$sort: {'meta.a': -1, 'control.max.t': -1, 'control.min.t': -1}}"));
+    ASSERT_BSONOBJ_EQ(serialized[1],
+                      fromjson("{$group: {_id: '$meta.a', bucket: {$first: '$_id'}}}"));
+    ASSERT_BSONOBJ_EQ(
+        serialized[2],
+        fromjson(
+            "{$lookup: {from: 'pipeline_test', as: 'metrics', localField: 'bucket', foreignField: "
+            "'_id', let: {}, pipeline: [{$_internalUnpackBucket: {exclude: [], timeField: 't', "
+            "metaField: 'tags', bucketMaxSpanSeconds: 3600}}, {$sort: {t: -1}}, {$limit: 1}]}}"));
+    ASSERT_BSONOBJ_EQ(serialized[3], fromjson("{$unwind: {path: '$metrics'}}"));
+    ASSERT_BSONOBJ_EQ(
+        serialized[4],
+        fromjson("{$replaceRoot: {newRoot: {_id: '$_id', b: {$ifNull: ['$metrics.b', {$const: "
+                 "null}]}, c: {$ifNull: ['$metrics.c', {$const: null}]}}}}"));
+}
+
+TEST_F(InternalUnpackBucketOptimizeLastpointTest, LastpointWithMetaSubfieldAscendingTimeAscending) {
+    RAIIServerParameterControllerForTest controller("featureFlagLastPointQuery", true);
+    auto pipeline = Pipeline::parse(
+        makeVector(fromjson("{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
+                            "'tags', bucketMaxSpanSeconds: 3600}}"),
+                   fromjson("{$sort: {'tags.a': 1, t: 1}}"),
+                   fromjson("{$group: {_id: '$tags.a', b: {$last: '$b'}, c: {$last: '$c'}}}")),
+        getExpCtx());
+    auto& container = pipeline->getSources();
+
+    ASSERT_EQ(container.size(), 3U);
+
+    auto success = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
+                       ->optimizeLastpoint(container.begin(), &container);
+    ASSERT_TRUE(success);
+
+    auto serialized = pipeline->serializeToBson();
+
+    ASSERT_EQ(serialized.size(), 5u);
+    ASSERT_BSONOBJ_EQ(
+        serialized[0],
+        fromjson("{$sort: {'meta.a': -1, 'control.max.t': -1, 'control.min.t': -1}}"));
+    ASSERT_BSONOBJ_EQ(serialized[1],
+                      fromjson("{$group: {_id: '$meta.a', bucket: {$first: '$_id'}}}"));
+    ASSERT_BSONOBJ_EQ(
+        serialized[2],
+        fromjson(
+            "{$lookup: {from: 'pipeline_test', as: 'metrics', localField: 'bucket', foreignField: "
+            "'_id', let: {}, pipeline: [{$_internalUnpackBucket: {exclude: [], timeField: 't', "
+            "metaField: 'tags', bucketMaxSpanSeconds: 3600}}, {$sort: {t: -1}}, {$limit: 1}]}}"));
+    ASSERT_BSONOBJ_EQ(serialized[3], fromjson("{$unwind: {path: '$metrics'}}"));
+    ASSERT_BSONOBJ_EQ(
+        serialized[4],
+        fromjson("{$replaceRoot: {newRoot: {_id: '$_id', b: {$ifNull: ['$metrics.b', {$const: "
+                 "null}]}, c: {$ifNull: ['$metrics.c', {$const: null}]}}}}"));
+}
+
+TEST_F(InternalUnpackBucketOptimizeLastpointTest,
+       LastpointWithMetaSubfieldDescendingTimeAscending) {
+    RAIIServerParameterControllerForTest controller("featureFlagLastPointQuery", true);
+    auto pipeline = Pipeline::parse(
+        makeVector(fromjson("{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
+                            "'tags', bucketMaxSpanSeconds: 3600}}"),
+                   fromjson("{$sort: {'tags.a': -1, t: 1}}"),
+                   fromjson("{$group: {_id: '$tags.a', b: {$last: '$b'}, c: {$last: '$c'}}}")),
+        getExpCtx());
+    auto& container = pipeline->getSources();
+
+    ASSERT_EQ(container.size(), 3U);
+
+    auto success = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
+                       ->optimizeLastpoint(container.begin(), &container);
+    ASSERT_TRUE(success);
+
+    auto serialized = pipeline->serializeToBson();
+
+    ASSERT_EQ(serialized.size(), 5u);
+    ASSERT_BSONOBJ_EQ(serialized[0],
+                      fromjson("{$sort: {'meta.a': 1, 'control.max.t': -1, 'control.min.t': -1}}"));
+    ASSERT_BSONOBJ_EQ(serialized[1],
+                      fromjson("{$group: {_id: '$meta.a', bucket: {$first: '$_id'}}}"));
+    ASSERT_BSONOBJ_EQ(
+        serialized[2],
+        fromjson(
+            "{$lookup: {from: 'pipeline_test', as: 'metrics', localField: 'bucket', foreignField: "
+            "'_id', let: {}, pipeline: [{$_internalUnpackBucket: {exclude: [], timeField: 't', "
+            "metaField: 'tags', bucketMaxSpanSeconds: 3600}}, {$sort: {t: -1}}, {$limit: 1}]}}"));
+    ASSERT_BSONOBJ_EQ(serialized[3], fromjson("{$unwind: {path: '$metrics'}}"));
+    ASSERT_BSONOBJ_EQ(
+        serialized[4],
+        fromjson("{$replaceRoot: {newRoot: {_id: '$_id', b: {$ifNull: ['$metrics.b', {$const: "
+                 "null}]}, c: {$ifNull: ['$metrics.c', {$const: null}]}}}}"));
 }
 
 }  // namespace
