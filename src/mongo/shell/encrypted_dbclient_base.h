@@ -118,6 +118,9 @@ public:
     using EncryptionCallbacks::decrypt;
     void decrypt(mozjs::MozJSImplScope* scope, JSContext* cx, JS::CallArgs args) final;
 
+    using EncryptionCallbacks::compact;
+    void compact(JSContext* cx, JS::CallArgs args) final;
+
     using EncryptionCallbacks::trace;
     void trace(JSTracer* trc) final;
 
@@ -200,6 +203,8 @@ private:
 
     std::shared_ptr<SymmetricKey> getDataKeyFromDisk(const UUID& uuid);
     SecureVector<uint8_t> getKeyMaterialFromDisk(const UUID& uuid);
+
+    boost::optional<EncryptedFieldConfig> getEncryptedFieldConfig(const NamespaceString& nss);
 
 protected:
     std::unique_ptr<DBClientBase> _conn;

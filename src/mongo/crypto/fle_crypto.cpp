@@ -1232,6 +1232,20 @@ BSONObj FLEClientCrypto::generateInsertOrUpdateFromPlaceholders(const BSONObj& o
     return ret;
 }
 
+BSONObj FLEClientCrypto::generateCompactionTokens(const EncryptedFieldConfig& cfg,
+                                                  FLEKeyVault* keyVault) {
+    BSONObjBuilder tokensBuilder;
+    auto& fields = cfg.getFields();
+    for (const auto& field : fields) {
+        auto indexKey = keyVault->getIndexKeyById(field.getKeyId());
+        auto collToken = FLELevel1TokenGenerator::generateCollectionsLevel1Token(indexKey.key);
+        auto ecocToken = FLECollectionTokenGenerator::generateECOCToken(collToken);
+        auto tokenCdr = ecocToken.toCDR();
+        tokensBuilder.appendBinData(
+            field.getPath(), tokenCdr.length(), BinDataType::BinDataGeneral, tokenCdr.data());
+    }
+    return tokensBuilder.obj();
+}
 
 std::pair<BSONType, std::vector<uint8_t>> FLEClientCrypto::decrypt(BSONElement element,
                                                                    FLEKeyVault* keyVault) {

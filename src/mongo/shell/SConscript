@@ -205,6 +205,7 @@ if get_option('ssl') == 'on':
             LIBDEPS_PRIVATE=[
                 '$BUILD_DIR/mongo/client/clientdriver_minimal',
                 '$BUILD_DIR/mongo/crypto/aead_encryption',
+                '$BUILD_DIR/mongo/crypto/encrypted_field_config',
                 '$BUILD_DIR/mongo/crypto/fle_crypto',
                 '$BUILD_DIR/mongo/crypto/fle_fields',
                 '$BUILD_DIR/mongo/crypto/symmetric_crypto',

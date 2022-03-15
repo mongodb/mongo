@@ -515,6 +515,48 @@ void EncryptedDBClientBase::decrypt(mozjs::MozJSImplScope* scope,
     }
 }
 
+boost::optional<EncryptedFieldConfig> EncryptedDBClientBase::getEncryptedFieldConfig(
+    const NamespaceString& nss) {
+    auto collsList = _conn->getCollectionInfos(nss.db().toString(), BSON("name" << nss.coll()));
+    uassert(ErrorCodes::BadValue,
+            str::stream() << "Namespace not found: " << nss.toString(),
+            !collsList.empty());
+    auto info = collsList.front();
+    auto opts = info.getField("options");
+    if (opts.eoo() || !opts.isABSONObj()) {
+        return boost::none;
+    }
+    auto efc = opts.Obj().getField("encryptedFields");
+    if (efc.eoo() || !efc.isABSONObj()) {
+        return boost::none;
+    }
+    return EncryptedFieldConfig::parse(IDLParserErrorContext("encryptedFields"), efc.Obj());
+}
+
+void EncryptedDBClientBase::compact(JSContext* cx, JS::CallArgs args) {
+    if (args.length() != 1) {
+        uasserted(ErrorCodes::BadValue, "compact requires 1 arg");
+    }
+    if (!args.get(0).isString()) {
+        uasserted(ErrorCodes::BadValue, "1st param to compact has to be a string");
+    }
+    std::string fullName = mozjs::ValueWriter(cx, args.get(0)).toString();
+    NamespaceString nss(fullName);
+    uassert(
+        ErrorCodes::BadValue, str::stream() << "Invalid namespace: " << fullName, nss.isValid());
+
+    auto efc = getEncryptedFieldConfig(nss);
+    BSONObjBuilder builder;
+    builder.append("compactStructuredEncryptionData", nss.coll());
+    builder.append("compactionTokens",
+                   efc ? FLEClientCrypto::generateCompactionTokens(*efc, this) : BSONObj());
+
+    BSONObj reply;
+    runCommand(nss.db().toString(), builder.obj(), reply, 0);
+    reply = reply.getOwned();
+    mozjs::ValueReader(cx, args.rval()).fromBSON(reply, nullptr, false);
+}
+
 void EncryptedDBClientBase::trace(JSTracer* trc) {
     JS::TraceEdge(trc, &_collection, "collection object");
 }

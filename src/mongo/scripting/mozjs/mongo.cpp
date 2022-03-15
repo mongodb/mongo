@@ -62,6 +62,7 @@ namespace mozjs {
 const JSFunctionSpec MongoBase::methods[] = {
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(auth, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(close, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(compact, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(cursorHandleFromId, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(find, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(generateDataKey, MongoExternalInfo),
@@ -405,6 +406,12 @@ void MongoBase::Functions::decrypt::call(JSContext* cx, JS::CallArgs args) {
     auto conn = getConnection(args);
     auto ptr = getEncryptionCallbacks(conn);
     ptr->decrypt(scope, cx, args);
+}
+
+void MongoBase::Functions::compact::call(JSContext* cx, JS::CallArgs args) {
+    auto conn = getConnection(args);
+    auto ptr = getEncryptionCallbacks(conn);
+    ptr->compact(cx, args);
 }
 
 void MongoBase::Functions::logout::call(JSContext* cx, JS::CallArgs args) {

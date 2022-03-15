@@ -733,6 +733,17 @@ public:
     static BSONObj generateInsertOrUpdateFromPlaceholders(const BSONObj& obj,
                                                           FLEKeyVault* keyVault);
 
+
+    /**
+     * For every encrypted field path in the EncryptedFieldConfig, this generates
+     * a compaction token derived from the field's index key, which is retrieved from
+     * the supplied FLEKeyVault using the field's key ID.
+     *
+     * Returns a BSON object mapping the encrypted field path to its compaction token,
+     * which is a general BinData value.
+     */
+    static BSONObj generateCompactionTokens(const EncryptedFieldConfig& cfg, FLEKeyVault* keyVault);
+
     /**
      * Decrypts a document. Only supports FLE2.
      */
