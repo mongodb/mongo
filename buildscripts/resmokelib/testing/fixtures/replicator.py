@@ -30,6 +30,8 @@ class ReplicatorFixture(interface.Fixture):
 
     def setup(self):
         """Since launching the binary starts the replication, we do nothing here."""
+        replicator.start()
+        self.logger.info("Replicator webserver started with pid %d.", replicator.pid)
         self.fixture_is_running = True
 
     def pids(self):
@@ -57,8 +59,17 @@ class ReplicatorFixture(interface.Fixture):
                                                      **self.cli_options)
         try:
             self.logger.info("Starting replicator...\n%s", replicator.as_command())
-            replicator.start()
-            self.logger.info("Replicator started with pid %d.", replicator.pid)
+            from urllib import request
+            url = f'http://localhost:{self.port}/api/v1/start'
+            # right now we set reversible to false, at some point this could be an
+            # argument to start.
+            data = '{"reversible": false}'.encode('ascii')
+            headers = {'Content-Type': 'application/json'}
+
+            req = request.Request(url=url, data=data, headers=headers)
+            response = request.urlopen(req)
+            self.logger.info("Start command response was...\n%s", response.read())
+
         except Exception as err:
             msg = "Failed to start replicator: {}".format(err)
             self.logger.exception(msg)
