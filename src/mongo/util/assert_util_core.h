@@ -35,19 +35,22 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/util/debug_util.h"
 
-namespace mongo {
-
 /**
  * This header is separated from assert_util.h so that the low-level
  * dependencies of assert_util.h (e.g. mongo/base/status_with.h,
- * mongo/base/status.h, mongo/base/string_data.h) can use the invariant macro
+ * mongo/base/status.h, mongo/base/string_data.h) can use the `invariant` macro
  * without causing a circular include chain. It should never be included
  * directly in any other files.
+ *
+ *     [assert_util.h]
+ *     |    |
+ *     |    v
+ *     |    [string_data.h, etc]
+ *     |    |
+ *     v    v
+ *     [assert_util_core.h]
  */
-
-#if !defined(MONGO_ALLOW_INCLUDE_INVARIANT_H)
-#error "Include assert_util.h instead of invariant.h."
-#endif
+namespace mongo {
 
 MONGO_COMPILER_NORETURN void invariantFailed(const char* expr,
                                              const char* file,

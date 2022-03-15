@@ -41,12 +41,9 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/platform/compiler.h"
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/static_immortal.h"
-
-#define MONGO_ALLOW_INCLUDE_INVARIANT_H
-#include "mongo/util/invariant.h"
-#undef MONGO_ALLOW_INCLUDE_INVARIANT_H
 
 namespace mongo {
 

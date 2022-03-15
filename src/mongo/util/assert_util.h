@@ -33,17 +33,14 @@
 #include <string>
 #include <typeinfo>
 
-#include "mongo/base/status.h"  // NOTE: This is safe as utils depend on base
+#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/source_location.h"
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/exit_code.h"
-
-#define MONGO_ALLOW_INCLUDE_INVARIANT_H
-#include "mongo/util/invariant.h"
-#undef MONGO_ALLOW_INCLUDE_INVARIANT_H
 
 namespace mongo {
 

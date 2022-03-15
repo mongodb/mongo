@@ -38,11 +38,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/platform/compiler.h"
-
-#define MONGO_ALLOW_INCLUDE_INVARIANT_H
-#include "mongo/util/invariant.h"
-#undef MONGO_ALLOW_INCLUDE_INVARIANT_H
-
+#include "mongo/util/assert_util_core.h"
 
 namespace mongo {
 

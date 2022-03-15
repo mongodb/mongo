@@ -45,9 +45,9 @@
 #include "mongo/platform/random.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/session.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/spin_lock.h"
 #include "mongo/util/decorable.h"
-#include "mongo/util/invariant.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/uuid.h"
 

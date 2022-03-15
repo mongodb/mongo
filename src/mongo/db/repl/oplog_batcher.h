@@ -33,8 +33,8 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/invariant.h"
 
 namespace mongo {
 namespace repl {
