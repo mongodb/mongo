@@ -76,6 +76,7 @@ const auto getTTLMonitor = ServiceContext::declareDecoration<std::unique_ptr<TTL
 }  // namespace
 
 MONGO_FAIL_POINT_DEFINE(hangTTLMonitorWithLock);
+MONGO_FAIL_POINT_DEFINE(hangTTLMonitorBetweenPasses);
 
 Counter64 ttlPasses;
 Counter64 ttlDeletedDocuments;
@@ -180,6 +181,8 @@ private:
     void doTTLPass() {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext* opCtx = opCtxPtr.get();
+
+        hangTTLMonitorBetweenPasses.pauseWhileSet(opCtx);
 
         // If part of replSet but not in a readable state (e.g. during initial sync), skip.
         if (repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() ==
