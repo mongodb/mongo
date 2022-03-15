@@ -50,7 +50,7 @@ namespace mongo {
 bool CheckPrivilegeEnabled(const wchar_t* name) {
     LUID luid;
     if (!LookupPrivilegeValueW(nullptr, name, &luid)) {
-        auto str = errnoWithPrefix("Failed to LookupPrivilegeValue");
+        auto str = "Failed to LookupPrivilegeValue: " + errorMessage(lastSystemError());
         LOGV2_WARNING(4718701, "{str}", "str"_attr = str);
         return false;
     }
@@ -58,7 +58,7 @@ bool CheckPrivilegeEnabled(const wchar_t* name) {
     // Get the access token for the current process.
     HANDLE accessToken;
     if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &accessToken)) {
-        auto str = errnoWithPrefix("Failed to OpenProcessToken");
+        auto str = "Failed to OpenProcessToken: " + errorMessage(lastSystemError());
         LOGV2_WARNING(4718702, "{str}", "str"_attr = str);
         return false;
     }
@@ -74,7 +74,7 @@ bool CheckPrivilegeEnabled(const wchar_t* name) {
     privileges.Privilege[0].Attributes = 0;
 
     if (!PrivilegeCheck(accessToken, &privileges, &ret)) {
-        auto str = errnoWithPrefix("Failed to PrivilegeCheck");
+        auto str = "Failed to PrivilegeCheck: " + errorMessage(lastSystemError());
         LOGV2_WARNING(4718703, "{str}", "str"_attr = str);
         return false;
     }

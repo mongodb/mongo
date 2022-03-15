@@ -90,12 +90,11 @@ bool readBytes(size_t toRead, char* buf, int fd) {
 #endif
 
         if (r == -1) {
-            auto pair = errnoAndDescription();
-
+            auto ec = lastPosixError();
             uassert(ErrorCodes::FileStreamFailed,
-                    str::stream() << "failed to read bytes: errno(" << pair.first
-                                  << ") : " << pair.second,
-                    pair.first == EINTR);
+                    str::stream() << "failed to read bytes: errno(" << ec.value()
+                                  << ") : " << errorMessage(ec),
+                    ec.value() == EINTR);
 
             continue;
         } else if (r == 0) {

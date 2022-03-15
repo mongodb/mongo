@@ -65,8 +65,8 @@ public:
         std::ofstream out(path.c_str(), std::ios_base::out);
         out << ProcessId::getCurrent() << std::endl;
         if (!out.good()) {
-            auto errAndStr = errnoAndDescription();
-            if (errAndStr.first == 0) {
+            auto ec = lastSystemError();
+            if (!ec) {
                 LOGV2(23329,
                       "ERROR: Cannot write pid file to {path_string}: Unable to determine OS error",
                       "path_string"_attr = path.string());
@@ -74,7 +74,7 @@ public:
                 LOGV2(23330,
                       "ERROR: Cannot write pid file to {path_string}: {errAndStr_second}",
                       "path_string"_attr = path.string(),
-                      "errAndStr_second"_attr = errAndStr.second);
+                      "errAndStr_second"_attr = errorMessage(ec));
             }
         } else {
             boost::system::error_code ec;
