@@ -44,7 +44,6 @@ env.Library(
         'zstd/lib/dictBuilder/divsufsort.c',
         'zstd/lib/dictBuilder/fastcover.c',
         'zstd/lib/dictBuilder/zdict.c',
-
     ],
     LIBDEPS_TAGS=[
         'init-no-global-side-effects',

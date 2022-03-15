@@ -17,6 +17,7 @@ decompress_dstSize_tooSmall
 fse_read_ncount
 sequence_compression_api
 seekable_roundtrip
+huf_decompress
 huf_round_trip
 fuzz-*.log
 rt_lib_*

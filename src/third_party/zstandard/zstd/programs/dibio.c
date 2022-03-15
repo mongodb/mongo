@@ -31,7 +31,6 @@
 
 #include "timefn.h"         /* UTIL_time_t, UTIL_clockSpanMicro, UTIL_getTime */
 #include "../lib/common/mem.h"  /* read */
-#include "../lib/common/error_private.h"
 #include "dibio.h"
 
 

@@ -118,7 +118,7 @@ zstdd_%.o : $(ZSTDDIR)/decompress/%.c
 	$(CC) -c $(CPPFLAGS) $(CFLAGS) $< -o $@
 
 zstdd_%.o : $(ZSTDDIR)/decompress/%.S
-	$(CC) -c $(CPPFLAGS) $(CFLAGS) $< -o $@
+	$(CC) -c $(CPPFLAGS) $(ASFLAGS) $< -o $@
 
 zstdmt%.o : CPPFLAGS += $(MULTITHREAD_CPP)
 
@@ -132,7 +132,7 @@ zstdmt_d_%.o : $(ZSTDDIR)/decompress/%.c
 	$(CC) -c $(CPPFLAGS) $(CFLAGS) $< -o $@
 
 zstdmt_d_%.o : $(ZSTDDIR)/decompress/%.S
-	$(CC) -c $(CPPFLAGS) $(CFLAGS) $< -o $@
+	$(CC) -c $(CPPFLAGS) $(ASFLAGS) $< -o $@
 
 fullbench32: CPPFLAGS += -m32
 fullbench fullbench32 : CPPFLAGS += $(MULTITHREAD_CPP) -Wno-deprecated-declarations

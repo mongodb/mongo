@@ -12,6 +12,7 @@
 CFLAGS ?= -O3
 CXXFLAGS ?= -O3
 CPPFLAGS ?=
+ASFLAGS ?=
 LDFLAGS ?=
 ARFLAGS ?=
 LIB_FUZZING_ENGINE ?= libregression.a
@@ -43,6 +44,7 @@ FUZZ_EXTRA_FLAGS := -Wall -Wextra -Wcast-qual -Wcast-align -Wshadow \
 	-Wredundant-decls -Wno-deprecated-declarations \
 	-g -fno-omit-frame-pointer
 FUZZ_CFLAGS := $(FUZZ_EXTRA_FLAGS) $(CFLAGS)
+FUZZ_ASFLAGS := $(FUZZ_EXTRA_FLAGS) $(ASFLAGS)
 FUZZ_CXXFLAGS := $(FUZZ_EXTRA_FLAGS) -std=c++11 $(CXXFLAGS)
 FUZZ_LDFLAGS := -pthread $(LDFLAGS)
 FUZZ_ARFLAGS := $(ARFLAGS)
@@ -127,7 +129,7 @@ rt_lib_decompress_%.o: $(ZSTDDIR)/decompress/%.c
 	$(CC) $(FUZZ_CPPFLAGS) $(FUZZ_CFLAGS) $(FUZZ_ROUND_TRIP_FLAGS) $< -c -o $@
 
 rt_lib_decompress_%.o: $(ZSTDDIR)/decompress/%.S
-	$(CC) $(FUZZ_CPPFLAGS) $(FUZZ_CFLAGS) $(FUZZ_ROUND_TRIP_FLAGS) $< -c -o $@
+	$(CC) $(FUZZ_CPPFLAGS) $(FUZZ_ASFLAGS) $(FUZZ_ROUND_TRIP_FLAGS) $< -c -o $@
 
 rt_lib_dictBuilder_%.o: $(ZSTDDIR)/dictBuilder/%.c
 	$(CC) $(FUZZ_CPPFLAGS) $(FUZZ_CFLAGS) $(FUZZ_ROUND_TRIP_FLAGS) $< -c -o $@
@@ -151,7 +153,7 @@ d_lib_decompress_%.o: $(ZSTDDIR)/decompress/%.c
 	$(CC) $(FUZZ_CPPFLAGS) $(FUZZ_CFLAGS) $< -c -o $@
 
 d_lib_decompress_%.o: $(ZSTDDIR)/decompress/%.S
-	$(CC) $(FUZZ_CPPFLAGS) $(FUZZ_CFLAGS) $< -c -o $@
+	$(CC) $(FUZZ_CPPFLAGS) $(FUZZ_ASFLAGS) $< -c -o $@
 
 d_lib_dictBuilder_%.o: $(ZSTDDIR)/dictBuilder/%.c
 	$(CC) $(FUZZ_CPPFLAGS) $(FUZZ_CFLAGS) $< -c -o $@

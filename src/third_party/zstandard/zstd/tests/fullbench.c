@@ -108,7 +108,25 @@ local_ZSTD_compress(const void* src, size_t srcSize,
     p.fParams = f;
     p.cParams = *(ZSTD_compressionParameters*)payload;
     return ZSTD_compress_advanced (g_zcc, dst, dstSize, src, srcSize, NULL ,0, p);
-    //return ZSTD_compress(dst, dstSize, src, srcSize, cLevel);
+}
+
+static size_t
+local_ZSTD_compress_freshCCtx(const void* src, size_t srcSize,
+                    void* dst, size_t dstSize,
+                    void* payload)
+{
+    ZSTD_parameters p;
+    ZSTD_frameParameters f = { 1 /* contentSizeHeader*/, 0, 0 };
+    p.fParams = f;
+    p.cParams = *(ZSTD_compressionParameters*)payload;
+    if (g_zcc != NULL) ZSTD_freeCCtx(g_zcc);
+    g_zcc = ZSTD_createCCtx();
+    assert(g_zcc != NULL);
+    {   size_t const r = ZSTD_compress_advanced (g_zcc, dst, dstSize, src, srcSize, NULL ,0, p);
+        ZSTD_freeCCtx(g_zcc);
+        g_zcc = NULL;
+        return r;
+    }
 }
 
 static size_t g_cSize = 0;
@@ -230,14 +248,15 @@ local_ZSTD_compressStream_freshCCtx(const void* src, size_t srcSize,
                           void* dst, size_t dstCapacity,
                           void* payload)
 {
-    ZSTD_CCtx* const cctx = ZSTD_createCCtx();
-    size_t r;
-    assert(cctx != NULL);
+    if (g_cstream != NULL) ZSTD_freeCCtx(g_cstream);
+    g_cstream = ZSTD_createCCtx();
+    assert(g_cstream != NULL);
 
-    r = local_ZSTD_compressStream(src, srcSize, dst, dstCapacity, payload);
-
-    ZSTD_freeCCtx(cctx);
-    return r;
+    {   size_t const r = local_ZSTD_compressStream(src, srcSize, dst, dstCapacity, payload);
+        ZSTD_freeCCtx(g_cstream);
+        g_cstream = NULL;
+        return r;
+    }
 }
 
 static size_t
@@ -430,6 +449,9 @@ static int benchMem(unsigned benchNb,
     case 2:
         benchFunction = local_ZSTD_decompress; benchName = "decompress";
         break;
+    case 3:
+        benchFunction = local_ZSTD_compress_freshCCtx; benchName = "compress_freshCCtx";
+        break;
 #ifndef ZSTD_DLL_IMPORT
     case 11:
         benchFunction = local_ZSTD_compressContinue; benchName = "compressContinue";
@@ -508,7 +530,6 @@ static int benchMem(unsigned benchNb,
     ZSTD_CCtx_setParameter(g_zcc, ZSTD_c_targetLength, (int)cparams.targetLength);
     ZSTD_CCtx_setParameter(g_zcc, ZSTD_c_strategy, cparams.strategy);
 
-
     ZSTD_CCtx_setParameter(g_cstream, ZSTD_c_compressionLevel, cLevel);
     ZSTD_CCtx_setParameter(g_cstream, ZSTD_c_windowLog, (int)cparams.windowLog);
     ZSTD_CCtx_setParameter(g_cstream, ZSTD_c_hashLog, (int)cparams.hashLog);
@@ -526,6 +547,9 @@ static int benchMem(unsigned benchNb,
         break;
     case 2:
         g_cSize = ZSTD_compress(dstBuff2, dstBuffSize, src, srcSize, cLevel);
+        break;
+    case 3:
+        payload = &cparams;
         break;
 #ifndef ZSTD_DLL_IMPORT
     case 11:

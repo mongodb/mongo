@@ -72,10 +72,10 @@ static size_t decodeSequences(void* dst, size_t nbSequences,
                               size_t literalsSize, const void* dict, size_t dictSize) {
     const uint8_t* litPtr = literalsBuffer;
     const uint8_t* const litBegin = literalsBuffer;
-    const uint8_t* const litEnd = literalsBuffer + literalsSize;
+    const uint8_t* const litEnd = litBegin + literalsSize;
     const uint8_t* dictPtr = dict;
     uint8_t* op = dst;
-    const uint8_t* const oend = dst + ZSTD_FUZZ_GENERATED_SRC_MAXSIZE;
+    const uint8_t* const oend = (uint8_t*)dst + ZSTD_FUZZ_GENERATED_SRC_MAXSIZE;
     size_t generatedSrcBufferSize = 0;
     size_t bytesWritten = 0;
     uint32_t lastLLSize;

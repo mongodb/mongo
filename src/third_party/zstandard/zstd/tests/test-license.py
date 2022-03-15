@@ -43,6 +43,7 @@ SUFFIXES = [
     "Makefile",
     ".mk",
     ".py",
+    ".S",
 ]
 
 # License should certainly be in the first 10 KB.

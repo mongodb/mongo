@@ -18,7 +18,7 @@ if grep -q Microsoft /proc/version; then
 fi
 
 NAME=zstandard
-REVISION=1.5.1
+REVISION=1.5.2
 if grep -q Microsoft /proc/version; then
     SRC_ROOT=$(wslpath -u $(powershell.exe -Command "Get-ChildItem Env:TEMP | Get-Content | Write-Host"))
     SRC_ROOT+="$(mktemp -u /zstandard.XXXXXX)"
@@ -103,7 +103,6 @@ env.Library(
         'zstd/lib/dictBuilder/divsufsort.c',
         'zstd/lib/dictBuilder/fastcover.c',
         'zstd/lib/dictBuilder/zdict.c',
-        
     ],
     LIBDEPS_TAGS=[
         'init-no-global-side-effects',

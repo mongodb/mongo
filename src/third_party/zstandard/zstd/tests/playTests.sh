@@ -304,6 +304,13 @@ zstd -d -f tmp_corrupt.zst --no-check
 zstd -d -f tmp_corrupt.zst --check --no-check # final flag overrides
 zstd -d -f tmp.zst --no-check
 
+if [ "$isWindows" = false ]; then
+  if [ -n "$(which readelf)" ]; then
+    println "test: check if binary has executable stack (#2963)"
+    readelf -lW "$ZSTD_BIN" | grep 'GNU_STACK .* RW ' || die "zstd binary has executable stack!"
+  fi
+fi
+
 println "\n===> zstdgrep tests"
 ln -sf "$ZSTD_BIN" zstdcat
 rm -f tmp_grep
@@ -1359,21 +1366,21 @@ zstd -d tmp.tzst
 rm -f tmp.tar tmp.tzst
 
 if [ $GZIPMODE -eq 1 ]; then
-    tar -c tmp | gzip > tmp.tgz
+    tar -f - -c tmp | gzip > tmp.tgz
     zstd -d tmp.tgz
     [ -e tmp.tar ] || die ".tgz failed to decompress to .tar!"
     rm -f tmp.tar tmp.tgz
 fi
 
 if [ $LZMAMODE -eq 1 ]; then
-    tar -c tmp | zstd --format=xz > tmp.txz
+    tar -f - -c tmp | zstd --format=xz > tmp.txz
     zstd -d tmp.txz
     [ -e tmp.tar ] || die ".txz failed to decompress to .tar!"
     rm -f tmp.tar tmp.txz
 fi
 
 if [ $LZ4MODE -eq 1 ]; then
-    tar -c tmp | zstd --format=lz4 > tmp.tlz4
+    tar -f - -c tmp | zstd --format=lz4 > tmp.tlz4
     zstd -d tmp.tlz4
     [ -e tmp.tar ] || die ".tlz4 failed to decompress to .tar!"
     rm -f tmp.tar tmp.tlz4

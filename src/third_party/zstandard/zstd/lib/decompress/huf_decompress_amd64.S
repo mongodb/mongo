@@ -1,13 +1,23 @@
-#include "../common/portability_macros.h"
+/*
+ * Copyright (c) Facebook, Inc.
+ * All rights reserved.
+ *
+ * This source code is licensed under both the BSD-style license (found in the
+ * LICENSE file in the root directory of this source tree) and the GPLv2 (found
+ * in the COPYING file in the root directory of this source tree).
+ * You may select, at your option, one of the above-listed licenses.
+ */
 
-#if ZSTD_ENABLE_ASM_X86_64_BMI2
+#include "../common/portability_macros.h"
 
 /* Stack marking
  * ref: https://wiki.gentoo.org/wiki/Hardened/GNU_stack_quickstart
  */
-#if defined(__linux__) && defined(__ELF__)
+#if defined(__ELF__) && defined(__GNUC__)
 .section .note.GNU-stack,"",%progbits
 #endif
+
+#if ZSTD_ENABLE_ASM_X86_64_BMI2
 
 /* Calling convention:
  *
@@ -20,6 +30,10 @@
  * TODO: Support Windows calling convention.
  */
 
+ZSTD_HIDE_ASM_FUNCTION(HUF_decompress4X1_usingDTable_internal_bmi2_asm_loop)
+ZSTD_HIDE_ASM_FUNCTION(HUF_decompress4X2_usingDTable_internal_bmi2_asm_loop)
+ZSTD_HIDE_ASM_FUNCTION(_HUF_decompress4X2_usingDTable_internal_bmi2_asm_loop)
+ZSTD_HIDE_ASM_FUNCTION(_HUF_decompress4X1_usingDTable_internal_bmi2_asm_loop)
 .global HUF_decompress4X1_usingDTable_internal_bmi2_asm_loop
 .global HUF_decompress4X2_usingDTable_internal_bmi2_asm_loop
 .global _HUF_decompress4X1_usingDTable_internal_bmi2_asm_loop

@@ -31,9 +31,14 @@
 #include "timefn.h"      /* UTIL_time_t */
 #include "benchfn.h"
 #include "../lib/common/mem.h"
+#ifndef ZSTD_STATIC_LINKING_ONLY
 #define ZSTD_STATIC_LINKING_ONLY
+#endif
 #include "../lib/zstd.h"
 #include "datagen.h"     /* RDG_genBuffer */
+#ifndef XXH_INLINE_ALL
+#define XXH_INLINE_ALL
+#endif
 #include "../lib/common/xxhash.h"
 #include "benchzstd.h"
 #include "../lib/zstd_errors.h"

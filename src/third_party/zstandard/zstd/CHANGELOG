@@ -1,3 +1,8 @@
+v1.5.2 (Jan, 2022)
+perf: Regain Minimal memset()-ing During Reuse of Compression Contexts (@Cyan4973, #2969)
+build: Build Zstd with `noexecstack` on All Architectures (@felixhandte, #2964)
+doc: Clarify Licensing (@terrelln, #2981)
+
 v1.5.1 (Dec, 2021)
 perf: rebalanced compression levels, to better match the intended speed/level curve, by @senhuang42
 perf: faster huffman decoder, using x64 assembly, by @terrelln

@@ -24,7 +24,7 @@ LINUX_ZSTD_OBJECTS0   := $(LINUX_ZSTD_FILES:.c=.o)
 LINUX_ZSTD_OBJECTS    := $(LINUX_ZSTD_OBJECTS0:.S=.o)
 
 %.o: %.S
-	$(CC) -c $(CPPFLAGS) $(CFLAGS) $^ -o $@
+	$(COMPILE.S) $(OUTPUT_OPTION) $<
 
 liblinuxzstd.a: $(LINUX_ZSTD_OBJECTS)
 	$(AR) $(ARFLAGS) $@ $^

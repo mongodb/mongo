@@ -123,7 +123,7 @@ FUZZ_dict_t FUZZ_train(void const* src, size_t srcSize, FUZZ_dataProducer_t *pro
       size_t const offset = FUZZ_dataProducer_uint32Range(producer, 0, MAX(srcSize, 1) - 1);
       size_t const limit = MIN(srcSize - offset, remaining);
       size_t const toCopy = MIN(limit, remaining / (nbSamples - sample));
-      memcpy(samples + pos, src + offset, toCopy);
+      memcpy(samples + pos, (const char*)src + offset, toCopy);
       pos += toCopy;
       samplesSizes[sample] = toCopy;
     }
