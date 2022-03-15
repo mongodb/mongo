@@ -144,6 +144,57 @@ void validateTxnNumber(OperationContext* opCtx, int64_t cursorId, const ClientCu
 }
 
 /**
+ * Validate that the client has necessary privileges to call getMore on the given cursor.
+ */
+void validateAuthorization(const OperationContext* opCtx, const ClientCursor& cursor) {
+
+    auto authzSession = AuthorizationSession::get(opCtx->getClient());
+    // A user can only call getMore on their own cursor. If there were multiple users
+    // authenticated when the cursor was created, then at least one of them must be
+    // authenticated in order to run getMore on the cursor.
+    if (!authzSession->isCoauthorizedWith(cursor.getAuthenticatedUsers())) {
+        uasserted(ErrorCodes::Unauthorized,
+                  str::stream() << "cursor id " << cursor.cursorid()
+                                << " was not created by the authenticated user");
+    }
+
+    // Ensure that the client still has the privileges to run the originating command.
+    if (!authzSession->isAuthorizedForPrivileges(cursor.getOriginatingPrivileges())) {
+        uasserted(ErrorCodes::Unauthorized,
+                  str::stream() << "not authorized for getMore with cursor id "
+                                << cursor.cursorid());
+    }
+}
+
+/**
+ * Validate that the command's and cursor's namespaces match.
+ */
+void validateNamespace(const NamespaceString& commandNss, const ClientCursor& cursor) {
+    uassert(ErrorCodes::Unauthorized,
+            str::stream() << "Requested getMore on namespace '" << commandNss.ns()
+                          << "', but cursor belongs to a different namespace " << cursor.nss().ns(),
+            commandNss == cursor.nss());
+
+    if (commandNss.isOplog() && MONGO_unlikely(rsStopGetMoreCmd.shouldFail())) {
+        uasserted(ErrorCodes::CommandFailed,
+                  str::stream() << "getMore on " << commandNss.ns()
+                                << " rejected due to active fail point rsStopGetMoreCmd");
+    }
+}
+
+/**
+ * Validate that the command's maxTimeMS is only set when the cursor is in awaitData mode.
+ */
+void validateMaxTimeMS(const boost::optional<std::int64_t>& commandMaxTimeMS,
+                       const ClientCursor& cursor) {
+    if (commandMaxTimeMS.has_value()) {
+        uassert(ErrorCodes::BadValue,
+                "cannot set maxTimeMS on getMore command for a non-awaitData cursor",
+                cursor.isAwaitData());
+    }
+}
+
+/**
  * Apply the read concern from the cursor to this operation.
  */
 void applyCursorReadConcern(OperationContext* opCtx, repl::ReadConcernArgs rcArgs) {
@@ -403,7 +454,6 @@ public:
 
         void acquireLocksAndIterateCursor(OperationContext* opCtx,
                                           rpc::ReplyBuilderInterface* reply,
-                                          CursorManager* cursorManager,
                                           ClientCursorPin& cursorPin,
                                           CurOp* curOp) {
             // Cursors come in one of two flavors:
@@ -427,7 +477,6 @@ public:
             boost::optional<AutoGetCollectionForReadMaybeLockFree> readLock;
             boost::optional<AutoStatsTracker> statsTracker;
             NamespaceString nss(_cmd.getDbName(), _cmd.getCollection());
-            int64_t cursorId = _cmd.getCommandParameter();
 
             const bool disableAwaitDataFailpointActive =
                 MONGO_unlikely(disableAwaitDataForGetMoreCmd.shouldFail());
@@ -435,6 +484,9 @@ public:
             // Inherit properties like readConcern and maxTimeMS from our originating cursor.
             setUpOperationContextStateForGetMore(
                 opCtx, *cursorPin.getCursor(), _cmd, disableAwaitDataFailpointActive);
+
+            // On early return, typically due to a failed assertion, delete the cursor.
+            ScopeGuard cursorDeleter([&] { cursorPin.deleteUnderlying(); });
 
             if (cursorPin->getExecutor()->lockPolicy() ==
                 PlanExecutor::LockPolicy::kLocksInternally) {
@@ -480,49 +532,6 @@ public:
                 uassertStatusOK(repl::ReplicationCoordinator::get(opCtx)->checkCanServeReadsFor(
                     opCtx, nss, true));
             }
-
-            // A user can only call getMore on their own cursor. If there were multiple users
-            // authenticated when the cursor was created, then at least one of them must be
-            // authenticated in order to run getMore on the cursor.
-            auto authzSession = AuthorizationSession::get(opCtx->getClient());
-            if (!authzSession->isCoauthorizedWith(cursorPin->getAuthenticatedUsers())) {
-                uasserted(ErrorCodes::Unauthorized,
-                          str::stream() << "cursor id " << cursorId
-                                        << " was not created by the authenticated user");
-            }
-
-            // Ensure that the client still has the privileges to run the originating command.
-            if (!authzSession->isAuthorizedForPrivileges(cursorPin->getOriginatingPrivileges())) {
-                uasserted(ErrorCodes::Unauthorized,
-                          str::stream()
-                              << "not authorized for getMore with cursor id " << cursorId);
-            }
-
-            if (nss != cursorPin->nss()) {
-                uasserted(ErrorCodes::Unauthorized,
-                          str::stream() << "Requested getMore on namespace '" << nss.ns()
-                                        << "', but cursor belongs to a different namespace "
-                                        << cursorPin->nss().ns());
-            }
-
-            if (nss.isOplog() && MONGO_unlikely(rsStopGetMoreCmd.shouldFail())) {
-                uasserted(ErrorCodes::CommandFailed,
-                          str::stream() << "getMore on " << nss.ns()
-                                        << " rejected due to active fail point rsStopGetMoreCmd");
-            }
-
-            // Validation related to awaitData.
-            if (cursorPin->isAwaitData()) {
-                invariant(cursorPin->isTailable());
-            }
-
-            if (_cmd.getMaxTimeMS() && !cursorPin->isAwaitData()) {
-                uasserted(ErrorCodes::BadValue,
-                          "cannot set maxTimeMS on getMore command for a non-awaitData cursor");
-            }
-
-            // On early return, get rid of the cursor.
-            ScopeGuard cursorFreer([&] { cursorPin.deleteUnderlying(); });
 
             // If the 'waitAfterPinningCursorBeforeGetMoreBatch' fail point is enabled, set the
             // 'msg' field of this operation's CurOp to signal that we've hit this point and then
@@ -683,7 +692,7 @@ public:
             }
 
             if (shouldSaveCursor) {
-                respondWithId = cursorId;
+                respondWithId = cursorPin->cursorid();
 
                 exec->saveState();
                 exec->detachFromOperationContext();
@@ -713,7 +722,7 @@ public:
             curOp->debug().nreturned = numResults;
 
             if (respondWithId) {
-                cursorFreer.dismiss();
+                cursorDeleter.dismiss();
 
                 if (opCtx->isExhaust()) {
                     // Indicate that an exhaust message should be generated and the previous BSONObj
@@ -751,21 +760,23 @@ public:
                 opCtx->lockState()->skipAcquireTicket();
             }
 
-            auto cursorManager = CursorManager::get(opCtx);
-            auto pinCheck = [opCtx, cursorId](const ClientCursor& cc) {
-                // Ensure the lsid and txnNumber of the getMore match that of the
-                // originating command.
+            // Perform validation checks which don't cause the cursor to be deleted on failure.
+            auto pinCheck = [&](const ClientCursor& cc) {
                 validateLSID(opCtx, cursorId, &cc);
                 validateTxnNumber(opCtx, cursorId, &cc);
+                validateAuthorization(opCtx, cc);
+                validateNamespace(nss, cc);
+                validateMaxTimeMS(_cmd.getMaxTimeMS(), cc);
             };
 
-            auto cursorPin = uassertStatusOK(cursorManager->pinCursor(opCtx, cursorId, pinCheck));
+            auto cursorPin =
+                uassertStatusOK(CursorManager::get(opCtx)->pinCursor(opCtx, cursorId, pinCheck));
 
             // Get the read concern level here in case the cursor is exhausted while iterating.
             const auto isLinearizableReadConcern = cursorPin->getReadConcernArgs().getLevel() ==
                 repl::ReadConcernLevel::kLinearizableReadConcern;
 
-            acquireLocksAndIterateCursor(opCtx, reply, cursorManager, cursorPin, curOp);
+            acquireLocksAndIterateCursor(opCtx, reply, cursorPin, curOp);
 
             if (MONGO_unlikely(getMoreHangAfterPinCursor.shouldFail())) {
                 LOGV2(20477,

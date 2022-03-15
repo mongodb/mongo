@@ -852,6 +852,11 @@ void AsyncResultsMerger::_scheduleKillCursors(WithLock, OperationContext* opCtx)
 
             executor::RemoteCommandRequest request(
                 remote.getTargetHost(), _params.getNss().db().toString(), cmdObj, opCtx);
+            // The 'RemoteCommandRequest' takes the remaining time from the 'opCtx' parameter. If
+            // the cursor was killed due to a maxTimeMs timeout, the remaining time will be 0, and
+            // the remote request will not be sent. To avoid this, we remove the timeout for the
+            // remote 'killCursor' command.
+            request.timeout = executor::RemoteCommandRequestBase::kNoTimeout;
 
             // Send kill request; discard callback handle, if any, or failure report, if not.
             _executor->scheduleRemoteCommand(request, [](auto const&) {}).getStatus().ignore();

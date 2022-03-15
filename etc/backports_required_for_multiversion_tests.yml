@@ -152,6 +152,8 @@ last-continuous:
       test_file: jstests/aggregation/lookup_let_optimization.js
     - ticket: SERVER-63129
       test_file: jstests/replsets/tenant_migration_resume_collection_cloner_after_recipient_failover_with_dropped_views.js
+    - ticket: SERVER-62710
+      test_file: jstests/sharding/max_time_ms_does_not_leak_shard_cursor.js
     - ticket: SERVER-62759
       test_file: jstests/replsets/apply_ops_dropDatabase.js
     - ticket: SERVER-63732
@@ -447,6 +449,8 @@ last-lts:
       test_file: jstests/aggregation/lookup_let_optimization.js
     - ticket: SERVER-63129
       test_file: jstests/replsets/tenant_migration_resume_collection_cloner_after_recipient_failover_with_dropped_views.js
+    - ticket: SERVER-62710
+      test_file: jstests/sharding/max_time_ms_does_not_leak_shard_cursor.js
     - ticket: SERVER-62759
       test_file: jstests/replsets/apply_ops_dropDatabase.js
     - ticket: SERVER-63732

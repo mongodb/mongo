@@ -961,6 +961,19 @@ TEST_F(AsyncResultsMergerTest, KillCalledTwice) {
     killFuture2.wait();
 }
 
+TEST_F(AsyncResultsMergerTest, KillCursorCmdHasNoTimeout) {
+    std::vector<RemoteCursor> cursors;
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 1, {})));
+    auto arm = makeARMFromExistingCursors(std::move(cursors));
+
+    auto* opCtx = operationContext();
+    opCtx->setDeadlineAfterNowBy(Microseconds::zero(), ErrorCodes::MaxTimeMSExpired);
+    auto killFuture = arm->kill(opCtx);
+    ASSERT_EQ(executor::RemoteCommandRequestBase::kNoTimeout, getNthPendingRequest(0u).timeout);
+    killFuture.wait();
+}
+
 TEST_F(AsyncResultsMergerTest, TailableBasic) {
     BSONObj findCmd = fromjson("{find: 'testcoll', tailable: true}");
     std::vector<RemoteCursor> cursors;
