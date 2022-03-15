@@ -384,43 +384,28 @@ ShardServerProcessInterface::attachCursorSourceToPipeline(Pipeline* ownedPipelin
         ownedPipeline, shardTargetingPolicy, std::move(readConcern));
 }
 
-void ShardServerProcessInterface::unsetExpectedDbVersion(OperationContext* opCtx,
-                                                         const NamespaceString& nss) {
-    auto& oss = OperationShardingState::get(opCtx);
-    oss.unsetExpectedDbVersion_Only_For_Aggregation_Local_Reads(nss.db());
-}
-
-bool ShardServerProcessInterface::setExpectedDbVersion(OperationContext* opCtx,
-                                                       const NamespaceString& nss,
-                                                       DatabaseVersion dbVersion) {
-    auto& oss = OperationShardingState::get(opCtx);
-
-    if (auto knownDBVersion = oss.getDbVersion(nss.db())) {
-        uassert(ErrorCodes::IllegalOperation,
-                "Expected db version must match known db version",
-                knownDBVersion == dbVersion);
-    } else {
-        OperationShardingState::setShardRole(opCtx, nss, boost::none /* shardVersion */, dbVersion);
-    }
-
-    return false;
-}
-
-void ShardServerProcessInterface::setExpectedShardVersion(
+std::unique_ptr<MongoProcessInterface::ScopedExpectUnshardedCollection>
+ShardServerProcessInterface::expectUnshardedCollectionInScope(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    boost::optional<ChunkVersion> chunkVersion) {
-    auto& oss = OperationShardingState::get(opCtx);
-    if (oss.hasShardVersion(nss)) {
-        invariant(oss.getShardVersion(nss) == chunkVersion);
-    } else {
-        OperationShardingState::setShardRole(
-            opCtx, nss, chunkVersion, boost::none /* databaseVersion */);
-    }
+    const boost::optional<DatabaseVersion>& dbVersion) {
+    class ScopedExpectUnshardedCollectionImpl : public ScopedExpectUnshardedCollection {
+    public:
+        ScopedExpectUnshardedCollectionImpl(OperationContext* opCtx,
+                                            const NamespaceString& nss,
+                                            const boost::optional<DatabaseVersion>& dbVersion)
+            : _expectUnsharded(opCtx, nss, ChunkVersion::UNSHARDED(), dbVersion) {}
+
+    private:
+        ScopedSetShardRole _expectUnsharded;
+    };
+
+    return std::make_unique<ScopedExpectUnshardedCollectionImpl>(opCtx, nss, dbVersion);
 }
 
 void ShardServerProcessInterface::checkOnPrimaryShardForDb(OperationContext* opCtx,
                                                            const NamespaceString& nss) {
     DatabaseShardingState::checkIsPrimaryShardForDb(opCtx, nss.db());
 }
+
 }  // namespace mongo

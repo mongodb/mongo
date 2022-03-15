@@ -214,19 +214,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    void setExpectedShardVersion(OperationContext* opCtx,
-                                 const NamespaceString& nss,
-                                 boost::optional<ChunkVersion> chunkVersion) override {
-        MONGO_UNREACHABLE;
-    }
-
-    bool setExpectedDbVersion(OperationContext* opCtx,
-                              const NamespaceString& nss,
-                              DatabaseVersion dbVersion) override {
-        MONGO_UNREACHABLE;
-    }
-
-    void unsetExpectedDbVersion(OperationContext* opCtx, const NamespaceString& nss) override {
+    std::unique_ptr<ScopedExpectUnshardedCollection> expectUnshardedCollectionInScope(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const boost::optional<DatabaseVersion>& dbVersion) override {
         MONGO_UNREACHABLE;
     }
 

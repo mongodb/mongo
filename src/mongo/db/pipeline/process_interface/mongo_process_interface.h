@@ -434,32 +434,16 @@ public:
                                               ChunkVersion targetCollectionVersion) const = 0;
 
     /**
-     * Sets the expected shard version for the given namespace. Invariants if the caller attempts to
-     * change an existing shard version, or if the shard version for this namespace has already been
-     * checked by the commands infrastructure. Used by $lookup and $graphLookup to enforce the
-     * constraint that the foreign collection must be unsharded if featureFlagShardedLookup is
-     * turned off. Also used to enforce that the catalog cache is up-to-date when doing a local
-     * read.
+     * Used to enforce the constraint that the foreign collection must be unsharded.
      */
-    virtual void setExpectedShardVersion(OperationContext* opCtx,
-                                         const NamespaceString& nss,
-                                         boost::optional<ChunkVersion> chunkVersion) = 0;
-
-    /**
-     * Sets the expected db version for the given namespace. Return true if the db version is set by
-     * this method. Throws an IllegalOperation if the caller attempts to change an existing db
-     * version. If the parent operation is unversioned, does nothing and returns false. Used to
-     * enforce that the catalog cache is up-to-date when doing a local read.
-     */
-    virtual bool setExpectedDbVersion(OperationContext* opCtx,
-                                      const NamespaceString& nss,
-                                      DatabaseVersion dbVersion) = 0;
-
-    /**
-     * Unsets the expected db version for the given namespace. Used as a pair with
-     * 'setExpectedDbVersion()' to reset state after a local read is attempted.
-     */
-    virtual void unsetExpectedDbVersion(OperationContext* opCtx, const NamespaceString& nss) = 0;
+    class ScopedExpectUnshardedCollection {
+    public:
+        virtual ~ScopedExpectUnshardedCollection() = default;
+    };
+    virtual std::unique_ptr<ScopedExpectUnshardedCollection> expectUnshardedCollectionInScope(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const boost::optional<DatabaseVersion>& dbVersion) = 0;
 
     /**
      * Checks if this process is on the primary shard for db specified by the given namespace.

@@ -29,8 +29,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/pipeline/process_interface/common_mongod_process_interface.h"
 
 #include <algorithm>
@@ -60,7 +58,6 @@
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/sbe_plan_cache.h"
 #include "mongo/db/repl/primary_only_service.h"
-#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/transaction_coordinator_curop.h"
 #include "mongo/db/s/transaction_coordinator_worker_curop_repository.h"
@@ -77,7 +74,6 @@
 #include "mongo/s/query/document_source_merge_cursors.h"
 
 namespace mongo {
-
 namespace {
 
 class MongoDResourceYielder : public ResourceYielder {

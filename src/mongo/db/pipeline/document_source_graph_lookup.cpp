@@ -229,12 +229,17 @@ void DocumentSourceGraphLookUp::doBreadthFirstSearch() {
     long long depth = 0;
     bool shouldPerformAnotherQuery;
     do {
+        std::unique_ptr<MongoProcessInterface::ScopedExpectUnshardedCollection>
+            expectUnshardedCollectionInScope;
+
         const auto allowForeignSharded = foreignShardedGraphLookupAllowed();
         if (!allowForeignSharded) {
             // Enforce that the foreign collection must be unsharded for $graphLookup.
-            _fromExpCtx->mongoProcessInterface->setExpectedShardVersion(
-                _fromExpCtx->opCtx, _fromExpCtx->ns, ChunkVersion::UNSHARDED());
+            expectUnshardedCollectionInScope =
+                _fromExpCtx->mongoProcessInterface->expectUnshardedCollectionInScope(
+                    _fromExpCtx->opCtx, _fromExpCtx->ns, boost::none);
         }
+
         shouldPerformAnotherQuery = false;
 
         // Check whether each key in the frontier exists in the cache or needs to be queried.

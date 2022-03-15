@@ -117,21 +117,16 @@ public:
                                         const NamespaceString& ns,
                                         const std::vector<BSONObj>& indexSpecs) override;
 
-    void setExpectedShardVersion(OperationContext* opCtx,
-                                 const NamespaceString& nss,
-                                 boost::optional<ChunkVersion> chunkVersion) override {
-        // Do nothing on a non-shardsvr mongoD.
-    }
+    std::unique_ptr<ScopedExpectUnshardedCollection> expectUnshardedCollectionInScope(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const boost::optional<DatabaseVersion>& dbVersion) override {
+        class ScopedExpectUnshardedCollectionNoop : public ScopedExpectUnshardedCollection {
+        public:
+            ScopedExpectUnshardedCollectionNoop() = default;
+        };
 
-    bool setExpectedDbVersion(OperationContext* opCtx,
-                              const NamespaceString& nss,
-                              DatabaseVersion dbVersion) override {
-        // Do nothing on a non-shardsvr mongoD.
-        return false;
-    }
-
-    void unsetExpectedDbVersion(OperationContext* opCtx, const NamespaceString& nss) override {
-        // Do nothing on a non-shardsvr mongoD.
+        return std::make_unique<ScopedExpectUnshardedCollectionNoop>();
     }
 
     void checkOnPrimaryShardForDb(OperationContext* opCtx, const NamespaceString& nss) override {

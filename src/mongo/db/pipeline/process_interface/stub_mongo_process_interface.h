@@ -31,7 +31,6 @@
 
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
-
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -267,20 +266,16 @@ public:
         return {*fieldPaths, targetCollectionVersion};
     }
 
-    void setExpectedShardVersion(OperationContext* opCtx,
-                                 const NamespaceString& nss,
-                                 boost::optional<ChunkVersion> chunkVersion) override {
-        // Do nothing.
-    }
+    std::unique_ptr<ScopedExpectUnshardedCollection> expectUnshardedCollectionInScope(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const boost::optional<DatabaseVersion>& dbVersion) override {
+        class ScopedExpectUnshardedCollectionNoop : public ScopedExpectUnshardedCollection {
+        public:
+            ScopedExpectUnshardedCollectionNoop() = default;
+        };
 
-    void unsetExpectedDbVersion(OperationContext* opCtx, const NamespaceString& nss) override {
-        // Do nothing.
-    }
-
-    bool setExpectedDbVersion(OperationContext* opCtx,
-                              const NamespaceString& nss,
-                              DatabaseVersion dbVersion) override {
-        return false;
+        return std::make_unique<ScopedExpectUnshardedCollectionNoop>();
     }
 
     void checkOnPrimaryShardForDb(OperationContext* opCtx, const NamespaceString& nss) override {

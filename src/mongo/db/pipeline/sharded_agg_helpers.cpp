@@ -29,8 +29,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
 
 #include "mongo/db/curop.h"
@@ -54,7 +52,6 @@
 #include "mongo/db/vector_clock.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/query/cluster_query_knobs_gen.h"
 #include "mongo/s/query/document_source_merge_cursors.h"
@@ -66,10 +63,9 @@
 
 namespace mongo {
 namespace sharded_agg_helpers {
+namespace {
 
 MONGO_FAIL_POINT_DEFINE(shardedAggregateHangBeforeEstablishingShardCursors);
-
-namespace {
 
 /**
  * Given a document representing an aggregation command such as
@@ -1371,23 +1367,10 @@ std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(
                 // do a local read. The primary may be moved right after the primary shard check,
                 // but the local read path will do a db version check before it establishes a cursor
                 // to catch this case and ensure we fail to read locally.
-                auto setDbVersion = false;
                 try {
-                    expCtx->mongoProcessInterface->setExpectedShardVersion(
-                        expCtx->opCtx, expCtx->ns, ChunkVersion::UNSHARDED());
-                    setDbVersion = expCtx->mongoProcessInterface->setExpectedDbVersion(
-                        expCtx->opCtx, expCtx->ns, cm.dbVersion());
-
-                    // During 'attachCursorSourceToPipelineForLocalRead', the expected db version
-                    // must be set. Whether or not that call is succesful, to avoid affecting later
-                    // operations on this db, we should unset the expected db version on the opCtx,
-                    // if we set it above.
-                    ScopeGuard dbVersionUnsetter([&]() {
-                        if (setDbVersion) {
-                            expCtx->mongoProcessInterface->unsetExpectedDbVersion(expCtx->opCtx,
-                                                                                  expCtx->ns);
-                        }
-                    });
+                    auto expectUnshardedCollection(
+                        expCtx->mongoProcessInterface->expectUnshardedCollectionInScope(
+                            expCtx->opCtx, expCtx->ns, cm.dbVersion()));
 
                     expCtx->mongoProcessInterface->checkOnPrimaryShardForDb(expCtx->opCtx,
                                                                             expCtx->ns);

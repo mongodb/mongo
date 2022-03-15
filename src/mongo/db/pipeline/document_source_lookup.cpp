@@ -28,12 +28,7 @@
  */
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
-#include "mongo/db/commands/feature_compatibility_version_parser.h"
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/pipeline/document_source_lookup.h"
-
-#include <memory>
 
 #include "mongo/base/init.h"
 #include "mongo/db/exec/document_value/document.h"
@@ -56,10 +51,6 @@
 #include "mongo/util/fail_point.h"
 
 namespace mongo {
-
-using boost::intrusive_ptr;
-using std::vector;
-
 namespace {
 
 /**
@@ -287,7 +278,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceLookUp::clone() const {
     return make_intrusive<DocumentSourceLookUp>(*this);
 }
 
-void validateLookupCollectionlessPipeline(const vector<BSONObj>& pipeline) {
+void validateLookupCollectionlessPipeline(const std::vector<BSONObj>& pipeline) {
     uassert(ErrorCodes::FailedToParse,
             "$lookup stage without explicit collection must have a pipeline with $documents as "
             "first stage",
@@ -552,11 +543,15 @@ std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceLookUp::buildPipeline(
     // Resolve the 'let' variables to values per the given input document.
     resolveLetVariables(inputDoc, &_fromExpCtx->variables);
 
+    std::unique_ptr<MongoProcessInterface::ScopedExpectUnshardedCollection>
+        expectUnshardedCollectionInScope;
+
     const auto allowForeignShardedColl = foreignShardedLookupAllowed();
     if (!allowForeignShardedColl) {
         // Enforce that the foreign collection must be unsharded for lookup.
-        _fromExpCtx->mongoProcessInterface->setExpectedShardVersion(
-            _fromExpCtx->opCtx, _fromExpCtx->ns, ChunkVersion::UNSHARDED());
+        expectUnshardedCollectionInScope =
+            _fromExpCtx->mongoProcessInterface->expectUnshardedCollectionInScope(
+                _fromExpCtx->opCtx, _fromExpCtx->ns, boost::none);
     }
 
     // If we don't have a cache, build and return the pipeline immediately.
@@ -1169,7 +1164,7 @@ void DocumentSourceLookUp::reattachToOperationContext(OperationContext* opCtx) {
     }
 }
 
-intrusive_ptr<DocumentSource> DocumentSourceLookUp::createFromBson(
+boost::intrusive_ptr<DocumentSource> DocumentSourceLookUp::createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
     uassert(ErrorCodes::FailedToParse,
             "the $lookup specification must be an Object",
@@ -1244,7 +1239,7 @@ intrusive_ptr<DocumentSource> DocumentSourceLookUp::createFromBson(
     }
     uassert(ErrorCodes::FailedToParse, "must specify 'as' field for a $lookup", !as.empty());
 
-    intrusive_ptr<DocumentSourceLookUp> lookupStage = nullptr;
+    boost::intrusive_ptr<DocumentSourceLookUp> lookupStage = nullptr;
     if (hasPipeline) {
         if (localField.empty() && foreignField.empty()) {
             // $lookup specified with only pipeline syntax.

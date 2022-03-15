@@ -128,15 +128,10 @@ public:
         ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
         boost::optional<BSONObj> readConcern = boost::none) final;
 
-    void setExpectedShardVersion(OperationContext* opCtx,
-                                 const NamespaceString& nss,
-                                 boost::optional<ChunkVersion> chunkVersion) final;
-
-    bool setExpectedDbVersion(OperationContext* opCtx,
-                              const NamespaceString& nss,
-                              DatabaseVersion dbVersion) final;
-
-    void unsetExpectedDbVersion(OperationContext* opCtx, const NamespaceString& nss) final;
+    std::unique_ptr<ScopedExpectUnshardedCollection> expectUnshardedCollectionInScope(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const boost::optional<DatabaseVersion>& dbVersion) override;
 
     void checkOnPrimaryShardForDb(OperationContext* opCtx, const NamespaceString& nss) final;
 };
