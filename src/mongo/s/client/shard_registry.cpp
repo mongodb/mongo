@@ -259,11 +259,12 @@ void ShardRegistry::shutdownPeriodicReloader() {
 }
 
 void ShardRegistry::shutdown() {
-    shutdownPeriodicReloader();
-
     if (!_isShutdown.load()) {
         LOGV2_DEBUG(4620235, 1, "Shutting down shard registry");
         _threadPool.shutdown();
+
+        shutdownPeriodicReloader();
+
         _threadPool.join();
         _isShutdown.store(true);
     }
