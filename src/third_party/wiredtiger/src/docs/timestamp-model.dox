@@ -32,7 +32,7 @@ timestamp_txn_api for a full explanation.
 
 Timestamps are 64-bit unsigned integers naming a point in application time.
 WiredTiger does not interpret timestamps other than expecting larger timestamps
-to correspond to "later" times. Timestamp 0 is reserved, so timestamps must
+to correspond to later times. Timestamp 0 is reserved, so timestamps must
 start at 1 or greater. It is not necessary for timestamp values to be clock time
 of any kind; an expected timestamp source is a global counter shared by
 instances of an application distributed across a network, individually running

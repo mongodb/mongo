@@ -4,18 +4,16 @@
 
 Applications setting timestamps for a transaction have to comply with the
 constraints based on the global timestamp state. In order to be compliant with
-the constraints applications will need to query the global timestamp state and
-check their timestamps for compliance and adjust timestamps if required, and
-this creates obvious races with other threads. To reduce application burden,
-WiredTiger supports automatic timestamp rounding in some scenarios.
+the constraints, applications will need to query the global timestamp state,
+check their timestamps for compliance, and adjust timestamps if required.
+To reduce application burden, WiredTiger supports automatic timestamp rounding
+in some scenarios.
 
-Applications can configure
-<code>roundup_timestamps=(prepared=true,read=true)</code> with
-the WT_SESSION::begin_transaction method.
-
-Configuring <code>roundup_timestamps=(read=true)</code> causes the read
-timestamp to be rounded up to the oldest timestamp. If the read timestamp is
-greater than the oldest timestamp no change will be made.
+Applications can configure <code>roundup_timestamps=(read=true)</code>
+with the WT_SESSION::begin_transaction method.  Configuring
+<code>roundup_timestamps=(read=true)</code> causes the read timestamp to be
+rounded up to the oldest timestamp. If the read timestamp is greater than
+the oldest timestamp no change will be made.
 
 @section timestamp_misc_rts Using rollback-to-stable with timestamps
 
@@ -29,7 +27,7 @@ stable timestamp.
 Logged tables and updates made without an associated commit timestamp are
 unaffected.
 
-The database must be quiescent during this process. Applications should close
+The database must be quiescent during this process, and applications must close
 or reset all open cursors before calling the WT_CONNECTION::rollback_to_stable
 method.
 
@@ -56,7 +54,7 @@ with the WT_SESSION::create method's \c assert configuration. The
 be used on reads in the table. The \c "assert(write_timestamp)" configuration
 requires update timestamps conform to the \c write_timestamp_usage setting. If
 WiredTiger detects a violation of the configured policy, an error message
-will be logged, in all cases. Additionally, in diagnostic builds, the library
+will be logged. Additionally, in diagnostic builds, the library
 will fail and drop core at the failing check.
 
 \warning
@@ -78,7 +76,7 @@ Timestamps are supported for in-memory databases, but must be configured as in
 ordinary databases, and the same APIs are used in both cases for historical
 reasons. By default, in-memory database objects behave like commit-level
 objects in ordinary databases, that is, timestamps are ignored. If logging
-is disabled for the object, using the \c log=(enabled=false) configuration,
+is disabled for the object, using the \c "log=(enabled=false)" configuration,
 then the timestamps will not be ignored and will behave as with objects in
 ordinary databases where logging has been disabled.
 

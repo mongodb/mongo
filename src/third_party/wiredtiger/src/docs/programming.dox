@@ -19,8 +19,9 @@ each of which is ordered by one or more columns.
 <h2>Transactions</h2>
 - @subpage transactions
 - @subpage transactions_api
-- @subpage checkpoint
-- @subpage durability
+- @subpage durability_overview
+- @subpage durability_checkpoint
+- @subpage durability_log
 - @subpage timestamp_model
 - @subpage timestamp_global_api
 - @subpage timestamp_txn_api
@@ -28,7 +29,6 @@ each of which is ordered by one or more columns.
 - @subpage timestamp_prepare_roundup
 - @subpage timestamp_misc
 - @subpage explain_acid
-- @subpage explain_durability
 - @subpage explain_isolation
 
 <h2>Storage options</h2>

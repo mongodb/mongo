@@ -1877,8 +1877,8 @@ methods = {
         type='list'),
     Config('use_timestamp', 'true', r'''
         if true (the default), create the checkpoint as of the last stable timestamp if timestamps
-        are in use, or all current updates if there is no stable timestamp set. If false, this
-        option generates a checkpoint with all updates including those later than the timestamp''',
+        are in use, or with all committed  updates if there is no stable timestamp set. If false,
+        always generate a checkpoint with all committed updates, ignoring any stable timestamp''',
         type='boolean'),
 ]),
 
@@ -1982,7 +1982,7 @@ methods = {
         stable timestamp.  See @ref timestamp_global_api'''),
     Config('stable_timestamp', '', r'''
         checkpoints will not include commits that are newer than the specified
-        timestamp in tables configured with \c log=(enabled=false).
+        timestamp in tables configured with \c "log=(enabled=false)".
         Values must be monotonically increasing, any attempt to set the value to
         older than the current is silently ignored.  The value must
         not be older than the current oldest timestamp.  See

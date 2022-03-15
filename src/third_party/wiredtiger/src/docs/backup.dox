@@ -1,13 +1,12 @@
 /*! @class doc_bulk_durability
 
-Bulk loads are not commit-level durable, that is, the creation and
-bulk-load of an object will not appear in the database log files.\  For
-this reason, applications doing incremental backups after a full backup
-should repeat the full backup step after doing a bulk load to make the
-bulk load durable.\ In addition, incremental backups after a bulk load
-(without an intervening full backup)
-can cause recovery to report errors because there are log records that
-apply to data files which do not appear in the backup.
+Bulk loads are not commit-level durable, that is, the creation and bulk-load
+of an object will not appear in the database log files. For this reason,
+applications doing incremental backups after a full backup should repeat the
+full backup step after doing a bulk load to make the bulk load appear in
+the backup. In addition, incremental backups after a bulk load (without an
+intervening full backup) can cause recovery to report errors because there
+are log records that apply to data files which do not appear in the backup.
 
 */
 
@@ -125,13 +124,13 @@ The following is the procedure for incrementally backing up a database
 using block modifications:
 
 1. Perform a full backup of the database (as described above), with the
-additional configuration \c incremental=(enabled=true,this_id="ID1").
+additional configuration <tt>incremental=(enabled=true,this_id="ID1")</tt>.
 The identifier specified in \c this_id starts block tracking and that
 identifier can be used in the future as the source of an incremental
 backup. Identifiers can be any text string, but should be unique.
 
 2. Begin the incremental backup by opening a backup cursor with the
-\c backup: URI and config string of \c incremental=(src_id="ID1",this_id="ID2").
+\c backup: URI and config string of <tt>incremental=(src_id="ID1",this_id="ID2")</tt>.
 Call this \c backup_cursor. Like a normal full backup cursor,
 this cursor will return the filename as the key.  There is no associated
 value.  The information returned will be based on blocks tracked since the time of
@@ -144,7 +143,7 @@ for details.
 3. For each file returned by \c backup_cursor->next(), open a duplicate
 backup cursor to do the incremental backup on that file.  The list
 returned will also include log files (prefixed by \c WiredTigerLog) that need to
-be copied. Configure that duplicate cursor with \c incremental=(file=name).
+be copied. Configure that duplicate cursor with \c "incremental=(file=name)".
 The \c name comes from the string returned from \c backup_cursor->get_key().
 Call this incr_cursor.
 
@@ -211,7 +210,7 @@ Incremental backups may also save time when the tables are very large.
 By default, WiredTiger automatically removes log files no longer
 required for recovery.  Applications wanting to use log files for
 incremental backup must first disable automatic log file removal using
-the \c log=(remove=false) configuration to ::wiredtiger_open.
+the \c "log=(remove=false)" configuration to ::wiredtiger_open.
 
 The following is the procedure for incrementally backing up a database
 and removing log files from the original database home:

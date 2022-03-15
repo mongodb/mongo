@@ -1,4 +1,4 @@
-/*! @page explain_durability Tutorial: durability models
+/*! @page durability_overview Durability overview
 
 <i>Durability</i> refers to the property that a transaction, once committed,
 should be permanent and changes will never be lost.  This can mean a number of

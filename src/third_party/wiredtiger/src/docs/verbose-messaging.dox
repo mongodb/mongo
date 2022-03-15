@@ -52,7 +52,7 @@ An example configuring a WiredTiger connection with verbosity enabled:
 In the above example:
 - \c api is configured to the \c DEBUG verbosity level.
 - \c version is configured to the \c DEBUG verbosity level. If a category is passed without a verbosity
-level (.e.g \c <code>:0</code>), the category will default to the \c DEBUG level (i.e \c <code>verbose=[version]</code> is equivalent to <code>verbose=[version:1]</code>).
+level (.e.g \c <code>:0</code>), the category will default to the \c DEBUG level (i.e <code>verbose=[version]</code> is equivalent to <code>verbose=[version:1]</code>).
 - \c write is configured to the \c INFO verbosity level.
 
 When configuring verbosity levels, the lowest value the user can associate with a category is \c 0 (\c INFO). This ensuring

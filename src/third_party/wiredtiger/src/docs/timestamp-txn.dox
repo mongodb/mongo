@@ -14,19 +14,22 @@ With a read timestamp, reads will occur as of the specified time.
 The transaction's commit timestamp is the time at which the transaction takes
 effect. This is the time at which other transactions, with appropriately set
 read timestamps, will see the transaction's writes instead of any previous
-value.
+value. Applications can also set commit timestamps on a per-update basis in
+a single transaction, in which case the commit timestamp is the time of the
+visibility of the effected updates.
 
 Updating a key without a commit timestamp creates a value that has "always
-existed". This makes sense when loading initial data into an object or in
-applications wishing to clear historic values, but once timestamps are
-used to update a particular value, subsequent updates will likely also
-use a commit timestamp. Updating a key with a commit timestamp and then
-subsequently updating it without a commit timestamp will discard all prior
-historical values, and future reads will read the new value regardless of
-read timestamp. In other words, readers with already acquired snapshots will
-see prior historical values based on their timestamps. Readers acquiring
-a snapshot after the commit of the update without a timestamp will not see
-prior historical values regardless of their read timestamps.
+existed" and is visible regardless of timestamp. This makes sense when
+loading initial data into an object or in applications wishing to clear
+historic values, but once timestamps are used to update a particular value,
+subsequent updates will likely also use a commit timestamp. Updating a key
+with a commit timestamp and then subsequently updating it without a commit
+timestamp will discard all prior historical values, and future reads will
+read the new value regardless of read timestamp. In other words, readers
+with already acquired snapshots will see prior historical values based
+on their timestamps. Readers acquiring a snapshot after the commit of the
+update without a timestamp will not see prior historical values regardless
+of their read timestamps.
 
 @section timestamp_txn_api_configure Enforcing application timestamp behavior
 
@@ -55,7 +58,7 @@ The following table lists the transaction's timestamps and behaviors that can be
 
 | Timestamp | Constraint |  Description |
 |-----------|------------|-------------|
-| read_timestamp | >= oldest or >= pinned | the transaction's read timestamp, see @ref timestamp_txn_api_read_timestamp for details |
+| read_timestamp | >= oldest | the transaction's read timestamp, see @ref timestamp_txn_api_read_timestamp for details |
 | roundup_timestamps | None | boolean setting for timestamp auto-adjustments, see @ref timestamp_prepare_roundup and @ref timestamp_read_roundup for details |
 
 @section timestamp_txn_api_commit Configuring transaction timestamp information with WT_SESSION::commit_transaction
@@ -87,7 +90,7 @@ points in the transaction's lifetime, using WT_SESSION::timestamp_transaction:
 | commit_timestamp | > stable and >= prepare and >= any system read timestamp | the transaction's commit timestamp, see @ref timestamp_txn_api_commit_timestamp for details |
 | durable_timestamp | >= commit | the transaction's durable timestamp, only applicable to prepared transactions, see @ref timestamp_prepare for details |
 | prepare_timestamp | > stable and >= any system read timestamp | the transaction's prepare timestamp, see @ref timestamp_prepare for details |
-| read_timestamp | >= oldest or >= pinned | the transaction's read timestamp, see @ref timestamp_txn_api_read_timestamp for details |
+| read_timestamp | >= oldest | the transaction's read timestamp, see @ref timestamp_txn_api_read_timestamp for details |
 
 @section timestamp_txn_api_commit_timestamp Setting the transaction's commit timestamp
 
@@ -133,9 +136,8 @@ timestamp order are expected to explicitly fail in future releases.
 Some diagnostic tools are available to help enforce this constraint;
 see @ref timestamp_misc_diagnostic.
 
-For prepared transactions, the commit timestamp must not be less than the
-prepare timestamp. Otherwise, the commit
-timestamp must not be less than the system's stable timestamp.
+For prepared transactions, the commit timestamp must not be before the prepare
+timestamp. Otherwise, the commit timestamp must be after the stable timestamp.
 
 @section timestamp_txn_api_read_timestamp Setting the transaction's read timestamp
 
@@ -146,9 +148,8 @@ a newer timestamp, of course.),
 The read timestamp may be set to any time equal to or after the system's
 \c oldest timestamp.
 
-This restriction is enforced and
-applications can rely on an error return to detect attempts to set the read
-timestamp older than the \c oldest timestamp.
+This restriction is enforced and applications can rely on an error return to
+detect attempts to set the read timestamp older than the \c oldest timestamp.
 
 The read timestamp may only be set once in the lifetime of a transaction.
 

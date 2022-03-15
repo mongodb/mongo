@@ -49,7 +49,7 @@ A hole can be generated in a log file if a buffer with a later LSN is written be
 a buffer with an earlier LSN. That can also happen at a log file boundary and that is why
 knowing the LSN at the end of the previous log file is critical to recovery.
 
-The user can choose the maximum log file size via \c log=(file_max=size) configuration
+The user can choose the maximum log file size via \c "log=(file_max=size)" configuration
 to the ::wiredtiger_open call. Records written in the log are varying length
 depending on the data written. In typical usage, the system will choose to switch
 log files before writing a log buffer that exceeds the configured file size. However it

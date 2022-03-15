@@ -1,4 +1,4 @@
-/*! @page checkpoint Checkpoint durability
+/*! @page durability_checkpoint Checkpoint-level durability
 
 WiredTiger supports checkpoint durability by default, and optionally
 commit-level durability when logging is enabled.  In most applications,
@@ -6,22 +6,22 @@ commit-level durability impacts performance more than checkpoint
 durability; checkpoints offer basic operation durability across
 application or system failure without impacting performance (although
 the creation of each checkpoint is a relatively heavy-weight operation).
-See @ref durability for information on commit-level durability.
+See @ref durability_log for information on commit-level durability.
 
 @section checkpoint_snapshot Checkpoints vs. snapshots
 
-Since the terms "checkpoint" and "snapshot" are widely used in this manual, a
-quick explanation of the difference: a checkpoint is an on-disk entity that
+Here is a brief explanation of the terms "checkpoint" and "snapshot", as
+they are widely used in this manual. A checkpoint is an on-disk entity that
 captures the persistent state of some or all of the database, while a snapshot
 is a lightweight in-memory entity that captures the current state of pending
-updates in the cache.  Isolation refers to snapshots, because isolation is about
-runtime state and which updates can be seen by other threads' transactions as
-they run.  Durability refers to checkpoints, because durability is about on-disk
-persistence.  The two concepts are closely connected, of course; when a
-checkpoint is created the code involved uses a snapshot to determine which
-updates should and should not appear in the checkpoint.
+updates in the cache. Isolation refers to snapshots, because isolation is about
+runtime state and which updates can be seen by other threads' transactions
+as they run. Durability refers to checkpoints, because durability is about
+on-disk persistence.  The two concepts are closely connected, of course;
+when a checkpoint is created the code involved uses a snapshot to determine
+which updates should and should not appear in the checkpoint.
 
-@section checkpoints Checkpoints
+@section checkpoint_checkpoints Checkpoints
 
 A checkpoint is automatically created for each individual file whenever the last
 reference to a modified data source is closed.
@@ -40,11 +40,11 @@ Data sources that are involved in an exclusive operation when the checkpoint
 starts, including bulk load, upgrade or salvage, will be skipped by the
 checkpoint.
 
-When a data source is first opened, it appears in the same state it was in when
-it was most recently checkpointed. In other words, updates after the most recent
-checkpoint will not appear in the data source at checkpoint-level durability.
-If no checkpoint is found when the data source is opened, the data source will
-appear empty.
+When a data source is first opened, it appears in the same state it was
+in when it was most recently checkpointed. In other words, updates after
+the most recent checkpoint (for example, in the case of failure), will not
+appear in the data source at checkpoint-level durability.  If no checkpoint
+is found when the data source is opened, the data source will appear empty.
 
 @subsection checkpoint_target Checkpointing specific objects
 
@@ -109,11 +109,12 @@ data source's checkpoints, with time stamp, in a human-readable format.
 Backups are done using backup cursors (see @ref backup for more information).
 
 \warning
-When applications are using checkpoint-level durability, checkpoints taken while
-a backup cursor is open are not durable. That is, if a crash occurs when a
-backup cursor is open, then the system will be restored to the most recent
-checkpoint prior to the opening of the backup cursor, even if later database
-checkpoints were completed.
+When applications are using checkpoint-level durability, checkpoints taken
+while a backup cursor is open are not durable. That is, if a crash occurs
+when a backup cursor is open, then the system will be restored to the most
+recent checkpoint prior to the opening of the backup cursor, even if later
+database checkpoints were completed. As soon as the backup cursor is closed,
+the system will again be restored to the most recent checkpoint taken.
 
 Applications using commit-level durability retain durability via the write-ahead
 log even though checkpoints taken while a backup cursor is open are not durable.

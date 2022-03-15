@@ -14,13 +14,15 @@ allowed to read. The historic values of data modified before this time can no
 longer be read by new transactions. (Transactions already in progress
 are not affected when the \c oldest_timestamp changes.)
 
-The stable timestamp is the earliest time at which data is considered
-fully stable. It is saved along with every checkpoint, and that saved
-time is the point to which the database is recovered after a crash.
-It is also the earliest point to which the database can be returned via an
-explicit WT_CONNECTION::rollback_to_stable call.
-(See @ref timestamp_misc_rts.)
-All transactions must commit after the current \c stable timestamp.
+The stable timestamp is the earliest time at which data is considered stable.
+(Data is said to be stable when it is not only durable, but additionally,
+transactions committed at or before the stable time cannot be rolled back by
+application-level transaction management.) The stable timestamp is saved
+along with every checkpoint, and that saved time is the point to which the
+database is recovered after a crash. It is also the earliest point to which
+the database can be returned via an explicit WT_CONNECTION::rollback_to_stable
+call. (See @ref timestamp_misc_rts.)  All transactions must commit after
+the current \c stable timestamp.
 
 Applications are responsible for managing these timestamps and
 periodically updating them.
@@ -40,7 +42,7 @@ WT_CONNECTION::set_timestamp method, including constraints.
 
 | Timestamp | Constraints | Description |
 |-----------|-------------|-------------|
-| durable_timestamp | <= oldest | Reset the maximum durable timestamp |
+| durable_timestamp | <= oldest | Reset the maximum durable timestamp (see @ref timestamp_prepare for discussion of the durable timestamp). |
 | oldest_timestamp | <= stable; may not move backward, set to the value as of the last checkpoint during recovery | Inform the system future reads and writes will never be earlier than the specified timestamp. |
 | stable_timestamp | may not move backward, set to the recovery timestamp during recovery | Inform the system checkpoints should not include commits newer than the specified timestamp. |
 
@@ -61,7 +63,7 @@ in that case.
 
 Setting \c oldest_timestamp indicates future read timestamps will be at
 least as recent as the timestamp, allowing WiredTiger to discard history before
-the specified point. It is not required there be no currently active readers at
+the specified point. It is not required that there be no currently active readers at
 earlier timestamps: this setting only indicates future application needs.
 In other words, as active readers age out of the system, historic data up to the
 oldest timestamp will be discarded, but no historic data at or after the \c
@@ -83,17 +85,11 @@ The \c oldest_timestamp must be less than or equal to the \c stable_timestamp.
 The \c stable_timestamp determines the timestamp for subsequent checkpoints. In
 other words, updates to an object after the stable timestamp will not be included in a
 future checkpoint. Because tables in a timestamp world are generally using
-checkpoint durability, the \c stable_timestamp also determines to point to which
+checkpoint durability, the \c stable_timestamp also determines the point to which
 recovery will be done after failures.
 
 During recovery, the \c stable_timestamp is set to the value to which recovery is
 performed.
-
-The use of the \c stable_timestamp for checkpoints can be overridden in the call
-to WT_SESSION::checkpoint.
-
-<!-- XXX
-OVERRIDING THE STABLE ts IN CHECKPOINT NEEDS MOTIVATION AND DISCUSSION -->
 
 It is possible to explicitly roll back to a time after, or equal to, the current
 \c stable_timestamp using the WT_CONNECTION::rollback_to_stable method.
@@ -106,6 +102,13 @@ performance.
 
 Attempting to set the \c stable_timestamp to a value earlier than its current
 value will be silently ignored.
+
+Using the stable timestamp in the checkpoint is not required, and can be
+overridden using the <tt>use_timestamp=false</tt> configuration of the
+WT_SESSION::checkpoint call. This is not intended for general use, but can
+be useful for backup scenarios where rolling back to a stable timestamp
+isn't possible and it's useful for a checkpoint to contain the most recent
+possible data.
 
 @subsection timestamp_global_forcing Forcing global timestamps
 
@@ -128,11 +131,11 @@ the WT_CONNECTION::set_timestamp method, including constraints.
 
 | Timestamp | Constraints | Description |
 |-----------|-------------|-------------|
-| all_durable | None | The largest timestamp such that all timestamps up to that value have been made durable. |
+| all_durable | None | The largest timestamp such that all timestamps up to that value have been made durable (see @ref timestamp_prepare for discussion of the durable timestamp). |
 | last_checkpoint | <= stable | The stable timestamp at which the last checkpoint ran (or 0 if no checkpoints have run). |
 | oldest_reader | None | The timestamp of the oldest currently active read transaction. |
 | oldest_timestamp | <= stable | The current application-set \c oldest_timestamp value. |
-| pinned | <= oldest | The minimum of the \c oldest_timestamp and the read timestamps of all active readers. |
+| pinned | <= oldest | The minimum of the \c oldest_timestamp and the oldest active reader. |
 | recovery | <= stable | The stable timestamp used in the most recent checkpoint prior to the last shutdown (or 0 if none available). |
 | stable_timestamp | None | The current application-set \c stable_timestamp value. |
 
@@ -193,13 +196,11 @@ application.
 
 @subsection timestamp_global_query_api_pinned Reading the "pinned" timestamp
 
-The \c pinned timestamp is the minimum of \c oldest_timestamp and the read
-timestamps of all active readers, including any running checkpoint. It is not
-the same as \c oldest_timestamp
-because the oldest timestamp can be advanced past currently active readers,
-leaving a reader as the earliest timestamp in the system. Applications
-can use the \c pinned timestamp to understand the earliest data required by any
-reader in the system.
+The \c pinned timestamp is the minimum of \c oldest_timestamp and the oldest active
+reader, including any running checkpoint. It is not the same as \c oldest_timestamp
+because the oldest timestamp can be advanced past currently active readers, leaving
+a reader as the earliest timestamp in the system. Applications can use the \c pinned
+timestamp to understand the earliest data required by any reader in the system.
 
 The \c pinned timestamp is read-only.
 
@@ -207,7 +208,7 @@ The \c pinned timestamp is read-only.
 
 The \c recovery timestamp is the stable timestamp to which recovery was
 performed on startup. Applications can use the \c recovery timestamp to
-determine the stable timestamp of the system on startup.
+retrieve the value the stable timestamp had at system startup.
 
 The \c recovery timestamp is read-only.
 

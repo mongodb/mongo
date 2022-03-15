@@ -1895,8 +1895,8 @@ struct __wt_session {
 	 * \c use_timestamp=true (the default), updates committed with a timestamp after the
 	 * \c stable timestamp, in tables configured for checkpoint-level durability, are not
 	 * included in the checkpoint. Updates committed in tables configured for commit-level
-	 * durability are always included in the checkpoint. See @ref checkpoint and @ref durability
-	 * for more information.
+	 * durability are always included in the checkpoint. See @ref durability_checkpoint and
+	 * @ref durability_log for more information.
 	 *
 	 * Calling the checkpoint method multiple times serializes the checkpoints, new checkpoint
 	 * calls wait for running checkpoint calls to complete.
@@ -1925,9 +1925,9 @@ struct __wt_session {
 	 * objects separately from a database-wide checkpoint can lead to data inconsistencies\, see
 	 * @ref checkpoint_target for more information., a list of strings; default empty.}
 	 * @config{use_timestamp, if true (the default)\, create the checkpoint as of the last
-	 * stable timestamp if timestamps are in use\, or all current updates if there is no stable
-	 * timestamp set.  If false\, this option generates a checkpoint with all updates including
-	 * those later than the timestamp., a boolean flag; default \c true.}
+	 * stable timestamp if timestamps are in use\, or with all committed updates if there is no
+	 * stable timestamp set.  If false\, always generate a checkpoint with all committed
+	 * updates\, ignoring any stable timestamp., a boolean flag; default \c true.}
 	 * @configend
 	 * @errors
 	 */
@@ -2523,7 +2523,7 @@ struct __wt_connection {
 	 * value to older than the current is silently ignored.  The value must not be newer than
 	 * the current stable timestamp.  See @ref timestamp_global_api., a string; default empty.}
 	 * @config{stable_timestamp, checkpoints will not include commits that are newer than the
-	 * specified timestamp in tables configured with \c log=(enabled=false). Values must be
+	 * specified timestamp in tables configured with \c "log=(enabled=false)". Values must be
 	 * monotonically increasing\, any attempt to set the value to older than the current is
 	 * silently ignored.  The value must not be older than the current oldest timestamp.  See
 	 * @ref timestamp_global_api., a string; default empty.}

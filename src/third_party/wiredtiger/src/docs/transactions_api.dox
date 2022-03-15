@@ -33,9 +33,11 @@ violation of consistency or isolation.) Failures of this form produce the error
 current transaction using WT_SESSION::rollback_transaction, and either abandon
 the operation or retry the entire operation by starting a new transaction.
 
-The WT_SESSION::rollback_transaction method resets all cursors in the session
-(as if the WT_CURSOR::reset method was called), discarding any cursor position
-as well as any currently set keys or values they may have.
+After a transaction is successfully committed, cursors in the session retain
+their position, as well as any currently set keys or values they may have.
+If a transaction is rolled back for any reason, cursors in the session are
+reset (as if the WT_CURSOR::reset method was called), discarding any cursor
+position as well as any currently set keys or values.
 
 @snippet ex_all.c transaction commit/rollback
 
@@ -67,7 +69,7 @@ allocated to hold the data required to satisfy transactional readers, operations
 may fail and return ::WT_ROLLBACK.
 
 \warning
-As read transactions rarely fail, application developers may fail to correctly
+As read transactions rarely fail, application developers may neglect to correctly
 handle a read transaction return of ::WT_ROLLBACK. Applications must be written
 to anticipate read failure.
 

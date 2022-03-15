@@ -16,7 +16,7 @@ WT_SESSION::commit_transaction returns, giving highest performance but
 not ensuring durability.  The durability guarantees can be stricter but
 this will impact performance.
 
-If \c transaction_sync=(enabled=false) is configured to ::wiredtiger_open,
+If \c "transaction_sync=(enabled=false)" is configured in ::wiredtiger_open,
 log records may be buffered in memory, and only flushed to disk by
 checkpoints, when log files switch or calls to WT_SESSION::commit_transaction
 with \c sync=on.  (Note that any call to WT_SESSION::commit_transaction
@@ -24,10 +24,10 @@ with \c sync=on will flush the log records for all committed transactions,
 not just the transaction where the configuration is set.)  This provides the
 minimal guarantees, but will be significantly faster than other configurations.
 
-If \c transaction_sync=(enabled=true), \c transaction_sync=(method)
+If \c "transaction_sync=(enabled=true)", \c "transaction_sync=(method)"
 further configures the method used to flush log records to disk.  By
 default, the configured value is \c fsync, which calls the operating
-system's \c fsync call (of \c fdatasync if available) as each commit completes.
+system's \c fsync call (or \c fdatasync if available) as each commit completes.
 
 If the value is set to \c dsync, the \c O_DSYNC or \c O_SYNC
 flag to the operating system's \c open call will be specified when the
@@ -36,10 +36,10 @@ configurations are the same, and in our experience the \c open flags are
 slower; this configuration is only included for systems where that may
 not be the case.)
 
-If the value is set to \c none, the operating system's \c write call
-will be called as each commit completes but no explicit disk flush is made.
-This setting gives durability at the application level but not at
-the system level.
+If the value is set to \c none, the operating system's \c write call will
+be called as each commit completes but no explicit disk flush is made.
+This setting gives durability across application failure, but likely not
+across system failure (depending on operating system guarantees).
 
 When a log file fills and the system moves to the next log file, the
 previous log file will always be flushed to disk prior to close.  So
@@ -74,7 +74,7 @@ the \c sync configuration that override the connection level settings.
 
 If \c sync=on is configured then this commit operation will wait for its
 log records, and all earlier ones, to be durable to the extent specified
-by the \c transaction_sync=(method) setting before returning.
+by the \c "transaction_sync=(method)" setting before returning.
 
 If \c sync=off is configured then this commit operation will write its
 records into the in-memory buffer and return immediately.

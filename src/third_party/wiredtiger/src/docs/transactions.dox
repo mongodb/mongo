@@ -1,7 +1,7 @@
 /*! @page transactions Transactional applications
 
-WiredTiger offers standard ACID-style transaction support where operations are
-done at snapshot isolation and subsequently become durable. (Readers not
+WiredTiger offers standard ACID-style transaction support where modifications happen
+at snapshot isolation and subsequently become durable. (Readers not
 already familiar with these concepts may wish to see @ref explain_acid for a brief
 discussion of ACID and @ref explain_isolation for a brief discussion of isolation
 levels.)
@@ -11,9 +11,10 @@ There are three approaches to writing transactional programs in WiredTiger:
 applications with simple transactions where updates become durable when
 the last reference to the object is closed or at the next database checkpoint.
 
--# Applications supporting \b commit-level durability, which extends checkpoint-level
-durability, adding logging to the database so updates are durable as
-soon as their transaction successfully commits.
+-# Applications supporting \b commit-level durability, which extends
+checkpoint-level durability, adding logging to the database so updates written
+on behalf of a transaction become durable as soon as the transaction's log
+records become durable.
 
 -# Applications using timestamps for fine-grained control of the database,
 extending checkpoint-level durability. This allows applications to do things
@@ -34,17 +35,18 @@ the first approach and iterating to a complete application is recommended.
 We will discuss these approaches in order, from the simplest to the most
 complex.
 
-If this is your first WiredTiger application, please read @ref explain_durability
+If this is your first WiredTiger application, please read @ref durability_overview
 for a discussion of WiredTiger durability models, so you can select the application
-architecture that's appropriate for your needs.
+architecture that is appropriate for your needs.
 
 \warning
-Recovery is the process of restoring the database to a consistent state after
-failure. Recovery is automatically performed by WiredTiger, as necessary, when a
-database is opened. Recovery is required after the failure of any thread of
-control in the application, where the failed thread might have been executing
-inside of the WiredTiger library or open WiredTiger handles have been lost. If
-any application thread of control exits unexpectedly while holding any database
-resources of any kind, the application should close and re-open the database.
+Recovery is the process of restoring the database to a transactionally
+consistent state after failure. Recovery is automatically performed by
+WiredTiger, as necessary, when a database is opened. Recovery is required
+after the failure of any thread of control in the application, where the
+failed thread might have been executing inside of the WiredTiger library
+or open WiredTiger handles have been lost. If any application thread of
+control exits unexpectedly while holding any database resources of any kind,
+the application should close and re-open the database.
 
 */

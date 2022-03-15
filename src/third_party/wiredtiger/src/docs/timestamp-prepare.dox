@@ -10,10 +10,9 @@ transaction, which will be used for visibility checks until the transaction is
 committed or aborted. Once a transaction has been prepared no further data
 operations are permitted, and the transaction must next be resolved by calling
 WT_SESSION::commit_transaction or WT_SESSION::rollback_transaction.
-Calling WT_SESSION::prepare_transaction only
-guarantees that transactional conflicts will not cause the transaction to
-roll back and specifically does not guarantee the transaction's updates are
-durable.
+Calling WT_SESSION::prepare_transaction only guarantees that a subsequent
+WT_SESSION::commit_transaction will succeed and specifically does not
+guarantee the transaction's updates are durable.
 
 If a read operation encounters an update from a prepared transaction,
 the error ::WT_PREPARE_CONFLICT will be returned indicating it is not possible to
@@ -53,6 +52,7 @@ reading its writes in a second transaction and then committing other writes such
 that the second transaction becomes durable before the first can produce data
 inconsistency.
 
+\warning
 In this scenario the second transaction depends on the first; thus it must be
 rolled back if the first transaction is rolled back; thus it must not become
 durable before the first transaction.
@@ -64,6 +64,7 @@ this scenario cannot occur.
 transaction is also its durable timestamp, and committing with no timestamp is
 roughly comparable to committing at the current stable timestamp.)
 
+\warning
 This scenario is not currently detected by WiredTiger; applications are
 responsible for avoiding it.
 In future versions such transactions might fail.

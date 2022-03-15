@@ -1,60 +1,51 @@
 /*! @page timestamp_prepare_roundup Automatic prepare timestamp rounding
 
-Prepared transactions have their own configuration keyword for rounding
-timestamps.
-
 @section timestamp_prepare_roundup_replay Replaying prepared transactions by rounding up the prepare timestamp
 
-It is possible for a system crash to cause a prepared transaction to
-be rolled back.
-Because the durable timestamp of a transaction is permitted to be
-later than its commit timestamp, it is even possible for a system crash to
-cause a prepared and committed transaction to be rolled back.
-Part of the purpose of the timestamp interface is to allow such
-transactions to be replayed at the same time during an
-application-level recovery phase.
+Prepared transactions have a configuration keyword for rounding timestamps.
+Applications can configure <code>roundup_timestamps=(prepare=true)</code>
+with the WT_SESSION::begin_transaction method.
 
-Under ordinary circumstances this is purely an application concern.
-However, because it is also allowed for the stable timestamp to move
-forward after a transaction prepares, strict enforcement of the
-timestamping rules can make replaying prepared transactions at the
-same time impossible.
+It is possible for a system crash to cause a prepared transaction to be
+rolled back. Because the durable timestamp of a transaction is permitted
+to be later than the prepared transaction's commit timestamp, it is even
+possible for a system crash to cause a prepared and committed transaction
+to be rolled back. Part of the purpose of the timestamp interface is to
+allow such transactions to be replayed at their original timestamps during
+an application-level recovery phase.
 
-The setting <code>roundup_timestamps=(prepared=true)</code> is
-provided to allow handling this situation.
-It disables the normal restriction that the prepare timestamp must be
-greater than the stable timestamp.
-In addition, the prepare timestamp is rounded up to the <i>oldest</i>
-timestamp (not the stable timestamp) if necessary and then the commit
-timestamp is rounded up to the prepare timestamp.
-The rounding provides some measure of safety by disallowing operations
-before oldest.
+Under ordinary circumstances this is purely an application concern.  However,
+because it is also allowed for the stable timestamp to move forward after a
+transaction prepares, strict enforcement of the timestamping rules can make
+replaying prepared transactions at the same time impossible.
 
-Arguably the name of the setting should be more descriptive of the
-full behavior.
+The setting <code>roundup_timestamps=(prepared=true)</code> is provided to
+handle this problem. It disables the normal restriction that the prepare
+timestamp must be greater than the stable timestamp. In addition, the
+prepare timestamp is rounded up to the <i>oldest</i> timestamp (not the
+stable timestamp) if necessary and then the commit timestamp is rounded up
+to the prepare timestamp. The rounding provides some measure of safety by
+disallowing operations before oldest.
 
 \warning
-This setting is an extremely sharp knife.
-It is safe to replay a prepared transaction at its original time,
-regardless of the stable timestamp, as long as this is done during an
-application recovery phase after a crash and before any ordinary
-operations are allowed.
-Using this setting to prepare and/or commit before the stable
-timestamp for any other purpose can lead to data inconsistency.
-Likewise, replaying anything other than the exact transaction that
-successfully prepared before the crash can lead to subtle
-inconsistencies.
-If in any doubt it is far safer to either abort the transaction (this
-requires no further action in WiredTiger) or not allow stable to
-advance past a transaction that has prepared.
+This setting is dangerous. It is safe to replay a prepared transaction at
+its original timestamps, regardless of the current stable timestamp, as
+long as it is done during an application recovery phase after a crash and
+before any ordinary operations are allowed. Using this setting to prepare
+and/or commit before the current stable timestamp for any other purpose
+can lead to data inconsistency. Likewise, replaying anything other than the
+exact transaction that successfully prepared before the crash can lead to
+subtle inconsistencies. If in any doubt, it is far safer to either abort the
+transaction (this requires no further action in WiredTiger) or not allow the
+stable timestamp to advance past the commit timestamp of a transaction that
+has been prepared.
 
 @section timestamp_prepare_roundup_safety Safety rationale and details
 
-When a transaction is prepared and rolled back by a crash, then
-replayed, this creates a period of time (execution time, not timestamp
-time) where it is not there.
-Reads or writes made during this period that intersect with the
-transaction will not see it and thus will produce incorrect results.
+When a transaction is prepared and rolled back by a crash, then replayed,
+this creates a period of execution time where the transaction's updates will
+not appear. Reads or writes made during this period that intersect with
+the transaction will not see it and can therefore produce incorrect results.
 
 An <i>application recovery phase</i> is a startup phase in application
 code that is responsible for returning the application to a running
@@ -66,16 +57,13 @@ The important property is that only application-level recovery code
 executes, and that code is expected to be able to take account of
 special circumstances related to recovery.
 
-It is safe to replay a prepared transaction during an application
-recovery phase because nothing can make intersecting reads or writes
-during the period the prepared transaction is missing, and once it has
-been replayed it covers the exact same region of the database as
-before the crash, so any further intersecting reads or writes will
-behave the same as if they had been performed before the crash.
-(If for some reason the application recovery code itself needs to read
-the affected region of the database before replaying a prepared
-transaction, it is then responsible for compensating for its temporary
-absence somehow.)
+It is safe to replay a prepared transaction during an application recovery
+phase if nothing makes intersecting reads or writes during the period the
+prepared transaction is missing and the replay makes the exact same updates
+as before the crash, so any subsequent intersecting reads or writes will
+behave the same as if they had been performed before the crash. (If the
+application recovery code itself makes intersecting reads before replaying
+a prepared transaction, it is responsible for compensating.)
 
 Because a transaction's durable timestamp is allowed to be
 later than its commit timestamp, it is possible for a transaction to
@@ -90,11 +78,10 @@ before the crash, it is important to replay exactly the same write
 set; otherwise reads before and after the crash might produce
 ::WT_PREPARE_CONFLICT inconsistently.
 
-It is expected that the oldest timestamp is not advanced during
-application recovery.
-The rounding behavior does not check for this possibility; if for some
-reason applications wish to advance oldest while replaying
-transactions during recovery, they must check their commit timestamps
-explicitly to avoid committing before oldest.
+It is expected the oldest timestamp will not advance during application
+recovery. The rounding behavior does not check for this possibility; if for
+some reason applications wish to advance oldest while replaying transactions
+during recovery, they must check their commit timestamps explicitly to avoid
+committing before oldest.
 
 */

@@ -122,11 +122,24 @@ valid_build()
 		echo 'Unreferenced page: see docs/pages.html for the list.'
 		e=1
 	}
+
 	classf=`ls ../docs/struct___* 2>/dev/null`
 	for c in $classf; do
 		echo "$c: Add class to PREDEFINED in src/docs/$doxyfile, then remove docs/*.{html,js} and rebuild"
-
 	done
+
+	# Complain if \c markdown isn't right.
+	grep '=</code>(' ../docs/*.html > $t
+	test -s $t && {
+	    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+	    echo "Some <code> markup fragments are not correctly quoted, the output switched into"
+	    echo "typewrite format and then switched out of typewrite format before the fragment"
+	    echo "was complete. Probably a \\\c command that didn't span a parenthesis character."
+	    echo
+	    cat $t
+	    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+	    e=1
+	}
 }
 
 check_docs_data()

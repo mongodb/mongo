@@ -1,21 +1,31 @@
-/*! @page durability Commit-level durability
+/*! @page durability_log Commit-level durability
 
 The next level of WiredTiger transactional application involves adding
-commit-level durability for data modifications. As described in @ref checkpoint,
-WiredTiger supports checkpoint durability by default. Commit-level durability
-requires additional configuration.
+commit-level durability for data modifications. As described in
+@ref durability_checkpoint, WiredTiger supports checkpoint durability
+by default. Commit-level durability requires additional configuration.
 
 @section commit_durability_enable Enabling commit-level durability
 
-To enable commit-level durability, pass the \c log=(enabled) configuration
-string to ::wiredtiger_open. This causes WiredTiger to write records into the
-log for each transaction, giving all objects opened in the database commit-level
-durability. The operational transactional API does not otherwise change.
+To enable commit-level durability, pass the <tt>log=(enabled)</tt>
+configuration string to ::wiredtiger_open. This causes WiredTiger to write
+records into the log for each transaction, giving all objects opened in the
+database commit-level durability. The operational transactional API does
+not otherwise change.
+
+\warning
+By default, log records are written to an in-memory buffer before
+WT_SESSION::commit_transaction returns, giving the highest performance but
+not ensuring immediate durability. The database can be configured to flush
+log records to the operating system buffer cache (ensuring durability over
+application failure), or to stable storage (ensuring durability over system
+failure), but that will impact performance.
+See @ref commit_durability_flush_config for more information.
 
 It is possible to enable commit-level durability for some database
 objects and not others.
-To do this, one must pass \c log=(enabled) to ::wiredtiger_open and
-then pass \c log=(enabled=false) to WT_SESSION::create for the objects
+To do this, one must pass \c "log=(enabled)" to ::wiredtiger_open and
+then pass \c "log=(enabled=false)" to WT_SESSION::create for the objects
 that should continue to use checkpoint durability.
 (Doing the converse is not supported, that is,
 enabling logging on some tables while leaving the global switch turned
@@ -47,12 +57,12 @@ transaction is committed.
 By default, log records are buffered in memory and not flushed to disk
 immediately, even when committed; groups of transactions are flushed
 together.
-(See @ref durability_group_commit.)
+(See @ref commit_durability_group_commit.)
 It is possible to flush transactions to disk more aggressively if
 desired.
-See @ref durability_flush_config.
+See @ref commit_durability_flush_config.
 
-@section durability_recovery Recovery
+@section commit_durability_recovery Recovery
 
 When the transactional log is enabled, calling ::wiredtiger_open
 automatically performs a recovery step when opening the database.
@@ -67,7 +77,7 @@ Therefore, applications using commit-level durability must configure
 extensions with the \c extensions keyword to ::wiredtiger_open consistently
 whenever re-opening the database.
 
-@section durability_checkpoint Checkpoints
+@section commit_durability_checkpoint Checkpoints
 
 When using commit-level durability one should still perform
 checkpoints of the database.
@@ -80,15 +90,16 @@ be processed.
 
 Checkpoints can be done either explicitly by the application or periodically
 based on elapsed time or data size with the \c checkpoint configuration to
-::wiredtiger_open.  The period between checkpoints can be defined in seconds via
-\c wait, as the number of bytes written to the log since the last checkpoint via
-\c log_size, or both.  If both periods are defined then the checkpoint occurs as
-soon as either threshold has occurred and both are reset once the checkpoint is
-complete.  If using \c log_size to scheduled automatic checkpoints, we recommend
-the size selected be a multiple of the physical size of the underlying log file
-to more easily support automatic log file removal.
+::wiredtiger_open. The period between checkpoint completion and the start of
+a subsequent checkpoint can be set in seconds via \c wait, as the number of
+bytes written to the log since the last checkpoint via \c log_size, or both.
+If both are set then the checkpoint occurs as soon as either threshold has
+occurred and both are reset once the checkpoint is complete.  If using
+\c log_size to scheduled automatic checkpoints, we recommend the size selected
+be a multiple of the physical size of the underlying log file to more easily
+support automatic log file removal.
 
-@section durability_backup Backups
+@section commit_durability_backup Backups
 
 Backups are done using backup cursors (see @ref backup for more information).
 
@@ -98,20 +109,20 @@ files referenced in the logs might not be found.  Applications should either
 copy all objects and log files if commit-level durability of the copied database
 is required, or alternatively, copy only selected objects when backing up and
 not copy log files at all, then fall back to checkpoint durability when
-switching to the backup.
+activating the backup.
 
-@section durability_archiving Log file archival and removal
+@section commit_durability_archiving Log file archival and removal
 
 WiredTiger log files are named "WiredTigerLog.[number]" where "[number]"
-is a 10-digit value, for example WiredTigerLog.0000000001".  The log
-file with the largest number in its name is the most recent log file
-written.  The log file size can be set using the \c log configuration
+is a 10-digit value, for example <tt>WiredTigerLog.0000000001</tt>.
+The log file with the largest number in its name is the most recent log
+file written. The log file size can be set using the \c log configuration
 to ::wiredtiger_open.
 
 By default, WiredTiger automatically removes log files no longer required for
 recovery. Applications wanting to archive log files instead (for example, to
 support catastrophic recovery), must disable log file removal using the
-::wiredtiger_open \c log=(remove=false) configuration.
+::wiredtiger_open \c "log=(remove=false)" configuration.
 
 Log files may be removed or archived after a checkpoint has completed,
 as long as there is no backup in progress.  When performing @ref
@@ -122,7 +133,7 @@ Immediately after the checkpoint has completed, only the most recent log file
 is needed for recovery, and all other log files can be removed or archived.
 Note that there must always be at least one log file for the database.
 
-@section log_cursors Log cursors
+@section commit_log_cursors Log cursors
 
 Applications can independently read and write WiredTiger log files for their own
 purposes (for example, inserting debugging records), using the standard
@@ -134,16 +145,16 @@ Applications manually removing log files should take care that no log cursors
 are opened in the log when removing files or errors may occur when trying to
 read a log record in a file that was removed.
 
-@section durability_bulk Bulk loads
+@section commit_durability_bulk Bulk loads
 
 @copydoc doc_bulk_durability
 
-@section durability_tuning Tuning commit-level durability
+@section commit_durability_tuning Tuning commit-level durability
 
-@subsection durability_group_commit Group commit
+@subsection commit_durability_group_commit Group commit
 @copydoc doc_tune_durability_group_commit
 
-@subsection durability_flush_config Flush call configuration
+@subsection commit_durability_flush_config Flush call configuration
 @copydoc doc_tune_durability_flush_config
 
  */
