@@ -374,14 +374,14 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMo
         }
 
         candidateChunks.insert(candidateChunks.end(),
-                               std::make_move_iterator(candidatesStatus.getValue().begin()),
-                               std::make_move_iterator(candidatesStatus.getValue().end()));
+                               std::make_move_iterator(candidatesStatus.getValue().first.begin()),
+                               std::make_move_iterator(candidatesStatus.getValue().first.end()));
     }
 
     return candidateChunks;
 }
 
-StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMove(
+StatusWith<MigrateInfosWithReason> BalancerChunkSelectionPolicyImpl::selectChunksToMove(
     OperationContext* opCtx, const NamespaceString& nss) {
     auto shardStatsStatus = _clusterStats->getStats(opCtx);
     if (!shardStatsStatus.isOK()) {
@@ -514,7 +514,8 @@ StatusWith<SplitInfoVector> BalancerChunkSelectionPolicyImpl::_getSplitCandidate
     return splitCandidates.done();
 }
 
-StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::_getMigrateCandidatesForCollection(
+StatusWith<MigrateInfosWithReason>
+BalancerChunkSelectionPolicyImpl::_getMigrateCandidatesForCollection(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const ShardStatisticsVector& shardStats,

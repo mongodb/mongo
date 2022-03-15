@@ -369,8 +369,7 @@ Status Balancer::moveSingleChunk(OperationContext* opCtx,
                             nss,
                             chunk,
                             forceJumbo ? MoveChunkRequest::ForceJumbo::kForceManual
-                                       : MoveChunkRequest::ForceJumbo::kDoNotForce,
-                            MigrateInfo::chunksImbalance);
+                                       : MoveChunkRequest::ForceJumbo::kDoNotForce);
     auto response =
         _commandScheduler
             ->requestMoveChunk(opCtx, migrateInfo, settings, true /* issuedByRemoteUser */)
@@ -1016,20 +1015,18 @@ BalancerCollectionStatusResponse Balancer::getBalancerStatusForNs(OperationConte
         return response;
     }
 
-    auto chunksToMove = uassertStatusOK(_chunkSelectionPolicy->selectChunksToMove(opCtx, ns));
-    if (chunksToMove.empty()) {
-        return response;
-    }
+    auto [_, reason] = uassertStatusOK(_chunkSelectionPolicy->selectChunksToMove(opCtx, ns));
 
-    const auto& migrationInfo = chunksToMove.front();
-    switch (migrationInfo.reason) {
-        case MigrateInfo::drain:
+    switch (reason) {
+        case MigrationReason::none:
+            break;
+        case MigrationReason::drain:
             setViolationOnResponse(kBalancerPolicyStatusDraining);
             break;
-        case MigrateInfo::zoneViolation:
+        case MigrationReason::zoneViolation:
             setViolationOnResponse(kBalancerPolicyStatusZoneViolation);
             break;
-        case MigrateInfo::chunksImbalance:
+        case MigrationReason::chunksImbalance:
             setViolationOnResponse(kBalancerPolicyStatusChunksImbalance);
             break;
     }

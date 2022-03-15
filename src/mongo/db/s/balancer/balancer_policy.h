@@ -56,13 +56,10 @@ struct ZoneRange {
 };
 
 struct MigrateInfo {
-    enum MigrationReason { drain, zoneViolation, chunksImbalance };
-
     MigrateInfo(const ShardId& a_to,
                 const NamespaceString& a_nss,
                 const ChunkType& a_chunk,
-                MoveChunkRequest::ForceJumbo a_forceJumbo,
-                MigrationReason a_reason);
+                MoveChunkRequest::ForceJumbo a_forceJumbo);
 
     MigrateInfo(const ShardId& a_to,
                 const ShardId& a_from,
@@ -71,8 +68,7 @@ struct MigrateInfo {
                 const BSONObj& a_min,
                 const BSONObj& a_max,
                 const ChunkVersion& a_version,
-                MoveChunkRequest::ForceJumbo a_forceJumbo,
-                MigrationReason a_reason);
+                MoveChunkRequest::ForceJumbo a_forceJumbo);
 
     std::string getName() const;
 
@@ -88,10 +84,13 @@ struct MigrateInfo {
     BSONObj maxKey;
     ChunkVersion version;
     MoveChunkRequest::ForceJumbo forceJumbo;
-    MigrationReason reason;
 };
 
+enum MigrationReason { none, drain, zoneViolation, chunksImbalance };
+
 typedef std::vector<MigrateInfo> MigrateInfoVector;
+
+typedef std::pair<MigrateInfoVector, MigrationReason> MigrateInfosWithReason;
 
 typedef std::vector<BSONObj> SplitPoints;
 
@@ -385,10 +384,10 @@ public:
      * used for migrations. Used so we don't return multiple conflicting migrations for the same
      * shard.
      */
-    static std::vector<MigrateInfo> balance(const ShardStatisticsVector& shardStats,
-                                            const DistributionStatus& distribution,
-                                            stdx::unordered_set<ShardId>* usedShards,
-                                            bool forceJumbo);
+    static MigrateInfosWithReason balance(const ShardStatisticsVector& shardStats,
+                                          const DistributionStatus& distribution,
+                                          stdx::unordered_set<ShardId>* usedShards,
+                                          bool forceJumbo);
 
     /**
      * Using the specified distribution information, returns a suggested better location for the

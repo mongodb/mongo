@@ -716,8 +716,7 @@ private:
                                chunkToMove->range.getMin(),
                                chunkToMove->range.getMax(),
                                version,
-                               MoveChunkRequest::ForceJumbo::kForceBalancer,
-                               MigrateInfo::chunksImbalance);
+                               MoveChunkRequest::ForceJumbo::kForceBalancer);
         }
 
         ChunkRange asMergedRange() const {

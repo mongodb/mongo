@@ -77,8 +77,7 @@ public:
                            BSON("x" << min),
                            BSON("x" << min + 10),
                            ChunkVersion(1, 1, OID::gen(), Timestamp(10)),
-                           MoveChunkRequest::ForceJumbo::kDoNotForce,
-                           MigrateInfo::chunksImbalance);
+                           MoveChunkRequest::ForceJumbo::kDoNotForce);
     }
 
     MoveChunkSettings getMoveChunkSettings(int64_t maxChunkSize = kDefaultMaxChunkSizeBytes) {

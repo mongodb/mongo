@@ -49,8 +49,8 @@ public:
     StatusWith<MigrateInfoVector> selectChunksToMove(
         OperationContext* opCtx, stdx::unordered_set<ShardId>* usedShards) override;
 
-    StatusWith<MigrateInfoVector> selectChunksToMove(OperationContext* opCtx,
-                                                     const NamespaceString& ns) override;
+    StatusWith<MigrateInfosWithReason> selectChunksToMove(OperationContext* opCtx,
+                                                          const NamespaceString& ns) override;
 
     StatusWith<boost::optional<MigrateInfo>> selectSpecificChunkToMove(
         OperationContext* opCtx, const NamespaceString& nss, const ChunkType& chunk) override;
@@ -73,7 +73,7 @@ private:
      * Synchronous method, which iterates the collection's chunks and uses the cluster statistics to
      * figure out where to place them.
      */
-    StatusWith<MigrateInfoVector> _getMigrateCandidatesForCollection(
+    StatusWith<MigrateInfosWithReason> _getMigrateCandidatesForCollection(
         OperationContext* opCtx,
         const NamespaceString& nss,
         const ShardStatisticsVector& shardStats,

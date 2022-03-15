@@ -80,8 +80,8 @@ public:
      * Given a valid namespace returns all the Migrations the balancer would need to perform
      * with the current state
      */
-    virtual StatusWith<MigrateInfoVector> selectChunksToMove(OperationContext* opCtx,
-                                                             const NamespaceString& nss) = 0;
+    virtual StatusWith<MigrateInfosWithReason> selectChunksToMove(OperationContext* opCtx,
+                                                                  const NamespaceString& nss) = 0;
 
     /**
      * Requests a single chunk to be relocated to a different shard, if possible. If some error
