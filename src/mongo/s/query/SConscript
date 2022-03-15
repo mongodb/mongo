@@ -92,17 +92,6 @@ env.Library(
 )
 
 env.Library(
-    target="cluster_client_cursor_mock",
-    source=[
-        "cluster_client_cursor_mock.cpp",
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/shared_request_handling',
-    ],
-)
-
-env.Library(
     target="store_possible_cursor",
     source=[
         "store_possible_cursor.cpp"
@@ -152,6 +141,7 @@ env.CppUnitTest(
         "async_results_merger_test.cpp",
         "blocking_results_merger_test.cpp",
         "cluster_client_cursor_impl_test.cpp",
+        "cluster_client_cursor_mock.cpp",
         "cluster_cursor_manager_test.cpp",
         "cluster_exchange_test.cpp",
         "establish_cursors_test.cpp",
@@ -167,6 +157,7 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/db/logical_session_id",
         "$BUILD_DIR/mongo/db/query/query_request",
         "$BUILD_DIR/mongo/db/query/query_test_service_context",
+        "$BUILD_DIR/mongo/db/shared_request_handling",
         "$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture",
         "$BUILD_DIR/mongo/s/sharding_router_test_fixture",
         "$BUILD_DIR/mongo/s/vector_clock_mongos",
@@ -174,7 +165,6 @@ env.CppUnitTest(
         "async_results_merger",
         "cluster_aggregate",
         "cluster_client_cursor",
-        "cluster_client_cursor_mock",
         "cluster_cursor_manager",
         "router_exec_stage",
         "store_possible_cursor",
