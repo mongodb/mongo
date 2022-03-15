@@ -59,7 +59,8 @@ namespace tenant_migration_util {
 
 inline Status validateDatabasePrefix(const std::string& tenantId) {
     const bool isPrefixSupported =
-        kUnsupportedTenantIds.find(tenantId) == kUnsupportedTenantIds.end();
+        kUnsupportedTenantIds.find(tenantId) == kUnsupportedTenantIds.end() &&
+        tenantId.find("_") == std::string::npos;
 
     return isPrefixSupported
         ? Status::OK()
@@ -69,10 +70,9 @@ inline Status validateDatabasePrefix(const std::string& tenantId) {
 
 inline Status validateDatabasePrefix(const std::vector<std::string>& tenantsId) {
     for (const auto& tenantId : tenantsId) {
-        if (kUnsupportedTenantIds.find(tenantId) != kUnsupportedTenantIds.end()) {
-            return Status(ErrorCodes::BadValue,
-                          str::stream()
-                              << "cannot migrate databases for tenant \'" << tenantId << "'");
+        auto status = validateDatabasePrefix(tenantId);
+        if (!status.isOK()) {
+            return status;
         }
     }
 

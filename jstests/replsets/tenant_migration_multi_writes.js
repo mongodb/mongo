@@ -39,7 +39,8 @@ const donorRst = new ReplSetTest({
 const oplogMinRetentionHours = 2;  // Set to standard Evergreen task timeout time
 donorRst.startSet({oplogMinRetentionHours});
 donorRst.initiateWithHighElectionTimeout();
-const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), donorRst: donorRst});
+const tenantMigrationTest =
+    new TenantMigrationTest({name: jsTestName(), donorRst: donorRst, quickGarbageCollection: true});
 
 const recipientRst = tenantMigrationTest.getRecipientRst();
 const donorPrimary = donorRst.getPrimary();
@@ -134,6 +135,7 @@ function testMultiWritesWhileInBlockingState(readConcern, writeConcern) {
 
         jsTest.log('Drop DB and wait for garbage collection after test cycle.');
         assert.commandWorked(recipientRst.getPrimary().getDB(kDbName).dropDatabase());
+        tenantMigrationTest.waitForMigrationGarbageCollection(migrationId, kTenantId);
     }
 
     writesThread.join();
@@ -144,7 +146,8 @@ readWriteConcerns.push({writeConcern: 1, readConcern: 'local'});
 readWriteConcerns.push({writeConcern: 'majority', readConcern: 'majority'});
 
 readWriteConcerns.forEach(concerns => {
-    jsTest.log(`Test sending multi write while in migration blocking state with ${concerns}`);
+    jsTest.log(
+        `Test sending multi write while in migration blocking state with ${tojson(concerns)}`);
     testMultiWritesWhileInBlockingState(concerns.readConcern, concerns.writeConcern);
 });
 

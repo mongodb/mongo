@@ -26,7 +26,7 @@ const kTenantIdPrefix = "testTenantId";
 const kUnrelatedDbNameDonor = "unrelatedDBDonor";
 const kUnrelatedDbNameRecipient = "unrelatedDBRecipient";
 const collName = "foo";
-const tenantId = kTenantIdPrefix + "_0";
+const tenantId = kTenantIdPrefix + "-0";
 const migrationId = UUID();
 const migrationOpts = {
     migrationIdString: extractUUIDFromObject(migrationId),

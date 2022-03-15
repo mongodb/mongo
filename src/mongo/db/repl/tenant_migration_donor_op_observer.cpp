@@ -78,7 +78,9 @@ void onTransitionToAbortingIndexBuilds(OperationContext* opCtx,
             });
         }
     } else {
-        // The protocol is kShardMerge.
+        tassert(6448702,
+                "Bad protocol",
+                donorStateDoc.getProtocol() == MigrationProtocolEnum::kShardMerge);
         auto mtab = std::make_shared<TenantMigrationDonorAccessBlocker>(
             opCtx->getServiceContext(),
             donorStateDoc.getId(),
@@ -195,11 +197,16 @@ public:
                 // The migration durably aborted and is now marked as garbage collectable,
                 // remove its TenantMigrationDonorAccessBlocker right away to allow back-to-back
                 // migration retries.
-                if (_donorStateDoc.getProtocol() == MigrationProtocolEnum::kMultitenantMigrations) {
+                if (_donorStateDoc.getProtocol().value_or(
+                        MigrationProtocolEnum::kMultitenantMigrations) ==
+                    MigrationProtocolEnum::kMultitenantMigrations) {
                     TenantMigrationAccessBlockerRegistry::get(_opCtx->getServiceContext())
                         .remove(_donorStateDoc.getTenantId(),
                                 TenantMigrationAccessBlocker::BlockerType::kDonor);
                 } else {
+                    tassert(6448701,
+                            "Bad protocol",
+                            _donorStateDoc.getProtocol() == MigrationProtocolEnum::kShardMerge);
                     TenantMigrationAccessBlockerRegistry::get(_opCtx->getServiceContext())
                         .removeDonorAccessBlocker(_donorStateDoc.getId());
                 }
@@ -305,12 +312,16 @@ void TenantMigrationDonorOpObserver::aboutToDelete(OperationContext* opCtx,
         // TenantMigrationDonorAccessBlocker as soon as its donor state doc is marked as garbage
         // collectable. So onDelete should skip removing the TenantMigrationDonorAccessBlocker for
         // aborted migrations.
-        if (donorStateDoc.getProtocol() == MigrationProtocolEnum::kMultitenantMigrations) {
+        if (donorStateDoc.getProtocol().value_or(MigrationProtocolEnum::kMultitenantMigrations) ==
+            MigrationProtocolEnum::kMultitenantMigrations) {
             tenantIdToDeleteDecoration(opCtx) =
                 donorStateDoc.getState() == TenantMigrationDonorStateEnum::kAborted
                 ? boost::none
                 : boost::make_optional(donorStateDoc.getTenantId().toString());
         } else {
+            tassert(6448700,
+                    "Bad protocol",
+                    donorStateDoc.getProtocol() == MigrationProtocolEnum::kShardMerge);
             migrationIdToDeleteDecoration(opCtx) =
                 donorStateDoc.getState() == TenantMigrationDonorStateEnum::kAborted
                 ? boost::none
