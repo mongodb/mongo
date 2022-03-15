@@ -2579,11 +2579,11 @@ __verbose_dump_cache_single(WT_SESSION_IMPL *session, uint64_t *total_bytesp,
      * skipped it.
      */
     if (F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE))
-        return (__wt_msg(session, "  Opened exclusively. Cannot walk tree, skipping."));
+        return (__wt_msg(session, " handle opened exclusively, cannot walk tree, skipping"));
 
     next_walk = NULL;
-    while (__wt_tree_walk(
-             session, &next_walk, WT_READ_CACHE | WT_READ_NO_EVICT | WT_READ_NO_WAIT) == 0 &&
+    while (__wt_tree_walk(session, &next_walk,
+             WT_READ_CACHE | WT_READ_NO_EVICT | WT_READ_NO_WAIT | WT_READ_VISIBLE_ALL) == 0 &&
       next_walk != NULL) {
         page = next_walk->page;
         size = page->memory_footprint;
