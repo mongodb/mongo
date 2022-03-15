@@ -290,6 +290,15 @@ public:
     };
 
     /**
+     * Returns true if there are no namespaces in the query other than the namespace the query was
+     * issued against. eg if there is no $out, $lookup ect. If namespaces have not yet been resolved
+     * then it will also return false.
+     */
+    bool noForeignNamespaces() const {
+        return _resolvedNamespaces.empty();
+    }
+
+    /**
      * Convenience call that returns true if the tailableMode indicates a tailable and awaitData
      * query.
      */

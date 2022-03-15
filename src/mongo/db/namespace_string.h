@@ -452,6 +452,9 @@ public:
         return coll().startsWith("$cmd."_sd);
     }
 
+    /**
+     * NOTE an aggregate could still refer to another collection using a stage like $out.
+     */
     bool isCollectionlessAggregateNS() const;
     bool isListCollectionsCursorNS() const;
 
