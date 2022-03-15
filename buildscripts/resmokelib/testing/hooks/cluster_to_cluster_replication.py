@@ -48,9 +48,6 @@ class ClusterToClusterReplication(interface.Hook):  # pylint: disable=too-many-i
         self._replicator_start_delay = replicator_start_delay
         random.seed(config.RANDOM_SEED)
 
-        self._source_cluster = None
-        self._destination_cluster = None
-
         # The last test executed so far.
         self._last_test = None
 
@@ -60,24 +57,6 @@ class ClusterToClusterReplication(interface.Hook):  # pylint: disable=too-many-i
         """Before suite."""
         if not self._fixture:
             raise ValueError("No ClusterToClusterFixture to run migrations on")
-
-        self.logger.info("Setting up cluster to cluster test data.")
-
-        # Set up the initial replication direction.
-        clusters = self._fixture.get_independent_clusters()
-        self._source_cluster = clusters[self._fixture.source_cluster_index]
-        self._destination_cluster = clusters[1 - self._fixture.source_cluster_index]
-
-        source_url = self._source_cluster.get_driver_connection_url()
-        dest_url = self._destination_cluster.get_driver_connection_url()
-        self.logger.info("Setting source cluster string: '%s', destination cluster string: '%s'",
-                         source_url, dest_url)
-
-        # The TestData needs to be set to allow the data consistency hooks to run correctly.
-        self._shell_options["global_vars"]["TestData"]["sourceConnectionString"] = source_url
-        self._shell_options["global_vars"]["TestData"]["destinationConnectionString"] = dest_url
-
-        self._replicator.set_cli_options({'sourceURI': source_url, 'destinationURI': dest_url})
 
         if self._replicator_start_delay is None:
             if math.isinf(self._tests_per_cycle):
@@ -120,8 +99,17 @@ class ClusterToClusterReplication(interface.Hook):  # pylint: disable=too-many-i
 
     def _run_data_consistency_check(self, test, test_report):
         """Run the data consistency check across both clusters."""
+        # The TestData needs to be set to allow the data consistency hooks to run correctly.
+        clusters = self._fixture.get_independent_clusters()
+        source_url = clusters[self._fixture.source_cluster_index].get_driver_connection_url()
+        dest_url = clusters[1 - self._fixture.source_cluster_index].get_driver_connection_url()
+
+        shell_options = copy.deepcopy(self._shell_options)
+        shell_options["global_vars"]["TestData"]["sourceConnectionString"] = source_url
+        shell_options["global_vars"]["TestData"]["destinationConnectionString"] = dest_url
+
         data_consistency = cluster_to_cluster_data_consistency.CheckClusterToClusterDataConsistency(
-            self.logger, self._fixture, self._shell_options)
+            self.logger, self._fixture, shell_options)
         data_consistency.before_suite(test_report)
         data_consistency.before_test(test, test_report)
         data_consistency.after_test(test, test_report)
