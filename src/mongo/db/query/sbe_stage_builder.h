@@ -334,6 +334,7 @@ private:
         } else {
             debugInfo.reset();
         }
+        inputParamToSlotMap = other.inputParamToSlotMap;
     }
 };
 

@@ -11,3 +11,4 @@
 # Disable featureFlagSBELookupPushdown until integration tests can pass with basic SBE
 # lookup translation.
 - featureFlagSBELookupPushdown
+- featureFlagAutoParameterization

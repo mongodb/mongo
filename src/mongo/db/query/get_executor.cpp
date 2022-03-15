@@ -281,6 +281,13 @@ void fillOutIndexEntries(OperationContext* opCtx,
                          CanonicalQuery* canonicalQuery,
                          const CollectionPtr& collection,
                          std::vector<IndexEntry>& entries) {
+    // TODO SERVER-63352: Eliminate this check once we support auto-parameterized index scan plans.
+    if (feature_flags::gFeatureFlagAutoParameterization.isEnabledAndIgnoreFCV()) {
+        // Indexed plans are not yet supported when auto-parameterization is enabled, so make it
+        // look to the planner like there are no indexes.
+        return;
+    }
+
     auto ii = collection->getIndexCatalog()->getIndexIterator(opCtx, false);
     while (ii->more()) {
         const IndexCatalogEntry* ice = ii->next();
@@ -983,6 +990,15 @@ protected:
         const IndexDescriptor* descriptor, QueryPlannerParams* plannerParams) final {
         invariant(descriptor);
         invariant(plannerParams);
+
+        // Auto-parameterization currently only works for collection scan plans, but idhack plans
+        // use the _id index. Therefore, we inhibit idhack when auto-parametrization is enabled.
+        //
+        // TODO SERVER-64237: Eliminate this check once we support auto-parameterized ID hack
+        // plans.
+        if (feature_flags::gFeatureFlagAutoParameterization.isEnabledAndIgnoreFCV()) {
+            return nullptr;
+        }
 
         tassert(5536100,
                 "SBE cannot handle query with metadata",

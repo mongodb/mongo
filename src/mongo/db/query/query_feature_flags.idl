@@ -82,6 +82,13 @@ feature_flags:
       cpp_varname: gFeatureFlagSbePlanCache
       default: false
 
+    featureFlagAutoParameterization:
+      description: "Feature flag for enabling auto-parameterization of match expressions. This
+      feature is used to store auto-parameterized plans in the SBE plan cache, so this flag is only
+      meaningful to turn on in combination with 'featureFlagSbePlanCache'."
+      cpp_varname: gFeatureFlagAutoParameterization
+      default: false
+
     featureFlagSortArray:
         description: "Feature flag for allowing use of the $sortArray aggregation expression"
         cpp_varname: gFeatureFlagSortArray

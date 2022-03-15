@@ -29,16 +29,22 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/query/canonical_query_encoder.h"
 
 #include <boost/iterator/transform_iterator.hpp>
 
 #include "mongo/base/simple_string_data_comparator.h"
 #include "mongo/db/matcher/expression_array.h"
+#include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/matcher/expression_geo.h"
+#include "mongo/db/matcher/expression_text.h"
+#include "mongo/db/matcher/expression_text_noop.h"
+#include "mongo/db/matcher/expression_where.h"
+#include "mongo/db/matcher/expression_where_noop.h"
 #include "mongo/db/query/projection.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/tree_walker.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/base64.h"
 
@@ -78,11 +84,35 @@ const char kEncodeRegexFlagsSeparator = '/';
 const char kEncodeSortSection = '~';
 const char kEncodeEngineSection = '@';
 
+// These special bytes are used in the encoding of auto-parameterized match expressions in the SBE
+// plan cache key.
+
+// Precedes the id number of a parameter marker.
+const char kEncodeParamMarker = '?';
+// Precedes the encoding of a constant when that constant has not been auto-paramterized. The
+// constant is typically encoded as a BSON type byte followed by a BSON value (without the
+// BSONElement's field name).
+const char kEncodeConstantLiteralMarker = ':';
+
 /**
- * Encode user-provided string. Cache key delimiters seen in the
- * user string are escaped with a backslash.
+ * AppendChar provides the compiler with a type for a "appendChar(...)" member function.
  */
-void encodeUserString(StringData s, StringBuilder* keyBuilder) {
+template <class BuilderType>
+using AppendChar = decltype(std::declval<BuilderType>().appendChar(std::declval<char>()));
+
+/**
+ * hasAppendChar is a template variable indicating whether such a void-returning member function
+ * exists for a 'BuilderType'.
+ */
+template <typename BuilderType>
+inline constexpr auto hasAppendChar = stdx::is_detected_exact_v<void, AppendChar, BuilderType>;
+
+/**
+ * Encode user-provided string. Cache key delimiters seen in the user string are escaped with a
+ * backslash.
+ */
+template <class BuilderType>
+void encodeUserString(StringData s, BuilderType* builder) {
     for (size_t i = 0; i < s.size(); ++i) {
         char c = s[i];
         switch (c) {
@@ -95,11 +125,21 @@ void encodeUserString(StringData s, StringBuilder* keyBuilder) {
             case kEncodeRegexFlagsSeparator:
             case kEncodeSortSection:
             case kEncodeEngineSection:
+            case kEncodeParamMarker:
+            case kEncodeConstantLiteralMarker:
             case '\\':
-                *keyBuilder << '\\';
+                if constexpr (hasAppendChar<BuilderType>) {
+                    builder->appendChar('\\');
+                } else {
+                    *builder << '\\';
+                }
             // Fall through to default case.
             default:
-                *keyBuilder << c;
+                if constexpr (hasAppendChar<BuilderType>) {
+                    builder->appendChar(c);
+                } else {
+                    *builder << c;
+                }
         }
     }
 }
@@ -621,7 +661,380 @@ CanonicalQuery::QueryShapeString encode(const CanonicalQuery& cq) {
     return keyBuilder.str();
 }
 
+namespace {
+/**
+ * A visitor intended for use in combination with the corresponding walker class below to encode a
+ * 'MatchExpression' into the SBE plan cache key.
+ *
+ * Handles potentially parameterized queries, in which case parameter markers are encoded into the
+ * cache key in place of the actual constant values.
+ */
+class MatchExpressionSbePlanCacheKeySerializationVisitor final
+    : public MatchExpressionConstVisitor {
+public:
+    explicit MatchExpressionSbePlanCacheKeySerializationVisitor(BufBuilder* builder)
+        : _builder(builder) {
+        invariant(_builder);
+    }
+
+    void visit(const BitsAllClearMatchExpression* expr) final {
+        encodeBitTestExpression(expr);
+    }
+    void visit(const BitsAllSetMatchExpression* expr) final {
+        encodeBitTestExpression(expr);
+    }
+    void visit(const BitsAnyClearMatchExpression* expr) final {
+        encodeBitTestExpression(expr);
+    }
+    void visit(const BitsAnySetMatchExpression* expr) final {
+        encodeBitTestExpression(expr);
+    }
+
+    void visit(const ExistsMatchExpression* expr) final {
+        encodeRhs(expr);
+    }
+
+    void visit(const ExprMatchExpression* expr) final {
+        encodeFull(expr);
+    }
+
+    void visit(const EqualityMatchExpression* expr) final {
+        encodeSingleParamPathNode(expr);
+    }
+    void visit(const GTEMatchExpression* expr) final {
+        encodeSingleParamPathNode(expr);
+    }
+    void visit(const GTMatchExpression* expr) final {
+        encodeSingleParamPathNode(expr);
+    }
+    void visit(const LTEMatchExpression* expr) final {
+        encodeSingleParamPathNode(expr);
+    }
+    void visit(const LTMatchExpression* expr) final {
+        encodeSingleParamPathNode(expr);
+    }
+
+    void visit(const InMatchExpression* expr) final {
+        encodeSingleParamPathNode(expr);
+    }
+
+    void visit(const ModMatchExpression* expr) final {
+        auto divisorParam = expr->getDivisorInputParamId();
+        auto remainderParam = expr->getRemainderInputParamId();
+        if (divisorParam) {
+            tassert(6142105,
+                    "$mod expression had divisor param but not remainder param",
+                    remainderParam);
+            encodeParamMarker(*divisorParam);
+            encodeParamMarker(*remainderParam);
+        } else {
+            // TODO SERVER-64137: remove this branch and assert the existence of both params once
+            // auto-parameterization flag is removed.
+            tassert(6142106,
+                    "$mod expression had remainder param but not divisor param",
+                    !remainderParam);
+            encodeRhs(expr);
+        }
+    }
+
+    void visit(const RegexMatchExpression* expr) final {
+        auto sourceRegexParam = expr->getSourceRegexInputParamId();
+        auto compiledRegexParam = expr->getCompiledRegexInputParamId();
+        if (sourceRegexParam) {
+            tassert(6142107,
+                    "regex expression had source param but not compiled param",
+                    compiledRegexParam);
+            encodeParamMarker(*sourceRegexParam);
+            encodeParamMarker(*compiledRegexParam);
+        } else {
+            // TODO SERVER-64137: remove this branch and assert the existence of both params once
+            // auto-parameterization flag is removed.
+            tassert(6142108,
+                    "regex expression had compiled param but not source param",
+                    !compiledRegexParam);
+            encodeRhs(expr);
+        }
+    }
+
+    void visit(const SizeMatchExpression* expr) final {
+        encodeSingleParamPathNode(expr);
+    }
+
+    void visit(const TextMatchExpression* expr) final {
+        encodeFull(expr);
+    }
+    void visit(const TextNoOpMatchExpression* expr) final {
+        encodeFull(expr);
+    }
+
+    void visit(const TypeMatchExpression* expr) final {
+        encodeSingleParamPathNode(expr);
+    }
+
+    void visit(const WhereMatchExpression* expr) final {
+        encodeSingleParamNode(expr);
+    }
+    void visit(const WhereNoOpMatchExpression* expr) final {
+        MONGO_UNREACHABLE_TASSERT(6142109);
+    }
+
+    /**
+     * Nothing needs to be encoded for these nodes beyond their type, their path (if they have one),
+     * and their children.
+     */
+    void visit(const AlwaysFalseMatchExpression* expr) final {}
+    void visit(const AlwaysTrueMatchExpression* expr) final {}
+    void visit(const AndMatchExpression* expr) final {}
+    void visit(const ElemMatchObjectMatchExpression* matchExpr) final {}
+    void visit(const NorMatchExpression* expr) final {}
+    void visit(const NotMatchExpression* expr) final {}
+    void visit(const OrMatchExpression* expr) final {}
+    // The 'InternalExpr*' match expressions are generated internally from a $expr, so they do not
+    // need to contribute anything else to the cache key.
+    void visit(const InternalExprEqMatchExpression* expr) final {}
+    void visit(const InternalExprGTEMatchExpression* expr) final {}
+    void visit(const InternalExprGTMatchExpression* expr) final {}
+    void visit(const InternalExprLTEMatchExpression* expr) final {}
+    void visit(const InternalExprLTMatchExpression* expr) final {}
+
+    /**
+     * These node types are not yet supported in SBE.
+     */
+    void visit(const ElemMatchValueMatchExpression* matchExpr) final {
+        MONGO_UNREACHABLE_TASSERT(6142110);
+    }
+    void visit(const GeoMatchExpression* expr) final {
+        MONGO_UNREACHABLE_TASSERT(6142111);
+    }
+    void visit(const GeoNearMatchExpression* expr) final {
+        MONGO_UNREACHABLE_TASSERT(6142112);
+    }
+    void visit(const InternalBucketGeoWithinMatchExpression* expr) final {
+        // This is only used for time-series collections, but SBE isn't yet used for querying
+        // time-series collections.
+        MONGO_UNREACHABLE_TASSERT(6142113);
+    }
+    void visit(const InternalSchemaAllElemMatchFromIndexMatchExpression* expr) final {
+        MONGO_UNREACHABLE_TASSERT(6142114);
+    }
+    void visit(const InternalSchemaAllowedPropertiesMatchExpression* expr) final {
+        MONGO_UNREACHABLE_TASSERT(6142115);
+    }
+    void visit(const InternalSchemaBinDataEncryptedTypeExpression* expr) final {
+        MONGO_UNREACHABLE_TASSERT(6142116);
+    }
+    void visit(const InternalSchemaBinDataSubTypeExpression* expr) final {
+        MONGO_UNREACHABLE_TASSERT(6142117);
+    }
+    void visit(const InternalSchemaCondMatchExpression* expr) final {
+        MONGO_UNREACHABLE_TASSERT(6142118);
+    }
+    void visit(const InternalSchemaEqMatchExpression* expr) final {
+        MONGO_UNREACHABLE_TASSERT(6142119);
+    }
+    void visit(const InternalSchemaFmodMatchExpression* expr) final {
+        MONGO_UNREACHABLE_TASSERT(6142120);
+    }
+    void visit(const InternalSchemaMatchArrayIndexMatchExpression* expr) final {
+        MONGO_UNREACHABLE_TASSERT(6142121);
+    }
+    void visit(const InternalSchemaMaxItemsMatchExpression* expr) final {
+        MONGO_UNREACHABLE_TASSERT(6142122);
+    }
+    void visit(const InternalSchemaMaxLengthMatchExpression* expr) final {
+        MONGO_UNREACHABLE_TASSERT(6142123);
+    }
+    void visit(const InternalSchemaMaxPropertiesMatchExpression* expr) final {
+        MONGO_UNREACHABLE_TASSERT(6142124);
+    }
+    void visit(const InternalSchemaMinItemsMatchExpression* expr) final {
+        MONGO_UNREACHABLE_TASSERT(6142125);
+    }
+    void visit(const InternalSchemaMinLengthMatchExpression* expr) final {
+        MONGO_UNREACHABLE_TASSERT(6142126);
+    }
+    void visit(const InternalSchemaMinPropertiesMatchExpression* expr) final {
+        MONGO_UNREACHABLE_TASSERT(6142127);
+    }
+    void visit(const InternalSchemaObjectMatchExpression* expr) final {
+        MONGO_UNREACHABLE_TASSERT(6142128);
+    }
+    void visit(const InternalSchemaRootDocEqMatchExpression* expr) final {
+        MONGO_UNREACHABLE_TASSERT(6142129);
+    }
+    void visit(const InternalSchemaTypeExpression* expr) final {
+        MONGO_UNREACHABLE_TASSERT(6142130);
+    }
+    void visit(const InternalSchemaUniqueItemsMatchExpression* expr) final {
+        MONGO_UNREACHABLE_TASSERT(6142131);
+    }
+    void visit(const InternalSchemaXorMatchExpression* expr) final {
+        MONGO_UNREACHABLE_TASSERT(6142132);
+    }
+    // Used in the implementation of geoNear, which is not yet supported in SBE.
+    void visit(const TwoDPtInAnnulusExpression* expr) final {
+        MONGO_UNREACHABLE_TASSERT(6142133);
+    }
+
+private:
+    /**
+     * Encodes a 'PathMatchExpression' node of type T whose constant can be replaced with a single
+     * parameter marker. If the parameter marker is not present, encodes the node's BSON constant
+     * into the cache key.
+     */
+    template <typename T,
+              typename = std::enable_if_t<std::is_convertible_v<T*, PathMatchExpression*>>>
+    void encodeSingleParamPathNode(const T* expr) {
+        if (expr->getInputParamId()) {
+            encodeParamMarker(*expr->getInputParamId());
+        } else {
+            encodeRhs(expr);
+        }
+    }
+
+    /**
+     * Encodes a non-path 'MatchExpression' node of type T whose constant can be replaced with a
+     * single parameter marker. If the parameter marker is not present, encodes the entire node into
+     * the cache key.
+     */
+    template <typename T>
+    void encodeSingleParamNode(const T* expr) {
+        static_assert(!std::is_convertible_v<T*, PathMatchExpression*>);
+        if (expr->getInputParamId()) {
+            encodeParamMarker(*expr->getInputParamId());
+        } else {
+            encodeFull(expr);
+        }
+    }
+
+    void encodeBitTestExpression(const BitTestMatchExpression* expr) {
+        auto bitPositionsParam = expr->getBitPositionsParamId();
+        auto bitMaskParam = expr->getBitMaskParamId();
+        if (bitPositionsParam) {
+            tassert(6142100,
+                    "bit-test expression had bit positions param but not bitmask param",
+                    bitMaskParam);
+            encodeParamMarker(*bitPositionsParam);
+            encodeParamMarker(*bitMaskParam);
+        } else {
+            // TODO SERVER-64137: remove this branch and assert the existence of both params once
+            // auto-parameterization flag is removed.
+            tassert(6142101,
+                    "bit-test expression had bitmask param but not bit positions param",
+                    !bitMaskParam);
+            encodeRhs(expr);
+        }
+    }
+
+    /**
+     * Adds a special parameter marker byte to the cache key, followed by a four byte integer for
+     * the parameter id.
+     */
+    void encodeParamMarker(MatchExpression::InputParamId paramId) {
+        _builder->appendChar(kEncodeParamMarker);
+        _builder->appendNum(paramId);
+    }
+
+    /**
+     * For path match expressions which can be written as {"some.path": {$operator: <RHS>}}, encodes
+     * the right-hand side portion of the expression verbatim. Illegal to call if 'expr' has a
+     * parameter marker.
+     */
+    void encodeRhs(const PathMatchExpression* expr) {
+        encodeHelper(expr->getSerializedRightHandSide());
+    }
+
+    /**
+     * Similar to 'encodeRhs()' above, but for non-path match expressions. In this case, rather than
+     * encode just the right-hand side, we call 'serialize()' to get a serialized version of the
+     * full expression, and encode the result into the plan cache key. Illegal to call if 'expr' has
+     * a parameter marker.
+     */
+    void encodeFull(const MatchExpression* expr) {
+        encodeHelper(expr->serialize());
+    }
+
+    void encodeHelper(BSONObj toEncode) {
+        tassert(6142102, "expected object to encode to be non-empty", !toEncode.isEmpty());
+        BSONObjIterator objIter{toEncode};
+        BSONElement firstElem = objIter.next();
+        tassert(6142103, "expected object to encode to have exactly one element", !objIter.more());
+        encodeBsonValue(firstElem);
+    }
+
+    /**
+     * Encodes a special byte to mark a constant, followed by a byte for the BSON type of 'elem',
+     * followed by the bytes of the value part of 'elem' (for types that have such a value).
+     *
+     * Note that the element's field name is not encoded, just the type and value.
+     */
+    void encodeBsonValue(BSONElement elem) {
+        _builder->appendChar(kEncodeConstantLiteralMarker);
+        _builder->appendChar(elem.type());
+        _builder->appendBuf(elem.value(), elem.valuesize());
+    }
+
+    BufBuilder* const _builder;
+};
+
+/**
+ * A tree walker which walks a 'MatchExpression' tree and encodes the corresponding portion of the
+ * SBE plan cache key into 'builder'.
+ *
+ * Handles potentially parameterized queries, in which case parameter markers are encoded into the
+ * cache key in place of the actual constant values.
+ */
+class MatchExpressionSbePlanCacheKeySerializationWalker {
+public:
+    explicit MatchExpressionSbePlanCacheKeySerializationWalker(BufBuilder* builder)
+        : _builder{builder}, _visitor{_builder} {
+        invariant(_builder);
+    }
+
+    void preVisit(const MatchExpression* expr) {
+        // Encode the type of the node as well as the path (if there is a non-empty path).
+        _builder->appendStr(encodeMatchType(expr->matchType()));
+        encodeUserString(expr->path(), _builder);
+
+        // The node encodes itself, and then its children.
+        expr->acceptVisitor(&_visitor);
+
+        if (expr->numChildren() > 0) {
+            _builder->appendChar(kEncodeChildrenBegin);
+        }
+    }
+
+    void inVisit(long count, const MatchExpression* expr) {
+        _builder->appendChar(kEncodeChildrenSeparator);
+    }
+
+    void postVisit(const MatchExpression* expr) {
+        if (expr->numChildren() > 0) {
+            _builder->appendChar(kEncodeChildrenEnd);
+        }
+    }
+
+private:
+    BufBuilder* const _builder;
+    MatchExpressionSbePlanCacheKeySerializationVisitor _visitor;
+};
+
+/**
+ * Given a 'matchExpr' which may have parameter markers, encodes a key into 'builder' with the
+ * following property: Two match expression trees which are identical after auto-parameterization
+ * have the same key, otherwise the keys must differ.
+ */
+void encodeKeyForAutoParameterizedMatchSBE(MatchExpression* matchExpr, BufBuilder* builder) {
+    MatchExpressionSbePlanCacheKeySerializationWalker walker{builder};
+    tree_walker::walk<true, MatchExpression>(matchExpr, &walker);
+}
+}  // namespace
+
 std::string encodeSBE(const CanonicalQuery& cq) {
+    tassert(6142104,
+            "attempting to encode SBE plan cache key for SBE-incompatible query",
+            cq.isSbeCompatible());
+
     const auto& filter = cq.getQueryObj();
     const auto& proj = cq.getFindCommandRequest().getProjection();
     const auto& sort = cq.getFindCommandRequest().getSort();
@@ -639,7 +1052,14 @@ std::string encodeSBE(const CanonicalQuery& cq) {
         kBufferSizeConstant + (let ? let->objsize() : 0);
 
     BufBuilder bufBuilder(bufSize);
-    bufBuilder.appendBuf(filter.objdata(), filter.objsize());
+    if (feature_flags::gFeatureFlagAutoParameterization.isEnabledAndIgnoreFCV()) {
+        encodeKeyForAutoParameterizedMatchSBE(cq.root(), &bufBuilder);
+    } else {
+        // When auto-parameterization is off, just add the entire filter BSON to the cache key,
+        // including any constants.
+        bufBuilder.appendBuf(filter.objdata(), filter.objsize());
+    }
+
     bufBuilder.appendBuf(proj.objdata(), proj.objsize());
     // TODO SERVER-62100: No need to encode the entire "let" object.
     if (let) {

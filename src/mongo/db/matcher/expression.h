@@ -208,7 +208,7 @@ public:
 
     using Iterator = MatchExpressionIterator<false>;
     using ConstIterator = MatchExpressionIterator<true>;
-    using InputParamId = int64_t;
+    using InputParamId = int32_t;
 
     /**
      * Tracks the information needed to generate a document validation error for a
