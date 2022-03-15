@@ -256,7 +256,10 @@ public:
                                                           const rpc::ReplSetMetadata& replMetadata,
                                                           const rpc::OplogQueryMetadata& oqMetadata,
                                                           const OpTime& previousOpTimeFetched,
-                                                          const OpTime& lastOpTimeFetched);
+                                                          const OpTime& lastOpTimeFetched) const;
+
+    virtual ChangeSyncSourceAction shouldChangeSyncSourceOnError(
+        const HostAndPort& currentSource, const OpTime& lastOpTimeFetched) const;
 
     virtual OpTime getLastCommittedOpTime() const;
 

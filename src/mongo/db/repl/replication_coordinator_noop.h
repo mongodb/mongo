@@ -220,7 +220,10 @@ public:
                                                   const rpc::ReplSetMetadata&,
                                                   const rpc::OplogQueryMetadata&,
                                                   const OpTime&,
-                                                  const OpTime&) final;
+                                                  const OpTime&) const final;
+
+    ChangeSyncSourceAction shouldChangeSyncSourceOnError(const HostAndPort&,
+                                                         const OpTime&) const final;
 
     OpTime getLastCommittedOpTime() const final;
 

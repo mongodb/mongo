@@ -406,7 +406,12 @@ ChangeSyncSourceAction ReplicationCoordinatorNoOp::shouldChangeSyncSource(
     const rpc::ReplSetMetadata&,
     const rpc::OplogQueryMetadata&,
     const OpTime&,
-    const OpTime&) {
+    const OpTime&) const {
+    MONGO_UNREACHABLE;
+}
+
+ChangeSyncSourceAction ReplicationCoordinatorNoOp::shouldChangeSyncSourceOnError(
+    const HostAndPort&, const OpTime&) const {
     MONGO_UNREACHABLE;
 }
 

@@ -1232,6 +1232,48 @@ TEST_F(OplogFetcherTest, DontRecreateNewCursorAfterFailedBatchNoRetries) {
     ASSERT_EQUALS(ErrorCodes::NetworkTimeout, shutdownState.getStatus());
 }
 
+TEST_F(OplogFetcherTest, DontRecreateNewCursorAfterFailedBatchWhenSyncSourceChangeIsExpected) {
+    ShutdownState shutdownState;
+
+    // Create an oplog fetcher with one retry.
+    auto oplogFetcher = getOplogFetcherAfterConnectionCreated(std::ref(shutdownState), 1);
+
+    CursorId cursorId = 22LL;
+    auto firstEntry = makeNoopOplogEntry(lastFetched);
+    auto secondEntry = makeNoopOplogEntry({{Seconds(456), 0}, lastFetched.getTerm()});
+    auto metadataObj = makeOplogBatchMetadata(replSetMetadata, oqMetadata);
+    auto firstBatch = {firstEntry, secondEntry};
+
+    // Update lastFetched before it is updated by getting the next batch.
+    lastFetched = oplogFetcher->getLastOpTimeFetched_forTest();
+
+    // Creating the cursor will succeed.
+    auto m = processSingleRequestResponse(oplogFetcher->getDBClientConnection_forTest(),
+                                          makeFirstBatch(cursorId, firstBatch, metadataObj),
+                                          true);
+
+    validateFindCommand(
+        m, lastFetched, durationCount<Milliseconds>(oplogFetcher->getInitialFindMaxTime_forTest()));
+
+    // Check that the first batch was successfully processed.
+    validateLastBatch(
+        true /* skipFirstDoc */, firstBatch, oplogFetcher->getLastOpTimeFetched_forTest());
+
+    // Mock a result that tells us to stop syncing.
+    dataReplicatorExternalState->shouldStopFetchingResult =
+        ChangeSyncSourceAction::kStopSyncingAndDropLastBatchIfPresent;
+
+    // This will cause the oplog fetcher to fail while getting the next batch. Since we're expecting
+    // a sync source change, the oplog fetcher will shut down.
+    processSingleRequestResponse(
+        oplogFetcher->getDBClientConnection_forTest(),
+        mongo::Status{mongo::ErrorCodes::NetworkTimeout, "Fake socket timeout"});
+
+    oplogFetcher->join();
+
+    ASSERT_EQUALS(ErrorCodes::NetworkTimeout, shutdownState.getStatus());
+}
+
 TEST_F(OplogFetcherTest, FailCreateNewCursorAfterFailedBatchRetriesShutsDownOplogFetcher) {
     ShutdownState shutdownState;
 
@@ -2008,10 +2050,10 @@ TEST_F(OplogFetcherTest,
 
 TEST_F(OplogFetcherTest, FailedSyncSourceCheckReturnsStopSyncingAndDropBatch) {
     testSyncSourceChecking(
-        replSetMetadata, oqMetadata, ChangeSyncSourceAction::kStopSyncingAndDropLastBatch);
+        replSetMetadata, oqMetadata, ChangeSyncSourceAction::kStopSyncingAndDropLastBatchIfPresent);
 
-    // If the 'shouldStopFetching' check returns kStopSyncingAndDropLastBatch, we should not enqueue
-    // any documents.
+    // If the 'shouldStopFetching' check returns kStopSyncingAndDropLastBatchIfPresent, we should
+    // not enqueue any documents.
     ASSERT_TRUE(lastEnqueuedDocuments.empty());
 }
 
@@ -2195,14 +2237,50 @@ TEST_F(OplogFetcherTest, OplogFetcherRetriesConnectionButFails) {
     // Shutdown the mock remote server before the OplogFetcher tries to connect.
     _mockServer->shutdown();
 
+    startCapturingLogMessages();
     // Create an OplogFetcher with 1 retry attempt. This will also ensure that _runQuery was
     // scheduled before returning.
     auto oplogFetcher = getOplogFetcherAfterConnectionCreated(std::ref(shutdownState), 1);
 
     oplogFetcher->join();
+    stopCapturingLogMessages();
 
     // This is the error code for connection failures.
     ASSERT_EQUALS(ErrorCodes::HostUnreachable, shutdownState.getStatus());
+
+    // We should see one retry
+    ASSERT_EQUALS(1, countBSONFormatLogLinesIsSubset(BSON("id" << 21274)));
+
+    // We should one failure to retry
+    ASSERT_EQUALS(1, countBSONFormatLogLinesIsSubset(BSON("id" << 21275)));
+}
+
+TEST_F(OplogFetcherTest, OplogFetcherDoesNotRetryConnectionWhenSyncSourceChangeIsExpected) {
+    // Test that OplogFetcher does not retry after failing the initial connection if we've gotten
+    // a better sync source in the meantime.
+    ShutdownState shutdownState;
+
+    // Mock a result that tells us to stop syncing.
+    dataReplicatorExternalState->shouldStopFetchingResult =
+        ChangeSyncSourceAction::kStopSyncingAndDropLastBatchIfPresent;
+
+    // Shutdown the mock remote server before the OplogFetcher tries to connect.
+    _mockServer->shutdown();
+
+    startCapturingLogMessages();
+    // Create an OplogFetcher with 1 retry attempt. This will also ensure that _runQuery was
+    // scheduled before returning.
+    auto oplogFetcher = getOplogFetcherAfterConnectionCreated(std::ref(shutdownState), 1);
+
+    oplogFetcher->join();
+    stopCapturingLogMessages();
+
+    // This is the error code for connection failures.
+    ASSERT_EQUALS(ErrorCodes::HostUnreachable, shutdownState.getStatus());
+
+    // We should not see retry attempts.
+    ASSERT_EQUALS(0, countBSONFormatLogLinesIsSubset(BSON("id" << 21274)));
+    ASSERT_EQUALS(0, countBSONFormatLogLinesIsSubset(BSON("id" << 21275)));
 }
 
 TEST_F(OplogFetcherTest, OplogFetcherReturnsCallbackCanceledIfShutdownBeforeReconnect) {

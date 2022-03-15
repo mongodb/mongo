@@ -229,7 +229,10 @@ public:
                                                         const rpc::ReplSetMetadata&,
                                                         const rpc::OplogQueryMetadata&,
                                                         const repl::OpTime&,
-                                                        const repl::OpTime&) override;
+                                                        const repl::OpTime&) const override;
+
+    repl::ChangeSyncSourceAction shouldChangeSyncSourceOnError(const HostAndPort&,
+                                                               const repl::OpTime&) const override;
 
     repl::OpTime getLastCommittedOpTime() const override;
 

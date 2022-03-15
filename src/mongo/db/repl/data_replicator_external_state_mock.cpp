@@ -98,10 +98,16 @@ ChangeSyncSourceAction DataReplicatorExternalStateMock::shouldStopFetching(
     const rpc::ReplSetMetadata& replMetadata,
     const rpc::OplogQueryMetadata& oqMetadata,
     const OpTime& previousOpTimeFetched,
-    const OpTime& lastOpTimeFetched) {
+    const OpTime& lastOpTimeFetched) const {
     lastSyncSourceChecked = source;
     syncSourceLastOpTime = oqMetadata.getLastOpApplied();
     syncSourceHasSyncSource = oqMetadata.getSyncSourceIndex() != -1;
+    return shouldStopFetchingResult;
+}
+
+ChangeSyncSourceAction DataReplicatorExternalStateMock::shouldStopFetchingOnError(
+    const HostAndPort& source, const OpTime& lastOpTimeFetched) const {
+    lastSyncSourceChecked = source;
     return shouldStopFetchingResult;
 }
 

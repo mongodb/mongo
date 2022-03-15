@@ -57,7 +57,10 @@ public:
                                                   const rpc::ReplSetMetadata&,
                                                   const rpc::OplogQueryMetadata& oqMetadata,
                                                   const OpTime& previousOpTimeFetched,
-                                                  const OpTime& lastOpTimeFetched) override;
+                                                  const OpTime& lastOpTimeFetched) const override;
+
+    ChangeSyncSourceAction shouldChangeSyncSourceOnError(
+        const HostAndPort&, const OpTime& lastOpTimeFetched) const override;
 
     /**
      * Sets a function that will be run every time chooseNewSyncSource() is called.

@@ -396,11 +396,17 @@ void OplogFetcher::_runQuery(const executor::TaskExecutor::CallbackArgs& callbac
         auto batchResult = _getNextBatch();
         if (!batchResult.isOK()) {
             auto brStatus = batchResult.getStatus();
+            // Determine if we should stop syncing from our current sync source. If we're going
+            // to change sync sources anyway, do it immediately rather than checking if we can
+            // retry the error.
+            const bool stopFetching = _dataReplicatorExternalState->shouldStopFetchingOnError(
+                                          _config.source, _getLastOpTimeFetched()) !=
+                ChangeSyncSourceAction::kContinueSyncing;
 
             // Recreate a cursor if we have enough retries left.
             // If we are a TenantOplogFetcher, we never retry as we will always restart the
             // TenantMigrationRecipient state machine on failure. So instead, we just fail and exit.
-            if (_oplogFetcherRestartDecision->shouldContinue(this, brStatus) &&
+            if (!stopFetching && _oplogFetcherRestartDecision->shouldContinue(this, brStatus) &&
                 !_config.forTenantMigration) {
                 hangBeforeOplogFetcherRetries.pauseWhileSet();
                 _cursor.reset();
@@ -488,6 +494,9 @@ Status OplogFetcher::_connect() {
             }
         }();
     } while (!connectStatus.isOK() &&
+             _dataReplicatorExternalState->shouldStopFetchingOnError(_config.source,
+                                                                     _getLastOpTimeFetched()) ==
+                 ChangeSyncSourceAction::kContinueSyncing &&
              _oplogFetcherRestartDecision->shouldContinue(this, connectStatus));
 
     return connectStatus;
@@ -883,7 +892,7 @@ Status OplogFetcher::_onSuccessfulBatch(const Documents& documents) {
     errMsg << " previous batch last fetched optime: " << previousOpTimeFetched.toString();
     errMsg << " current batch last fetched optime: " << lastDocOpTime.toString();
 
-    if (changeSyncSourceAction == ChangeSyncSourceAction::kStopSyncingAndDropLastBatch) {
+    if (changeSyncSourceAction == ChangeSyncSourceAction::kStopSyncingAndDropLastBatchIfPresent) {
         return Status(ErrorCodes::InvalidSyncSource, errMsg);
     }
 

@@ -430,7 +430,12 @@ ChangeSyncSourceAction ReplicationCoordinatorEmbedded::shouldChangeSyncSource(
     const rpc::ReplSetMetadata&,
     const rpc::OplogQueryMetadata&,
     const OpTime&,
-    const OpTime&) {
+    const OpTime&) const {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
+ChangeSyncSourceAction ReplicationCoordinatorEmbedded::shouldChangeSyncSourceOnError(
+    const HostAndPort&, const OpTime&) const {
     UASSERT_NOT_IMPLEMENTED;
 }
 

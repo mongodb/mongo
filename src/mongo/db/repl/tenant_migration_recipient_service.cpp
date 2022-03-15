@@ -207,7 +207,13 @@ public:
                                               const rpc::ReplSetMetadata& replMetadata,
                                               const rpc::OplogQueryMetadata& oqMetadata,
                                               const OpTime& previousOpTimeFetched,
-                                              const OpTime& lastOpTimeFetched) final {
+                                              const OpTime& lastOpTimeFetched) const final {
+        return ChangeSyncSourceAction::kContinueSyncing;
+    }
+
+    // Tenant migration does not re-evaluate sync source on error.
+    ChangeSyncSourceAction shouldStopFetchingOnError(const HostAndPort& source,
+                                                     const OpTime& lastOpTimeFetched) const final {
         return ChangeSyncSourceAction::kContinueSyncing;
     }
 

@@ -176,9 +176,14 @@ public:
                                                   const rpc::ReplSetMetadata& replMetadata,
                                                   const rpc::OplogQueryMetadata& oqMetadata,
                                                   const OpTime& previousOpTimeFetched,
-                                                  const OpTime& lastOpTimeFetched) override {
+                                                  const OpTime& lastOpTimeFetched) const override {
         return _syncSourceSelector->shouldChangeSyncSource(
             currentSource, replMetadata, oqMetadata, previousOpTimeFetched, lastOpTimeFetched);
+    }
+
+    ChangeSyncSourceAction shouldChangeSyncSourceOnError(
+        const HostAndPort& currentSource, const OpTime& lastOpTimeFetched) const override {
+        return _syncSourceSelector->shouldChangeSyncSourceOnError(currentSource, lastOpTimeFetched);
     }
 
     void scheduleNetworkResponse(std::string cmdName, const BSONObj& obj) {
