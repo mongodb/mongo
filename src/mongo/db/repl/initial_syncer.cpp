@@ -58,6 +58,7 @@
 #include "mongo/db/repl/oplog_fetcher.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
+#include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/repl/replication_consistency_markers.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/storage_interface.h"
@@ -575,6 +576,8 @@ void InitialSyncer::_tearDown_inlock(OperationContext* opCtx,
 
     tenant_migration_access_blocker::recoverTenantMigrationAccessBlockers(opCtx);
     reconstructPreparedTransactions(opCtx, repl::OplogApplication::Mode::kInitialSync);
+
+    ReplicaSetAwareServiceRegistry::get(opCtx->getServiceContext()).onInitialSyncComplete(opCtx);
 
     _replicationProcess->getConsistencyMarkers()->setInitialSyncIdIfNotSet(opCtx);
 

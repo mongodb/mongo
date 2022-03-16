@@ -48,6 +48,20 @@
 
 namespace mongo {
 
+namespace recoverable_critical_section_util {
+
+bool inRecoveryMode(OperationContext* opCtx) {
+    const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    if (!replCoord->isReplEnabled()) {
+        return false;
+    }
+
+    const auto memberState = replCoord->getMemberState();
+    return memberState.startup() || memberState.startup2() || memberState.rollback();
+}
+
+}  // namespace recoverable_critical_section_util
+
 namespace {
 const auto serviceDecorator =
     ServiceContext::declareDecoration<RecoverableCriticalSectionService>();

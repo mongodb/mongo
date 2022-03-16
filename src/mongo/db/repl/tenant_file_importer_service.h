@@ -54,6 +54,9 @@ public:
 private:
     void onStartup(OperationContext* opCtx) final;
 
+    void onStartupRecoveryComplete(OperationContext* opCtx) final {}
+    void onInitialSyncComplete(OperationContext* opCtx) final {}
+
     void onShutdown() final {
         stdx::lock_guard lk(_mutex);
         _reset(lk);

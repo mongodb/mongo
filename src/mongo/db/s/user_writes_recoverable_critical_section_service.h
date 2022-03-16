@@ -36,6 +36,12 @@
 
 namespace mongo {
 
+namespace user_writes_recoverable_critical_section_util {
+
+bool inRecoveryMode(OperationContext* opCtx);
+
+}
+
 /**
  * Represents the 'user writes blocking' critical section. The critical section status is persisted
  * on disk and it's in-memory representation is kept in sync with the persisted state through an
@@ -136,10 +142,15 @@ public:
     void recoverRecoverableCriticalSections(OperationContext* opCtx);
 
 private:
-    void onStartup(OperationContext* opCtx) override final {
+    void onStartupRecoveryComplete(OperationContext* opCtx) override final {
         recoverRecoverableCriticalSections(opCtx);
     }
 
+    void onInitialSyncComplete(OperationContext* opCtx) override final {
+        recoverRecoverableCriticalSections(opCtx);
+    }
+
+    void onStartup(OperationContext* opCtx) override final {}
     void onShutdown() override final {}
     void onStepUpBegin(OperationContext* opCtx, long long term) override final {}
     void onStepUpComplete(OperationContext* opCtx, long long term) override final {}
