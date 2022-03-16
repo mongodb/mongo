@@ -1013,9 +1013,9 @@ const boost::filesystem::path constructFilePath(std::string path, std::string fi
     return filePath;
 }
 
-std::vector<std::string> getUniqueFiles(const std::vector<std::string>& files,
-                                        const std::set<std::string>& referenceFiles) {
-    std::vector<std::string> result;
+std::deque<std::string> getUniqueFiles(const std::vector<std::string>& files,
+                                       const std::set<std::string>& referenceFiles) {
+    std::deque<std::string> result;
     for (auto& file : files) {
         if (referenceFiles.find(file) == referenceFiles.end()) {
             result.push_back(file);
@@ -1038,9 +1038,9 @@ public:
 
     ~StreamingCursorImpl() = default;
 
-    StatusWith<std::vector<StorageEngine::BackupBlock>> getNextBatch(const std::size_t batchSize) {
+    StatusWith<std::deque<StorageEngine::BackupBlock>> getNextBatch(const std::size_t batchSize) {
         int wtRet;
-        std::vector<StorageEngine::BackupBlock> backupBlocks;
+        std::deque<StorageEngine::BackupBlock> backupBlocks;
 
         stdx::lock_guard<Latch> backupCursorLk(_wtBackup->wtBackupCursorMutex);
         while (backupBlocks.size() < batchSize) {
@@ -1113,7 +1113,7 @@ private:
                                            boost::filesystem::path filePath,
                                            const std::uint64_t fileSize,
                                            const std::size_t batchSize,
-                                           std::vector<StorageEngine::BackupBlock>* backupBlocks) {
+                                           std::deque<StorageEngine::BackupBlock>* backupBlocks) {
         // For each file listed, open a duplicate backup cursor and get the blocks to copy.
         std::stringstream ss;
         ss << "incremental=(file=" << filename << ")";
@@ -1251,7 +1251,7 @@ void WiredTigerKVEngine::endNonBlockingBackup(OperationContext* opCtx) {
     _wtBackup.logFilePathsSeenByGetNextBatch = {};
 }
 
-StatusWith<std::vector<std::string>> WiredTigerKVEngine::extendBackupCursor(
+StatusWith<std::deque<std::string>> WiredTigerKVEngine::extendBackupCursor(
     OperationContext* opCtx) {
     uassert(51033, "Cannot extend backup cursor with in-memory mode.", !isEphemeral());
     invariant(_wtBackup.cursor);

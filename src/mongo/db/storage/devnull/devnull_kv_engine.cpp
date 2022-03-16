@@ -273,9 +273,9 @@ public:
         return BSONObj();
     }
 
-    StatusWith<std::vector<StorageEngine::BackupBlock>> getNextBatch(const std::size_t batchSize) {
+    StatusWith<std::deque<StorageEngine::BackupBlock>> getNextBatch(const std::size_t batchSize) {
         if (_exhaustCursor) {
-            std::vector<StorageEngine::BackupBlock> emptyVector;
+            std::deque<StorageEngine::BackupBlock> emptyVector;
             return emptyVector;
         }
         _exhaustCursor = true;
@@ -283,7 +283,7 @@ public:
     }
 
 private:
-    std::vector<StorageEngine::BackupBlock> _backupBlocks;
+    std::deque<StorageEngine::BackupBlock> _backupBlocks;
     bool _exhaustCursor;
 };
 
@@ -294,8 +294,8 @@ StatusWith<std::unique_ptr<StorageEngine::StreamingCursor>> DevNullKVEngine::beg
     return std::make_unique<StreamingCursorImpl>(options);
 }
 
-StatusWith<std::vector<std::string>> DevNullKVEngine::extendBackupCursor(OperationContext* opCtx) {
-    std::vector<std::string> filesToCopy = {"journal/WiredTigerLog.999"};
+StatusWith<std::deque<std::string>> DevNullKVEngine::extendBackupCursor(OperationContext* opCtx) {
+    std::deque<std::string> filesToCopy = {"journal/WiredTigerLog.999"};
     return filesToCopy;
 }
 
