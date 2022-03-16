@@ -86,6 +86,7 @@ class MultiversionConfig(BaseModel):
     """Multiversion Configuration."""
 
     last_versions: List[str]
+    requires_fcv_tag: str
 
 
 class MultiversionConfigSubcommand(Subcommand):
@@ -100,7 +101,10 @@ class MultiversionConfigSubcommand(Subcommand):
     def determine_multiversion_config() -> MultiversionConfig:
         """Discover the current multiversion configuration."""
         from buildscripts.resmokelib import multiversionconstants
-        return MultiversionConfig(last_versions=multiversionconstants.OLD_VERSIONS)
+        return MultiversionConfig(
+            last_versions=multiversionconstants.OLD_VERSIONS,
+            requires_fcv_tag=multiversionconstants.REQUIRES_FCV_TAG,
+        )
 
 
 class DiscoveryPlugin(PluginInterface):
