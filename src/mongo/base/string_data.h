@@ -121,7 +121,7 @@ public:
      * Returns -1, 0, or 1 if 'this' is less, equal, or greater than 'other' in
      * lexicographical order.
      */
-    int compare(StringData other) const;
+    constexpr int compare(StringData other) const;
 
     /**
      * note: this uses tolower, and therefore does not handle
@@ -193,42 +193,35 @@ private:
     size_t _size = 0;             // 'size' does not include the null terminator
 };
 
-inline bool operator==(StringData lhs, StringData rhs) {
+constexpr bool operator==(StringData lhs, StringData rhs) {
     return (lhs.size() == rhs.size()) && (lhs.compare(rhs) == 0);
 }
 
-inline bool operator!=(StringData lhs, StringData rhs) {
+constexpr bool operator!=(StringData lhs, StringData rhs) {
     return !(lhs == rhs);
 }
 
-inline bool operator<(StringData lhs, StringData rhs) {
+constexpr bool operator<(StringData lhs, StringData rhs) {
     return lhs.compare(rhs) < 0;
 }
 
-inline bool operator<=(StringData lhs, StringData rhs) {
+constexpr bool operator<=(StringData lhs, StringData rhs) {
     return lhs.compare(rhs) <= 0;
 }
 
-inline bool operator>(StringData lhs, StringData rhs) {
+constexpr bool operator>(StringData lhs, StringData rhs) {
     return lhs.compare(rhs) > 0;
 }
 
-inline bool operator>=(StringData lhs, StringData rhs) {
+constexpr bool operator>=(StringData lhs, StringData rhs) {
     return lhs.compare(rhs) >= 0;
 }
 
 std::ostream& operator<<(std::ostream& stream, StringData value);
 
-inline int StringData::compare(StringData other) const {
-    // It is illegal to pass nullptr to memcmp. It is an invariant of
-    // StringData that if _data is nullptr, _size is zero. If asked to
-    // compare zero bytes, memcmp returns zero (how could they
-    // differ?). So, if either StringData object has a nullptr _data
-    // object, then memcmp would return zero. Achieve this by assuming
-    // zero, and only calling memcmp if both pointers are valid.
-    int res = 0;
-    if (_data && other._data)
-        res = memcmp(_data, other._data, std::min(_size, other._size));
+constexpr int StringData::compare(StringData other) const {
+    // Note: char_traits::compare() allows nullptr arguments unlike memcmp().
+    int res = std::char_traits<char>::compare(_data, other._data, std::min(_size, other._size));
 
     if (res != 0)
         return res > 0 ? 1 : -1;

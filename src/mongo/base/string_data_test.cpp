@@ -127,6 +127,8 @@ TEST(Comparison, BothEmpty) {
     ASSERT_TRUE(empty >= empty);
     ASSERT_FALSE(empty < empty);
     ASSERT_TRUE(empty <= empty);
+
+    static_assert(""_sd.compare(""_sd) == 0);
 }
 
 TEST(Comparison, BothNonEmptyOnSize) {
@@ -140,6 +142,8 @@ TEST(Comparison, BothNonEmptyOnSize) {
     ASSERT_TRUE(a < aa);
     ASSERT_TRUE(a <= aa);
     ASSERT_TRUE(a <= a);
+
+    static_assert("a"_sd.compare("aa"_sd) < 0);
 }
 
 TEST(Comparison, BothNonEmptyOnContent) {
@@ -151,6 +155,8 @@ TEST(Comparison, BothNonEmptyOnContent) {
     ASSERT_FALSE(a >= b);
     ASSERT_TRUE(a < b);
     ASSERT_TRUE(a <= b);
+
+    static_assert("a"_sd.compare("b"_sd) < 0);
 }
 
 TEST(Comparison, MixedEmptyAndNot) {
@@ -162,6 +168,8 @@ TEST(Comparison, MixedEmptyAndNot) {
     ASSERT_TRUE(a >= empty);
     ASSERT_FALSE(a < empty);
     ASSERT_FALSE(a <= empty);
+
+    static_assert(""_sd.compare("a"_sd) < 0);
 }
 
 TEST(Find, Char1) {
