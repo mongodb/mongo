@@ -448,5 +448,12 @@ TEST(Ostream, StringDataMatchesStdString) {
     }
 }
 
+TEST(StringData, PlusEq) {
+    auto str = std::string("hello ");
+    auto& ret = str += "world"_sd;
+    ASSERT_EQ(str, "hello world");
+    ASSERT_EQ(&ret, &str);
+}
+
 }  // namespace
 }  // namespace mongo

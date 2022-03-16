@@ -321,6 +321,12 @@ inline bool StringData::endsWith(StringData suffix) const {
     return substr(thisSize - suffixSize) == suffix;
 }
 
+inline std::string& operator+=(std::string& lhs, StringData rhs) {
+    if (!rhs.empty())
+        lhs.append(rhs.rawData(), rhs.size());
+    return lhs;
+}
+
 inline std::string operator+(std::string lhs, StringData rhs) {
     if (!rhs.empty())
         lhs.append(rhs.rawData(), rhs.size());
