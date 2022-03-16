@@ -101,20 +101,21 @@ FieldRemovedStatus isFieldRemovedByV2Update(const BSONObj& oField, StringData fi
 }  // namespace
 
 UpdateType extractUpdateType(const BSONObj& updateDocument) {
+    // For an update oplog entry, a replacement type should always have _id field.
+    if (updateDocument["_id"]) {
+        return UpdateType::kReplacement;
+    }
+
     // Use the "$v" field to determine which type of update this is. Note $v:1 updates were allowed
     // to omit the $v field so that case must be handled carefully.
     auto vElt = updateDocument[kUpdateOplogEntryVersionFieldName];
 
     if (!vElt.ok()) {
-        // We're dealing with a $v:1 entry if the first field name starts with a '$'. Otherwise
-        // it's a replacement update, which does not have a specific version name.
+        // We're dealing with a $v:1 entry if the first field name starts with a '$' and there is no
+        // $v field.
         if (updateDocument.firstElementFieldNameStringData().startsWith("$")) {
             return UpdateType::kV1Modifier;
         }
-
-        // The version field is missing and the first field is not prefixed by "$". This means we
-        // have a replacement update.
-        return UpdateType::kReplacement;
     } else if (vElt.numberInt() == static_cast<int>(UpdateOplogEntryVersion::kUpdateNodeV1)) {
         return UpdateType::kV1Modifier;
     } else if (vElt.numberInt() == static_cast<int>(UpdateOplogEntryVersion::kDeltaV2)) {
@@ -122,7 +123,7 @@ UpdateType extractUpdateType(const BSONObj& updateDocument) {
     }
 
     // Unrecognized oplog entry version.
-    MONGO_UNREACHABLE;
+    MONGO_UNREACHABLE_TASSERT(6448500);
 }
 
 BSONElement extractNewValueForField(const BSONObj& oField, StringData fieldName) {

@@ -303,9 +303,11 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
 void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) {
     const auto& updateDoc = args.updateArgs->update;
     // Most of these handlers do not need to run when the update is a full document replacement.
-    const bool isReplacementUpdate = (update_oplog_entry::extractUpdateType(updateDoc) ==
-                                      update_oplog_entry::UpdateType::kReplacement);
-    if (args.nss == NamespaceString::kShardConfigCollectionsNamespace && !isReplacementUpdate) {
+    // An empty updateDoc implies a no-op update and is not a valid oplog entry.
+    const bool needsSpecialHandling = !updateDoc.isEmpty() &&
+        (update_oplog_entry::extractUpdateType(updateDoc) !=
+         update_oplog_entry::UpdateType::kReplacement);
+    if (needsSpecialHandling && args.nss == NamespaceString::kShardConfigCollectionsNamespace) {
         // Notification of routing table changes are only needed on secondaries
         if (isStandaloneOrPrimary(opCtx)) {
             return;
@@ -356,7 +358,7 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
         }
     }
 
-    if (args.nss == NamespaceString::kShardConfigDatabasesNamespace && !isReplacementUpdate) {
+    if (needsSpecialHandling && args.nss == NamespaceString::kShardConfigDatabasesNamespace) {
         // Notification of routing table changes are only needed on secondaries
         if (isStandaloneOrPrimary(opCtx)) {
             return;
@@ -388,7 +390,7 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
         }
     }
 
-    if (args.nss == NamespaceString::kRangeDeletionNamespace && !isReplacementUpdate) {
+    if (needsSpecialHandling && args.nss == NamespaceString::kRangeDeletionNamespace) {
         if (!isStandaloneOrPrimary(opCtx))
             return;
 
