@@ -11,4 +11,6 @@
 # Disable featureFlagSBELookupPushdown until integration tests can pass with basic SBE
 # lookup translation.
 - featureFlagSBELookupPushdown
+# TODO(SERVER-63574): Remove this feature flag and enable index join in all feature flag variant once all types of local fields are supported.
+- featureFlagSBELookupPushdownIndexJoin
 - featureFlagAutoParameterization

@@ -19,7 +19,9 @@ const JoinAlgorithm = {
 };
 
 // Standalone cases.
-const conn = MongoRunner.runMongod({setParameter: "featureFlagSBELookupPushdown=true"});
+const conn = MongoRunner.runMongod({
+    setParameter: {featureFlagSBELookupPushdown: true, featureFlagSBELookupPushdownIndexJoin: true}
+});
 assert.neq(null, conn, "mongod was unable to start up");
 const name = "lookup_pushdown";
 const foreignCollName = "foreign_lookup_pushdown";
@@ -636,7 +638,12 @@ MongoRunner.stopMongod(conn);
 const st = new ShardingTest({
     shards: 2,
     mongos: 1,
-    other: {shardOptions: {setParameter: "featureFlagSBELookupPushdown=true"}}
+    other: {
+        shardOptions: {
+            setParameter:
+                {featureFlagSBELookupPushdown: true, featureFlagSBELookupPushdownIndexJoin: true}
+        }
+    }
 });
 db = st.s.getDB(name);
 

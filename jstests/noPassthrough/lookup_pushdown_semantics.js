@@ -8,7 +8,9 @@ load("jstests/libs/sbe_util.js");  // For 'checkSBEEnabled()'.
 load("jstests/aggregation/extras/utils.js");
 
 // Standalone cases.
-const conn = MongoRunner.runMongod({setParameter: "featureFlagSBELookupPushdown=true"});
+const conn = MongoRunner.runMongod({
+    setParameter: {featureFlagSBELookupPushdown: true, featureFlagSBELookupPushdownIndexJoin: true}
+});
 assert.neq(null, conn, "mongod was unable to start up");
 const db = conn.getDB("lookup_pushdown");
 if (!checkSBEEnabled(db, ["featureFlagSBELookupPushdown"])) {
