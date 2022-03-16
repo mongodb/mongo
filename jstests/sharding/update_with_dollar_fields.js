@@ -8,15 +8,14 @@
 (function() {
 "use strict";
 
-const rst = new ReplSetTest({nodes: 2});
-rst.startSet();
-rst.initiate();
+const st = new ShardingTest({nodes: 2});
 
 const dbName = 'testDb';
 const collName = 'testColl';
-const primary = rst.getPrimary();
-const coll = primary.getDB(dbName).getCollection(collName);
-const oplog = primary.getDB('local').getCollection('oplog.rs');
+const coll = st.s.getDB(dbName).getCollection(collName);
+
+st.adminCommand({enablesharding: dbName});
+const oplog = st.getPrimaryShard(dbName).getDB('local').getCollection('oplog.rs');
 
 function assertLastUpdateOplogEntryIsReplacement() {
     const lastUpdate = oplog.find({op: 'u'}).sort({$natural: -1}).limit(1).next();
@@ -45,6 +44,5 @@ assert.commandWorked(coll.update(
 assertLastUpdateOplogEntryIsReplacement();
 })();
 
-rst.awaitReplication();
-rst.stopSet();
+st.stop();
 }());
