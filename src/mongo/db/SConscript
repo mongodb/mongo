@@ -452,15 +452,18 @@ env.Library(
 )
 
 env.Library(
-    target="write_concern_options",
+    target='write_concern_options',
     source=[
-        "write_concern_options.cpp",
+        'write_concern_options.cpp',
+        'write_concern_options.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson/util/bson_extract',
-        '$BUILD_DIR/mongo/idl/basic_types',
         'read_write_concern_provenance',
     ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_options_core', # For serverGlobalParams
+    ]
 )
 
 env.Library(

@@ -32,13 +32,13 @@
 #include <type_traits>
 
 #include "mongo/db/write_concern_options.h"
+#include "mongo/db/write_concern_options_gen.h"
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/field_parser.h"
 #include "mongo/db/repl/repl_set_config.h"
-#include "mongo/idl/basic_types_gen.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -174,6 +174,70 @@ StatusWith<WriteConcernOptions> WriteConcernOptions::extractWCFromCommand(const 
     }
 
     return parse(writeConcernObj);
+}
+
+WriteConcernW deserializeWriteConcernW(BSONElement wEl) {
+    // Preserve pre-5.3 behavior to avoid issues with mixed-version clusters. This will eventually
+    // be removed when we release 7.0.
+    if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+        serverGlobalParams.featureCompatibility.isLessThan(
+            multiversion::FeatureCompatibilityVersion::kVersion_5_3)) {
+        uassert(ErrorCodes::FailedToParse,
+                "w has to be a number or string; found: {}"_format(typeName(wEl.type())),
+                wEl.type() != BSONType::Object);
+    }
+
+    if (wEl.isNumber()) {
+        auto wNum = wEl.safeNumberLong();
+        if (wNum < 0 || wNum > static_cast<long long>(repl::ReplSetConfig::kMaxMembers)) {
+            uasserted(ErrorCodes::FailedToParse,
+                      "w has to be a non-negative number and not greater than {}; found: {}"_format(
+                          repl::ReplSetConfig::kMaxMembers, wNum));
+        }
+
+        return WriteConcernW{wNum};
+    } else if (wEl.type() == BSONType::String) {
+        return WriteConcernW{wEl.str()};
+    } else if (wEl.type() == BSONType::Object) {
+        auto wTags = wEl.Obj();
+        uassert(ErrorCodes::FailedToParse, "tagged write concern requires tags", !wTags.isEmpty());
+
+        WTags tags;
+        for (auto e : wTags) {
+            uassert(
+                ErrorCodes::FailedToParse,
+                "tags must be a single level document with only number values; found: {}"_format(
+                    e.toString()),
+                e.isNumber());
+
+            tags.try_emplace(e.fieldName(), e.safeNumberInt());
+        }
+
+        return WriteConcernW{std::move(tags)};
+    } else if (wEl.eoo() || wEl.type() == BSONType::jstNULL || wEl.type() == BSONType::Undefined) {
+        return WriteConcernW{};
+    }
+    uasserted(ErrorCodes::FailedToParse,
+              "w has to be a number, string, or object; found: {}"_format(typeName(wEl.type())));
+}
+
+void serializeWriteConcernW(const WriteConcernW& w, StringData fieldName, BSONObjBuilder* builder) {
+    stdx::visit(
+        visit_helper::Overloaded{[&](int64_t wNumNodes) {
+                                     builder->appendNumber(fieldName,
+                                                           static_cast<long long>(wNumNodes));
+                                 },
+                                 [&](std::string wMode) { builder->append(fieldName, wMode); },
+                                 [&](WTags wTags) { builder->append(fieldName, wTags); }},
+        w);
+}
+
+std::int64_t parseWTimeoutFromBSON(BSONElement element) {
+    constexpr std::array<mongo::BSONType, 4> validTypes{
+        NumberLong, NumberInt, NumberDecimal, NumberDouble};
+    bool isValidType = std::any_of(
+        validTypes.begin(), validTypes.end(), [&](auto type) { return element.type() == type; });
+    return isValidType ? element.safeNumberLong() : 0;
 }
 
 BSONObj WriteConcernOptions::toBSON() const {

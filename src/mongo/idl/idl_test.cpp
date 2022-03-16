@@ -38,6 +38,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/db/auth/authorization_contract.h"
 #include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/write_concern_options_gen.h"
 #include "mongo/idl/unittest_gen.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/unittest/bson_test_util.h"

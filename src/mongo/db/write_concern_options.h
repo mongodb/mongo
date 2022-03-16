@@ -33,11 +33,13 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/read_write_concern_provenance.h"
-#include "mongo/idl/basic_types_gen.h"
 
 namespace mongo {
 
 class Status;
+
+using WTags = StringMap<int64_t>;
+using WriteConcernW = stdx::variant<std::string, std::int64_t, WTags>;
 
 struct WriteConcernOptions {
 public:
@@ -174,5 +176,10 @@ public:
 private:
     ReadWriteConcernProvenance _provenance;
 };
+
+// Helpers for IDL parsing
+WriteConcernW deserializeWriteConcernW(BSONElement wEl);
+void serializeWriteConcernW(const WriteConcernW& w, StringData fieldName, BSONObjBuilder* builder);
+std::int64_t parseWTimeoutFromBSON(BSONElement element);
 
 }  // namespace mongo

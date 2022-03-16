@@ -33,7 +33,7 @@ global:
 
 imports:
     - "mongo/idl/basic_types.idl"
-
+    - "mongo/db/read_write_concern_provenance_base.idl"
 
 types:
     WriteConcern:
@@ -42,3 +42,63 @@ types:
         cpp_type: "mongo::WriteConcernOptions"
         serializer: "mongo::WriteConcernOptions::toBSON"
         deserializer: "mongo::WriteConcernOptions::deserializerForIDL"
+
+    writeConcernW:
+        bson_serialization_type: any
+        description: >-
+            A string or integer representing the 'w' option in a document specifying write concern.
+            See https://docs.mongodb.com/manual/reference/write-concern/"
+        cpp_type: "mongo::WriteConcernW"
+        serializer: "::mongo::serializeWriteConcernW"
+        deserializer: "::mongo::deserializeWriteConcernW"
+
+    writeConcernWTimeout:
+        bson_serialization_type: any
+        description: >-
+            An integer representing the 'wtimeout' option in a document specifying write concern.
+            See https://docs.mongodb.com/manual/reference/write-concern/"
+        cpp_type: std::int64_t
+        deserializer: "::mongo::parseWTimeoutFromBSON"
+
+structs:
+    WriteConcernIdl:
+        description: "WriteConcern object parser"
+        strict: true
+        fields:
+            w:
+                type: writeConcernW
+                cpp_name: writeConcernW
+                optional: true
+                unstable: false
+            j:
+                type: safeBool
+                optional: true
+                unstable: false
+            wtimeout:
+                type: writeConcernWTimeout
+                default: 0
+                unstable: false
+            fsync:
+                type: safeBool
+                optional: true
+                unstable: false
+            # Fields with names wElectionId, wOpTime, and getLastError are accepted in the WriteConcern document for
+            # backwards-compatibility reasons, but their values are entirely ignored.
+            wElectionId:
+                type: any
+                ignore: true
+                unstable: false
+            wOpTime:
+                type: any
+                ignore: true
+                unstable: false
+            getLastError:
+                type: any
+                ignore: true
+                unstable: false
+            provenance:
+                description: "The source for this provenance"
+                cpp_name: source
+                type: ReadWriteConcernProvenanceSource
+                optional: true
+                unstable: false
