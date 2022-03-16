@@ -202,7 +202,7 @@ public:
 
     void endNonBlockingBackup(OperationContext* opCtx) override;
 
-    virtual StatusWith<std::vector<std::string>> extendBackupCursor(
+    virtual StatusWith<std::deque<std::string>> extendBackupCursor(
         OperationContext* opCtx) override;
 
     int64_t getIdentSize(OperationContext* opCtx, StringData ident) override;

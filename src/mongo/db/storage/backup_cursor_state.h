@@ -30,8 +30,8 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <deque>
 #include <string>
-#include <vector>
 
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/storage/backup_block.h"
@@ -45,11 +45,11 @@ struct BackupCursorState {
     std::unique_ptr<StorageEngine::StreamingCursor> streamingCursor;
     // 'otherBackupBlocks' includes the backup blocks for the encrypted storage engine in the
     // enterprise module.
-    std::vector<BackupBlock> otherBackupBlocks;
+    std::deque<BackupBlock> otherBackupBlocks;
 };
 
 struct BackupCursorExtendState {
-    std::vector<std::string> filenames;
+    std::deque<std::string> filenames;
 };
 
 }  // namespace mongo

@@ -954,8 +954,7 @@ void StorageEngineImpl::endNonBlockingBackup(OperationContext* opCtx) {
     return _engine->endNonBlockingBackup(opCtx);
 }
 
-StatusWith<std::vector<std::string>> StorageEngineImpl::extendBackupCursor(
-    OperationContext* opCtx) {
+StatusWith<std::deque<std::string>> StorageEngineImpl::extendBackupCursor(OperationContext* opCtx) {
     return _engine->extendBackupCursor(opCtx);
 }
 

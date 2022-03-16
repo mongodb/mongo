@@ -79,7 +79,7 @@ public:
                       "The current storage engine doesn't support backup mode");
     }
     void endNonBlockingBackup(OperationContext* opCtx) final {}
-    StatusWith<std::vector<std::string>> extendBackupCursor(OperationContext* opCtx) final {
+    StatusWith<std::deque<std::string>> extendBackupCursor(OperationContext* opCtx) final {
         return Status(ErrorCodes::CommandNotSupported,
                       "The current storage engine doesn't support backup mode");
     }

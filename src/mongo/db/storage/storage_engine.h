@@ -327,8 +327,8 @@ public:
 
         virtual ~StreamingCursor() = default;
 
-        virtual StatusWith<std::vector<BackupBlock>> getNextBatch(OperationContext* opCtx,
-                                                                  std::size_t batchSize) = 0;
+        virtual StatusWith<std::deque<BackupBlock>> getNextBatch(OperationContext* opCtx,
+                                                                 std::size_t batchSize) = 0;
 
     protected:
         BackupOptions options;
@@ -341,7 +341,7 @@ public:
 
     virtual void endNonBlockingBackup(OperationContext* opCtx) = 0;
 
-    virtual StatusWith<std::vector<std::string>> extendBackupCursor(OperationContext* opCtx) = 0;
+    virtual StatusWith<std::deque<std::string>> extendBackupCursor(OperationContext* opCtx) = 0;
 
     /**
      * Recover as much data as possible from a potentially corrupt RecordStore.

@@ -220,7 +220,7 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    virtual StatusWith<std::vector<std::string>> extendBackupCursor(OperationContext* opCtx) {
+    virtual StatusWith<std::deque<std::string>> extendBackupCursor(OperationContext* opCtx) {
         return Status(ErrorCodes::CommandNotSupported,
                       "The current storage engine doesn't support backup mode");
     }

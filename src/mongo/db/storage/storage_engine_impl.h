@@ -100,7 +100,7 @@ public:
 
     virtual void endNonBlockingBackup(OperationContext* opCtx) override;
 
-    virtual StatusWith<std::vector<std::string>> extendBackupCursor(
+    virtual StatusWith<std::deque<std::string>> extendBackupCursor(
         OperationContext* opCtx) override;
 
     virtual bool isDurable() const override;

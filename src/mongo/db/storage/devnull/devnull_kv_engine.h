@@ -150,7 +150,7 @@ public:
 
     virtual void endNonBlockingBackup(OperationContext* opCtx) override {}
 
-    virtual StatusWith<std::vector<std::string>> extendBackupCursor(
+    virtual StatusWith<std::deque<std::string>> extendBackupCursor(
         OperationContext* opCtx) override;
 
     virtual boost::optional<Timestamp> getLastStableRecoveryTimestamp() const override {
@@ -170,13 +170,13 @@ public:
     void dump() const override {}
 
     // This sets the results of the backup cursor for unit tests.
-    void setBackupBlocks_forTest(std::vector<BackupBlock> newBackupBlocks) {
+    void setBackupBlocks_forTest(std::deque<BackupBlock> newBackupBlocks) {
         _mockBackupBlocks = std::move(newBackupBlocks);
     }
 
 private:
     std::shared_ptr<void> _catalogInfo;
     int _cachePressureForTest;
-    std::vector<BackupBlock> _mockBackupBlocks;
+    std::deque<BackupBlock> _mockBackupBlocks;
 };
 }  // namespace mongo

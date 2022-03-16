@@ -286,7 +286,7 @@ namespace {
 class StreamingCursorImpl : public StorageEngine::StreamingCursor {
 public:
     StreamingCursorImpl() = delete;
-    StreamingCursorImpl(StorageEngine::BackupOptions options, std::vector<BackupBlock> backupBlocks)
+    StreamingCursorImpl(StorageEngine::BackupOptions options, std::deque<BackupBlock> backupBlocks)
         : StorageEngine::StreamingCursor(options), _backupBlocks(std::move(backupBlocks)) {
         _exhaustCursor = false;
     };
@@ -297,10 +297,10 @@ public:
         return BSONObj();
     }
 
-    StatusWith<std::vector<BackupBlock>> getNextBatch(OperationContext* opCtx,
-                                                      const std::size_t batchSize) {
+    StatusWith<std::deque<BackupBlock>> getNextBatch(OperationContext* opCtx,
+                                                     const std::size_t batchSize) {
         if (_exhaustCursor) {
-            std::vector<BackupBlock> emptyVector;
+            std::deque<BackupBlock> emptyVector;
             return emptyVector;
         }
         _exhaustCursor = true;
@@ -308,7 +308,7 @@ public:
     }
 
 private:
-    std::vector<BackupBlock> _backupBlocks;
+    std::deque<BackupBlock> _backupBlocks;
     bool _exhaustCursor;
 };
 
@@ -321,8 +321,8 @@ StatusWith<std::unique_ptr<StorageEngine::StreamingCursor>> DevNullKVEngine::beg
     return std::make_unique<StreamingCursorImpl>(options, _mockBackupBlocks);
 }
 
-StatusWith<std::vector<std::string>> DevNullKVEngine::extendBackupCursor(OperationContext* opCtx) {
-    std::vector<std::string> filesToCopy = {"journal/WiredTigerLog.999"};
+StatusWith<std::deque<std::string>> DevNullKVEngine::extendBackupCursor(OperationContext* opCtx) {
+    std::deque<std::string> filesToCopy = {"journal/WiredTigerLog.999"};
     return filesToCopy;
 }
 
