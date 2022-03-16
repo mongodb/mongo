@@ -57,6 +57,57 @@ using std::string;
 using std::unique_ptr;
 using std::vector;
 
+namespace {
+struct BoundMakerAsc {
+    const Seconds bound;
+
+    DocumentSourceSort::SortableDate operator()(DocumentSourceSort::SortableDate key) const {
+        return {key.date - bound};
+    }
+
+    long long serialize() const {
+        return duration_cast<Seconds>(bound).count();
+    }
+};
+
+struct BoundMakerDesc {
+    const Seconds bound;
+
+    DocumentSourceSort::SortableDate operator()(DocumentSourceSort::SortableDate key) const {
+        return {key.date + bound};
+    }
+
+    long long serialize() const {
+        return duration_cast<Seconds>(bound).count();
+    }
+};
+struct CompAsc {
+    int operator()(DocumentSourceSort::SortableDate x, DocumentSourceSort::SortableDate y) const {
+        // compare(x, y) op 0 means x op y, for any comparator 'op'.
+        if (x.date.toMillisSinceEpoch() < y.date.toMillisSinceEpoch())
+            return -1;
+        if (x.date.toMillisSinceEpoch() > y.date.toMillisSinceEpoch())
+            return 1;
+        return 0;
+    }
+};
+struct CompDesc {
+    int operator()(DocumentSourceSort::SortableDate x, DocumentSourceSort::SortableDate y) const {
+        // compare(x, y) op 0 means x op y, for any comparator 'op'.
+        if (x.date.toMillisSinceEpoch() > y.date.toMillisSinceEpoch())
+            return -1;
+        if (x.date.toMillisSinceEpoch() < y.date.toMillisSinceEpoch())
+            return 1;
+        return 0;
+    }
+};
+
+using TimeSorterAsc =
+    BoundedSorter<DocumentSourceSort::SortableDate, Document, CompAsc, BoundMakerAsc>;
+using TimeSorterDesc =
+    BoundedSorter<DocumentSourceSort::SortableDate, Document, CompDesc, BoundMakerDesc>;
+}  // namespace
+
 constexpr StringData DocumentSourceSort::kStageName;
 
 DocumentSourceSort::DocumentSourceSort(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
@@ -92,7 +143,7 @@ REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(
 DocumentSource::GetNextResult DocumentSourceSort::doGetNext() {
     if (_timeSorter) {
         // Only pull input as necessary to get _timeSorter to have a result.
-        while (_timeSorter->getState() == TimeSorter::State::kWait) {
+        while (_timeSorter->getState() == TimeSorterInterface::State::kWait) {
             auto input = pSource->getNext();
             switch (input.getStatus()) {
                 case GetNextResult::ReturnStatus::kPauseExecution:
@@ -113,7 +164,7 @@ DocumentSource::GetNextResult DocumentSourceSort::doGetNext() {
             }
         }
 
-        if (_timeSorter->getState() == TimeSorter::State::kDone)
+        if (_timeSorter->getState() == TimeSorterInterface::State::kDone)
             return GetNextResult::makeEOF();
 
         return _timeSorter->next().second;
@@ -150,7 +201,7 @@ void DocumentSourceSort::serializeToArray(
             {"$_internalBoundedSort"_sd,
              Document{{
                  {"sortKey"_sd, std::move(sortKey)},
-                 {"bound"_sd, durationCount<Seconds>(_timeSorter->makeBound.bound)},
+                 {"bound"_sd, _timeSorter->serializeBound()},
              }}},
         }}});
         return;
@@ -278,7 +329,6 @@ intrusive_ptr<DocumentSourceSort> DocumentSourceSort::parseBoundedSort(
     uassert(6369904, "$_internalBoundedSort sortKey must be an object", key.type() == Object);
     SortPattern pat{key.embeddedObject(), expCtx};
     uassert(6369903, "$_internalBoundedSort doesn't support compound sort", pat.size() == 1);
-    uassert(6369902, "$_internalBoundedSort only handles ascending sort", pat[0].isAscending);
     uassert(6369901,
             "$_internalBoundedSort doesn't support an expression in the sortKey",
             pat[0].expression == nullptr);
@@ -297,7 +347,12 @@ intrusive_ptr<DocumentSourceSort> DocumentSourceSort::parseBoundedSort(
     }
 
     auto ds = DocumentSourceSort::create(expCtx, pat);
-    ds->_timeSorter.reset(new TimeSorter{opts, {}, BoundMaker{Seconds{boundN}}});
+    if (pat[0].isAscending) {
+        ds->_timeSorter.reset(new TimeSorterAsc{opts, CompAsc{}, BoundMakerAsc{Seconds{boundN}}});
+    } else {
+        ds->_timeSorter.reset(
+            new TimeSorterDesc{opts, CompDesc{}, BoundMakerDesc{Seconds{boundN}}});
+    }
     return ds;
 }
 
@@ -399,5 +454,9 @@ std::string nextFileName() {
 #include "mongo/db/sorter/sorter.cpp"
 template class ::mongo::BoundedSorter<::mongo::DocumentSourceSort::SortableDate,
                                       ::mongo::Document,
-                                      ::mongo::DocumentSourceSort::Comp,
-                                      ::mongo::DocumentSourceSort::BoundMaker>;
+                                      ::mongo::CompAsc,
+                                      ::mongo::BoundMakerAsc>;
+template class ::mongo::BoundedSorter<::mongo::DocumentSourceSort::SortableDate,
+                                      ::mongo::Document,
+                                      ::mongo::CompDesc,
+                                      ::mongo::BoundMakerDesc>;

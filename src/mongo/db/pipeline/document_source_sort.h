@@ -42,6 +42,21 @@ namespace mongo {
 
 class DocumentSourceSort final : public DocumentSource {
 public:
+    struct SortableDate {
+        Date_t date;
+
+        struct SorterDeserializeSettings {};  // unused
+        void serializeForSorter(BufBuilder& buf) const {
+            buf.appendNum(date.toMillisSinceEpoch());
+        }
+        static SortableDate deserializeForSorter(BufReader& buf, const SorterDeserializeSettings&) {
+            return {Date_t::fromMillisSinceEpoch(buf.read<LittleEndian<long long>>().value)};
+        }
+        int memUsageForSorter() const {
+            return sizeof(SortableDate);
+        }
+    };
+
     static constexpr StringData kStageName = "$sort"_sd;
 
     const char* getSourceName() const final {
@@ -194,40 +209,8 @@ private:
 
     boost::optional<SortKeyGenerator> _sortKeyGen;
 
-    struct SortableDate {
-        Date_t date;
-
-        struct SorterDeserializeSettings {};  // unused
-        void serializeForSorter(BufBuilder& buf) const {
-            buf.appendNum(date.toMillisSinceEpoch());
-        }
-        static SortableDate deserializeForSorter(BufReader& buf, const SorterDeserializeSettings&) {
-            return {Date_t::fromMillisSinceEpoch(buf.read<LittleEndian<long long>>().value)};
-        }
-        int memUsageForSorter() const {
-            return sizeof(SortableDate);
-        }
-    };
-
-    struct BoundMaker {
-        Seconds bound;
-
-        SortableDate operator()(SortableDate key) {
-            return {key.date - bound};
-        }
-    };
-    struct Comp {
-        int operator()(SortableDate x, SortableDate y) const {
-            // compare(x, y) op 0 means x op y, for any comparator 'op'.
-            if (x.date.toMillisSinceEpoch() < y.date.toMillisSinceEpoch())
-                return -1;
-            if (x.date.toMillisSinceEpoch() > y.date.toMillisSinceEpoch())
-                return 1;
-            return 0;
-        }
-    };
-    using TimeSorter = BoundedSorter<SortableDate, Document, Comp, BoundMaker>;
-    std::unique_ptr<TimeSorter> _timeSorter;
+    using TimeSorterInterface = BoundedSorterInterface<SortableDate, Document>;
+    std::unique_ptr<TimeSorterInterface> _timeSorter;
 };
 
 }  // namespace mongo

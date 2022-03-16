@@ -394,6 +394,48 @@ protected:
     std::vector<std::shared_ptr<Iterator>> _iters;  // Data that has already been spilled.
 };
 
+
+template <typename Key, typename Value>
+class BoundedSorterInterface {
+public:
+    virtual ~BoundedSorterInterface() {}
+
+    // Feed one item of input to the sorter.
+    // Together, add() and done() represent the input stream.
+    virtual void add(Key key, Value value) = 0;
+
+    // Indicate that no more input will arrive.
+    // Together, add() and done() represent the input stream.
+    virtual void done() = 0;
+
+    enum class State {
+        // An output document is not available yet, but this may change as more input arrives.
+        kWait,
+        // An output document is available now: you may call next() once.
+        kReady,
+        // All output has been returned.
+        kDone,
+    };
+    // Together, state() and next() represent the output stream.
+    // See BoundedSorter::State for the meaning of each case.
+    virtual State getState() const = 0;
+
+    // Remove and return one item of output.
+    // Only valid to call when getState() == kReady.
+    // Together, state() and next() represent the output stream.
+    virtual std::pair<Key, Value> next() = 0;
+
+    // Serialize the bound for explain output
+    virtual long long serializeBound() const = 0;
+
+    virtual size_t numSpills() const = 0;
+
+    // By default, uassert that the input meets our assumptions of being almost-sorted.
+    // But if _checkInput is false, don't do that check.
+    // The output will be in the wrong order but otherwise it should work.
+    virtual bool checkInput() const = 0;
+};
+
 /**
  * Sorts data that is already "almost sorted", meaning we can put a bound on how out-of-order
  * any two input elements are. For example, maybe we are sorting by {time: 1} and we know that no
@@ -413,7 +455,7 @@ protected:
  * less-or-equal to all future Keys that will be seen in the input.
  */
 template <typename Key, typename Value, typename Comparator, typename BoundMaker>
-class BoundedSorter {
+class BoundedSorter : public BoundedSorterInterface<Key, Value> {
 public:
     // 'Comparator' is a 3-way comparison, but std::priority_queue wants a '<' comparison.
     // But also, std::priority_queue is a max-heap, and we want a min-heap.
@@ -421,12 +463,20 @@ public:
     // on whole elements.
     struct Greater {
         bool operator()(const std::pair<Key, Value>& p1, const std::pair<Key, Value>& p2) const {
-            return compare(p1.first, p2.first) > 0;
+            return (*compare)(p1.first, p2.first) > 0;
         }
-        Comparator compare;
+        Comparator const* compare;
     };
 
-    BoundedSorter(const SortOptions& opts, Comparator comp, BoundMaker makeBound);
+    BoundedSorter(const SortOptions& opts,
+                  Comparator comp,
+                  BoundMaker makeBound,
+                  bool checkInput = true);
+
+    BoundedSorter(const BoundedSorter&) = delete;
+    BoundedSorter(BoundedSorter&&) = delete;
+    BoundedSorter& operator=(const BoundedSorter&) = delete;
+    BoundedSorter& operator=(BoundedSorter&&) = delete;
 
     // Feed one item of input to the sorter.
     // Together, add() and done() represent the input stream.
@@ -439,16 +489,9 @@ public:
         _done = true;
     }
 
-    enum class State {
-        // An output document is not available yet, but this may change as more input arrives.
-        kWait,
-        // An output document is available now: you may call next() once.
-        kReady,
-        // All output has been returned.
-        kDone,
-    };
     // Together, state() and next() represent the output stream.
     // See BoundedSorter::State for the meaning of each case.
+    using State = typename BoundedSorterInterface<Key, Value>::State;
     State getState() const;
 
     // Remove and return one item of output.
@@ -456,26 +499,34 @@ public:
     // Together, state() and next() represent the output stream.
     std::pair<Key, Value> next();
 
+    // Serialize the bound for explain output
+    long long serializeBound() const {
+        return makeBound.serialize();
+    };
+
     size_t numSpills() const {
         return _numSpills;
     }
 
-    // By default, uassert that the input meets our assumptions of being almost-sorted.
-    // But if _checkInput is false, don't do that check.
-    // The output will be in the wrong order but otherwise it should work.
-    bool checkInput = true;
+    bool checkInput() const {
+        return _checkInput;
+    }
 
-    Comparator compare;
-    BoundMaker makeBound;
+    const Comparator compare;
+    const BoundMaker makeBound;
 
 private:
     using SpillIterator = SortIteratorInterface<Key, Value>;
-    using PairComparator =
-        std::function<int(const std::pair<Key, Value>&, const std::pair<Key, Value>&)>;
+    struct PairComparator {
+        int operator()(const std::pair<Key, Value>& p1, const std::pair<Key, Value>& p2) const;
+        const Comparator& compare;
+    };
 
     void _spill();
 
-    PairComparator _comparePairs;
+    const PairComparator _comparePairs;
+
+    bool _checkInput;
 
     size_t _numSorted = 0;              // Keeps track of the number of keys sorted.
     uint64_t _totalDataSizeSorted = 0;  // Keeps track of the total size of data sorted.

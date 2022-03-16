@@ -1238,14 +1238,14 @@ SortIteratorInterface<Key, Value>* SortedFileWriter<Key, Value>::done() {
 template <typename Key, typename Value, typename Comparator, typename BoundMaker>
 BoundedSorter<Key, Value, Comparator, BoundMaker>::BoundedSorter(const SortOptions& opts,
                                                                  Comparator comp,
-                                                                 BoundMaker makeBound)
+                                                                 BoundMaker makeBound,
+                                                                 bool checkInput)
     : compare(comp),
       makeBound(makeBound),
-      _comparePairs([this](const std::pair<Key, Value>& lhs, const std::pair<Key, Value>& rhs) {
-          return this->compare(lhs.first, rhs.first);
-      }),
+      _comparePairs{compare},
+      _checkInput(checkInput),
       _opts(opts),
-      _heap(Greater{comp}),
+      _heap(Greater{&compare}),
       _file(opts.extSortAllowed ? std::make_shared<typename Sorter<Key, Value>::File>(
                                       opts.tempDir + "/" + nextFileName())
                                 : nullptr) {}
@@ -1256,7 +1256,7 @@ void BoundedSorter<Key, Value, Comparator, BoundMaker>::add(Key key, Value value
     // If a new value violates what we thought was our min bound, something has gone wrong.
     uassert(6369910,
             "BoundedSorter input is too out-of-order.",
-            !checkInput || !_min || compare(*_min, key) <= 0);
+            !_checkInput || !_min || compare(*_min, key) <= 0);
 
     // Each new item can potentially give us a tighter bound (a higher min).
     Key newMin = makeBound(key);
@@ -1274,7 +1274,7 @@ void BoundedSorter<Key, Value, Comparator, BoundMaker>::add(Key key, Value value
 }
 
 template <typename Key, typename Value, typename Comparator, typename BoundMaker>
-typename BoundedSorter<Key, Value, Comparator, BoundMaker>::State
+typename BoundedSorterInterface<Key, Value>::State
 BoundedSorter<Key, Value, Comparator, BoundMaker>::getState() const {
     if (_opts.limit > 0 && _opts.limit == _numSorted) {
         return State::kDone;
@@ -1347,11 +1347,11 @@ void BoundedSorter<Key, Value, Comparator, BoundMaker>::_spill() {
     if (_heap.empty())
         return;
 
-    // If we have a small $limit, we can simply extract that many of the smallest elements from the
-    // _heap and discard the rest, avoiding an expensive spill to disk.
+    // If we have a small $limit, we can simply extract that many of the smallest elements from
+    // the _heap and discard the rest, avoiding an expensive spill to disk.
     if (_opts.limit > 0 && _opts.limit < (_heap.size() / 2)) {
         _memUsed = 0;
-        decltype(_heap) retained;
+        decltype(_heap) retained{Greater{&compare}};
         for (size_t i = 0; i < _opts.limit; ++i) {
             _memUsed +=
                 _heap.top().first.memUsageForSorter() + _heap.top().second.memUsageForSorter();
@@ -1391,6 +1391,12 @@ void BoundedSorter<Key, Value, Comparator, BoundMaker>::_spill() {
     dassert(_spillIter->more());
 
     _memUsed = 0;
+}
+
+template <typename Key, typename Value, typename Comparator, typename BoundMaker>
+int BoundedSorter<Key, Value, Comparator, BoundMaker>::PairComparator::operator()(
+    const std::pair<Key, Value>& p1, const std::pair<Key, Value>& p2) const {
+    return compare(p1.first, p2.first);
 }
 
 //

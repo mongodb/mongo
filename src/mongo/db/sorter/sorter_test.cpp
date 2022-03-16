@@ -966,17 +966,36 @@ public:
             return sizeof(Doc);
         }
     };
-    struct Comparator {
+    struct ComparatorAsc {
         int operator()(Key x, Key y) const {
             return x - y;
         }
     };
-    struct BoundMaker {
+    struct ComparatorDesc {
+        int operator()(Key x, Key y) const {
+            return y - x;
+        }
+    };
+    struct BoundMakerAsc {
         Key operator()(Key k) const {
             return k - 10;
         }
+        long long serialize() const {
+            return 10;
+        }
     };
-    using S = BoundedSorter<Key, Doc, Comparator, BoundMaker>;
+    struct BoundMakerDesc {
+        Key operator()(Key k) const {
+            return k + 10;
+        }
+        long long serialize() const {
+            return 10;
+        }
+    };
+
+    using S = BoundedSorterInterface<Key, Doc>;
+    using SAsc = BoundedSorter<Key, Doc, ComparatorAsc, BoundMakerAsc>;
+    using SDesc = BoundedSorter<Key, Doc, ComparatorDesc, BoundMakerDesc>;
 
     /**
      * Feed the input into the sorter one-by-one, taking any output as soon as it's available.
@@ -986,35 +1005,46 @@ public:
         auto push = [&](Doc doc) { output.push_back(doc); };
 
         for (auto&& doc : input) {
-            sorter.add(doc.time, doc);
-            while (sorter.getState() == S::State::kReady)
-                push(sorter.next().second);
+            sorter->add(doc.time, doc);
+            while (sorter->getState() == S::State::kReady)
+                push(sorter->next().second);
         }
-        sorter.done();
+        sorter->done();
 
-        while (sorter.getState() == S::State::kReady)
-            push(sorter.next().second);
-        ASSERT(sorter.getState() == S::State::kDone);
+        while (sorter->getState() == S::State::kReady)
+            push(sorter->next().second);
+        ASSERT(sorter->getState() == S::State::kDone);
 
         ASSERT_EQ(output.size(), expectedSize == -1 ? input.size() : expectedSize);
         return output;
     }
 
-    static void assertSorted(const std::vector<Doc>& docs) {
+    static void assertSorted(const std::vector<Doc>& docs, bool ascending = true) {
         for (size_t i = 1; i < docs.size(); ++i) {
             Doc prev = docs[i - 1];
             Doc curr = docs[i];
-            ASSERT_LTE(prev.time, curr.time);
+            if (ascending) {
+                ASSERT_LTE(prev.time, curr.time);
+            } else {
+                ASSERT_GTE(prev.time, curr.time);
+            }
         }
     }
 
-    S sorter{{}, {}, {}};
+    std::unique_ptr<S> makeAsc(SortOptions options, bool checkInput = true) {
+        return std::make_unique<SAsc>(options, ComparatorAsc{}, BoundMakerAsc{}, checkInput);
+    }
+    std::unique_ptr<S> makeDesc(SortOptions options, bool checkInput = true) {
+        return std::make_unique<SDesc>(options, ComparatorDesc{}, BoundMakerDesc{}, checkInput);
+    }
+
+    std::unique_ptr<S> sorter = makeAsc({});
 };
 TEST_F(BoundedSorterTest, Empty) {
-    ASSERT(sorter.getState() == S::State::kWait);
+    ASSERT(sorter->getState() == S::State::kWait);
 
-    sorter.done();
-    ASSERT(sorter.getState() == S::State::kDone);
+    sorter->done();
+    ASSERT(sorter->getState() == S::State::kDone);
 }
 TEST_F(BoundedSorterTest, Sorted) {
     auto output = sort({
@@ -1080,7 +1110,7 @@ TEST_F(BoundedSorterTest, WrongInput) {
     };
 
     // Disable input order checking so we can see what happens.
-    sorter.checkInput = false;
+    sorter = makeAsc({}, /* checkInput */ false);
     auto output = sort(input);
     ASSERT_EQ(output.size(), 7);
 
@@ -1093,14 +1123,14 @@ TEST_F(BoundedSorterTest, WrongInput) {
     ASSERT_EQ(output[6].time, 16);
 
     // Test that by default, bad input like this would be detected.
-    sorter = S{{}, {}, {}};
-    ASSERT(sorter.checkInput);
+    sorter = makeAsc({});
+    ASSERT(sorter->checkInput());
     ASSERT_THROWS_CODE(sort(input), DBException, 6369910);
 }
 
 TEST_F(BoundedSorterTest, MemoryLimitsNoExtSortAllowed) {
     auto options = SortOptions().MaxMemoryUsageBytes(16);
-    sorter = S(options, {}, {});
+    sorter = makeAsc(options);
 
     std::vector<Doc> input = {
         {0},
@@ -1121,7 +1151,7 @@ TEST_F(BoundedSorterTest, MemoryLimitsNoExtSortAllowed) {
 TEST_F(BoundedSorterTest, SpillSorted) {
     auto options =
         SortOptions().ExtSortAllowed().TempDir("unused_temp_dir").MaxMemoryUsageBytes(16);
-    sorter = S(options, {}, {});
+    sorter = makeAsc(options);
 
     auto output = sort({
         {0},
@@ -1136,13 +1166,13 @@ TEST_F(BoundedSorterTest, SpillSorted) {
     });
     assertSorted(output);
 
-    ASSERT_EQ(sorter.numSpills(), 3);
+    ASSERT_EQ(sorter->numSpills(), 3);
 }
 
 TEST_F(BoundedSorterTest, SpillSortedExceptOne) {
     auto options =
         SortOptions().ExtSortAllowed().TempDir("unused_temp_dir").MaxMemoryUsageBytes(16);
-    sorter = S(options, {}, {});
+    sorter = makeAsc(options);
 
     auto output = sort({
         {0},
@@ -1158,13 +1188,13 @@ TEST_F(BoundedSorterTest, SpillSortedExceptOne) {
     });
     assertSorted(output);
 
-    ASSERT_EQ(sorter.numSpills(), 3);
+    ASSERT_EQ(sorter->numSpills(), 3);
 }
 
 TEST_F(BoundedSorterTest, SpillAlmostSorted) {
     auto options =
         SortOptions().ExtSortAllowed().TempDir("unused_temp_dir").MaxMemoryUsageBytes(16);
-    sorter = S(options, {}, {});
+    sorter = makeAsc(options);
 
     auto output = sort({
         // 0 and 11 cannot swap.
@@ -1181,13 +1211,12 @@ TEST_F(BoundedSorterTest, SpillAlmostSorted) {
     });
     assertSorted(output);
 
-    ASSERT_EQ(sorter.numSpills(), 2);
+    ASSERT_EQ(sorter->numSpills(), 2);
 }
 
 TEST_F(BoundedSorterTest, SpillWrongInput) {
     auto options =
         SortOptions().ExtSortAllowed().TempDir("unused_temp_dir").MaxMemoryUsageBytes(16);
-    sorter = S(options, {}, {});
 
     std::vector<Doc> input = {
         {3},
@@ -1204,7 +1233,7 @@ TEST_F(BoundedSorterTest, SpillWrongInput) {
     };
 
     // Disable input order checking so we can see what happens.
-    sorter.checkInput = false;
+    sorter = makeAsc(options, /* checkInput */ false);
     auto output = sort(input);
     ASSERT_EQ(output.size(), 7);
 
@@ -1216,18 +1245,18 @@ TEST_F(BoundedSorterTest, SpillWrongInput) {
     ASSERT_EQ(output[5].time, 15);
     ASSERT_EQ(output[6].time, 16);
 
-    ASSERT_EQ(sorter.numSpills(), 2);
+    ASSERT_EQ(sorter->numSpills(), 2);
 
     // Test that by default, bad input like this would be detected.
-    sorter = S{options, {}, {}};
-    ASSERT(sorter.checkInput);
+    sorter = makeAsc(options);
+    ASSERT(sorter->checkInput());
     ASSERT_THROWS_CODE(sort(input), DBException, 6369910);
 }
 
 TEST_F(BoundedSorterTest, LimitNoSpill) {
     auto options =
         SortOptions().ExtSortAllowed().TempDir("unused_temp_dir").MaxMemoryUsageBytes(40).Limit(2);
-    sorter = S(options, {}, {});
+    sorter = makeAsc(options);
 
     auto output = sort(
         {
@@ -1246,13 +1275,13 @@ TEST_F(BoundedSorterTest, LimitNoSpill) {
         2);
     assertSorted(output);
 
-    ASSERT_EQ(sorter.numSpills(), 0);
+    ASSERT_EQ(sorter->numSpills(), 0);
 }
 
 TEST_F(BoundedSorterTest, LimitSpill) {
     auto options =
         SortOptions().ExtSortAllowed().TempDir("unused_temp_dir").MaxMemoryUsageBytes(40).Limit(3);
-    sorter = S(options, {}, {});
+    sorter = makeAsc(options);
 
     auto output = sort(
         {
@@ -1271,9 +1300,96 @@ TEST_F(BoundedSorterTest, LimitSpill) {
         3);
     assertSorted(output);
 
-    ASSERT_EQ(sorter.numSpills(), 1);
+    ASSERT_EQ(sorter->numSpills(), 1);
 }
 
+TEST_F(BoundedSorterTest, DescSorted) {
+    sorter = makeDesc({});
+    auto output = sort({
+        {16},
+        {15},
+        {14},
+        {13},
+        {12},
+        {11},
+        {10},
+        {3},
+        {0},
+    });
+    assertSorted(output, /* ascending */ false);
+}
+
+TEST_F(BoundedSorterTest, DescSortedExceptOne) {
+    sorter = makeDesc({});
+
+    auto output = sort({
+
+        {16},
+        {15},
+        {14},
+        {13},
+        // Swap 11 and 12.
+        {11},
+        {12},
+        {10},
+        {3},
+        {0},
+    });
+    assertSorted(output, /* ascending */ false);
+}
+
+TEST_F(BoundedSorterTest, DescAlmostSorted) {
+    sorter = makeDesc({});
+
+    auto output = sort({
+        {16},
+        {15},
+        // 3 and 14 cannot swap.
+        {14},
+        {3},
+        {12},
+        {10},
+        {13},
+        // 0 and 11 cannot swap.
+        {11},
+        {0},
+    });
+    assertSorted(output, /* ascending */ false);
+}
+
+TEST_F(BoundedSorterTest, DescWrongInput) {
+    std::vector<Doc> input = {
+        {16},
+        {14},
+        {10},
+        {5},
+        {3},
+        // This 15 is too far out of order: it's more than 10 away from 3.
+        // So it will appear too late in the output.
+        // We will still be hanging on to anything in the range [-inf, 13).
+        // So we will have already returned 16, 14.
+        {15},
+        {1},
+    };
+
+    // Disable input order checking so we can see what happens.
+    sorter = makeDesc({}, /* checkInput */ false);
+    auto output = sort(input);
+    ASSERT_EQ(output.size(), 7);
+
+    ASSERT_EQ(output[0].time, 16);
+    ASSERT_EQ(output[1].time, 14);
+    ASSERT_EQ(output[2].time, 15);  // Out of order.
+    ASSERT_EQ(output[3].time, 10);
+    ASSERT_EQ(output[4].time, 5);
+    ASSERT_EQ(output[5].time, 3);
+    ASSERT_EQ(output[6].time, 1);
+
+    // Test that by default, bad input like this would be detected.
+    sorter = makeDesc({});
+    ASSERT(sorter->checkInput());
+    ASSERT_THROWS_CODE(sort(input), DBException, 6369910);
+}
 
 }  // namespace
 }  // namespace sorter
@@ -1283,5 +1399,9 @@ template class ::mongo::Sorter<::mongo::sorter::BoundedSorterTest::Key,
                                ::mongo::sorter::BoundedSorterTest::Doc>;
 template class ::mongo::BoundedSorter<::mongo::sorter::BoundedSorterTest::Key,
                                       ::mongo::sorter::BoundedSorterTest::Doc,
-                                      ::mongo::sorter::BoundedSorterTest::Comparator,
-                                      ::mongo::sorter::BoundedSorterTest::BoundMaker>;
+                                      ::mongo::sorter::BoundedSorterTest::ComparatorAsc,
+                                      ::mongo::sorter::BoundedSorterTest::BoundMakerAsc>;
+template class ::mongo::BoundedSorter<::mongo::sorter::BoundedSorterTest::Key,
+                                      ::mongo::sorter::BoundedSorterTest::Doc,
+                                      ::mongo::sorter::BoundedSorterTest::ComparatorDesc,
+                                      ::mongo::sorter::BoundedSorterTest::BoundMakerDesc>;
