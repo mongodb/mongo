@@ -240,7 +240,7 @@ types:
         cpp_type: "mongo::IDLAnyType"
         serializer: mongo::IDLAnyType::serializeToBSON
         deserializer: mongo::IDLAnyType::parseFromBSON
-    
+
     IDLAnyTypeOwned:
         bson_serialization_type: any
         description: "Holds a BSONElement of any type. Does not require the backing BSON to stay
@@ -249,34 +249,7 @@ types:
         serializer: mongo::IDLAnyTypeOwned::serializeToBSON
         deserializer: mongo::IDLAnyTypeOwned::parseFromBSON
 
-    writeConcernW:
-        bson_serialization_type: any
-        description: >-
-            A string or integer representing the 'w' option in a document specifying write concern.
-            See https://docs.mongodb.com/manual/reference/write-concern/"
-        cpp_type: "mongo::WriteConcernW"
-        serializer: "::mongo::serializeWriteConcernW"
-        deserializer: "::mongo::deserializeWriteConcernW"
-
-    writeConcernWTimeout:
-        bson_serialization_type: any
-        description: >-
-            An integer representing the 'wtimeout' option in a document specifying write concern.
-            See https://docs.mongodb.com/manual/reference/write-concern/"
-        cpp_type: std::int64_t
-        deserializer: "mongo::parseWTimeoutFromBSON"
-
 enums:
-    ReadWriteConcernProvenanceSource:
-        description: "Provenance sources"
-        type: string
-        values:
-            clientSupplied: "clientSupplied"
-            implicitDefault: "implicitDefault"
-            customDefault: "customDefault"
-            getLastErrorDefaults: "getLastErrorDefaults"
-            internalWriteDefault: "internalWriteDefault"
-
     CollationCaseFirst:
         description: Sort order of case differences.
         type: string
@@ -319,16 +292,16 @@ structs:
         strict: false
         fields:
             ok:
-                type: safeDouble 
+                type: safeDouble
                 validator: { gte: 0.0, lte: 0.0 }
                 unstable: false
-            code: 
+            code:
                 type: int
                 unstable: false
-            codeName: 
+            codeName:
                 type: string
                 unstable: false
-            errmsg: 
+            errmsg:
                 type: string
                 unstable: false
             errorLabels:
@@ -344,47 +317,6 @@ structs:
                 type: safeInt64
                 optional: true
                 validator: { gte: 0 }
-                unstable: false
-    WriteConcernIdl:
-        description: "WriteConcern object parser"
-        strict: true
-        fields:
-            w:
-                type: writeConcernW
-                cpp_name: writeConcernW
-                optional: true
-                unstable: false
-            j:
-                type: safeBool
-                optional: true
-                unstable: false
-            wtimeout:
-                type: writeConcernWTimeout
-                default: 0
-                unstable: false
-            fsync:
-                type: safeBool
-                optional: true
-                unstable: false
-            # Fields with names wElectionId, wOpTime, and getLastError are accepted in the WriteConcern document for
-            # backwards-compatibility reasons, but their values are entirely ignored.
-            wElectionId:
-                type: any
-                ignore: true
-                unstable: false
-            wOpTime:
-                type: any
-                ignore: true
-                unstable: false
-            getLastError:
-                type: any
-                ignore: true
-                unstable: false
-            provenance:
-                description: "The source for this provenance"
-                cpp_name: source
-                type: ReadWriteConcernProvenanceSource
-                optional: true
                 unstable: false
 
     Collation:

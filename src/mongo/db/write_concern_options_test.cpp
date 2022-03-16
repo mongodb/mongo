@@ -187,6 +187,10 @@ TEST(WriteConcernOptionsTest, ParseWithTags) {
     ASSERT_STRING_CONTAINS(status.reason(),
                            "tags must be a single level document with only number values");
 
+    status = WriteConcernOptions::parse(BSON("w" << BSONObj())).getStatus();
+    ASSERT_EQUALS(ErrorCodes::FailedToParse, status);
+    ASSERT_STRING_CONTAINS(status.reason(), "tagged write concern requires tags");
+
     auto sw = WriteConcernOptions::parse(BSON("w" << BSON("abc" << 1)));
     ASSERT_OK(sw.getStatus());
 
@@ -207,6 +211,14 @@ TEST(WriteConcernOptionsTest, ParseWithTags) {
     ASSERT(wc != wc4);
     auto wc5 = uassertStatusOK(WriteConcernOptions::parse(BSON("w" << 2)));
     ASSERT(wc != wc5);
+}
+
+TEST(WriteConcernOptionsTest, WTagsNotPermittedFCVLessThan53) {
+    serverGlobalParams.mutableFeatureCompatibility.setVersion(
+        multiversion::FeatureCompatibilityVersion::kVersion_5_2);
+    auto status = WriteConcernOptions::parse(BSON("w" << BSON("abc" << 1))).getStatus();
+    ASSERT_EQUALS(ErrorCodes::FailedToParse, status);
+    ASSERT_STRING_CONTAINS(status.reason(), "w has to be a number or string");
 }
 
 }  // namespace

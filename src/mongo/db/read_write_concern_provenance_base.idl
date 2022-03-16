@@ -32,6 +32,17 @@ global:
 imports:
     - "mongo/idl/basic_types.idl"
 
+enums:
+    ReadWriteConcernProvenanceSource:
+        description: "Provenance sources"
+        type: string
+        values:
+            clientSupplied: "clientSupplied"
+            implicitDefault: "implicitDefault"
+            customDefault: "customDefault"
+            getLastErrorDefaults: "getLastErrorDefaults"
+            internalWriteDefault: "internalWriteDefault"
+
 structs:
     ReadWriteConcernProvenanceBase:
         description: "Represents the 'provenance' (ie. original source) of a read or write concern."
