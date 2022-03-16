@@ -92,6 +92,8 @@ private:
     // ReplicaSetAwareService methods implementation
 
     void onStartup(OperationContext* opCtx) override {}
+    void onStartupRecoveryComplete(OperationContext* opCtx) override {}
+    void onInitialSyncComplete(OperationContext* opCtx) override {}
     void onShutdown() override {}
     void onStepUpBegin(OperationContext* opCtx, long long term) override;
     void onStepUpComplete(OperationContext* opCtx, long long term) override {}

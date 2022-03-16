@@ -566,6 +566,8 @@ public:
                                        std::vector<BSONObj>* ops) noexcept;
 
     void onStartup(OperationContext*) final;
+    void onStartupRecoveryComplete(OperationContext* opCtx) final {}
+    void onInitialSyncComplete(OperationContext* opCtx) final {}
     void onShutdown() final;
     void onStepUpBegin(OperationContext*, long long term) final {}
     void onBecomeArbiter() final {}
