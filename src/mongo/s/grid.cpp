@@ -82,6 +82,12 @@ bool Grid::isShardingInitialized() const {
     return _shardingInitialized.load();
 }
 
+void Grid::assertShardingIsInitialized() const {
+    uassert(ErrorCodes::ShardingStateNotInitialized,
+            "Sharding is not enabled",
+            isShardingInitialized());
+}
+
 void Grid::setShardingInitialized() {
     invariant(!_shardingInitialized.load());
     _shardingInitialized.store(true);

@@ -272,7 +272,7 @@ TEST_F(MongosTopoCoordTest, HelloReturnsErrorOnEnteringQuiesceMode) {
     auto quiesceTime = Milliseconds(0);
 
     // This will cause the hello request to hang.
-    auto waitForHelloFailPoint = globalFailPointRegistry().find("waitForHelloResponse");
+    auto waitForHelloFailPoint = globalFailPointRegistry().find("waitForHelloResponseMongos");
     auto timesEnteredFailPoint = waitForHelloFailPoint->setMode(FailPoint::alwaysOn);
     ON_BLOCK_EXIT([&] { waitForHelloFailPoint->setMode(FailPoint::off, 0); });
     stdx::thread getHelloThread([&] {
@@ -299,7 +299,7 @@ TEST_F(MongosTopoCoordTest, AlwaysDecrementNumAwaitingTopologyChangesOnErrorMong
     auto opCtx = makeOperationContext();
     ASSERT_EQUALS(0, HelloMetrics::get(opCtx.get())->getNumAwaitingTopologyChanges());
 
-    auto hangFP = globalFailPointRegistry().find("hangWhileWaitingForHelloResponse");
+    auto hangFP = globalFailPointRegistry().find("hangWhileWaitingForHelloResponseMongos");
     auto timesEnteredHangFP = hangFP->setMode(FailPoint::alwaysOn);
 
     // Use a novel error code to test this functionality.

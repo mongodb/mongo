@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2022-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
 #include <boost/optional.hpp>
 
@@ -44,55 +44,24 @@
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/commands/cluster_explain.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/is_mongos.h"
 #include "mongo/s/query/cluster_aggregate.h"
 #include "mongo/s/query/cluster_find.h"
 
 namespace mongo {
-namespace {
-
-using std::string;
-using std::unique_ptr;
-using std::vector;
-
-const char kTermField[] = "term";
-
-// Parses the command object to a FindCommandRequest, validates that no runtime constants were
-// supplied with the command, and sets the constant runtime values that will be forwarded to each
-// shard.
-std::unique_ptr<FindCommandRequest> parseCmdObjectToFindCommandRequest(OperationContext* opCtx,
-                                                                       NamespaceString nss,
-                                                                       BSONObj cmdObj) {
-    auto findCommand = query_request_helper::makeFromFindCommand(
-        std::move(cmdObj),
-        std::move(nss),
-        APIParameters::get(opCtx).getAPIStrict().value_or(false));
-    if (!findCommand->getReadConcern()) {
-        if (opCtx->isStartingMultiDocumentTransaction() || !opCtx->inMultiDocumentTransaction()) {
-            // If there is no explicit readConcern in the cmdObj, and this is either the first
-            // operation in a transaction, or not running in a transaction, then use the readConcern
-            // from the opCtx (which may be a cluster-wide default).
-            const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-            findCommand->setReadConcern(readConcernArgs.toBSONInner());
-        }
-    }
-    uassert(51202,
-            "Cannot specify runtime constants option to a mongos",
-            !findCommand->getLegacyRuntimeConstants());
-    uassert(5746101,
-            "Cannot specify ntoreturn in a find command against mongos",
-            findCommand->getNtoreturn() == boost::none);
-    return findCommand;
-}
 
 /**
  * Implements the find command on mongos.
  */
-class ClusterFindCmd final : public Command {
+template <typename Impl>
+class ClusterFindCmdBase final : public Command {
 public:
-    ClusterFindCmd() : Command("find") {}
+    static constexpr StringData kTermField = "term"_sd;
+
+    ClusterFindCmdBase() : Command(Impl::kName) {}
 
     const std::set<std::string>& apiVersions() const {
-        return kApiVersions1;
+        return Impl::getApiVersions();
     }
 
     std::unique_ptr<CommandInvocation> parse(OperationContext* opCtx,
@@ -123,7 +92,9 @@ public:
 
     class Invocation final : public CommandInvocation {
     public:
-        Invocation(const ClusterFindCmd* definition, const OpMsgRequest& request, StringData dbName)
+        Invocation(const ClusterFindCmdBase* definition,
+                   const OpMsgRequest& request,
+                   StringData dbName)
             : CommandInvocation(definition), _request(request), _dbName(dbName) {}
 
     private:
@@ -148,15 +119,14 @@ public:
          */
         void doCheckAuthorization(OperationContext* opCtx) const final {
             auto hasTerm = _request.body.hasField(kTermField);
-            uassertStatusOK(auth::checkAuthForFind(
-                AuthorizationSession::get(opCtx->getClient()), ns(), hasTerm));
+            Impl::doCheckAuthorization(opCtx, hasTerm, ns());
         }
 
         void explain(OperationContext* opCtx,
                      ExplainOptions::Verbosity verbosity,
                      rpc::ReplyBuilderInterface* result) override {
             // Parse the command BSON to a FindCommandRequest.
-            auto findCommand = parseCmdObjectToFindCommandRequest(opCtx, ns(), _request.body);
+            auto findCommand = _parseCmdObjectToFindCommandRequest(opCtx, ns(), _request.body);
 
             try {
                 const auto explainCmd =
@@ -224,12 +194,14 @@ public:
             // We count find command as a query op.
             globalOpCounters.gotQuery();
 
+            Grid::get(opCtx)->assertShardingIsInitialized();
+
             ON_BLOCK_EXIT([opCtx] {
                 Grid::get(opCtx)->catalogCache()->checkAndRecordOperationBlockedByRefresh(
                     opCtx, mongo::LogicalOp::opQuery);
             });
 
-            auto findCommand = parseCmdObjectToFindCommandRequest(opCtx, ns(), _request.body);
+            auto findCommand = _parseCmdObjectToFindCommandRequest(opCtx, ns(), _request.body);
 
             const boost::intrusive_ptr<ExpressionContext> expCtx;
             auto cq = uassertStatusOK(
@@ -287,11 +259,39 @@ public:
         }
 
     private:
+        /**
+         * Parses the command object to a FindCommandRequest, validates that no runtime constants
+         * were supplied with the command, and sets the constant runtime values that will be
+         * forwarded to each shard.
+         */
+        static std::unique_ptr<FindCommandRequest> _parseCmdObjectToFindCommandRequest(
+            OperationContext* opCtx, NamespaceString nss, BSONObj cmdObj) {
+            auto findCommand = query_request_helper::makeFromFindCommand(
+                std::move(cmdObj),
+                std::move(nss),
+                APIParameters::get(opCtx).getAPIStrict().value_or(false));
+            if (!findCommand->getReadConcern()) {
+                if (opCtx->isStartingMultiDocumentTransaction() ||
+                    !opCtx->inMultiDocumentTransaction()) {
+                    // If there is no explicit readConcern in the cmdObj, and this is either the
+                    // first operation in a transaction, or not running in a transaction, then use
+                    // the readConcern from the opCtx (which may be a cluster-wide default).
+                    const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+                    findCommand->setReadConcern(readConcernArgs.toBSONInner());
+                }
+            }
+            uassert(51202,
+                    "Cannot specify runtime constants option to a mongos",
+                    !findCommand->getLegacyRuntimeConstants());
+            uassert(5746101,
+                    "Cannot specify ntoreturn in a find command against mongos",
+                    findCommand->getNtoreturn() == boost::none);
+            return findCommand;
+        }
+
         const OpMsgRequest& _request;
         const StringData _dbName;
     };
+};
 
-} cmdFindCluster;
-
-}  // namespace
 }  // namespace mongo

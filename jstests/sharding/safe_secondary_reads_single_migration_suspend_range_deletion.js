@@ -406,6 +406,7 @@ let testCases = {
     testDeprecation: {skip: "does not return user data"},
     testDeprecationInVersion2: {skip: "does not return user data"},
     testInternalTransactions: {skip: "primary only"},
+    clusterFind: {skip: "already tested by 'find' tests on mongos"},
     testRemoval: {skip: "does not return user data"},
     testVersions1And2: {skip: "does not return user data"},
     testVersion2: {skip: "does not return user data"},

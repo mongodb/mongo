@@ -87,7 +87,7 @@ runTest(primary.getDB("admin"), "ismaster", failPoint);
 replTest.stopSet();
 
 const st = new ShardingTest({mongos: 1, shards: [{nodes: 1}], config: 1});
-failPoint = configureFailPoint(st.s, "hangWhileWaitingForHelloResponse");
+failPoint = configureFailPoint(st.s, "hangWhileWaitingForHelloResponseMongos");
 runTest(st.s.getDB("admin"), "hello", failPoint);
 runTest(st.s.getDB("admin"), "isMaster", failPoint);
 runTest(st.s.getDB("admin"), "ismaster", failPoint);

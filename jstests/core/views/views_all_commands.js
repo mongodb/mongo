@@ -650,6 +650,7 @@ let viewsCommandTests = {
     testDeprecation: {skip: isAnInternalCommand},
     testDeprecationInVersion2: {skip: isAnInternalCommand},
     testInternalTransactions: {skip: isAnInternalCommand},
+    clusterFind: {skip: "already tested by 'find' tests on mongos"},
     testRemoval: {skip: isAnInternalCommand},
     testReshardCloneCollection: {skip: isAnInternalCommand},
     testVersion2: {skip: isAnInternalCommand},

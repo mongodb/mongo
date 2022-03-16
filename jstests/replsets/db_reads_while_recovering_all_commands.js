@@ -338,6 +338,7 @@ const allCommands = {
     stopRecordingTraffic: {skip: isNotAUserDataRead},
     testDeprecation: {skip: isNotAUserDataRead},
     testDeprecationInVersion2: {skip: isNotAUserDataRead},
+    clusterFind: {skip: "already tested by 'find' tests on mongos"},
     testRemoval: {skip: isNotAUserDataRead},
     testReshardCloneCollection: {skip: isNotAUserDataRead},
     testVersions1And2: {skip: isNotAUserDataRead},

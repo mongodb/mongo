@@ -54,13 +54,13 @@ MONGO_INITIALIZER(GenerateMongosInstanceId)(InitializerContext*) {
 }
 
 // Signals that a hello request has started waiting.
-MONGO_FAIL_POINT_DEFINE(waitForHelloResponse);
+MONGO_FAIL_POINT_DEFINE(waitForHelloResponseMongos);
 // Awaitable hello requests with the proper topologyVersions are expected to wait for
 // maxAwaitTimeMS on mongos. When set, this failpoint will hang right before waiting on a
 // topology change.
-MONGO_FAIL_POINT_DEFINE(hangWhileWaitingForHelloResponse);
+MONGO_FAIL_POINT_DEFINE(hangWhileWaitingForHelloResponseMongos);
 // Failpoint for hanging during quiesce mode on mongos.
-MONGO_FAIL_POINT_DEFINE(hangDuringQuiesceMode);
+MONGO_FAIL_POINT_DEFINE(hangDuringQuiesceModeMongos);
 // Simulates returning a specified error in the hello response.
 MONGO_FAIL_POINT_DEFINE(setCustomErrorInHelloResponseMongoS);
 
@@ -154,15 +154,15 @@ std::shared_ptr<const MongosHelloResponse> MongosTopologyCoordinator::awaitHello
     HelloMetrics::get(opCtx)->incrementNumAwaitingTopologyChanges();
     lk.unlock();
 
-    if (MONGO_unlikely(waitForHelloResponse.shouldFail())) {
+    if (MONGO_unlikely(waitForHelloResponseMongos.shouldFail())) {
         // Used in tests that wait for this failpoint to be entered before shutting down mongos,
         // which is the only action that triggers a topology change.
-        LOGV2(4695704, "waitForHelloResponse failpoint enabled");
+        LOGV2(4695704, "waitForHelloResponseMongos failpoint enabled");
     }
 
-    if (MONGO_unlikely(hangWhileWaitingForHelloResponse.shouldFail())) {
-        LOGV2(4695501, "hangWhileWaitingForHelloResponse failpoint enabled");
-        hangWhileWaitingForHelloResponse.pauseWhileSet(opCtx);
+    if (MONGO_unlikely(hangWhileWaitingForHelloResponseMongos.shouldFail())) {
+        LOGV2(4695501, "hangWhileWaitingForHelloResponseMongos failpoint enabled");
+        hangWhileWaitingForHelloResponseMongos.pauseWhileSet(opCtx);
     }
 
     // Wait for a mongos topology change with timeout set to deadline.
@@ -232,9 +232,9 @@ void MongosTopologyCoordinator::enterQuiesceModeAndWait(OperationContext* opCtx,
         HelloMetrics::get(getGlobalServiceContext())->resetNumAwaitingTopologyChanges();
     }
 
-    if (MONGO_unlikely(hangDuringQuiesceMode.shouldFail())) {
-        LOGV2(4695700, "hangDuringQuiesceMode failpoint enabled");
-        hangDuringQuiesceMode.pauseWhileSet(opCtx);
+    if (MONGO_unlikely(hangDuringQuiesceModeMongos.shouldFail())) {
+        LOGV2(4695700, "hangDuringQuiesceModeMongos failpoint enabled");
+        hangDuringQuiesceModeMongos.pauseWhileSet(opCtx);
     }
 
     LOGV2(4695701, "Entering quiesce mode for mongos shutdown", "quiesceTime"_attr = quiesceTime);

@@ -52,6 +52,8 @@ void ClusterCommandTestFixture::setUp() {
     CatalogCacheTestFixture::setUp();
     CatalogCacheTestFixture::setupNShards(numShards);
 
+    Grid::get(getServiceContext())->setShardingInitialized();
+
     // Set the initial clusterTime.
     VectorClock::get(getServiceContext())->advanceClusterTime_forTest(kInMemoryLogicalTime);
 

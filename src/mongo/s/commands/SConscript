@@ -47,10 +47,9 @@ env.Library(
         'cluster_drop_indexes_cmd.cpp',
         'cluster_enable_sharding_cmd.cpp',
         'cluster_explain_cmd.cpp',
-        'cluster_explain.cpp',
         'cluster_filemd5_cmd.cpp',
         'cluster_find_and_modify_cmd.cpp',
-        'cluster_find_cmd.cpp',
+        'cluster_find_cmd_s.cpp',
         'cluster_fsync_cmd.cpp',
         'cluster_ftdc_commands.cpp',
         'cluster_get_last_error_cmd.cpp',
@@ -89,11 +88,9 @@ env.Library(
         'cluster_validate_db_metadata_cmd.cpp',
         'cluster_whats_my_uri_cmd.cpp',
         'cluster_write_cmd.cpp',
-        'document_shard_key_update_util.cpp',
         'internal_transactions_test_commands.cpp',
         'kill_sessions_remote.cpp',
         's_read_write_concern_defaults_server_status.cpp',
-        'strategy.cpp',
         'cluster_commands.idl',
         'internal_transactions_test_commands.idl',
         'shard_collection.idl',
@@ -150,7 +147,32 @@ env.Library(
         '$BUILD_DIR/mongo/s/sharding_router_api',
         '$BUILD_DIR/mongo/transport/message_compressor',
         '$BUILD_DIR/mongo/transport/transport_layer_common',
+        'cluster_commands_common',
     ]
+)
+
+env.Library(
+    target='cluster_commands_common',
+    source=[
+        'cluster_explain.cpp',
+        'document_shard_key_update_util.cpp',
+        'strategy.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/initialize_api_parameters',
+        '$BUILD_DIR/mongo/db/read_write_concern_defaults',
+        '$BUILD_DIR/mongo/db/repl/repl_server_parameters',
+        '$BUILD_DIR/mongo/db/shared_request_handling',
+        '$BUILD_DIR/mongo/db/stats/api_version_metrics',
+        '$BUILD_DIR/mongo/db/stats/counters',
+        '$BUILD_DIR/mongo/rpc/rewrite_state_change_errors',
+        '$BUILD_DIR/mongo/s/load_balancer_support',
+        '$BUILD_DIR/mongo/s/mongos_topology_coordinator',
+        '$BUILD_DIR/mongo/s/sharding_api',
+        '$BUILD_DIR/mongo/s/sharding_router_api',
+        '$BUILD_DIR/mongo/transport/message_compressor',
+        '$BUILD_DIR/mongo/transport/transport_layer_common',
+     ]
 )
 
 # These commands are linked in MongoS only
@@ -193,6 +215,7 @@ env.Library(
         '$BUILD_DIR/mongo/s/vector_clock_mongos',
         '$BUILD_DIR/mongo/transport/transport_layer_common',
         'cluster_commands',
+        'cluster_commands_common',
     ]
 )
 
@@ -219,5 +242,6 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/s/sharding_router_test_fixture',
         '$BUILD_DIR/mongo/s/vector_clock_mongos',
         'cluster_commands',
+        'cluster_commands_common',
     ],
 )

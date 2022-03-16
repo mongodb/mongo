@@ -18,6 +18,8 @@ const st = new ShardingTest({shards: [{nodes: 1}], mongos: 1});
 const mongos = st.s;
 const mongodPrimary = st.rs0.getPrimary();
 
+const oldMongos = MongoRunner.compareBinVersions(mongos.fullOptions.binVersion, "5.3") <= 0;
+
 const dbName = "test";
 const collName = "coll";
 const mongosDB = mongos.getDB(dbName);
@@ -73,13 +75,15 @@ jsTestLog("Create a hanging hello via mongos.");
 res = assert.commandWorked(mongos.adminCommand({hello: 1}));
 assert(res.hasOwnProperty("topologyVersion"), res);
 let topologyVersionField = res.topologyVersion;
-let helloFailPoint = configureFailPoint(mongos, "waitForHelloResponse");
+let helloFailPoint =
+    configureFailPoint(mongos, oldMongos ? "waitForHelloResponse" : "waitForHelloResponseMongos");
 let hello = startParallelShell(funWithArgs(runAwaitableHello, topologyVersionField), mongos.port);
 helloFailPoint.wait();
 assert.eq(1, mongos.getDB("admin").serverStatus().connections.awaitingTopologyChanges);
 
 jsTestLog("Transition mongos to quiesce mode.");
-let quiesceModeFailPoint = configureFailPoint(mongos, "hangDuringQuiesceMode");
+let quiesceModeFailPoint =
+    configureFailPoint(mongos, oldMongos ? "hangDuringQuiesceMode" : "hangDuringQuiesceModeMongos");
 // We must skip validation due to the failpoint that hangs find commands.
 st.stopMongos(0 /* mongos index */, undefined /* opts */, {waitpid: false});
 quiesceModeFailPoint.wait();

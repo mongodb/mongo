@@ -3803,6 +3803,19 @@ var authCommandsLib = {
           ]
         },
         {
+          testname: "clusterFind",
+          command: {clusterFind: "foo"},
+          skipSharded: true,
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                roles: {__system: 1},
+                privileges: [{resource: {cluster: true}, actions: ["internal"]}],
+                expectFail: true,
+              },
+          ]
+        },
+        {
           testname: "find",
           command: {find: "foo"},
           testcases: [

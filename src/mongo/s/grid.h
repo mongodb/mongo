@@ -85,6 +85,11 @@ public:
     bool isShardingInitialized() const;
 
     /**
+     * Throws if sharding is not initialized.
+     */
+    void assertShardingIsInitialized() const;
+
+    /**
      * Used to indicate the sharding initialization process is complete. Should only be called once
      * in the lifetime of a server. Protected by an atomic access guard.
      */
