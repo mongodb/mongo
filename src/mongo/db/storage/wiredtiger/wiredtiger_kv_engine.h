@@ -185,6 +185,8 @@ public:
                             StringData ident,
                             const IndexDescriptor* desc) override;
 
+    Status alterMetadata(StringData uri, StringData config);
+
     void flushAllFiles(OperationContext* opCtx, bool callerHoldsReadLock) override;
 
     Status beginBackup(OperationContext* opCtx) override;
@@ -384,6 +386,8 @@ private:
         StorageEngine::DropIdentCallback callback;
     };
 
+    void _checkpoint(WT_SESSION* session);
+
     /**
      * Opens a connection on the WiredTiger database 'path' with the configuration 'wtOpenConfig'.
      * Only returns when successful. Intializes both '_conn' and '_fileVersion'.
@@ -511,5 +515,10 @@ private:
     // Pins the oplog so that OplogStones will not truncate oplog history equal or newer to this
     // timestamp.
     AtomicWord<std::uint64_t> _pinnedOplogTimestamp;
+
+    // Limits the actions of concurrent checkpoint callers as we update some internal data during a
+    // checkpoint. WT has a mutex of its own to only have one checkpoint active at all times so this
+    // is only to protect our internal updates.
+    Mutex _checkpointMutex = MONGO_MAKE_LATCH("WiredTigerKVEngine::_checkpointMutex");
 };
 }  // namespace mongo

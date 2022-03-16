@@ -126,23 +126,27 @@ void removeTableChecksFile() {
     }
 }
 
-void setTableWriteTimestampAssertion(WT_SESSION* session, const std::string& uri, bool on) {
+void setTableWriteTimestampAssertion(WiredTigerSessionCache* sessionCache,
+                                     const std::string& uri,
+                                     bool on) {
     const std::string setting = on ? "assert=(write_timestamp=on)" : "assert=(write_timestamp=off)";
     LOGV2_DEBUG(6003700,
                 1,
                 "Changing table write timestamp assertion settings",
                 "uri"_attr = uri,
                 "writeTimestampAssertionOn"_attr = on);
-    int ret = session->alter(session, uri.c_str(), setting.c_str());
-    if (ret) {
-        LOGV2_FATAL(6003701,
-                    "Failed to update write timestamp assertion setting",
-                    "uri"_attr = uri,
-                    "writeTimestampAssertionOn"_attr = on,
-                    "error"_attr = ret,
-                    "metadata"_attr =
-                        redact(WiredTigerUtil::getMetadataCreate(session, uri).getValue()),
-                    "message"_attr = session->strerror(session, ret));
+    auto status = sessionCache->getKVEngine()->alterMetadata(uri, setting);
+    if (!status.isOK()) {
+        auto sessionPtr = sessionCache->getSession();
+        LOGV2_FATAL(
+            6003701,
+            "Failed to update write timestamp assertion setting",
+            "uri"_attr = uri,
+            "writeTimestampAssertionOn"_attr = on,
+            "error"_attr = status.code(),
+            "metadata"_attr =
+                redact(WiredTigerUtil::getMetadataCreate(sessionPtr->getSession(), uri).getValue()),
+            "message"_attr = status.reason());
     }
 }
 
@@ -861,18 +865,12 @@ Status WiredTigerUtil::setTableLogging(OperationContext* opCtx, const std::strin
     WiredTigerSessionCache* sessionCache = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache();
     sessionCache->closeAllCursors(uri);
 
-    // Use a dedicated session for alter operations to avoid transaction issues.
-    WiredTigerSession session(sessionCache->conn());
-    return setTableLogging(session.getSession(), uri, on);
-}
-
-Status WiredTigerUtil::setTableLogging(WT_SESSION* session, const std::string& uri, bool on) {
     invariant(!storageGlobalParams.readOnly);
     stdx::lock_guard<Latch> lk(_tableLoggingInfoMutex);
 
     // Update the table logging settings regardless if we're no longer starting up the process.
     if (!_tableLoggingInfo.isInitializing) {
-        return _setTableLogging(session, uri, on);
+        return _setTableLogging(sessionCache, uri, on);
     }
 
     // During the start up process, the table logging settings are checked for each table to verify
@@ -924,12 +922,12 @@ Status WiredTigerUtil::setTableLogging(WT_SESSION* session, const std::string& u
                       _tableLoggingInfo.hasPreviouslyIncompleteTableChecks);
         }
 
-        return _setTableLogging(session, uri, on);
+        return _setTableLogging(sessionCache, uri, on);
     }
 
     if (!_tableLoggingInfo.isFirstTable) {
         if (_tableLoggingInfo.changeTableLogging) {
-            return _setTableLogging(session, uri, on);
+            return _setTableLogging(sessionCache, uri, on);
         }
 
         // The table logging settings do not need to be modified.
@@ -946,7 +944,7 @@ Status WiredTigerUtil::setTableLogging(WT_SESSION* session, const std::string& u
 
     // Check if the first tables logging settings need to be modified.
     const std::string setting = on ? "log=(enabled=true)" : "log=(enabled=false)";
-    const std::string existingMetadata = getMetadataCreate(session, uri).getValue();
+    const std::string existingMetadata = getMetadataCreate(opCtx, uri).getValue();
     if (existingMetadata.find(setting) != std::string::npos) {
         // The table is running with the expected logging settings.
         LOGV2(4366408,
@@ -964,7 +962,7 @@ Status WiredTigerUtil::setTableLogging(WT_SESSION* session, const std::string& u
           "Modifying the table logging settings for all existing WiredTiger tables",
           "loggingEnabled"_attr = on);
 
-    Status status = _setTableLogging(session, uri, on);
+    Status status = _setTableLogging(sessionCache, uri, on);
 
     if (MONGO_unlikely(crashAfterUpdatingFirstTableLoggingSettings.shouldFail())) {
         LOGV2_FATAL_NOTRACE(
@@ -973,7 +971,11 @@ Status WiredTigerUtil::setTableLogging(WT_SESSION* session, const std::string& u
     return status;
 }
 
-Status WiredTigerUtil::_setTableLogging(WT_SESSION* session, const std::string& uri, bool on) {
+Status WiredTigerUtil::_setTableLogging(WiredTigerSessionCache* sessionCache,
+                                        const std::string& uri,
+                                        bool on) {
+    auto engine = sessionCache->getKVEngine();
+
     const std::string setting = on ? "log=(enabled=true)" : "log=(enabled=false)";
 
     // This method does some "weak" parsing to see if the table is in the expected logging
@@ -983,7 +985,11 @@ Status WiredTigerUtil::_setTableLogging(WT_SESSION* session, const std::string& 
     //
     // If the settings need to be changed (only expected at startup), the alter table call must
     // succeed.
-    std::string existingMetadata = getMetadataCreate(session, uri).getValue();
+    std::string existingMetadata;
+    {
+        auto session = sessionCache->getSession();
+        existingMetadata = getMetadataCreate(session->getSession(), uri).getValue();
+    }
     if (existingMetadata.find("log=(enabled=true)") != std::string::npos &&
         existingMetadata.find("log=(enabled=false)") != std::string::npos) {
         // Sanity check against a table having multiple logging specifications.
@@ -999,24 +1005,24 @@ Status WiredTigerUtil::_setTableLogging(WT_SESSION* session, const std::string& 
 
     LOGV2_DEBUG(
         22432, 1, "Changing table logging settings", "uri"_attr = uri, "loggingEnabled"_attr = on);
-    int ret = session->alter(session, uri.c_str(), setting.c_str());
-    if (ret) {
+    auto status = engine->alterMetadata(uri, setting);
+    if (!status.isOK()) {
         LOGV2_FATAL(50756,
                     "Failed to update log setting",
                     "uri"_attr = uri,
                     "loggingEnabled"_attr = on,
-                    "error"_attr = ret,
+                    "error"_attr = status.code(),
                     "metadata"_attr = redact(existingMetadata),
-                    "message"_attr = session->strerror(session, ret));
+                    "message"_attr = status.reason());
     }
 
     // The write timestamp assertion setting only needs to be changed at startup. It will be turned
     // on when logging is disabled, and off when logging is enabled.
     if (TestingProctor::instance().isEnabled()) {
-        setTableWriteTimestampAssertion(session, uri, !on);
+        setTableWriteTimestampAssertion(sessionCache, uri, !on);
     } else {
         // Disables the assertion when the testing proctor is off.
-        setTableWriteTimestampAssertion(session, uri, false /* on */);
+        setTableWriteTimestampAssertion(sessionCache, uri, false /* on */);
     }
 
     return Status::OK();

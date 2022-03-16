@@ -46,6 +46,7 @@ class OperationContext;
 class WiredTigerConfigParser;
 class WiredTigerKVEngine;
 class WiredTigerSession;
+class WiredTigerSessionCache;
 
 Status wtRCToStatus_slow(int retCode, WT_SESSION* session, StringData prefix);
 
@@ -305,8 +306,6 @@ public:
 
     static Status setTableLogging(OperationContext* opCtx, const std::string& uri, bool on);
 
-    static Status setTableLogging(WT_SESSION* session, const std::string& uri, bool on);
-
     /**
      * Generates a WiredTiger connection configuration given the LOGV2 WiredTiger components
      * verbosity levels.
@@ -328,7 +327,9 @@ private:
     template <typename T>
     static T _castStatisticsValue(uint64_t statisticsValue, T maximumResultType);
 
-    static Status _setTableLogging(WT_SESSION* session, const std::string& uri, bool on);
+    static Status _setTableLogging(WiredTigerSessionCache* sessionCache,
+                                   const std::string& uri,
+                                   bool on);
 
     // Used to keep track of the table logging setting modifications during start up. The mutex must
     // be held prior to accessing any of the member variables in the struct.
