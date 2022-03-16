@@ -312,6 +312,8 @@ last-lts:
       test_file: jstests/aggregation/lookup_let_optimization.js
     - ticket: SERVER-59290
       test_file: jstests/replsets/sync_source_changes.js
+    - ticket: SERVER-64485
+      test_file: jstests/sharding/update_with_dollar_fields.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
