@@ -51,71 +51,85 @@ assert.commandWorked(coll.createIndex({t: 1}));
 
 const unpackStage = getAggPlanStage(coll.explain().aggregate(), '$_internalUnpackBucket');
 
-function assertSorted(result) {
-    let prev = {t: -Infinity};
+function assertSorted(result, ascending) {
+    let prev = ascending ? {t: -Infinity} : {t: Infinity};
     for (const doc of result) {
-        assert.lte(+prev.t, +doc.t, 'Found two docs not in time order: ' + tojson({prev, doc}));
+        if (ascending) {
+            assert.lte(+prev.t,
+                       +doc.t,
+                       'Found two docs not in ascending time order: ' + tojson({prev, doc}));
+        } else {
+            assert.gte(+prev.t,
+                       +doc.t,
+                       'Found two docs not in descending time order: ' + tojson({prev, doc}));
+        }
+
         prev = doc;
     }
 }
 
-// Test sorting the whole collection.
-{
-    const naive = buckets
-                      .aggregate([
-                          unpackStage,
-                          {$_internalInhibitOptimization: {}},
-                          {$sort: {t: 1}},
-                      ])
-                      .toArray();
-    assertSorted(naive);
+function runTest(ascending) {
+    // Test sorting the whole collection.
+    {
+        const naive = buckets
+                          .aggregate([
+                              unpackStage,
+                              {$_internalInhibitOptimization: {}},
+                              {$sort: {t: ascending ? 1 : -1}},
+                          ])
+                          .toArray();
+        assertSorted(naive, ascending);
 
-    const opt = buckets
-                    .aggregate([
-                        {$sort: {'control.min.t': 1}},
-                        unpackStage,
-                        {
-                            $_internalBoundedSort: {
-                                sortKey: {t: 1},
-                                bound: bucketMaxSpanSeconds,
-                            }
-                        },
-                    ])
-                    .toArray();
-    assertSorted(opt);
+        const opt = buckets
+                        .aggregate([
+                            {$sort: {'control.min.t': ascending ? 1 : -1}},
+                            unpackStage,
+                            {
+                                $_internalBoundedSort: {
+                                    sortKey: {t: ascending ? 1 : -1},
+                                    bound: bucketMaxSpanSeconds,
+                                }
+                            },
+                        ])
+                        .toArray();
+        assertSorted(opt, ascending);
 
-    assert.eq(naive, opt);
+        assert.eq(naive, opt);
+    }
+
+    // Test $sort + $limit.
+    {
+        const naive = buckets
+                          .aggregate([
+                              unpackStage,
+                              {$_internalInhibitOptimization: {}},
+                              {$sort: {t: ascending ? 1 : -1}},
+                              {$limit: 100},
+                          ])
+                          .toArray();
+        assertSorted(naive, ascending);
+        assert.eq(100, naive.length);
+
+        const opt = buckets
+                        .aggregate([
+                            {$sort: {'control.min.t': ascending ? 1 : -1}},
+                            unpackStage,
+                            {
+                                $_internalBoundedSort: {
+                                    sortKey: {t: ascending ? 1 : -1},
+                                    bound: bucketMaxSpanSeconds,
+                                }
+                            },
+                            {$limit: 100},
+                        ])
+                        .toArray();
+        assertSorted(opt, ascending);
+        assert.eq(100, opt.length);
+
+        assert.eq(naive, opt);
+    }
 }
 
-// Test $sort + $limit.
-{
-    const naive = buckets
-                      .aggregate([
-                          unpackStage,
-                          {$_internalInhibitOptimization: {}},
-                          {$sort: {t: 1}},
-                          {$limit: 100},
-                      ])
-                      .toArray();
-    assertSorted(naive);
-    assert.eq(100, naive.length);
-
-    const opt = buckets
-                    .aggregate([
-                        {$sort: {'control.min.t': 1}},
-                        unpackStage,
-                        {
-                            $_internalBoundedSort: {
-                                sortKey: {t: 1},
-                                bound: bucketMaxSpanSeconds,
-                            }
-                        },
-                        {$limit: 100},
-                    ])
-                    .toArray();
-    assertSorted(opt);
-    assert.eq(100, opt.length);
-
-    assert.eq(naive, opt);
-}
+runTest(true);   // ascending
+runTest(false);  // descending
 })();
