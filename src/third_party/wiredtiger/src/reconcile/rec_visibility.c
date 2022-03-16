@@ -679,16 +679,25 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, W
      * Set the flag if the selected tombstone is an out-of-order or mixed mode to an update. Based
      * on this flag, the caller functions perform the history store truncation for this key.
      */
-    if (tombstone != NULL &&
+    if (!is_hs_page && tombstone != NULL &&
       !F_ISSET(tombstone, WT_UPDATE_RESTORED_FROM_DS | WT_UPDATE_RESTORED_FROM_HS)) {
         upd = upd_select->upd;
-        while (upd != NULL && upd->txnid == WT_TXN_ABORTED)
+
+        /*
+         * The selected update can be the tombstone itself when the tombstone is globally visible.
+         * Compare the tombstone's timestamp with either the next update in the update list or the
+         * on-disk cell timestamp to determine if the tombstone is an out-of-order or mixed mode.
+         */
+        if (tombstone == upd) {
             upd = upd->next;
 
-        if (upd != NULL && upd->start_ts > tombstone->start_ts)
-            upd_select->ooo_tombstone = true;
+            /* Loop until a valid update is found. */
+            while (upd != NULL && upd->txnid == WT_TXN_ABORTED)
+                upd = upd->next;
+        }
 
-        if (vpack != NULL && vpack->tw.start_ts > upd->start_ts)
+        if ((upd != NULL && upd->start_ts > tombstone->start_ts) ||
+          (vpack != NULL && vpack->tw.start_ts > tombstone->start_ts))
             upd_select->ooo_tombstone = true;
     }
 
