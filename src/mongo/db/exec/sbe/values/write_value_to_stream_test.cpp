@@ -31,6 +31,7 @@
  * This file contains tests for sbe::value::writeValueToStream.
  */
 
+#include "mongo/db/exec/sbe/util/print_options.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/hex.h"
@@ -101,8 +102,8 @@ TEST(WriteValueToStream, LongBSONBinDataTest) {
     const std::pair<value::TypeTags, value::Value> value(value::TypeTags::bsonBinData, val);
     std::ostringstream oss;
     writeToStream(oss, value);
-    auto expectedString =
-        "BinData(0, " + hexblob::encode(kStringLong, value::kBinDataMaxDisplayLength) + "...)";
+    auto expectedString = "BinData(0, " +
+        hexblob::encode(kStringLong, PrintOptions::kDefaultBinDataMaxDisplayLength) + "...)";
     ASSERT_EQUALS(expectedString, oss.str());
 }
 
@@ -153,8 +154,9 @@ TEST(WriteValueToStream, LongStringBigTest) {
     value::ValueGuard guard{tag, val};
     std::ostringstream oss;
     writeToStream(oss, {tag, val});
-    auto expectedString =
-        "\"" + std::string(kStringLong).substr(0, value::kStringMaxDisplayLength) + "\"" + "...";
+    auto expectedString = "\"" +
+        std::string(kStringLong).substr(0, PrintOptions::kDefaultStringMaxDisplayLength) + "\"" +
+        "...";
     ASSERT_EQUALS(expectedString, oss.str());
 }
 
@@ -164,7 +166,7 @@ TEST(WriteValueToStream, BigArrayTest) {
     auto [sTag, sVal] = value::makeNewString("a");
     value::ValueGuard sGuard{sTag, sVal};
     auto testArr = value::getArrayView(aVal);
-    for (size_t i = 0; i < value::kArrayObjectOrNestingMaxDepth + 1; ++i) {
+    for (size_t i = 0; i < PrintOptions::kDefaultArrayObjectOrNestingMaxDepth + 1; ++i) {
         testArr->push_back(sTag, sVal);
     }
     std::ostringstream oss;
@@ -176,7 +178,8 @@ TEST(WriteValueToStream, BigArrayTest) {
 
 TEST(WriteValueToStream, NestedArrayTest) {
     auto [aTag, aVal] = value::makeNewArray();
-    auto [tag, val] = makeNestedArray(value::kArrayObjectOrNestingMaxDepth, aVal, aVal);
+    auto [tag, val] =
+        makeNestedArray(PrintOptions::kDefaultArrayObjectOrNestingMaxDepth, aVal, aVal);
     value::ValueGuard guard{tag, val};
     std::ostringstream oss;
     writeToStream(oss, {tag, val});
@@ -186,7 +189,8 @@ TEST(WriteValueToStream, NestedArrayTest) {
 
 TEST(WriteValueToStream, NestedObjectTest) {
     auto [oTag, oVal] = value::makeNewObject();
-    auto [tag, val] = makeNestedObject(value::kArrayObjectOrNestingMaxDepth, oVal, oVal);
+    auto [tag, val] =
+        makeNestedObject(PrintOptions::kDefaultArrayObjectOrNestingMaxDepth, oVal, oVal);
     value::ValueGuard guard{tag, val};
     std::ostringstream oss;
     writeToStream(oss, {tag, val});
@@ -209,7 +213,7 @@ TEST(WriteValueToStream, BigArrayInObjectInArrayTest) {
 
     auto testArr = value::getArrayView(iaVal);
     auto [sTag, sVal] = value::makeNewString("a");
-    for (size_t i = 0; i < value::kArrayObjectOrNestingMaxDepth + 1; ++i) {
+    for (size_t i = 0; i < PrintOptions::kDefaultArrayObjectOrNestingMaxDepth + 1; ++i) {
         testArr->push_back(sTag, sVal);
     }
 
@@ -234,7 +238,7 @@ TEST(WriteValueToStream, BigObjectInArrayInObjectTest) {
 
     auto testObj = value::getObjectView(ioVal);
     auto [sTag, sVal] = value::makeNewString("a");
-    for (size_t i = 0; i < value::kArrayObjectOrNestingMaxDepth + 1; ++i) {
+    for (size_t i = 0; i < PrintOptions::kDefaultArrayObjectOrNestingMaxDepth + 1; ++i) {
         testObj->push_back(std::to_string(i), sTag, sVal);
     }
 
@@ -252,7 +256,7 @@ TEST(WriteValueToStream, SmallArrayTest) {
     auto [sTag, sVal] = value::makeNewString("a");
     value::ValueGuard sGuard{sTag, sVal};
     auto testArr = value::getArrayView(aVal);
-    for (size_t i = 0; i < value::kArrayObjectOrNestingMaxDepth - 1; ++i) {
+    for (size_t i = 0; i < PrintOptions::kDefaultArrayObjectOrNestingMaxDepth - 1; ++i) {
         testArr->push_back(sTag, sVal);
     }
     std::ostringstream oss;
@@ -267,7 +271,7 @@ TEST(WriteValueToStream, BigObjTest) {
     auto [sTag, sVal] = value::makeNewString("a");
     value::ValueGuard sGuard{sTag, sVal};
     auto testObj = value::getObjectView(oVal);
-    for (size_t i = 0; i < value::kArrayObjectOrNestingMaxDepth + 1; ++i) {
+    for (size_t i = 0; i < PrintOptions::kDefaultArrayObjectOrNestingMaxDepth + 1; ++i) {
         testObj->push_back(std::to_string(i), sTag, sVal);
     }
     std::ostringstream oss;
@@ -284,7 +288,7 @@ TEST(WriteValueToStream, SmallObjTest) {
     auto [sTag, sVal] = value::makeNewString("a");
     value::ValueGuard sGuard{sTag, sVal};
     auto testObj = value::getObjectView(oVal);
-    for (size_t i = 0; i < value::kArrayObjectOrNestingMaxDepth - 1; ++i) {
+    for (size_t i = 0; i < PrintOptions::kDefaultArrayObjectOrNestingMaxDepth - 1; ++i) {
         testObj->push_back(std::to_string(i), sTag, sVal);
     }
     std::ostringstream oss;
@@ -340,8 +344,9 @@ TEST(WriteValueToStream, LongBSONStringTest) {
     const std::pair<value::TypeTags, value::Value> value(value::TypeTags::bsonString, val);
     std::ostringstream oss;
     writeToStream(oss, value);
-    auto expectedString =
-        "\"" + std::string(kStringLong).substr(0, value::kStringMaxDisplayLength) + "\"" + "...";
+    auto expectedString = "\"" +
+        std::string(kStringLong).substr(0, PrintOptions::kDefaultStringMaxDisplayLength) + "\"" +
+        "...";
     ASSERT_EQUALS(expectedString, oss.str());
 }
 
@@ -362,7 +367,8 @@ TEST(WriteValueToStream, LongBSONSymbolTest) {
     std::ostringstream oss;
     writeToStream(oss, value);
     auto expectedString = "Symbol(\"" +
-        std::string(kStringLong).substr(0, value::kStringMaxDisplayLength) + "\"" + "...)";
+        std::string(kStringLong).substr(0, PrintOptions::kDefaultStringMaxDisplayLength) + "\"" +
+        "...)";
     ASSERT_EQUALS(expectedString, oss.str());
 }
 

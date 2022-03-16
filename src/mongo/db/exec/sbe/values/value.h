@@ -77,10 +77,7 @@ using IndexKeysInclusionSet = std::bitset<Ordering::kMaxCompoundIndexKeys>;
 namespace value {
 class SortSpec;
 
-static constexpr size_t kStringMaxDisplayLength = 160;
-static constexpr size_t kBinDataMaxDisplayLength = 80;
 static constexpr size_t kNewUUIDLength = 16;
-static constexpr size_t kArrayObjectOrNestingMaxDepth = 10;
 
 /**
  * Type dispatch tags.

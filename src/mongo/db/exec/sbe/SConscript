@@ -17,6 +17,7 @@ env.Library(
     source=[
         'values/bson.cpp',
         'values/value.cpp',
+        'values/value_printer.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -57,8 +58,10 @@ sbeEnv.Library(
         'stages/unique.cpp',
         'stages/unwind.cpp',
         'util/debug_print.cpp',
+        'util/stage_results_printer.cpp',
         'values/sbe_pattern_value_cmp.cpp',
         'values/slot.cpp',
+        'values/slot_printer.cpp',
         'vm/arith.cpp',
         'vm/datetime.cpp',
         'vm/vm.cpp',
@@ -193,7 +196,9 @@ env.CppUnitTest(
         'sbe_test.cpp',
         'sbe_trial_run_tracker_test.cpp',
         'sbe_unique_test.cpp',
+        'util/stage_results_printer_test.cpp',
         'values/sbe_pattern_value_cmp_test.cpp',
+        'values/slot_printer_test.cpp',
         'values/value_serialization_test.cpp',
         "values/value_test.cpp",
         'values/write_value_to_stream_test.cpp'
