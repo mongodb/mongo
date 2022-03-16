@@ -232,48 +232,6 @@ std::pair<SlotId /*matched docs*/, std::unique_ptr<sbe::PlanStage>> buildNljLook
     return {innerResultSlot, std::move(nlj)};
 }
 
-std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildLookupResultObject(
-    std::unique_ptr<sbe::PlanStage> stage,
-    SlotId localDocumentSlot,
-    SlotId resultArraySlot,
-    const FieldPath& fieldPath,
-    const PlanNodeId nodeId,
-    SlotIdGenerator& slotIdGenerator) {
-    const int32_t pathLength = fieldPath.getPathLength();
-
-    // Extract values of all fields along the path except the last one.
-    auto fieldSlots = slotIdGenerator.generateMultiple(pathLength - 1);
-    for (int32_t i = 0; i < pathLength - 1; i++) {
-        const auto fieldName = fieldPath.getFieldName(i);
-        const auto inputSlot = i == 0 ? localDocumentSlot : fieldSlots[i - 1];
-        stage = makeProjectStage(
-            std::move(stage),
-            nodeId,
-            fieldSlots[i],
-            makeFunction("getField"_sd, makeVariable(inputSlot), makeConstant(fieldName)));
-    }
-
-    // Construct new objects for each path level.
-    auto objectSlots = slotIdGenerator.generateMultiple(pathLength);
-    for (int32_t i = pathLength - 1; i >= 0; i--) {
-        const auto rootObjectSlot = i == 0 ? localDocumentSlot : fieldSlots[i - 1];
-        const auto fieldName = fieldPath.getFieldName(i).toString();
-        const auto valueSlot = i == pathLength - 1 ? resultArraySlot : objectSlots[i + 1];
-        stage = makeS<MakeBsonObjStage>(std::move(stage),
-                                        objectSlots[i],                        /* objSlot */
-                                        rootObjectSlot,                        /* rootSlot */
-                                        MakeBsonObjStage::FieldBehavior::drop, /* fieldBehaviour */
-                                        std::vector<std::string>{},            /* fields */
-                                        std::vector<std::string>{fieldName},   /* projectFields */
-                                        SlotVector{valueSlot},                 /* projectVars */
-                                        true,                                  /* forceNewObject */
-                                        false,                                 /* returnOldObject */
-                                        nodeId);
-    }
-
-    return {objectSlots.front(), std::move(stage)};
-}
-
 /*
  * Build $lookup stage using index join strategy. Below is an example plan for the aggregation
  * [{$lookup: {localField: "a", foreignField: "b"}}] with an index {b: 1} on the foreign
@@ -314,6 +272,7 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
     std::unique_ptr<sbe::PlanStage> localStage,
     SlotId localRecordSlot,
     std::string localFieldName,
+    std::string joinFieldName,
     const CollectionPtr& foreignColl,
     const IndexEntry& index,
     StringMap<const IndexAccessMethod*>& iamMap,
@@ -435,7 +394,22 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
                                          nullptr,
                                          nodeId);
 
-    return {foreignGroupSlot, std::move(nljStage)};
+    // TODO(SERVER-63753): Remove mkbson stage here as it's temporarily added to enable testing
+    // index join.
+    auto resultSlot = slotIdGenerator.generate();
+    auto resultStage = makeS<MakeBsonObjStage>(
+        std::move(nljStage),
+        resultSlot,
+        localRecordSlot,
+        MakeObjFieldBehavior::drop /* fieldBehavior */,
+        std::vector<std::string>{} /* fields */,
+        std::vector<std::string>{std::move(joinFieldName)} /* projectFields */,
+        makeSV(foreignGroupSlot) /* projectVars */,
+        true,
+        false,
+        nodeId);
+
+    return {resultSlot, std::move(resultStage)};
 }
 }  // namespace
 
@@ -445,101 +419,101 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     // $lookup creates its own output documents.
     _shouldProduceRecordIdSlot = false;
-
-    auto localReqs = reqs.copy().set(kResult);
-    auto [localStage, localOutputs] = build(eqLookupNode->children[0], localReqs);
-    SlotId localDocumentSlot = localOutputs.get(PlanStageSlots::kResult);
-
-    auto [matchedDocumentsSlot, foreignStage] = [&, localStage = std::move(localStage)]() mutable
-        -> std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> {
-        switch (eqLookupNode->lookupStrategy) {
-            case EqLookupNode::LookupStrategy::kHashJoin:
-                uasserted(5842602, "$lookup planning logic picked hash join");
-                break;
-            case EqLookupNode::LookupStrategy::kIndexedLoopJoin: {
-                tassert(
-                    6357201,
+    switch (eqLookupNode->lookupStrategy) {
+        case EqLookupNode::LookupStrategy::kHashJoin:
+            uasserted(5842602, "$lookup planning logic picked hash join");
+            break;
+        case EqLookupNode::LookupStrategy::kIndexedLoopJoin: {
+            tassert(6357201,
                     "$lookup using index join should have one child and a populated index entry",
                     eqLookupNode->children.size() == 1 && eqLookupNode->idxEntry);
 
-                const NamespaceString foreignCollNs(eqLookupNode->foreignCollection);
-                const auto& foreignColl = _collections.lookupCollection(foreignCollNs);
-                tassert(6357202,
-                        str::stream()
-                            << "$lookup using index join with unknown foreign collection '"
-                            << foreignCollNs << "'",
-                        foreignColl);
-                const auto& index = *eqLookupNode->idxEntry;
+            const NamespaceString foreignCollNs(eqLookupNode->foreignCollection);
+            const auto& foreignColl = _collections.lookupCollection(foreignCollNs);
+            tassert(6357202,
+                    str::stream() << "$lookup using index join with unknown foreign collection '"
+                                  << foreignCollNs << "'",
+                    foreignColl);
+            const auto& index = *eqLookupNode->idxEntry;
 
-                uassert(6357203,
-                        str::stream() << "$lookup using index join doesn't work for hashed index '"
-                                      << index.identifier.catalogName << "'",
-                        index.type != INDEX_HASHED);
+            uassert(6357203,
+                    str::stream() << "$lookup using index join doesn't work for hashed index '"
+                                  << index.identifier.catalogName << "'",
+                    index.type != INDEX_HASHED);
 
-                return buildIndexJoinLookupStage(_state,
-                                                 std::move(localStage),
-                                                 localDocumentSlot,
-                                                 eqLookupNode->joinFieldLocal,
-                                                 foreignColl,
-                                                 index,
-                                                 _data.iamMap,
-                                                 _yieldPolicy,
-                                                 eqLookupNode->nodeId(),
-                                                 _slotIdGenerator);
-            }
-            case EqLookupNode::LookupStrategy::kNestedLoopJoin: {
-                auto numChildren = eqLookupNode->children.size();
-                tassert(6355300, "An EqLookupNode can only have one child", numChildren == 1);
+            const auto& localRoot = eqLookupNode->children[0];
+            auto [localStage, localOutputs] = build(localRoot, reqs);
+            sbe::value::SlotId localScanSlot = localOutputs.get(PlanStageSlots::kResult);
 
-                auto foreignResultSlot = _slotIdGenerator.generate();
-                auto foreignRecordIdSlot = _slotIdGenerator.generate();
-                const auto& foreignColl =
-                    _collections.lookupCollection(NamespaceString(eqLookupNode->foreignCollection));
+            auto [resultSlot, indexJoinStage] =
+                buildIndexJoinLookupStage(_state,
+                                          std::move(localStage),
+                                          localScanSlot,
+                                          eqLookupNode->joinFieldLocal,
+                                          eqLookupNode->joinField,
+                                          foreignColl,
+                                          index,
+                                          _data.iamMap,
+                                          _yieldPolicy,
+                                          eqLookupNode->nodeId(),
+                                          _slotIdGenerator);
 
-                // TODO SERVER-64091: Delete this tassert when we correctly handle the case of a non
-                //  existent foreign collection.
-                tassert(6355302, "The foreign collection should exist", foreignColl);
-                auto foreignStage = makeS<ScanStage>(foreignColl->uuid(),
-                                                     foreignResultSlot,
-                                                     foreignRecordIdSlot,
-                                                     boost::none /* snapshotIdSlot */,
-                                                     boost::none /* indexIdSlot */,
-                                                     boost::none /* indexKeySlot */,
-                                                     boost::none /* indexKeyPatternSlot */,
-                                                     boost::none /* tsSlot */,
-                                                     std::vector<std::string>{} /* fields */,
-                                                     makeSV() /* vars */,
-                                                     boost::none /* seekKeySlot */,
-                                                     true /* forward */,
-                                                     _yieldPolicy,
-                                                     eqLookupNode->nodeId(),
-                                                     ScanCallbacks{});
-
-                return buildNljLookupStage(_state,
-                                           std::move(localStage),
-                                           localDocumentSlot,
-                                           eqLookupNode->joinFieldLocal,
-                                           std::move(foreignStage),
-                                           foreignResultSlot,
-                                           eqLookupNode->joinFieldForeign,
-                                           eqLookupNode->nodeId(),
-                                           _slotIdGenerator);
-            }
-            default:
-                MONGO_UNREACHABLE_TASSERT(5842605);
+            PlanStageSlots outputs;
+            outputs.set(kResult, resultSlot);
+            return {std::move(indexJoinStage), std::move(outputs)};
         }
-    }();
+        case EqLookupNode::LookupStrategy::kNestedLoopJoin: {
+            auto numChildren = eqLookupNode->children.size();
+            tassert(6355300, "An EqLookupNode can only have one child", numChildren == 1);
+            const auto& localRoot = eqLookupNode->children[0];
+            auto [localStage, localOutputs] = build(localRoot, reqs);
+            sbe::value::SlotId localResultSlot = localOutputs.get(PlanStageSlots::kResult);
 
-    auto [resultSlot, resultStage] = buildLookupResultObject(std::move(foreignStage),
-                                                             localDocumentSlot,
-                                                             matchedDocumentsSlot,
-                                                             eqLookupNode->joinField,
-                                                             eqLookupNode->nodeId(),
-                                                             _slotIdGenerator);
+            auto foreignResultSlot = _slotIdGenerator.generate();
+            auto foreignRecordIdSlot = _slotIdGenerator.generate();
+            const auto& foreignColl =
+                _collections.lookupCollection(NamespaceString(eqLookupNode->foreignCollection));
 
-    PlanStageSlots outputs;
-    outputs.set(kResult, resultSlot);
-    return {std::move(resultStage), std::move(outputs)};
+            // TODO SERVER-64091: Delete this tassert when we correctly handle the case of a non
+            //  existent foreign collection.
+            tassert(6355302, "The foreign collection should exist", foreignColl);
+            auto foreignStage = sbe::makeS<sbe::ScanStage>(foreignColl->uuid(),
+                                                           foreignResultSlot,
+                                                           foreignRecordIdSlot,
+                                                           boost::none /* snapshotIdSlot */,
+                                                           boost::none /* indexIdSlot */,
+                                                           boost::none /* indexKeySlot */,
+                                                           boost::none /* indexKeyPatternSlot */,
+                                                           boost::none /* tsSlot */,
+                                                           std::vector<std::string>{} /* fields */,
+                                                           sbe::makeSV() /* vars */,
+                                                           boost::none /* seekKeySlot */,
+                                                           true /* forward */,
+                                                           _yieldPolicy,
+                                                           eqLookupNode->nodeId(),
+                                                           sbe::ScanCallbacks{});
+
+            auto [matchedSlot, nljStage] = buildNljLookupStage(_state,
+                                                               std::move(localStage),
+                                                               localResultSlot,
+                                                               eqLookupNode->joinFieldLocal,
+                                                               std::move(foreignStage),
+                                                               foreignResultSlot,
+                                                               eqLookupNode->joinFieldForeign,
+                                                               eqLookupNode->nodeId(),
+                                                               _slotIdGenerator);
+
+            PlanStageSlots outputs;
+            outputs.set(kResult,
+                        localResultSlot);  // TODO SERVER-63753: create an object for $lookup result
+            outputs.set("local"_sd, localResultSlot);
+            outputs.set("matched"_sd, matchedSlot);
+            return {std::move(nljStage), std::move(outputs)};
+        }
+        default:
+            MONGO_UNREACHABLE_TASSERT(5842605);
+    }
+    MONGO_UNREACHABLE_TASSERT(5842606);
 }
 
 }  // namespace mongo::stage_builder

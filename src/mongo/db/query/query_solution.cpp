@@ -1575,7 +1575,7 @@ void EqLookupNode::appendToString(str::stream* ss, int indent) const {
     addIndent(ss, indent + 1);
     *ss << "from = " << foreignCollection << "\n";
     addIndent(ss, indent + 1);
-    *ss << "as = " << joinField.fullPath() << "\n";
+    *ss << "as = " << joinField << "\n";
     addIndent(ss, indent + 1);
     *ss << "localField = " << joinFieldLocal << "\n";
     addIndent(ss, indent + 1);

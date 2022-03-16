@@ -175,7 +175,7 @@ void statsToBSON(const QuerySolutionNode* node,
             bob->append("foreignCollection", eln->foreignCollection);
             bob->append("localField", eln->joinFieldLocal);
             bob->append("foreignField", eln->joinFieldForeign);
-            bob->append("asField", eln->joinField.fullPath());
+            bob->append("asField", eln->joinField);
             bob->append("strategy", EqLookupNode::serializeLookupStrategy(eln->lookupStrategy));
             if (eln->idxEntry) {
                 bob->append("indexName", eln->idxEntry->identifier.catalogName);
