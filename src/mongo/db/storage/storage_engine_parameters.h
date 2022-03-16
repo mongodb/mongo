@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/db/storage/storage_engine_parameters_gen.h"
 
 namespace mongo {
 

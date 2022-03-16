@@ -30,16 +30,12 @@
 #pragma once
 
 #include "mongo/base/status.h"
+
 #include <memory>
 
 namespace mongo {
 
-class TicketHolder;
-
 struct TicketHolders {
-    static std::unique_ptr<TicketHolder> openWriteTransaction;
-    static std::unique_ptr<TicketHolder> openReadTransaction;
-
     static Status updateConcurrentWriteTransactions(const int& newWriteTransactions);
 
     static Status updateConcurrentReadTransactions(const int& newReadTransactions);

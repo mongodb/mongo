@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/storage/storage_parameters.h"
+#include "mongo/db/storage/storage_engine_parameters.h"
 #include "mongo/db/storage/ticketholders.h"
 #include "mongo/util/concurrency/ticketholder.h"
 

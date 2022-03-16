@@ -286,21 +286,9 @@ void CondVarLockGrantNotification::notify(ResourceId resId, LockResult result) {
     _cond.notify_all();
 }
 
-namespace {
-TicketHolder* ticketHolders[LockModesCount] = {};
-}  // namespace
-
-
 //
 // Locker
 //
-
-/* static */
-void Locker::setGlobalThrottling(class TicketHolder* reading, class TicketHolder* writing) {
-    ticketHolders[MODE_S] = reading;
-    ticketHolders[MODE_IS] = reading;
-    ticketHolders[MODE_IX] = writing;
-}
 
 LockerImpl::LockerImpl()
     : _id(idCounter.addAndFetch(1)), _wuowNestingLevel(0), _threadId(stdx::this_thread::get_id()) {}
@@ -371,7 +359,8 @@ void LockerImpl::reacquireTicket(OperationContext* opCtx) {
 
 bool LockerImpl::_acquireTicket(OperationContext* opCtx, LockMode mode, Date_t deadline) {
     const bool reader = isSharedLockMode(mode);
-    auto holder = shouldAcquireTicket() ? ticketHolders[mode] : nullptr;
+    auto lockManager = getGlobalLockManager();
+    auto holder = shouldAcquireTicket() ? lockManager->getTicketHolder(mode) : nullptr;
     if (holder) {
         _clientState.store(reader ? kQueuedReader : kQueuedWriter);
 
@@ -1080,7 +1069,8 @@ void LockerImpl::releaseTicket() {
 }
 
 void LockerImpl::_releaseTicket() {
-    auto holder = shouldAcquireTicket() ? ticketHolders[_modeForTicket] : nullptr;
+    auto ticketManager = getGlobalLockManager();
+    auto holder = shouldAcquireTicket() ? ticketManager->getTicketHolder(_modeForTicket) : nullptr;
     if (holder) {
         holder->release();
     }

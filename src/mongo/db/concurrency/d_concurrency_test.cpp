@@ -70,18 +70,18 @@ const auto kMaxClockJitterMillis = Milliseconds(0);
 class UseGlobalThrottling {
 public:
     explicit UseGlobalThrottling(OperationContext* opCtx, int numTickets) : _opCtx(opCtx) {
-        _holder = std::make_unique<SemaphoreTicketHolder>(numTickets);
-        _opCtx->lockState()->setGlobalThrottling(_holder.get(), _holder.get());
+        auto lockManager = LockManager::get(_opCtx);
+        lockManager->setTicketHolders(std::make_unique<SemaphoreTicketHolder>(numTickets),
+                                      std::make_unique<SemaphoreTicketHolder>(numTickets));
     }
     ~UseGlobalThrottling() noexcept(false) {
         // Reset the global setting as we're about to destroy the ticket holder.
-        _opCtx->lockState()->setGlobalThrottling(nullptr, nullptr);
-        ASSERT_EQ(_holder->used(), 0);
+        auto lockManager = LockManager::get(_opCtx);
+        lockManager->setTicketHolders(nullptr, nullptr);
     }
 
 private:
     OperationContext* _opCtx;
-    std::unique_ptr<TicketHolder> _holder;
 };
 
 

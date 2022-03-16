@@ -74,9 +74,10 @@
 #include "mongo/db/snapshot_window_options_gen.h"
 #include "mongo/db/storage/journal_listener.h"
 #include "mongo/db/storage/key_format.h"
+#include "mongo/db/storage/storage_engine_parameters.h"
+#include "mongo/db/storage/storage_engine_parameters_gen.h"
 #include "mongo/db/storage/storage_file_util.h"
 #include "mongo/db/storage/storage_options.h"
-#include "mongo/db/storage/storage_parameters.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/storage_repair_observer.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor.h"
@@ -576,25 +577,21 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
     auto writeTransactions = gConcurrentWriteTransactions.load();
     writeTransactions = writeTransactions == 0 ? DEFAULT_TICKETS_VALUE : writeTransactions;
 
+    auto serviceContext = getGlobalServiceContext();
+    auto lockManager = LockManager::get(serviceContext);
     switch (gTicketQueueingPolicy) {
         case QueueingPolicyEnum::Semaphore:
             LOGV2_DEBUG(6382201, 1, "Using Semaphore-based ticketing scheduler");
-            TicketHolders::openReadTransaction =
-                std::make_unique<SemaphoreTicketHolder>(readTransactions);
-            TicketHolders::openWriteTransaction =
-                std::make_unique<SemaphoreTicketHolder>(writeTransactions);
+            lockManager->setTicketHolders(
+                std::make_unique<SemaphoreTicketHolder>(readTransactions),
+                std::make_unique<SemaphoreTicketHolder>(writeTransactions));
             break;
         case QueueingPolicyEnum::FifoQueue:
             LOGV2_DEBUG(6382200, 1, "Using FIFO queue-based ticketing scheduler");
-            TicketHolders::openReadTransaction =
-                std::make_unique<FifoTicketHolder>(readTransactions);
-            TicketHolders::openWriteTransaction =
-                std::make_unique<FifoTicketHolder>(writeTransactions);
+            lockManager->setTicketHolders(std::make_unique<FifoTicketHolder>(readTransactions),
+                                          std::make_unique<FifoTicketHolder>(writeTransactions));
             break;
     }
-
-    Locker::setGlobalThrottling(TicketHolders::openReadTransaction.get(),
-                                TicketHolders::openWriteTransaction.get());
 
     _runTimeConfigParam.reset(makeServerParameter<WiredTigerEngineRuntimeConfigParameter>(
         "wiredTigerEngineRuntimeConfig", ServerParameterType::kRuntimeOnly));
@@ -608,6 +605,13 @@ WiredTigerKVEngine::~WiredTigerKVEngine() {
 
     cleanShutdown();
 
+    // Cleanup the ticket holders.
+    if (hasGlobalServiceContext()) {
+        auto serviceContext = getGlobalServiceContext();
+        auto lockManager = LockManager::get(serviceContext);
+        lockManager->setTicketHolders(nullptr, nullptr);
+    }
+
     _sessionCache.reset(nullptr);
 }
 
@@ -618,18 +622,22 @@ void WiredTigerKVEngine::notifyStartupComplete() {
 
 void WiredTigerKVEngine::appendGlobalStats(BSONObjBuilder& b) {
     BSONObjBuilder bb(b.subobjStart("concurrentTransactions"));
+    auto serviceContext = getGlobalServiceContext();
+    auto lockManager = LockManager::get(serviceContext);
+    auto writer = lockManager->getTicketHolder(MODE_IX);
+    auto reader = lockManager->getTicketHolder(MODE_IS);
     {
         BSONObjBuilder bbb(bb.subobjStart("write"));
-        bbb.append("out", TicketHolders::openWriteTransaction->used());
-        bbb.append("available", TicketHolders::openWriteTransaction->available());
-        bbb.append("totalTickets", TicketHolders::openWriteTransaction->outof());
+        bbb.append("out", writer->used());
+        bbb.append("available", writer->available());
+        bbb.append("totalTickets", writer->outof());
         bbb.done();
     }
     {
         BSONObjBuilder bbb(bb.subobjStart("read"));
-        bbb.append("out", TicketHolders::openReadTransaction->used());
-        bbb.append("available", TicketHolders::openReadTransaction->available());
-        bbb.append("totalTickets", TicketHolders::openReadTransaction->outof());
+        bbb.append("out", reader->used());
+        bbb.append("available", reader->available());
+        bbb.append("totalTickets", reader->outof());
         bbb.done();
     }
     bb.done();

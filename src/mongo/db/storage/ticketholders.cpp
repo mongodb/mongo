@@ -28,25 +28,31 @@
  */
 
 #include "mongo/db/storage/ticketholders.h"
+#include "mongo/db/concurrency/lock_manager.h"
 #include "mongo/util/concurrency/ticketholder.h"
 
 namespace mongo {
 
-std::unique_ptr<TicketHolder> TicketHolders::openReadTransaction =
-    std::unique_ptr<TicketHolder>(nullptr);
-std::unique_ptr<TicketHolder> TicketHolders::openWriteTransaction =
-    std::unique_ptr<TicketHolder>(nullptr);
-
 Status TicketHolders::updateConcurrentWriteTransactions(const int& newWriteTransactions) {
-    if (openWriteTransaction) {
-        return openWriteTransaction->resize(newWriteTransactions);
+    if (hasGlobalServiceContext()) {
+        auto serviceContext = getGlobalServiceContext();
+        auto lockManager = LockManager::get(serviceContext);
+        auto ticketHolder = lockManager->getTicketHolder(LockMode::MODE_IX);
+        if (ticketHolder) {
+            return ticketHolder->resize(newWriteTransactions);
+        }
     }
     return Status::OK();
 };
 
 Status TicketHolders::updateConcurrentReadTransactions(const int& newReadTransactions) {
-    if (openReadTransaction) {
-        return openReadTransaction->resize(newReadTransactions);
+    if (hasGlobalServiceContext()) {
+        auto serviceContext = getGlobalServiceContext();
+        auto lockManager = LockManager::get(serviceContext);
+        auto ticketHolder = lockManager->getTicketHolder(LockMode::MODE_IS);
+        if (ticketHolder) {
+            return ticketHolder->resize(newReadTransactions);
+        }
     }
     return Status::OK();
 };

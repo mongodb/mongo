@@ -1,0 +1,76 @@
+# Copyright (C) 2022-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+global:
+  cpp_namespace: "mongo"
+  cpp_includes:
+    - "mongo/db/storage/ticketholders.h"
+
+server_parameters:
+
+  # The wiredTigerQueueingPolicy specifies which policy to use and is essentially
+  # the same as the values of the enum QueueingPolicy
+  storageEngineQueueingPolicy:
+    description: "Storage Engine queueing policy to use"
+    set_at: [ startup ]
+    cpp_class:
+      name: TicketQueueingPolicy
+
+  storageEngineConcurrentWriteTransactions:
+    description: "Storage Engine Concurrent Write Transactions"
+    set_at: [ startup, runtime ]
+    cpp_vartype: AtomicWord<int>
+    cpp_varname: gConcurrentWriteTransactions
+    on_update: "TicketHolders::updateConcurrentWriteTransactions"
+    deprecated_name:
+      - wiredTigerConcurrentWriteTransactions
+    # Default value being 0 means we're allowing the underlying storage engines to use their default values.
+    default: 0
+    validator:
+      gt: 0
+
+  storageEngineConcurrentReadTransactions:
+    description: "Storage Engine Concurrent Read Transactions"
+    set_at: [ startup, runtime ]
+    cpp_vartype: AtomicWord<int>
+    cpp_varname: gConcurrentReadTransactions
+    on_update: "TicketHolders::updateConcurrentReadTransactions"
+    deprecated_name:
+      - wiredTigerConcurrentReadTransactions
+    # Default value being 0 means we're allowing the underlying storage engines to use their default values.
+    default: 0
+    validator:
+      gt: 0
+
+enums:
+  QueueingPolicy:
+    description: Queueing policy to use for obtaining tickets
+    type: string
+    values:
+      Semaphore: semaphore
+      FifoQueue: fifoQueue
