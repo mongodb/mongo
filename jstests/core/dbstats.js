@@ -84,4 +84,17 @@ if (!isMongoS) {
     assert.eq(2, dbStats.collections, tojson(dbStats));  // testColl + system.views
     assert.eq(1, dbStats.views, tojson(dbStats));
 }
+
+// Check that the output for non-existing database and  the output for empty database
+// have the same fields.
+const testEmptyAndNonExistingDB = db.getSiblingDB(jsTestName() + "_non_existing_and_empty");
+testEmptyAndNonExistingDB.dropDatabase();
+
+const statsNonExistingDB = testEmptyAndNonExistingDB.runCommand({dbStats: 1, freeStorage: 1});
+testEmptyAndNonExistingDB.runCommand({create: "test_empty_collection"});
+
+const statsEmptyDB = testEmptyAndNonExistingDB.runCommand({dbStats: 1, freeStorage: 1});
+assert.sameMembers(Object.keys(statsNonExistingDB),
+                   Object.keys(statsEmptyDB),
+                   "dbStats for non-existing and empty dbs should return the same fields");
 })();

@@ -369,6 +369,8 @@ void DatabaseImpl::getStats(OperationContext* opCtx,
             return true;
         });
 
+    // Make sure that the same fields are returned for non-existing dbs
+    // in `DBStats::errmsgRun`
     output->appendNumber("collections", nCollections);
     output->appendNumber("views", nViews);
     output->appendNumber("objects", objects);

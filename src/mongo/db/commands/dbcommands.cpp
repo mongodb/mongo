@@ -663,22 +663,30 @@ public:
 
         Database* db = autoDb.getDb();
         if (!db) {
-            // TODO: This preserves old behaviour where we used to create an empty database
-            // metadata even when the database is accessed for read. Without this several
-            // unit-tests will fail, which are fairly easy to fix. If backwards compatibility
-            // is not needed for the missing DB case, we can just do the same that's done in
-            // CollectionStats.
+            // This preserves old behavior where we used to create an empty database even when the
+            // database was accessed for a read. Changing this behavior would impact users that have
+            // learned to depend on it, so we continue to support it. Ensure that these fields match
+            // exactly the fields in `DatabaseImpl::getStats`.
+
             result.appendNumber("collections", 0);
             result.appendNumber("views", 0);
             result.appendNumber("objects", 0);
             result.append("avgObjSize", 0);
             result.appendNumber("dataSize", 0);
             result.appendNumber("storageSize", 0);
-            result.appendNumber("totalSize", 0);
-            result.appendNumber("indexes", 0);
-            result.appendNumber("indexSize", 0);
+            if (includeFreeStorage) {
+                result.appendNumber("freeStorageSize", 0);
+                result.appendNumber("indexes", 0);
+                result.appendNumber("indexSize", 0);
+                result.appendNumber("indexFreeStorageSize", 0);
+                result.appendNumber("totalSize", 0);
+                result.appendNumber("totalFreeStorageSize", 0);
+            } else {
+                result.appendNumber("indexes", 0);
+                result.appendNumber("indexSize", 0);
+                result.appendNumber("totalSize", 0);
+            }
             result.appendNumber("scaleFactor", scale);
-            result.appendNumber("fileSize", 0);
             if (!getGlobalServiceContext()->getStorageEngine()->isEphemeral()) {
                 result.appendNumber("fsUsedSize", 0);
                 result.appendNumber("fsTotalSize", 0);
