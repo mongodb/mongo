@@ -256,6 +256,11 @@ std::unique_ptr<MatchExpression> buildInternalOpFilter(
     auto nsRegex = DocumentSourceChangeStream::getNsRegexForChangeStream(expCtx);
     internalOpTypeOrBuilder.append(BSON("o2.shardCollection" << BSONRegEx(nsRegex)));
 
+    // Only return the 'migrateLastChunkFromShard' event if 'showSystemEvents' is set.
+    if (expCtx->changeStreamSpec->getShowSystemEvents()) {
+        internalOpTypeOrBuilder.append(BSON("o2.migrateLastChunkFromShard" << BSONRegEx(nsRegex)));
+    }
+
     // Finalize the array of $or filter predicates.
     internalOpTypeOrBuilder.done();
 

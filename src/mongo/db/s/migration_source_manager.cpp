@@ -390,13 +390,20 @@ void MigrationSourceManager::enterCriticalSection() {
     _stats.totalDonorChunkCloneTimeMillis.addAndFetch(_cloneAndCommitTimer.millis());
     _cloneAndCommitTimer.reset();
 
-    _notifyChangeStreamsOnRecipientFirstChunk(_getCurrentMetadataAndCheckEpoch());
+    const auto& metadata = _getCurrentMetadataAndCheckEpoch();
+
+    // Check that there are no chunks on the recepient shard. Write an oplog event for change
+    // streams if this is the first migration to the recipient.
+    if (!metadata.getChunkManager()->getVersion(_args.getToShardId()).isSet()) {
+        migrationutil::notifyChangeStreamsOnRecipientFirstChunk(
+            _opCtx, _args.getNss(), _args.getFromShardId(), _args.getToShardId(), _collectionUUID);
+    }
 
     // Mark the shard as running critical operation, which requires recovery on crash.
     //
     // NOTE: The 'migrateChunkToNewShard' oplog message written by the above call to
-    // '_notifyChangeStreamsOnRecipientFirstChunk' depends on this majority write to carry its local
-    // write to majority committed.
+    // 'notifyChangeStreamsOnRecipientFirstChunk' depends on this majority write to carry its
+    // local write to majority committed.
     uassertStatusOK(ShardingStateRecovery::startMetadataOp(_opCtx));
 
     LOGV2_DEBUG_OPTIONS(4817402,
@@ -571,6 +578,13 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
     // Migration succeeded
 
     const auto refreshedMetadata = _getCurrentMetadataAndCheckEpoch();
+    // Check if there are no chunks left on donor shard. Write an oplog event for change streams if
+    // the last chunk migrated off the donor.
+    if (!refreshedMetadata.getChunkManager()->getVersion(_args.getFromShardId()).isSet()) {
+        migrationutil::notifyChangeStreamsOnDonorLastChunk(
+            _opCtx, _args.getNss(), _args.getFromShardId(), _collectionUUID);
+    }
+
 
     LOGV2(22018,
           "Migration succeeded and updated collection version to {updatedCollectionVersion}",
@@ -689,42 +703,6 @@ CollectionMetadata MigrationSourceManager::_getCurrentMetadataAndCheckEpoch() {
             metadata.isSharded() && metadata.getCollVersion().epoch() == *_collectionEpoch);
 
     return metadata;
-}
-
-void MigrationSourceManager::_notifyChangeStreamsOnRecipientFirstChunk(
-    const CollectionMetadata& metadata) {
-    // If this is not the first donation, there is nothing to be done
-    if (metadata.getChunkManager()->getVersion(_args.getToShardId()).isSet())
-        return;
-
-    const std::string dbgMessage = str::stream()
-        << "Migrating chunk from shard " << _args.getFromShardId() << " to shard "
-        << _args.getToShardId() << " with no chunks for this collection";
-
-    // The message expected by change streams
-    const auto o2Message = BSON("type"
-                                << "migrateChunkToNewShard"
-                                << "from" << _args.getFromShardId() << "to"
-                                << _args.getToShardId());
-
-    auto const serviceContext = _opCtx->getClient()->getServiceContext();
-
-    UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
-    AutoGetOplog oplogWrite(_opCtx, OplogAccessMode::kWrite);
-    writeConflictRetry(
-        _opCtx, "migrateChunkToNewShard", NamespaceString::kRsOplogNamespace.ns(), [&] {
-            WriteUnitOfWork uow(_opCtx);
-            serviceContext->getOpObserver()->onInternalOpMessage(_opCtx,
-                                                                 _args.getNss(),
-                                                                 *_collectionUUID,
-                                                                 BSON("msg" << dbgMessage),
-                                                                 o2Message,
-                                                                 boost::none,
-                                                                 boost::none,
-                                                                 boost::none,
-                                                                 boost::none);
-            uow.commit();
-        });
 }
 
 void MigrationSourceManager::_cleanup(bool completeMigration) noexcept {

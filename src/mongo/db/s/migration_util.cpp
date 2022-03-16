@@ -42,9 +42,11 @@
 #include "mongo/db/catalog/collection_catalog_helper.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/logical_session_cache.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/op_observer.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -706,6 +708,73 @@ int retrieveNumOrphansFromRecipient(OperationContext* opCtx,
     return rangeDeletionResponse.docs[0].getIntField("numOrphanDocs");
 }
 
+void notifyChangeStreamsOnRecipientFirstChunk(OperationContext* opCtx,
+                                              const NamespaceString& collNss,
+                                              const ShardId& fromShardId,
+                                              const ShardId& toShardId,
+                                              boost::optional<UUID> collUUID) {
+
+    const std::string dbgMessage = str::stream()
+        << "Migrating chunk from shard " << fromShardId << " to shard " << toShardId
+        << " with no chunks for this collection";
+
+    // The message expected by change streams
+    const auto o2Message = BSON("type"
+                                << "migrateChunkToNewShard"
+                                << "from" << fromShardId << "to" << toShardId);
+
+    auto const serviceContext = opCtx->getClient()->getServiceContext();
+
+    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+    AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
+    writeConflictRetry(
+        opCtx, "migrateChunkToNewShard", NamespaceString::kRsOplogNamespace.ns(), [&] {
+            WriteUnitOfWork uow(opCtx);
+            serviceContext->getOpObserver()->onInternalOpMessage(opCtx,
+                                                                 collNss,
+                                                                 *collUUID,
+                                                                 BSON("msg" << dbgMessage),
+                                                                 o2Message,
+                                                                 boost::none,
+                                                                 boost::none,
+                                                                 boost::none,
+                                                                 boost::none);
+            uow.commit();
+        });
+}
+
+void notifyChangeStreamsOnDonorLastChunk(OperationContext* opCtx,
+                                         const NamespaceString& collNss,
+                                         const ShardId& donorShardId,
+                                         boost::optional<UUID> collUUID) {
+
+    const std::string oMessage = str::stream()
+        << "Migrate the last chunk for " << collNss << " off shard " << donorShardId;
+
+    // The message expected by change streams
+    const auto o2Message =
+        BSON("migrateLastChunkFromShard" << collNss.toString() << "shardId" << donorShardId);
+
+    auto const serviceContext = opCtx->getClient()->getServiceContext();
+
+    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+    AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
+    writeConflictRetry(
+        opCtx, "migrateLastChunkFromShard", NamespaceString::kRsOplogNamespace.ns(), [&] {
+            WriteUnitOfWork uow(opCtx);
+            serviceContext->getOpObserver()->onInternalOpMessage(opCtx,
+                                                                 collNss,
+                                                                 *collUUID,
+                                                                 BSON("msg" << oMessage),
+                                                                 o2Message,
+                                                                 boost::none,
+                                                                 boost::none,
+                                                                 boost::none,
+                                                                 boost::none);
+            uow.commit();
+        });
+}
+
 void persistCommitDecision(OperationContext* opCtx,
                            const MigrationCoordinatorDocument& migrationDoc) {
     invariant(migrationDoc.getDecision() &&
@@ -1068,6 +1137,10 @@ void recoverMigrationCoordinations(OperationContext* opCtx,
                 coordinator.setMigrationDecision(DecisionEnum::kAborted);
             } else {
                 coordinator.setMigrationDecision(DecisionEnum::kCommitted);
+                if (!currentMetadata.getChunkManager()->getVersion(doc.getDonorShardId()).isSet()) {
+                    notifyChangeStreamsOnDonorLastChunk(
+                        opCtx, doc.getNss(), doc.getDonorShardId(), doc.getCollectionUuid());
+                }
             }
 
             coordinator.completeMigration(opCtx, acquireCSOnRecipient);

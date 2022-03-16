@@ -282,5 +282,24 @@ void drainMigrationsPendingRecovery(OperationContext* opCtx);
 void asyncRecoverMigrationUntilSuccessOrStepDown(OperationContext* opCtx,
                                                  const NamespaceString& nss) noexcept;
 
+/**
+ * This function writes a no-op message to the oplog when migrating a first chunk to the recipient
+ * (i.e., the recipient didn't have any * chunks), so that change stream will notice  that and close
+ * the cursor in order to notify mongos to target the new shard as well.
+ */
+void notifyChangeStreamsOnRecipientFirstChunk(OperationContext* opCtx,
+                                              const NamespaceString& collNss,
+                                              const ShardId& fromShardId,
+                                              const ShardId& toShardId,
+                                              boost::optional<UUID> collUUID);
+
+/**
+ * This function writes a no-op message to the oplog when during migration the last chunk of the
+ * collection collNss is migrated off the off the donor and hence the  donor has no more chunks.
+ */
+void notifyChangeStreamsOnDonorLastChunk(OperationContext* opCtx,
+                                         const NamespaceString& collNss,
+                                         const ShardId& donorShardId,
+                                         boost::optional<UUID> collUUID);
 }  // namespace migrationutil
 }  // namespace mongo
