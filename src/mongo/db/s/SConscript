@@ -181,6 +181,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/repl/replica_set_aware_service',
         '$BUILD_DIR/mongo/db/rw_concern_d',
         'sharding_api_d',
+        'sharding_commands_d',
     ]
 )
 

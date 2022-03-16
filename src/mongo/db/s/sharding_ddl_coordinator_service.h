@@ -75,6 +75,12 @@ public:
     void waitForCoordinatorsOfGivenTypeToComplete(OperationContext* opCtx,
                                                   DDLCoordinatorTypeEnum type) const;
 
+    /**
+     * Waits for all currently running coordinators to finish. While waiting here, new coordinators
+     * may start, but they will not be waited for.
+     */
+    void waitForOngoingCoordinatorsToFinish(OperationContext* opCtx);
+
 private:
     ExecutorFuture<void> _rebuildService(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                          const CancellationToken& token) override;

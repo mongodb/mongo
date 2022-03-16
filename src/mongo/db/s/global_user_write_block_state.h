@@ -49,12 +49,25 @@ public:
 
     /**
      * Checks that user writes are allowed on the specified namespace. Callers must hold the
-     * GlobalLock in any mode.
+     * GlobalLock in any mode. Throws OperationFailed if user writes are disallowed.
      */
     void checkUserWritesAllowed(OperationContext* opCtx, const NamespaceString& nss) const;
 
+    /**
+     * Methods to enable/disable blocking new sharded DDL operations.
+     */
+    void enableUserShardedDDLBlocking(OperationContext* opCtx);
+    void disableUserShardedDDLBlocking(OperationContext* opCtx);
+
+    /**
+     * Checks that new sharded DDL operations are allowed to start. Throws OperationFailed if
+     * starting new sharded DDL operations is disallowed.
+     */
+    void checkShardedDDLAllowedToStart(OperationContext* opCtx, const NamespaceString& nss) const;
+
 private:
     bool _globalUserWritesBlocked{false};
+    AtomicWord<bool> _userShardedDDLBlocked{false};
 };
 
 }  // namespace mongo

@@ -37,6 +37,7 @@
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/database_sharding_state.h"
+#include "mongo/db/s/global_user_write_block_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_ddl_coordinator_gen.h"
 #include "mongo/db/s/sharding_ddl_util.h"
@@ -187,6 +188,19 @@ void ShardingDDLCoordinator::interrupt(Status status) {
 SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                              const CancellationToken& token) noexcept {
     return ExecutorFuture<void>(**executor)
+        .then([this, executor, token, anchor = shared_from_this()] {
+            auto opCtxHolder = cc().makeOperationContext();
+            auto* opCtx = opCtxHolder.get();
+            getForwardableOpMetadata().setOn(opCtx);
+
+            // Check if this coordinator is allowed to start according to the user-writes blocking
+            // critical section. If it is not the first execution, it means it had started already
+            // and we are recovering this coordinator. In this case, let it be completed even though
+            // new DDL operations may be prohibited now.
+            if (_firstExecution) {
+                GlobalUserWriteBlockState::get(opCtx)->checkShardedDDLAllowedToStart(opCtx, nss());
+            }
+        })
         .then([this, executor, token, anchor = shared_from_this()] {
             return _acquireLockAsync(executor, token, nss().db());
         })

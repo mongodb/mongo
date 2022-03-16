@@ -65,4 +65,22 @@ void GlobalUserWriteBlockState::checkUserWritesAllowed(OperationContext* opCtx,
                 nss.isOnInternalDb());
 }
 
+void GlobalUserWriteBlockState::enableUserShardedDDLBlocking(OperationContext* opCtx) {
+    invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
+    _userShardedDDLBlocked.store(true);
+}
+
+void GlobalUserWriteBlockState::disableUserShardedDDLBlocking(OperationContext* opCtx) {
+    _userShardedDDLBlocked.store(false);
+}
+
+void GlobalUserWriteBlockState::checkShardedDDLAllowedToStart(OperationContext* opCtx,
+                                                              const NamespaceString& nss) const {
+    invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
+    uassert(ErrorCodes::OperationFailed,
+            "User writes blocked",
+            !_userShardedDDLBlocked.load() ||
+                WriteBlockBypass::get(opCtx).isWriteBlockBypassEnabled() || nss.isOnInternalDb());
+}
+
 }  // namespace mongo

@@ -165,6 +165,22 @@ void ShardingDDLCoordinatorService::waitForCoordinatorsOfGivenTypeToComplete(
     });
 }
 
+void ShardingDDLCoordinatorService::waitForOngoingCoordinatorsToFinish(OperationContext* opCtx) {
+    std::vector<SharedSemiFuture<void>> futuresToWait;
+
+    const auto instances = getAllInstances(opCtx);
+    for (const auto& instance : instances) {
+        auto typedInstance = checked_pointer_cast<ShardingDDLCoordinator>(instance);
+        // TODO: SERVER-63724 Wait only for coordinators that don't have the user-write-blocking
+        // bypass enabled.
+        futuresToWait.emplace_back(typedInstance->getCompletionFuture());
+    }
+
+    for (auto&& future : futuresToWait) {
+        future.wait(opCtx);
+    }
+}
+
 void ShardingDDLCoordinatorService::_afterStepDown() {
     stdx::lock_guard lg(_mutex);
     _state = State::kPaused;

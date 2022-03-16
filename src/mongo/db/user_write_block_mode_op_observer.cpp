@@ -75,6 +75,12 @@ void UserWriteBlockModeOpObserver::onInserts(OperationContext* opCtx,
                         if (!isStandaloneOrPrimary(opCtx)) {
                             globalLockIfNotPrimary.emplace(opCtx, MODE_IX);
                         }
+
+                        if (blockShardedDDL) {
+                            GlobalUserWriteBlockState::get(opCtx)->enableUserShardedDDLBlocking(
+                                opCtx);
+                        }
+
                         if (blockWrites) {
                             GlobalUserWriteBlockState::get(opCtx)->enableUserWriteBlocking(opCtx);
                         }
@@ -106,6 +112,12 @@ void UserWriteBlockModeOpObserver::onUpdate(OperationContext* opCtx,
                     boost::optional<Lock::GlobalLock> globalLockIfNotPrimary;
                     if (!isStandaloneOrPrimary(opCtx)) {
                         globalLockIfNotPrimary.emplace(opCtx, MODE_IX);
+                    }
+
+                    if (blockShardedDDL) {
+                        GlobalUserWriteBlockState::get(opCtx)->enableUserShardedDDLBlocking(opCtx);
+                    } else {
+                        GlobalUserWriteBlockState::get(opCtx)->disableUserShardedDDLBlocking(opCtx);
                     }
 
                     if (blockWrites) {
@@ -155,6 +167,7 @@ void UserWriteBlockModeOpObserver::onDelete(OperationContext* opCtx,
                         globalLockIfNotPrimary.emplace(opCtx, MODE_IX);
                     }
 
+                    GlobalUserWriteBlockState::get(opCtx)->disableUserShardedDDLBlocking(opCtx);
                     GlobalUserWriteBlockState::get(opCtx)->disableUserWriteBlocking(opCtx);
                 });
         }

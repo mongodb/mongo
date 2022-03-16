@@ -37,6 +37,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/s/global_user_write_block_state.h"
+#include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/db/s/user_writes_critical_section_document_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
@@ -177,6 +178,11 @@ void UserWritesRecoverableCriticalSectionService::
     // Take the user writes critical section blocking only ShardingDDLCoordinators.
     acquireRecoverableCriticalSection(
         opCtx, nss, true /* blockShardedDDL */, false /* blockUserWrites */);
+
+    // Wait for ongoing ShardingDDLCoordinators to finish. This ensures that all coordinators that
+    // started before enabling blocking have finish, and that any new coordinator that is started
+    // after this point will see the blocking is enabled.
+    ShardingDDLCoordinatorService::getService(opCtx)->waitForOngoingCoordinatorsToFinish(opCtx);
 }
 
 void UserWritesRecoverableCriticalSectionService::
@@ -333,6 +339,7 @@ void UserWritesRecoverableCriticalSectionService::recoverRecoverableCriticalSect
     OperationContext* opCtx) {
     LOGV2_DEBUG(6351912, 2, "Recovering all user writes recoverable critical sections");
 
+    GlobalUserWriteBlockState::get(opCtx)->disableUserShardedDDLBlocking(opCtx);
     GlobalUserWriteBlockState::get(opCtx)->disableUserWriteBlocking(opCtx);
 
     // Read the persisted critical section documents and restore the state into memory.
@@ -340,6 +347,11 @@ void UserWritesRecoverableCriticalSectionService::recoverRecoverableCriticalSect
         NamespaceString::kUserWritesCriticalSectionsNamespace);
     store.forEach(opCtx, BSONObj{}, [&opCtx](const UserWriteBlockingCriticalSectionDocument& doc) {
         invariant(doc.getNss().isEmpty());
+
+        if (doc.getBlockNewUserShardedDDL()) {
+            GlobalUserWriteBlockState::get(opCtx)->enableUserShardedDDLBlocking(opCtx);
+        }
+
         if (doc.getBlockUserWrites()) {
             GlobalUserWriteBlockState::get(opCtx)->enableUserWriteBlocking(opCtx);
         }
