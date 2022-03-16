@@ -423,11 +423,23 @@ CreateCollectionCoordinator::CreateCollectionCoordinator(ShardingDDLCoordinatorS
                                                          const BSONObj& initialState)
     : ShardingDDLCoordinator(service, initialState),
       _doc(CreateCollectionCoordinatorDocument::parse(
-          IDLParserErrorContext("CreateCollectionCoordinatorDocument"), initialState)),
-      _critSecReason(BSON("command"
+          IDLParserErrorContext("CreateCollectionCoordinatorDocument"), initialState)) {
+
+    // TODO SERVER-64559: remove request from critSec reason.
+    auto filter = BSON(CreateCollectionRequest::kShardKeyFieldName
+                       << 1 << CreateCollectionRequest::kUniqueFieldName << 1
+                       << CreateCollectionRequest::kNumInitialChunksFieldName << 1
+                       << CreateCollectionRequest::kPresplitHashedZonesFieldName << 1
+                       << CreateCollectionRequest::kInitialSplitPointsFieldName << 1
+                       << CreateCollectionRequest::kTimeseriesFieldName << 1
+                       << CreateCollectionRequest::kCollationFieldName << 1);
+
+    _critSecReason = BSON("command"
                           << "createCollection"
                           << "ns" << nss().toString() << "request"
-                          << _doc.getCreateCollectionRequest().toBSON())) {}
+                          << _doc.getCreateCollectionRequest().toBSON().filterFieldsUndotted(filter,
+                                                                                             true));
+}
 
 boost::optional<BSONObj> CreateCollectionCoordinator::reportForCurrentOp(
     MongoProcessInterface::CurrentOpConnectionsMode connMode,
