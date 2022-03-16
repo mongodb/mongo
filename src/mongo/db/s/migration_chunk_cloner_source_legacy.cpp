@@ -136,16 +136,11 @@ public:
     LogOpForShardingHandler(MigrationChunkClonerSourceLegacy* cloner,
                             const BSONObj& idObj,
                             const char op,
-                            const repl::OpTime& opTime,
-                            const repl::OpTime& prePostImageOpTime)
-        : _cloner(cloner),
-          _idObj(idObj.getOwned()),
-          _op(op),
-          _opTime(opTime),
-          _prePostImageOpTime(prePostImageOpTime) {}
+                            const repl::OpTime& opTime)
+        : _cloner(cloner), _idObj(idObj.getOwned()), _op(op), _opTime(opTime) {}
 
     void commit(boost::optional<Timestamp>) override {
-        _cloner->_addToTransferModsQueue(_idObj, _op, _opTime, _prePostImageOpTime);
+        _cloner->_addToTransferModsQueue(_idObj, _op, _opTime);
         _cloner->_decrementOutstandingOperationTrackRequests();
     }
 
@@ -158,7 +153,6 @@ private:
     const BSONObj _idObj;
     const char _op;
     const repl::OpTime _opTime;
-    const repl::OpTime _prePostImageOpTime;
 };
 
 void LogTransactionOperationsForShardingHandler::commit(boost::optional<Timestamp>) {
@@ -225,7 +219,7 @@ void LogTransactionOperationsForShardingHandler::commit(boost::optional<Timestam
 
         // Pass an empty prePostOpTime to the queue because retryable write history doesn't care
         // about writes in transactions.
-        cloner->_addToTransferModsQueue(idElement.wrap(), getOpCharForCrudOpType(opType), {}, {});
+        cloner->_addToTransferModsQueue(idElement.wrap(), getOpCharForCrudOpType(opType), {});
     }
 }
 
@@ -446,11 +440,11 @@ void MigrationChunkClonerSourceLegacy::onInsertOp(OperationContext* opCtx,
     }
 
     if (opCtx->getTxnNumber()) {
-        opCtx->recoveryUnit()->registerChange(std::make_unique<LogOpForShardingHandler>(
-            this, idElement.wrap(), 'i', opTime, repl::OpTime()));
+        opCtx->recoveryUnit()->registerChange(
+            std::make_unique<LogOpForShardingHandler>(this, idElement.wrap(), 'i', opTime));
     } else {
-        opCtx->recoveryUnit()->registerChange(std::make_unique<LogOpForShardingHandler>(
-            this, idElement.wrap(), 'i', repl::OpTime(), repl::OpTime()));
+        opCtx->recoveryUnit()->registerChange(
+            std::make_unique<LogOpForShardingHandler>(this, idElement.wrap(), 'i', repl::OpTime()));
     }
 }
 
@@ -489,18 +483,18 @@ void MigrationChunkClonerSourceLegacy::onUpdateOp(OperationContext* opCtx,
     }
 
     if (opCtx->getTxnNumber()) {
-        opCtx->recoveryUnit()->registerChange(std::make_unique<LogOpForShardingHandler>(
-            this, idElement.wrap(), 'u', opTime, prePostImageOpTime));
+        opCtx->recoveryUnit()->registerChange(
+            std::make_unique<LogOpForShardingHandler>(this, idElement.wrap(), 'u', opTime));
     } else {
-        opCtx->recoveryUnit()->registerChange(std::make_unique<LogOpForShardingHandler>(
-            this, idElement.wrap(), 'u', repl::OpTime(), repl::OpTime()));
+        opCtx->recoveryUnit()->registerChange(
+            std::make_unique<LogOpForShardingHandler>(this, idElement.wrap(), 'u', repl::OpTime()));
     }
 }
 
 void MigrationChunkClonerSourceLegacy::onDeleteOp(OperationContext* opCtx,
                                                   const BSONObj& deletedDocId,
                                                   const repl::OpTime& opTime,
-                                                  const repl::OpTime& preImageOpTime) {
+                                                  const repl::OpTime&) {
     dassert(opCtx->lockState()->isCollectionLockedForMode(_args.getNss(), MODE_IX));
 
     BSONElement idElement = deletedDocId["_id"];
@@ -519,11 +513,11 @@ void MigrationChunkClonerSourceLegacy::onDeleteOp(OperationContext* opCtx,
     }
 
     if (opCtx->getTxnNumber()) {
-        opCtx->recoveryUnit()->registerChange(std::make_unique<LogOpForShardingHandler>(
-            this, idElement.wrap(), 'd', opTime, preImageOpTime));
+        opCtx->recoveryUnit()->registerChange(
+            std::make_unique<LogOpForShardingHandler>(this, idElement.wrap(), 'd', opTime));
     } else {
-        opCtx->recoveryUnit()->registerChange(std::make_unique<LogOpForShardingHandler>(
-            this, idElement.wrap(), 'd', repl::OpTime(), repl::OpTime()));
+        opCtx->recoveryUnit()->registerChange(
+            std::make_unique<LogOpForShardingHandler>(this, idElement.wrap(), 'd', repl::OpTime()));
     }
 }
 
@@ -537,11 +531,9 @@ void MigrationChunkClonerSourceLegacy::_addToSessionMigrationOptimeQueue(
     }
 }
 
-void MigrationChunkClonerSourceLegacy::_addToTransferModsQueue(
-    const BSONObj& idObj,
-    const char op,
-    const repl::OpTime& opTime,
-    const repl::OpTime& prePostImageOpTime) {
+void MigrationChunkClonerSourceLegacy::_addToTransferModsQueue(const BSONObj& idObj,
+                                                               const char op,
+                                                               const repl::OpTime& opTime) {
     switch (op) {
         case 'd': {
             stdx::lock_guard<Latch> sl(_mutex);
@@ -562,8 +554,6 @@ void MigrationChunkClonerSourceLegacy::_addToTransferModsQueue(
             MONGO_UNREACHABLE;
     }
 
-    _addToSessionMigrationOptimeQueue(
-        prePostImageOpTime, SessionCatalogMigrationSource::EntryAtOpTimeType::kRetryableWrite);
     _addToSessionMigrationOptimeQueue(
         opTime, SessionCatalogMigrationSource::EntryAtOpTimeType::kRetryableWrite);
 }

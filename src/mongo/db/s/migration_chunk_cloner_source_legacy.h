@@ -261,10 +261,7 @@ private:
      * part of a part of a chunk being migrated. In doing so, this the method also removes the
      * corresponding operation track request from the operation track requests queue.
      */
-    void _addToTransferModsQueue(const BSONObj& idObj,
-                                 char op,
-                                 const repl::OpTime& opTime,
-                                 const repl::OpTime& prePostImageOpTime);
+    void _addToTransferModsQueue(const BSONObj& idObj, char op, const repl::OpTime& opTime);
 
     /**
      * Adds an operation to the outstanding operation track requests. Returns false if the cloner

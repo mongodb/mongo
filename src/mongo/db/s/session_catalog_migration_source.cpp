@@ -456,7 +456,7 @@ bool SessionCatalogMigrationSource::_fetchNextNewWriteOplog(OperationContext* op
         stdx::lock_guard<Latch> lk(_newOplogMutex);
         if (_lastFetchedNewWriteOplogImage) {
             // When `_lastFetchedNewWriteOplogImage` is set, it means we found an oplog entry with
-            // `needsRetryImage`. At this step, we've already returned the image document, but we
+            // a pre/post image. At this step, we've already returned the image oplog entry, but we
             // have yet to return the original oplog entry stored in `_lastFetchedNewWriteOplog`. We
             // will unset this value and return such that the next call to `getLastFetchedOplog`
             // will return `_lastFetchedNewWriteOplog`.
@@ -492,28 +492,15 @@ bool SessionCatalogMigrationSource::_fetchNextNewWriteOplog(OperationContext* op
                                    opCtx->getServiceContext()->getFastClockSource()->now());
     }
 
-    boost::optional<repl::OplogEntry> forgedNoopImage;
-    if (newWriteOplogEntry.getNeedsRetryImage()) {
-        // Generate the image outside of the mutex. Assign it atomically with the actual oplog
-        // entry.
-        forgedNoopImage = forgeNoopEntryFromImageCollection(opCtx, newWriteOplogEntry);
-        if (forgedNoopImage == boost::none) {
-            // No pre/post image was found. Defensively strip the `needsRetryImage` value to remove
-            // any notion this operation was a retryable findAndModify. If the request is retried on
-            // the destination, it will surface an error to the user.
-            auto mutableOplog = fassert(5676404, repl::MutableOplogEntry::parse(newWriteOplogDoc));
-            mutableOplog.setNeedsRetryImage(boost::none);
-            newWriteOplogEntry = repl::OplogEntry(mutableOplog.toBSON());
-        }
-    }
+    auto imageNoopOplogEntry = fetchPrePostImageOplog(opCtx, &newWriteOplogEntry);
 
     {
         stdx::lock_guard<Latch> lk(_newOplogMutex);
         _lastFetchedNewWriteOplog = newWriteOplogEntry;
         _newWriteOpTimeList.pop_front();
 
-        if (forgedNoopImage) {
-            _lastFetchedNewWriteOplogImage = forgedNoopImage;
+        if (imageNoopOplogEntry) {
+            _lastFetchedNewWriteOplogImage = imageNoopOplogEntry;
         }
     }
 
