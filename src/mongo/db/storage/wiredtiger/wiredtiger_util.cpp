@@ -726,12 +726,6 @@ Status WiredTigerUtil::setTableLogging(OperationContext* opCtx, const std::strin
     WiredTigerSessionCache* sessionCache = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache();
     sessionCache->closeAllCursors(uri);
 
-    // Use a dedicated session for alter operations to avoid transaction issues.
-    WiredTigerSession session(sessionCache->conn());
-    return setTableLogging(session.getSession(), uri, on);
-}
-
-Status WiredTigerUtil::setTableLogging(WT_SESSION* session, const std::string& uri, bool on) {
     invariant(!storageGlobalParams.readOnly);
 
     if (gWiredTigerSkipTableLoggingChecksOnStartup) {
@@ -747,7 +741,11 @@ Status WiredTigerUtil::setTableLogging(WT_SESSION* session, const std::string& u
     //
     // If the settings need to be changed (only expected at startup), the alter table call must
     // succeed.
-    std::string existingMetadata = getMetadataCreate(session, uri).getValue();
+    std::string existingMetadata;
+    {
+        auto session = sessionCache->getSession();
+        existingMetadata = getMetadataCreate(session->getSession(), uri).getValue();
+    }
     if (existingMetadata.find("log=(enabled=true)") != std::string::npos &&
         existingMetadata.find("log=(enabled=false)") != std::string::npos) {
         // Sanity check against a table having multiple logging specifications.
@@ -763,15 +761,15 @@ Status WiredTigerUtil::setTableLogging(WT_SESSION* session, const std::string& u
 
     LOGV2_DEBUG(
         22432, 1, "Changing table logging settings", "uri"_attr = uri, "loggingEnabled"_attr = on);
-    int ret = session->alter(session, uri.c_str(), setting.c_str());
-    if (ret) {
+    auto status = sessionCache->getKVEngine()->alterMetadata(uri, setting);
+    if (!status.isOK()) {
         LOGV2_FATAL(50756,
                     "Failed to update log setting",
                     "uri"_attr = uri,
                     "loggingEnabled"_attr = on,
-                    "error"_attr = ret,
+                    "error"_attr = status.code(),
                     "metadata"_attr = redact(existingMetadata),
-                    "message"_attr = session->strerror(session, ret));
+                    "message"_attr = status.reason());
     }
 
     return Status::OK();

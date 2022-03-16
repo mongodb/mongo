@@ -45,6 +45,7 @@ class OperationContext;
 class WiredTigerConfigParser;
 class WiredTigerKVEngine;
 class WiredTigerSession;
+class WiredTigerSessionCache;
 
 Status wtRCToStatus_slow(int retCode, WT_SESSION* session, const char* prefix);
 
@@ -302,8 +303,6 @@ public:
     static bool useTableLogging(NamespaceString ns, bool replEnabled);
 
     static Status setTableLogging(OperationContext* opCtx, const std::string& uri, bool on);
-
-    static Status setTableLogging(WT_SESSION* session, const std::string& uri, bool on);
 
     /**
      * Casts unsigned 64-bit statistics value to T.

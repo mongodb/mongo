@@ -821,6 +821,14 @@ Status WiredTigerKVEngine::_salvageIfNeeded(const char* uri) {
     WT_SESSION* session = sessionWrapper.getSession();
 
     int rc = (session->verify)(session, uri, nullptr);
+    // WT may return EBUSY if the database contains dirty data. If we checkpoint and retry the
+    // operation it will attempt to clean up the dirty elements during checkpointing, thus allowing
+    // the operation to succeed if it was the only reason to fail.
+    if (rc == EBUSY) {
+        _checkpoint(session);
+        rc = (session->verify)(session, uri, nullptr);
+    }
+
     if (rc == 0) {
         LOGV2(22327, "Verify succeeded. Not salvaging.", "uri"_attr = uri);
         return Status::OK();
@@ -847,7 +855,13 @@ Status WiredTigerKVEngine::_salvageIfNeeded(const char* uri) {
     }
 
     LOGV2(22328, "Verify failed. Running a salvage operation.", "uri"_attr = uri);
-    auto status = wtRCToStatus(session->salvage(session, uri, nullptr), session, "Salvage failed:");
+    rc = session->salvage(session, uri, nullptr);
+    // Same reasoning for handling EBUSY errors as above.
+    if (rc == EBUSY) {
+        _checkpoint(session);
+        rc = session->salvage(session, uri, nullptr);
+    }
+    auto status = wtRCToStatus(rc, session, "Salvage failed:");
     if (status.isOK()) {
         return {ErrorCodes::DataModifiedByRepair, str::stream() << "Salvaged data for " << uri};
     }
@@ -899,6 +913,13 @@ Status WiredTigerKVEngine::_rebuildIdent(WT_SESSION* session, const char* uri) {
     }
 
     int rc = session->drop(session, uri, nullptr);
+    // WT may return EBUSY if the database contains dirty data. If we checkpoint and retry the
+    // operation it will attempt to clean up the dirty elements during checkpointing, thus allowing
+    // the operation to succeed if it was the only reason to fail.
+    if (rc == EBUSY) {
+        _checkpoint(session);
+        rc = session->drop(session, uri, nullptr);
+    }
     if (rc != 0) {
         auto status = wtRCToStatus(rc, session);
         LOGV2_ERROR(22358,
@@ -1638,6 +1659,28 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::makeTemporaryRecordStore(Operat
     rs->postConstructorInit(opCtx);
 
     return std::move(rs);
+}
+
+Status WiredTigerKVEngine::alterMetadata(StringData uri, StringData config) {
+    // Use a dedicated session in an alter operation to avoid transaction issues.
+    WiredTigerSession session(_conn);
+    auto sessionPtr = session.getSession();
+
+    auto uriNullTerminated = uri.toString();
+    auto configNullTerminated = config.toString();
+
+    auto ret =
+        sessionPtr->alter(sessionPtr, uriNullTerminated.c_str(), configNullTerminated.c_str());
+    // WT may return EBUSY if the database contains dirty data. If we checkpoint and retry the
+    // operation it will attempt to clean up the dirty elements during checkpointing, thus allowing
+    // the operation to succeed if it was the only reason to fail.
+    if (ret == EBUSY) {
+        _checkpoint(sessionPtr);
+        ret =
+            sessionPtr->alter(sessionPtr, uriNullTerminated.c_str(), configNullTerminated.c_str());
+    }
+
+    return wtRCToStatus(ret, sessionPtr);
 }
 
 Status WiredTigerKVEngine::dropIdent(RecoveryUnit* ru,

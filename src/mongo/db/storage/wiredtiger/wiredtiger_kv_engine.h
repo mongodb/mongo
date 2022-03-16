@@ -181,6 +181,8 @@ public:
 
     void dropIdentForImport(OperationContext* opCtx, StringData ident) override;
 
+    Status alterMetadata(StringData uri, StringData config);
+
     void flushAllFiles(OperationContext* opCtx, bool callerHoldsReadLock) override;
 
     Status beginBackup(OperationContext* opCtx) override;
