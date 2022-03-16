@@ -118,6 +118,16 @@ public:
     virtual void onStartup(OperationContext* opCtx) = 0;
 
     /**
+     * Called after startup recovery has completed.
+     */
+    virtual void onStartupRecoveryComplete(OperationContext* opCtx) = 0;
+
+    /**
+     * Called after initial sync has completed.
+     */
+    virtual void onInitialSyncComplete(OperationContext* opCtx) = 0;
+
+    /**
      * Called as part of ReplicationCoordinator shutdown.
      */
     virtual void onShutdown() = 0;
@@ -190,6 +200,8 @@ public:
     static ReplicaSetAwareServiceRegistry& get(ServiceContext* serviceContext);
 
     void onStartup(OperationContext* opCtx) final;
+    void onStartupRecoveryComplete(OperationContext* opCtx) final;
+    void onInitialSyncComplete(OperationContext* opCtx) final;
     void onShutdown() final;
     void onStepUpBegin(OperationContext* opCtx, long long term) final;
     void onStepUpComplete(OperationContext* opCtx, long long term) final;

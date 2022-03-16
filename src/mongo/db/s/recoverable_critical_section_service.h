@@ -37,6 +37,12 @@
 
 namespace mongo {
 
+namespace recoverable_critical_section_util {
+
+bool inRecoveryMode(OperationContext* opCtx);
+
+}
+
 class RecoverableCriticalSectionService
     : public ReplicaSetAwareServiceShardSvr<RecoverableCriticalSectionService> {
 
@@ -98,10 +104,15 @@ public:
     void recoverRecoverableCriticalSections(OperationContext* opCtx);
 
 private:
-    void onStartup(OperationContext* opCtx) override final {
+    void onStartupRecoveryComplete(OperationContext* opCtx) override final {
         recoverRecoverableCriticalSections(opCtx);
     }
 
+    void onInitialSyncComplete(OperationContext* opCtx) override final {
+        recoverRecoverableCriticalSections(opCtx);
+    }
+
+    void onStartup(OperationContext* opCtx) override final {}
     void onShutdown() override final {}
     void onStepUpBegin(OperationContext* opCtx, long long term) override final {}
     void onStepUpComplete(OperationContext* opCtx, long long term) override final {}
