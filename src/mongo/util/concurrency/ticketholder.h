@@ -32,13 +32,14 @@
 #include <semaphore.h>
 #endif
 
+#include <queue>
+
 #include "mongo/db/operation_context.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/future.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/hierarchical_acquisition.h"
-#include "mongo/util/producer_consumer_queue.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -153,20 +154,20 @@ private:
     Mutex _resizeMutex =
         MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "FifoTicketHolder::_resizeMutex");
     AtomicWord<int> _capacity;
-    AtomicWord<int> _numAvailable;
-    AtomicWord<int> _elementsInQueue;
     enum class WaitingState { Waiting, Cancelled, Assigned };
     struct WaitingElement {
         stdx::condition_variable signaler;
         Mutex modificationMutex = MONGO_MAKE_LATCH(
-            HierarchicalAcquisitionLevel(1), "FifoTicketHolder::WaitingElement::modificationMutex");
+            HierarchicalAcquisitionLevel(0), "FifoTicketHolder::WaitingElement::modificationMutex");
         WaitingState state;
     };
-    MultiProducerMultiConsumerQueue<std::shared_ptr<WaitingElement>> _queue;
+    std::queue<std::shared_ptr<WaitingElement>> _queue;
     // _queueMutex protects all modifications made to either the _queue, or the statistics of the
     // queue.
     Mutex _queueMutex =
         MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "FifoTicketHolder::_queueMutex");
+    AtomicWord<int> _enqueuedElements;
+    AtomicWord<int> _ticketsAvailable;
 };
 
 class ScopedTicket {

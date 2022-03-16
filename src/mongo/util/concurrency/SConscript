@@ -58,3 +58,14 @@ env.CppUnitTest(
         'ticketholder',
     ]
 )
+
+env.Benchmark(
+    target='ticketholder_bm',
+    source=[
+        'ticketholder_bm.cpp',
+    ],
+    LIBDEPS=[
+        'ticketholder',
+    ],
+)
+
