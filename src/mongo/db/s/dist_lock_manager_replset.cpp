@@ -65,6 +65,8 @@ public:
     static DistLockManagerService* get(OperationContext* opCtx);
 
     void onStartup(OperationContext* opCtx) override {}
+    void onStartupRecoveryComplete(OperationContext* opCtx) override {}
+    void onInitialSyncComplete(OperationContext* opCtx) override {}
     void onShutdown() override {}
     void onStepUpBegin(OperationContext* opCtx, long long term) override {
         auto distLockManager = DistLockManager::get(opCtx);

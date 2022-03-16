@@ -56,6 +56,18 @@ void ReplicaSetAwareServiceRegistry::onStartup(OperationContext* opCtx) {
     });
 }
 
+void ReplicaSetAwareServiceRegistry::onStartupRecoveryComplete(OperationContext* opCtx) {
+    std::for_each(_services.begin(), _services.end(), [&](ReplicaSetAwareInterface* service) {
+        service->onStartupRecoveryComplete(opCtx);
+    });
+}
+
+void ReplicaSetAwareServiceRegistry::onInitialSyncComplete(OperationContext* opCtx) {
+    std::for_each(_services.begin(), _services.end(), [&](ReplicaSetAwareInterface* service) {
+        service->onInitialSyncComplete(opCtx);
+    });
+}
+
 void ReplicaSetAwareServiceRegistry::onShutdown() {
     std::for_each(_services.begin(), _services.end(), [&](ReplicaSetAwareInterface* service) {
         service->onShutdown();
