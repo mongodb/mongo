@@ -147,7 +147,7 @@ private:
     void _logEndCreateCollection(OperationContext* opCtx);
 
     CreateCollectionCoordinatorDocument _doc;
-    const BSONObj _critSecReason;
+    BSONObj _critSecReason;
 
     // Objects generated on each execution.
     boost::optional<ShardKeyPattern> _shardKeyPattern;
