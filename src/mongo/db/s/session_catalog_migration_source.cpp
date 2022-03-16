@@ -201,12 +201,27 @@ SessionCatalogMigrationSource::SessionCatalogMigrationSource(OperationContext* o
     // tests.
     DBDirectClient client(opCtx);
     FindCommandRequest findRequest{NamespaceString::kSessionTransactionsTableNamespace};
-    findRequest.setSort(BSON("_id" << 1));
+    // Skip retryable internal transactions that are either aborted or still in progress so there is
+    // no write history to transfer at this point.
+    // TODO (SERVER-64331): Determine if chunk migration should migrate internal sessions for
+    // non-retryable writes.
+    findRequest.setFilter(BSON(
+        "$or" << BSON_ARRAY(BSON((SessionTxnRecord::kSessionIdFieldName + "." +
+                                  InternalSessionFields::kTxnUUIDFieldName)
+                                 << BSON("$exists" << false))
+                            << BSON("$and" << BSON_ARRAY(BSON(
+                                        (SessionTxnRecord::kSessionIdFieldName + "." +
+                                         InternalSessionFields::kTxnNumberFieldName)
+                                        << BSON("$exists" << true)
+                                        << SessionTxnRecord::kStateFieldName << "committed"))))));
+    findRequest.setSort(BSON(SessionTxnRecord::kSessionIdFieldName << 1));
     auto cursor = client.find(std::move(findRequest));
 
     while (cursor->more()) {
         auto nextSession = SessionTxnRecord::parse(
             IDLParserErrorContext("Session migration cloning"), cursor->next());
+        const auto sessionId = nextSession.getSessionId();
+
         if (!nextSession.getLastWriteOpTime().isNull()) {
             _sessionOplogIterators.push_back(
                 std::make_unique<SessionOplogIterator>(std::move(nextSession), _rollbackIdAtInit));
@@ -486,6 +501,14 @@ bool SessionCatalogMigrationSource::_fetchNextNewWriteOplog(OperationContext* op
     // If this oplog entry corresponds to transaction prepare/commit, replace it with a sentinel
     // entry.
     if (entryAtOpTimeType == EntryAtOpTimeType::kTransaction) {
+        const auto sessionId = *newWriteOplogEntry.getSessionId();
+
+        if (isInternalSessionForNonRetryableWrite(sessionId)) {
+            // TODO (SERVER-64331): Determine if chunk migration should migrate internal sessions
+            // for non-retryable writes.
+            return false;
+        }
+
         newWriteOplogEntry =
             makeSentinelOplogEntry(*newWriteOplogEntry.getSessionId(),
                                    *newWriteOplogEntry.getTxnNumber(),
