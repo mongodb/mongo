@@ -129,7 +129,8 @@ class test_tiered09(wttest.WiredTigerTestCase):
         # to drop the local objects. Clean them up now to make sure we can open
         # the correct object in the bucket.
         localobj = './' + self.obj1file
-        os.remove(localobj)
+        if os.path.exists(localobj):
+            os.remove(localobj)
 
         # Reopen the connection with a different prefix this time.
         conn_params = self.saved_conn + ',tiered_storage=(bucket_prefix=%s)' % self.prefix2
@@ -163,8 +164,11 @@ class test_tiered09(wttest.WiredTigerTestCase):
         # to drop the local objects. Clean them up now to make sure we can open
         # the correct object in the bucket.
         localobj = './' + self.obj2file
-        os.remove(localobj)
+        if os.path.exists(localobj):
+            os.remove(localobj)
         localobj = './' + self.obj1second
+        if os.path.exists(localobj):
+            os.remove(localobj)
 
         # Reopen with the other prefix and check all data. Even though we're using the
         # other prefix, we should find all the data in the object with the original
