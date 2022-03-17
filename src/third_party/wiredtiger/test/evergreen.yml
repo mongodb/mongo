@@ -4099,10 +4099,10 @@ buildvariants:
     - name: ".stress-test-ppc-1"
     - name: ".stress-test-ppc-2"
 
-- name: ubuntu1804-zseries
-  display_name: "~ Ubuntu 18.04 zSeries"
+- name: rhel8-zseries
+  display_name: "~ RHEL8 zSeries"
   run_on:
-  - ubuntu1804-zseries-test
+  - rhel80-zseries-test
   batchtime: 120 # 2 hours
   expansions:
     test_env_vars:
