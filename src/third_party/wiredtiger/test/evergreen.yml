@@ -1767,6 +1767,17 @@ tasks:
         vars:
           compat_test_args: -u
 
+  - name: compatibility-test-for-patch-releases
+    commands:
+      - func: "get project"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger"
+          script: |
+            set -o errexit
+            set -o verbose
+            test/evergreen/compatibility_test_for_releases.sh -p
+
   - name: compatibility-test-for-wt-standalone-releases
     commands:
       - func: "get project"
@@ -4014,6 +4025,7 @@ buildvariants:
   - ubuntu2004-test
   tasks:
     - name: compatibility-test-for-newer-releases
+    - name: compatibility-test-for-patch-releases
     - name: import-compatibility-test
 
 - name: windows-64

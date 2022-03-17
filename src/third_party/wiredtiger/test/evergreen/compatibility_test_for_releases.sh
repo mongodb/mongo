@@ -11,11 +11,11 @@ set -e
 #############################################################
 bflag()
 {
-        # Return if the branch's format command takes the -B flag for backward compatibility.
-        test "$1" = "develop" && echo "-B "
-        test "$1" = "mongodb-5.0" && echo "-B "
-        test "$1" = "mongodb-4.4" && echo "-B "
-        return 0
+    # Return if the branch's format command takes the -B flag for backward compatibility.
+    test "$1" = "develop" && echo "-B "
+    test "$1" = "mongodb-5.0" && echo "-B "
+    test "$1" = "mongodb-4.4" && echo "-B "
+    return 0
 }
 
 #############################################################
@@ -32,37 +32,60 @@ get_prev_version()
 }
 
 #############################################################
+# pick_a_version:
+#       arg1: branch name
+#############################################################
+pick_a_version()
+{
+    branch=$1
+
+    # Query out all released patch versions for a given release branch using "git tag"
+    local versions=()
+
+    # Avoid picking below types of versions:
+    #   - release candidates (rc)
+    #   - alpha releases (alpha)
+    #   - mongodb-4.4.0 through mongodb-4.4.6 (4.4.[0-6]$) as they are not compatible with Doxygen
+    #     version 1.8.17 (installed on the build hosts). WT-7437 was introduced since 4.4.7.
+    mapfile -t versions < <( git tag | grep $branch | grep -Ev "rc|alpha|4.4.[0-6]$" )
+
+    # Randomly pick a version from the array of patch versions
+    pv=${versions[$RANDOM % ${#versions[@]} ]}
+    echo "$pv"
+}
+
+#############################################################
 # build_branch:
 #       arg1: branch name
 #############################################################
 build_branch()
 {
-        echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
-        echo "Building branch: \"$1\""
-        echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+    echo "Building branch: \"$1\""
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
 
-        git clone --quiet https://github.com/wiredtiger/wiredtiger.git "$1"
-        cd "$1"
-        git checkout --quiet "$1"
-        if [ "${build_sys[$1]}" == "cmake" ]; then
-            . ./test/evergreen/find_cmake.sh
-            config=""
-            config+="-DENABLE_SNAPPY=1 "
-            config+="-DWT_STANDALONE_BUILD=0 "
-            (mkdir build && cd build &&
-                $CMAKE $config ../. && make -j $(grep -c ^processor /proc/cpuinfo)) > /dev/null
-        else
-            config+="--enable-snappy "
-            config+="--disable-standalone-build "
-            (mkdir build && cd build && sh ../build_posix/reconf &&
-                ../configure $config && make -j $(grep -c ^processor /proc/cpuinfo)) > /dev/null
-            # Copy out the extension modules to their parent directory. This is done to maintain uniformity between
-            # autoconf and CMake build directories, where relative module paths can possibly be cached when running verify/upgrade_downgrade
-            # tests between branch directories i.e. in the connection configuration.
-            cp build/ext/compressors/snappy/.libs/libwiredtiger_snappy.so build/ext/compressors/snappy/libwiredtiger_snappy.so
-            cp build/ext/collators/reverse/.libs/libwiredtiger_reverse_collator.so build/ext/collators/reverse/libwiredtiger_reverse_collator.so
-            cp build/ext/encryptors/rotn/.libs/libwiredtiger_rotn.so build/ext/encryptors/rotn/libwiredtiger_rotn.so
-        fi
+    git clone --quiet https://github.com/wiredtiger/wiredtiger.git "$1"
+    cd "$1"
+    git checkout --quiet "$1"
+    if [ "${build_sys[$1]}" == "cmake" ]; then
+        . ./test/evergreen/find_cmake.sh
+        config=""
+        config+="-DENABLE_SNAPPY=1 "
+        config+="-DWT_STANDALONE_BUILD=0 "
+        (mkdir build && cd build &&
+            $CMAKE $config ../. && make -j $(grep -c ^processor /proc/cpuinfo)) > /dev/null
+    else
+        config+="--enable-snappy "
+        config+="--disable-standalone-build "
+        (mkdir build && cd build && sh ../build_posix/reconf &&
+            ../configure $config && make -j $(grep -c ^processor /proc/cpuinfo)) > /dev/null
+        # Copy out the extension modules to their parent directory. This is done to maintain uniformity between
+        # autoconf and CMake build directories, where relative module paths can possibly be cached when running verify/upgrade_downgrade
+        # tests between branch directories i.e. in the connection configuration.
+        cp build/ext/compressors/snappy/.libs/libwiredtiger_snappy.so build/ext/compressors/snappy/libwiredtiger_snappy.so
+        cp build/ext/collators/reverse/.libs/libwiredtiger_reverse_collator.so build/ext/collators/reverse/libwiredtiger_reverse_collator.so
+        cp build/ext/encryptors/rotn/.libs/libwiredtiger_rotn.so build/ext/encryptors/rotn/libwiredtiger_rotn.so
+    fi
 }
 
 #############################################################
@@ -141,6 +164,9 @@ create_default_configs()
     for b in `ls`; do
         if [ -d "$b" ]; then
             (create_configs $b)
+            if [ -f CONFIG_$b ]; then
+                cp -rf CONFIG_$b $b/test/format/
+            fi
         fi
     done
 }
@@ -172,39 +198,127 @@ create_configs_for_newer_release_branches()
 #############################################################
 run_format()
 {
-        branch_name=$1
-        echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
-        echo "Running format in branch: \"$branch_name\""
-        echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+    branch_name=$1
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+    echo "Running format in branch: \"$branch_name\""
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
 
+    format_dir="$branch_name/build/test/format"
+    cd "$format_dir"
+    flags="-1q $(bflag $branch_name)"
 
-        format_dir="$branch_name/build/test/format"
-        cd "$format_dir"
-        flags="-1q $(bflag $branch_name)"
+    config_file=""
 
-        config_file=""
+    # Compatibility test for newer releases will have CONFIG file for each release
+    # branches for the upgrade/downgrade testing.
+    #
+    # Compatibility test for older and standalone releases will have the default config.
+    if [ "${wt_standalone}" = true ] || [ $older = true ]; then
+        config_file="-c CONFIG_default"
+    else
+        config_file="-c CONFIG_${branch_name}"
+    fi
 
-        # Compatibility test for newer releases will have CONFIG file for each release
-        # branches for the upgrade/downgrade testing.
-        #
-        # Compatibility test for older and standalone releases will have the default config.
-        if [ "$newer" = true ]; then
-            config_file="-c CONFIG_${branch_name}"
+    for am in $2; do
+        dir="RUNDIR.$am"
+        echo "./t running $am access method..."
+        ./t $flags ${config_file} -h $dir "file_type=$am"
+
+        # Remove the version string from the base configuration file. (MongoDB does not create
+        # a base configuration file, but format does, so we need to remove its version string
+        # to allow backward compatibility testing.)
+        (echo '/^version=/d'
+            echo w) | ed -s $dir/WiredTiger.basecfg > /dev/null
+    done
+    cd -
+}
+
+#############################################################
+# is_test_checkpoint_recovery_supported:
+#       arg1: branch name
+#############################################################
+is_test_checkpoint_recovery_supported()
+{
+    branch_name=$1
+
+    #
+    # The test_checkpoint recovery change WT-7958 are included in mongo
+    # 4.4.9 and 5.0.3 (and newer) versions.
+    #
+    # There's no much value to run test_checkpoint for earlier versions.
+    #
+    # Exclude mongodb-4.4.10+ and mongodb-5.0.10+ versions.
+    #
+    # Exclude mongodb-4.4 and mongodb-5.0 and they represent latest code
+    # of the corresponding release branches, which have WT-7958 included.
+    #
+    if ( ([[ $branch_name == mongodb-* ]] &&
+          [[ $branch_name < "mongodb-4.4.9" ]]) ||
+         ([[ $branch_name == mongodb-5.0.[0-9] ]] &&
+          [[ $branch_name < "mongodb-5.0.3" ]]) ) &&
+       [[ $branch_name != mongodb-4.4.[1-9][0-9] ]] &&
+       [[ $branch_name != mongodb-5.0.[1-9][0-9] ]] &&
+       [[ $branch_name != "mongodb-4.4" ]] &&
+       [[ $branch_name != "mongodb-5.0" ]]
+    then
+        echo "no"
+    else
+        echo "yes"
+    fi
+}
+
+#############################################################
+# run_test_checkpoint:
+#       arg1: branch name
+#       arg2: access methods list
+#############################################################
+run_test_checkpoint()
+{
+    branch_name=$1
+
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+    echo "Running test checkpoint in branch: \"$branch_name\""
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+
+    cd "$branch_name/build/test/checkpoint"
+
+    if [ "${build_sys[$branch_name]}" == "cmake" ]; then
+        test_bin="test_checkpoint"
+    else
+        test_bin="t"
+    fi
+
+    # With the timestamp and prepare transactions configuration, this test
+    # can produce a scenario where the on-disk tables have more data than
+    # the checkpoint can see.
+    #
+    # During the verification stage, rollback to stable has to be performed
+    # with the checkpoint snapshot to achieve the consistency.
+    flags="-W 3 -D -x -n 100000 -k 100000 -C cache_size=100MB"
+
+    for am in $2; do
+        dir="RUNDIR.$am"
+        echo "./t running $am access method..."
+        if [ "$am" == "fix" ]; then
+            ./$test_bin f $flags -h $dir
+        elif [ "$am" == "var" ]; then
+            ./$test_bin -t c $flags -h $dir
         else
-            config_file="-c CONFIG_default"
+            ./$test_bin -t r $flags -h $dir
         fi
+    done
+    cd -
+}
 
-        for am in $2; do
-            dir="RUNDIR.$am"
-            echo "./t running $am access method..."
-            ./t $flags ${config_file} -h $dir "file_type=$am"
-
-            # Remove the version string from the base configuration file. (MongoDB does not create
-            # a base configuration file, but format does, so we need to remove its version string
-            # to allow backward compatibility testing.)
-            (echo '/^version=/d'
-             echo w) | ed -s $dir/WiredTiger.basecfg > /dev/null
-        done
+#############################################################
+# run_tests:
+#       arg1: branch name
+#       arg2: access methods list
+#############################################################
+run_tests()
+{
+    run_format $1 $2
+    run_test_checkpoint $1 $2
 }
 
 EXT="extensions=["
@@ -212,6 +326,74 @@ EXT+="build/ext/compressors/snappy/libwiredtiger_snappy.so,"
 EXT+="build/ext/collators/reverse/libwiredtiger_reverse_collator.so, "
 EXT+="build/ext/encryptors/rotn/libwiredtiger_rotn.so, "
 EXT+="]"
+
+#############################################################
+# verify_test_format:
+#       arg1: branch name #1
+#       arg2: branch name #2
+#       arg3: access methods list
+#       arg4: backward compatibility
+#############################################################
+verify_test_format()
+{
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+    echo "Release \"$1\" format verifying \"$2\""
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+
+    cd "$1"
+
+    wt_bin="build/wt"
+    for am in $3; do
+        echo "$1/$wt_bin verifying $2 access method $am..."
+        dir="$2/build/test/format/RUNDIR.$am"
+        WIREDTIGER_CONFIG="$EXT" ./$wt_bin $(bflag $1) -h "../$dir" verify table:wt
+
+        if [ "$4" = true ]; then
+            echo "$1/wt dump and load $2 access method $am..."
+            WIREDTIGER_CONFIG="$EXT" ./$wt_bin $(bflag $1) -h "../$dir" dump table:wt > dump_wt.txt
+            WIREDTIGER_CONFIG="$EXT" ./$wt_bin $(bflag $1) -h "../$dir" load -f dump_wt.txt
+        fi
+    done
+
+    cd -
+}
+
+#############################################################
+# verify_test_checkpoint:
+#       arg1: branch name #1
+#       arg2: branch name #2
+#       arg3: access methods list
+#############################################################
+verify_test_checkpoint()
+{
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+    echo "Version \"$1\" test_checkpoint verifying \"$2\""
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+
+    top_dir=$PWD
+    cd "$1/build/test/checkpoint"
+
+    if [ "${build_sys[$1]}" == "cmake" ]; then
+        test_bin="test_checkpoint"
+    else
+        test_bin="t"
+    fi
+
+    for am in $3; do
+        echo "$1/$test_bin verifying $2 access method $am..."
+        dir="$top_dir/$2/build/test/checkpoint/RUNDIR.$am"
+        cp -fr "$dir" "$dir.backup"
+        if [ "$am" = "fix" ]; then
+            ./$test_bin -t f -D -v -h "$dir"
+        elif [ "$am" = "var" ]; then
+            ./$test_bin -t c -D -v -h "$dir"
+        else
+            ./$test_bin -t r -D -v -h "$dir"
+        fi
+    done
+
+    cd -
+}
 
 #############################################################
 # verify_branches:
@@ -222,24 +404,8 @@ EXT+="]"
 #############################################################
 verify_branches()
 {
-        echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
-        echo "Release \"$1\" verifying \"$2\""
-        echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
-
-        cd "$1"
-
-        wt_bin="build/wt"
-        for am in $3; do
-            echo "$1/$wt_bin verifying $2 access method $am..."
-            dir="$2/build/test/format/RUNDIR.$am"
-            WIREDTIGER_CONFIG="$EXT" ./$wt_bin $(bflag $1) -h "../$dir" verify table:wt
-
-            if [ "$4" = true ]; then
-                echo "$1/wt dump and load $2 access method $am..."
-                WIREDTIGER_CONFIG="$EXT" ./$wt_bin $(bflag $1) -h "../$dir" dump table:wt > dump_wt.txt
-                WIREDTIGER_CONFIG="$EXT" ./$wt_bin $(bflag $1) -h "../$dir" load -f dump_wt.txt
-            fi
-        done
+    verify_test_format $1 $2 $3 $4
+    verify_test_checkpoint $1 $2 $3
 }
 
 #############################################################
@@ -250,32 +416,32 @@ verify_branches()
 #############################################################
 upgrade_downgrade()
 {
-        echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
-        echo "Upgrade/downgrade testing with \"$1\" and \"$2\""
-        echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+    echo "Upgrade/downgrade testing with \"$1\" and \"$2\""
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
 
-        cfg_file_branch1=$(get_config_file_name $1)
-        cfg_file_branch2=$(get_config_file_name $2)
+    cfg_file_branch1=$(get_config_file_name $1)
+    cfg_file_branch2=$(get_config_file_name $2)
 
-        format_dir_branch1="$1/build/test/format"
-        format_dir_branch2="$2/build/test/format"
+    format_dir_branch1="$1/build/test/format"
+    format_dir_branch2="$2/build/test/format"
 
-        # Alternate running each branch format test program on the second branch's build.
-        # Loop twice, that is, run format twice using each branch.
-        top="$PWD"
-        for am in $3; do
-            for reps in {1..2}; do
-                echo "$1 format running on $2 access method $am..."
-                cd "$top/$format_dir_branch1"
-                flags="-1Rq $(bflag $1)"
-                ./t $flags -c "$top/$format_dir_branch2/${cfg_file_branch1}" -h "$top/$format_dir_branch2/RUNDIR.$am" timer=2
+    # Alternate running each branch format test program on the second branch's build.
+    # Loop twice, that is, run format twice using each branch.
+    top="$PWD"
+    for am in $3; do
+        for reps in {1..2}; do
+            echo "$1 format running on $2 access method $am..."
+            cd "$top/$format_dir_branch1"
+            flags="-1Rq $(bflag $1)"
+            ./t $flags -c "$top/$format_dir_branch2/${cfg_file_branch1}" -h "$top/$format_dir_branch2/RUNDIR.$am" timer=2
 
-                echo "$2 format running on $2 access method $am..."
-                cd "$top/$format_dir_branch2"
-                flags="-1Rq $(bflag $2)"
-                ./t $flags -c $cfg_file_branch2 -h "RUNDIR.$am" timer=2
-            done
+            echo "$2 format running on $2 access method $am..."
+            cd "$top/$format_dir_branch2"
+            flags="-1Rq $(bflag $2)"
+            ./t $flags -c $cfg_file_branch2 -h "RUNDIR.$am" timer=2
         done
+    done
 }
 
 #############################################################
@@ -285,45 +451,45 @@ upgrade_downgrade()
 #############################################################
 test_upgrade_to_branch()
 {
-        cd $1/build/test/checkpoint
+    cd $1/build/test/checkpoint
 
-        if [ "${build_sys[$1]}" == "cmake" ]; then
-            test_bin="test_checkpoint"
-        else
-            test_bin="t"
-        fi
+    if [ "${build_sys[$1]}" == "cmake" ]; then
+        test_bin="test_checkpoint"
+    else
+        test_bin="t"
+    fi
 
-        for FILE in $2/*; do
-            # Run actual test.
-            echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
-            echo "Upgrading $FILE database to $1..."
+    for FILE in $2/*; do
+        # Run actual test.
+        echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+        echo "Upgrading $FILE database to $1..."
 
-            # Disable exit on non 0
-            set +e
+        # Disable exit on non 0
+        set +e
 
-            output="$(./$test_bin -t r -D -v -h $FILE)"
-            test_res=$?
+        output="$(./$test_bin -t r -D -v -h $FILE)"
+        test_res=$?
 
-            # Enable exit on non 0
-            set -e
+        # Enable exit on non 0
+        set -e
 
-            # Validate test result.
-            if [[ "$FILE" =~ "4.4."[0-6]"_unclean"$ ]]; then
-                echo "Databases generated with unclean shutdown from versions 4.4.[0-6] must fail."
-                if [[ "$test_res" == 0 ]]; then
-                    echo "$output"
-                    echo "Error: Upgrade of $FILE database to $1 has not failed!"
-                    exit 1
-                fi
-            elif [[ "$test_res" != 0 ]]; then
+        # Validate test result.
+        if [[ "$FILE" =~ "4.4."[0-6]"_unclean"$ ]]; then
+            echo "Databases generated with unclean shutdown from versions 4.4.[0-6] must fail."
+            if [[ "$test_res" == 0 ]]; then
                 echo "$output"
-                echo "Error: Upgrade of $FILE database to $1 failed! Test result is $test_res."
+                echo "Error: Upgrade of $FILE database to $1 has not failed!"
                 exit 1
             fi
+        elif [[ "$test_res" != 0 ]]; then
+            echo "$output"
+            echo "Error: Upgrade of $FILE database to $1 failed! Test result is $test_res."
+            exit 1
+        fi
 
-            echo "Success!"
-            echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
-        done
+        echo "Success!"
+        echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+    done
 }
 
 #############################################################
@@ -331,20 +497,21 @@ test_upgrade_to_branch()
 #############################################################
 prepare_test_data_wt_8395()
 {
-        echo "Preparing test data..."
-        git clone --quiet --depth 1 --filter=blob:none --no-checkout https://github.com/wiredtiger/mongo-tests.git
-        cd mongo-tests
-        git checkout --quiet master -- WT-8395 &> /dev/null
-        cd WT-8395
+    echo "Preparing test data..."
+    git clone --quiet --depth 1 --filter=blob:none --no-checkout https://github.com/wiredtiger/mongo-tests.git
+    cd mongo-tests
+    git checkout --quiet master -- WT-8395 &> /dev/null
+    cd WT-8395
 
-        for FILE in *; do tar -zxf $FILE; done
-        rm *.tar.gz; cd ../..
+    for FILE in *; do tar -zxf $FILE; done
+    rm *.tar.gz; cd ../..
 }
 
 # Only one of below flags will be set by the 1st argument of the script.
 older=false
 newer=false
 wt_standalone=false
+patch_version=false
 upgrade_to_latest=false
 
 # Branches in below 2 arrays should be put in newer-to-older order.
@@ -362,14 +529,24 @@ older_release_branches=(mongodb-4.2 mongodb-4.0 mongodb-3.6)
 # configuration file.
 compatible_upgrade_downgrade_release_branches=(mongodb-4.4 mongodb-4.2)
 
+# This array is used to configure the release branches we'd like to run patch version
+# upgrade/downgrade test.
+patch_version_upgrade_downgrade_release_branches=(mongodb-5.0 mongodb-4.4)
+
+# This array is used to configure the release branches we'd like to run test checkpoint
+# upgrade/downgrade test.
+test_checkpoint_release_branches=(develop mongodb-5.0 mongodb-4.4)
+
 # This array is used to configure the release branches we'd like to run upgrade to latest test.
 upgrade_to_latest_upgrade_downgrade_release_branches=(mongodb-5.0 mongodb-4.4)
 
 declare -A scopes
 scopes[newer]="newer stable release branches"
 scopes[older]="older stable release branches"
+scopes[patch_version]="patch versions of the same release branch"
 scopes[upgrade_to_latest]="upgrade/downgrade databases to the latest versions of the codebase"
 scopes[wt_standalone]="WiredTiger standalone releases"
+scopes[two_versions]="any two given versions"
 
 # The following associative array maps the 'official' build system to use for each branch.
 # CMake build support is reliably mature in newer release branches, whilst earlier revisions
@@ -388,15 +565,17 @@ build_sys['mongodb-3.6']="autoconf"
 #############################################################
 usage()
 {
-    echo -e "Usage: \tcompatibility_test_for_releases [-n|-o|-u|-w]"
+    echo -e "Usage: \tcompatibility_test_for_releases [-n|-o|-p|-u|-w|-v]"
     echo -e "\t-n\trun compatibility tests for ${scopes[newer]}"
     echo -e "\t-o\trun compatibility tests for ${scopes[older]}"
+    echo -e "\t-p\trun compatibility tests for ${scopes[patch_version]}"
     echo -e "\t-u\trun compatibility tests for ${scopes[upgrade_to_latest]}"
     echo -e "\t-w\trun compatibility tests for ${scopes[wt_standalone]}"
+    echo -e "\t-v <v1> <v2>\trun compatibility tests for ${scopes[two_versions]}"
     exit 1
 }
 
-if [ $# -ne 1 ]; then
+if [ $# -lt 1 ]; then
     usage
 fi
 
@@ -414,6 +593,11 @@ case $1 in
     echo "Performing compatibility tests for ${scopes[older]}"
     echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
 ;;
+"-p")
+    patch_version=true
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+    echo "Performing compatibility tests for ${scopes[patch_version]}"
+;;
 "-u")
     upgrade_to_latest=true
     echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
@@ -424,6 +608,15 @@ case $1 in
     wt_standalone=true
     echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
     echo "Performing compatibility tests for ${scopes[wt_standalone]}"
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+;;
+"-v")
+    two_versions=true
+    v1=$2
+    v2=$3
+    [[ -z "$v1" || -z "$v2" ]] && usage
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+    echo "Performing compatibility tests for $v1 and $v2"
     echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
 ;;
 *)
@@ -451,6 +644,60 @@ if [ "$upgrade_to_latest" = true ]; then
         cd $test_root
         rm -rf $test_data_root
     done
+fi
+
+if [ "$two_versions" = true ]; then
+    # Check if the 2 given versions support test checkpoint with recovery
+    rtn=$(is_test_checkpoint_recovery_supported $v1)
+    if [ $rtn == "no" ]; then
+        echo -e "\n\"$v1\" does not support test checkpoint with recovery, exiting ...\n"
+        exit 1
+    fi
+
+    rtn=$(is_test_checkpoint_recovery_supported $v2)
+    if [ $rtn == "no" ]; then
+        echo -e "\n\"$v2\" does not support test checkpoint with recovery, exiting ...\n"
+        exit 1
+    fi
+
+    # Build the branches
+    (build_branch $v1)
+    (build_branch $v2)
+
+    # Run test for both branches to generate data files
+    (run_test_checkpoint $v1 "row")
+    (run_test_checkpoint $v2 "row")
+
+    # Use one version binary to verify data files generated by the other version
+    (verify_test_checkpoint "$v1" "$v2" "row")
+    (verify_test_checkpoint "$v2" "$v1" "row")
+
+    exit 0
+fi
+
+if [ "$patch_version" = true ]; then
+    for b in ${patch_version_upgrade_downgrade_release_branches[@]}; do
+        # Build the tip of the release branch and run test to genearte data files
+        (build_branch $b)
+        (run_test_checkpoint "$b" "row")
+
+        # Pick a patch version from the list of patch versions for the release branch
+        cd $b; pv=$(pick_a_version $b); cd ..
+        (build_branch $pv)
+        (run_test_checkpoint "$pv" "row")
+
+        # Use one version binary to verify data files generated by the other version
+        (verify_test_checkpoint "$b" "$pv" "row")
+        # Only run verify if the picked version supports test checkpoint recovery
+        rtn=$(is_test_checkpoint_recovery_supported $pv)
+        if [ $rtn == "no" ]; then
+            echo -e "\n\"$pv\" does not support test checkpoint with recovery, skipping ...\n"
+        else
+            (verify_test_checkpoint "$pv" "$b" "row")
+        fi
+    done
+
+    exit 0
 fi
 
 # Build the branches.
@@ -483,11 +730,13 @@ else
     create_default_configs
 fi
 
-
 # Run format in each branch for supported access methods.
 if [ "$newer" = true ]; then
     for b in ${newer_release_branches[@]}; do
         (run_format $b "row")
+    done
+    for b in ${test_checkpoint_release_branches[@]}; do
+        (run_test_checkpoint $b "row")
     done
 fi
 
@@ -498,7 +747,7 @@ if [ "$older" = true ]; then
 fi
 
 if [ "${wt_standalone}" = true ]; then
-    (run_format "$wt1" "row")
+    (run_tests "$wt1" "row")
     (run_format "$wt2" "row")
 fi
 
@@ -511,20 +760,24 @@ fi
 if [ "$newer" = true ]; then
     for i in ${!newer_release_branches[@]}; do
         [[ $((i+1)) < ${#newer_release_branches[@]} ]] && \
-        (verify_branches ${newer_release_branches[$i]} ${newer_release_branches[$((i+1))]} "row" true)
+        (verify_test_format ${newer_release_branches[$i]} ${newer_release_branches[$((i+1))]} "row" true)
+    done
+    for i in ${!test_checkpoint_release_branches[@]}; do
+        [[ $((i+1)) < ${#test_checkpoint_release_branches[@]} ]] && \
+        (verify_test_checkpoint ${test_checkpoint_release_branches[$i]} ${test_checkpoint_release_branches[$((i+1))]} "row")
     done
 fi
 
 if [ "$older" = true ]; then
     for i in ${!older_release_branches[@]}; do
         [[ $((i+1)) < ${#older_release_branches[@]} ]] && \
-        (verify_branches ${older_release_branches[$i]} ${older_release_branches[$((i+1))]} "fix row var" true)
+        (verify_test_format ${older_release_branches[$i]} ${older_release_branches[$((i+1))]} "fix row var" true)
     done
 fi
 
 if [ "${wt_standalone}" = true ]; then
     (verify_branches develop "$wt1" "row" true)
-    (verify_branches "$wt1" "$wt2" "row" true)
+    (verify_test_format "$wt1" "$wt2" "row" true)
 fi
 
 # Verify forward compatibility for supported access methods.
@@ -536,7 +789,11 @@ fi
 if [ "$newer" = true ]; then
     for i in ${!newer_release_branches[@]}; do
         [[ $((i+1)) < ${#newer_release_branches[@]} ]] && \
-        (verify_branches ${newer_release_branches[$((i+1))]} ${newer_release_branches[$i]} "row" false)
+        (verify_test_format ${newer_release_branches[$((i+1))]} ${newer_release_branches[$i]} "row" false)
+    done
+    for i in ${!test_checkpoint_release_branches[@]}; do
+        [[ $((i+1)) < ${#test_checkpoint_release_branches[@]} ]] && \
+        (verify_test_checkpoint ${test_checkpoint_release_branches[$((i+1))]} ${test_checkpoint_release_branches[$i]} "row")
     done
 fi
 

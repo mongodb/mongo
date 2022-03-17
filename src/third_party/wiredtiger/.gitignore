@@ -3,3 +3,4 @@
 build/
 dist/clang-format
 /docs/
+test-compatibility-run/
