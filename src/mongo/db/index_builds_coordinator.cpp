@@ -854,8 +854,39 @@ void IndexBuildsCoordinator::applyAbortIndexBuild(OperationContext* opCtx,
     std::string abortReason(str::stream()
                             << "abortIndexBuild oplog entry encountered: " << *oplogEntry.cause);
     auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
-    indexBuildsCoord->abortIndexBuildByBuildUUID(
-        opCtx, buildUUID, IndexBuildAction::kOplogAbort, abortReason);
+    if (indexBuildsCoord->abortIndexBuildByBuildUUID(
+            opCtx, buildUUID, IndexBuildAction::kOplogAbort, abortReason)) {
+        return;
+    }
+
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    if (replCoord->getSettings().shouldRecoverFromOplogAsStandalone()) {
+        // Unfinished index builds are not restarted in standalone mode. That means there will be no
+        // index builder threads to abort. Instead, we should drop the unfinished indexes that were
+        // aborted.
+        AutoGetCollection autoColl{opCtx, nss, MODE_X};
+        auto coll = autoColl.getCollection();
+
+        WriteUnitOfWork wuow(opCtx);
+
+        auto indexCatalog = coll->getIndexCatalog();
+        for (const auto& indexSpec : oplogEntry.indexSpecs) {
+            const IndexDescriptor* desc = indexCatalog->findIndexByName(
+                opCtx,
+                indexSpec.getStringField(IndexDescriptor::kIndexNameFieldName),
+                /*includeUnfinishedIndexes=*/true);
+
+            LOGV2(6455400,
+                  "Dropping unfinished index during oplog recovery as standalone",
+                  "spec"_attr = indexSpec);
+
+            invariant(desc);
+            invariant(indexCatalog->dropUnfinishedIndex(opCtx, desc));
+        }
+
+        wuow.commit();
+        return;
+    }
 }
 
 boost::optional<UUID> IndexBuildsCoordinator::abortIndexBuildByIndexNames(
