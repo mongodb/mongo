@@ -118,6 +118,9 @@ const allCommands = {
     cleanupReshardCollection: {skip: isPrimaryOnly},
     clearLog: {skip: isNotAUserDataRead},
     cloneCollectionAsCapped: {skip: isPrimaryOnly},
+    clusterAbortTransaction: {skip: "already tested by 'abortTransaction' tests on mongos"},
+    clusterCommitTransaction: {skip: "already tested by 'commitTransaction' tests on mongos"},
+    clusterFind: {skip: "already tested by 'find' tests on mongos"},
     collMod: {skip: isPrimaryOnly},
     collStats: {
         command: {aggregate: collName, pipeline: [{$collStats: {count: {}}}], cursor: {}},
@@ -338,7 +341,6 @@ const allCommands = {
     stopRecordingTraffic: {skip: isNotAUserDataRead},
     testDeprecation: {skip: isNotAUserDataRead},
     testDeprecationInVersion2: {skip: isNotAUserDataRead},
-    clusterFind: {skip: "already tested by 'find' tests on mongos"},
     testRemoval: {skip: isNotAUserDataRead},
     testReshardCloneCollection: {skip: isNotAUserDataRead},
     testVersions1And2: {skip: isNotAUserDataRead},

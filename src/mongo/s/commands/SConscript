@@ -24,7 +24,7 @@ env.Library(
     target='cluster_commands',
     source=[
         'cluster_abort_reshard_collection_cmd.cpp',
-        'cluster_abort_transaction_cmd.cpp',
+        'cluster_abort_transaction_cmd_s.cpp',
         'cluster_available_query_options_cmd.cpp',
         'cluster_build_info.cpp',
         'cluster_change_stream_options_command.cpp',
@@ -32,7 +32,7 @@ env.Library(
         'cluster_coll_stats_cmd.cpp',
         'cluster_collection_mod_cmd.cpp',
         'cluster_commit_reshard_collection_cmd.cpp',
-        'cluster_commit_transaction_cmd.cpp',
+        'cluster_commit_transaction_cmd_s.cpp',
         'cluster_compact_cmd.cpp',
         'cluster_convert_to_capped_cmd.cpp',
         'cluster_count_cmd.cpp',

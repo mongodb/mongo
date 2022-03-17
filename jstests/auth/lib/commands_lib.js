@@ -254,6 +254,21 @@ var authCommandsLib = {
           ]
         },
         {
+          testname: "clusterAbortTransaction",
+          command: {clusterAbortTransaction: 1},
+          skipSharded: true,
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                roles: {__system: 1},
+                privileges: [{resource: {cluster: true}, actions: ["internal"]}],
+                expectFail: true,
+              },
+              {runOnDb: firstDbName, roles: {}},
+              {runOnDb: secondDbName, roles: {}}
+          ]
+        },
+        {
           testname: "_addShard",
           command: {
               _addShard: 1,
@@ -2690,6 +2705,21 @@ var authCommandsLib = {
                 runOnDb: firstDbName,
                 roles: roles_all,
               },
+          ]
+        },
+        {
+          testname: "clusterCommitTransaction",
+          command: {clusterCommitTransaction: 1},
+          skipSharded: true,
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                roles: {__system: 1},
+                privileges: [{resource: {cluster: true}, actions: ["internal"]}],
+                expectFail: true,
+              },
+              {runOnDb: firstDbName, roles: {}},
+              {runOnDb: secondDbName, roles: {}}
           ]
         },
         {

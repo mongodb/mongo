@@ -27,7 +27,9 @@
  *    it in the license file.
  */
 
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/s/commands/cluster_find_cmd.h"
+#include "mongo/s/grid.h"
 
 namespace mongo {
 namespace {
@@ -50,6 +52,14 @@ struct ClusterFindCmdD {
                 AuthorizationSession::get(opCtx->getClient())
                     ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
                                                        ActionType::internal));
+    }
+
+    static void checkCanRunHere(OperationContext* opCtx) {
+        Grid::get(opCtx)->assertShardingIsInitialized();
+
+        // A cluster command on the config server may attempt to use a ShardLocal to target itself,
+        // which triggers an invariant, so only shard servers can run this.
+        uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
     }
 };
 ClusterFindCmdBase<ClusterFindCmdD> clusterFindCmdD;

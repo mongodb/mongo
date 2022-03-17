@@ -51,7 +51,7 @@
 namespace mongo {
 
 /**
- * Implements the find command on mongos.
+ * Implements the find command for a router.
  */
 template <typename Impl>
 class ClusterFindCmdBase final : public Command {
@@ -194,7 +194,7 @@ public:
             // We count find command as a query op.
             globalOpCounters.gotQuery();
 
-            Grid::get(opCtx)->assertShardingIsInitialized();
+            Impl::checkCanRunHere(opCtx);
 
             ON_BLOCK_EXIT([opCtx] {
                 Grid::get(opCtx)->catalogCache()->checkAndRecordOperationBlockedByRefresh(

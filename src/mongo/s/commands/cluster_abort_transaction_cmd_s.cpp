@@ -27,33 +27,30 @@
  *    it in the license file.
  */
 
-#include "mongo/s/commands/cluster_find_cmd.h"
+#include "mongo/s/commands/cluster_abort_transaction_cmd.h"
 
 namespace mongo {
 namespace {
 
 /**
- * Implements the cluster find command on mongos.
+ * Implements the cluster abortTransaction command on mongos.
  */
-struct ClusterFindCmdS {
-    static constexpr StringData kName = "find"_sd;
+struct ClusterAbortTransactionCmdS {
+    static constexpr StringData kName = "abortTransaction"_sd;
 
     static const std::set<std::string>& getApiVersions() {
         return kApiVersions1;
     }
 
-    static void doCheckAuthorization(OperationContext* opCtx,
-                                     bool hasTerm,
-                                     const NamespaceString& nss) {
-        uassertStatusOK(
-            auth::checkAuthForFind(AuthorizationSession::get(opCtx->getClient()), nss, hasTerm));
+    static Status checkAuthForOperation(OperationContext* opCtx) {
+        return Status::OK();
     }
 
     static void checkCanRunHere(OperationContext* opCtx) {
         // Can always run on a mongos.
     }
 };
-ClusterFindCmdBase<ClusterFindCmdS> clusterFindCmdS;
+ClusterAbortTransactionCmdBase<ClusterAbortTransactionCmdS> clusterAbortTransactionS;
 
 }  // namespace
 }  // namespace mongo

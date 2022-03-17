@@ -1020,6 +1020,8 @@ protected:
         : BasicCommandWithReplyBuilderInterface(Derived::Request::kCommandName,
                                                 command_alias_v<typename Derived::Request>) {}
 
+    BasicCommandWithRequestParser(StringData name) : BasicCommandWithReplyBuilderInterface(name) {}
+
     bool runWithReplyBuilder(OperationContext* opCtx,
                              const std::string& db,
                              const BSONObj& cmdObj,

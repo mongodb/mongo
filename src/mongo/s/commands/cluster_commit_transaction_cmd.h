@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2022-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,9 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
-
-#include "mongo/platform/basic.h"
+#pragma once
 
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
@@ -41,29 +39,35 @@ namespace mongo {
 namespace {
 
 /**
- * Implements the commitTransaction command on mongos.
+ * Implements the commitTransaction command for a router.
  */
-class ClusterCommitTransactionCmd
-    : public BasicCommandWithRequestParser<ClusterCommitTransactionCmd> {
+template <typename Impl>
+class ClusterCommitTransactionCmdBase
+    : public BasicCommandWithRequestParser<ClusterCommitTransactionCmdBase<Impl>> {
 public:
-    using BasicCommandWithRequestParser::BasicCommandWithRequestParser;
+    ClusterCommitTransactionCmdBase()
+        : BasicCommandWithRequestParser<ClusterCommitTransactionCmdBase<Impl>>(Impl::kName) {}
+
     using Request = CommitTransaction;
     using Reply = OkReply;
+    using BaseType = BasicCommandWithRequestParser<ClusterCommitTransactionCmdBase<Impl>>;
+    using RequestParser = typename BasicCommandWithRequestParser<
+        ClusterCommitTransactionCmdBase<Impl>>::RequestParser;
 
     void validateResult(const BSONObj& resultObj) final {
         auto ctx = IDLParserErrorContext("CommitReply");
-        if (!checkIsErrorStatus(resultObj, ctx)) {
+        if (!BaseType::checkIsErrorStatus(resultObj, ctx)) {
             // Will throw if the result doesn't match the commitReply.
             Reply::parse(ctx, resultObj);
         }
     }
 
     const std::set<std::string>& apiVersions() const {
-        return kApiVersions1;
+        return Impl::getApiVersions();
     }
 
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kAlways;
+    BasicCommand::AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+        return BasicCommand::AllowedOnSecondary::kAlways;
     }
 
     bool adminOnly() const override {
@@ -81,7 +85,7 @@ public:
     Status checkAuthForOperation(OperationContext* opCtx,
                                  const std::string& dbname,
                                  const BSONObj& cmdObj) const override {
-        return Status::OK();
+        return Impl::checkAuthForOperation(opCtx);
     }
 
     bool runWithRequestParser(OperationContext* opCtx,
@@ -89,6 +93,8 @@ public:
                               const BSONObj& cmdObj,
                               const RequestParser& requestParser,
                               BSONObjBuilder& result) final {
+        Impl::checkCanRunHere(opCtx);
+
         auto txnRouter = TransactionRouter::get(opCtx);
         uassert(ErrorCodes::InvalidOptions,
                 "commitTransaction can only be run within a session",
@@ -103,7 +109,7 @@ public:
     const AuthorizationContract* getAuthorizationContract() const final {
         return &::mongo::CommitTransaction::kAuthorizationContract;
     }
-} clusterCommitTransactionCmd;
+};
 
 }  // namespace
 }  // namespace mongo

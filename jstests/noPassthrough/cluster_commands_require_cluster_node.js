@@ -12,6 +12,22 @@
 const kDBName = "foo";
 const kCollName = "bar";
 
+// Note some commands may still fail, e.g. committing a non-existent transaction, so we validate the
+// error was different than when a command is rejected for not having sharding enabled.
+const clusterCommandsCases = [
+    {cmd: {clusterAbortTransaction: 1}, expectedErr: ErrorCodes.InvalidOptions},
+    {cmd: {clusterCommitTransaction: 1}, expectedErr: ErrorCodes.InvalidOptions},
+    {cmd: {clusterFind: kCollName}},
+];
+
+function runTestCaseExpectFail(conn, testCase, code) {
+    assert.commandFailedWithCode(conn.adminCommand(testCase.cmd), code, tojson(testCase.cmd));
+}
+
+function runTestCaseExpectSuccess(conn, testCase) {
+    assert.commandWorked(conn.adminCommand(testCase.cmd), tojson(testCase.cmd));
+}
+
 //
 // Standalone mongods have cluster commands, but they cannot be run.
 //
@@ -19,8 +35,9 @@ const kCollName = "bar";
     const standalone = MongoRunner.runMongod({});
     assert(standalone);
 
-    assert.commandFailedWithCode(standalone.getDB(kDBName).runCommand({clusterFind: kCollName}),
-                                 ErrorCodes.ShardingStateNotInitialized);
+    for (let testCase of clusterCommandsCases) {
+        runTestCaseExpectFail(standalone, testCase, ErrorCodes.ShardingStateNotInitialized);
+    }
 
     MongoRunner.stopMongod(standalone);
 }
@@ -33,9 +50,9 @@ const kCollName = "bar";
     rst.startSet();
     rst.initiate();
 
-    assert.commandFailedWithCode(
-        rst.getPrimary().getDB(kDBName).runCommand({clusterFind: kCollName}),
-        ErrorCodes.ShardingStateNotInitialized);
+    for (let testCase of clusterCommandsCases) {
+        runTestCaseExpectFail(rst.getPrimary(), testCase, ErrorCodes.ShardingStateNotInitialized);
+    }
 
     rst.stopSet();
 }
@@ -48,9 +65,10 @@ const kCollName = "bar";
     shardsvrRst.startSet({shardsvr: ""});
     shardsvrRst.initiate();
 
-    assert.commandFailedWithCode(
-        shardsvrRst.getPrimary().getDB(kDBName).runCommand({clusterFind: kCollName}),
-        ErrorCodes.ShardingStateNotInitialized);
+    for (let testCase of clusterCommandsCases) {
+        runTestCaseExpectFail(
+            shardsvrRst.getPrimary(), testCase, ErrorCodes.ShardingStateNotInitialized);
+    }
 
     shardsvrRst.stopSet();
 }
@@ -62,21 +80,29 @@ const kCollName = "bar";
     // Cluster commands do not exist on mongos.
     //
 
-    assert.commandFailedWithCode(st.s.getDB(kDBName).runCommand({clusterFind: kCollName}),
-                                 ErrorCodes.CommandNotFound);
+    for (let testCase of clusterCommandsCases) {
+        runTestCaseExpectFail(st.s, testCase, ErrorCodes.CommandNotFound);
+    }
+
+    //
+    // Cluster commands are not allowed on a config server node.
+    //
+
+    for (let testCase of clusterCommandsCases) {
+        runTestCaseExpectFail(st.configRS.getPrimary(), testCase, ErrorCodes.NoShardingEnabled);
+    }
 
     //
     // Cluster commands work on sharding enabled shardsvr.
     //
 
-    assert.commandWorked(st.rs0.getPrimary().getDB(kDBName).runCommand({clusterFind: kCollName}));
-
-    //
-    // Cluster commands work on config server.
-    //
-
-    assert.commandWorked(
-        st.configRS.getPrimary().getDB(kDBName).runCommand({clusterFind: kCollName}));
+    for (let testCase of clusterCommandsCases) {
+        if (testCase.expectedErr) {
+            runTestCaseExpectFail(st.rs0.getPrimary(), testCase, testCase.expectedErr);
+        } else {
+            runTestCaseExpectSuccess(st.rs0.getPrimary(), testCase);
+        }
+    }
 
     st.stop();
 }

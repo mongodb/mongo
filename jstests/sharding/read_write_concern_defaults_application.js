@@ -241,6 +241,9 @@ let testCases = {
         checkReadConcern: false,
         checkWriteConcern: true,
     },
+    clusterAbortTransaction: {skip: "already tested by 'abortTransaction' tests on mongos"},
+    clusterCommitTransaction: {skip: "already tested by 'commitTransaction' tests on mongos"},
+    clusterFind: {skip: "already tested by 'find' tests on mongos"},
     collMod: {
         setUp: function(conn) {
             assert.commandWorked(conn.getDB(db).runCommand({create: coll, writeConcern: {w: 1}}));
@@ -698,7 +701,6 @@ let testCases = {
     testDeprecation: {skip: "does not accept read or write concern"},
     testDeprecationInVersion2: {skip: "does not accept read or write concern"},
     testInternalTransactions: {skip: "internal command"},
-    clusterFind: {skip: "already tested by 'find' tests on mongos"},
     testRemoval: {skip: "does not accept read or write concern"},
     testReshardCloneCollection: {skip: "internal command"},
     testVersions1And2: {skip: "does not accept read or write concern"},

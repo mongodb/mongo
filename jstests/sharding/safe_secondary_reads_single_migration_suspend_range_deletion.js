@@ -139,6 +139,9 @@ let testCases = {
     clearLog: {skip: "does not return user data"},
     clone: {skip: "primary only"},
     cloneCollectionAsCapped: {skip: "primary only"},
+    clusterAbortTransaction: {skip: "already tested by 'abortTransaction' tests on mongos"},
+    clusterCommitTransaction: {skip: "already tested by 'commitTransaction' tests on mongos"},
+    clusterFind: {skip: "already tested by 'find' tests on mongos"},
     commitReshardCollection: {skip: "primary only"},
     commitTransaction: {skip: "primary only"},
     configureCollectionAutoSplitter: {
@@ -406,7 +409,6 @@ let testCases = {
     testDeprecation: {skip: "does not return user data"},
     testDeprecationInVersion2: {skip: "does not return user data"},
     testInternalTransactions: {skip: "primary only"},
-    clusterFind: {skip: "already tested by 'find' tests on mongos"},
     testRemoval: {skip: "does not return user data"},
     testVersions1And2: {skip: "does not return user data"},
     testVersion2: {skip: "does not return user data"},

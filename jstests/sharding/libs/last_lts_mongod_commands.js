@@ -12,6 +12,8 @@ const commandsRemovedFromMongodSinceLastLTS = [
 // listCommands output of a last LTS version mongod. We will allow these commands to have a
 // test defined without always existing on the mongod being used.
 const commandsAddedToMongodSinceLastLTS = [
+    "clusterAbortTransaction",
+    "clusterCommitTransaction",
     "clusterFind",
     "rotateCertificates",
     "setUserWriteBlockMode",

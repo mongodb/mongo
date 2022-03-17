@@ -27,33 +27,41 @@
  *    it in the license file.
  */
 
-#include "mongo/s/commands/cluster_find_cmd.h"
+#include "mongo/db/s/sharding_state.h"
+#include "mongo/s/commands/cluster_abort_transaction_cmd.h"
+#include "mongo/s/grid.h"
 
 namespace mongo {
 namespace {
 
 /**
- * Implements the cluster find command on mongos.
+ * Implements the cluster abortTransaction command on mongod.
  */
-struct ClusterFindCmdS {
-    static constexpr StringData kName = "find"_sd;
+struct ClusterAbortTransactionCmdD {
+    static constexpr StringData kName = "clusterAbortTransaction"_sd;
 
     static const std::set<std::string>& getApiVersions() {
-        return kApiVersions1;
+        return kNoApiVersions;
     }
 
-    static void doCheckAuthorization(OperationContext* opCtx,
-                                     bool hasTerm,
-                                     const NamespaceString& nss) {
-        uassertStatusOK(
-            auth::checkAuthForFind(AuthorizationSession::get(opCtx->getClient()), nss, hasTerm));
+    static Status checkAuthForOperation(OperationContext* opCtx) {
+        if (!AuthorizationSession::get(opCtx->getClient())
+                 ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                    ActionType::internal)) {
+            return Status(ErrorCodes::Unauthorized, "Unauthorized");
+        }
+        return Status::OK();
     }
 
     static void checkCanRunHere(OperationContext* opCtx) {
-        // Can always run on a mongos.
+        Grid::get(opCtx)->assertShardingIsInitialized();
+
+        // A cluster command on the config server may attempt to use a ShardLocal to target itself,
+        // which triggers an invariant, so only shard servers can run this.
+        uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
     }
 };
-ClusterFindCmdBase<ClusterFindCmdS> clusterFindCmdS;
+ClusterAbortTransactionCmdBase<ClusterAbortTransactionCmdD> clusterAbortTransactionD;
 
 }  // namespace
 }  // namespace mongo

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2022-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,9 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
-
-#include "mongo/platform/basic.h"
+#pragma once
 
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
@@ -41,35 +39,36 @@
 namespace mongo {
 namespace {
 
-static const Status kOnlyTransactionsReadConcernsSupported{
-    ErrorCodes::InvalidOptions, "only read concerns valid in transactions are supported"};
-static const Status kDefaultReadConcernNotPermitted{ErrorCodes::InvalidOptions,
-                                                    "default read concern not permitted"};
-
 /**
- * Implements the abortTransaction command on mongos.
+ * Implements the abortTransaction command for a router.
  */
-class ClusterAbortTransactionCmd
-    : public BasicCommandWithRequestParser<ClusterAbortTransactionCmd> {
+template <typename Impl>
+class ClusterAbortTransactionCmdBase
+    : public BasicCommandWithRequestParser<ClusterAbortTransactionCmdBase<Impl>> {
 public:
-    using BasicCommandWithRequestParser::BasicCommandWithRequestParser;
+    ClusterAbortTransactionCmdBase()
+        : BasicCommandWithRequestParser<ClusterAbortTransactionCmdBase<Impl>>(Impl::kName) {}
+
     using Request = AbortTransaction;
     using Reply = OkReply;
+    using BaseType = BasicCommandWithRequestParser<ClusterAbortTransactionCmdBase<Impl>>;
+    using RequestParser =
+        typename BasicCommandWithRequestParser<ClusterAbortTransactionCmdBase<Impl>>::RequestParser;
 
     void validateResult(const BSONObj& resultObj) final {
         auto ctx = IDLParserErrorContext("AbortReply");
-        if (!checkIsErrorStatus(resultObj, ctx)) {
+        if (!BaseType::checkIsErrorStatus(resultObj, ctx)) {
             // Will throw if the result doesn't match the abortReply.
             Reply::parse(ctx, resultObj);
         }
     }
 
     const std::set<std::string>& apiVersions() const {
-        return kApiVersions1;
+        return Impl::getApiVersions();
     }
 
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kAlways;
+    BasicCommand::AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+        return BasicCommand::AllowedOnSecondary::kAlways;
     }
 
     bool adminOnly() const override {
@@ -83,6 +82,11 @@ public:
     ReadConcernSupportResult supportsReadConcern(const BSONObj& cmdObj,
                                                  repl::ReadConcernLevel level,
                                                  bool isImplicitDefault) const override {
+        static const Status kOnlyTransactionsReadConcernsSupported{
+            ErrorCodes::InvalidOptions, "only read concerns valid in transactions are supported"};
+        static const Status kDefaultReadConcernNotPermitted{ErrorCodes::InvalidOptions,
+                                                            "default read concern not permitted"};
+
         // abortTransaction commences running inside a transaction (even though the transaction will
         // be ended by the time it completes).  Therefore it needs to accept any readConcern which
         // is valid within a transaction.  However it is not appropriate to apply the default
@@ -100,7 +104,7 @@ public:
     Status checkAuthForOperation(OperationContext* opCtx,
                                  const std::string& dbname,
                                  const BSONObj& cmdObj) const override {
-        return Status::OK();
+        return Impl::checkAuthForOperation(opCtx);
     }
 
     bool runWithRequestParser(OperationContext* opCtx,
@@ -108,6 +112,8 @@ public:
                               const BSONObj& cmdObj,
                               const RequestParser& requestParser,
                               BSONObjBuilder& result) final {
+        Impl::checkCanRunHere(opCtx);
+
         auto txnRouter = TransactionRouter::get(opCtx);
         uassert(ErrorCodes::InvalidOptions,
                 "abortTransaction can only be run within a session",
@@ -121,8 +127,7 @@ public:
     const AuthorizationContract* getAuthorizationContract() const final {
         return &::mongo::AbortTransaction::kAuthorizationContract;
     }
-
-} clusterAbortTransactionCmd;
+};
 
 }  // namespace
 }  // namespace mongo
