@@ -49,7 +49,7 @@ structs:
     CreateCollectionCoordinatorDocument:
         description: "Object with neccessary fields to create a collection"
         generate_comparison_operators: false
-        strict: true
+        strict: false
         chained_structs:
             ShardingDDLCoordinatorMetadata: ShardingDDLCoordinatorMetadata
             CreateCollectionRequest: CreateCollectionRequest
