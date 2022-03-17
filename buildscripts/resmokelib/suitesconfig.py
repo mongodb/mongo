@@ -1,13 +1,12 @@
 """Module for retrieving the configuration of resmoke.py test suites."""
 import collections
 import os
-
-from typing import List, Dict
+from threading import Lock
+from typing import Dict, List
 
 import buildscripts.resmokelib.utils.filesystem as fs
 from buildscripts.resmokelib import config as _config
-from buildscripts.resmokelib import errors
-from buildscripts.resmokelib import utils
+from buildscripts.resmokelib import errors, utils
 from buildscripts.resmokelib.testing import suite as _suite
 from buildscripts.resmokelib.utils import load_yaml_file
 
@@ -141,6 +140,7 @@ class SuiteConfigInterface:
 class ExplicitSuiteConfig(SuiteConfigInterface):
     """Class for storing the resmoke.py suite YAML configuration."""
 
+    _name_suites_lock = Lock()
     _named_suites = {}
 
     @classmethod
@@ -164,17 +164,18 @@ class ExplicitSuiteConfig(SuiteConfigInterface):
     @classmethod
     def get_named_suites(cls) -> Dict[str, str]:
         """Populate the named suites by scanning config_dir/suites."""
-        if not cls._named_suites:
-            suites_dir = os.path.join(_config.CONFIG_DIR, "suites")
-            root = os.path.abspath(suites_dir)
-            files = os.listdir(root)
-            for filename in files:
-                (short_name, ext) = os.path.splitext(filename)
-                if ext in (".yml", ".yaml"):
-                    pathname = os.path.join(root, filename)
-                    cls._named_suites[short_name] = pathname
+        with cls._name_suites_lock:
+            if not cls._named_suites:
+                suites_dir = os.path.join(_config.CONFIG_DIR, "suites")
+                root = os.path.abspath(suites_dir)
+                files = os.listdir(root)
+                for filename in files:
+                    (short_name, ext) = os.path.splitext(filename)
+                    if ext in (".yml", ".yaml"):
+                        pathname = os.path.join(root, filename)
+                        cls._named_suites[short_name] = pathname
 
-        return cls._named_suites
+            return cls._named_suites
 
     @classmethod
     def get_suite_files(cls):
