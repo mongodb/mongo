@@ -90,9 +90,9 @@ const stdx::unordered_map<NamespaceString,
         {NamespaceString("config.system.sharding_ddl_coordinators"),
          std::make_pair(std::string("_id.namespace"), boost::none)}};
 
-class ConfigSvrRunResoreCommand : public BasicCommand {
+class ConfigSvrRunRestoreCommand : public BasicCommand {
 public:
-    ConfigSvrRunResoreCommand() : BasicCommand("_configsvrRunRestore") {}
+    ConfigSvrRunRestoreCommand() : BasicCommand("_configsvrRunRestore") {}
 
     bool skipApiVersionCheck() const override {
         // Internal command used by the restore procedure.
