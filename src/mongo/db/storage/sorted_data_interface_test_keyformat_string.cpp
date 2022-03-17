@@ -130,10 +130,13 @@ TEST(SortedDataInterface, KeyFormatStringUniqueInsertRemoveDuplicates) {
         ASSERT_OK(sorted->insert(opCtx.get(),
                                  makeKeyString(sorted.get(), key1, rid1),
                                  /*dupsAllowed*/ true));
-        auto result = sorted->insert(opCtx.get(),
+        ASSERT_OK(sorted->insert(opCtx.get(),
+                                 makeKeyString(sorted.get(), key1, rid1),
+                                 /*dupsAllowed*/ false));
+        auto status = sorted->insert(opCtx.get(),
                                      makeKeyString(sorted.get(), key1, rid2),
                                      /*dupsAllowed*/ false);
-        ASSERT_EQ(ErrorCodes::DuplicateKey, result.getStatus().code());
+        ASSERT_EQ(ErrorCodes::DuplicateKey, status.code());
 
         ASSERT_OK(sorted->insert(opCtx.get(),
                                  makeKeyString(sorted.get(), key1, rid3),

@@ -101,9 +101,9 @@ public:
                     const IndexDescriptor* desc,
                     bool readOnly);
 
-    virtual StatusWith<bool> insert(OperationContext* opCtx,
-                                    const KeyString::Value& keyString,
-                                    bool dupsAllowed);
+    virtual Status insert(OperationContext* opCtx,
+                          const KeyString::Value& keyString,
+                          bool dupsAllowed);
 
     virtual void unindex(OperationContext* opCtx,
                          const KeyString::Value& keyString,
@@ -166,10 +166,10 @@ public:
     }
 
 protected:
-    virtual StatusWith<bool> _insert(OperationContext* opCtx,
-                                     WT_CURSOR* c,
-                                     const KeyString::Value& keyString,
-                                     bool dupsAllowed) = 0;
+    virtual Status _insert(OperationContext* opCtx,
+                           WT_CURSOR* c,
+                           const KeyString::Value& keyString,
+                           bool dupsAllowed) = 0;
 
     virtual void _unindex(OperationContext* opCtx,
                           WT_CURSOR* c,
@@ -180,14 +180,22 @@ protected:
     void getKey(OperationContext* opCtx, WT_CURSOR* cursor, WT_ITEM* key);
 
     /**
-     * If this returns true, the cursor will be positioned on the first matching the input 'key'.
+     * Checks whether the prefix key defined by 'buffer' and 'size' is in the index. If it is,
+     * returns the RecordId of the first matching key and positions the cursor 'c' on that key.
      */
-    bool _keyExists(OperationContext* opCtx, WT_CURSOR* c, const char* buffer, size_t size);
+    boost::optional<RecordId> _keyExists(OperationContext* opCtx,
+                                         WT_CURSOR* c,
+                                         const char* buffer,
+                                         size_t size);
 
     /**
-     * Ensures correctly inserting a unique key. This should only be used by non-id indexes.
+     * Returns a DuplicateKey error if the prefix key exists in the index with a different RecordId.
+     * Returns true if the prefix key exists in the index with the same RecordId. Returns false if
+     * the prefix key does not exist in the index. Should only be used for non-_id indexes.
      */
-    Status _checkDups(OperationContext* opCtx, WT_CURSOR* c, const KeyString::Value& keyString);
+    StatusWith<bool> _checkDups(OperationContext* opCtx,
+                                WT_CURSOR* c,
+                                const KeyString::Value& keyString);
 
     /*
      * Determines the data format version from application metadata and verifies compatibility.
@@ -197,6 +205,8 @@ protected:
                                           const std::string& uri,
                                           const IndexDescriptor* desc,
                                           bool isReadOnly);
+
+    RecordId _decodeRecordIdAtEnd(const void* buffer, size_t size);
 
     class BulkBuilder;
     class IdBulkBuilder;
@@ -244,10 +254,10 @@ public:
                                            RecordId rid) override;
 
 protected:
-    StatusWith<bool> _insert(OperationContext* opCtx,
-                             WT_CURSOR* c,
-                             const KeyString::Value& keyString,
-                             bool dupsAllowed) override;
+    Status _insert(OperationContext* opCtx,
+                   WT_CURSOR* c,
+                   const KeyString::Value& keyString,
+                   bool dupsAllowed) override;
 
     void _unindex(OperationContext* opCtx,
                   WT_CURSOR* c,
@@ -290,10 +300,10 @@ public:
     }
 
 protected:
-    StatusWith<bool> _insert(OperationContext* opCtx,
-                             WT_CURSOR* c,
-                             const KeyString::Value& keyString,
-                             bool dupsAllowed) override;
+    Status _insert(OperationContext* opCtx,
+                   WT_CURSOR* c,
+                   const KeyString::Value& keyString,
+                   bool dupsAllowed) override;
 
     void _unindex(OperationContext* opCtx,
                   WT_CURSOR* c,
@@ -337,10 +347,10 @@ public:
     }
 
 protected:
-    StatusWith<bool> _insert(OperationContext* opCtx,
-                             WT_CURSOR* c,
-                             const KeyString::Value& keyString,
-                             bool dupsAllowed) override;
+    Status _insert(OperationContext* opCtx,
+                   WT_CURSOR* c,
+                   const KeyString::Value& keyString,
+                   bool dupsAllowed) override;
 
     void _unindex(OperationContext* opCtx,
                   WT_CURSOR* c,

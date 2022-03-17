@@ -1353,9 +1353,9 @@ SortedDataInterfaceUnique::SortedDataInterfaceUnique(const Ordering& ordering, S
     _KSForIdentEnd = createRadixKeyWithoutLocFromObj(BSONObj(), _identEnd, _ordering);
 }
 
-StatusWith<bool> SortedDataInterfaceUnique::insert(OperationContext* opCtx,
-                                                   const KeyString::Value& keyString,
-                                                   bool dupsAllowed) {
+Status SortedDataInterfaceUnique::insert(OperationContext* opCtx,
+                                         const KeyString::Value& keyString,
+                                         bool dupsAllowed) {
     StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
     RecordId loc = decodeRecordId(keyString, rsKeyFormat());
 
@@ -1363,6 +1363,13 @@ StatusWith<bool> SortedDataInterfaceUnique::insert(OperationContext* opCtx,
     auto it = workingCopy->find(key);
     if (it != workingCopy->end()) {
         if (!dupsAllowed) {
+            UniqueIndexData data{it->second, _rsKeyFormat};
+            auto dataIt = data.lower_bound(loc);
+            if (dataIt != data.end() && dataIt->loc() == loc) {
+                // This exact key+RecordId was already inserted.
+                return Status::OK();
+            }
+
             // There was an attempt to create an index entry with a different RecordId while
             // dups were not allowed.
             return buildDupKeyErrorStatus(opCtx, keyString, _ordering, _desc);
@@ -1372,7 +1379,7 @@ StatusWith<bool> SortedDataInterfaceUnique::insert(OperationContext* opCtx,
         auto added = data.add(loc, keyString.getTypeBits());
         if (!added) {
             // Already indexed
-            return false;
+            return Status::OK();
         }
 
         workingCopy->update({std::move(key), *added});
@@ -1381,7 +1388,7 @@ StatusWith<bool> SortedDataInterfaceUnique::insert(OperationContext* opCtx,
         workingCopy->insert({std::move(key), *data.add(loc, keyString.getTypeBits())});
     }
     RecoveryUnit::get(opCtx)->makeDirty();
-    return true;
+    return Status::OK();
 }
 
 void SortedDataInterfaceUnique::unindex(OperationContext* opCtx,
@@ -1576,9 +1583,9 @@ SortedDataInterfaceStandard::SortedDataInterfaceStandard(const Ordering& orderin
     _KSForIdentEnd = createMinRadixKeyFromObj(BSONObj(), _identEnd, _ordering);
 }
 
-StatusWith<bool> SortedDataInterfaceStandard::insert(OperationContext* opCtx,
-                                                     const KeyString::Value& keyString,
-                                                     bool dupsAllowed) {
+Status SortedDataInterfaceStandard::insert(OperationContext* opCtx,
+                                           const KeyString::Value& keyString,
+                                           bool dupsAllowed) {
     StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
     RecordId loc = decodeRecordId(keyString, rsKeyFormat());
 
@@ -1605,7 +1612,7 @@ StatusWith<bool> SortedDataInterfaceStandard::insert(OperationContext* opCtx,
             .second;
     if (inserted)
         RecoveryUnit::get(opCtx)->makeDirty();
-    return inserted;
+    return Status::OK();
 }
 
 void SortedDataInterfaceStandard::unindex(OperationContext* opCtx,

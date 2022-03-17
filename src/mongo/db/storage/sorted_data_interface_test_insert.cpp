@@ -233,6 +233,7 @@ TEST(SortedDataInterface, InsertSameKey) {
         {
             WriteUnitOfWork uow(opCtx.get());
             ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), false));
+            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), false));
             ASSERT_NOT_OK(
                 sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc2), false));
             uow.commit();
