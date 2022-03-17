@@ -43,7 +43,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/s/is_mongos.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/scopeguard.h"
 
@@ -96,11 +95,6 @@ Status LogicalSessionCacheImpl::startSession(OperationContext* opCtx,
 
 Status LogicalSessionCacheImpl::vivify(OperationContext* opCtx, const LogicalSessionId& lsid) {
     auto parentLsid = getParentSessionId(lsid);
-    if (parentLsid) {
-        uassert(ErrorCodes::InvalidOptions,
-                "Internal transactions are only supported in sharded clusters",
-                isMongos() || serverGlobalParams.clusterRole != ClusterRole::None);
-    }
 
     stdx::lock_guard lg(_mutex);
 

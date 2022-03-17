@@ -36,7 +36,6 @@
 #include "mongo/db/logical_session_cache.h"
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/s/is_mongos.h"
 
 namespace mongo {
 
@@ -107,9 +106,6 @@ OperationSessionInfoFromClient initializeOperationSessionInfo(OperationContext* 
             uassert(ErrorCodes::InvalidOptions,
                     "Internal sessions are not supported outside of transactions",
                     osi.getTxnNumber() && osi.getAutocommit() && !osi.getAutocommit().value());
-            uassert(ErrorCodes::InvalidOptions,
-                    "Internal sessions are only supported in sharded clusters",
-                    isMongos() || serverGlobalParams.clusterRole != ClusterRole::None);
         }
 
         opCtx->setLogicalSessionId(std::move(lsid));

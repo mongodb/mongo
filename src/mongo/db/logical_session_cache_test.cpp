@@ -112,17 +112,6 @@ public:
         return _opCtx.get();
     }
 
-protected:
-    void setUp() final {
-        ServiceContextTest::setUp();
-        serverGlobalParams.clusterRole = ClusterRole::ShardServer;
-    }
-
-    void tearDown() final {
-        serverGlobalParams.clusterRole = ClusterRole::None;
-        ServiceContextTest::tearDown();
-    }
-
 private:
     ServiceContext::UniqueOperationContext _opCtx;
 
@@ -201,17 +190,6 @@ TEST_F(LogicalSessionCacheTest, VivifyUpdatesLastUseOfParentSession) {
     runTest(parentLsid, makeLogicalSessionIdWithTxnUUIDForTest(parentLsid));
     runTest(makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid),
             makeLogicalSessionIdWithTxnUUIDForTest(parentLsid));
-}
-
-TEST_F(LogicalSessionCacheTest, CannotVivifySessionWithParentSessionIfNotRunningInShardedCluster) {
-    serverGlobalParams.clusterRole = ClusterRole::None;
-    ASSERT_THROWS_CODE(cache()->vivify(opCtx(), makeLogicalSessionIdWithTxnNumberAndUUIDForTest()),
-                       DBException,
-                       ErrorCodes::InvalidOptions);
-    ASSERT_THROWS_CODE(cache()->vivify(opCtx(), makeLogicalSessionIdWithTxnUUIDForTest()),
-                       DBException,
-                       ErrorCodes::InvalidOptions);
-    ASSERT_EQ(0UL, cache()->size());
 }
 
 // Test the startSession method
