@@ -37,12 +37,12 @@ StorageSource = wiredtiger.StorageSource  # easy access to constants
 #    Basic tiered storage API test.
 class test_tiered04(wttest.WiredTigerTestCase):
     storage_sources = [
-        ('local', dict(auth_token = get_auth_token('local_store'),
-            bucket = get_bucket1_name('local_store'),
-            bucket1 = get_bucket2_name('local_store'),
+        ('dir_store', dict(auth_token = get_auth_token('dir_store'),
+            bucket = get_bucket1_name('dir_store'),
+            bucket1 = get_bucket2_name('dir_store'),
             prefix = "pfx_",
             prefix1 = "pfx1_",
-            ss_name = 'local_store')),
+            ss_name = 'dir_store')),
         ('s3', dict(auth_token = get_auth_token('s3_store'),
             bucket = get_bucket1_name('s3_store'),
             bucket1 = get_bucket2_name('s3_store'),
@@ -72,7 +72,7 @@ class test_tiered04(wttest.WiredTigerTestCase):
     retention = 3
     retention1 = 600
     def conn_config(self):
-        if self.ss_name == 'local_store':
+        if self.ss_name == 'dir_store':
             os.mkdir(self.bucket)
             os.mkdir(self.bucket1)
         self.saved_conn = \
@@ -93,7 +93,7 @@ class test_tiered04(wttest.WiredTigerTestCase):
         if self.ss_name == 's3_store':
             #config = '=(config=\"(verbose=1)\")'
             extlist.skip_if_missing = True
-        #if self.ss_name == 'local_store':
+        #if self.ss_name == 'dir_store':
             #config = '=(config=\"(verbose=1,delay_ms=200,force_delay=3)\")'
         # Windows doesn't support dynamically loaded extension libraries.
         if os.name == 'nt':

@@ -35,7 +35,7 @@ import datetime, inspect, os, random
 # Generate a storage store specific authentication token.
 def get_auth_token(storage_source):
     auth_token = None
-    if storage_source == 'local_store':
+    if storage_source == 'dir_store':
         # Fake a secret token.
         auth_token = "Secret"
     if storage_source == 's3_store':
@@ -59,7 +59,7 @@ local_buckets = ['bucket1', 'bucket2']
 def get_bucket1_name(storage_source):
     if storage_source == 's3_store':
         return s3_buckets[0]
-    if storage_source == 'local_store':
+    if storage_source == 'dir_store':
         return local_buckets[0]
     return None
 
@@ -67,7 +67,7 @@ def get_bucket1_name(storage_source):
 def get_bucket2_name(storage_source):
     if storage_source == 's3_store':
         return s3_buckets[1]
-    if storage_source == 'local_store':
+    if storage_source == 'dir_store':
         return local_buckets[1]
     return None
 

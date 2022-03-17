@@ -65,7 +65,7 @@ from wttest import WiredTigerTestCase
 def wiredtiger_open_tiered(ignored_self, args):
     auth_token = "test_token"
     bucket = "mybucket"
-    extension_name = "local_store"
+    extension_name = "dir_store"
     prefix = "pfx-"
     extension_libs = WiredTigerTestCase.findExtension('storage_sources', extension_name)
     if len(extension_libs) == 0:

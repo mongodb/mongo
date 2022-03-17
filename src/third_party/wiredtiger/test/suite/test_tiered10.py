@@ -36,11 +36,11 @@ StorageSource = wiredtiger.StorageSource  # easy access to constants
 # prefixes to the same bucket directory but different local databases.
 class test_tiered10(wttest.WiredTigerTestCase):
     storage_sources = [
-        ('local', dict(auth_token = get_auth_token('local_store'),
-            bucket = get_bucket1_name('local_store'),
+        ('dir_store', dict(auth_token = get_auth_token('dir_store'),
+            bucket = get_bucket1_name('dir_store'),
             prefix1 = '1_',
             prefix2 = '2_',
-            ss_name = 'local_store')),
+            ss_name = 'dir_store')),
         # FIXME-WT-8896 The S3 extension gets stuck during initialization if more than one
         # simultaneous WT connection is created. Enable once we have fixed this issue.
         #('s3', dict(auth_token = get_auth_token('s3_store'),
@@ -62,16 +62,16 @@ class test_tiered10(wttest.WiredTigerTestCase):
     retention = 1
     saved_conn = ''
     def conn_config(self):
-        if self.ss_name == 'local_store' and not os.path.exists(self.bucket):
+        if self.ss_name == 'dir_store' and not os.path.exists(self.bucket):
             os.mkdir(self.bucket)
         os.mkdir(self.conn1_dir)
         os.mkdir(self.conn2_dir)
         # Use this to create the directories and set up for the others.
         dummy_conn = 'create,statistics=(all),'
 
-        # For local store, the bucket is a directory one level up from database directories.
+        # For directory store, the bucket is a directory one level up from database directories.
         bucket = ''
-        if self.ss_name == 'local_store':
+        if self.ss_name == 'dir_store':
             bucket = '../'
         bucket += self.bucket
 
@@ -91,7 +91,7 @@ class test_tiered10(wttest.WiredTigerTestCase):
         if self.ss_name == 's3_store':
             #config = '=(config=\"(verbose=1)\")'
             extlist.skip_if_missing = True
-        #if self.ss_name == 'local_store':
+        #if self.ss_name == 'dir_store':
             #config = '=(config=\"(verbose=1,delay_ms=200,force_delay=3)\")'
         # Windows doesn't support dynamically loaded extension libraries.
         if os.name == 'nt':

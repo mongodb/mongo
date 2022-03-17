@@ -35,10 +35,10 @@ StorageSource = wiredtiger.StorageSource  # easy access to constants
 #    Basic tiered storage API for schema operations.
 class test_tiered07(wttest.WiredTigerTestCase):
     storage_sources = [
-        ('local', dict(auth_token = get_auth_token('local_store'),
-            bucket = get_bucket1_name('local_store'),
+        ('dir_store', dict(auth_token = get_auth_token('dir_store'),
+            bucket = get_bucket1_name('dir_store'),
             bucket_prefix = "pfx_",
-            ss_name = 'local_store')),
+            ss_name = 'dir_store')),
         # FIXME-WT-8897 Disabled as S3 directory listing is interpreting a directory to end in a '/',
         # whereas the code in the tiered storage doesn't expect that. Enable when fixed.
         #('s3', dict(auth_token = get_auth_token('s3_store'),
@@ -61,7 +61,7 @@ class test_tiered07(wttest.WiredTigerTestCase):
         if self.ss_name == 's3_store':
             #config = '=(config=\"(verbose=1)\")'
             extlist.skip_if_missing = True
-        #if self.ss_name == 'local_store':
+        #if self.ss_name == 'dir_store':
             #config = '=(config=\"(verbose=1,delay_ms=200,force_delay=3)\")'
         # Windows doesn't support dynamically loaded extension libraries.
         if os.name == 'nt':
@@ -69,7 +69,7 @@ class test_tiered07(wttest.WiredTigerTestCase):
         extlist.extension('storage_sources', self.ss_name + config)
 
     def conn_config(self):
-        if self.ss_name == 'local_store' and not os.path.exists(self.bucket):
+        if self.ss_name == 'dir_store' and not os.path.exists(self.bucket):
             os.mkdir(self.bucket)
         #  'verbose=(tiered),' + \
 

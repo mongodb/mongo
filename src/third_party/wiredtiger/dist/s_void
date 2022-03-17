@@ -113,11 +113,11 @@ func_ok()
 	    -e '/int index_compare_primary$/d' \
 	    -e '/int index_compare_u$/d' \
 	    -e '/int index_extractor_u$/d' \
-	    -e '/int local_directory_list_free$/d' \
-	    -e '/int local_err$/d' \
-	    -e '/int local_file_lock$/d' \
-	    -e '/int local_file_sync$/d' \
-	    -e '/int local_fs_terminate$/d' \
+	    -e '/int dir_store_directory_list_free$/d' \
+	    -e '/int dir_store_err$/d' \
+	    -e '/int dir_store_file_lock$/d' \
+	    -e '/int dir_store_file_sync$/d' \
+	    -e '/int dir_store_fs_terminate$/d' \
 	    -e '/int log_print_err$/d' \
 	    -e '/int lz4_error$/d' \
 	    -e '/int lz4_pre_size$/d' \

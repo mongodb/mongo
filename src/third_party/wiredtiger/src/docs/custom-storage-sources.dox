@@ -63,10 +63,10 @@ It must always be provided when WiredTiger is reopened (again, with the ::wiredt
 
 @section storage_examples Storage source examples
 
-An example of a storage source exists in \c ext/storage_sources/local_store/local_store.c.
+An example of a storage source exists in \c ext/storage_sources/dir_store/dir_store.c.
 This storage source emulates cloud storage by storing all objects on the local file system.
 This example does not include application level code to call it. By default, WiredTiger builds
 it as a loadable shared library, and it can be loaded during a ::wiredtiger_open call as with
-any other extension, and \c local_store can be specified to be used with tiered storage system.
+any other extension, and \c dir_store can be specified to be used with tiered storage system.
 
  */

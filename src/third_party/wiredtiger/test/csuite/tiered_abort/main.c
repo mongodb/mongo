@@ -71,7 +71,7 @@ static char home[1024]; /* Program working dir */
 /* Include worker threads and extra sessions */
 #define SESSION_MAX (MAX_TH + 4)
 #ifndef WT_STORAGE_LIB
-#define WT_STORAGE_LIB "ext/storage_sources/local_store/.libs/libwiredtiger_local_store.so"
+#define WT_STORAGE_LIB "ext/storage_sources/dir_store/.libs/libwiredtiger_dir_store.so"
 #endif
 
 static const char *table_pfx = "table";
@@ -100,7 +100,7 @@ static uint32_t flush_calls = 1;
     "eviction_updates_target=20,eviction_updates_trigger=90," \
     "log=(enabled,file_max=10M,remove=true),session_max=%d,"  \
     "statistics=(fast),statistics_log=(wait=1,json=true),"    \
-    "tiered_storage=(bucket=%s,bucket_prefix=pfx,local_retention=%d,name=local_store)"
+    "tiered_storage=(bucket=%s,bucket_prefix=pfx,local_retention=%d,name=dir_store)"
 #define ENV_CONFIG_TXNSYNC                                \
     ENV_CONFIG_DEF                                        \
     ",eviction_dirty_target=20,eviction_dirty_trigger=90" \

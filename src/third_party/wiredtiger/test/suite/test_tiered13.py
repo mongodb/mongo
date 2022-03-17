@@ -36,10 +36,10 @@ from test_import01 import test_import_base
 
 class test_tiered13(test_import_base):
     storage_sources = [
-        ('local', dict(auth_token = get_auth_token('local_store'),
-            bucket = get_bucket1_name('local_store'),
+        ('dir_store', dict(auth_token = get_auth_token('dir_store'),
+            bucket = get_bucket1_name('dir_store'),
             bucket_prefix = "pfx_",
-            ss_name = 'local_store')),
+            ss_name = 'dir_store')),
         ('s3', dict(auth_token = get_auth_token('s3_store'),
             bucket = get_bucket1_name('s3_store'),
             bucket_prefix = generate_s3_prefix(),
@@ -65,7 +65,7 @@ class test_tiered13(test_import_base):
         if self.ss_name == 's3_store':
             #config = '=(config=\"(verbose=1)\")'
             extlist.skip_if_missing = True
-        #if self.ss_name == 'local_store':
+        #if self.ss_name == 'dir_store':
             #config = '=(config=\"(verbose=1,delay_ms=200,force_delay=3)\")'
         # Windows doesn't support dynamically loaded extension libraries.
         if os.name == 'nt':
@@ -73,7 +73,7 @@ class test_tiered13(test_import_base):
         extlist.extension('storage_sources', self.ss_name + config)
 
     def conn_config(self):
-        if self.ss_name == 'local_store' and not os.path.exists(self.bucket):
+        if self.ss_name == 'dir_store' and not os.path.exists(self.bucket):
             os.mkdir(self.bucket)
         self.saved_conn = \
           'debug_mode=(flush_checkpoint=true),' + \
@@ -133,7 +133,7 @@ class test_tiered13(test_import_base):
         shutil.rmtree(newdir, ignore_errors=True)
         os.mkdir(newdir)
         newbucket = os.path.join(newdir, self.bucket)
-        if self.ss_name == 'local_store':
+        if self.ss_name == 'dir_store':
             os.mkdir(newbucket)
         # It is tricky to work around the extension and connection bucket setup for
         # creating the new import directory that is tiered-enabled.

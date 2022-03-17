@@ -35,10 +35,10 @@ from wtscenario import make_scenarios
 #    Test tiered tree
 class test_tiered02(wttest.WiredTigerTestCase):
     storage_sources = [
-        ('local', dict(auth_token = get_auth_token('local_store'),
-            bucket = get_bucket1_name('local_store'),
+        ('dirstore', dict(auth_token = get_auth_token('dir_store'),
+            bucket = get_bucket1_name('dir_store'),
             bucket_prefix = "pfx_",
-            ss_name = 'local_store')),
+            ss_name = 'dir_store')),
         ('s3', dict(auth_token = get_auth_token('s3_store'),
             bucket = get_bucket1_name('s3_store'),
             bucket_prefix = generate_s3_prefix(),
@@ -50,7 +50,7 @@ class test_tiered02(wttest.WiredTigerTestCase):
     uri = "table:test_tiered02"
 
     def conn_config(self):
-        if self.ss_name == 'local_store' and not os.path.exists(self.bucket):
+        if self.ss_name == 'dir_store' and not os.path.exists(self.bucket):
             os.mkdir(self.bucket)
         return \
           'debug_mode=(flush_checkpoint=true),' + \
@@ -66,7 +66,7 @@ class test_tiered02(wttest.WiredTigerTestCase):
         if self.ss_name == 's3_store':
             #config = '=(config=\"(verbose=1)\")'
             extlist.skip_if_missing = True
-        #if self.ss_name == 'local_store':
+        #if self.ss_name == 'dir_store':
             #config = '=(config=\"(verbose=1,delay_ms=200,force_delay=3)\")'
         # Windows doesn't support dynamically loaded extension libraries.
         if os.name == 'nt':
@@ -78,9 +78,9 @@ class test_tiered02(wttest.WiredTigerTestCase):
         self.pr(s)
 
     def confirm_flush(self, increase=True):
-        # Without directly using the filesystem API, directory listing is only supported on the
-        # local store. Limit this check to the local store. 
-        if self.ss_name != 'local_store':
+        # Without directly using the filesystem API, directory listing is only supported on
+        # the directory store.  Limit this check to the directory store.
+        if self.ss_name != 'dir_store':
             return
 
         got = sorted(list(os.listdir(self.bucket)))

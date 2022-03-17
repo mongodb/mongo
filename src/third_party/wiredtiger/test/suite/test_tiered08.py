@@ -42,10 +42,10 @@ from wtthread import checkpoint_thread, flush_tier_thread
 #   data into a table from another thread.
 class test_tiered08(wttest.WiredTigerTestCase):
     storage_sources = [
-        ('local', dict(auth_token = get_auth_token('local_store'),
-            bucket = get_bucket1_name('local_store'),
+        ('dir_store', dict(auth_token = get_auth_token('dir_store'),
+            bucket = get_bucket1_name('dir_store'),
             bucket_prefix = "pfx_",
-            ss_name = 'local_store')),
+            ss_name = 'dir_store')),
         ('s3', dict(auth_token = get_auth_token('s3_store'),
             bucket = get_bucket1_name('s3_store'),
             bucket_prefix = generate_s3_prefix(),
@@ -62,7 +62,7 @@ class test_tiered08(wttest.WiredTigerTestCase):
     uri = "table:test_tiered08"
 
     def conn_config(self):
-        if self.ss_name == 'local_store' and not os.path.exists(self.bucket):
+        if self.ss_name == 'dir_store' and not os.path.exists(self.bucket):
             os.mkdir(self.bucket)
         return \
           'debug_mode=(flush_checkpoint=true),' + \
@@ -79,7 +79,7 @@ class test_tiered08(wttest.WiredTigerTestCase):
         if self.ss_name == 's3_store':
             #config = '=(config=\"(verbose=1)\")'
             extlist.skip_if_missing = True
-        #if self.ss_name == 'local_store':
+        #if self.ss_name == 'dir_store':
             #config = '=(config=\"(verbose=1,delay_ms=200,force_delay=3)\")'
         # Windows doesn't support dynamically loaded extension libraries.
         if os.name == 'nt':

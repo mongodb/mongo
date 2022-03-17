@@ -39,11 +39,11 @@ FileSystem = wiredtiger.FileSystem  # easy access to constants
 
 class test_tiered06(wttest.WiredTigerTestCase):
     storage_sources = [
-        ('local', dict(auth_token = get_auth_token('local_store'),
-            bucket1 = get_bucket1_name('local_store'),
-            bucket2 = get_bucket2_name('local_store'),
+        ('dir_store', dict(auth_token = get_auth_token('dir_store'),
+            bucket1 = get_bucket1_name('dir_store'),
+            bucket2 = get_bucket2_name('dir_store'),
             bucket_prefix_base = "pfx_",
-            ss_name = 'local_store')),
+            ss_name = 'dir_store')),
         ('s3', dict(auth_token = get_auth_token('s3_store'),
             bucket1 = get_bucket1_name('s3_store'),
             bucket2 = get_bucket2_name('s3_store'),
@@ -60,7 +60,7 @@ class test_tiered06(wttest.WiredTigerTestCase):
         if self.ss_name == 's3_store':
             #config = '=(config=\"(verbose=1)\")'
             extlist.skip_if_missing = True
-        #if self.ss_name == 'local_store':
+        #if self.ss_name == 'dir_store':
             #config = '=(config=\"(verbose=1,delay_ms=200,force_delay=3)\")'
         # Windows doesn't support dynamically loaded extension libraries.
         if os.name == 'nt':
@@ -96,8 +96,8 @@ class test_tiered06(wttest.WiredTigerTestCase):
         # avoid namespace collison. 0th element on the stack is the current function.
         prefix = self.bucket_prefix_base + inspect.stack()[0][3] + '/'
 
-        # Local store needs the bucket created as a directory on the filesystem.
-        if self.ss_name == 'local_store':
+        # The directory store needs the bucket created as a directory on the filesystem.
+        if self.ss_name == 'dir_store':
             os.mkdir(self.bucket1)
 
         fs = ss.ss_customize_file_system(session, self.bucket1, self.auth_token,
@@ -144,7 +144,7 @@ class test_tiered06(wttest.WiredTigerTestCase):
         self.assertEquals(fh.fh_size(session), len(outbytes))
         fh.close(session)
 
-        # The fh_lock call doesn't do anything in the local and S3 store implementation.
+        # The fh_lock call doesn't do anything in the directory and S3 store implementation.
         fh = fs.fs_open_file(session, 'foobar', FileSystem.open_file_type_data, FileSystem.open_readonly)
         fh.fh_lock(session, True)
         fh.fh_lock(session, False)
@@ -178,8 +178,8 @@ class test_tiered06(wttest.WiredTigerTestCase):
         cachedir = self.bucket1 + '_cache'
         os.mkdir(cachedir)
 
-        # Local store needs the bucket created as a directory on the filesystem.
-        if self.ss_name == 'local_store':
+        # Directory store needs the bucket created as a directory on the filesystem.
+        if self.ss_name == 'dir_store':
             os.mkdir(self.bucket1)
         
         fs = ss.ss_customize_file_system(session, self.bucket1, self.auth_token,
@@ -279,11 +279,11 @@ class test_tiered06(wttest.WiredTigerTestCase):
         expect = sorted(self.suffix(expect, 'wt'))
         self.assertEquals(got, expect)
 
-    # Check that objects are "in the cloud" for the local store after a flush.
-    # Using the local storage module, they are actually going to be in either
+    # Check that objects are "in the cloud" for the directory store after a flush.
+    # Using the directory storage module, they are actually going to be in either
     # bucket1 or bucket2.
     def check_local_objects(self, expect1, expect2):
-        if self.ss_name != 'local_store':
+        if self.ss_name != 'dir_store':
             return
 
         got = sorted(list(os.listdir(self.bucket1)))
@@ -316,8 +316,8 @@ class test_tiered06(wttest.WiredTigerTestCase):
         # avoid namespace collison. 0th element on the stack is the current function.
         prefix = self.bucket_prefix_base + inspect.stack()[0][3] + '/'
 
-        # Local store needs the bucket created as a directory on the filesystem.
-        if self.ss_name == 'local_store':
+        # Directory store needs the bucket created as a directory on the filesystem.
+        if self.ss_name == 'dir_store':
             os.mkdir(self.bucket1)
             os.mkdir(self.bucket2)
 
@@ -340,8 +340,8 @@ class test_tiered06(wttest.WiredTigerTestCase):
             lambda: ss.ss_customize_file_system(session, bad_bucket, self.auth_token,
                 self.get_fs_config(prefix, self.cachedir1)), errmsg)
 
-        # For local store - Create an empty file, try to use it as a directory.
-        if self.ss_name == 'local_store':
+        # For directory store - Create an empty file, try to use it as a directory.
+        if self.ss_name == 'dir_store':
             with open("some_file", "w"):
                 pass
             errmsg = '/Invalid argument/'
