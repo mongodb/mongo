@@ -1720,12 +1720,6 @@ err:
     if (cursor != NULL)
         WT_TRET(cursor->close(cursor));
 
-    /*
-     * If anything went wrong, roll back.
-     *
-     * !!!
-     * Nothing can fail after this point.
-     */
     if (locked)
         __wt_readunlock(session, &txn_global->visibility_rwlock);
 
@@ -1733,15 +1727,6 @@ err:
     if (cannot_fail)
         WT_RET_PANIC(session, ret,
           "failed to commit a transaction after data corruption point, failing the system");
-
-    /*
-     * Check for a prepared transaction, and quit: we can't ignore the error and we can't roll back
-     * a prepared transaction.
-     */
-    if (prepare)
-        WT_RET_PANIC(session, ret, "failed to commit prepared transaction, failing the system");
-
-    WT_TRET(__wt_txn_rollback(session, cfg));
     return (ret);
 }
 

@@ -1673,30 +1673,31 @@ __session_commit_transaction(WT_SESSION *wt_session, const char *config)
     WT_ERR(__wt_txn_context_check(session, true));
 
     /* Permit the commit if the transaction failed, but was read-only. */
-    if (F_ISSET(txn, WT_TXN_ERROR) && txn->mod_count != 0) {
-        __wt_err(session, EINVAL,
-          "failed %s"
-          "transaction requires rollback%s%s",
+    if (F_ISSET(txn, WT_TXN_ERROR) && txn->mod_count != 0)
+        WT_ERR_MSG(session, EINVAL, "failed %s transaction requires rollback%s%s",
           F_ISSET(txn, WT_TXN_PREPARE) ? "prepared " : "", txn->rollback_reason == NULL ? "" : ": ",
           txn->rollback_reason == NULL ? "" : txn->rollback_reason);
-        ret = EINVAL;
-    }
+
+    F_SET(session, WT_SESSION_RESOLVING_TXN);
+    ret = __wt_txn_commit(session, cfg);
+    F_CLR(session, WT_SESSION_RESOLVING_TXN);
 
 err:
     /*
-     * We might have failed because an illegal configuration was specified or because there wasn't a
-     * transaction running, and we check the former as part of the api macros before we check the
-     * latter. Deal with it here: if there's an error and a transaction is running, roll it back.
+     * We can fail because of an illegal configuration, or there wasn't a transaction running, or
+     * because commit itself failed. Deal with it here: if there's an error and a transaction is
+     * still running, roll it back.
+     *
+     * Check for a prepared transaction, and quit: we can't ignore the error and we can't roll back
+     * a prepared transaction the application wanted to commit.
      */
-    if (ret == 0) {
-        F_SET(session, WT_SESSION_RESOLVING_TXN);
-        ret = __wt_txn_commit(session, cfg);
-        F_CLR(session, WT_SESSION_RESOLVING_TXN);
-    } else if (F_ISSET(txn, WT_TXN_RUNNING)) {
+    if (ret != 0 && F_ISSET(txn, WT_TXN_RUNNING)) {
         if (F_ISSET(txn, WT_TXN_PREPARE))
-            WT_RET_PANIC(session, ret, "failed to commit prepared transaction, failing the system");
+            WT_TRET(__wt_panic(
+              session, ret, "failed to commit prepared transaction, failing the system"));
 
         WT_TRET(__wt_session_reset_cursors(session, false));
+
         F_SET(session, WT_SESSION_RESOLVING_TXN);
         WT_TRET(__wt_txn_rollback(session, cfg));
         F_CLR(session, WT_SESSION_RESOLVING_TXN);
