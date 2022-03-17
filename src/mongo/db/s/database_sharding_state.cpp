@@ -179,11 +179,6 @@ void DatabaseShardingState::checkDbVersion(OperationContext* opCtx, DSSLock&) co
     if (!clientDbVersion)
         return;
 
-    uassert(StaleDbRoutingVersion(_dbName, *clientDbVersion, boost::none),
-            str::stream() << "sharding status of database " << _dbName
-                          << " is not currently known and needs to be recovered",
-            _optDatabaseInfo);
-
     {
         auto criticalSectionSignal = _critSec.getSignal(
             opCtx->lockState()->isWriteLocked() ? ShardingMigrationCriticalSection::kWrite
@@ -193,6 +188,11 @@ void DatabaseShardingState::checkDbVersion(OperationContext* opCtx, DSSLock&) co
             str::stream() << "movePrimary commit in progress for " << _dbName,
             !criticalSectionSignal);
     }
+
+    uassert(StaleDbRoutingVersion(_dbName, *clientDbVersion, boost::none),
+            str::stream() << "sharding status of database " << _dbName
+                          << " is not currently known and needs to be recovered",
+            _optDatabaseInfo);
 
     const auto& dbVersion = _optDatabaseInfo->getVersion();
     uassert(StaleDbRoutingVersion(_dbName, *clientDbVersion, dbVersion),

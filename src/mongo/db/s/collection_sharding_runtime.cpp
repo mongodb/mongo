@@ -344,17 +344,6 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
 
     auto csrLock = CSRLock::lockShared(opCtx, this);
 
-    auto optCurrentMetadata = _getCurrentMetadataIfKnown(atClusterTime);
-    uassert(StaleConfigInfo(_nss,
-                            receivedShardVersion,
-                            boost::none /* wantedVersion */,
-                            ShardingState::get(opCtx)->shardId()),
-            str::stream() << "sharding status of collection " << _nss.ns()
-                          << " is not currently known and needs to be recovered",
-            optCurrentMetadata);
-
-    const auto& currentMetadata = optCurrentMetadata->get();
-
     {
         auto criticalSectionSignal = _critSec.getSignal(
             opCtx->lockState()->isWriteLocked() ? ShardingMigrationCriticalSection::kWrite
@@ -367,6 +356,17 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
                 str::stream() << "migration commit in progress for " << _nss.ns(),
                 !criticalSectionSignal);
     }
+
+    auto optCurrentMetadata = _getCurrentMetadataIfKnown(atClusterTime);
+    uassert(StaleConfigInfo(_nss,
+                            receivedShardVersion,
+                            boost::none /* wantedVersion */,
+                            ShardingState::get(opCtx)->shardId()),
+            str::stream() << "sharding status of collection " << _nss.ns()
+                          << " is not currently known and needs to be recovered",
+            optCurrentMetadata);
+
+    const auto& currentMetadata = optCurrentMetadata->get();
 
     auto wantedShardVersion = currentMetadata.getShardVersion();
 
