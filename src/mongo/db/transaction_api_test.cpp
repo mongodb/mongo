@@ -1114,12 +1114,6 @@ TEST_F(TxnAPITest, ClientSession_UsesNonRetryableInternalSession) {
 }
 
 TEST_F(TxnAPITest, ClientRetryableWrite_UsesRetryableInternalSession) {
-    // This case is only currently supported on mongos.
-    // TODO SERVER-63747: Remove this once this restriction is lifted.
-    bool savedMongos = isMongos();
-    ON_BLOCK_EXIT([&] { setMongos(savedMongos); });
-    setMongos(true);
-
     opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
     opCtx()->setTxnNumber(5);
     resetTxnWithRetries();
@@ -1197,12 +1191,6 @@ TEST_F(TxnAPITest, ClientRetryableWrite_UsesRetryableInternalSession) {
 }
 
 TEST_F(TxnAPITest, ClientRetryableWrite_RetryableWriteWithoutStmtIdFails) {
-    // This case is only currently supported on mongos.
-    // TODO SERVER-63747: Remove this once this restriction is lifted.
-    bool savedMongos = isMongos();
-    ON_BLOCK_EXIT([&] { setMongos(savedMongos); });
-    setMongos(true);
-
     opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
     opCtx()->setTxnNumber(5);
     resetTxnWithRetries();

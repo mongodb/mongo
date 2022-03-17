@@ -452,7 +452,7 @@ public:
      */
     virtual void checkOnPrimaryShardForDb(OperationContext* opCtx, const NamespaceString& nss) = 0;
 
-    virtual std::unique_ptr<ResourceYielder> getResourceYielder() const = 0;
+    virtual std::unique_ptr<ResourceYielder> getResourceYielder(StringData cmdName) const = 0;
 
     /**
      * If the user did not provide the 'fieldPaths' set, a default unique key will be picked,

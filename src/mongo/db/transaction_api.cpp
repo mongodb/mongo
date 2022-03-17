@@ -52,7 +52,6 @@
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/reply_interface.h"
-#include "mongo/s/is_mongos.h"
 #include "mongo/stdx/future.h"
 #include "mongo/transport/service_entry_point.h"
 
@@ -586,10 +585,6 @@ void Transaction::_primeTransaction(OperationContext* opCtx) {
                         0 /* txnNumber */,
                         {true} /* startTransaction */);
         _execContext = ExecutionContext::kClientRetryableWrite;
-
-        // TODO SERVER-63747: Handle client retryable write case on mongod. This is different from
-        // mongos because only mongod checks out a transaction session for retryable writes.
-        invariant(isMongos(), "This case is not yet supported on a mongod");
     } else {
         // Note that we don't want to include startTransaction or any first transaction command
         // fields because we assume that if we're in a client transaction the component tracking

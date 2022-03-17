@@ -250,7 +250,7 @@ public:
         uasserted(51019, "Unexpected check of routing table");
     }
 
-    std::unique_ptr<ResourceYielder> getResourceYielder() const override {
+    std::unique_ptr<ResourceYielder> getResourceYielder(StringData cmdName) const override {
         return nullptr;
     }
 

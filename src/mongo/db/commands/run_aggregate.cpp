@@ -506,7 +506,13 @@ std::vector<std::unique_ptr<Pipeline, PipelineDeleter>> createExchangePipelinesI
             // Create a new pipeline for the consumer consisting of a single
             // DocumentSourceExchange.
             boost::intrusive_ptr<DocumentSource> consumer = new DocumentSourceExchange(
-                expCtx, exchange, idx, expCtx->mongoProcessInterface->getResourceYielder());
+                expCtx,
+                exchange,
+                idx,
+                // Assumes this is only called from the 'aggregate' or 'getMore' commands.  The code
+                // which relies on this parameter does not distinguish/care about the difference so
+                // we simply always pass 'aggregate'.
+                expCtx->mongoProcessInterface->getResourceYielder("aggregate"_sd));
             pipelines.emplace_back(Pipeline::create({consumer}, expCtx));
         }
     } else {

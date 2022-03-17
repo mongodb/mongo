@@ -85,10 +85,14 @@ void DocumentSourceMergeCursors::populateMerger() {
     invariant(_armParams);
     invariant(_armParams->getRecordRemoteOpWaitTime());
 
-    _blockingResultsMerger.emplace(pExpCtx->opCtx,
-                                   std::move(*_armParams),
-                                   pExpCtx->mongoProcessInterface->taskExecutor,
-                                   pExpCtx->mongoProcessInterface->getResourceYielder());
+    _blockingResultsMerger.emplace(
+        pExpCtx->opCtx,
+        std::move(*_armParams),
+        pExpCtx->mongoProcessInterface->taskExecutor,
+        // Assumes this is only called from the 'aggregate' or 'getMore' commands.  The code which
+        // relies on this parameter does not distinguish/care about the difference so we simply
+        // always pass 'aggregate'.
+        pExpCtx->mongoProcessInterface->getResourceYielder("aggregate"_sd));
     _armParams = boost::none;
     // '_blockingResultsMerger' now owns the cursors.
     _ownCursors = false;
