@@ -3743,6 +3743,44 @@ buildvariants:
     - name: ".stress-test-4"
     - name: format-abort-recovery-stress-test
 
+- name: ubuntu2004-stress-tests-arm64
+  display_name: Ubuntu 20.04 Stress tests (ARM64)
+  run_on:
+  # FIXME-WT-8946: Use a larger machine with a reduced number of parallel jobs to prevent OOM killer
+  # from interrupting the format sanitizer stress tests. Once we have root caused and fixed the
+  # issue, we should reduce to a smaller machine with the same number of parallel jobs as the cores
+  # available.
+  - ubuntu2004-arm64-large
+  expansions:
+    smp_command: -j $(echo "`grep -c ^processor /proc/cpuinfo` / 2" | bc)
+    make_command: ninja
+    test_env_vars:
+      LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libeatmydata.so
+      PATH=/opt/mongodbtoolchain/v3/bin:$PATH
+      WT_TOPDIR=$(git rev-parse --show-toplevel)
+      WT_BUILDDIR=$WT_TOPDIR/cmake_build
+      LD_LIBRARY_PATH=$WT_BUILDDIR:$WT_TOPDIR/TCMALLOC_LIB/lib
+    posix_configure_flags:
+      -DHAVE_DIAGNOSTIC=1
+      -DENABLE_PYTHON=1
+      -DENABLE_ZLIB=1
+      -DENABLE_SNAPPY=1
+      -DENABLE_STRICT=1
+      -DENABLE_STATIC=1
+      -DENABLE_TCMALLOC=1
+      -DCMAKE_PREFIX_PATH="$(pwd)/../TCMALLOC_LIB"
+      -DCMAKE_INSTALL_PREFIX=$(pwd)/LOCAL_INSTALL
+    python_binary: '/opt/mongodbtoolchain/v3/bin/python3'
+  tasks:
+  # FIXME-WT-8947: For now run the whole stress test suite like we do on the x86 platform. But later
+  # find a smaller set of tests that give an optimal test coverage while being mindful of machine
+  # costs and availability.
+    - name: ".stress-test-1"
+    - name: ".stress-test-2"
+    - name: ".stress-test-3"
+    - name: ".stress-test-4"
+    - name: format-abort-recovery-stress-test
+
 - name: ubuntu2004-perf-tests
   display_name: Ubuntu 20.04 Performance tests
   batchtime: 1440 # 1 day
