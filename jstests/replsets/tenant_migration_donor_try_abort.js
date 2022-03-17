@@ -330,8 +330,7 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
     const barrierBeforeWaitingForKeyWC = configureFailPoint(
         donorRst.getPrimary(), "pauseTenantMigrationDonorBeforeWaitingForKeysToReplicate");
 
-    assert.commandWorked(
-        tenantMigrationTest.startMigration(migrationOpts, false /* retryOnRetryableErrors */));
+    assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
 
     // Wait for the donor to begin waiting for replication of the copied keys.
     barrierBeforeWaitingForKeyWC.wait();
@@ -340,8 +339,7 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
 
     // The migration should be unable to progress past the aborting index builds state because
     // it cannot replicate the copied keys to every donor node.
-    let res = assert.commandWorked(tenantMigrationTest.runDonorStartMigration(
-        migrationOpts, false /* waitForMigrationToComplete */, false /* retryOnRetryableErrors */));
+    let res = assert.commandWorked(tenantMigrationTest.runDonorStartMigration(migrationOpts));
     assert.eq("aborting index builds", res.state, tojson(res));
 
     // Abort the migration and the donor should stop waiting for key replication, despite the write

@@ -46,10 +46,8 @@ const tenantMigrationTest =
     const donorPrimary = tenantMigrationTest.getDonorPrimary();
     const abortFp =
         configureFailPoint(donorPrimary, "abortTenantMigrationBeforeLeavingBlockingState");
-    TenantMigrationTest.assertAborted(
-        tenantMigrationTest.runMigration({migrationIdString: migrationId1, tenantId: tenantId},
-                                         false /* retryOnRetryableErrors */,
-                                         false /* automaticForgetMigration */));
+    TenantMigrationTest.assertAborted(tenantMigrationTest.runMigration(
+        {migrationIdString: migrationId1, tenantId: tenantId}, {automaticForgetMigration: false}));
     abortFp.off();
 
     // Forget the aborted migration.

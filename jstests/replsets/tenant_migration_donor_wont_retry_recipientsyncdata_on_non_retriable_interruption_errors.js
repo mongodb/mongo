@@ -48,7 +48,7 @@ const donorRstArgs = TenantMigrationUtil.createRstArgs(donorRst);
 const runMigrationThread = new Thread(TenantMigrationUtil.runMigrationAsync,
                                       migrationOpts,
                                       donorRstArgs,
-                                      true /* retryOnRetryableErrors */);
+                                      {retryOnRetryableErrors: true});
 runMigrationThread.start();
 
 TenantMigrationTest.assertAborted(runMigrationThread.returnData());

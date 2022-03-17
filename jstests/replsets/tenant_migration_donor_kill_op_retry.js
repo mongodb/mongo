@@ -181,9 +181,7 @@ function makeTenantId() {
         let fp = configureFailPoint(tenantMigrationTest.getDonorPrimary(), fpName);
 
         TenantMigrationTest.assertCommitted(
-            tenantMigrationTest.runMigration(migrationOpts,
-                                             false /* retry on retriable errors */,
-                                             false /* Automatically forget migration */));
+            tenantMigrationTest.runMigration(migrationOpts, {automaticForgetMigration: false}));
 
         const donorPrimary = tenantMigrationTest.getDonorPrimary();
         const donorRstArgs = TenantMigrationUtil.createRstArgs(tenantMigrationTest.getDonorRst());

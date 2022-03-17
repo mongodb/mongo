@@ -206,13 +206,10 @@ function makeTestOptions(
 }
 
 function cleanUp(dbName) {
+    // To avoid disk space errors, ensure a new snapshot after dropping the DB,
+    // so subsequent 'Shard Merge' migrations don't copy it again.
     const donorDB = donorPrimary.getDB(dbName);
-
     assert.commandWorked(donorDB.dropDatabase());
-    donorRst.awaitLastOpCommitted();
-    // TODO SERVER-62934: Remove this fsync once we run fsync command before the migration
-    // start for shard merge protocol.
-    assert.commandWorked(donorPrimary.adminCommand({fsync: 1}));
 }
 
 function runTest(
@@ -324,8 +321,11 @@ function testRejectWritesAfterMigrationCommitted(testCase, testOpts) {
         tenantId,
     };
 
-    TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(
-        migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
+    TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(migrationOpts, {
+        retryOnRetryableErrors: false,
+        automaticForgetMigration: false,
+        enableDonorStartMigrationFsync: true
+    }));
 
     runCommand(testOpts, ErrorCodes.TenantMigrationCommitted);
     testCase.assertCommandFailed(testOpts.primaryDB, testOpts.dbName, testOpts.collName);
@@ -348,8 +348,11 @@ function testDoNotRejectWritesAfterMigrationAborted(testCase, testOpts) {
 
     let abortFp =
         configureFailPoint(testOpts.primaryDB, "abortTenantMigrationBeforeLeavingBlockingState");
-    TenantMigrationTest.assertAborted(tenantMigrationTest.runMigration(
-        migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
+    TenantMigrationTest.assertAborted(tenantMigrationTest.runMigration(migrationOpts, {
+        retryOnRetryableErrors: false,
+        automaticForgetMigration: false,
+        enableDonorStartMigrationFsync: true
+    }));
     abortFp.off();
 
     // Wait until the in-memory migration state is updated after the migration has majority
@@ -383,7 +386,8 @@ function testBlockWritesAfterMigrationEnteredBlocking(testCase, testOpts) {
     let blockingFp =
         configureFailPoint(testOpts.primaryDB, "pauseTenantMigrationBeforeLeavingBlockingState");
 
-    assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
+    assert.commandWorked(
+        tenantMigrationTest.startMigration(migrationOpts, {enableDonorStartMigrationFsync: true}));
 
     // Run the command after the migration enters the blocking state.
     blockingFp.wait();
@@ -421,7 +425,8 @@ function testRejectBlockedWritesAfterMigrationCommitted(testCase, testOpts) {
 
     // Run the command after the migration enters the blocking state.
     resumeMigrationThread.start();
-    assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
+    assert.commandWorked(
+        tenantMigrationTest.startMigration(migrationOpts, {enableDonorStartMigrationFsync: true}));
     blockingFp.wait();
 
     // The migration should unpause and commit after the write is blocked. Verify that the write is
@@ -461,7 +466,8 @@ function testRejectBlockedWritesAfterMigrationAborted(testCase, testOpts) {
         new Thread(resumeMigrationAfterBlockingWrite, testOpts.primaryHost, tenantId, 1);
 
     // Run the command after the migration enters the blocking state.
-    assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
+    assert.commandWorked(
+        tenantMigrationTest.startMigration(migrationOpts, {enableDonorStartMigrationFsync: true}));
     resumeMigrationThread.start();
     blockingFp.wait();
 

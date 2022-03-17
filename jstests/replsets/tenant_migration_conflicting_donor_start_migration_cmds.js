@@ -100,10 +100,10 @@ function setup() {
 
     const {tenantMigrationTest, recipientPrimary, teardown} = setup();
 
-    TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(
-        migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
-    TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(
-        migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
+    TenantMigrationTest.assertCommitted(
+        tenantMigrationTest.runMigration(migrationOpts, {automaticForgetMigration: false}));
+    TenantMigrationTest.assertCommitted(
+        tenantMigrationTest.runMigration(migrationOpts, {automaticForgetMigration: false}));
 
     // If the second donorStartMigration had started a duplicate migration, the recipient would have
     // received four recipientSyncData commands instead of two.
@@ -151,8 +151,8 @@ function testStartingConflictingMigrationAfterInitialMigrationCommitted({
     migrationOpts1,
     donorPrimary,
 }) {
-    TenantMigrationTest.assertCommitted(tenantMigrationTest0.runMigration(
-        migrationOpts0, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
+    TenantMigrationTest.assertCommitted(
+        tenantMigrationTest0.runMigration(migrationOpts0, {automaticForgetMigration: false}));
     const res1 = assert.commandFailedWithCode(tenantMigrationTest1.runMigration(migrationOpts1),
                                               ErrorCodes.ConflictingOperationInProgress);
     assertNoCertificateOrPrivateKey(res1.errmsg);

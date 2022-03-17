@@ -59,10 +59,8 @@ function testRecipientSyncDataInterrupt(interruptFunc, recipientRestarted) {
     };
     const donorRstArgs = TenantMigrationUtil.createRstArgs(donorRst);
 
-    const runMigrationThread = new Thread(TenantMigrationUtil.runMigrationAsync,
-                                          migrationOpts,
-                                          donorRstArgs,
-                                          false /* retryOnRetryableErrors */);
+    const runMigrationThread =
+        new Thread(TenantMigrationUtil.runMigrationAsync, migrationOpts, donorRstArgs);
     runMigrationThread.start();
 
     // Wait for recipientSyncData command to start.
@@ -142,8 +140,8 @@ function testRecipientForgetMigrationInterrupt(interruptFunc) {
     };
     const donorRstArgs = TenantMigrationUtil.createRstArgs(donorRst);
 
-    TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(
-        migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
+    TenantMigrationTest.assertCommitted(
+        tenantMigrationTest.runMigration(migrationOpts, {automaticForgetMigration: false}));
     const forgetMigrationThread = new Thread(TenantMigrationUtil.forgetMigrationAsync,
                                              migrationOpts.migrationIdString,
                                              donorRstArgs,

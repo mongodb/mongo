@@ -91,8 +91,7 @@ const kCollName = "testColl";
         configureFailPoint(donorPrimary, "pauseTenantMigrationBeforeLeavingBlockingState");
     let abortFp =
         configureFailPoint(donorPrimary, "abortTenantMigrationBeforeLeavingBlockingState");
-    assert.commandWorked(
-        tenantMigrationTest.startMigration(migrationOpts, false /* retryOnRetryableErrors */));
+    assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
     blockingFp.wait();
     donorRst.awaitReplication();
 
@@ -135,8 +134,7 @@ const kCollName = "testColl";
 
     let blockingFp =
         configureFailPoint(donorPrimary, "pauseTenantMigrationBeforeLeavingBlockingState");
-    assert.commandWorked(
-        tenantMigrationTest.startMigration(migrationOpts, false /* retryOnRetryableErrors */));
+    assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
     blockingFp.wait();
     donorRst.awaitReplication();
 
@@ -178,8 +176,7 @@ const kCollName = "testColl";
 
     let blockingFp =
         configureFailPoint(donorPrimary, "pauseTenantMigrationBeforeLeavingBlockingState");
-    assert.commandWorked(
-        tenantMigrationTest.startMigration(migrationOpts, false /* retryOnRetryableErrors */));
+    assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
     blockingFp.wait();
 
     // Run a read command and a write command against the primary, and wait for them to block.

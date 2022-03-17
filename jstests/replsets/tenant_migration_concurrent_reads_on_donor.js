@@ -117,8 +117,8 @@ function testRejectReadsAfterMigrationCommitted(testCase, dbName, collName) {
     const donorRst = tenantMigrationTest.getDonorRst();
     const donorPrimary = donorRst.getPrimary();
 
-    TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(
-        migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
+    TenantMigrationTest.assertCommitted(
+        tenantMigrationTest.runMigration(migrationOpts, {automaticForgetMigration: false}));
 
     // Wait for the last oplog entry on the primary to be visible in the committed snapshot view of
     // the oplog on all the secondaries. This is to ensure that snapshot reads on secondaries with
@@ -172,8 +172,8 @@ function testDoNotRejectReadsAfterMigrationAborted(testCase, dbName, collName) {
 
     let abortFp =
         configureFailPoint(donorPrimary, "abortTenantMigrationBeforeLeavingBlockingState");
-    TenantMigrationTest.assertAborted(tenantMigrationTest.runMigration(
-        migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
+    TenantMigrationTest.assertAborted(
+        tenantMigrationTest.runMigration(migrationOpts, {automaticForgetMigration: false}));
     abortFp.off();
 
     // Wait for the last oplog entry on the primary to be visible in the committed snapshot view of

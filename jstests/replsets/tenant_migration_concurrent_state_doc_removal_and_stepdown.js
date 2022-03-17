@@ -36,8 +36,8 @@ const migrationOpts = {
     tenantId: kTenantId,
 };
 
-TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(
-    migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
+TenantMigrationTest.assertCommitted(
+    tenantMigrationTest.runMigration(migrationOpts, {automaticForgetMigration: false}));
 
 let fp = configureFailPoint(donorPrimary,
                             "pauseTenantMigrationDonorAfterMarkingStateGarbageCollectable");

@@ -220,8 +220,8 @@ function testStats(node, {
         configureFailPoint(recipientPrimary,
                            "fpBeforeFulfillingDataConsistentPromise",
                            {action: "stop", stopErrorCode: ErrorCodes.InternalError});
-    TenantMigrationTest.assertAborted(tenantMigrationTest.runMigration(
-        migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
+    TenantMigrationTest.assertAborted(
+        tenantMigrationTest.runMigration(migrationOpts, {automaticForgetMigration: false}));
     abortRecipientFp.off();
 
     const donorDoc = configDonorsColl.findOne({tenantId: kTenantId});
@@ -263,8 +263,8 @@ function testStats(node, {
 
     let abortDonorFp =
         configureFailPoint(donorPrimary, "abortTenantMigrationBeforeLeavingBlockingState");
-    TenantMigrationTest.assertAborted(tenantMigrationTest.runMigration(
-        migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
+    TenantMigrationTest.assertAborted(
+        tenantMigrationTest.runMigration(migrationOpts, {automaticForgetMigration: false}));
     abortDonorFp.off();
 
     const donorDoc = configDonorsColl.findOne({tenantId: kTenantId});
@@ -313,8 +313,8 @@ configDonorsColl.dropIndex({expireAt: 1});
         donorPrimary.adminCommand({donorForgetMigration: 1, migrationId: migrationId}),
         ErrorCodes.NoSuchTenantMigration);
 
-    TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(
-        migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
+    TenantMigrationTest.assertCommitted(
+        tenantMigrationTest.runMigration(migrationOpts, {automaticForgetMigration: false}));
     assert.commandWorked(
         donorPrimary.adminCommand({donorForgetMigration: 1, migrationId: migrationId}));
 

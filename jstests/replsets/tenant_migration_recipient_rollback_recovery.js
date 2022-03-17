@@ -130,10 +130,8 @@ function testRollbackInitialState() {
 
         // Start the migration asynchronously and wait for the primary to insert the state doc.
         migrationOpts = makeMigrationOpts(tenantMigrationTest, migrationId, kTenantId + "-initial");
-        migrationThread = new Thread(TenantMigrationUtil.runMigrationAsync,
-                                     migrationOpts,
-                                     donorRstArgs,
-                                     false /* retryOnRetryableErrors */);
+        migrationThread =
+            new Thread(TenantMigrationUtil.runMigrationAsync, migrationOpts, donorRstArgs);
         migrationThread.start();
         assert.soon(() => {
             return 1 ===
@@ -181,10 +179,8 @@ function testRollBackStateTransition(pauseFailPoint, setUpFailPoints, nextState,
 
         migrationOpts =
             makeMigrationOpts(tenantMigrationTest, migrationId, kTenantId + "-" + nextState);
-        migrationThread = new Thread(TenantMigrationUtil.runMigrationAsync,
-                                     migrationOpts,
-                                     donorRstArgs,
-                                     false /* retryOnRetryableErrors */);
+        migrationThread =
+            new Thread(TenantMigrationUtil.runMigrationAsync, migrationOpts, donorRstArgs);
         migrationThread.start();
         pauseFp.wait();
     };
@@ -230,9 +226,7 @@ function testRollBackMarkingStateGarbageCollectable() {
         migrationOpts = makeMigrationOpts(
             tenantMigrationTest, migrationId, kTenantId + "-markGarbageCollectable");
         TenantMigrationTest.assertCommitted(
-            tenantMigrationTest.runMigration(migrationOpts,
-                                             false /* retryOnRetryableErrors */,
-                                             false /* automaticForgetMigration */));
+            tenantMigrationTest.runMigration(migrationOpts, {automaticForgetMigration: false}));
     };
 
     let rollbackOpsFunc = (tenantMigrationTest, donorRstArgs) => {
@@ -278,8 +272,8 @@ function testRollBackRandom() {
         migrationOpts = makeMigrationOpts(tenantMigrationTest, migrationId, kTenantId + "-random");
         migrationThread = new Thread((donorRstArgs, migrationOpts) => {
             load("jstests/replsets/libs/tenant_migration_util.js");
-            assert.commandWorked(TenantMigrationUtil.runMigrationAsync(
-                migrationOpts, donorRstArgs, false /* retryOnRetryableErrors */));
+            assert.commandWorked(
+                TenantMigrationUtil.runMigrationAsync(migrationOpts, donorRstArgs));
             assert.commandWorked(TenantMigrationUtil.forgetMigrationAsync(
                 migrationOpts.migrationIdString, donorRstArgs, false /* retryOnRetryableErrors */));
         }, donorRstArgs, migrationOpts);

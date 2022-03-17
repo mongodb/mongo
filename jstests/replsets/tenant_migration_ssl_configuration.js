@@ -252,8 +252,7 @@ const kExpiredMigrationCertificates = {
     const stateRes = assert.commandWorked(TenantMigrationUtil.runTenantMigrationCommand(
         donorStartMigrationCmdObj,
         donorRst,
-        false /* retryOnRetryableErrors */,
-        TenantMigrationUtil.isMigrationCompleted /* shouldStopFunc */));
+        {retryOnRetryableErrors: false, shouldStopFunc: TenantMigrationUtil.isMigrationCompleted}));
     assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
     assert.commandWorked(
         donorRst.getPrimary().adminCommand({donorForgetMigration: 1, migrationId: migrationId}));
@@ -298,8 +297,7 @@ const kExpiredMigrationCertificates = {
     const stateRes = assert.commandWorked(TenantMigrationUtil.runTenantMigrationCommand(
         donorStartMigrationCmdObj,
         donorRst,
-        false /* retryOnRetryableErrors */,
-        TenantMigrationUtil.isMigrationCompleted /* shouldStopFunc */));
+        {retryOnRetryableErrors: false, shouldStopFunc: TenantMigrationUtil.isMigrationCompleted}));
     assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
 
     donorRst.stopSet();
@@ -345,8 +343,7 @@ const kExpiredMigrationCertificates = {
     const stateRes = assert.commandWorked(TenantMigrationUtil.runTenantMigrationCommand(
         donorStartMigrationCmdObj,
         donorRst,
-        false /* retryOnRetryableErrors */,
-        TenantMigrationUtil.isMigrationCompleted /* shouldStopFunc */));
+        {retryOnRetryableErrors: false, shouldStopFunc: TenantMigrationUtil.isMigrationCompleted}));
     assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
 
     donorRst.stopSet();

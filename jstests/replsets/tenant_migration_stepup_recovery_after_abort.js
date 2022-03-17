@@ -51,8 +51,7 @@ assert.commandWorked(donorPrimary.getCollection(tenantId + "_testDb.testColl").i
 const donorFp = configureFailPoint(donorPrimary, "abortTenantMigrationBeforeLeavingBlockingState");
 
 TenantMigrationTest.assertAborted(
-    tenantMigrationTest.runMigration(
-        migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */),
+    tenantMigrationTest.runMigration(migrationOpts, {automaticForgetMigration: false}),
     ErrorCodes.InternalError);
 donorFp.off();
 
@@ -61,8 +60,7 @@ assert.commandWorked(
 assert.commandWorked(donorPrimary.adminCommand({replSetFreeze: 0}));
 
 TenantMigrationTest.assertAborted(
-    tenantMigrationTest.runMigration(
-        migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */),
+    tenantMigrationTest.runMigration(migrationOpts, {automaticForgetMigration: false}),
     ErrorCodes.InternalError);
 
 assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));

@@ -71,16 +71,11 @@ function testDroppingStateDocCollections(tenantMigrationTest, fpName, {
     let fp;
     if (fpName) {
         fp = configureFailPoint(donorPrimary, fpName, {tenantId: tenantId});
-        assert.commandWorked(
-            tenantMigrationTest.startMigration(migrationOptsBeforeDrop,
-                                               false /* retryOnRetryableErrors */,
-                                               false /* automaticForgetMigration */));
+        assert.commandWorked(tenantMigrationTest.startMigration(migrationOptsBeforeDrop));
         fp.wait();
     } else {
-        TenantMigrationTest.assertCommitted(
-            tenantMigrationTest.runMigration(migrationOptsBeforeDrop,
-                                             false /* retryOnRetryableErrors */,
-                                             false /* automaticForgetMigration */));
+        TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(
+            migrationOptsBeforeDrop, {automaticForgetMigration: false}));
     }
 
     if (dropDonorsCollection) {
@@ -123,9 +118,8 @@ function testDroppingStateDocCollections(tenantMigrationTest, fpName, {
     const migrationOptsAfterDrop = retryWithDifferentMigrationId
         ? makeMigrationOpts(tenantMigrationTest, tenantId)
         : migrationOptsBeforeDrop;
-    const runMigrationRes = tenantMigrationTest.runMigration(migrationOptsAfterDrop,
-                                                             false /* retryOnRetryableErrors */,
-                                                             false /* automaticForgetMigration */);
+    const runMigrationRes =
+        tenantMigrationTest.runMigration(migrationOptsAfterDrop, {automaticForgetMigration: false});
     if (expectedRunMigrationError) {
         assert.commandFailedWithCode(runMigrationRes, expectedRunMigrationError);
     } else {

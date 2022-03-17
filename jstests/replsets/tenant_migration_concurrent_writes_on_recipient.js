@@ -109,8 +109,8 @@ const kTenantId = "testTenantId";
     let abortFp = configureFailPoint(recipientPrimary,
                                      "fpBeforeFulfillingDataConsistentPromise",
                                      {action: "stop", stopErrorCode: ErrorCodes.InternalError});
-    TenantMigrationTest.assertAborted(tenantMigrationTest.runMigration(
-        migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
+    TenantMigrationTest.assertAborted(
+        tenantMigrationTest.runMigration(migrationOpts, {automaticForgetMigration: false}));
     abortFp.off();
 
     // Write after the migration aborted.
@@ -143,8 +143,8 @@ const kTenantId = "testTenantId";
     // recipientSyncData.
     let abortFp =
         configureFailPoint(donorPrimary, "abortTenantMigrationBeforeLeavingBlockingState");
-    TenantMigrationTest.assertAborted(tenantMigrationTest.runMigration(
-        migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
+    TenantMigrationTest.assertAborted(
+        tenantMigrationTest.runMigration(migrationOpts, {automaticForgetMigration: false}));
     abortFp.off();
 
     // Write after the migration aborted.

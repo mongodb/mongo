@@ -77,7 +77,7 @@ function testDonorStartMigrationInterrupt(interruptFunc,
     const runMigrationThread = new Thread(TenantMigrationUtil.runMigrationAsync,
                                           migrationOpts,
                                           donorRstArgs,
-                                          true /* retryOnRetryableErrors */);
+                                          {retryOnRetryableErrors: true});
     runMigrationThread.start();
 
     // Wait for donorStartMigration command to start.
@@ -161,8 +161,8 @@ function testDonorForgetMigrationInterrupt(interruptFunc) {
     };
     const donorRstArgs = TenantMigrationUtil.createRstArgs(donorRst);
 
-    TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(
-        migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
+    TenantMigrationTest.assertCommitted(
+        tenantMigrationTest.runMigration(migrationOpts, {automaticForgetMigration: false}));
     const forgetMigrationThread = new Thread(TenantMigrationUtil.forgetMigrationAsync,
                                              migrationOpts.migrationIdString,
                                              donorRstArgs,

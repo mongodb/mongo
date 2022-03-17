@@ -42,9 +42,6 @@ const donorPrimary = tenantMigrationTest.getDonorPrimary();
 // Do a majority write.
 tenantMigrationTest.insertDonorDB(tenantDB, collName);
 
-// Ensure our new collections appear in the backup cursor's checkpoint.
-assert.commandWorked(donorPrimary.adminCommand({fsync: 1}));
-
 const failpoint = "fpAfterStartingOplogApplierMigrationRecipientInstance";
 const waitInFailPoint = configureFailPoint(recipientPrimary, failpoint, {action: "hang"});
 
@@ -59,7 +56,8 @@ const migrationOpts = {
 };
 
 jsTestLog(`Starting the tenant migration to wait in failpoint: ${failpoint}`);
-assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
+assert.commandWorked(
+    tenantMigrationTest.startMigration(migrationOpts, {enableDonorStartMigrationFsync: true}));
 
 waitInFailPoint.wait();
 

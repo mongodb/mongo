@@ -62,9 +62,6 @@ assert.commandWorked(db.runCommand({
     indexes: [{key: {a: 1}, name: "a_1"}],
     writeConcern: {w: "majority"}
 }));
-
-// Ensure our new collections appear in the backup cursor's checkpoint.
-assert.commandWorked(db.adminCommand({fsync: 1}));
 })();
 
 // Enable Failpoints to simulate WriteConflict exception while importing donor files.
@@ -82,7 +79,8 @@ const migrationOpts = {
     migrationIdString: extractUUIDFromObject(migrationId),
     tenantId: kTenantId,
 };
-TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(migrationOpts));
+TenantMigrationTest.assertCommitted(
+    tenantMigrationTest.runMigration(migrationOpts, {enableDonorStartMigrationFsync: true}));
 
 tenantMigrationTest.getRecipientRst().nodes.forEach(node => {
     for (let collectionName of ["myCollection", "myCappedCollection"]) {

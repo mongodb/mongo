@@ -168,8 +168,8 @@ function checkStandardFieldsOK(ops, {
         readPreference: kReadPreference
     };
     configureFailPoint(donorPrimary, "abortTenantMigrationBeforeLeavingBlockingState");
-    TenantMigrationTest.assertAborted(tenantMigrationTest.runMigration(
-        migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
+    TenantMigrationTest.assertAborted(
+        tenantMigrationTest.runMigration(migrationOpts, {automaticForgetMigration: false}));
 
     const res = assert.commandWorked(
         donorPrimary.adminCommand({currentOp: true, desc: "tenant donor migration"}));
@@ -203,8 +203,8 @@ function checkStandardFieldsOK(ops, {
         tenantId: kTenantId,
         readPreference: kReadPreference
     };
-    assert.commandWorked(tenantMigrationTest.runMigration(
-        migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
+    assert.commandWorked(
+        tenantMigrationTest.runMigration(migrationOpts, {automaticForgetMigration: false}));
 
     let res = donorPrimary.adminCommand({currentOp: true, desc: "tenant donor migration"});
 

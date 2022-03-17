@@ -193,8 +193,8 @@ function testDoNotRejectReadsAfterMigrationAbortedBeforeReachingRejectReadsBefor
     let abortFp = configureFailPoint(recipientPrimary,
                                      "fpBeforeFulfillingDataConsistentPromise",
                                      {action: "stop", stopErrorCode: ErrorCodes.InternalError});
-    TenantMigrationTest.assertAborted(tenantMigrationTest.runMigration(
-        migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
+    TenantMigrationTest.assertAborted(
+        tenantMigrationTest.runMigration(migrationOpts, {automaticForgetMigration: false}));
     abortFp.off();
 
     const nodes = testCase.isSupportedOnSecondaries ? recipientRst.nodes : [recipientPrimary];
@@ -263,8 +263,8 @@ function testDoNotRejectReadsAfterMigrationAbortedAfterReachingRejectReadsBefore
     // recipientSyncData (i.e. after it has reached the returnAfterReachingTimestamp).
     let abortFp =
         configureFailPoint(donorPrimary, "abortTenantMigrationBeforeLeavingBlockingState");
-    TenantMigrationTest.assertAborted(tenantMigrationTest.runMigration(
-        migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
+    TenantMigrationTest.assertAborted(
+        tenantMigrationTest.runMigration(migrationOpts, {automaticForgetMigration: false}));
     abortFp.off();
 
     // Wait for the last oplog entry on the primary to be visible in the committed snapshot view of

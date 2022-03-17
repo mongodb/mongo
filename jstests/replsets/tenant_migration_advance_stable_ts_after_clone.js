@@ -56,7 +56,7 @@ const recipientHoldStablefp = configureFailPoint(
     recipientPrimary, "holdStableTimestampAtSpecificTimestamp", {timestamp: recipientHoldStableTs});
 
 // Advance the stable timestamp on the donor so that it's greater than the timestamp of the
-// recipient. Then, force the checkpoint timestamp to advance by calling fsync.
+// recipient.
 let donorAdvancedStableTs;
 assert.soon(function() {
     donorAdvancedStableTs =
@@ -70,7 +70,6 @@ assert.soon(function() {
 
     return bsonWoCompare(donorAdvancedStableTs, recipientHoldStableTs) > 0;
 });
-assert.commandWorked(donorPrimary.adminCommand({fsync: 1}));
 
 // Force the tenant migration to hang just before we attempt to advance the stable timestamp on the
 // recipient.
@@ -78,7 +77,7 @@ const hangBeforeAdvanceStableTsFp =
     configureFailPoint(recipientPrimary, "fpBeforeAdvancingStableTimestamp", {action: "hang"});
 
 // Start the migration.
-assert.commandWorked(tmt.startMigration(migrationOpts));
+assert.commandWorked(tmt.startMigration(migrationOpts, {enableDonorStartMigrationFsync: true}));
 
 // The recipient's stable timestamp should be less than the timestamp it receives from the donor to
 // use as the startApplyingDonorOpTime, so the recipient should advance its stable timestamp. Wait

@@ -37,7 +37,7 @@ const migrationOpts = {
 };
 
 TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(
-    migrationOpts, true /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
+    migrationOpts, {retryOnRetryableErrors: true, automaticForgetMigration: false}));
 
 const fpBeforeDroppingOplogBufferCollection =
     configureFailPoint(tenantMigrationTest.getRecipientPrimary(),

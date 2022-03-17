@@ -99,16 +99,21 @@ function TenantMigrationTest({
     }
 
     /**
-     * Runs a tenant migration with the given migration options and waits for the migration to be
-     * committed or aborted.
+     * Runs a tenant migration with the given migration options and waits for the migration to
+     * be committed or aborted.
      *
      * Returns the result of the initial donorStartMigration if it was unsuccessful. Otherwise,
-     * returns the command response containing the migration state on the donor after the migration
-     * has completed.
+     * returns the command response containing the migration state on the donor after the
+     * migration has completed.
      */
-    this.runMigration = function(
-        migrationOpts, retryOnRetryableErrors = false, automaticForgetMigration = true) {
-        const startRes = this.startMigration(migrationOpts, retryOnRetryableErrors);
+    this.runMigration = function(migrationOpts, opts = {}) {
+        const {
+            retryOnRetryableErrors = false,
+            automaticForgetMigration = true,
+            enableDonorStartMigrationFsync = false
+        } = opts;
+
+        const startRes = this.startMigration(migrationOpts, opts);
         if (!startRes.ok) {
             return startRes;
         }
@@ -131,9 +136,13 @@ function TenantMigrationTest({
      *
      * Returns the result of the 'donorStartMigration' command.
      */
-    this.startMigration = function(migrationOpts, retryOnRetryableErrors = false) {
-        return this.runDonorStartMigration(
-            migrationOpts, false /* waitForMigrationToComplete */, retryOnRetryableErrors);
+    this.startMigration = function(
+        migrationOpts,
+        {retryOnRetryableErrors = false, enableDonorStartMigrationFsync = false} = {}) {
+        return this.runDonorStartMigration(migrationOpts, {
+            retryOnRetryableErrors,
+            enableDonorStartMigrationFsync,
+        });
     };
 
     /**
@@ -152,7 +161,7 @@ function TenantMigrationTest({
                    .findOne({tenantId}));
 
         const donorStartReply = this.runDonorStartMigration(
-            migrationOpts, true /* waitForMigrationToComplete */, retryOnRetryableErrors);
+            migrationOpts, {waitForMigrationToComplete: true, retryOnRetryableErrors});
         if (!forgetMigration) {
             return donorStartReply;
         }
@@ -179,8 +188,13 @@ function TenantMigrationTest({
         donorCertificateForRecipient = migrationCertificates.donorCertificateForRecipient,
         recipientCertificateForDonor = migrationCertificates.recipientCertificateForDonor,
     },
-                                           waitForMigrationToComplete,
-                                           retryOnRetryableErrors) {
+                                           opts = {}) {
+        const {
+            waitForMigrationToComplete = false,
+            retryOnRetryableErrors = false,
+            enableDonorStartMigrationFsync = false,
+        } = opts;
+
         const cmdObj = {
             donorStartMigration: 1,
             tenantId,
@@ -191,12 +205,12 @@ function TenantMigrationTest({
             recipientCertificateForDonor
         };
 
-        const stateRes = TenantMigrationUtil.runTenantMigrationCommand(
-            cmdObj,
-            this.getDonorRst(),
+        const stateRes = TenantMigrationUtil.runTenantMigrationCommand(cmdObj, this.getDonorRst(), {
+            enableDonorStartMigrationFsync,
             retryOnRetryableErrors,
-            stateRes => (!waitForMigrationToComplete ||
-                         TenantMigrationUtil.isMigrationCompleted(stateRes)));
+            shouldStopFunc: stateRes =>
+                (!waitForMigrationToComplete || TenantMigrationUtil.isMigrationCompleted(stateRes))
+        });
 
         // If the migration has been successfully committed, check the db hashes for the tenantId
         // between the donor and recipient.
@@ -217,7 +231,7 @@ function TenantMigrationTest({
     this.forgetMigration = function(migrationIdString, retryOnRetryableErrors = false) {
         const cmdObj = {donorForgetMigration: 1, migrationId: UUID(migrationIdString)};
         const res = TenantMigrationUtil.runTenantMigrationCommand(
-            cmdObj, this.getDonorRst(), retryOnRetryableErrors);
+            cmdObj, this.getDonorRst(), {retryOnRetryableErrors});
 
         // If the command succeeded, we expect that the migration is marked garbage collectable on
         // the donor and the recipient. Check the state docs for expireAt, check that the oplog
@@ -280,7 +294,7 @@ function TenantMigrationTest({
             migrationId: UUID(migrationOpts.migrationIdString),
         };
         return TenantMigrationUtil.runTenantMigrationCommand(
-            cmdObj, this.getDonorRst(), retryOnRetryableErrors);
+            cmdObj, this.getDonorRst(), {retryOnRetryableErrors});
     };
 
     /**

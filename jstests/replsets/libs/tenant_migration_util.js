@@ -125,7 +125,11 @@ var TenantMigrationUtil = (function() {
      * all other use cases, please consider the runMigration() function in the TenantMigrationTest
      * fixture.
      */
-    function runMigrationAsync(migrationOpts, donorRstArgs, retryOnRetryableErrors = false) {
+    function runMigrationAsync(migrationOpts, donorRstArgs, opts = {}) {
+        const {
+            retryOnRetryableErrors = false,
+            enableDonorStartMigrationFsync = false,
+        } = opts;
         load("jstests/replsets/libs/tenant_migration_util.js");
         const donorRst = TenantMigrationUtil.createRst(donorRstArgs, retryOnRetryableErrors);
 
@@ -142,8 +146,11 @@ var TenantMigrationUtil = (function() {
                 migrationCertificates.recipientCertificateForDonor
         };
 
-        return TenantMigrationUtil.runTenantMigrationCommand(
-            cmdObj, donorRst, retryOnRetryableErrors, TenantMigrationUtil.isMigrationCompleted);
+        return TenantMigrationUtil.runTenantMigrationCommand(cmdObj, donorRst, {
+            retryOnRetryableErrors,
+            enableDonorStartMigrationFsync,
+            shouldStopFunc: TenantMigrationUtil.isMigrationCompleted
+        });
     }
 
     /**
@@ -161,7 +168,7 @@ var TenantMigrationUtil = (function() {
         const donorRst = TenantMigrationUtil.createRst(donorRstArgs, retryOnRetryableErrors);
         const cmdObj = {donorForgetMigration: 1, migrationId: UUID(migrationIdString)};
         return TenantMigrationUtil.runTenantMigrationCommand(
-            cmdObj, donorRst, retryOnRetryableErrors);
+            cmdObj, donorRst, {retryOnRetryableErrors});
     }
 
     /**
@@ -183,24 +190,37 @@ var TenantMigrationUtil = (function() {
             migrationId: UUID(migrationOpts.migrationIdString),
         };
         return TenantMigrationUtil.runTenantMigrationCommand(
-            cmdObj, donorRst, retryOnRetryableErrors);
+            cmdObj, donorRst, {retryOnRetryableErrors});
     }
 
     /**
      * Runs the given tenant migration command against the primary of the given replica set until
      * the command succeeds or fails with a non-retryable error (if 'retryOnRetryableErrors' is
-     * true) or until 'shouldStopFunc' returns true (if it is given). Returns the last response.
+     * true) or until 'shouldStopFunc' returns true. Returns the last response.
      */
-    function runTenantMigrationCommand(cmdObj, rst, retryOnRetryableErrors, shouldStopFunc) {
+    function runTenantMigrationCommand(cmdObj, rst, {
+        retryOnRetryableErrors = false,
+        shouldStopFunc = () => true,
+        enableDonorStartMigrationFsync = false
+    } = {}) {
         let primary = rst.getPrimary();
         let localCmdObj = cmdObj;
+        let run = () => primary.adminCommand(localCmdObj);
         if (Object.keys(cmdObj)[0] === "donorStartMigration") {
-            localCmdObj = donorStartMigrationWithProtocol(cmdObj, primary.getDB("admin"));
+            run = () => {
+                const adminDB = primary.getDB("admin");
+                localCmdObj = donorStartMigrationWithProtocol(cmdObj, adminDB);
+                if (enableDonorStartMigrationFsync) {
+                    rst.awaitLastOpCommitted();
+                    assert.commandWorked(primary.adminCommand({fsync: 1}));
+                }
+                return primary.adminCommand(localCmdObj);
+            };
         }
         let res;
         assert.soon(() => {
             try {
-                res = primary.adminCommand(localCmdObj);
+                res = run();
 
                 if (!res.ok) {
                     // If retry is enabled and the command failed with a NotPrimary error, continue
@@ -214,10 +234,7 @@ var TenantMigrationUtil = (function() {
                     return true;
                 }
 
-                if (shouldStopFunc) {
-                    return shouldStopFunc(res);
-                }
-                return true;
+                return shouldStopFunc(res);
             } catch (e) {
                 if (retryOnRetryableErrors && isNetworkError(e)) {
                     jsTestLog(`runTenantMigrationCommand retryable error. Command: ${

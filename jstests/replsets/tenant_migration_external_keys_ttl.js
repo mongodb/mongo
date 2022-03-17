@@ -128,9 +128,8 @@ function makeTestParams() {
         }
         const [tenantId, migrationId, migrationOpts] = makeTestParams();
 
-        TenantMigrationTest.assertCommitted(tmt.runMigration(migrationOpts,
-                                                             false /* retryOnRetryableErrors */,
-                                                             false /* automaticForgetMigration */));
+        TenantMigrationTest.assertCommitted(
+            tmt.runMigration(migrationOpts, {automaticForgetMigration: false}));
 
         // The keys should have been created without a TTL deadline.
         verifyExternalKeys(tmt.getDonorPrimary(), {migrationId, expectTTLValue: false});
@@ -144,9 +143,8 @@ function makeTestParams() {
             tenantId: makeTenantId(),
         };
 
-        TenantMigrationTest.assertCommitted(tmt.runMigration(otherMigrationOpts,
-                                                             false /* retryOnRetryableErrors */,
-                                                             false /* automaticForgetMigration */));
+        TenantMigrationTest.assertCommitted(
+            tmt.runMigration(otherMigrationOpts, {automaticForgetMigration: false}));
 
         // The keys should have been created without a TTL deadline.
         verifyExternalKeys(tmt.getDonorPrimary(),
@@ -187,9 +185,8 @@ function makeTestParams() {
         assert.eq(origDonorKeysExpirationParam, 60 * 60 * 24);      // 1 day.
         assert.eq(origRecipientKeysExpirationParam, 60 * 60 * 24);  // 1 day.
 
-        TenantMigrationTest.assertCommitted(tmt.runMigration(migrationOpts,
-                                                             false /* retryOnRetryableErrors */,
-                                                             false /* automaticForgetMigration */));
+        TenantMigrationTest.assertCommitted(
+            tmt.runMigration(migrationOpts, {automaticForgetMigration: false}));
 
         // The keys should have been created without a TTL deadline.
         verifyExternalKeys(tmt.getDonorPrimary(), {migrationId, expectTTLValue: false});
