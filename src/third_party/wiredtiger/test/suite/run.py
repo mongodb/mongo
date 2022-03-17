@@ -578,6 +578,20 @@ if __name__ == '__main__':
             sys.exit(2)
         from discover import defaultTestLoader as loader
         suites = loader.discover(suitedir)
+
+        # If you have an empty Python file, it comes back as an empty entry in suites
+        # and then the sort explodes. Drop empty entries first. Note: this converts
+        # suites to a list, but the sort does that anyway. Also note: there seems to be
+        # no way to count other than iteration; there's a count method but it also
+        # returns zero for test files that contain a test class with no test functions,
+        # and it's not clear that dropping those here is correct.
+        def isempty(s):
+            count = 0
+            for c in s:
+                count += 1
+            return (count == 0)
+        suites = [s for s in suites if not isempty(s)]
+
         suites = sorted(suites, key=lambda c: str(list(c)[0]))
         if configfile != None:
             suites = configApply(suites, configfile, configwrite)
