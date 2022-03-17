@@ -347,9 +347,11 @@ assert.commandFailed(dbTest.createCollection(
 
 jsTestLog("test FLE1 schema validator on FLE2 collection");
 dbTest.test.drop();
-// TODO: SERVER-64100 this should be prohibited
-assert.commandWorked(dbTest.createCollection(
-    "test", {encryptedFields: sampleEncryptedFields, validator: fle1Schema}));
+
+assert.commandFailedWithCode(
+    dbTest.createCollection("test",
+                            {encryptedFields: sampleEncryptedFields, validator: fle1Schema}),
+    224);
 
 jsTestLog("test collMod adding user validator on encrypted collection");
 dbTest.test.drop();
