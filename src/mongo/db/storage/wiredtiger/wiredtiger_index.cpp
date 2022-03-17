@@ -93,13 +93,17 @@ static const WiredTigerItem emptyItem(nullptr, 0);
 
 // Keystring format 7 was used in 3.3.6 - 3.3.8 development releases. 4.2 onwards, unique indexes
 // can be either format version 11 or 12. On upgrading to 4.2, an existing format 6 unique index
-// will upgrade to format 11 and an existing format 8 unique index will upgrade to format 12.
+// will upgrade to format 11 and an existing format 8 unique index will upgrade to format 12. When
+// downgraded from 6.0, unique indexes can also be format 13 or 14. We will allow them to exist but
+// we'll still create new unique indexes in format 11 and 12 in version 5.0.
 const int kDataFormatV1KeyStringV0IndexVersionV1 = 6;
 const int kDataFormatV2KeyStringV1IndexVersionV2 = 8;
 const int kDataFormatV3KeyStringV0UniqueIndexVersionV1 = 11;
 const int kDataFormatV4KeyStringV1UniqueIndexVersionV2 = 12;
+const int kDataFormatV5KeyStringV0UniqueIndexVersionV1 = 13;
+const int kDataFormatV6KeyStringV1UniqueIndexVersionV2 = 14;
 const int kMinimumIndexVersion = kDataFormatV1KeyStringV0IndexVersionV1;
-const int kMaximumIndexVersion = kDataFormatV4KeyStringV1UniqueIndexVersionV2;
+const int kMaximumIndexVersion = kDataFormatV6KeyStringV1UniqueIndexVersionV2;
 
 void WiredTigerIndex::setKey(WT_CURSOR* cursor, const WT_ITEM* item) {
     cursor->set_key(cursor, item);
@@ -516,8 +520,8 @@ KeyString::Version WiredTigerIndex::_handleVersionInfo(OperationContext* ctx,
     _dataFormatVersion = version.getValue();
 
     if (!desc->isIdIndex() && desc->unique() &&
-        _dataFormatVersion != kDataFormatV3KeyStringV0UniqueIndexVersionV1 &&
-        _dataFormatVersion != kDataFormatV4KeyStringV1UniqueIndexVersionV2) {
+        (_dataFormatVersion < kDataFormatV3KeyStringV0UniqueIndexVersionV1 ||
+         _dataFormatVersion > kDataFormatV6KeyStringV1UniqueIndexVersionV2)) {
         auto collectionNamespace = desc->getEntry()->getNSSFromCatalog(ctx);
         Status versionStatus(ErrorCodes::UnsupportedFormat,
                              str::stream()
@@ -537,11 +541,12 @@ KeyString::Version WiredTigerIndex::_handleVersionInfo(OperationContext* ctx,
     }
 
     /*
-     * Index data format 6 and 11 correspond to KeyString version V0 and data format 8 and 12
-     * correspond to KeyString version V1.
+     * Index data format 6, 11, and 13 correspond to KeyString version V0 and data format 8, 12, and
+     * 14 correspond to KeyString version V1.
      */
     return (_dataFormatVersion == kDataFormatV2KeyStringV1IndexVersionV2 ||
-            _dataFormatVersion == kDataFormatV4KeyStringV1UniqueIndexVersionV2)
+            _dataFormatVersion == kDataFormatV4KeyStringV1UniqueIndexVersionV2 ||
+            _dataFormatVersion == kDataFormatV6KeyStringV1UniqueIndexVersionV2)
         ? KeyString::Version::V1
         : KeyString::Version::V0;
 }
