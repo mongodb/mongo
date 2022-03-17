@@ -58,7 +58,7 @@ def icecc_create_env(env, target, source, for_signature):
     # store it in a known location. Add any files requested from the user environment.
     create_env = "ICECC_VERSION_TMP=$$(${SOURCES[0]} --$ICECC_COMPILER_TYPE ${SOURCES[1]} ${SOURCES[2]}"
 
-    # TODO: It would be a little more elegant if things in
+    # TODO: SERVER-57393 It would be a little more elegant if things in
     # ICECC_CREATE_ENV_ADDFILES were handled as sources, because we
     # would get automatic dependency tracking. However, there are some
     # wrinkles around the mapped case so we have opted to leave it as
@@ -328,7 +328,7 @@ def generate(env):
     # of such a node easily. Creating a Substfile means that SCons
     # will take care of generating a file that Ninja can use.
     run_icecc = setupEnv.Textfile(
-        target="$ICECREAM_TARGET_DIR/run-icecc.sh",
+        target="$ICECREAM_TARGET_DIR/$ICECREAM_RUN_SCRIPT_SUBPATH/run-icecc.sh",
         source=[
             '#!/bin/sh',
             'ICECC_VERSION=@icecc_version_arch@@icecc_version@ exec @icecc@ "$@"',
