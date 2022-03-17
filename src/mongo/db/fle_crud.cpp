@@ -71,9 +71,10 @@ public:
                                                              BSONObj obj,
                                                              bool translateDuplicateKey) final;
 
-    BSONObj deleteWithPreimage(const NamespaceString& nss,
-                               const EncryptionInformation& ei,
-                               const write_ops::DeleteCommandRequest& deleteRequest) final;
+    std::pair<write_ops::DeleteCommandReply, BSONObj> deleteWithPreimage(
+        const NamespaceString& nss,
+        const EncryptionInformation& ei,
+        const write_ops::DeleteCommandRequest& deleteRequest) final;
 
     std::pair<write_ops::UpdateCommandReply, BSONObj> updateWithPreimage(
         const NamespaceString& nss,
@@ -257,7 +258,8 @@ StatusWith<write_ops::InsertCommandReply> FLEQueryInterfaceImpl::insertDocument(
     return {reply};
 }
 
-BSONObj FLEQueryInterfaceImpl::deleteWithPreimage(
+std::pair<write_ops::DeleteCommandReply, BSONObj> FLEQueryInterfaceImpl::deleteWithPreimage(
+
     const NamespaceString& nss,
     const EncryptionInformation& ei,
     const write_ops::DeleteCommandRequest& deleteRequest) {
@@ -278,16 +280,20 @@ BSONObj FLEQueryInterfaceImpl::deleteWithPreimage(
 
     auto response = _txnClient.runCommand(nss.db(), findAndModifyRequest.toBSON({})).get();
     auto status = getStatusFromWriteCommandReply(response);
-    uassertStatusOK(status);
 
     auto reply =
         write_ops::FindAndModifyCommandReply::parse(IDLParserErrorContext("reply"), response);
 
-    if (!reply.getValue().has_value()) {
-        return BSONObj();
+    write_ops::DeleteCommandReply deleteReply;
+
+    if (!status.isOK()) {
+        deleteReply.getWriteCommandReplyBase().setN(0);
+        deleteReply.getWriteCommandReplyBase().setWriteErrors(singleStatusToWriteErrors(status));
+    } else if (reply.getLastErrorObject().getNumDocs() > 0) {
+        deleteReply.getWriteCommandReplyBase().setN(1);
     }
 
-    return reply.getValue().value();
+    return {deleteReply, reply.getValue().value_or(BSONObj())};
 }
 
 boost::optional<BSONObj> mergeLetAndCVariables(const boost::optional<BSONObj>& let,
@@ -530,9 +536,9 @@ std::pair<FLEBatchResult, write_ops::InsertCommandReply> processInsert(
                                                                     reply};
 }
 
-StatusWith<uint64_t> processDelete(OperationContext* opCtx,
-                                   const write_ops::DeleteCommandRequest& deleteRequest,
-                                   GetTxnCallback getTxns) {
+write_ops::DeleteCommandReply processDelete(OperationContext* opCtx,
+                                            const write_ops::DeleteCommandRequest& deleteRequest,
+                                            GetTxnCallback getTxns) {
 
     auto deletes = deleteRequest.getDeletes();
     uassert(6371302, "Only single document deletes are permitted", deletes.size() == 1);
@@ -544,10 +550,11 @@ StatusWith<uint64_t> processDelete(OperationContext* opCtx,
 
     std::shared_ptr<txn_api::TransactionWithRetries> trun = getTxns(opCtx);
 
+    write_ops::DeleteCommandReply reply;
+
     // The function that handles the transaction may outlive this function so we need to use
     // shared_ptrs
-    uint64_t count = 0;
-    auto deleteBlock = std::tie(deleteRequest, count);
+    auto deleteBlock = std::tie(deleteRequest, reply);
     auto sharedDeleteBlock = std::make_shared<decltype(deleteBlock)>(deleteBlock);
 
     auto swResult = runInTxnWithRetry(
@@ -556,18 +563,32 @@ StatusWith<uint64_t> processDelete(OperationContext* opCtx,
         [sharedDeleteBlock](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
             FLEQueryInterfaceImpl queryImpl(txnClient);
 
-            auto [deleteRequest2, count] = *sharedDeleteBlock.get();
+            auto [deleteRequest2, reply2] = *sharedDeleteBlock.get();
 
-            count = processDelete(&queryImpl, deleteRequest2);
+            reply2 = processDelete(&queryImpl, deleteRequest2);
+
+            // If we have write errors but no unexpected internal errors, then we reach here
+            // If we have write errors, we need to return a failed status to ensure the txn client
+            // does not try to commit the transaction.
+            if (reply2.getWriteErrors().has_value() && !reply2.getWriteErrors().value().empty()) {
+                return SemiFuture<void>::makeReady(
+                    Status(ErrorCodes::FLETransactionAbort, "FLE2 write errors on delete"));
+            }
 
             return SemiFuture<void>::makeReady();
         });
 
     if (!swResult.isOK()) {
-        return swResult.getStatus();
+        // FLETransactionAbort is used for control flow so it means we have a valid
+        // InsertCommandReply with write errors so we should return that.
+        if (swResult.getStatus() == ErrorCodes::FLETransactionAbort) {
+            return reply;
+        }
+
+        appendSingleStatusToWriteErrors(swResult.getStatus(), &reply.getWriteCommandReplyBase());
     }
 
-    return count;
+    return reply;
 }
 
 StatusWith<write_ops::UpdateCommandReply> processUpdate(
@@ -860,8 +881,8 @@ StatusWith<write_ops::InsertCommandReply> processInsert(
     return queryImpl->insertDocument(edcNss, finalDoc, false);
 }
 
-uint64_t processDelete(FLEQueryInterface* queryImpl,
-                       const write_ops::DeleteCommandRequest& deleteRequest) {
+write_ops::DeleteCommandReply processDelete(FLEQueryInterface* queryImpl,
+                                            const write_ops::DeleteCommandRequest& deleteRequest) {
     auto edcNss = deleteRequest.getNamespace();
     auto ei = deleteRequest.getEncryptionInformation().get();
 
@@ -869,18 +890,21 @@ uint64_t processDelete(FLEQueryInterface* queryImpl,
     auto tokenMap = EncryptionInformationHelpers::getDeleteTokens(edcNss, ei);
 
     // TODO SERVER-64143 - use this delete for retryable writes
-    BSONObj deletedDocument = queryImpl->deleteWithPreimage(edcNss, ei, deleteRequest);
+    auto [deleteReply, deletedDocument] = queryImpl->deleteWithPreimage(edcNss, ei, deleteRequest);
 
     // If the delete did not actually delete anything, we are done
     if (deletedDocument.isEmpty()) {
-        return 0;
+        write_ops::DeleteCommandReply reply;
+        reply.getWriteCommandReplyBase().setN(0);
+        return reply;
     }
+
 
     auto deletedFields = EDCServerCollection::getEncryptedIndexedFields(deletedDocument);
 
     processRemovedFields(queryImpl, edcNss, efc, tokenMap, deletedFields);
 
-    return 1;
+    return deleteReply;
 }
 
 /**
@@ -1015,18 +1039,11 @@ FLEBatchResult processFLEBatch(OperationContext* opCtx,
 
         auto deleteRequest = request.getDeleteRequest();
 
-        auto swResult = processDelete(opCtx, deleteRequest, &getTransactionWithRetriesForMongoS);
+        auto deleteReply = processDelete(opCtx, deleteRequest, &getTransactionWithRetriesForMongoS);
 
-
-        if (!swResult.isOK()) {
-            response->setStatus(swResult.getStatus());
-            response->setN(0);
-        } else {
-            response->setStatus(Status::OK());
-            response->setN(swResult.getValue());
-        }
-
+        replyToResponse(&deleteReply.getWriteCommandReplyBase(), response);
         return FLEBatchResult::kProcessed;
+
     } else if (request.getBatchType() == BatchedCommandRequest::BatchType_Update) {
 
         auto updateRequest = request.getUpdateRequest();

@@ -87,6 +87,14 @@ void stopFLECrud();
 FLEBatchResult processFLEInsert(OperationContext* opCtx,
                                 const write_ops::InsertCommandRequest& insertRequest,
                                 write_ops::InsertCommandReply* insertReply);
+
+/**
+ * Process a replica set delete.
+ */
+write_ops::DeleteCommandReply processFLEDelete(
+    OperationContext* opCtx, const write_ops::DeleteCommandRequest& deleteRequest);
+
+
 /**
  * Process a findAndModify request from mongos
  */
@@ -132,9 +140,10 @@ public:
      * Returns the pre-image of the deleted document. If no documents were deleted, returns an empty
      * BSON object.
      */
-    virtual BSONObj deleteWithPreimage(const NamespaceString& nss,
-                                       const EncryptionInformation& ei,
-                                       const write_ops::DeleteCommandRequest& deleteRequest) = 0;
+    virtual std::pair<write_ops::DeleteCommandReply, BSONObj> deleteWithPreimage(
+        const NamespaceString& nss,
+        const EncryptionInformation& ei,
+        const write_ops::DeleteCommandRequest& deleteRequest) = 0;
 
     /**
      * Update a single document with the given query and update operators.
@@ -175,8 +184,8 @@ StatusWith<write_ops::InsertCommandReply> processInsert(
  *
  * Used by unit tests.
  */
-uint64_t processDelete(FLEQueryInterface* queryImpl,
-                       const write_ops::DeleteCommandRequest& deleteRequest);
+write_ops::DeleteCommandReply processDelete(FLEQueryInterface* queryImpl,
+                                            const write_ops::DeleteCommandRequest& deleteRequest);
 
 /**
  * Process a FLE Update with the query interface
@@ -185,6 +194,15 @@ uint64_t processDelete(FLEQueryInterface* queryImpl,
  */
 write_ops::UpdateCommandReply processUpdate(FLEQueryInterface* queryImpl,
                                             const write_ops::UpdateCommandRequest& updateRequest);
+
+/**
+ * Process a FLE Find And Modify with the query interface
+ *
+ * Used by unit tests.
+ */
+write_ops::FindAndModifyCommandReply processFindAndModify(
+    FLEQueryInterface* queryImpl,
+    const write_ops::FindAndModifyCommandRequest& findAndModifyRequest);
 
 /**
  * Callback function to get a TransactionWithRetries with the appropiate Executor
@@ -197,13 +215,7 @@ std::pair<FLEBatchResult, write_ops::InsertCommandReply> processInsert(
     const write_ops::InsertCommandRequest& insertRequest,
     GetTxnCallback getTxns);
 
-/**
- * Process a FLE Find And Modify with the query interface
- *
- * Used by unit tests.
- */
-write_ops::FindAndModifyCommandReply processFindAndModify(
-    FLEQueryInterface* queryImpl,
-    const write_ops::FindAndModifyCommandRequest& findAndModifyRequest);
-
+write_ops::DeleteCommandReply processDelete(OperationContext* opCtx,
+                                            const write_ops::DeleteCommandRequest& deleteRequest,
+                                            GetTxnCallback getTxns);
 }  // namespace mongo

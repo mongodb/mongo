@@ -1572,6 +1572,10 @@ public:
             write_ops::DeleteCommandReply deleteReply;
             OperationSource source = OperationSource::kStandard;
 
+            if (request().getEncryptionInformation().has_value()) {
+                return processFLEDelete(opCtx, request());
+            }
+
             if (isTimeseries(opCtx, request())) {
                 uassert(ErrorCodes::InvalidOptions,
                         "Time-series deletes are not enabled",

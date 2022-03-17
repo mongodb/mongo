@@ -29,8 +29,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <cstdint>
-#include <memory>
 #include <string>
 #include <utility>
 
@@ -46,6 +44,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/ops/write_ops_parsers.h"
+#include "mongo/db/query/find_command_gen.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/session.h"
 #include "mongo/db/session_catalog.h"
@@ -55,7 +54,9 @@
 #include "mongo/db/transaction_participant_resource_yielder.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/transaction_router_resource_yielder.h"
 #include "mongo/s/write_ops/batch_write_exec.h"
+#include "mongo/s/write_ops/write_error_detail.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
 
@@ -187,6 +188,21 @@ FLEBatchResult processFLEInsert(OperationContext* opCtx,
     setMongosFieldsInReply(opCtx, &insertReply->getWriteCommandReplyBase());
 
     return FLEBatchResult::kProcessed;
+}
+
+write_ops::DeleteCommandReply processFLEDelete(
+    OperationContext* opCtx, const write_ops::DeleteCommandRequest& deleteRequest) {
+
+    uassert(6371701,
+            "Encrypted index operations are only supported on replica sets",
+            repl::ReplicationCoordinator::get(opCtx->getServiceContext())->getReplicationMode() ==
+                repl::ReplicationCoordinator::modeReplSet);
+
+    auto deleteReply = processDelete(opCtx, deleteRequest, &getTransactionWithRetriesForMongoD);
+
+    setMongosFieldsInReply(opCtx, &deleteReply.getWriteCommandReplyBase());
+
+    return deleteReply;
 }
 
 }  // namespace mongo

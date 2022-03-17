@@ -89,9 +89,10 @@ public:
                                                              BSONObj obj,
                                                              bool translateDuplicateKey) final;
 
-    BSONObj deleteWithPreimage(const NamespaceString& nss,
-                               const EncryptionInformation& ei,
-                               const write_ops::DeleteCommandRequest& deleteRequest) final;
+    std::pair<write_ops::DeleteCommandReply, BSONObj> deleteWithPreimage(
+        const NamespaceString& nss,
+        const EncryptionInformation& ei,
+        const write_ops::DeleteCommandRequest& deleteRequest) final;
 
     std::pair<write_ops::UpdateCommandReply, BSONObj> updateWithPreimage(
         const NamespaceString& nss,
@@ -136,9 +137,11 @@ StatusWith<write_ops::InsertCommandReply> FLEQueryTestImpl::insertDocument(
     return write_ops::InsertCommandReply();
 }
 
-BSONObj FLEQueryTestImpl::deleteWithPreimage(const NamespaceString& nss,
-                                             const EncryptionInformation& ei,
-                                             const write_ops::DeleteCommandRequest& deleteRequest) {
+
+std::pair<write_ops::DeleteCommandReply, BSONObj> FLEQueryTestImpl::deleteWithPreimage(
+    const NamespaceString& nss,
+    const EncryptionInformation& ei,
+    const write_ops::DeleteCommandRequest& deleteRequest) {
     // A limit of the API, we can delete by _id and get the pre-image so we limit our unittests to
     // this
     ASSERT_EQ(deleteRequest.getDeletes().size(), 1);
@@ -149,10 +152,10 @@ BSONObj FLEQueryTestImpl::deleteWithPreimage(const NamespaceString& nss,
 
     // Some of the unit tests delete documents that do not exist
     if (swDoc.getStatus() == ErrorCodes::NoSuchKey) {
-        return BSONObj();
+        return {write_ops::DeleteCommandReply(), BSONObj()};
     }
 
-    return uassertStatusOK(swDoc);
+    return {write_ops::DeleteCommandReply(), uassertStatusOK(swDoc)};
 }
 
 std::pair<write_ops::UpdateCommandReply, BSONObj> FLEQueryTestImpl::updateWithPreimage(
