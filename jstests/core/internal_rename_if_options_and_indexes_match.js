@@ -1,11 +1,14 @@
 // Test that internalRenameIfOptionsAndIndexesMatch command works as expected.
 //
 // This command cannot be run against mongos.
+// This test does not send dbVersion with internalRenameIfOptionsAndIndexeMatch, so cannot be run
+// directly against shardsvrs.
 // @tags: [
 //   assumes_against_mongod_not_mongos,
 //   incompatible_with_embedded,
 //   requires_capped,
 //   requires_non_retryable_commands,
+//   directly_against_shardsvrs_incompatible,
 // ]
 
 (function() {

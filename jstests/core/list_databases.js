@@ -17,6 +17,9 @@ function verifySizeSum(listDatabasesOut) {
 }
 
 function verifyNameOnly(listDatabasesOut) {
+    // Delete extra meta info only returned by shardsvrs.
+    delete listDatabasesOut.lastCommittedOpTime;
+
     for (let field in listDatabasesOut) {
         assert(['databases', 'nameOnly', 'ok', 'operationTime', '$clusterTime'].some((f) => f ==
                                                                                          field),

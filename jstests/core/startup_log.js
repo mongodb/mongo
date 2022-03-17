@@ -65,9 +65,11 @@ assert.eq(serverStatus.pid, latestStartUpLog.pid, "pid doesn't match that from s
 
 // Test buildinfo
 var buildinfo = db.runCommand("buildinfo");
-delete buildinfo.ok;             // Delete extra meta info not in startup_log
-delete buildinfo.operationTime;  // Delete extra meta info not in startup_log
-delete buildinfo.$clusterTime;   // Delete extra meta info not in startup_log
+delete buildinfo.ok;                   // Delete extra meta info not in startup_log
+delete buildinfo.operationTime;        // Delete extra meta info not in startup_log
+delete buildinfo.$clusterTime;         // Delete extra meta info not in startup_log
+delete buildinfo.lastCommittedOpTime;  // Delete extra meta info not in startup_log (only returned
+                                       // by shardsvrs)
 var hello = db._adminCommand("hello");
 
 // Test buildinfo has the expected keys

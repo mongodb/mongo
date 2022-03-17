@@ -2,7 +2,13 @@
  * Tests that timestamped reads, reads with snapshot and afterClusterTime, wait for the prepare
  * transaction oplog entry to be visible before choosing a read timestamp.
  *
- * @tags: [uses_transactions, uses_prepare_transaction, uses_parallel_shell]
+ * @tags: [
+ *  uses_transactions,
+ *  uses_prepare_transaction,
+ *  uses_parallel_shell,
+ *  # 'setDefaultRWConcern' is not supposed to be run on shard nodes.
+ *  command_not_supported_in_serverless,
+ * ]
  */
 (function() {
 'use strict';

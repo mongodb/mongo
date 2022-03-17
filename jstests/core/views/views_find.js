@@ -4,6 +4,8 @@
  * @tags: [
  *   assumes_unsharded_collection,
  *   requires_getmore,
+ *   # Explain of a resolved view must be executed by mongos.
+ *   directly_against_shardsvrs_incompatible,
  * ]
  */
 (function() {

@@ -8,6 +8,8 @@
  *   does_not_support_transactions,
  *   requires_fcv_51,
  *   requires_getmore,
+ *   # Explain of a resolved view must be executed by mongos.
+ *   directly_against_shardsvrs_incompatible,
  * ]
  */
 

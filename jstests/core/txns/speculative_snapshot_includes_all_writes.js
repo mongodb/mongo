@@ -1,7 +1,13 @@
 /**
  * A speculative snapshot must not include any writes ordered after any uncommitted writes.
  *
- * @tags: [uses_transactions, requires_majority_read_concern, uses_parallel_shell]
+ * @tags: [
+ *  uses_transactions,
+ *  requires_majority_read_concern,
+ *  uses_parallel_shell,
+ *  # 'setDefaultRWConcern' is not supposed to be run on shard nodes.
+ *  command_not_supported_in_serverless,
+ * ]
  */
 (function() {
 "use strict";

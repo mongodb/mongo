@@ -1,0 +1,77 @@
+test_kind: js_test
+
+selector:
+  roots:
+  - jstests/core/**/*.js
+  exclude_files:
+  # These tests run applyOps which is not supported in serverless.
+  - jstests/core/apply_ops1.js
+  - jstests/core/apply_ops1.js
+  - jstests/core/apply_ops2.js
+  - jstests/core/apply_ops_dups.js
+  - jstests/core/apply_ops_index_collation.js
+  - jstests/core/apply_ops_invalid_index_spec.js
+  - jstests/core/apply_ops_missing_field.js
+  - jstests/core/apply_ops_system_dot_views.js
+  - jstests/core/apply_ops_without_ns.js
+  - jstests/core/bypass_doc_validation.js
+  - jstests/core/collmod_without_uuid.js
+  - jstests/core/txns/commands_banning_txnnumber_outside_transactions.js
+  - jstests/core/txns/commands_not_allowed_in_txn.js
+  - jstests/core/txns/prepare_transaction_fails_on_temp_collections.js
+  - jstests/core/txns/statement_ids_accepted.js
+  - jstests/core/list_collections1.js
+  - jstests/core/list_collections_filter.js
+  - jstests/core/list_collections_no_views.js
+  - jstests/core/views/view_with_invalid_dbname.js
+  - jstests/core/views/views_creation.js
+  - jstests/core/views/invalid_system_views.js
+  - jstests/core/views/views_all_commands.js
+  - jstests/core/rename_collection_staytemp.js
+  # This test expects that the connection (i.e. 'threadName') does not change throughout each test
+  # case. That is not always true when the test driver use a replica set connection string. As this
+  # test sets fail point with error code NotWritablePrimary, the test driver changes its topology to
+  # ReplicaSetNoPrimary and create a new connection once it get the primary again.
+  - jstests/core/failcommand_failpoint.js
+
+  exclude_with_any_tags:
+  - assumes_standalone_mongod
+  - command_not_supported_in_serverless
+  # capped collections are banned in Serverless.
+  - requires_capped
+  # In this suite the test talks directly to shardsvrs (doesn't go through mongos).
+  - directly_against_shardsvrs_incompatible
+  # TODO (SERVER-64132): Remove these tests from the exclude list. They may currently fail because
+  # they create a collection via the renameCollection path, so are not created with kUnsharded
+  # filtering metadata.
+  - uses_$out
+  - uses_map_reduce_with_temp_collections
+
+executor:
+  archive:
+    tests: true
+    hooks:
+      - CheckReplDBHash
+      - CheckReplOplogs
+      - ValidateCollections
+  config:
+    shell_options:
+      eval: >-
+        testingReplication = true;
+  hooks:
+  # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+  # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+  # validating the entire contents of the collection.
+  - class: CheckReplOplogs
+  - class: CheckReplDBHash
+  - class: ValidateCollections
+  - class: CleanEveryN
+    n: 20
+  fixture:
+    class: TalkDirectlyToShardsvrsFixture
+    common_mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+    num_replica_sets: 1
+    num_nodes_per_replica_set: 3
+    use_replica_set_connection_string: true

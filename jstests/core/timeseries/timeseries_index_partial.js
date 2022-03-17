@@ -5,6 +5,8 @@
  *   does_not_support_stepdowns,
  *   does_not_support_transactions,
  *   requires_fcv_52,
+ *   # Explain of a resolved view must be executed by mongos.
+ *   directly_against_shardsvrs_incompatible,
  * ]
  */
 (function() {

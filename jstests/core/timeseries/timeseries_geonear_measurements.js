@@ -15,6 +15,8 @@
  *     requires_fcv_51,
  *     requires_pipeline_optimization,
  *     requires_timeseries,
+ *     # Explain of a resolved view must be executed by mongos.
+ *     directly_against_shardsvrs_incompatible,
  * ]
  */
 

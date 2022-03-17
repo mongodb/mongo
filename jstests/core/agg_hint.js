@@ -3,6 +3,8 @@
 // @tags: [
 //   assumes_no_implicit_collection_creation_after_drop,
 //   does_not_support_stepdowns,
+//   # Explain of a resolved view must be executed by mongos.
+//   directly_against_shardsvrs_incompatible,
 // ]
 
 // Confirms correct behavior for hinted aggregation execution. This includes tests for scenarios

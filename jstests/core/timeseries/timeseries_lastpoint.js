@@ -8,7 +8,9 @@
  *   requires_pipeline_optimization,
  *   requires_fcv_53,
  *   # TODO (SERVER-63590): Investigate presence of getmore tag in timeseries jstests.
- *   requires_getmore
+ *   requires_getmore,
+ *   # Explain of a resolved view must be executed by mongos.
+ *   directly_against_shardsvrs_incompatible,
  * ]
  */
 (function() {

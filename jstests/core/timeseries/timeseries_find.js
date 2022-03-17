@@ -8,6 +8,8 @@
  *     requires_timeseries,
  *     # Required because of deficiencies in the burnin multiversion system.
  *     requires_fcv_51,
+ *     # Explain of a resolved view must be executed by mongos.
+ *     directly_against_shardsvrs_incompatible,
  * ]
  */
 
