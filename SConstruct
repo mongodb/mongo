@@ -4545,6 +4545,17 @@ if 'CCACHE' in env and env['CCACHE']:
 if 'ICECC' in env and env['ICECC']:
     env['ICECREAM_VERBOSE'] = env.Verbose()
     env['ICECREAM_TARGET_DIR'] = '$BUILD_ROOT/scons/icecream'
+
+    # Posssibly multiple ninja files are in play, and there are cases where ninja will
+    # use the wrong icecc run script, so we must create a unique script per ninja variant
+    # for ninja to track separately. We will use the variant dir which contains the each
+    # separate ninja builds meta files. This has to be under an additional flag then just
+    # ninja disabled, because the run icecc script is generated under a context where ninja
+    # is always disabled via the scons callback mechanism. The __NINJA_NO flag is intended
+    # to differentiate this particular context.
+    if env.get('__NINJA_NO') or get_option('ninja') != 'disabled':
+        env['ICECREAM_RUN_SCRIPT_SUBPATH'] = '$VARIANT_DIR'
+
     icecream = Tool('icecream')
     if not icecream.exists(env):
         env.FatalError(f"Failed to load icecream tool with ICECC={env['ICECC']}")
