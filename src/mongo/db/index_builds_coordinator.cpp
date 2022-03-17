@@ -1009,14 +1009,45 @@ void IndexBuildsCoordinator::applyAbortIndexBuild(OperationContext* opCtx,
 
     std::string abortReason(str::stream()
                             << "abortIndexBuild oplog entry encountered: " << *oplogEntry.cause);
-    if (!abortIndexBuildByBuildUUID(opCtx, buildUUID, IndexBuildAction::kOplogAbort, abortReason)) {
-        // The index build may already be in the midst of tearing down.
-        LOGV2(5010504,
-              "Index build: failed to abort index build while applying abortIndexBuild operation",
-              "buildUUID"_attr = buildUUID,
-              "namespace"_attr = nss,
-              "collectionUUID"_attr = collUUID,
-              "cause"_attr = *oplogEntry.cause);
+    if (abortIndexBuildByBuildUUID(opCtx, buildUUID, IndexBuildAction::kOplogAbort, abortReason)) {
+        return;
+    }
+
+    // The index build may already be in the midst of tearing down.
+    LOGV2(5010504,
+          "Index build: failed to abort index build while applying abortIndexBuild operation",
+          "buildUUID"_attr = buildUUID,
+          "namespace"_attr = nss,
+          "collectionUUID"_attr = collUUID,
+          "cause"_attr = *oplogEntry.cause);
+
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    if (replCoord->getSettings().shouldRecoverFromOplogAsStandalone()) {
+        // Unfinished index builds are not restarted in standalone mode. That means there will be no
+        // index builder threads to abort. Instead, we should drop the unfinished indexes that were
+        // aborted.
+        AutoGetCollection autoColl{opCtx, nss, MODE_X};
+
+        WriteUnitOfWork wuow(opCtx);
+
+        auto indexCatalog = autoColl.getWritableCollection(opCtx)->getIndexCatalog();
+        for (const auto& indexSpec : oplogEntry.indexSpecs) {
+            const IndexDescriptor* desc = indexCatalog->findIndexByName(
+                opCtx,
+                indexSpec.getStringField(IndexDescriptor::kIndexNameFieldName),
+                /*includeUnfinishedIndexes=*/true);
+
+            LOGV2(6455400,
+                  "Dropping unfinished index during oplog recovery as standalone",
+                  "spec"_attr = indexSpec);
+
+            invariant(desc && desc->getEntry()->isFrozen());
+            invariant(indexCatalog->dropUnfinishedIndex(
+                opCtx, autoColl.getWritableCollection(opCtx), desc));
+        }
+
+        wuow.commit();
+        return;
     }
 }
 
