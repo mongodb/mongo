@@ -7,16 +7,6 @@
 (function() {
 "use strict";
 
-const checkPerShardCursorEnabled = () => {
-    const conn = MongoRunner.runMongod();
-    const res = conn.adminCommand({
-        getParameter: 1,
-        featureFlagPerShardCursor: 1,
-    });
-    MongoRunner.stopMongod(conn);
-    return res.featureFlagPerShardCursor.value;
-};
-
 const dbName = jsTestName();
 const setupShardedCluster = (shards = 1) => {
     const st = new ShardingTest(
@@ -64,16 +54,6 @@ const pscWatch = (db, coll, shardId, options = {}, csOptions = {}) => {
     }
     return new DBCommandCursor(db, resp);
 };
-
-if (!checkPerShardCursorEnabled()) {
-    let [sdb, st, shardId] = setupShardedCluster();
-
-    // Should only work with feature flag on.
-    assert.commandFailedWithCode(assert.throws(() => pscWatch(sdb, "coll", shardId)), 6273800);
-    st.stop();
-    jsTestLog("Skipping the rest of the test because featureFlagPerSardCursor is not enabled");
-    return;
-}
 
 // Parsing
 let [sdb, st, shardId] = setupShardedCluster();

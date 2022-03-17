@@ -112,11 +112,6 @@ feature_flags:
         default: true
         version: 5.3
 
-    featureFlagPerShardCursor:
-      description: "Feature flag for enabling a per-shard cursor via mongos"
-      cpp_varname: gFeatureFlagPerShardCursor
-      default: false
-
     featureFlagCommonQueryFramework:
       description: "Feature flag for allowing use of Cascades-based query optimizer"
       cpp_varname: gfeatureFlagCommonQueryFramework
