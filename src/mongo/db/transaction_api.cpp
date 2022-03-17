@@ -431,8 +431,14 @@ Transaction::ErrorHandlingStep Transaction::handleError(
 
     const auto& clientStatus = swResult.getStatus();
     if (!clientStatus.isOK()) {
-        // A network error before commit is a transient transaction error.
-        if (!hasStartedCommit && ErrorCodes::isNetworkError(clientStatus)) {
+        if (ErrorCodes::isNetworkError(clientStatus)) {
+            // A network error before commit is a transient transaction error, so we can retry the
+            // entire transaction. If there is a network error after a commit is sent, we can retry
+            // the commit command to either recommit if the operation failed or get the result of
+            // the successful commit.
+            if (hasStartedCommit) {
+                return ErrorHandlingStep::kRetryCommit;
+            }
             return ErrorHandlingStep::kRetryTransaction;
         }
         return ErrorHandlingStep::kAbortAndDoNotRetry;

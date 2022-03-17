@@ -140,12 +140,16 @@ public:
         _lastSentRequest = cmdBob.obj();
 
         auto nextResponse = _nextResponse;
-        if (!_secondResponse.isEmpty()) {
-            _nextResponse = _secondResponse;
-            _secondResponse = BSONObj();
+        if (_secondResponse) {
+            _nextResponse = *_secondResponse;
+            _secondResponse.reset();
         }
-        _hooks->runReplyHook(nextResponse);
-        return SemiFuture<BSONObj>::makeReady(nextResponse);
+        if (!nextResponse.isOK()) {
+            return SemiFuture<BSONObj>::makeReady(nextResponse);
+        }
+        auto nextResponseRes = nextResponse.getValue();
+        _hooks->runReplyHook(nextResponseRes);
+        return SemiFuture<BSONObj>::makeReady(nextResponseRes);
     }
 
     virtual SemiFuture<BatchedCommandResponse> runCRUDOp(
@@ -166,18 +170,18 @@ public:
         return _lastSentRequest;
     }
 
-    void setNextCommandResponse(BSONObj res) {
+    void setNextCommandResponse(StatusWith<BSONObj> res) {
         _nextResponse = res;
     }
 
-    void setSecondCommandResponse(BSONObj res) {
+    void setSecondCommandResponse(StatusWith<BSONObj> res) {
         _secondResponse = res;
     }
 
 private:
     std::unique_ptr<TxnMetadataHooks> _hooks;
-    mutable BSONObj _nextResponse;
-    mutable BSONObj _secondResponse;
+    mutable StatusWith<BSONObj> _nextResponse{BSONObj()};
+    mutable boost::optional<StatusWith<BSONObj>> _secondResponse;
     mutable BSONObj _lastSentRequest;
 };
 
@@ -1360,6 +1364,42 @@ TEST_F(TxnAPITest, ClientTransaction_DoesNotRetryOnTransientErrors) {
     // No best effort abort should have been sent.
     auto lastRequest = mockClient()->getLastSentRequest();
     ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "insert"_sd);
+}
+
+TEST_F(TxnAPITest, OwnSession_HandleErrorRetryCommitOnNetworkError) {
+    auto swResult = txnWithRetries().runSyncNoThrow(
+        opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+            mockClient()->setNextCommandResponse(kOKInsertResponse);
+            auto insertRes = txnClient
+                                 .runCommand("user"_sd,
+                                             BSON("insert"
+                                                  << "foo"
+                                                  << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                 .get();
+
+            ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
+            assertTxnMetadata(
+                mockClient()->getLastSentRequest(), 0 /* txnNumber */, true /* startTransaction */);
+            assertSessionIdMetadata(mockClient()->getLastSentRequest(), LsidAssertion::kStandalone);
+
+            // The commit response.
+            mockClient()->setNextCommandResponse(
+                Status(ErrorCodes::HostUnreachable, "Host Unreachable"));
+            mockClient()->setSecondCommandResponse(kOKCommandResponse);
+
+            return SemiFuture<void>::makeReady();
+        });
+    ASSERT(swResult.getStatus().isOK());
+    ASSERT(swResult.getValue().getEffectiveStatus().isOK());
+
+    auto lastRequest = mockClient()->getLastSentRequest();
+    assertTxnMetadata(lastRequest,
+                      0 /* txnNumber */,
+                      boost::none /* startTransaction */,
+                      boost::none /* readConcern */,
+                      WriteConcernOptions().toBSON() /* writeConcern */);
+    assertSessionIdMetadata(mockClient()->getLastSentRequest(), LsidAssertion::kStandalone);
+    ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "commitTransaction"_sd);
 }
 
 }  // namespace
