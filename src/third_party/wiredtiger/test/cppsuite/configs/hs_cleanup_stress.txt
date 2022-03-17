@@ -1,6 +1,8 @@
 # Run for half an hour.
 duration_seconds=1800,
-cache_size_mb=200,
+# The configuration can produce a large number of updates at once, therefore use 500MB cache size 
+# to hold these values.
+cache_size_mb=500,
 compression_enabled=true,
 statistics_config=
 (

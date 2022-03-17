@@ -246,7 +246,7 @@ struct __wt_cursor_bulk {
      * row-store compares keys during bulk load to avoid corruption.
      */
     bool first_insert; /* First insert */
-    WT_ITEM last;      /* Last key/value inserted */
+    WT_ITEM *last;     /* Last key/value inserted */
 
     /*
      * Additional column-store bulk load support.

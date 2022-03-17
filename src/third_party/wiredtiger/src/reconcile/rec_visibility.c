@@ -416,6 +416,7 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, W
      */
     upd_select->upd = NULL;
     upd_select->upd_saved = false;
+    upd_select->ooo_tombstone = false;
     select_tw = &upd_select->tw;
     WT_TIME_WINDOW_INIT(select_tw);
 
@@ -711,6 +712,23 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, W
 
     /* Check the update chain for conditions that could prevent it's eviction. */
     WT_ERR(__rec_validate_upd_chain(session, r, onpage_upd, select_tw, vpack));
+
+    /*
+     * Set the flag if the selected tombstone is an out-of-order or mixed mode to an update. Based
+     * on this flag, the caller functions perform the history store truncation for this key.
+     */
+    if (tombstone != NULL &&
+      !F_ISSET(tombstone, WT_UPDATE_RESTORED_FROM_DS | WT_UPDATE_RESTORED_FROM_HS)) {
+        upd = upd_select->upd;
+        while (upd != NULL && upd->txnid == WT_TXN_ABORTED)
+            upd = upd->next;
+
+        if (upd != NULL && upd->start_ts > tombstone->start_ts)
+            upd_select->ooo_tombstone = true;
+
+        if (vpack != NULL && vpack->tw.start_ts > upd->start_ts)
+            upd_select->ooo_tombstone = true;
+    }
 
     /*
      * Fixup any out of order timestamps, assert that checkpoint wasn't running when this round of

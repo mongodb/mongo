@@ -89,7 +89,7 @@
          * We should not leave any history store cursor open when return from an api call. \
          * However, we cannot do a stricter check before WT-7247 is resolved.              \
          */                                                                                \
-        WT_ASSERT(s, (s)->api_call_counter > 1 || (s)->hs_cursor_counter <= 2);            \
+        WT_ASSERT(s, (s)->api_call_counter > 1 || (s)->hs_cursor_counter <= 3);            \
         /*                                                                                 \
          * No code after this line, otherwise error handling                               \
          * won't be correct.                                                               \

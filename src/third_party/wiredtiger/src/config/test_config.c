@@ -133,6 +133,7 @@ static const WT_CONFIG_CHECK confchk_search_near_01[] = {
   {"duration_seconds", "int", NULL, "min=0,max=1000000", NULL, 0},
   {"enable_logging", "boolean", NULL, NULL, NULL, 0},
   {"runtime_monitor", "category", NULL, NULL, confchk_runtime_monitor_subconfigs, 5},
+  {"search_near_threads", "string", NULL, NULL, NULL, 0},
   {"statistics_config", "category", NULL, NULL, confchk_statistics_config_subconfigs, 2},
   {"timestamp_manager", "category", NULL, NULL, confchk_timestamp_manager_subconfigs, 4},
   {"workload_generator", "category", NULL, NULL, confchk_workload_generator_subconfigs, 6},
@@ -231,7 +232,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
     "compression_enabled=false,duration_seconds=0,"
     "enable_logging=false,runtime_monitor=(enabled=true,op_rate=1s,"
     "postrun_statistics=[],stat_cache_size=(enabled=false,limit=0),"
-    "stat_db_size=(enabled=false,limit=0)),"
+    "stat_db_size=(enabled=false,limit=0)),search_near_threads=10,"
     "statistics_config=(enable_logging=true,type=all),"
     "timestamp_manager=(enabled=true,oldest_lag=1,op_rate=1s,"
     "stable_lag=1),workload_generator=(enabled=true,"
@@ -243,7 +244,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
     "value_size=5),update_config=(key_size=5,op_rate=1s,"
     "ops_per_transaction=(max=1,min=0),thread_count=0,value_size=5)),"
     "workload_tracking=(enabled=true,op_rate=1s)",
-    confchk_search_near_01, 10},
+    confchk_search_near_01, 11},
   {"search_near_02",
     "cache_size_mb=0,checkpoint_manager=(enabled=false,op_rate=1s),"
     "compression_enabled=false,duration_seconds=0,"

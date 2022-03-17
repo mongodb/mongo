@@ -229,7 +229,7 @@ class test_tiered04(wttest.WiredTigerTestCase):
         # Call flush_tier with its various configuration arguments. It is difficult
         # to force a timeout or lock contention with a unit test. So just test the
         # call for now.
-        self.session.flush_tier('timeout=10')
+        self.session.flush_tier('timeout=100')
         self.session.flush_tier('lock_wait=false')
         self.session.flush_tier('sync=off')
         flush += 3

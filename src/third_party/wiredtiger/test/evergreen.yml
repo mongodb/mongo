@@ -91,10 +91,18 @@ functions:
   "fetch mongo repo" :
     command: shell.exec
     params:
+      shell: bash
       script: |
         set -o errexit
         set -o verbose
-        git clone https://github.com/mongodb/mongo
+        mongo_repo=https://github.com/mongodb/mongo
+        branch=${branch_name}
+        if [[ $branch =~ "mongodb-" ]]; then   
+          mongo_branch=v$(echo $branch | cut -d'-' -f 2)
+        else
+          mongo_branch=master
+        fi
+        git clone $mongo_repo -b $mongo_branch
   "import wiredtiger into mongo" :
     command: shell.exec
     params:
@@ -2894,7 +2902,8 @@ tasks:
             virtualenv -p python3 venv
             source venv/bin/activate
             pip3 install lorem pymongo==3.12.2
-            ./run_many_coll.sh ../../mongo/build/opt/install/bin/mongod mongodb.log config/many-collection-testing many-collection clean-and-populate
+            mongod_path=$(find ../../mongo/build -executable -type f -path \*/bin/mongod)
+            ./run_many_coll.sh $mongod_path mongodb.log config/many-collection-testing many-collection clean-and-populate
 
       - command: shell.exec
         params:
@@ -3941,6 +3950,9 @@ buildvariants:
     - name: package
 
 - name: documentation-update
+  # Documentation update is NOT expected to be triggered on Evergreen projects
+  # other than "WiredTiger (develop)"
+  activate: false
   display_name: "~ Documentation update"
   batchtime: 10080 # 7 days
   run_on:
@@ -4024,15 +4036,21 @@ buildvariants:
     - name: cyclomatic-complexity
 
 - name: compatibility-tests-less-frequent
+  # Compatibility tests are NOT expected to be triggered on Evergreen projects
+  # other than "WiredTiger (develop)".
+  activate: false
   display_name: Compatibility tests (less frequent)
   batchtime: 10080 # 7 days
   run_on:
-  - ubuntu1804-test
+    - ubuntu1804-test
   tasks:
     - name: compatibility-test-for-older-releases
     - name: compatibility-test-for-wt-standalone-releases
 
 - name: compatibility-tests
+  # Compatibility tests are NOT expected to be triggered on Evergreen projects
+  # other than "WiredTiger (develop)".
+  activate: false
   display_name: Compatibility tests
   run_on:
   - ubuntu2004-test

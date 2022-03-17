@@ -149,8 +149,8 @@ __curbulk_insert_var(WT_CURSOR *cursor)
          * If not the first insert and the key space is sequential, compare the current value
          * against the last value; if the same, just increment the RLE count.
          */
-        if (recno == cbulk->recno + 1 && cbulk->last.size == cursor->value.size &&
-          memcmp(cbulk->last.data, cursor->value.data, cursor->value.size) == 0) {
+        if (recno == cbulk->recno + 1 && cbulk->last->size == cursor->value.size &&
+          memcmp(cbulk->last->data, cursor->value.data, cursor->value.size) == 0) {
             ++cbulk->rle;
             ++cbulk->recno;
             goto duplicate;
@@ -173,7 +173,7 @@ __curbulk_insert_var(WT_CURSOR *cursor)
     cbulk->recno = recno;
 
     /* Save a copy of the value for the next comparison. */
-    ret = __wt_buf_set(session, &cbulk->last, cursor->value.data, cursor->value.size);
+    ret = __wt_buf_set(session, cbulk->last, cursor->value.data, cursor->value.size);
 
 duplicate:
 err:
@@ -203,7 +203,7 @@ __bulk_row_keycmp_err(WT_CURSOR_BULK *cbulk)
       "bulk-load presented with out-of-order keys: %s compares smaller than previously inserted "
       "key %s",
       __wt_buf_set_printable(session, cursor->key.data, cursor->key.size, false, a),
-      __wt_buf_set_printable(session, cbulk->last.data, cbulk->last.size, false, b));
+      __wt_buf_set_printable(session, cbulk->last->data, cbulk->last->size, false, b));
 
 err:
     __wt_scr_free(session, &a);
@@ -242,14 +242,14 @@ __curbulk_insert_row(WT_CURSOR *cursor)
      * application doesn't accidentally corrupt the table.
      */
     if (!cbulk->first_insert) {
-        WT_ERR(__wt_compare(session, btree->collator, &cursor->key, &cbulk->last, &cmp));
+        WT_ERR(__wt_compare(session, btree->collator, &cursor->key, cbulk->last, &cmp));
         if (cmp <= 0)
             WT_ERR(__bulk_row_keycmp_err(cbulk));
     } else
         cbulk->first_insert = false;
 
     /* Save a copy of the key for the next comparison. */
-    WT_ERR(__wt_buf_set(session, &cbulk->last, cursor->key.data, cursor->key.size));
+    WT_ERR(__wt_buf_set(session, cbulk->last, cursor->key.data, cursor->key.size));
 
     ret = __wt_bulk_insert_row(session, cbulk);
 
@@ -326,6 +326,17 @@ __wt_curbulk_init(
     if (bitmap)
         F_SET(cursor, WT_CURSTD_RAW);
 
+    /*
+     * The bulk last buffer is used to detect out-of-order keys in row-store to avoid corruption,
+     * and to detect duplicate values in variable-length column-store, where we increment the RLE
+     * instead of storing another value. In variable-length column-store, if the first two values we
+     * load are zero-length, the first one will set the last buffer's data field to NULL, and the
+     * second will cause us to call the underlying memory comparison function with a NULL pointer,
+     * which triggers run-time analyzers. Give the buffer some memory to avoid the problem (h/t to
+     * C99 typos).
+     */
+    WT_RET(__wt_scr_alloc(session, 100, &cbulk->last));
+
     return (__wt_bulk_init(session, cbulk));
 }
 
@@ -340,6 +351,6 @@ __wt_curbulk_close(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
 
     ret = __wt_bulk_wrapup(session, cbulk);
 
-    __wt_buf_free(session, &cbulk->last);
+    __wt_scr_free(session, &cbulk->last);
     return (ret);
 }
