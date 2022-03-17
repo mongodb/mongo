@@ -214,6 +214,7 @@ const allCommands = {
     fsyncUnlock: {skip: isNotAUserDataRead},
     getAuditConfig: {skip: isNotAUserDataRead},
     getChangeStreamOptions: {skip: isNotAUserDataRead},
+    getClusterParameter: {skip: isNotAUserDataRead},
     getCmdLineOpts: {skip: isNotAUserDataRead},
     getDatabaseVersion: {skip: isNotAUserDataRead},
     getDefaultRWConcern: {skip: isNotAUserDataRead},

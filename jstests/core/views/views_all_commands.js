@@ -359,6 +359,7 @@ let viewsCommandTests = {
     getAuditConfig: {skip: isUnrelated},
     getDatabaseVersion: {skip: isUnrelated},
     getChangeStreamOptions: {skip: isUnrelated},
+    getClusterParameter: {skip: isUnrelated},
     getCmdLineOpts: {skip: isUnrelated},
     getDefaultRWConcern: {skip: isUnrelated},
     getDiagnosticData: {skip: isUnrelated},

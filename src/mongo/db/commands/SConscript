@@ -322,9 +322,9 @@ env.Library(
 )
 
 env.Library(
-    target='set_cluster_parameter_idl',
+    target='cluster_server_parameter_cmds_idl',
     source=[
-        'set_cluster_parameter.idl',
+        'cluster_server_parameter_cmds.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -535,6 +535,7 @@ env.Library(
         "dbcommands_d.cpp",
         "dbhash.cpp",
         "driverHelpers.cpp",
+        'get_cluster_parameter_command.cpp',
         "internal_rename_if_options_and_indexes_match_cmd.cpp",
         "fle2_compact_cmd.cpp",
         "map_reduce_command.cpp",
@@ -638,7 +639,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/s/write_ops/cluster_write_ops',
-        'set_cluster_parameter_idl'
+        'cluster_server_parameter_cmds_idl'
     ],
 )
 

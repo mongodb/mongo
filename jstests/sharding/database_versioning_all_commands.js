@@ -458,6 +458,7 @@ let testCases = {
     getAuditConfig: {skip: "not on a user database", conditional: true},
     getChangeStreamOptions:
         {skip: "executes locally on mongos (not sent to any remote node)", conditional: true},
+    getClusterParameter: {skip: "always targets the config server"},
     getCmdLineOpts: {skip: "executes locally on mongos (not sent to any remote node)"},
     getDefaultRWConcern: {skip: "executes locally on mongos (not sent to any remote node)"},
     getDiagnosticData: {skip: "executes locally on mongos (not sent to any remote node)"},

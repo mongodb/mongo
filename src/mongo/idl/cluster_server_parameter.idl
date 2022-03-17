@@ -51,9 +51,47 @@ structs:
                     In normal operation, the clusterParameterTime will increase as the CSP is updated via 
                     setClusterParameter, but may decrease to a previously-seen value on rollback. 
                 type: logicalTime
+                default: LogicalTime::kUninitialized
+
+    TestIntClusterParameterStorage:
+        description: "Storage used for testIntClusterParameter"
+        inline_chained_structs: true
+        chained_structs:
+            ClusterServerParameter: ClusterServerParameter
+        fields:
+            intData:
+                description: "Some int parameter"
+                type: safeInt64
+                default: 16
+
+    TestStrClusterParameterStorage:
+        description: "Storage used for testStrClusterParameter"
+        inline_chained_structs: true
+        chained_structs:
+            ClusterServerParameter: ClusterServerParameter
+        fields:
+            strData:
+                description: "Some string parameter"
+                type: string
+                default: "\"off\""
 
 feature_flags:
     featureFlagClusterWideConfig:
         description: Mechanism for cluster-wide configuration options
         cpp_varname: gFeatureFlagClusterWideConfig
         default: false
+
+server_parameters:
+    testIntClusterParameter:
+        set_at: cluster
+        description: "Test cluster parameter that is only usable if enableTestCommands=true"
+        cpp_vartype: TestIntClusterParameterStorage
+        cpp_varname: intStorage
+        test_only: true
+
+    testStrClusterParameter:
+        set_at: cluster
+        description: "Test cluster parameter that is only usable if enableTestCommands=true"
+        cpp_vartype: TestStrClusterParameterStorage
+        cpp_varname: strStorage
+        test_only: true

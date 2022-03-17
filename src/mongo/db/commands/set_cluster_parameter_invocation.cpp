@@ -31,10 +31,10 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/commands/set_cluster_parameter_invocation.h"
+
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/set_cluster_parameter_gen.h"
-#include "mongo/db/commands/set_cluster_parameter_invocation.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/idl/cluster_server_parameter_gen.h"
 #include "mongo/logv2/log.h"

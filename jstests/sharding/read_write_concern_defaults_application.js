@@ -476,6 +476,7 @@ let testCases = {
     fsyncUnlock: {skip: "does not accept read or write concern"},
     getAuditConfig: {skip: "does not accept read or write concern"},
     getChangeStreamOptions: {skip: "TODO PM-2502"},
+    getClusterParameter: {skip: "does not accept read or write concern"},
     getCmdLineOpts: {skip: "does not accept read or write concern"},
     getDatabaseVersion: {skip: "does not accept read or write concern"},
     getDefaultRWConcern: {skip: "does not accept read or write concern"},

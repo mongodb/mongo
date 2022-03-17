@@ -33,7 +33,7 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/set_cluster_parameter_gen.h"
+#include "mongo/db/commands/cluster_server_parameter_cmds_gen.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"

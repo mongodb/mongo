@@ -27,7 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/db/commands/set_cluster_parameter_gen.h"
+#pragma once
+
+#include "mongo/db/commands/cluster_server_parameter_cmds_gen.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 

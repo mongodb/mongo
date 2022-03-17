@@ -162,6 +162,9 @@ const NamespaceString NamespaceString::kUserWritesCriticalSectionsNamespace(
 const NamespaceString NamespaceString::kCompactStructuredEncryptionCoordinatorNamespace(
     NamespaceString::kConfigDb, "compact_structured_encryption_coordinator");
 
+const NamespaceString NamespaceString::kClusterParametersNamespace(NamespaceString::kConfigDb,
+                                                                   "clusterParameters");
+
 bool NamespaceString::isListCollectionsCursorNS() const {
     return coll() == listCollectionsCursorCol;
 }

@@ -27,17 +27,34 @@
 #
 
 global:
-    cpp_namespace: "mongo"
+    cpp_namespace: "mongo"  
 
 imports:
     - "mongo/idl/basic_types.idl"
 
+structs:
+    GetClusterParameterReply:
+        description: "Reply to getClusterParameter command"
+        fields:
+            clusterParameters: array<object>
+
 commands:
     setClusterParameter:
-        description: Command to set a ClusterServerParameter
+        description: "Command to set a ClusterServerParameter"
         command_name: setClusterParameter
         cpp_name: SetClusterParameter
         api_version: ""
         namespace: type
         type: object
         strict: true
+    
+    getClusterParameter:
+        description: "Retrieves the in-memory value of the specified cluster server parameter(s)"
+        command_name: getClusterParameter
+        cpp_name: GetClusterParameter
+        api_version: ""
+        namespace: type
+        type:
+            variant: [string, array<string>] 
+        reply_type: GetClusterParameterReply
+        strict: false 

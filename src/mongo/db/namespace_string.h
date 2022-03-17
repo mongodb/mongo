@@ -216,6 +216,9 @@ public:
     // Namespace used for CompactParticipantCoordinator service.
     static const NamespaceString kCompactStructuredEncryptionCoordinatorNamespace;
 
+    // Namespace used for storing cluster wide parameters.
+    static const NamespaceString kClusterParametersNamespace;
+
     /**
      * Constructs an empty NamespaceString.
      */

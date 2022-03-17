@@ -4176,6 +4176,18 @@ var authCommandsLib = {
           ]
         },
         {
+          testname: "getClusterParameter",
+          command: {getClusterParameter: "testIntClusterParameter"},
+          skipTest: (conn) => !TestData.setParameters.featureFlagClusterWideConfig,
+          testcases: [
+            {
+              runOnDb: adminDbName,
+              roles: {clusterManager: 1, clusterAdmin: 1, root: 1, __system: 1},
+              privileges: [{resource: {cluster: true}, actions: ["getClusterParameter"]}]
+            }
+          ]
+        },
+        {
           testname: "getCmdLineOpts",
           command: {getCmdLineOpts: 1},
           testcases: [
@@ -5652,10 +5664,14 @@ var authCommandsLib = {
               }
           ]
         },
-        { // TODO: Temporarily disabled until an appropriate parameter is configured for testing (SERVER-62261)
+        { 
           testname: "setClusterParameter",
-          command: {setClusterParameter: {param: true}},
-          skipTest: (conn) => true || !TestData.setParameters.featureFlagClusterWideConfig,
+          command: {setClusterParameter: {testIntClusterParameterParam: {intData: 17}}},
+          skipTest: (conn) => {
+              const hello = assert.commandWorked(conn.getDB("admin").runCommand({hello: 1}));
+              const isStandalone = hello.msg !== "isdbgrid" && !hello.hasOwnProperty('setName');
+              return !TestData.setParameters.featureFlagClusterWideConfig || isStandalone;
+          },
           testcases: [
               {
                 runOnDb: adminDbName,

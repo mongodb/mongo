@@ -61,7 +61,6 @@ env.Library(
     LIBDEPS_PRIVATE=[
         'feature_flag',
         'idl_parser',
-        'server_parameter',
     ],
 )
 

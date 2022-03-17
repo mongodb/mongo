@@ -18,6 +18,7 @@ const commandsAddedToMongosSinceLastLTS = [
     "commitReshardCollection",
     "compactStructuredEncryptionData",
     "configureCollectionBalancing",
+    "getClusterParameter",
     "moveRange",
     "reshardCollection",
     "rotateCertificates",

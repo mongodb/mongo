@@ -97,6 +97,7 @@ enums:
            forceUUID :  "forceUUID"
            fsync :  "fsync"
            getChangeStreamOptions: "getChangeStreamOptions"
+           getClusterParameter: "getClusterParameter"
            getDatabaseVersion :  "getDatabaseVersion"
            getDefaultRWConcern :  "getDefaultRWConcern"
            getCmdLineOpts :  "getCmdLineOpts"
