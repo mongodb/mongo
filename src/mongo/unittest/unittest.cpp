@@ -388,20 +388,13 @@ std::unique_ptr<Result> Suite::run(const std::string& filter,
     Timer timer;
     auto r = std::make_unique<Result>(_name);
 
-    boost::optional<pcrecpp::RE> filterRe;
-    boost::optional<pcrecpp::RE> fileNameFilterRe;
-    if (!filter.empty())
-        filterRe.emplace(filter);
-    if (!fileNameFilter.empty())
-        fileNameFilterRe.emplace(fileNameFilter);
-
     for (const auto& tc : _tests) {
-        if (filterRe && !filterRe->PartialMatch(tc.name)) {
+        if (filter.size() && tc.name.find(filter) == std::string::npos) {
             LOGV2_DEBUG(23057, 1, "skipped due to filter", "test"_attr = tc.name);
             continue;
         }
 
-        if (fileNameFilterRe && !fileNameFilterRe->PartialMatch(tc.fileName)) {
+        if (fileNameFilter.size() && tc.fileName.find(fileNameFilter) == std::string::npos) {
             LOGV2_DEBUG(23058, 1, "skipped due to fileNameFilter", "testFile"_attr = tc.fileName);
             continue;
         }
@@ -655,12 +648,6 @@ ComparisonAssertion<op> ComparisonAssertion<op>::make(const char* theFile,
 
 // Provide definitions for common instantiations of ComparisonAssertion.
 INSTANTIATE_COMPARISON_ASSERTION_CTORS();
-
-
-SpawnInfo& getSpawnInfo() {
-    static auto v = new SpawnInfo{};
-    return *v;
-}
 
 namespace {
 // At startup, teach the terminate handler how to print TestAssertionFailureException.
