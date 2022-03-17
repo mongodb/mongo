@@ -1426,7 +1426,7 @@ struct EqLookupNode : public QuerySolutionNode {
                  const std::string& foreignCollection,
                  const std::string& joinFieldLocal,
                  const std::string& joinFieldForeign,
-                 const std::string& joinField)
+                 const FieldPath& joinField)
         : QuerySolutionNode(std::move(child)),
           foreignCollection(foreignCollection),
           joinFieldLocal(joinFieldLocal),
@@ -1485,7 +1485,7 @@ struct EqLookupNode : public QuerySolutionNode {
      * The field stores the array of all matched foreign (inner) documents.
      * If the field already exists in the local (outer) document, the field will be overwritten.
      */
-    std::string joinField;
+    FieldPath joinField;
 
     /**
      * The algorithm that will be used to execute this 'EqLookupNode'. Defaults to nested loop join

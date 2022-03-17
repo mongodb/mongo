@@ -1400,12 +1400,12 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
                         << testSoln.toString()};
         }
 
-        if (expectedAsField.str() != actualEqLookupNode->joinField) {
+        if (expectedAsField.str() != actualEqLookupNode->joinField.fullPath()) {
             return {ErrorCodes::Error{6267508},
                     str::stream() << "Test solution 'joinField' does not match actual; test "
                                      ""
                                   << expectedAsField.str() << " != actual "
-                                  << actualEqLookupNode->joinField};
+                                  << actualEqLookupNode->joinField.fullPath()};
         }
 
         auto expectedStrategy = expectedEqLookupSoln["strategy"];
