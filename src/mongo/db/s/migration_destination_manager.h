@@ -76,16 +76,16 @@ class MigrationDestinationManager {
 
 public:
     enum State {
-        READY,
-        CLONE,
-        CATCHUP,
-        STEADY,
-        COMMIT_START,
-        ENTERED_CRIT_SEC,
-        EXIT_CRIT_SEC,
-        DONE,
-        FAIL,
-        ABORT
+        kReady,
+        kClone,
+        kCatchup,
+        kSteady,
+        kCommitStart,
+        kEnteredCritSec,
+        kExitCritSec,
+        kDone,
+        kFail,
+        kAbort
     };
 
     MigrationDestinationManager();
@@ -293,7 +293,7 @@ private:
     long long _numCatchup{0};
     long long _numSteady{0};
 
-    State _state{READY};
+    State _state{kReady};
     std::string _errmsg;
 
     std::unique_ptr<SessionCatalogMigrationDestination> _sessionMigration;
