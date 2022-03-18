@@ -103,11 +103,9 @@ structs:
         optional: true
       implicitlyCreateIndex:
         description: "Creates an index on the shard key pattern if the collection is empty."
-        type: bool
-        default: true
+        type: optionalBool
       enforceUniquenessCheck:
         description: >-
           Controls whether this command verifies that any unique indexes are prefixed by the shard
           key pattern if unique is true. If true then it will verify and if false then it won't.
-        type: bool
-        default: true
+        type: optionalBool

@@ -572,7 +572,7 @@ CreateCollectionResponse shardCollection(OperationContext* opCtx,
 
         checkCollation(opCtx, request);
 
-        if (request.getImplicitlyCreateIndex()) {
+        if (request.getImplicitlyCreateIndex().value_or(true)) {
             // Create the collection locally
             shardkeyutil::validateShardKeyIndexExistsOrCreateIfPossible(
                 opCtx,
@@ -580,18 +580,18 @@ CreateCollectionResponse shardCollection(OperationContext* opCtx,
                 ShardKeyPattern(request.getKey()),
                 *request.getCollation(),
                 request.getUnique(),
-                request.getEnforceUniquenessCheck(),
+                request.getEnforceUniquenessCheck().value_or(true),
                 shardkeyutil::ValidationBehaviorsShardCollection(opCtx));
         } else {
-            uassert(
-                6373201,
-                "Must have an index compatible with the proposed shard key",
-                validShardKeyIndexExists(opCtx,
-                                         nss,
-                                         ShardKeyPattern(request.getKey()),
-                                         *request.getCollation(),
-                                         request.getUnique() && request.getEnforceUniquenessCheck(),
-                                         shardkeyutil::ValidationBehaviorsShardCollection(opCtx)));
+            uassert(6373201,
+                    "Must have an index compatible with the proposed shard key",
+                    validShardKeyIndexExists(
+                        opCtx,
+                        nss,
+                        ShardKeyPattern(request.getKey()),
+                        *request.getCollation(),
+                        request.getUnique() && request.getEnforceUniquenessCheck().value_or(true),
+                        shardkeyutil::ValidationBehaviorsShardCollection(opCtx)));
         }
 
         // Wait until the index is majority written, to prevent having the collection commited to
