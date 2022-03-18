@@ -393,6 +393,10 @@ TEST_F(ShardSplitDonorServiceTest, StepDownTest) {
 }
 
 TEST_F(ShardSplitDonorServiceTest, DeleteStateDocMarkedGarbageCollectable) {
+    // Instance building (from inserted state document) is done in a separate thread. This failpoint
+    // disable it to ensure there's no race condition with the insertion of the state document.
+    FailPointEnableBlock fp("PrimaryOnlyServiceSkipRebuildingInstances");
+
     auto opCtx = makeOperationContext();
 
     test::shard_split::ScopedTenantAccessBlocker scopedTenants(_tenantIds, opCtx.get());
