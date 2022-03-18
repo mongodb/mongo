@@ -32,3 +32,8 @@ fun:_ZNSt8_Rb_tree*_M_insert_nodeE*
 
 # See https://bugzilla.mozilla.org/show_bug.cgi?id=744965
 fun:_ZN7mozilla*NumberEqualsInt32*
+
+# SERVER-62972
+# libunwind has some UB when doing stack unwinding
+[alignment]
+fun:access_mem
