@@ -131,10 +131,6 @@ public:
         return _completionPromise.getFuture();
     }
 
-    SharedSemiFuture<void> replicaSetMonitorCreatedFuture() const {
-        return _replicaSetMonitorCreatedPromise.getFuture();
-    }
-
     UUID getId() const {
         return _migrationId;
     }
@@ -156,9 +152,6 @@ public:
 
 private:
     // Tasks
-    ExecutorFuture<void> _enterBlockingState(const ScopedTaskExecutorPtr& executor,
-                                             const CancellationToken& token);
-
     ExecutorFuture<void> _waitForRecipientToReachBlockTimestamp(
         const ScopedTaskExecutorPtr& executor, const CancellationToken& token);
 
@@ -222,9 +215,6 @@ private:
     bool _abortRequested = false;
     boost::optional<CancellationSource> _abortSource;
     boost::optional<Status> _abortReason;
-
-    // A promise fulfilled when the replicaSetMonitor has been created;
-    SharedPromise<void> _replicaSetMonitorCreatedPromise;
 
     // A promise fulfilled when the shard split has committed or aborted.
     SharedPromise<DurableState> _decisionPromise;

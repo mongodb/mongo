@@ -45,6 +45,8 @@
 #include "mongo/db/repl/primary_only_service_test_fixture.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_impl.h"
+#include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
+#include "mongo/db/repl/tenant_migration_donor_access_blocker.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/serverless/shard_split_donor_op_observer.h"
 #include "mongo/db/serverless/shard_split_donor_service.h"
@@ -228,11 +230,10 @@ protected:
     StreamableReplicaSetMonitorForTesting _rsmMonitor;
     std::string _recipientTagName{"$recipientNode"};
     std::string _recipientSetName{_replSet.getURI().getSetName()};
+    FailPointEnableBlock _skipAcceptanceFP{"skipShardSplitWaitForSplitAcceptance"};
 };
 
 TEST_F(ShardSplitDonorServiceTest, BasicShardSplitDonorServiceInstanceCreation) {
-    FailPointEnableBlock fp("skipShardSplitWaitForSplitAcceptance");
-
     auto opCtx = makeOperationContext();
     test::shard_split::ScopedTenantAccessBlocker scopedTenants(_tenantIds, opCtx.get());
     test::shard_split::reconfigToAddRecipientNodes(
@@ -245,36 +246,21 @@ TEST_F(ShardSplitDonorServiceTest, BasicShardSplitDonorServiceInstanceCreation) 
     ASSERT_EQ(_uuid, serviceInstance->getId());
 
     auto decisionFuture = serviceInstance->decisionFuture();
-
-    std::shared_ptr<TopologyDescription> topologyDescriptionOld =
-        std::make_shared<sdam::TopologyDescription>(sdam::SdamConfiguration());
-    std::shared_ptr<TopologyDescription> topologyDescriptionNew =
-        makeRecipientTopologyDescription(_replSet);
-
-    // Wait until the RSM has been created by the instance.
-    auto replicaSetMonitorCreatedFuture = serviceInstance->replicaSetMonitorCreatedFuture();
-    replicaSetMonitorCreatedFuture.wait(opCtx.get());
-
-    // Retrieve monitor installed by _rsmMonitor.setup(...)
-    auto monitor = std::dynamic_pointer_cast<StreamableReplicaSetMonitor>(
-        ReplicaSetMonitor::createIfNeeded(_replSet.getURI()));
-    invariant(monitor);
-    auto publisher = monitor->getEventsPublisher();
-
-    publisher->onTopologyDescriptionChangedEvent(topologyDescriptionOld, topologyDescriptionNew);
-
     decisionFuture.wait();
+
+    auto result = decisionFuture.get();
+    ASSERT(!result.abortReason);
+    ASSERT_EQ(result.state, mongo::ShardSplitDonorStateEnum::kCommitted);
 
     BSONObj splitConfigBson = mockReplSetReconfigCmd.getLatestConfig();
     ASSERT_TRUE(splitConfigBson.hasField("replSetReconfig"));
     auto splitConfig = repl::ReplSetConfig::parse(splitConfigBson["replSetReconfig"].Obj());
     ASSERT(splitConfig.isSplitConfig());
 
-    auto result = decisionFuture.get();
-    ASSERT(!result.abortReason);
-    ASSERT_EQ(result.state, mongo::ShardSplitDonorStateEnum::kCommitted);
-
     serviceInstance->tryForget();
+
+    auto completionFuture = serviceInstance->completionFuture();
+    completionFuture.wait();
 
     ASSERT_OK(serviceInstance->completionFuture().getNoThrow());
     ASSERT_TRUE(serviceInstance->isGarbageCollectable());
@@ -282,7 +268,6 @@ TEST_F(ShardSplitDonorServiceTest, BasicShardSplitDonorServiceInstanceCreation) 
 
 TEST_F(ShardSplitDonorServiceTest, ShardSplitDonorServiceTimeout) {
     FailPointEnableBlock fp("pauseShardSplitAfterBlocking");
-    FailPointEnableBlock fp2("skipShardSplitWaitForSplitAcceptance");
 
     auto opCtx = makeOperationContext();
     auto serviceContext = getServiceContext();
@@ -352,7 +337,7 @@ TEST_F(ShardSplitDonorServiceTest, CreateInstanceThenAbort) {
 
     std::shared_ptr<ShardSplitDonorService::DonorStateMachine> serviceInstance;
     {
-        FailPointEnableBlock fp("pauseShardSplitBeforeBlocking");
+        FailPointEnableBlock fp("pauseShardSplitAfterBlocking");
         auto initialTimesEntered = fp.initialTimesEntered();
 
         serviceInstance = ShardSplitDonorService::DonorStateMachine::getOrCreate(
@@ -386,7 +371,7 @@ TEST_F(ShardSplitDonorServiceTest, StepDownTest) {
     std::shared_ptr<ShardSplitDonorService::DonorStateMachine> serviceInstance;
 
     {
-        FailPointEnableBlock fp("pauseShardSplitBeforeBlocking");
+        FailPointEnableBlock fp("pauseShardSplitAfterBlocking");
         auto initialTimesEntered = fp.initialTimesEntered();
 
         serviceInstance = ShardSplitDonorService::DonorStateMachine::getOrCreate(
@@ -415,7 +400,14 @@ TEST_F(ShardSplitDonorServiceTest, DeleteStateDocMarkedGarbageCollectable) {
         getServiceContext(), _recipientTagName, _replSet.getHosts(), _recipientSet.getHosts());
 
     auto stateDocument = defaultStateDocument();
-    stateDocument.setState(ShardSplitDonorStateEnum::kUninitialized);
+    stateDocument.setState(ShardSplitDonorStateEnum::kAborted);
+    stateDocument.setCommitOrAbortOpTime(repl::OpTime(Timestamp(1, 1), 1));
+
+    Status status(ErrorCodes::CallbackCanceled, "Split has been aborted");
+    BSONObjBuilder bob;
+    status.serializeErrorToBSON(&bob);
+    stateDocument.setAbortReason(bob.obj());
+
     boost::optional<mongo::Date_t> expireAt = getServiceContext()->getFastClockSource()->now() +
         Milliseconds{repl::shardSplitGarbageCollectionDelayMS.load()};
     stateDocument.setExpireAt(expireAt);
@@ -567,6 +559,55 @@ protected:
     std::unique_ptr<FailPointEnableBlock> _pauseBeforeRecipientCleanupFp;
     FailPoint::EntryCountT _initialTimesEntered;
 };
+
+TEST_F(ShardSplitDonorServiceTest, ResumeAfterStepdownTest) {
+    auto opCtx = makeOperationContext();
+    test::shard_split::ScopedTenantAccessBlocker scopedTenants(_tenantIds, opCtx.get());
+    test::shard_split::reconfigToAddRecipientNodes(
+        getServiceContext(), _recipientTagName, _replSet.getHosts(), _recipientSet.getHosts());
+
+    auto initialFuture = [&]() {
+        FailPointEnableBlock fp("pauseShardSplitAfterBlocking");
+        auto initialTimesEntered = fp.initialTimesEntered();
+
+        std::shared_ptr<ShardSplitDonorService::DonorStateMachine> serviceInstance =
+            ShardSplitDonorService::DonorStateMachine::getOrCreate(
+                opCtx.get(), _service, defaultStateDocument().toBSON());
+        ASSERT(serviceInstance.get());
+
+        fp->waitForTimesEntered(initialTimesEntered + 1);
+        stepDown();
+
+        return serviceInstance->decisionFuture();
+    }();
+
+    auto result = initialFuture.getNoThrow();
+    ASSERT_FALSE(result.isOK());
+    ASSERT_EQ(ErrorCodes::InterruptedDueToReplStateChange, result.getStatus().code());
+
+    ASSERT_OK(serverless::getStateDocument(opCtx.get(), _uuid).getStatus());
+
+    auto fp = std::make_unique<FailPointEnableBlock>("pauseShardSplitAfterBlocking");
+    auto initialTimesEntered = fp->initialTimesEntered();
+
+    stepUp(opCtx.get());
+
+    fp->failPoint()->waitForTimesEntered(initialTimesEntered + 1);
+
+    std::shared_ptr<ShardSplitDonorService::DonorStateMachine> serviceInstance =
+        ShardSplitDonorService::DonorStateMachine::getOrCreate(
+            opCtx.get(), _service, defaultStateDocument().toBSON());
+    ASSERT(serviceInstance.get());
+
+    ASSERT_OK(serverless::getStateDocument(opCtx.get(), _uuid).getStatus());
+
+    fp.reset();
+
+    ASSERT_OK(serviceInstance->decisionFuture().getNoThrow().getStatus());
+
+    serviceInstance->tryForget();
+}
+
 class ShardSplitRecipientCleanupTest : public ShardSplitPersistenceTest {
 public:
     repl::ReplSetConfig initialDonorConfig() override {

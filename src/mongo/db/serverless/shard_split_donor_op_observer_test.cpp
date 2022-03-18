@@ -49,13 +49,6 @@ void startBlockingReadsAfter(
     }
 }
 
-void startBlockingWrites(
-    std::vector<std::shared_ptr<TenantMigrationDonorAccessBlocker>>& blockers) {
-    for (auto& blocker : blockers) {
-        blocker->startBlockingWrites();
-    }
-}
-
 class ShardSplitDonorOpObserverTest : public ServiceContextMongoDTest {
 public:
     void setUp() override {
@@ -110,14 +103,7 @@ protected:
     void runUpdateTestCase(
         ShardSplitDonorDocument stateDocument,
         const std::vector<std::string>& tenants,
-        std::vector<std::shared_ptr<TenantMigrationDonorAccessBlocker>> blockers,
         std::function<void(std::shared_ptr<TenantMigrationAccessBlocker>)> mtabVerifier) {
-        ASSERT_EQ(tenants.size(), blockers.size());
-
-        for (size_t i = 0; i < blockers.size(); ++i) {
-            TenantMigrationAccessBlockerRegistry::get(_opCtx->getServiceContext())
-                .add(tenants[i], std::move(blockers[i]));
-        }
 
         // If there's an exception, aborting without removing the access blocker will trigger an
         // invariant. This creates a confusing error log in the test output.
@@ -140,13 +126,13 @@ protected:
         scopedTenants.dismiss();
     }
 
-    std::vector<std::shared_ptr<TenantMigrationDonorAccessBlocker>> createBlockers(
-        const std::vector<std::string>& tenants,
-        OperationContext* opCtx,
-        const std::string& connectionStr) {
+    std::vector<std::shared_ptr<TenantMigrationDonorAccessBlocker>>
+    createBlockersAndStartBlockingWrites(const std::vector<std::string>& tenants,
+                                         OperationContext* opCtx,
+                                         const std::string& connectionStr) {
         auto uuid = UUID::gen();
         std::vector<std::shared_ptr<TenantMigrationDonorAccessBlocker>> blockers;
-        for (auto& tenant : tenants) {
+        for (const auto& tenant : tenants) {
             auto mtab = std::make_shared<TenantMigrationDonorAccessBlocker>(
                 _opCtx->getServiceContext(),
                 uuid,
@@ -154,7 +140,9 @@ protected:
                 MigrationProtocolEnum::kMultitenantMigrations,
                 _connectionStr);
 
-            blockers.push_back(std::move(mtab));
+            blockers.push_back(mtab);
+            mtab->startBlockingWrites();
+            TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext()).add(tenant, mtab);
         }
 
         return blockers;
@@ -227,6 +215,7 @@ TEST_F(ShardSplitDonorOpObserverTest, InsertWrongType) {
 TEST_F(ShardSplitDonorOpObserverTest, InitialInsertInvalidState) {
     std::vector<ShardSplitDonorStateEnum> states = {ShardSplitDonorStateEnum::kAborted,
                                                     ShardSplitDonorStateEnum::kBlocking,
+                                                    ShardSplitDonorStateEnum::kUninitialized,
                                                     ShardSplitDonorStateEnum::kCommitted};
 
     for (auto state : states) {
@@ -264,30 +253,15 @@ TEST_F(ShardSplitDonorOpObserverTest, InsertValidAbortedDocument) {
     }
 }
 
-TEST_F(ShardSplitDonorOpObserverTest, InsertDocument) {
+TEST_F(ShardSplitDonorOpObserverTest, InsertBlockingDocumentPrimary) {
     test::shard_split::reconfigToAddRecipientNodes(
         getServiceContext(), _recipientTagName, _replSet.getHosts(), _recipientReplSet.getHosts());
 
-    auto stateDocument = defaultStateDocument();
-    auto mtabVerifier = [opCtx = _opCtx.get()](std::shared_ptr<TenantMigrationAccessBlocker> mtab) {
-        ASSERT_TRUE(mtab);
-        ASSERT_OK(mtab->checkIfCanWrite(Timestamp(1)).code());
-        ASSERT_OK(mtab->checkIfLinearizableReadWasAllowed(opCtx));
-        ASSERT_EQ(mtab->checkIfCanBuildIndex().code(), ErrorCodes::TenantMigrationConflict);
-    };
+    createBlockersAndStartBlockingWrites(_tenantIds, _opCtx.get(), _connectionStr);
 
-    runInsertTestCase(stateDocument, _tenantIds, mtabVerifier);
-}
-
-TEST_F(ShardSplitDonorOpObserverTest, TransitionToBlockingPrimary) {
     auto stateDocument = defaultStateDocument();
     stateDocument.setState(ShardSplitDonorStateEnum::kBlocking);
     stateDocument.setBlockTimestamp(Timestamp(1, 1));
-
-    auto blockers = createBlockers(_tenantIds, _opCtx.get(), _connectionStr);
-    for (auto& blocker : blockers) {
-        blocker->startBlockingWrites();
-    }
 
     auto mtabVerifier = [opCtx = _opCtx.get()](std::shared_ptr<TenantMigrationAccessBlocker> mtab) {
         ASSERT_TRUE(mtab);
@@ -300,10 +274,13 @@ TEST_F(ShardSplitDonorOpObserverTest, TransitionToBlockingPrimary) {
         ASSERT_EQ(mtab->checkIfCanBuildIndex().code(), ErrorCodes::TenantMigrationConflict);
     };
 
-    runUpdateTestCase(stateDocument, _tenantIds, blockers, mtabVerifier);
+    runInsertTestCase(stateDocument, _tenantIds, mtabVerifier);
 }
 
-TEST_F(ShardSplitDonorOpObserverTest, TransitionToBlockingSecondary) {
+TEST_F(ShardSplitDonorOpObserverTest, InsertBlockingDocumentSecondary) {
+    test::shard_split::reconfigToAddRecipientNodes(
+        getServiceContext(), _recipientTagName, _replSet.getHosts(), _recipientReplSet.getHosts());
+
     // This indicates the instance is secondary for the OpObserver.
     repl::UnreplicatedWritesBlock setSecondary(_opCtx.get());
 
@@ -311,10 +288,9 @@ TEST_F(ShardSplitDonorOpObserverTest, TransitionToBlockingSecondary) {
     stateDocument.setState(ShardSplitDonorStateEnum::kBlocking);
     stateDocument.setBlockTimestamp(Timestamp(1, 1));
 
-    auto blockers = createBlockers(_tenantIds, _opCtx.get(), _connectionStr);
-
     auto mtabVerifier = [opCtx = _opCtx.get()](std::shared_ptr<TenantMigrationAccessBlocker> mtab) {
         ASSERT_TRUE(mtab);
+        // The OpObserver does not set the mtab to blocking for primaries.
         ASSERT_EQ(mtab->checkIfCanWrite(Timestamp(1, 1)).code(),
                   ErrorCodes::TenantMigrationConflict);
         ASSERT_EQ(mtab->checkIfCanWrite(Timestamp(1, 3)).code(),
@@ -323,7 +299,35 @@ TEST_F(ShardSplitDonorOpObserverTest, TransitionToBlockingSecondary) {
         ASSERT_EQ(mtab->checkIfCanBuildIndex().code(), ErrorCodes::TenantMigrationConflict);
     };
 
-    runUpdateTestCase(stateDocument, _tenantIds, blockers, mtabVerifier);
+    runInsertTestCase(stateDocument, _tenantIds, mtabVerifier);
+}
+
+
+TEST_F(ShardSplitDonorOpObserverTest, TransitionToBlockingFail) {
+    // This indicates the instance is secondary for the OpObserver.
+    repl::UnreplicatedWritesBlock setSecondary(_opCtx.get());
+
+    auto stateDocument = defaultStateDocument();
+    stateDocument.setState(ShardSplitDonorStateEnum::kBlocking);
+    stateDocument.setBlockTimestamp(Timestamp(1, 1));
+
+
+    CollectionUpdateArgs updateArgs;
+    updateArgs.stmtIds = {};
+    updateArgs.updatedDoc = stateDocument.toBSON();
+    updateArgs.update =
+        BSON("$set" << BSON(ShardSplitDonorDocument::kStateFieldName
+                            << ShardSplitDonorState_serializer(stateDocument.getState())));
+    updateArgs.criteria = BSON("_id" << stateDocument.getId());
+    OplogUpdateEntryArgs update(&updateArgs, _nss, stateDocument.getId());
+
+    auto update_lambda = [&]() {
+        WriteUnitOfWork wuow(_opCtx.get());
+        _observer->onUpdate(_opCtx.get(), update);
+        wuow.commit();
+    };
+
+    ASSERT_THROWS_CODE(update_lambda(), DBException, ErrorCodes::IllegalOperation);
 }
 
 TEST_F(ShardSplitDonorOpObserverTest, TransitionToCommit) {
@@ -336,8 +340,7 @@ TEST_F(ShardSplitDonorOpObserverTest, TransitionToCommit) {
     stateDocument.setBlockTimestamp(Timestamp(1, 2));
     stateDocument.setCommitOrAbortOpTime(commitOpTime);
 
-    auto blockers = createBlockers(_tenantIds, _opCtx.get(), _connectionStr);
-    startBlockingWrites(blockers);
+    auto blockers = createBlockersAndStartBlockingWrites(_tenantIds, _opCtx.get(), _connectionStr);
     startBlockingReadsAfter(blockers, Timestamp(1));
 
     auto mtabVerifier = [opCtx = _opCtx.get()](std::shared_ptr<TenantMigrationAccessBlocker> mtab) {
@@ -351,7 +354,7 @@ TEST_F(ShardSplitDonorOpObserverTest, TransitionToCommit) {
         ASSERT_EQ(mtab->checkIfCanBuildIndex().code(), ErrorCodes::TenantMigrationCommitted);
     };
 
-    runUpdateTestCase(stateDocument, _tenantIds, blockers, mtabVerifier);
+    runUpdateTestCase(stateDocument, _tenantIds, mtabVerifier);
 }
 
 TEST_F(ShardSplitDonorOpObserverTest, TransitionToAbort) {
@@ -369,8 +372,7 @@ TEST_F(ShardSplitDonorOpObserverTest, TransitionToAbort) {
     stateDocument.setCommitOrAbortOpTime(commitOpTime);
     stateDocument.setAbortReason(bob.obj());
 
-    auto blockers = createBlockers(_tenantIds, _opCtx.get(), _connectionStr);
-    startBlockingWrites(blockers);
+    auto blockers = createBlockersAndStartBlockingWrites(_tenantIds, _opCtx.get(), _connectionStr);
     startBlockingReadsAfter(blockers, Timestamp(1));
 
     auto mtabVerifier = [opCtx = _opCtx.get()](std::shared_ptr<TenantMigrationAccessBlocker> mtab) {
@@ -383,7 +385,7 @@ TEST_F(ShardSplitDonorOpObserverTest, TransitionToAbort) {
         ASSERT_OK(mtab->checkIfCanBuildIndex().code());
     };
 
-    runUpdateTestCase(stateDocument, _tenantIds, blockers, mtabVerifier);
+    runUpdateTestCase(stateDocument, _tenantIds, mtabVerifier);
 }
 
 }  // namespace

@@ -55,6 +55,10 @@ namespace mongo {
 
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(pauseShardSplitAfterBlocking);
+MONGO_FAIL_POINT_DEFINE(skipShardSplitWaitForSplitAcceptance);
+MONGO_FAIL_POINT_DEFINE(pauseShardSplitBeforeRecipientCleanup);
+
 const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
 
 bool shouldStopInsertingDonorStateDoc(Status status) {
@@ -106,10 +110,39 @@ void checkForTokenInterrupt(const CancellationToken& token) {
     uassert(ErrorCodes::CallbackCanceled, "Donor service interrupted", !token.isCanceled());
 }
 
-MONGO_FAIL_POINT_DEFINE(pauseShardSplitBeforeBlocking);
-MONGO_FAIL_POINT_DEFINE(pauseShardSplitAfterBlocking);
-MONGO_FAIL_POINT_DEFINE(skipShardSplitWaitForSplitAcceptance);
-MONGO_FAIL_POINT_DEFINE(pauseShardSplitBeforeRecipientCleanup);
+void insertTenantAccessBlocker(WithLock lk,
+                               OperationContext* opCtx,
+                               ShardSplitDonorDocument donorStateDoc) {
+    auto optionalTenants = donorStateDoc.getTenantIds();
+    invariant(optionalTenants);
+
+    auto recipientTagName = donorStateDoc.getRecipientTagName();
+    auto recipientSetName = donorStateDoc.getRecipientSetName();
+    invariant(recipientTagName);
+    invariant(recipientSetName);
+
+    auto config = repl::ReplicationCoordinator::get(cc().getServiceContext())->getConfig();
+    auto recipientConnectionString =
+        serverless::makeRecipientConnectionString(config, *recipientTagName, *recipientSetName);
+
+    for (const auto& tenantId : optionalTenants.get()) {
+        auto mtab = std::make_shared<TenantMigrationDonorAccessBlocker>(
+            opCtx->getServiceContext(),
+            donorStateDoc.getId(),
+            tenantId.toString(),
+            MigrationProtocolEnum::kMultitenantMigrations,
+            recipientConnectionString.toString());
+
+        TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext()).add(tenantId, mtab);
+
+        // If the wuow fails, we need to remove the access blockers we just added. This ensures we
+        // leave things in a valid state and are able to retry the operation.
+        opCtx->recoveryUnit()->onRollback([opCtx, donorStateDoc, tenant = tenantId.toString()] {
+            TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
+                .remove(tenant, TenantMigrationAccessBlocker::BlockerType::kDonor);
+        });
+    }
+}
 
 const std::string kTTLIndexName = "ShardSplitDonorTTLIndex";
 
@@ -324,6 +357,8 @@ SemiFuture<void> ShardSplitDonorService::DonorStateMachine::run(
           "id"_attr = _migrationId,
           "timeout"_attr = repl::shardSplitTimeoutMS.load());
 
+    _createReplicaSetMonitor(abortToken);
+
     _decisionPromise.setWith([&] {
         return ExecutorFuture(**executor)
             .then([this, executor, primaryToken] {
@@ -332,21 +367,15 @@ SemiFuture<void> ShardSplitDonorService::DonorStateMachine::run(
                 // inserting the initial state document fails.
                 return _writeInitialDocument(executor, primaryToken);
             })
-            .then([this] { pauseShardSplitBeforeBlocking.pauseWhileSet(); })
             .then([this, executor, abortToken] {
                 checkForTokenInterrupt(abortToken);
                 _cancelableOpCtxFactory.emplace(abortToken, _markKilledExecutor);
-                _createReplicaSetMonitor(abortToken);
-                return _enterBlockingState(executor, abortToken);
-            })
-            .then([this, abortToken] {
                 if (MONGO_unlikely(pauseShardSplitAfterBlocking.shouldFail())) {
                     auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
                     pauseShardSplitAfterBlocking.pauseWhileSetAndNotCanceled(opCtx.get(),
                                                                              abortToken);
                 }
-            })
-            .then([this, executor, abortToken] {
+
                 return _waitForRecipientToReachBlockTimestamp(executor, abortToken);
             })
             .then([this, executor, abortToken] {
@@ -399,24 +428,6 @@ boost::optional<BSONObj> ShardSplitDonorService::DonorStateMachine::reportForCur
     BSONObjBuilder bob;
     bob.append("desc", "shard split operation");
     return bob.obj();
-}
-
-ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_enterBlockingState(
-    const ScopedTaskExecutorPtr& executor, const CancellationToken& abortToken) {
-    checkForTokenInterrupt(abortToken);
-
-    {
-        stdx::lock_guard<Latch> lg(_mutex);
-        if (_stateDoc.getState() >= ShardSplitDonorStateEnum::kBlocking) {
-            return ExecutorFuture(**executor);
-        }
-    }
-
-    LOGV2(6177200, "Entering blocking state.", "id"_attr = _migrationId);
-    return _updateStateDocument(executor, abortToken, ShardSplitDonorStateEnum::kBlocking)
-        .then([this, executor, abortToken](repl::OpTime opTime) {
-            return _waitForMajorityWriteConcern(executor, std::move(opTime), abortToken);
-        });
 }
 
 ExecutorFuture<void>
@@ -540,37 +551,40 @@ ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_waitForRecipien
 ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_writeInitialDocument(
     const ScopedTaskExecutorPtr& executor, const CancellationToken& primaryServiceToken) {
 
-    const auto initialState = [&]() {
+    ShardSplitDonorStateEnum nextState;
+    {
         stdx::lock_guard<Latch> lg(_mutex);
-        return _stateDoc.getState();
-    }();
 
-    if (initialState == ShardSplitDonorStateEnum::kAborted) {
-        stdx::lock_guard<Latch> lg(_mutex);
-        if (isAbortedDocumentPersistent(lg, _stateDoc)) {
-            // Node has step up and created an instance using a document in abort state. No need
-            // to write the document as it already exists.
+        if (_stateDoc.getState() == ShardSplitDonorStateEnum::kAborted) {
+            if (isAbortedDocumentPersistent(lg, _stateDoc)) {
+                // Node has step up and created an instance using a document in abort state. No need
+                // to write the document as it already exists.
+                return ExecutorFuture(**executor);
+            }
+
+            _abortReason =
+                Status(ErrorCodes::TenantMigrationAborted, "Aborted due to abortShardSplit.");
+            BSONObjBuilder bob;
+            _abortReason->serializeErrorToBSON(&bob);
+            _stateDoc.setAbortReason(bob.obj());
+            nextState = ShardSplitDonorStateEnum::kAborted;
+
+        } else if (_stateDoc.getState() == ShardSplitDonorStateEnum::kUninitialized) {
+            _stateDoc.setState(ShardSplitDonorStateEnum::kBlocking);
+            nextState = ShardSplitDonorStateEnum::kBlocking;
+        } else {
+            // Node has step up and resumed a shard split. No need to write the document as it
+            // already exists.
             return ExecutorFuture(**executor);
         }
-
-        _abortReason =
-            Status(ErrorCodes::TenantMigrationAborted, "Aborted due to abortShardSplit.");
-        BSONObjBuilder bob;
-        _abortReason->serializeErrorToBSON(&bob);
-        _stateDoc.setAbortReason(bob.obj());
-
-    } else if (initialState != ShardSplitDonorStateEnum::kUninitialized) {
-        // Node has step up and resumed a shard split. No need to write the document as it
-        // already exists.
-        return ExecutorFuture(**executor);
     }
 
     LOGV2(6086504,
           "Inserting initial state document.",
           "id"_attr = _migrationId,
-          "state"_attr = initialState);
+          "state"_attr = nextState);
 
-    return AsyncTry([this, nextState = initialState, uuid = _migrationId]() {
+    return AsyncTry([this, nextState, uuid = _migrationId]() {
                auto opCtxHolder = _cancelableOpCtxFactory->makeOperationContext(&cc());
                auto opCtx = opCtxHolder.get();
 
@@ -584,33 +598,32 @@ ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_writeInitialDoc
                            return _stateDoc.toBSON();
                        };
 
-                       if (nextState == ShardSplitDonorStateEnum::kAborted) {
-                           WriteUnitOfWork wuow(opCtx);
+                       WriteUnitOfWork wuow(opCtx);
+                       if (nextState == ShardSplitDonorStateEnum::kBlocking) {
+                           stdx::lock_guard<Latch> lg(_mutex);
 
-                           // Reserve an opTime for the write.
-                           auto oplogSlot =
-                               LocalOplogInfo::get(opCtx)->getNextOpTimes(opCtx, 1U)[0];
-                           setStateDocTimestamps(
-                               stdx::lock_guard<Latch>{_mutex}, nextState, oplogSlot, _stateDoc);
-                           auto updateResult = Helpers::upsert(opCtx,
-                                                               _stateDocumentsNS.ns(),
-                                                               filter,
-                                                               getUpdatedStateDocBson(),
-                                                               /*fromMigrate=*/false);
+                           insertTenantAccessBlocker(lg, opCtx, _stateDoc);
 
-                           // We only want to insert, not modify, document
-                           invariant(updateResult.numDocsModified == 0);
-                           wuow.commit();
-                       } else {
-                           auto updateResult = Helpers::upsert(opCtx,
-                                                               _stateDocumentsNS.ns(),
-                                                               filter,
-                                                               getUpdatedStateDocBson(),
-                                                               /*fromMigrate=*/false);
-
-                           // We only want to insert, not modify, document
-                           invariant(updateResult.numDocsModified == 0);
+                           auto tenantIds = _stateDoc.getTenantIds();
+                           invariant(tenantIds);
+                           setMtabToBlockingForTenants(_serviceContext, opCtx, tenantIds.get());
                        }
+
+                       // Reserve an opTime for the write.
+                       auto oplogSlot = LocalOplogInfo::get(opCtx)->getNextOpTimes(opCtx, 1U)[0];
+                       setStateDocTimestamps(
+                           stdx::lock_guard<Latch>{_mutex}, nextState, oplogSlot, _stateDoc);
+
+                       auto updateResult = Helpers::upsert(opCtx,
+                                                           _stateDocumentsNS.ns(),
+                                                           filter,
+                                                           getUpdatedStateDocBson(),
+                                                           /*fromMigrate=*/false);
+
+
+                       // We only want to insert, not modify, document
+                       invariant(updateResult.numMatched == 0);
+                       wuow.commit();
                    });
 
                return repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
@@ -623,7 +636,7 @@ ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_writeInitialDoc
         .then([this, executor, primaryServiceToken](repl::OpTime opTime) {
             return _waitForMajorityWriteConcern(executor, std::move(opTime), primaryServiceToken);
         })
-        .then([this, executor, nextState = initialState]() {
+        .then([this, executor, nextState]() {
             uassert(ErrorCodes::TenantMigrationAborted,
                     "Shard split operation aborted",
                     nextState != ShardSplitDonorStateEnum::kAborted);
@@ -654,10 +667,6 @@ ExecutorFuture<repl::OpTime> ShardSplitDonorService::DonorStateMachine::_updateS
                    opCtx, "ShardSplitDonorUpdateStateDoc", _stateDocumentsNS.ns(), [&] {
                        WriteUnitOfWork wuow(opCtx);
 
-                       if (nextState == ShardSplitDonorStateEnum::kBlocking) {
-                           invariant(tenantIds);
-                           setMtabToBlockingForTenants(_serviceContext, opCtx, tenantIds.get());
-                       }
                        // Reserve an opTime for the write.
                        auto oplogSlot = LocalOplogInfo::get(opCtx)->getNextOpTimes(opCtx, 1U)[0];
                        setStateDocTimestamps(
@@ -749,7 +758,6 @@ void ShardSplitDonorService::DonorStateMachine::_createReplicaSetMonitor(
     }();
 
     _recipientAcceptedSplit.setFrom(std::move(future).unsafeToInlineFuture());
-    _replicaSetMonitorCreatedPromise.emplaceValue();
 }
 
 ExecutorFuture<ShardSplitDonorService::DonorStateMachine::DurableState>
