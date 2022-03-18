@@ -117,423 +117,454 @@ struct ParsedCollModRequest {
     boost::optional<long long> cappedMax;
 };
 
-StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
-                                                     const NamespaceString& nss,
-                                                     const CollectionPtr& coll,
-                                                     const CollMod& cmd,
-                                                     BSONObjBuilder* oplogEntryBuilder) {
+Status getNotSupportedOnViewError(StringData fieldName) {
+    return {ErrorCodes::InvalidOptions,
+            str::stream() << "option not supported on a view: " << fieldName};
+}
+
+Status getOnlySupportedOnViewError(StringData fieldName) {
+    return {ErrorCodes::InvalidOptions,
+            str::stream() << "option only supported on a view: " << fieldName};
+}
+
+Status getNotSupportedOnTimeseriesError(StringData fieldName) {
+    return {ErrorCodes::InvalidOptions,
+            str::stream() << "option not supported on a time-series collection: " << fieldName};
+}
+
+Status getOnlySupportedOnTimeseriesError(StringData fieldName) {
+    return {ErrorCodes::InvalidOptions,
+            str::stream() << "option only supported on a time-series collection: " << fieldName};
+}
+
+StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(OperationContext* opCtx,
+                                                                         const NamespaceString& nss,
+                                                                         const CollectionPtr& coll,
+                                                                         const CollMod& cmd) {
 
     bool isView = !coll;
     bool isTimeseries = coll && coll->getTimeseriesOptions() != boost::none;
 
-    ParsedCollModRequest cmr;
+    ParsedCollModRequest parsed;
+    auto& cmr = cmd.getCollModRequest();
+    BSONObjBuilder oplogEntryBuilder;
+    oplogEntryBuilder.append(CollMod::kCommandName, cmd.getNamespace().coll());
 
     try {
-        checkCollectionUUIDMismatch(opCtx, nss, coll, cmd.getCollModRequest().getCollectionUUID());
+        checkCollectionUUIDMismatch(opCtx, nss, coll, cmr.getCollectionUUID());
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
 
-    if (cmd.getCollModRequest().getCappedSize() || cmd.getCollModRequest().getCappedMax()) {
+    if (cmr.getCappedSize() || cmr.getCappedMax()) {
         // TODO (SERVER-64042): Remove FCV check once 6.1 is released.
         if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
             serverGlobalParams.featureCompatibility.isLessThan(
                 multiversion::FeatureCompatibilityVersion::kVersion_6_0)) {
-            return Status(ErrorCodes::InvalidOptions,
-                          "Cannot change the size limits of a capped collection.");
+            return {ErrorCodes::InvalidOptions,
+                    "Cannot change the size limits of a capped collection."};
         } else if (!coll->isCapped()) {
-            return Status(ErrorCodes::InvalidOptions, "Collection must be capped.");
+            return {ErrorCodes::InvalidOptions, "Collection must be capped."};
         } else if (coll->ns().isOplog()) {
-            return Status(ErrorCodes::InvalidOptions,
-                          "Cannot resize the oplog using this command. Use the "
-                          "'replSetResizeOplog' command instead.");
+            return {ErrorCodes::InvalidOptions,
+                    "Cannot resize the oplog using this command. Use the "
+                    "'replSetResizeOplog' command instead."};
         } else {
-            cmr.cappedSize = cmd.getCollModRequest().getCappedSize();
-            cmr.cappedMax = cmd.getCollModRequest().getCappedMax();
+            parsed.cappedSize = cmr.getCappedSize();
+            parsed.cappedMax = cmr.getCappedMax();
         }
-    }
 
-    // TODO (SERVER-62732): Check options directly rather than using a loop.
-    auto cmdObj = cmd.toBSON(BSONObj());
-    for (const auto& e : cmdObj) {
-        const auto fieldName = e.fieldNameStringData();
-        if (isGenericArgument(fieldName)) {
-            continue;  // Don't add to oplog builder.
-        } else if (fieldName == "collMod") {
-            // no-op
-        } else if (fieldName == "index" && !isView) {
-            const auto& cmdIndex = *cmd.getIndex();
-            StringData indexName;
-            BSONObj keyPattern;
-
-            if (cmdIndex.getName() && cmdIndex.getKeyPattern()) {
-                return Status(ErrorCodes::InvalidOptions,
-                              "Cannot specify both key pattern and name.");
-            }
-
-            if (!cmdIndex.getName() && !cmdIndex.getKeyPattern()) {
-                return Status(ErrorCodes::InvalidOptions,
-                              "Must specify either index name or key pattern.");
-            }
-
-            if (cmdIndex.getName()) {
-                indexName = *cmdIndex.getName();
-            }
-
-            if (cmdIndex.getKeyPattern()) {
-                keyPattern = *cmdIndex.getKeyPattern();
-            }
-
-            if (!cmdIndex.getExpireAfterSeconds() && !cmdIndex.getHidden() &&
-                !cmdIndex.getUnique() && !cmdIndex.getPrepareUnique() &&
-                !cmdIndex.getForceNonUnique()) {
-                return Status(ErrorCodes::InvalidOptions,
-                              "no expireAfterSeconds, hidden, unique, or prepareUnique field");
-            }
-
-            auto cmrIndex = &cmr.indexRequest;
-            auto indexObj = e.Obj();
-
-            if (cmdIndex.getUnique() || cmdIndex.getPrepareUnique()) {
-                uassert(ErrorCodes::InvalidOptions,
-                        "collMod does not support converting an index to 'unique' or to "
-                        "'prepareUnique' mode",
-                        feature_flags::gCollModIndexUnique.isEnabled(
-                            serverGlobalParams.featureCompatibility));
-            }
-
-            if (cmdIndex.getUnique() && cmdIndex.getForceNonUnique()) {
-                return Status(
-                    ErrorCodes::InvalidOptions,
-                    "collMod does not support 'unique' and 'forceNonUnique' options at the "
-                    "same time");
-            }
-
-            if (cmdIndex.getExpireAfterSeconds()) {
-                if (isTimeseries) {
-                    return Status(ErrorCodes::InvalidOptions,
-                                  "TTL indexes are not supported for time-series collections. "
-                                  "Please refer to the documentation and use the top-level "
-                                  "'expireAfterSeconds' option instead");
-                }
-                if (coll->isCapped()) {
-                    return Status(ErrorCodes::InvalidOptions,
-                                  "TTL indexes are not supported for capped collections.");
-                }
-                if (auto status = index_key_validate::validateExpireAfterSeconds(
-                        *cmdIndex.getExpireAfterSeconds());
-                    !status.isOK()) {
-                    return {ErrorCodes::InvalidOptions, status.reason()};
-                }
-            }
-
-            if (cmdIndex.getHidden() && coll->isClustered() &&
-                !nss.isTimeseriesBucketsCollection()) {
-                auto clusteredInfo = coll->getClusteredInfo();
-                tassert(6011801,
-                        "Collection isClustered() and getClusteredInfo() should be synced",
-                        clusteredInfo);
-
-                const auto& indexSpec = clusteredInfo->getIndexSpec();
-
-                tassert(6011802,
-                        "When not provided by the user, a default name should always be generated "
-                        "for the collection's clusteredIndex",
-                        indexSpec.getName());
-
-                if ((!indexName.empty() && indexName == StringData(indexSpec.getName().get())) ||
-                    keyPattern.woCompare(indexSpec.getKey()) == 0) {
-                    // The indexName or keyPattern match the collection's clusteredIndex.
-                    return Status(ErrorCodes::Error(6011800),
-                                  "The 'hidden' option is not supported for a clusteredIndex");
-                }
-            }
-            if (!indexName.empty()) {
-                cmrIndex->idx = coll->getIndexCatalog()->findIndexByName(opCtx, indexName);
-                if (!cmrIndex->idx) {
-                    return Status(ErrorCodes::IndexNotFound,
-                                  str::stream()
-                                      << "cannot find index " << indexName << " for ns " << nss);
-                }
-            } else {
-                std::vector<const IndexDescriptor*> indexes;
-                coll->getIndexCatalog()->findIndexesByKeyPattern(
-                    opCtx, keyPattern, false, &indexes);
-
-                if (indexes.size() > 1) {
-                    return Status(ErrorCodes::AmbiguousIndexKeyPattern,
-                                  str::stream() << "index keyPattern " << keyPattern << " matches "
-                                                << indexes.size() << " indexes,"
-                                                << " must use index name. "
-                                                << "Conflicting indexes:" << indexes[0]->infoObj()
-                                                << ", " << indexes[1]->infoObj());
-                } else if (indexes.empty()) {
-                    return Status(ErrorCodes::IndexNotFound,
-                                  str::stream()
-                                      << "cannot find index " << keyPattern << " for ns " << nss);
-                }
-
-                cmrIndex->idx = indexes[0];
-            }
-
-            if (cmdIndex.getExpireAfterSeconds()) {
-                cmr.numModifications++;
-                BSONElement oldExpireSecs = cmrIndex->idx->infoObj().getField("expireAfterSeconds");
-                if (oldExpireSecs.eoo()) {
-                    if (cmrIndex->idx->isIdIndex()) {
-                        return Status(ErrorCodes::InvalidOptions,
-                                      "the _id field does not support TTL indexes");
-                    }
-                    if (cmrIndex->idx->getNumFields() != 1) {
-                        return Status(ErrorCodes::InvalidOptions,
-                                      "TTL indexes are single-field indexes, compound indexes do "
-                                      "not support TTL");
-                    }
-                } else if (!oldExpireSecs.isNumber()) {
-                    return Status(ErrorCodes::InvalidOptions,
-                                  "existing expireAfterSeconds field is not a number");
-                }
-
-                cmrIndex->indexExpireAfterSeconds = *cmdIndex.getExpireAfterSeconds();
-            }
-
-            // Make a copy of the index options doc for writing to the oplog.
-            // This index options doc should exclude the options that do not need
-            // to be modified.
-            auto indexObjForOplog = indexObj;
-
-            if (cmdIndex.getUnique()) {
-                cmr.numModifications++;
-                if (bool unique = *cmdIndex.getUnique(); !unique) {
-                    return Status(ErrorCodes::BadValue, "'Unique: false' option is not supported");
-                }
-
-                // Attempting to convert a unique index should be treated as a no-op.
-                if (cmrIndex->idx->unique()) {
-                    indexObjForOplog = indexObjForOplog.removeField(CollModIndex::kUniqueFieldName);
-                } else {
-                    // Disallow one-step unique convertion. The user has to set
-                    // 'prepareUnique' to true first.
-                    if (!cmrIndex->idx->prepareUnique()) {
-                        return Status(ErrorCodes::InvalidOptions,
-                                      "Cannot make index unique with 'prepareUnique=false'. "
-                                      "Run collMod to set it first.");
-                    }
-                    cmrIndex->indexUnique = true;
-                }
-            }
-
-            if (cmdIndex.getHidden()) {
-                cmr.numModifications++;
-                // Disallow index hiding/unhiding on system collections.
-                // Bucket collections, which hold data for user-created time-series collections, do
-                // not have this restriction.
-                if (nss.isSystem() && !nss.isTimeseriesBucketsCollection()) {
-                    return Status(ErrorCodes::BadValue, "Can't hide index on system collection");
-                }
-
-                // Disallow index hiding/unhiding on _id indexes - these are created by default and
-                // are critical to most collection operations.
-                if (cmrIndex->idx->isIdIndex()) {
-                    return Status(ErrorCodes::BadValue, "can't hide _id index");
-                }
-
-                // Hiding a hidden index or unhiding a visible index should be treated as a no-op.
-                if (cmrIndex->idx->hidden() == *cmdIndex.getHidden()) {
-                    indexObjForOplog = indexObjForOplog.removeField(CollModIndex::kHiddenFieldName);
-                } else {
-                    cmrIndex->indexHidden = cmdIndex.getHidden();
-                }
-            }
-
-            if (cmdIndex.getPrepareUnique()) {
-                cmr.numModifications++;
-                // Attempting to modify with the same value should be treated as a no-op.
-                if (cmrIndex->idx->prepareUnique() == *cmdIndex.getPrepareUnique()) {
-                    indexObjForOplog =
-                        indexObjForOplog.removeField(CollModIndex::kPrepareUniqueFieldName);
-                } else {
-                    cmrIndex->indexPrepareUnique = cmdIndex.getPrepareUnique();
-                }
-            }
-
-            if (cmdIndex.getForceNonUnique()) {
-                cmr.numModifications++;
-                if (bool unique = *cmdIndex.getForceNonUnique(); !unique) {
-                    return Status(ErrorCodes::BadValue, "'forceNonUnique: false' is not supported");
-                }
-
-                // Attempting to convert a non-unique index should be treated as a no-op.
-                if (!cmrIndex->idx->unique()) {
-                    indexObjForOplog =
-                        indexObjForOplog.removeField(CollModIndex::kForceNonUniqueFieldName);
-                } else {
-                    cmrIndex->indexForceNonUnique = true;
-                }
-            }
-
-            // The index options doc must contain either the name or key pattern, but not both.
-            // If we have just one field, the index modifications requested matches the current
-            // state in catalog and there is nothing further to do.
-            if (indexObjForOplog.nFields() > 1) {
-                oplogEntryBuilder->append(CollMod::kIndexFieldName, indexObjForOplog);
-            }
-
-            // Skip the automatic write to the oplogEntryBuilder that occurs at the end of the
-            // parsing loop because we have already written the normalized index options in
-            // 'indexObjForOplog'.
-            continue;
-        } else if (fieldName == "validator" && !isView && !isTimeseries) {
-            cmr.numModifications++;
-            // If the feature compatibility version is not kLatest, and we are validating features
-            // as primary, ban the use of new agg features introduced in kLatest to prevent them
-            // from being persisted in the catalog.
-            boost::optional<multiversion::FeatureCompatibilityVersion>
-                maxFeatureCompatibilityVersion;
-            // (Generic FCV reference): This FCV check should exist across LTS binary versions.
-            multiversion::FeatureCompatibilityVersion fcv;
-            if (serverGlobalParams.validateFeaturesAsPrimary.load() &&
-                serverGlobalParams.featureCompatibility.isLessThan(
-                    multiversion::GenericFCV::kLatest, &fcv)) {
-                maxFeatureCompatibilityVersion = fcv;
-            }
-            cmr.collValidator = coll->parseValidator(opCtx,
-                                                     e.Obj().getOwned(),
-                                                     MatchExpressionParser::kDefaultSpecialFeatures,
-                                                     maxFeatureCompatibilityVersion);
-            if (!cmr.collValidator->isOK()) {
-                return cmr.collValidator->getStatus();
-            }
-        } else if (fieldName == "validationLevel" && !isView && !isTimeseries) {
-            cmr.numModifications++;
-            try {
-                cmr.collValidationLevel = ValidationLevel_parse({"validationLevel"}, e.String());
-            } catch (const DBException& exc) {
-                return exc.toStatus();
-            }
-        } else if (fieldName == "validationAction" && !isView && !isTimeseries) {
-            cmr.numModifications++;
-            try {
-                cmr.collValidationAction = ValidationAction_parse({"validationAction"}, e.String());
-            } catch (const DBException& exc) {
-                return exc.toStatus();
-            }
-        } else if (fieldName == "pipeline") {
-            cmr.numModifications++;
-            if (!isView) {
-                return Status(ErrorCodes::InvalidOptions,
-                              "'pipeline' option only supported on a view");
-            }
-            // Access this value through the generated CollMod IDL type.
-            // See CollModRequest::getPipeline().
-        } else if (fieldName == "viewOn") {
-            cmr.numModifications++;
-            if (!isView) {
-                return Status(ErrorCodes::InvalidOptions,
-                              "'viewOn' option only supported on a view");
-            }
-            if (e.type() != mongo::String) {
-                return Status(ErrorCodes::InvalidOptions, "'viewOn' option must be a string");
-            }
-            cmr.viewOn = e.str();
-        } else if (fieldName == "recordPreImages" && !isView && !isTimeseries) {
-            cmr.numModifications++;
-            cmr.recordPreImages = e.trueValue();
-        } else if (fieldName == CollMod::kChangeStreamPreAndPostImagesFieldName && !isView &&
-                   !isTimeseries) {
-            cmr.numModifications++;
-            if (e.type() != mongo::Object) {
-                return {ErrorCodes::InvalidOptions,
-                        str::stream() << "'" << CollMod::kChangeStreamPreAndPostImagesFieldName
-                                      << "' option must be a document"};
-            }
-
-            try {
-                cmr.changeStreamPreAndPostImagesOptions =
-                    ChangeStreamPreAndPostImagesOptions::parse(
-                        {"changeStreamPreAndPostImagesOptions"}, e.Obj());
-            } catch (const DBException& ex) {
-                return ex.toStatus();
-            }
-        } else if (fieldName == "expireAfterSeconds" && !isView) {
-            cmr.numModifications++;
-            if (coll->getRecordStore()->keyFormat() != KeyFormat::String) {
-                return Status(ErrorCodes::InvalidOptions,
-                              "'expireAfterSeconds' option is only supported on collections "
-                              "clustered by _id");
-            }
-
-            if (e.type() == mongo::String) {
-                const std::string elemStr = e.String();
-                if (elemStr != "off") {
-                    return Status(
-                        ErrorCodes::InvalidOptions,
-                        str::stream()
-                            << "Invalid string value for the 'clusteredIndex::expireAfterSeconds' "
-                            << "option. Got: '" << elemStr << "'. Accepted value is 'off'");
-                }
-            } else {
-                invariant(e.type() == mongo::NumberLong);
-                const int64_t elemNum = e.safeNumberLong();
-                uassertStatusOK(index_key_validate::validateExpireAfterSeconds(elemNum));
-            }
-
-            // Access this value through the generated CollMod IDL type.
-            // See CollModRequest::getExpireAfterSeconds().
-        } else if (fieldName == CollMod::kTimeseriesFieldName) {
-            cmr.numModifications++;
-            if (!isTimeseries) {
-                return Status(ErrorCodes::InvalidOptions,
-                              str::stream() << "option only supported on a time-series collection: "
-                                            << fieldName);
-            }
-
-            // Access the parsed CollModTimeseries through the generated CollMod IDL type.
-        } else if (fieldName == CollMod::kDryRunFieldName) {
-            cmr.dryRun = e.trueValue();
-            // The dry run option should never be included in a collMod oplog entry.
-            continue;
-        } else if (fieldName == CollMod::kCollectionUUIDFieldName) {
-        } else if (fieldName == CollMod::kCappedSizeFieldName) {
-            const long long minSize = 4096;
-            auto swCappedSize = CollectionOptions::checkAndAdjustCappedSize(*cmr.cappedSize);
+        if (auto& cappedSize = cmr.getCappedSize()) {
+            static constexpr long long minCappedSize = 4096;
+            auto swCappedSize = CollectionOptions::checkAndAdjustCappedSize(*cappedSize);
             if (!swCappedSize.isOK()) {
                 return swCappedSize.getStatus();
             }
-            cmr.cappedSize =
-                (swCappedSize.getValue() < minSize) ? minSize : swCappedSize.getValue();
-        } else if (fieldName == CollMod::kCappedMaxFieldName) {
-            auto swCappedMaxDocs = CollectionOptions::checkAndAdjustCappedMaxDocs(*cmr.cappedMax);
+            parsed.cappedSize =
+                (swCappedSize.getValue() < minCappedSize) ? minCappedSize : swCappedSize.getValue();
+            oplogEntryBuilder.append(CollMod::kCappedSizeFieldName, *cappedSize);
+        }
+        if (auto& cappedMax = cmr.getCappedMax()) {
+            auto swCappedMaxDocs = CollectionOptions::checkAndAdjustCappedMaxDocs(*cappedMax);
             if (!swCappedMaxDocs.isOK()) {
                 return swCappedMaxDocs.getStatus();
             }
-            cmr.cappedMax = swCappedMaxDocs.getValue();
-        } else {
-            if (isTimeseries) {
-                return Status(ErrorCodes::InvalidOptions,
-                              str::stream() << "option not supported on a time-series collection: "
-                                            << fieldName);
-            }
+            parsed.cappedMax = swCappedMaxDocs.getValue();
+            oplogEntryBuilder.append(CollMod::kCappedMaxFieldName, *cappedMax);
+        }
+    }
 
-            if (isView) {
-                return Status(ErrorCodes::InvalidOptions,
-                              str::stream() << "option not supported on a view: " << fieldName);
-            }
+    if (auto& index = cmr.getIndex()) {
+        if (isView) {
+            return getNotSupportedOnViewError(CollMod::kIndexFieldName);
+        }
+        const auto& cmdIndex = *index;
+        StringData indexName;
+        BSONObj keyPattern;
 
-            return Status(ErrorCodes::InvalidOptions,
-                          str::stream() << "unknown option to collMod: " << fieldName);
+        if (cmdIndex.getName() && cmdIndex.getKeyPattern()) {
+            return {ErrorCodes::InvalidOptions, "Cannot specify both key pattern and name."};
         }
 
-        oplogEntryBuilder->append(e);
+        if (!cmdIndex.getName() && !cmdIndex.getKeyPattern()) {
+            return {ErrorCodes::InvalidOptions, "Must specify either index name or key pattern."};
+        }
+
+        if (cmdIndex.getName()) {
+            indexName = *cmdIndex.getName();
+        }
+
+        if (cmdIndex.getKeyPattern()) {
+            keyPattern = *cmdIndex.getKeyPattern();
+        }
+
+        if (!cmdIndex.getExpireAfterSeconds() && !cmdIndex.getHidden() && !cmdIndex.getUnique() &&
+            !cmdIndex.getPrepareUnique() && !cmdIndex.getForceNonUnique()) {
+            return {ErrorCodes::InvalidOptions,
+                    "no expireAfterSeconds, hidden, unique, or prepareUnique field"};
+        }
+
+        auto cmrIndex = &parsed.indexRequest;
+
+        if ((cmdIndex.getUnique() || cmdIndex.getPrepareUnique()) &&
+            !feature_flags::gCollModIndexUnique.isEnabled(
+                serverGlobalParams.featureCompatibility)) {
+            return {ErrorCodes::InvalidOptions,
+                    "collMod does not support converting an index to 'unique' or to "
+                    "'prepareUnique' mode"};
+        }
+
+        if (cmdIndex.getUnique() && cmdIndex.getForceNonUnique()) {
+            return {ErrorCodes::InvalidOptions,
+                    "collMod does not support 'unique' and 'forceNonUnique' options at the "
+                    "same time"};
+        }
+
+        if (cmdIndex.getExpireAfterSeconds()) {
+            if (isTimeseries) {
+                return {ErrorCodes::InvalidOptions,
+                        "TTL indexes are not supported for time-series collections. "
+                        "Please refer to the documentation and use the top-level "
+                        "'expireAfterSeconds' option instead"};
+            }
+            if (coll->isCapped()) {
+                return {ErrorCodes::InvalidOptions,
+                        "TTL indexes are not supported for capped collections."};
+            }
+            if (auto status = index_key_validate::validateExpireAfterSeconds(
+                    *cmdIndex.getExpireAfterSeconds());
+                !status.isOK()) {
+                return {ErrorCodes::InvalidOptions, status.reason()};
+            }
+        }
+
+        if (cmdIndex.getHidden() && coll->isClustered() && !nss.isTimeseriesBucketsCollection()) {
+            auto clusteredInfo = coll->getClusteredInfo();
+            tassert(6011801,
+                    "Collection isClustered() and getClusteredInfo() should be synced",
+                    clusteredInfo);
+
+            const auto& indexSpec = clusteredInfo->getIndexSpec();
+
+            tassert(6011802,
+                    "When not provided by the user, a default name should always be generated "
+                    "for the collection's clusteredIndex",
+                    indexSpec.getName());
+
+            if ((!indexName.empty() && indexName == StringData(indexSpec.getName().get())) ||
+                keyPattern.woCompare(indexSpec.getKey()) == 0) {
+                // The indexName or keyPattern match the collection's clusteredIndex.
+                return {ErrorCodes::Error(6011800),
+                        "The 'hidden' option is not supported for a clusteredIndex"};
+            }
+        }
+        if (!indexName.empty()) {
+            cmrIndex->idx = coll->getIndexCatalog()->findIndexByName(opCtx, indexName);
+            if (!cmrIndex->idx) {
+                return {ErrorCodes::IndexNotFound,
+                        str::stream() << "cannot find index " << indexName << " for ns " << nss};
+            }
+        } else {
+            std::vector<const IndexDescriptor*> indexes;
+            coll->getIndexCatalog()->findIndexesByKeyPattern(opCtx, keyPattern, false, &indexes);
+
+            if (indexes.size() > 1) {
+                return {ErrorCodes::AmbiguousIndexKeyPattern,
+                        str::stream() << "index keyPattern " << keyPattern << " matches "
+                                      << indexes.size() << " indexes,"
+                                      << " must use index name. "
+                                      << "Conflicting indexes:" << indexes[0]->infoObj() << ", "
+                                      << indexes[1]->infoObj()};
+            } else if (indexes.empty()) {
+                return {ErrorCodes::IndexNotFound,
+                        str::stream() << "cannot find index " << keyPattern << " for ns " << nss};
+            }
+
+            cmrIndex->idx = indexes[0];
+        }
+
+        if (cmdIndex.getExpireAfterSeconds()) {
+            parsed.numModifications++;
+            BSONElement oldExpireSecs = cmrIndex->idx->infoObj().getField("expireAfterSeconds");
+            if (oldExpireSecs.eoo()) {
+                if (cmrIndex->idx->isIdIndex()) {
+                    return {ErrorCodes::InvalidOptions,
+                            "the _id field does not support TTL indexes"};
+                }
+                if (cmrIndex->idx->getNumFields() != 1) {
+                    return {ErrorCodes::InvalidOptions,
+                            "TTL indexes are single-field indexes, compound indexes do "
+                            "not support TTL"};
+                }
+            } else if (!oldExpireSecs.isNumber()) {
+                return {ErrorCodes::InvalidOptions,
+                        "existing expireAfterSeconds field is not a number"};
+            }
+
+            cmrIndex->indexExpireAfterSeconds = *cmdIndex.getExpireAfterSeconds();
+        }
+
+        // Make a copy of the index options doc for writing to the oplog.
+        // This index options doc should exclude the options that do not need
+        // to be modified.
+        auto indexForOplog = index;
+
+        if (cmdIndex.getUnique()) {
+            parsed.numModifications++;
+            if (bool unique = *cmdIndex.getUnique(); !unique) {
+                return {ErrorCodes::BadValue, "Cannot make index non-unique"};
+            }
+
+            // Attempting to converting a unique index should be treated as a no-op.
+            if (cmrIndex->idx->unique()) {
+                indexForOplog->setUnique(boost::none);
+            } else {
+                // Disallow one-step unique convertion. The user has to set
+                // 'prepareUnique' to true first.
+                if (!cmrIndex->idx->prepareUnique()) {
+                    return Status(ErrorCodes::InvalidOptions,
+                                  "Cannot make index unique with 'prepareUnique=false'. "
+                                  "Run collMod to set it first.");
+                }
+                cmrIndex->indexUnique = true;
+            }
+        }
+
+        if (cmdIndex.getHidden()) {
+            parsed.numModifications++;
+            // Disallow index hiding/unhiding on system collections.
+            // Bucket collections, which hold data for user-created time-series collections, do
+            // not have this restriction.
+            if (nss.isSystem() && !nss.isTimeseriesBucketsCollection()) {
+                return {ErrorCodes::BadValue, "Can't hide index on system collection"};
+            }
+
+            // Disallow index hiding/unhiding on _id indexes - these are created by default and
+            // are critical to most collection operations.
+            if (cmrIndex->idx->isIdIndex()) {
+                return {ErrorCodes::BadValue, "can't hide _id index"};
+            }
+
+            // Hiding a hidden index or unhiding a visible index should be treated as a no-op.
+            if (cmrIndex->idx->hidden() == *cmdIndex.getHidden()) {
+                indexForOplog->setHidden(boost::none);
+            } else {
+                cmrIndex->indexHidden = cmdIndex.getHidden();
+            }
+        }
+
+        if (cmdIndex.getPrepareUnique()) {
+            parsed.numModifications++;
+            // Attempting to modify with the same value should be treated as a no-op.
+            if (cmrIndex->idx->prepareUnique() == *cmdIndex.getPrepareUnique()) {
+                indexForOplog->setPrepareUnique(boost::none);
+            } else {
+                cmrIndex->indexPrepareUnique = cmdIndex.getPrepareUnique();
+            }
+        }
+
+        if (cmdIndex.getForceNonUnique()) {
+            parsed.numModifications++;
+            if (bool unique = *cmdIndex.getForceNonUnique(); !unique) {
+                return {ErrorCodes::BadValue, "'forceNonUnique: false' is not supported"};
+            }
+
+            // Attempting to convert a non-unique index should be treated as a no-op.
+            if (!cmrIndex->idx->unique()) {
+                indexForOplog->setForceNonUnique(boost::none);
+            } else {
+                cmrIndex->indexForceNonUnique = true;
+            }
+        }
+        // The index options doc must contain either the name or key pattern, but not both.
+        // If we have just one field, the index modifications requested matches the current
+        // state in catalog and there is nothing further to do.
+        BSONObjBuilder indexForOplogObjBuilder;
+        indexForOplog->serialize(&indexForOplogObjBuilder);
+        auto indexForOplogObj = indexForOplogObjBuilder.obj();
+        if (indexForOplogObj.nFields() > 1) {
+            oplogEntryBuilder.append(CollMod::kIndexFieldName, indexForOplogObj);
+        }
+    }
+
+    if (auto& validator = cmr.getValidator()) {
+        if (isView) {
+            return getNotSupportedOnViewError(CollMod::kValidatorFieldName);
+        }
+        if (isTimeseries) {
+            return getNotSupportedOnTimeseriesError(CollMod::kValidatorFieldName);
+        }
+        parsed.numModifications++;
+        // If the feature compatibility version is not kLatest, and we are validating features as
+        // primary, ban the use of new agg features introduced in kLatest to prevent them from being
+        // persisted in the catalog.
+        boost::optional<multiversion::FeatureCompatibilityVersion> maxFeatureCompatibilityVersion;
+        // (Generic FCV reference): This FCV check should exist across LTS binary versions.
+        multiversion::FeatureCompatibilityVersion fcv;
+        if (serverGlobalParams.validateFeaturesAsPrimary.load() &&
+            serverGlobalParams.featureCompatibility.isLessThan(multiversion::GenericFCV::kLatest,
+                                                               &fcv)) {
+            maxFeatureCompatibilityVersion = fcv;
+        }
+        auto validatorObj = *validator;
+        parsed.collValidator = coll->parseValidator(opCtx,
+                                                    validatorObj.getOwned(),
+                                                    MatchExpressionParser::kDefaultSpecialFeatures,
+                                                    maxFeatureCompatibilityVersion);
+        if (!parsed.collValidator->isOK()) {
+            return parsed.collValidator->getStatus();
+        }
+        oplogEntryBuilder.append(CollMod::kValidatorFieldName, validatorObj);
+    }
+
+    if (auto& validationLevel = cmr.getValidationLevel()) {
+        if (isView) {
+            return getNotSupportedOnViewError(CollMod::kValidationLevelFieldName);
+        }
+        if (isTimeseries) {
+            return getNotSupportedOnTimeseriesError(CollMod::kValidationLevelFieldName);
+        }
+        parsed.numModifications++;
+        parsed.collValidationLevel = *validationLevel;
+        oplogEntryBuilder.append(CollMod::kValidationLevelFieldName,
+                                 ValidationLevel_serializer(*validationLevel));
+    }
+
+    if (auto& validationAction = cmr.getValidationAction()) {
+        if (isView) {
+            return getNotSupportedOnViewError(CollMod::kValidationActionFieldName);
+        }
+        if (isTimeseries) {
+            return getNotSupportedOnTimeseriesError(CollMod::kValidationActionFieldName);
+        }
+        parsed.numModifications++;
+        parsed.collValidationAction = *validationAction;
+        oplogEntryBuilder.append(CollMod::kValidationActionFieldName,
+                                 ValidationAction_serializer(*validationAction));
+    }
+
+    if (auto& pipeline = cmr.getPipeline()) {
+        parsed.numModifications++;
+        if (!isView) {
+            return getOnlySupportedOnViewError(CollMod::kPipelineFieldName);
+        }
+        oplogEntryBuilder.append(CollMod::kPipelineFieldName, *pipeline);
+    }
+
+    if (auto& viewOn = cmr.getViewOn()) {
+        parsed.numModifications++;
+        if (!isView) {
+            return getOnlySupportedOnViewError(CollMod::kViewOnFieldName);
+        }
+        parsed.viewOn = viewOn->toString();
+        oplogEntryBuilder.append(CollMod::kViewOnFieldName, *viewOn);
+    }
+
+    if (auto& recordPreImages = cmr.getRecordPreImages()) {
+        if (isView) {
+            return getNotSupportedOnViewError(CollMod::kRecordPreImagesFieldName);
+        }
+        if (isTimeseries) {
+            return getNotSupportedOnTimeseriesError(CollMod::kRecordPreImagesFieldName);
+        }
+        parsed.numModifications++;
+        parsed.recordPreImages = *recordPreImages;
+        oplogEntryBuilder.append(CollMod::kRecordPreImagesFieldName, *recordPreImages);
+    }
+
+    if (auto& changeStreamPreAndPostImages = cmr.getChangeStreamPreAndPostImages()) {
+        if (isView) {
+            return getNotSupportedOnViewError(CollMod::kChangeStreamPreAndPostImagesFieldName);
+        }
+        if (isTimeseries) {
+            return getNotSupportedOnTimeseriesError(
+                CollMod::kChangeStreamPreAndPostImagesFieldName);
+        }
+        parsed.numModifications++;
+        parsed.changeStreamPreAndPostImagesOptions = *changeStreamPreAndPostImages;
+
+        BSONObjBuilder subObjBuilder(
+            oplogEntryBuilder.subobjStart(CollMod::kChangeStreamPreAndPostImagesFieldName));
+        changeStreamPreAndPostImages->serialize(&subObjBuilder);
+    }
+
+    if (auto& expireAfterSeconds = cmr.getExpireAfterSeconds()) {
+        if (isView) {
+            return getNotSupportedOnViewError(CollMod::kExpireAfterSecondsFieldName);
+        }
+        parsed.numModifications++;
+        if (coll->getRecordStore()->keyFormat() != KeyFormat::String) {
+            return {ErrorCodes::InvalidOptions,
+                    str::stream() << "'" << CollMod::kExpireAfterSecondsFieldName
+                                  << "' option is only supported on collections clustered by _id"};
+        }
+
+        auto status = stdx::visit(
+            visit_helper::Overloaded{
+                [&oplogEntryBuilder](const std::string& value) -> Status {
+                    if (value != "off") {
+                        return {ErrorCodes::InvalidOptions,
+                                str::stream()
+                                    << "Invalid string value for the "
+                                       "'clusteredIndex::expireAfterSeconds' "
+                                    << "option. Got: '" << value << "'. Accepted value is 'off'"};
+                    }
+                    oplogEntryBuilder.append(CollMod::kExpireAfterSecondsFieldName, value);
+                    return Status::OK();
+                },
+                [&oplogEntryBuilder](std::int64_t value) {
+                    oplogEntryBuilder.append(CollMod::kExpireAfterSecondsFieldName, value);
+                    return index_key_validate::validateExpireAfterSeconds(value);
+                },
+            },
+            *expireAfterSeconds);
+        if (!status.isOK()) {
+            return status;
+        }
+    }
+
+    if (auto& timeseries = cmr.getTimeseries()) {
+        parsed.numModifications++;
+        if (!isTimeseries) {
+            return getOnlySupportedOnTimeseriesError(CollMod::kIsTimeseriesNamespaceFieldName);
+        }
+
+        BSONObjBuilder subObjBuilder(oplogEntryBuilder.subobjStart(CollMod::kTimeseriesFieldName));
+        timeseries->serialize(&subObjBuilder);
+    }
+
+    if (auto& dryRun = cmr.getDryRun()) {
+        parsed.dryRun = *dryRun;
+        // The dry run option should never be included in a collMod oplog entry.
     }
 
     // Currently disallows the use of 'indexPrepareUnique' with other collMod options.
-    if (cmr.indexRequest.indexPrepareUnique && cmr.numModifications > 1) {
+    if (parsed.indexRequest.indexPrepareUnique && parsed.numModifications > 1) {
         return {ErrorCodes::InvalidOptions,
                 "prepareUnique cannot be combined with any other modification."};
     }
 
-    return {std::move(cmr)};
+    return std::make_pair(std::move(parsed), oplogEntryBuilder.obj());
 }
 
 void _setClusteredExpireAfterSeconds(
@@ -603,13 +634,11 @@ Status _processCollModDryRunMode(OperationContext* opCtx,
     const auto& collection = coll.getCollection();
 
     // Validate collMod request and look up index descriptor for checking duplicates.
-    BSONObjBuilder oplogEntryBuilderWeDontCareAbout;
-    auto statusW =
-        parseCollModRequest(opCtx, nss, collection, cmd, &oplogEntryBuilderWeDontCareAbout);
+    auto statusW = parseCollModRequest(opCtx, nss, collection, cmd);
     if (!statusW.isOK()) {
         return statusW.getStatus();
     }
-    const auto& cmr = statusW.getValue();
+    const auto& cmr = statusW.getValue().first;
 
     // The unique option should be set according to the checks at the top of this function.
     // Any other modification requested should lead to us refusing to run collMod in dry run mode.
@@ -643,12 +672,11 @@ StatusWith<const IndexDescriptor*> _setUpCollModIndexUnique(OperationContext* op
     }
 
     // Scan index for duplicates without exclusive access.
-    BSONObjBuilder unused;
-    auto statusW = parseCollModRequest(opCtx, nss, collection, cmd, &unused);
+    auto statusW = parseCollModRequest(opCtx, nss, collection, cmd);
     if (!statusW.isOK()) {
         return statusW.getStatus();
     }
-    const auto& cmr = statusW.getValue();
+    const auto& cmr = statusW.getValue().first;
     auto idx = cmr.indexRequest.idx;
     auto violatingRecordsList = scanIndexForDuplicates(opCtx, collection, idx);
 
@@ -749,15 +777,13 @@ Status _collModInternal(OperationContext* opCtx,
                       str::stream() << "Not primary while setting collection options on " << nss);
     }
 
-    BSONObjBuilder oplogEntryBuilder;
-    auto statusW = parseCollModRequest(opCtx, nss, coll.getCollection(), cmd, &oplogEntryBuilder);
+    auto statusW = parseCollModRequest(opCtx, nss, coll.getCollection(), cmd);
     if (!statusW.isOK()) {
         return statusW.getStatus();
     }
-    auto oplogEntryObj = oplogEntryBuilder.obj();
 
-    // Save both states of the ParsedCollModRequest to allow writeConflictRetries.
-    ParsedCollModRequest cmrNew = std::move(statusW.getValue());
+    auto& cmrNew = statusW.getValue().first;
+    auto& oplogEntryObj = statusW.getValue().second;
     auto idx_second = cmrNew.indexRequest.idx;
     if (idx_first && idx_first != idx_second) {
         return Status(
