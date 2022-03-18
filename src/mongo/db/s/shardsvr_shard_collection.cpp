@@ -256,7 +256,8 @@ bool validShardKeyIndexExists(OperationContext* opCtx,
 
     // 3. If proposed key is required to be unique, additionally check for exact match.
 
-    if (hasUsefulIndexForKey && request.getUnique() && request.getEnforceUniquenessCheck()) {
+    if (hasUsefulIndexForKey && request.getUnique() &&
+        request.getEnforceUniquenessCheck().value_or(true)) {
         BSONObj eqQuery = BSON("ns" << nss.ns() << "key" << proposedKey);
         BSONObj eqQueryResult;
 
@@ -723,7 +724,7 @@ UUID shardCollection(OperationContext* opCtx,
     const auto proposedKey(request.getKey().getOwned());
     const ShardKeyPattern shardKeyPattern(proposedKey);
 
-    if (request.getImplicitlyCreateIndex()) {
+    if (request.getImplicitlyCreateIndex().value_or(true)) {
         createIndexesOrValidateExisting(opCtx, nss, proposedKey, shardKeyPattern, request);
     } else {
         uassert(6373200,
