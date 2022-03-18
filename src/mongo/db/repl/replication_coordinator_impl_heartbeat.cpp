@@ -725,15 +725,18 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
     const auto myIndex = [&]() -> StatusWith<int> {
         // We always check the config when _selfIndex is not valid, in order to be able to
         // recover from transient DNS errors.
-        if (_selfIndex >= 0 && sameConfigContents(_rsConfig, configToApply)) {
-            LOGV2_FOR_HEARTBEATS(
-                6351200,
-                2,
-                "New heartbeat config is only a version/term change, skipping validation checks",
-                "oldConfig"_attr = _rsConfig,
-                "newConfig"_attr = configToApply);
-            // If the configs are the same, so is our index.
-            return _selfIndex;
+        {
+            stdx::lock_guard<Latch> lk(_mutex);
+            if (_selfIndex >= 0 && sameConfigContents(_rsConfig, configToApply)) {
+                LOGV2_FOR_HEARTBEATS(6351200,
+                                     2,
+                                     "New heartbeat config is only a version/term change, skipping "
+                                     "validation checks",
+                                     "oldConfig"_attr = _rsConfig,
+                                     "newConfig"_attr = configToApply);
+                // If the configs are the same, so is our index.
+                return _selfIndex;
+            }
         }
         return validateConfigForHeartbeatReconfig(
             _externalState.get(), configToApply, getGlobalServiceContext());
