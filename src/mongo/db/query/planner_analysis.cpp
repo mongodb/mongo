@@ -663,7 +663,8 @@ void QueryPlannerAnalysis::determineLookupStrategy(
 
         for (const auto& index : indexes) {
             if ((index.type == INDEX_BTREE || index.type == INDEX_HASHED) &&
-                index.keyPattern.firstElement().fieldName() == eqLookupNode->joinFieldForeign) {
+                index.keyPattern.firstElement().fieldName() ==
+                    eqLookupNode->joinFieldForeign.fullPath()) {
                 return index;
             }
         }

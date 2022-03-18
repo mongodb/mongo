@@ -290,6 +290,66 @@ function runTest_ExpectFailure(
     });
 })();
 
+(function testMatchingDeepPathToScalar() {
+    const docs = [
+        // For these docs "a.b.c" resolves to a (logical) set that contains value "1" (and possibly
+        // other values)
+        {_id: 0, a: {b: {c: 1}}},
+        {_id: 1, a: {b: {c: [[2, 3], 1]}}},
+
+        {_id: 2, a: {b: [{c: 2}, {c: 1}]}},
+        {_id: 3, a: {b: [{c: null}, {c: 1}]}},
+        {_id: 4, a: {b: [{no_c: 2}, {c: 1}]}},
+        {_id: 5, a: {b: [{c: []}, {c: 1}]}},
+        {_id: 6, a: {b: [{c: [[2, 3], 1]}]}},
+        {_id: 7, a: {b: [{c: 1}, {c: [[2, 3], 4]}]}},
+
+        {_id: 8, a: [{b: {c: 2}}, {b: {c: 1}}]},
+        {_id: 9, a: [{b: {c: null}}, {b: {c: 1}}]},
+        {_id: 10, a: [{b: {no_c: 2}}, {b: {c: 1}}]},
+        {_id: 11, a: [{b: {c: []}}, {b: {c: 1}}]},
+        {_id: 12, a: [{b: {c: [[2, 3], 1]}}]},
+        {_id: 13, a: [{b: {c: 4}}, {b: {c: [[2, 3], 1]}}]},
+        {_id: 14, a: [{no_b: 2}, {b: {c: 1}}]},
+
+        {_id: 15, a: [{b: [{c: 1}]}]},
+        {_id: 16, a: [{b: {c: 3}}, {b: [{c: 1}, {c: 2}]}]},
+        {_id: 17, a: [{b: {c: null}}, {b: [{c: 1}]}]},
+        {_id: 18, a: [{b: {no_c: 2}}, {b: [{c: 1}]}]},
+        {_id: 19, a: [{b: {c: []}}, {b: [{c: 1}]}]},
+        {_id: 20, a: [{b: [{c: [[2, 3], 1]}]}]},
+        {_id: 21, a: [{b: {c: 4}}, {b: [{c: [[2, 3], 1]}]}]},
+        {_id: 22, a: [{no_b: 2}, {b: [{no_c: 3}, {c: 1}]}]},
+
+        // For these docs "a.b.c" should resolve to a (logical) set that does _not_ contain value
+        // "1" (but might contain other values).
+        {_id: 100, a: {b: {c: [[1, 2], 3]}}},
+        {_id: 101, a: {b: [{c: [[1, 2], 3]}]}},
+        {_id: 102, a: [{b: {c: [[1, 2], 3]}}]},
+        {_id: 103, a: [{b: [{c: [[1, 2], 3]}]}]},
+    ];
+
+    // When matching a scalar, local and foreign collections are fully symmetric.
+    runTest_SingleForeignRecord({
+        testDescription: "Deep path in local and top-level scalar in foreign",
+        localRecords: docs,
+        localField: "a.b.c",
+        foreignRecord: {_id: 0, key: 1},
+        foreignField: "key",
+        idsExpectedToMatch:
+            [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]
+    });
+    runTest_SingleLocalRecord({
+        testDescription: "Top-level scalar in local and deep path in foreign",
+        localRecord: {_id: 0, key: 1},
+        localField: "key",
+        foreignRecords: docs,
+        foreignField: "a.b.c",
+        idsExpectedToMatch:
+            [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]
+    });
+})();
+
 (function testMatchingTopLevelFieldToArray() {
     const docs = [
         // For these docs "a" resolves to a (logical) set that contains [1,2] array as a value.
@@ -521,7 +581,41 @@ function runTest_ExpectFailure(
     });
 })();
 
-(function testMatchingEmptyArrayOnPath() {
+(function testMatchingDeepPathWithEmptyArrays() {
+    const docs = [
+        {_id: 0, a: {b: {c: []}}},
+        {_id: 1, a: {b: [{c: []}, {c: []}]}},
+        {_id: 2, a: {b: [{no_c: 42}, {c: []}, {c: []}]}},
+        {_id: 3, a: [{b: {c: []}}, {b: {c: []}}]},
+        {_id: 4, a: [{b: {no_c: 42}}, {b: {c: []}}, {b: {c: []}}]},
+
+        {_id: 5, a: {b: {c: [[]]}}},
+        {_id: 6, a: {b: [{c: []}, {c: [[]]}]}},
+        {_id: 7, a: {b: [{no_c: 42}, {c: []}, {c: [[]]}]}},
+        {_id: 8, a: [{b: {c: []}}, {b: {c: [[]]}}]},
+        {_id: 9, a: [{b: {no_c: 42}}, {b: {c: []}}, {b: {c: [[]]}}]},
+    ];
+
+    runTest_SingleForeignRecord({
+        testDescription: "Empty arrays and missing on deep path in local",
+        localRecords: docs,
+        localField: "a.b.c",
+        foreignRecord: {_id: 0, b: null},
+        foreignField: "b",
+        idsExpectedToMatch: [0, 1, 2, 3, 4]
+    });
+
+    runTest_SingleForeignRecord({
+        testDescription: "Empty arrays and missing on deep path in local",
+        localRecords: docs,
+        localField: "a.b.c",
+        foreignRecord: {_id: 0, b: []},
+        foreignField: "b",
+        idsExpectedToMatch: [5, 6, 7, 8, 9]
+    });
+})();
+
+(function testMatchingEmptyArrayValueOnPath() {
     const docs = [
         // For these docs "a.x" resolves to a (logical) set that contains empty array as a value.
         {_id: 0, a: {x: [[]], y: 1}},

@@ -1131,7 +1131,9 @@ TEST(QuerySolutionTest, EqLookupNodeWithIndexScan) {
     scanNode->bounds.isSimpleRange = true;
     scanNode->bounds.startKey = BSON("a" << 1 << "b" << 1);
     scanNode->bounds.endKey = BSON("a" << 1 << "b" << 1);
-    EqLookupNode node(std::move(scanNode), "col", "local", "remote", "as");
+
+    EqLookupNode node(std::move(scanNode), "col", "local", "foreign", "as");
+
     node.computeProperties();
 
     auto child = node.children[0];
@@ -1157,7 +1159,9 @@ TEST(QuerySolutionTest, EqLookupNodeWithIndexScanFieldOverwrite) {
                                          << "1");
     scanNode->bounds.endKey = BSON("a" << 1 << "b" << 1 << "c"
                                        << "1");
-    EqLookupNode node(std::move(scanNode), "col", "local", "remote", "b");
+
+    EqLookupNode node(std::move(scanNode), "col", "local", "foreign", "b");
+
     node.computeProperties();
 
     auto child = node.children[0];

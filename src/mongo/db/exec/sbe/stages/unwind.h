@@ -43,7 +43,7 @@ namespace mongo::sbe {
  *
  * Debug string representation:
  *
- *   unwind inputSlot outputValueSlot outputIndexSlot preserveNullAndEmptyArrays childStage
+ *   unwind outputValueSlot outputIndexSlot inputSlot preserveNullAndEmptyArrays childStage
  */
 class UnwindStage final : public PlanStage {
 public:

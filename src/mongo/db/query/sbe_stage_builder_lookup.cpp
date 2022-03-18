@@ -39,6 +39,7 @@
 #include "mongo/db/exec/sbe/stages/ix_scan.h"
 #include "mongo/db/exec/sbe/stages/loop_join.h"
 #include "mongo/db/exec/sbe/stages/scan.h"
+#include "mongo/db/exec/sbe/stages/unwind.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/query/sbe_stage_builder_coll_scan.h"
 #include "mongo/db/query/sbe_stage_builder_expression.h"
@@ -57,50 +58,99 @@ namespace {
 using namespace sbe;
 using namespace sbe::value;
 
-std::unique_ptr<EExpression> replaceUndefinedWithNullOrPassthrough(SlotId slot) {
-    return makeE<EIf>(
-        makeFunction("typeMatch",
-                     makeVariable(slot),
-                     sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64,
-                                                sbe::value::bitcastFrom<int64_t>(
-                                                    getBSONTypeMask(TypeTags::bsonUndefined)))),
-        makeConstant(TypeTags::Null, 0),
-        makeVariable(slot));
+// Creates stages for traversing path 'fp' in the record from 'inputSlot'. Returns one key value at
+// a time. For example, if the record in the 'inputSlot' is:
+//     {a: [{b:[1,[2,3]]}, {b:4}, {b:1}, {b:2}]},
+// the returned values for path "a.b" will be streamed as: 1, [2,3], 4, 1, 2.
+std::pair<SlotId /*keyValueSlot*/, std::unique_ptr<sbe::PlanStage>> buildKeysStream(
+    SlotId inputSlot,
+    const FieldPath& fp,
+    const PlanNodeId nodeId,
+    SlotIdGenerator& slotIdGenerator) {
+    const FieldIndex numParts = fp.getPathLength();
+
+    std::unique_ptr<sbe::PlanStage> currentStage = makeLimitCoScanTree(nodeId, 1);
+    SlotId keyValueSlot = inputSlot;
+    for (size_t i = 0; i < numParts; i++) {
+        const StringData fieldName = fp.getFieldName(i);
+
+        SlotId getFieldSlot = slotIdGenerator.generate();
+        EvalStage getFieldStage = makeProject(
+            EvalStage{std::move(currentStage), makeSV()},
+            nodeId,
+            getFieldSlot,
+            makeFunction("getField"_sd, makeVariable(keyValueSlot), makeConstant(fieldName)));
+
+        SlotId unwindOutputSlot = slotIdGenerator.generate();
+        currentStage = makeS<UnwindStage>(std::move(getFieldStage.stage) /*child stage*/,
+                                          getFieldSlot,
+                                          unwindOutputSlot,
+                                          slotIdGenerator.generate() /*outIndex*/,
+                                          true /*preserveNullAndEmptyArrays*/,
+                                          nodeId);
+        keyValueSlot = unwindOutputSlot;
+    }
+    return {keyValueSlot, std::move(currentStage)};
 }
 
-// Creates stages for building the key value. Missing keys are replaced with "null".
-// TODO SERVER-63690: implement handling of paths.
-std::pair<SlotId /*keySlot*/, std::unique_ptr<sbe::PlanStage>> buildLookupKey(
+// Creates stages for traversing path 'fp' in the record from 'inputSlot'. Puts the set of key
+// values into 'keyValuesSetSlot. For example, if the record in the 'inputSlot' is:
+//     {a: [{b:[1,[2,3]]}, {b:4}, {b:1}, {b:2}]},
+// the returned slot will contain for path "a.b" a set of {1, 2, 4, [2,3]}.
+// If the stream produces no values, that is, would result in an empty set, the empty set is
+// replaced with a set that contains a single 'null' value, so that it matches MQL semantics when
+// empty arrays and all missing are matched to 'null'.
+std::pair<SlotId /*keyValuesSetSlot*/, std::unique_ptr<sbe::PlanStage>> buildLocalKeySet(
     std::unique_ptr<sbe::PlanStage> inputStage,
     SlotId recordSlot,
-    StringData fieldName,
+    const FieldPath& fp,
     const PlanNodeId nodeId,
     SlotIdGenerator& slotIdGenerator) {
-    SlotId keySlot = slotIdGenerator.generate();
-    EvalStage innerBranch = makeProject(
-        EvalStage{std::move(inputStage), SlotVector{recordSlot}},
-        nodeId,
-        keySlot,
-        makeFunction("fillEmpty"_sd,
-                     makeFunction("getField"_sd, makeVariable(recordSlot), makeConstant(fieldName)),
-                     makeConstant(TypeTags::Null, 0)));
+    // Create the branch to stream individual key values from every terminal of the path.
+    auto [keyValueSlot, keyValuesStage] = buildKeysStream(recordSlot, fp, nodeId, slotIdGenerator);
 
-    return {keySlot, std::move(innerBranch.stage)};
-}
+    // Re-pack the individual key values into a set.
+    SlotId keyValuesSetSlot = slotIdGenerator.generate();
+    EvalStage packedKeyValuesStage = makeHashAgg(
+        EvalStage{std::move(keyValuesStage), SlotVector{}},
+        makeSV(), /*groupBy slots - "none" means creating a single group*/
+        makeEM(keyValuesSetSlot, makeFunction("addToSet"_sd, makeVariable(keyValueSlot))),
+        {} /*collatorSlot*/,
+        false /*allowDiskUse*/,
+        nodeId);
 
-// Creates stages for the local side of $lookup.
-std::pair<SlotId /*localKey*/, std::unique_ptr<sbe::PlanStage>> buildLocalLookupBranch(
-    StageBuilderState& state,
-    std::unique_ptr<sbe::PlanStage> localInputStage,
-    SlotId localRecordSlot,
-    StringData localFieldName,
-    const PlanNodeId nodeId,
-    SlotIdGenerator& slotIdGenerator) {
-    auto [localKeySlot, localKeyStage] = buildLookupKey(
-        std::move(localInputStage), localRecordSlot, localFieldName, nodeId, slotIdGenerator);
+    // The set in 'keyValuesSetSlot' might end up empty if the localField contained only missing and
+    // empty arrays (e.g. path "a.b" in {a: [{no_b:1}, {b:[]}]}). The semantics of MQL require these
+    // cases to match to 'null', so we replace the empty set with a constant set that contains a
+    // single 'null' value.
+    auto [arrayWithNullTag, arrayWithNullVal] = makeNewArray();
+    std::unique_ptr<EExpression> arrayWithNull = makeConstant(arrayWithNullTag, arrayWithNullVal);
+    value::Array* arrayWithNullView = getArrayView(arrayWithNullVal);
+    arrayWithNullView->push_back(TypeTags::Null, 0);
 
-    // TODO SERVER-63691: repack local keys from an array into a set.
-    return std::make_pair(localKeySlot, std::move(localKeyStage));
+    std::unique_ptr<EExpression> isNonEmptySetExpr =
+        makeBinaryOp(sbe::EPrimBinary::greater,
+                     makeFunction("getArraySize", makeVariable(keyValuesSetSlot)),
+                     makeConstant(TypeTags::NumberInt32, 0));
+
+    SlotId nonEmptySetSlot = slotIdGenerator.generate();
+    packedKeyValuesStage = makeProject(std::move(packedKeyValuesStage),
+                                       nodeId,
+                                       nonEmptySetSlot,
+                                       sbe::makeE<sbe::EIf>(std::move(isNonEmptySetExpr),
+                                                            makeVariable(keyValuesSetSlot),
+                                                            std::move(arrayWithNull)));
+
+    // Attach the set of key values to the original local record.
+    std::unique_ptr<sbe::PlanStage> nljLocalWithKeyValuesSet =
+        makeS<LoopJoinStage>(std::move(inputStage),
+                             std::move(packedKeyValuesStage.stage),
+                             makeSV(recordSlot) /*outerProjects*/,
+                             makeSV(recordSlot) /*outerCorrelated*/,
+                             nullptr /*predicate*/,
+                             nodeId);
+
+    return {nonEmptySetSlot, std::move(nljLocalWithKeyValuesSet)};
 }
 
 // Creates stages for grouping matched foreign records into an array. If there's no match, the
@@ -154,37 +204,41 @@ std::pair<SlotId /*matched docs*/, std::unique_ptr<sbe::PlanStage>> buildNljLook
     StageBuilderState& state,
     std::unique_ptr<sbe::PlanStage> localStage,
     SlotId localRecordSlot,
-    StringData localFieldName,
+    const FieldPath& localFieldName,
     std::unique_ptr<sbe::PlanStage> foreignStage,
     SlotId foreignRecordSlot,
     StringData foreignFieldName,
     const PlanNodeId nodeId,
     SlotIdGenerator& slotIdGenerator) {
-    // Build the outer branch that produces the correclated local key slot.
-    auto [localKeySlot, outerRootStage] = buildLocalLookupBranch(
-        state, std::move(localStage), localRecordSlot, localFieldName, nodeId, slotIdGenerator);
+    // Build the outer branch that produces the set of local key values.
+    auto [localKeySlot, outerRootStage] = buildLocalKeySet(
+        std::move(localStage), localRecordSlot, localFieldName, nodeId, slotIdGenerator);
 
-    // Build the inner branch. It involves getting the key and then building the nested lookup
-    // join.
-    auto [foreignKeySlot, foreignKeyStage] = buildLookupKey(
-        std::move(foreignStage), foreignRecordSlot, foreignFieldName, nodeId, slotIdGenerator);
-    EvalStage innerBranch{std::move(foreignKeyStage), SlotVector{}};
+    // Build the inner branch. It involves getting the foreign keys and then building the nested
+    // lookup join.
+    // TODO SERVER-64483: implement handling of paths in foreignField.
+    SlotId foreignKeySlot = slotIdGenerator.generate();
+    EvalStage innerBranch =
+        makeProject(EvalStage{std::move(foreignStage), SlotVector{foreignKeySlot}},
+                    nodeId,
+                    foreignKeySlot,
+                    makeFunction("fillEmpty"_sd,
+                                 makeFunction("getField"_sd,
+                                              makeVariable(foreignRecordSlot),
+                                              makeConstant(foreignFieldName)),
+                                 makeConstant(TypeTags::Null, 0)));
 
-    // If the foreign key is an array, $lookup should match against any element of the array,
-    // so need to traverse into it, while applying the equality filter to each element. Contents
-    // of 'foreignKeySlot' will be overwritten with true/false result of the traversal - do we
-    // want to keep it?
+    // If the foreign key is an array, $lookup should match against the array itself and all
+    // elements of the array, so need to traverse into it, while applying the equality filter to
+    // each element. Contents of 'foreignKeySlot' will be overwritten with true/false result of the
+    // traversal - do we want to keep it?
     {
         SlotId traverseOutputSlot = slotIdGenerator.generate();
         // "in" branch of the traverse applies the filter and populates the output slot with
         // true/false. If the local key is an array check for membership rather than equality.
         // Also, need to compare "undefined" in foreign as "null".
-        std::unique_ptr<EExpression> checkInTraverse = makeE<EIf>(
-            makeFunction("isArray"_sd, makeVariable(localKeySlot)),
-            makeFunction("isMember"_sd, makeVariable(foreignKeySlot), makeVariable(localKeySlot)),
-            makeBinaryOp(EPrimBinary::eq,
-                         makeVariable(localKeySlot),
-                         replaceUndefinedWithNullOrPassthrough(foreignKeySlot)));
+        std::unique_ptr<EExpression> checkInTraverse =
+            makeFunction("isMember"_sd, makeVariable(foreignKeySlot), makeVariable(localKeySlot));
 
         SlotId innerTraverseOutputSlot = slotIdGenerator.generate();
         EvalStage innerTraverseBranch = makeProject(makeLimitCoScanStage(nodeId),
@@ -313,7 +367,7 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
     StageBuilderState& state,
     std::unique_ptr<sbe::PlanStage> localStage,
     SlotId localRecordSlot,
-    std::string localFieldName,
+    const FieldPath& localFieldName,
     const CollectionPtr& foreignColl,
     const IndexEntry& index,
     StringMap<const IndexAccessMethod*>& iamMap,
@@ -334,10 +388,19 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
     const auto indexOrdering = indexAccessMethod->getSortedDataInterface()->getOrdering();
     iamMap.insert({indexName, indexAccessMethod});
 
-    // Build the outer side of the index join which extracts the local join field. The local
-    // field is stored in 'localFieldSlot' and made available to the inner side of the join.
-    auto [localFieldSlot, localFieldStage] = buildLocalLookupBranch(
-        state, std::move(localStage), localRecordSlot, localFieldName, nodeId, slotIdGenerator);
+    // Build the outer branch that produces the correclated local key slot.
+    auto [localKeysSetSlot, localKeysSetStage] = buildLocalKeySet(
+        std::move(localStage), localRecordSlot, localFieldName, nodeId, slotIdGenerator);
+
+    // 'localFieldSlot' is a set even if it contains a single item. Extract this single value until
+    // SERVER-63574 is implemented.
+    SlotId localFieldSlot = slotIdGenerator.generate();
+    auto localFieldStage = makeS<UnwindStage>(std::move(localKeysSetStage) /*child stage*/,
+                                              localKeysSetSlot,
+                                              localFieldSlot,
+                                              slotIdGenerator.generate() /*outIndex*/,
+                                              true /*preserveNullAndEmptyArrays*/,
+                                              nodeId);
 
     // Calculate the low key and high key of each individual local field. They are stored in
     // 'lowKeySlot' and 'highKeySlot', respectively. These two slots will be made available in
@@ -521,7 +584,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                            eqLookupNode->joinFieldLocal,
                                            std::move(foreignStage),
                                            foreignResultSlot,
-                                           eqLookupNode->joinFieldForeign,
+                                           eqLookupNode->joinFieldForeign.fullPath(),
                                            eqLookupNode->nodeId(),
                                            _slotIdGenerator);
             }

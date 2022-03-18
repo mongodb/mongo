@@ -1365,12 +1365,12 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
         }
 
 
-        if (expectedLocalField.str() != actualEqLookupNode->joinFieldLocal) {
+        if (expectedLocalField.str() != actualEqLookupNode->joinFieldLocal.fullPath()) {
             return {ErrorCodes::Error{6267504},
                     str::stream() << "Test solution 'joinFieldLocal' does not match actual; test "
                                      ""
                                   << expectedLocalField.str() << " != actual "
-                                  << actualEqLookupNode->joinFieldLocal};
+                                  << actualEqLookupNode->joinFieldLocal.fullPath()};
         }
 
         auto expectedForeignField = expectedEqLookupSoln["joinFieldForeign"];
@@ -1383,12 +1383,12 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
                     << testSoln.toString()};
         }
 
-        if (expectedForeignField.str() != actualEqLookupNode->joinFieldForeign) {
+        if (expectedForeignField.str() != actualEqLookupNode->joinFieldForeign.fullPath()) {
             return {ErrorCodes::Error{6267506},
                     str::stream() << "Test solution 'joinFieldForeign' does not match actual; test "
                                      ""
                                   << expectedForeignField.str() << " != actual "
-                                  << actualEqLookupNode->joinFieldForeign};
+                                  << actualEqLookupNode->joinFieldForeign.fullPath()};
         }
 
         auto expectedAsField = expectedEqLookupSoln["joinField"];

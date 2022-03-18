@@ -173,8 +173,8 @@ void statsToBSON(const QuerySolutionNode* node,
             auto eln = static_cast<const EqLookupNode*>(node);
 
             bob->append("foreignCollection", eln->foreignCollection);
-            bob->append("localField", eln->joinFieldLocal);
-            bob->append("foreignField", eln->joinFieldForeign);
+            bob->append("localField", eln->joinFieldLocal.fullPath());
+            bob->append("foreignField", eln->joinFieldForeign.fullPath());
             bob->append("asField", eln->joinField.fullPath());
             bob->append("strategy", EqLookupNode::serializeLookupStrategy(eln->lookupStrategy));
             if (eln->idxEntry) {

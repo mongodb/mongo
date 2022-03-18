@@ -1424,8 +1424,8 @@ struct EqLookupNode : public QuerySolutionNode {
 
     EqLookupNode(std::unique_ptr<QuerySolutionNode> child,
                  const std::string& foreignCollection,
-                 const std::string& joinFieldLocal,
-                 const std::string& joinFieldForeign,
+                 const FieldPath& joinFieldLocal,
+                 const FieldPath& joinFieldForeign,
                  const FieldPath& joinField)
         : QuerySolutionNode(std::move(child)),
           foreignCollection(foreignCollection),
@@ -1473,12 +1473,12 @@ struct EqLookupNode : public QuerySolutionNode {
     /**
      * The local (outer) join field.
      */
-    std::string joinFieldLocal;
+    FieldPath joinFieldLocal;
 
     /**
      * The foreign (inner) join field.
      */
-    std::string joinFieldForeign;
+    FieldPath joinFieldForeign;
 
     /**
      * The "as" field for the output field that will be added to local (outer) document.

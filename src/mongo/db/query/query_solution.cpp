@@ -1577,9 +1577,9 @@ void EqLookupNode::appendToString(str::stream* ss, int indent) const {
     addIndent(ss, indent + 1);
     *ss << "as = " << joinField.fullPath() << "\n";
     addIndent(ss, indent + 1);
-    *ss << "localField = " << joinFieldLocal << "\n";
+    *ss << "localField = " << joinFieldLocal.fullPath() << "\n";
     addIndent(ss, indent + 1);
-    *ss << "foreignField = " << joinFieldForeign << "\n";
+    *ss << "foreignField = " << joinFieldForeign.fullPath() << "\n";
     addCommon(ss, indent);
     addIndent(ss, indent + 1);
     *ss << "Child:" << '\n';
