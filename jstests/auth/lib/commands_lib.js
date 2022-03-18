@@ -5664,7 +5664,11 @@ var authCommandsLib = {
         {
           testname: "setUserWriteBlockMode",
           command: {setUserWriteBlockMode: 1, global: false},
-          skipTest: (conn) => !TestData.setParameters.featureFlagUserWriteBlocking,
+          skipTest: (conn) => {
+              const hello = assert.commandWorked(conn.getDB("admin").runCommand({hello: 1}));
+              const isStandalone = hello.msg !== "isdbgrid" && !hello.hasOwnProperty('setName');
+              return !TestData.setParameters.featureFlagUserWriteBlocking || isStandalone;
+	  },
           testcases: [
               {
                 runOnDb: adminDbName,

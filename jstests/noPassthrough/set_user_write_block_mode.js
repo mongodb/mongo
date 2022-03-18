@@ -102,9 +102,9 @@ function runTest(frontend) {
     });
 }
 
-// Test on standalone
+// Validate that setting user write blocking fails on standalones
 const conn = MongoRunner.runMongod({auth: "", bind_ip: "127.0.0.1"});
-runTest(conn);
+assert.throws(() => runTest(conn));
 MongoRunner.stopMongod(conn);
 
 const keyfile = "jstests/libs/key1";

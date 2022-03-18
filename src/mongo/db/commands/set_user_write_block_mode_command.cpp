@@ -35,6 +35,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/set_user_write_block_mode_gen.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/user_writes_recoverable_critical_section_service.h"
 #include "mongo/logv2/log.h"
 
@@ -65,6 +66,11 @@ public:
                     str::stream() << Request::kCommandName
                                   << " cannot be run on shardsvrs nor configsvrs",
                     serverGlobalParams.clusterRole == ClusterRole::None);
+
+            uassert(ErrorCodes::IllegalOperation,
+                    str::stream() << Request::kCommandName << " cannot be run on standalones",
+                    repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() !=
+                        repl::ReplicationCoordinator::modeNone);
 
             {
                 if (request().getGlobal()) {
