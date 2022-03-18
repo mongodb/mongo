@@ -29,8 +29,9 @@
 
 #pragma once
 
+#include <cstddef>
+
 #include "mongo/platform/basic.h"
-#include "mongo/util/ctype.h"
 
 namespace mongo::sbe {
 
