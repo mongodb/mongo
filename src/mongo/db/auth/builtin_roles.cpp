@@ -254,7 +254,8 @@ MONGO_INITIALIZER(AuthorizationBuiltinRoles)(InitializerContext* context) {
         << ActionType::setFeatureCompatibilityVersion
         << ActionType::setFreeMonitoring
         << ActionType::setChangeStreamOptions
-        << ActionType::getChangeStreamOptions;
+        << ActionType::getChangeStreamOptions
+        << ActionType::setClusterParameter;
 
     clusterManagerRoleDatabaseActions
         << ActionType::clearJumboFlag

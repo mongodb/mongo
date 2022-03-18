@@ -161,6 +161,7 @@ enums:
            serverStatus :  "serverStatus"
            setAuthenticationRestriction :  "setAuthenticationRestriction"
            setChangeStreamOptions: "setChangeStreamOptions"
+           setClusterParameter: "setClusterParameter"
            setDefaultRWConcern :  "setDefaultRWConcern"
            setFeatureCompatibilityVersion :  "setFeatureCompatibilityVersion"
            setFreeMonitoring :  "setFreeMonitoring"

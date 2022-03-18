@@ -446,6 +446,6 @@ commands:
                       cluster parameter."
         # TODO SERVER-63870: use replica set command parameters.
         namespace: type
-        type: object
+        type: object_owned
         api_version: ""
         strict: false

@@ -552,6 +552,7 @@ env.Library(
         "resize_oplog.cpp",
         "resize_oplog.idl",
         'rwc_defaults_commands.cpp',
+        'set_cluster_parameter_command.cpp',
         "set_feature_compatibility_version_command.cpp",
         "set_index_commit_quorum_command.cpp",
         "shutdown_d.cpp",

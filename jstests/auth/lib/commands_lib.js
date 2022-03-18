@@ -5589,6 +5589,18 @@ var authCommandsLib = {
           ]
         },
         {
+          testname: "setClusterParameter",
+          command: {setClusterParameter: {param: true}},
+          skipTest: (conn) => !TestData.setParameters.featureFlagClusterWideConfig,
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                roles: {clusterManager: 1, clusterAdmin: 1, root:1, __system:1},
+                privileges: [{resource: {cluster: true}, actions: ["setClusterParameter"]}]
+              }
+          ]
+        },
+        {
             testname: "setDefaultRWConcern",
             command: {
                 setDefaultRWConcern: 1,

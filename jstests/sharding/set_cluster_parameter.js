@@ -1,5 +1,5 @@
 /**
- * Checks that _configsvrSetClusterParameter command only run once
+ * Checks that setClusterParameter command only run once
  *
  * @tags: [
  *   # Requires all nodes to be running the latest binary.
@@ -18,10 +18,10 @@ const st = new ShardingTest({shards: 1});
 let fp =
     configureFailPoint(st.configRS.getPrimary(), 'hangBeforeRunningConfigsvrCoordinatorInstance');
 
-let setClusterParameterSuccessThread = new Thread((mongodConnString) => {
-    let mongod = new Mongo(mongodConnString);
-    assert.commandWorked(mongod.adminCommand({_configsvrSetClusterParameter: {param: true}}));
-}, st.configRS.getPrimary().host);
+let setClusterParameterSuccessThread = new Thread((mongosConnString) => {
+    let mongos = new Mongo(mongosConnString);
+    assert.commandWorked(mongos.adminCommand({setClusterParameter: {param: true}}));
+}, st.s.host);
 
 setClusterParameterSuccessThread.start();
 fp.wait();
@@ -29,10 +29,10 @@ fp.wait();
 jsTestLog(
     'Check that 2 requests for the same cluster parameter and same value generates only one coordinator.');
 
-let setClusterParameterJoinSuccessThread = new Thread((mongodConnString) => {
-    let mongod = new Mongo(mongodConnString);
-    assert.commandWorked(mongod.adminCommand({_configsvrSetClusterParameter: {param: true}}));
-}, st.configRS.getPrimary().host);
+let setClusterParameterJoinSuccessThread = new Thread((mongosConnString) => {
+    let mongos = new Mongo(mongosConnString);
+    assert.commandWorked(mongos.adminCommand({setClusterParameter: {param: true}}));
+}, st.s.host);
 
 setClusterParameterJoinSuccessThread.start();
 
@@ -49,9 +49,8 @@ assert.eq(true, currOp[0].command.param);
 
 jsTestLog('Check that a second request will fail with ConflictingOperationInProgress.');
 
-assert.commandFailedWithCode(
-    st.configRS.getPrimary().adminCommand({_configsvrSetClusterParameter: {otherParam: true}}),
-    ErrorCodes.ConflictingOperationInProgress);
+assert.commandFailedWithCode(st.s.adminCommand({setClusterParameter: {otherParam: true}}),
+                             ErrorCodes.ConflictingOperationInProgress);
 
 fp.off();
 setClusterParameterSuccessThread.join();
