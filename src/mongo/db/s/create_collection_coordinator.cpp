@@ -772,14 +772,14 @@ void CreateCollectionCoordinator::_createCollectionAndIndexes(OperationContext* 
     shardkeyutil::validateShardKeyIsNotEncrypted(opCtx, nss(), *_shardKeyPattern);
 
     auto indexCreated = false;
-    if (_doc.getImplicitlyCreateIndex()) {
+    if (_doc.getImplicitlyCreateIndex().value_or(true)) {
         indexCreated = shardkeyutil::validateShardKeyIndexExistsOrCreateIfPossible(
             opCtx,
             nss(),
             *_shardKeyPattern,
             _collationBSON,
             _doc.getUnique().value_or(false),
-            _doc.getEnforceUniquenessCheck(),
+            _doc.getEnforceUniquenessCheck().value_or(true),
             shardkeyutil::ValidationBehaviorsShardCollection(opCtx));
     } else {
         uassert(6373200,
@@ -789,7 +789,7 @@ void CreateCollectionCoordinator::_createCollectionAndIndexes(OperationContext* 
                                          *_shardKeyPattern,
                                          _collationBSON,
                                          _doc.getUnique().value_or(false) &&
-                                             _doc.getEnforceUniquenessCheck(),
+                                             _doc.getEnforceUniquenessCheck().value_or(true),
                                          shardkeyutil::ValidationBehaviorsShardCollection(opCtx)));
     }
 
