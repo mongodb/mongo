@@ -635,14 +635,23 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
 
         auto operation = MutableOplogEntry::makeUpdateOperation(
             args.nss, args.uuid, args.updateArgs->update, args.updateArgs->criteria);
+
         if (inRetryableInternalTransaction) {
+            uassert(6462400,
+                    str::stream() << "Found a retryable internal transaction on a sharded cluster "
+                                  << "executing an update against the collection '" << args.nss
+                                  << "' with the 'recordPreImages' option enabled",
+                    !args.updateArgs->preImageRecordingEnabledForCollection ||
+                        serverGlobalParams.clusterRole == ClusterRole::None);
+
             operation.setInitializedStatementIds(args.updateArgs->stmtIds);
             if (args.updateArgs->storeDocOption == CollectionUpdateArgs::StoreDocOption::PreImage) {
                 invariant(args.updateArgs->preImageDoc);
                 operation.setPreImage(args.updateArgs->preImageDoc->getOwned());
                 operation.setPreImageRecordedForRetryableInternalTransaction();
                 if (args.retryableFindAndModifyLocation ==
-                    RetryableFindAndModifyLocation::kSideCollection) {
+                        RetryableFindAndModifyLocation::kSideCollection &&
+                    !args.updateArgs->preImageRecordingEnabledForCollection) {
                     operation.setNeedsRetryImage(repl::RetryImageEnum::kPreImage);
                 }
             }
@@ -655,7 +664,9 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
                     operation.setNeedsRetryImage(repl::RetryImageEnum::kPostImage);
                 }
             }
-        } else if (args.updateArgs->preImageRecordingEnabledForCollection) {
+        }
+
+        if (args.updateArgs->preImageRecordingEnabledForCollection) {
             invariant(args.updateArgs->preImageDoc);
             tassert(
                 5869402,
@@ -827,7 +838,15 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
 
         auto operation =
             MutableOplogEntry::makeDeleteOperation(nss, uuid, documentKey.getShardKeyAndId());
+
         if (inRetryableInternalTransaction) {
+            uassert(6462401,
+                    str::stream() << "Found a retryable internal transaction on a sharded cluster "
+                                  << "executing an delete against the collection '" << nss
+                                  << "' with the 'recordPreImages' option enabled",
+                    !args.preImageRecordingEnabledForCollection ||
+                        serverGlobalParams.clusterRole == ClusterRole::None);
+
             operation.setInitializedStatementIds({stmtId});
             if (args.retryableFindAndModifyLocation != RetryableFindAndModifyLocation::kNone) {
                 tassert(6054000,
@@ -836,7 +855,8 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
                 operation.setPreImage(args.deletedDoc->getOwned());
                 operation.setPreImageRecordedForRetryableInternalTransaction();
                 if (args.retryableFindAndModifyLocation ==
-                    RetryableFindAndModifyLocation::kSideCollection) {
+                        RetryableFindAndModifyLocation::kSideCollection &&
+                    !args.preImageRecordingEnabledForCollection) {
                     operation.setNeedsRetryImage(repl::RetryImageEnum::kPreImage);
                 }
             }
