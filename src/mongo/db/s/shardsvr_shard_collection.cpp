@@ -327,7 +327,7 @@ ShardCollectionTargetState calculateTargetState(OperationContext* opCtx,
     auto proposedKey(request.getKey().getOwned());
     ShardKeyPattern shardKeyPattern(proposedKey);
 
-    if (request.getImplicitlyCreateIndex()) {
+    if (request.getImplicitlyCreateIndex().value_or(true)) {
         shardkeyutil::validateShardKeyIndexExistsOrCreateIfPossible(
             opCtx,
             nss,
@@ -335,7 +335,7 @@ ShardCollectionTargetState calculateTargetState(OperationContext* opCtx,
             shardKeyPattern,
             request.getCollation(),
             request.getUnique(),
-            request.getEnforceUniquenessCheck(),
+            request.getEnforceUniquenessCheck().value_or(true),
             shardkeyutil::ValidationBehaviorsShardCollection(opCtx));
     } else {
         uassert(6373200,
@@ -346,7 +346,7 @@ ShardCollectionTargetState calculateTargetState(OperationContext* opCtx,
                     proposedKey,
                     shardKeyPattern,
                     request.getCollation(),
-                    request.getUnique() && request.getEnforceUniquenessCheck(),
+                    request.getUnique() && request.getEnforceUniquenessCheck().value_or(true),
                     shardkeyutil::ValidationBehaviorsShardCollection(opCtx)));
     }
 

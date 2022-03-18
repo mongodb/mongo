@@ -66,6 +66,13 @@ public:
     }
 
     /**
+     * Returns the stored value or the given defaultValue if nothing is stored.
+     */
+    bool value_or(bool defaultValue) const {
+        return _value.value_or(defaultValue);
+    }
+
+    /**
      * Returns true if the value has been populated, false otherwise.
      */
     bool has_value() const {
