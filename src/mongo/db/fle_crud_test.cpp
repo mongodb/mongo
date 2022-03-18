@@ -93,9 +93,10 @@ public:
                                const EncryptionInformation& ei,
                                const write_ops::DeleteCommandRequest& deleteRequest) final;
 
-    BSONObj updateWithPreimage(const NamespaceString& nss,
-                               const EncryptionInformation& ei,
-                               const write_ops::UpdateCommandRequest& updateRequest) final;
+    std::pair<write_ops::UpdateCommandReply, BSONObj> updateWithPreimage(
+        const NamespaceString& nss,
+        const EncryptionInformation& ei,
+        const write_ops::UpdateCommandRequest& updateRequest) final;
 
     write_ops::FindAndModifyCommandReply findAndModify(
         const NamespaceString& nss,
@@ -154,9 +155,10 @@ BSONObj FLEQueryTestImpl::deleteWithPreimage(const NamespaceString& nss,
     return uassertStatusOK(swDoc);
 }
 
-BSONObj FLEQueryTestImpl::updateWithPreimage(const NamespaceString& nss,
-                                             const EncryptionInformation& ei,
-                                             const write_ops::UpdateCommandRequest& updateRequest) {
+std::pair<write_ops::UpdateCommandReply, BSONObj> FLEQueryTestImpl::updateWithPreimage(
+    const NamespaceString& nss,
+    const EncryptionInformation& ei,
+    const write_ops::UpdateCommandRequest& updateRequest) {
     // A limit of the API, we can delete by _id and get the pre-image so we limit our unittests to
     // this
     ASSERT_EQ(updateRequest.getUpdates().size(), 1);
@@ -165,12 +167,20 @@ BSONObj FLEQueryTestImpl::updateWithPreimage(const NamespaceString& nss,
 
     BSONObj preimage = getById(nss, updateOpEntry.getQ().firstElement());
 
-    uassertStatusOK(_storage->upsertById(_opCtx,
-                                         nss,
-                                         updateOpEntry.getQ().firstElement(),
-                                         updateOpEntry.getU().getUpdateModifier()));
+    if (updateOpEntry.getU().type() == write_ops::UpdateModification::Type::kModifier) {
+        uassertStatusOK(_storage->upsertById(_opCtx,
+                                             nss,
+                                             updateOpEntry.getQ().firstElement(),
+                                             updateOpEntry.getU().getUpdateModifier()));
+    } else {
+        uassertStatusOK(_storage->upsertById(_opCtx,
+                                             nss,
+                                             updateOpEntry.getQ().firstElement(),
+                                             updateOpEntry.getU().getUpdateReplacement()));
+    }
 
-    return preimage;
+
+    return {write_ops::UpdateCommandReply(), preimage};
 }
 
 write_ops::FindAndModifyCommandReply FLEQueryTestImpl::findAndModify(
@@ -286,6 +296,7 @@ protected:
     void doSingleUpdate(int id, BSONElement element);
     void doSingleUpdate(int id, BSONObj obj);
     void doSingleUpdateWithUpdateDoc(int id, BSONObj update);
+    void doSingleUpdateWithUpdateDoc(int id, const write_ops::UpdateModification& modification);
 
     void doFindAndModify(write_ops::FindAndModifyCommandRequest& request);
 
@@ -610,6 +621,14 @@ void FleCrudTest::doSingleUpdate(int id, BSONElement element) {
 }
 
 void FleCrudTest::doSingleUpdateWithUpdateDoc(int id, BSONObj update) {
+    doSingleUpdateWithUpdateDoc(
+        id,
+        write_ops::UpdateModification(update, write_ops::UpdateModification::ClassicTag{}, false));
+}
+
+void FleCrudTest::doSingleUpdateWithUpdateDoc(int id,
+                                              const write_ops::UpdateModification& modification) {
+
     auto efc = getTestEncryptedFieldConfig();
     auto doc = EncryptionInformationHelpers::encryptionInformationSerializeForDelete(
         _edcNs, efc, &_keyVault);
@@ -617,8 +636,7 @@ void FleCrudTest::doSingleUpdateWithUpdateDoc(int id, BSONObj update) {
 
     write_ops::UpdateOpEntry entry;
     entry.setQ(BSON("_id" << id));
-    entry.setU(
-        write_ops::UpdateModification(update, write_ops::UpdateModification::ClassicTag{}, false));
+    entry.setU(modification);
 
     write_ops::UpdateCommandRequest updateRequest(_edcNs);
     updateRequest.setUpdates({entry});
@@ -948,6 +966,42 @@ TEST_F(FleCrudTest, UpdateOneSameValue) {
                                 << "sample"
                                 << "encrypted"
                                 << "secret"));
+}
+
+
+// Update one document with replacement
+TEST_F(FleCrudTest, UpdateOneReplace) {
+
+    doSingleInsert(1,
+                   BSON("encrypted"
+                        << "secret"));
+
+    assertDocumentCounts(1, 1, 0, 1);
+
+    auto replace = BSON("encrypted"
+                        << "top secret");
+
+    auto buf = generateSinglePlaceholder(replace.firstElement());
+
+    auto replaceEP = BSON("plainText"
+                          << "fake"
+                          << "encrypted"
+                          << BSONBinData(buf.data(), buf.size(), BinDataType::Encrypt));
+
+    auto result = FLEClientCrypto::generateInsertOrUpdateFromPlaceholders(replaceEP, &_keyVault);
+
+    doSingleUpdateWithUpdateDoc(
+        1,
+        write_ops::UpdateModification(result, write_ops::UpdateModification::ClassicTag{}, true));
+
+
+    assertDocumentCounts(1, 2, 1, 3);
+
+    validateDocument(1,
+                     BSON("_id" << 1 << "plainText"
+                                << "fake"
+                                << "encrypted"
+                                << "top secret"));
 }
 
 // Rename safeContent

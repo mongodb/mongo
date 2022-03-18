@@ -142,9 +142,10 @@ public:
      * Returns the pre-image of the updated document. If no documents were updated, returns an empty
      * BSON object.
      */
-    virtual BSONObj updateWithPreimage(const NamespaceString& nss,
-                                       const EncryptionInformation& ei,
-                                       const write_ops::UpdateCommandRequest& updateRequest) = 0;
+    virtual std::pair<write_ops::UpdateCommandReply, BSONObj> updateWithPreimage(
+        const NamespaceString& nss,
+        const EncryptionInformation& ei,
+        const write_ops::UpdateCommandRequest& updateRequest) = 0;
 
     /**
      * Do a single findAndModify request.
@@ -182,8 +183,8 @@ uint64_t processDelete(FLEQueryInterface* queryImpl,
  *
  * Used by unit tests.
  */
-uint64_t processUpdate(FLEQueryInterface* queryImpl,
-                       const write_ops::UpdateCommandRequest& updateRequest);
+write_ops::UpdateCommandReply processUpdate(FLEQueryInterface* queryImpl,
+                                            const write_ops::UpdateCommandRequest& updateRequest);
 
 /**
  * Callback function to get a TransactionWithRetries with the appropiate Executor
