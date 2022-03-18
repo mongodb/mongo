@@ -104,6 +104,13 @@ FLEBatchResult processFLEFindAndModify(OperationContext* opCtx,
                                        BSONObjBuilder& result);
 
 /**
+ * Process a findAndModify request from a replica set.
+ */
+write_ops::FindAndModifyCommandReply processFLEFindAndModify(
+    OperationContext* opCtx, const write_ops::FindAndModifyCommandRequest& findAndModifyRequest);
+
+
+/**
  * Abstraction layer for FLE
  */
 class FLEQueryInterface {
@@ -278,4 +285,10 @@ std::pair<FLEBatchResult, write_ops::InsertCommandReply> processInsert(
 write_ops::DeleteCommandReply processDelete(OperationContext* opCtx,
                                             const write_ops::DeleteCommandRequest& deleteRequest,
                                             GetTxnCallback getTxns);
+
+StatusWith<write_ops::FindAndModifyCommandReply> processFindAndModifyRequest(
+    OperationContext* opCtx,
+    const write_ops::FindAndModifyCommandRequest& findAndModifyRequest,
+    GetTxnCallback getTxns);
+
 }  // namespace mongo

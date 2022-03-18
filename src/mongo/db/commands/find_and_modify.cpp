@@ -46,6 +46,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/update_stage.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/fle_crud.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -611,6 +612,11 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
     const auto& req = request();
 
     validate(req);
+
+    if (req.getEncryptionInformation().has_value() &&
+        !req.getEncryptionInformation()->getCrudProcessed().get_value_or(false)) {
+        return processFLEFindAndModify(opCtx, req);
+    }
 
     const NamespaceString& nsString = req.getNamespace();
     uassertStatusOK(userAllowedWriteNS(opCtx, nsString));

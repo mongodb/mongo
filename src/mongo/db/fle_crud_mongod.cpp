@@ -205,4 +205,18 @@ write_ops::DeleteCommandReply processFLEDelete(
     return deleteReply;
 }
 
+write_ops::FindAndModifyCommandReply processFLEFindAndModify(
+    OperationContext* opCtx, const write_ops::FindAndModifyCommandRequest& findAndModifyRequest) {
+
+    uassert(6371800,
+            "Encrypted index operations are only supported on replica sets",
+            repl::ReplicationCoordinator::get(opCtx->getServiceContext())->getReplicationMode() ==
+                repl::ReplicationCoordinator::modeReplSet);
+
+    auto reply = processFindAndModifyRequest(
+        opCtx, findAndModifyRequest, &getTransactionWithRetriesForMongoD);
+
+    return uassertStatusOK(reply);
+}
+
 }  // namespace mongo

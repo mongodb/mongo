@@ -320,7 +320,7 @@ write_ops::DeleteCommandReply processDelete(OperationContext* opCtx,
 StatusWith<write_ops::UpdateCommandReply> processUpdate(
     OperationContext* opCtx,
     const write_ops::UpdateCommandRequest& updateRequest,
-    std::function<std::shared_ptr<txn_api::TransactionWithRetries>(OperationContext*)> getTxns) {
+    GetTxnCallback getTxns) {
 
     auto updates = updateRequest.getUpdates();
     uassert(6371502, "Only single document updates are permitted", updates.size() == 1);
@@ -529,10 +529,12 @@ void processRemovedFields(FLEQueryInterface* queryImpl,
     }
 }
 
+}  // namespace
+
 StatusWith<write_ops::FindAndModifyCommandReply> processFindAndModifyRequest(
     OperationContext* opCtx,
     const write_ops::FindAndModifyCommandRequest& findAndModifyRequest,
-    std::function<std::shared_ptr<txn_api::TransactionWithRetries>(OperationContext*)> getTxns) {
+    GetTxnCallback getTxns) {
 
     // Is this a delete
     bool isDelete = findAndModifyRequest.getRemove().value_or(false);
@@ -587,8 +589,6 @@ StatusWith<write_ops::FindAndModifyCommandReply> processFindAndModifyRequest(
 
     return reply;
 }
-
-}  // namespace
 
 FLEQueryInterface::~FLEQueryInterface() {}
 
