@@ -257,7 +257,7 @@ SingleWriteResult parseOplogEntryForUpdate(const repl::OplogEntry& entry) {
         res.setN(1);
         res.setNModified(1);
     } else if (entry.getOpType() == repl::OpTypeEnum::kNoop) {
-        if (entry.getObject().woCompare(kWouldChangeOwningShardSentinel) == 0) {
+        if (isWouldChangeOwningShardSentinelOplogEntry(entry)) {
             uasserted(ErrorCodes::IncompleteTransactionHistory,
                       kWouldChangeOwningShardRetryContext);
         }
@@ -281,7 +281,7 @@ write_ops::FindAndModifyCommandReply parseOplogEntryForFindAndModify(
 
     // Migrated op and WouldChangeOwningShard sentinel case.
     if (oplogEntry.getOpType() == repl::OpTypeEnum::kNoop) {
-        if (oplogEntry.getObject().woCompare(kWouldChangeOwningShardSentinel) == 0) {
+        if (isWouldChangeOwningShardSentinelOplogEntry(oplogEntry)) {
             uasserted(ErrorCodes::IncompleteTransactionHistory,
                       kWouldChangeOwningShardRetryContext);
         }

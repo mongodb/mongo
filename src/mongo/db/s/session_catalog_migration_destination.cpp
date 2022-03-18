@@ -40,6 +40,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/logical_session_id.h"
+#include "mongo/db/ops/write_ops_retryability.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/s/migration_session_id.h"
@@ -216,6 +217,10 @@ ProcessOplogResult processSessionOplog(const BSONObj& oplogBSON,
         //     and o2 will be empty.
         // (3) Oplog entries that are a dead sentinel, which the donor sent over as the replacement
         //     for a prepare oplog entry or unprepared transaction commit oplog entry.
+        // (4) Oplog entries that are a WouldChangeOwningShard sentinel entry, used for making
+        //     retries of a WouldChangeOwningShard update or findAndModify fail with
+        //     IncompleteTransactionHistory. In this case, the o field is non-empty and the o2
+        //     field is an empty BSONObj.
 
         BSONObj object2;
         if (oplogEntry.getObject2()) {
@@ -224,7 +229,7 @@ ProcessOplogResult processSessionOplog(const BSONObj& oplogBSON,
             oplogEntry.setObject2(object2);
         }
 
-        if (object2.isEmpty()) {
+        if (object2.isEmpty() && !isWouldChangeOwningShardSentinelOplogEntry(oplogEntry)) {
             result.isPrePostImage = true;
 
             uassert(40632,

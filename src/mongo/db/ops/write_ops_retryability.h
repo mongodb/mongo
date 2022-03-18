@@ -40,6 +40,12 @@ class OperationContext;
 
 const BSONObj kWouldChangeOwningShardSentinel(BSON("$wouldChangeOwningShard" << 1));
 
+template <typename OplogEntryType>
+bool isWouldChangeOwningShardSentinelOplogEntry(const OplogEntryType& oplogEntry) {
+    return (oplogEntry.getOpType() == repl::OpTypeEnum::kNoop) &&
+        (oplogEntry.getObject().woCompare(kWouldChangeOwningShardSentinel) == 0);
+}
+
 /**
  * Returns the single write result corresponding to the given oplog entry for document update. I.e.,
  * the single write result that would have been returned by the statement that would have resulted

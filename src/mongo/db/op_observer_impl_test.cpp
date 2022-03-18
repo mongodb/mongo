@@ -1938,6 +1938,14 @@ protected:
             if (updateOplogEntry.getTxnNumber()) {
                 ASSERT_EQ(*updateOplogEntry.getTxnNumber(), *preImage.getTxnNumber());
             }
+            if (!updateOplogEntry.getStatementIds().empty()) {
+                const auto& updateOplogStmtIds = updateOplogEntry.getStatementIds();
+                const auto& preImageOplogStmtIds = preImage.getStatementIds();
+                ASSERT_EQ(updateOplogStmtIds.size(), preImageOplogStmtIds.size());
+                for (size_t i = 0; i < updateOplogStmtIds.size(); i++) {
+                    ASSERT_EQ(updateOplogStmtIds[i], preImageOplogStmtIds[i]);
+                }
+            }
         } else {
             ASSERT_FALSE(updateOplogEntry.getPreImageOpTime());
         }
@@ -1966,6 +1974,14 @@ protected:
             }
             if (updateOplogEntry.getTxnNumber()) {
                 ASSERT_EQ(*updateOplogEntry.getTxnNumber(), *postImage.getTxnNumber());
+            }
+            if (!updateOplogEntry.getStatementIds().empty()) {
+                const auto& updateOplogStmtIds = updateOplogEntry.getStatementIds();
+                const auto& postImageOplogStmtIds = postImage.getStatementIds();
+                ASSERT_EQ(updateOplogStmtIds.size(), postImageOplogStmtIds.size());
+                for (size_t i = 0; i < updateOplogStmtIds.size(); i++) {
+                    ASSERT_EQ(updateOplogStmtIds[i], postImageOplogStmtIds[i]);
+                }
             }
         } else {
             ASSERT_FALSE(updateOplogEntry.getPostImageOpTime());
@@ -2383,6 +2399,14 @@ protected:
             }
             if (deleteOplogEntry.getTxnNumber()) {
                 ASSERT_EQ(*deleteOplogEntry.getTxnNumber(), *preImage.getTxnNumber());
+            }
+            if (!deleteOplogEntry.getStatementIds().empty()) {
+                const auto& deleteOplogStmtIds = deleteOplogEntry.getStatementIds();
+                const auto& preImageOplogStmtIds = preImage.getStatementIds();
+                ASSERT_EQ(deleteOplogStmtIds.size(), preImageOplogStmtIds.size());
+                for (size_t i = 0; i < deleteOplogStmtIds.size(); i++) {
+                    ASSERT_EQ(deleteOplogStmtIds[i], preImageOplogStmtIds[i]);
+                }
             }
         } else {
             ASSERT_FALSE(deleteOplogEntry.getPreImageOpTime());

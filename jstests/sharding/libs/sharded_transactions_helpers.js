@@ -192,11 +192,20 @@ function flushRoutersAndRefreshShardMetadata(st, {ns, dbNames = []} = {}) {
     });
 }
 
-function getOplogEntriesForTxnOnNode(node, lsid, txnNumber) {
-    const filter = {txnNumber: NumberLong(txnNumber)};
-    for (let k in lsid) {
-        filter["lsid." + k] = lsid[k];
+function makeLsidFilter(lsid, fieldName) {
+    const filter = {};
+    for (let k of ["id", "txnUUID", "txnNumber"]) {
+        if (k in lsid) {
+            filter[fieldName + "." + k] = lsid[k];
+        } else {
+            filter[fieldName + "." + k] = {"$exists": false};
+        }
     }
+    return filter;
+}
+
+function getOplogEntriesForTxnOnNode(node, lsid, txnNumber) {
+    const filter = Object.assign(makeLsidFilter(lsid, "lsid"), {txnNumber: NumberLong(txnNumber)});
     return node.getCollection("local.oplog.rs").find(filter).sort({_id: 1}).toArray();
 }
 
@@ -207,16 +216,13 @@ function getOplogEntriesForTxn(rs, lsid, txnNumber) {
 function getTxnEntriesForSession(rs, lsid) {
     return rs.getPrimary()
         .getCollection("config.transactions")
-        .find({"_id.id": lsid.id})
+        .find(makeLsidFilter(lsid, "_id"))
         .sort({_id: 1})
         .toArray();
 }
 
 function getImageEntriesForTxnOnNode(node, lsid, txnNumber) {
-    const filter = {txnNum: NumberLong(txnNumber)};
-    for (let k in lsid) {
-        filter["_id." + k] = lsid[k];
-    }
+    const filter = Object.assign(makeLsidFilter(lsid, "_id"), {txnNum: NumberLong(txnNumber)});
     return node.getCollection("config.image_collection").find(filter).sort({_id: 1}).toArray();
 }
 

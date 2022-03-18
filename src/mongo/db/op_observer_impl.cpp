@@ -1508,7 +1508,6 @@ int logOplogEntriesForTransaction(
 
     const auto txnParticipant = TransactionParticipant::get(opCtx);
     OpTimeBundle prevWriteOpTime;
-    auto numEntriesWritten = 0;
 
     // Writes to the oplog only require a Global intent lock. Guaranteed by
     // OplogSlotReserver.
@@ -1528,6 +1527,7 @@ int logOplogEntriesForTransaction(
         MutableOplogEntry imageEntry;
         imageEntry.setSessionId(*opCtx->getLogicalSessionId());
         imageEntry.setTxnNumber(*opCtx->getTxnNumber());
+        imageEntry.setStatementIds(statement.getStatementIds());
         imageEntry.setOpType(repl::OpTypeEnum::kNoop);
         imageEntry.setObject(imageDoc);
         imageEntry.setNss(statement.getNss());
@@ -1674,10 +1674,9 @@ int logOplogEntriesForTransaction(
 
         // Advance the iterator to the beginning of the remaining unpacked statements.
         stmtsIter = nextStmt;
-        numEntriesWritten++;
     }
 
-    return numEntriesWritten;
+    return currOplogSlot - oplogSlots.begin();
 }
 
 void logCommitOrAbortForPreparedTransaction(OperationContext* opCtx,
