@@ -929,8 +929,8 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx) {
     }
 
     _doc = _updateSession(opCtx, _doc);
-    _writeOplogMessage(opCtx, nss(), *_collectionUUID, _doc.getCreateCollectionRequest().toBSON());
     updateCatalogEntry(opCtx, nss(), coll, getCurrentSession(_doc));
+    _writeOplogMessage(opCtx, nss(), *_collectionUUID, _doc.getCreateCollectionRequest().toBSON());
 }
 
 void CreateCollectionCoordinator::_finalize(OperationContext* opCtx) {
