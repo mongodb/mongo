@@ -107,6 +107,7 @@ public:
     void visit(InternalSchemaAllElemMatchFromIndexMatchExpression* expr) final {}
     void visit(InternalSchemaAllowedPropertiesMatchExpression* expr) final {}
     void visit(InternalSchemaBinDataEncryptedTypeExpression* expr) final {}
+    void visit(InternalSchemaBinDataFLE2EncryptedTypeExpression* expr) final {}
     void visit(InternalSchemaBinDataSubTypeExpression* expr) final {}
     void visit(InternalSchemaCondMatchExpression* expr) final {}
     void visit(InternalSchemaEqMatchExpression* expr) final {}

@@ -260,6 +260,9 @@ const char* encodeMatchType(MatchExpression::MatchType mt) {
         case MatchExpression::INTERNAL_SCHEMA_BIN_DATA_ENCRYPTED_TYPE:
             return "internalSchemaBinDataEncryptedType";
 
+        case MatchExpression::INTERNAL_SCHEMA_BIN_DATA_FLE2_ENCRYPTED_TYPE:
+            return "internalSchemaBinDataFLE2EncryptedType";
+
         case MatchExpression::INTERNAL_SCHEMA_BIN_DATA_SUBTYPE:
             return "internalSchemaBinDataSubType";
 
@@ -822,6 +825,9 @@ public:
     }
     void visit(const InternalSchemaBinDataEncryptedTypeExpression* expr) final {
         MONGO_UNREACHABLE_TASSERT(6142116);
+    }
+    void visit(const InternalSchemaBinDataFLE2EncryptedTypeExpression* expr) final {
+        MONGO_UNREACHABLE_TASSERT(6364303);
     }
     void visit(const InternalSchemaBinDataSubTypeExpression* expr) final {
         MONGO_UNREACHABLE_TASSERT(6142117);

@@ -179,6 +179,10 @@ public:
         unsupportedExpression(expr);
     }
 
+    void visit(const InternalSchemaBinDataFLE2EncryptedTypeExpression* expr) override {
+        unsupportedExpression(expr);
+    }
+
     void visit(const InternalSchemaBinDataSubTypeExpression* expr) override {
         unsupportedExpression(expr);
     }

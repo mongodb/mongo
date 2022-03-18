@@ -56,8 +56,10 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/matcher/doc_validation_error.h"
+#include "mongo/db/matcher/doc_validation_util.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/matcher/implicit_validator.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/update_request.h"
@@ -664,8 +666,12 @@ Collection::Validator CollectionImpl::parseValidator(
         return {validator, nullptr, nullptr};
     }
 
-    if (validator.isEmpty())
+    bool doImplicitValidation = (_metadata->options.encryptedFieldConfig != boost::none) &&
+        !_metadata->options.encryptedFieldConfig->getFields().empty();
+
+    if (validator.isEmpty() && !doImplicitValidation) {
         return {validator, nullptr, nullptr};
+    }
 
     Status canUseValidatorInThisContext = checkValidatorCanBeUsedOnNs(validator, ns(), _uuid);
     if (!canUseValidatorInThisContext.isOK()) {
@@ -688,26 +694,61 @@ Collection::Validator CollectionImpl::parseValidator(
 
     // If the validation action is "warn" or the level is "moderate", then disallow any encryption
     // keywords. This is to prevent any plaintext data from showing up in the logs.
+    // Also disallow if the collection has FLE2 encrypted fields.
     if (validationActionOrDefault(_metadata->options.validationAction) ==
             ValidationActionEnum::warn ||
         validationLevelOrDefault(_metadata->options.validationLevel) ==
-            ValidationLevelEnum::moderate)
+            ValidationLevelEnum::moderate ||
+        doImplicitValidation)
         allowedFeatures &= ~MatchExpressionParser::AllowedFeatures::kEncryptKeywords;
 
-    expCtx->startExpressionCounters();
-    auto statusWithMatcher =
-        MatchExpressionParser::parse(validator, expCtx, ExtensionsCallbackNoop(), allowedFeatures);
-    expCtx->stopExpressionCounters();
+    std::unique_ptr<MatchExpression> implicitMatchExpr;
+    std::unique_ptr<MatchExpression> explicitMatchExpr;
+    std::unique_ptr<MatchExpression> combinedMatchExpr;
 
-    if (!statusWithMatcher.isOK()) {
-        return {
-            validator,
-            boost::intrusive_ptr<ExpressionContext>(nullptr),
-            statusWithMatcher.getStatus().withContext("Parsing of collection validator failed")};
+    if (doImplicitValidation) {
+        auto statusWithMatcher = generateMatchExpressionFromEncryptedFields(
+            expCtx, _metadata->options.encryptedFieldConfig->getFields());
+        if (!statusWithMatcher.isOK()) {
+            return {validator,
+                    nullptr,
+                    statusWithMatcher.getStatus().withContext(
+                        "Failed to generate implicit validator for encrypted fields")};
+        }
+        implicitMatchExpr = std::move(statusWithMatcher.getValue());
     }
 
-    return Collection::Validator{
-        validator, std::move(expCtx), std::move(statusWithMatcher.getValue())};
+    if (!validator.isEmpty()) {
+        expCtx->startExpressionCounters();
+        auto statusWithMatcher = MatchExpressionParser::parse(
+            validator, expCtx, ExtensionsCallbackNoop(), allowedFeatures);
+        expCtx->stopExpressionCounters();
+
+        if (!statusWithMatcher.isOK()) {
+            return {validator,
+                    boost::intrusive_ptr<ExpressionContext>(nullptr),
+                    statusWithMatcher.getStatus().withContext(
+                        "Parsing of collection validator failed")};
+        }
+        explicitMatchExpr = std::move(statusWithMatcher.getValue());
+    }
+
+    if (implicitMatchExpr && explicitMatchExpr) {
+        combinedMatchExpr = std::make_unique<AndMatchExpression>(
+            makeVector(std::move(explicitMatchExpr), std::move(implicitMatchExpr)),
+            doc_validation_error::createAnnotation(expCtx, "$and", BSONObj()));
+    } else if (implicitMatchExpr) {
+        combinedMatchExpr = std::move(implicitMatchExpr);
+    } else {
+        combinedMatchExpr = std::move(explicitMatchExpr);
+    }
+
+    LOGV2_DEBUG(6364301,
+                5,
+                "Combined match expression",
+                "expression"_attr = combinedMatchExpr->serialize());
+
+    return Collection::Validator{validator, std::move(expCtx), std::move(combinedMatchExpr)};
 }
 
 Status CollectionImpl::insertDocumentsForOplog(OperationContext* opCtx,

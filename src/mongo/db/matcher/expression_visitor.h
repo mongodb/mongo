@@ -58,6 +58,7 @@ class InternalExprLTEMatchExpression;
 class InternalSchemaAllElemMatchFromIndexMatchExpression;
 class InternalSchemaAllowedPropertiesMatchExpression;
 class InternalSchemaBinDataEncryptedTypeExpression;
+class InternalSchemaBinDataFLE2EncryptedTypeExpression;
 class InternalSchemaBinDataSubTypeExpression;
 class InternalSchemaCondMatchExpression;
 class InternalSchemaEqMatchExpression;
@@ -136,6 +137,9 @@ public:
             expr) = 0;
     virtual void visit(
         tree_walker::MaybeConstPtr<IsConst, InternalSchemaBinDataEncryptedTypeExpression> expr) = 0;
+    virtual void visit(
+        tree_walker::MaybeConstPtr<IsConst, InternalSchemaBinDataFLE2EncryptedTypeExpression>
+            expr) = 0;
     virtual void visit(
         tree_walker::MaybeConstPtr<IsConst, InternalSchemaBinDataSubTypeExpression> expr) = 0;
     virtual void visit(

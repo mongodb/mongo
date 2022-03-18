@@ -206,6 +206,7 @@ public:
     void visit(const InternalSchemaAllElemMatchFromIndexMatchExpression* expr) final {}
     void visit(const InternalSchemaAllowedPropertiesMatchExpression* expr) final {}
     void visit(const InternalSchemaBinDataEncryptedTypeExpression* expr) final {}
+    void visit(const InternalSchemaBinDataFLE2EncryptedTypeExpression* expr) final {}
     void visit(const InternalSchemaBinDataSubTypeExpression* expr) final {}
     void visit(const InternalSchemaCondMatchExpression* expr) final {}
     void visit(const InternalSchemaEqMatchExpression* expr) final {}

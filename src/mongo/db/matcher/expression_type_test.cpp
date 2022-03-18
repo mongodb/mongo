@@ -321,5 +321,99 @@ TEST(InternalSchemaBinDataEncryptedTypeTest, DoesNotTraverseLeafArrays) {
     ASSERT_FALSE(expr.matchesBSON(BSON("a" << BSONArray())));
 }
 
+/* TODO: SERVER-64113
+TEST(InternalSchemaBinDataEncryptedTypeTest, DoesNotMatchShortBinData) {
+    MatcherTypeSet typeSet;
+    typeSet.bsonTypes.insert(BSONType::String);
+    typeSet.bsonTypes.insert(BSONType::Date);
+    InternalSchemaBinDataEncryptedTypeExpression expr("a", std::move(typeSet));
+
+    FleBlobHeader blob;
+    blob.fleBlobSubtype = FleBlobSubtype::Deterministic;
+    memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
+    blob.originalBsonType = BSONType::String;
+    auto binData = BSONBinData(
+        reinterpret_cast<const void*>(&blob), sizeof(FleBlobHeader) - sizeof(blob.originalBsonType),
+BinDataType::Encrypt);
+
+    ASSERT_FALSE(expr.matchesBSON(BSON("a" << binData << "foo" << "bar")));
+} */
+
+TEST(InternalSchemaBinDataFLE2EncryptedTypeTest, DoesNotTraverseLeafArrays) {
+    InternalSchemaBinDataFLE2EncryptedTypeExpression expr("a", BSONType::String);
+
+    FleBlobHeader blob;
+    blob.fleBlobSubtype = static_cast<uint8_t>(EncryptedBinDataType::kFLE2EqualityIndexedValue);
+    memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
+    blob.originalBsonType = BSONType::String;
+
+    auto binData = BSONBinData(
+        reinterpret_cast<const void*>(&blob), sizeof(FleBlobHeader), BinDataType::Encrypt);
+
+    ASSERT_TRUE(expr.matchesBSON(BSON("a" << binData)));
+    ASSERT_FALSE(expr.matchesBSON(BSON("a" << BSON_ARRAY(binData))));
+    ASSERT_FALSE(expr.matchesBSON(BSON("a" << BSONArray())));
+}
+
+TEST(InternalSchemaBinDataFLE2EncryptedTypeTest, DoesNotMatchShortBinData) {
+    InternalSchemaBinDataFLE2EncryptedTypeExpression expr("a", BSONType::String);
+
+    FleBlobHeader blob;
+    blob.fleBlobSubtype = static_cast<uint8_t>(EncryptedBinDataType::kFLE2EqualityIndexedValue);
+    memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
+    blob.originalBsonType = BSONType::String;
+
+    auto binData = BSONBinData(reinterpret_cast<const void*>(&blob),
+                               sizeof(FleBlobHeader) - sizeof(blob.originalBsonType),
+                               BinDataType::Encrypt);
+    auto emptyBinData = BSONBinData(reinterpret_cast<const void*>(&blob), 0, BinDataType::Encrypt);
+
+    ASSERT_FALSE(expr.matchesBSON(BSON("a" << binData << "foo"
+                                           << "bar")));
+    ASSERT_FALSE(expr.matchesBSON(BSON("a" << emptyBinData)));
+}
+
+TEST(InternalSchemaBinDataFLE2EncryptedTypeTest, MatchesOnlyFLE2ServerSubtypes) {
+    InternalSchemaBinDataFLE2EncryptedTypeExpression expr("a", BSONType::String);
+
+    FleBlobHeader blob;
+    memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
+    blob.originalBsonType = BSONType::String;
+
+    for (uint8_t i = 0; i < kNumEncryptedBinDataType; i++) {
+        blob.fleBlobSubtype = i;
+        auto binData = BSONBinData(
+            reinterpret_cast<const void*>(&blob), sizeof(FleBlobHeader), BinDataType::Encrypt);
+
+        if (i == static_cast<uint8_t>(EncryptedBinDataType::kFLE2EqualityIndexedValue) ||
+            i == static_cast<uint8_t>(EncryptedBinDataType::kFLE2UnindexedEncryptedValue)) {
+            ASSERT_TRUE(expr.matchesBSON(BSON("a" << binData)));
+        } else {
+            ASSERT_FALSE(expr.matchesBSON(BSON("a" << binData)));
+        }
+    }
+}
+
+TEST(InternalSchemaBinDataFLE2EncryptedTypeTest, DoesNotMatchIncorrectBsonType) {
+    InternalSchemaBinDataFLE2EncryptedTypeExpression encryptedString("ssn", BSONType::String);
+    InternalSchemaBinDataFLE2EncryptedTypeExpression encryptedInt("age", BSONType::NumberInt);
+
+    FleBlobHeader blob;
+    blob.fleBlobSubtype = static_cast<uint8_t>(EncryptedBinDataType::kFLE2EqualityIndexedValue);
+    memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
+    blob.originalBsonType = BSONType::String;
+
+    auto binData = BSONBinData(
+        reinterpret_cast<const void*>(&blob), sizeof(FleBlobHeader), BinDataType::Encrypt);
+    ASSERT_TRUE(encryptedString.matchesBSON(BSON("ssn" << binData)));
+    ASSERT_FALSE(encryptedInt.matchesBSON(BSON("age" << binData)));
+
+    blob.originalBsonType = BSONType::NumberInt;
+    binData = BSONBinData(
+        reinterpret_cast<const void*>(&blob), sizeof(FleBlobHeader), BinDataType::Encrypt);
+    ASSERT_FALSE(encryptedString.matchesBSON(BSON("ssn" << binData)));
+    ASSERT_TRUE(encryptedInt.matchesBSON(BSON("age" << binData)));
+}
+
 }  // namespace
 }  // namespace mongo

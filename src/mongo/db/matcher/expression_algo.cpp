@@ -596,6 +596,7 @@ bool splitMatchExpressionForColumns(const MatchExpression* me,
         case MatchExpression::INTERNAL_SCHEMA_ALLOWED_PROPERTIES:
         case MatchExpression::INTERNAL_SCHEMA_ALL_ELEM_MATCH_FROM_INDEX:
         case MatchExpression::INTERNAL_SCHEMA_BIN_DATA_ENCRYPTED_TYPE:
+        case MatchExpression::INTERNAL_SCHEMA_BIN_DATA_FLE2_ENCRYPTED_TYPE:
         case MatchExpression::INTERNAL_SCHEMA_BIN_DATA_SUBTYPE:
         case MatchExpression::INTERNAL_SCHEMA_COND:
         case MatchExpression::INTERNAL_SCHEMA_EQ:

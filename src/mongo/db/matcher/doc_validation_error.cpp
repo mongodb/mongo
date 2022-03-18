@@ -878,8 +878,8 @@ public:
         }
     }
     void visit(const InternalSchemaBinDataEncryptedTypeExpression* expr) final {
-        static constexpr auto kNormalReason = "encrypted value has wrong type";
         // This node will never generate an error in the inverted case.
+        static constexpr auto kNormalReason = "encrypted value has wrong type";
         static constexpr auto kInvertedReason = "";
         _context->pushNewFrame(*expr);
         if (_context->shouldGenerateError(*expr)) {
@@ -897,6 +897,27 @@ public:
                 appendErrorReason(kNormalReason, kInvertedReason);
             } else {
                 _context->setCurrentRuntimeState(RuntimeState::kNoError);
+            }
+        }
+    }
+    void visit(const InternalSchemaBinDataFLE2EncryptedTypeExpression* expr) final {
+        static constexpr auto kNotEncryptedReason = "value was not encrypted";
+        static constexpr auto kBadValueTypeReason = "FLE2 encrypted value has wrong type";
+        static constexpr auto kInvertedReason = "value was encrypted";
+
+        _context->pushNewFrame(*expr);
+        if (_context->shouldGenerateError(*expr)) {
+            ElementPath path(expr->path(), LeafArrayBehavior::kNoTraversal);
+            BSONMatchableDocument doc(_context->getCurrentDocument());
+            MatchableDocument::IteratorHolder cursor(&doc, &path);
+            invariant(cursor->more());
+            auto elem = cursor->next().element();
+
+            appendOperatorName(*expr);
+            if (elem.type() != BSONType::BinData || elem.binDataType() != BinDataType::Encrypt) {
+                appendErrorReason(kNotEncryptedReason, kInvertedReason);
+            } else {
+                appendErrorReason(kBadValueTypeReason, kInvertedReason);
             }
         }
     }
@@ -1837,6 +1858,7 @@ public:
         _context->incrementCurrentChildIndex();
     }
     void visit(const InternalSchemaBinDataEncryptedTypeExpression* expr) final {}
+    void visit(const InternalSchemaBinDataFLE2EncryptedTypeExpression* expr) final {}
     void visit(const InternalSchemaBinDataSubTypeExpression* expr) final {}
     void visit(const InternalSchemaCondMatchExpression* expr) final {
         if (_context->shouldGenerateError(*expr)) {
@@ -2073,6 +2095,9 @@ public:
         _context->popFrame();
     }
     void visit(const InternalSchemaBinDataEncryptedTypeExpression* expr) final {
+        _context->finishCurrentError(expr);
+    }
+    void visit(const InternalSchemaBinDataFLE2EncryptedTypeExpression* expr) final {
         _context->finishCurrentError(expr);
     }
     void visit(const InternalSchemaBinDataSubTypeExpression* expr) final {

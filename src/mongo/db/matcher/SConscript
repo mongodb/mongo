@@ -39,6 +39,7 @@ env.Library(
         'expression_with_placeholder.cpp',
         'extensions_callback.cpp',
         'extensions_callback_noop.cpp',
+        'implicit_validator.cpp',
         'match_details.cpp',
         'matchable.cpp',
         'matcher.cpp',
@@ -125,6 +126,7 @@ env.CppUnitTest(
         'expression_tree_test.cpp',
         'expression_type_test.cpp',
         'expression_with_placeholder_test.cpp',
+        'implicit_validator_test.cpp',
         'matcher_type_set_test.cpp',
         'path_accepting_keyword_test.cpp',
         'path_test.cpp',
@@ -155,6 +157,7 @@ env.CppUnitTest(
         'schema/scalar_keywords_test.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/crypto/encrypted_field_config',
         '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
         '$BUILD_DIR/mongo/db/query/query_planner',
         '$BUILD_DIR/mongo/db/query/query_test_service_context',

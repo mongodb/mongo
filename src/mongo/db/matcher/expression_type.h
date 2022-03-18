@@ -342,8 +342,6 @@ public:
         auto fleBlobSubType =
             EncryptedBinDataType_parse(IDLParserErrorContext("subtype"), binData[0]);
         switch (fleBlobSubType) {
-            case EncryptedBinDataType::kPlaceholder:
-                return false;
             case EncryptedBinDataType::kDeterministic:
             case EncryptedBinDataType::kRandom: {
                 // Verify the type of the encrypted data.
@@ -351,9 +349,7 @@ public:
                 return typeSet().hasType(static_cast<BSONType>(fleBlob->originalBsonType));
             }
             default:
-                uasserted(33118,
-                          str::stream() << "unexpected subtype " << static_cast<int>(fleBlobSubType)
-                                        << " of encrypted binary data");
+                return false;
         }
     }
 
@@ -365,4 +361,74 @@ public:
         visitor->visit(this);
     }
 };
+
+/**
+ * Implements matching semantics for a FLE2 encrypted field. A document
+ * matches successfully if a field is encrypted and the encrypted payload indicates the
+ * original BSON element belongs to the specified type set.
+ */
+class InternalSchemaBinDataFLE2EncryptedTypeExpression final
+    : public TypeMatchExpressionBase<InternalSchemaBinDataFLE2EncryptedTypeExpression> {
+public:
+    static constexpr StringData kName = "$_internalSchemaBinDataFLE2EncryptedType"_sd;
+
+    InternalSchemaBinDataFLE2EncryptedTypeExpression(
+        StringData path, MatcherTypeSet typeSet, clonable_ptr<ErrorAnnotation> annotation = nullptr)
+        : TypeMatchExpressionBase(MatchExpression::INTERNAL_SCHEMA_BIN_DATA_FLE2_ENCRYPTED_TYPE,
+                                  path,
+                                  ElementPath::LeafArrayBehavior::kNoTraversal,
+                                  std::move(typeSet),
+                                  std::move(annotation)) {}
+
+    StringData name() const {
+        return kName;
+    }
+
+    std::unique_ptr<MatchExpression> shallowClone() const final {
+        auto expr = std::make_unique<InternalSchemaBinDataFLE2EncryptedTypeExpression>(
+            path(), typeSet(), _errorAnnotation);
+        if (getTag()) {
+            expr->setTag(getTag()->clone());
+        }
+        return expr;
+    }
+
+    MatchCategory getCategory() const final {
+        return MatchCategory::kOther;
+    }
+
+    bool matchesSingleElement(const BSONElement& elem,
+                              MatchDetails* details = nullptr) const final {
+        if (elem.type() != BSONType::BinData)
+            return false;
+        if (elem.binDataType() != BinDataType::Encrypt)
+            return false;
+
+        int binDataLen;
+        auto binData = elem.binData(binDataLen);
+        if (static_cast<size_t>(binDataLen) < sizeof(FleBlobHeader))
+            return false;
+
+        EncryptedBinDataType subTypeByte = static_cast<EncryptedBinDataType>(binData[0]);
+        switch (subTypeByte) {
+            case EncryptedBinDataType::kFLE2EqualityIndexedValue:
+            case EncryptedBinDataType::kFLE2UnindexedEncryptedValue: {
+                // Verify the type of the encrypted data.
+                auto fleBlob = reinterpret_cast<const FleBlobHeader*>(binData);
+                return typeSet().hasType(static_cast<BSONType>(fleBlob->originalBsonType));
+            }
+            default:
+                return false;
+        }
+    }
+
+    void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(MatchExpressionConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+};
+
 }  // namespace mongo
