@@ -34,7 +34,7 @@ a notice will be included in
 | [kms-message]              |                   | 1.0.1             |                      |                ✗                |
 | [libstemmer]               | BSD-3-Clause      | Unknown           |          ✗           |                ✗                |
 | [linenoise]                | BSD-3-Clause      | Unknown + changes |                      |                ✗                |
-| [MozJS]                    | MPL-2.0           | ESR 60.3.0        |                      |                ✗                |
+| [MozJS]                    | MPL-2.0           | ESR 91.3.0        |                      |                ✗                |
 | [MurmurHash3]              | Public Domain     | Unknown + changes |          ✗           |                ✗                |
 | [ocspbuilder]              | MIT               | 0.10.2            |                      |                                 |
 | [ocspresponder]            | Apache-2.0        | 0.5.0             |                      |                                 |
