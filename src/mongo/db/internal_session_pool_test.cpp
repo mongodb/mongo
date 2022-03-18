@@ -38,39 +38,18 @@
 #include "mongo/db/sessions_collection_mock.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/clock_source_mock.h"
 
 namespace mongo {
 namespace {
 
-class TestInternalSessionPool : public InternalSessionPool {
-public:
-    void reset() {
-        _childSessions = LogicalSessionIdMap<InternalSessionPool::Session>();
-        _nonChildSessions = std::stack<InternalSessionPool::Session>();
-    }
-};
 class InternalSessionPoolTest : public ServiceContextTest {
 public:
     void setUp() override {
         ServiceContextTest::setUp();
         serverGlobalParams.clusterRole = ClusterRole::ShardServer;
-        _pool.reset();
-
+        _pool = InternalSessionPool::get(getServiceContext());
         _opCtx = makeOperationContext();
-
-        auto localServiceLiaison =
-            std::make_unique<MockServiceLiaison>(std::make_shared<MockServiceLiaisonImpl>());
-        auto localSessionsCollection = std::make_unique<MockSessionsCollection>(
-            std::make_shared<MockSessionsCollectionImpl>());
-
-        auto localLogicalSessionCache = std::make_unique<LogicalSessionCacheImpl>(
-            std::move(localServiceLiaison),
-            std::move(localSessionsCollection),
-            [](OperationContext*, SessionsCollection&, Date_t) {
-                return 0; /* No op*/
-            });
-
-        LogicalSessionCache::set(getServiceContext(), std::move(localLogicalSessionCache));
     }
 
     OperationContext* opCtx() const {
@@ -78,7 +57,7 @@ public:
     }
 
 protected:
-    TestInternalSessionPool _pool;
+    InternalSessionPool* _pool;
     RAIIServerParameterControllerForTest _featureFlagInternalTransactions{
         "featureFlagInternalTransactions", true};
 
@@ -86,28 +65,27 @@ private:
     ServiceContext::UniqueOperationContext _opCtx;
 };
 
-TEST_F(InternalSessionPoolTest, AcquireWithoutParentSessionFromEmptyPool) {
-    auto session = _pool.acquire(opCtx());
+TEST_F(InternalSessionPoolTest, AcquireStandaloneSessionFromEmptyPool) {
+    auto session = _pool->acquireStandaloneSession(opCtx());
     ASSERT_EQ(TxnNumber(0), session.getTxnNumber());
 }
 
 TEST_F(InternalSessionPoolTest, AcquireWithParentSessionFromEmptyPool) {
     auto parentLsid = makeLogicalSessionIdForTest();
-    auto session = _pool.acquire(opCtx(), parentLsid);
+    auto session = _pool->acquireChildSession(opCtx(), parentLsid);
 
     ASSERT_EQ(parentLsid, *getParentSessionId(session.getSessionId()));
     ASSERT_EQ(TxnNumber(0), session.getTxnNumber());
 }
 
-TEST_F(InternalSessionPoolTest, AcquireWithoutParentSessionFromPool) {
+TEST_F(InternalSessionPoolTest, AcquireStandaloneSessionFromPool) {
     auto expectedLsid = makeLogicalSessionIdForTest();
     auto sessionToRelease = InternalSessionPool::Session(expectedLsid, TxnNumber(0));
-    _pool.release(sessionToRelease);
+    _pool->release(sessionToRelease);
 
-    auto session = _pool.acquire(opCtx());
+    auto session = _pool->acquireStandaloneSession(opCtx());
 
     ASSERT_EQ(expectedLsid, session.getSessionId());
-
     // txnNumber should be 1 larger than the released session.
     ASSERT_EQ(TxnNumber(1), session.getTxnNumber());
 }
@@ -117,9 +95,9 @@ TEST_F(InternalSessionPoolTest, AcquireWithParentSessionFromPoolWithoutParentEnt
     LogicalSessionId parentLsid2 = makeLogicalSessionIdForTest();
 
     auto parentSession1 = InternalSessionPool::Session(parentLsid1, TxnNumber(1));
-    _pool.release(parentSession1);
+    _pool->release(parentSession1);
 
-    auto session = _pool.acquire(opCtx(), parentLsid2);
+    auto session = _pool->acquireChildSession(opCtx(), parentLsid2);
 
     ASSERT_NOT_EQUALS(parentLsid1, session.getSessionId());
     ASSERT_EQ(TxnNumber(0), session.getTxnNumber());
@@ -134,18 +112,137 @@ TEST_F(InternalSessionPoolTest, AcquireWithParentSessionFromPoolWithParentEntry)
     parentLsid2.getInternalSessionFields().setTxnUUID(UUID::gen());
 
     auto parentSession1 = InternalSessionPool::Session(parentLsid1, TxnNumber(1));
-    _pool.release(parentSession1);
+    _pool->release(parentSession1);
 
     auto parentSession2 = InternalSessionPool::Session(parentLsid2, TxnNumber(2));
-    _pool.release(parentSession2);
+    _pool->release(parentSession2);
 
-    auto childSession2 = _pool.acquire(opCtx(), parentLsid2);
+    auto childSession2 = _pool->acquireChildSession(opCtx(), parentLsid2);
 
     ASSERT_NOT_EQUALS(parentLsid1, childSession2.getSessionId());
     ASSERT_EQ(parentLsid2, childSession2.getSessionId());
 
     // txnNumber should be 1 larger than the released parent session.
     ASSERT_EQ(TxnNumber(3), childSession2.getTxnNumber());
+}
+
+TEST_F(InternalSessionPoolTest, ReuseUnexpiredStandaloneSessionForSystemUser) {
+    auto expectedLsid = makeSystemLogicalSessionId();
+    auto sessionToRelease = InternalSessionPool::Session(expectedLsid, TxnNumber(0));
+    _pool->release(sessionToRelease);
+
+    auto session = _pool->acquireSystemSession();
+    ASSERT_EQ(expectedLsid, session.getSessionId());
+
+    // txnNumber should be 1 larger than the released session.
+    ASSERT_EQ(TxnNumber(1), session.getTxnNumber());
+}
+
+TEST_F(InternalSessionPoolTest, ReuseUnexpiredStandaloneSession) {
+    auto session = _pool->acquireStandaloneSession(opCtx());
+    auto expectedLsid = session.getSessionId();
+    _pool->release(session);
+
+    auto acquiredSession = _pool->acquireStandaloneSession(opCtx());
+    ASSERT_EQ(expectedLsid, session.getSessionId());
+
+    // txnNumber should be 1 larger than the released session.
+    ASSERT_EQ(TxnNumber(1), acquiredSession.getTxnNumber());
+}
+
+TEST_F(InternalSessionPoolTest, StandaloneSessionAcquiredInReverseOrder) {
+    auto expectedLsid1 = makeLogicalSessionId(opCtx());
+    auto expectedLsid2 = makeLogicalSessionId(opCtx());
+    auto sessionToRelease1 = InternalSessionPool::Session(expectedLsid1, TxnNumber(0));
+    auto sessionToRelease2 = InternalSessionPool::Session(expectedLsid2, TxnNumber(0));
+    _pool->release(sessionToRelease1);
+    _pool->release(sessionToRelease2);
+
+    auto session = _pool->acquireStandaloneSession(opCtx());
+    ASSERT_EQ(expectedLsid2, session.getSessionId());
+    // txnNumber should be 1 larger than the released session.
+    ASSERT_EQ(TxnNumber(1), session.getTxnNumber());
+
+    auto nextSession = _pool->acquireStandaloneSession(opCtx());
+    ASSERT_EQ(expectedLsid1, nextSession.getSessionId());
+    // txnNumber should be 1 larger than the released session.
+    ASSERT_EQ(TxnNumber(1), nextSession.getTxnNumber());
+}
+
+TEST_F(InternalSessionPoolTest, UserCannotAcquireSystemStandaloneSession) {
+    auto lsid = makeLogicalSessionId(opCtx());
+    auto sessionToRelease = InternalSessionPool::Session(lsid, TxnNumber(0));
+    _pool->release(sessionToRelease);
+
+    auto systemLsid = makeSystemLogicalSessionId();
+    _pool->release(InternalSessionPool::Session(systemLsid, TxnNumber(0)));
+
+    auto session = _pool->acquireStandaloneSession(opCtx());
+    ASSERT_NE(systemLsid, session.getSessionId());
+    ASSERT_EQ(lsid, session.getSessionId());
+    // txnNumber should be 1 larger than the released session.
+    ASSERT_EQ(TxnNumber(1), session.getTxnNumber());
+    _pool->release(session);
+
+    auto nextSession = _pool->acquireSystemSession();
+    ASSERT_NE(lsid, nextSession.getSessionId());
+    ASSERT_EQ(systemLsid, nextSession.getSessionId());
+    // txnNumber should be 1 larger than the released session.
+    ASSERT_EQ(TxnNumber(1), nextSession.getTxnNumber());
+}
+
+TEST_F(InternalSessionPoolTest, StaleStandaloneSessionIsNotAcquired) {
+    auto service = getServiceContext();
+    const std::shared_ptr<ClockSourceMock> mockClock = std::make_shared<ClockSourceMock>();
+    service->setFastClockSource(std::make_unique<SharedClockSourceAdapter>(mockClock));
+
+    auto expectedLsid = makeSystemLogicalSessionId();
+    auto sessionToRelease = InternalSessionPool::Session(expectedLsid, TxnNumber(0));
+    _pool->release(sessionToRelease);
+    mockClock->advance(Minutes{localLogicalSessionTimeoutMinutes});
+
+    auto acquiredSession = _pool->acquireSystemSession();
+    ASSERT_NE(expectedLsid, acquiredSession.getSessionId());
+    // Should be a new session.
+    ASSERT_EQ(TxnNumber(0), acquiredSession.getTxnNumber());
+}
+
+TEST_F(InternalSessionPoolTest, ExpiredSessionReapedDuringRelease) {
+    auto service = getServiceContext();
+    const std::shared_ptr<ClockSourceMock> mockClock = std::make_shared<ClockSourceMock>();
+    service->setFastClockSource(std::make_unique<SharedClockSourceAdapter>(mockClock));
+
+    auto lsid0 = makeSystemLogicalSessionId();
+    auto session0 = InternalSessionPool::Session(lsid0, TxnNumber(0));
+    _pool->release(session0);
+
+    auto lsid1 = makeSystemLogicalSessionId();
+    auto session1 = InternalSessionPool::Session(lsid1, TxnNumber(0));
+    mockClock->advance(Minutes{localLogicalSessionTimeoutMinutes});
+    _pool->release(session1);
+
+    // Both system sessions have the same userDigest, but the session with lsid0 should've been
+    // removed during release.
+    ASSERT_EQ(1, _pool->numSessionsForUser_forTest(lsid1.getUid()));
+}
+
+TEST_F(InternalSessionPoolTest, UserExpiredSessionsReapedWhenAnotherUserReleasesSession) {
+    auto service = getServiceContext();
+    const std::shared_ptr<ClockSourceMock> mockClock = std::make_shared<ClockSourceMock>();
+    service->setFastClockSource(std::make_unique<SharedClockSourceAdapter>(mockClock));
+
+    auto lsid0 = makeLogicalSessionId(opCtx());
+    auto sessionToRelease = InternalSessionPool::Session(lsid0, TxnNumber(0));
+    _pool->release(sessionToRelease);
+
+    auto lsid1 = makeSystemLogicalSessionId();
+    auto session1 = InternalSessionPool::Session(lsid1, TxnNumber(0));
+    mockClock->advance(Minutes{localLogicalSessionTimeoutMinutes});
+    _pool->release(session1);
+
+    // The session with lsid0 should've been removed from the session pool when lsid1 was released.
+    ASSERT_EQ(0, _pool->numSessionsForUser_forTest(lsid0.getUid()));
+    ASSERT_EQ(1, _pool->numSessionsForUser_forTest(lsid1.getUid()));
 }
 
 }  // namespace

@@ -92,6 +92,11 @@ LogicalSessionId makeLogicalSessionId(const LogicalSessionFromClient& lsid,
                                       OperationContext* opCtx,
                                       std::initializer_list<Privilege> allowSpoof = {});
 LogicalSessionId makeLogicalSessionId(OperationContext* opCtx);
+
+/**
+ * We recommend acquiring a system session through the session pool. It can be acquired through this
+ * method InternalSessionPool::acquireSystemSession().
+ */
 LogicalSessionId makeSystemLogicalSessionId();
 
 /**

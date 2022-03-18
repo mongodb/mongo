@@ -34,6 +34,7 @@
 #include "mongo/db/internal_session_pool.h"
 #include "mongo/db/logical_session_cache.h"
 #include "mongo/db/logical_session_id_helpers.h"
+#include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
@@ -48,35 +49,92 @@ auto InternalSessionPool::get(OperationContext* opCtx) -> InternalSessionPool* {
     return get(opCtx->getServiceContext());
 }
 
-InternalSessionPool::Session InternalSessionPool::acquire(OperationContext* opCtx) {
+void InternalSessionPool::_reapExpiredSessions(WithLock) {
+    auto service = serviceDecorator.owner(this);
+
+    for (auto it = _perUserSessionPool.begin(); it != _perUserSessionPool.end();) {
+        auto& userSessionPool = it->second;
+        while (!userSessionPool.empty() &&
+               userSessionPool.back()._isExpired(service->getFastClockSource()->now())) {
+            userSessionPool.pop_back();
+        }
+
+        if (userSessionPool.empty()) {
+            it = _perUserSessionPool.erase(it, std::next(it));
+        } else {
+            ++it;
+        }
+    }
+}
+
+boost::optional<InternalSessionPool::Session> InternalSessionPool::_acquireSession(
+    SHA256Block userDigest, WithLock) {
+    if (!_perUserSessionPool.contains(userDigest)) {
+        _perUserSessionPool.try_emplace(userDigest, std::list<InternalSessionPool::Session>{});
+    }
+
+    auto& userSessionPool = _perUserSessionPool.at(userDigest);
+
+    if (!userSessionPool.empty()) {
+        auto session = std::move(userSessionPool.front());
+        userSessionPool.pop_front();
+
+        // Check if most recent session has expired before checking it out.
+        auto service = serviceDecorator.owner(this);
+        if (!session._isExpired(service->getFastClockSource()->now())) {
+            return session;
+        }
+
+        // Most recent available session is expired, so all sessions must be expired. Clear
+        // list.
+        userSessionPool.clear();
+        _perUserSessionPool.erase(userDigest);
+    }
+
+    return boost::none;
+}
+
+InternalSessionPool::Session InternalSessionPool::acquireSystemSession() {
     const InternalSessionPool::Session session = [&] {
         stdx::lock_guard<Latch> lock(_mutex);
 
-        if (!_nonChildSessions.empty()) {
-            auto session = std::move(_nonChildSessions.top());
-            _nonChildSessions.pop();
-            return session;
-        } else {
-            auto lsid = makeSystemLogicalSessionId();
-            auto session = InternalSessionPool::Session(lsid, TxnNumber(0));
-
-            auto lsc = LogicalSessionCache::get(opCtx->getServiceContext());
-            uassertStatusOK(lsc->vivify(opCtx, lsid));
-            return session;
-        }
+        auto const& systemUserDigest = (*internalSecurity.getUser())->getDigest();
+        auto session = _acquireSession(systemUserDigest, lock);
+        return session ? *session
+                       : InternalSessionPool::Session(makeSystemLogicalSessionId(), TxnNumber(0));
     }();
 
-    LOGV2_DEBUG(5876600,
+    LOGV2_DEBUG(5876603,
                 2,
-                "Acquired internal session",
+                "Acquired standalone internal session for system",
                 "lsid"_attr = session.getSessionId(),
                 "txnNumber"_attr = session.getTxnNumber());
 
     return session;
 }
 
-InternalSessionPool::Session InternalSessionPool::acquire(OperationContext* opCtx,
-                                                          const LogicalSessionId& parentLsid) {
+InternalSessionPool::Session InternalSessionPool::acquireStandaloneSession(
+    OperationContext* opCtx) {
+    const InternalSessionPool::Session session = [&] {
+        stdx::lock_guard<Latch> lock(_mutex);
+
+        auto const& userDigest = getLogicalSessionUserDigestForLoggedInUser(opCtx);
+        auto session = _acquireSession(userDigest, lock);
+        return session ? *session
+                       : InternalSessionPool::Session(makeLogicalSessionId(opCtx), TxnNumber(0));
+    }();
+
+    LOGV2_DEBUG(5876600,
+                2,
+                "Acquired standalone internal session for logged-in user",
+                "lsid"_attr = session.getSessionId(),
+                "txnNumber"_attr = session.getTxnNumber());
+
+    return session;
+}
+
+InternalSessionPool::Session InternalSessionPool::acquireChildSession(
+    OperationContext* opCtx, const LogicalSessionId& parentLsid) {
     const InternalSessionPool::Session session = [&] {
         stdx::lock_guard<Latch> lock(_mutex);
 
@@ -87,13 +145,8 @@ InternalSessionPool::Session InternalSessionPool::acquire(OperationContext* opCt
             return session;
         } else {
             auto lsid = LogicalSessionId{parentLsid.getId(), parentLsid.getUid()};
-
             lsid.getInternalSessionFields().setTxnUUID(UUID::gen());
-
             auto session = InternalSessionPool::Session(lsid, TxnNumber(0));
-
-            auto lsc = LogicalSessionCache::get(opCtx->getServiceContext());
-            uassertStatusOK(lsc->vivify(opCtx, lsid));
             return session;
         }
     }();
@@ -115,15 +168,30 @@ void InternalSessionPool::release(Session session) {
                 "lsid"_attr = session.getSessionId(),
                 "txnNumber"_attr = session.getTxnNumber());
 
-    session.setTxnNumber(session.getTxnNumber() + 1);
-    if (session.getSessionId().getTxnUUID()) {
-        auto lsid = session.getSessionId();
+    ++session._txnNumber;
+    const auto& lsid = session.getSessionId();
+    if (lsid.getTxnUUID()) {
         stdx::lock_guard<Latch> lock(_mutex);
         _childSessions.insert({std::move(lsid), std::move(session)});
     } else {
         stdx::lock_guard<Latch> lock(_mutex);
-        _nonChildSessions.push(std::move(session));
+
+        if (!_perUserSessionPool.contains(lsid.getUid())) {
+            _perUserSessionPool.try_emplace(lsid.getUid(),
+                                            std::list<InternalSessionPool::Session>{});
+        }
+        auto& userSessionPool = _perUserSessionPool.at(lsid.getUid());
+        auto service = serviceDecorator.owner(this);
+        session._lastSeen = service->getFastClockSource()->now();
+        userSessionPool.push_front(std::move(session));
+
+        // Clean up session pool by reaping all expired sessions.
+        _reapExpiredSessions(lock);
     }
+}
+
+std::size_t InternalSessionPool::numSessionsForUser_forTest(SHA256Block userDigest) {
+    return _perUserSessionPool[userDigest].size();
 }
 
 }  // namespace mongo

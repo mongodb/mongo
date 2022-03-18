@@ -37,6 +37,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/error_labels.h"
+#include "mongo/db/internal_session_pool.h"
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -569,14 +570,21 @@ void Transaction::_primeTransaction(OperationContext* opCtx) {
     auto clientInMultiDocumentTransaction = opCtx->inMultiDocumentTransaction();
 
     if (!clientSession) {
-        // TODO SERVER-61783: Integrate session pool.
-        _setSessionInfo(
-            lg, makeLogicalSessionId(opCtx), 0 /* txnNumber */, {true} /* startTransaction */);
+        const auto acquiredSession =
+            InternalSessionPool::get(opCtx)->acquireStandaloneSession(opCtx);
+        _acquiredSessionFromPool = true;
+        _setSessionInfo(lg,
+                        acquiredSession.getSessionId(),
+                        acquiredSession.getTxnNumber(),
+                        {true} /* startTransaction */);
         _execContext = ExecutionContext::kOwnSession;
     } else if (!clientTxnNumber) {
+        const auto acquiredSession =
+            InternalSessionPool::get(opCtx)->acquireChildSession(opCtx, *clientSession);
+        _acquiredSessionFromPool = true;
         _setSessionInfo(lg,
-                        makeLogicalSessionIdWithTxnUUID(*clientSession),
-                        0 /* txnNumber */,
+                        acquiredSession.getSessionId(),
+                        acquiredSession.getTxnNumber(),
                         {true} /* startTransaction */);
         _execContext = ExecutionContext::kClientSession;
     } else if (!clientInMultiDocumentTransaction) {
@@ -623,6 +631,14 @@ void Transaction::_primeTransaction(OperationContext* opCtx) {
 LogicalTime Transaction::getOperationTime() const {
     stdx::lock_guard<Latch> lg(_mutex);
     return _lastOperationTime;
+}
+
+Transaction::~Transaction() {
+    if (_acquiredSessionFromPool) {
+        InternalSessionPool::get(_service)->release(
+            {*_sessionInfo.getSessionId(), *_sessionInfo.getTxnNumber()});
+        _acquiredSessionFromPool = false;
+    }
 }
 
 }  // namespace details

@@ -29,12 +29,19 @@
 
 #pragma once
 
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/stdx/unordered_map.h"
 
 #include <stack>
 
 namespace mongo {
 
+/**
+ * The InternalSessionPool creates a pool of reusable sessions, as needed, that can be used
+ * to execute an internal transaction. Sessions are reaped from the pool if they have not been used
+ * for over 15 minutes. The session pool is partitioned by uid.
+ */
 class InternalSessionPool {
 
 public:
@@ -53,15 +60,14 @@ public:
         }
 
     private:
-        void setSessionId(LogicalSessionId lsid) {
-            _lsid = std::move(lsid);
-        }
-        void setTxnNumber(TxnNumber txnNumber) {
-            _txnNumber = txnNumber;
+        bool _isExpired(Date_t now) {
+            auto timeElapsed = now - _lastSeen;
+            return timeElapsed > Minutes(localLogicalSessionTimeoutMinutes / 2);
         }
 
         LogicalSessionId _lsid;
         TxnNumber _txnNumber;
+        Date_t _lastSeen;
     };
 
     InternalSessionPool() = default;
@@ -69,20 +75,45 @@ public:
     static InternalSessionPool* get(ServiceContext* serviceContext);
     static InternalSessionPool* get(OperationContext* opCtx);
 
-    Session acquire(OperationContext* opCtx);
-    Session acquire(OperationContext* opCtx, const LogicalSessionId& parentLsid);
+    /**
+     * Use this method to acquire an internal session for a system initiated transaction.
+     */
+    Session acquireSystemSession();
 
-    void release(Session);
+    /**
+     * Use this method to acquire an internal session when the user is not currently running a
+     * session.
+     */
+    Session acquireStandaloneSession(OperationContext* opCtx);
 
-protected:
-    // Used for associating parent lsids with existing Sessions of the form <id, uid, txnUUID>
-    LogicalSessionIdMap<Session> _childSessions;
+    /**
+     * Use this method to acquire an internal session nested in a client session.
+     */
+    Session acquireChildSession(OperationContext* opCtx, const LogicalSessionId& parentLsid);
 
-    // Used for standalone Sessions
-    std::stack<Session> _nonChildSessions;
+    /**
+     * Use this method to release all types of acquired sessions back to the session pool. Upon
+     * release, all expired sessions are removed from the session pool.
+     */
+    void release(Session session);
+
+    /**
+     * Use this method to confirm the size of list at _userSessionPool[userDigest]. To be used for
+     * testing only.
+     */
+    std::size_t numSessionsForUser_forTest(SHA256Block userDigest);
 
 private:
-    // Protects the internal data structures
+    void _reapExpiredSessions(WithLock);
+    boost::optional<InternalSessionPool::Session> _acquireSession(SHA256Block userDigest, WithLock);
+
+    // Used for associating parent lsids with existing Sessions of the form <id, uid, txnUUID>.
+    LogicalSessionIdMap<Session> _childSessions;
+
+    // Map partitioning the session pool by logged in user.
+    stdx::unordered_map<SHA256Block, std::list<Session>, SHA256Block::Hash> _perUserSessionPool;
+
+    // Protects the internal data structures.
     mutable Mutex _mutex = MONGO_MAKE_LATCH("InternalSessionPool::_mutex");
 };
 

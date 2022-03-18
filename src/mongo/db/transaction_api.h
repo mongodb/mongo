@@ -282,13 +282,16 @@ public:
 
     Transaction(const Transaction&) = delete;
     Transaction operator=(const Transaction&) = delete;
+    ~Transaction();
 
     /**
      * Main constructor that extracts the session options and infers its execution context from the
      * given OperationContext and constructs a default TransactionClient.
      */
     Transaction(OperationContext* opCtx, ExecutorPtr executor)
-        : _executor(executor), _txnClient(std::make_unique<SEPTransactionClient>(opCtx, executor)) {
+        : _executor(executor),
+          _txnClient(std::make_unique<SEPTransactionClient>(opCtx, executor)),
+          _service(opCtx->getServiceContext()) {
         _primeTransaction(opCtx);
         _txnClient->injectHooks(_makeTxnMetadataHooks());
     }
@@ -299,7 +302,9 @@ public:
     Transaction(OperationContext* opCtx,
                 ExecutorPtr executor,
                 std::unique_ptr<TransactionClient> txnClient)
-        : _executor(executor), _txnClient(std::move(txnClient)) {
+        : _executor(executor),
+          _txnClient(std::move(txnClient)),
+          _service(opCtx->getServiceContext()) {
         _primeTransaction(opCtx);
         _txnClient->injectHooks(_makeTxnMetadataHooks());
     }
@@ -407,6 +412,8 @@ private:
 
     OperationSessionInfo _sessionInfo;
     TransactionState _state{TransactionState::kInit};
+    bool _acquiredSessionFromPool{false};
+    ServiceContext* _service;
 };
 
 /**

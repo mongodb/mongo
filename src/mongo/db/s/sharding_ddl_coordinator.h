@@ -141,7 +141,7 @@ protected:
             optSession->setTxnNumber(++txnNumber);
             newShardingDDLCoordinatorMetadata.setSession(optSession);
         } else {
-            auto session = InternalSessionPool::get(opCtx)->acquire(opCtx);
+            auto session = InternalSessionPool::get(opCtx)->acquireSystemSession();
             newShardingDDLCoordinatorMetadata.setSession(
                 ShardingDDLSession(session.getSessionId(), session.getTxnNumber()));
         }
