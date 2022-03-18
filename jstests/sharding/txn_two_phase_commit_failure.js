@@ -13,8 +13,11 @@ const dbName = "test";
 const collName = "foo";
 const ns = dbName + "." + collName;
 
-// The test should not depend on a particular timeout, but shorter timeout makes it faster.
-TestData.transactionLifetimeLimitSeconds = 10;
+// Lower the transaction timeout for participants, since this test exercises the case where the
+// coordinator hangs before writing the participant list and then checks that the transaction is
+// eventually aborted on the coordinator, and the coordinator will only abort on reaching the
+// transaction timeout.
+TestData.transactionLifetimeLimitSeconds = 30;
 
 let lsid = {id: UUID()};
 let txnNumber = 0;
