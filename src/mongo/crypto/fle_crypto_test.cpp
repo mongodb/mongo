@@ -600,41 +600,32 @@ BSONObj encryptDocumentForInsert(BSONObj obj, FLEKeyVault* keyVault) {
     return finalDoc;
 }
 
-
-BSONObj generateTokensForFind(BSONObj obj, FLEKeyVault* keyVault) {
-    auto result = FLEClientCrypto::transformPlaceholders(obj, keyVault);
-
-    // TODO: once query work for find is done, we can return finalDoc. Until then
-    // we should just return result to see the object with placeholders.
-
-    // // Start Server Side
-    // auto serverPayload = EDCServerCollection::getEncryptedFieldInfo(result);
-
-    // for (auto& payload : serverPayload) {
-    //     payload.count = 1;
-    // }
-
-    // // Finalize document for find
-    // auto finalDoc = EDCServerCollection::finalizeForUpdate(result, serverPayload);
-
-    return result;
-}
-
 BSONObj encryptDocument(BSONObj obj, FLEKeyVault* keyVault, Operation operation) {
     if (operation == Operation::kInsert) {
         return encryptDocumentForInsert(obj, keyVault);
     } else if (operation == Operation::kFind) {
-        return generateTokensForFind(obj, keyVault);
+        return FLEClientCrypto::transformPlaceholders(obj, keyVault);
     } else {
         return BSONObj();
     }
 }
 
-void roundTripTest(BSONObj doc, BSONType type, Operation operation) {
+void assertPayload(BSONElement elem, Operation operation) {
+    int len;
+    const char* data(elem.binData(len));
+    ConstDataRange cdr(data, len);
 
+    const auto& [encryptedType, subCdr] = fromEncryptedConstDataRange(cdr);
+    if (operation == Operation::kFind) {
+        ASSERT_TRUE(encryptedType == EncryptedBinDataType::kFLE2FindEqualityPayload);
+    } else {
+        ASSERT_TRUE(encryptedType == EncryptedBinDataType::kFLE2InsertUpdatePayload);
+    }
+}
+
+void roundTripTest(BSONObj doc, BSONType type, Operation operation) {
     auto element = doc.firstElement();
     ASSERT_EQ(element.type(), type);
-
 
     TestKeyVault keyVault;
 
@@ -656,6 +647,7 @@ void roundTripTest(BSONObj doc, BSONType type, Operation operation) {
     // TODO : when query enables server side work for Find, remove this
     // if statement.
     if (operation == Operation::kFind) {
+        assertPayload(finalDoc["encrypted"], operation);
         return;
     }
 
@@ -668,28 +660,68 @@ void roundTripTest(BSONObj doc, BSONType type, Operation operation) {
     ASSERT_BSONOBJ_EQ(inputDoc, decryptedDoc);
 }
 
+void roundTripMultiencrypted(BSONObj doc1, BSONObj doc2, Operation operation1, Operation operation2) {
+    auto element1 = doc1.firstElement();
+    auto element2 = doc2.firstElement();
+
+    TestKeyVault keyVault;
+
+    auto inputDoc = BSON("plainText"
+                         << "sample"
+                         << "encrypted1" << element1
+                         << "encrypted2" << element2);
+
+    auto buf1 = generatePlaceholder(element1, operation1);
+    auto buf2 = generatePlaceholder(element2, operation2);
+
+    BSONObjBuilder builder;
+    builder.append("plaintext", "sample");
+    builder.appendBinData("encrypted1", buf1.size(), BinDataType::Encrypt, buf1.data());
+    builder.appendBinData("encrypted2", buf2.size(), BinDataType::Encrypt, buf2.data());
+
+    auto finalDoc = FLEClientCrypto::transformPlaceholders(builder.obj(), &keyVault);
+
+    ASSERT_EQ(finalDoc["encrypted1"].type(), BinData);
+    ASSERT_TRUE(finalDoc["encrypted1"].isBinData(BinDataType::Encrypt));
+
+    ASSERT_EQ(finalDoc["encrypted2"].type(), BinData);
+    ASSERT_TRUE(finalDoc["encrypted2"].isBinData(BinDataType::Encrypt));
+
+    assertPayload(finalDoc["encrypted1"], operation1);
+    assertPayload(finalDoc["encrypted2"], operation2);
+}
+
+const std::vector<std::pair<BSONObj, BSONType>> objects{
+    { BSON("sample" << "value123"), String },
+    { BSON("sample" << BSONBinData(testValue.data(), testValue.size(), BinDataType::BinDataGeneral)), BinData },
+    { BSON("sample" << OID()), jstOID },
+    { BSON("sample" << false), Bool },
+    { BSON("sample" << true), Bool },
+    { BSON("sample" << Date_t()), Date },
+    { BSON("sample" << BSONRegEx("value1", "value2")), RegEx },
+    { BSON("sample" << 123456), NumberInt },
+    { BSON("sample" << Timestamp()), bsonTimestamp },
+    { BSON("sample" << 12345678901234567LL), NumberLong },
+    { BSON("sample" << BSONCode("value")), Code }
+};
+
 TEST(FLE_EDC, Allowed_Types) {
     std::vector<Operation> opTypes{Operation::kInsert, Operation::kFind};
-    
-    for (const auto& type : opTypes) {
-        roundTripTest(BSON("sample"
-                        << "value123"),
-                    String, type);
-        roundTripTest(BSON("sample" << BSONBinData(
-                            testValue.data(), testValue.size(), BinDataType::BinDataGeneral)),
-                    BinData, type);
-        roundTripTest(BSON("sample" << OID()), jstOID, type);
 
-
-        roundTripTest(BSON("sample" << false), Bool, type);
-        roundTripTest(BSON("sample" << true), Bool, type);
-        roundTripTest(BSON("sample" << Date_t()), Date, type);
-        roundTripTest(BSON("sample" << BSONRegEx("value1", "value2")), RegEx, type);
-        roundTripTest(BSON("sample" << 123456), NumberInt, type);
-        roundTripTest(BSON("sample" << Timestamp()), bsonTimestamp, type);
-        roundTripTest(BSON("sample" << 12345678901234567LL), NumberLong, type);
-        roundTripTest(BSON("sample" << BSONCode("value")), Code, type);
+    for (const auto& opType : opTypes) {
+        for (const auto& [obj, objType] : objects) {
+            roundTripTest(obj, objType, opType);
+        }
     };
+
+    for (const auto& [obj1, _] : objects) {
+        for (const auto& [obj2, _] : objects) {
+            roundTripMultiencrypted(obj1, obj2, Operation::kInsert, Operation::kInsert);
+            roundTripMultiencrypted(obj1, obj2, Operation::kInsert, Operation::kFind);
+            roundTripMultiencrypted(obj1, obj2, Operation::kFind, Operation::kInsert);
+            roundTripMultiencrypted(obj1, obj2, Operation::kFind, Operation::kFind);
+        }
+    }
 }
 
 void illegalBSONType(BSONObj doc, BSONType type) {

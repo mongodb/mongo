@@ -714,6 +714,14 @@ public:
     static std::pair<BSONType, std::vector<uint8_t>> decrypt(BSONElement element,
                                                              FLEKeyVault* keyVault);
 
+    static FLE2FindEqualityPayload parseFindPayload(ConstDataRange cdr);
+
+    static FLE2FindEqualityPayload serializeFindPayload(FLEIndexKeyAndId indexKey,
+                                                        FLEUserKeyAndId userKey,
+                                                        BSONElement element,
+                                                        uint64_t maxContentionFactor);
+
+
     /**
      * Generates a client-side payload that is sent to the server.
      *
