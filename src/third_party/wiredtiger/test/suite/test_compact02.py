@@ -123,12 +123,6 @@ class test_compact02(wttest.WiredTigerTestCase):
     def test_compact02(self):
         mb = 1024 * 1024
 
-        # FIXME-WT-7187
-        # This test is temporarily disabled for OS/X, it fails, but not consistently.
-        import platform
-        if platform.system() == 'Darwin':
-            self.skipTest('Compaction tests skipped, as they fail on OS/X')
-
         self.ConnectionOpen(self.cacheSize)
 
         # Set the leaf_value_max to ensure we never create overflow items.

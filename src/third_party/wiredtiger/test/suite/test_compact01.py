@@ -37,9 +37,10 @@ from wtscenario import make_scenarios
 class test_compact(wttest.WiredTigerTestCase, suite_subprocess):
     name = 'test_compact'
 
-    # Use a small page size because we want to create lots of pages.
-    config = 'allocation_size=512,' +\
-        'leaf_page_max=512,key_format=S'
+    # We don't want to set the page size too small as compaction doesn't work on tables with many
+    # overflow items, furthermore eviction can get very slow with overflow items. We don't want the
+    # page size to be too big either as there won't be enough pages to rewrite.
+    config = 'leaf_page_max=8KB,key_format=S'
     nentries = 50000
 
     # The table is a complex object, give it roughly 5 pages per underlying
@@ -73,12 +74,6 @@ class test_compact(wttest.WiredTigerTestCase, suite_subprocess):
 
     # Test compaction.
     def test_compact(self):
-        # FIXME-WT-7187
-        # This test is temporarily disabled for OS/X, it fails often, but not consistently.
-        import platform
-        if platform.system() == 'Darwin':
-            self.skipTest('Compaction tests skipped, as they fail on OS/X')
-
         # Populate an object
         uri = self.type + self.name
         ds = self.dataset(self, uri, self.nentries - 1, config=self.config)
