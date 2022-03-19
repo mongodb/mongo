@@ -277,8 +277,13 @@ ProcessOplogResult processSessionOplog(const BSONObj& oplogBSON,
         throw;
     }
 
-    if (!result.isPrePostImage)
+    if (!result.isPrePostImage && !isWouldChangeOwningShardSentinelOplogEntry(oplogEntry)) {
+        // Do not overwrite the "o" field if this is a pre/post image oplog entry. Also do not
+        // overwrite it if this is a WouldChangeOwningShard sentinel oplog entry since it contains
+        // a special BSONObj used for making retries fail with an IncompleteTransactionHistory
+        // error.
         oplogEntry.setObject(SessionCatalogMigration::kSessionOplogTag);
+    }
     setPrePostImageTs(lastResult, &oplogEntry);
     oplogEntry.setPrevWriteOpTimeInTransaction(txnParticipant.getLastWriteOpTime());
 

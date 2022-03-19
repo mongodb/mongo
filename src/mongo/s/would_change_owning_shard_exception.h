@@ -32,6 +32,7 @@
 #include "mongo/base/error_extra_info.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/namespace_string.h"
 
 namespace mongo {
 
@@ -48,10 +49,12 @@ public:
 
     explicit WouldChangeOwningShardInfo(const BSONObj& preImage,
                                         const BSONObj& postImage,
-                                        const bool shouldUpsert)
+                                        const bool shouldUpsert,
+                                        boost::optional<NamespaceString> ns)
         : _preImage(preImage.getOwned()),
           _postImage(postImage.getOwned()),
-          _shouldUpsert(shouldUpsert) {}
+          _shouldUpsert(shouldUpsert),
+          _ns(ns) {}
 
     const auto& getPreImage() const {
         return _preImage;
@@ -63,6 +66,10 @@ public:
 
     const auto& getShouldUpsert() const {
         return _shouldUpsert;
+    }
+
+    const auto& getNs() const {
+        return _ns;
     }
 
     BSONObj toBSON() const {
@@ -84,6 +91,10 @@ private:
 
     // True if {upsert: true} and the update stage did not match any docs
     bool _shouldUpsert;
+
+    // The namespace of the collection containing the document. Does not get serialized into the
+    // BSONObj for this error.
+    boost::optional<NamespaceString> _ns;
 };
 using WouldChangeOwningShardException = ExceptionFor<ErrorCodes::WouldChangeOwningShard>;
 

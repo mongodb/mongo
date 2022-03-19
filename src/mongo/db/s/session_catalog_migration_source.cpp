@@ -431,7 +431,7 @@ void SessionCatalogMigrationSource::_extractOplogEntriesForInternalTransactionFo
             continue;
         }
 
-        if (replOp.getNss() != _ns && !isWouldChangeOwningShardSentinelOplogEntry(replOp)) {
+        if (replOp.getNss() != _ns) {
             // Skip this operation since it does not involve the namespace being migrated.
             continue;
         }

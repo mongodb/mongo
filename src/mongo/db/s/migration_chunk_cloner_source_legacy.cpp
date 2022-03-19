@@ -40,6 +40,8 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/ops/write_ops_retryability.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
@@ -158,9 +160,32 @@ private:
 void LogTransactionOperationsForShardingHandler::commit(boost::optional<Timestamp>) {
     std::set<NamespaceString> namespacesTouchedByTransaction;
 
+    // Inform the session migration subsystem that a transaction has committed for the given
+    // namespace.
+    auto addToSessionMigrationOptimeQueue =
+        [&namespacesTouchedByTransaction](MigrationChunkClonerSourceLegacy* const cloner,
+                                          const NamespaceString& nss,
+                                          const repl::OpTime opTime) {
+            if (namespacesTouchedByTransaction.find(nss) == namespacesTouchedByTransaction.end()) {
+                cloner->_addToSessionMigrationOptimeQueue(
+                    opTime, SessionCatalogMigrationSource::EntryAtOpTimeType::kTransaction);
+
+                namespacesTouchedByTransaction.emplace(nss);
+            }
+        };
+
     for (const auto& stmt : _stmts) {
         auto opType = stmt.getOpType();
-        if (opType == repl::OpTypeEnum::kNoop) {
+
+        // Skip every noop entry except for a WouldChangeOwningShard (WCOS) sentinel noop entry
+        // since for an internal transaction for a retryable WCOS findAndModify that is an upsert,
+        // the applyOps oplog entry on the old owning shard would not have the insert entry; so if
+        // we skip the noop entry here, the write history for the internal transaction would not get
+        // transferred to the recipient since the _prepareOrCommitOpTime would not get added to the
+        // session migration opTime queue below, and this would cause the write to execute again if
+        // there is a retry after the migration.
+        if (opType == repl::OpTypeEnum::kNoop &&
+            !isWouldChangeOwningShardSentinelOplogEntry(stmt)) {
             continue;
         }
 
@@ -176,6 +201,11 @@ void LogTransactionOperationsForShardingHandler::commit(boost::optional<Timestam
             continue;
         }
         auto* const cloner = dynamic_cast<MigrationChunkClonerSourceLegacy*>(clonerPtr.get());
+
+        if (isWouldChangeOwningShardSentinelOplogEntry(stmt)) {
+            addToSessionMigrationOptimeQueue(cloner, nss, _prepareOrCommitOpTime);
+            continue;
+        }
 
         auto documentKey = getDocumentKeyFromReplOperation(stmt, opType);
 
@@ -207,15 +237,7 @@ void LogTransactionOperationsForShardingHandler::commit(boost::optional<Timestam
             }
         }
 
-        // Inform the session migration subsystem that a transaction has committed for all involved
-        // namespaces.
-        if (namespacesTouchedByTransaction.find(nss) == namespacesTouchedByTransaction.end()) {
-            cloner->_addToSessionMigrationOptimeQueue(
-                _prepareOrCommitOpTime,
-                SessionCatalogMigrationSource::EntryAtOpTimeType::kTransaction);
-
-            namespacesTouchedByTransaction.emplace(nss);
-        }
+        addToSessionMigrationOptimeQueue(cloner, nss, _prepareOrCommitOpTime);
 
         // Pass an empty prePostOpTime to the queue because retryable write history doesn't care
         // about writes in transactions.

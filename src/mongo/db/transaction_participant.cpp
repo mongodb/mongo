@@ -71,6 +71,7 @@
 #include "mongo/db/txn_retry_counter_too_old_info.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/would_change_owning_shard_exception.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/log_with_sampling.h"
 #include "mongo/util/net/socket_utils.h"
@@ -3083,7 +3084,8 @@ void TransactionParticipant::Participant::addCommittedStmtIds(
 }
 
 void TransactionParticipant::Participant::handleWouldChangeOwningShardError(
-    OperationContext* opCtx) {
+    OperationContext* opCtx,
+    std::shared_ptr<const WouldChangeOwningShardInfo> wouldChangeOwningShardInfo) {
     if (o().txnState.isNone() && p().autoCommit == boost::none) {
         // If this was a retryable write, reset the transaction state so this participant can be
         // reused for the transaction mongos will use to handle the WouldChangeOwningShard error.
@@ -3105,8 +3107,11 @@ void TransactionParticipant::Participant::handleWouldChangeOwningShardError(
                 p().autoCommit != boost::none);
         repl::ReplOperation operation;
         operation.setOpType(repl::OpTypeEnum::kNoop);
-        operation.setNss(NamespaceString());
         operation.setObject(kWouldChangeOwningShardSentinel);
+
+        // Required by chunk migration.
+        invariant(wouldChangeOwningShardInfo->getNs());
+        operation.setNss(*wouldChangeOwningShardInfo->getNs());
 
         // The operation that triggers WouldChangeOwningShard should always be the first in its
         // transaction.

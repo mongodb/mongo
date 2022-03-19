@@ -103,6 +103,7 @@
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/rpc/warn_deprecated_wire_ops.h"
 #include "mongo/s/shard_cannot_refresh_due_to_locks_held_exception.h"
+#include "mongo/s/would_change_owning_shard_exception.h"
 #include "mongo/transport/hello_metrics.h"
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/session.h"
@@ -988,7 +989,9 @@ void CheckoutSessionAndInvokeCommand::_tapError(Status status) {
         // in the transaction's participant list, so it is guaranteed to learn its outcome.
         _stashTransaction();
     } else if (status.code() == ErrorCodes::WouldChangeOwningShard) {
-        _txnParticipant->handleWouldChangeOwningShardError(opCtx);
+        auto wouldChangeOwningShardInfo = status.extraInfo<WouldChangeOwningShardInfo>();
+        invariant(wouldChangeOwningShardInfo);
+        _txnParticipant->handleWouldChangeOwningShardError(opCtx, wouldChangeOwningShardInfo);
         _stashTransaction();
 
         auto txnResponseMetadata = _txnParticipant->getResponseMetadata();

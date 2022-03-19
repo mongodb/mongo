@@ -983,7 +983,7 @@ TEST_F(SessionCatalogMigrationSourceTest,
         makeDurableReplOp(repl::OpTypeEnum::kInsert, kOtherNs, BSON("x" << -5), BSONObj(), {5});
     // WouldChangeOwningShard sentinel op.
     auto op6 = makeDurableReplOp(
-        repl::OpTypeEnum::kNoop, {}, kWouldChangeOwningShardSentinel, BSONObj(), {6});
+        repl::OpTypeEnum::kNoop, kNs, kWouldChangeOwningShardSentinel, BSONObj(), {6});
 
     auto applyOpsOpTime1 = repl::OpTime(Timestamp(130, 1), 1);
     auto entry1 = makeApplyOpsOplogEntry(applyOpsOpTime1,
@@ -1501,7 +1501,7 @@ TEST_F(SessionCatalogMigrationSourceTest,
             makeDurableReplOp(repl::OpTypeEnum::kInsert, kOtherNs, BSON("x" << -5), BSONObj(), {5});
         // WouldChangeOwningShard sentinel op.
         auto op6 = makeDurableReplOp(
-            repl::OpTypeEnum::kNoop, {}, kWouldChangeOwningShardSentinel, BSONObj(), {6});
+            repl::OpTypeEnum::kNoop, kNs, kWouldChangeOwningShardSentinel, BSONObj(), {6});
 
         auto applyOpsOpTime1 = repl::OpTime(Timestamp(opTimeSecs, 1), 1);
         auto entry1 = makeApplyOpsOplogEntry(applyOpsOpTime1,

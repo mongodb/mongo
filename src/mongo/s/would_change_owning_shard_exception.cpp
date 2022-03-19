@@ -58,7 +58,8 @@ std::shared_ptr<const ErrorExtraInfo> WouldChangeOwningShardInfo::parse(const BS
 WouldChangeOwningShardInfo WouldChangeOwningShardInfo::parseFromCommandError(const BSONObj& obj) {
     return WouldChangeOwningShardInfo(obj[kPreImage].Obj().getOwned(),
                                       obj[kPostImage].Obj().getOwned(),
-                                      obj[kShouldUpsert].Bool());
+                                      obj[kShouldUpsert].Bool(),
+                                      boost::none);
 }
 
 }  // namespace mongo

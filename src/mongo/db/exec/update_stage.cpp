@@ -671,9 +671,10 @@ bool UpdateStage::wasReshardingKeyUpdated(const ShardingWriteRouter& shardingWri
     auto oldRecipShard = *shardingWriteRouter.getReshardingDestinedRecipient(oldObj.value());
     auto newRecipShard = *shardingWriteRouter.getReshardingDestinedRecipient(newObj);
 
-    uassert(WouldChangeOwningShardInfo(oldObj.value(), newObj, false /* upsert */),
-            "This update would cause the doc to change owning shards under the new shard key",
-            oldRecipShard == newRecipShard);
+    uassert(
+        WouldChangeOwningShardInfo(oldObj.value(), newObj, false /* upsert */, collection()->ns()),
+        "This update would cause the doc to change owning shards under the new shard key",
+        oldRecipShard == newRecipShard);
 
     return true;
 }
@@ -750,7 +751,8 @@ bool UpdateStage::wasExistingShardKeyUpdated(const ShardingWriteRouter& sharding
             hangBeforeThrowWouldChangeOwningShard.pauseWhileSet(opCtx());
         }
 
-        uasserted(WouldChangeOwningShardInfo(oldObj.value(), newObj, false /* upsert */),
+        uasserted(WouldChangeOwningShardInfo(
+                      oldObj.value(), newObj, false /* upsert */, collection()->ns()),
                   "This update would cause the doc to change owning shards");
     }
 

@@ -780,7 +780,9 @@ public:
          * Handles a WouldChangeOwningShard error based on whether the operation that triggered it
          * was a retryable write or in a retryable transaction.
          */
-        void handleWouldChangeOwningShardError(OperationContext* opCtx);
+        void handleWouldChangeOwningShardError(
+            OperationContext* opCtx,
+            std::shared_ptr<const WouldChangeOwningShardInfo> wouldChangeOwningShardInfo);
 
     private:
         // Checks whether the given statementId for the specified transaction has already executed

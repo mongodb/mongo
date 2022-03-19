@@ -506,13 +506,6 @@ var $config = extendWorkload($config, function($config, $super) {
 
     const origMoveChunk = $config.states.moveChunk;
     $config.states.moveChunk = function moveChunk(db, collName, connCache) {
-        if (this.internalTransactionsEnabled &&
-            (this.retryOnKilledSession || this.runningWithStepdowns)) {
-            // TODO SERVER-58758: Remove this when retryable transaction history is migrated.
-            print("Skipping moveChunk until transaction API use supports retries");
-            return;
-        }
-
         origMoveChunk.apply(this, arguments);
     };
 

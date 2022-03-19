@@ -144,8 +144,10 @@ void UpsertStage::_performInsert(BSONObj newDocument) {
                         "upserts are only allowed when running in a transaction or with "
                         "retryWrites: true.",
                         opCtx()->getTxnNumber());
-                uasserted(WouldChangeOwningShardInfo(
-                              _params.request->getQuery(), newDocument, true /* upsert */),
+                uasserted(WouldChangeOwningShardInfo(_params.request->getQuery(),
+                                                     newDocument,
+                                                     true /* upsert */,
+                                                     collection()->ns()),
                           "The document we are inserting belongs on a different shard");
             }
         }
