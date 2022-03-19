@@ -121,6 +121,33 @@ function runTest_SingleLocalRecord({
     });
 }
 
+/**
+ * Executes $lookup with non existent foreign collection and checks that the "as" field for it
+ * contains empty arrays.
+ */
+(
+    function runTest_NonExistentForeignCollection() {
+        localColl.drop();
+        const localDocs = Array(10).fill({a: 1});
+        assert.commandWorked(localColl.insert(localDocs));
+
+        foreignColl.drop();
+
+        const results = localColl.aggregate([{
+        $lookup: {
+            from: foreignColl.getName(),
+            localField: "a",
+            foreignField: "b",
+            as: "matched"
+        }
+    }]).toArray();
+
+        assert.eq(localDocs.length, results.length);
+
+        // Local record should have no match.
+        assert.eq(results[0].matched, []);
+    })();
+
 (function testMatchingTopLevelFieldToScalar() {
     const docs = [
         {_id: 0, a: NumberInt(0)},

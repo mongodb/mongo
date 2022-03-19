@@ -388,7 +388,7 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
     const auto indexOrdering = indexAccessMethod->getSortedDataInterface()->getOrdering();
     iamMap.insert({indexName, indexAccessMethod});
 
-    // Build the outer branch that produces the correclated local key slot.
+    // Build the outer branch that produces the correlated local key slot.
     auto [localKeysSetSlot, localKeysSetStage] = buildLocalKeySet(
         std::move(localStage), localRecordSlot, localFieldName, nodeId, slotIdGenerator);
 
@@ -500,6 +500,23 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
 
     return {foreignGroupSlot, std::move(nljStage)};
 }
+
+/*
+ * Builds a project stage that projects an empty array for each local document.
+ */
+std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildNonExistentForeignCollLookupStage(
+    StageBuilderState& state,
+    std::unique_ptr<sbe::PlanStage> localStage,
+    const PlanNodeId nodeId,
+    SlotIdGenerator& slotIdGenerator) {
+    auto [emptyArrayTag, emptyArrayVal] = makeNewArray();
+    SlotId emptyArraySlot = slotIdGenerator.generate();
+    return {emptyArraySlot,
+            makeProjectStage(std::move(localStage),
+                             nodeId,
+                             emptyArraySlot,
+                             makeConstant(emptyArrayTag, emptyArrayVal))};
+}
 }  // namespace
 
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildLookup(
@@ -515,6 +532,18 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     auto [matchedDocumentsSlot, foreignStage] = [&, localStage = std::move(localStage)]() mutable
         -> std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> {
+        const auto& foreignColl =
+            _collections.lookupCollection(NamespaceString(eqLookupNode->foreignCollection));
+        // When foreign collection doesn't exist, we create stages that simply append empty arrays
+        // to each local document and do not consider the case that foreign collection may be
+        // created during the query, since we cannot easily create dynamic plan stages and it has
+        // messier semantics. Builds a project stage that projects an empty array for each local
+        // document.
+        if (!foreignColl) {
+            return buildNonExistentForeignCollLookupStage(
+                _state, std::move(localStage), eqLookupNode->nodeId(), _slotIdGenerator);
+        }
+
         switch (eqLookupNode->lookupStrategy) {
             case EqLookupNode::LookupStrategy::kHashJoin:
                 uasserted(5842602, "$lookup planning logic picked hash join");
@@ -525,13 +554,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                     "$lookup using index join should have one child and a populated index entry",
                     eqLookupNode->children.size() == 1 && eqLookupNode->idxEntry);
 
-                const NamespaceString foreignCollNs(eqLookupNode->foreignCollection);
-                const auto& foreignColl = _collections.lookupCollection(foreignCollNs);
-                tassert(6357202,
-                        str::stream()
-                            << "$lookup using index join with unknown foreign collection '"
-                            << foreignCollNs << "'",
-                        foreignColl);
                 const auto& index = *eqLookupNode->idxEntry;
 
                 uassert(6357203,
@@ -556,12 +578,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
                 auto foreignResultSlot = _slotIdGenerator.generate();
                 auto foreignRecordIdSlot = _slotIdGenerator.generate();
-                const auto& foreignColl =
-                    _collections.lookupCollection(NamespaceString(eqLookupNode->foreignCollection));
 
-                // TODO SERVER-64091: Delete this tassert when we correctly handle the case of a non
-                //  existent foreign collection.
-                tassert(6355302, "The foreign collection should exist", foreignColl);
                 auto foreignStage = makeS<ScanStage>(foreignColl->uuid(),
                                                      foreignResultSlot,
                                                      foreignRecordIdSlot,
