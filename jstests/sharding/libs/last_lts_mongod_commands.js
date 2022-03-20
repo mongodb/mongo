@@ -14,7 +14,10 @@ const commandsRemovedFromMongodSinceLastLTS = [
 const commandsAddedToMongodSinceLastLTS = [
     "clusterAbortTransaction",
     "clusterCommitTransaction",
+    "clusterDelete",
     "clusterFind",
+    "clusterInsert",
+    "clusterUpdate",
     "rotateCertificates",
     "setClusterParameter",
     "setUserWriteBlockMode",

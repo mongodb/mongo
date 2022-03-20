@@ -17,7 +17,10 @@ const kCollName = "bar";
 const clusterCommandsCases = [
     {cmd: {clusterAbortTransaction: 1}, expectedErr: ErrorCodes.InvalidOptions},
     {cmd: {clusterCommitTransaction: 1}, expectedErr: ErrorCodes.InvalidOptions},
+    {cmd: {clusterDelete: kCollName, deletes: [{q: {}, limit: 1}]}},
     {cmd: {clusterFind: kCollName}},
+    {cmd: {clusterInsert: kCollName, documents: [{x: 1}]}},
+    {cmd: {clusterUpdate: kCollName, updates: [{q: {doesNotExist: 1}, u: {x: 1}}]}},
 ];
 
 function runTestCaseExpectFail(conn, testCase, code) {

@@ -120,7 +120,10 @@ const allCommands = {
     cloneCollectionAsCapped: {skip: isPrimaryOnly},
     clusterAbortTransaction: {skip: "already tested by 'abortTransaction' tests on mongos"},
     clusterCommitTransaction: {skip: "already tested by 'commitTransaction' tests on mongos"},
+    clusterDelete: {skip: "already tested by 'delete' tests on mongos"},
     clusterFind: {skip: "already tested by 'find' tests on mongos"},
+    clusterInsert: {skip: "already tested by 'insert' tests on mongos"},
+    clusterUpdate: {skip: "already tested by 'update' tests on mongos"},
     collMod: {skip: isPrimaryOnly},
     collStats: {
         command: {aggregate: collName, pipeline: [{$collStats: {count: {}}}], cursor: {}},

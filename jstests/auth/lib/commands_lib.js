@@ -4339,6 +4339,45 @@ var authCommandsLib = {
           ]
         },
         {
+          testname: "clusterDelete",
+          command: {clusterDelete: "foo", deletes: [{q: {}, limit: 1}]},
+          skipSharded: true,
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                roles: {__system: 1},
+                privileges: [{resource: {cluster: true}, actions: ["internal"]}],
+                expectFail: true,
+              },
+          ]
+        },
+        {
+          testname: "clusterInsert",
+          command: {clusterInsert: "foo", documents: [{data: 5}]},
+          skipSharded: true,
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                roles: {__system: 1},
+                privileges: [{resource: {cluster: true}, actions: ["internal"]}],
+                expectFail: true,
+              },
+          ]
+        },
+        {
+          testname: "clusterUpdate",
+          command: {clusterUpdate: "foo", updates: [{q: {doesNotExist: 1}, u: {x: 1}}]},
+          skipSharded: true,
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                roles: {__system: 1},
+                privileges: [{resource: {cluster: true}, actions: ["internal"]}],
+                expectFail: true,
+              },
+          ]
+        },
+        {
           testname: "insert",
           command: {insert: "foo", documents: [{data: 5}]},
           testcases: [
