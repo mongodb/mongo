@@ -928,4 +928,19 @@ T assertGet(StatusWith<T>&& swt) {
  */
 std::vector<std::string> getAllSuiteNames();
 
+/** Invocation info (used e.g. by death test to exec). */
+struct SpawnInfo {
+    /** Copy of the original `argv` from main. */
+    std::vector<std::string> argVec;
+    /** If nonempty, this process is a death test respawn. */
+    std::string internalRunDeathTest;
+    /**
+     * A unit test main has to turn this on to indicate that it can be brought to
+     * the death test from a fresh exec with `--suite` and `--filter` options.
+     * Otherwise death tests simply fork. See death_test.cpp.
+     */
+    bool deathTestExecAllowed = false;
+};
+SpawnInfo& getSpawnInfo();
+
 }  // namespace mongo::unittest

@@ -31,6 +31,7 @@
 #include "mongo/platform/basic.h"
 
 #include <fmt/format.h>
+#include <pcrecpp.h>
 #include <stdio.h>
 
 #include "mongo/bson/json.h"
@@ -59,21 +60,31 @@
 #include "mongo/util/debugger.h"
 #include "mongo/util/quick_exit.h"
 
+#if defined(__has_feature)
+#if __has_feature(thread_sanitizer)
+#define TSAN_ENABLED_
+#endif
+#if __has_feature(address_sanitizer)
+#define ASAN_ENABLED_
+#endif
+#if __has_feature(memory_sanitizer)
+#define MSAN_ENABLED_
+#endif
+#endif  // __has_feature
+
 namespace mongo {
 namespace unittest {
+
+using namespace fmt::literals;
 
 class DeathTestSyscallException : public std::runtime_error {
 public:
     using std::runtime_error::runtime_error;
 };
 
-#define logAndThrowWithErrno(expr) logAndThrowWithErrnoAt(expr, __FILE__, __LINE__, errno)
+#define LOG_AND_THROW_WITH_ERRNO(expr) logAndThrowWithErrnoAt(expr, __FILE__, __LINE__, errno)
 
-void logAndThrowWithErrnoAt(const StringData expr,
-                            const StringData file,
-                            const unsigned line,
-                            const int err) {
-    using namespace fmt::literals;
+void logAndThrowWithErrnoAt(StringData expr, StringData file, unsigned line, int err) {
     LOGV2_ERROR(24138,
                 "{expr} failed: {error} @{file}:{line}",
                 "expression failed",
@@ -86,140 +97,237 @@ void logAndThrowWithErrnoAt(const StringData expr,
         "{} failed: {} @{}:{}"_format(expr, errnoWithDescription(err), file, line));
 }
 
-#if defined(__has_feature) && __has_feature(thread_sanitizer)
-// Our callback handler exits with the default TSAN exit code so we can check in the death test
-// framework Without this, the use could override the exit code and get a false positive that the
-// test passes in TSAN builds.
-void sanitizerDieCallback() {
-    _exit(EXIT_THREAD_SANITIZER);
+
+/**
+ * Logs an artifact about why a death test might be skipped.
+ * As a side effect, defines the DEATH_TEST_ENABLED macro.
+ */
+void initDeathTest() {
+#if defined(ASAN_ENABLED_) || defined(MSAN_ENABLED_)
+    LOGV2(5306900, "Skipping death test in sanitizer build");
+#elif defined(_WIN32)
+    LOGV2(24133, "Skipping death test on Windows");
+#elif defined(__APPLE__) && (TARGET_OS_TV || TARGET_OS_WATCH)
+    LOGV2(24134, "Skipping death test on tvOS/watchOS");
+#else
+#define DEATH_TEST_ENABLED
+#endif
 }
+
+#ifdef DEATH_TEST_ENABLED
+struct DeathTestBase::Subprocess {
+    void run();
+    void execChild();
+    void monitorChild(FILE* fromChild);
+    void prepareChild(int (&pipes)[2]);
+    void invokeTest();
+
+    DeathTestBase* death;
+    pid_t child;
+};
 #endif
 
 void DeathTestBase::_doTest() {
-#if defined(__has_feature) && (__has_feature(address_sanitizer) || __has_feature(memory_sanitizer))
-    LOGV2(5306900, "Skipping death test in sanitizer build");
-    return;
-#elif defined(_WIN32)
-    LOGV2(24133, "Skipping death test on Windows");
-    return;
-#elif defined(__APPLE__) && (TARGET_OS_TV || TARGET_OS_WATCH)
-    LOGV2(24134, "Skipping death test on tvOS/watchOS");
-    return;
-#else
-    int pipes[2];
-    if (pipe(pipes) == -1)
-        logAndThrowWithErrno("pipe()");
-    pid_t child;
-    if ((child = fork()) == -1)
-        logAndThrowWithErrno("fork()");
-    if (child) {
-        if (close(pipes[1]) == -1)
-            logAndThrowWithErrno("close(pipe[1])");
-        std::ostringstream os;
-        FILE* pf = 0;
-        if ((pf = fdopen(pipes[0], "r")) == NULL)
-            logAndThrowWithErrno("fdopen(pipe[0], \"r\")");
-        ScopeGuard pfGuard([&] {
-            if (fclose(pf) != 0)
-                logAndThrowWithErrno("fclose(pf)");
-        });
-        LOGV2(5042601, "Death test starting");
-        ScopeGuard alwaysLogExit([] { LOGV2(5042602, "Death test finishing"); });
+    initDeathTest();
+#ifdef DEATH_TEST_ENABLED
+    Subprocess{this}.run();
+#endif  // DEATH_TEST_ENABLED
+}
 
-        char* lineBuf = nullptr;
-        size_t lineBufSize = 0;
-        ScopeGuard lineBufGuard([&] { free(lineBuf); });
-        while (true) {
-            errno = 0;  // Needed as getline can return -1 without setting errno.
-            ssize_t bytesRead = getline(&lineBuf, &lineBufSize, pf);
-            if (bytesRead == -1) {
-                if (errno == EINTR)
-                    continue;
-                break;
-            }
-            StringData line(lineBuf, bytesRead);
-            if (line.empty())
-                continue;
-            if (line[line.size() - 1] == '\n')
-                line = line.substr(0, line.size() - 1);
-            if (line.empty())
-                continue;
-            int parsedLen = 0;
-            BSONObj parsedChildLog;
-            try {
-                parsedChildLog = fromjson(lineBuf, &parsedLen);
-            } catch (DBException&) {
-                // ignore json parsing errors and dump the whole log line as text
-                parsedLen = 0;
-            }
-            if (static_cast<size_t>(parsedLen) == line.size()) {
-                LOGV2(20165, "child", "json"_attr = parsedChildLog);
-            } else {
-                LOGV2(20169, "child", "text"_attr = line);
-            }
-            os.write(lineBuf, bytesRead);
-            invariant(os);
-        }
-        if (!feof(pf))
-            logAndThrowWithErrno("getline(&buf, &bufSize, pf)");
+#ifdef DEATH_TEST_ENABLED
+#define THROWY_LIBC_IF(expr, isErr)          \
+    [&] {                                    \
+        auto&& rLocal_{expr};                \
+        if (isErr(rLocal_))                  \
+            LOG_AND_THROW_WITH_ERRNO(#expr); \
+        return rLocal_;                      \
+    }()
+#define THROWY_LIBC(expr) THROWY_LIBC_IF(expr, [](auto r) { return r == -1; })
 
-        pid_t pid;
-        int stat;
-        while (child != (pid = waitpid(child, &stat, 0))) {
-            invariant(pid == -1);
-            const int err = errno;
-            switch (err) {
-                case EINTR:
-                    continue;
-                default:
-                    logAndThrowWithErrno("waitpid(child, &stat, 0)");
-            }
-        }
-        if (WIFSIGNALED(stat) || (WIFEXITED(stat) && WEXITSTATUS(stat) != 0)) {
-// Exited with a signal or non-zero code. Validate the expected message.
-#if defined(__has_feature) && __has_feature(thread_sanitizer)
-            if (WEXITSTATUS(stat) == EXIT_THREAD_SANITIZER) {
-                FAIL(
-                    "Death test exited with Thread Sanitizer exit code, search test output for "
-                    "'ThreadSanitizer' for more information");
-            }
-#endif
-            if (_isRegex()) {
-                ASSERT_STRING_SEARCH_REGEX(os.str(), _doGetPattern())
-                    << " @" << _getFile() << ":" << _getLine();
-            } else {
-                ASSERT_STRING_CONTAINS(os.str(), _doGetPattern())
-                    << " @" << _getFile() << ":" << _getLine();
-            }
-            LOGV2(5042603, "Death test test died as expected");
-            return;
+namespace {
+template <typename F>
+int eintrLoop(F&& libcCall) {
+    while (true) {
+        errno = 0;
+        auto&& r{libcCall()};
+        if (r == -1 && errno == EINTR)
+            continue;
+        return r;
+    }
+}
+
+/** Removes "--opt val" and "--opt=val" argument sequences from `av`. */
+void stripOption(std::vector<std::string>& av, StringData opt) {
+    for (size_t i = 0; i < av.size();) {
+        StringData sd = av[i];
+        if (sd == "--{}"_format(opt)) {
+            if (i + 1 < av.size())
+                av.erase(av.begin() + i, av.begin() + i + 2);
+        } else if (sd.startsWith("--{}="_format(opt))) {
+            av.erase(av.begin() + i);
         } else {
-            invariant(!WIFSTOPPED(stat));
+            ++i;
         }
-        FAIL("Expected death, found life\n\n") << os.str();
+    }
+}
+
+}  // namespace
+
+void DeathTestBase::Subprocess::run() {
+    if (!getSpawnInfo().internalRunDeathTest.empty()) {
+        invokeTest();  // We're in an execve child process.
+        return;
     }
 
-    // This code only executes in the child process.
-    if (close(pipes[0]) == -1)
-        logAndThrowWithErrno("close(pipes[0])");
-    if (dup2(pipes[1], 1) == -1)
-        logAndThrowWithErrno("dup2(pipes[1], 1)");
-    if (dup2(1, 2) == -1)
-        logAndThrowWithErrno("dup2(1, 2)");
+    // There are a few reasons to fall back to non-exec death tests.
+    // These are mostly unusual tests with a custom main.
+    bool doExec = death->_exec;
+    if (!UnitTest::getInstance()->currentTestInfo()) {
+        LOGV2(6186002, "Cannot exec child without currentTestInfo");
+        doExec = false;
+    }
+    if (!getSpawnInfo().deathTestExecAllowed) {
+        LOGV2(6186003, "Death test exec disallowed");
+        doExec = false;
+    }
+    if (getSpawnInfo().argVec.empty()) {
+        LOGV2(6186004, "Cannot exec child without an argVec");
+        doExec = false;
+    }
+    LOGV2(6186001, "Child", "exec"_attr = doExec);
+
+    int pipes[2];
+    THROWY_LIBC(pipe(pipes));
+    if ((child = THROWY_LIBC(fork())) != 0) {
+        THROWY_LIBC(close(pipes[1]));
+        FILE* pf = THROWY_LIBC_IF(fdopen(pipes[0], "r"), [](FILE* f) { return !f; });
+        ScopeGuard pfGuard = [&] { THROWY_LIBC(fclose(pf)); };
+        monitorChild(pf);
+    } else {
+        prepareChild(pipes);
+        if (doExec) {
+            // Go further: fully reboot the child with `execve`.
+            execChild();
+        } else {
+            invokeTest();
+        }
+    }
+}
+
+void DeathTestBase::Subprocess::execChild() {
+    auto& spawnInfo = getSpawnInfo();
+    std::vector<std::string> av = spawnInfo.argVec;
+    // Arrange for the subprocess to execute only this test, exactly once.
+    // Remove '--repeat' option. We want to repeat the whole death test not its child.
+    stripOption(av, "repeat");
+    stripOption(av, "suite");
+    stripOption(av, "filter");
+    stripOption(av, "filterFileName");
+    const TestInfo* info = UnitTest::getInstance()->currentTestInfo();
+    av.push_back("--suite={}"_format(info->suiteName()));
+    av.push_back("--filter=^{}$"_format(pcrecpp::RE::QuoteMeta(std::string{info->testName()})));
+    // The presence of this flag is how the test body in the child process knows it's in the
+    // child process, and therefore to not exec again. Its value is ignored.
+    av.push_back("--internalRunDeathTest=1");
+
+    LOGV2(6186000, "Exec", "argv"_attr = av);
+
+    std::vector<char*> avp;
+    std::transform(av.begin(), av.end(), std::back_inserter(avp), [](auto& s) { return s.data(); });
+    avp.push_back(nullptr);
+    THROWY_LIBC(execv(avp.front(), avp.data()));
+}
+
+void DeathTestBase::Subprocess::monitorChild(FILE* pf) {
+    std::ostringstream os;
+
+    LOGV2(5042601, "Death test starting");
+    ScopeGuard alwaysLogExit = [] { LOGV2(5042602, "Death test finishing"); };
+
+    char* lineBuf = nullptr;
+    size_t lineBufSize = 0;
+    ScopeGuard lineBufGuard = [&] { free(lineBuf); };
+    while (true) {
+        ssize_t bytesRead = eintrLoop([&] { return getline(&lineBuf, &lineBufSize, pf); });
+        if (bytesRead == -1)
+            break;
+        StringData line(lineBuf, bytesRead);
+        if (line.empty())
+            continue;
+        if (line[line.size() - 1] == '\n')
+            line = line.substr(0, line.size() - 1);
+        if (line.empty())
+            continue;
+        int parsedLen = 0;
+        BSONObj parsedChildLog;
+        try {
+            parsedChildLog = fromjson(lineBuf, &parsedLen);
+        } catch (DBException&) {
+            // ignore json parsing errors and dump the whole log line as text
+            parsedLen = 0;
+        }
+        if (static_cast<size_t>(parsedLen) == line.size()) {
+            LOGV2(20165, "child", "json"_attr = parsedChildLog);
+        } else {
+            LOGV2(20169, "child", "text"_attr = line);
+        }
+        os.write(lineBuf, bytesRead);
+        invariant(os);
+    }
+    if (!feof(pf))
+        LOG_AND_THROW_WITH_ERRNO("getline(&buf, &bufSize, pf)");
+
+    int stat;
+    THROWY_LIBC(eintrLoop([&] { return waitpid(child, &stat, 0); }));
+
+    if (WIFSIGNALED(stat) || (WIFEXITED(stat) && WEXITSTATUS(stat) != 0)) {
+        // Exited with a signal or non-zero code. Validate the expected message.
+#if defined(TSAN_ENABLED_)
+        if (WEXITSTATUS(stat) == EXIT_THREAD_SANITIZER) {
+            FAIL(
+                "Death test exited with Thread Sanitizer exit code, search test output for "
+                "'ThreadSanitizer' for more information");
+        }
+#endif
+        if (death->_isRegex()) {
+            ASSERT_STRING_SEARCH_REGEX(os.str(), death->_doGetPattern())
+                << " @" << death->_getFile() << ":" << death->_getLine();
+        } else {
+            ASSERT_STRING_CONTAINS(os.str(), death->_doGetPattern())
+                << " @" << death->_getFile() << ":" << death->_getLine();
+        }
+        LOGV2(5042603, "Death test test died as expected");
+        return;
+    } else {
+        invariant(!WIFSTOPPED(stat));
+    }
+    FAIL("Expected death, found life\n\n") << os.str();
+}
+
+void DeathTestBase::Subprocess::prepareChild(int (&pipes)[2]) {
+    THROWY_LIBC(close(pipes[0]));
+    THROWY_LIBC(dup2(pipes[1], STDOUT_FILENO));
+    THROWY_LIBC(dup2(pipes[1], STDERR_FILENO));
+    THROWY_LIBC(close(pipes[1]));
+    THROWY_LIBC(close(STDIN_FILENO));
 
     // We disable the creation of core dump files in the child process since the child process
     // is expected to exit uncleanly. This avoids unnecessarily creating core dump files when
     // the child process calls std::abort() or std::terminate().
-    const struct rlimit kNoCoreDump { 0U, 0U };
-    if (setrlimit(RLIMIT_CORE, &kNoCoreDump) == -1)
-        logAndThrowWithErrno("setrlimit(RLIMIT_CORE, &kNoCoreDump)");
+    const struct rlimit zeroLimit = {0, 0};
+    THROWY_LIBC(setrlimit(RLIMIT_CORE, &zeroLimit));
 
-#if defined(__has_feature) && __has_feature(thread_sanitizer)
-    __sanitizer_set_death_callback(sanitizerDieCallback);
+#if defined(TSAN_ENABLED_)
+    // Our callback handler exits with the default TSAN exit code so we can check in the death test
+    // framework Without this, the use could override the exit code and get a false positive that
+    // the test passes in TSAN builds.
+    __sanitizer_set_death_callback(+[] { _exit(EXIT_THREAD_SANITIZER); });
 #endif
+}
 
+void DeathTestBase::Subprocess::invokeTest() {
     try {
-        auto test = _doMakeTest();
+        auto test = death->_doMakeTest();
         LOGV2(23515, "Running DeathTest in child");
         test->run();
         LOGV2(20166, "Death test failed to die");
@@ -231,8 +339,8 @@ void DeathTestBase::_doTest() {
     // To fail the test, we must exit with a successful error code, because the parent process
     // is checking for the child to die with an exit code indicating an error.
     quickExit(EXIT_SUCCESS);
-#endif
 }
+#endif  // DEATH_TEST_ENABLED
 
 }  // namespace unittest
 }  // namespace mongo

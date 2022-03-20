@@ -116,10 +116,22 @@
 namespace mongo::unittest {
 
 class DeathTestBase : public Test {
+public:
+    /**
+     * A test can use this to opt-out of exec behavior.
+     * Would have to be called by the constructor. By the time the test body is
+     * running, it's too late.
+     */
+    void setExec(bool enable) {
+        _exec = enable;
+    }
+
 protected:
     DeathTestBase() = default;
 
 private:
+    struct Subprocess;
+
     // Forks, executes _doMakeTest() in the child process to create a Test, then runs that Test.
     void _doTest() final;
 
@@ -129,6 +141,12 @@ private:
     virtual bool _isRegex() = 0;
     virtual int _getLine() = 0;
     virtual std::string _getFile() = 0;
+
+    /**
+     * All death tests will fork a subprocess.
+     * Some will be configured to then go ahead and exec.
+     */
+    bool _exec = true;
 };
 
 template <typename T>

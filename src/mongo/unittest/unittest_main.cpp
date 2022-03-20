@@ -93,6 +93,7 @@ int main(int argc, char** argv) {
     int repeat = 1;
     std::string verbose;
     std::string fileNameFilter;
+    std::string internalRunDeathTest;
 
     // "list" and "repeat" will be assigned with default values, if not present.
     invariant(environment.get("list", &list));
@@ -102,6 +103,9 @@ int main(int argc, char** argv) {
     environment.get("filter", &filter).ignore();
     environment.get("verbose", &verbose).ignore();
     environment.get("fileNameFilter", &fileNameFilter).ignore();
+    environment.get("internalRunDeathTest", &internalRunDeathTest).ignore();
+
+    mongo::unittest::getSpawnInfo() = {argVec, internalRunDeathTest, true};
 
     if (std::any_of(verbose.cbegin(), verbose.cend(), [](char ch) { return ch != 'v'; })) {
         std::cerr << "The string for the --verbose option cannot contain characters other than 'v'"
