@@ -513,6 +513,9 @@ class _MongoSFixture(interface.Fixture):
         return [info]
 
 
+# Default shutdown quiesce mode duration for mongos
+DEFAULT_MONGOS_SHUTDOWN_TIMEOUT_MILLIS = 0
+
 # The default verbosity setting for any tests that are not started with an Evergreen task id. This
 # will apply to any tests run locally.
 DEFAULT_MONGOS_LOG_COMPONENT_VERBOSITY = {"transaction": 3}
@@ -555,6 +558,11 @@ class MongosLauncher(object):
         if "logComponentVerbosity" not in suite_set_parameters:
             suite_set_parameters[
                 "logComponentVerbosity"] = self.default_mongos_log_component_verbosity()
+
+        # Set default shutdown timeout millis if none was specified.
+        if "mongosShutdownTimeoutMillisForSignaledShutdown" not in suite_set_parameters:
+            suite_set_parameters[
+                "mongosShutdownTimeoutMillisForSignaledShutdown"] = DEFAULT_MONGOS_SHUTDOWN_TIMEOUT_MILLIS
 
         _add_testing_set_parameters(suite_set_parameters)
 
