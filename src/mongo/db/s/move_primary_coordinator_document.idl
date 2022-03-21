@@ -40,7 +40,7 @@ structs:
     MovePrimaryCoordinatorDocument:
         description: "Object with neccessary fields to move a database between shards"
         generate_comparison_operators: false
-        strict: true
+        strict: false
         chained_structs:
             ShardingDDLCoordinatorMetadata: ShardingDDLCoordinatorMetadata
         fields:
