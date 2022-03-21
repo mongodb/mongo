@@ -409,7 +409,7 @@ public:
         // std::sort(_docs.begin(), _docs.end());
     }
 
-    BSONObj getById(PrfBlock id) override {
+    BSONObj getById(PrfBlock id) const override {
         for (const auto& doc : _docs) {
             auto el = doc.firstElement();
             int len;
@@ -424,7 +424,7 @@ public:
         return BSONObj();
     }
 
-    uint64_t getDocumentCount() override {
+    uint64_t getDocumentCount() const override {
         return _docs.size();
     }
 
@@ -454,7 +454,7 @@ TEST(FLE_ESC, EmuBinary_Empty) {
         FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedValueToken(escDerivedToken);
 
 
-    auto i = ESCCollection::emuBinary(&coll, escTwiceTag, escTwiceValue);
+    auto i = ESCCollection::emuBinary(coll, escTwiceTag, escTwiceValue);
 
     ASSERT_TRUE(i.has_value());
     ASSERT_EQ(i.value(), 0);
@@ -486,7 +486,7 @@ TEST(FLE_ESC, EmuBinary) {
         coll.insert(doc);
     }
 
-    auto i = ESCCollection::emuBinary(&coll, escTwiceTag, escTwiceValue);
+    auto i = ESCCollection::emuBinary(coll, escTwiceTag, escTwiceValue);
 
     ASSERT_TRUE(i.has_value());
     ASSERT_EQ(i.value(), 5);
@@ -537,12 +537,12 @@ TEST(FLE_ESC, EmuBinary2) {
         coll.insert(doc);
     }
 
-    auto i = ESCCollection::emuBinary(&coll, escTwiceTag, escTwiceValue);
+    auto i = ESCCollection::emuBinary(coll, escTwiceTag, escTwiceValue);
 
     ASSERT_TRUE(i.has_value());
     ASSERT_EQ(i.value(), 13);
 
-    i = ESCCollection::emuBinary(&coll, escTwiceTag2, escTwiceValue2);
+    i = ESCCollection::emuBinary(coll, escTwiceTag2, escTwiceValue2);
 
     ASSERT_TRUE(i.has_value());
     ASSERT_EQ(i.value(), 5);
@@ -572,7 +572,7 @@ TEST(FLE_ESC, EmuBinary_NullRecord) {
     BSONObj doc = ESCCollection::generateNullDocument(escTwiceTag, escTwiceValue, 7, 7);
     coll.insert(doc);
 
-    auto i = ESCCollection::emuBinary(&coll, escTwiceTag, escTwiceValue);
+    auto i = ESCCollection::emuBinary(coll, escTwiceTag, escTwiceValue);
 
     ASSERT_FALSE(i.has_value());
 }

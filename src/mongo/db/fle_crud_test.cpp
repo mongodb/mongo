@@ -47,6 +47,7 @@
 #include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/crypto/fle_crypto.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
+#include "mongo/crypto/fle_tags.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/matcher/schema/encrypt_schema_gen.h"
@@ -264,11 +265,10 @@ std::string fieldNameFromInt(uint64_t i) {
 }
 
 class FleCrudTest : public ServiceContextMongoDTest {
-private:
-    void setUp() final;
-    void tearDown() final;
-
 protected:
+    void setUp();
+    void tearDown();
+
     void createCollection(const NamespaceString& ns);
 
     void assertDocumentCounts(uint64_t edc, uint64_t esc, uint64_t ecc, uint64_t ecoc);
@@ -289,6 +289,10 @@ protected:
     void doSingleWideInsert(int id, uint64_t fieldCount, ValueGenerator func);
 
     void validateDocument(int id, boost::optional<BSONObj> doc);
+
+    ESCDerivedFromDataToken getTestESCDataToken(BSONObj obj);
+    ECCDerivedFromDataToken getTestECCDataToken(BSONObj obj);
+    EDCDerivedFromDataToken getTestEDCDataToken(BSONObj obj);
 
     ESCTwiceDerivedTagToken getTestESCToken(BSONElement value);
     ESCTwiceDerivedTagToken getTestESCToken(BSONObj obj);
@@ -358,11 +362,37 @@ ConstDataRange toCDR(BSONElement element) {
     return ConstDataRange(element.value(), element.value() + element.valuesize());
 }
 
+ESCDerivedFromDataToken FleCrudTest::getTestESCDataToken(BSONObj obj) {
+    auto element = obj.firstElement();
+    auto c1token = FLELevel1TokenGenerator::generateCollectionsLevel1Token(
+        _keyVault.getIndexKeyById(indexKeyId).key);
+    auto escToken = FLECollectionTokenGenerator::generateESCToken(c1token);
+    return FLEDerivedFromDataTokenGenerator::generateESCDerivedFromDataToken(escToken,
+                                                                             toCDR(element));
+}
+
+ECCDerivedFromDataToken FleCrudTest::getTestECCDataToken(BSONObj obj) {
+    auto element = obj.firstElement();
+    auto c1token = FLELevel1TokenGenerator::generateCollectionsLevel1Token(
+        _keyVault.getIndexKeyById(indexKeyId).key);
+    auto eccToken = FLECollectionTokenGenerator::generateECCToken(c1token);
+    return FLEDerivedFromDataTokenGenerator::generateECCDerivedFromDataToken(eccToken,
+                                                                             toCDR(element));
+}
+
+EDCDerivedFromDataToken FleCrudTest::getTestEDCDataToken(BSONObj obj) {
+    auto element = obj.firstElement();
+    auto c1token = FLELevel1TokenGenerator::generateCollectionsLevel1Token(
+        _keyVault.getIndexKeyById(indexKeyId).key);
+    auto edcToken = FLECollectionTokenGenerator::generateEDCToken(c1token);
+    return FLEDerivedFromDataTokenGenerator::generateEDCDerivedFromDataToken(edcToken,
+                                                                             toCDR(element));
+}
+
 ESCTwiceDerivedTagToken FleCrudTest::getTestESCToken(BSONElement element) {
     auto c1token = FLELevel1TokenGenerator::generateCollectionsLevel1Token(
         _keyVault.getIndexKeyById(indexKeyId).key);
     auto escToken = FLECollectionTokenGenerator::generateESCToken(c1token);
-
     auto escDataToken =
         FLEDerivedFromDataTokenGenerator::generateESCDerivedFromDataToken(escToken, toCDR(element));
     auto escContentionToken = FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
@@ -398,7 +428,6 @@ ECCDerivedFromDataTokenAndContentionFactorToken FleCrudTest::getTestECCToken(BSO
     auto c1token = FLELevel1TokenGenerator::generateCollectionsLevel1Token(
         _keyVault.getIndexKeyById(indexKeyId).key);
     auto eccToken = FLECollectionTokenGenerator::generateECCToken(c1token);
-
     auto eccDataToken =
         FLEDerivedFromDataTokenGenerator::generateECCDerivedFromDataToken(eccToken, toCDR(element));
     return FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
@@ -623,6 +652,43 @@ void FleCrudTest::doFindAndModify(write_ops::FindAndModifyCommandRequest& reques
 
     processFindAndModify(_queryImpl.get(), request);
 }
+
+class CollectionReader : public FLEStateCollectionReader {
+public:
+    CollectionReader(std::string&& coll, FLEQueryTestImpl& queryImpl)
+        : _coll(NamespaceString(coll)), _queryImpl(queryImpl) {}
+
+    uint64_t getDocumentCount() const override {
+        return _queryImpl.countDocuments(_coll);
+    }
+
+    BSONObj getById(PrfBlock block) const override {
+        auto doc = BSON("v" << BSONBinData(block.data(), block.size(), BinDataGeneral));
+        return _queryImpl.getById(_coll, doc.firstElement());
+    }
+
+private:
+    NamespaceString _coll;
+    FLEQueryTestImpl& _queryImpl;
+};
+
+class FleTagsTest : public FleCrudTest {
+protected:
+    void setUp() {
+        FleCrudTest::setUp();
+    }
+    void tearDown() {
+        FleCrudTest::tearDown();
+    }
+    std::vector<PrfBlock> readTags(BSONObj obj) {
+        auto s = getTestESCDataToken(obj);
+        auto c = getTestECCDataToken(obj);
+        auto d = getTestEDCDataToken(obj);
+        auto esc = CollectionReader("test.esc", *_queryImpl);
+        auto ecc = CollectionReader("test.ecc", *_queryImpl);
+        return mongo::fle::readTags(esc, ecc, s, c, d, 0);
+    }
+};
 
 // Insert one document
 TEST_F(FleCrudTest, InsertOne) {
@@ -1013,6 +1079,84 @@ TEST_F(FleCrudTest, FindAndModify_SetSafeContent) {
     ASSERT_THROWS_CODE(doFindAndModify(req), DBException, 6371507);
 }
 
+TEST_F(FleTagsTest, InsertOne) {
+    auto doc = BSON("encrypted"
+                    << "a");
 
+    doSingleInsert(1, doc);
+
+    ASSERT_EQ(1, readTags(doc).size());
+}
+
+TEST_F(FleTagsTest, InsertTwoSame) {
+    auto doc = BSON("encrypted"
+                    << "a");
+
+    doSingleInsert(1, doc);
+    doSingleInsert(2, doc);
+
+    ASSERT_EQ(2, readTags(doc).size());
+}
+
+TEST_F(FleTagsTest, InsertTwoDifferent) {
+    auto doc1 = BSON("encrypted"
+                     << "a");
+    auto doc2 = BSON("encrypted"
+                     << "b");
+
+    doSingleInsert(1, doc1);
+    doSingleInsert(2, doc2);
+
+    ASSERT_EQ(1, readTags(doc1).size());
+    ASSERT_EQ(1, readTags(doc2).size());
+}
+
+TEST_F(FleTagsTest, InsertAndDeleteOne) {
+    auto doc = BSON("encrypted"
+                    << "a");
+
+    doSingleInsert(1, doc);
+    doSingleDelete(1);
+
+    ASSERT_EQ(0, readTags(doc).size());
+}
+
+TEST_F(FleTagsTest, InsertTwoSameAndDeleteOne) {
+    auto doc = BSON("encrypted"
+                    << "a");
+
+    doSingleInsert(1, doc);
+    doSingleInsert(2, doc);
+    doSingleDelete(2);
+
+    ASSERT_EQ(1, readTags(doc).size());
+}
+
+TEST_F(FleTagsTest, InsertTwoDifferentAndDeleteOne) {
+    auto doc1 = BSON("encrypted"
+                     << "a");
+    auto doc2 = BSON("encrypted"
+                     << "b");
+
+    doSingleInsert(1, doc1);
+    doSingleInsert(2, doc2);
+    doSingleDelete(1);
+
+    ASSERT_EQ(0, readTags(doc1).size());
+    ASSERT_EQ(1, readTags(doc2).size());
+}
+
+TEST_F(FleTagsTest, InsertAndUpdate) {
+    auto doc1 = BSON("encrypted"
+                     << "a");
+    auto doc2 = BSON("encrypted"
+                     << "b");
+
+    doSingleInsert(1, doc1);
+    doSingleUpdate(1, doc2);
+
+    ASSERT_EQ(0, readTags(doc1).size());
+    ASSERT_EQ(1, readTags(doc2).size());
+}
 }  // namespace
 }  // namespace mongo

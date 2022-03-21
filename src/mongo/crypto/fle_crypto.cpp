@@ -446,7 +446,7 @@ StatusWith<std::tuple<T1, T2>> decryptAndUnpack(ConstDataRange cdr, FLEToken<Tok
 
 
 template <typename collectionT, typename tagTokenT, typename valueTokenT>
-boost::optional<uint64_t> emuBinaryCommon(FLEStateCollectionReader* reader,
+boost::optional<uint64_t> emuBinaryCommon(const FLEStateCollectionReader& reader,
                                           tagTokenT tagToken,
                                           valueTokenT valueToken) {
 
@@ -458,7 +458,7 @@ boost::optional<uint64_t> emuBinaryCommon(FLEStateCollectionReader* reader,
     // Search for null record
     PrfBlock nullRecordId = collectionT::generateId(tagToken, boost::none);
 
-    BSONObj nullDoc = reader->getById(nullRecordId);
+    BSONObj nullDoc = reader.getById(nullRecordId);
 
     if (!nullDoc.isEmpty()) {
         auto swNullEscDoc = collectionT::decryptNullDocument(valueToken, nullDoc);
@@ -471,7 +471,7 @@ boost::optional<uint64_t> emuBinaryCommon(FLEStateCollectionReader* reader,
     }
 
     // step 4, 5: get document count
-    uint64_t rho = reader->getDocumentCount();
+    uint64_t rho = reader.getDocumentCount();
 
 #ifdef DEBUG_ENUM_BINARY
     std::cout << fmt::format("start: lambda: {}, i: {}, rho: {}", lambda, i, rho) << std::endl;
@@ -485,7 +485,7 @@ boost::optional<uint64_t> emuBinaryCommon(FLEStateCollectionReader* reader,
     // condition
     while (flag) {
         // 7 a
-        BSONObj doc = reader->getById(collectionT::generateId(tagToken, rho + lambda));
+        BSONObj doc = reader.getById(collectionT::generateId(tagToken, rho + lambda));
 
 #ifdef DEBUG_ENUM_BINARY
         std::cout << fmt::format("search1: rho: {},  doc: {}", rho, doc.toString()) << std::endl;
@@ -515,7 +515,7 @@ boost::optional<uint64_t> emuBinaryCommon(FLEStateCollectionReader* reader,
 
 
         // 9b
-        BSONObj doc = reader->getById(collectionT::generateId(tagToken, median + lambda));
+        BSONObj doc = reader.getById(collectionT::generateId(tagToken, median + lambda));
 
 #ifdef DEBUG_ENUM_BINARY
         std::cout << fmt::format("search_stat: min: {}, median: {}, max: {}, i: {}, doc: {}",
@@ -546,7 +546,7 @@ boost::optional<uint64_t> emuBinaryCommon(FLEStateCollectionReader* reader,
             // explicitly
             if (j == maxIterations && min == 1) {
                 // 9 d ii A
-                BSONObj doc = reader->getById(collectionT::generateId(tagToken, 1 + lambda));
+                BSONObj doc = reader.getById(collectionT::generateId(tagToken, 1 + lambda));
                 // 9 d ii B
                 if (!doc.isEmpty()) {
                     i = 1 + lambda;
@@ -1494,6 +1494,11 @@ BSONObj ESCCollection::generateCompactionPlaceholderDocument(ESCTwiceDerivedTagT
 
 StatusWith<ESCNullDocument> ESCCollection::decryptNullDocument(ESCTwiceDerivedValueToken valueToken,
                                                                BSONObj& doc) {
+    return ESCCollection::decryptNullDocument(valueToken, std::move(doc));
+}
+
+StatusWith<ESCNullDocument> ESCCollection::decryptNullDocument(ESCTwiceDerivedValueToken valueToken,
+                                                               BSONObj&& doc) {
     BSONElement encryptedValue;
     auto status = bsonExtractTypedField(doc, kValue, BinData, &encryptedValue);
     if (!status.isOK()) {
@@ -1511,9 +1516,13 @@ StatusWith<ESCNullDocument> ESCCollection::decryptNullDocument(ESCTwiceDerivedVa
     return ESCNullDocument{std::get<0>(value), std::get<1>(value)};
 }
 
-
 StatusWith<ESCDocument> ESCCollection::decryptDocument(ESCTwiceDerivedValueToken valueToken,
                                                        BSONObj& doc) {
+    return ESCCollection::decryptDocument(valueToken, std::move(doc));
+}
+
+StatusWith<ESCDocument> ESCCollection::decryptDocument(ESCTwiceDerivedValueToken valueToken,
+                                                       BSONObj&& doc) {
     BSONElement encryptedValue;
     auto status = bsonExtractTypedField(doc, kValue, BinData, &encryptedValue);
     if (!status.isOK()) {
@@ -1533,7 +1542,7 @@ StatusWith<ESCDocument> ESCCollection::decryptDocument(ESCTwiceDerivedValueToken
 }
 
 
-boost::optional<uint64_t> ESCCollection::emuBinary(FLEStateCollectionReader* reader,
+boost::optional<uint64_t> ESCCollection::emuBinary(const FLEStateCollectionReader& reader,
                                                    ESCTwiceDerivedTagToken tagToken,
                                                    ESCTwiceDerivedValueToken valueToken) {
     return emuBinaryCommon<ESCCollection, ESCTwiceDerivedTagToken, ESCTwiceDerivedValueToken>(
@@ -1663,7 +1672,7 @@ StatusWith<ECCDocument> ECCCollection::decryptDocument(ECCTwiceDerivedValueToken
                        std::get<1>(value)};
 }
 
-boost::optional<uint64_t> ECCCollection::emuBinary(FLEStateCollectionReader* reader,
+boost::optional<uint64_t> ECCCollection::emuBinary(const FLEStateCollectionReader& reader,
                                                    ECCTwiceDerivedTagToken tagToken,
                                                    ECCTwiceDerivedValueToken valueToken) {
     return emuBinaryCommon<ECCCollection, ECCTwiceDerivedTagToken, ECCTwiceDerivedValueToken>(

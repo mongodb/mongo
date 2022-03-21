@@ -285,11 +285,11 @@ public:
     TxnCollectionReader(uint64_t count, FLEQueryInterface* queryImpl, const NamespaceString& nss)
         : _count(count), _queryImpl(queryImpl), _nss(nss) {}
 
-    uint64_t getDocumentCount() override {
+    uint64_t getDocumentCount() const override {
         return _count;
     }
 
-    BSONObj getById(PrfBlock block) override {
+    BSONObj getById(PrfBlock block) const override {
         auto doc = BSON("v" << BSONBinData(block.data(), block.size(), BinDataGeneral));
         BSONElement element = doc.firstElement();
         return _queryImpl->getById(_nss, element);
@@ -503,7 +503,7 @@ void processFieldsForInsert(FLEQueryInterface* queryImpl,
 
         int position = 1;
         int count = 1;
-        auto alpha = ESCCollection::emuBinary(&reader, tagToken, valueToken);
+        auto alpha = ESCCollection::emuBinary(reader, tagToken, valueToken);
 
         if (alpha.has_value() && alpha.value() == 0) {
             position = 1;
@@ -594,7 +594,7 @@ void processRemovedFields(FLEQueryInterface* queryImpl,
         auto valueToken =
             FLETwiceDerivedTokenGenerator::generateECCTwiceDerivedValueToken(plainTextField.ecc);
 
-        auto alpha = ECCCollection::emuBinary(&reader, tagToken, valueToken);
+        auto alpha = ECCCollection::emuBinary(reader, tagToken, valueToken);
 
         uint64_t index = 0;
         if (alpha.has_value() && alpha.value() == 0) {

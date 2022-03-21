@@ -445,12 +445,12 @@ public:
      *
      * TODO - how perfect does it need to be ? Is too high or too low ok if it is just an estimate?
      */
-    virtual uint64_t getDocumentCount() = 0;
+    virtual uint64_t getDocumentCount() const = 0;
 
     /**
      * Get a document by its _id.
      */
-    virtual BSONObj getById(PrfBlock block) = 0;
+    virtual BSONObj getById(PrfBlock block) const = 0;
 };
 
 class ESCCollection {
@@ -499,15 +499,27 @@ public:
                                                            BSONObj& doc);
 
     /**
+     * Decrypt the null document.
+     */
+    static StatusWith<ESCNullDocument> decryptNullDocument(ESCTwiceDerivedValueToken valueToken,
+                                                           BSONObj&& doc);
+
+    /**
      * Decrypt a regular document.
      */
     static StatusWith<ESCDocument> decryptDocument(ESCTwiceDerivedValueToken valueToken,
                                                    BSONObj& doc);
 
     /**
+     * Decrypt a regular document.
+     */
+    static StatusWith<ESCDocument> decryptDocument(ESCTwiceDerivedValueToken valueToken,
+                                                   BSONObj&& doc);
+
+    /**
      * Search for the highest document id for a given field/value pair based on the token.
      */
-    static boost::optional<uint64_t> emuBinary(FLEStateCollectionReader* reader,
+    static boost::optional<uint64_t> emuBinary(const FLEStateCollectionReader& reader,
                                                ESCTwiceDerivedTagToken tagToken,
                                                ESCTwiceDerivedValueToken valueToken);
 };
@@ -655,7 +667,7 @@ public:
     /**
      * Search for the highest document id for a given field/value pair based on the token.
      */
-    static boost::optional<uint64_t> emuBinary(FLEStateCollectionReader* reader,
+    static boost::optional<uint64_t> emuBinary(const FLEStateCollectionReader& reader,
                                                ECCTwiceDerivedTagToken tagToken,
                                                ECCTwiceDerivedValueToken valueToken);
 };

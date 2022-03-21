@@ -94,6 +94,7 @@ env.Library(
     source=[
         "encryption_fields_util.cpp",
         "fle_crypto.cpp",
+        "fle_tags.cpp",
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base/secure_allocator',
