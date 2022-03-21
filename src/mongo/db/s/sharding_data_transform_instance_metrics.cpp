@@ -123,7 +123,7 @@ BSONObj ShardingDataTransformInstanceMetrics::reportForCurrentOp() const noexcep
     builder.append(kDescription, createOperationDescription());
     builder.append(kOp, "command");
     builder.append(kNamespace, _sourceNs.toString());
-    builder.append(kOriginalCommand, _originalCommand);
+    builder.append(kOriginatingCommand, _originalCommand);
     builder.append(kOpTimeElapsed, getOperationRunningTimeSecs());
 
     switch (_role) {

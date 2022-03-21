@@ -80,8 +80,8 @@ protected:
     static constexpr auto kType = "type";
     static constexpr auto kDescription = "desc";
     static constexpr auto kNamespace = "ns";
-    static constexpr auto kOp = "command";
-    static constexpr auto kOriginalCommand = "originalCommand";
+    static constexpr auto kOp = "op";
+    static constexpr auto kOriginatingCommand = "originatingCommand";
     static constexpr auto kOpTimeElapsed = "totalOperationTimeElapsedSecs";
     static constexpr auto kCriticalSectionTimeElapsed = "totalCriticalSectionTimeElapsedSecs";
     static constexpr auto kRemainingOpTimeEstimated = "remainingOperationTimeEstimatedSecs";

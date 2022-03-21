@@ -46,8 +46,8 @@ constexpr auto kCountFailed = "countFailed";
 constexpr auto kCountCanceled = "countCanceled";
 constexpr auto kLastOpEndingChunkImbalance = "lastOpEndingChunkImbalance";
 constexpr auto kActive = "active";
-constexpr auto kDocumentsCopied = "documentsCopied";
-constexpr auto kBytesCopied = "bytesCopied";
+constexpr auto kDocumentsProcessed = "documentsProcessed";
+constexpr auto kBytesWritten = "bytesWritten";
 constexpr auto kOplogEntriesFetched = "oplogEntriesFetched";
 constexpr auto kOplogEntriesApplied = "oplogEntriesApplied";
 constexpr auto kInsertsApplied = "insertsApplied";
@@ -211,8 +211,8 @@ void ShardingDataTransformCumulativeMetrics::reportForServerStatus(BSONObjBuilde
 
 void ShardingDataTransformCumulativeMetrics::reportActive(BSONObjBuilder* bob) const {
     BSONObjBuilder s(bob->subobjStart(kActive));
-    s.append(kDocumentsCopied, kPlaceholderLong);
-    s.append(kBytesCopied, kPlaceholderLong);
+    s.append(kDocumentsProcessed, kPlaceholderLong);
+    s.append(kBytesWritten, kPlaceholderLong);
     s.append(kOplogEntriesFetched, kPlaceholderLong);
     s.append(kOplogEntriesApplied, kPlaceholderLong);
     s.append(kInsertsApplied, kPlaceholderLong);
