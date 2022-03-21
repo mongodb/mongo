@@ -103,12 +103,8 @@ public:
 
         void getForeignExecutionNamespaces(
             stdx::unordered_set<NamespaceString>& nssSet) const final {
-            // We do not recurse on, nor insert '_foreignNss' in the event that this $lookup has
-            // a subpipeline as such $lookup stages are not eligible for pushdown.
-            if (getSubPipelines().empty()) {
-                tassert(6235100, "Expected foreignNss to be initialized for $lookup", _foreignNss);
-                nssSet.emplace(*_foreignNss);
-            }
+            tassert(6235100, "Expected foreignNss to be initialized for $lookup", _foreignNss);
+            nssSet.emplace(*_foreignNss);
         }
 
         PrivilegeVector requiredPrivileges(bool isMongos,

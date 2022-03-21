@@ -315,8 +315,6 @@ public:
 
     stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final override;
 
-    virtual void getForeignExecutionNamespaces(
-        stdx::unordered_set<NamespaceString>& nssSet) const override;
     bool allowedToPassthroughFromMongos() const override;
 
     bool allowShardedForeignCollection(NamespaceString nss,
