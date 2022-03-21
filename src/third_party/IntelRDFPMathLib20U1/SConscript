@@ -353,9 +353,9 @@ libenv = env.Clone()
 # On windows and macos we don't have this problem, but on other
 # platforms we do, where the system ligbcc may duplicate symbols that
 # exist in the intel library. We use a version script to force our
-# verion of the symbols into a version namespace that we control,
+# version of the symbols into a version namespace that we control,
 # avoiding the conflict. It also allows us to restrict the set of
-# visibile symbols in the library to just those used in
+# visible symbols in the library to just those used in
 # platform/decimal128.cpp. We still use an exported_symbol_list on
 # macOS too though, so that we can catch the case where we have a
 # symbolic dependency on a symbol that isn't exported. We will catch
@@ -363,35 +363,26 @@ libenv = env.Clone()
 # could end up binding to the shadow version.
 def export_file_generator(target, source, env, for_signature):
     if env.TargetOSIs('darwin'):
-        script = env.File(env.subst("${TARGET.base}.exported_symbols_list", target=target))
-        ret_value = script.get_csig() if for_signature else "-Wl,-exported_symbols_list," + str(script)
-    elif env.TargetOSIs('posix'):
-        script = env.File(env.subst("${TARGET.base}.version_script", target=target))
-        ret_value = script.get_csig() if for_signature else "-Wl,--version-script," + str(script)
-    else:
-        script = None
-        ret_value = None
+        return env.File(env.subst("${TARGET.base}.exported_symbols_list", target=target))
+    if env.TargetOSIs('posix'):
+        return env.File(env.subst("${TARGET.base}.version_script", target=target))
 
-    if script:
-        # ninja workaround:
-        #   This is redundant for scons because the content signiture of this generator
-        #   will cause the targets to be out of date. However ninja is not able to
-        #   content signature checks for expansions, so we setup the implicit depends
-        #   to create this dependency for ninja.
-        #
-        # TODO remove this after https://jira.mongodb.org/browse/SERVER-54253
-        target.add_to_implicit([script])
+def export_flag_generator(target, source, env, for_signature):
+    if env.TargetOSIs('darwin'):
+        return "-Wl,-exported_symbols_list,"
+    if env.TargetOSIs('posix'):
+        return "-Wl,--version-script,"
 
-    return ret_value
+if env.TargetOSIs('darwin', 'posix'):
+    libenv.AppendUnique(
+        EXPORT_FLAG_GEN=export_flag_generator,
+        EXPORT_FILE_GEN=export_file_generator,
+        SHLINKFLAGS=[
+            '${EXPORT_FLAG_GEN}${EXPORT_FILE_GEN}',
+        ],
+    )
 
-libenv['EXPORT_FILE_SHLINKFLAGS'] = export_file_generator
-libenv.AppendUnique(
-    SHLINKFLAGS=[
-        '$EXPORT_FILE_SHLINKFLAGS'
-    ],
-)
-
-libenv.Library(
+inteldecimal_library = libenv.Library(
     target='intel_decimal128',
     source=source_files,
     LIBS=libenv['LIBS'] + libs,
@@ -399,6 +390,9 @@ libenv.Library(
         'init-no-global-side-effects',
     ]
 )
+
+if 'EXPORT_FILE_GEN' in libenv:
+    libenv.Depends(inteldecimal_library, libenv.subst('$EXPORT_FILE_GEN', target=inteldecimal_library))
 
 if env["BUILDERS"].get("Ninja", None) is not None:
     Return()
