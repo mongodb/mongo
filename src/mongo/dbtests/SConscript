@@ -102,6 +102,7 @@ env.Program(
         'plan_ranking.cpp',
         'query_plan_executor.cpp',
         'query_stage_and.cpp',
+        'query_stage_batched_delete.cpp',
         'query_stage_cached_plan.cpp',
         'query_stage_collscan.cpp',
         'query_stage_count.cpp',

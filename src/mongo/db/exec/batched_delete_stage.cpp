@@ -51,6 +51,44 @@
 
 namespace mongo {
 
+MONGO_FAIL_POINT_DEFINE(throwWriteConflictExceptionInBatchedDeleteStage);
+
+namespace {
+void incrementSSSMetricNoOverflow(AtomicWord<long long>& metric, long long value) {
+    const int64_t MAX = 1ULL << 60;
+
+    if (metric.loadRelaxed() > MAX) {
+        metric.store(value);
+    } else {
+        metric.fetchAndAdd(value);
+    }
+}
+
+// Returns true to if the Record exists and its data still matches the query. Returns false
+// otherwise.
+bool ensureStillMatches(OperationContext* opCtx,
+                        const CollectionPtr& collection,
+                        RecordId rid,
+                        SnapshotId snapshotId,
+                        const CanonicalQuery* cq) {
+
+    if (opCtx->recoveryUnit()->getSnapshotId() != snapshotId) {
+        Snapshotted<BSONObj> docData;
+        bool docExists = collection->findDoc(opCtx, rid, &docData);
+        if (!docExists) {
+            return false;
+        }
+
+        // Make sure the re-fetched doc still matches the predicate.
+        if (cq && !cq->root()->matchesBSON(docData.value(), nullptr)) {
+            // No longer matches.
+            return false;
+        }
+    }
+    return true;
+}
+
+}  // namespace
 
 /**
  * Reports globally-aggregated batch stats.
@@ -79,15 +117,6 @@ struct BatchedDeletesSSS : ServerStatusSection {
     AtomicWord<long long> timeMillis;
 } batchedDeletesSSS;
 
-void incrementSSSMetricNoOverflow(AtomicWord<long long>& metric, long long value) {
-    const int64_t MAX = 1ULL << 60;
-
-    if (metric.loadRelaxed() > MAX) {
-        metric.store(value);
-    } else {
-        metric.fetchAndAdd(value);
-    }
-}
 
 BatchedDeleteStage::BatchedDeleteStage(ExpressionContext* expCtx,
                                        std::unique_ptr<DeleteStageParams> params,
@@ -139,32 +168,48 @@ PlanStage::StageState BatchedDeleteStage::_deleteBatch(WorkingSetID* out) {
     // TODO (SERVER-63047): use a single write timestamp by grouping oplog entries.
     opCtx()->recoveryUnit()->ignoreAllMultiTimestampConstraints();
 
-    unsigned int docsDeleted = 0;
     const auto startOfBatchTimestampMillis = Date_t::now().toMillisSinceEpoch();
-
+    unsigned int docsDeleted = 0;
+    std::vector<RecordId> recordsThatNoLongerMatch;
     try {
         WriteUnitOfWork wuow(opCtx());
 
-        while (!_ridBuffer.empty()) {
-            const auto rid = _ridBuffer.front();
-            _ridBuffer.pop_front();
+        for (auto& [rid, snapshotId] : _ridMap) {
+            if (MONGO_unlikely(throwWriteConflictExceptionInBatchedDeleteStage.shouldFail())) {
+                throw WriteConflictException();
+            }
 
-            // TODO (SERVER-63863): skip the record if it does not exist any longer.
+            // The PlanExecutor YieldPolicy may change snapshots between calls to 'doWork()'.
+            // Different documents may have different snapshots.
+            bool docStillMatches =
+                ensureStillMatches(opCtx(), collection(), rid, snapshotId, _params->canonicalQuery);
+            if (docStillMatches) {
+                collection()->deleteDocument(opCtx(),
+                                             _params->stmtId,
+                                             rid,
+                                             _params->opDebug,
+                                             _params->fromMigrate,
+                                             false,
+                                             _params->returnDeleted
+                                                 ? Collection::StoreDeletedDoc::On
+                                                 : Collection::StoreDeletedDoc::Off);
 
-            collection()->deleteDocument(opCtx(),
-                                         _params->stmtId,
-                                         rid,
-                                         _params->opDebug,
-                                         _params->fromMigrate,
-                                         false,
-                                         _params->returnDeleted ? Collection::StoreDeletedDoc::On
-                                                                : Collection::StoreDeletedDoc::Off);
-            docsDeleted++;
+                docsDeleted++;
+            } else {
+                recordsThatNoLongerMatch.emplace_back(rid);
+            }
         }
-
         wuow.commit();
     } catch (const WriteConflictException&) {
-        // TODO (SERVER-63863): retriability on write conflict exception.
+        for (auto rid : recordsThatNoLongerMatch) {
+            // Lazily delete records that no longer match from the buffer. They should be skipped
+            // when the deletes are retryed.
+            _ridMap.erase(rid);
+        }
+
+        _drainRemainingBuffer = true;
+        *out = WorkingSet::INVALID_ID;
+        return NEED_YIELD;
     }
 
     const auto endOfBatchTimestampMillis = Date_t::now().toMillisSinceEpoch();
@@ -173,8 +218,9 @@ PlanStage::StageState BatchedDeleteStage::_deleteBatch(WorkingSetID* out) {
     incrementSSSMetricNoOverflow(batchedDeletesSSS.timeMillis,
                                  endOfBatchTimestampMillis - startOfBatchTimestampMillis);
     // TODO (SERVER-63039): report batch size
-
     _specificStats.docsDeleted += docsDeleted;
+    _ridMap.clear();
+    _drainRemainingBuffer = false;
 
     try {
         child()->restoreState(&collection());
@@ -188,61 +234,58 @@ PlanStage::StageState BatchedDeleteStage::_deleteBatch(WorkingSetID* out) {
 }
 
 PlanStage::StageState BatchedDeleteStage::doWork(WorkingSetID* out) {
-    // TODO (SERVER-63863): handle retries due to a previous write conflict exception.
-    WorkingSetID id;
-    auto status = child()->work(&id);
+    if (!_drainRemainingBuffer) {
+        WorkingSetID id;
+        auto status = child()->work(&id);
 
-    switch (status) {
-        case PlanStage::ADVANCED:
-            break;
+        switch (status) {
+            case PlanStage::ADVANCED:
+                break;
 
-        case PlanStage::NEED_TIME:
-            return status;
+            case PlanStage::NEED_TIME:
+                return status;
 
-        case PlanStage::NEED_YIELD:
-            *out = id;
-            return status;
+            case PlanStage::NEED_YIELD:
+                *out = id;
+                return status;
 
-        case PlanStage::IS_EOF:
-            if (!_ridBuffer.empty()) {
-                // Drain the outstanding deletions.
-                auto ret = _deleteBatch(out);
-                if (ret != NEED_TIME) {
-                    return ret;
+            case PlanStage::IS_EOF:
+                if (!_ridMap.empty()) {
+                    // Drain the outstanding deletions.
+                    auto ret = _deleteBatch(out);
+                    if (ret != NEED_TIME) {
+                        return ret;
+                    }
                 }
-            }
-            return status;
+                return status;
 
-        default:
-            MONGO_UNREACHABLE;
+            default:
+                MONGO_UNREACHABLE;
+        }
+
+        WorkingSetMember* member = _ws->get(id);
+
+        // Free the WSM at the end of this scope. Retries will re-fetch by the RecordId and will not
+        // need to keep the WSM around
+        ScopeGuard memberFreer([&] { _ws->free(id); });
+
+        invariant(member->hasRecordId());
+        RecordId recordId = member->recordId;
+
+        // Deletes can't have projections. This means that covering analysis will always add
+        // a fetch. We should always get fetched data, and never just key data.
+        invariant(member->hasObj());
+
+        if (!_params->isExplain) {
+            _ridMap.insert(std::make_pair(recordId, member->doc.snapshotId()));
+        }
     }
 
-    // We advanced, or are retrying, and id is set to the WSM to work on.
-    WorkingSetMember* member = _ws->get(id);
-
-    // We want to free this member when we return, unless we need to retry deleting it.
-    ScopeGuard memberFreer([&] { _ws->free(id); });
-
-    invariant(member->hasRecordId());
-    RecordId recordId = member->recordId;
-    // Deletes can't have projections. This means that covering analysis will always add
-    // a fetch. We should always get fetched data, and never just key data.
-    invariant(member->hasObj());
-
-    // Ensure that the BSONObj underlying the WSM is owned because saveState() is
-    // allowed to free the memory the BSONObj points to. The BSONObj will be needed
-    // later when it is passed to Collection::deleteDocument(). Note that the call to
-    // makeObjOwnedIfNeeded() will leave the WSM in the RID_AND_OBJ state in case we need to retry
-    // deleting it.
-    member->makeObjOwnedIfNeeded();
-
-    // Do the write, unless this is an explain.
-    if (!_params->isExplain) {
-        _ridBuffer.emplace_back(recordId);
-        if (_batchParams->targetBatchDocs &&
-            _ridBuffer.size() >= static_cast<unsigned long long>(_batchParams->targetBatchDocs)) {
-            return _deleteBatch(out);
-        }
+    if (!_params->isExplain &&
+        (_drainRemainingBuffer ||
+         (_batchParams->targetBatchDocs &&
+          _ridMap.size() >= static_cast<unsigned long long>(_batchParams->targetBatchDocs)))) {
+        return _deleteBatch(out);
     }
 
     return PlanStage::NEED_TIME;

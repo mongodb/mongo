@@ -88,13 +88,19 @@ public:
 
 private:
     /**
-     * Deletes the documents staged in _ridBuffer in a batch.
+     * Deletes the documents staged in _ridMap in a batch.
      * Returns NEED_TIME on success.
      */
     PlanStage::StageState _deleteBatch(WorkingSetID* out);
 
-    // Buffer of RecordId's of documents that are staged for deletion.
-    std::deque<RecordId> _ridBuffer;
+    // Maps records to delete to the latest snapshot their data matched the query. Records must be
+    // deleted in a single WriteUnitOrWork. Operation order has no impact on the outcome of the
+    // WriteUnitOfWork since all operations become visible at the same time.
+    stdx::unordered_map<RecordId, SnapshotId, RecordId::Hasher> _ridMap;
+
+    // Whether there are remaining docs in the buffer from a previous call to doWork() that should
+    // be drained before fetching more documents.
+    bool _drainRemainingBuffer = false;
 
     // Batch targeting parameters.
     std::unique_ptr<BatchedDeleteStageBatchParams> _batchParams;
