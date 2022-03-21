@@ -233,6 +233,7 @@ private:
 TEST_F(TransactionRouterTestWithDefaultSession,
        StartTxnShouldBeAttachedOnlyOnFirstStatementToParticipant) {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
@@ -271,6 +272,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 
 TEST_F(TransactionRouterTestWithDefaultSession, BasicStartTxnWithAtClusterTime) {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
@@ -309,6 +311,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, BasicStartTxnWithAtClusterTime) 
 
 TEST_F(TransactionRouterTestWithDefaultSession, CannotContiueTxnWithoutStarting) {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     ASSERT_THROWS_CODE(
@@ -320,6 +323,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, CannotContiueTxnWithoutStarting)
 
 TEST_F(TransactionRouterTestWithDefaultSession, NewParticipantMustAttachTxnAndReadConcern) {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
@@ -386,6 +390,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, NewParticipantMustAttachTxnAndRe
 
 TEST_F(TransactionRouterTestWithDefaultSession, StartingNewTxnShouldClearState) {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
@@ -409,6 +414,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, StartingNewTxnShouldClearState) 
     }
 
     TxnNumber txnNum2{5};
+    operationContext()->setTxnNumber(txnNum2);
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum2, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
@@ -434,6 +440,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, StartingNewTxnShouldClearState) 
 TEST_F(TransactionRouterTestWithDefaultSession,
        DoNotAttachTxnRetryCounterIfTxnRetryCounterIsDefault) {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
@@ -452,6 +459,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 
 TEST_F(TransactionRouterTestWithDefaultSession, FirstParticipantIsCoordinator) {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
@@ -477,6 +485,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, FirstParticipantIsCoordinator) {
     }
 
     TxnNumber txnNum2{5};
+    operationContext()->setTxnNumber(txnNum2);
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum2, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
@@ -494,6 +503,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, FirstParticipantIsCoordinator) {
 
 TEST_F(TransactionRouterTestWithDefaultSession, RecoveryShardDoesNotGetSetForReadOnlyTransaction) {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
@@ -536,6 +546,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, RecoveryShardDoesNotGetSetForRea
 TEST_F(TransactionRouterTestWithDefaultSession,
        RecoveryShardIsSetToSingleParticipantIfSingleParticipantDoesWriteOnFirstStatement) {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
@@ -551,6 +562,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 TEST_F(TransactionRouterTestWithDefaultSession,
        RecoveryShardIsSetToSingleParticipantIfSingleParticipantDoesWriteOnLaterStatement) {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
@@ -572,6 +584,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 TEST_F(TransactionRouterTestWithDefaultSession,
        RecoveryShardIsSetToSecondParticipantIfSecondParticipantIsFirstToDoAWrite) {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
@@ -593,6 +606,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 TEST_F(TransactionRouterTestWithDefaultSession,
        RecoveryShardIsResetIfRecoveryParticipantIsPendingAndPendingParticipantsAreCleared) {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
@@ -617,6 +631,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 TEST_F(TransactionRouterTestWithDefaultSession,
        RecoveryShardIsNotResetIfRecoveryParticipantIsNotPendingAndPendingParticipantsAreCleared) {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
@@ -653,6 +668,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 
 TEST_F(TransactionRouterTestWithDefaultSession, RecoveryShardIsResetOnStartingNewTransaction) {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
@@ -675,6 +691,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, RecoveryShardIsResetOnStartingNe
 
 TEST_F(TransactionRouterTestWithDefaultSession, DoesNotAttachTxnNumIfAlreadyThere) {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
@@ -702,6 +719,7 @@ DEATH_TEST_F(TransactionRouterTestWithDefaultSession,
              CrashesIfCmdHasDifferentTxnNumber,
              "invariant") {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
@@ -715,26 +733,38 @@ DEATH_TEST_F(TransactionRouterTestWithDefaultSession,
                                            << "txnNumber" << TxnNumber(10)));
 }
 
-TEST_F(TransactionRouterTestWithDefaultSession, CannotUnstashWithDifferentTxnNumber) {
+DEATH_TEST_F(TransactionRouterTestWithDefaultSession,
+             CannotUnstashWithDifferentTxnNumber,
+             "The requested operation has a different transaction number") {
     TxnNumber txnNum{3};
-    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
 
-    // Simulates the user beginning another transaction while the previous one has not completed.
+    operationContext()->setTxnNumber(txnNum + 1);
+    txnRouter.stash(operationContext(), TransactionRouter::StashReason::kYield);
+    txnRouter.unstash(operationContext());
+}
+
+DEATH_TEST_F(TransactionRouterTestWithDefaultSession,
+             CannotUnstashWithNoTxnNumber,
+             "Cannot unstash without a transaction number") {
+    TxnNumber txnNum{3};
+
+    auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
-        operationContext(), txnNum + 1, TransactionRouter::TransactionActions::kStart);
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
 
-    ASSERT_THROWS_CODE(
-        txnRouter.unstash(operationContext()), AssertionException, ErrorCodes::NoSuchTransaction);
+    txnRouter.stash(operationContext(), TransactionRouter::StashReason::kYield);
+    txnRouter.unstash(operationContext());
 }
 
 TEST_F(TransactionRouterTestWithDefaultSession, SuccessfullyUnstashWithMatchingTxnNumber) {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
@@ -742,11 +772,13 @@ TEST_F(TransactionRouterTestWithDefaultSession, SuccessfullyUnstashWithMatchingT
     txnRouter.setDefaultAtClusterTime(operationContext());
 
     operationContext()->setTxnNumber(txnNum);
+    txnRouter.stash(operationContext(), TransactionRouter::StashReason::kYield);
     txnRouter.unstash(operationContext());
 }
 
 TEST_F(TransactionRouterTestWithDefaultSession, AttachTxnValidatesReadConcernIfAlreadyOnCmd) {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
@@ -778,6 +810,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, SameAPIParametersAfterFirstState
     apiParameters.setAPIVersion("1");
     APIParameters::get(operationContext()) = apiParameters;
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
@@ -795,6 +828,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, DifferentAPIParametersAfterFirst
     apiParameters.setAPIVersion("1");
     APIParameters::get(operationContext()) = apiParameters;
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
@@ -816,6 +850,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, NoAPIParametersAfterFirstStateme
     apiParameters.setAPIVersion("1");
     APIParameters::get(operationContext()) = apiParameters;
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
@@ -834,6 +869,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, NoAPIParametersAfterFirstStateme
 
 TEST_F(TransactionRouterTestWithDefaultSession, CannotSpecifyReadConcernAfterFirstStatement) {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
@@ -851,6 +887,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, PassesThroughEmptyReadConcernToP
     repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs();
 
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
@@ -877,6 +914,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
         repl::ReadConcernArgs(kAfterClusterTime, boost::none);
 
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
@@ -902,6 +940,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, RejectUnsupportedReadConcernLeve
         repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs(readConcernLevel);
 
         TxnNumber txnNum{3};
+        operationContext()->setTxnNumber(txnNum);
         auto txnRouter = TransactionRouter::get(operationContext());
         ASSERT_THROWS_CODE(
             txnRouter.beginOrContinueTxn(
@@ -917,6 +956,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, RejectUnsupportedLevelsWithAfter
             repl::ReadConcernArgs(LogicalTime(Timestamp(10, 1)), readConcernLevel);
 
         TxnNumber txnNum{3};
+        operationContext()->setTxnNumber(txnNum);
         auto txnRouter = TransactionRouter::get(operationContext());
         ASSERT_THROWS_CODE(
             txnRouter.beginOrContinueTxn(
@@ -932,6 +972,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, RejectUnsupportedLevelsWithAfter
             repl::ReadConcernArgs(repl::OpTime(Timestamp(10, 1), 2), readConcernLevel);
 
         TxnNumber txnNum{3};
+        operationContext()->setTxnNumber(txnNum);
         auto txnRouter = TransactionRouter::get(operationContext());
         ASSERT_THROWS_CODE(
             txnRouter.beginOrContinueTxn(
@@ -943,6 +984,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, RejectUnsupportedLevelsWithAfter
 
 TEST_F(TransactionRouterTestWithDefaultSession, CannotCommitWithoutParticipantsOrRecoveryToken) {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
@@ -985,6 +1027,7 @@ void checkWriteConcern(const BSONObj& cmdObj, const WriteConcernOptions& expecte
 TEST_F(TransactionRouterTestWithDefaultSession,
        CommitTransactionWithNoParticipantsDoesNotSendCommit) {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
@@ -1006,6 +1049,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 TEST_F(TransactionRouterTestWithDefaultSession,
        SendCommitDirectlyForSingleParticipantThatIsReadOnly) {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
@@ -1042,6 +1086,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 TEST_F(TransactionRouterTestWithDefaultSession,
        SendCommitDirectlyForSingleParticipantThatDidAWrite) {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
@@ -1078,6 +1123,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 TEST_F(TransactionRouterTestWithDefaultSession,
        SendCommitDirectlyForMultipleParticipantsThatAreAllReadOnly) {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
@@ -1128,6 +1174,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 TEST_F(TransactionRouterTestWithDefaultSession,
        SendCoordinateCommitForMultipleParticipantsOnlyOneDidAWrite) {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
@@ -1176,6 +1223,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 TEST_F(TransactionRouterTestWithDefaultSession,
        SendCoordinateCommitForMultipleParticipantsMoreThanOneDidAWrite) {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
@@ -1291,6 +1339,7 @@ TEST_F(TransactionRouterTest, CommitWithRecoveryTokenWithNoParticipants) {
 TEST_F(TransactionRouterTestWithDefaultSession,
        CrossShardTxnCommitWorksAfterRecoveryCommitForPreviousTransaction) {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto opCtx = operationContext();
     opCtx->setTxnNumber(txnNum);
@@ -1333,6 +1382,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     // should be sent with the correct participant list.
     {
         ++txnNum;
+        operationContext()->setTxnNumber(txnNum);
         txnRouter.beginOrContinueTxn(
             operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
         txnRouter.setDefaultAtClusterTime(operationContext());
@@ -1380,6 +1430,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 TEST_F(TransactionRouterTestWithDefaultSession,
        RouterShouldWorkAsRecoveryRouterEvenIfItHasSeenPreviousTransactions) {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto opCtx = operationContext();
     opCtx->setTxnNumber(txnNum);
@@ -1439,7 +1490,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     // participants.
     {
         ++txnNum;
-
+        operationContext()->setTxnNumber(txnNum);
         txnRouter.beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kCommit);
 
         TxnRecoveryToken recoveryToken;
@@ -1524,6 +1575,7 @@ TEST_F(TransactionRouterTest, CommitWithRecoveryTokenWithUnknownShard) {
 
 TEST_F(TransactionRouterTestWithDefaultSession, SnapshotErrorsResetAtClusterTime) {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
@@ -1572,6 +1624,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, SnapshotErrorsResetAtClusterTime
 TEST_F(TransactionRouterTestWithDefaultSession,
        CannotChangeAtClusterTimeAfterStatementThatSelectedIt) {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
@@ -1633,6 +1686,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 
 TEST_F(TransactionRouterTestWithDefaultSession, SnapshotErrorsClearsAllParticipants) {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
@@ -1683,6 +1737,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, SnapshotErrorsClearsAllParticipa
 
 TEST_F(TransactionRouterTestWithDefaultSession, CannotContinueOnSnapshotErrorAfterFirstCommand) {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
@@ -1706,6 +1761,8 @@ TEST_F(TransactionRouterTestWithDefaultSession, CannotContinueOnSnapshotErrorAft
 
 TEST_F(TransactionRouterTestWithDefaultSession, ParticipantsRememberStmtIdCreatedAt) {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
+
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
@@ -1738,6 +1795,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, ParticipantsRememberStmtIdCreate
     repl::ReadConcernArgs::get(operationContext()) =
         repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
     TxnNumber txnNum2{5};
+    operationContext()->setTxnNumber(txnNum2);
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum2, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
@@ -1759,6 +1817,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, ParticipantsRememberStmtIdCreate
 TEST_F(TransactionRouterTestWithDefaultSession,
        AllParticipantsAndCoordinatorClearedOnStaleErrorOnFirstCommand) {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
@@ -1804,6 +1863,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 
 TEST_F(TransactionRouterTestWithDefaultSession, OnlyNewlyCreatedParticipantsClearedOnStaleError) {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
@@ -1848,6 +1908,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, OnlyNewlyCreatedParticipantsClea
 TEST_F(TransactionRouterTestWithDefaultSession,
        RetriesCannotPickNewAtClusterTimeOnStatementAfterSelected) {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
@@ -1901,6 +1962,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, WritesCanOnlyBeRetriedIfFirstOve
     auto otherCmds = {"find", "distinct", "aggregate", "killCursors", "getMore"};
 
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
@@ -2127,6 +2189,7 @@ TEST_F(TransactionRouterTest, AbortForMultipleParticipantsSomeReturnNetworkError
 
 TEST_F(TransactionRouterTestWithDefaultSession, OnViewResolutionErrorClearsAllNewParticipants) {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
@@ -2304,6 +2367,7 @@ TEST_F(TransactionRouterTest, ImplicitAbortIgnoresErrors) {
 
 TEST_F(TransactionRouterTestWithDefaultSession, AbortPropagatesWriteConcern) {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
     auto opCtx = operationContext();
     auto txnRouter = TransactionRouter::get(opCtx);
 
@@ -2332,6 +2396,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, AbortPropagatesWriteConcern) {
 
 TEST_F(TransactionRouterTestWithDefaultSession, ContinueOnlyOnStaleVersionOnFirstOp) {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
@@ -2384,6 +2449,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, ContinueOnlyOnStaleVersionOnFirs
 
 TEST_F(TransactionRouterTestWithDefaultSession, ContinuingTransactionPlacesItsReadConcernOnOpCtx) {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
@@ -2401,6 +2467,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, ContinuingTransactionPlacesItsRe
 TEST_F(TransactionRouterTestWithDefaultSession,
        SubsequentStatementCanSelectAtClusterTimeIfNotSelectedYet) {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
@@ -2547,6 +2614,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, NonSnapshotReadConcernLevelsPres
 TEST_F(TransactionRouterTestWithDefaultSession,
        AbortBetweenStatementRetriesIgnoresNoSuchTransaction) {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
@@ -2577,6 +2645,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 TEST_F(TransactionRouterTestWithDefaultSession,
        AbortBetweenStatementRetriesUsesIdempotentRetryPolicy) {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
@@ -2609,6 +2678,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 TEST_F(TransactionRouterTestWithDefaultSession,
        AbortBetweenStatementRetriesFailsWithNoSuchTransactionOnUnexpectedErrors) {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
@@ -2641,6 +2711,7 @@ DEATH_TEST_F(TransactionRouterTestWithDefaultSession,
              ProcessParticipantResponseInvariantsIfParticipantDoesNotExist,
              "Participant should exist if processing participant response") {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
@@ -2658,6 +2729,7 @@ DEATH_TEST_F(TransactionRouterTestWithDefaultSession,
 TEST_F(TransactionRouterTestWithDefaultSession,
        ProcessParticipantResponseDoesNotUpdateParticipantIfResponseStatusIsNotOk) {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
@@ -2673,6 +2745,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 TEST_F(TransactionRouterTestWithDefaultSession,
        ProcessParticipantResponseMarksParticipantAsReadOnlyIfResponseSaysReadOnlyTrue) {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
@@ -2698,6 +2771,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 TEST_F(TransactionRouterTestWithDefaultSession,
        ProcessParticipantResponseMarksParticipantAsNotReadOnlyIfFirstResponseSaysReadOnlyFalse) {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
@@ -2723,6 +2797,7 @@ TEST_F(
     TransactionRouterTestWithDefaultSession,
     ProcessParticipantResponseUpdatesParticipantToReadOnlyFalseIfLaterResponseSaysReadOnlyFalse) {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
@@ -2749,6 +2824,7 @@ TEST_F(
 TEST_F(TransactionRouterTestWithDefaultSession,
        ProcessParticipantResponseThrowsIfParticipantClaimsToChangeFromReadOnlyFalseToReadOnlyTrue) {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
@@ -2774,6 +2850,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 TEST_F(TransactionRouterTestWithDefaultSession,
        ProcessParticipantResponseThrowsIfParticipantReturnsErrorThenSuccessOnLaterStatement) {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
@@ -2811,6 +2888,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 TEST_F(TransactionRouterTestWithDefaultSession,
        ProcessParticipantSkipsValidationIfAbortAlreadyInitiated) {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
     auto opCtx = operationContext();
 
     auto txnRouter = TransactionRouter::get(opCtx);
@@ -2837,6 +2915,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 TEST_F(TransactionRouterTestWithDefaultSession,
        ProcessParticipantSkipsValidationIfImplicitAbortAlreadyInitiated) {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
     auto opCtx = operationContext();
 
     auto txnRouter = TransactionRouter::get(opCtx);
@@ -2859,6 +2938,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 TEST_F(TransactionRouterTestWithDefaultSession,
        ProcessParticipantSkipsValidationIfCommitAlreadyInitiated) {
     TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
     auto opCtx = operationContext();
 
     auto txnRouter = TransactionRouter::get(opCtx);
@@ -2882,6 +2962,111 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 
     // Processing readonly response should not throw since commit has been initiated.
     txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyTrueResponse);
+}
+
+TEST_F(TransactionRouterTestWithDefaultSession, CannotAdvanceTxnNumberWithActiveYielder) {
+    TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
+    auto opCtx = operationContext();
+
+    auto txnRouter = TransactionRouter::get(opCtx);
+    txnRouter.beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kStart);
+
+    txnRouter.stash(opCtx, TransactionRouter::StashReason::kYield);
+
+    // We can beginOrContinueTxn at the active txnNumber. This simulates a yielded session being
+    // checked out by a different operation for that same transaction.
+    repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs();
+    txnRouter.beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kContinue);
+
+    txnRouter.stash(opCtx, TransactionRouter::StashReason::kYield);
+
+    // A higher txnNumber cannot be used.
+    ASSERT_THROWS_CODE(txnRouter.beginOrContinueTxn(
+                           opCtx, txnNum + 1, TransactionRouter::TransactionActions::kStart),
+                       AssertionException,
+                       ErrorCodes::ConflictingOperationInProgress);
+
+    ASSERT_THROWS_CODE(txnRouter.beginOrContinueTxn(
+                           opCtx, txnNum + 1, TransactionRouter::TransactionActions::kCommit),
+                       AssertionException,
+                       ErrorCodes::ConflictingOperationInProgress);
+
+    TransactionRouter::get(opCtx).unstash(opCtx);
+
+    // A higher txnNumber still cannot be used because there is an outstanding yielder.
+    ASSERT_THROWS_CODE(txnRouter.beginOrContinueTxn(
+                           opCtx, txnNum + 1, TransactionRouter::TransactionActions::kStart),
+                       AssertionException,
+                       ErrorCodes::ConflictingOperationInProgress);
+
+    ASSERT_THROWS_CODE(txnRouter.beginOrContinueTxn(
+                           opCtx, txnNum + 1, TransactionRouter::TransactionActions::kCommit),
+                       AssertionException,
+                       ErrorCodes::ConflictingOperationInProgress);
+
+    TransactionRouter::get(opCtx).unstash(opCtx);
+
+    // A non-yielding stash does not affect whether a new transaction can begin. This simulates an
+    // operation completing. Stash multiple times to verify it does not bring the activeYields
+    // counter below 0 and trigger a crash.
+    txnRouter.stash(opCtx, TransactionRouter::StashReason::kDone);
+    txnRouter.stash(opCtx, TransactionRouter::StashReason::kDone);
+    txnRouter.stash(opCtx, TransactionRouter::StashReason::kDone);
+
+    // Now the router can advance.
+    txnRouter.beginOrContinueTxn(opCtx, txnNum + 1, TransactionRouter::TransactionActions::kStart);
+}
+
+DEATH_TEST_F(TransactionRouterTestWithDefaultSession,
+             ActiveYieldersCannotGoBelowZero,
+             "Invalid activeYields") {
+    TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
+    auto opCtx = operationContext();
+
+    auto txnRouter = TransactionRouter::get(opCtx);
+    txnRouter.beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kStart);
+
+    txnRouter.stash(opCtx, TransactionRouter::StashReason::kYield);
+    txnRouter.unstash(opCtx);
+    txnRouter.unstash(opCtx);
+}
+
+TEST_F(TransactionRouterTestWithDefaultSession, CannotBeReapedWithActiveYielders) {
+    TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
+    auto opCtx = operationContext();
+
+    auto txnRouter = TransactionRouter::get(opCtx);
+
+    // Can be reaped initially.
+    ASSERT(txnRouter.canBeReaped());
+
+    // Can be reaped after a non-yield stash.
+    txnRouter.beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kStart);
+    txnRouter.stash(opCtx, TransactionRouter::StashReason::kDone);
+    ASSERT(txnRouter.canBeReaped());
+
+    // Cannot be reaped after a yield stash.
+    repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs();
+    txnRouter.beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kContinue);
+    txnRouter.stash(opCtx, TransactionRouter::StashReason::kYield);
+    ASSERT_FALSE(txnRouter.canBeReaped());
+
+    // Cannot be reaped after multiple yield stashes until all corresponding unstashes.
+    repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs();
+    txnRouter.beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kContinue);
+    txnRouter.stash(opCtx, TransactionRouter::StashReason::kYield);
+    ASSERT_FALSE(txnRouter.canBeReaped());
+
+    txnRouter.unstash(opCtx);
+    txnRouter.stash(opCtx, TransactionRouter::StashReason::kDone);
+    ASSERT_FALSE(txnRouter.canBeReaped());
+
+    txnRouter.unstash(opCtx);
+    txnRouter.stash(opCtx, TransactionRouter::StashReason::kDone);
+    ASSERT(txnRouter.canBeReaped());
 }
 
 // Begins a transaction with snapshot level read concern and sets a default cluster time.
@@ -2951,6 +3136,8 @@ protected:
     void setUp() override {
         TransactionRouterTestWithDefaultSession::setUp();
         repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs();
+        _txnRouter = TransactionRouter::get(operationContext());
+        operationContext()->setTxnNumber(kTxnNumber);
     }
 
     TickSourceMock<Microseconds>* tickSource() {
@@ -2965,8 +3152,9 @@ protected:
         return dynamic_cast<ClockSourceMock*>(getServiceContext()->getPreciseClockSource());
     }
 
-    TransactionRouter::Router txnRouter() {
-        return TransactionRouter::get(operationContext());
+    TransactionRouter::Router& txnRouter() {
+        invariant(_txnRouter);
+        return *_txnRouter;
     }
 
     void beginTxnWithDefaultTxnNumber() {
@@ -3221,7 +3409,7 @@ protected:
         assertTimeActiveIs(Microseconds(timeActive));
         assertTimeInactiveIs(Microseconds(timeInactive));
 
-        txnRouter().stash(operationContext());
+        txnRouter().stash(operationContext(), TransactionRouter::StashReason::kDone);
 
         tickSource()->advance(Microseconds(150));
         assertTimeActiveIs(Microseconds(timeActive));
@@ -3233,12 +3421,15 @@ protected:
         assertTimeActiveIs(kDefaultTimeActive);
         assertTimeInactiveIs(Microseconds(0));
 
-        txnRouter().stash(operationContext());
+        txnRouter().stash(operationContext(), TransactionRouter::StashReason::kDone);
 
         tickSource()->advance(kDefaultTimeInactive);
         assertTimeActiveIs(kDefaultTimeActive);
         assertTimeInactiveIs(kDefaultTimeInactive);
     }
+
+private:
+    boost::optional<TransactionRouter::Router> _txnRouter;
 };
 
 //
@@ -3404,7 +3595,7 @@ TEST_F(TransactionRouterMetricsTest, SlowLoggingPrintsTimeActiveAndInactive) {
     tickSource()->advance(Microseconds(111111));
     assertTimeActiveIs(Microseconds(111111));
 
-    txnRouter().stash(operationContext());
+    txnRouter().stash(operationContext(), TransactionRouter::StashReason::kDone);
     tickSource()->advance(Microseconds(222222));
     assertTimeInactiveIs(Microseconds(222222));
 
@@ -3926,6 +4117,7 @@ TEST_F(TransactionRouterMetricsTest, CommitDurationResetByNewTransaction) {
     future.default_timed_get();
 
     // Start a new transaction and verify the commit duration was reset.
+    operationContext()->setTxnNumber(kTxnNumber + 1);
     txnRouter().beginOrContinueTxn(
         operationContext(), kTxnNumber + 1, TransactionRouter::TransactionActions::kStart);
 
@@ -4050,7 +4242,7 @@ TEST_F(TransactionRouterMetricsTest, TimeActiveAndInactiveAdvanceSeparatelyAndSu
     assertDurationIs(Microseconds(50));
 
     // Only timeInactive will advance while a txn is stashed.
-    txnRouter().stash(operationContext());
+    txnRouter().stash(operationContext(), TransactionRouter::StashReason::kDone);
     tickSource()->advance(Microseconds(100));
     assertTimeActiveIs(Microseconds(50));
     assertTimeInactiveIs(Microseconds(100));
@@ -4080,7 +4272,7 @@ TEST_F(TransactionRouterMetricsTest, StashIsIdempotent) {
     assertTimeActiveIs(kDefaultTimeActive);
     assertTimeInactiveIs(kDefaultTimeInactive);
 
-    txnRouter().stash(operationContext());
+    txnRouter().stash(operationContext(), TransactionRouter::StashReason::kDone);
     ASSERT_EQUALS(1L, routerTxnMetrics()->getCurrentInactive());
 
     // Only timeInactive can advance.
@@ -4088,7 +4280,7 @@ TEST_F(TransactionRouterMetricsTest, StashIsIdempotent) {
     assertTimeActiveIs(kDefaultTimeActive);
     assertTimeInactiveIs(kDefaultTimeInactive + Microseconds(100));
 
-    txnRouter().stash(operationContext());
+    txnRouter().stash(operationContext(), TransactionRouter::StashReason::kDone);
     ASSERT_EQUALS(1L, routerTxnMetrics()->getCurrentInactive());
 
     // Still only timeInactive can advance.
@@ -4106,7 +4298,7 @@ TEST_F(TransactionRouterMetricsTest, DurationsForImplicitlyAbortedStashedTxn) {
     assertTimeInactiveIs(kDefaultTimeInactive);
     assertDurationIs(kDefaultTimeActive + kDefaultTimeInactive);
 
-    txnRouter().stash(operationContext());
+    txnRouter().stash(operationContext(), TransactionRouter::StashReason::kDone);
 
     // At shutdown transactions are implicitly aborted without being continued so a transaction may
     // be stashed when aborting, which should still lead to durations in a consistent state.
@@ -4153,7 +4345,7 @@ TEST_F(TransactionRouterMetricsTest, DurationsForImplicitlyAbortedEndedTxn) {
     txnRouter().beginOrContinueTxn(
         operationContext(), kTxnNumber, TransactionRouter::TransactionActions::kCommit);
     runCommit(kDummyOkRes);
-    txnRouter().stash(operationContext());
+    txnRouter().stash(operationContext(), TransactionRouter::StashReason::kDone);
 
     // At shutdown transactions are implicitly aborted without being continued, so an "ended"
     // transaction (i.e. committed or aborted) may be implicitly aborted again. This shouldn't
@@ -4211,7 +4403,7 @@ TEST_F(TransactionRouterMetricsTest, TimeActiveAndInactiveAdvanceAfterUnknownCom
     assertTimeInactiveIs(kDefaultTimeInactive);
 
     // timeInactive can advance.
-    txnRouter().stash(operationContext());
+    txnRouter().stash(operationContext(), TransactionRouter::StashReason::kDone);
     tickSource()->advance(Microseconds(100));
     assertTimeActiveIs(kDefaultTimeActive + Microseconds(100));
     assertTimeInactiveIs(kDefaultTimeInactive + Microseconds(100));
@@ -4226,7 +4418,7 @@ TEST_F(TransactionRouterMetricsTest, TimeActiveAndInactiveAdvanceAfterUnknownCom
     assertTimeInactiveIs(kDefaultTimeInactive + Microseconds(100));
 
     // timeInactive can advance.
-    txnRouter().stash(operationContext());
+    txnRouter().stash(operationContext(), TransactionRouter::StashReason::kDone);
     tickSource()->advance(Microseconds(100));
     assertTimeActiveIs(kDefaultTimeActive + Microseconds(200));
     assertTimeInactiveIs(kDefaultTimeInactive + Microseconds(200));
@@ -4293,7 +4485,7 @@ TEST_F(TransactionRouterMetricsTest, RouterMetricsCurrent_BeginRecover) {
 
 TEST_F(TransactionRouterMetricsTest, RouterMetricsCurrent_Stash) {
     beginRecoverCommitWithDefaultTxnNumber();
-    txnRouter().stash(operationContext());
+    txnRouter().stash(operationContext(), TransactionRouter::StashReason::kDone);
     ASSERT_EQUALS(1L, routerTxnMetrics()->getCurrentOpen());
     ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentActive());
     ASSERT_EQUALS(1L, routerTxnMetrics()->getCurrentInactive());
@@ -4301,7 +4493,7 @@ TEST_F(TransactionRouterMetricsTest, RouterMetricsCurrent_Stash) {
 
 TEST_F(TransactionRouterMetricsTest, RouterMetricsCurrent_BeginAfterStash) {
     beginRecoverCommitWithDefaultTxnNumber();
-    txnRouter().stash(operationContext());
+    txnRouter().stash(operationContext(), TransactionRouter::StashReason::kDone);
     txnRouter().beginOrContinueTxn(
         operationContext(), kTxnNumber, TransactionRouter::TransactionActions::kContinue);
 
@@ -4326,14 +4518,14 @@ TEST_F(TransactionRouterMetricsTest, RouterMetricsCurrent_AreNotCumulative) {
     // Test inactive.
     txnRouter().beginOrContinueTxn(
         operationContext(), kTxnNumber + 2, TransactionRouter::TransactionActions::kStart);
-    txnRouter().stash(operationContext());
+    txnRouter().stash(operationContext(), TransactionRouter::StashReason::kDone);
     ASSERT_EQUALS(1L, routerTxnMetrics()->getCurrentOpen());
     ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentActive());
     ASSERT_EQUALS(1L, routerTxnMetrics()->getCurrentInactive());
 
     txnRouter().beginOrContinueTxn(
         operationContext(), kTxnNumber + 3, TransactionRouter::TransactionActions::kStart);
-    txnRouter().stash(operationContext());
+    txnRouter().stash(operationContext(), TransactionRouter::StashReason::kDone);
     ASSERT_EQUALS(1L, routerTxnMetrics()->getCurrentOpen());
     ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentActive());
     ASSERT_EQUALS(1L, routerTxnMetrics()->getCurrentInactive());
@@ -4357,7 +4549,7 @@ TEST_F(TransactionRouterMetricsTest, RouterMetricsCurrent_UnknownCommit) {
 
 TEST_F(TransactionRouterMetricsTest, RouterMetricsCurrent_ImplicitAbortForStashedTxn) {
     beginTxnWithDefaultTxnNumber();
-    txnRouter().stash(operationContext());
+    txnRouter().stash(operationContext(), TransactionRouter::StashReason::kDone);
     ASSERT_EQUALS(1L, routerTxnMetrics()->getCurrentOpen());
     ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentActive());
     ASSERT_EQUALS(1L, routerTxnMetrics()->getCurrentInactive());
@@ -4396,7 +4588,7 @@ TEST_F(TransactionRouterMetricsTest, RouterMetricsCurrent_BeginAndStashForEndedT
     ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentActive());
     ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentInactive());
 
-    txnRouter().stash(operationContext());
+    txnRouter().stash(operationContext(), TransactionRouter::StashReason::kDone);
 
     ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentOpen());
     ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentActive());
@@ -4567,6 +4759,7 @@ TEST_F(TransactionRouterMetricsTest, RouterMetricsTotalStarted_IsCumulative) {
     beginTxnWithDefaultTxnNumber();
     ASSERT_EQUALS(1L, routerTxnMetrics()->getTotalStarted());
 
+    operationContext()->setTxnNumber(kTxnNumber + 1);
     txnRouter().beginOrContinueTxn(
         operationContext(), kTxnNumber + 1, TransactionRouter::TransactionActions::kStart);
     ASSERT_EQUALS(2L, routerTxnMetrics()->getTotalStarted());
@@ -4635,6 +4828,7 @@ TEST_F(TransactionRouterMetricsTest, RouterMetricsTotalCommitted_IsCumulative) {
     runCommit(kDummyOkRes);
     ASSERT_EQUALS(1L, routerTxnMetrics()->getTotalCommitted());
 
+    operationContext()->setTxnNumber(kTxnNumber + 1);
     txnRouter().beginOrContinueTxn(
         operationContext(), kTxnNumber + 1, TransactionRouter::TransactionActions::kStart);
     runCommit(kDummyOkRes);
@@ -4811,6 +5005,7 @@ TEST_F(TransactionRouterMetricsTest, RouterMetricsTotalParticipantsAtCommit) {
     ASSERT_EQUALS(2L, routerTxnMetrics()->getTotalParticipantsAtCommit());
 
     // Is cumulative across transactions.
+    operationContext()->setTxnNumber(kTxnNumber + 1);
     txnRouter().beginOrContinueTxn(
         operationContext(), kTxnNumber + 1, TransactionRouter::TransactionActions::kStart);
     txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard1, {});
@@ -4893,6 +5088,7 @@ TEST_F(TransactionRouterMetricsTest, RouterMetricsCommitTypeStatsSuccessfulDurat
                       .successfulDurationMicros.load());
 
     // Start a new transaction and verify that successful commit duration is cumulative.
+    operationContext()->setTxnNumber(kTxnNumber + 1);
     txnRouter().beginOrContinueTxn(
         operationContext(), kTxnNumber + 1, TransactionRouter::TransactionActions::kStart);
     txnRouter().setDefaultAtClusterTime(operationContext());

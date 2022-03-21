@@ -33,6 +33,7 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/s/transaction_router.h"
+#include "mongo/s/transaction_router_resource_yielder.h"
 
 namespace mongo {
 
@@ -81,13 +82,14 @@ MultiStatementTransactionRequestsSender::MultiStatementTransactionRequestsSender
     const ReadPreferenceSetting& readPreference,
     Shard::RetryPolicy retryPolicy)
     : _opCtx(opCtx),
-      _ars(std::make_unique<AsyncRequestsSender>(opCtx,
-                                                 std::move(executor),
-                                                 dbName,
-                                                 attachTxnDetails(opCtx, requests),
-                                                 readPreference,
-                                                 retryPolicy,
-                                                 nullptr /* resourceYielder */)) {}
+      _ars(std::make_unique<AsyncRequestsSender>(
+          opCtx,
+          std::move(executor),
+          dbName,
+          attachTxnDetails(opCtx, requests),
+          readPreference,
+          retryPolicy,
+          TransactionRouterResourceYielder::makeForRemoteCommand())) {}
 
 MultiStatementTransactionRequestsSender::~MultiStatementTransactionRequestsSender() {
     invariant(_opCtx);

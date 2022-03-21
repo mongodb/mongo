@@ -865,7 +865,8 @@ void CheckoutSessionAndInvokeCommand::_checkOutSession() {
     // Used for waiting for an in-progress transaction to transition out of the conflicting state.
     auto waitForInProgressTxn = [](OperationContext* opCtx, auto& stateTransitionFuture) {
         // Check the session back in and wait for the conflict to resolve.
-        MongoDOperationContextSession::checkIn(opCtx);
+        MongoDOperationContextSession::checkIn(opCtx,
+                                               OperationContextSession::CheckInReason::kYield);
         stateTransitionFuture.wait(opCtx);
         // Wait for any commit or abort oplog entry to be visible in the oplog. This will prevent a
         // new transaction from missing the transaction table update for the previous commit or

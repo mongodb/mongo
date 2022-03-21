@@ -126,7 +126,7 @@ constexpr bool returnsVoid() {
 // throwing, will reacquire the session and verify it is still valid to proceed with the migration.
 template <typename Callable, std::enable_if_t<!returnsVoid<Callable>(), int> = 0>
 auto runWithoutSession(OperationContext* opCtx, Callable&& callable) {
-    MongoDOperationContextSession::checkIn(opCtx);
+    MongoDOperationContextSession::checkIn(opCtx, OperationContextSession::CheckInReason::kYield);
 
     auto retVal = callable();
 
@@ -140,7 +140,7 @@ auto runWithoutSession(OperationContext* opCtx, Callable&& callable) {
 // Same as runWithoutSession above but takes a void function.
 template <typename Callable, std::enable_if_t<returnsVoid<Callable>(), int> = 0>
 void runWithoutSession(OperationContext* opCtx, Callable&& callable) {
-    MongoDOperationContextSession::checkIn(opCtx);
+    MongoDOperationContextSession::checkIn(opCtx, OperationContextSession::CheckInReason::kYield);
 
     callable();
 

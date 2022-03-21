@@ -143,7 +143,7 @@ void doFLERewriteInTxn(OperationContext* opCtx, std::shared_ptr<RewriteBase> sha
     auto txn = std::make_shared<txn_api::TransactionWithRetries>(
         opCtx,
         Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
-        TransactionRouterResourceYielder::make());
+        TransactionRouterResourceYielder::makeForLocalHandoff());
 
     auto swCommitResult = txn->runSyncNoThrow(
         opCtx, [sharedBlock](const txn_api::TransactionClient& txnClient, auto txnExec) {

@@ -73,16 +73,20 @@ RouterOperationContextSession::RouterOperationContextSession(OperationContext* o
 
 RouterOperationContextSession::~RouterOperationContextSession() {
     if (auto txnRouter = TransactionRouter::get(_opCtx)) {
-        // Only stash if the session wasn't yielded.
-        txnRouter.stash(_opCtx);
+        // Only stash if the session wasn't yielded. This should only happen at global shutdown.
+        txnRouter.stash(_opCtx, TransactionRouter::StashReason::kDone);
     }
 };
 
-void RouterOperationContextSession::checkIn(OperationContext* opCtx) {
+void RouterOperationContextSession::checkIn(OperationContext* opCtx,
+                                            OperationContextSession::CheckInReason reason) {
     invariant(OperationContextSession::get(opCtx));
 
-    TransactionRouter::get(opCtx).stash(opCtx);
-    OperationContextSession::checkIn(opCtx);
+    TransactionRouter::get(opCtx).stash(opCtx,
+                                        reason == OperationContextSession::CheckInReason::kYield
+                                            ? TransactionRouter::StashReason::kYield
+                                            : TransactionRouter::StashReason::kDone);
+    OperationContextSession::checkIn(opCtx, reason);
 }
 
 void RouterOperationContextSession::checkOut(OperationContext* opCtx) {

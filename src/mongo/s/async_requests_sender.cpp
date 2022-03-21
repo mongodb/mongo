@@ -117,13 +117,15 @@ AsyncRequestsSender::Response AsyncRequestsSender::next() noexcept {
             _resourceYielder->yield(_opCtx);
         }
 
-        // Only wait for the next result without popping it, so an error unyielding doesn't discard
-        // an already popped response.
-        _responseQueue.waitForNonEmpty(_opCtx);
+        // Only wait for the next result without popping it, so an error unyielding doesn't
+        // discard an already popped response.
+        auto waitStatus = _responseQueue.waitForNonEmptyNoThrow(_opCtx);
 
-        if (_resourceYielder) {
-            _resourceYielder->unyield(_opCtx);
-        }
+        auto unyieldStatus =
+            _resourceYielder ? _resourceYielder->unyieldNoThrow(_opCtx) : Status::OK();
+
+        uassertStatusOK(waitStatus);
+        uassertStatusOK(unyieldStatus);
 
         // There should always be a response ready after the wait above.
         auto response = _responseQueue.tryPop();

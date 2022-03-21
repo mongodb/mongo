@@ -214,7 +214,7 @@ TEST_F(AsyncRequestsSenderTest, HandlesExceptionWhenUnyielding) {
     future.default_timed_get();
 }
 
-TEST_F(AsyncRequestsSenderTest, ExceptionWhileWaitingSkipsUnyield) {
+TEST_F(AsyncRequestsSenderTest, ExceptionWhileWaitingDoesNotSkipUnyield) {
     class CountingResourceYielder : public ResourceYielder {
     public:
         void yield(OperationContext*) {
@@ -258,7 +258,7 @@ TEST_F(AsyncRequestsSenderTest, ExceptionWhileWaitingSkipsUnyield) {
     future.default_timed_get();
 
     ASSERT_EQ(yielderPointer->timesYielded, 1);
-    ASSERT_EQ(yielderPointer->timesUnyielded, 0);
+    ASSERT_EQ(yielderPointer->timesUnyielded, 1);
 }
 }  // namespace
 }  // namespace mongo

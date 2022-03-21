@@ -159,7 +159,7 @@ std::shared_ptr<txn_api::TransactionWithRetries> getTransactionWithRetriesForMon
     return std::make_shared<txn_api::TransactionWithRetries>(
         opCtx,
         Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
-        TransactionRouterResourceYielder::make());
+        TransactionRouterResourceYielder::makeForLocalHandoff());
 }
 
 }  // namespace

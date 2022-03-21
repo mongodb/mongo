@@ -165,7 +165,7 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, CannotCheckOutParentSessionOfCheckedO
         });
         ASSERT(stdx::future_status::ready != future.wait_for(Milliseconds(10).toSystemDuration()));
 
-        OperationContextSession::checkIn(_opCtx);
+        OperationContextSession::checkIn(_opCtx, OperationContextSession::CheckInReason::kDone);
         ASSERT(!OperationContextSession::get(_opCtx));
         future.get();
     };
@@ -190,7 +190,7 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, CannotCheckOutChildSessionOfCheckedOu
         });
         ASSERT(stdx::future_status::ready != future.wait_for(Milliseconds(10).toSystemDuration()));
 
-        OperationContextSession::checkIn(_opCtx);
+        OperationContextSession::checkIn(_opCtx, OperationContextSession::CheckInReason::kDone);
         ASSERT(!OperationContextSession::get(_opCtx));
         future.get();
     };
@@ -215,7 +215,7 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, CannotCheckoutMultipleChildSessionsCo
         });
         ASSERT(stdx::future_status::ready != future.wait_for(Milliseconds(10).toSystemDuration()));
 
-        OperationContextSession::checkIn(_opCtx);
+        OperationContextSession::checkIn(_opCtx, OperationContextSession::CheckInReason::kDone);
         ASSERT(!OperationContextSession::get(_opCtx));
         future.get();
     };
@@ -1098,7 +1098,7 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, SessionDiscarOperationContextAfterChe
             OperationContextSession ocs(_opCtx);
             ASSERT(OperationContextSession::get(_opCtx));
 
-            OperationContextSession::checkIn(_opCtx);
+            OperationContextSession::checkIn(_opCtx, OperationContextSession::CheckInReason::kDone);
             ASSERT(!OperationContextSession::get(_opCtx));
         }
 
@@ -1118,7 +1118,7 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, SessionDiscarOperationContextAfterChe
             OperationContextSession ocs(_opCtx);
             ASSERT(OperationContextSession::get(_opCtx));
 
-            OperationContextSession::checkIn(_opCtx);
+            OperationContextSession::checkIn(_opCtx, OperationContextSession::CheckInReason::kDone);
             ASSERT(!OperationContextSession::get(_opCtx));
 
             OperationContextSession::checkOut(_opCtx);

@@ -59,6 +59,43 @@
 
 namespace mongo::txn_api {
 
+namespace {
+
+/**
+ * Accepts a callback that returns a future. Yields the ResourceYielder before constructing and
+ * waiting on the future and then unyields before returning the ready future's result. Unyield will
+ * always be called if yield is successful. Errors from the callback are returned if it and unyield
+ * return errors.
+ *
+ * Notably, the futures are constructed after yielding so a future made with an inline executor
+ * will still run after the yield.
+ */
+template <typename Callback>
+StatusOrStatusWith<typename std::invoke_result_t<Callback>::value_type> getWithYields(
+    OperationContext* opCtx,
+    Callback&& cb,
+    const std::unique_ptr<ResourceYielder>& resourceYielder) {
+    auto yieldStatus = resourceYielder ? resourceYielder->yieldNoThrow(opCtx) : Status::OK();
+    if (!yieldStatus.isOK()) {
+        return yieldStatus;
+    }
+
+    auto fut = std::forward<Callback>(cb)();
+    auto futureStatus = fut.getNoThrow(opCtx);
+
+    auto unyieldStatus = resourceYielder ? resourceYielder->unyieldNoThrow(opCtx) : Status::OK();
+
+    if (!futureStatus.isOK()) {
+        return futureStatus;
+    } else if (!unyieldStatus.isOK()) {
+        return unyieldStatus;
+    }
+
+    return futureStatus;
+}
+
+}  // namespace
+
 namespace details {
 
 std::string execContextToString(Transaction::ExecutionContext execContext) {
@@ -114,56 +151,14 @@ void logNextStep(Transaction::ErrorHandlingStep nextStep, const BSONObj& txnInfo
 
 }  // namespace details
 
-Status TransactionWithRetries::_runBodyWithYields(OperationContext* opCtx) noexcept try {
-    if (_resourceYielder) {
-        _resourceYielder->yield(opCtx);
-    }
-
-    auto bodyFuture = _internalTxn->runCallback();
-    bodyFuture.wait(opCtx);
-
-    if (_resourceYielder) {
-        _resourceYielder->unyield(opCtx);
-    }
-
-    return bodyFuture.getNoThrow(opCtx);
-} catch (const DBException& e) {
-    return e.toStatus();
-}
-
-StatusWith<CommitResult> TransactionWithRetries::_runCommitWithYields(
-    OperationContext* opCtx) noexcept try {
-    if (_resourceYielder) {
-        _resourceYielder->yield(opCtx);
-    }
-
-    auto commitFuture = _internalTxn->commit();
-    commitFuture.wait(opCtx);
-
-    if (_resourceYielder) {
-        _resourceYielder->unyield(opCtx);
-    }
-
-    return commitFuture.getNoThrow(opCtx);
-} catch (const DBException& e) {
-    return e.toStatus();
-}
-
-Status TransactionWithRetries::_runAbortWithYields(OperationContext* opCtx) noexcept try {
-    if (_resourceYielder) {
-        _resourceYielder->yield(opCtx);
-    }
-
-    auto abortFuture = _internalTxn->abort();
-    abortFuture.wait(opCtx);
-
-    if (_resourceYielder) {
-        _resourceYielder->unyield(opCtx);
-    }
-
-    return abortFuture.getNoThrow(opCtx);
-} catch (const DBException& e) {
-    return e.toStatus();
+TransactionWithRetries::TransactionWithRetries(OperationContext* opCtx,
+                                               ExecutorPtr executor,
+                                               std::unique_ptr<ResourceYielder> resourceYielder)
+    : _internalTxn(std::make_shared<details::Transaction>(opCtx, executor)),
+      _resourceYielder(std::move(resourceYielder)) {
+    // Callers should always provide a yielder when using the API with a session checked out,
+    // otherwise commands run by the API won't be able to check out that session.
+    invariant(!OperationContextSession::get(opCtx) || _resourceYielder);
 }
 
 StatusWith<CommitResult> TransactionWithRetries::runSyncNoThrow(OperationContext* opCtx,
@@ -176,7 +171,8 @@ StatusWith<CommitResult> TransactionWithRetries::runSyncNoThrow(OperationContext
     _internalTxn->setCallback(std::move(callback));
     while (true) {
         {
-            auto bodyStatus = _runBodyWithYields(opCtx);
+            auto bodyStatus =
+                getWithYields(opCtx, [&] { return _internalTxn->runCallback(); }, _resourceYielder);
 
             if (!bodyStatus.isOK()) {
                 auto nextStep = _internalTxn->handleError(bodyStatus);
@@ -199,7 +195,8 @@ StatusWith<CommitResult> TransactionWithRetries::runSyncNoThrow(OperationContext
         }
 
         while (true) {
-            auto swResult = _runCommitWithYields(opCtx);
+            auto swResult =
+                getWithYields(opCtx, [&] { return _internalTxn->commit(); }, _resourceYielder);
 
             if (swResult.isOK() && swResult.getValue().getEffectiveStatus().isOK()) {
                 // Commit succeeded so return to the caller.
@@ -231,7 +228,8 @@ StatusWith<CommitResult> TransactionWithRetries::runSyncNoThrow(OperationContext
 
 void TransactionWithRetries::_bestEffortAbort(OperationContext* opCtx) {
     try {
-        uassertStatusOK(_runAbortWithYields(opCtx));
+        uassertStatusOK(
+            getWithYields(opCtx, [&] { return _internalTxn->abort(); }, _resourceYielder));
     } catch (const DBException& e) {
         LOGV2(5875900,
               "Unable to abort internal transaction",

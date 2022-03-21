@@ -427,7 +427,7 @@ OperationContextSession::~OperationContextSession() {
     if (!checkedOutSession)
         return;
 
-    checkIn(_opCtx);
+    checkIn(_opCtx, CheckInReason::kDone);
 }
 
 Session* OperationContextSession::get(OperationContext* opCtx) {
@@ -439,9 +439,17 @@ Session* OperationContextSession::get(OperationContext* opCtx) {
     return nullptr;
 }
 
-void OperationContextSession::checkIn(OperationContext* opCtx) {
+void OperationContextSession::checkIn(OperationContext* opCtx, CheckInReason reason) {
     auto& checkedOutSession = operationSessionDecoration(opCtx);
     invariant(checkedOutSession);
+
+    if (reason == CheckInReason::kYield) {
+        // Don't allow yielding a session that was checked out for kill because it will "unkill" the
+        // session and the subsequent check out will not have priority, which can easily lead to
+        // bugs. If you need to run an operation with a session that may yield, kill the session,
+        // check it out for kill, release it, then check it out normally.
+        invariant(!checkedOutSession->wasCheckedOutForKill());
+    }
 
     // Removing the checkedOutSession from the OperationContext must be done under the Client lock,
     // but destruction of the checkedOutSession must not be, as it takes the SessionCatalog mutex,

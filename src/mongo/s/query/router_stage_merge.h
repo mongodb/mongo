@@ -35,6 +35,7 @@
 #include "mongo/s/query/blocking_results_merger.h"
 #include "mongo/s/query/cluster_client_cursor_params.h"
 #include "mongo/s/query/router_exec_stage.h"
+#include "mongo/s/transaction_router_resource_yielder.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
@@ -49,7 +50,10 @@ public:
                      std::shared_ptr<executor::TaskExecutor> executor,
                      AsyncResultsMergerParams&& armParams)
         : RouterExecStage(opCtx),
-          _resultsMerger(opCtx, std::move(armParams), std::move(executor), nullptr) {}
+          _resultsMerger(opCtx,
+                         std::move(armParams),
+                         std::move(executor),
+                         TransactionRouterResourceYielder::makeForRemoteCommand()) {}
 
     StatusWith<ClusterQueryResult> next() final {
         return _resultsMerger.next(getOpCtx());

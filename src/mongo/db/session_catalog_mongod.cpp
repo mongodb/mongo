@@ -51,6 +51,7 @@
 #include "mongo/db/transaction_participant.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/transaction_router.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/scopeguard.h"
 
@@ -441,7 +442,8 @@ int MongoDSessionCatalog::reapSessionsOlderThan(OperationContext* opCtx,
         for (const auto& lsid : expiredSessionIds) {
             catalog->scanSession(lsid, [](ObservableSession& session) {
                 const auto participant = TransactionParticipant::get(session);
-                if (!participant.transactionIsOpen()) {
+                const auto txnRouter = TransactionRouter::get(session);
+                if (!participant.transactionIsOpen() && txnRouter.canBeReaped()) {
                     session.markForReap();
                 }
             });
@@ -496,8 +498,9 @@ MongoDOperationContextSession::MongoDOperationContextSession(OperationContext* o
 
 MongoDOperationContextSession::~MongoDOperationContextSession() = default;
 
-void MongoDOperationContextSession::checkIn(OperationContext* opCtx) {
-    OperationContextSession::checkIn(opCtx);
+void MongoDOperationContextSession::checkIn(OperationContext* opCtx,
+                                            OperationContextSession::CheckInReason reason) {
+    OperationContextSession::checkIn(opCtx, reason);
 }
 
 void MongoDOperationContextSession::checkOut(OperationContext* opCtx) {

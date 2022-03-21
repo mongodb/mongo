@@ -148,10 +148,8 @@ void handleWouldChangeOwningShardErrorRetryableWrite(
     const NamespaceString& nss,
     const write_ops::FindAndModifyCommandRequest& request,
     BSONObjBuilder* result) {
-    auto txn =
-        txn_api::TransactionWithRetries(opCtx,
-                                        Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
-                                        TransactionRouterResourceYielder::make());
+    auto txn = txn_api::TransactionWithRetries(
+        opCtx, Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(), nullptr);
 
     // Shared state for the transaction API use below.
     struct SharedBlock {
@@ -245,10 +243,11 @@ void handleWouldChangeOwningShardErrorTransaction(
         WouldChangeOwningShardInfo::parseFromCommandError(extraInfo), nss);
 
     try {
-        auto txn =
-            txn_api::TransactionWithRetries(opCtx,
-                                            Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
-                                            TransactionRouterResourceYielder::make());
+        auto txn = txn_api::TransactionWithRetries(
+            opCtx,
+            Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
+            TransactionRouterResourceYielder::makeForLocalHandoff());
+
 
         txn.runSync(opCtx,
                     [sharedBlock](const txn_api::TransactionClient& txnClient,

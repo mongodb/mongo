@@ -93,7 +93,7 @@ public:
      *
      * May only be called if the session has actually been checked out previously.
      */
-    static void checkIn(OperationContext* opCtx);
+    static void checkIn(OperationContext* opCtx, OperationContextSession::CheckInReason reason);
 
     /**
      * May only be called if the session is not checked out already.

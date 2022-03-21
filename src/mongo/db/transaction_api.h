@@ -146,9 +146,7 @@ public:
      */
     TransactionWithRetries(OperationContext* opCtx,
                            ExecutorPtr executor,
-                           std::unique_ptr<ResourceYielder> resourceYielder)
-        : _internalTxn(std::make_shared<details::Transaction>(opCtx, executor)),
-          _resourceYielder(std::move(resourceYielder)) {}
+                           std::unique_ptr<ResourceYielder> resourceYielder);
 
     /**
      * Alternate constructor that accepts a custom transaction client.
@@ -189,19 +187,6 @@ private:
      * Attempts to abort the active internal transaction, logging on errors.
      */
     void _bestEffortAbort(OperationContext* opCtx);
-
-    /**
-     * Runs the body, commit, and abort logic in the owned internal transaction. Yields the
-     * ResourceYielder before constructing and waiting on the future and then unyields before
-     * returning the ready future's result. The only case where the resource won't be unyielded is
-     * if the given operation context is interrupted or reaches its deadline.
-     *
-     * Notably, the futures are constructed after yielding so a future made with an inline executor
-     * will still run after the yield.
-     */
-    Status _runBodyWithYields(OperationContext* opCtx) noexcept;
-    StatusWith<CommitResult> _runCommitWithYields(OperationContext* opCtx) noexcept;
-    Status _runAbortWithYields(OperationContext* opCtx) noexcept;
 
     std::shared_ptr<details::Transaction> _internalTxn;
     std::unique_ptr<ResourceYielder> _resourceYielder;

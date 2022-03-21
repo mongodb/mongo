@@ -44,5 +44,23 @@ public:
 
     virtual void yield(OperationContext*) = 0;
     virtual void unyield(OperationContext*) = 0;
+
+    Status yieldNoThrow(OperationContext* opCtx) noexcept {
+        try {
+            yield(opCtx);
+        } catch (const DBException& e) {
+            return e.toStatus();
+        }
+        return Status::OK();
+    };
+
+    Status unyieldNoThrow(OperationContext* opCtx) noexcept {
+        try {
+            unyield(opCtx);
+        } catch (const DBException& e) {
+            return e.toStatus();
+        }
+        return Status::OK();
+    };
 };
 }  // namespace mongo

@@ -832,7 +832,7 @@ TEST_F(TxnParticipantTest, KillOpBeforeCommittingPreparedTransaction) {
 
     // Check the session back in.
     txnParticipant.stashTransactionResources(opCtx());
-    sessionCheckout->checkIn(opCtx());
+    sessionCheckout->checkIn(opCtx(), OperationContextSession::CheckInReason::kDone);
 
     // The transaction state should have been unaffected.
     ASSERT_TRUE(txnParticipant.transactionIsPrepared());
@@ -876,7 +876,7 @@ TEST_F(TxnParticipantTest, KillOpBeforeAbortingPreparedTransaction) {
 
     // Check the session back in.
     txnParticipant.stashTransactionResources(opCtx());
-    sessionCheckout->checkIn(opCtx());
+    sessionCheckout->checkIn(opCtx(), OperationContextSession::CheckInReason::kDone);
 
     // The transaction state should have been unaffected.
     ASSERT_TRUE(txnParticipant.transactionIsPrepared());
@@ -1315,7 +1315,7 @@ TEST_F(TxnParticipantTest, CannotStartNewTransactionWhilePreparedTransactionInPr
     ASSERT_EQ(ruPrepareTimestamp, prepareTimestamp);
 
     txnParticipant.stashTransactionResources(opCtx());
-    OperationContextSession::checkIn(opCtx());
+    OperationContextSession::checkIn(opCtx(), OperationContextSession::CheckInReason::kDone);
     {
         ScopeGuard guard([&]() { OperationContextSession::checkOut(opCtx()); });
         // Try to start a new transaction while there is already a prepared transaction on the
@@ -4797,7 +4797,7 @@ TEST_F(ShardTxnParticipantTest,
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
     ASSERT_TRUE(txnParticipant.transactionIsInProgress());
-    OperationContextSession::checkIn(opCtx());
+    OperationContextSession::checkIn(opCtx(), OperationContextSession::CheckInReason::kDone);
 
     runFunctionFromDifferentOpCtx([parentLsid, parentTxnNumber](OperationContext* newOpCtx) {
         newOpCtx->setLogicalSessionId(
@@ -4826,7 +4826,7 @@ TEST_F(ShardTxnParticipantTest,
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
     ASSERT_TRUE(txnParticipant.transactionIsInProgress());
-    OperationContextSession::checkIn(opCtx());
+    OperationContextSession::checkIn(opCtx(), OperationContextSession::CheckInReason::kDone);
 
     runFunctionFromDifferentOpCtx([parentLsid, parentTxnNumber](OperationContext* newOpCtx) {
         newOpCtx->setLogicalSessionId(parentLsid);
@@ -4879,7 +4879,7 @@ TEST_F(ShardTxnParticipantTest,
     txnParticipant.prepareTransaction(opCtx(), {});
     ASSERT(txnParticipant.transactionIsPrepared());
     txnParticipant.stashTransactionResources(opCtx());
-    OperationContextSession::checkIn(opCtx());
+    OperationContextSession::checkIn(opCtx(), OperationContextSession::CheckInReason::kDone);
 
     runFunctionFromDifferentOpCtx([parentLsid, parentTxnNumber](OperationContext* newOpCtx) {
         newOpCtx->setLogicalSessionId(
@@ -4912,7 +4912,7 @@ TEST_F(ShardTxnParticipantTest,
     txnParticipant.prepareTransaction(opCtx(), {});
     ASSERT(txnParticipant.transactionIsPrepared());
     txnParticipant.stashTransactionResources(opCtx());
-    OperationContextSession::checkIn(opCtx());
+    OperationContextSession::checkIn(opCtx(), OperationContextSession::CheckInReason::kDone);
 
     runFunctionFromDifferentOpCtx([parentLsid, parentTxnNumber](OperationContext* newOpCtx) {
         newOpCtx->setLogicalSessionId(parentLsid);

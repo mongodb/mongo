@@ -38,8 +38,11 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/is_mongos.h"
 #include "mongo/stdx/future.h"
+#include "mongo/stdx/thread.h"
+#include "mongo/unittest/barrier.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/executor_test_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
@@ -266,14 +269,29 @@ protected:
 
         _opCtx = makeOperationContext();
 
-        auto mockClient = std::make_unique<txn_api::details::MockTransactionClient>(
-            opCtx(), InlineQueuedCountingExecutor::make());
+        ThreadPool::Options options;
+        options.poolName = "TxnAPITest";
+        options.minThreads = 1;
+        options.maxThreads = 1;
+
+        _threadPool = std::make_shared<ThreadPool>(std::move(options));
+        _threadPool->startup();
+
+        auto mockClient =
+            std::make_unique<txn_api::details::MockTransactionClient>(opCtx(), _threadPool);
         _mockClient = mockClient.get();
-        _txnWithRetries =
-            std::make_unique<txn_api::TransactionWithRetries>(opCtx(),
-                                                              InlineQueuedCountingExecutor::make(),
-                                                              std::move(mockClient),
-                                                              nullptr /* resourceYielder */);
+        _txnWithRetries = std::make_unique<txn_api::TransactionWithRetries>(
+            opCtx(), _threadPool, std::move(mockClient), nullptr /* resourceYielder */);
+    }
+
+    void tearDown() override {
+        _threadPool->shutdown();
+        _threadPool->join();
+        _threadPool.reset();
+    }
+
+    void waitForAllEarlierTasksToComplete() {
+        _threadPool->waitForIdle();
     }
 
     OperationContext* opCtx() {
@@ -303,11 +321,8 @@ protected:
         // Reset _txnWithRetries so it returns and reacquires the same session from the session
         // pool. This ensures that we can predictably monitor txnNumber's value.
         _txnWithRetries = nullptr;
-        _txnWithRetries =
-            std::make_unique<txn_api::TransactionWithRetries>(opCtx(),
-                                                              InlineQueuedCountingExecutor::make(),
-                                                              std::move(mockClient),
-                                                              std::move(resourceYielder));
+        _txnWithRetries = std::make_unique<txn_api::TransactionWithRetries>(
+            opCtx(), _threadPool, std::move(mockClient), std::move(resourceYielder));
     }
 
     void expectSentAbort(TxnNumber txnNumber, BSONObj writeConcern) {
@@ -322,6 +337,7 @@ protected:
 
 private:
     ServiceContext::UniqueOperationContext _opCtx;
+    std::shared_ptr<ThreadPool> _threadPool;
     txn_api::details::MockTransactionClient* _mockClient{nullptr};
     MockResourceYielder* _resourceYielder{nullptr};
     std::unique_ptr<txn_api::TransactionWithRetries> _txnWithRetries;
@@ -1069,6 +1085,49 @@ TEST_F(TxnAPITest, HandlesExceptionWhileYieldingDuringAbort) {
     // 2 yields in body and best effort abort. Only unyield in body because the other yield throws.
     ASSERT_EQ(resourceYielder()->timesYielded(), 2);
     ASSERT_EQ(resourceYielder()->timesUnyielded(), 1);
+}
+
+TEST_F(TxnAPITest, UnyieldsAfterCancellation) {
+    resetTxnWithRetries(std::make_unique<MockResourceYielder>());
+
+    unittest::Barrier txnApiStarted(2);
+    unittest::Barrier opCtxKilled(2);
+
+    auto killerThread = stdx::thread([&txnApiStarted, &opCtxKilled, opCtx = opCtx()] {
+        txnApiStarted.countDownAndWait();
+        opCtx->markKilled();
+    });
+
+    auto swResult = txnWithRetries().runSyncNoThrow(
+        opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+            mockClient()->setNextCommandResponse(kOKInsertResponse);
+            auto insertRes = txnClient
+                                 .runCommand("user"_sd,
+                                             BSON("insert"
+                                                  << "foo"
+                                                  << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                 .get();
+
+            resourceYielder()->throwInUnyield(ErrorCodes::InternalError);
+
+            txnApiStarted.countDownAndWait();
+            opCtxKilled.countDownAndWait();
+
+            return SemiFuture<void>::makeReady();
+        });
+
+    // The transaction should fail with an Interrupted error from killing the opCtx using the
+    // API instead of the ResourceYielder error from within the API callback.
+    ASSERT_EQ(swResult.getStatus(), ErrorCodes::Interrupted);
+    // 2 yields in body and best effort abort and both of their corresponding unyields.
+    ASSERT_EQ(resourceYielder()->timesYielded(), 2);
+    ASSERT_EQ(resourceYielder()->timesUnyielded(), 2);
+
+    opCtxKilled.countDownAndWait();
+    killerThread.join();
+
+    // Wait until the API callback has completed before letting the barriers go out of scope.
+    waitForAllEarlierTasksToComplete();
 }
 
 TEST_F(TxnAPITest, HandlesExceptionWhileUnyieldingDuringAbort) {

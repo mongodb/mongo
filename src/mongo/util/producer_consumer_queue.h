@@ -586,6 +586,15 @@ public:
         return _popRunner([&](stdx::unique_lock<Latch>& lk) { return _tryPop(lk); });
     }
 
+    Status waitForNonEmptyNoThrow(Interruptible* interruptible) noexcept {
+        try {
+            waitForNonEmpty(interruptible);
+            return Status::OK();
+        } catch (const DBException& ex) {
+            return ex.toStatus();
+        }
+    }
+
     // Waits until there is at least one item in the queue.
     void waitForNonEmpty(Interruptible* interruptible) {
         stdx::unique_lock<Latch> lk(_mutex);

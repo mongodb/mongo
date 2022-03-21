@@ -103,7 +103,8 @@ public:
                 txnParticipant.stashTransactionResources(opCtx);
             }
 
-            MongoDOperationContextSession::checkIn(opCtx);
+            MongoDOperationContextSession::checkIn(opCtx,
+                                                   OperationContextSession::CheckInReason::kYield);
         }
         _yielded = (session != nullptr);
     }

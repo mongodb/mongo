@@ -249,6 +249,10 @@ public:
         return *get();
     }
 
+    bool wasCheckedOutForKill() const {
+        return bool(_killToken);
+    }
+
 private:
     // The owning session catalog into which the session should be checked back
     SessionCatalog& _catalog;
@@ -431,7 +435,8 @@ public:
      * Check-in may only be called if the session has actually been checked out previously and
      * similarly check-out may only be called if the session is not checked out already.
      */
-    static void checkIn(OperationContext* opCtx);
+    enum class CheckInReason { kDone, kYield };
+    static void checkIn(OperationContext* opCtx, CheckInReason reason);
     static void checkOut(OperationContext* opCtx);
 
 private:

@@ -199,13 +199,10 @@ Future<void> invokeInTransactionRouter(std::shared_ptr<RequestExecutionContext> 
 
             auto opCtx = rec->getOpCtx();
 
-            auto txnRouter = TransactionRouter::get(opCtx);
-            if (!txnRouter) {
-                // The command had yielded its session while the error was thrown.
-                return;
+            // Abort if the router wasn't yielded, which may happen at global shutdown.
+            if (auto txnRouter = TransactionRouter::get(opCtx)) {
+                txnRouter.implicitlyAbortTransaction(opCtx, status);
             }
-
-            TransactionRouter::get(opCtx).implicitlyAbortTransaction(opCtx, status);
         });
 }
 
@@ -442,8 +439,6 @@ private:
 
     // Logs and updates statistics if an error occurs.
     void _tapOnError(const Status& status);
-
-    void _tapOnSuccess();
 
     ParseAndRunCommand* const _parc;
 
@@ -1085,15 +1080,6 @@ void ParseAndRunCommand::RunInvocation::_tapOnError(const Status& status) {
     _parc->_errorBuilder->appendElements(errorLabels);
 }
 
-void ParseAndRunCommand::RunInvocation::_tapOnSuccess() {
-    auto opCtx = _parc->_rec->getOpCtx();
-    if (_parc->_osi && _parc->_osi->getAutocommit() == boost::optional<bool>(false)) {
-        tassert(5918604,
-                "A successful transaction command must always check out its session after yielding",
-                TransactionRouter::get(opCtx));
-    }
-}
-
 Future<void> ParseAndRunCommand::RunAndRetry::run() {
     return makeReadyFutureWith([&] {
                // Try kMaxNumStaleVersionRetries times. On the last try, exceptions are rethrown.
@@ -1134,7 +1120,6 @@ Future<void> ParseAndRunCommand::RunInvocation::run() {
                return future_util::makeState<RunAndRetry>(_parc).thenWithState(
                    [](auto* runner) { return runner->run(); });
            })
-        .tap([this]() { _tapOnSuccess(); })
         .tapError([this](Status status) { _tapOnError(status); });
 }
 

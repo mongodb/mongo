@@ -156,10 +156,8 @@ void handleWouldChangeOwningShardErrorRetryableWrite(OperationContext* opCtx,
     // Unset error details because they will be repopulated below.
     response->unsetErrDetails();
 
-    auto txn =
-        txn_api::TransactionWithRetries(opCtx,
-                                        Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
-                                        TransactionRouterResourceYielder::make());
+    auto txn = txn_api::TransactionWithRetries(
+        opCtx, Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(), nullptr);
 
     // Shared state for the transaction API use below.
     struct SharedBlock {
@@ -238,7 +236,7 @@ UpdateShardKeyResult handleWouldChangeOwningShardErrorTransaction(
     auto txn =
         txn_api::TransactionWithRetries(opCtx,
                                         Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
-                                        TransactionRouterResourceYielder::make());
+                                        TransactionRouterResourceYielder::makeForLocalHandoff());
 
     try {
         txn.runSync(opCtx,
