@@ -1053,8 +1053,12 @@ void TransactionRouter::Router::unstash(OperationContext* opCtx) {
         return;
     }
 
-    // TODO SERVER-64052: Validate that the transaction number hasn't changed and metrics are
-    // updated appropriately.
+    // Validate that the transaction number hasn't changed.
+    if (o().txnNumberAndRetryCounter.getTxnNumber() != opCtx->getTxnNumber()) {
+        uasserted(ErrorCodes::NoSuchTransaction,
+                  "The requested operation has a different transaction number than the active "
+                  "transaction.");
+    }
 
     auto tickSource = opCtx->getServiceContext()->getTickSource();
     stdx::lock_guard<Client> lk(*opCtx->getClient());

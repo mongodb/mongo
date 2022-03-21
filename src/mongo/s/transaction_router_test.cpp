@@ -715,6 +715,36 @@ DEATH_TEST_F(TransactionRouterTestWithDefaultSession,
                                            << "txnNumber" << TxnNumber(10)));
 }
 
+TEST_F(TransactionRouterTestWithDefaultSession, CannotUnstashWithDifferentTxnNumber) {
+    TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
+
+    auto txnRouter = TransactionRouter::get(operationContext());
+    txnRouter.beginOrContinueTxn(
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
+    txnRouter.setDefaultAtClusterTime(operationContext());
+
+    // Simulates the user beginning another transaction while the previous one has not completed.
+    txnRouter.beginOrContinueTxn(
+        operationContext(), txnNum + 1, TransactionRouter::TransactionActions::kStart);
+    txnRouter.setDefaultAtClusterTime(operationContext());
+
+    ASSERT_THROWS_CODE(
+        txnRouter.unstash(operationContext()), AssertionException, ErrorCodes::NoSuchTransaction);
+}
+
+TEST_F(TransactionRouterTestWithDefaultSession, SuccessfullyUnstashWithMatchingTxnNumber) {
+    TxnNumber txnNum{3};
+
+    auto txnRouter = TransactionRouter::get(operationContext());
+    txnRouter.beginOrContinueTxn(
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
+    txnRouter.setDefaultAtClusterTime(operationContext());
+
+    operationContext()->setTxnNumber(txnNum);
+    txnRouter.unstash(operationContext());
+}
+
 TEST_F(TransactionRouterTestWithDefaultSession, AttachTxnValidatesReadConcernIfAlreadyOnCmd) {
     TxnNumber txnNum{3};
 
