@@ -41,7 +41,7 @@ structs:
     SetAllowMigrationsCoordinatorDocument:
         description: "Represents a set allow migrations operation on the coordinator shard."
         generate_comparison_operators: false
-        strict: true
+        strict: false
         chained_structs:
             ShardingDDLCoordinatorMetadata: ShardingDDLCoordinatorMetadata
             SetAllowMigrationsRequest: SetAllowMigrationsRequest
