@@ -233,13 +233,13 @@ ExecutorFuture<void> markExternalKeysAsGarbageCollectable(
 void createOplogViewForTenantMigrations(OperationContext* opCtx, Database* db);
 
 /**
- * Creates a pipeline for fetching committed transactions on the donor before
- * 'startFetchingTimestamp'. We use 'tenantId' to fetch transaction entries specific to a particular
- * set of tenant databases.
+ * Creates a pipeline for fetching committed transactions on the donor before or at
+ * 'startApplyingDonorOpTime'. We use 'tenantId' to fetch transaction entries specific to a
+ * particular set of tenant databases.
  */
 std::unique_ptr<Pipeline, PipelineDeleter> createCommittedTransactionsPipelineForTenantMigrations(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const Timestamp& startFetchingTimestamp,
+    const Timestamp& startApplyingDonorOpTime,
     const std::string& tenantId);
 
 /**

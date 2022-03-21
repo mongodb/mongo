@@ -1,7 +1,7 @@
 /**
- * Tests that the migration recipient will retrieve committed transactions on the donor with a
- * 'lastWriteOpTime' before the stored 'startFetchingOpTime'. The recipient should store these
- * committed transaction entries in its own 'config.transactions' collection.
+ * Tests that the migration recipient will retrieve committed transactions on the donor
+ * with lastWriteOpTime <= the stored startApplyingOpTime. The recipient should store
+ * these committed transaction entries in its own 'config.transactions' collection.
  *
  * @tags: [
  *   incompatible_with_eft,
@@ -10,6 +10,7 @@
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   serverless,
+ *   requires_fcv_53
  * ]
  */
 
@@ -22,24 +23,48 @@ load("jstests/replsets/libs/tenant_migration_util.js");
 load("jstests/replsets/rslib.js");
 load("jstests/libs/uuid_util.js");
 
-const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
-
 const tenantId = "testTenantId";
+const transactionsNS = "config.transactions";
+const collName = "testColl";
+
+const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 const tenantDB = tenantMigrationTest.tenantDB(tenantId, "testDB");
 const nonTenantDB = tenantMigrationTest.nonTenantDB(tenantId, "testDB");
-const collName = "testColl";
 const tenantNS = `${tenantDB}.${collName}`;
-const transactionsNS = "config.transactions";
 
 const donorPrimary = tenantMigrationTest.getDonorPrimary();
 const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
 
+function validateTransactionEntryonRecipient(sessionId) {
+    const donorTxnEntry =
+        donorPrimary.getCollection(transactionsNS).findOne({"_id.id": sessionId.id});
+    const recipientTxnEntry =
+        recipientPrimary.getCollection(transactionsNS).findOne({"_id.id": sessionId.id});
+
+    assert.eq(donorTxnEntry.txnNum, recipientTxnEntry.txnNum);
+    assert.eq(donorTxnEntry.state, recipientTxnEntry.state);
+
+    // The recipient should have replaced the 'lastWriteOpTime' and 'lastWriteDate' fields.
+    assert.neq(donorTxnEntry.lastWriteOpTime, recipientTxnEntry.lastWriteOpTime);
+    assert.neq(donorTxnEntry.lastWriteDate, recipientTxnEntry.lastWriteDate);
+
+    // Test that the client can retry the first 'commitTransaction' on the recipient.
+    assert.commandWorked(recipientPrimary.adminCommand({
+        commitTransaction: 1,
+        lsid: recipientTxnEntry._id,
+        txnNumber: recipientTxnEntry.txnNum,
+        autocommit: false,
+    }));
+}
+
 assert.commandWorked(donorPrimary.getCollection(tenantNS).insert([{_id: 0, x: 0}, {_id: 1, x: 1}],
                                                                  {writeConcern: {w: "majority"}}));
 
+let sessionIdBeforeMigration;
 {
     jsTestLog("Run and commit a transaction prior to the migration");
     const session = donorPrimary.startSession({causalConsistency: false});
+    sessionIdBeforeMigration = session.getSessionId();
     const sessionDb = session.getDatabase(tenantDB);
     const sessionColl = sessionDb.getCollection(collName);
 
@@ -51,9 +76,7 @@ assert.commandWorked(donorPrimary.getCollection(tenantNS).insert([{_id: 0, x: 0}
     session.endSession();
 }
 
-// This should be the only transaction entry on the donor fetched by the recipient.
 assert.eq(1, donorPrimary.getCollection(transactionsNS).find().itcount());
-const donorTxnEntryBeforeMigration = donorPrimary.getCollection(transactionsNS).find().toArray()[0];
 
 {
     jsTestLog("Run and abort a transaction prior to the migration");
@@ -65,15 +88,17 @@ const donorTxnEntryBeforeMigration = donorPrimary.getCollection(transactionsNS).
     const findAndModifyRes0 = sessionColl.findAndModify({query: {x: 1}, remove: true});
     assert.eq({_id: 1, x: 1}, findAndModifyRes0);
 
-    // We prepare the transaction so that 'abortTransaction' will update the transactions table. We
-    // should later see that the recipient will not update its transactions table with this entry,
-    // since we only fetch committed transactions.
+    // We prepare the transaction so that 'abortTransaction' will update the transactions table.
+    // We should later see that the recipient will not update its transactions table with this
+    // entry, since we only fetch committed transactions.
     PrepareHelpers.prepareTransaction(session);
 
     assert.commandWorked(session.abortTransaction_forTesting());
     assert.sameMembers(sessionColl.find({}).toArray(), [{_id: 1, x: 1}]);
     session.endSession();
 }
+
+assert.eq(2, donorPrimary.getCollection(transactionsNS).find().itcount());
 
 {
     jsTestLog("Run and commit a transaction that does not belong to the tenant");
@@ -87,9 +112,7 @@ const donorTxnEntryBeforeMigration = donorPrimary.getCollection(transactionsNS).
     session.endSession();
 }
 
-const donorTxnEntries = donorPrimary.getCollection(transactionsNS).find().toArray();
-jsTestLog(`All donor entries: ${tojson(donorTxnEntries)}`);
-assert.eq(3, donorTxnEntries.length, `donor transaction entries: ${tojson(donorTxnEntries)}`);
+assert.eq(3, donorPrimary.getCollection(transactionsNS).find().itcount());
 
 jsTestLog("Running a migration");
 const migrationId = UUID();
@@ -97,28 +120,40 @@ const migrationOpts = {
     migrationIdString: extractUUIDFromObject(migrationId),
     tenantId,
 };
-TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(migrationOpts));
 
-// Verify that the recipient has fetched and written only the first committed transaction entry from
-// the donor.
-assert.eq(1, recipientPrimary.getCollection(transactionsNS).find().itcount());
-const recipientTxnEntry = recipientPrimary.getCollection(transactionsNS).find().toArray()[0];
+const pauseAfterRetrievingLastTxnMigrationRecipientInstance =
+    configureFailPoint(recipientPrimary, "pauseAfterRetrievingLastTxnMigrationRecipientInstance");
 
-assert.eq(donorTxnEntryBeforeMigration._id, recipientTxnEntry._id);
-assert.eq(donorTxnEntryBeforeMigration.txnNum, recipientTxnEntry.txnNum);
-assert.eq(donorTxnEntryBeforeMigration.state, recipientTxnEntry.state);
+assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
 
-// The recipient should have replaced the 'lastWriteOpTime' and 'lastWriteDate' fields.
-assert.neq(donorTxnEntryBeforeMigration.lastWriteOpTime, recipientTxnEntry.lastWriteOpTime);
-assert.neq(donorTxnEntryBeforeMigration.lastWriteDate, recipientTxnEntry.lastWriteDate);
+pauseAfterRetrievingLastTxnMigrationRecipientInstance.wait();
 
-// Test that the client can retry 'commitTransaction' on the recipient.
-assert.commandWorked(recipientPrimary.adminCommand({
-    commitTransaction: 1,
-    lsid: donorTxnEntryBeforeMigration._id,
-    txnNumber: donorTxnEntryBeforeMigration.txnNum,
-    autocommit: false,
-}));
+let sessionIdBetweenFetchingAndApplyingOpTime;
+{
+    jsTestLog("Start and commit a transaction at startFetchingOpTime < t <= startApplyingOpTime");
+    const session = donorPrimary.startSession({causalConsistency: false});
+    sessionIdBetweenFetchingAndApplyingOpTime = session.getSessionId();
+    const sessionDb = session.getDatabase(tenantDB);
+    const sessionColl = sessionDb.getCollection(collName);
+    session.startTransaction({writeConcern: {w: "majority"}});
+    sessionColl.insert({doc: {}});
+    assert.commandWorked(session.commitTransaction_forTesting());
+    session.endSession();
+}
+
+assert.eq(4, donorPrimary.getCollection(transactionsNS).find().itcount());
+
+pauseAfterRetrievingLastTxnMigrationRecipientInstance.off();
+
+TenantMigrationTest.assertCommitted(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
+
+// Verify that the recipient has fetched and written the two committed transaction entries
+// from the donor.
+assert.eq(2, recipientPrimary.getCollection(transactionsNS).find().itcount());
+
+validateTransactionEntryonRecipient(sessionIdBeforeMigration);
+
+validateTransactionEntryonRecipient(sessionIdBetweenFetchingAndApplyingOpTime);
 
 tenantMigrationTest.stop();
 })();

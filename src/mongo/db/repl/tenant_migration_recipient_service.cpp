@@ -1187,16 +1187,16 @@ TenantMigrationRecipientService::Instance::_makeCommittedTransactionsAggregation
     auto opCtx = cc().makeOperationContext();
     auto expCtx = makeExpressionContext(opCtx.get());
 
-    Timestamp startFetchingTimestamp;
+    Timestamp startApplyingDonorOpTime;
     {
         stdx::lock_guard lk(_mutex);
-        invariant(_stateDoc.getStartFetchingDonorOpTime());
-        startFetchingTimestamp = _stateDoc.getStartFetchingDonorOpTime().get().getTimestamp();
+        invariant(_stateDoc.getStartApplyingDonorOpTime());
+        startApplyingDonorOpTime = _stateDoc.getStartApplyingDonorOpTime().get().getTimestamp();
     }
 
     auto serializedPipeline =
         tenant_migration_util::createCommittedTransactionsPipelineForTenantMigrations(
-            expCtx, startFetchingTimestamp, getTenantId())
+            expCtx, startApplyingDonorOpTime, getTenantId())
             ->serializeToBson();
 
     AggregateCommandRequest aggRequest(NamespaceString::kSessionTransactionsTableNamespace,
