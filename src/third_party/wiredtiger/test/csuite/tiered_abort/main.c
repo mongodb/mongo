@@ -67,7 +67,7 @@ static char home[1024]; /* Program working dir */
 #define MAX_VAL 1024
 #define MIN_TH 5
 #define NUM_INT_THREADS 3
-#define RECORDS_FILE "records-%" PRIu32
+#define RECORDS_FILE "%s/records-%" PRIu32
 /* Include worker threads and extra sessions */
 #define SESSION_MAX (MAX_TH + 4)
 #ifndef WT_STORAGE_LIB
@@ -238,7 +238,7 @@ thread_flush_run(void *arg)
     THREAD_DATA *td;
     uint64_t stable;
     uint32_t i, sleep_time;
-    char ts_string[WT_TS_HEX_STRING_SIZE];
+    char buf[512], ts_string[WT_TS_HEX_STRING_SIZE];
 
     __wt_random_init(&rnd);
 
@@ -246,7 +246,8 @@ thread_flush_run(void *arg)
     /*
      * Keep a separate file with the records we wrote for checking.
      */
-    (void)unlink(sentinel_file);
+    testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/%s", home, sentinel_file));
+    (void)unlink(buf);
     testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
     for (i = 0;;) {
         sleep_time = __wt_random(&rnd) % MAX_FLUSH_INVL;
@@ -270,7 +271,7 @@ thread_flush_run(void *arg)
          * flush_tier calls have finished and can start its timer.
          */
         if (++i == flush_calls) {
-            testutil_assert_errno((fp = fopen(sentinel_file, "w")) != NULL);
+            testutil_assert_errno((fp = fopen(buf, "w")) != NULL);
             testutil_assert_errno(fclose(fp) == 0);
         }
     }
@@ -307,7 +308,7 @@ thread_run(void *arg)
     /*
      * Set up the separate file for checking.
      */
-    testutil_check(__wt_snprintf(cbuf, sizeof(cbuf), RECORDS_FILE, td->info));
+    testutil_check(__wt_snprintf(cbuf, sizeof(cbuf), RECORDS_FILE, home, td->info));
     (void)unlink(cbuf);
     testutil_assert_errno((fp = fopen(cbuf, "w")) != NULL);
     /*
@@ -449,17 +450,14 @@ run_workload(uint32_t nth, const char *build_dir)
      */
     cache_mb = ((32 * WT_KILOBYTE * 10) * nth) / WT_MEGABYTE + 20;
 
-    if (chdir(home) != 0)
-        testutil_die(errno, "Child chdir: %s", home);
     testutil_check(__wt_snprintf(envconf, sizeof(envconf), ENV_CONFIG_TXNSYNC, cache_mb,
       SESSION_MAX, BUCKET, LOCAL_RETENTION));
 
     testutil_check(__wt_snprintf(extconf, sizeof(extconf), ",extensions=(%s/%s=(early_load=true))",
       build_dir, WT_STORAGE_LIB));
-
     strcat(envconf, extconf);
     printf("wiredtiger_open configuration: %s\n", envconf);
-    testutil_check(wiredtiger_open(NULL, NULL, envconf, &conn));
+    testutil_check(wiredtiger_open(home, NULL, envconf, &conn));
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
     /*
      * Create all the tables.
@@ -587,7 +585,7 @@ main(int argc, char *argv[])
     uint32_t i, nth, timeout;
     int ch, status, ret;
     const char *working_dir;
-    char buf[512], bucket_dir[512], build_dir[512], fname[64], kname[64];
+    char buf[512], bucket_dir[512], build_dir[512], fname[512], kname[64];
     char envconf[1024], extconf[512];
     char ts_string[WT_TS_HEX_STRING_SIZE];
     bool fatal, preserve, rand_th, rand_time, verify_only;
@@ -734,6 +732,10 @@ main(int argc, char *argv[])
     /* Copy the data to a separate folder for debugging purpose. */
     testutil_copy_data(home);
 
+    /* Come back to root directory, so we can link wiredtiger with extensions properly. */
+    if (chdir("../") != 0)
+        testutil_die(errno, "root chdir: %s", home);
+
     printf("Open database, run recovery and verify content\n");
 
     /* Open the connection which forces recovery to be run. */
@@ -743,7 +745,7 @@ main(int argc, char *argv[])
       build_dir, WT_STORAGE_LIB));
 
     strcat(envconf, extconf);
-    testutil_check(wiredtiger_open(NULL, NULL, envconf, &conn));
+    testutil_check(wiredtiger_open(home, NULL, envconf, &conn));
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
     /* Open a cursor on all the tables. */
     testutil_check(__wt_snprintf(buf, sizeof(buf), "%s:%s", table_pfx, uri_collection));
@@ -770,7 +772,7 @@ main(int argc, char *argv[])
         initialize_rep(&c_rep[i]);
         initialize_rep(&l_rep[i]);
         initialize_rep(&o_rep[i]);
-        testutil_check(__wt_snprintf(fname, sizeof(fname), RECORDS_FILE, i));
+        testutil_check(__wt_snprintf(fname, sizeof(fname), RECORDS_FILE, home, i));
         if ((fp = fopen(fname, "r")) == NULL)
             testutil_die(errno, "fopen: %s", fname);
 

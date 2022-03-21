@@ -145,11 +145,12 @@ testutil_clean_work_dir(const char *dir)
 void
 testutil_build_dir(TEST_OPTS *opts, char *buf, int size)
 {
-    /* To keep it simple, in order to get the build directory we require the user to set the build
-     * directory from the command line options.
-     * We unfortunately can't depend on a known/constant build directory (the user could have
-     * multiple out-of-source build directories). There's also not really any OS-agnostic mechanisms
-     * we can here use to discover the build directory the calling test binary exists in.
+    /*
+     * To keep it simple, in order to get the build directory we require the user to set the build
+     * directory from the command line options. We unfortunately can't depend on a known/constant
+     * build directory (the user could have multiple out-of-source build directories). There's also
+     * not really any OS-agnostic mechanisms we can here use to discover the build directory the
+     * calling test binary exists in.
      */
     if (opts->build_dir == NULL)
         testutil_die(ENOENT, "No build directory given");
