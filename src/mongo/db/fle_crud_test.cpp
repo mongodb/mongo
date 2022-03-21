@@ -85,7 +85,9 @@ public:
 
     uint64_t countDocuments(const NamespaceString& nss) final;
 
-    void insertDocument(const NamespaceString& nss, BSONObj obj, bool translateDuplicateKey) final;
+    StatusWith<write_ops::InsertCommandReply> insertDocument(const NamespaceString& nss,
+                                                             BSONObj obj,
+                                                             bool translateDuplicateKey) final;
 
     BSONObj deleteWithPreimage(const NamespaceString& nss,
                                const EncryptionInformation& ei,
@@ -119,15 +121,18 @@ uint64_t FLEQueryTestImpl::countDocuments(const NamespaceString& nss) {
     return uassertStatusOK(_storage->getCollectionCount(_opCtx, nss));
 }
 
-void FLEQueryTestImpl::insertDocument(const NamespaceString& nss,
-                                      BSONObj obj,
-                                      bool translateDuplicateKey) {
+StatusWith<write_ops::InsertCommandReply> FLEQueryTestImpl::insertDocument(
+    const NamespaceString& nss, BSONObj obj, bool translateDuplicateKey) {
     repl::TimestampedBSONObj tb;
     tb.obj = obj;
 
     auto status = _storage->insertDocument(_opCtx, nss, tb, 0);
 
-    uassertStatusOK(status);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    return write_ops::InsertCommandReply();
 }
 
 BSONObj FLEQueryTestImpl::deleteWithPreimage(const NamespaceString& nss,
@@ -520,7 +525,7 @@ void FleCrudTest::doSingleWideInsert(int id, uint64_t fieldCount, ValueGenerator
 
     auto efc = getTestEncryptedFieldConfig();
 
-    processInsert(_queryImpl.get(), _edcNs, serverPayload, efc, result);
+    uassertStatusOK(processInsert(_queryImpl.get(), _edcNs, serverPayload, efc, result));
 }
 
 
@@ -581,7 +586,7 @@ void FleCrudTest::doSingleInsert(int id, BSONElement element) {
 
     auto efc = getTestEncryptedFieldConfig();
 
-    processInsert(_queryImpl.get(), _edcNs, serverPayload, efc, result);
+    uassertStatusOK(processInsert(_queryImpl.get(), _edcNs, serverPayload, efc, result));
 }
 
 void FleCrudTest::doSingleInsert(int id, BSONObj obj) {

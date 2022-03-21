@@ -38,6 +38,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops_gen.h"
+#include "mongo/db/transaction_api.h"
 #include "mongo/s/write_ops/batch_write_exec.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 
@@ -68,6 +69,24 @@ FLEBatchResult processFLEBatch(OperationContext* opCtx,
                                BatchedCommandResponse* response,
                                boost::optional<OID> targetEpoch);
 
+
+/**
+ * Initialize the FLE CRUD subsystem on Mongod.
+ */
+void startFLECrud(ServiceContext* serviceContext);
+
+/**
+ * Stop the FLE CRUD subsystem on Mongod.
+ */
+void stopFLECrud();
+
+
+/**
+ * Process a replica set insert.
+ */
+FLEBatchResult processFLEInsert(OperationContext* opCtx,
+                                const write_ops::InsertCommandRequest& insertRequest,
+                                write_ops::InsertCommandReply* insertReply);
 /**
  * Process a findAndModify request from mongos
  */
@@ -104,9 +123,8 @@ public:
      * If translateDuplicateKey == true and the insert returns DuplicateKey, returns
      * FLEStateCollectionContention instead.
      */
-    virtual void insertDocument(const NamespaceString& nss,
-                                BSONObj obj,
-                                bool translateDuplicateKey) = 0;
+    virtual StatusWith<write_ops::InsertCommandReply> insertDocument(
+        const NamespaceString& nss, BSONObj obj, bool translateDuplicateKey) = 0;
 
     /**
      * Delete a single document with the given query.
@@ -144,11 +162,12 @@ public:
  *
  * Used by unit tests.
  */
-void processInsert(FLEQueryInterface* queryImpl,
-                   const NamespaceString& edcNss,
-                   std::vector<EDCServerPayloadInfo>& serverPayload,
-                   const EncryptedFieldConfig& efc,
-                   BSONObj document);
+StatusWith<write_ops::InsertCommandReply> processInsert(
+    FLEQueryInterface* queryImpl,
+    const NamespaceString& edcNss,
+    std::vector<EDCServerPayloadInfo>& serverPayload,
+    const EncryptedFieldConfig& efc,
+    BSONObj document);
 
 /**
  * Process a FLE delete with the query interface
@@ -165,6 +184,17 @@ uint64_t processDelete(FLEQueryInterface* queryImpl,
  */
 uint64_t processUpdate(FLEQueryInterface* queryImpl,
                        const write_ops::UpdateCommandRequest& updateRequest);
+
+/**
+ * Callback function to get a TransactionWithRetries with the appropiate Executor
+ */
+using GetTxnCallback =
+    std::function<std::shared_ptr<txn_api::TransactionWithRetries>(OperationContext*)>;
+
+std::pair<FLEBatchResult, write_ops::InsertCommandReply> processInsert(
+    OperationContext* opCtx,
+    const write_ops::InsertCommandRequest& insertRequest,
+    GetTxnCallback getTxns);
 
 /**
  * Process a FLE Find And Modify with the query interface

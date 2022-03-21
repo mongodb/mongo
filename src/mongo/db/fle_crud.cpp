@@ -52,6 +52,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/transaction_router_resource_yielder.h"
 #include "mongo/s/write_ops/batch_write_exec.h"
+#include "mongo/s/write_ops/write_error_detail.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
 
@@ -66,7 +67,9 @@ public:
 
     uint64_t countDocuments(const NamespaceString& nss) final;
 
-    void insertDocument(const NamespaceString& nss, BSONObj obj, bool translateDuplicateKey) final;
+    StatusWith<write_ops::InsertCommandReply> insertDocument(const NamespaceString& nss,
+                                                             BSONObj obj,
+                                                             bool translateDuplicateKey) final;
 
     BSONObj deleteWithPreimage(const NamespaceString& nss,
                                const EncryptionInformation& ei,
@@ -155,9 +158,71 @@ uint64_t FLEQueryInterfaceImpl::countDocuments(const NamespaceString& nss) {
     return docCount;
 }
 
-void FLEQueryInterfaceImpl::insertDocument(const NamespaceString& nss,
-                                           BSONObj obj,
-                                           bool translateDuplicateKey) {
+write_ops::WriteError writeErrorDetailToWriteError(const WriteErrorDetail* detail) {
+    return write_ops::WriteError(detail->getIndex(), detail->toStatus());
+}
+
+
+std::vector<write_ops::WriteError> writeErrorsDetailToWriteErrors(
+    const std::vector<WriteErrorDetail*>& details) {
+    std::vector<write_ops::WriteError> errors;
+    errors.reserve(details.size());
+    for (const auto& detail : details) {
+        errors.push_back(writeErrorDetailToWriteError(detail));
+    }
+    return errors;
+}
+
+std::vector<write_ops::WriteError> singleStatusToWriteErrors(const Status& status) {
+    std::vector<write_ops::WriteError> errors;
+
+    errors.push_back(write_ops::WriteError(0, status));
+
+    return errors;
+}
+
+void appendSingleStatusToWriteErrors(const Status& status,
+                                     write_ops::WriteCommandReplyBase* replyBase) {
+    std::vector<write_ops::WriteError> errors;
+
+    if (replyBase->getWriteErrors()) {
+        errors = std::move(replyBase->getWriteErrors().value());
+    }
+
+    errors.push_back(write_ops::WriteError(0, status));
+
+    replyBase->setWriteErrors(errors);
+}
+
+void writeErrorsToWriteDetails(const std::vector<write_ops::WriteError>& errors,
+                               BatchedCommandResponse* response) {
+    for (const auto& error : errors) {
+        auto detail = std::make_unique<WriteErrorDetail>();
+        detail->setIndex(error.getIndex());
+        detail->setStatus(error.getStatus());
+
+        response->addToErrDetails(detail.release());
+    }
+}
+
+void replyToResponse(write_ops::WriteCommandReplyBase* replyBase,
+                     BatchedCommandResponse* response) {
+    response->setStatus(Status::OK());
+    response->setN(replyBase->getN());
+    if (replyBase->getElectionId()) {
+        response->setElectionId(replyBase->getElectionId().value());
+    }
+    if (replyBase->getOpTime()) {
+        response->setLastOp(replyBase->getOpTime().value());
+    }
+    if (replyBase->getWriteErrors().has_value()) {
+        writeErrorsToWriteDetails(replyBase->getWriteErrors().value(), response);
+    }
+}
+
+
+StatusWith<write_ops::InsertCommandReply> FLEQueryInterfaceImpl::insertDocument(
+    const NamespaceString& nss, BSONObj obj, bool translateDuplicateKey) {
     write_ops::InsertCommandRequest insertRequest(nss);
     insertRequest.setDocuments({obj});
     // TODO SERVER-64143 - insertRequest.setWriteConcern
@@ -167,10 +232,28 @@ void FLEQueryInterfaceImpl::insertDocument(const NamespaceString& nss,
 
     auto status = response.toStatus();
     if (translateDuplicateKey && status.code() == ErrorCodes::DuplicateKey) {
-        uassertStatusOK(Status(ErrorCodes::FLEStateCollectionContention, status.reason()));
+        return Status(ErrorCodes::FLEStateCollectionContention, status.reason());
     }
 
-    uassertStatusOK(status);
+    write_ops::InsertCommandReply reply;
+
+    if (response.isLastOpSet()) {
+        reply.getWriteCommandReplyBase().setOpTime(response.getLastOp());
+    }
+
+    if (response.isElectionIdSet()) {
+        reply.getWriteCommandReplyBase().setElectionId(response.getElectionId());
+    }
+
+    reply.getWriteCommandReplyBase().setN(response.getN());
+    if (response.isErrDetailsSet()) {
+        reply.getWriteCommandReplyBase().setWriteErrors(
+            writeErrorsDetailToWriteErrors(response.getErrDetails()));
+    }
+
+    reply.getWriteCommandReplyBase().setRetriedStmtIds(reply.getRetriedStmtIds());
+
+    return {reply};
 }
 
 BSONObj FLEQueryInterfaceImpl::deleteWithPreimage(
@@ -344,10 +427,21 @@ StatusWith<txn_api::CommitResult> runInTxnWithRetry(
     }
 }
 
-StatusWith<FLEBatchResult> processInsert(
+
+std::shared_ptr<txn_api::TransactionWithRetries> getTransactionWithRetriesForMongoS(
+    OperationContext* opCtx) {
+    return std::make_shared<txn_api::TransactionWithRetries>(
+        opCtx,
+        Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
+        TransactionRouterResourceYielder::make());
+}
+
+}  // namespace
+
+std::pair<FLEBatchResult, write_ops::InsertCommandReply> processInsert(
     OperationContext* opCtx,
     const write_ops::InsertCommandRequest& insertRequest,
-    std::function<std::shared_ptr<txn_api::TransactionWithRetries>(OperationContext*)> getTxns) {
+    GetTxnCallback getTxns) {
 
     auto documents = insertRequest.getDocuments();
     // TODO - how to check if a document will be too large???
@@ -359,20 +453,22 @@ StatusWith<FLEBatchResult> processInsert(
 
     if (serverPayload->size() == 0) {
         // No actual FLE2 indexed fields
-        return FLEBatchResult::kNotProcessed;
+        return std::pair<FLEBatchResult, write_ops::InsertCommandReply>{
+            FLEBatchResult::kNotProcessed, write_ops::InsertCommandReply()};
     }
 
     auto ei = insertRequest.getEncryptionInformation().get();
 
     auto edcNss = insertRequest.getNamespace();
     auto efc = EncryptionInformationHelpers::getAndValidateSchema(insertRequest.getNamespace(), ei);
+    write_ops::InsertCommandReply reply;
 
     std::shared_ptr<txn_api::TransactionWithRetries> trun = getTxns(opCtx);
 
     // The function that handles the transaction may outlive this function so we need to use
     // shared_ptrs since it runs on another thread
     auto ownedDocument = document.getOwned();
-    auto insertBlock = std::tie(edcNss, efc, serverPayload);
+    auto insertBlock = std::tie(edcNss, efc, serverPayload, reply);
     auto sharedInsertBlock = std::make_shared<decltype(insertBlock)>(insertBlock);
 
     auto swResult = runInTxnWithRetry(
@@ -382,23 +478,40 @@ StatusWith<FLEBatchResult> processInsert(
                                            ExecutorPtr txnExec) {
             FLEQueryInterfaceImpl queryImpl(txnClient);
 
-            auto [edcNss2, efc2, serverPayload2] = *sharedInsertBlock.get();
+            auto [edcNss2, efc2, serverPayload2, reply2] = *sharedInsertBlock.get();
 
-            processInsert(&queryImpl, edcNss2, *serverPayload2.get(), efc2, ownedDocument);
+            reply2 = uassertStatusOK(
+                processInsert(&queryImpl, edcNss2, *serverPayload2.get(), efc2, ownedDocument));
+
+            // If we have write errors but no unexpected internal errors, then we reach here
+            // If we have write errors, we need to return a failed status to ensure the txn client
+            // does not try to commit the transaction.
+            if (reply2.getWriteErrors().has_value() && !reply2.getWriteErrors().value().empty()) {
+                return SemiFuture<void>::makeReady(
+                    Status(ErrorCodes::FLETransactionAbort, "FLE2 write errors on insert"));
+            }
 
             return SemiFuture<void>::makeReady();
         });
+
     if (!swResult.isOK()) {
-        return swResult.getStatus();
+        // FLETransactionAbort is used for control flow so it means we have a valid
+        // InsertCommandReply with write errors so we should return that.
+        if (swResult.getStatus() == ErrorCodes::FLETransactionAbort) {
+            return std::pair<FLEBatchResult, write_ops::InsertCommandReply>{
+                FLEBatchResult::kProcessed, reply};
+        }
+
+        appendSingleStatusToWriteErrors(swResult.getStatus(), &reply.getWriteCommandReplyBase());
     }
 
-    return FLEBatchResult::kProcessed;
+    return std::pair<FLEBatchResult, write_ops::InsertCommandReply>{FLEBatchResult::kProcessed,
+                                                                    reply};
 }
 
-StatusWith<uint64_t> processDelete(
-    OperationContext* opCtx,
-    const write_ops::DeleteCommandRequest& deleteRequest,
-    std::function<std::shared_ptr<txn_api::TransactionWithRetries>(OperationContext*)> getTxns) {
+StatusWith<uint64_t> processDelete(OperationContext* opCtx,
+                                   const write_ops::DeleteCommandRequest& deleteRequest,
+                                   GetTxnCallback getTxns) {
 
     auto deletes = deleteRequest.getDeletes();
     uassert(6371302, "Only single document deletes are permitted", deletes.size() == 1);
@@ -436,10 +549,9 @@ StatusWith<uint64_t> processDelete(
     return count;
 }
 
-StatusWith<uint64_t> processUpdate(
-    OperationContext* opCtx,
-    const write_ops::UpdateCommandRequest& updateRequest,
-    std::function<std::shared_ptr<txn_api::TransactionWithRetries>(OperationContext*)> getTxns) {
+StatusWith<uint64_t> processUpdate(OperationContext* opCtx,
+                                   const write_ops::UpdateCommandRequest& updateRequest,
+                                   GetTxnCallback getTxns) {
 
     auto updates = updateRequest.getUpdates();
     uassert(6371502, "Only single document updates are permitted", updates.size() == 1);
@@ -483,6 +595,7 @@ StatusWith<uint64_t> processUpdate(
     return count;
 }
 
+namespace {
 void processFieldsForInsert(FLEQueryInterface* queryImpl,
                             const NamespaceString& edcNss,
                             std::vector<EDCServerPayloadInfo>& serverPayload,
@@ -538,18 +651,22 @@ void processFieldsForInsert(FLEQueryInterface* queryImpl,
 
         payload.count = count;
 
-        queryImpl->insertDocument(
+        auto escInsertReply = uassertStatusOK(queryImpl->insertDocument(
             nssEsc,
             ESCCollection::generateInsertDocument(tagToken, valueToken, position, count),
-            true);
+            true));
+        checkWriteErrors(escInsertReply);
+
 
         NamespaceString nssEcoc(edcNss.db(), efc.getEcocCollection().get());
 
         // TODO - should we make this a batch of ECOC updates?
-        queryImpl->insertDocument(nssEcoc,
-                                  ECOCCollection::generateDocument(
-                                      payload.fieldPathName, payload.payload.getEncryptedTokens()),
-                                  false);
+        auto ecocInsertReply = uassertStatusOK(queryImpl->insertDocument(
+            nssEcoc,
+            ECOCCollection::generateDocument(payload.fieldPathName,
+                                             payload.payload.getEncryptedTokens()),
+            false));
+        checkWriteErrors(ecocInsertReply);
     }
 }
 
@@ -624,20 +741,22 @@ void processRemovedFields(FLEQueryInterface* queryImpl,
             index = alpha.value() + 1;
         }
 
-        queryImpl->insertDocument(
+        auto eccInsertReply = uassertStatusOK(queryImpl->insertDocument(
             nssEcc,
             ECCCollection::generateDocument(tagToken, valueToken, index, plainTextField.count),
-            true);
+            true));
+        checkWriteErrors(eccInsertReply);
 
         NamespaceString nssEcoc(edcNss.db(), efc.getEcocCollection().get());
 
         // TODO - make this a batch of ECOC updates?
         EncryptedStateCollectionTokens tokens(plainTextField.esc, plainTextField.ecc);
         auto encryptedTokens = uassertStatusOK(tokens.serialize(deleteToken.ecocToken));
-        queryImpl->insertDocument(
+        auto ecocInsertReply = uassertStatusOK(queryImpl->insertDocument(
             nssEcoc,
             ECOCCollection::generateDocument(deletedField.fieldPathName, encryptedTokens),
-            false);
+            false));
+        checkWriteErrors(ecocInsertReply);
     }
 }
 
@@ -696,17 +815,19 @@ StatusWith<write_ops::FindAndModifyCommandReply> processFindAndModifyRequest(
 
 FLEQueryInterface::~FLEQueryInterface() {}
 
-void processInsert(FLEQueryInterface* queryImpl,
-                   const NamespaceString& edcNss,
-                   std::vector<EDCServerPayloadInfo>& serverPayload,
-                   const EncryptedFieldConfig& efc,
-                   BSONObj document) {
+
+StatusWith<write_ops::InsertCommandReply> processInsert(
+    FLEQueryInterface* queryImpl,
+    const NamespaceString& edcNss,
+    std::vector<EDCServerPayloadInfo>& serverPayload,
+    const EncryptedFieldConfig& efc,
+    BSONObj document) {
 
     processFieldsForInsert(queryImpl, edcNss, serverPayload, efc);
 
     auto finalDoc = EDCServerCollection::finalizeForInsert(document, serverPayload);
 
-    queryImpl->insertDocument(edcNss, finalDoc, false);
+    return queryImpl->insertDocument(edcNss, finalDoc, false);
 }
 
 uint64_t processDelete(FLEQueryInterface* queryImpl,
@@ -824,34 +945,23 @@ FLEBatchResult processFLEBatch(OperationContext* opCtx,
         uasserted(6371209, "Feature flag FLE2 is not enabled");
     }
 
-    auto getTxn = [](OperationContext* opCtx) {
-        return std::make_shared<txn_api::TransactionWithRetries>(
-            opCtx,
-            Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
-            TransactionRouterResourceYielder::make());
-    };
-
     if (request.getBatchType() == BatchedCommandRequest::BatchType_Insert) {
         auto insertRequest = request.getInsertRequest();
 
-        auto swResult = processInsert(opCtx, insertRequest, getTxn);
-
-        if (!swResult.isOK()) {
-            response->setStatus(swResult.getStatus());
-            response->setN(0);
-
-            return FLEBatchResult::kProcessed;
-        } else if (swResult.getValue() == FLEBatchResult::kProcessed) {
-            response->setStatus(Status::OK());
-            response->setN(1);
+        auto [batchResult, insertReply] =
+            processInsert(opCtx, insertRequest, &getTransactionWithRetriesForMongoS);
+        if (batchResult == FLEBatchResult::kNotProcessed) {
+            return FLEBatchResult::kNotProcessed;
         }
 
-        return swResult.getValue();
+        replyToResponse(&insertReply.getWriteCommandReplyBase(), response);
+
+        return FLEBatchResult::kProcessed;
     } else if (request.getBatchType() == BatchedCommandRequest::BatchType_Delete) {
 
         auto deleteRequest = request.getDeleteRequest();
 
-        auto swResult = processDelete(opCtx, deleteRequest, getTxn);
+        auto swResult = processDelete(opCtx, deleteRequest, &getTransactionWithRetriesForMongoS);
 
 
         if (!swResult.isOK()) {
@@ -867,7 +977,7 @@ FLEBatchResult processFLEBatch(OperationContext* opCtx,
 
         auto updateRequest = request.getUpdateRequest();
 
-        auto swResult = processUpdate(opCtx, updateRequest, getTxn);
+        auto swResult = processUpdate(opCtx, updateRequest, &getTransactionWithRetriesForMongoS);
 
         if (!swResult.isOK()) {
             response->setStatus(swResult.getStatus());
@@ -998,14 +1108,7 @@ FLEBatchResult processFLEFindAndModify(OperationContext* opCtx,
         return FLEBatchResult::kNotProcessed;
     }
 
-    auto getTxn = [](OperationContext* opCtx) {
-        return std::make_shared<txn_api::TransactionWithRetries>(
-            opCtx,
-            Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
-            TransactionRouterResourceYielder::make());
-    };
-
-    auto swReply = processFindAndModifyRequest(opCtx, request, getTxn);
+    auto swReply = processFindAndModifyRequest(opCtx, request, &getTransactionWithRetriesForMongoS);
 
     auto reply = uassertStatusOK(swReply);
 

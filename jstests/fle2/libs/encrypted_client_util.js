@@ -1,3 +1,5 @@
+load("jstests/concurrency/fsm_workload_helpers/server_types.js");  // For isMongos.
+
 /**
  * Create a FLE client that has an unencrypted and encrypted client to the same database
  */
@@ -158,6 +160,17 @@ class EncryptedClient {
             let unEncryptedField = unEncryptedDoc[field];
             assert.eq(unEncryptedField, fields[field]);
         }
+    }
+
+    assertWriteCommandReplyFields(response) {
+        if (isMongod(this._edb)) {
+            // These fields are replica set specific
+            assert(response.hasOwnProperty("electionId"));
+            assert(response.hasOwnProperty("opTime"));
+        }
+
+        assert(response.hasOwnProperty("$clusterTime"));
+        assert(response.hasOwnProperty("operationTime"));
     }
 
     /**

@@ -43,6 +43,7 @@
 #include "mongo/db/commands/write_commands_common.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/fle_crud.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/doc_validation_error.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
@@ -523,6 +524,14 @@ public:
 
         write_ops::InsertCommandReply typedRun(OperationContext* opCtx) final try {
             transactionChecks(opCtx, ns());
+
+            if (request().getEncryptionInformation().has_value()) {
+                write_ops::InsertCommandReply insertReply;
+                auto batch = processFLEInsert(opCtx, request(), &insertReply);
+                if (batch == FLEBatchResult::kProcessed) {
+                    return insertReply;
+                }
+            }
 
             if (isTimeseries(opCtx, request())) {
                 // Re-throw parsing exceptions to be consistent with CmdInsert::Invocation's

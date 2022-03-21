@@ -10,7 +10,7 @@ load("jstests/fle2/libs/encrypted_client_util.js");
 (function() {
 'use strict';
 
-if (!isFLE2Enabled()) {
+if (!isFLE2ReplicationEnabled()) {
     return;
 }
 

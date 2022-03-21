@@ -81,6 +81,7 @@
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/fcv_op_observer.h"
+#include "mongo/db/fle_crud.h"
 #include "mongo/db/free_mon/free_mon_mongod.h"
 #include "mongo/db/ftdc/ftdc_mongod.h"
 #include "mongo/db/ftdc/util.h"
@@ -750,6 +751,8 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         }
 
         storageEngine->startTimestampMonitor();
+
+        startFLECrud(serviceContext);
     }
 
     startClientCursorMonitor();
@@ -1231,6 +1234,9 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         opCtx->sleepFor(shutdownTimeout);
         LOGV2_OPTIONS(4695103, {LogComponent::kReplication}, "Exiting quiesce mode for shutdown");
     }
+
+    LOGV2_OPTIONS(6371601, {LogComponent::kDefault}, "Shutting down the FLE Crud thread pool");
+    stopFLECrud();
 
     LOGV2_OPTIONS(4784901, {LogComponent::kCommand}, "Shutting down the MirrorMaestro");
     MirrorMaestro::shutdown(serviceContext);

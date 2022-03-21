@@ -861,8 +861,11 @@ env.Library(
     source=[
         'fle_crud.cpp',
     ],
-    LIBDEPS_PRIVATE=[
+    LIBDEPS=[
         '$BUILD_DIR/mongo/crypto/encrypted_field_config',
+        'transaction_api',
+    ],
+    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/crypto/fle_crypto',
         '$BUILD_DIR/mongo/db/ops/write_ops_parsers',
         '$BUILD_DIR/mongo/db/query/query_request',
@@ -870,7 +873,24 @@ env.Library(
         '$BUILD_DIR/mongo/s/grid',
         '$BUILD_DIR/mongo/s/sharding_router_api',
         'logical_session_id',
-        'transaction_api',
+    ],
+)
+
+env.Library(
+    target='fle_crud_mongod',
+    source=[
+        'fle_crud_mongod.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/crypto/encrypted_field_config',
+        '$BUILD_DIR/mongo/crypto/fle_crypto',
+        '$BUILD_DIR/mongo/db/ops/write_ops_parsers',
+        '$BUILD_DIR/mongo/db/query/query_request',
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
+        '$BUILD_DIR/mongo/executor/task_executor_pool',
+        'fle_crud',
+        'logical_session_id',
+        'transaction',
     ],
 )
 
@@ -2416,6 +2436,7 @@ env.Library(
         'concurrency/flow_control_ticketholder',
         'concurrency/lock_manager',
         'fcv_op_observer',
+        'fle_crud_mongod',
         'free_mon/free_mon_mongod',
         'ftdc/ftdc_mongod',
         'index/index_access_method_factory',
