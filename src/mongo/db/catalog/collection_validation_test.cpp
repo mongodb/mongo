@@ -129,6 +129,27 @@ std::vector<std::pair<BSONObj, ValidateResults>> foregroundValidate(
     return results;
 }
 
+ValidateResults omitTransientWarnings(const ValidateResults& results) {
+    ValidateResults copy = results;
+    copy.warnings.clear();
+    for (const auto& warning : results.warnings) {
+        std::string endMsg =
+            "This is a transient issue as the collection was actively in use by other "
+            "operations.";
+        std::string beginMsg = "Could not complete validation of ";
+        if (warning.size() >= std::max(endMsg.size(), beginMsg.size())) {
+            bool startsWith = std::equal(beginMsg.begin(), beginMsg.end(), warning.begin());
+            bool endsWith = std::equal(endMsg.rbegin(), endMsg.rend(), warning.rbegin());
+            if (!(startsWith && endsWith)) {
+                copy.warnings.emplace_back(warning);
+            }
+        } else {
+            copy.warnings.emplace_back(warning);
+        }
+    }
+    return copy;
+}
+
 /**
  * Calls validate on collection kNss with {background:true} and verifies the results.
  * If 'runForegroundAsWell' is set, then foregroundValidate() above will be run in addition.
@@ -447,8 +468,9 @@ TEST_F(BackgroundCollectionValidationTest, ValidateOldUniqueIndexKeyWarning) {
         validateResults.appendToResultObj(&builder, debugging);
         auto obj = builder.obj();
         ASSERT(validateResults.valid) << obj;
-        ASSERT_EQ(validateResults.warnings.size(), 1U) << obj;
-        ASSERT_STRING_CONTAINS(validateResults.warnings[0],
+        auto warningsWithoutTransientErrors = omitTransientWarnings(validateResults);
+        ASSERT_EQ(warningsWithoutTransientErrors.warnings.size(), 1U) << obj;
+        ASSERT_STRING_CONTAINS(warningsWithoutTransientErrors.warnings[0],
                                "Unique index a_1 has one or more keys in the old format")
             << obj;
     }
