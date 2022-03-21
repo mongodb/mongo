@@ -40,13 +40,13 @@
 
 namespace mongo {
 
-REGISTER_REMOVABLE_WINDOW_FUNCTION(covarianceSamp,
-                                   AccumulatorCovarianceSamp,
-                                   WindowFunctionCovarianceSamp);
+REGISTER_STABLE_REMOVABLE_WINDOW_FUNCTION(covarianceSamp,
+                                          AccumulatorCovarianceSamp,
+                                          WindowFunctionCovarianceSamp);
 
-REGISTER_REMOVABLE_WINDOW_FUNCTION(covariancePop,
-                                   AccumulatorCovariancePop,
-                                   WindowFunctionCovariancePop);
+REGISTER_STABLE_REMOVABLE_WINDOW_FUNCTION(covariancePop,
+                                          AccumulatorCovariancePop,
+                                          WindowFunctionCovariancePop);
 
 void AccumulatorCovariance::processInternal(const Value& input, bool merging) {
     tassert(5424000, "$covariance can't be merged", !merging);

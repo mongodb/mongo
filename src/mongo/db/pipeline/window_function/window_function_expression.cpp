@@ -54,54 +54,63 @@ using boost::optional;
 namespace mongo::window_function {
 using namespace std::string_literals;
 using namespace window_function_n_traits;
-REGISTER_WINDOW_FUNCTION(derivative, ExpressionDerivative::parse);
-REGISTER_WINDOW_FUNCTION(first, ExpressionFirst::parse);
-REGISTER_WINDOW_FUNCTION(last, ExpressionLast::parse);
+REGISTER_STABLE_WINDOW_FUNCTION(derivative, ExpressionDerivative::parse);
+REGISTER_STABLE_WINDOW_FUNCTION(first, ExpressionFirst::parse);
+REGISTER_STABLE_WINDOW_FUNCTION(last, ExpressionLast::parse);
 REGISTER_WINDOW_FUNCTION_CONDITIONALLY(linearFill,
                                        (ExpressionLinearFill::parse),
                                        feature_flags::gFeatureFlagFill.getVersion(),
+                                       AllowedWithApiStrict::kNeverInVersion1,
                                        feature_flags::gFeatureFlagFill.isEnabledAndIgnoreFCV());
 REGISTER_WINDOW_FUNCTION_CONDITIONALLY(
     minN,
     (ExpressionN<WindowFunctionMinN, AccumulatorMinN>::parse),
     feature_flags::gFeatureFlagExactTopNAccumulator.getVersion(),
+    AllowedWithApiStrict::kNeverInVersion1,
     feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
 REGISTER_WINDOW_FUNCTION_CONDITIONALLY(
     maxN,
     (ExpressionN<WindowFunctionMaxN, AccumulatorMaxN>::parse),
     feature_flags::gFeatureFlagExactTopNAccumulator.getVersion(),
+    AllowedWithApiStrict::kNeverInVersion1,
     feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
 REGISTER_WINDOW_FUNCTION_CONDITIONALLY(
     firstN,
     (ExpressionN<WindowFunctionFirstN, AccumulatorFirstN>::parse),
     feature_flags::gFeatureFlagExactTopNAccumulator.getVersion(),
+    AllowedWithApiStrict::kNeverInVersion1,
     feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
 REGISTER_WINDOW_FUNCTION_CONDITIONALLY(
     lastN,
     (ExpressionN<WindowFunctionLastN, AccumulatorLastN>::parse),
     feature_flags::gFeatureFlagExactTopNAccumulator.getVersion(),
+    AllowedWithApiStrict::kNeverInVersion1,
     feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
 REGISTER_WINDOW_FUNCTION_CONDITIONALLY(
     topN,
     (ExpressionN<WindowFunctionTopN, AccumulatorTopBottomN<TopBottomSense::kTop, false>>::parse),
     feature_flags::gFeatureFlagExactTopNAccumulator.getVersion(),
+    AllowedWithApiStrict::kNeverInVersion1,
     feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
 REGISTER_WINDOW_FUNCTION_CONDITIONALLY(
     bottomN,
     (ExpressionN<WindowFunctionBottomN,
                  AccumulatorTopBottomN<TopBottomSense::kBottom, false>>::parse),
     feature_flags::gFeatureFlagExactTopNAccumulator.getVersion(),
+    AllowedWithApiStrict::kNeverInVersion1,
     feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
 REGISTER_WINDOW_FUNCTION_CONDITIONALLY(
     top,
     (ExpressionN<WindowFunctionTop, AccumulatorTopBottomN<TopBottomSense::kTop, true>>::parse),
     feature_flags::gFeatureFlagExactTopNAccumulator.getVersion(),
+    AllowedWithApiStrict::kNeverInVersion1,
     feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
 REGISTER_WINDOW_FUNCTION_CONDITIONALLY(
     bottom,
     (ExpressionN<WindowFunctionBottom,
                  AccumulatorTopBottomN<TopBottomSense::kBottom, true>>::parse),
     feature_flags::gFeatureFlagExactTopNAccumulator.getVersion(),
+    AllowedWithApiStrict::kNeverInVersion1,
     feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
 
 StringMap<Expression::ExpressionParserRegistration> Expression::parserMap;
@@ -118,8 +127,9 @@ intrusive_ptr<Expression> Expression::parse(BSONObj obj,
             if (auto parserFCV = parserMap.find(exprName); parserFCV != parserMap.end()) {
                 // Found one valid window function. If there are multiple window functions they will
                 // be caught as invalid arguments to the Expression parser later.
-                const auto& parser = parserFCV->second.first;
-                auto fcv = parserFCV->second.second;
+                const auto& parserRegistration = parserFCV->second;
+                const auto& parser = parserRegistration.parser;
+                const auto& fcv = parserRegistration.fcv;
                 uassert(ErrorCodes::QueryFeatureNotAllowed,
                         str::stream()
                             << exprName
@@ -128,8 +138,23 @@ intrusive_ptr<Expression> Expression::parse(BSONObj obj,
                             << " for more information.",
                         !expCtx->maxFeatureCompatibilityVersion || !fcv ||
                             (*fcv <= *expCtx->maxFeatureCompatibilityVersion));
+
+                auto allowedWithApi = parserRegistration.allowedWithApi;
+
+                const auto opCtx = expCtx->opCtx;
+
+                if (!opCtx) {
+                    // It's expected that we always have an op context attached to the expression
+                    // context for window functions.
+                    MONGO_UNREACHABLE_TASSERT(6089901);
+                }
+
+                assertLanguageFeatureIsAllowed(
+                    opCtx, exprName, allowedWithApi, AllowedWithClientType::kAny);
+
                 return parser(obj, sortBy, expCtx);
             }
+
             // The window function provided in the window function expression is invalid.
 
             // For example, in this window function expression:
@@ -158,9 +183,10 @@ intrusive_ptr<Expression> Expression::parse(BSONObj obj,
 void Expression::registerParser(
     std::string functionName,
     Parser parser,
-    boost::optional<multiversion::FeatureCompatibilityVersion> requiredMinVersion) {
+    boost::optional<multiversion::FeatureCompatibilityVersion> requiredMinVersion,
+    AllowedWithApiStrict allowedWithApi) {
     invariant(parserMap.find(functionName) == parserMap.end());
-    ExpressionParserRegistration r(parser, requiredMinVersion);
+    ExpressionParserRegistration r{parser, requiredMinVersion, allowedWithApi};
     parserMap.emplace(std::move(functionName), std::move(r));
 }
 
