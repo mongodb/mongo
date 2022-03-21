@@ -126,6 +126,7 @@ MONGO_FAIL_POINT_DEFINE(WTPreserveSnapshotHistoryIndefinitely);
 MONGO_FAIL_POINT_DEFINE(WTSetOldestTSToStableTS);
 MONGO_FAIL_POINT_DEFINE(WTWriteConflictExceptionForImportCollection);
 MONGO_FAIL_POINT_DEFINE(WTWriteConflictExceptionForImportIndex);
+MONGO_FAIL_POINT_DEFINE(WTRollbackToStableReturnOnEBUSY);
 
 const std::string kPinOldestTimestampAtStartupName = "_wt_startup";
 
@@ -2358,7 +2359,28 @@ StatusWith<Timestamp> WiredTigerKVEngine::recoverToStableTimestamp(OperationCont
                        "Rolling back to the stable timestamp",
                        "stableTimestamp"_attr = stableTimestamp,
                        "initialDataTimestamp"_attr = initialDataTimestamp);
-    int ret = _conn->rollback_to_stable(_conn, nullptr);
+    int ret = 0;
+
+    // The rollback_to_stable operation requires all open cursors to be closed or reset before the
+    // call, otherwise EBUSY will be returned. Occasionally, there could be an operation that hasn't
+    // been killed yet, such as the CappedInsertNotifier for a yielded oplog getMore. We will retry
+    // rollback_to_stable until the system quiesces.
+    size_t attempts = 0;
+    do {
+        ret = _conn->rollback_to_stable(_conn, nullptr);
+        if (ret != EBUSY) {
+            break;
+        }
+
+        if (MONGO_unlikely(WTRollbackToStableReturnOnEBUSY.shouldFail())) {
+            return wtRCToStatus(ret, nullptr);
+        }
+
+        LOGV2_FOR_ROLLBACK(
+            6398900, 0, "Retrying rollback to stable due to EBUSY", "attempts"_attr = ++attempts);
+        opCtx->sleepFor(Seconds(1));
+    } while (ret == EBUSY);
+
     if (ret) {
         return {ErrorCodes::UnrecoverableRollbackError,
                 str::stream() << "Error rolling back to stable. Err: " << wiredtiger_strerror(ret)};

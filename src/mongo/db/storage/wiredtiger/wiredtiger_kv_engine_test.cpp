@@ -588,6 +588,27 @@ TEST_F(WiredTigerKVEngineTest, TestReconfigureLog) {
     }
 }
 
+TEST_F(WiredTigerKVEngineTest, RollbackToStableEBUSY) {
+    auto opCtxPtr = _makeOperationContext();
+    _engine->setInitialDataTimestamp(Timestamp(1, 1));
+    _engine->setStableTimestamp(Timestamp(1, 1), false);
+
+    // Get a session. This will open a transaction.
+    WiredTigerSession* session = WiredTigerRecoveryUnit::get(opCtxPtr.get())->getSession();
+    invariant(session);
+
+    // WT will return EBUSY due to the open transaction.
+    FailPointEnableBlock failPoint("WTRollbackToStableReturnOnEBUSY");
+    ASSERT_EQ(ErrorCodes::ObjectIsBusy,
+              _engine->recoverToStableTimestamp(opCtxPtr.get()).getStatus().code());
+
+    // Close the open transaction.
+    WiredTigerRecoveryUnit::get(opCtxPtr.get())->abandonSnapshot();
+
+    // WT will no longer return EBUSY.
+    ASSERT_OK(_engine->recoverToStableTimestamp(opCtxPtr.get()));
+}
+
 std::unique_ptr<KVHarnessHelper> makeHelper(ServiceContext* svcCtx) {
     return std::make_unique<WiredTigerKVHarnessHelper>(svcCtx);
 }
