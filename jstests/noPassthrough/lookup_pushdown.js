@@ -27,6 +27,41 @@ const name = "lookup_pushdown";
 const foreignCollName = "foreign_lookup_pushdown";
 const viewName = "view_lookup_pushdown";
 
+/**
+ * Helper function which verifies that at least one $lookup was lowered into SBE within
+ * 'explain', and that the EqLookupNode at 'eqLookupNodeIndex' chose the appropriate strategy.
+ * In particular, if 'IndexedLoopJoin' was chosen, we verify that the index described by
+ * 'indexKeyPattern' was chosen. Otherwise, we verify that 'NestedLoopJoin' was chosen.
+ */
+function verifyEqLookupNodeStrategy(explain, eqLookupNodeIndex, indexKeyPattern = {}) {
+    const eqLookupNodes = getAggPlanStages(explain, "EQ_LOOKUP");
+    assert.gt(
+        eqLookupNodes.length, 0, "expected at least one EQ_LOOKUP node; got " + tojson(explain));
+
+    // Verify that we're selecting an EQ_LOOKUP node within range.
+    assert(eqLookupNodeIndex >= 0 && eqLookupNodeIndex < eqLookupNodes.length,
+           "expected eqLookupNodeIndex within range of available EQ_LOOKUP nodes; got " +
+               tojson(explain));
+
+    // Fetch the requested EQ_LOOKUP node.
+    const eqLookupNode = eqLookupNodes[eqLookupNodes.length - 1 - eqLookupNodeIndex];
+    assert(eqLookupNode, "expected EQ_LOOKUP node; explain: " + tojson(explain));
+    const strategy = eqLookupNode.strategy;
+    assert(strategy, "expected EQ_LOOKUP node to have a strategy " + tojson(eqLookupNode));
+    if (strategy === "IndexedLoopJoin") {
+        assert(indexKeyPattern,
+               "expected indexKeyPattern should be set for IndexedLoopJoin algorithm");
+        assert.docEq(eqLookupNode.indexKeyPattern,
+                     indexKeyPattern,
+                     "expected IndexedLoopJoin node to have index " + tojson(indexKeyPattern) +
+                         ", got plan " + tojson(eqLookupNode));
+    } else {
+        assert.eq("NestedLoopJoin",
+                  strategy,
+                  "Incorrect strategy; expected NestedLoopJoin, got " + tojson(strategy));
+    }
+}
+
 function runTest(coll,
                  pipeline,
                  expectedJoinAlgorithm,
@@ -61,35 +96,7 @@ function runTest(coll,
     } else {
         assert.commandWorked(response);
         const explain = coll.explain().aggregate(pipeline, aggOptions);
-        const eqLookupNodes = getAggPlanStages(explain, "EQ_LOOKUP");
-
-        // Verify via explain that $lookup was lowered and appropriate join algorithm was chosen.
-        assert.gt(eqLookupNodes.length,
-                  0,
-                  "expected at least one EQ_LOOKUP node; got " + tojson(explain));
-
-        // Verify that we're selecting an EQ_LOOKUP node within range.
-        assert(eqLookupNodeIndex >= 0 && eqLookupNodeIndex < eqLookupNodes.length,
-               "expected eqLookupNodeIndex within range of available EQ_LOOKUP nodes; got " +
-                   tojson(explain));
-
-        // Fetch the requested EQ_LOOKUP node.
-        const eqLookupNode = eqLookupNodes[eqLookupNodes.length - 1 - eqLookupNodeIndex];
-        assert(eqLookupNode, "expected EQ_LOOKUP node; explain: " + tojson(explain));
-        const strategy = eqLookupNode.strategy;
-        assert(strategy, "expected EQ_LOOKUP node to have a strategy " + tojson(eqLookupNode));
-        if (strategy === "IndexedLoopJoin") {
-            assert(indexKeyPattern,
-                   "expected indexKeyPattern should be set for IndexedLoopJoin algorithm");
-            assert.docEq(eqLookupNode.indexKeyPattern,
-                         indexKeyPattern,
-                         "expected IndexedLoopJoin node to have index " + tojson(indexKeyPattern) +
-                             ", got plan " + tojson(eqLookupNode));
-        } else {
-            assert.eq("NestedLoopJoin",
-                      strategy,
-                      "Incorrect strategy; expected NestedLoopJoin, got " + tojson(strategy));
-        }
+        verifyEqLookupNodeStrategy(explain, eqLookupNodeIndex, indexKeyPattern);
 
         // Verify that multiplanning took place by verifying that there was at least one
         // rejected plan.
@@ -524,6 +531,26 @@ let view = db[viewName];
             true /* checkMultiplanning */);
         assert.commandWorked(coll.dropIndexes());
     })();
+
+// Verify that $lookup is correctly pushed down when it is nested inside of a $unionWith.
+(
+    function
+        verifyLookupNestedInUnionWithGetsPushedDown() {
+            const unionCollName = "unionColl";
+            const unionColl = db[unionCollName];
+            assert.commandWorked(unionColl.insert({}));
+            const explain = coll.explain().aggregate([{$unionWith: {coll: unionCollName, pipeline: [{$lookup: {from:
+                foreignCollName, localField: "a", foreignField: "b", as: "results"}}]}}]);
+            const unionWithStage = getAggPlanStage(explain, "$unionWith");
+            const unionWithSpec = unionWithStage["$unionWith"];
+            assert(unionWithSpec.hasOwnProperty("pipeline"), unionWithSpec);
+
+            // Wrap the subpipeline's explain output in a format that can be parsed by
+            // 'getAggPlanStages'.
+            verifyEqLookupNodeStrategy({stages: unionWithSpec["pipeline"]}, 0);
+            assert(unionColl.drop());
+        }());
+
 MongoRunner.stopMongod(conn);
 
 (function testHashJoinQueryKnobs() {

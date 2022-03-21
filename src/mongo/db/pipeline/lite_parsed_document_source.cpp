@@ -117,6 +117,18 @@ LiteParsedDocumentSourceNestedPipelines::getInvolvedNamespaces() const {
     return involvedNamespaces;
 }
 
+void LiteParsedDocumentSourceNestedPipelines::getForeignExecutionNamespaces(
+    stdx::unordered_set<NamespaceString>& nssSet) const {
+    for (auto&& pipeline : _pipelines) {
+        auto nssVector = pipeline.getForeignExecutionNamespaces();
+        for (const auto& nssOrUUID : nssVector) {
+            auto nss = nssOrUUID.nss();
+            tassert(6458500, "nss expected to contain a NamespaceString", nss != boost::none);
+            nssSet.insert(*nss);
+        }
+    }
+}
+
 bool LiteParsedDocumentSourceNestedPipelines::allowedToPassthroughFromMongos() const {
     // If any of the sub-pipelines doesn't allow pass through, then return false.
     return std::all_of(_pipelines.cbegin(), _pipelines.cend(), [](const auto& subPipeline) {
