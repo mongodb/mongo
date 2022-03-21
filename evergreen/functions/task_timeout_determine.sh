@@ -17,11 +17,19 @@ if [[ -n "${exec_timeout_factor}" ]]; then
   timeout_factor="--exec-timeout-factor ${exec_timeout_factor}"
 fi
 
+build_variant_for_timeout=${build_variant}
+if [[ -n "${burn_in_bypass}" ]]; then
+  # burn_in_tags may generate new build variants, if we are running on one of those build variants
+  # we should use the build variant it is based on for determining the timeout. This is stored in
+  # the `burn_in_bypass` expansion.
+  build_variant_for_timeout=${burn_in_bypass}
+fi
+
 activate_venv
 PATH=$PATH:$HOME:/ $python buildscripts/evergreen_task_timeout.py $timeout_factor \
   --task-name ${task_name} \
   --suite-name ${suite_name} \
-  --build-variant ${build_variant} \
+  --build-variant $build_variant_for_timeout \
   --evg-alias '${alias}' \
   --timeout ${timeout_secs} \
   --exec-timeout ${exec_timeout_secs} \
