@@ -26,7 +26,17 @@ const st = new ShardingTest({
         enableBalancer: true,
         // Set global max chunk size to 1MB
         chunkSize: 1,
-        configOptions: {setParameter: {logComponentVerbosity: tojson({sharding: {verbosity: 2}})}},
+        configOptions: {
+            setParameter: {
+                logComponentVerbosity: tojson({sharding: {verbosity: 2}}),
+                reshardingCriticalSectionTimeoutMillis: 24 * 60 * 60 * 1000 /* 1 day */
+            }
+        },
+        shardOptions: {
+            setParameter: {
+                reshardingCriticalSectionTimeoutMillis: 24 * 60 * 60 * 1000 /* 1 day */
+            }
+        }
     }
 });
 
