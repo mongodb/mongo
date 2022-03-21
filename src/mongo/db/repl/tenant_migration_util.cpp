@@ -161,18 +161,18 @@ void createOplogViewForTenantMigrations(OperationContext* opCtx, Database* db) {
 
 std::unique_ptr<Pipeline, PipelineDeleter> createCommittedTransactionsPipelineForTenantMigrations(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const Timestamp& startFetchingTimestamp,
+    const Timestamp& startApplyingTimestamp,
     const std::string& tenantId) {
     Pipeline::SourceContainer stages;
     using Doc = Document;
 
-    // 1. Match config.transactions entries that have a 'lastWriteOpTime.ts' before
-    //    'startFetchingTimestamp' and 'state: committed', which indicates that it is a committed
+    // 1. Match config.transactions entries that have a 'lastWriteOpTime.ts' before or at
+    //    'startApplyingTimestamp' and 'state: committed', which indicates that it is a committed
     //    transaction. Retryable writes should not have the 'state' field.
     stages.emplace_back(DocumentSourceMatch::createFromBson(
         Doc{{"$match",
              Doc{{"state", Value{"committed"_sd}},
-                 {"lastWriteOpTime.ts", Doc{{"$lt", startFetchingTimestamp}}}}}}
+                 {"lastWriteOpTime.ts", Doc{{"$lte", startApplyingTimestamp}}}}}}
             .toBson()
             .firstElement(),
         expCtx));
