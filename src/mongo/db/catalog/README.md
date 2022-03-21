@@ -837,16 +837,22 @@ secondary oplog application and [initial sync][] where the uniqueness constraint
 temporarily. Indexes store key value pairs where they key is the `KeyString`. Current WiredTiger
 secondary unique indexes may have a mix of the old and new representations described below.
 
-| Index type                   | Key                            | Value                                |
-| ---------------------------- | ------------------------------ | ------------------------------------ |
-| `_id` index                  | `KeyString` without `RecordId` | `RecordId` and optionally `TypeBits` |
-| non-unique index             | `KeyString` with `RecordId`    | optionally `TypeBits`                |
-| unique secondary index (new) | `KeyString` with `RecordId`    | optionally `TypeBits`                |
-| unique secondary index (old) | `KeyString` without `RecordId` | `RecordId` and opt. `TypeBits`       |
+| Index type                   | (Key, Value)                                                                                                                           | Data Format Version            |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
+| `_id` index                  | (`KeyString` without `RecordId`, `RecordId` and optionally `TypeBits`)                                                                 | index V1: 6<br />index V2: 8   |
+| non-unique index             | (`KeyString` with `RecordId`, optionally `TypeBits`)                                                                                   | index V1: 6<br />index V2: 8   |
+| unique secondary index (new) | (`KeyString` with `RecordId`, optionally `TypeBits`)                                                                                   | index V1: 13<br />index V2: 14 |
+| unique secondary index (old) | (`KeyString` with `RecordId`, optionally `TypeBits`) or<br />(`KeyString` without `RecordId`, `RecordId` and optionally `TypeBits`)    | index V1: 11<br />index V2: 12 |
 
 The reason for the change in index format is that the secondary key uniqueness property can be
 temporarily violated during oplog application (because operations may be applied out of order).
 With prepared transactions, out-of-order commits would conflict with prepared transactions.
+
+For `_id` indexes and non-unique indexes, the index data formats will be 6 and 8 for index version
+V1 and V2, respectively. For unique secondary indexes, if they are of formats 13 or 14, it is
+guaranteed that the indexes only store keys of `KeyString` with `RecordId`. If they are of formats
+11 or 12, they may have a mix of the keys with and without `RecordId`. Users can run a `full`
+validation to check if there are keys in the old format in unique secondary indexes.
 
 ## Building KeyString values and passing them around
 
