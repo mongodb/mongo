@@ -50,6 +50,13 @@ StatusWith<KeysCollectionDocument> KeysCollectionCache::refresh(OperationContext
                 "Cannot refresh keys collection cache during initial sync"};
     }
 
+    // Don't allow this to read during rollback as the storage engine requires exclusive access.
+    if (repl::ReplicationCoordinator::get(opCtx) &&
+        repl::ReplicationCoordinator::get(opCtx)->getMemberState().rollback()) {
+        return {ErrorCodes::InterruptedDueToReplStateChange,
+                "Cannot refresh keys collection cache during rollback"};
+    }
+
     auto refreshStatus = _refreshExternalKeys(opCtx);
 
     if (!refreshStatus.isOK()) {
