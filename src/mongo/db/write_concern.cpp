@@ -275,8 +275,15 @@ Status waitForWriteConcern(OperationContext* opCtx,
     auto* const storageEngine = opCtx->getServiceContext()->getStorageEngine();
     auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
 
-    if (!opCtx->getClient()->isInDirectClient()) {
+    if (MONGO_unlikely(hangBeforeWaitingForWriteConcern.shouldFail()) &&
+        !opCtx->getClient()->isInDirectClient()) {
         // Respecting this failpoint for internal clients prevents stepup from working properly.
+        // This fail point pauses with an open snapshot on the oplog. Some tests pause on this fail
+        // point prior to running replication rollback. This prevents the operation from being
+        // killed and the snapshot being released. Hence, we release the snapshot here.
+        auto recoveryUnit = opCtx->releaseAndReplaceRecoveryUnit();
+        recoveryUnit.reset();
+
         hangBeforeWaitingForWriteConcern.pauseWhileSet();
     }
 
