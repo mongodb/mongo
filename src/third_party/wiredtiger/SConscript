@@ -125,22 +125,31 @@ replacements = {
     '@wiredtiger_includes_decl@': wiredtiger_includes
 }
 
-env.Substfile(
+wiredtiger_h = env.Substfile(
     target='wiredtiger.h',
     source=[
         'src/include/wiredtiger.in',
     ],
     SUBST_DICT=replacements)
 
-env.Install(
+wiredtiger_ext_h = env.Install(
     target='.',
     source=[
         'src/include/wiredtiger_ext.h'
     ],
 )
 
-env.Alias('generated-sources', "wiredtiger.h")
-env.Alias('generated-sources', "wiredtiger_ext.h")
+env.Alias('generated-sources', [wiredtiger_h, wiredtiger_ext_h])
+
+env.AutoInstall(
+    '$PREFIX_INCLUDEDIR',
+    source=[
+        wiredtiger_h,
+        wiredtiger_ext_h,
+    ],
+    AIB_COMPONENT='wiredtiger',
+    AIB_ROLE='dev',
+)
 
 #
 # WiredTiger library
@@ -196,6 +205,7 @@ if (get_option("use-hardware-crc32") == "off"):
 cslib = env.Library(
     target="wiredtiger_checksum",
     source=cssources,
+    AIB_COMPONENT='wiredtiger',
 )
 
 wtlib = env.Library(
@@ -210,6 +220,7 @@ wtlib = env.Library(
     LIBDEPS_TAGS=[
         'init-no-global-side-effects',
     ],
+    AIB_COMPONENT='wiredtiger',
 )
 
 env.Depends([cslib, wtlib], [filelistfile, version_file])
@@ -233,5 +244,8 @@ wtbin = wtbinEnv.Program(
     target="wt",
     source=Glob("src/utilities/*.c"),
     LIBDEPS=["wiredtiger"],
-    AIB_COMPONENT="dist-test",
+    AIB_COMPONENT='wiredtiger',
+    AIB_COMPONENTS_EXTRA=[
+        'dist-test',
+    ],
 )
