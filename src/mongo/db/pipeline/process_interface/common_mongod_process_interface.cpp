@@ -390,13 +390,30 @@ CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalRead(Pipeline*
     const NamespaceStringOrUUID nsOrUUID = expCtx->uuid
         ? NamespaceStringOrUUID{expCtx->ns.db().toString(), *expCtx->uuid}
         : expCtx->ns;
+
+    // Reparse 'pipeline' to discover whether there are secondary namespaces that we need to lock
+    // when constructing our query executor.
+    std::vector<NamespaceStringOrUUID> secondaryNamespaces = [&]() {
+        if (feature_flags::gFeatureFlagSBELookupPushdown.isEnabledAndIgnoreFCV()) {
+            auto lpp = LiteParsedPipeline(expCtx->ns, pipeline->serializeToBson());
+            return lpp.getForeignExecutionNamespaces();
+        } else {
+            return std::vector<NamespaceStringOrUUID>{};
+        }
+    }();
+
     autoColl.emplace(expCtx->opCtx,
                      nsOrUUID,
                      AutoGetCollectionViewMode::kViewsForbidden,
                      Date_t::max(),
-                     AutoStatsTracker::LogMode::kUpdateTop);
+                     AutoStatsTracker::LogMode::kUpdateTop,
+                     secondaryNamespaces);
 
-    MultipleCollectionAccessor holder{autoColl->getCollection()};
+    MultipleCollectionAccessor holder{expCtx->opCtx,
+                                      &autoColl->getCollection(),
+                                      autoColl->getNss(),
+                                      autoColl->isAnySecondaryNamespaceAViewOrSharded(),
+                                      secondaryNamespaces};
     PipelineD::buildAndAttachInnerQueryExecutorToPipeline(
         holder, expCtx->ns, nullptr, pipeline.get());
 
