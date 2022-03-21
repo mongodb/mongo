@@ -190,8 +190,6 @@ thread_run(void *arg)
         if (i == 0)
             i++;
 
-        testutil_check(session->begin_transaction(session, NULL));
-
         /*
          * The value is the insert- with key appended.
          */
@@ -215,9 +213,9 @@ thread_run(void *arg)
             data.data = buf;
         }
         cursor->set_value(cursor, &data);
-        testutil_check(cursor->insert(cursor));
-
-        testutil_check(session->commit_transaction(session, NULL));
+        while ((ret = cursor->insert(cursor)) == WT_ROLLBACK)
+            ;
+        testutil_assert(ret == 0);
 
         /*
          * Save the key separately for checking later.
@@ -240,16 +238,14 @@ thread_run(void *arg)
          * Decide what kind of operation can be performed on the already inserted data.
          */
         if (i % MAX_NUM_OPS == OP_TYPE_DELETE) {
-            testutil_check(session->begin_transaction(session, NULL));
-
             if (columnar_table)
                 cursor->set_key(cursor, i);
             else
                 cursor->set_key(cursor, kname);
 
-            testutil_check(cursor->remove(cursor));
-
-            testutil_check(session->commit_transaction(session, NULL));
+            while ((ret = cursor->remove(cursor)) == WT_ROLLBACK)
+                ;
+            testutil_assert(ret == 0);
 
             /* Save the key separately for checking later.*/
             if (fprintf(fp[DELETE_RECORD_FILE_ID], "%" PRIu64 "\n", i) == -1)
@@ -266,27 +262,29 @@ thread_run(void *arg)
              * Make sure the modify operation is carried out in an snapshot isolation level with
              * explicit transaction.
              */
-            testutil_check(session->begin_transaction(session, NULL));
+            do {
+                testutil_check(session->begin_transaction(session, NULL));
 
-            ret = wiredtiger_calc_modify(session, &data, &newv, maxdiff, entries, &nentries);
+                if (columnar_table)
+                    cursor->set_key(cursor, i);
+                else
+                    cursor->set_key(cursor, kname);
 
-            if (columnar_table)
-                cursor->set_key(cursor, i);
-            else
-                cursor->set_key(cursor, kname);
-
-            if (ret == 0)
-                testutil_check(cursor->modify(cursor, entries, nentries));
-            else {
-                /*
-                 * In case if we couldn't able to generate modify vectors, treat this change as a
-                 * normal update operation.
-                 */
-                cursor->set_value(cursor, &newv);
-                testutil_check(cursor->update(cursor));
-            }
-
-            testutil_check(session->commit_transaction(session, NULL));
+                ret = wiredtiger_calc_modify(session, &data, &newv, maxdiff, entries, &nentries);
+                if (ret == 0)
+                    ret = cursor->modify(cursor, entries, nentries);
+                else {
+                    /*
+                     * In case if we couldn't able to generate modify vectors, treat this change as
+                     * a normal update operation.
+                     */
+                    cursor->set_value(cursor, &newv);
+                    ret = cursor->update(cursor);
+                }
+                testutil_check(ret == 0 ? session->commit_transaction(session, NULL) :
+                                          session->rollback_transaction(session, NULL));
+            } while (ret == WT_ROLLBACK);
+            testutil_assert(ret == 0);
 
             /*
              * Save the key and new value separately for checking later.
@@ -487,10 +485,11 @@ recover_and_verify(uint32_t nthreads)
                     cursor->set_key(cursor, kname);
                 }
 
-                if ((ret = cursor->search(cursor)) != 0) {
-                    if (ret != WT_NOTFOUND)
-                        testutil_die(ret, "search");
-                } else if (middle != 0) {
+                while ((ret = cursor->search(cursor)) == WT_ROLLBACK)
+                    ;
+                if (ret != 0)
+                    testutil_assert(ret == WT_NOTFOUND);
+                else if (middle != 0) {
                     /*
                      * We should never find an existing key after we have detected one missing for
                      * the thread.
@@ -516,9 +515,10 @@ recover_and_verify(uint32_t nthreads)
                     cursor->set_key(cursor, kname);
                 }
 
-                if ((ret = cursor->search(cursor)) != 0) {
-                    if (ret != WT_NOTFOUND)
-                        testutil_die(ret, "search");
+                while ((ret = cursor->search(cursor)) == WT_ROLLBACK)
+                    ;
+                if (ret != 0) {
+                    testutil_assert(ret == WT_NOTFOUND);
                     if (!inmem)
                         printf("%s: no insert record with key %" PRIu64 "\n",
                           fname[INSERT_RECORD_FILE_ID], key);
@@ -567,9 +567,10 @@ recover_and_verify(uint32_t nthreads)
                     cursor->set_key(cursor, kname);
                 }
 
-                if ((ret = cursor->search(cursor)) != 0) {
-                    if (ret != WT_NOTFOUND)
-                        testutil_die(ret, "search");
+                while ((ret = cursor->search(cursor)) == WT_ROLLBACK)
+                    ;
+                if (ret != 0) {
+                    testutil_assert(ret == WT_NOTFOUND);
                     if (!inmem)
                         printf("%s: no modified record with key %" PRIu64 "\n",
                           fname[MODIFY_RECORD_FILE_ID], key);
