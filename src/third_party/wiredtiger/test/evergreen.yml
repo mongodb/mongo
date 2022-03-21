@@ -3572,6 +3572,7 @@ buildvariants:
     posix_configure_flags:
       -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_v3_gcc.cmake
       -DCMAKE_C_FLAGS="-ggdb"
+      -DCMAKE_CXX_FLAGS="-ggdb"
       -DHAVE_DIAGNOSTIC=1
       -DENABLE_PYTHON=1
       -DENABLE_ZLIB=1
@@ -3635,6 +3636,7 @@ buildvariants:
       -DCMAKE_PREFIX_PATH="$(pwd)/../TCMALLOC_LIB"
       -DCMAKE_INSTALL_PREFIX=$(pwd)/LOCAL_INSTALL
       -DCMAKE_C_FLAGS="-ggdb"
+      -DCMAKE_CXX_FLAGS="-ggdb"
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
     make_command: ninja
     test_env_vars:
@@ -3704,6 +3706,7 @@ buildvariants:
       -DCMAKE_PREFIX_PATH="$(pwd)/../TCMALLOC_LIB"
       -DCMAKE_INSTALL_PREFIX=$(pwd)/LOCAL_INSTALL
       -DCMAKE_C_FLAGS="-ggdb"
+      -DCMAKE_CXX_FLAGS="-ggdb"
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
     make_command: ninja
     test_env_vars:
@@ -3925,6 +3928,7 @@ buildvariants:
       -DENABLE_STATIC=1
       -DENABLE_TCMALLOC=1
       -DENABLE_ZLIB=1
+      -DCMAKE_CXX_FLAGS="-ggdb"
       -DCMAKE_PREFIX_PATH="$(pwd)/../TCMALLOC_LIB"
   tasks:
     - name: compile

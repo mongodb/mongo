@@ -198,7 +198,7 @@ configuration::merge_default_config(
     auto user_it = split_user_config.begin();
     for (auto default_it = split_default_config.begin(); default_it != split_default_config.end();
          ++default_it) {
-        if (user_it->first != default_it->first)
+        if (user_it == split_user_config.end() || user_it->first != default_it->first)
             /* The default does not exist in the user configuration, add it. */
             merged_config += default_it->first + "=" + default_it->second;
         else {
@@ -214,6 +214,11 @@ configuration::merge_default_config(
         /* Add a comma after every item we add except the last one. */
         if (split_default_config.end() - default_it != 1)
             merged_config += ",";
+    }
+    /* Add any remaining user config items. */
+    while (user_it != split_user_config.end()) {
+        merged_config += "," + user_it->first + "=" + user_it->second;
+        ++user_it;
     }
     return (merged_config);
 }
