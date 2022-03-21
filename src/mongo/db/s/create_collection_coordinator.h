@@ -39,7 +39,7 @@
 
 namespace mongo {
 
-class CreateCollectionCoordinator final : public ShardingDDLCoordinator {
+class CreateCollectionCoordinator : public ShardingDDLCoordinator {
 public:
     using CoordDoc = CreateCollectionCoordinatorDocument;
     using Phase = CreateCollectionCoordinatorPhaseEnum;
@@ -146,7 +146,7 @@ private:
      */
     void _logEndCreateCollection(OperationContext* opCtx);
 
-    CreateCollectionCoordinatorDocument _doc;
+    CoordDoc _doc;
     BSONObj _critSecReason;
 
     // Objects generated on each execution.
@@ -158,6 +158,24 @@ private:
     boost::optional<CreateCollectionResponse> _result;
     boost::optional<bool> _collectionEmpty;
     boost::optional<size_t> _numChunks;
+};
+
+class CreateCollectionCoordinatorDocumentPre60Compatible final
+    : public CreateCollectionCoordinatorDocument {
+    // TODO SERVER-64720 remove once 6.0 becomes last LTS
+public:
+    using CreateCollectionCoordinatorDocument::CreateCollectionCoordinatorDocument;
+
+    static const BSONObj kPre60IncompatibleFields;
+    void serialize(BSONObjBuilder* builder) const;
+    BSONObj toBSON() const;
+};
+
+class CreateCollectionCoordinatorPre60Compatible final : public CreateCollectionCoordinator {
+    // TODO SERVER-64720 remove once 6.0 becomes last LTS
+public:
+    using CreateCollectionCoordinator::CreateCollectionCoordinator;
+    using CoordDoc = CreateCollectionCoordinatorDocumentPre60Compatible;
 };
 
 }  // namespace mongo

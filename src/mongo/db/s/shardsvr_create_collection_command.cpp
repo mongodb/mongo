@@ -32,6 +32,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/s/create_collection_coordinator.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/db/s/sharding_state.h"
@@ -137,13 +138,32 @@ public:
                         *createCmdRequest.getTimeseries(), *createCmdRequest.getShardKey())));
             }
 
-            auto coordinatorDoc = CreateCollectionCoordinatorDocument();
-            coordinatorDoc.setShardingDDLCoordinatorMetadata(
-                {{std::move(nss), DDLCoordinatorTypeEnum::kCreateCollection}});
-            coordinatorDoc.setCreateCollectionRequest(std::move(createCmdRequest));
-            auto service = ShardingDDLCoordinatorService::getService(opCtx);
-            auto createCollectionCoordinator = checked_pointer_cast<CreateCollectionCoordinator>(
-                service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));
+            const auto createCollectionCoordinator = [&] {
+                FixedFCVRegion fixedFcvRegion(opCtx);
+
+                auto coordinatorDoc = [&] {
+                    if (serverGlobalParams.featureCompatibility.isLessThan(
+                            multiversion::FeatureCompatibilityVersion::kVersion_6_0)) {
+                        auto doc = CreateCollectionCoordinatorDocumentPre60Compatible();
+                        doc.setShardingDDLCoordinatorMetadata(
+                            {{std::move(nss),
+                              DDLCoordinatorTypeEnum::kCreateCollectionPre60Compatible}});
+                        doc.setCreateCollectionRequest(std::move(createCmdRequest));
+                        return doc.toBSON();
+                    } else {
+                        auto doc = CreateCollectionCoordinatorDocument();
+                        doc.setShardingDDLCoordinatorMetadata(
+                            {{std::move(nss), DDLCoordinatorTypeEnum::kCreateCollection}});
+                        doc.setCreateCollectionRequest(std::move(createCmdRequest));
+                        return doc.toBSON();
+                    }
+                }();
+
+                auto service = ShardingDDLCoordinatorService::getService(opCtx);
+                return checked_pointer_cast<CreateCollectionCoordinator>(
+                    service->getOrCreateInstance(opCtx, std::move(coordinatorDoc)));
+            }();
+
             return createCollectionCoordinator->getResult(opCtx);
         }
 

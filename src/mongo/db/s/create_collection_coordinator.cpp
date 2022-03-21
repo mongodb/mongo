@@ -1027,4 +1027,21 @@ void CreateCollectionCoordinator::_enterPhase(Phase newPhase) {
     _doc = _updateStateDocument(cc().makeOperationContext().get(), std::move(newDoc));
 }
 
+const BSONObj CreateCollectionCoordinatorDocumentPre60Compatible::kPre60IncompatibleFields =
+    BSON(CreateCollectionRequest::kCollectionUUIDFieldName
+         << 1 << CreateCollectionRequest::kImplicitlyCreateIndexFieldName << 1
+         << CreateCollectionRequest::kEnforceUniquenessCheckFieldName << 1);
+
+void CreateCollectionCoordinatorDocumentPre60Compatible::serialize(BSONObjBuilder* builder) const {
+    BSONObjBuilder internalBuilder;
+    CreateCollectionCoordinatorDocument::serialize(&internalBuilder);
+    internalBuilder.asTempObj().filterFieldsUndotted(builder, kPre60IncompatibleFields, false);
+}
+
+BSONObj CreateCollectionCoordinatorDocumentPre60Compatible::toBSON() const {
+    BSONObjBuilder builder;
+    serialize(&builder);
+    return builder.obj();
+}
+
 }  // namespace mongo

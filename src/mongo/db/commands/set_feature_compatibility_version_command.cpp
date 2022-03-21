@@ -849,6 +849,13 @@ private:
             }
         }
 
+        // TODO SERVER-64720 Remove when 6.0 becomes last LTS
+        if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+            ShardingDDLCoordinatorService::getService(opCtx)
+                ->waitForCoordinatorsOfGivenTypeToComplete(
+                    opCtx, DDLCoordinatorTypeEnum::kCreateCollection);
+        }
+
         // TODO SERVER-62338 Remove when 6.0 branches-out
         if (serverGlobalParams.clusterRole == ClusterRole::ShardServer &&
             !resharding::gFeatureFlagRecoverableShardsvrReshardCollectionCoordinator
