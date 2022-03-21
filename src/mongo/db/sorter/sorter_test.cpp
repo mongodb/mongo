@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/pipeline/document_source.h"
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 #include "mongo/platform/basic.h"
@@ -977,19 +978,19 @@ public:
         }
     };
     struct BoundMakerAsc {
-        Key operator()(Key k) const {
+        Key operator()(Key k, const Doc&) const {
             return k - 10;
         }
-        long long serialize() const {
-            return 10;
+        Document serialize() const {
+            MONGO_UNREACHABLE;
         }
     };
     struct BoundMakerDesc {
-        Key operator()(Key k) const {
+        Key operator()(Key k, const Doc&) const {
             return k + 10;
         }
-        long long serialize() const {
-            return 10;
+        Document serialize() const {
+            MONGO_UNREACHABLE;
         }
     };
 

@@ -55,6 +55,9 @@ public:
         int memUsageForSorter() const {
             return sizeof(SortableDate);
         }
+        std::string toString() const {
+            return date.toString();
+        }
     };
 
     static constexpr StringData kStageName = "$sort"_sd;
@@ -211,6 +214,7 @@ private:
 
     using TimeSorterInterface = BoundedSorterInterface<SortableDate, Document>;
     std::unique_ptr<TimeSorterInterface> _timeSorter;
+    QueryMetadataBitSet _requiredMetadata;
 };
 
 }  // namespace mongo

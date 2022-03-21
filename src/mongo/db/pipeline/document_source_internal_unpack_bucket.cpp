@@ -326,6 +326,18 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
                         field.find('.') == std::string::npos);
                 bucketSpec.computedMetaProjFields.insert(field.toString());
             }
+        } else if (fieldName == kIncludeMinTimeAsMetadata) {
+            uassert(6460208,
+                    str::stream() << kIncludeMinTimeAsMetadata
+                                  << " field must be a bool, got: " << elem.type(),
+                    elem.type() == BSONType::Bool);
+            bucketSpec.includeMinTimeAsMetadata = elem.boolean();
+        } else if (fieldName == kIncludeMaxTimeAsMetadata) {
+            uassert(6460209,
+                    str::stream() << kIncludeMaxTimeAsMetadata
+                                  << " field must be a bool, got: " << elem.type(),
+                    elem.type() == BSONType::Bool);
+            bucketSpec.includeMaxTimeAsMetadata = elem.boolean();
         } else {
             uasserted(5346506,
                       str::stream()
@@ -419,6 +431,13 @@ void DocumentSourceInternalUnpackBucket::serializeToArray(
                                         [](auto&& projString) { return Value{projString}; });
                          return compFields;
                      }()});
+
+    if (_bucketUnpacker.includeMinTimeAsMetadata()) {
+        out.addField(kIncludeMinTimeAsMetadata, Value{_bucketUnpacker.includeMinTimeAsMetadata()});
+    }
+    if (_bucketUnpacker.includeMaxTimeAsMetadata()) {
+        out.addField(kIncludeMaxTimeAsMetadata, Value{_bucketUnpacker.includeMaxTimeAsMetadata()});
+    }
 
     if (!explain) {
         array.push_back(Value(DOC(getSourceName() << out.freeze())));
@@ -1016,6 +1035,14 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
                                                      BucketUnpacker::Behavior::kInclude);
 
             // Keep going for next optimization.
+        }
+
+        if (deps.getNeedsMetadata(DocumentMetadataFields::MetaType::kTimeseriesBucketMinTime)) {
+            _bucketUnpacker.setIncludeMinTimeAsMetadata();
+        }
+
+        if (deps.getNeedsMetadata(DocumentMetadataFields::MetaType::kTimeseriesBucketMaxTime)) {
+            _bucketUnpacker.setIncludeMaxTimeAsMetadata();
         }
     }
 

@@ -29,8 +29,6 @@ const buckets = db['system.buckets.' + coll.getName()];
 coll.drop();
 assert.commandWorked(
     db.createCollection(coll.getName(), {timeseries: {timeField: 't', metaField: 'm'}}));
-const bucketMaxSpanSeconds =
-    db.getCollectionInfos({name: coll.getName()})[0].options.timeseries.bucketMaxSpanSeconds;
 const unpackStage = getAggPlanStage(coll.explain().aggregate(), '$_internalUnpackBucket');
 assert(unpackStage.$_internalUnpackBucket);
 
@@ -46,12 +44,7 @@ const result = buckets
                    .aggregate([
                        {$sort: {'control.min.t': 1}},
                        unpackStage,
-                       {
-                           $_internalBoundedSort: {
-                               sortKey: {t: 1},
-                               bound: bucketMaxSpanSeconds,
-                           }
-                       },
+                       {$_internalBoundedSort: {sortKey: {t: 1}, bound: {base: "min"}}},
                    ])
                    .toArray();
 

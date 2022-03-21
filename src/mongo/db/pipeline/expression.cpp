@@ -2893,6 +2893,8 @@ const std::string recordIdName = "recordId";
 const std::string indexKeyName = "indexKey";
 const std::string sortKeyName = "sortKey";
 const std::string searchScoreDetailsName = "searchScoreDetails";
+const std::string timeseriesBucketMinTimeName = "timeseriesBucketMinTime";
+const std::string timeseriesBucketMaxTimeName = "timeseriesBucketMaxTime";
 
 using MetaType = DocumentMetadataFields::MetaType;
 const StringMap<DocumentMetadataFields::MetaType> kMetaNameToMetaType = {
@@ -2906,6 +2908,8 @@ const StringMap<DocumentMetadataFields::MetaType> kMetaNameToMetaType = {
     {searchScoreDetailsName, MetaType::kSearchScoreDetails},
     {sortKeyName, MetaType::kSortKey},
     {textScoreName, MetaType::kTextScore},
+    {timeseriesBucketMinTimeName, MetaType::kTimeseriesBucketMinTime},
+    {timeseriesBucketMaxTimeName, MetaType::kTimeseriesBucketMaxTime},
 };
 
 const stdx::unordered_map<DocumentMetadataFields::MetaType, StringData> kMetaTypeToMetaName = {
@@ -2919,6 +2923,8 @@ const stdx::unordered_map<DocumentMetadataFields::MetaType, StringData> kMetaTyp
     {MetaType::kSearchScoreDetails, searchScoreDetailsName},
     {MetaType::kSortKey, sortKeyName},
     {MetaType::kTextScore, textScoreName},
+    {MetaType::kTimeseriesBucketMinTime, timeseriesBucketMinTimeName},
+    {MetaType::kTimeseriesBucketMaxTime, timeseriesBucketMaxTimeName},
 };
 
 }  // namespace
@@ -2984,6 +2990,14 @@ Value ExpressionMeta::evaluate(const Document& root, Variables* variables) const
         case MetaType::kSearchScoreDetails:
             return metadata.hasSearchScoreDetails() ? Value(metadata.getSearchScoreDetails())
                                                     : Value();
+        case MetaType::kTimeseriesBucketMinTime:
+            return metadata.hasTimeseriesBucketMinTime()
+                ? Value(metadata.getTimeseriesBucketMinTime())
+                : Value();
+        case MetaType::kTimeseriesBucketMaxTime:
+            return metadata.hasTimeseriesBucketMaxTime()
+                ? Value(metadata.getTimeseriesBucketMaxTime())
+                : Value();
         default:
             MONGO_UNREACHABLE;
     }

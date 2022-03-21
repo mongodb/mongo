@@ -63,6 +63,9 @@ struct BucketSpec {
     // Vector of computed meta field projection names. Added at the end of materialized
     // measurements.
     std::set<std::string> computedMetaProjFields;
+
+    bool includeMinTimeAsMetadata = false;
+    bool includeMaxTimeAsMetadata = false;
 };
 
 /**
@@ -144,7 +147,17 @@ public:
         return _numberOfMeasurements;
     }
 
+    bool includeMinTimeAsMetadata() const {
+        return _includeMinTimeAsMetadata;
+    }
+
+    bool includeMaxTimeAsMetadata() const {
+        return _includeMaxTimeAsMetadata;
+    }
+
     void setBucketSpecAndBehavior(BucketSpec&& bucketSpec, Behavior behavior);
+    void setIncludeMinTimeAsMetadata();
+    void setIncludeMaxTimeAsMetadata();
 
     // Add computed meta projection names to the bucket specification.
     void addComputedMetaProjFields(const std::vector<StringData>& computedFieldNames);
@@ -179,6 +192,12 @@ private:
     // A flag used to mark that a bucket's metadata value should be materialized in measurements.
     bool _includeMetaField;
 
+    // A flag used to mark that a bucket's min time should be materialized as metadata.
+    bool _includeMinTimeAsMetadata{false};
+
+    // A flag used to mark that a bucket's max time should be materialized as metadata.
+    bool _includeMaxTimeAsMetadata{false};
+
     // The bucket being unpacked.
     BSONObj _bucket;
 
@@ -187,6 +206,16 @@ private:
     // measurement.
     BSONElement _metaValue;
 
+
+    // Since the bucket min time is the same across all materialized measurements, we can cache the
+    // value in the reset phase and use it to materialize as a metadata field in each measurement
+    // if required by the pipeline.
+    boost::optional<Date_t> _minTime;
+
+    // Since the bucket max time is the same across all materialized measurements, we can cache the
+    // value in the reset phase and use it to materialize as a metadata field in each measurement
+    // if required by the pipeline.
+    boost::optional<Date_t> _maxTime;
 
     // Map <name, BSONElement> for the computed meta field projections. Updated for
     // every bucket upon reset().

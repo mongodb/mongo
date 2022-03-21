@@ -85,6 +85,12 @@ void DocumentMetadataFields::mergeWith(const DocumentMetadataFields& other) {
     if (!hasSearchScoreDetails() && other.hasSearchScoreDetails()) {
         setSearchScoreDetails(other.getSearchScoreDetails());
     }
+    if (!hasTimeseriesBucketMinTime() && other.hasTimeseriesBucketMinTime()) {
+        setTimeseriesBucketMinTime(other.getTimeseriesBucketMinTime());
+    }
+    if (!hasTimeseriesBucketMaxTime() && other.hasTimeseriesBucketMaxTime()) {
+        setTimeseriesBucketMaxTime(other.getTimeseriesBucketMaxTime());
+    }
 }
 
 void DocumentMetadataFields::copyFrom(const DocumentMetadataFields& other) {
@@ -114,6 +120,12 @@ void DocumentMetadataFields::copyFrom(const DocumentMetadataFields& other) {
     }
     if (other.hasSearchScoreDetails()) {
         setSearchScoreDetails(other.getSearchScoreDetails());
+    }
+    if (other.hasTimeseriesBucketMinTime()) {
+        setTimeseriesBucketMinTime(other.getTimeseriesBucketMinTime());
+    }
+    if (other.hasTimeseriesBucketMaxTime()) {
+        setTimeseriesBucketMaxTime(other.getTimeseriesBucketMaxTime());
     }
 }
 
@@ -184,6 +196,14 @@ void DocumentMetadataFields::serializeForSorter(BufBuilder& buf) const {
         buf.appendNum(static_cast<char>(MetaType::kSearchScoreDetails + 1));
         getSearchScoreDetails().appendSelfToBufBuilder(buf);
     }
+    if (hasTimeseriesBucketMinTime()) {
+        buf.appendNum(static_cast<char>(MetaType::kTimeseriesBucketMinTime + 1));
+        buf.appendNum(getTimeseriesBucketMinTime().toMillisSinceEpoch());
+    }
+    if (hasTimeseriesBucketMaxTime()) {
+        buf.appendNum(static_cast<char>(MetaType::kTimeseriesBucketMaxTime + 1));
+        buf.appendNum(getTimeseriesBucketMaxTime().toMillisSinceEpoch());
+    }
     buf.appendNum(static_cast<char>(0));
 }
 
@@ -215,6 +235,10 @@ void DocumentMetadataFields::deserializeForSorter(BufReader& buf, DocumentMetada
         } else if (marker == static_cast<char>(MetaType::kSearchScoreDetails) + 1) {
             out->setSearchScoreDetails(
                 BSONObj::deserializeForSorter(buf, BSONObj::SorterDeserializeSettings()));
+        } else if (marker == static_cast<char>(MetaType::kTimeseriesBucketMinTime) + 1) {
+            out->setTimeseriesBucketMinTime(Date_t::fromMillisSinceEpoch(buf.read<long long>()));
+        } else if (marker == static_cast<char>(MetaType::kTimeseriesBucketMaxTime) + 1) {
+            out->setTimeseriesBucketMaxTime(Date_t::fromMillisSinceEpoch(buf.read<long long>()));
         } else {
             uasserted(28744, "Unrecognized marker, unable to deserialize buffer");
         }
@@ -270,6 +294,10 @@ const char* DocumentMetadataFields::typeNameToDebugString(DocumentMetadataFields
             return "text score";
         case DocumentMetadataFields::kSearchScoreDetails:
             return "$search score details";
+        case DocumentMetadataFields::kTimeseriesBucketMinTime:
+            return "timeseries bucket min time";
+        case DocumentMetadataFields::kTimeseriesBucketMaxTime:
+            return "timeseries bucket max time";
         default:
             MONGO_UNREACHABLE;
     }
