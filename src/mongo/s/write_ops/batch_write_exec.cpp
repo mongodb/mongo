@@ -363,11 +363,20 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                                            : OID());
                 } else {
                     // Error occurred dispatching, note it
-                    if (ErrorCodes::isShutdownError(responseStatus.code()) &&
+                    if ((ErrorCodes::isShutdownError(responseStatus.code()) ||
+                         responseStatus.code() == ErrorCodes::CallbackCanceled) &&
                         globalInShutdownDeprecated()) {
                         // Throw an error since the mongos itself is shutting down so this should
                         // be a top level error instead of a write error.
-                        uassertStatusOK(responseStatus);
+                        if (responseStatus.code() == ErrorCodes::CallbackCanceled) {
+                            // CallbackCanceled indicates the TaskExecutor got shut down as part of
+                            // mongos shutting down. Drivers won't automatically retry on a
+                            // CallbackCanceled error so we replace it with an InterruptedAtShutdown
+                            // error which drivers do support automatically retrying on.
+                            uasserted(ErrorCodes::InterruptedAtShutdown, responseStatus.reason());
+                        } else {
+                            uassertStatusOK(responseStatus);
+                        }
                     }
 
                     const Status status = responseStatus.withContext(

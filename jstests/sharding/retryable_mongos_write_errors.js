@@ -1,5 +1,10 @@
 /**
  * Tests that retryable write errors in MongoS return a top level error message.
+ * Does the following:
+ *   1.  Set failpoint hangAfterCollectionInserts so that inserts never complete.
+ *   2.  Initiate a batch insert (which won't complete).
+ *   3.  Stop the mongos.
+ *   4.  Assert that the returned error code is InterruptedAtShutdown (which is retryable).
  */
 
 (function() {
@@ -22,10 +27,8 @@ function insertHandler(host, dbName, collName, testData) {
         const conn = new Mongo(host);
         const database = conn.getDB(dbName);
         // creates an array with 10 documents
-        const docs = Array.from(Array(10).keys()).map((i) => ({a: i, b: "retryable"}));
+        const docs = Array.from(Array(10).keys()).map((i) => ({a: i}));
         const commandResponse = database.runCommand({insert: collName, documents: docs});
-        // assert that retryableInsertRes failed with the HostUnreachableError or
-        // InterruptedAtShutdown error code
         assert.commandFailedWithCode(commandResponse, ErrorCodes.InterruptedAtShutdown);
         jsTest.log("Command Response: " + tojson(commandResponse) + "." + commandResponse.code);
         return {ok: 1};
