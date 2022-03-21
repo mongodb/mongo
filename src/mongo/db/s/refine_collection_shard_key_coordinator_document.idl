@@ -49,7 +49,7 @@ structs:
     RefineCollectionShardKeyCoordinatorDocument:
         description: "Object with neccessary fields to refine a collection's shard key"
         generate_comparison_operators: false
-        strict: true
+        strict: false
         chained_structs:
             ShardingDDLCoordinatorMetadata: ShardingDDLCoordinatorMetadata
             RefineCollectionShardKeyRequest: RefineCollectionShardKeyRequest

@@ -57,7 +57,7 @@ structs:
     DropDatabaseCoordinatorDocument:
         description: "Represents a drop database operation on the coordinator shard."
         generate_comparison_operators: false
-        strict: true
+        strict: false
         chained_structs:
             ShardingDDLCoordinatorMetadata: ShardingDDLCoordinatorMetadata
         fields:
