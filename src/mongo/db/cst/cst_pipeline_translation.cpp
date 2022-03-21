@@ -217,6 +217,12 @@ auto translateMeta(const CNode::ObjectChildren& object, ExpressionContext* expCt
             return make_intrusive<ExpressionMeta>(expCtx, DocumentMetadataFields::kSortKey);
         case KeyValue::textScore:
             return make_intrusive<ExpressionMeta>(expCtx, DocumentMetadataFields::kTextScore);
+        case KeyValue::timeseriesBucketMaxTime:
+            return make_intrusive<ExpressionMeta>(expCtx,
+                                                  DocumentMetadataFields::kTimeseriesBucketMaxTime);
+        case KeyValue::timeseriesBucketMinTime:
+            return make_intrusive<ExpressionMeta>(expCtx,
+                                                  DocumentMetadataFields::kTimeseriesBucketMinTime);
         default:
             MONGO_UNREACHABLE;
     }

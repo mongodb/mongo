@@ -35,30 +35,32 @@
 
 namespace mongo {
 
-#define KEYVALUES(ENUMIFY)    \
-    ENUMIFY(absentKey)        \
-    ENUMIFY(decimalNegOneKey) \
-    ENUMIFY(decimalOneKey)    \
-    ENUMIFY(decimalZeroKey)   \
-    ENUMIFY(doubleNegOneKey)  \
-    ENUMIFY(doubleOneKey)     \
-    ENUMIFY(doubleZeroKey)    \
-    ENUMIFY(falseKey)         \
-    ENUMIFY(geoNearDistance)  \
-    ENUMIFY(geoNearPoint)     \
-    ENUMIFY(indexKey)         \
-    ENUMIFY(intNegOneKey)     \
-    ENUMIFY(intOneKey)        \
-    ENUMIFY(intZeroKey)       \
-    ENUMIFY(longNegOneKey)    \
-    ENUMIFY(longOneKey)       \
-    ENUMIFY(longZeroKey)      \
-    ENUMIFY(randVal)          \
-    ENUMIFY(recordId)         \
-    ENUMIFY(searchHighlights) \
-    ENUMIFY(searchScore)      \
-    ENUMIFY(sortKey)          \
-    ENUMIFY(textScore)        \
+#define KEYVALUES(ENUMIFY)           \
+    ENUMIFY(absentKey)               \
+    ENUMIFY(decimalNegOneKey)        \
+    ENUMIFY(decimalOneKey)           \
+    ENUMIFY(decimalZeroKey)          \
+    ENUMIFY(doubleNegOneKey)         \
+    ENUMIFY(doubleOneKey)            \
+    ENUMIFY(doubleZeroKey)           \
+    ENUMIFY(falseKey)                \
+    ENUMIFY(geoNearDistance)         \
+    ENUMIFY(geoNearPoint)            \
+    ENUMIFY(indexKey)                \
+    ENUMIFY(intNegOneKey)            \
+    ENUMIFY(intOneKey)               \
+    ENUMIFY(intZeroKey)              \
+    ENUMIFY(longNegOneKey)           \
+    ENUMIFY(longOneKey)              \
+    ENUMIFY(longZeroKey)             \
+    ENUMIFY(randVal)                 \
+    ENUMIFY(recordId)                \
+    ENUMIFY(searchHighlights)        \
+    ENUMIFY(searchScore)             \
+    ENUMIFY(sortKey)                 \
+    ENUMIFY(textScore)               \
+    ENUMIFY(timeseriesBucketMaxTime) \
+    ENUMIFY(timeseriesBucketMinTime) \
     ENUMIFY(trueKey)
 
 QUERY_UTIL_NAMED_ENUM_DEFINE(KeyValue, KEYVALUES)

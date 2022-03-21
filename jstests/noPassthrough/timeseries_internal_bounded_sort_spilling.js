@@ -86,7 +86,7 @@ function assertSorted(result) {
             {
                 $_internalBoundedSort: {
                     sortKey: {t: 1},
-                    bound: bucketMaxSpanSeconds,
+                    bound: {base: "min"},
                 }
             },
         ],
@@ -116,7 +116,7 @@ function assertSorted(result) {
                             {
                                 $_internalBoundedSort: {
                                     sortKey: {t: 1},
-                                    bound: bucketMaxSpanSeconds,
+                                    bound: {base: "min"},
                                 }
                             },
                         ],
@@ -150,7 +150,7 @@ function assertSorted(result) {
                             {
                                 $_internalBoundedSort: {
                                     sortKey: {t: 1},
-                                    bound: bucketMaxSpanSeconds,
+                                    bound: {base: "min"},
                                 }
                             },
                             {$limit: 100},

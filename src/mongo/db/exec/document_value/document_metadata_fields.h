@@ -65,6 +65,8 @@ public:
         kSortKey,
         kTextScore,
         kSearchScoreDetails,
+        kTimeseriesBucketMinTime,
+        kTimeseriesBucketMaxTime,
 
         // New fields must be added before the kNumFields sentinel.
         kNumFields
@@ -320,6 +322,39 @@ public:
         _holder->searchScoreDetails = details.getOwned();
     }
 
+    bool hasTimeseriesBucketMinTime() const {
+        return _holder && _holder->metaFields.test(MetaType::kTimeseriesBucketMinTime);
+    }
+
+    Date_t getTimeseriesBucketMinTime() const {
+        invariant(hasTimeseriesBucketMinTime());
+        return _holder->timeseriesBucketMinTime;
+    }
+
+    void setTimeseriesBucketMinTime(Date_t time) {
+        if (!_holder) {
+            _holder = std::make_unique<MetadataHolder>();
+        }
+        _holder->metaFields.set(MetaType::kTimeseriesBucketMinTime);
+        _holder->timeseriesBucketMinTime = time;
+    }
+
+    bool hasTimeseriesBucketMaxTime() const {
+        return _holder && _holder->metaFields.test(MetaType::kTimeseriesBucketMaxTime);
+    }
+
+    Date_t getTimeseriesBucketMaxTime() const {
+        invariant(hasTimeseriesBucketMaxTime());
+        return _holder->timeseriesBucketMaxTime;
+    }
+
+    void setTimeseriesBucketMaxTime(Date_t time) {
+        if (!_holder) {
+            _holder = std::make_unique<MetadataHolder>();
+        }
+        _holder->metaFields.set(MetaType::kTimeseriesBucketMaxTime);
+        _holder->timeseriesBucketMaxTime = time;
+    }
     void serializeForSorter(BufBuilder& buf) const;
 
 private:
@@ -342,6 +377,8 @@ private:
         BSONObj indexKey;
         RecordId recordId;
         BSONObj searchScoreDetails;
+        Date_t timeseriesBucketMinTime;
+        Date_t timeseriesBucketMaxTime;
     };
 
     // Null until the first setter is called, at which point a MetadataHolder struct is allocated.
