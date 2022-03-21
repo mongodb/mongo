@@ -206,6 +206,24 @@ private:
      */
     std::pair<Value, Document> extractSortKey(Document&& doc) const;
 
+    /**
+     * Peeks at the next document in the input. The next document is cached in _timeSorterNextDoc
+     * to support peeking without advancing.
+     */
+    GetNextResult::ReturnStatus timeSorterPeek();
+
+    /**
+     * Peeks at the next document in the input, but ignores documents whose partition key differs
+     * from the current partition key (if there is one).
+     */
+    GetNextResult::ReturnStatus timeSorterPeekSamePartition();
+
+    /**
+     * Gets the next document from the input. Caller must call timeSorterPeek() first, and it's
+     * only valid to call timeSorterGetNext() if peek returned kAdvanced.
+     */
+    Document timeSorterGetNext();
+
     bool _populated = false;
 
     boost::optional<SortExecutor<Document>> _sortExecutor;
@@ -214,6 +232,19 @@ private:
 
     using TimeSorterInterface = BoundedSorterInterface<SortableDate, Document>;
     std::unique_ptr<TimeSorterInterface> _timeSorter;
+    boost::optional<SortKeyGenerator> _timeSorterPartitionKeyGen;
+    // The next document that will be returned by timeSorterGetNext().
+    // timeSorterPeek() fills it in, and timeSorterGetNext() empties it.
+    boost::optional<Document> _timeSorterNextDoc;
+    // The current partition key.
+    // If _timeSorterNextDoc has a document then this represents the partition key of
+    // that document.
+    // If _timeSorterNextDoc is empty then this represents the partition key of
+    // the document last returned by timeSorterGetNext().
+    boost::optional<Value> _timeSorterCurrentPartition;
+    // Used in timeSorterPeek() to avoid calling getNext() on an exhausted pSource.
+    bool _timeSorterInputEOF = false;
+
     QueryMetadataBitSet _requiredMetadata;
 };
 

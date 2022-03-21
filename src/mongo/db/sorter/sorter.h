@@ -409,6 +409,15 @@ public:
     // Together, add() and done() represent the input stream.
     virtual void done() = 0;
 
+    // Prepare the sorter to receive a new stream of input.
+    //
+    // The new input stream is treated as unrelated to the old one: new elements are only compared
+    // against each other, not against any elements of the old input stream.
+    //
+    // However, any SortOptions::limit applies to the entire sorter, not to each input stream
+    // separately.
+    virtual void restart() = 0;
+
     enum class State {
         // An output document is not available yet, but this may change as more input arrives.
         kWait,
@@ -463,6 +472,9 @@ public:
     // And also, 'Comparator' compares Keys, but std::priority_queue calls its comparator
     // on whole elements.
     struct Greater {
+        // Prevent default construction.
+        explicit Greater(Comparator const* compare) : compare(compare) {}
+
         bool operator()(const std::pair<Key, Value>& p1, const std::pair<Key, Value>& p2) const {
             return (*compare)(p1.first, p2.first) > 0;
         }
@@ -489,6 +501,8 @@ public:
         invariant(!_done);
         _done = true;
     }
+
+    void restart();
 
     // Together, state() and next() represent the output stream.
     // See BoundedSorter::State for the meaning of each case.

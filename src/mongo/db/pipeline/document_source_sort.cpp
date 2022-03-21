@@ -151,23 +151,102 @@ REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(
         none /* TODO SERVER-52286 feature_flags::gFeatureFlagBucketUnpackWithSort.getVersion() */,
     feature_flags::gFeatureFlagBucketUnpackWithSort50.isEnabledAndIgnoreFCV());
 
+DocumentSource::GetNextResult::ReturnStatus DocumentSourceSort::timeSorterPeek() {
+    if (_timeSorterNextDoc) {
+        return GetNextResult::ReturnStatus::kAdvanced;
+    }
+    if (_timeSorterInputEOF) {
+        return GetNextResult::ReturnStatus::kEOF;
+    }
+
+    auto next = pSource->getNext();
+    auto status = next.getStatus();
+    switch (status) {
+        case GetNextResult::ReturnStatus::kAdvanced: {
+            _timeSorterNextDoc = next.getDocument();
+            return status;
+        }
+        case GetNextResult::ReturnStatus::kEOF:
+            _timeSorterInputEOF = true;
+            return status;
+        case GetNextResult::ReturnStatus::kPauseExecution:
+            return status;
+    }
+    MONGO_UNREACHABLE_TASSERT(6434800);
+}
+
+Document DocumentSourceSort::timeSorterGetNext() {
+    tassert(6434801,
+            "timeSorterGetNext() is only valid after timeSorterPeek() returns isAdvanced()",
+            _timeSorterNextDoc);
+    auto result = std::move(*_timeSorterNextDoc);
+    _timeSorterNextDoc.reset();
+    return result;
+}
+
+DocumentSource::GetNextResult::ReturnStatus DocumentSourceSort::timeSorterPeekSamePartition() {
+    auto status = timeSorterPeek();
+    switch (status) {
+        case GetNextResult::ReturnStatus::kEOF:
+        case GetNextResult::ReturnStatus::kPauseExecution:
+            return status;
+        case GetNextResult::ReturnStatus::kAdvanced:
+            break;
+    }
+
+    if (!_timeSorterPartitionKeyGen) {
+        // No partition key means everything is in the same partition.
+        return GetNextResult::ReturnStatus::kAdvanced;
+    } else {
+        auto prevPartition = std::move(_timeSorterCurrentPartition);
+        _timeSorterCurrentPartition =
+            _timeSorterPartitionKeyGen->computeSortKeyFromDocument(*_timeSorterNextDoc);
+
+        if (!prevPartition) {
+            // No previous partition means there is no constraint.
+            return GetNextResult::ReturnStatus::kAdvanced;
+        } else if (pExpCtx->getValueComparator().evaluate(*_timeSorterCurrentPartition ==
+                                                          *prevPartition)) {
+            // Next is in the same partition.
+            return GetNextResult::ReturnStatus::kAdvanced;
+        } else {
+            // Next is in a new partition: pretend we don't have a next document.
+            return GetNextResult::ReturnStatus::kEOF;
+        }
+    }
+}
 
 DocumentSource::GetNextResult DocumentSourceSort::doGetNext() {
     if (_timeSorter) {
+        // If the _timeSorter is exhausted but we have more input, it must be because we just
+        // finished a partition. Restart the _timeSorter to make it ready for the next partition.
+        if (_timeSorter->getState() == TimeSorterInterface::State::kDone &&
+            timeSorterPeek() == GetNextResult::ReturnStatus::kAdvanced) {
+            _timeSorter->restart();
+            _timeSorterCurrentPartition.reset();
+        }
+
         // Only pull input as necessary to get _timeSorter to have a result.
         while (_timeSorter->getState() == TimeSorterInterface::State::kWait) {
-            auto input = pSource->getNext();
-            switch (input.getStatus()) {
+            auto status = timeSorterPeekSamePartition();
+            switch (status) {
                 case GetNextResult::ReturnStatus::kPauseExecution:
-                    return input;
+                    return GetNextResult::makePauseExecution();
                 case GetNextResult::ReturnStatus::kEOF:
-                    // Tell _timeSorter there will be no more input. In response, its state
-                    // will never be kWait again, and so we'll never call pSource->getNext() again.
+                    // We've reached the end of the current partition. Tell _timeSorter there will
+                    // be no more input. In response, its state will never be kWait again unless we
+                    // restart it, so we can proceed to drain all the documents currently held by
+                    // the sorter.
                     _timeSorter->done();
+                    tassert(
+                        6434802,
+                        "DocumentSourceSort::_timeSorter waiting for input that will not arrive",
+                        _timeSorter->getState() != TimeSorterInterface::State::kWait);
                     continue;
                 case GetNextResult::ReturnStatus::kAdvanced:
-                    Document doc = input.getDocument();
-                    auto time = doc.getField(_sortExecutor->sortPattern()[0].fieldPath->fullPath());
+                    Document doc = timeSorterGetNext();
+                    auto time =
+                        doc.getField(_sortExecutor->sortPattern().back().fieldPath->fullPath());
                     uassert(6369909,
                             "$_internalBoundedSort only handles Date values",
                             time.getType() == Date);
@@ -338,14 +417,20 @@ intrusive_ptr<DocumentSourceSort> DocumentSourceSort::parseBoundedSort(
 
     BSONElement key = args["sortKey"];
     uassert(6369904, "$_internalBoundedSort sortKey must be an object", key.type() == Object);
+
     SortPattern pat{key.embeddedObject(), expCtx};
-    uassert(6369903, "$_internalBoundedSort doesn't support compound sort", pat.size() == 1);
-    uassert(6369901,
-            "$_internalBoundedSort doesn't support an expression in the sortKey",
-            pat[0].expression == nullptr);
-    uassert(6369907,
-            "$_internalBoundedSort doesn't support dotted field names",
-            pat[0].fieldPath->getPathLength() == 1);
+
+    {
+        auto timePart = pat.back();
+        uassert(6369901,
+                "$_internalBoundedSort doesn't support an expression in the time field (the last "
+                "component of sortKey)",
+                timePart.expression == nullptr);
+        uassert(6369907,
+                "$_internalBoundedSort doesn't support dotted field names in the time field (the "
+                "last component of sortKey)",
+                timePart.fieldPath->getPathLength() == 1);
+    }
 
     BSONElement bound = args["bound"];
     uassert(
@@ -377,7 +462,7 @@ intrusive_ptr<DocumentSourceSort> DocumentSourceSort::parseBoundedSort(
 
     auto ds = DocumentSourceSort::create(expCtx, pat);
     if (boundBase == kMin) {
-        if (pat[0].isAscending) {
+        if (pat.back().isAscending) {
             ds->_timeSorter.reset(
                 new TimeSorterAscMin{opts, CompAsc{}, BoundMakerMin{boundOffset}});
         } else {
@@ -386,7 +471,7 @@ intrusive_ptr<DocumentSourceSort> DocumentSourceSort::parseBoundedSort(
         }
         ds->_requiredMetadata.set(DocumentMetadataFields::MetaType::kTimeseriesBucketMinTime);
     } else if (boundBase == kMax) {
-        if (pat[0].isAscending) {
+        if (pat.back().isAscending) {
             ds->_timeSorter.reset(
                 new TimeSorterAscMax{opts, CompAsc{}, BoundMakerMax{boundOffset}});
         } else {
@@ -397,6 +482,14 @@ intrusive_ptr<DocumentSourceSort> DocumentSourceSort::parseBoundedSort(
     } else {
         MONGO_UNREACHABLE;
     }
+
+    if (pat.size() > 1) {
+        SortPattern partitionKey =
+            std::vector<SortPattern::SortPatternPart>(pat.begin(), pat.end() - 1);
+        ds->_timeSorterPartitionKeyGen =
+            SortKeyGenerator{std::move(partitionKey), expCtx->getCollator()};
+    }
+
     return ds;
 }
 

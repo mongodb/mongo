@@ -117,6 +117,13 @@ public:
         return _sortPattern.cend();
     }
 
+    SortPatternPart front() const {
+        return _sortPattern.front();
+    }
+    SortPatternPart back() const {
+        return _sortPattern.back();
+    }
+
     /**
      * Returns the types of metadata depended on by this sort.
      *

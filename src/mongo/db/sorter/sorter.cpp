@@ -1274,6 +1274,34 @@ void BoundedSorter<Key, Value, Comparator, BoundMaker>::add(Key key, Value value
 }
 
 template <typename Key, typename Value, typename Comparator, typename BoundMaker>
+void BoundedSorter<Key, Value, Comparator, BoundMaker>::restart() {
+    tassert(
+        6434804, "BoundedSorter must be in state kDone to restart()", getState() == State::kDone);
+
+    // In state kDone, the heap and spill are usually empty, because kDone means the sorter has
+    // no more elements to return. However, if there is a limit then we can also reach state
+    // kDone when '_numSorted == _opts.limit'.
+    _spillIter.reset();
+    _heap = decltype(_heap){Greater{&compare}};
+    _memUsed = 0;
+
+    _done = false;
+    _min.reset();
+
+    // There are now two possible states we could be in:
+    // - Typically, we should be ready for more input (kWait).
+    // - If there is a limit and we reached it, then we're done. We were done before restart()
+    //   and we're still done.
+    if (_opts.limit && _numSorted == _opts.limit) {
+        tassert(6434806,
+                "BoundedSorter has fulfilled _opts.limit and should still be in state kDone",
+                getState() == State::kDone);
+    } else {
+        tassert(6434805, "BoundedSorter should now be ready for input", getState() == State::kWait);
+    }
+}
+
+template <typename Key, typename Value, typename Comparator, typename BoundMaker>
 typename BoundedSorterInterface<Key, Value>::State
 BoundedSorter<Key, Value, Comparator, BoundMaker>::getState() const {
     if (_opts.limit > 0 && _opts.limit == _numSorted) {

@@ -950,7 +950,7 @@ public:
     struct Doc {
         Key time;
 
-        bool operator==(const Doc& other) {
+        bool operator==(const Doc& other) const {
             return time == other.time;
         }
 
@@ -1275,6 +1275,9 @@ TEST_F(BoundedSorterTest, LimitNoSpill) {
         },
         2);
     assertSorted(output);
+    // Also check that the correct values made it into the top K.
+    ASSERT_EQ(output[0].time, 0);
+    ASSERT_EQ(output[1].time, 3);
 
     ASSERT_EQ(sorter->numSpills(), 0);
 }
@@ -1300,6 +1303,10 @@ TEST_F(BoundedSorterTest, LimitSpill) {
         },
         3);
     assertSorted(output);
+    // Also check that the correct values made it into the top K.
+    ASSERT_EQ(output[0].time, 0);
+    ASSERT_EQ(output[1].time, 3);
+    ASSERT_EQ(output[2].time, 10);
 
     ASSERT_EQ(sorter->numSpills(), 1);
 }
@@ -1390,6 +1397,203 @@ TEST_F(BoundedSorterTest, DescWrongInput) {
     sorter = makeDesc({});
     ASSERT(sorter->checkInput());
     ASSERT_THROWS_CODE(sort(input), DBException, 6369910);
+}
+
+TEST_F(BoundedSorterTest, CompoundAsc) {
+    {
+        auto output = sort({
+            {1001},
+            {1005},
+            {1004},
+            {1007},
+        });
+        assertSorted(output);
+    }
+
+    {
+        // After restart(), the sorter accepts new input.
+        // The new values are compared to each other, but not compared to any of the old values,
+        // so it's fine for the new values to be smaller even though the sort is ascending.
+        sorter->restart();
+        auto output = sort({
+            {1},
+            {5},
+            {4},
+            {7},
+        });
+        assertSorted(output);
+    }
+
+    {
+        // restart() can be called any number of times.
+        sorter->restart();
+        auto output = sort({
+            {11},
+            {15},
+            {14},
+            {17},
+        });
+        assertSorted(output);
+    }
+}
+
+TEST_F(BoundedSorterTest, CompoundDesc) {
+    sorter = makeDesc({});
+    {
+        auto output = sort({
+            {1007},
+            {1004},
+            {1005},
+            {1001},
+        });
+        assertSorted(output, /* ascending */ false);
+    }
+
+    {
+        // After restart(), the sorter accepts new input.
+        // The new values are compared to each other, but not compared to any of the old values,
+        // so it's fine for the new values to be smaller even though the sort is ascending.
+        sorter->restart();
+        auto output = sort({
+            {7},
+            {4},
+            {5},
+            {1},
+        });
+        assertSorted(output, /* ascending */ false);
+    }
+
+    {
+        // restart() can be called any number of times.
+        sorter->restart();
+        auto output = sort({
+            {17},
+            {14},
+            {15},
+            {11},
+        });
+        assertSorted(output, /* ascending */ false);
+    }
+}
+
+TEST_F(BoundedSorterTest, CompoundLimit) {
+    // A limit applies to the entire sorter, not to each partition of a compound sort.
+
+    // Example where the limit lands in the first partition.
+    sorter = makeAsc(SortOptions().Limit(2));
+    {
+        auto output = sort(
+            {
+                {1001},
+                {1005},
+                {1004},
+                {1007},
+            },
+            2);
+        assertSorted(output);
+        // Also check that the correct values made it into the top K.
+        ASSERT_EQ(output[0].time, 1001);
+        ASSERT_EQ(output[1].time, 1004);
+
+        sorter->restart();
+        output = sort(
+            {
+                {1},
+                {5},
+                {4},
+                {7},
+            },
+            0);
+
+        sorter->restart();
+        output = sort(
+            {
+                {11},
+                {15},
+                {14},
+                {17},
+            },
+            0);
+    }
+
+    // Example where the limit lands in the second partition.
+    sorter = makeAsc(SortOptions().Limit(6));
+    {
+        auto output = sort({
+            {1001},
+            {1005},
+            {1004},
+            {1007},
+        });
+        assertSorted(output);
+
+        sorter->restart();
+        output = sort(
+            {
+                {1},
+                {5},
+                {4},
+                {7},
+            },
+            2);
+        // Also check that the correct values made it into the top K.
+        ASSERT_EQ(output[0].time, 1);
+        ASSERT_EQ(output[1].time, 4);
+
+        sorter->restart();
+        output = sort(
+            {
+                {11},
+                {15},
+                {14},
+                {17},
+            },
+            0);
+    }
+}
+
+TEST_F(BoundedSorterTest, CompoundSpill) {
+    auto options =
+        SortOptions().ExtSortAllowed().TempDir("unused_temp_dir").MaxMemoryUsageBytes(40);
+    sorter = makeAsc(options);
+
+    // When each partition is small enough, we don't spill.
+    ASSERT_EQ(sorter->numSpills(), 0);
+    auto output = sort({
+        {1001},
+        {1007},
+    });
+    assertSorted(output);
+    ASSERT_EQ(sorter->numSpills(), 0);
+
+    // If any individual partition is large enough, we do spill.
+    sorter->restart();
+    ASSERT_EQ(sorter->numSpills(), 0);
+    output = sort({
+        {1},
+        {5},
+        {5},
+        {5},
+        {5},
+        {5},
+        {5},
+        {5},
+        {5},
+        {4},
+        {7},
+    });
+    assertSorted(output);
+    ASSERT_EQ(sorter->numSpills(), 1);
+
+    // If later partitions are small again, they don't spill.
+    sorter->restart();
+    ASSERT_EQ(sorter->numSpills(), 1);
+    output = sort({
+        {11},
+        {17},
+    });
+    assertSorted(output);
+    ASSERT_EQ(sorter->numSpills(), 1);
 }
 
 }  // namespace
