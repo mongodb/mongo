@@ -20,7 +20,7 @@ var TimeseriesAggTests = class {
      * @returns An array of a time-series collection and a non time-series collection,
      *     respectively in this order.
      */
-    static prepareInputCollections(numHosts, numIterations) {
+    static prepareInputCollections(numHosts, numIterations, includeIdleMeasurements = true) {
         const timeseriesCollOption = {timeseries: {timeField: "time", metaField: "tags"}};
 
         Random.setRandomSeed();
@@ -60,7 +60,7 @@ var TimeseriesAggTests = class {
                 assert.commandWorked(inColl.insert(newMeasurement));
                 assert.commandWorked(observerInColl.insert(newMeasurement));
 
-                if (i % 2) {
+                if (includeIdleMeasurements && (i % 2)) {
                     let idleMeasurement = {
                         tags: host.tags,
                         time: new Date(currTime + i),
