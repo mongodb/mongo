@@ -33,6 +33,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/s/refine_collection_shard_key_coordinator.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/s/refine_collection_shard_key_coordinator_feature_flags_gen.h"
 #include "mongo/s/request_types/refine_collection_shard_key_gen.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
@@ -64,6 +65,10 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
+
+            uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
+            opCtx->setAlwaysInterruptAtStepDownOrUp();
+
             const auto coordinatorCompletionFuture = [&]() -> SharedSemiFuture<void> {
                 FixedFCVRegion fixedFcvRegion(opCtx);
                 const auto coordinatorType =

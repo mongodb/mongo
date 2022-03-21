@@ -274,6 +274,11 @@ assert.commandFailedWithCode(
     mongos.adminCommand({refineCollectionShardKey: kNsName, key: {_id: 1, aKey: 1}}),
     ErrorCodes.NamespaceNotSharded);
 
+// Should fail because operation can't run on config server
+assert.commandFailedWithCode(
+    mongos.adminCommand({refineCollectionShardKey: "config.collections", key: {_id: 1, aKey: 1}}),
+    ErrorCodes.NoShardingEnabled);
+
 enableShardingAndShardColl({_id: 1});
 
 // Should fail because shard key is invalid (i.e. bad values).
