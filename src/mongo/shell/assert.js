@@ -612,6 +612,28 @@ assert = (function() {
         return res;
     };
 
+    assert.dropExceptionsWithCode = function(func, dropCodes, onDrop) {
+        if (typeof func !== "function") {
+            doassert('assert.dropExceptionsWithCode 1st argument must be a function');
+        }
+        if (typeof onDrop !== "function") {
+            doassert('assert.dropExceptionsWithCode 3rd argument must be a function');
+        }
+        if (!Array.isArray(dropCodes)) {
+            dropCodes = [dropCodes];
+        }
+
+        try {
+            return func();
+        } catch (e) {
+            if (dropCodes.some((ec) => e.code === ec)) {
+                return onDrop(e);
+            } else {
+                throw e;
+            }
+        }
+    };
+
     assert.throws.automsg = function(func, params) {
         if (arguments.length === 1)
             params = [];
