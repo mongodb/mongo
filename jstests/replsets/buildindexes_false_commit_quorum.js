@@ -21,9 +21,7 @@ const replTest = new ReplSetTest({
     nodes: [
         {},
         {},
-        {},
         {rsConfig: {priority: 0, buildIndexes: false}},
-        {rsConfig: {priority: 0, votes: 0, buildIndexes: false}},
     ]
 });
 replTest.startSet();
@@ -47,12 +45,12 @@ assert.commandFailedWithCode(primaryDb.runCommand({
 }),
                              ErrorCodes.UnsatisfiableCommitQuorum);
 
-// With a commit quorum that includes 4 nodes, the quorum is unsatisfiable because it includes a
-// buildIndexes: false node.
+// With a commit quorum that includes all nodes, the quorum is unsatisfiable for the same reason as
+// 'votingMembers'.
 assert.commandFailedWithCode(primaryDb.runCommand({
     createIndexes: collName,
     indexes: [{key: {y: 1}, name: 'y_1_commitQuorum_3'}],
-    commitQuorum: 4,
+    commitQuorum: 3,
 }),
                              ErrorCodes.UnsatisfiableCommitQuorum);
 
@@ -74,9 +72,7 @@ replTest.getSecondaries().forEach((conn) => {
 });
 
 IndexBuildTest.assertIndexes(secondaryDbs[0][collName], 2, ['_id_', indexName]);
-IndexBuildTest.assertIndexes(secondaryDbs[1][collName], 2, ['_id_', indexName]);
-IndexBuildTest.assertIndexes(secondaryDbs[2][collName], 1, ['_id_']);
-IndexBuildTest.assertIndexes(secondaryDbs[3][collName], 1, ['_id_']);
+IndexBuildTest.assertIndexes(secondaryDbs[1][collName], 1, ['_id_']);
 
 replTest.stopSet();
 }());

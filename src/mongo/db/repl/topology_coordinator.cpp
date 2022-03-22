@@ -3648,16 +3648,16 @@ Status TopologyCoordinator::checkIfCommitQuorumCanBeSatisfied(
         }
     }
 
-    bool buildIndexesFalseNodes = false;
+    bool votingBuildIndexesFalseNodes = false;
     for (auto&& member : _rsConfig.members()) {
         // Only count data-bearing nodes.
         if (member.isArbiter()) {
             continue;
         }
 
-        // Only count nodes that build indexes.
-        if (!member.shouldBuildIndexes()) {
-            buildIndexesFalseNodes = true;
+        // Only count voting nodes that build indexes.
+        if (member.isVoter() && !member.shouldBuildIndexes()) {
+            votingBuildIndexesFalseNodes = true;
             continue;
         }
 
@@ -3667,17 +3667,18 @@ Status TopologyCoordinator::checkIfCommitQuorumCanBeSatisfied(
         }
     }
 
-    // buildIndexes:false should not be included in a commitQuorum because they never actually build
+    // Voting, buildIndexes:false nodes can be included in a commitQuorum but never actually build
     // indexes and vote to commit. Provide a helpful error message to prevent users from starting
     // index builds that will never commit.
-    if (buildIndexesFalseNodes) {
+    if (votingBuildIndexesFalseNodes) {
         return {ErrorCodes::UnsatisfiableCommitQuorum,
-                str::stream() << "Commit quorum cannot depend on buildIndexes:false nodes; "
-                              << "use a commit quorum that excludes these nodes"};
+                str::stream()
+                    << "Commit quorum cannot depend on voting buildIndexes:false nodes; "
+                    << "use a commit quorum that excludes these nodes or do not give them votes"};
     }
 
     return {ErrorCodes::UnsatisfiableCommitQuorum,
-            "Not enough data-bearing nodes to satisfy commit quorum"};
+            "Not enough data-bearing voting nodes to satisfy commit quorum"};
 }
 
 }  // namespace repl
