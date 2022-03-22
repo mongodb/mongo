@@ -1590,6 +1590,8 @@ extern int __wt_txn_set_read_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t 
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_txn_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_txn_set_timestamp_uint(WT_SESSION_IMPL *session, WT_TS_TXN_TYPE which,
+  wt_timestamp_t ts) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_txn_truncate_log(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *start,
   WT_CURSOR_BTREE *stop) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_txn_ts_log(WT_SESSION_IMPL *session)

@@ -734,6 +734,14 @@ struct __wt_cursor {
 #endif
 };
 
+/*! WT_SESSION::timestamp_transaction_uint timestamp types */
+typedef enum {
+	WT_TS_TXN_TYPE_COMMIT, /*!< Commit timestamp. */
+	WT_TS_TXN_TYPE_DURABLE, /*!< Durable timestamp. */
+	WT_TS_TXN_TYPE_PREPARE, /*!< Prepare timestamp. */
+	WT_TS_TXN_TYPE_READ /*!< Read timestamp. */
+} WT_TS_TXN_TYPE;
+
 /*!
  * All data operations are performed in the context of a WT_SESSION.  This
  * encapsulates the thread and transactional context of the operation.
@@ -1881,6 +1889,25 @@ struct __wt_session {
 	 * @errors
 	 */
 	int __F(timestamp_transaction)(WT_SESSION *session, const char *config);
+
+	/*!
+	 * Set a timestamp on a transaction numerically.  Prefer this over @ref
+	 * timestamp_transaction when the string parsing done in that method becomes a bottleneck.
+	 *
+	 * The WT_SESSION.timestamp_transaction_uint method can only be used at snapshot
+	 * isolation.
+	 *
+	 * @requires_transaction
+	 *
+	 * @param session the session handle
+	 * @param which the timestamp you wish to set. See @ref WT_TS_TXN_TYPE for available
+	 * options, and @ref timestamp_transaction for constraints on when timestamps can be
+	 * set.
+	 * @param ts the timestamp.
+	 * @errors
+	 */
+	int __F(timestamp_transaction_uint)(WT_SESSION *session, WT_TS_TXN_TYPE which,
+	        uint64_t ts);
 	/*! @} */
 
 	/*!

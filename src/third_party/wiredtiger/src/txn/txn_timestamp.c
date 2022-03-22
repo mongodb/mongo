@@ -897,7 +897,7 @@ __wt_txn_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
     commit_ts = durable_ts = prepare_ts = read_ts = WT_TS_NONE;
     set_ts = false;
 
-    WT_TRET(__wt_txn_context_check(session, true));
+    WT_RET(__wt_txn_context_check(session, true));
 
     /*
      * If the API received no configuration string, or we just have the base configuration, there's
@@ -952,6 +952,44 @@ __wt_txn_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
 
     /* Timestamps are only logged in debugging mode. */
     if (set_ts && FLD_ISSET(conn->log_flags, WT_CONN_LOG_DEBUG_MODE) &&
+      FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED) && !F_ISSET(conn, WT_CONN_RECOVERING))
+        WT_RET(__wt_txn_ts_log(session));
+
+    return (0);
+}
+
+/*
+ * __wt_txn_set_timestamp_uint --
+ *     Directly set the commit timestamp in a transaction, bypassing parsing logic. Prefer this to
+ *     __wt_txn_set_timestamp when string parsing is a performance bottleneck.
+ */
+int
+__wt_txn_set_timestamp_uint(WT_SESSION_IMPL *session, WT_TS_TXN_TYPE which, wt_timestamp_t ts)
+{
+    WT_CONNECTION_IMPL *conn;
+
+    WT_RET(__wt_txn_context_check(session, true));
+
+    conn = S2C(session);
+
+    switch (which) {
+    case WT_TS_TXN_TYPE_COMMIT:
+        WT_RET(__wt_txn_set_commit_timestamp(session, ts));
+        break;
+    case WT_TS_TXN_TYPE_DURABLE:
+        WT_RET(__wt_txn_set_durable_timestamp(session, ts));
+        break;
+    case WT_TS_TXN_TYPE_READ:
+        WT_RET(__wt_txn_set_read_timestamp(session, ts));
+        break;
+    case WT_TS_TXN_TYPE_PREPARE:
+        WT_RET(__wt_txn_set_prepare_timestamp(session, ts));
+        break;
+    }
+    __wt_txn_publish_durable_timestamp(session);
+
+    /* Timestamps are only logged in debugging mode. */
+    if (ts != WT_TS_NONE && FLD_ISSET(conn->log_flags, WT_CONN_LOG_DEBUG_MODE) &&
       FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED) && !F_ISSET(conn, WT_CONN_RECOVERING))
         WT_RET(__wt_txn_ts_log(session));
 
