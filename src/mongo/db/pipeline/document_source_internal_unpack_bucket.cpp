@@ -164,6 +164,7 @@ bool checkMetadataSortReorder(
 boost::intrusive_ptr<DocumentSourceSort> createMetadataSortForReorder(
     const DocumentSourceSort& sort,
     const boost::optional<std::string&> lastpointTimeField = boost::none,
+    const boost::optional<std::string> groupIdField = boost::none,
     bool flipSort = false) {
     auto sortPattern = flipSort
         ? SortPattern(
@@ -174,6 +175,16 @@ boost::intrusive_ptr<DocumentSourceSort> createMetadataSortForReorder(
               sort.getContext())
         : sort.getSortKeyPattern();
     std::vector<SortPattern::SortPatternPart> updatedPattern;
+
+    if (groupIdField) {
+        auto groupId = FieldPath(groupIdField.get());
+        SortPattern::SortPatternPart patternPart;
+        patternPart.isAscending = !flipSort;
+        patternPart.fieldPath = groupId;
+        updatedPattern.push_back(patternPart);
+    }
+
+
     for (const auto& entry : sortPattern) {
         updatedPattern.push_back(entry);
 
@@ -831,10 +842,14 @@ bool DocumentSourceInternalUnpackBucket::optimizeLastpoint(Pipeline::SourceConta
         newFieldPath = newFieldPath.concat(fieldPath.tail().tail());
     }
 
+    auto groupByExpr = ExpressionFieldPath::createPathFromString(
+        pExpCtx.get(), newFieldPath.fullPath(), pExpCtx->variablesParseState);
+
     // Insert bucket-level $sort and $group stages before we unpack any buckets.
     boost::intrusive_ptr<DocumentSourceSort> newSort;
     auto insertBucketLevelSortAndGroup = [&](bool flipSort) {
-        newSort = createMetadataSortForReorder(*sortStage, timeField, flipSort);
+        newSort =
+            createMetadataSortForReorder(*sortStage, timeField, newFieldPath.fullPath(), flipSort);
         auto newGroup = createGroupForReorder(pExpCtx, newFieldPath);
         container->insert(itr, newSort);
         container->insert(itr, newGroup);

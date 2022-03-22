@@ -147,6 +147,15 @@ for (const {time, bucketsIndex} of testCases) {
 
     // Test both directions of the metaField sort for each direction of time.
     for (const index of [{"tags.hostid": 1, time}, {"tags.hostid": -1, time}]) {
+        const canUseDistinctNoMeta =
+            (index["tags.hostid"] === 1) + isTimeDescending + (bucketsIndex !== undefined);
+        verifyTsResultsWithAndWithoutIndex({
+            pipeline: [{$sort: {time}}, groupStage],
+            index,
+            bucketsIndex,
+            expectStage: (canUseDistinctNoMeta >= 2 ? expectDistinctScan : expectCollScan)
+        });
+
         // Test pipeline without a preceding $match stage.
         verifyTsResultsWithAndWithoutIndex({
             pipeline: [{$sort: index}, groupStage],
