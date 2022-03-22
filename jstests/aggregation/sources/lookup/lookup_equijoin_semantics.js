@@ -6,6 +6,7 @@
 
 load("jstests/aggregation/extras/utils.js");
 load("jstests/libs/fixture_helpers.js");  // For isSharded.
+load("jstests/libs/sbe_util.js");         // For checkSBEEnabled.
 
 const localColl = db.lookup_arrays_semantics_local;
 const foreignColl = db.lookup_arrays_semantics_foreign;
@@ -175,6 +176,12 @@ function runTest_ExpectFailure(
 })();
 
 (function testMatchingUndefined() {
+    if (checkSBEEnabled(db, ["featureFlagSBELookupPushdown"])) {
+        jsTestLog(
+            "SERVER-64586, SERVER-64587: Skipping 'undefined' test when $lookup is lowered into SBE.");
+        return;
+    }
+
     const docs = [
         {_id: 0, no_a: 1},
         {_id: 1, a: null},
@@ -208,6 +215,35 @@ function runTest_ExpectFailure(
         foreignRecords: docs,
         foreignField: "a",
         expectedErrorCode: ErrorCodes.BadValue
+    });
+})();
+
+(function testMatchingNaN() {
+    const docs = [
+        {_id: 0, a: NaN},
+        {_id: 1, a: NumberDecimal("NaN")},
+        {_id: 2, a: [1, NaN]},
+        {_id: 3, a: [1, NumberDecimal("NaN")]},
+
+        {_id: 10, a: null},
+        {_id: 11, no_a: 42},
+    ];
+
+    runTest_SingleForeignRecord({
+        testDescription: "NaN in foreign, top-level field in local",
+        localRecords: docs,
+        localField: "a",
+        foreignRecord: {_id: 0, b: NaN},
+        foreignField: "b",
+        idsExpectedToMatch: [0, 1, 2, 3]
+    });
+    runTest_SingleLocalRecord({
+        testDescription: "NaN in local, top-level field in foreign",
+        localRecord: {_id: 0, b: NaN},
+        localField: "b",
+        foreignRecords: docs,
+        foreignField: "a",
+        idsExpectedToMatch: [0, 1, 2, 3]
     });
 })();
 

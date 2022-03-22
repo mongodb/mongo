@@ -272,7 +272,7 @@ TEST_F(LookupStageBuilderTest, NestedLoopJoin_MatchingArrayAsValue) {
 
     const std::vector<std::pair<BSONObj, std::vector<BSONObj>>> expected = {
         {ldocs[0], {fdocs[0], fdocs[1]}},
-        {ldocs[1], {/*TODO SERVER-64483: fdocs[1],*/ fdocs[2]}},
+        {ldocs[1], {fdocs[1], fdocs[2]}},
     };
 
     insertDocuments(ldocs, fdocs);
@@ -341,7 +341,7 @@ TEST_F(LookupStageBuilderTest, NestedLoopJoin_TopLevelFields_EmptyArrays) {
 
     std::vector<std::pair<BSONObj, std::vector<BSONObj>>> expected = {
         {ldocs[0], {fdocs[1], fdocs[2], fdocs[3]}},
-        {ldocs[1], {fdocs[7]}},  // TODO SERVER-64483: it should be {fdocs[6], fdocs[7]}
+        {ldocs[1], {fdocs[6], fdocs[7]}},
     };
 
     insertDocuments(ldocs, fdocs);
@@ -409,9 +409,8 @@ TEST_F(LookupStageBuilderTest, NestedLoopJoin_MatchingForeignPathToLocalScalar) 
          }},
     };
 
-    // TODO SERVER-64483
-    // insertDocuments(ldocs, MatchingPathToScalar_Docs);
-    // assertMatchedDocuments("lkey", "a.x", expected);
+    insertDocuments(ldocs, MatchingPathToScalar_Docs);
+    assertMatchedDocuments("lkey", "a.x", expected);
 }
 
 TEST_F(LookupStageBuilderTest, NestedLoopJoin_DeepLocalPath_Basic) {
@@ -430,11 +429,40 @@ TEST_F(LookupStageBuilderTest, NestedLoopJoin_DeepLocalPath_Basic) {
     };
 
     const std::vector<std::pair<BSONObj, std::vector<BSONObj>>> expected = {
-        {ldocs[0], {fdocs[0], fdocs[1], fdocs[2], /*SERVER-64483: fdocs[5], fdocs[6]*/}},
+        {ldocs[0], {fdocs[0], fdocs[1], fdocs[2], fdocs[5], fdocs[6]}},
     };
 
     insertDocuments(ldocs, fdocs);
     assertMatchedDocuments("a.b.c", "fkey", expected);
+}
+
+TEST_F(LookupStageBuilderTest, NestedLoopJoin_DeepForeignPath_Basic) {
+    const std::vector<BSONObj> ldocs = {
+        fromjson("{_id: 0, key: 1}"),
+        fromjson("{_id: 1, key: 3}"),
+        fromjson("{_id: 2, key: 4}"),
+        fromjson("{_id: 3, key: 5}"),
+        fromjson("{_id: 4, key: [[2, 3], 21]}"),
+        fromjson("{_id: 5, key: [[4, 5], 21]}"),
+        fromjson("{_id: 6, key: [[5, 4], 21]}"),
+    };
+
+    const std::vector<BSONObj> fdocs = {
+        fromjson("{_id: 0, a: [ {b: [ {c: 1}, {c: [2, 3]} ]}, {b: {c: [[4, 5], 4]}} ]}"),
+    };
+
+    const std::vector<std::pair<BSONObj, std::vector<BSONObj>>> expected = {
+        {ldocs[0], {fdocs[0]}},
+        {ldocs[1], {fdocs[0]}},
+        {ldocs[2], {fdocs[0]}},
+        {ldocs[3], {}},
+        {ldocs[4], {fdocs[0]}},
+        {ldocs[5], {fdocs[0]}},
+        {ldocs[6], {}},
+    };
+
+    insertDocuments(ldocs, fdocs);
+    assertMatchedDocuments("key", "a.b.c", expected);
 }
 
 TEST_F(LookupStageBuilderTest, NestedLoopJoin_DeepLocalPath_Missing) {
@@ -494,6 +522,42 @@ TEST_F(LookupStageBuilderTest, NestedLoopJoin_DeepLocalPath_Missing) {
     assertMatchedDocuments("a.b.c", "fkey", expected);
 }
 
+TEST_F(LookupStageBuilderTest, NestedLoopJoin_DeepForeignPath_Missing) {
+    const std::vector<BSONObj> ldocs = {
+        fromjson("{_id: 0, key: 1}"),
+        fromjson("{_id: 1, key: null}"),
+    };
+
+    const std::vector<BSONObj> fdocs = {
+        fromjson("{_id: 0, a: {b: [ {no_c: 42}, {c: 1}      ]}}"),
+        fromjson("{_id: 1, a: {b: [ {no_c: 42}, {c: [1, 2]} ]}}"),
+        fromjson("{_id: 2, a: {b: [ {no_c: 42}, {no_c: 42}  ]}}"),
+        fromjson("{_id: 3, a: {b: [41, 42]}}"),
+
+        fromjson("{_id: 4, a: [ {b: {no_c: 42}}, {b: {c: 1}}      ]}"),
+        fromjson("{_id: 5, a: [ {b: {no_c: 42}}, {b: {c: [1, 2]}} ]}"),
+        fromjson("{_id: 6, a: [ {b: {no_c: 42}}, {b: {no_c: 42}}  ]}"),
+        fromjson("{_id: 7, a: [41, 42]}"),
+
+        fromjson("{_id: 8, a: [ {b: [ {no_c: 42}, {c: 1}     ]}, {b: {no_c: 42}} ]}"),
+        fromjson("{_id: 9, a: [ {b: [ {no_c: 42}, {no_c: 42} ]}, {b: {c: 1}}     ]}"),
+
+        fromjson("{_id: 10, a: [ {no_b: 42}, {b: [ {no_c: 42}, {c: 1}    ]} ]}"),
+        fromjson("{_id: 11, a: [ {no_b: 42}, {b: [ {no_c: 42}, {no_c: 42} ]} ]}"),
+        fromjson("{_id: 12, a: [ {no_b: 42}, {no_b: 42} ]}"),
+
+        fromjson("{_id: 13, no_a: 42}"),
+    };
+
+    const std::vector<std::pair<BSONObj, std::vector<BSONObj>>> expected = {
+        {ldocs[0], {fdocs[0], fdocs[1], fdocs[4], fdocs[5], fdocs[8], fdocs[9], fdocs[10]}},
+        {ldocs[1], {fdocs[2], fdocs[3], fdocs[6], fdocs[7], fdocs[11], fdocs[12], fdocs[13]}},
+    };
+
+    insertDocuments(ldocs, fdocs);
+    assertMatchedDocuments("key", "a.b.c", expected);
+}
+
 TEST_F(LookupStageBuilderTest, NestedLoopJoin_DeepLocalPath_EmptyArrays) {
     const std::vector<BSONObj> ldocs = {
         fromjson("{_id: 0, a: {b: {c: []}}}"),
@@ -529,6 +593,49 @@ TEST_F(LookupStageBuilderTest, NestedLoopJoin_DeepLocalPath_EmptyArrays) {
 
     insertDocuments(ldocs, fdocs);
     assertMatchedDocuments("a.b.c", "fkey", expected);
+}
+
+TEST_F(LookupStageBuilderTest, NestedLoopJoin_DeepForeignPath_EmptyArrays) {
+    const std::vector<BSONObj> ldocs = {
+        fromjson("{_id: 0, key: [[]]}"),
+        fromjson("{_id: 1, key: null}"),
+    };
+    const std::vector<BSONObj> fdocs = {
+        fromjson("{_id: 0, a: {b: {c: []}}}"),
+        fromjson("{_id: 1, a: {b: [ {c: []}, {c: []}             ]}}"),
+        fromjson("{_id: 2, a: {b: [ {no_c: 42}, {c: []}, {c: []} ]}}"),
+        fromjson("{_id: 3, a: [ {b: {c: []}}, {b: {c: []}}                  ]}"),
+        fromjson("{_id: 4, a: [ {b: {no_c: 42}}, {b: {c: []}}, {b: {c: []}} ]}"),
+
+        fromjson("{_id: 5, a: {b: {c: [[]]}}}"),
+        fromjson("{_id: 6, a: {b: [ {c: 42}, {c: [[]]}             ]}}"),
+        fromjson("{_id: 7, a: {b: [ {no_c: 42}, {c: 42}, {c: [[]]} ]}}"),
+        fromjson("{_id: 8, a: [ {b: {c: 42}}, {b: {c: [[]]}}                  ]}"),
+        fromjson("{_id: 9, a: [ {b: {no_c: 42}}, {b: {c: 42}}, {b: {c: [[]]}} ]}"),
+
+        fromjson("{_id: 10, a: {b: [{c: null}, {c: []}   ]}}"),
+        fromjson("{_id: 11, a: {b: [{c: null}, {c: [[]]} ]}}"),
+    };
+
+    std::vector<std::pair<BSONObj, std::vector<BSONObj>>> expected = {
+        {ldocs[0],
+         {fdocs[0],
+          fdocs[1],
+          fdocs[2],
+          fdocs[3],
+          fdocs[4],
+          fdocs[5],
+          fdocs[6],
+          fdocs[7],
+          fdocs[8],
+          fdocs[9],
+          fdocs[10],
+          fdocs[11]}},
+        {ldocs[1], {fdocs[10], fdocs[11]}},
+    };
+
+    insertDocuments(ldocs, fdocs);
+    assertMatchedDocuments("key", "a.b.c", expected);
 }
 
 TEST_F(LookupStageBuilderTest, OneComponentAsPath) {

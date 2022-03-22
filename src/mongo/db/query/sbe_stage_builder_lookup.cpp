@@ -39,6 +39,7 @@
 #include "mongo/db/exec/sbe/stages/ix_scan.h"
 #include "mongo/db/exec/sbe/stages/loop_join.h"
 #include "mongo/db/exec/sbe/stages/scan.h"
+#include "mongo/db/exec/sbe/stages/union.h"
 #include "mongo/db/exec/sbe/stages/unwind.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/query/sbe_stage_builder_coll_scan.h"
@@ -58,16 +59,22 @@ namespace {
 using namespace sbe;
 using namespace sbe::value;
 
+enum class JoinSide { Local = 0, Foreign = 1 };
+
 // Creates stages for traversing path 'fp' in the record from 'inputSlot'. Returns one key value at
-// a time. For example, if the record in the 'inputSlot' is:
+// a time, including terminal arrays as whole values if 'joinSide' is JoinSide::Local. For example,
+// if the record in the 'inputSlot' is:
 //     {a: [{b:[1,[2,3]]}, {b:4}, {b:1}, {b:2}]},
-// the returned values for path "a.b" will be streamed as: 1, [2,3], 4, 1, 2.
+// the returned values for path "a.b" will be streamed as: 1, [2,3], [1, [2, 3]], 4, 1, 2 for
+// JoinSide::Foreign and as: 1, [2,3], 4, 1, 2 for JoinSide::Local.
 std::pair<SlotId /*keyValueSlot*/, std::unique_ptr<sbe::PlanStage>> buildKeysStream(
+    JoinSide joinSide,
     SlotId inputSlot,
     const FieldPath& fp,
     const PlanNodeId nodeId,
     SlotIdGenerator& slotIdGenerator) {
     const FieldIndex numParts = fp.getPathLength();
+    invariant(numParts > 0);
 
     std::unique_ptr<sbe::PlanStage> currentStage = makeLimitCoScanTree(nodeId, 1);
     SlotId keyValueSlot = inputSlot;
@@ -80,16 +87,67 @@ std::pair<SlotId /*keyValueSlot*/, std::unique_ptr<sbe::PlanStage>> buildKeysStr
             nodeId,
             getFieldSlot,
             makeFunction("getField"_sd, makeVariable(keyValueSlot), makeConstant(fieldName)));
+        currentStage = std::move(getFieldStage.stage);
+        keyValueSlot = getFieldSlot;
 
+        // For the terminal array we might need to do extra work -- see below.
+        if (i + 1 < numParts) {
+            SlotId unwindOutputSlot = slotIdGenerator.generate();
+            currentStage = makeS<UnwindStage>(std::move(currentStage) /*child stage*/,
+                                              keyValueSlot,
+                                              unwindOutputSlot,
+                                              slotIdGenerator.generate() /*outIndex*/,
+                                              true /*preserveNullAndEmptyArrays*/,
+                                              nodeId);
+            keyValueSlot = unwindOutputSlot;
+        }
+    }
+
+    if (joinSide == JoinSide::Local) {
+        // For the terminal field in local, only the elements of the array are considered to be the
+        // keys, so we can unwind the same way as above in the loop and do nothing else.
         SlotId unwindOutputSlot = slotIdGenerator.generate();
-        currentStage = makeS<UnwindStage>(std::move(getFieldStage.stage) /*child stage*/,
-                                          getFieldSlot,
+        currentStage = makeS<UnwindStage>(std::move(currentStage) /*child stage*/,
+                                          keyValueSlot,
                                           unwindOutputSlot,
                                           slotIdGenerator.generate() /*outIndex*/,
                                           true /*preserveNullAndEmptyArrays*/,
                                           nodeId);
         keyValueSlot = unwindOutputSlot;
+    } else {
+        // For the terminal field part in foreign, if the field is an array, we need to add to the
+        // keys both, the elements of the array and the array itself. We do this with a union stage,
+        // but to avoid re-traversing the path, we pass the already extracted path to the union via
+        // nlj stage.
+        SlotId terminalUnwindOutputSlot = slotIdGenerator.generate();
+        std::unique_ptr<sbe::PlanStage> terminalUnwind =
+            makeS<UnwindStage>(makeLimitCoScanTree(nodeId, 1) /*child stage*/,
+                               keyValueSlot,
+                               terminalUnwindOutputSlot,
+                               slotIdGenerator.generate() /*outIndex*/,
+                               true /*preserveNullAndEmptyArrays*/,
+                               nodeId);
+
+        SlotId unionOutputSlot = slotIdGenerator.generate();
+        sbe::PlanStage::Vector terminalStagesToUnion;
+        terminalStagesToUnion.push_back(std::move(terminalUnwind));
+        terminalStagesToUnion.emplace_back(makeLimitCoScanTree(nodeId, 1));
+
+        std::unique_ptr<sbe::PlanStage> unionStage = sbe::makeS<UnionStage>(
+            std::move(terminalStagesToUnion),
+            std::vector{makeSV(terminalUnwindOutputSlot), makeSV(keyValueSlot)},
+            makeSV(unionOutputSlot),
+            nodeId);
+
+        currentStage = makeS<LoopJoinStage>(std::move(currentStage),
+                                            std::move(unionStage),
+                                            makeSV() /*outerProjects*/,
+                                            makeSV(keyValueSlot) /*outerCorrelated*/,
+                                            nullptr /*predicate*/,
+                                            nodeId);
+        keyValueSlot = unionOutputSlot;
     }
+
     return {keyValueSlot, std::move(currentStage)};
 }
 
@@ -100,14 +158,16 @@ std::pair<SlotId /*keyValueSlot*/, std::unique_ptr<sbe::PlanStage>> buildKeysStr
 // If the stream produces no values, that is, would result in an empty set, the empty set is
 // replaced with a set that contains a single 'null' value, so that it matches MQL semantics when
 // empty arrays and all missing are matched to 'null'.
-std::pair<SlotId /*keyValuesSetSlot*/, std::unique_ptr<sbe::PlanStage>> buildLocalKeySet(
+std::pair<SlotId /*keyValuesSetSlot*/, std::unique_ptr<sbe::PlanStage>> buildKeySet(
+    JoinSide joinSide,
     std::unique_ptr<sbe::PlanStage> inputStage,
     SlotId recordSlot,
     const FieldPath& fp,
     const PlanNodeId nodeId,
     SlotIdGenerator& slotIdGenerator) {
     // Create the branch to stream individual key values from every terminal of the path.
-    auto [keyValueSlot, keyValuesStage] = buildKeysStream(recordSlot, fp, nodeId, slotIdGenerator);
+    auto [keyValueSlot, keyValuesStage] =
+        buildKeysStream(joinSide, recordSlot, fp, nodeId, slotIdGenerator);
 
     // Re-pack the individual key values into a set.
     SlotId keyValuesSetSlot = slotIdGenerator.generate();
@@ -211,60 +271,33 @@ std::pair<SlotId /*matched docs*/, std::unique_ptr<sbe::PlanStage>> buildNljLook
     const PlanNodeId nodeId,
     SlotIdGenerator& slotIdGenerator) {
     // Build the outer branch that produces the set of local key values.
-    auto [localKeySlot, outerRootStage] = buildLocalKeySet(
-        std::move(localStage), localRecordSlot, localFieldName, nodeId, slotIdGenerator);
+    auto [localKeySlot, outerRootStage] = buildKeySet(JoinSide::Local,
+                                                      std::move(localStage),
+                                                      localRecordSlot,
+                                                      localFieldName,
+                                                      nodeId,
+                                                      slotIdGenerator);
 
-    // Build the inner branch. It involves getting the foreign keys and then building the nested
-    // lookup join.
-    // TODO SERVER-64483: implement handling of paths in foreignField.
-    SlotId foreignKeySlot = slotIdGenerator.generate();
-    EvalStage innerBranch =
-        makeProject(EvalStage{std::move(foreignStage), SlotVector{foreignKeySlot}},
-                    nodeId,
-                    foreignKeySlot,
-                    makeFunction("fillEmpty"_sd,
-                                 makeFunction("getField"_sd,
-                                              makeVariable(foreignRecordSlot),
-                                              makeConstant(foreignFieldName)),
-                                 makeConstant(TypeTags::Null, 0)));
+    // Build the inner branch that produces the set of foreign key values.
+    auto [foreignKeySlot, foreignKeyStage] = buildKeySet(JoinSide::Foreign,
+                                                         std::move(foreignStage),
+                                                         foreignRecordSlot,
+                                                         foreignFieldName,
+                                                         nodeId,
+                                                         slotIdGenerator);
 
-    // If the foreign key is an array, $lookup should match against the array itself and all
-    // elements of the array, so need to traverse into it, while applying the equality filter to
-    // each element. Contents of 'foreignKeySlot' will be overwritten with true/false result of the
-    // traversal - do we want to keep it?
-    {
-        SlotId traverseOutputSlot = slotIdGenerator.generate();
-        // "in" branch of the traverse applies the filter and populates the output slot with
-        // true/false. If the local key is an array check for membership rather than equality.
-        // Also, need to compare "undefined" in foreign as "null".
-        std::unique_ptr<EExpression> checkInTraverse =
-            makeFunction("isMember"_sd, makeVariable(foreignKeySlot), makeVariable(localKeySlot));
+    // Add a filter that only lets through foreign records with non-empty intersection of local and
+    // foreign keys.
+    std::unique_ptr<EExpression> haveMatchingKeys = makeBinaryOp(
+        sbe::EPrimBinary::greater,
+        makeFunction("getArraySize",
+                     sbe::makeE<sbe::EFunction>("setIntersection",
+                                                sbe::makeEs(makeE<EVariable>(localKeySlot),
+                                                            makeE<EVariable>(foreignKeySlot)))),
+        makeConstant(TypeTags::NumberInt32, 0));
 
-        SlotId innerTraverseOutputSlot = slotIdGenerator.generate();
-        EvalStage innerTraverseBranch = makeProject(makeLimitCoScanStage(nodeId),
-                                                    nodeId,
-                                                    innerTraverseOutputSlot,
-                                                    std::move(checkInTraverse));
-
-        innerBranch = makeTraverse(
-            std::move(innerBranch) /* "from" branch */,
-            std::move(innerTraverseBranch) /* "in" branch */,
-            foreignKeySlot /* inField */,
-            traverseOutputSlot /* outField */,
-            innerTraverseOutputSlot /* outFieldInner */,
-            makeVariable(innerTraverseOutputSlot) /* foldExpr */,
-            makeVariable(traverseOutputSlot) /* finalExpr: stop as soon as find a match */,
-            nodeId,
-            1 /*nestedArraysDepth*/);
-
-        // Add a filter that only lets through matched records.
-        std::unique_ptr<EExpression> predicate =
-            makeFunction("fillEmpty"_sd,
-                         makeVariable(traverseOutputSlot),
-                         makeConstant(TypeTags::Boolean, false));
-        innerBranch = makeFilter<false /*IsConst*/, false /*IsEof*/>(
-            std::move(innerBranch), std::move(predicate), nodeId);
-    }
+    EvalStage innerBranch = makeFilter<false /*IsConst*/, false /*IsEof*/>(
+        EvalStage{std::move(foreignKeyStage), SlotVector{}}, std::move(haveMatchingKeys), nodeId);
 
     // Group the matched foreign documents into a list, stored in the 'innerResultSlot'.
     // It creates a union stage internally so that when there's no matching foreign records, an
@@ -389,8 +422,12 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
     iamMap.insert({indexName, indexAccessMethod});
 
     // Build the outer branch that produces the correlated local key slot.
-    auto [localKeysSetSlot, localKeysSetStage] = buildLocalKeySet(
-        std::move(localStage), localRecordSlot, localFieldName, nodeId, slotIdGenerator);
+    auto [localKeysSetSlot, localKeysSetStage] = buildKeySet(JoinSide::Local,
+                                                             std::move(localStage),
+                                                             localRecordSlot,
+                                                             localFieldName,
+                                                             nodeId,
+                                                             slotIdGenerator);
 
     // 'localFieldSlot' is a set even if it contains a single item. Extract this single value until
     // SERVER-63574 is implemented.
