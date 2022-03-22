@@ -476,20 +476,6 @@ env.Library(
 )
 
 env.Library(
-    target='set_user_write_block_mode_command',
-    source=[
-        'set_user_write_block_mode_command.cpp',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/commands',
-        '$BUILD_DIR/mongo/db/rw_concern_d',
-        '$BUILD_DIR/mongo/db/s/user_writes_recoverable_critical_section',
-        'set_user_write_block_mode_idl',
-    ],
-)
-
-env.Library(
     target='set_user_write_block_mode_idl',
     source=[
         'set_user_write_block_mode.idl',
@@ -556,6 +542,7 @@ env.Library(
         'set_cluster_parameter_command.cpp',
         "set_feature_compatibility_version_command.cpp",
         "set_index_commit_quorum_command.cpp",
+        'set_user_write_block_mode_command.cpp',
         "shutdown_d.cpp",
         "snapshot_management.cpp",
         "tenant_migration_donor_cmds.cpp",
@@ -608,6 +595,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/s/sharding_commands_d',
         '$BUILD_DIR/mongo/db/s/sharding_runtime_d',
         '$BUILD_DIR/mongo/db/s/transaction_coordinator',
+        '$BUILD_DIR/mongo/db/s/user_writes_recoverable_critical_section',
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_conversion_util',
         '$BUILD_DIR/mongo/idl/idl_parser',
@@ -625,6 +613,7 @@ env.Library(
         'set_cluster_parameter_idl',
         'set_feature_compatibility_version_idl',
         'set_index_commit_quorum_idl',
+        'set_user_write_block_mode_idl',
         'shell_protocol',
         'shutdown_idl',
         'standalone',

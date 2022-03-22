@@ -108,6 +108,9 @@ public:
      * Acquires the user writes critical section blocking only new sharded DDL operations, but not
      * user writes nor local DDL. This is a 'prepare' state before user writes and local DDL can be
      * blocked on sharded clusters.
+     * Note: This method does not wait for ongoing DDL coordinators to finish. If the caller wishes
+     * to ensure that any ongoing DDL operation has seen the new blocking state, the caller should
+     * wait for the ShardingDDLCoordinators to drain itself.
      */
     void acquireRecoverableCriticalSectionBlockNewShardedDDL(OperationContext* opCtx,
                                                              const NamespaceString& nss);

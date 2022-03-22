@@ -202,6 +202,13 @@ public:
 
 protected:
     long long _term = 1;
+
+    // Skip recovering user writes critical sections because the fixture doesn't construct
+    // ServiceEntryPoint and this causes a segmentation fault when
+    // UserWritesRecoverableCriticalSectionService uses DBDirectClient to call into
+    // ServiceEntryPoint
+    FailPointEnableBlock skipRecoverUserWriteCriticalSections{
+        "skipRecoverUserWriteCriticalSections"};
 };
 
 

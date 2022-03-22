@@ -151,6 +151,25 @@ protected:
         });
     }
 
+    void expectRemoveUserWritesCriticalSectionsDocs(const HostAndPort& target) {
+        onCommandForAddShard([&](const RemoteCommandRequest& request) {
+            ASSERT_EQ(request.target, target);
+            ASSERT_EQ(request.dbname, NamespaceString::kUserWritesCriticalSectionsNamespace.db());
+            ASSERT_BSONOBJ_EQ(
+                request.cmdObj,
+                BSON("delete" << NamespaceString::kUserWritesCriticalSectionsNamespace.coll()
+                              << "bypassDocumentValidation" << false << "ordered" << true
+                              << "deletes" << BSON_ARRAY(BSON("q" << BSONObj() << "limit" << 0))
+                              << "writeConcern"
+                              << BSON("w"
+                                      << "majority"
+                                      << "wtimeout" << 60000)));
+            ASSERT_BSONOBJ_EQ(rpc::makeEmptyMetadata(), request.metadata);
+
+            return BSON("ok" << 1);
+        });
+    }
+
     /**
      * Waits for a request for the shardIdentity document to be upserted into a shard from the
      * config server on addShard.
@@ -418,6 +437,9 @@ TEST_F(AddShardTest, StandaloneBasicSuccess) {
     // The shard receives the _addShard command
     expectAddShardCmdReturnSuccess(shardTarget, expectedShardName);
 
+    // The shard receives a delete op to clear any leftover user_writes_critical_sections doc.
+    expectRemoveUserWritesCriticalSectionsDocs(shardTarget);
+
     // The shard receives the setFeatureCompatibilityVersion command.
     expectSetFeatureCompatibilityVersion(shardTarget, BSON("ok" << 1), expectWriteConcern.toBSON());
 
@@ -497,6 +519,9 @@ TEST_F(AddShardTest, StandaloneGenerateName) {
 
     // The shard receives the _addShard command
     expectAddShardCmdReturnSuccess(shardTarget, expectedShardName);
+
+    // The shard receives a delete op to clear any leftover user_writes_critical_sections doc.
+    expectRemoveUserWritesCriticalSectionsDocs(shardTarget);
 
     // The shard receives the setFeatureCompatibilityVersion command.
     expectSetFeatureCompatibilityVersion(
@@ -893,6 +918,9 @@ TEST_F(AddShardTest, SuccessfullyAddReplicaSet) {
     // The shard receives the _addShard command
     expectAddShardCmdReturnSuccess(shardTarget, expectedShardName);
 
+    // The shard receives a delete op to clear any leftover user_writes_critical_sections doc.
+    expectRemoveUserWritesCriticalSectionsDocs(shardTarget);
+
     // The shard receives the setFeatureCompatibilityVersion command.
     expectSetFeatureCompatibilityVersion(
         shardTarget, BSON("ok" << 1), operationContext()->getWriteConcern().toBSON());
@@ -957,6 +985,9 @@ TEST_F(AddShardTest, ReplicaSetExtraHostsDiscovered) {
 
     // The shard receives the _addShard command
     expectAddShardCmdReturnSuccess(shardTarget, expectedShardName);
+
+    // The shard receives a delete op to clear any leftover user_writes_critical_sections doc.
+    expectRemoveUserWritesCriticalSectionsDocs(shardTarget);
 
     // The shard receives the setFeatureCompatibilityVersion command.
     expectSetFeatureCompatibilityVersion(
@@ -1035,6 +1066,9 @@ TEST_F(AddShardTest, AddShardSucceedsEvenIfAddingDBsFromNewShardFails) {
 
     // The shard receives the _addShard command
     expectAddShardCmdReturnSuccess(shardTarget, expectedShardName);
+
+    // The shard receives a delete op to clear any leftover user_writes_critical_sections doc.
+    expectRemoveUserWritesCriticalSectionsDocs(shardTarget);
 
     // The shard receives the setFeatureCompatibilityVersion command.
     expectSetFeatureCompatibilityVersion(

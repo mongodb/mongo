@@ -189,6 +189,9 @@ void ReplCoordTest::start() {
     // Skip recovering tenant migration access blockers for the same reason as the above.
     FailPointEnableBlock skipRecoverTenantMigrationAccessBlockers(
         "skipRecoverTenantMigrationAccessBlockers");
+    // Skip recovering user writes critical sections for the same reason as the above.
+    FailPointEnableBlock skipRecoverUserWriteCriticalSections(
+        "skipRecoverUserWriteCriticalSections");
     invariant(!_callShutdown);
     // if we haven't initialized yet, do that first.
     if (!_repl) {

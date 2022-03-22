@@ -629,6 +629,12 @@ private:
                                                       const std::string& shardName,
                                                       const std::string& zoneName);
 
+    /**
+     * Sets the current cluster's user-write blocking state on the shard that is being added.
+     */
+    void _setUserWriteBlockingStateOnNewShard(OperationContext* opCtx,
+                                              RemoteCommandTargeter* targeter);
+
     // The owning service context
     ServiceContext* const _serviceContext;
 

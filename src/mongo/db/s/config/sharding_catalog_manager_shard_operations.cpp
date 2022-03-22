@@ -53,6 +53,7 @@
 #include "mongo/db/commands/set_feature_compatibility_version_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/persistent_task_store.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/repl/hello_gen.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -61,6 +62,9 @@
 #include "mongo/db/s/add_shard_util.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/type_shard_identity.h"
+#include "mongo/db/s/user_writes_critical_section_document_gen.h"
+#include "mongo/db/s/user_writes_recoverable_critical_section_service.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/task_executor.h"
@@ -75,6 +79,7 @@
 #include "mongo/s/cluster_identity_loader.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/fail_point.h"
@@ -677,6 +682,9 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
         return addShardStatus;
     }
 
+    // Set the user-writes blocking state on the new shard.
+    _setUserWriteBlockingStateOnNewShard(opCtx, targeter.get());
+
     {
         // Keep the FCV stable across checking the FCV, sending setFCV to the new shard and writing
         // the entry for the new shard to config.shards. This ensures the FCV doesn't change after
@@ -1037,6 +1045,73 @@ StatusWith<long long> ShardingCatalogManager::_runCountCommandOnConfig(Operation
     }
 
     return result;
+}
+
+void ShardingCatalogManager::_setUserWriteBlockingStateOnNewShard(OperationContext* opCtx,
+                                                                  RemoteCommandTargeter* targeter) {
+    // Delete all the config.user_writes_critical_sections documents from the new shard.
+    {
+        write_ops::DeleteCommandRequest deleteOp(
+            NamespaceString::kUserWritesCriticalSectionsNamespace);
+        write_ops::DeleteOpEntry query({}, true /*multi*/);
+        deleteOp.setDeletes({query});
+
+        const auto swCommandResponse =
+            _runCommandForAddShard(opCtx,
+                                   targeter,
+                                   NamespaceString::kUserWritesCriticalSectionsNamespace.db(),
+                                   CommandHelpers::appendMajorityWriteConcern(deleteOp.toBSON({})));
+        uassertStatusOK(swCommandResponse.getStatus());
+        uassertStatusOK(getStatusFromWriteCommandReply(swCommandResponse.getValue().response));
+    }
+
+    // Propagate the cluster's current user write blocking state onto the new shard.
+    PersistentTaskStore<UserWriteBlockingCriticalSectionDocument> store(
+        NamespaceString::kUserWritesCriticalSectionsNamespace);
+    store.forEach(opCtx, BSONObj(), [&](const UserWriteBlockingCriticalSectionDocument& doc) {
+        invariant(doc.getNss() ==
+                  UserWritesRecoverableCriticalSectionService::kGlobalUserWritesNamespace);
+
+        // We must be running in an FCV that supports user writes blocking. This has to be true
+        // because it is only possible to enable user-write blocking on an FCV that supports it, and
+        // because it's not possible to downgrade to an FCV that doesn't support user write blocking
+        // is enabled.
+        invariant(gFeatureFlagUserWriteBlocking.isEnabled(serverGlobalParams.featureCompatibility));
+
+        const auto makeShardsvrSetUserWriteBlockModeCommand =
+            [](ShardsvrSetUserWriteBlockModePhaseEnum phase) -> BSONObj {
+            ShardsvrSetUserWriteBlockMode shardsvrSetUserWriteBlockModeCmd;
+            shardsvrSetUserWriteBlockModeCmd.setDbName(NamespaceString::kAdminDb);
+            SetUserWriteBlockModeRequest setUserWriteBlockModeRequest(true /* global */);
+            shardsvrSetUserWriteBlockModeCmd.setSetUserWriteBlockModeRequest(
+                std::move(setUserWriteBlockModeRequest));
+            shardsvrSetUserWriteBlockModeCmd.setPhase(phase);
+
+            return CommandHelpers::appendMajorityWriteConcern(
+                shardsvrSetUserWriteBlockModeCmd.toBSON({}));
+        };
+
+        if (doc.getBlockNewUserShardedDDL()) {
+            const auto cmd = makeShardsvrSetUserWriteBlockModeCommand(
+                ShardsvrSetUserWriteBlockModePhaseEnum::kPrepare);
+
+            const auto cmdResponse =
+                _runCommandForAddShard(opCtx, targeter, NamespaceString::kAdminDb, cmd);
+            uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(cmdResponse));
+        }
+
+        if (doc.getBlockUserWrites()) {
+            invariant(doc.getBlockNewUserShardedDDL());
+            const auto cmd = makeShardsvrSetUserWriteBlockModeCommand(
+                ShardsvrSetUserWriteBlockModePhaseEnum::kComplete);
+
+            const auto cmdResponse =
+                _runCommandForAddShard(opCtx, targeter, NamespaceString::kAdminDb, cmd);
+            uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(cmdResponse));
+        }
+
+        return true;
+    });
 }
 
 }  // namespace mongo

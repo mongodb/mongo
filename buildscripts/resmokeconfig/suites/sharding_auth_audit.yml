@@ -33,6 +33,9 @@ selector:
   - jstests/sharding/migration_critical_section_concurrency.js        # SERVER-21713
   # Runs with auth enabled.
   - jstests/sharding/mongod_returns_no_cluster_time_without_keys.js
+  # Skip because this suite implicitly authenticates as __system, which allows bypassing user write
+  # blocking.
+  - jstests/sharding/set_user_write_block_mode.js
 
 executor:
   archive:

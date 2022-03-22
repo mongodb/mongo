@@ -33,12 +33,16 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/db/s/user_writes_recoverable_critical_section_service.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
+#include "mongo/util/fail_point.h"
 
 namespace mongo {
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(hangInShardsvrSetUserWriteBlockMode);
 
 class ShardsvrSetUserWriteBlockCommand final
     : public TypedCommand<ShardsvrSetUserWriteBlockCommand> {
@@ -56,6 +60,8 @@ public:
             CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
                                                           opCtx->getWriteConcern());
 
+            hangInShardsvrSetUserWriteBlockMode.pauseWhileSet();
+
             const auto startBlocking = request().getGlobal();
 
             if (startBlocking) {
@@ -66,6 +72,13 @@ public:
                                 opCtx,
                                 UserWritesRecoverableCriticalSectionService::
                                     kGlobalUserWritesNamespace);
+
+                        // Wait for ongoing ShardingDDLCoordinators to finish. This ensures that all
+                        // coordinators that started before enabling blocking have finish, and that
+                        // any new coordinator that is started after this point will see the
+                        // blocking is enabled.
+                        ShardingDDLCoordinatorService::getService(opCtx)
+                            ->waitForOngoingCoordinatorsToFinish(opCtx);
                         break;
                     case ShardsvrSetUserWriteBlockModePhaseEnum::kComplete:
                         UserWritesRecoverableCriticalSectionService::get(opCtx)

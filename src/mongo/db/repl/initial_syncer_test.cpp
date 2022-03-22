@@ -2048,6 +2048,8 @@ TEST_F(
     FailPointEnableBlock skipReconstructPreparedTransactions("skipReconstructPreparedTransactions");
     FailPointEnableBlock skipRecoverTenantMigrationAccessBlockers(
         "skipRecoverTenantMigrationAccessBlockers");
+    FailPointEnableBlock skipRecoverUserWriteCriticalSections(
+        "skipRecoverUserWriteCriticalSections");
 
     // Start the real work.
     ASSERT_OK(initialSyncer->startup(opCtx.get(), initialSyncMaxAttempts));
@@ -2088,6 +2090,8 @@ TEST_F(InitialSyncerTest,
     FailPointEnableBlock skipReconstructPreparedTransactions("skipReconstructPreparedTransactions");
     FailPointEnableBlock skipRecoverTenantMigrationAccessBlockers(
         "skipRecoverTenantMigrationAccessBlockers");
+    FailPointEnableBlock skipRecoverUserWriteCriticalSections(
+        "skipRecoverUserWriteCriticalSections");
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(net);
 
@@ -2194,6 +2198,8 @@ TEST_F(InitialSyncerTest,
     // Skip recovering tenant migration access blockers for the same reason as the above.
     FailPointEnableBlock skipRecoverTenantMigrationAccessBlockers(
         "skipRecoverTenantMigrationAccessBlockers");
+    FailPointEnableBlock skipRecoverUserWriteCriticalSections(
+        "skipRecoverUserWriteCriticalSections");
 
     auto initialSyncer = &getInitialSyncer();
     auto opCtx = makeOpCtx();
@@ -2263,6 +2269,8 @@ TEST_F(
     // Skip recovering tenant migration access blockers for the same reason as the above.
     FailPointEnableBlock skipRecoverTenantMigrationAccessBlockers(
         "skipRecoverTenantMigrationAccessBlockers");
+    FailPointEnableBlock skipRecoverUserWriteCriticalSections(
+        "skipRecoverUserWriteCriticalSections");
 
     auto initialSyncer = &getInitialSyncer();
     auto opCtx = makeOpCtx();
@@ -2572,6 +2580,8 @@ TEST_F(InitialSyncerTest, InitialSyncerRetriesLastOplogEntryFetcherNetworkError)
     // Skip recovering tenant migration access blockers for the same reason as the above.
     FailPointEnableBlock skipRecoverTenantMigrationAccessBlockers(
         "skipRecoverTenantMigrationAccessBlockers");
+    FailPointEnableBlock skipRecoverUserWriteCriticalSections(
+        "skipRecoverUserWriteCriticalSections");
 
     auto initialSyncer = &getInitialSyncer();
     auto opCtx = makeOpCtx();
@@ -3214,6 +3224,8 @@ TEST_F(InitialSyncerTest, InitialSyncerHandlesNetworkErrorsFromRollbackCheckerAf
     // Skip recovering tenant migration access blockers for the same reason as the above.
     FailPointEnableBlock skipRecoverTenantMigrationAccessBlockers(
         "skipRecoverTenantMigrationAccessBlockers");
+    FailPointEnableBlock skipRecoverUserWriteCriticalSections(
+        "skipRecoverUserWriteCriticalSections");
     auto initialSyncer = &getInitialSyncer();
     auto opCtx = makeOpCtx();
 
@@ -3526,6 +3538,8 @@ TEST_F(InitialSyncerTest, LastOpTimeShouldBeSetEvenIfNoOperationsAreAppliedAfter
     // Skip recovering tenant migration access blockers for the same reason as the above.
     FailPointEnableBlock skipRecoverTenantMigrationAccessBlockers(
         "skipRecoverTenantMigrationAccessBlockers");
+    FailPointEnableBlock skipRecoverUserWriteCriticalSections(
+        "skipRecoverUserWriteCriticalSections");
 
     auto initialSyncer = &getInitialSyncer();
     auto opCtx = makeOpCtx();
@@ -4189,6 +4203,8 @@ TEST_F(InitialSyncerTest,
     // Skip recovering tenant migration access blockers for the same reason as the above.
     FailPointEnableBlock skipRecoverTenantMigrationAccessBlockers(
         "skipRecoverTenantMigrationAccessBlockers");
+    FailPointEnableBlock skipRecoverUserWriteCriticalSections(
+        "skipRecoverUserWriteCriticalSections");
 
     doSuccessfulInitialSyncWithOneBatch();
 }
@@ -4202,6 +4218,8 @@ TEST_F(InitialSyncerTest,
     // Skip recovering tenant migration access blockers for the same reason as the above.
     FailPointEnableBlock skipRecoverTenantMigrationAccessBlockers(
         "skipRecoverTenantMigrationAccessBlockers");
+    FailPointEnableBlock skipRecoverUserWriteCriticalSections(
+        "skipRecoverUserWriteCriticalSections");
 
     auto initialSyncer = &getInitialSyncer();
     auto opCtx = makeOpCtx();
@@ -4529,6 +4547,8 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
     // Skip recovering tenant migration access blockers for the same reason as the above.
     FailPointEnableBlock skipRecoverTenantMigrationAccessBlockers(
         "skipRecoverTenantMigrationAccessBlockers");
+    FailPointEnableBlock skipRecoverUserWriteCriticalSections(
+        "skipRecoverUserWriteCriticalSections");
 
     // Skip clearing initial sync progress so that we can check initialSyncStatus fields after
     // initial sync is complete.
@@ -4896,6 +4916,8 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgressForNetwork
     // Skip recovering tenant migration access blockers for the same reason as the above.
     FailPointEnableBlock skipRecoverTenantMigrationAccessBlockers(
         "skipRecoverTenantMigrationAccessBlockers");
+    FailPointEnableBlock skipRecoverUserWriteCriticalSections(
+        "skipRecoverUserWriteCriticalSections");
 
     // Skip clearing initial sync progress so that we can check initialSyncStatus fields after
     // initial sync is complete.

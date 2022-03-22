@@ -183,7 +183,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/repl/replica_set_aware_service',
         '$BUILD_DIR/mongo/db/rw_concern_d',
         'sharding_api_d',
-        'sharding_commands_d',
     ]
 )
 
@@ -286,6 +285,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         '$BUILD_DIR/mongo/db/repl/replica_set_aware_service',
         '$BUILD_DIR/mongo/db/rw_concern_d',
+        '$BUILD_DIR/mongo/db/server_feature_flags',
         '$BUILD_DIR/mongo/db/snapshot_window_options',
         '$BUILD_DIR/mongo/db/transaction',
         '$BUILD_DIR/mongo/db/transaction_api',
@@ -298,6 +298,7 @@ env.Library(
         '$BUILD_DIR/mongo/util/log_and_backoff',
         'forwardable_operation_metadata',
         'sharding_logging',
+        'user_writes_recoverable_critical_section',
     ],
 )
 
@@ -408,6 +409,7 @@ env.Library(
         'shardsvr_reshard_collection_command.cpp',
         'shardsvr_resharding_operation_time_command.cpp',
         'shardsvr_set_allow_migrations_command.cpp',
+        'shardsvr_set_user_write_block_mode_command.cpp',
         'split_chunk_command.cpp',
         'split_vector_command.cpp',
         'txn_two_phase_commit_cmds.cpp',
@@ -439,6 +441,7 @@ env.Library(
         '$BUILD_DIR/mongo/s/sharding_router_api',
         'forwardable_operation_metadata',
         'sharding_runtime_d',
+        'user_writes_recoverable_critical_section',
     ],
 )
 
@@ -464,19 +467,6 @@ env.Library(
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_impl',
         'sharding_api_d',
     ],
-)
-
-env.Library(
-    target='shardsvr_set_user_write_block_mode_command',
-    source=[
-        'shardsvr_set_user_write_block_mode_command.cpp',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/auth/auth',
-        '$BUILD_DIR/mongo/db/commands',
-        '$BUILD_DIR/mongo/s/common_s',
-        'user_writes_recoverable_critical_section',
-    ]
 )
 
 env.Library(
