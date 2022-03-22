@@ -67,8 +67,19 @@ function retryOnNetworkError(func, numRetries, sleepMs) {
     }
 }
 
-// Checks if a Javascript exception is a network error.
-function isNetworkError(error) {
+/**
+ * Determine if a provided object represents a network error
+ * @param {object|Error|string|number} errorOrResponse A command response, error or scalar
+ *     representing an error
+ */
+function isNetworkError(errorOrResponse) {
+    // First check if this is a command response, if so check by error code
+    if (errorOrResponse.code) {
+        if (ErrorCodes.isNetworkError(errorOrResponse.code)) {
+            return true;
+        }
+    }
+
     let networkErrs = [
         "network error",
         "error doing query",
@@ -76,11 +87,32 @@ function isNetworkError(error) {
         "SocketException",
         "HostNotFound"
     ];
-    // See if any of the known network error strings appear in the given message.
-    return networkErrs.some(err => error.message.includes(err));
+
+    // Then check if it's an Error, if so see if any of the known network error strings appear
+    // in the given message.
+    if (errorOrResponse.message) {
+        if (networkErrs.some(err => errorOrResponse.message.includes(err))) {
+            return true;
+        }
+    }
+
+    // Otherwise fall back to checking by scalar value
+    return ErrorCodes.isNetworkError(errorOrResponse);
 }
 
-function isRetryableError(error) {
+/**
+ * Determine if a provided object represents a retryable error
+ * @param {object|Error|string|number} errorOrResponse A command response, error or scalar
+ *     representing an error
+ */
+function isRetryableError(errorOrResponse) {
+    // First check if this is a command response, if so determine retryability by error code
+    if (errorOrResponse.code) {
+        if (ErrorCodes.isRetriableError(errorOrResponse.code)) {
+            return true;
+        }
+    }
+
     const retryableErrors = [
         "Interrupted",
         "InterruptedAtShutdown",
@@ -104,8 +136,16 @@ function isRetryableError(error) {
         "UnsatisfiableWriteConcern"
     ];
 
-    // See if any of the known network error strings appear in the given message.
-    return retryableErrors.some(err => error.message.includes(err));
+    // Then check if it's an Error, if so determine retryability by checking the error message
+    if (errorOrResponse.message) {
+        // See if any of the known network error strings appear in the given message.
+        if (retryableErrors.some(err => errorOrResponse.message.includes(err))) {
+            return true;
+        }
+    }
+
+    // Otherwise fall back to checking by scalar value
+    return ErrorCodes.isRetriableError(errorOrResponse);
 }
 
 // Please consider using bsonWoCompare instead of this as much as possible.

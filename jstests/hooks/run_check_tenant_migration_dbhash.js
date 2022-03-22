@@ -26,10 +26,10 @@ while (true) {
             new Mongo(donorRst.getURL()).startSession({retryWrites: true}).getDatabase(testDBName);
         break;
     } catch (e) {
-        if (!TenantMigrationUtil.checkIfRetriableErrorForTenantDbHashCheck(e)) {
+        if (!TenantMigrationUtil.checkIfRetryableErrorForTenantDbHashCheck(e)) {
             throw e;
         }
-        print(`Got error: ${tojson(e)}. Retrying ReplSetTest setup on retriable error.`);
+        print(`Got error: ${tojson(e)}. Retrying ReplSetTest setup on retryable error.`);
     }
 }
 

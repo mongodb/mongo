@@ -119,7 +119,7 @@ var TenantMigrationUtil = (function() {
      * response.
      *
      * If 'retryOnRetryableErrors' is set, this function will retry if the command fails with a
-     * NotPrimary or network error.
+     * retryable error.
      *
      * Only use when it is necessary to run the donorStartMigration command in its own thread. For
      * all other use cases, please consider the runMigration() function in the TenantMigrationTest
@@ -157,7 +157,7 @@ var TenantMigrationUtil = (function() {
      * Runs the donorForgetMigration command with the given migrationId and returns the response.
      *
      * If 'retryOnRetryableErrors' is set, this function will retry if the command fails with a
-     * NotPrimary or network error.
+     * retryable error.
      *
      * Only use when it is necessary to run the donorForgetMigration command in its own thread. For
      * all other use cases, please consider the forgetMigration() function in the
@@ -176,7 +176,7 @@ var TenantMigrationUtil = (function() {
      * response.
      *
      * If 'retryOnRetryableErrors' is set, this function will retry if the command fails with a
-     * NotPrimary or network error.
+     * retryable error.
      *
      * Only use when it is necessary to run the donorAbortMigration command in its own thread. For
      * all other use cases, please consider the tryAbortMigration() function in the
@@ -223,20 +223,22 @@ var TenantMigrationUtil = (function() {
                 res = run();
 
                 if (!res.ok) {
-                    // If retry is enabled and the command failed with a NotPrimary error, continue
-                    // looping.
-                    if (retryOnRetryableErrors && ErrorCodes.isNotPrimaryError(res.code)) {
+                    if (retryOnRetryableErrors && isRetryableError(res)) {
+                        jsTestLog(`runTenantMigrationCommand retryable error. Command: ${
+                            tojson(localCmdObj)}, reply: ${tojson(res)}`);
+
                         primary = rst.getPrimary();
                         return false;
                     }
-                    const cmdName = Object.keys(localCmdObj)[0];
-                    jsTestLog(`Error from ${cmdName}: ${tojson(res)}`);
+
+                    jsTestLog(`runTenantMigrationCommand fatal error. Command: ${
+                        tojson(localCmdObj)}, reply: ${tojson(res)}`);
                     return true;
                 }
 
                 return shouldStopFunc(res);
             } catch (e) {
-                if (retryOnRetryableErrors && isNetworkError(e)) {
+                if (retryOnRetryableErrors && isRetryableError(e)) {
                     jsTestLog(`runTenantMigrationCommand retryable error. Command: ${
                         tojson(localCmdObj)}, reply: ${tojson(res)}`);
                     return false;
@@ -412,7 +414,7 @@ var TenantMigrationUtil = (function() {
 
                 break;
             } catch (e) {
-                if (!checkIfRetriableErrorForTenantDbHashCheck(e)) {
+                if (!checkIfRetryableErrorForTenantDbHashCheck(e)) {
                     throw e;
                 } else {
                     print(`Got error: ${tojson(e)}. Failover occurred during tenant dbhash check,` +
@@ -443,9 +445,9 @@ var TenantMigrationUtil = (function() {
     }
 
     /**
-     * Checks if an error gotten while doing a tenant dbhash check is retriable.
+     * Checks if an error gotten while doing a tenant dbhash check is retryable.
      */
-    function checkIfRetriableErrorForTenantDbHashCheck(error) {
+    function checkIfRetryableErrorForTenantDbHashCheck(error) {
         // Due to the shell not propagating error codes correctly, if we get any of the following
         // error messages, we can retry the operation.
         const retryableErrorMessages = [
@@ -453,10 +455,9 @@ var TenantMigrationUtil = (function() {
             "can't connect to new replica set primary"
         ];
 
-        return ErrorCodes.isRetriableError(error.code) || ErrorCodes.isNetworkError(error.code) ||
-            // The following shell helper methods check if the error message contains some
-            // notion of retriability. This is in case the error does not contain an error code.
-            isRetryableError(error) || isNetworkError(error) ||
+        // The following shell helper methods check if the error message contains some
+        // notion of retryability. This is in case the error does not contain an error code.
+        return isRetryableError(error) || isNetworkError(error) ||
             // If there's a failover while we're running a dbhash check, the elected secondary might
             // not have set the tenantMigrationDonorAllowsNonTimestampedReads failpoint, which means
             // that the listCollections command run when we call CollInfos would throw a
@@ -537,6 +538,6 @@ var TenantMigrationUtil = (function() {
         createTenantMigrationDonorRoleIfNotExist,
         createTenantMigrationRecipientRoleIfNotExist,
         roleExists,
-        checkIfRetriableErrorForTenantDbHashCheck
+        checkIfRetryableErrorForTenantDbHashCheck
     };
 })();
