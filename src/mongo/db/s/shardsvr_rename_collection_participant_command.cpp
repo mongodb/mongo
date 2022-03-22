@@ -87,11 +87,12 @@ public:
             const auto renameCollectionParticipant =
                 RenameParticipantInstance::getOrCreate(opCtx, service, participantDocBSON);
             bool hasSameOptions = renameCollectionParticipant->hasSameOptions(participantDocBSON);
-            invariant(hasSameOptions,
-                      str::stream() << "Another rename participant for namespace " << fromNss
-                                    << "is instantiated with different parameters: `"
-                                    << renameCollectionParticipant->doc() << "` vs `"
-                                    << participantDocBSON << "`");
+            uassert(ErrorCodes::InvalidOptions,
+                    str::stream() << "Another rename participant for namespace " << fromNss
+                                  << "is instantiated with different parameters: `"
+                                  << renameCollectionParticipant->doc() << "` vs `"
+                                  << participantDocBSON << "`",
+                    hasSameOptions);
 
             renameCollectionParticipant->getBlockCRUDAndRenameCompletionFuture().get(opCtx);
 
