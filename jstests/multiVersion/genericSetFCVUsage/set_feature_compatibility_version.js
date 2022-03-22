@@ -25,7 +25,8 @@ const latest = "latest";
 function runStandaloneTest(downgradeVersion) {
     jsTestLog("Running standalone test with 'downgradeVersion': " + downgradeVersion);
     const downgradeFCV = binVersionToFCV(downgradeVersion);
-    const unsupportedOldFCV = (parseFloat(downgradeFCV) - 1).toFixed(1);
+    // The oldest FCV that is supported is 'lastLTS'.
+    const unsupportedOldFCV = (parseFloat(lastLTSFCV) - 0.1).toFixed(1);
     const unsupportedFutureFCV = (parseFloat(latestFCV) + 0.1).toFixed(1);
 
     let conn;
@@ -436,7 +437,8 @@ function runReplicaSetTest(downgradeVersion) {
 function runShardingTest(downgradeVersion) {
     jsTestLog("Running sharding test with 'downgradeVersion': " + downgradeVersion);
     const downgradeFCV = binVersionToFCV(downgradeVersion);
-    const unsupportedOldFCV = (parseFloat(downgradeFCV) - 1).toFixed(1);
+    // The oldest FCV that is supported is 'lastLTS'.
+    const unsupportedOldFCV = (parseFloat(lastLTSFCV) - 0.1).toFixed(1);
     const unsupportedFutureFCV = (parseFloat(latestFCV) + 0.1).toFixed(1);
 
     let singleNodeShard;
