@@ -233,8 +233,10 @@ bool RewriteExpr::_canRewriteComparison(
 
     for (auto operand : operandList) {
         if (auto exprFieldPath = dynamic_cast<ExpressionFieldPath*>(operand.get())) {
-            if (exprFieldPath->isVariableReference()) {
-                // This field path refers to a variable rather than a local document field path.
+            if (exprFieldPath->isVariableReference() || exprFieldPath->isROOT()) {
+                // Rather than a local document field path, this field path refers to either a
+                // variable or the full document itself. Neither of which can be expressed in the
+                // match language.
                 return false;
             }
 
