@@ -105,7 +105,6 @@ MONGO_FAIL_POINT_DEFINE(hangWhileUpgrading);
 MONGO_FAIL_POINT_DEFINE(failDowngrading);
 MONGO_FAIL_POINT_DEFINE(hangWhileDowngrading);
 MONGO_FAIL_POINT_DEFINE(hangBeforeUpdatingFcvDoc);
-MONGO_FAIL_POINT_DEFINE(hangBeforeDrainingMigrations);
 
 /**
  * Ensures that only one instance of setFeatureCompatibilityVersion can run at a given time.
@@ -396,8 +395,7 @@ public:
                 invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
                 // TODO SERVER-64162 Destroy the BalancerStatsRegistry
                 if (actualVersion > requestedVersion &&
-                    !feature_flags::gOrphanTracking.isEnabledOnVersion(requestedVersion)) {
-                    auto [dbLock, collLock] = getRangeDeleterLock(opCtx);
+                    !feature_flags::gNoMoreAutoSplitter.isEnabledOnVersion(requestedVersion)) {
                     clearOrphanCountersFromRangeDeletionTasks(opCtx);
                 }
 
@@ -438,17 +436,12 @@ public:
             _runDowngrade(opCtx, request, changeTimestamp);
         }
 
-        hangBeforeDrainingMigrations.pauseWhileSet();
         {
             boost::optional<MigrationBlockingGuard> drainOldMoveChunks;
 
-            bool orphanTrackingCondition =
-                serverGlobalParams.clusterRole == ClusterRole::ShardServer &&
-                !feature_flags::gOrphanTracking.isEnabledOnVersion(actualVersion) &&
-                feature_flags::gOrphanTracking.isEnabledOnVersion(requestedVersion);
             // Drain moveChunks if the actualVersion relies on the old migration protocol but the
-            // requestedVersion uses the new one (upgrading), we're persisting the new chunk
-            // version format, or we are adding the numOrphans field to range deletion documents.
+            // requestedVersion uses the new one (upgrading) or we're persisting the new chunk
+            // version format.
             if ((!feature_flags::gFeatureFlagMigrationRecipientCriticalSection.isEnabledOnVersion(
                      actualVersion) &&
                  feature_flags::gFeatureFlagMigrationRecipientCriticalSection.isEnabledOnVersion(
@@ -456,20 +449,13 @@ public:
                 (!feature_flags::gFeatureFlagNewPersistedChunkVersionFormat.isEnabledOnVersion(
                      actualVersion) &&
                  feature_flags::gFeatureFlagNewPersistedChunkVersionFormat.isEnabledOnVersion(
-                     requestedVersion)) ||
-                orphanTrackingCondition) {
+                     requestedVersion))) {
                 drainOldMoveChunks.emplace(opCtx, "setFeatureCompatibilityVersionUpgrade");
 
                 // At this point, because we are holding the MigrationBlockingGuard, no new
                 // migrations can start and there are no active ongoing ones. Still, there could
                 // be migrations pending recovery. Drain them.
                 migrationutil::drainMigrationsPendingRecovery(opCtx);
-
-                if (orphanTrackingCondition) {
-                    // TODO SERVER-64162 Initialize the BalancerStatsRegistry
-                    auto [dbLock, collLock] = getRangeDeleterLock(opCtx);
-                    setOrphanCountersOnRangeDeletionTasks(opCtx);
-                }
             }
 
             // Complete transition by updating the local FCV document to the fully upgraded or
@@ -581,6 +567,13 @@ private:
             // on a consistent version from start to finish. This will ensure that it will be able
             // to apply the oplog entries correctly.
             abortAllReshardCollection(opCtx);
+        }
+
+        if (serverGlobalParams.clusterRole == ClusterRole::ShardServer &&
+            request.getPhase() == SetFCVPhaseEnum::kComplete &&
+            feature_flags::gNoMoreAutoSplitter.isEnabledOnVersion(requestedVersion)) {
+            // TODO SERVER-64162 Initialize the BalancerStatsRegistry
+            setOrphanCountersOnRangeDeletionTasks(opCtx);
         }
 
         // Create the pre-images collection if the feature flag is enabled on the requested version.

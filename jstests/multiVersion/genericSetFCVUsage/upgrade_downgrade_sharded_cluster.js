@@ -18,7 +18,7 @@ load('jstests/multiVersion/libs/multi_cluster.js');  // For upgradeCluster
 const dbName = jsTestName();
 
 // TODO SERVER-57417 remove feature flag check once enabled
-const noMoreAutoSplitterFeatureFlagEnabled = TestData.setParameters.featureFlagOrphanTracking;
+const noMoreAutoSplitterFeatureFlagEnabled = TestData.setParameters.featureFlagNoMoreAutoSplitter;
 
 //==========//
 // TODO SERVER-64400 remove code delimited with //==========// once 6.0 branches out
