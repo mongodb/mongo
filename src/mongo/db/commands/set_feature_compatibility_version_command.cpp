@@ -360,7 +360,7 @@ public:
 
                 if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
                     if (requestedVersion < actualVersion) {
-                        // TODO SERVER-62584 review/adapt this scope before v6.0 branches out
+                        // TODO SERVER-64779 review/adapt this scope before v6.0 branches out
                         // Make sure no collection is currently being defragmented
                         DBDirectClient client(opCtx);
 
@@ -595,9 +595,7 @@ private:
                 requestedVersion);
 
         // TODO SERVER-62693: remove the following scope once 6.0 branches out
-        if (requestedVersion == multiversion::GenericFCV::kLastLTS ||
-            // TODO SERVER-62584: remove the last-continuous check once 5.3 branches out
-            requestedVersion == multiversion::GenericFCV::kLastContinuous) {
+        if (requestedVersion == multiversion::GenericFCV::kLastLTS) {
             if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer ||
                 serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
                 sharding_util::downgradeCollectionBalancingFieldsToPre53(opCtx);

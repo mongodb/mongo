@@ -20,49 +20,45 @@ const fullNs = coll.getFullName();
 
 assert.commandWorked(st.s.adminCommand({shardCollection: fullNs, key: {x: 1}}));
 
-// TODO SERVER-62584: remove lastContinuousFCV check once 5.3 branches out
-for (const downgradeVersion of [lastLTSFCV, lastContinuousFCV]) {
-    assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
+const downgradeVersion = lastLTSFCV;
+assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
 
-    // Test that downgrade is not allowed if a collection is undergoing defragmentation
-    {
-        // Set collection under defragmentation to block downgrade
-        assert.commandWorked(
-            st.s.adminCommand({configureCollectionBalancing: fullNs, defragmentCollection: true}));
+// Test that downgrade is not allowed if a collection is undergoing defragmentation
+{
+    // Set collection under defragmentation to block downgrade
+    assert.commandWorked(
+        st.s.adminCommand({configureCollectionBalancing: fullNs, defragmentCollection: true}));
 
-        var setFCVCmdResult = st.s.adminCommand({setFeatureCompatibilityVersion: downgradeVersion});
-        assert.commandFailedWithCode(setFCVCmdResult, ErrorCodes.CannotDowngrade);
+    var setFCVCmdResult = st.s.adminCommand({setFeatureCompatibilityVersion: downgradeVersion});
+    assert.commandFailedWithCode(setFCVCmdResult, ErrorCodes.CannotDowngrade);
 
-        // Rollback the change to allow downgrade
-        assert.commandWorked(st.config.collections.updateOne(
-            {defragmentCollection: {$exists: true}}, {$unset: {defragmentCollection: 1}}));
-    }
+    // Rollback the change to allow downgrade
+    assert.commandWorked(st.config.collections.updateOne({defragmentCollection: {$exists: true}},
+                                                         {$unset: {defragmentCollection: 1}}));
+}
 
-    // Check that per-collection balancing fields are removed upon setFCV < 5.3
-    {
-        assert.commandWorked(st.s.adminCommand(
-            {configureCollectionBalancing: fullNs, enableAutoSplitter: false, chunkSize: 10}));
+// Check that per-collection balancing fields are removed upon setFCV < 5.3
+{
+    assert.commandWorked(st.s.adminCommand(
+        {configureCollectionBalancing: fullNs, enableAutoSplitter: false, chunkSize: 10}));
 
-        var configEntryBeforeSetFCV =
-            st.config.getSiblingDB('config').collections.findOne({_id: fullNs});
-        var shardEntryBeforeSetFCV =
-            st.shard0.getDB('config').cache.collections.findOne({_id: fullNs});
-        assert.eq(10 * 1024 * 1024, configEntryBeforeSetFCV.maxChunkSizeBytes);
-        assert(configEntryBeforeSetFCV.noAutoSplit);
-        assert.eq(10 * 1024 * 1024, shardEntryBeforeSetFCV.maxChunkSizeBytes);
-        assert(!shardEntryBeforeSetFCV.allowAutoSplit);
+    var configEntryBeforeSetFCV =
+        st.config.getSiblingDB('config').collections.findOne({_id: fullNs});
+    var shardEntryBeforeSetFCV = st.shard0.getDB('config').cache.collections.findOne({_id: fullNs});
+    assert.eq(10 * 1024 * 1024, configEntryBeforeSetFCV.maxChunkSizeBytes);
+    assert(configEntryBeforeSetFCV.noAutoSplit);
+    assert.eq(10 * 1024 * 1024, shardEntryBeforeSetFCV.maxChunkSizeBytes);
+    assert(!shardEntryBeforeSetFCV.allowAutoSplit);
 
-        assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: downgradeVersion}));
+    assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: downgradeVersion}));
 
-        var configEntryAfterSetFCV =
-            st.config.getSiblingDB('config').collections.findOne({_id: fullNs});
-        var shardEntryAfterSetFCV =
-            st.shard0.getDB('config').cache.collections.findOne({_id: fullNs});
-        assert.isnull(configEntryAfterSetFCV.maxChunkSizeBytes);
-        assert.isnull(configEntryAfterSetFCV.noAutoSplit);
-        assert.isnull(shardEntryAfterSetFCV.maxChunkSizeBytes);
-        assert.isnull(shardEntryAfterSetFCV.allowAutoSplit);
-    }
+    var configEntryAfterSetFCV =
+        st.config.getSiblingDB('config').collections.findOne({_id: fullNs});
+    var shardEntryAfterSetFCV = st.shard0.getDB('config').cache.collections.findOne({_id: fullNs});
+    assert.isnull(configEntryAfterSetFCV.maxChunkSizeBytes);
+    assert.isnull(configEntryAfterSetFCV.noAutoSplit);
+    assert.isnull(shardEntryAfterSetFCV.maxChunkSizeBytes);
+    assert.isnull(shardEntryAfterSetFCV.allowAutoSplit);
 }
 
 st.stop();
