@@ -1134,8 +1134,6 @@ TEST_F(ReshardingOplogSessionApplicationTest, IgnoreIncomingAbortedRetryableInte
 }
 
 TEST_F(ReshardingOplogSessionApplicationTest, IgnoreIncomingNonRetryableInternalTransaction) {
-    // TODO (SERVER-63877): Determine if resharding should migrate internal sessions for
-    // non-retryable writes.
     auto lsid = makeLogicalSessionIdWithTxnUUIDForTest();
 
     TxnNumber incomingTxnNumber = 100;

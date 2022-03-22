@@ -2,9 +2,6 @@
  * Tests that resharding does not transfer the history for non-retryable internal transactions that
  * commit or abort on the donor(s) during resharding to the recipient.
  *
- * TODO (SERVER-63877): Determine if resharding should migrate internal sessions for non-retryable
- * writes.
- *
  * @tags: [requires_fcv_53, featureFlagInternalTransactions]
  */
 (function() {

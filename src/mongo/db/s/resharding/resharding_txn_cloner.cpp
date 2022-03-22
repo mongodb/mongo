@@ -171,8 +171,9 @@ boost::optional<SharedSemiFuture<void>> ReshardingTxnCloner::doOneRecord(
     auto txnNumber = donorRecord.getTxnNum();
 
     if (isInternalSessionForNonRetryableWrite(sessionId)) {
-        // TODO (SERVER-63877): Determine if resharding should migrate internal sessions for
-        // non-retryable writes.
+        // Skip internal sessions for non-retryable writes since they only support transactions
+        // and those transactions are not retryable so there is no need to transfer the write
+        // history to resharding recipient(s).
         return boost::none;
     }
 
