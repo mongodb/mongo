@@ -33,6 +33,7 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/s/sharding_ddl_coordinator.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/db/s/user_writes_recoverable_critical_section_service.h"
 #include "mongo/logv2/log.h"
@@ -76,9 +77,19 @@ public:
                         // Wait for ongoing ShardingDDLCoordinators to finish. This ensures that all
                         // coordinators that started before enabling blocking have finish, and that
                         // any new coordinator that is started after this point will see the
-                        // blocking is enabled.
-                        ShardingDDLCoordinatorService::getService(opCtx)
-                            ->waitForOngoingCoordinatorsToFinish(opCtx);
+                        // blocking is enabled. Wait only for coordinators that don't have
+                        // the user-write-blocking bypass enabled -- the ones allowed to bypass user
+                        // write blocking don't care about the write blocking state.
+                        {
+                            const auto mayNotBypassUserWriteBlockPred =
+                                [](const ShardingDDLCoordinator& coordinatorInstance) -> bool {
+                                return !coordinatorInstance.getForwardableOpMetadata()
+                                            .getMayBypassWriteBlocking();
+                            };
+                            ShardingDDLCoordinatorService::getService(opCtx)
+                                ->waitForOngoingCoordinatorsToFinish(
+                                    opCtx, mayNotBypassUserWriteBlockPred);
+                        }
                         break;
                     case ShardsvrSetUserWriteBlockModePhaseEnum::kComplete:
                         UserWritesRecoverableCriticalSectionService::get(opCtx)

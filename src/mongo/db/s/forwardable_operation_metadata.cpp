@@ -32,6 +32,7 @@
 #include "mongo/db/s/forwardable_operation_metadata.h"
 
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/write_block_bypass.h"
 #include "mongo/rpc/metadata/impersonated_user_metadata.h"
 
 namespace mongo {
@@ -48,6 +49,8 @@ ForwardableOperationMetadata::ForwardableOperationMetadata(OperationContext* opC
     if (const auto authMetadata = rpc::getImpersonatedUserMetadata(opCtx)) {
         setImpersonatedUserMetadata({{authMetadata->getUsers(), authMetadata->getRoles()}});
     }
+
+    setMayBypassWriteBlocking(WriteBlockBypass::get(opCtx).isWriteBlockBypassEnabled());
 }
 
 void ForwardableOperationMetadata::setOn(OperationContext* opCtx) const {
@@ -64,6 +67,8 @@ void ForwardableOperationMetadata::setOn(OperationContext* opCtx) const {
                                                                        authMetadata.getRoles());
         }
     }
+
+    WriteBlockBypass::get(opCtx).set(getMayBypassWriteBlocking());
 }
 
 }  // namespace mongo

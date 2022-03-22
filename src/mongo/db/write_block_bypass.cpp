@@ -56,12 +56,15 @@ void WriteBlockBypass::setFromMetadata(OperationContext* opCtx, const BSONElemen
                 AuthorizationSession::get(opCtx->getClient())
                     ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
                                                        ActionType::internal));
-        _writeBlockBypassEnabled = elem.Bool();
+        set(elem.Bool());
     } else {
         // Otherwise, set our state based on the AuthorizationSession state.
-        _writeBlockBypassEnabled =
-            AuthorizationSession::get(opCtx->getClient())->mayBypassWriteBlockingMode();
+        set(AuthorizationSession::get(opCtx->getClient())->mayBypassWriteBlockingMode());
     }
+}
+
+void WriteBlockBypass::set(bool bypassEnabled) {
+    _writeBlockBypassEnabled = bypassEnabled;
 }
 
 void WriteBlockBypass::writeAsMetadata(BSONObjBuilder* builder) {

@@ -35,6 +35,8 @@
 
 namespace mongo {
 
+class ShardingDDLCoordinator;
+
 class ShardingDDLCoordinatorService final : public repl::PrimaryOnlyService {
 public:
     static constexpr StringData kServiceName = "ShardingDDLCoordinator"_sd;
@@ -76,10 +78,13 @@ public:
                                                   DDLCoordinatorTypeEnum type) const;
 
     /**
-     * Waits for all currently running coordinators to finish. While waiting here, new coordinators
-     * may start, but they will not be waited for.
+     * Waits for all currently running coordinators matching the predicate 'pred' to finish. While
+     * waiting here, new coordinators may start, but they will not be waited for.
      */
-    void waitForOngoingCoordinatorsToFinish(OperationContext* opCtx);
+    void waitForOngoingCoordinatorsToFinish(
+        OperationContext* opCtx,
+        std::function<bool(const ShardingDDLCoordinator&)> pred = {
+            [](const ShardingDDLCoordinator&) { return true; }});
 
 private:
     ExecutorFuture<void> _rebuildService(std::shared_ptr<executor::ScopedTaskExecutor> executor,
