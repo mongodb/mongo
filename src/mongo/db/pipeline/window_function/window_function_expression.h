@@ -46,30 +46,25 @@ class WindowFunctionExec;
 class PartitionIterator;
 }  // namespace mongo
 
-#define REGISTER_STABLE_WINDOW_FUNCTION(name, parser) \
-    REGISTER_WINDOW_FUNCTION_CONDITIONALLY(           \
-        name, parser, boost::none, AllowedWithApiStrict::kAlways, true)
-
-#define REGISTER_WINDOW_FUNCTION(name, parser, allowedWithApi) \
-    REGISTER_WINDOW_FUNCTION_CONDITIONALLY(name, parser, boost::none, allowedWithApi, true)
+#define REGISTER_WINDOW_FUNCTION(name, parser) \
+    REGISTER_WINDOW_FUNCTION_CONDITIONALLY(name, parser, boost::none, true)
 
 #define REGISTER_WINDOW_FUNCTION_WITH_MIN_VERSION(name, parser, minVersion) \
-    REGISTER_WINDOW_FUNCTION_CONDITIONALLY(                                 \
-        name, parser, minVersion, AllowedWithApiStrict::kNeverInVersion1, true)
+    REGISTER_WINDOW_FUNCTION_CONDITIONALLY(name, parser, minVersion, true)
 
-#define REGISTER_WINDOW_FUNCTION_CONDITIONALLY(name, parser, minVersion, allowedWithApi, ...) \
-    MONGO_INITIALIZER_GENERAL(addToWindowFunctionMap_##name,                                  \
-                              ("BeginWindowFunctionRegistration"),                            \
-                              ("EndWindowFunctionRegistration"))                              \
-    (InitializerContext*) {                                                                   \
-        if (!(__VA_ARGS__)) {                                                                 \
-            return;                                                                           \
-        }                                                                                     \
-        ::mongo::window_function::Expression::registerParser(                                 \
-            "$" #name, parser, minVersion, allowedWithApi);                                   \
+#define REGISTER_WINDOW_FUNCTION_CONDITIONALLY(name, parser, minVersion, ...)                \
+    MONGO_INITIALIZER_GENERAL(addToWindowFunctionMap_##name,                                 \
+                              ("BeginWindowFunctionRegistration"),                           \
+                              ("EndWindowFunctionRegistration"))                             \
+    (InitializerContext*) {                                                                  \
+        if (!(__VA_ARGS__)) {                                                                \
+            return;                                                                          \
+        }                                                                                    \
+        ::mongo::window_function::Expression::registerParser("$" #name, parser, minVersion); \
     }
 
-#define REGISTER_STABLE_REMOVABLE_WINDOW_FUNCTION(name, accumClass, wfClass)           \
+
+#define REGISTER_REMOVABLE_WINDOW_FUNCTION(name, accumClass, wfClass)                  \
     MONGO_INITIALIZER_GENERAL(addToWindowFunctionMap_##name,                           \
                               ("BeginWindowFunctionRegistration"),                     \
                               ("EndWindowFunctionRegistration"))                       \
@@ -77,8 +72,7 @@ class PartitionIterator;
         ::mongo::window_function::Expression::registerParser(                          \
             "$" #name,                                                                 \
             ::mongo::window_function::ExpressionRemovable<accumClass, wfClass>::parse, \
-            boost::none,                                                               \
-            AllowedWithApiStrict::kAlways);                                            \
+            boost::none);                                                              \
     }
 
 
@@ -125,18 +119,12 @@ public:
      * described above, because some parsers need to switch on the function name.
      */
     using Parser = std::function<decltype(parse)>;
-
-    struct ExpressionParserRegistration {
-        Parser parser;
-        boost::optional<multiversion::FeatureCompatibilityVersion> fcv;
-        AllowedWithApiStrict allowedWithApi;
-    };
-
+    using ExpressionParserRegistration =
+        std::pair<Parser, boost::optional<multiversion::FeatureCompatibilityVersion>>;
     static void registerParser(
         std::string functionName,
         Parser parser,
-        boost::optional<multiversion::FeatureCompatibilityVersion> requiredMinVersion,
-        AllowedWithApiStrict allowedWithApi);
+        boost::optional<multiversion::FeatureCompatibilityVersion> requiredMinVersion);
 
     /**
      * Is this a function that the parser knows about?

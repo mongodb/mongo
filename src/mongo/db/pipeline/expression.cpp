@@ -1983,7 +1983,11 @@ void ExpressionDateToString::_doAddDependencies(DepsTracker* deps) const {
 
 /* ----------------------- ExpressionDateDiff ---------------------------- */
 
-REGISTER_STABLE_EXPRESSION(dateDiff, ExpressionDateDiff::parse);
+REGISTER_EXPRESSION_WITH_MIN_VERSION(dateDiff,
+                                     ExpressionDateDiff::parse,
+                                     AllowedWithApiStrict::kNeverInVersion1,
+                                     AllowedWithClientType::kAny,
+                                     boost::none);
 
 ExpressionDateDiff::ExpressionDateDiff(ExpressionContext* const expCtx,
                                        boost::intrusive_ptr<Expression> startDate,
@@ -7420,8 +7424,11 @@ Value ExpressionDateArithmetics::evaluate(const Document& root, Variables* varia
         startDate.coerceToDate(), unit, amount.coerceToLong(), timezone.get());
 }
 
-/* ----------------------- ExpressionDateAdd ---------------------------- */
-REGISTER_STABLE_EXPRESSION(dateAdd, ExpressionDateAdd::parse);
+REGISTER_EXPRESSION_WITH_MIN_VERSION(dateAdd,
+                                     ExpressionDateAdd::parse,
+                                     AllowedWithApiStrict::kNeverInVersion1,
+                                     AllowedWithClientType::kAny,
+                                     boost::none);
 
 boost::intrusive_ptr<Expression> ExpressionDateAdd::parse(ExpressionContext* const expCtx,
                                                           BSONElement expr,
@@ -7444,9 +7451,11 @@ Value ExpressionDateAdd::evaluateDateArithmetics(Date_t date,
     return Value(dateAdd(date, unit, amount, timezone));
 }
 
-/* ----------------------- ExpressionDateSubtract ---------------------------- */
-
-REGISTER_STABLE_EXPRESSION(dateSubtract, ExpressionDateSubtract::parse);
+REGISTER_EXPRESSION_WITH_MIN_VERSION(dateSubtract,
+                                     ExpressionDateSubtract::parse,
+                                     AllowedWithApiStrict::kNeverInVersion1,
+                                     AllowedWithClientType::kAny,
+                                     boost::none);
 
 boost::intrusive_ptr<Expression> ExpressionDateSubtract::parse(ExpressionContext* const expCtx,
                                                                BSONElement expr,
@@ -7475,7 +7484,11 @@ Value ExpressionDateSubtract::evaluateDateArithmetics(Date_t date,
 
 /* ----------------------- ExpressionDateTrunc ---------------------------- */
 
-REGISTER_STABLE_EXPRESSION(dateTrunc, ExpressionDateTrunc::parse);
+REGISTER_EXPRESSION_WITH_MIN_VERSION(dateTrunc,
+                                     ExpressionDateTrunc::parse,
+                                     AllowedWithApiStrict::kNeverInVersion1,
+                                     AllowedWithClientType::kAny,
+                                     boost::none);
 
 ExpressionDateTrunc::ExpressionDateTrunc(ExpressionContext* const expCtx,
                                          boost::intrusive_ptr<Expression> date,
@@ -7649,7 +7662,7 @@ void ExpressionDateTrunc::_doAddDependencies(DepsTracker* deps) const {
 REGISTER_EXPRESSION_WITH_MIN_VERSION(
     getField,
     ExpressionGetField::parse,
-    AllowedWithApiStrict::kAlways,
+    AllowedWithApiStrict::kNeverInVersion1,
     AllowedWithClientType::kAny,
     multiversion::FeatureCompatibilityVersion::kFullyDowngradedTo_5_0);
 
@@ -7761,7 +7774,7 @@ Value ExpressionGetField::serialize(const bool explain) const {
 REGISTER_EXPRESSION_WITH_MIN_VERSION(
     setField,
     ExpressionSetField::parse,
-    AllowedWithApiStrict::kAlways,
+    AllowedWithApiStrict::kNeverInVersion1,
     AllowedWithClientType::kAny,
     multiversion::FeatureCompatibilityVersion::kFullyDowngradedTo_5_0);
 
@@ -7905,7 +7918,7 @@ Value ExpressionTsSecond::evaluate(const Document& root, Variables* variables) c
 REGISTER_EXPRESSION_WITH_MIN_VERSION(
     tsSecond,
     ExpressionTsSecond::parse,
-    AllowedWithApiStrict::kAlways,
+    AllowedWithApiStrict::kNeverInVersion1,
     AllowedWithClientType::kAny,
     multiversion::FeatureCompatibilityVersion::kFullyDowngradedTo_5_0);
 
@@ -7929,7 +7942,7 @@ Value ExpressionTsIncrement::evaluate(const Document& root, Variables* variables
 REGISTER_EXPRESSION_WITH_MIN_VERSION(
     tsIncrement,
     ExpressionTsIncrement::parse,
-    AllowedWithApiStrict::kAlways,
+    AllowedWithApiStrict::kNeverInVersion1,
     AllowedWithClientType::kAny,
     multiversion::FeatureCompatibilityVersion::kFullyDowngradedTo_5_0);
 

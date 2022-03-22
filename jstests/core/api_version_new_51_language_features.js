@@ -18,17 +18,18 @@ const coll = db[collName];
 coll.drop();
 assert.commandWorked(coll.insert({a: 1, date: new ISODate()}));
 
-const stablePipelines = [
+const unstablePipelines = [
     [{$set: {x: {$tsSecond: new Timestamp(0, 0)}}}],
     [{$set: {x: {$tsIncrement: new Timestamp(0, 0)}}}],
 ];
 
-for (let pipeline of stablePipelines) {
+for (let pipeline of unstablePipelines) {
     // Assert error thrown when running a pipeline with stages not in API Version 1.
-    APIVersionHelpers.assertAggregateSucceedsWithAPIStrict(pipeline, collName);
+    APIVersionHelpers.assertAggregateFailsWithAPIStrict(
+        pipeline, collName, ErrorCodes.APIStrictError);
 
     // Assert error thrown when creating a view on a pipeline with stages not in API Version 1.
-    APIVersionHelpers.assertViewSucceedsWithAPIStrict(pipeline, collName);
+    APIVersionHelpers.assertViewFailsWithAPIStrict(pipeline, collName);
 
     // Assert error is not thrown when running without apiStrict=true.
     assert.commandWorked(db.runCommand({

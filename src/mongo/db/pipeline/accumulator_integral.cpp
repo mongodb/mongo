@@ -38,7 +38,7 @@
 
 namespace mongo {
 
-REGISTER_STABLE_WINDOW_FUNCTION(integral, mongo::window_function::ExpressionIntegral::parse);
+REGISTER_WINDOW_FUNCTION(integral, mongo::window_function::ExpressionIntegral::parse);
 
 AccumulatorIntegral::AccumulatorIntegral(ExpressionContext* const expCtx,
                                          boost::optional<long long> unitMillis)

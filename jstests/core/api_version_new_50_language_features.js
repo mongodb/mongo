@@ -17,7 +17,7 @@ const coll = db[collName];
 coll.drop();
 assert.commandWorked(coll.insert({a: 1, date: new ISODate()}));
 
-const stablePipelines = [
+const unstablePipelines = [
     [{$set: {x: {$dateTrunc: {date: "$date", unit: "second", binSize: 5}}}}],
     [{$set: {x: {$dateAdd: {startDate: "$date", unit: "day", amount: 1}}}}],
     [{$set: {x: {$dateSubtract: {startDate: "$date", unit: "day", amount: 1}}}}],
@@ -26,12 +26,13 @@ const stablePipelines = [
     [{$set: {x: {$setField: {input: "$$ROOT", field: "x", value: "foo"}}}}],
 ];
 
-for (let pipeline of stablePipelines) {
+for (let pipeline of unstablePipelines) {
     // Assert error thrown when running a pipeline with stages not in API Version 1.
-    APIVersionHelpers.assertAggregateSucceedsWithAPIStrict(pipeline, collName);
+    APIVersionHelpers.assertAggregateFailsWithAPIStrict(
+        pipeline, collName, ErrorCodes.APIStrictError);
 
     // Assert error thrown when creating a view on a pipeline with stages not in API Version 1.
-    APIVersionHelpers.assertViewSucceedsWithAPIStrict(pipeline, collName);
+    APIVersionHelpers.assertViewFailsWithAPIStrict(pipeline, collName);
 
     // Assert error is not thrown when running without apiStrict=true.
     assert.commandWorked(db.runCommand({
@@ -50,19 +51,20 @@ const setWindowFieldsPipeline = [{
         output: {runningCount: {$sum: 1, window: {documents: ["unbounded", "current"]}}}
     }
 }];
+APIVersionHelpers.assertAggregateFailsWithAPIStrict(setWindowFieldsPipeline, collName, [
+    ErrorCodes.APIStrictError,
+    ErrorCodes.InvalidOptions,
+    ErrorCodes.OperationNotSupportedInTransaction
+]);
 
-APIVersionHelpers.assertAggregateSucceedsWithAPIStrict(
-    setWindowFieldsPipeline,
-    collName,
-    [ErrorCodes.InvalidOptions, ErrorCodes.OperationNotSupportedInTransaction]);
+APIVersionHelpers.assertViewFailsWithAPIStrict(setWindowFieldsPipeline, collName);
 
-APIVersionHelpers.assertViewSucceedsWithAPIStrict(setWindowFieldsPipeline, collName);
-
-// Creating a collection with the unstable validator is allowed with apiStrict:true.
-assert.commandWorked(db.runCommand({
+// Creating a collection with the unstable validator is not allowed with apiStrict:true.
+assert.commandFailedWithCode(db.runCommand({
     create: 'new_50_features_validator',
     validator: {$expr: {$eq: [{$getField: {input: "$$ROOT", field: "dotted.path"}}, 2]}},
     apiVersion: "1",
     apiStrict: true
-}));
+}),
+                             ErrorCodes.APIStrictError);
 })();

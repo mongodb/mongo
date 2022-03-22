@@ -42,7 +42,6 @@ REGISTER_WINDOW_FUNCTION_CONDITIONALLY(
     locf,
     mongo::window_function::ExpressionFromLeftUnboundedWindowFunction<AccumulatorLocf>::parse,
     feature_flags::gFeatureFlagLocf.getVersion(),
-    AllowedWithApiStrict::kNeverInVersion1,
     feature_flags::gFeatureFlagLocf.isEnabledAndIgnoreFCV());
 
 AccumulatorLocf::AccumulatorLocf(ExpressionContext* const expCtx)

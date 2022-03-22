@@ -44,7 +44,7 @@ using boost::intrusive_ptr;
 using std::vector;
 
 REGISTER_ACCUMULATOR(push, genericParseSingleExpressionAccumulator<AccumulatorPush>);
-REGISTER_STABLE_REMOVABLE_WINDOW_FUNCTION(push, AccumulatorPush, WindowFunctionPush);
+REGISTER_REMOVABLE_WINDOW_FUNCTION(push, AccumulatorPush, WindowFunctionPush);
 
 void AccumulatorPush::processInternal(const Value& input, bool merging) {
     if (!merging) {

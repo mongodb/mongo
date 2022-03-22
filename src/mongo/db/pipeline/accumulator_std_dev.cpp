@@ -46,10 +46,8 @@ REGISTER_ACCUMULATOR(stdDevPop, genericParseSingleExpressionAccumulator<Accumula
 REGISTER_ACCUMULATOR(stdDevSamp, genericParseSingleExpressionAccumulator<AccumulatorStdDevSamp>);
 REGISTER_STABLE_EXPRESSION(stdDevPop, ExpressionFromAccumulator<AccumulatorStdDevPop>::parse);
 REGISTER_STABLE_EXPRESSION(stdDevSamp, ExpressionFromAccumulator<AccumulatorStdDevSamp>::parse);
-REGISTER_STABLE_REMOVABLE_WINDOW_FUNCTION(stdDevPop, AccumulatorStdDevPop, WindowFunctionStdDevPop);
-REGISTER_STABLE_REMOVABLE_WINDOW_FUNCTION(stdDevSamp,
-                                          AccumulatorStdDevSamp,
-                                          WindowFunctionStdDevSamp);
+REGISTER_REMOVABLE_WINDOW_FUNCTION(stdDevPop, AccumulatorStdDevPop, WindowFunctionStdDevPop);
+REGISTER_REMOVABLE_WINDOW_FUNCTION(stdDevSamp, AccumulatorStdDevSamp, WindowFunctionStdDevSamp);
 
 void AccumulatorStdDev::processInternal(const Value& input, bool merging) {
     if (!merging) {

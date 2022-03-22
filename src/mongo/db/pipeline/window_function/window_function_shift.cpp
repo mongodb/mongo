@@ -32,7 +32,7 @@
 #include "window_function_exec_first_last.h"
 
 namespace mongo::window_function {
-REGISTER_STABLE_WINDOW_FUNCTION(shift, ExpressionShift::parse);
+REGISTER_WINDOW_FUNCTION(shift, ExpressionShift::parse);
 
 boost::intrusive_ptr<Expression> ExpressionShift::parseShiftArgs(BSONObj obj,
                                                                  const mongo::StringData& accName,

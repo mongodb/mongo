@@ -45,11 +45,11 @@ namespace mongo {
 using boost::intrusive_ptr;
 
 // These don't make sense as accumulators, so only register them as window functions.
-REGISTER_STABLE_WINDOW_FUNCTION(
+REGISTER_WINDOW_FUNCTION(
     rank, mongo::window_function::ExpressionFromRankAccumulator<AccumulatorRank>::parse);
-REGISTER_STABLE_WINDOW_FUNCTION(
+REGISTER_WINDOW_FUNCTION(
     denseRank, mongo::window_function::ExpressionFromRankAccumulator<AccumulatorDenseRank>::parse);
-REGISTER_STABLE_WINDOW_FUNCTION(
+REGISTER_WINDOW_FUNCTION(
     documentNumber,
     mongo::window_function::ExpressionFromRankAccumulator<AccumulatorDocumentNumber>::parse);
 

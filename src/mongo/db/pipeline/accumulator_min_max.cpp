@@ -45,8 +45,8 @@ REGISTER_ACCUMULATOR(max, genericParseSingleExpressionAccumulator<AccumulatorMax
 REGISTER_ACCUMULATOR(min, genericParseSingleExpressionAccumulator<AccumulatorMin>);
 REGISTER_STABLE_EXPRESSION(max, ExpressionFromAccumulator<AccumulatorMax>::parse);
 REGISTER_STABLE_EXPRESSION(min, ExpressionFromAccumulator<AccumulatorMin>::parse);
-REGISTER_STABLE_REMOVABLE_WINDOW_FUNCTION(max, AccumulatorMax, WindowFunctionMax);
-REGISTER_STABLE_REMOVABLE_WINDOW_FUNCTION(min, AccumulatorMin, WindowFunctionMin);
+REGISTER_REMOVABLE_WINDOW_FUNCTION(max, AccumulatorMax, WindowFunctionMax);
+REGISTER_REMOVABLE_WINDOW_FUNCTION(min, AccumulatorMin, WindowFunctionMin);
 
 void AccumulatorMinMax::processInternal(const Value& input, bool merging) {
     // nullish values should have no impact on result
