@@ -20,7 +20,7 @@ const rst = new ReplSetTest({
         {},
     ]
 });
-const nodes = rst.startSet();
+rst.startSet();
 rst.initiate();
 
 const primary = rst.getPrimary();
@@ -30,53 +30,44 @@ const coll = testDB.getCollection('test');
 assert.commandWorked(coll.insert({a: 1}));
 
 let res = assert.commandWorked(primary.adminCommand(
-    {configureFailPoint: 'hangAfterInitializingIndexBuild', mode: 'alwaysOn'}));
-const hangAfterInitFailpointTimesEntered = res.count;
-
-res = assert.commandWorked(primary.adminCommand(
     {configureFailPoint: 'hangBeforeIndexBuildAbortOnInterrupt', mode: 'alwaysOn'}));
 const hangBeforeAbortFailpointTimesEntered = res.count;
 
-const createIdx = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {a: 1});
+IndexBuildTest.pauseIndexBuilds(primary);
+const createIdx = IndexBuildTest.startIndexBuild(
+    primary, coll.getFullName(), {a: 1}, {}, [ErrorCodes.Interrupted]);
 
-try {
-    assert.commandWorked(primary.adminCommand({
-        waitForFailPoint: "hangAfterInitializingIndexBuild",
-        timesEntered: hangAfterInitFailpointTimesEntered + 1,
-        maxTimeMS: kDefaultWaitForFailPointTimeout
-    }));
+// When the index build starts, find its op id. This will be the op id of the client connection, not
+// the thread pool task managed by IndexBuildsCoordinatorMongod.
+const filter = {
+    "desc": {$regex: /conn.*/}
+};
+const opId = IndexBuildTest.waitForIndexBuildToStart(testDB, coll.getName(), 'a_1', filter);
 
-    // When the index build starts, find its op id. This will be the op id of the client
-    // connection, not the thread pool task managed by IndexBuildsCoordinatorMongod.
-    const filter = {"desc": {$regex: /conn.*/}};
-    const opId = IndexBuildTest.waitForIndexBuildToStart(testDB, coll.getName(), 'a_1', filter);
+// Kill the index build.
+assert.commandWorked(testDB.killOp(opId));
 
-    // Kill the index build.
-    assert.commandWorked(testDB.killOp(opId));
+// Wait for the command thread to observe the killOp.
+assert.commandWorked(primary.adminCommand({
+    waitForFailPoint: "hangBeforeIndexBuildAbortOnInterrupt",
+    timesEntered: hangBeforeAbortFailpointTimesEntered + 1,
+    maxTimeMS: kDefaultWaitForFailPointTimeout
+}));
 
-    // Let the index build continue running.
-    assert.commandWorked(
-        primary.adminCommand({configureFailPoint: 'hangAfterInitializingIndexBuild', mode: 'off'}));
+// Step down the primary, preventing the index build from generating an abort oplog entry.
+assert.commandWorked(testDB.adminCommand({replSetStepDown: 30, force: true}));
 
-    // Wait for the command thread to abort the index build.
-    assert.commandWorked(primary.adminCommand({
-        waitForFailPoint: "hangBeforeIndexBuildAbortOnInterrupt",
-        timesEntered: hangBeforeAbortFailpointTimesEntered + 1,
-        maxTimeMS: kDefaultWaitForFailPointTimeout
-    }));
+// Let the command thread try to abort the index build.
+assert.commandWorked(primary.adminCommand(
+    {configureFailPoint: 'hangBeforeIndexBuildAbortOnInterrupt', mode: 'off'}));
 
-    // Step down the primary, preventing the index build from generating an abort oplog entry.
-    assert.commandWorked(testDB.adminCommand({replSetStepDown: 30, force: true}));
-} finally {
-    assert.commandWorked(
-        primary.adminCommand({configureFailPoint: 'hangAfterInitializingIndexBuild', mode: 'off'}));
-    // Let the index build finish cleaning up.
-    assert.commandWorked(primary.adminCommand(
-        {configureFailPoint: 'hangBeforeIndexBuildAbortOnInterrupt', mode: 'off'}));
-}
+// Unable to abort index build because we are not primary.
+checkLog.containsJson(primary, 20449);
 
-const exitCode = createIdx({checkExitSuccess: false});
-assert.neq(0, exitCode, 'expected shell to exit abnormally due to index build being terminated');
+createIdx();
+
+// Let the index build continue running.
+IndexBuildTest.resumeIndexBuilds(primary);
 
 // Wait for the index build to stop.
 IndexBuildTest.waitForIndexBuildToStop(testDB);
