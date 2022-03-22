@@ -737,7 +737,7 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
         // names will remain.
         const bool stayTemp = true;
         auto futureColl = db ? catalog->lookupCollectionByNamespace(opCtx, newCollName) : nullptr;
-        bool needsRenaming = static_cast<bool>(futureColl);
+        bool needsRenaming(futureColl);
         invariant(!needsRenaming || allowRenameOutOfTheWay,
                   str::stream() << "Current collection name: " << currentName << ", UUID: " << uuid
                                 << ". Future collection name: " << newCollName);
