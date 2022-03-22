@@ -7,6 +7,7 @@
 //   assumes_read_concern_unchanged,
 //   assumes_unsharded_collection,
 //   does_not_support_stepdowns,
+//   requires_fcv_60,
 // ]
 
 (function() {
