@@ -49,35 +49,6 @@ namespace mongo {
 using namespace fmt::literals;
 
 namespace {
-void debugDump(WT_SESSION* session, const std::string& ident) {
-    if (!shouldLog(MONGO_LOGV2_DEFAULT_COMPONENT, logv2::LogSeverity::Debug(1))) {
-        return;
-    }
-
-    WT_CURSOR* cursor;
-    uassertWTOK(
-        session->open_cursor(session,
-                             "{}{}"_format(WiredTigerKVEngine::kTableUriPrefix, ident).c_str(),
-                             nullptr,
-                             nullptr,
-                             &cursor),
-        session);
-
-    BSONArrayBuilder bab;
-    while (true) {
-        int ret = cursor->next(cursor);
-        if (ret == WT_NOTFOUND) {
-            break;
-        }
-        uassertWTOK(ret, session);
-        WT_ITEM value;
-        uassertWTOK(cursor->get_value(cursor, &value), session);
-        bab.append(BSONObj(static_cast<const char*>(value.data)));
-    }
-
-    LOGV2_DEBUG(6113706, 1, "donor data", "table"_attr = ident, "documents"_attr = bab.arr());
-}
-
 bool shouldImport(NamespaceString ns) {
     return !(ns.isLocal() || ns.isAdminDB() || ns.isConfigDB());
 }
@@ -175,8 +146,6 @@ std::vector<CollectionImportMetadata> wiredTigerRollbackToStableAndGetMetadata(
     LOGV2_DEBUG(6113700, 1, "Opened donor WiredTiger database");
     WT_SESSION* session;
     uassertWTOK(conn->open_session(conn, nullptr, nullptr, &session), nullptr);
-    debugDump(session, "_mdb_catalog");
-    debugDump(session, "sizeStorer");
     WT_CURSOR* mdbCatalogCursor;
     WT_CURSOR* sizeStorerCursor;
     uassertWTOK(
@@ -218,7 +187,7 @@ std::vector<CollectionImportMetadata> wiredTigerRollbackToStableAndGetMetadata(
         collectionMetadata.dataSize = sizeInfo.dataSize;
         LOGV2_DEBUG(6113802,
                     1,
-                    "recorded collection metadata",
+                    "Recorded collection metadata",
                     "ns"_attr = ns,
                     "tableMetadata"_attr = collectionMetadata.importArgs.tableMetadata,
                     "fileMetadata"_attr = collectionMetadata.importArgs.fileMetadata);

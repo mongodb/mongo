@@ -47,6 +47,25 @@ std::shared_ptr<TenantMigrationRecipientAccessBlocker> getTenantMigrationRecipie
     ServiceContext* serviceContext, StringData tenantId);
 
 /**
+ * For "shard merge" protocol: tell all recipient access blockers to reject reads before ts.
+ */
+void startRejectingReadsBefore(OperationContext* opCtx, UUID migrationId, mongo::Timestamp ts);
+
+/**
+ * Add an access blocker if one does not already exist.
+ */
+void addTenantMigrationRecipientAccessBlocker(ServiceContext* serviceContext,
+                                              StringData tenantId,
+                                              UUID migrationId,
+                                              MigrationProtocolEnum protocol,
+                                              StringData donorConnectionString);
+
+/**
+ * Parse the tenantId from a database name, or return boost::none if there is no tenantId.
+ */
+boost::optional<std::string> parseTenantIdFromDB(StringData dbName);
+
+/**
  * Returns a TenantMigrationDonorDocument constructed from the given bson doc and validate the
  * resulting doc.
  */

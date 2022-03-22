@@ -40,7 +40,6 @@
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
 #include "mongo/db/repl/tenant_migration_conflict_info.h"
-#include "mongo/db/repl/tenant_migration_state_machine_gen.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/logv2/log.h"
 #include "mongo/transport/service_executor.h"
@@ -80,6 +79,45 @@ std::shared_ptr<TenantMigrationRecipientAccessBlocker> getTenantMigrationRecipie
     return checked_pointer_cast<TenantMigrationRecipientAccessBlocker>(
         TenantMigrationAccessBlockerRegistry::get(serviceContext)
             .getTenantMigrationAccessBlockerForTenantId(tenantId, MtabType::kRecipient));
+}
+
+void startRejectingReadsBefore(OperationContext* opCtx, UUID migrationId, mongo::Timestamp ts) {
+    auto callback = [&](std::shared_ptr<TenantMigrationAccessBlocker> mtab) {
+        auto recipientMtab = checked_pointer_cast<TenantMigrationRecipientAccessBlocker>(mtab);
+        recipientMtab->startRejectingReadsBefore(ts);
+    };
+
+    TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
+        .applyAll(TenantMigrationAccessBlocker::BlockerType::kRecipient, callback);
+}
+
+void addTenantMigrationRecipientAccessBlocker(ServiceContext* serviceContext,
+                                              StringData tenantId,
+                                              UUID migrationId,
+                                              MigrationProtocolEnum protocol,
+                                              StringData donorConnectionString) {
+    if (getTenantMigrationRecipientAccessBlocker(serviceContext, tenantId)) {
+        return;
+    }
+
+    auto mtab =
+        std::make_shared<TenantMigrationRecipientAccessBlocker>(serviceContext,
+                                                                migrationId,
+                                                                tenantId.toString(),
+                                                                protocol,
+                                                                donorConnectionString.toString());
+
+    TenantMigrationAccessBlockerRegistry::get(serviceContext).add(tenantId, mtab);
+}
+
+boost::optional<std::string> parseTenantIdFromDB(StringData dbName) {
+    auto pos = dbName.find("_");
+    if (pos == std::string::npos || pos == 0) {
+        // Not a tenant database.
+        return boost::none;
+    }
+
+    return dbName.toString().substr(0, pos);
 }
 
 TenantMigrationDonorDocument parseDonorStateDocument(const BSONObj& doc) {
@@ -320,7 +358,7 @@ void recoverTenantMigrationAccessBlockers(OperationContext* opCtx) {
         if (protocol == MigrationProtocolEnum::kMultitenantMigrations) {
             registry.add(doc.getTenantId(), mtab);
         } else {
-            registry.addDonorAccessBlocker(mtab);
+            registry.addShardMergeDonorAccessBlocker(mtab);
         }
 
         switch (doc.getState()) {

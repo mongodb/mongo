@@ -35,6 +35,7 @@ const kTenantId = "testTenantId";
     jsTest.log("Test writes during and after a migration that commits");
 
     const tenantId = kTenantId + "Commit";
+    tenantMigrationTest.insertDonorDB(`${tenantId}_test`, "test");
     const ns = tenantId + "_testDb.testColl";
     const tenantCollOnRecipient = recipientPrimary.getCollection(ns);
 
@@ -59,8 +60,11 @@ const kTenantId = "testTenantId";
     runMigrationThread.start();
     startOplogFetcherFp.wait();
 
-    // Write before cloning is done.
-    assert.commandFailedWithCode(tenantCollOnRecipient.remove({_id: 1}), ErrorCodes.SnapshotTooOld);
+    if (!TenantMigrationUtil.isShardMergeEnabled(donorPrimary.getDB("adminDB"))) {
+        // Write before cloning is done.
+        assert.commandFailedWithCode(tenantCollOnRecipient.remove({_id: 1}),
+                                     ErrorCodes.SnapshotTooOld);
+    }
 
     startOplogFetcherFp.off();
     clonerDoneFp.wait();
@@ -94,6 +98,7 @@ const kTenantId = "testTenantId";
                "returnAfterReachingTimestamp");
 
     const tenantId = kTenantId + "AbortBeforeReturnAfterReachingTs";
+    tenantMigrationTest.insertDonorDB(`${tenantId}_test`, "test");
     const ns = tenantId + "_testDb.testColl";
     const tenantCollOnRecipient = recipientPrimary.getCollection(ns);
 
@@ -130,6 +135,7 @@ const kTenantId = "testTenantId";
                " application");
 
     const tenantId = kTenantId + "AbortAfterReturnAfterReachingTs";
+    tenantMigrationTest.insertDonorDB(`${tenantId}_test`, "test");
     const ns = tenantId + "_testDb.testColl";
     const tenantCollOnRecipient = recipientPrimary.getCollection(ns);
 

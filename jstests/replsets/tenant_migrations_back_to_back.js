@@ -24,9 +24,10 @@ load("jstests/libs/parallelTester.js");  // for 'Thread'
 load("jstests/libs/uuid_util.js");
 load("jstests/replsets/rslib.js");  // for 'getLastOpTime'
 
-const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
-
 const kTenantId = "testTenantId";
+const tenantMigrationTest =
+    new TenantMigrationTest({name: jsTestName(), insertDataForTenant: kTenantId});
+
 const kDbName = tenantMigrationTest.tenantDB(kTenantId, "testDb");
 const kCollName = "testColl";
 
@@ -64,14 +65,15 @@ tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString);
 
 recipientRst.nodes.forEach(node => {
     const db = node.getDB(kDbName);
-    const res = db.runCommand({
+    const cmd = {
         find: kCollName,
         readConcern: {
             level: "snapshot",
             atClusterTime: preMigrationTimestamp,
         }
-    });
-    assert.commandFailedWithCode(res, ErrorCodes.SnapshotTooOld, tojson(res));
+    };
+    const res = db.runCommand(cmd);
+    assert.commandFailedWithCode(res, ErrorCodes.SnapshotTooOld, tojson(cmd));
     assert.eq(res.errmsg, "Tenant read is not allowed before migration completes");
 });
 
@@ -140,14 +142,15 @@ newDonorRst.nodes.forEach(node => {
 newDonorRst.nodes.forEach(node => {
     jsTestLog("Test that read fails on node: " + node);
     const db = node.getDB(kDbName);
-    const res = db.runCommand({
+    const cmd = {
         find: kCollName,
         readConcern: {
             level: "snapshot",
             atClusterTime: preMigrationTimestamp,
         }
-    });
-    assert.commandFailedWithCode(res, ErrorCodes.SnapshotTooOld, tojson(res));
+    };
+    const res = db.runCommand(cmd);
+    assert.commandFailedWithCode(res, ErrorCodes.SnapshotTooOld, tojson(cmd));
     assert.eq(res.errmsg, "Tenant read is not allowed before migration completes");
 });
 

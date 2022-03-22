@@ -64,7 +64,7 @@ function prepareDb(dbName, ttlTimeoutSeconds = 0) {
 
 function getNumTTLPasses(node) {
     let serverStatus = assert.commandWorked(node.adminCommand({serverStatus: 1}));
-    jsTestLog(`TTL: ${tojson(serverStatus.metrics.ttl)}`);
+    jsTestLog(`TTL ${node}: ${tojson(serverStatus.metrics.ttl)}`);
     return serverStatus.metrics.ttl.passes;
 }
 
@@ -122,15 +122,11 @@ function assertTTLDeleteExpiredDocs(dbName, node) {
     prepareDb(dbName, 3);
 
     const recipientDb = recipientPrimary.getDB(dbName);
-    let recipientColl = recipientDb.getCollection(collName);
-    const hangDuringCollectionClone = configureFailPoint(
-        recipientDb,
-        "hangAfterClonerStage",
-        {cloner: "TenantCollectionCloner", stage: "query", nss: recipientColl.getFullName()});
-
+    const hangAfterCollectionClone =
+        configureFailPoint(recipientDb, "fpAfterCollectionClonerDone", {action: "hang"});
     assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
 
-    hangDuringCollectionClone.wait();
+    hangAfterCollectionClone.wait();
 
     // On a very slow machine, there is a chance that a TTL cycle happened at the donor before the
     // recipient cloned the documents. Therefore, these checks are only valid when we are sure the
@@ -144,7 +140,7 @@ function assertTTLDeleteExpiredDocs(dbName, node) {
         assertTTLNotDeleteExpiredDocs(dbName, recipientPrimary);
     }
 
-    hangDuringCollectionClone.off();
+    hangAfterCollectionClone.off();
 
     TenantMigrationTest.assertCommitted(
         tenantMigrationTest.waitForMigrationToComplete(migrationOpts));

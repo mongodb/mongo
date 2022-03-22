@@ -24,6 +24,8 @@ load("jstests/replsets/libs/tenant_migration_util.js");
  *     migration.
  * @param {boolean} [initiateRstWithHighElectionTimeout] whether donor and recipient replica sets
  *     should be initiated with high election timeout.
+ * @param {boolean} [quickGarbageCollection] whether to set a low garbageCollectionDelayMS.
+ * @param {string} [insertDataForTenant] create dummy data in <tenantId>_test database.
  */
 function TenantMigrationTest({
     name = "TenantMigrationTest",
@@ -35,6 +37,7 @@ function TenantMigrationTest({
     allowStaleReadsOnDonor = true,
     initiateRstWithHighElectionTimeout = true,
     quickGarbageCollection = false,
+    insertDataForTenant,
 }) {
     const donorPassedIn = (donorRst !== undefined);
     const recipientPassedIn = (recipientRst !== undefined);
@@ -63,6 +66,33 @@ function TenantMigrationTest({
         recipientRst.awaitReplication();
         TenantMigrationUtil.createTenantMigrationDonorRoleIfNotExist(recipientRst);
     });
+
+    function loadDummyData() {
+        const numDocs = 20;
+        const testData = [];
+        for (let i = 0; i < numDocs; ++i) {
+            testData.push({_id: i, x: i});
+        }
+        return testData;
+    }
+
+    /**
+     * Inserts documents into the specified collection on the donor primary.
+     */
+    this.insertDonorDB = function(dbName, collName, data = loadDummyData()) {
+        jsTestLog(`Inserting data into collection ${collName} of DB ${dbName} on the donor`);
+        const primary = donorRst.getPrimary();
+        const db = primary.getDB(dbName);
+        const res = assert.commandWorked(
+            db.runCommand({insert: collName, documents: data, writeConcern: {w: 'majority'}}));
+        jsTestLog(`Inserted with w: majority, opTime ${tojson(res.operationTime)}`);
+    };
+
+    // Shard Merge installs TenantRecipientAccessBlockers only for tenants with data, so most tests
+    // require some data.
+    if (insertDataForTenant !== undefined) {
+        this.insertDonorDB(`${insertDataForTenant}_test`, "test");
+    }
 
     /**
      * Creates a ReplSetTest instance. The repl set will have 2 nodes if not otherwise specified.
@@ -440,26 +470,6 @@ function TenantMigrationTest({
         };
 
         return {value: checkStates(), configDoc: configDoc, recipientMtab: mtab.recipient};
-    };
-
-    function loadDummyData() {
-        const numDocs = 20;
-        const testData = [];
-        for (let i = 0; i < numDocs; ++i) {
-            testData.push({_id: i, x: i});
-        }
-        return testData;
-    }
-
-    /**
-     * Inserts documents into the specified collection on the donor primary.
-     */
-    this.insertDonorDB = function(dbName, collName, data = loadDummyData()) {
-        jsTestLog(`Inserting data into collection ${collName} of DB ${dbName} on the donor`);
-        const db = this.getDonorPrimary().getDB(dbName);
-        const coll = db.getCollection(collName);
-
-        assert.commandWorked(coll.insertMany(data, {writeConcern: {w: 'majority'}}));
     };
 
     /**

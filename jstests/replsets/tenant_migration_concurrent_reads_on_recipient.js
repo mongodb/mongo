@@ -375,7 +375,7 @@ const testCases = {
             };
         },
     },
-    snapshotReadWithAtClusterTimeTxn: {
+    snapshotReadAtClusterTimeTxn: {
         isSupportedOnSecondaries: false,
         requiresReadTimestamp: true,
         command: function(collName, readTimestamp) {
@@ -416,10 +416,12 @@ const testFuncs = {
 for (const [testName, testFunc] of Object.entries(testFuncs)) {
     for (const [testCaseName, testCase] of Object.entries(testCases)) {
         jsTest.log("Testing " + testName + " with testCase " + testCaseName);
-        let dbName = testCaseName + "-" + testName + "_" + kTenantDefinedDbName;
+        let tenantId = `${testCaseName}-${testName}`;
+        let dbName = `${tenantId}_${kTenantDefinedDbName}`;
         const tenantMigrationTest = new TenantMigrationTest({
             name: jsTestName(),
             quickGarbageCollection: true,
+            insertDataForTenant: tenantId,
         });
 
         // Force the recipient to preserve all snapshot history to ensure that snapshot reads do not

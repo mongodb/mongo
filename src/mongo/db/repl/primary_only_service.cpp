@@ -525,7 +525,6 @@ PrimaryOnlyService::getOrCreateInstance(OperationContext* opCtx, BSONObj initial
         return {it->second.getInstance(), false};
     }
 
-    // Lock _mutex, make this vector & call constructInstance so it can safely check for conflicts.
     std::vector<const Instance*> existingInstances;
     for (auto& [instanceId, instance] : _activeInstances) {
         existingInstances.emplace_back(instance.getInstance().get());

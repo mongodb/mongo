@@ -75,8 +75,7 @@ function runDropTest({failPointName, failPointData, expectedLog, createNew}) {
     const donorDB = donorPrimary.getDB(dbName);
     const donorColl = donorDB.getCollection(collName);
     assert(donorColl.drop());
-    TwoPhaseDropCollectionTest.waitForDropToComplete(
-        donorDB, collName, [{_id: "not the same collection"}]);
+    TwoPhaseDropCollectionTest.waitForDropToComplete(donorDB, collName);
 
     if (createNew) {
         jsTestLog("Creating a new collection with the same name.");

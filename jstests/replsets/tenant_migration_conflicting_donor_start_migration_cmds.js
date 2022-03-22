@@ -151,10 +151,14 @@ function testStartingConflictingMigrationAfterInitialMigrationCommitted({
     migrationOpts1,
     donorPrimary,
 }) {
-    TenantMigrationTest.assertCommitted(
-        tenantMigrationTest0.runMigration(migrationOpts0, {automaticForgetMigration: false}));
-    const res1 = assert.commandFailedWithCode(tenantMigrationTest1.runMigration(migrationOpts1),
-                                              ErrorCodes.ConflictingOperationInProgress);
+    jsTestLog("Start conflicting migration after first commits");
+    const res0 =
+        tenantMigrationTest0.runMigration(migrationOpts0, {automaticForgetMigration: false});
+    jsTestLog(`Migration 0 opts: ${tojson(migrationOpts0)}, result: ${tojson(res0)}`);
+    TenantMigrationTest.assertCommitted(res0);
+    const res1 = tenantMigrationTest1.runMigration(migrationOpts1);
+    jsTestLog(`Migration 1 opts: ${tojson(migrationOpts1)}, result: ${tojson(res1)}`);
+    assert.commandFailedWithCode(res1, ErrorCodes.ConflictingOperationInProgress);
     assertNoCertificateOrPrivateKey(res1.errmsg);
 
     // If the second donorStartMigration had started a duplicate migration, there would be two donor
@@ -191,8 +195,11 @@ function testConcurrentConflictingMigrations({
     migrationOpts1,
     donorPrimary,
 }) {
+    jsTestLog("Start conflicting migrations concurrently");
     const res0 = tenantMigrationTest0.startMigration(migrationOpts0);
+    jsTestLog(`Migration 0 opts: ${tojson(migrationOpts0)}, result: ${tojson(res0)}`);
     const res1 = tenantMigrationTest1.startMigration(migrationOpts1);
+    jsTestLog(`Migration 1 opts: ${tojson(migrationOpts1)}, result: ${tojson(res1)}`);
 
     let configDonorsColl = donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS);
 

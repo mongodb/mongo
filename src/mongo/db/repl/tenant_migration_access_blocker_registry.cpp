@@ -26,10 +26,15 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTenantMigration
+
 #include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
 #include "mongo/db/repl/tenant_migration_access_blocker.h"
+#include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/concurrency/thread_pool.h"
 
 namespace mongo {
@@ -70,7 +75,7 @@ void TenantMigrationAccessBlockerRegistry::add(StringData tenantId,
     stdx::lock_guard<Latch> lg(_mutex);
     auto mtabType = mtab->getType();
     tassert(8423351,
-            "add called with new-style blocker, use addDonorAccessBlocker instead",
+            "add called with new-style blocker, use addShardMergeDonorAccessBlocker instead",
             mtabType != MtabType::kDonor ||
                 mtab->getProtocol() != MigrationProtocolEnum::kShardMerge);
 
@@ -101,16 +106,17 @@ void TenantMigrationAccessBlockerRegistry::add(StringData tenantId,
     _tenantMigrationAccessBlockers.emplace(tenantId, mtabPair);
 }
 
-void TenantMigrationAccessBlockerRegistry::addDonorAccessBlocker(
+void TenantMigrationAccessBlockerRegistry::addShardMergeDonorAccessBlocker(
     std::shared_ptr<TenantMigrationDonorAccessBlocker> mtab) {
+    LOGV2_DEBUG(6114102, 1, "Adding shard merge donor access blocker");
     stdx::lock_guard<Latch> lg(_mutex);
     tassert(8423342,
-            "addDonorAccessBlocker called with old-style multitenant migrations blocker",
+            "addShardMergeDonorAccessBlocker called with old-style multitenant migrations blocker",
             mtab->getProtocol() == MigrationProtocolEnum::kShardMerge);
     tassert(ErrorCodes::ConflictingOperationInProgress,
             str::stream() << "This node is already a shard merge donor",
             !_donorAccessBlocker);
-    tassert(8423349,
+    tassert(6114105,
             "Adding shard merge donor blocker when this node has other donor blockers",
             std::find_if(_tenantMigrationAccessBlockers.begin(),
                          _tenantMigrationAccessBlockers.end(),
@@ -144,13 +150,32 @@ void TenantMigrationAccessBlockerRegistry::remove(StringData tenantId, MtabType 
     _remove(lg, tenantId, type);
 }
 
-void TenantMigrationAccessBlockerRegistry::removeDonorAccessBlocker(const UUID& migrationId) {
+void TenantMigrationAccessBlockerRegistry::removeShardMergeDonorAccessBlocker(
+    const UUID& migrationId) {
     stdx::lock_guard<Latch> lg(_mutex);
     if (_donorAccessBlocker && _donorAccessBlocker->getMigrationId() == migrationId) {
         // Shard merge has one donor blocker. If it exists it must be the one we're removing.
         _donorAccessBlocker->interrupt();
         _donorAccessBlocker.reset();
     }
+}
+
+void TenantMigrationAccessBlockerRegistry::removeRecipientAccessBlockersForMigration(
+    const UUID& migrationId) {
+    stdx::lock_guard<Latch> lg(_mutex);
+    // Clear recipient blockers for migrationId, and erase pairs with no blocker remaining.
+    erase_if(_tenantMigrationAccessBlockers,
+             [&](std::pair<const std::string, DonorRecipientAccessBlockerPair> it) {
+                 auto& mtabPair = it.second;
+                 auto recipient = checked_pointer_cast<TenantMigrationRecipientAccessBlocker>(
+                     mtabPair.getAccessBlocker(MtabType::kRecipient));
+                 if (!recipient || recipient->getMigrationId() != migrationId) {
+                     return false;
+                 }
+
+                 mtabPair.clearAccessBlocker(MtabType::kRecipient);
+                 return !mtabPair.getAccessBlocker(MtabType::kDonor);
+             });
 }
 
 void TenantMigrationAccessBlockerRegistry::removeAll(MtabType type) {
@@ -187,14 +212,7 @@ TenantMigrationAccessBlockerRegistry::getTenantMigrationAccessBlockerForDbName(S
 boost::optional<MtabPair>
 TenantMigrationAccessBlockerRegistry::_getTenantMigrationAccessBlockersForDbName(StringData dbName,
                                                                                  WithLock lk) {
-    // TODO (SERVER-61141): Refactor.
-    auto tenantId = [&]() -> StringData {
-        if (auto pos = dbName.find("_"); pos != std::string::npos) {
-            return dbName.substr(0, pos);
-        }
-        return StringData();
-    }();
-
+    auto tenantId = tenant_migration_access_blocker::parseTenantIdFromDB(dbName).value_or("");
     auto it = _tenantMigrationAccessBlockers.find(tenantId);
     if (it != _tenantMigrationAccessBlockers.end()) {
         auto pair = it->second;
@@ -229,6 +247,17 @@ TenantMigrationAccessBlockerRegistry::getTenantMigrationAccessBlockerForTenantId
         return it->second.getAccessBlocker(type);
     } else {
         return nullptr;
+    }
+}
+
+void TenantMigrationAccessBlockerRegistry::applyAll(
+    TenantMigrationAccessBlocker::BlockerType type,
+    const std::function<void(std::shared_ptr<TenantMigrationAccessBlocker>)>& callback) {
+    stdx::lock_guard<Latch> lg(_mutex);
+    for (auto& [tenantId, mtabPair] : _tenantMigrationAccessBlockers) {
+        if (auto mtab = mtabPair.getAccessBlocker(type)) {
+            callback(mtab);
+        }
     }
 }
 

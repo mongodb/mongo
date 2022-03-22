@@ -89,14 +89,14 @@ void onTransitionToAbortingIndexBuilds(OperationContext* opCtx,
             donorStateDoc.getRecipientConnectionString().toString());
 
         TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-            .addDonorAccessBlocker(mtab);
+            .addShardMergeDonorAccessBlocker(mtab);
 
         if (opCtx->writesAreReplicated()) {
             // onRollback is not registered on secondaries since secondaries should not fail to
             // apply the write.
             opCtx->recoveryUnit()->onRollback([opCtx, donorStateDoc] {
                 TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-                    .removeDonorAccessBlocker(donorStateDoc.getId());
+                    .removeShardMergeDonorAccessBlocker(donorStateDoc.getId());
             });
         }
     }
@@ -208,7 +208,7 @@ public:
                             "Bad protocol",
                             _donorStateDoc.getProtocol() == MigrationProtocolEnum::kShardMerge);
                     TenantMigrationAccessBlockerRegistry::get(_opCtx->getServiceContext())
-                        .removeDonorAccessBlocker(_donorStateDoc.getId());
+                        .removeShardMergeDonorAccessBlocker(_donorStateDoc.getId());
                 }
             }
             return;
@@ -348,7 +348,7 @@ void TenantMigrationDonorOpObserver::onDelete(OperationContext* opCtx,
         if (migrationIdToDeleteDecoration(opCtx)) {
             opCtx->recoveryUnit()->onCommit([opCtx](boost::optional<Timestamp>) {
                 TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-                    .removeDonorAccessBlocker(migrationIdToDeleteDecoration(opCtx).get());
+                    .removeShardMergeDonorAccessBlocker(migrationIdToDeleteDecoration(opCtx).get());
             });
         }
     }

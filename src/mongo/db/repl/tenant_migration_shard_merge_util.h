@@ -30,7 +30,6 @@
 #include <string>
 #include <vector>
 
-
 #include <boost/filesystem/operations.hpp>
 #include <fmt/format.h>
 
@@ -39,6 +38,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_import.h"
 #include "mongo/executor/scoped_task_executor.h"
 #include "mongo/util/cancellation.h"
 
@@ -102,12 +102,20 @@ struct MetadataInfo {
 };
 
 /**
- * Uses the TenantFileCloner to copy a file from the donor.
+ * Copy a file from the donor.
  */
 void cloneFile(OperationContext* opCtx, const BSONObj& metadataDoc);
 
-void importCopiedFiles(OperationContext* opCtx, UUID uuid);
+/**
+ * Import a donor collection after its files have been cloned to a temp dir.
+ */
+void wiredTigerImportFromBackupCursor(OperationContext* opCtx,
+                                      const std::vector<CollectionImportMetadata>& metadatas,
+                                      const std::string& importPath);
 
+/**
+ * Send a "getMore" to keep a backup cursor from timing out.
+ */
 SemiFuture<void> keepBackupCursorAlive(CancellationSource cancellationSource,
                                        std::shared_ptr<executor::TaskExecutor> executor,
                                        HostAndPort hostAndPort,

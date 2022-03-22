@@ -46,10 +46,10 @@ public:
     static constexpr StringData kTenantFileImporterServiceName = "TenantFileImporterService"_sd;
     static TenantFileImporterService* get(ServiceContext* serviceContext);
     TenantFileImporterService() = default;
-    void startMigration(const UUID& migrationId);
+    void startMigration(const UUID& migrationId, const StringData& donorConnectionString);
     void learnedFilename(const UUID& migrationId, const BSONObj& metadataDoc);
     void learnedAllFilenames(const UUID& migrationId);
-    void reset();
+    void reset(const UUID& migrationId);
 
 private:
     void onStartup(OperationContext* opCtx) final;
@@ -82,15 +82,16 @@ private:
         _reset(lk);
     }
 
-    void _voteImportedFiles();
+    void _voteImportedFiles(const UUID& migrationId, WithLock);
 
-    void _reset(WithLock lk);
+    void _reset(WithLock);
 
     // Lasts for the lifetime of the process.
     std::shared_ptr<executor::ThreadPoolTaskExecutor> _executor;
     // Wraps _executor. Created by learnedFilename and destroyed by _reset.
     std::shared_ptr<executor::ScopedTaskExecutor> _scopedExecutor;
     boost::optional<UUID> _migrationId;
+    std::string _donorConnectionString;
     Mutex _mutex = MONGO_MAKE_LATCH("TenantFileImporterService::_mutex");
 
     class ImporterState {

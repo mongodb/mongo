@@ -49,7 +49,6 @@
 #include "mongo/db/repl/tenant_file_cloner.h"
 #include "mongo/db/repl/tenant_migration_shared_data.h"
 #include "mongo/db/storage/durable_catalog.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_import.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/future_util.h"
 
@@ -59,7 +58,6 @@ constexpr int kBackupCursorKeepAliveIntervalMillis = mongo::kCursorTimeoutMillis
 
 namespace mongo::repl::shard_merge_utils {
 namespace {
-MONGO_FAIL_POINT_DEFINE(skipDeleteTempDBPath);
 using namespace fmt::literals;
 
 void moveFile(const std::string& src, const std::string& dst) {
@@ -128,6 +126,7 @@ Status connect(const HostAndPort& source, DBClientConnection* client) {
     return replAuthenticate(client).withContext(str::stream()
                                                 << "Failed to authenticate to " << source);
 }
+}  // namespace
 
 void wiredTigerImportFromBackupCursor(OperationContext* opCtx,
                                       const std::vector<CollectionImportMetadata>& metadatas,
@@ -171,6 +170,8 @@ void wiredTigerImportFromBackupCursor(OperationContext* opCtx,
         writeConflictRetry(opCtx, "importCollection", nss.ns(), [&] {
             LOGV2_DEBUG(6114303, 1, "Importing donor collection", "ns"_attr = nss);
             AutoGetDb autoDb(opCtx, nss.db(), MODE_IX);
+            auto db = autoDb.ensureDbExists(opCtx);
+            invariant(db);
             Lock::CollectionLock collLock(opCtx, nss, MODE_X);
             auto catalog = CollectionCatalog::get(opCtx);
             // TODO SERVER-63789 Uncomment WriteUnitOfWork declaration below when we
@@ -231,7 +232,6 @@ void wiredTigerImportFromBackupCursor(OperationContext* opCtx,
         revertIndexFileMove.dismiss();
     }
 }
-}  // namespace
 
 void cloneFile(OperationContext* opCtx, const BSONObj& metadataDoc) {
     std::unique_ptr<DBClientConnection> client;
@@ -322,41 +322,5 @@ SemiFuture<void> keepBackupCursorAlive(CancellationSource cancellationSource,
         .on(executor, cancellationSource.token())
         .onCompletion([](auto&&) {})
         .semi();
-}
-
-void importCopiedFiles(OperationContext* opCtx, UUID migrationId) {
-    auto tempWTDirectory = fileClonerTempDir(migrationId);
-    uassert(6113315,
-            str::stream() << "Missing file cloner's temporary dbpath directory: "
-                          << tempWTDirectory.string(),
-            boost::filesystem::exists(tempWTDirectory));
-
-    // TODO SERVER-63204: Evaluate correct place to remove the temporary
-    // WT dbpath.
-    ON_BLOCK_EXIT([&tempWTDirectory, &migrationId] {
-        // TODO SERVER-63789: Delete skipDeleteTempDBPath failpoint
-        if (MONGO_unlikely(skipDeleteTempDBPath.shouldFail())) {
-            LOGV2(6114402,
-                  "skipDeleteTempDBPath failpoint enabled, skipping temp directory cleanup.");
-            return;
-        }
-        LOGV2_DEBUG(6113324,
-                    1,
-                    "Done importing files, removing the temporary WT dbpath",
-                    "migrationId"_attr = migrationId,
-                    "tempDbPath"_attr = tempWTDirectory.string());
-        boost::system::error_code ec;
-        boost::filesystem::remove_all(tempWTDirectory, ec);
-    });
-
-    auto metadatas = wiredTigerRollbackToStableAndGetMetadata(opCtx, tempWTDirectory.string());
-
-    // TODO SERVER-63122: Remove the try-catch block once logical cloning is removed for
-    // shard merge protocol.
-    try {
-        wiredTigerImportFromBackupCursor(opCtx, metadatas, tempWTDirectory.string());
-    } catch (const ExceptionFor<ErrorCodes::NamespaceExists>& ex) {
-        LOGV2_WARNING(6113314, "Temporarily ignoring the error", "error"_attr = ex.toStatus());
-    }
 }
 }  // namespace mongo::repl::shard_merge_utils
