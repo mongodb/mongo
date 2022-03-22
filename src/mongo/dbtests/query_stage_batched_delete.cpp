@@ -232,6 +232,11 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteStagedDocIsDeleted) {
 // WriteConflict, yields, and then deletes the batch using a more recent snapshot that accounts for
 // the concurrent data changes.
 TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteStagedDocIsDeletedWriteConflict) {
+    if (storageGlobalParams.engine == "ephemeralForTest") {
+        // TODO SERVER-64778 Investigate how to enable for the ephemeralForTest storage engine.
+        return;
+    }
+
     auto serviceContext = getGlobalServiceContext();
 
     // Issue the batched delete through different client than the default _client test member.
