@@ -96,6 +96,10 @@ using std::stringstream;
 using std::unique_ptr;
 
 namespace {
+Counter64 allowDiskUseCounter;
+ServerStatusMetricField<Counter64> allowDiskUseMetric{"commands.aggregate.allowDiskUseTrue",
+                                                      &allowDiskUseCounter};
+
 /**
  * If a pipeline is empty (assuming that a $cursor stage hasn't been created yet), it could mean
  * that we were able to absorb all pipeline stages and pull them into a single PlanExecutor. So,
@@ -654,6 +658,7 @@ Status runAggregate(OperationContext* opCtx,
                     const BSONObj& cmdObj,
                     const PrivilegeVector& privileges,
                     rpc::ReplyBuilderInterface* result) {
+
     // Perform some validations on the LiteParsedPipeline and request before continuing with the
     // aggregation command.
     performValidationChecks(opCtx, request, liteParsedPipeline);
@@ -893,6 +898,10 @@ Status runAggregate(OperationContext* opCtx,
         expCtx->startExpressionCounters();
         auto pipeline = Pipeline::parse(request.getPipeline(), expCtx);
         expCtx->stopExpressionCounters();
+
+        if (request.getAllowDiskUse()) {
+            allowDiskUseCounter.increment();
+        }
 
         // Check that the view's collation matches the collation of any views involved in the
         // pipeline.

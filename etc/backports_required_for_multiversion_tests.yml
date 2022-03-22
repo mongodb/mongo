@@ -136,6 +136,8 @@ last-continuous:
       test_file: jstests/replsets/tenant_migration_transaction_boundary.js
     - ticket: SERVER-62245
       test_file: jstests/sharding/recover_multiple_migrations_on_stepup.js
+    - ticket: SERVER-64184
+      test_file: jstests/noPassthrough/aggregate_metrics.js
     - ticket: SERVER-62212
       test_file: jstests/replsets/dbcheck_write_concern.js
     - ticket: SERVER-62296
@@ -205,6 +207,8 @@ last-lts:
       test_file: jstests/sharding/safe_secondary_reads_single_migration_suspend_range_deletion.js
     - ticket: SERVER-50640
       test_file: jstests/sharding/safe_secondary_reads_single_migration_waitForDelete.js
+    - ticket: SERVER-64184
+      test_file: jstests/noPassthrough/aggregate_metrics.js
     - ticket: SERVER-49991
       test_file: jstests/replsets/get_replication_info_helper.js
     - ticket: SERVER-47469
