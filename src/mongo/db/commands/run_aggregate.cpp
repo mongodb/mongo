@@ -86,6 +86,10 @@ using std::stringstream;
 using std::unique_ptr;
 
 namespace {
+Counter64 allowDiskUseCounter;
+ServerStatusMetricField<Counter64> allowDiskUseMetric{"commands.aggregate.allowDiskUseTrue",
+                                                      &allowDiskUseCounter};
+
 /**
  * Returns true if this PlanExecutor is for a Pipeline.
  */
@@ -687,6 +691,10 @@ Status runAggregate(OperationContext* opCtx,
         expCtx->startExpressionCounters();
         auto pipeline = Pipeline::parse(request.getPipeline(), expCtx);
         expCtx->stopExpressionCounters();
+
+        if (request.shouldAllowDiskUse()) {
+            allowDiskUseCounter.increment();
+        }
 
         // Check that the view's collation matches the collation of any views involved in the
         // pipeline.
