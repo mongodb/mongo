@@ -423,23 +423,10 @@ CreateCollectionCoordinator::CreateCollectionCoordinator(ShardingDDLCoordinatorS
                                                          const BSONObj& initialState)
     : ShardingDDLCoordinator(service, initialState),
       _doc(CreateCollectionCoordinatorDocument::parse(
-          IDLParserErrorContext("CreateCollectionCoordinatorDocument"), initialState)) {
-
-    // TODO SERVER-64559: remove request from critSec reason.
-    auto filter = BSON(CreateCollectionRequest::kShardKeyFieldName
-                       << 1 << CreateCollectionRequest::kUniqueFieldName << 1
-                       << CreateCollectionRequest::kNumInitialChunksFieldName << 1
-                       << CreateCollectionRequest::kPresplitHashedZonesFieldName << 1
-                       << CreateCollectionRequest::kInitialSplitPointsFieldName << 1
-                       << CreateCollectionRequest::kTimeseriesFieldName << 1
-                       << CreateCollectionRequest::kCollationFieldName << 1);
-
-    _critSecReason = BSON("command"
+          IDLParserErrorContext("CreateCollectionCoordinatorDocument"), initialState)),
+      _critSecReason(BSON("command"
                           << "createCollection"
-                          << "ns" << nss().toString() << "request"
-                          << _doc.getCreateCollectionRequest().toBSON().filterFieldsUndotted(filter,
-                                                                                             true));
-}
+                          << "ns" << nss().toString())) {}
 
 boost::optional<BSONObj> CreateCollectionCoordinator::reportForCurrentOp(
     MongoProcessInterface::CurrentOpConnectionsMode connMode,
@@ -532,7 +519,7 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                         ->releaseRecoverableCriticalSection(
                             opCtx,
                             nss(),
-                            _critSecReason,
+                            _getCriticalSectionReason(),
                             ShardingCatalogClient::kMajorityWriteConcern);
                     return;
                 }
@@ -543,7 +530,10 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                 // presence of a stepdown.
                 RecoverableCriticalSectionService::get(opCtx)
                     ->acquireRecoverableCriticalSectionBlockWrites(
-                        opCtx, nss(), _critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
+                        opCtx,
+                        nss(),
+                        _getCriticalSectionReason(),
+                        ShardingCatalogClient::kMajorityWriteConcern);
 
                 if (_recoveredFromDisk) {
                     auto uuid = sharding_ddl_util::getCollectionUUID(opCtx, nss());
@@ -583,7 +573,7 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                         ->promoteRecoverableCriticalSectionToBlockAlsoReads(
                             opCtx,
                             nss(),
-                            _critSecReason,
+                            _getCriticalSectionReason(),
                             ShardingCatalogClient::kMajorityWriteConcern);
 
                     _doc = _updateSession(opCtx, _doc);
@@ -601,7 +591,10 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
 
                 // End of the critical section, from now on, read and writes are permitted.
                 RecoverableCriticalSectionService::get(opCtx)->releaseRecoverableCriticalSection(
-                    opCtx, nss(), _critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
+                    opCtx,
+                    nss(),
+                    _getCriticalSectionReason(),
+                    ShardingCatalogClient::kMajorityWriteConcern);
 
                 // Slow path. Create chunks (which might incur in an index scan) and commit must be
                 // done outside of the critical section to prevent writes from stalling in unsharded
@@ -632,7 +625,10 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                 auto* opCtx = opCtxHolder.get();
 
                 RecoverableCriticalSectionService::get(opCtx)->releaseRecoverableCriticalSection(
-                    opCtx, nss(), _critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
+                    opCtx,
+                    nss(),
+                    _getCriticalSectionReason(),
+                    ShardingCatalogClient::kMajorityWriteConcern);
             }
             return status;
         });
@@ -1043,5 +1039,16 @@ BSONObj CreateCollectionCoordinatorDocumentPre60Compatible::toBSON() const {
     serialize(&builder);
     return builder.obj();
 }
+
+CreateCollectionCoordinatorPre60Compatible::CreateCollectionCoordinatorPre60Compatible(
+    ShardingDDLCoordinatorService* service, const BSONObj& initialState)
+    : CreateCollectionCoordinator(service, initialState),
+      _critSecReason(
+          BSON("command"
+               << "createCollection"
+               << "ns" << nss().toString() << "request"
+               << _doc.getCreateCollectionRequest().toBSON().filterFieldsUndotted(
+                      CreateCollectionCoordinatorDocumentPre60Compatible::kPre60IncompatibleFields,
+                      false))) {}
 
 }  // namespace mongo

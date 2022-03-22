@@ -65,6 +65,9 @@ public:
         return *_result;
     }
 
+protected:
+    CoordDoc _doc;
+
 private:
     ShardingDDLCoordinatorMetadata const& metadata() const override {
         return _doc.getShardingDDLCoordinatorMetadata();
@@ -146,8 +149,17 @@ private:
      */
     void _logEndCreateCollection(OperationContext* opCtx);
 
-    CoordDoc _doc;
-    BSONObj _critSecReason;
+    /**
+     * Returns the BSONObj used as critical section reason
+     *
+     * TODO SERVER-64720 remove this function, directly access _critSecReason
+     *
+     */
+    virtual const BSONObj& _getCriticalSectionReason() const {
+        return _critSecReason;
+    };
+
+    const BSONObj _critSecReason;
 
     // Objects generated on each execution.
     boost::optional<ShardKeyPattern> _shardKeyPattern;
@@ -176,6 +188,16 @@ class CreateCollectionCoordinatorPre60Compatible final : public CreateCollection
 public:
     using CreateCollectionCoordinator::CreateCollectionCoordinator;
     using CoordDoc = CreateCollectionCoordinatorDocumentPre60Compatible;
+
+    CreateCollectionCoordinatorPre60Compatible(ShardingDDLCoordinatorService* service,
+                                               const BSONObj& initialState);
+
+    virtual const BSONObj& _getCriticalSectionReason() const override {
+        return _critSecReason;
+    };
+
+private:
+    const BSONObj _critSecReason;
 };
 
 }  // namespace mongo
