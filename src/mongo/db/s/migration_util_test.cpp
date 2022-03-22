@@ -344,6 +344,7 @@ TEST_F(MigrationUtilsTest, TestUpdateNumberOfOrphans) {
     const auto uuid = UUID::gen();
     PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
     auto rangeDeletionDoc = createDeletionTask(opCtx, kTestNss, uuid, 0, 10);
+    rangeDeletionDoc.setNumOrphanDocs(0);
     store.add(opCtx, rangeDeletionDoc);
 
     auto rangeDeletionQuery = BSON("_id" << rangeDeletionDoc.getId());

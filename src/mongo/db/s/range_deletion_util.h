@@ -32,6 +32,7 @@
 
 #include <boost/optional.hpp>
 
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/executor/task_executor.h"
@@ -108,5 +109,10 @@ void setOrphanCountersOnRangeDeletionTasks(OperationContext* opCtx);
  * Unsets the numOrphanDocs field from each document in `config.rangeDeletions`
  */
 void clearOrphanCountersFromRangeDeletionTasks(OperationContext* opCtx);
+
+/**
+ * Returns an exclusive lock for the `config.rangeDeletions` namespace.
+ */
+std::pair<Lock::DBLock, Lock::CollectionLock> getRangeDeleterLock(OperationContext* opCtx);
 
 }  // namespace mongo

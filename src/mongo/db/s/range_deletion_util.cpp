@@ -674,14 +674,6 @@ void setOrphanCountersOnRangeDeletionTasks(OperationContext* opCtx) {
             setNumOrphansOnTask(deletionTask, numOrphansInRange);
             return true;
         });
-
-    auto replClientInfo = repl::ReplClientInfo::forClient(opCtx->getClient());
-    replClientInfo.setLastOpToSystemLastOpTime(opCtx);
-    WriteConcernResult ignoreResult;
-    uassertStatusOK(waitForWriteConcern(opCtx,
-                                        replClientInfo.getLastOp(),
-                                        WriteConcerns::kMajorityWriteConcernNoTimeout,
-                                        &ignoreResult));
 }
 
 void clearOrphanCountersFromRangeDeletionTasks(OperationContext* opCtx) {
@@ -691,10 +683,16 @@ void clearOrphanCountersFromRangeDeletionTasks(OperationContext* opCtx) {
         store.update(opCtx,
                      allDocsQuery,
                      BSON("$unset" << BSON(RangeDeletionTask::kNumOrphanDocsFieldName << "")),
-                     WriteConcerns::kMajorityWriteConcernNoTimeout);
+                     WriteConcernOptions());
     } catch (const ExceptionFor<ErrorCodes::NoMatchingDocument>&) {
         // There may be no range deletion tasks, so it is possible no document is updated
     }
+}
+
+std::pair<Lock::DBLock, Lock::CollectionLock> getRangeDeleterLock(OperationContext* opCtx) {
+    Lock::DBLock dbLock(opCtx, NamespaceString::kConfigDb, MODE_IX);
+    Lock::CollectionLock collLock(opCtx, NamespaceString::kRangeDeletionNamespace, MODE_X);
+    return std::make_pair(std::move(dbLock), std::move(collLock));
 }
 
 }  // namespace mongo

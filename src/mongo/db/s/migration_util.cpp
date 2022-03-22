@@ -56,6 +56,7 @@
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/migration_coordinator.h"
 #include "mongo/db/s/migration_destination_manager.h"
+#include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_state.h"
@@ -672,12 +673,24 @@ void persistRangeDeletionTaskLocally(OperationContext* opCtx,
 void persistUpdatedNumOrphans(OperationContext* opCtx,
                               const BSONObj& rangeDeletionQuery,
                               const int& changeInOrphans) {
-    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
-    store.update(
-        opCtx,
-        rangeDeletionQuery,
-        BSON("$inc" << BSON(RangeDeletionTask::kNumOrphanDocsFieldName << changeInOrphans)),
-        WriteConcernOptions());
+    auto [dbLock, collLock] = getRangeDeleterLock(opCtx);
+    // Add $exists to the query to ensure that on upgrade and downgrade, the numOrphanDocs field
+    // is only updated after the upgrade procedure has populated it with an initial value.
+    BSONObj extendedQuery = rangeDeletionQuery.addField(
+        BSON(RangeDeletionTask::kNumOrphanDocsFieldName << BSON("$exists" << true)).firstElement());
+    try {
+        PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
+        store.update(
+            opCtx,
+            extendedQuery,
+            BSON("$inc" << BSON(RangeDeletionTask::kNumOrphanDocsFieldName << changeInOrphans)),
+            WriteConcernOptions());
+    } catch (const ExceptionFor<ErrorCodes::NoMatchingDocument>& ex) {
+        LOGV2_ERROR(6416300,
+                    "No range deletion document found for query",
+                    "query"_attr = extendedQuery,
+                    "error"_attr = redact(ex));
+    }
 }
 
 int retrieveNumOrphansFromRecipient(OperationContext* opCtx,

@@ -80,5 +80,5 @@ structs:
                 optional: true
             numOrphanDocs:
                 type: safeInt64
-                default: 0
                 description: "The estimated number of orphaned documents in the range"
+                optional: true
