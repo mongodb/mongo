@@ -21,24 +21,24 @@ var $config = (function() {
             const startingId = Random.randInt(this.numDocs - limitAmount);
 
             function getQueryResults() {
-                const cursor = db[collName]
-                      .aggregate([
-                          {$match: {_id: {$gt: startingId}}},
-                          {
-                              $graphLookup: {
-                                  from: collName,
-                                  startWith: "$to",
-                                  connectToField: "_id",
-                                  connectFromField: "to",
-                                  maxDepth: 10,
-                                  as: "out",
-                              }
-                          },
-                          {$limit: limitAmount}
-                      ]);
-
                 let arr = null;
                 try {
+                    const cursor = db[collName]
+                          .aggregate([
+                              {$match: {_id: {$gt: startingId}}},
+                              {
+                                  $graphLookup: {
+                                      from: collName,
+                                      startWith: "$to",
+                                      connectToField: "_id",
+                                      connectFromField: "to",
+                                      maxDepth: 10,
+                                      as: "out",
+                                  }
+                              },
+                              {$limit: limitAmount}
+                          ]);
+
                     arr = cursor.toArray();
                 } catch (e) {
                     if (TestData.runningWithShardStepdowns) {
