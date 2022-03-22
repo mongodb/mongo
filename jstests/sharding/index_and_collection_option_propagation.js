@@ -1,5 +1,5 @@
 /**
- * Mongos has special targeting behavior for createIndex, reIndex, dropIndex, and collMod:
+ * Mongos has special targeting behavior for createIndex, dropIndex, and collMod:
  *
  * - If called on an unsharded collection, the request is routed only to the primary shard.
  * - If called on a sharded collection, the request is broadcast to shards with chunks.
@@ -131,10 +131,10 @@ checkShardIndexes("idx2", [st.shard1], [st.shard2]);
 
 // dropIndex
 res = st.s.getDB(dbName).getCollection(collName).dropIndex("idx1_1");
-assert.commandWorked(res);
 assert.eq(undefined, res.raw[st.shard0.host], tojson(res));
 assert.eq(res.raw[st.shard1.host].ok, 1, tojson(res));
 assert.eq(undefined, res.raw[st.shard2.host], tojson(res));
+assert.commandWorked(res);
 checkShardIndexes("idx1", [], [st.shard1, st.shard2]);
 
 // collMod

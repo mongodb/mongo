@@ -151,6 +151,7 @@ let viewsCommandTests = {
     _shardsvrDropCollection: {skip: isAnInternalCommand},
     _shardsvrDropCollectionIfUUIDNotMatching: {skip: isUnrelated},
     _shardsvrDropCollectionParticipant: {skip: isAnInternalCommand},
+    _shardsvrDropIndexes: {skip: isAnInternalCommand},
     _shardsvrCleanupReshardCollection: {skip: isAnInternalCommand},
     _shardsvrCommitReshardCollection: {skip: isAnInternalCommand},
     _shardsvrCreateCollection: {skip: isAnInternalCommand},

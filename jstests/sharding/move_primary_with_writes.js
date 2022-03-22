@@ -153,7 +153,15 @@ function buildCommands(collName, shouldFail) {
             errorCodes: [ErrorCodes.LockBusy, ErrorCodes.MovePrimaryInProgress]
         },
         {command: {convertToCapped: "unshardedFoo", size: 1000000}, shouldFail: true},
-        {command: {dropIndexes: collName, index: collName + "Index"}, shouldFail: shouldFail},
+        {
+            command: {dropIndexes: collName, index: collName + "Index"},
+            shouldFail: true,
+            errorCodes: [
+                ErrorCodes.LockBusy,
+                ErrorCodes.MovePrimaryInProgress,
+                ErrorCodes.InterruptedDueToReplStateChange
+            ]
+        },
         {
             command: {drop: collName},
             shouldFail: true,

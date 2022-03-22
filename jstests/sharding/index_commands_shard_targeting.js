@@ -67,7 +67,7 @@ function assertCommandChecksShardVersions(st, dbName, collName, testCase) {
  * the given command function. Asserts that the command is blocked behind the critical section.
  */
 function assertCommandBlocksIfCriticalSectionInProgress(
-    st, staticMongod, dbName, collName, testCase) {
+    st, staticMongod, dbName, collName, allShards, testCase) {
     const ns = dbName + "." + collName;
     const fromShard = st.shard0;
     const toShard = st.shard1;
@@ -94,6 +94,10 @@ function assertCommandBlocksIfCriticalSectionInProgress(
     // It could be possible that the following check fails on slow clusters because the request
     // expired its maxTimeMS on the mongos before to reach the shard.
     checkLog.checkContainsOnceJsonStringMatch(st.shard0, 22062, "error", "MaxTimeMSExpired");
+
+    allShards.forEach(function(shard) {
+        testCase.assertCommandDidNotRunOnShard(shard);
+    });
 
     // Turn off the fail point and wait for moveChunk to complete.
     unpauseMoveChunkAtStep(fromShard, moveChunkStepNames.chunkDataCommitted);
@@ -219,11 +223,8 @@ for (const command of Object.keys(testCases)) {
     let testCase = testCases[command](collName);
 
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: shardKey}));
-    assertCommandBlocksIfCriticalSectionInProgress(st, staticMongod, dbName, collName, testCase);
-
-    allShards.forEach(function(shard) {
-        testCase.assertCommandDidNotRunOnShard(shard);
-    });
+    assertCommandBlocksIfCriticalSectionInProgress(
+        st, staticMongod, dbName, collName, allShards, testCase);
 }
 
 st.stop();
