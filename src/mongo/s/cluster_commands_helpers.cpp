@@ -475,7 +475,6 @@ RawResponsesResult appendRawResponses(
     std::string* errmsg,
     BSONObjBuilder* output,
     const std::vector<AsyncRequestsSender::Response>& shardResponses) {
-
     std::vector<AsyncRequestsSender::Response> successARSResponses;
     std::vector<std::pair<ShardId, BSONObj>> successResponsesReceived;
     std::vector<std::pair<ShardId, Status>> shardNotFoundErrorsReceived;

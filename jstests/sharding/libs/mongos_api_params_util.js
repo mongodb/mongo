@@ -468,7 +468,7 @@ let MongosAPIParametersUtil = (function() {
             commandName: "dropIndexes",
             run: {
                 inAPIVersion1: true,
-                shardCommandName: "dropIndexes",
+                shardCommandName: "_shardsvrDropIndexes",
                 permittedInTxn: false,
                 command: () => ({dropIndexes: "collection", index: "*"}),
             }

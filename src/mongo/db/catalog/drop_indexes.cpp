@@ -282,7 +282,8 @@ std::vector<UUID> abortActiveIndexBuilders(OperationContext* opCtx,
 void dropReadyIndexes(OperationContext* opCtx,
                       Collection* collection,
                       const std::vector<std::string>& indexNames,
-                      DropIndexesReply* reply) {
+                      DropIndexesReply* reply,
+                      bool forceDropShardKeyIndex) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_X));
 
     if (indexNames.empty()) {
@@ -294,7 +295,7 @@ void dropReadyIndexes(OperationContext* opCtx,
         CollectionShardingState::get(opCtx, collection->ns())->getCollectionDescription(opCtx);
 
     if (indexNames.front() == "*") {
-        if (collDescription.isSharded()) {
+        if (collDescription.isSharded() && !forceDropShardKeyIndex) {
             indexCatalog->dropIndexes(
                 opCtx,
                 collection,
@@ -561,7 +562,8 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
 
             // This is necessary to check shard version.
             OldClientContext ctx(opCtx, (*collection)->ns().ns());
-            dropReadyIndexes(opCtx, collection->getWritableCollection(opCtx), indexNames, &reply);
+            dropReadyIndexes(
+                opCtx, collection->getWritableCollection(opCtx), indexNames, &reply, false);
             wunit.commit();
         });
 
@@ -611,8 +613,11 @@ Status dropIndexesForApplyOps(OperationContext* opCtx,
         OldClientContext ctx(opCtx, nss.ns());
 
         DropIndexesReply ignoredReply;
-        dropReadyIndexes(
-            opCtx, collection.getWritableCollection(opCtx), swIndexNames.getValue(), &ignoredReply);
+        dropReadyIndexes(opCtx,
+                         collection.getWritableCollection(opCtx),
+                         swIndexNames.getValue(),
+                         &ignoredReply,
+                         true);
 
         wunit.commit();
         return Status::OK();

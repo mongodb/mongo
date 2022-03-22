@@ -247,10 +247,14 @@ DropIndexes makeTimeseriesDropIndexesCommand(OperationContext* opCtx,
                               << " Command request: " << redact(origCmd.toBSON({})),
                 bucketsIndexSpecWithStatus.isOK());
 
-        return DropIndexes(ns, std::move(bucketsIndexSpecWithStatus.getValue()));
+        DropIndexes dropIndexCmd(ns);
+        dropIndexCmd.setDropIndexesRequest({std::move(bucketsIndexSpecWithStatus.getValue())});
+        return dropIndexCmd;
     }
 
-    return DropIndexes(ns, origIndex);
+    DropIndexes dropIndexCmd(ns);
+    dropIndexCmd.setDropIndexesRequest(origIndex);
+    return dropIndexCmd;
 }
 
 }  // namespace mongo::timeseries

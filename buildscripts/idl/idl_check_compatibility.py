@@ -707,7 +707,10 @@ def check_param_or_command_type_recursive(ctxt: IDLCompatibilityContext,
             # Check that new variant types are a superset of old variant types.
             for old_variant_type in old_variant_types:
                 for new_variant_type in new_variant_types:
-                    if old_variant_type.name == new_variant_type.name:
+                    # object->object_owned serialize to the same bson type. object_owned->object is
+                    # not always safe so we only limit this special case to object->object_owned.
+                    if (old_variant_type.name == "object" and new_variant_type.name == "object_owned") or \
+                        old_variant_type.name == new_variant_type.name:
                         # Check that the old and new version of each variant type is also compatible.
                         old = FieldCompatibility(old_variant_type, old_field.idl_file,
                                                  old_field.idl_file_path, old_field.unstable,

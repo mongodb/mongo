@@ -32,48 +32,16 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/commands.h"
-#include "mongo/db/drop_indexes_gen.h"
-#include "mongo/db/timeseries/timeseries_commands_conversion_helper.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/chunk_manager_targeter.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 
 namespace mongo {
 namespace {
 
 constexpr auto kRawFieldName = "raw"_sd;
-
-struct StaleConfigRetryState {
-    std::set<ShardId> shardsWithSuccessResponses;
-    std::vector<AsyncRequestsSender::Response> shardSuccessResponses;
-};
-
-const OperationContext::Decoration<std::unique_ptr<StaleConfigRetryState>> staleConfigRetryState =
-    OperationContext::declareDecoration<std::unique_ptr<StaleConfigRetryState>>();
-
-StaleConfigRetryState createAndRetrieveStateFromStaleConfigRetry(OperationContext* opCtx) {
-    if (!staleConfigRetryState(opCtx)) {
-        staleConfigRetryState(opCtx) = std::make_unique<StaleConfigRetryState>();
-    }
-
-    return *staleConfigRetryState(opCtx);
-}
-
-void updateStateForStaleConfigRetry(OperationContext* opCtx,
-                                    const StaleConfigRetryState& retryState,
-                                    const RawResponsesResult& response) {
-    std::set<ShardId> okShardIds;
-    std::set_union(response.shardsWithSuccessResponses.begin(),
-                   response.shardsWithSuccessResponses.end(),
-                   retryState.shardsWithSuccessResponses.begin(),
-                   retryState.shardsWithSuccessResponses.end(),
-                   std::inserter(okShardIds, okShardIds.begin()));
-
-    staleConfigRetryState(opCtx)->shardsWithSuccessResponses = std::move(okShardIds);
-    staleConfigRetryState(opCtx)->shardSuccessResponses = std::move(response.successResponses);
-}
 
 class DropIndexesCmd : public BasicCommandWithRequestParser<DropIndexesCmd> {
 public:
@@ -128,6 +96,15 @@ public:
                               const RequestParser& requestParser,
                               BSONObjBuilder& output) final {
         auto nss = requestParser.request().getNamespace();
+
+        uassert(ErrorCodes::IllegalOperation,
+                "Cannot drop indexes in 'config' database in sharded cluster",
+                nss.db() != NamespaceString::kConfigDb);
+
+        uassert(ErrorCodes::IllegalOperation,
+                "Cannot drop indexes in 'admin' database in sharded cluster",
+                nss.db() != NamespaceString::kAdminDb);
+
         LOGV2_DEBUG(22751,
                     1,
                     "dropIndexes: {namespace} cmd: {command}",
@@ -135,61 +112,24 @@ public:
                     "namespace"_attr = nss,
                     "command"_attr = redact(cmdObj));
 
-        // dropIndexes can be retried on a stale config error. If a previous attempt already
-        // successfully dropped the index on shards, those shards will return an IndexNotFound
-        // error when retried. We instead maintain the record of shards that have already
-        // successfully dropped the index, so that we don't try to contact those shards again
-        // across stale config retries.
-        const auto retryState = createAndRetrieveStateFromStaleConfigRetry(opCtx);
+        ShardsvrDropIndexes shardsvrDropIndexCmd(nss);
+        shardsvrDropIndexCmd.setDropIndexesRequest(requestParser.request().getDropIndexesRequest());
 
-        // If the collection is sharded, we target only the primary shard and the shards that own
-        // chunks for the collection.
-        auto targeter = ChunkManagerTargeter(opCtx, nss);
-        auto routingInfo = targeter.getRoutingInfo();
+        const CachedDatabaseInfo dbInfo =
+            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName));
 
-        auto cmdToBeSent = cmdObj;
-        if (targeter.timeseriesNamespaceNeedsRewrite(nss)) {
-            cmdToBeSent = timeseries::makeTimeseriesCommand(
-                cmdToBeSent, nss, getName(), DropIndexes::kIsTimeseriesNamespaceFieldName);
-        }
+        auto cmdResponse = executeCommandAgainstDatabasePrimary(
+            opCtx,
+            dbName,
+            dbInfo,
+            CommandHelpers::appendMajorityWriteConcern(shardsvrDropIndexCmd.toBSON({}),
+                                                       opCtx->getWriteConcern()),
+            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+            Shard::RetryPolicy::kNotIdempotent);
 
-        auto shardResponses =
-            scatterGatherVersionedTargetByRoutingTableNoThrowOnStaleShardVersionErrors(
-                opCtx,
-                nss.db(),
-                targeter.getNS(),
-                routingInfo,
-                retryState.shardsWithSuccessResponses,
-                applyReadWriteConcern(
-                    opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdToBeSent)),
-                ReadPreferenceSetting::get(opCtx),
-                Shard::RetryPolicy::kNotIdempotent,
-                BSONObj() /* query */,
-                BSONObj() /* collation */);
-
-        // Append responses we've received from previous retries of this operation due to a stale
-        // config error.
-        shardResponses.insert(shardResponses.end(),
-                              retryState.shardSuccessResponses.begin(),
-                              retryState.shardSuccessResponses.end());
-
-        std::string errmsg;
-        const auto aggregateResponse =
-            appendRawResponses(opCtx, &errmsg, &output, std::move(shardResponses));
-
-        // If we have a stale config error, update the success shards for the upcoming retry.
-        if (!aggregateResponse.responseOK && aggregateResponse.firstStaleConfigError) {
-            updateStateForStaleConfigRetry(opCtx, retryState, aggregateResponse);
-            uassertStatusOK(*aggregateResponse.firstStaleConfigError);
-        }
-
-        CommandHelpers::appendSimpleCommandStatus(output, aggregateResponse.responseOK, errmsg);
-
-        if (aggregateResponse.responseOK) {
-            LOGV2(5706401, "Indexes dropped", "namespace"_attr = nss);
-        }
-
-        return aggregateResponse.responseOK;
+        const auto remoteResponse = uassertStatusOK(cmdResponse.swResponse);
+        CommandHelpers::filterCommandReplyForPassthrough(remoteResponse.data, &output);
+        return true;
     }
 
     const AuthorizationContract* getAuthorizationContract() const final {

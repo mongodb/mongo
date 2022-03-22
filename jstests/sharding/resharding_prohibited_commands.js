@@ -65,7 +65,7 @@ const assertCommandsFailDuringReshardingOp = (database) => {
         jsTest.log(`Testing that ${tojson(command)} fails during resharding operation`);
         // The collMod is serialized with the resharding command, so we explicitly add an timeout to
         // the command so that it doesn't get blocked and timeout the test.
-        if (command.hasOwnProperty('collMod')) {
+        if (command.hasOwnProperty('collMod') || command.hasOwnProperty('dropIndexes')) {
             command = Object.assign({}, command);
             command.maxTimeMS = 5000;
         }

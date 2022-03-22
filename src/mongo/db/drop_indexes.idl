@@ -50,20 +50,9 @@ structs:
                 optional: true
                 unstable: false
 
-commands:
-    dropIndexes:
-        description: "Parser for the dropIndexes command"
-        command_name: dropIndexes
-        command_alias: deleteIndexes
-        namespace: concatenate_with_db
-        cpp_name: dropIndexes
-        strict: true
-        api_version: "1"
-        access_check:
-            simple:
-                privilege:
-                    resource_pattern: exact_namespace
-                    action_type: dropIndex
+    DropIndexesRequest:
+        description: dropIndexes command request
+        strict: false
         fields:
             index:
                 description: An index name, or array of names, or "*" for all indexes, or an index
@@ -85,5 +74,23 @@ commands:
                 type: uuid
                 description: "The expected UUID of the collection."
                 optional: true
-                unstable: true 
+                unstable: true
+
+commands:
+    dropIndexes:
+        description: "Parser for the dropIndexes command"
+        command_name: dropIndexes
+        command_alias: deleteIndexes
+        namespace: concatenate_with_db
+        cpp_name: dropIndexes
+        strict: true
+        api_version: "1"
+        access_check:
+            simple:
+                privilege:
+                    resource_pattern: exact_namespace
+                    action_type: dropIndex
+        inline_chained_structs: true
+        chained_structs:
+            DropIndexesRequest: DropIndexesRequest
         reply_type: DropIndexesReply

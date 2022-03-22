@@ -36,6 +36,7 @@ global:
 imports:
     - "mongo/db/commands/rename_collection.idl"
     - "mongo/db/commands/set_user_write_block_mode.idl"
+    - "mongo/db/drop_indexes.idl"
     - "mongo/db/drop_database.idl"
     - "mongo/db/keypattern.idl"
     - "mongo/db/coll_mod.idl"
@@ -394,6 +395,16 @@ commands:
                 description: >-
                     Verifies that the shard key index has the same unique setting as the command.
                 type: optionalBool
+
+    _shardsvrDropIndexes:
+        description: "Parser for the _shardsvrDropIndexes command"
+        command_name: _shardsvrDropIndexes
+        cpp_name: ShardsvrDropIndexes
+        namespace: concatenate_with_db
+        api_version: ""
+        strict: false
+        chained_structs: 
+            DropIndexesRequest: DropIndexesRequest
 
     _configsvrCreateDatabase:
         description: "The internal createDatabase command on the config server"

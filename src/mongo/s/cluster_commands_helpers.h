@@ -235,7 +235,7 @@ AsyncRequestsSender::Response executeCommandAgainstShardWithMinKeyChunk(
  * string representation of all errors to 'errmsg.'
  *
  * ShardNotFound responses are not treated as errors if any shard returned success. We allow
- * ShardNotFound errors to be ignored as errors since this node may not heave realized that a
+ * ShardNotFound errors to be ignored as errors since this node may not have realized that a
  * shard has been removed.
  *
  * Returns:
