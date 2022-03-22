@@ -196,8 +196,16 @@ SemiFuture<void> makeRecipientAcceptSplitFuture(
         .thenRunOn(taskExecutor)
         // Preserve lifetime of listener and monitor until the future is fulfilled and remove the
         // listener.
-        .onCompletion([monitors = std::move(monitors), listener, eventsPublisher, taskExecutor](
-                          Status s) { return s; })
+        .onCompletion(
+            [monitors = std::move(monitors), listener, eventsPublisher, taskExecutor](Status s) {
+                eventsPublisher->close();
+
+                for (auto& monitor : monitors) {
+                    monitor->shutdown();
+                }
+
+                return s;
+            })
         .semi();
 }
 
