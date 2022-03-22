@@ -470,6 +470,7 @@ void ShardRegistry::_reloadInternal(OperationContext* opCtx) {
 }
 
 void ShardRegistry::clearEntries() {
+    LOGV2_DEBUG(6471800, 1, "Invalidating Shard Registry");
     _cache->invalidateAll();
 }
 
@@ -520,6 +521,8 @@ void ShardRegistry::_initializeCacheIfNecessary() const {
     if (!_cache->peekLatestCached(_kSingleton)) {
         stdx::lock_guard<Latch> lk(_mutex);
         if (!_cache->peekLatestCached(_kSingleton)) {
+            LOGV2_DEBUG(
+                6471801, 1, "Initializing Shard Registry's cache to an empty set of shards");
             _cache->insertOrAssign(_kSingleton, {}, Date_t::now(), Time());
         }
     }
