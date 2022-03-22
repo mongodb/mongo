@@ -48,6 +48,8 @@ all:
     test_file: jstests/replsets/step_down_on_secondary.js
   - ticket: SERVER-45010
     test_file: jstests/replsets/rollback_dup_ids_clean_shutdown_during_rollback.js
+  - ticket: SERVER-64184
+    test_file: jstests/noPassthrough/aggregate_metrics.js
   - ticket: SERVER-45906
     test_file: jstests/replsets/trigger_initial_stable_checkpoint.js
   - ticket: SERVER-45178
