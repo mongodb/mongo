@@ -11,6 +11,7 @@
 
 load("jstests/aggregation/extras/utils.js");  // for arrayEq
 load("jstests/libs/discover_topology.js");    // For findDataBearingNodes.
+load("jstests/libs/sbe_util.js");             // For checkSBEEnabled.
 
 function runTests(withDefaultCollationColl, withoutDefaultCollationColl, collation) {
     // Test that the $lookup stage respects the inherited collation.
@@ -567,6 +568,14 @@ const caseInsensitive = {
 };
 
 const mongosDB = st.s0.getDB(testName);
+
+// TODO SERVER-64482 Reenable this test when SERVER-64482 is done.
+if (checkSBEEnabled(mongosDB, ["featureFlagSBELookupPushdown"])) {
+    jsTestLog("Skipping test because SBE and SBE $lookup features are both enabled.");
+    st.stop();
+    return;
+}
+
 const withDefaultCollationColl = mongosDB[testName + "_with_default"];
 const withoutDefaultCollationColl = mongosDB[testName + "_without_default"];
 

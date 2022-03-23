@@ -1,6 +1,7 @@
 'use strict';
 
 load("jstests/libs/fixture_helpers.js");  // For isSharded.
+load("jstests/libs/sbe_util.js");         // For checkSBEEnabled.
 
 /**
  * view_catalog_cycle_lookup.js
@@ -19,6 +20,10 @@ var $config = (function() {
 
     // Track if the test is not allowed to run on sharded collections.
     var isShardedAndShardedLookupDisabled = false;
+
+    // Test is not allowed yet when featureFlagSBELookPushdown is turned on.
+    // TODO SERVER-64665 Remove this variable after SERVER-64665 is fixed.
+    var isSBELookupEnabled = false;
 
     // Store the default value of the max sub pipeline view depth so it can be reset at the end of
     // the test.
@@ -88,7 +93,7 @@ var $config = (function() {
          * is expected at view create/modification time.
          */
         function remapViewToView(db, collName) {
-            if (this.isShardedAndShardedLookupDisabled) {
+            if (this.isShardedAndShardedLookupDisabled || this.isSBELookupEnabled) {
                 return;
             }
 
@@ -110,7 +115,7 @@ var $config = (function() {
          * error as it is expected at view create/modification time.
          */
         function remapViewToCollection(db, collName) {
-            if (this.isShardedAndShardedLookupDisabled) {
+            if (this.isShardedAndShardedLookupDisabled || this.isSBELookupEnabled) {
                 return;
             }
 
@@ -126,7 +131,7 @@ var $config = (function() {
         }
 
         function readFromView(db, collName) {
-            if (this.isShardedAndShardedLookupDisabled) {
+            if (this.isShardedAndShardedLookupDisabled || this.isSBELookupEnabled) {
                 return;
             }
 
@@ -171,6 +176,13 @@ var $config = (function() {
             jsTestLog(
                 "Skipping test because the sharded lookup feature flag is disabled and we have sharded collections");
             this.isShardedAndShardedLookupDisabled = true;
+            return;
+        }
+
+        // TODO SERVER-64665 Remove 'if' block after SERVER-64665 is fixed.
+        if (checkSBEEnabled(db, ["featureFlagSBELookupPushdown"])) {
+            jsTestLog("Skipping test because SBE and SBE $lookup features are both enabled.");
+            this.isSBELookupEnabled = true;
             return;
         }
 

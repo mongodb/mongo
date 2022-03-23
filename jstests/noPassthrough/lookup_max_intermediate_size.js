@@ -5,6 +5,7 @@
 // ]
 
 load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
+load("jstests/libs/sbe_util.js");             // For checkSBEEnabled.
 
 (function() {
 "use strict";
@@ -86,6 +87,14 @@ function runTest(coll, from) {
 // Run tests on single node.
 const standalone = MongoRunner.runMongod();
 const db = standalone.getDB("test");
+
+// TODO SERVER-64597 Remove 'if' block if we decide to support the same query knob for the SBE
+// $lookup.
+if (checkSBEEnabled(db, ["featureFlagSBELookupPushdown"])) {
+    jsTest.log("Skipping test because SBE and SBE $lookup features are both enabled.");
+    MongoRunner.stopMongod(standalone);
+    return;
+}
 
 assert.commandWorked(db.adminCommand(
     {setParameter: 1, internalLookupStageIntermediateDocumentMaxSizeBytes: 30 * 1024 * 1024}));

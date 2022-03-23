@@ -16,6 +16,13 @@
 "use strict";
 
 load("jstests/libs/analyze_plan.js");  // for 'getAggPlanStages'
+load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
+
+// TODO SERVER-64576 Update test cases for the SBE $lookup feature and remove 'if' block.
+if (checkSBEEnabled(db, ["featureFlagSBELookupPushdown"])) {
+    jsTest.log("Skipping test because SBE and SBE $lookup features are both enabled.");
+    return;
+}
 
 const testDB = db.getSiblingDB("lookup_query_stats");
 testDB.dropDatabase();

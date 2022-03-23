@@ -14,9 +14,18 @@
  */
 (function() {
 load("jstests/libs/analyze_plan.js");  // For getAggPlanStages().
+load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
 
 const st = new ShardingTest({shards: 2, config: 1});
 const db = st.s.getDB("test");
+
+// TODO SERVER-64614 Update test cases for the SBE $lookup and remove 'if' block.
+if (checkSBEEnabled(db, ["featureFlagSBELookupPushdown"])) {
+    jsTestLog("Skipping test because SBE and SBE $lookup features are both enabled.");
+    st.stop();
+    return;
+}
+
 const coll = db.lookup_with_limit;
 const other = db.lookup_with_limit_other;
 coll.drop();

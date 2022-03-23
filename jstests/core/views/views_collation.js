@@ -15,6 +15,13 @@
 "use strict";
 
 load("jstests/libs/analyze_plan.js");
+load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
+
+// TODO SERVER-64665 Reenable this test after SERVER-64665 is fixed.
+if (checkSBEEnabled(db, ["featureFlagSBELookupPushdown"])) {
+    jsTestLog("Skipping test because SBE and SBE $lookup features are both enabled.");
+    return;
+}
 
 let viewsDB = db.getSiblingDB("views_collation");
 assert.commandWorked(viewsDB.dropDatabase());

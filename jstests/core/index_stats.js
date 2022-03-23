@@ -15,6 +15,7 @@
 "use strict";
 
 load("jstests/libs/analyze_plan.js");
+load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 
 var colName = "jstests_index_stats";
 var col = db[colName];
@@ -230,9 +231,16 @@ assert.eq(2,
                  ])
                   .itcount());
 assert.eq(1, getUsageCount("_id_", col), "Expected aggregation to use _id index");
-assert.eq(2,
-          getUsageCount("_id_", foreignCollection),
-          "Expected each lookup to be tracked as an index use");
+
+// Temporarily disable this test case.
+// TODO SERVER-64662 Remove 'if' condition after SERVER-64662 is fixed.
+if (!checkSBEEnabled(db, ["featureFlagSBELookupPushdown"])) {
+    assert.eq(2,
+              getUsageCount("_id_", foreignCollection),
+              "Expected each lookup to be tracked as an index use");
+} else {
+    jsTestLog("Skipping test because SBE and SBE $lookup features are both enabled.");
+}
 
 //
 // Confirm index use is recorded for $graphLookup.

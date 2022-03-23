@@ -4,6 +4,7 @@
  * the fix for SERVER-43350.
  */
 load("jstests/aggregation/extras/utils.js");  // For anyEq.
+load("jstests/libs/sbe_util.js");             // For checkSBEEnabled.
 
 (function() {
 
@@ -13,6 +14,12 @@ load("jstests/libs/fixture_helpers.js");  // For isSharded.
 
 const testDB = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());
+
+// TODO SERVER-64482 Reenable this test when SERVER-64482 is done.
+if (checkSBEEnabled(testDB, ["featureFlagSBELookupPushdown"])) {
+    jsTestLog("Skipping test because SBE and SBE $lookup features are both enabled.");
+    return;
+}
 
 const caseInsensitiveCollation = {
     locale: "en_US",

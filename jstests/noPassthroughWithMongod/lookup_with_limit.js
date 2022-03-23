@@ -5,6 +5,12 @@
 "use strict";
 
 load('jstests/libs/analyze_plan.js');  // For getWinningPlan().
+load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
+
+if (checkSBEEnabled(db, ["featureFlagSBELookupPushdown"])) {
+    jsTestLog("Skipping test because SBE and SBE $lookup features are both enabled.");
+    return;
+}
 
 const coll = db.lookup_with_limit;
 const other = db.lookup_with_limit_other;

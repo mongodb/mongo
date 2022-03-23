@@ -6,6 +6,7 @@
  * ]
  */
 load("jstests/aggregation/extras/utils.js");  // For anyEq.
+load("jstests/libs/sbe_util.js");             // For checkSBEEnabled.
 
 (function() {
 
@@ -14,6 +15,13 @@ load("jstests/aggregation/extras/utils.js");  // For anyEq.
 load("jstests/libs/fixture_helpers.js");  // For isSharded.
 
 const testDB = db.getSiblingDB(jsTestName());
+
+// TODO SERVER-64482 Reenable this test when SERVER-64482 is done.
+if (checkSBEEnabled(testDB, ["featureFlagSBELookupPushdown"])) {
+    jsTestLog("Skipping test because SBE and SBE $lookup features are both enabled.");
+    return;
+}
+
 const localColl = testDB.local_no_collation;
 const localCaseInsensitiveColl = testDB.local_collation;
 const foreignColl = testDB.foreign_no_collation;
