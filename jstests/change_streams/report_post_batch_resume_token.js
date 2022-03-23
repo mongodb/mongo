@@ -224,26 +224,4 @@ assert.gt(bsonWoCompare(txnEvent3._id, previousGetMorePBRT), 0);
 // appear in the batch. Confirm that the postBatchResumeToken has been set correctly.
 getMorePBRT = csCursor.getResumeToken();
 assert.gte(bsonWoCompare(getMorePBRT, txnEvent3._id), 0);
-
-// Watch a collection, drop it, and then resume before the invalidate but filter out all events
-// This scenario means that we shouldn't get any events but the resume token should still be
-// present. This way the pbrt can't come from a document in the batch, and even if there is an
-// invalidate the pbrt should still be set.
-csCursor = testCollection.watch([], {cursor: {batchSize: 0}});
-assert.eq(csCursor.objsLeftInBatch(), 0);
-assert.neq(undefined, csCursor.getResumeToken());
-testCollection.drop();
-
-csCursor = testCollection.watch([{$match: {dontMatchAnything: true}}],
-                                {resumeAfter: previousGetMorePBRT, cursor: {batchSize: 0}});
-assert.eq(csCursor.objsLeftInBatch(), 0);
-initialAggPBRT = csCursor.getResumeToken();
-assert.neq(undefined, initialAggPBRT);
-
-// Trigger a getMore and make sure we can get another PBRT.
-assert.soon(() => {
-    csCursor.hasNext();
-    assert.neq(undefined, csCursor.getResumeToken());
-    return initialAggPBRT != csCursor.getResumeToken();
-});
 })();
