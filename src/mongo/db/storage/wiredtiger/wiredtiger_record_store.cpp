@@ -1950,7 +1950,8 @@ void WiredTigerRecordStore::_initNextIdIfNeeded(OperationContext* opCtx) {
     // largest_key API returns the largest key in the table regardless of visibility. This ensures
     // we don't re-use RecordIds that are not visible.
     int ret = cursor->largest_key(cursor);
-    if (ret == WT_CACHE_FULL) {
+    // TODO (SERVER-64461): Remove WT_CACHE_FULL error check after WT-8767
+    if (ret == WT_CACHE_FULL || ret == WT_ROLLBACK) {
         // Force the caller to rollback its transaction if we can't make progess with eviction.
         // TODO (SERVER-63620): Convert this to a different error code that is distinguishable from
         // a true write conflict.
