@@ -129,8 +129,10 @@ let view = db[viewName];
             [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
             JoinAlgorithm.NLJ /* expectedJoinAlgorithm */);
 
-    // TODO SERVER-64091: Add a test case for pushed down $lookup against a non-existent foreign
-    // collection.
+    // $lookup against a non-existent foreign collection should always pick NLJ.
+    runTest(coll,
+            [{$lookup: {from: "nonexistent", localField: "a", foreignField: "b", as: "out"}}],
+            JoinAlgorithm.NLJ /* expectedJoinAlgorithm */);
 
     // Self join $lookup, no views.
     runTest(coll,
