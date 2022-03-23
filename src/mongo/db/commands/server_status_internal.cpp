@@ -54,13 +54,21 @@ void MetricTree::add(ServerStatusMetric* metric) {
 void MetricTree::_add(const string& path, ServerStatusMetric* metric) {
     size_t idx = path.find(".");
     if (idx == string::npos) {
+        if (_subtrees.count(path) > 0) {
+            cerr << "metric conflict on: " << path << endl;
+            fassertFailed(6483100);
+        }
+        if (_metrics.count(path) > 0) {
+            cerr << "duplicate metric: " << path << endl;
+            fassertFailed(6483101);
+        }
         _metrics[path] = metric;
         return;
     }
 
     string myLevel = path.substr(0, idx);
     if (_metrics.count(myLevel) > 0) {
-        cerr << "metric conflict on: " << myLevel << endl;
+        cerr << "metric conflict on: " << path << endl;
         fassertFailed(16461);
     }
 
