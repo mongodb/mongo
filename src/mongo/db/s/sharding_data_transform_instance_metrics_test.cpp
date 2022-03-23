@@ -178,7 +178,6 @@ TEST_F(ShardingDataTransformInstanceMetricsTest, OnDeleteAppliedShouldIncrementD
     ASSERT_EQ(report.getIntField("deletesApplied"), 1);
 }
 
-
 TEST_F(ShardingDataTransformInstanceMetricsTest,
        OnOplogsEntriesAppliedShouldIncrementOplogsEntriesApplied) {
     auto metrics = createInstanceMetrics(UUID::gen(), Role::kRecipient);
@@ -189,6 +188,49 @@ TEST_F(ShardingDataTransformInstanceMetricsTest,
 
     report = metrics->reportForCurrentOp();
     ASSERT_EQ(report.getIntField("oplogEntriesApplied"), 100);
+}
+
+TEST_F(ShardingDataTransformInstanceMetricsTest, DonorIncrementWritesDuringCriticalSection) {
+    auto metrics = createInstanceMetrics(UUID::gen(), Role::kDonor);
+
+    auto report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("countWritesDuringCriticalSection"), 0);
+    metrics->onWriteDuringCriticalSection();
+
+    report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("countWritesDuringCriticalSection"), 1);
+}
+
+TEST_F(ShardingDataTransformInstanceMetricsTest, CurrentOpReportsCriticalSectionTime) {
+    const auto roles = {Role::kDonor, Role::kCoordinator};
+    for (const auto& role : roles) {
+        LOGV2(6437200, "CurrentOpReportsCriticalSectionTime", "Role"_attr = role);
+        constexpr auto kFiveSeconds = Milliseconds(5000);
+        auto uuid = UUID::gen();
+        const auto& clock = getClockSource();
+        auto metrics = std::make_unique<ShardingDataTransformInstanceMetrics>(
+            uuid, kTestCommand, kTestNamespace, role, clock->now(), clock, &_cumulativeMetrics);
+
+        // Reports 0 before critical section entered.
+        clock->advance(kFiveSeconds);
+        auto report = metrics->reportForCurrentOp();
+        ASSERT_EQ(report.getIntField("totalCriticalSectionTimeElapsedSecs"), 0);
+
+        // Reports time so far during critical section.
+        metrics->onCriticalSectionBegin();
+        clock->advance(kFiveSeconds);
+        report = metrics->reportForCurrentOp();
+        ASSERT_EQ(report.getIntField("totalCriticalSectionTimeElapsedSecs"), 5);
+        clock->advance(kFiveSeconds);
+        report = metrics->reportForCurrentOp();
+        ASSERT_EQ(report.getIntField("totalCriticalSectionTimeElapsedSecs"), 10);
+
+        // Still reports total time after critical section ends.
+        metrics->onCriticalSectionEnd();
+        clock->advance(kFiveSeconds);
+        report = metrics->reportForCurrentOp();
+        ASSERT_EQ(report.getIntField("totalCriticalSectionTimeElapsedSecs"), 10);
+    }
 }
 
 TEST_F(ShardingDataTransformInstanceMetricsTest, CurrentOpReportsRunningTime) {

@@ -137,6 +137,10 @@ public:
         return false;
     }
 
+    void handleReshardingCriticalSectionMetrics(OperationContext* opCtx,
+                                                const StaleConfigInfo& se) const noexcept override {
+    }
+
     void resetLockerState(OperationContext* opCtx) const noexcept override {}
 
     std::unique_ptr<PolymorphicScoped> scopedOperationCompletionShardingActions(

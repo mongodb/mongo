@@ -68,6 +68,9 @@ public:
     void onUpdateApplied();
     void onDeleteApplied();
     void onOplogEntriesApplied(int64_t numEntries);
+    void onWriteDuringCriticalSection();
+    void onCriticalSectionBegin();
+    void onCriticalSectionEnd();
     Role getRole() const;
 
 protected:
@@ -109,6 +112,7 @@ protected:
 
 private:
     inline int64_t getOperationRunningTimeSecs() const;
+    int64_t getCriticalSectionElapsedTimeSecs() const;
 
     ClockSource* _clockSource;
     ObserverPtr _observer;
@@ -116,10 +120,15 @@ private:
     ShardingDataTransformCumulativeMetrics::DeregistrationFunction _deregister;
 
     const Date_t _startTime;
+
     AtomicWord<int64_t> _insertsApplied;
     AtomicWord<int64_t> _updatesApplied;
     AtomicWord<int64_t> _deletesApplied;
     AtomicWord<int64_t> _oplogEntriesApplied;
+
+    AtomicWord<Date_t> _criticalSectionStartTime;
+    AtomicWord<Date_t> _criticalSectionEndTime;
+    AtomicWord<int64_t> _writesDuringCriticalSection;
 };
 
 }  // namespace mongo

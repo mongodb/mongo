@@ -93,6 +93,10 @@ struct ServiceEntryPointCommon {
             OperationContext* opCtx, const ShardCannotRefreshDueToLocksHeldInfo& refreshInfo) const
             noexcept = 0;
 
+        virtual void handleReshardingCriticalSectionMetrics(OperationContext* opCtx,
+                                                            const StaleConfigInfo& se) const
+            noexcept = 0;
+
         virtual void resetLockerState(OperationContext* opCtx) const noexcept = 0;
 
         MONGO_WARN_UNUSED_RESULT_FUNCTION virtual std::unique_ptr<PolymorphicScoped>

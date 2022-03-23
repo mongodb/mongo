@@ -39,6 +39,10 @@ constexpr auto TEMP_VALUE = "placeholder";
 
 namespace mongo {
 
+namespace {
+constexpr auto kNoDate = Date_t::min();
+}
+
 ShardingDataTransformInstanceMetrics::ShardingDataTransformInstanceMetrics(
     UUID instanceId,
     BSONObj originalCommand,
@@ -78,7 +82,10 @@ ShardingDataTransformInstanceMetrics::ShardingDataTransformInstanceMetrics(
       _insertsApplied{0},
       _updatesApplied{0},
       _deletesApplied{0},
-      _oplogEntriesApplied{0} {}
+      _oplogEntriesApplied{0},
+      _criticalSectionStartTime{kNoDate},
+      _criticalSectionEndTime{kNoDate},
+      _writesDuringCriticalSection{0} {}
 
 ShardingDataTransformInstanceMetrics::~ShardingDataTransformInstanceMetrics() {
     if (_deregister) {
@@ -133,12 +140,12 @@ BSONObj ShardingDataTransformInstanceMetrics::reportForCurrentOp() const noexcep
             builder.append(kCoordinatorState, getStateString());
             builder.append(kApplyTimeElapsed, TEMP_VALUE);
             builder.append(kCopyTimeElapsed, TEMP_VALUE);
-            builder.append(kCriticalSectionTimeElapsed, TEMP_VALUE);
+            builder.append(kCriticalSectionTimeElapsed, getCriticalSectionElapsedTimeSecs());
             break;
         case Role::kDonor:
             builder.append(kDonorState, getStateString());
-            builder.append(kCriticalSectionTimeElapsed, TEMP_VALUE);
-            builder.append(kCountWritesDuringCriticalSection, TEMP_VALUE);
+            builder.append(kCriticalSectionTimeElapsed, getCriticalSectionElapsedTimeSecs());
+            builder.append(kCountWritesDuringCriticalSection, _writesDuringCriticalSection.load());
             builder.append(kCountReadsDuringCriticalSection, TEMP_VALUE);
             break;
         case Role::kRecipient:
@@ -180,9 +187,32 @@ void ShardingDataTransformInstanceMetrics::onOplogEntriesApplied(int64_t numEntr
     _oplogEntriesApplied.addAndFetch(numEntries);
 }
 
+void ShardingDataTransformInstanceMetrics::onWriteDuringCriticalSection() {
+    _writesDuringCriticalSection.addAndFetch(1);
+}
+
+void ShardingDataTransformInstanceMetrics::onCriticalSectionBegin() {
+    _criticalSectionStartTime.store(_clockSource->now());
+}
+
+void ShardingDataTransformInstanceMetrics::onCriticalSectionEnd() {
+    _criticalSectionEndTime.store(_clockSource->now());
+}
 
 inline int64_t ShardingDataTransformInstanceMetrics::getOperationRunningTimeSecs() const {
     return durationCount<Seconds>(_clockSource->now() - _startTime);
+}
+
+int64_t ShardingDataTransformInstanceMetrics::getCriticalSectionElapsedTimeSecs() const {
+    auto start = _criticalSectionStartTime.load();
+    if (start == kNoDate) {
+        return 0;
+    }
+    auto end = _criticalSectionEndTime.load();
+    if (end == kNoDate) {
+        end = _clockSource->now();
+    }
+    return durationCount<Seconds>(end - start);
 }
 
 }  // namespace mongo

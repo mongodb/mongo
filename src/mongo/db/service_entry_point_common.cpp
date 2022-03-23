@@ -77,6 +77,7 @@
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/request_execution_context.h"
 #include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/s/resharding/resharding_metrics_helpers.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_statistics.h"
 #include "mongo/db/s/transaction_coordinator_factory.h"
@@ -1688,6 +1689,8 @@ Future<void> ExecCommandDatabase::_commandExec() {
                 !_refreshedCollection) {
                 if (auto sce = s.extraInfo<StaleConfigInfo>()) {
                     if (sce->getCriticalSectionSignal()) {
+                        _execContext->behaviors->handleReshardingCriticalSectionMetrics(opCtx,
+                                                                                        *sce);
                         // The shard is in a critical section, so we cannot retry locally
                         OperationShardingState::waitForCriticalSectionToComplete(
                             opCtx, *sce->getCriticalSectionSignal())

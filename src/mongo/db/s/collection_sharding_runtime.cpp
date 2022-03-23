@@ -34,7 +34,10 @@
 #include "mongo/base/checked_cast.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/global_settings.h"
+#include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
+#include "mongo/db/s/sharding_data_transform_metrics.h"
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
@@ -357,7 +360,10 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
                                 receivedShardVersion,
                                 boost::none /* wantedVersion */,
                                 ShardingState::get(opCtx)->shardId(),
-                                std::move(criticalSectionSignal)),
+                                std::move(criticalSectionSignal),
+                                opCtx->lockState()->isWriteLocked()
+                                    ? StaleConfigInfo::OperationType::kWrite
+                                    : StaleConfigInfo::OperationType::kRead),
                 str::stream() << "The critical section for " << _nss.ns()
                               << " is acquired with reason: " << reason,
                 !criticalSectionSignal);

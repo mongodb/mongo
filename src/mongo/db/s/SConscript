@@ -93,6 +93,7 @@ env.Library(
         'resharding/resharding_donor_service.cpp',
         'resharding/resharding_future_util.cpp',
         'resharding/resharding_manual_cleanup.cpp',
+        'resharding/resharding_metrics_helpers.cpp',
         'resharding/resharding_metrics.cpp',
         'resharding/resharding_metrics_new.cpp',
         'resharding/resharding_op_observer.cpp',

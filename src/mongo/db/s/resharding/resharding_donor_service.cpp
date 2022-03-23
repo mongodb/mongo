@@ -204,6 +204,9 @@ ReshardingDonorService::DonorStateMachine::DonorStateMachine(
     std::unique_ptr<DonorStateMachineExternalState> externalState)
     : repl::PrimaryOnlyService::TypedInstance<DonorStateMachine>(),
       _donorService(donorService),
+      _metricsNew{ShardingDataTransformMetrics::isEnabled()
+                      ? ReshardingMetricsNew::initializeFrom(donorDoc, getGlobalServiceContext())
+                      : nullptr},
       _metadata{donorDoc.getCommonReshardingMetadata()},
       _recipientShardIds{donorDoc.getRecipientShards()},
       _donorCtx{donorDoc.getMutableState()},
@@ -378,6 +381,9 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
                            ShardingCatalogClient::kLocalWriteConcern);
 
                    _metrics()->leaveCriticalSection(getCurrentTime());
+                   if (ShardingDataTransformMetrics::isEnabled()) {
+                       _metricsNew->onCriticalSectionEnd();
+                   }
                }
 
                auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
@@ -510,6 +516,13 @@ void ReshardingDonorService::DonorStateMachine::onReshardingFieldsChanges(
             ensureFulfilledPromise(lk, _coordinatorHasDecisionPersisted);
         }
     }
+}
+
+void ReshardingDonorService::DonorStateMachine::onWriteDuringCriticalSection() {
+    if (!ShardingDataTransformMetrics::isEnabled()) {
+        return;
+    }
+    _metricsNew->onWriteDuringCriticalSection();
 }
 
 SharedSemiFuture<void> ReshardingDonorService::DonorStateMachine::awaitCriticalSectionAcquired() {
@@ -673,6 +686,9 @@ void ReshardingDonorService::DonorStateMachine::
                 ShardingCatalogClient::kLocalWriteConcern);
 
         _metrics()->enterCriticalSection(getCurrentTime());
+        if (ShardingDataTransformMetrics::isEnabled()) {
+            _metricsNew->onCriticalSectionBegin();
+        }
     }
 
     {

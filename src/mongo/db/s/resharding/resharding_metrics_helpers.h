@@ -70,6 +70,8 @@ inline constexpr ShardingDataTransformMetrics::Role getRoleForStateDocument() {
     MONGO_UNREACHABLE;
 }
 
+void onCriticalSectionError(OperationContext* opCtx, const StaleConfigInfo& info) noexcept;
+
 }  // namespace resharding_metrics
 
 }  // namespace mongo

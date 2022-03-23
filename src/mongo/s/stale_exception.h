@@ -40,17 +40,20 @@ namespace mongo {
 class StaleConfigInfo final : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::StaleConfig;
+    enum class OperationType { kRead, kWrite };
 
     StaleConfigInfo(NamespaceString nss,
                     ChunkVersion received,
                     boost::optional<ChunkVersion> wanted,
                     ShardId shardId,
-                    boost::optional<SharedSemiFuture<void>> criticalSectionSignal = boost::none)
+                    boost::optional<SharedSemiFuture<void>> criticalSectionSignal = boost::none,
+                    boost::optional<OperationType> duringOperationType = boost::none)
         : _nss(std::move(nss)),
           _received(received),
           _wanted(wanted),
           _shardId(shardId),
-          _criticalSectionSignal(std::move(criticalSectionSignal)) {}
+          _criticalSectionSignal(std::move(criticalSectionSignal)),
+          _duringOperationType{duringOperationType} {}
 
     const auto& getNss() const {
         return _nss;
@@ -72,6 +75,10 @@ public:
         return _criticalSectionSignal;
     }
 
+    const auto& getDuringOperationType() const {
+        return _duringOperationType;
+    }
+
     void serialize(BSONObjBuilder* bob) const;
     static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj& obj);
 
@@ -81,8 +88,9 @@ protected:
     boost::optional<ChunkVersion> _wanted;
     ShardId _shardId;
 
-    // This signal does not get serialized and therefore does not get propagated to the router
+    // This fields below are not serialized and therefore do not get propagated to the router
     boost::optional<SharedSemiFuture<void>> _criticalSectionSignal;
+    boost::optional<OperationType> _duringOperationType;
 };
 
 class StaleEpochInfo final : public ErrorExtraInfo {
