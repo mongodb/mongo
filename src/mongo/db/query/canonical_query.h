@@ -221,6 +221,10 @@ public:
         return _sbeCompatible;
     }
 
+    bool isParameterized() const {
+        return _parameterized;
+    }
+
     void setExplain(bool explain) {
         _explain = explain;
     }
@@ -282,6 +286,9 @@ private:
 
     // True if this query can be executed by the SBE.
     bool _sbeCompatible = false;
+
+    // True if the query has at least one parameter marker.
+    bool _parameterized = false;
 };
 
 }  // namespace mongo

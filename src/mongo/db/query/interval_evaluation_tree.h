@@ -38,39 +38,39 @@
 #include "mongo/db/query/optimizer/algebra/operator.h"
 #include "mongo/db/query/optimizer/algebra/polyvalue.h"
 
-namespace mongo {
-
-class ConstInterval;
-class EvalInterval;
-class IntersectInterval;
-class UnionInterval;
-class ComplementInterval;
-
-/**
- *  A polyvalue which represents a node of Interval Evalution Tree.
- */
-using IET = optimizer::algebra::
-    PolyValue<ConstInterval, EvalInterval, IntersectInterval, UnionInterval, ComplementInterval>;
+namespace mongo::interval_evaluation_tree {
+class ConstNode;
+class EvalNode;
+class IntersectNode;
+class UnionNode;
+class ComplementNode;
 
 /**
- *  Represents an interval with the constant bounds, such as (MinKey, MaxKey)
+ *  IET is a polyvalue that represents a node of Interval Evaluation Tree.
  */
-class ConstInterval : public optimizer::algebra::OpSpecificArity<IET, ConstInterval, 0> {
+using IET =
+    optimizer::algebra::PolyValue<ConstNode, EvalNode, IntersectNode, UnionNode, ComplementNode>;
+
+/**
+ *  ConstNode is a node that represents an interval with constant bounds, such as (MinKey,
+ * MaxKey).
+ */
+class ConstNode : public optimizer::algebra::OpSpecificArity<IET, ConstNode, 0> {
 public:
-    explicit ConstInterval(const std::vector<Interval>& intervals) : intervals{intervals} {}
+    explicit ConstNode(const OrderedIntervalList& oil) : oil{oil} {}
 
-    std::vector<Interval> intervals;
+    const OrderedIntervalList oil;
 };
 
 /**
- * Evaluates an interval from a simple predicate such as {$gt: p1} where p1 is a parameter value
- * known at runtime.
+ * EvalNode is a node that evaluates an interval from a simple predicate such as {$gt: p1} where
+ * p1 is a parameter value known at runtime.
  */
-class EvalInterval : public optimizer::algebra::OpSpecificArity<IET, EvalInterval, 0> {
+class EvalNode : public optimizer::algebra::OpSpecificArity<IET, EvalNode, 0> {
 public:
     using InputParamId = MatchExpression::InputParamId;
 
-    EvalInterval(InputParamId inputParamId, MatchExpression::MatchType matchType)
+    EvalNode(InputParamId inputParamId, MatchExpression::MatchType matchType)
         : _inputParamId{inputParamId}, _matchType{matchType} {}
 
     InputParamId inputParamId() const {
@@ -87,49 +87,49 @@ private:
 };
 
 /**
- * Intersects two intervals.
+ * IntersectNode is a node that represents an intersection of two intervals.
  */
-class IntersectInterval : public optimizer::algebra::OpSpecificArity<IET, IntersectInterval, 2> {
+class IntersectNode : public optimizer::algebra::OpSpecificArity<IET, IntersectNode, 2> {
 public:
-    using Base = optimizer::algebra::OpSpecificArity<IET, IntersectInterval, 2>;
+    using Base = optimizer::algebra::OpSpecificArity<IET, IntersectNode, 2>;
 
-    IntersectInterval(IET lhs, IET rhs) : Base(std::move(lhs), std::move(rhs)) {}
+    IntersectNode(IET lhs, IET rhs) : Base(std::move(lhs), std::move(rhs)) {}
 };
 
 /**
- * Unions two intervals.
+ * UnionNode is a node that represents a union of two intervals.
  */
-class UnionInterval : public optimizer::algebra::OpSpecificArity<IET, UnionInterval, 2> {
+class UnionNode : public optimizer::algebra::OpSpecificArity<IET, UnionNode, 2> {
 public:
-    using Base = optimizer::algebra::OpSpecificArity<IET, UnionInterval, 2>;
+    using Base = optimizer::algebra::OpSpecificArity<IET, UnionNode, 2>;
 
-    UnionInterval(IET lhs, IET rhs) : Base(std::move(lhs), std::move(rhs)) {}
+    UnionNode(IET lhs, IET rhs) : Base(std::move(lhs), std::move(rhs)) {}
 };
 
 /**
- * ComplementInterval represent operand $not on the child.
+ * ComplementNode is a node that complements its child.
  */
-class ComplementInterval : public optimizer::algebra::OpSpecificArity<IET, ComplementInterval, 1> {
+class ComplementNode : public optimizer::algebra::OpSpecificArity<IET, ComplementNode, 1> {
 public:
-    using Base = optimizer::algebra::OpSpecificArity<IET, ComplementInterval, 1>;
+    using Base = optimizer::algebra::OpSpecificArity<IET, ComplementNode, 1>;
 
-    ComplementInterval(IET child) : Base(std::move(child)) {}
+    ComplementNode(IET child) : Base(std::move(child)) {}
 };
 
 std::string ietToString(const IET& iet);
 std::string ietsToString(const IndexEntry& index, const std::vector<IET>& iets);
 
-class IETBuilder {
+class Builder {
 public:
-    void intersectIntervals();
-    void unionIntervals();
-    void complementInterval();
-    void translate(const MatchExpression& expr, const OrderedIntervalList& oil);
-    void appendIntervalList(const OrderedIntervalList& oil);
+    void addIntersect();
+    void addUnion();
+    void addComplement();
+    void addEval(const MatchExpression& expr, const OrderedIntervalList& oil);
+    void addConst(const OrderedIntervalList& oil);
 
     boost::optional<IET> done() const;
 
 private:
     std::stack<IET> _intervals;
 };
-}  // namespace mongo
+}  // namespace mongo::interval_evaluation_tree

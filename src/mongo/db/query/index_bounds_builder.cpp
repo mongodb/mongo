@@ -339,13 +339,18 @@ void IndexBoundsBuilder::translateAndIntersect(const MatchExpression* expr,
                                                const BSONElement& elt,
                                                const IndexEntry& index,
                                                OrderedIntervalList* oilOut,
-                                               BoundsTightness* tightnessOut) {
+                                               BoundsTightness* tightnessOut,
+                                               interval_evaluation_tree::Builder* ietBuilder) {
     OrderedIntervalList arg;
-    translate(expr, elt, index, &arg, tightnessOut);
+    translate(expr, elt, index, &arg, tightnessOut, ietBuilder);
 
     // translate outputs arg in sorted order.  intersectize assumes that its arguments are
     // sorted.
     intersectize(arg, oilOut);
+
+    if (ietBuilder != nullptr) {
+        ietBuilder->addIntersect();
+    }
 }
 
 // static
@@ -353,15 +358,20 @@ void IndexBoundsBuilder::translateAndUnion(const MatchExpression* expr,
                                            const BSONElement& elt,
                                            const IndexEntry& index,
                                            OrderedIntervalList* oilOut,
-                                           BoundsTightness* tightnessOut) {
+                                           BoundsTightness* tightnessOut,
+                                           interval_evaluation_tree::Builder* ietBuilder) {
     OrderedIntervalList arg;
-    translate(expr, elt, index, &arg, tightnessOut);
+    translate(expr, elt, index, &arg, tightnessOut, ietBuilder);
 
     // Append the new intervals to oilOut.
     oilOut->intervals.insert(oilOut->intervals.end(), arg.intervals.begin(), arg.intervals.end());
 
     // Union the appended intervals with the existing ones.
     unionize(oilOut);
+
+    if (ietBuilder != nullptr) {
+        ietBuilder->addUnion();
+    }
 }
 
 bool typeMatch(const BSONObj& obj) {
@@ -386,9 +396,10 @@ void IndexBoundsBuilder::translate(const MatchExpression* expr,
                                    const BSONElement& elt,
                                    const IndexEntry& index,
                                    OrderedIntervalList* oilOut,
-                                   BoundsTightness* tightnessOut) {
+                                   BoundsTightness* tightnessOut,
+                                   interval_evaluation_tree::Builder* ietBuilder) {
     // Fill out the bounds and tightness appropriate for the given predicate.
-    _translatePredicate(expr, elt, index, oilOut, tightnessOut);
+    _translatePredicate(expr, elt, index, oilOut, tightnessOut, ietBuilder);
 
     // Under certain circumstances, queries on a $** index require that the bounds' tightness be
     // adjusted regardless of the predicate. Having filled out the initial bounds, we apply any
@@ -523,7 +534,8 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
                                              const BSONElement& elt,
                                              const IndexEntry& index,
                                              OrderedIntervalList* oilOut,
-                                             BoundsTightness* tightnessOut) {
+                                             BoundsTightness* tightnessOut,
+                                             interval_evaluation_tree::Builder* ietBuilder) {
     // We expect that the OIL we are constructing starts out empty.
     invariant(oilOut->intervals.empty());
 
@@ -538,22 +550,17 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
     invariant(!isHashed || QueryPlannerIXSelect::nodeIsSupportedByHashedIndex(expr));
 
     if (MatchExpression::ELEM_MATCH_VALUE == expr->matchType()) {
-        OrderedIntervalList acc;
-        _translatePredicate(expr->getChild(0), elt, index, &acc, tightnessOut);
+        _translatePredicate(expr->getChild(0), elt, index, oilOut, tightnessOut, ietBuilder);
 
         for (size_t i = 1; i < expr->numChildren(); ++i) {
             OrderedIntervalList next;
             BoundsTightness tightness;
-            _translatePredicate(expr->getChild(i), elt, index, &next, &tightness);
-            intersectize(next, &acc);
-        }
+            _translatePredicate(expr->getChild(i), elt, index, &next, &tightness, ietBuilder);
+            intersectize(next, oilOut);
 
-        for (size_t i = 0; i < acc.intervals.size(); ++i) {
-            oilOut->intervals.push_back(acc.intervals[i]);
-        }
-
-        if (!oilOut->intervals.empty()) {
-            std::sort(oilOut->intervals.begin(), oilOut->intervals.end(), IntervalComparison);
+            if (ietBuilder != nullptr) {
+                ietBuilder->addIntersect();
+            }
         }
 
         // $elemMatch value requires an array.
@@ -574,6 +581,9 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
             // {$exists:false} is a point-interval on [null,null] that requires a fetch.
             oilOut->intervals.push_back(makeNullPointInterval(isHashed));
             *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
+            if (ietBuilder != nullptr) {
+                ietBuilder->addConst(*oilOut);
+            }
             return;
         }
 
@@ -584,13 +594,25 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
                 oilOut->intervals.push_back(IndexBoundsBuilder::kEmptyArrayPointInterval);
                 oilOut->complement();
                 unionize(oilOut);
+
+                if (ietBuilder != nullptr) {
+                    // This is a special type of query of the following shape: {a: {$not: {$in:
+                    // [null, []]}}}. We never auto-parameterize such query according to our
+                    // encoding rules (due to presence of null and an array elements).
+                    ietBuilder->addConst(*oilOut);
+                }
+
                 *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
                 return;
             }
         }
 
-        _translatePredicate(child, elt, index, oilOut, tightnessOut);
+        _translatePredicate(child, elt, index, oilOut, tightnessOut, ietBuilder);
         oilOut->complement();
+
+        if (ietBuilder != nullptr) {
+            ietBuilder->addComplement();
+        }
 
         // Until the index distinguishes between missing values and literal null values, we cannot
         // build exact bounds for equality predicates on the literal value null. However, we _can_
@@ -617,6 +639,9 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
         }
     } else if (MatchExpression::EXISTS == expr->matchType()) {
         oilOut->intervals.push_back(allValues());
+        if (ietBuilder != nullptr) {
+            ietBuilder->addConst(*oilOut);
+        }
 
         // We only handle the {$exists:true} case, as {$exists:false}
         // will have been translated to {$not:{ $exists:true }}.
@@ -656,7 +681,28 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
         // There is no need to sort intervals or merge overlapping intervals here since the output
         // is from one element.
         translateEquality(node->getData(), index, isHashed, oilOut, tightnessOut);
+        if (ietBuilder != nullptr) {
+            switch (expr->matchType()) {
+                case MatchExpression::EQ:
+                    ietBuilder->addEval(*expr, *oilOut);
+                    break;
+                // Adding const node here since we do not auto-parameterise comparisons expressed
+                // using $expr.
+                case MatchExpression::INTERNAL_EXPR_EQ:
+                    ietBuilder->addConst(*oilOut);
+                    break;
+                default:
+                    tasserted(6334920,
+                              str::stream() << "unexpected MatchType " << expr->matchType());
+            }
+        }
     } else if (MatchExpression::LT == expr->matchType()) {
+        ON_BLOCK_EXIT([ietBuilder, expr, oilOut] {
+            if (ietBuilder != nullptr) {
+                ietBuilder->addEval(*expr, *oilOut);
+            }
+        });
+
         const LTMatchExpression* node = static_cast<const LTMatchExpression*>(expr);
         BSONElement dataElt = node->getData();
 
@@ -694,6 +740,12 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
 
         *tightnessOut = getInequalityPredicateTightness(interval, dataElt, index);
     } else if (MatchExpression::INTERNAL_EXPR_LT == expr->matchType()) {
+        ON_BLOCK_EXIT([ietBuilder, oilOut] {
+            if (ietBuilder != nullptr) {
+                ietBuilder->addConst(*oilOut);
+            }
+        });
+
         const auto* node = static_cast<const InternalExprLTMatchExpression*>(expr);
         BSONElement dataElt = node->getData();
 
@@ -726,6 +778,12 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
         }
         *tightnessOut = getInequalityPredicateTightness(interval, dataElt, index);
     } else if (MatchExpression::LTE == expr->matchType()) {
+        ON_BLOCK_EXIT([ietBuilder, expr, oilOut] {
+            if (ietBuilder != nullptr) {
+                ietBuilder->addEval(*expr, *oilOut);
+            }
+        });
+
         const LTEMatchExpression* node = static_cast<const LTEMatchExpression*>(expr);
         BSONElement dataElt = node->getData();
 
@@ -764,6 +822,12 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
 
         *tightnessOut = getInequalityPredicateTightness(interval, dataElt, index);
     } else if (MatchExpression::INTERNAL_EXPR_LTE == expr->matchType()) {
+        ON_BLOCK_EXIT([ietBuilder, oilOut] {
+            if (ietBuilder != nullptr) {
+                ietBuilder->addConst(*oilOut);
+            }
+        });
+
         const auto* node = static_cast<const InternalExprLTEMatchExpression*>(expr);
         BSONElement dataElt = node->getData();
 
@@ -793,6 +857,12 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
 
         *tightnessOut = getInequalityPredicateTightness(interval, dataElt, index);
     } else if (MatchExpression::GT == expr->matchType()) {
+        ON_BLOCK_EXIT([ietBuilder, expr, oilOut] {
+            if (ietBuilder != nullptr) {
+                ietBuilder->addEval(*expr, *oilOut);
+            }
+        });
+
         const GTMatchExpression* node = static_cast<const GTMatchExpression*>(expr);
         BSONElement dataElt = node->getData();
 
@@ -829,6 +899,12 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
         }
         *tightnessOut = getInequalityPredicateTightness(interval, dataElt, index);
     } else if (MatchExpression::INTERNAL_EXPR_GT == expr->matchType()) {
+        ON_BLOCK_EXIT([ietBuilder, oilOut] {
+            if (ietBuilder != nullptr) {
+                ietBuilder->addConst(*oilOut);
+            }
+        });
+
         const auto* node = static_cast<const InternalExprGTMatchExpression*>(expr);
         BSONElement dataElt = node->getData();
 
@@ -864,6 +940,12 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
 
         *tightnessOut = getInequalityPredicateTightness(interval, dataElt, index);
     } else if (MatchExpression::GTE == expr->matchType()) {
+        ON_BLOCK_EXIT([ietBuilder, expr, oilOut] {
+            if (ietBuilder != nullptr) {
+                ietBuilder->addEval(*expr, *oilOut);
+            }
+        });
+
         const GTEMatchExpression* node = static_cast<const GTEMatchExpression*>(expr);
         BSONElement dataElt = node->getData();
 
@@ -900,6 +982,12 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
 
         *tightnessOut = getInequalityPredicateTightness(interval, dataElt, index);
     } else if (MatchExpression::INTERNAL_EXPR_GTE == expr->matchType()) {
+        ON_BLOCK_EXIT([ietBuilder, oilOut] {
+            if (ietBuilder != nullptr) {
+                ietBuilder->addConst(*oilOut);
+            }
+        });
+
         const auto* node = static_cast<const InternalExprGTEMatchExpression*>(expr);
         BSONElement dataElt = node->getData();
 
@@ -922,6 +1010,10 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
     } else if (MatchExpression::REGEX == expr->matchType()) {
         const RegexMatchExpression* rme = static_cast<const RegexMatchExpression*>(expr);
         translateRegex(rme, index, oilOut, tightnessOut);
+
+        if (ietBuilder != nullptr) {
+            ietBuilder->addEval(*expr, *oilOut);
+        }
     } else if (MatchExpression::MOD == expr->matchType()) {
         BSONObjBuilder bob;
         bob.appendMinForType("", NumberDouble);
@@ -931,7 +1023,17 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
         oilOut->intervals.push_back(
             makeRangeInterval(dataObj, BoundInclusion::kIncludeBothStartAndEndKeys));
         *tightnessOut = IndexBoundsBuilder::INEXACT_COVERED;
+
+        if (ietBuilder != nullptr) {
+            ietBuilder->addConst(*oilOut);
+        }
     } else if (MatchExpression::TYPE_OPERATOR == expr->matchType()) {
+        ON_BLOCK_EXIT([ietBuilder, expr, oilOut] {
+            if (ietBuilder != nullptr) {
+                ietBuilder->addEval(*expr, *oilOut);
+            }
+        });
+
         const TypeMatchExpression* tme = static_cast<const TypeMatchExpression*>(expr);
 
         if (tme->typeSet().hasType(BSONType::Array)) {
@@ -972,6 +1074,12 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
         // Sort the intervals, and merge redundant ones.
         unionize(oilOut);
     } else if (MatchExpression::MATCH_IN == expr->matchType()) {
+        ON_BLOCK_EXIT([ietBuilder, expr, oilOut] {
+            if (ietBuilder != nullptr) {
+                ietBuilder->addEval(*expr, *oilOut);
+            }
+        });
+
         const InMatchExpression* ime = static_cast<const InMatchExpression*>(expr);
 
         *tightnessOut = IndexBoundsBuilder::EXACT;

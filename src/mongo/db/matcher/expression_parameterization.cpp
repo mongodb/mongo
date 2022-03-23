@@ -157,8 +157,6 @@ void MatchExpressionParameterizationVisitor::visit(InMatchExpression* expr) {
 }
 
 void MatchExpressionParameterizationVisitor::visit(TypeMatchExpression* expr) {
-    if (!expr->typeSet().hasType(BSONType::Array)) {
-        expr->setInputParamId(_context->nextInputParamId());
-    }
+    // TODO SERVER-64776: reenable auto-parameterization for $type expressions.
 }
 }  // namespace mongo

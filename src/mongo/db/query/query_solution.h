@@ -39,6 +39,7 @@
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/query/classic_plan_cache.h"
 #include "mongo/db/query/index_bounds.h"
+#include "mongo/db/query/interval_evaluation_tree.h"
 #include "mongo/db/query/plan_enumerator_explain_info.h"
 #include "mongo/db/query/record_id_bound.h"
 #include "mongo/db/query/stage_types.h"
@@ -762,6 +763,11 @@ struct IndexScanNode : public QuerySolutionNodeWithSortSet {
     //
     // The correct set of paths is computed and stored here by computeProperties().
     std::set<StringData> multikeyFields;
+
+    /**
+     * A vector of Interval Evaluation Trees (IETs) with the same ordering as the index key pattern.
+     */
+    std::vector<interval_evaluation_tree::IET> iets;
 };
 
 struct ReturnKeyNode : public QuerySolutionNode {

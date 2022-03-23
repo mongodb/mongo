@@ -115,11 +115,12 @@ void MatchExpression::sortTree(MatchExpression* tree) {
 }
 
 // static
-void MatchExpression::parameterize(MatchExpression* tree) {
+bool MatchExpression::parameterize(MatchExpression* tree) {
     MatchExpressionParameterizationVisitorContext context{};
     MatchExpressionParameterizationVisitor visitor{&context};
     MatchExpressionParameterizationWalker walker{&visitor};
     tree_walker::walk<false, MatchExpression>(tree, &walker);
+    return context.hasAssignedParameters();
 }
 
 std::string MatchExpression::toString() const {

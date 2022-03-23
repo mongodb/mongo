@@ -326,8 +326,10 @@ public:
     /**
      * Assigns an optional input parameter ID to each node which is eligible for
      * auto-parameterization.
+     *
+     * Returns true if at least one input parameter ID was assigned.
      */
-    static void parameterize(MatchExpression* tree);
+    static bool parameterize(MatchExpression* tree);
 
     MatchExpression(MatchType type, clonable_ptr<ErrorAnnotation> annotation = nullptr);
     virtual ~MatchExpression() {}

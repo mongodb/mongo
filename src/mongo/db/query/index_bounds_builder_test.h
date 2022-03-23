@@ -100,10 +100,11 @@ public:
             auto expr = parseMatchExpression(*it);
             BSONElement elt = it->firstElement();
             if (toUnion.begin() == it) {
-                IndexBoundsBuilder::translate(expr.get(), elt, testIndex, oilOut, tightnessOut);
+                IndexBoundsBuilder::translate(
+                    expr.get(), elt, testIndex, oilOut, tightnessOut, /* iet::Builder */ nullptr);
             } else {
                 IndexBoundsBuilder::translateAndUnion(
-                    expr.get(), elt, testIndex, oilOut, tightnessOut);
+                    expr.get(), elt, testIndex, oilOut, tightnessOut, /* iet::Builder */ nullptr);
             }
         }
     }
@@ -121,10 +122,11 @@ public:
             auto expr = parseMatchExpression(*it);
             BSONElement elt = it->firstElement();
             if (toIntersect.begin() == it) {
-                IndexBoundsBuilder::translate(expr.get(), elt, testIndex, oilOut, tightnessOut);
+                IndexBoundsBuilder::translate(
+                    expr.get(), elt, testIndex, oilOut, tightnessOut, /* iet::Builder */ nullptr);
             } else {
                 IndexBoundsBuilder::translateAndIntersect(
-                    expr.get(), elt, testIndex, oilOut, tightnessOut);
+                    expr.get(), elt, testIndex, oilOut, tightnessOut, /* iet::Builder */ nullptr);
             }
         }
     }
@@ -147,13 +149,14 @@ public:
             auto expr = parseMatchExpression(obj);
             BSONElement elt = obj.firstElement();
             if (constraints.begin() == it) {
-                IndexBoundsBuilder::translate(expr.get(), elt, testIndex, oilOut, tightnessOut);
+                IndexBoundsBuilder::translate(
+                    expr.get(), elt, testIndex, oilOut, tightnessOut, /* iet::Builder */ nullptr);
             } else if (isIntersect) {
                 IndexBoundsBuilder::translateAndIntersect(
-                    expr.get(), elt, testIndex, oilOut, tightnessOut);
+                    expr.get(), elt, testIndex, oilOut, tightnessOut, /* iet::Builder */ nullptr);
             } else {
                 IndexBoundsBuilder::translateAndUnion(
-                    expr.get(), elt, testIndex, oilOut, tightnessOut);
+                    expr.get(), elt, testIndex, oilOut, tightnessOut, /* iet::Builder */ nullptr);
             }
         }
     }

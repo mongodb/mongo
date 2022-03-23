@@ -449,7 +449,8 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeLeafNode(
     const IndexEntry& index,
     size_t pos,
     const MatchExpression* expr,
-    IndexBoundsBuilder::BoundsTightness* tightnessOut) {
+    IndexBoundsBuilder::BoundsTightness* tightnessOut,
+    interval_evaluation_tree::Builder* ietBuilder) {
     // We're guaranteed that all GEO_NEARs are first.  This slightly violates the "sort index
     // predicates by their position in the compound index" rule but GEO_NEAR isn't an ixscan.
     // This saves our bacon when we have {foo: 1, bar: "2dsphere"} and the predicate on bar is a
@@ -522,7 +523,8 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeLeafNode(
         }
         verify(!keyElt.eoo());
 
-        IndexBoundsBuilder::translate(expr, keyElt, index, &isn->bounds.fields[pos], tightnessOut);
+        IndexBoundsBuilder::translate(
+            expr, keyElt, index, &isn->bounds.fields[pos], tightnessOut, ietBuilder);
 
         return isn;
     }
@@ -608,7 +610,7 @@ void QueryPlannerAccess::mergeWithLeafNode(MatchExpression* expr, ScanBuildingSt
     invariant(nullptr != node);
 
     const MatchExpression::MatchType mergeType = scanState->root->matchType();
-    size_t pos = scanState->ixtag->pos;
+    const size_t pos = scanState->ixtag->pos;
     const IndexEntry& index = scanState->indices[scanState->currentIndexNumber];
 
     const StageType type = node->getType();
@@ -700,14 +702,16 @@ void QueryPlannerAccess::mergeWithLeafNode(MatchExpression* expr, ScanBuildingSt
     OrderedIntervalList* oil = &boundsToFillOut->fields[pos];
 
     if (boundsToFillOut->fields[pos].name.empty()) {
-        IndexBoundsBuilder::translate(expr, keyElt, index, oil, &scanState->tightness);
+        IndexBoundsBuilder::translate(
+            expr, keyElt, index, oil, &scanState->tightness, scanState->getCurrentIETBuilder());
     } else {
         if (MatchExpression::AND == mergeType) {
             IndexBoundsBuilder::translateAndIntersect(
-                expr, keyElt, index, oil, &scanState->tightness);
+                expr, keyElt, index, oil, &scanState->tightness, scanState->getCurrentIETBuilder());
         } else {
             verify(MatchExpression::OR == mergeType);
-            IndexBoundsBuilder::translateAndUnion(expr, keyElt, index, oil, &scanState->tightness);
+            IndexBoundsBuilder::translateAndUnion(
+                expr, keyElt, index, oil, &scanState->tightness, scanState->getCurrentIETBuilder());
         }
     }
 }
@@ -901,7 +905,9 @@ bool QueryPlannerAccess::orNeedsFetch(const ScanBuildingState* scanState) {
 
 void QueryPlannerAccess::finishAndOutputLeaf(ScanBuildingState* scanState,
                                              vector<std::unique_ptr<QuerySolutionNode>>* out) {
-    finishLeafNode(scanState->currentScan.get(), scanState->indices[scanState->currentIndexNumber]);
+    finishLeafNode(scanState->currentScan.get(),
+                   scanState->indices[scanState->currentIndexNumber],
+                   scanState->ietBuilders);
 
     if (MatchExpression::OR == scanState->root->matchType()) {
         if (orNeedsFetch(scanState)) {
@@ -932,7 +938,10 @@ void QueryPlannerAccess::finishAndOutputLeaf(ScanBuildingState* scanState,
     out->push_back(std::move(scanState->currentScan));
 }
 
-void QueryPlannerAccess::finishLeafNode(QuerySolutionNode* node, const IndexEntry& index) {
+void QueryPlannerAccess::finishLeafNode(
+    QuerySolutionNode* node,
+    const IndexEntry& index,
+    const std::vector<interval_evaluation_tree::Builder>& ietBuilders) {
     const StageType type = node->getType();
 
     if (STAGE_TEXT_MATCH == type) {
@@ -970,6 +979,22 @@ void QueryPlannerAccess::finishLeafNode(QuerySolutionNode* node, const IndexEntr
             verify(bounds->fields[firstEmptyField].intervals.empty());
             break;
         }
+    }
+
+    if (node->getType() == STAGE_IXSCAN && !ietBuilders.empty()) {
+        auto ixScan = static_cast<IndexScanNode*>(node);
+        ixScan->iets.reserve(ietBuilders.size());
+        for (size_t i = 0; i < ietBuilders.size(); ++i) {
+            auto iet = ietBuilders[i].done();
+            if (iet) {
+                ixScan->iets.push_back(*iet);
+            } else {
+                ixScan->iets.push_back(
+                    interval_evaluation_tree::IET::make<interval_evaluation_tree::ConstNode>(
+                        bounds->fields[i]));
+            }
+        }
+        LOGV2_DEBUG(6334900, 5, "Build IETs", "iets"_attr = ietsToString(index, ixScan->iets));
     }
 
     // All fields are filled out with bounds, nothing to do.
@@ -1229,13 +1254,14 @@ bool QueryPlannerAccess::processIndexScans(const CanonicalQuery& query,
             }
 
             // Reset state before producing a new leaf.
-            scanState.resetForNextScan(scanState.ixtag);
+            scanState.resetForNextScan(scanState.ixtag, query.isParameterized());
 
             scanState.currentScan = makeLeafNode(query,
                                                  indices[scanState.currentIndexNumber],
                                                  scanState.ixtag->pos,
                                                  child,
-                                                 &scanState.tightness);
+                                                 &scanState.tightness,
+                                                 scanState.getCurrentIETBuilder());
 
             handleFilter(&scanState);
         }
@@ -1340,7 +1366,8 @@ bool QueryPlannerAccess::processIndexScansElemMatch(
                                                   indices[scanState->currentIndexNumber],
                                                   scanState->ixtag->pos,
                                                   emChild,
-                                                  &scanState->tightness);
+                                                  &scanState->tightness,
+                                                  scanState->getCurrentIETBuilder());
         }
     }
 
@@ -1627,9 +1654,12 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::_buildIndexedDataAccess(
             IndexTag* tag = static_cast<IndexTag*>(root->getTag());
 
             IndexBoundsBuilder::BoundsTightness tightness = IndexBoundsBuilder::EXACT;
-            auto soln = makeLeafNode(query, indices[tag->index], tag->pos, root, &tightness);
+            // TODO SERVER-64816: Add IET suport.
+            auto soln =
+                makeLeafNode(query, indices[tag->index], tag->pos, root, &tightness, nullptr);
             verify(nullptr != soln);
-            finishLeafNode(soln.get(), indices[tag->index]);
+            finishLeafNode(
+                soln.get(), indices[tag->index], std::vector<interval_evaluation_tree::Builder>{});
 
             if (!ownedRoot) {
                 // We're performing access planning for the child of an array operator such as

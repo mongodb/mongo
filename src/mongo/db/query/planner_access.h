@@ -34,6 +34,7 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/index_tag.h"
+#include "mongo/db/query/interval_evaluation_tree.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_solution.h"
 
@@ -160,15 +161,37 @@ private:
          * Reset the scan building state in preparation for building a new scan.
          *
          * This always should be called prior to allocating a new 'currentScan'.
+         *
+         * If `isQueryParameterized` is true an Interval Evaluation Tree will be built for every key
+         * element.
          */
-        void resetForNextScan(IndexTag* newTag) {
+        void resetForNextScan(IndexTag* newTag, bool isQueryParameterized) {
             currentScan.reset(nullptr);
             currentIndexNumber = newTag->index;
             tightness = IndexBoundsBuilder::INEXACT_FETCH;
             loosestBounds = IndexBoundsBuilder::EXACT;
 
+            if (isQueryParameterized) {
+                const auto& index = indices[newTag->index];
+                for (int i = 0; i < index.keyPattern.nFields(); ++i) {
+                    ietBuilders.emplace_back();
+                }
+            }
+
             if (MatchExpression::OR == root->matchType()) {
                 curOr = std::make_unique<OrMatchExpression>();
+            }
+        }
+
+        interval_evaluation_tree::Builder* getCurrentIETBuilder() {
+            if (ietBuilders.empty()) {
+                return nullptr;
+            } else {
+                tassert(6334910,
+                        "IET Builder list size must be equal to the number of fields in the key "
+                        "pattern",
+                        ixtag->pos < ietBuilders.size());
+                return &ietBuilders[ixtag->pos];
             }
         }
 
@@ -221,6 +244,11 @@ private:
         // the child predicates assigned to the current index is INEXACT_COVERED but none are
         // INEXACT_FETCH, then 'loosestBounds' is INEXACT_COVERED.
         IndexBoundsBuilder::BoundsTightness loosestBounds;
+
+        // The list of Interval Evaluation Tree builders used to build IETs for SBE. Every
+        // iet::Builder in the list corresponds to the corresponding element in the key pattern. The
+        // vector is empty if the query has no parameter markers.
+        std::vector<interval_evaluation_tree::Builder> ietBuilders;
 
     private:
         // Default constructor is not allowed.
@@ -354,7 +382,8 @@ private:
         const IndexEntry& index,
         size_t pos,
         const MatchExpression* expr,
-        IndexBoundsBuilder::BoundsTightness* tightnessOut);
+        IndexBoundsBuilder::BoundsTightness* tightnessOut,
+        interval_evaluation_tree::Builder* ietBuilder);
 
     /**
      * Merge the predicate 'expr' with the leaf node 'node'.
@@ -377,7 +406,9 @@ private:
      * If geo, do nothing.
      * If text, punt to finishTextNode.
      */
-    static void finishLeafNode(QuerySolutionNode* node, const IndexEntry& index);
+    static void finishLeafNode(QuerySolutionNode* node,
+                               const IndexEntry& index,
+                               const std::vector<interval_evaluation_tree::Builder>& ietBuilders);
 
     /**
      * Fills in any missing bounds by calling finishLeafNode(...) for the scan contained in

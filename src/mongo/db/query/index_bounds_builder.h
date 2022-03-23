@@ -34,6 +34,7 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/index_entry.h"
+#include "mongo/db/query/interval_evaluation_tree.h"
 
 namespace mongo {
 
@@ -103,32 +104,44 @@ public:
      *
      * The expression must be a predicate over one field.  That is, expression category must be
      * kLeaf or kArrayMatching.
+     *
+     * If 'ietBuilder' is not null the given `expr` is turned into a Interval Evaluation Tree which
+     * might be used to restore index bounds from a cached plan.
      */
     static void translate(const MatchExpression* expr,
                           const BSONElement& elt,
                           const IndexEntry& index,
                           OrderedIntervalList* oilOut,
-                          BoundsTightness* tightnessOut);
+                          BoundsTightness* tightnessOut,
+                          interval_evaluation_tree::Builder* ietBuilder = nullptr);
 
     /**
      * Creates bounds for 'expr' (indexed according to 'elt').  Intersects those bounds
      * with the bounds in oilOut, which is an in/out parameter.
+     *
+     * If 'ietBuilder' is not null the given `expr` is turned into a Interval Evaluation Tree which
+     * might be used to restore index bounds from a cached plan.
      */
     static void translateAndIntersect(const MatchExpression* expr,
                                       const BSONElement& elt,
                                       const IndexEntry& index,
                                       OrderedIntervalList* oilOut,
-                                      BoundsTightness* tightnessOut);
+                                      BoundsTightness* tightnessOut,
+                                      interval_evaluation_tree::Builder* ietBuilder);
 
     /**
      * Creates bounds for 'expr' (indexed according to 'elt').  Unions those bounds
      * with the bounds in oilOut, which is an in/out parameter.
+     *
+     * If 'ietBuilder' is not null the given `expr` is turned into a Interval Evaluation Tree which
+     * might be used to restore index bounds from a cached plan.
      */
     static void translateAndUnion(const MatchExpression* expr,
                                   const BSONElement& elt,
                                   const IndexEntry& index,
                                   OrderedIntervalList* oilOut,
-                                  BoundsTightness* tightnessOut);
+                                  BoundsTightness* tightnessOut,
+                                  interval_evaluation_tree::Builder* ietBuilder);
 
     /**
      * Make a range interval from the provided object.
@@ -277,7 +290,8 @@ private:
                                     const BSONElement& elt,
                                     const IndexEntry& index,
                                     OrderedIntervalList* oilOut,
-                                    BoundsTightness* tightnessOut);
+                                    BoundsTightness* tightnessOut,
+                                    interval_evaluation_tree::Builder* ietBuilder);
 };
 
 }  // namespace mongo

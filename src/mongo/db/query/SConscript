@@ -366,6 +366,7 @@ env.CppUnitTest(
         "index_bounds_builder_type_test.cpp",
         "index_bounds_test.cpp",
         "index_entry_test.cpp",
+        "interval_evaluation_tree_test.cpp",
         "interval_test.cpp",
         "killcursors_request_test.cpp",
         "lru_key_value_test.cpp",

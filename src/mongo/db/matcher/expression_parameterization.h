@@ -50,6 +50,10 @@ public:
         return _inputParamIdCounter++;
     }
 
+    bool hasAssignedParameters() const {
+        return _inputParamIdCounter != 0;
+    }
+
 private:
     InputParamId _inputParamIdCounter{0};
 };

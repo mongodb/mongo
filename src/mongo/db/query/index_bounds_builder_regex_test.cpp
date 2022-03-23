@@ -259,7 +259,8 @@ TEST_F(IndexBoundsBuilderTest, SimpleNonPrefixRegex) {
     BSONElement elt = obj.firstElement();
     OrderedIntervalList oil;
     IndexBoundsBuilder::BoundsTightness tightness;
-    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+    IndexBoundsBuilder::translate(
+        expr.get(), elt, testIndex, &oil, &tightness, /* iet::Builder */ nullptr);
     ASSERT_EQUALS(oil.intervals.size(), 2U);
     ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
                   oil.intervals[0].compare(Interval(fromjson("{'': '', '': {}}"), true, false)));
@@ -276,7 +277,8 @@ TEST_F(IndexBoundsBuilderTest, NonSimpleRegexWithPipe) {
     BSONElement elt = obj.firstElement();
     OrderedIntervalList oil;
     IndexBoundsBuilder::BoundsTightness tightness;
-    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+    IndexBoundsBuilder::translate(
+        expr.get(), elt, testIndex, &oil, &tightness, /* iet::Builder */ nullptr);
     ASSERT_EQUALS(oil.intervals.size(), 2U);
     ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
                   oil.intervals[0].compare(Interval(fromjson("{'': '', '': {}}"), true, false)));
@@ -293,7 +295,8 @@ TEST_F(IndexBoundsBuilderTest, SimpleRegexSingleLineMode) {
     BSONElement elt = obj.firstElement();
     OrderedIntervalList oil;
     IndexBoundsBuilder::BoundsTightness tightness;
-    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+    IndexBoundsBuilder::translate(
+        expr.get(), elt, testIndex, &oil, &tightness, /* iet::Builder */ nullptr);
     ASSERT_EQUALS(oil.intervals.size(), 2U);
     ASSERT_EQUALS(
         Interval::INTERVAL_EQUALS,
@@ -311,7 +314,8 @@ TEST_F(IndexBoundsBuilderTest, SimplePrefixRegex) {
     BSONElement elt = obj.firstElement();
     OrderedIntervalList oil;
     IndexBoundsBuilder::BoundsTightness tightness;
-    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+    IndexBoundsBuilder::translate(
+        expr.get(), elt, testIndex, &oil, &tightness, /* iet::Builder */ nullptr);
     ASSERT_EQUALS(oil.intervals.size(), 2U);
     ASSERT_EQUALS(
         Interval::INTERVAL_EQUALS,
