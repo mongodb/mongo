@@ -54,7 +54,7 @@ class test_tiered03(wttest.WiredTigerTestCase):
         #    bucket_prefix = generate_s3_prefix(),
         #    ss_name = 's3_store')),
     ]
-    # Occasionally add a lot of records, so that merges (and bloom) happen.
+    # Occasionally add a lot of records to vary the amount of work flush does.
     record_count_scenarios = wtscenario.quick_scenarios(
         'nrecs', [10, 10000], [0.9, 0.1])
     scenarios = wtscenario.make_scenarios(storage_sources, record_count_scenarios, prune=100, prunelong=500)
