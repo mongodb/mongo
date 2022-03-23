@@ -104,7 +104,7 @@ var primaryOplog = primary.getDB('local').oplog.rs.find().sort({$natural: 1}).to
 var collModEntry = primaryOplog.find(op => op.o.collMod);
 
 assert(collModEntry, "collMod entry was not present in the oplog.");
-assert.eq(initialExpireAfterSeconds, collModEntry.o2["expireAfterSeconds_old"]);
+assert.eq(initialExpireAfterSeconds, collModEntry.o2["indexOptions_old"]["expireAfterSeconds"]);
 assert.eq("x_1", collModEntry.o["index"]["name"]);
 
 // finish up

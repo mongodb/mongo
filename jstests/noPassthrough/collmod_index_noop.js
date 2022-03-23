@@ -73,24 +73,24 @@ if (collModIndexUniqueEnabled) {
 // Hiding a non-hidden index will generate the oplog entry with a 'hidden_old: false'.
 let result = assert.commandWorked(primaryColl.hideIndex('a_1'));
 validateResultForCollMod(result, {hidden_old: false, hidden_new: true});
-validateCollModOplogEntryCount({"o.index.hidden": true, "o2.hidden_old": false}, 1);
+validateCollModOplogEntryCount({"o.index.hidden": true, "o2.indexOptions_old.hidden": false}, 1);
 
 // Hiding a hidden index won't generate both 'hidden' and 'hidden_old' field as it's a no-op. The
 // result for no-op 'collMod' command shouldn't contain 'hidden' field.
 result = assert.commandWorked(primaryColl.hideIndex('a_1'));
 validateResultForCollMod(result, {});
-validateCollModOplogEntryCount({"o.index.hidden": true, "o2.hidden_old": true}, 0);
+validateCollModOplogEntryCount({"o.index.hidden": true, "o2.indexOptions_old.hidden": true}, 0);
 
 // Un-hiding an hidden index will generate the oplog entry with a 'hidden_old: true'.
 result = assert.commandWorked(primaryColl.unhideIndex('a_1'));
 validateResultForCollMod(result, {hidden_old: true, hidden_new: false});
-validateCollModOplogEntryCount({"o.index.hidden": false, "o2.hidden_old": true}, 1);
+validateCollModOplogEntryCount({"o.index.hidden": false, "o2.indexOptions_old.hidden": true}, 1);
 
 // Un-hiding a non-hidden index won't generate both 'hidden' and 'hidden_old' field as it's a no-op.
 // The result for no-op 'collMod' command shouldn't contain 'hidden' field.
 result = assert.commandWorked(primaryColl.unhideIndex('a_1'));
 validateResultForCollMod(result, {});
-validateCollModOplogEntryCount({"o.index.hidden": false, "o2.hidden_old": false}, 0);
+validateCollModOplogEntryCount({"o.index.hidden": false, "o2.indexOptions_old.hidden": false}, 0);
 
 // Validate that if both 'expireAfterSeconds' and 'hidden' options are specified but the 'hidden'
 // option is a no-op, the operation as a whole will NOT be a no-op - instead, it will generate an
@@ -102,7 +102,7 @@ result = assert.commandWorked(primaryDB.runCommand({
 validateResultForCollMod(result, {expireAfterSeconds_old: 5, expireAfterSeconds_new: 10});
 validateCollModOplogEntryCount({
     "o.index.expireAfterSeconds": 10,
-    "o2.expireAfterSeconds_old": 5,
+    "o2.indexOptions_old.expireAfterSeconds": 5,
 },
                                1);
 
@@ -186,7 +186,7 @@ if (collModIndexUniqueEnabled) {
     validateCollModOplogEntryCount({
         "o.index.name": "f_1",
         "o.index.expireAfterSeconds": 20,
-        "o2.expireAfterSeconds_old": 15,
+        "o2.indexOptions_old.expireAfterSeconds": 15,
         "o.index.unique": {$exists: false},
     },
                                    1);
@@ -209,7 +209,7 @@ if (collModIndexUniqueEnabled) {
     validateCollModOplogEntryCount({
         "o.index.name": "g_1",
         "o.index.expireAfterSeconds": 30,
-        "o2.expireAfterSeconds_old": 25,
+        "o2.indexOptions_old.expireAfterSeconds": 25,
         "o.index.hidden": {$exists: false},
         "o.index.unique": {$exists: false},
     },
