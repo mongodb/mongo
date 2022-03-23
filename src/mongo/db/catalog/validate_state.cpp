@@ -282,7 +282,7 @@ void ValidateState::_relockDatabaseAndCollection(OperationContext* opCtx) {
         << " while validating collection: " << _nss << " (" << *_uuid << ")";
 
     _databaseLock.emplace(opCtx, _nss.db(), MODE_IS);
-    // TODO SERVER-63106 Have the ValidateState implementation use TenantNamespace
+    // TODO SERVER-64608 Use the tenantID from '_nss' to construct the DatabaseName
     const TenantDatabaseName tenantDbName(boost::none, _nss.db());
     _database = DatabaseHolder::get(opCtx)->getDb(opCtx, tenantDbName);
     uassert(ErrorCodes::Interrupted, dbErrMsg, _database);

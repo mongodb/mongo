@@ -38,7 +38,7 @@ feature_flags:
         # Only available with the server parameter "multitenancySupport".
         description: >-
             When enabled in conjunction with the server parameter "multitenancySupport",
-            require tenantID to be a part of TenantNamespace and TenantDatabase.
+            require tenantID to be a part of NamespaceString and TenantDatabase.
         cpp_varname: gFeatureFlagRequireTenantID
         default: false
     featureFlagUserWriteBlocking:

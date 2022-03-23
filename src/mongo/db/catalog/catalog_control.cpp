@@ -44,7 +44,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/rebuild_indexes.h"
 #include "mongo/db/tenant_database_name.h"
-#include "mongo/db/tenant_namespace.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {

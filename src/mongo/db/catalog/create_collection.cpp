@@ -57,7 +57,6 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/tenant_database_name.h"
-#include "mongo/db/tenant_namespace.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/idl/command_generic_argument.h"
 #include "mongo/logv2/log.h"

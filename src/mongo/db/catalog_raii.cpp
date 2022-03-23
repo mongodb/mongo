@@ -265,7 +265,7 @@ AutoGetCollection::AutoGetCollection(
         auto secondaryResolvedNss =
             catalog->resolveNamespaceStringOrUUID(opCtx, secondaryNssOrUUID);
         auto secondaryColl = catalog->lookupCollectionByNamespace(opCtx, secondaryResolvedNss);
-        // TODO SERVER-62926 Change collection lock RAII types to use TenantNamespace
+        // TODO SERVER-64608 Use tenantID on NamespaceString to construct DatabaseName
         const TenantDatabaseName secondaryTenantDbName(boost::none, secondaryNssOrUUID.db());
         verifyDbAndCollection(opCtx,
                               MODE_IS,

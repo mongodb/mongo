@@ -44,7 +44,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/tenant_database_name.h"
-#include "mongo/db/tenant_namespace.h"
 
 namespace mongo {
 

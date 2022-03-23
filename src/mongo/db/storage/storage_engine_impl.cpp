@@ -182,7 +182,7 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx, LastShutdownState l
                                "Historical entry",
                                "catalogId"_attr = entry.catalogId,
                                "ident"_attr = entry.ident,
-                               logAttrs(entry.tenantNs));
+                               logAttrs(entry.nss));
         }
     }
 
@@ -252,7 +252,7 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx, LastShutdownState l
             if (!restoredIdent) {
                 LOGV2(6260800,
                       "Removing catalog entry for collection not restored",
-                      logAttrs(entry.tenantNs.getNss()),
+                      logAttrs(entry.nss),
                       "ident"_attr = collectionIdent);
 
                 WriteUnitOfWork wuow(opCtx);
@@ -279,16 +279,14 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx, LastShutdownState l
             // store, drop it from the catalog and skip initializing it by continuing past the
             // following logic.
             if (orphan) {
-                // TODO SERVER-62917 pass the TenantNamespace here so it's accessible when creating
-                // the RecordStore in recoverOrphanedIdent.
-                auto status = _recoverOrphanedCollection(
-                    opCtx, entry.catalogId, entry.tenantNs.getNss(), collectionIdent);
+                auto status =
+                    _recoverOrphanedCollection(opCtx, entry.catalogId, entry.nss, collectionIdent);
                 if (!status.isOK()) {
                     LOGV2_WARNING(22266,
                                   "Failed to recover orphaned data file for collection "
                                   "'{namespace}': {error}",
                                   "Failed to recover orphaned data file for collection",
-                                  "namespace"_attr = entry.tenantNs,
+                                  "namespace"_attr = entry.nss,
                                   "error"_attr = status);
                     WriteUnitOfWork wuow(opCtx);
                     fassert(50716, _catalog->_removeEntry(opCtx, entry.catalogId));
@@ -296,7 +294,7 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx, LastShutdownState l
                     if (_options.forRepair) {
                         StorageRepairObserver::get(getGlobalServiceContext())
                             ->invalidatingModification(str::stream()
-                                                       << "Collection " << entry.tenantNs.toString()
+                                                       << "Collection " << entry.nss.ns()
                                                        << " dropped: " << status.reason());
                     }
                     wuow.commit();
@@ -305,7 +303,7 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx, LastShutdownState l
             }
         }
 
-        if (!entry.tenantNs.getNss().isReplicated() &&
+        if (!entry.nss.isReplicated() &&
             !std::binary_search(identsKnownToStorageEngine.begin(),
                                 identsKnownToStorageEngine.end(),
                                 entry.ident)) {
@@ -320,7 +318,7 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx, LastShutdownState l
             LOGV2_INFO(5555201,
                        "Removed unknown unreplicated collection from the catalog",
                        "catalogId"_attr = entry.catalogId,
-                       logAttrs(entry.tenantNs),
+                       logAttrs(entry.nss),
                        "ident"_attr = entry.ident);
             continue;
         }
@@ -350,11 +348,10 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx, LastShutdownState l
                 });
         }
 
-        _initCollection(
-            opCtx, entry.catalogId, entry.tenantNs.getNss(), _options.forRepair, minVisibleTs);
+        _initCollection(opCtx, entry.catalogId, entry.nss, _options.forRepair, minVisibleTs);
 
-        if (entry.tenantNs.getNss().isOrphanCollection()) {
-            LOGV2(22248, "Orphaned collection found", logAttrs(entry.tenantNs));
+        if (entry.nss.isOrphanCollection()) {
+            LOGV2(22248, "Orphaned collection found", logAttrs(entry.nss));
         }
     }
 
@@ -384,8 +381,7 @@ void StorageEngineImpl::_initCollection(OperationContext* opCtx,
     }
 
     auto collectionFactory = Collection::Factory::get(getGlobalServiceContext());
-    TenantNamespace tenantNs(getActiveTenant(opCtx), nss);
-    auto collection = collectionFactory->make(opCtx, tenantNs, catalogId, md, std::move(rs));
+    auto collection = collectionFactory->make(opCtx, nss, catalogId, md, std::move(rs));
     collection->setMinimumVisibleSnapshot(minVisibleTs);
 
     CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
@@ -453,7 +449,7 @@ void StorageEngineImpl::_checkForIndexFiles(
 
         LOGV2_FATAL_NOTRACE(6261000,
                             "Collection is missing an index file",
-                            logAttrs(entry.tenantNs.getNss()),
+                            logAttrs(entry.nss),
                             "collectionIdent"_attr = entry.ident,
                             "missingIndexIdent"_attr = indexIdent);
     }
@@ -625,7 +621,7 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
             if (engineIdents.find(entry.ident) == engineIdents.end()) {
                 return {ErrorCodes::UnrecoverableRollbackError,
                         str::stream() << "Expected collection does not exist. Collection: "
-                                      << entry.tenantNs.toString() << " Ident: " << entry.ident};
+                                      << entry.nss.ns() << " Ident: " << entry.ident};
             }
         }
     }
@@ -638,7 +634,7 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
     for (DurableCatalog::Entry entry : catalogEntries) {
         std::shared_ptr<BSONCollectionCatalogEntry::MetaData> metaData =
             _catalog->getMetaData(opCtx, entry.catalogId);
-        auto tenantNs = metaData->tenantNs;
+        NamespaceString nss(metaData->ns);
 
         // Batch up the indexes to remove them from `metaData` outside of the iterator.
         std::vector<std::string> indexesToDrop;
@@ -666,7 +662,7 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
                     "the index, or rerunning with the --repair option. See "
                     "http://dochub.mongodb.org/core/repair for more information",
                     "index"_attr = indexName,
-                    logAttrs(tenantNs));
+                    logAttrs(nss));
             }
 
             // Two-phase index drop ensures that the underlying data table for an index in the
@@ -683,7 +679,7 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
                           lastShutdownState == LastShutdownState::kUnclean,
                       str::stream() << "Failed to find an index data table matching " << indexIdent
                                     << " for durable index catalog entry " << indexMetaData.spec
-                                    << " in collection " << tenantNs.toString());
+                                    << " in collection " << nss.ns());
 
             // Any index build with a UUID is an unfinished two-phase build and must be restarted.
             // There are no special cases to handle on primaries or secondaries. An index build may
@@ -698,7 +694,7 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
 
                 LOGV2(22253,
                       "Found index from unfinished build",
-                      logAttrs(tenantNs),
+                      logAttrs(nss),
                       "uuid"_attr = *collUUID,
                       "index"_attr = indexName,
                       "buildUUID"_attr = buildUUID);
@@ -722,10 +718,10 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
                 LOGV2(22255,
                       "Expected background index build did not complete, rebuilding in foreground "
                       "- see SERVER-43097",
-                      logAttrs(tenantNs),
+                      logAttrs(nss),
                       "index"_attr = indexName);
                 reconcileResult.indexesToRebuild.push_back(
-                    {entry.catalogId, tenantNs.getNss(), indexName.toString()});
+                    {entry.catalogId, nss, indexName.toString()});
                 continue;
             }
 
@@ -736,10 +732,7 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
             // index when it replays the oplog. In these cases the index entry in the catalog
             // should be dropped.
             if (!indexMetaData.ready && !indexMetaData.isBackgroundSecondaryBuild) {
-                LOGV2(22256,
-                      "Dropping unfinished index",
-                      logAttrs(tenantNs),
-                      "index"_attr = indexName);
+                LOGV2(22256, "Dropping unfinished index", logAttrs(nss), "index"_attr = indexName);
                 // Ensure the `ident` is dropped while we have the `indexIdent` value.
                 fassert(50713, _engine->dropIdent(opCtx->recoveryUnit(), indexIdent));
                 indexesToDrop.push_back(indexName.toString());
@@ -749,14 +742,14 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
 
         for (auto&& indexName : indexesToDrop) {
             invariant(metaData->eraseIndex(indexName),
-                      str::stream() << "Index is missing. Collection: " << tenantNs.toString()
+                      str::stream() << "Index is missing. Collection: " << nss.ns()
                                     << " Index: " << indexName);
         }
         if (indexesToDrop.size() > 0) {
             WriteUnitOfWork wuow(opCtx);
             auto collection =
                 CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForMetadataWrite(
-                    opCtx, CollectionCatalog::LifetimeMode::kInplace, entry.tenantNs.getNss());
+                    opCtx, CollectionCatalog::LifetimeMode::kInplace, entry.nss);
             invariant(collection->getCatalogId() == entry.catalogId);
             collection->replaceMetadata(opCtx, std::move(metaData));
             wuow.commit();

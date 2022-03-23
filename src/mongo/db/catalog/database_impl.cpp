@@ -696,8 +696,7 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
     // because the CollectionCatalog manages the necessary isolation for this Collection until the
     // WUOW commits.
     auto writableCollection = collToRename.getWritableCollection();
-    TenantNamespace toTenantNs(boost::none, toNss);
-    Status status = writableCollection->rename(opCtx, toTenantNs, stayTemp);
+    Status status = writableCollection->rename(opCtx, toNss, stayTemp);
     if (!status.isOK())
         return status;
 
@@ -855,13 +854,12 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
 
     // Create Collection object
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    TenantNamespace tenantNs(boost::none, nss);
     std::pair<RecordId, std::unique_ptr<RecordStore>> catalogIdRecordStorePair =
         uassertStatusOK(storageEngine->getCatalog()->createCollection(
-            opCtx, tenantNs, optionsWithUUID, true /*allocateDefaultSpace*/));
+            opCtx, nss, optionsWithUUID, true /*allocateDefaultSpace*/));
     auto catalogId = catalogIdRecordStorePair.first;
     std::shared_ptr<Collection> ownedCollection = Collection::Factory::get(opCtx)->make(
-        opCtx, tenantNs, catalogId, optionsWithUUID, std::move(catalogIdRecordStorePair.second));
+        opCtx, nss, catalogId, optionsWithUUID, std::move(catalogIdRecordStorePair.second));
     auto collection = ownedCollection.get();
     ownedCollection->init(opCtx);
     ownedCollection->setCommitted(false);

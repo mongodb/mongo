@@ -66,7 +66,6 @@
 #include "mongo/db/storage/historical_ident_tracker.h"
 #include "mongo/db/storage/remove_saver.h"
 #include "mongo/db/tenant_database_name.h"
-#include "mongo/db/tenant_namespace.h"
 #include "mongo/db/transaction_history_iterator.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_config_version.h"

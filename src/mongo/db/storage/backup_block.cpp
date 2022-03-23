@@ -135,14 +135,14 @@ void BackupBlock::_initialize(OperationContext* opCtx,
                 // Index idents will get the namespace and UUID of their respective collection.
                 catalog->isIndexInEntry(opCtx, e.catalogId, _filenameStem)) {
                 _setUuid(opCtx, catalog, e.catalogId);
-                _setNamespaceString(e.tenantNs.getNss());
+                _setNamespaceString(e.nss);
                 break;
             }
 
             if (e.ident == _filenameStem) {
                 // This ident represents the collection.
                 _setUuid(opCtx, catalog, e.catalogId);
-                _setNamespaceString(e.tenantNs.getNss());
+                _setNamespaceString(e.nss);
                 break;
             }
         }

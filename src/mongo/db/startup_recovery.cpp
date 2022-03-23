@@ -54,7 +54,6 @@
 #include "mongo/db/repl_set_member_in_standalone_mode.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/storage_repair_observer.h"
-#include "mongo/db/tenant_namespace.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point.h"

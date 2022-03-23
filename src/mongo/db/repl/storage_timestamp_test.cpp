@@ -86,7 +86,6 @@
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/db/storage/storage_engine_impl.h"
-#include "mongo/db/tenant_namespace.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/db/transaction_participant_gen.h"
 #include "mongo/db/vector_clock_mutable.h"
@@ -3026,8 +3025,8 @@ TEST_F(StorageTimestampTest, ViewCreationSeparateTransaction) {
             << " incorrectly exists before creation. CreateTs: " << systemViewsCreateTs;
 
         systemViewsMd = getMetaDataAtTime(durableCatalog, catalogId, systemViewsCreateTs);
-        TenantNamespace tenantNs = systemViewsMd->tenantNs;
-        ASSERT_EQ(systemViewsNss.ns(), tenantNs.getNss().ns());
+        auto nss = systemViewsMd->ns;
+        ASSERT_EQ(systemViewsNss.ns(), nss);
 
         assertDocumentAtTimestamp(autoColl.getCollection(), systemViewsCreateTs, BSONObj());
         assertDocumentAtTimestamp(autoColl.getCollection(),

@@ -45,7 +45,6 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
-#include "mongo/db/tenant_namespace.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/system_clock_source.h"
@@ -87,8 +86,7 @@ public:
                                   << "v" << static_cast<int>(IndexDescriptor::kLatestIndexVersion)
                                   << "unique" << true);
 
-        auto collection =
-            std::make_unique<CollectionMock>(TenantNamespace(boost::none, NamespaceString(ns)));
+        auto collection = std::make_unique<CollectionMock>(NamespaceString(ns));
         IndexDescriptor desc("", spec);
         invariant(desc.isIdIndex());
 
@@ -120,8 +118,7 @@ public:
             spec = spec.addField(partialBSON.firstElement());
         }
 
-        auto collection =
-            std::make_unique<CollectionMock>(TenantNamespace(boost::none, NamespaceString(ns)));
+        auto collection = std::make_unique<CollectionMock>(NamespaceString(ns));
 
         IndexDescriptor& desc = _descriptors.emplace_back("", spec);
 

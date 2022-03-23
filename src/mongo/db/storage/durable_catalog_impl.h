@@ -109,7 +109,7 @@ public:
 
     StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> createCollection(
         OperationContext* opCtx,
-        const TenantNamespace& tenantNs,
+        const NamespaceString& nss,
         const CollectionOptions& options,
         bool allocateDefaultSpace);
 
@@ -119,14 +119,14 @@ public:
                        const IndexDescriptor* spec);
 
     StatusWith<ImportResult> importCollection(OperationContext* opCtx,
-                                              const TenantNamespace& tenantNs,
+                                              const NamespaceString& nss,
                                               const BSONObj& metadata,
                                               const BSONObj& storageMetadata,
                                               const ImportOptions& importOptions) override;
 
     Status renameCollection(OperationContext* opCtx,
                             RecordId catalogId,
-                            const TenantNamespace& toTenantNs,
+                            const NamespaceString& toNss,
                             BSONCollectionCatalogEntry::MetaData& md);
 
     Status dropCollection(OperationContext* opCtx, RecordId catalogId);
@@ -160,23 +160,23 @@ private:
 
     BSONObj _findEntry(OperationContext* opCtx, RecordId catalogId) const;
     StatusWith<Entry> _addEntry(OperationContext* opCtx,
-                                TenantNamespace tenantNs,
+                                NamespaceString nss,
                                 const CollectionOptions& options);
     StatusWith<Entry> _importEntry(OperationContext* opCtx,
-                                   TenantNamespace tenantNs,
+                                   NamespaceString nss,
                                    const BSONObj& metadata);
     Status _replaceEntry(OperationContext* opCtx,
                          RecordId catalogId,
-                         const TenantNamespace& toTenantNs,
+                         const NamespaceString& toNss,
                          BSONCollectionCatalogEntry::MetaData& md);
     Status _removeEntry(OperationContext* opCtx, RecordId catalogId);
 
     /**
      * Generates a new unique identifier for a new "thing".
-     * @param tenantNs - the containing tenant namespace
+     * @param nss - the containing namespace
      * @param kind - what this "thing" is, likely collection or index
      */
-    std::string _newUniqueIdent(TenantNamespace tenantNs, const char* kind);
+    std::string _newUniqueIdent(NamespaceString nss, const char* kind);
 
     std::string _newInternalIdent(StringData identStem);
 

@@ -34,7 +34,6 @@
 
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/index/multikey_paths.h"
-#include "mongo/db/tenant_namespace.h"
 
 namespace mongo {
 
@@ -150,7 +149,7 @@ public:
          */
         bool eraseIndex(StringData name);
 
-        TenantNamespace tenantNs;
+        std::string ns;
         CollectionOptions options;
         std::vector<IndexMetaData> indexes;
 

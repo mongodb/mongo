@@ -43,13 +43,13 @@ class CollectionImpl final : public Collection {
 public:
     // TODO SERVER-56999: We should just need one API to create Collections
     explicit CollectionImpl(OperationContext* opCtx,
-                            const TenantNamespace& tenantNs,
+                            const NamespaceString& nss,
                             RecordId catalogId,
                             const CollectionOptions& options,
                             std::unique_ptr<RecordStore> recordStore);
 
     explicit CollectionImpl(OperationContext* opCtx,
-                            const TenantNamespace& tenantNs,
+                            const NamespaceString& nss,
                             RecordId catalogId,
                             std::shared_ptr<BSONCollectionCatalogEntry::MetaData> metadata,
                             std::unique_ptr<RecordStore> recordStore);
@@ -62,14 +62,14 @@ public:
     public:
         // TODO SERVER-56999: We should just need one API to create Collections
         std::shared_ptr<Collection> make(OperationContext* opCtx,
-                                         const TenantNamespace& tenantNs,
+                                         const NamespaceString& nss,
                                          RecordId catalogId,
                                          const CollectionOptions& options,
                                          std::unique_ptr<RecordStore> rs) const final;
 
         std::shared_ptr<Collection> make(
             OperationContext* opCtx,
-            const TenantNamespace& tenantNs,
+            const NamespaceString& nss,
             RecordId catalogId,
             std::shared_ptr<BSONCollectionCatalogEntry::MetaData> metadata,
             std::unique_ptr<RecordStore> rs) const final;
@@ -83,14 +83,10 @@ public:
     void setCommitted(bool val) final;
 
     const NamespaceString& ns() const final {
-        return _tenantNs.getNss();
+        return _ns;
     }
 
-    const TenantNamespace& tenantNs() const final {
-        return _tenantNs;
-    }
-
-    Status rename(OperationContext* opCtx, const TenantNamespace& tenantNs, bool stayTemp) final;
+    Status rename(OperationContext* opCtx, const NamespaceString& nss, bool stayTemp) final;
 
     RecordId getCatalogId() const final {
         return _catalogId;
@@ -594,7 +590,7 @@ private:
         RecordId _cappedFirstRecord;
     };
 
-    TenantNamespace _tenantNs;
+    NamespaceString _ns;
     RecordId _catalogId;
     UUID _uuid;
     bool _cachedCommitted = true;

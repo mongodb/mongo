@@ -190,16 +190,14 @@ void wiredTigerImportFromBackupCursor(OperationContext* opCtx,
             });
 
             // Create Collection object
-            TenantNamespace tenantNs(getActiveTenant(opCtx), nss);
             auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
             auto durableCatalog = storageEngine->getCatalog();
             ImportOptions importOptions(ImportOptions::ImportCollectionUUIDOption::kKeepOld);
             importOptions.importTimestampRule = ImportOptions::ImportTimestampRule::kStable;
 
-            // TODO SERVER-62659 Ensure the correct tenantId is used when importing the collection.
             auto importResult = uassertStatusOK(
                 DurableCatalog::get(opCtx)->importCollection(opCtx,
-                                                             tenantNs,
+                                                             collectionMetadata.ns,
                                                              collectionMetadata.catalogObject,
                                                              storageMetadata.done(),
                                                              importOptions));
@@ -209,7 +207,7 @@ void wiredTigerImportFromBackupCursor(OperationContext* opCtx,
             }
 
             std::shared_ptr<Collection> ownedCollection = Collection::Factory::get(opCtx)->make(
-                opCtx, tenantNs, importResult.catalogId, md, std::move(importResult.rs));
+                opCtx, nss, importResult.catalogId, md, std::move(importResult.rs));
             ownedCollection->init(opCtx);
             ownedCollection->setCommitted(false);
 

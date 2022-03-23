@@ -95,8 +95,7 @@ private:
 
 class ChangeStreamOplogCollectionMock : public CollectionMock {
 public:
-    ChangeStreamOplogCollectionMock()
-        : CollectionMock(TenantNamespace(boost::none, NamespaceString::kRsOplogNamespace)) {
+    ChangeStreamOplogCollectionMock() : CollectionMock(NamespaceString::kRsOplogNamespace) {
         _recordStore =
             _devNullEngine.getRecordStore(nullptr, NamespaceString::kRsOplogNamespace.ns(), "", {});
     }

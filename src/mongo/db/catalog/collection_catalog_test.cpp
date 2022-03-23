@@ -68,8 +68,7 @@ public:
         ServiceContextMongoDTest::setUp();
         opCtx = makeOperationContext();
 
-        std::shared_ptr<Collection> collection =
-            std::make_shared<CollectionMock>(TenantNamespace(boost::none, nss));
+        std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
         col = CollectionPtr(collection.get(), CollectionPtr::NoYieldTag{});
         // Register dummy collection in catalog.
         catalog.registerCollection(opCtx.get(), colUUID, std::move(collection));
@@ -93,12 +92,10 @@ public:
             NamespaceString barNss("bar", "coll" + std::to_string(counter));
 
             auto fooUuid = UUID::gen();
-            std::shared_ptr<Collection> fooColl =
-                std::make_shared<CollectionMock>(TenantNamespace(boost::none, fooNss));
+            std::shared_ptr<Collection> fooColl = std::make_shared<CollectionMock>(fooNss);
 
             auto barUuid = UUID::gen();
-            std::shared_ptr<Collection> barColl =
-                std::make_shared<CollectionMock>(TenantNamespace(boost::none, barNss));
+            std::shared_ptr<Collection> barColl = std::make_shared<CollectionMock>(barNss);
 
             dbMap["foo"].insert(std::make_pair(fooUuid, fooColl.get()));
             dbMap["bar"].insert(std::make_pair(barUuid, barColl.get()));
@@ -279,8 +276,7 @@ public:
     void setUp() {
         for (int i = 0; i < 5; i++) {
             NamespaceString nss("resourceDb", "coll" + std::to_string(i));
-            std::shared_ptr<Collection> collection =
-                std::make_shared<CollectionMock>(TenantNamespace(boost::none, nss));
+            std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
             auto uuid = collection->uuid();
 
             catalog.registerCollection(&opCtx, uuid, std::move(collection));
@@ -429,8 +425,7 @@ TEST_F(CollectionCatalogTest, LookupNSSByUUID) {
 TEST_F(CollectionCatalogTest, InsertAfterLookup) {
     auto newUUID = UUID::gen();
     NamespaceString newNss(nss.db(), "newcol");
-    std::shared_ptr<Collection> newCollShared =
-        std::make_shared<CollectionMock>(TenantNamespace(boost::none, newNss));
+    std::shared_ptr<Collection> newCollShared = std::make_shared<CollectionMock>(newNss);
     auto newCol = newCollShared.get();
 
     // Ensure that looking up non-existing UUIDs doesn't affect later registration of those UUIDs.
@@ -450,15 +445,14 @@ TEST_F(CollectionCatalogTest, OnDropCollection) {
 TEST_F(CollectionCatalogTest, RenameCollection) {
     auto uuid = UUID::gen();
     NamespaceString oldNss(nss.db(), "oldcol");
-    std::shared_ptr<Collection> collShared =
-        std::make_shared<CollectionMock>(TenantNamespace(boost::none, oldNss));
+    std::shared_ptr<Collection> collShared = std::make_shared<CollectionMock>(oldNss);
     auto collection = collShared.get();
     catalog.registerCollection(opCtx.get(), uuid, std::move(collShared));
     ASSERT_EQUALS(catalog.lookupCollectionByUUID(opCtx.get(), uuid), collection);
 
-    TenantNamespace newNss(boost::none, NamespaceString(nss.db(), "newcol"));
+    NamespaceString newNss(NamespaceString(nss.db(), "newcol"));
     ASSERT_OK(collection->rename(opCtx.get(), newNss, false));
-    ASSERT_EQ(collection->ns(), newNss.getNss());
+    ASSERT_EQ(collection->ns(), newNss);
     ASSERT_EQUALS(catalog.lookupCollectionByUUID(opCtx.get(), uuid), collection);
 }
 
@@ -483,8 +477,7 @@ TEST_F(CollectionCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsOldNSSIfDrop
 TEST_F(CollectionCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsNewlyCreatedNSS) {
     auto newUUID = UUID::gen();
     NamespaceString newNss(nss.db(), "newcol");
-    std::shared_ptr<Collection> newCollShared =
-        std::make_shared<CollectionMock>(TenantNamespace(boost::none, newNss));
+    std::shared_ptr<Collection> newCollShared = std::make_shared<CollectionMock>(newNss);
     auto newCol = newCollShared.get();
 
     // Ensure that looking up non-existing UUIDs doesn't affect later registration of those UUIDs.
@@ -511,8 +504,7 @@ TEST_F(CollectionCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsNewlyCreated
 
 TEST_F(CollectionCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsFreshestNSS) {
     NamespaceString newNss(nss.db(), "newcol");
-    std::shared_ptr<Collection> newCollShared =
-        std::make_shared<CollectionMock>(TenantNamespace(boost::none, newNss));
+    std::shared_ptr<Collection> newCollShared = std::make_shared<CollectionMock>(newNss);
     auto newCol = newCollShared.get();
 
     {
@@ -567,8 +559,7 @@ TEST_F(CollectionCatalogTest, GetAllCollectionNamesAndGetAllDbNames) {
 
     std::vector<NamespaceString> nsss = {aColl, b1Coll, b2Coll, cColl, d1Coll, d2Coll, d3Coll};
     for (auto& nss : nsss) {
-        std::shared_ptr<Collection> newColl =
-            std::make_shared<CollectionMock>(TenantNamespace(boost::none, nss));
+        std::shared_ptr<Collection> newColl = std::make_shared<CollectionMock>(nss);
         auto uuid = UUID::gen();
         catalog.registerCollection(opCtx.get(), uuid, std::move(newColl));
     }
@@ -624,8 +615,7 @@ TEST_F(CollectionCatalogTest, GetAllCollectionNamesAndGetAllDbNamesWithUncommitt
 
     std::vector<NamespaceString> nsss = {aColl, b1Coll, b2Coll, cColl, d1Coll, d2Coll, d3Coll};
     for (auto& nss : nsss) {
-        std::shared_ptr<Collection> newColl =
-            std::make_shared<CollectionMock>(TenantNamespace(boost::none, nss));
+        std::shared_ptr<Collection> newColl = std::make_shared<CollectionMock>(nss);
         auto uuid = UUID::gen();
         catalog.registerCollection(opCtx.get(), uuid, std::move(newColl));
     }

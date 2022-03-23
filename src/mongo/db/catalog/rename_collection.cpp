@@ -98,8 +98,7 @@ Status checkSourceAndTargetNamespaces(OperationContext* opCtx,
         return {ErrorCodes::IllegalOperation,
                 "Cannot rename collections between a replicated and an unreplicated database"};
 
-    // TODO SERVER-63105 Make renameCollection accept TenantNamespace and create tenantDbName with
-    // the right tenant instead boost::none.
+    // TODO SERVER-64608 Use the tenantID from 'source' to construct the DatabaseName
     const TenantDatabaseName tenantDbName(boost::none, source.db());
     auto db = DatabaseHolder::get(opCtx)->getDb(opCtx, tenantDbName);
     if (!db || db->isDropPending(opCtx))

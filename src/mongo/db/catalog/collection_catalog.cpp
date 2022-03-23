@@ -371,15 +371,16 @@ public:
         for (auto&& entry : entries) {
             switch (entry.action) {
                 case UncommittedCatalogUpdates::Entry::Action::kWritableCollection:
-                    writeJobs.push_back(
-                        [collection = std::move(entry.collection)](CollectionCatalog& catalog) {
-                            catalog._collections[collection->ns()] = collection;
-                            catalog._catalog[collection->uuid()] = collection;
-                            auto dbIdPair =
-                                std::make_pair(collection->tenantNs().createTenantDatabaseName(),
-                                               collection->uuid());
-                            catalog._orderedCollections[dbIdPair] = collection;
-                        });
+                    writeJobs.push_back([collection = std::move(entry.collection)](
+                                            CollectionCatalog& catalog) {
+                        catalog._collections[collection->ns()] = collection;
+                        catalog._catalog[collection->uuid()] = collection;
+                        // TODO SERVER-64608 Use tenantID from ns
+                        auto dbIdPair =
+                            std::make_pair(TenantDatabaseName(boost::none, collection->ns().db()),
+                                           collection->uuid());
+                        catalog._orderedCollections[dbIdPair] = collection;
+                    });
                     break;
                 case UncommittedCatalogUpdates::Entry::Action::kRenamedCollection:
                     writeJobs.push_back(
@@ -1345,10 +1346,11 @@ CollectionCatalog::ViewCatalogSet CollectionCatalog::getViewCatalogDbNames(
 void CollectionCatalog::registerCollection(OperationContext* opCtx,
                                            const UUID& uuid,
                                            std::shared_ptr<Collection> coll) {
-    auto tenantNs = coll->tenantNs();
-    auto tenantDbName = tenantNs.createTenantDatabaseName();
+    auto nss = coll->ns();
+    // TODO SERVER-64608 Use tenantId from nss
+    auto tenantDbName = TenantDatabaseName(boost::none, nss.db());
     if (NonExistenceType::kDropPending ==
-        _ensureNamespaceDoesNotExist(opCtx, tenantNs.getNss(), NamespaceType::kAll)) {
+        _ensureNamespaceDoesNotExist(opCtx, nss, NamespaceType::kAll)) {
         // If we have an uncommitted drop of this collection we can defer the creation, the register
         // will happen in the same catalog write as the drop.
         auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
@@ -1360,7 +1362,7 @@ void CollectionCatalog::registerCollection(OperationContext* opCtx,
                 1,
                 "Registering collection {namespace} with UUID {uuid}",
                 "Registering collection",
-                logAttrs(tenantNs),
+                logAttrs(nss),
                 "uuid"_attr = uuid);
 
     auto dbIdPair = std::make_pair(tenantDbName, uuid);
@@ -1370,10 +1372,10 @@ void CollectionCatalog::registerCollection(OperationContext* opCtx,
     invariant(_orderedCollections.find(dbIdPair) == _orderedCollections.end());
 
     _catalog[uuid] = coll;
-    _collections[tenantNs.getNss()] = coll;
+    _collections[nss] = coll;
     _orderedCollections[dbIdPair] = coll;
 
-    if (!tenantNs.getNss().isOnInternalDb() && !tenantNs.getNss().isSystem()) {
+    if (!nss.isOnInternalDb() && !nss.isSystem()) {
         _stats.userCollections += 1;
         if (coll->isCapped()) {
             _stats.userCapped += 1;
@@ -1391,8 +1393,8 @@ void CollectionCatalog::registerCollection(OperationContext* opCtx,
     auto dbRid = ResourceId(RESOURCE_DATABASE, tenantDbName.dbName());
     addResource(dbRid, tenantDbName.dbName());
 
-    auto collRid = ResourceId(RESOURCE_COLLECTION, tenantNs.getNss().ns());
-    addResource(collRid, tenantNs.getNss().ns());
+    auto collRid = ResourceId(RESOURCE_COLLECTION, nss.ns());
+    addResource(collRid, nss.ns());
 }
 
 std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(OperationContext* opCtx,
@@ -1401,7 +1403,8 @@ std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(OperationCon
 
     auto coll = std::move(_catalog[uuid]);
     auto ns = coll->ns();
-    auto tenantDbName = coll->tenantNs().createTenantDatabaseName();
+    // TODO SERVER-64608 Use tenantID from ns
+    auto tenantDbName = TenantDatabaseName(boost::none, coll->ns().db());
     auto dbIdPair = std::make_pair(tenantDbName, uuid);
 
     LOGV2_DEBUG(20281, 1, "Deregistering collection", logAttrs(ns), "uuid"_attr = uuid);

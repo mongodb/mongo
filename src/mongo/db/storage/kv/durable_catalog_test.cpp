@@ -46,8 +46,6 @@
 #include "mongo/db/storage/devnull/devnull_kv_engine.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/storage_engine_impl.h"
-#include "mongo/db/tenant_id.h"
-#include "mongo/db/tenant_namespace.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -67,12 +65,12 @@ public:
     void setUp() final {
         CatalogTestFixture::setUp();
 
-        _tenantNs = TenantNamespace(boost::none, NamespaceString("unittests.durable_catalog"));
-        _collectionUUID = createCollection(_tenantNs, CollectionOptions());
+        _nss = NamespaceString("unittests.durable_catalog");
+        _collectionUUID = createCollection(_nss, CollectionOptions());
     }
 
-    TenantNamespace tenantNs() {
-        return _tenantNs;
+    NamespaceString ns() {
+        return _nss;
     }
 
     DurableCatalog* getCatalog() {
@@ -89,17 +87,17 @@ public:
             operationContext(), *_collectionUUID, CollectionCatalog::LifetimeMode::kInplace);
     }
 
-    UUID createCollection(const TenantNamespace& tenantNs, CollectionOptions options) {
-        Lock::DBLock dbLk(operationContext(), tenantNs.getNss().db(), MODE_IX);
-        Lock::CollectionLock collLk(operationContext(), tenantNs.getNss(), MODE_IX);
+    UUID createCollection(const NamespaceString& nss, CollectionOptions options) {
+        Lock::DBLock dbLk(operationContext(), nss.db(), MODE_IX);
+        Lock::CollectionLock collLk(operationContext(), nss, MODE_IX);
 
         WriteUnitOfWork wuow(operationContext());
 
         const bool allocateDefaultSpace = true;
         options.uuid = UUID::gen();
 
-        auto swColl = getCatalog()->createCollection(
-            operationContext(), tenantNs, options, allocateDefaultSpace);
+        auto swColl =
+            getCatalog()->createCollection(operationContext(), nss, options, allocateDefaultSpace);
         ASSERT_OK(swColl.getStatus());
 
         std::pair<RecordId, std::unique_ptr<RecordStore>> coll = std::move(swColl.getValue());
@@ -107,7 +105,7 @@ public:
 
         std::shared_ptr<Collection> collection = std::make_shared<CollectionImpl>(
             operationContext(),
-            tenantNs,
+            nss,
             catalogId,
             getCatalog()->getMetaData(operationContext(), catalogId),
             std::move(coll.second));
@@ -124,8 +122,8 @@ public:
     IndexCatalogEntry* createIndex(BSONObj keyPattern,
                                    std::string indexType = IndexNames::BTREE,
                                    bool twoPhase = false) {
-        Lock::DBLock dbLk(operationContext(), _tenantNs.getNss().db(), MODE_IX);
-        Lock::CollectionLock collLk(operationContext(), _tenantNs.getNss(), MODE_X);
+        Lock::DBLock dbLk(operationContext(), _nss.db(), MODE_IX);
+        Lock::CollectionLock collLk(operationContext(), _nss, MODE_X);
 
         std::string indexName = "idx" + std::to_string(_numIndexesCreated);
         // Make sure we have a valid IndexSpec for the type requested
@@ -168,15 +166,15 @@ public:
         ASSERT(match);
     }
 
-    StatusWith<DurableCatalog::ImportResult> importCollectionTest(const TenantNamespace& tenantNs,
+    StatusWith<DurableCatalog::ImportResult> importCollectionTest(const NamespaceString& nss,
                                                                   const BSONObj& metadata) {
-        Lock::DBLock dbLock(operationContext(), tenantNs.getNss().db(), MODE_IX);
-        Lock::CollectionLock collLock(operationContext(), tenantNs.getNss(), MODE_X);
+        Lock::DBLock dbLock(operationContext(), nss.db(), MODE_IX);
+        Lock::CollectionLock collLock(operationContext(), nss, MODE_X);
 
         WriteUnitOfWork wuow(operationContext());
         auto res = getCatalog()->importCollection(
             operationContext(),
-            tenantNs,
+            nss,
             metadata,
             BSON("storage"
                  << "metadata"),
@@ -204,7 +202,7 @@ private:
         return ss.str();
     }
 
-    TenantNamespace _tenantNs;
+    NamespaceString _nss;
 
     size_t _numIndexesCreated = 0;
 
@@ -520,17 +518,16 @@ DEATH_TEST_REGEX_F(DurableCatalogTest,
 TEST_F(DurableCatalogTest, ImportCollection) {
     // Import should fail if the namespace already exists.
     ASSERT_THROWS_CODE(
-        importCollectionTest(tenantNs(), {}), AssertionException, ErrorCodes::NamespaceExists);
+        importCollectionTest(ns(), {}), AssertionException, ErrorCodes::NamespaceExists);
 
-    const auto tenantNs = TenantNamespace(boost::none, NamespaceString("unittest.import"));
+    const auto nss = NamespaceString("unittest.import");
 
     // Import should fail with empty metadata.
-    ASSERT_THROWS_CODE(
-        importCollectionTest(tenantNs, {}), AssertionException, ErrorCodes::BadValue);
+    ASSERT_THROWS_CODE(importCollectionTest(nss, {}), AssertionException, ErrorCodes::BadValue);
 
     BSONCollectionCatalogEntry::MetaData md;
 
-    md.tenantNs = tenantNs;
+    md.ns = nss.ns();
 
     CollectionOptions optionsWithUUID;
     optionsWithUUID.uuid = UUID::gen();
@@ -550,29 +547,27 @@ TEST_F(DurableCatalogTest, ImportCollection) {
     // Import should fail with missing "md" field.
     ASSERT_THROWS_CODE(
         importCollectionTest(
-            tenantNs,
-            BSON("idxIdent" << idxIdentObj << "ns" << tenantNs.toString() << "ident" << ident)),
+            nss, BSON("idxIdent" << idxIdentObj << "ns" << nss.ns() << "ident" << ident)),
         AssertionException,
         ErrorCodes::BadValue);
 
     // Import should fail with missing "ident" field.
-    ASSERT_THROWS_CODE(importCollectionTest(tenantNs,
-                                            BSON("md" << mdObj << "idxIdent" << idxIdentObj << "ns"
-                                                      << tenantNs.toString())),
-                       AssertionException,
-                       ErrorCodes::BadValue);
+    ASSERT_THROWS_CODE(
+        importCollectionTest(nss,
+                             BSON("md" << mdObj << "idxIdent" << idxIdentObj << "ns" << nss.ns())),
+        AssertionException,
+        ErrorCodes::BadValue);
 
     // Import should success with validate inputs.
-    auto swImportResult =
-        importCollectionTest(tenantNs,
-                             BSON("md" << mdObj << "idxIdent" << idxIdentObj << "ns"
-                                       << tenantNs.toString() << "ident" << ident));
+    auto swImportResult = importCollectionTest(
+        nss,
+        BSON("md" << mdObj << "idxIdent" << idxIdentObj << "ns" << nss.ns() << "ident" << ident));
     ASSERT_OK(swImportResult.getStatus());
     DurableCatalog::ImportResult importResult = std::move(swImportResult.getValue());
 
     // Validate the catalog entry for the imported collection.
     auto entry = getCatalog()->getEntry(importResult.catalogId);
-    ASSERT_EQ(entry.tenantNs, tenantNs);
+    ASSERT_EQ(entry.nss, nss);
     ASSERT_EQ(entry.ident, ident);
     ASSERT_EQ(getCatalog()->getIndexIdent(operationContext(), importResult.catalogId, "_id_"),
               idxIdent);
@@ -583,17 +578,17 @@ TEST_F(DurableCatalogTest, ImportCollection) {
     // match.
     md.options.uuid = importResult.uuid;
     ASSERT_BSONOBJ_EQ(getCatalog()->getCatalogEntry(operationContext(), importResult.catalogId),
-                      BSON("md" << md.toBSON() << "idxIdent" << idxIdentObj << "ns"
-                                << tenantNs.toString() << "ident" << ident));
+                      BSON("md" << md.toBSON() << "idxIdent" << idxIdentObj << "ns" << nss.ns()
+                                << "ident" << ident));
 }
 
 TEST_F(DurableCatalogTest, IdentSuffixUsesRand) {
     const std::string rand = "0000000000000000000";
     getCatalog()->setRand_forTest(rand);
 
-    const TenantNamespace tenantNs = TenantNamespace(boost::none, NamespaceString("a.b"));
+    const NamespaceString nss = NamespaceString("a.b");
 
-    auto uuid = createCollection(tenantNs, CollectionOptions());
+    auto uuid = createCollection(nss, CollectionOptions());
     auto collection = CollectionCatalog::get(operationContext())
                           ->lookupCollectionByUUID(operationContext(), uuid);
     RecordId catalogId = collection->getCatalogId();
@@ -608,10 +603,9 @@ TEST_F(DurableCatalogTest, ImportCollectionRandConflict) {
     {
         // Import a collection with the 'rand' suffix as part of the ident. This will force 'rand'
         // to be changed in the durable catalog internals.
-        const TenantNamespace tenantNs =
-            TenantNamespace(boost::none, NamespaceString("unittest.import"));
+        const NamespaceString nss = NamespaceString("unittest.import");
         BSONCollectionCatalogEntry::MetaData md;
-        md.tenantNs = tenantNs;
+        md.ns = nss.ns();
 
         CollectionOptions optionsWithUUID;
         optionsWithUUID.uuid = UUID::gen();
@@ -629,9 +623,9 @@ TEST_F(DurableCatalogTest, ImportCollectionRandConflict) {
         auto idxIdentObj = BSON("_id_" << idxIdent);
 
         auto swImportResult =
-            importCollectionTest(tenantNs,
-                                 BSON("md" << mdObj << "idxIdent" << idxIdentObj << "ns"
-                                           << tenantNs.toString() << "ident" << ident));
+            importCollectionTest(nss,
+                                 BSON("md" << mdObj << "idxIdent" << idxIdentObj << "ns" << nss.ns()
+                                           << "ident" << ident));
         ASSERT_OK(swImportResult.getStatus());
     }
 
@@ -639,8 +633,8 @@ TEST_F(DurableCatalogTest, ImportCollectionRandConflict) {
 
     {
         // Check that a newly created collection doesn't use 'rand' as the suffix in the ident.
-        const TenantNamespace tenantNs = TenantNamespace(boost::none, NamespaceString("a.b"));
-        createCollection(tenantNs, CollectionOptions());
+        const NamespaceString nss = NamespaceString("a.b");
+        createCollection(nss, CollectionOptions());
 
         RecordId catalogId = getCollection()->getCatalogId();
         ASSERT(!StringData(getCatalog()->getEntry(catalogId).ident).endsWith(rand));
@@ -654,13 +648,11 @@ TEST_F(DurableCatalogTest, CheckTimeseriesBucketsMayHaveMixedSchemaDataFlagFCVLa
     serverGlobalParams.mutableFeatureCompatibility.setVersion(multiversion::GenericFCV::kLatest);
 
     {
-        const TenantNamespace regularTenantNs =
-            TenantNamespace(boost::none, NamespaceString("test.regular"));
-        createCollection(regularTenantNs, CollectionOptions());
+        const NamespaceString regularNss = NamespaceString("test.regular");
+        createCollection(regularNss, CollectionOptions());
 
-        auto collection =
-            CollectionCatalog::get(operationContext())
-                ->lookupCollectionByNamespace(operationContext(), regularTenantNs.getNss());
+        auto collection = CollectionCatalog::get(operationContext())
+                              ->lookupCollectionByNamespace(operationContext(), regularNss);
         RecordId catalogId = collection->getCatalogId();
         ASSERT(!getCatalog()
                     ->getMetaData(operationContext(), catalogId)
@@ -668,15 +660,13 @@ TEST_F(DurableCatalogTest, CheckTimeseriesBucketsMayHaveMixedSchemaDataFlagFCVLa
     }
 
     {
-        const TenantNamespace bucketsTenantNs =
-            TenantNamespace(boost::none, NamespaceString("system.buckets.ts"));
+        const NamespaceString bucketsNss = NamespaceString("system.buckets.ts");
         CollectionOptions options;
         options.timeseries = TimeseriesOptions(/*timeField=*/"t");
-        createCollection(bucketsTenantNs, options);
+        createCollection(bucketsNss, options);
 
-        auto collection =
-            CollectionCatalog::get(operationContext())
-                ->lookupCollectionByNamespace(operationContext(), bucketsTenantNs.getNss());
+        auto collection = CollectionCatalog::get(operationContext())
+                              ->lookupCollectionByNamespace(operationContext(), bucketsNss);
         RecordId catalogId = collection->getCatalogId();
         ASSERT(getCatalog()
                    ->getMetaData(operationContext(), catalogId)
@@ -685,42 +675,6 @@ TEST_F(DurableCatalogTest, CheckTimeseriesBucketsMayHaveMixedSchemaDataFlagFCVLa
                           ->getMetaData(operationContext(), catalogId)
                           ->timeseriesBucketsMayHaveMixedSchemaData);
     }
-}
-
-TEST_F(DurableCatalogTest, CreateCollectionCatalogEntryHasCorrectTenantNamespace) {
-    gMultitenancySupport = true;
-
-    auto tenantId = TenantId(OID::gen());
-    const TenantNamespace tenantNs = TenantNamespace(tenantId, NamespaceString("test.regular"));
-    createCollection(tenantNs, CollectionOptions());
-
-    auto collection = CollectionCatalog::get(operationContext())
-                          ->lookupCollectionByNamespace(operationContext(), tenantNs.getNss());
-    RecordId catalogId = collection->getCatalogId();
-    ASSERT_EQ(getCatalog()->getEntry(catalogId).tenantNs, tenantNs);
-}
-
-TEST_F(DurableCatalogTest, ImportCollectionCatalogEntryHasCorrectTenantNamespace) {
-    gMultitenancySupport = true;
-
-    auto tenantId = TenantId(OID::gen());
-    const TenantNamespace tenantNs = TenantNamespace(tenantId, NamespaceString("unittest.import"));
-
-    BSONCollectionCatalogEntry::MetaData md;
-    md.tenantNs = tenantNs;
-    CollectionOptions optionsWithUUID;
-    optionsWithUUID.uuid = UUID::gen();
-    md.options = optionsWithUUID;
-    auto mdObj = md.toBSON();
-    const auto ident = "collection-1-1234567891234567899";
-
-    auto swImportResult = importCollectionTest(
-        tenantNs, BSON("md" << mdObj << "ns" << tenantNs.toString() << "ident" << ident));
-    ASSERT_OK(swImportResult.getStatus());
-
-    auto entry = getCatalog()->getEntry(swImportResult.getValue().catalogId);
-    ASSERT_EQ(entry.tenantNs, tenantNs);
-    ASSERT_EQ(entry.ident, ident);
 }
 
 }  // namespace

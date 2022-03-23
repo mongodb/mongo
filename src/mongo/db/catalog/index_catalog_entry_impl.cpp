@@ -79,7 +79,7 @@ IndexCatalogEntryImpl::IndexCatalogEntryImpl(OperationContext* const opCtx,
     _descriptor->_entry = this;
     _isReady = collection->isIndexReady(_descriptor->indexName());
 
-    auto nss = DurableCatalog::get(opCtx)->getEntry(_catalogId).tenantNs.getNss();
+    auto nss = DurableCatalog::get(opCtx)->getEntry(_catalogId).nss;
     const BSONObj& collation = _descriptor->collation();
     if (!collation.isEmpty()) {
         auto statusWithCollator =
@@ -351,7 +351,7 @@ std::shared_ptr<Ident> IndexCatalogEntryImpl::getSharedIdent() const {
 // ----
 
 NamespaceString IndexCatalogEntryImpl::getNSSFromCatalog(OperationContext* opCtx) const {
-    return DurableCatalog::get(opCtx)->getEntry(_catalogId).tenantNs.getNss();
+    return DurableCatalog::get(opCtx)->getEntry(_catalogId).nss;
 }
 
 bool IndexCatalogEntryImpl::isReadyInMySnapshot(OperationContext* opCtx) const {

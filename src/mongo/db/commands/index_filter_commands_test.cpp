@@ -57,7 +57,7 @@ using std::vector;
 static const NamespaceString nss("test.collection");
 
 PlanCacheKey makeKey(const CanonicalQuery& cq) {
-    CollectionMock coll(TenantNamespace(boost::none, nss));
+    CollectionMock coll(nss);
     return plan_cache_key_factory::make<PlanCacheKey>(cq, &coll);
 }
 
@@ -229,7 +229,7 @@ TEST(IndexFilterCommandsTest, ClearFiltersInvalidParameter) {
     QuerySettings empty;
     PlanCache planCache(5000);
     OperationContextNoop opCtx;
-    CollectionMock coll(TenantNamespace(boost::none, nss));
+    CollectionMock coll(nss);
 
     // If present, query has to be an object.
     ASSERT_NOT_OK(
@@ -255,7 +255,7 @@ TEST(IndexFilterCommandsTest, ClearNonexistentHint) {
     QuerySettings querySettings;
     PlanCache planCache(5000);
     OperationContextNoop opCtx;
-    CollectionMock coll(TenantNamespace(boost::none, nss));
+    CollectionMock coll(nss);
 
     ASSERT_OK(SetFilter::set(
         &opCtx, &coll, &querySettings, &planCache, fromjson("{query: {a: 1}, indexes: [{a: 1}]}")));
@@ -278,7 +278,7 @@ TEST(IndexFilterCommandsTest, SetFilterInvalidParameter) {
     QuerySettings empty;
     PlanCache planCache(5000);
     OperationContextNoop opCtx;
-    CollectionMock coll(TenantNamespace(boost::none, nss));
+    CollectionMock coll(nss);
 
     ASSERT_NOT_OK(SetFilter::set(&opCtx, &coll, &empty, &planCache, fromjson("{}")));
     // Missing required query field.
@@ -336,7 +336,7 @@ TEST(IndexFilterCommandsTest, SetAndClearFilters) {
     PlanCache planCache(5000);
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
-    CollectionMock coll(TenantNamespace(boost::none, nss));
+    CollectionMock coll(nss);
 
     // Inject query shape into plan cache.
     addQueryShapeToPlanCache(opCtx.get(),
@@ -439,7 +439,7 @@ TEST(IndexFilterCommandsTest, SetAndClearFiltersCollation) {
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
     QuerySettings querySettings;
-    CollectionMock coll(TenantNamespace(boost::none, nss));
+    CollectionMock coll(nss);
     PlanCache planCache(5000);
 
     // Inject query shapes with and without collation into plan cache.
@@ -511,7 +511,7 @@ TEST(IndexFilterCommandsTest, SetFilterAcceptsIndexNames) {
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
     QuerySettings querySettings;
-    CollectionMock coll(TenantNamespace(boost::none, nss));
+    CollectionMock coll(nss);
 
     addQueryShapeToPlanCache(opCtx.get(), &planCache, "{a: 2}", "{}", "{}", "{}");
     ASSERT_TRUE(planCacheContains(opCtx.get(), planCache, "{a: 2}", "{}", "{}", "{}"));

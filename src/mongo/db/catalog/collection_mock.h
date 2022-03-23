@@ -40,12 +40,12 @@ namespace mongo {
  */
 class CollectionMock : public Collection {
 public:
-    CollectionMock(const TenantNamespace& tenantNs)
-        : CollectionMock(tenantNs, std::unique_ptr<IndexCatalog>()) {}
-    CollectionMock(const TenantNamespace& tenantNs, std::unique_ptr<IndexCatalog> indexCatalog)
-        : _tenantNs(tenantNs), _indexCatalog(std::move(indexCatalog)) {}
-    CollectionMock(const TenantNamespace& tenantNs, RecordId catalogId)
-        : _tenantNs(tenantNs), _catalogId(catalogId) {}
+    CollectionMock(const NamespaceString& nss)
+        : CollectionMock(nss, std::unique_ptr<IndexCatalog>()) {}
+    CollectionMock(const NamespaceString& nss, std::unique_ptr<IndexCatalog> indexCatalog)
+        : _nss(nss), _indexCatalog(std::move(indexCatalog)) {}
+    CollectionMock(const NamespaceString& nss, RecordId catalogId)
+        : _nss(nss), _catalogId(catalogId) {}
     ~CollectionMock() = default;
 
     std::shared_ptr<Collection> clone() const {
@@ -70,15 +70,11 @@ public:
     }
 
     const NamespaceString& ns() const {
-        return _tenantNs.getNss();
+        return _nss;
     }
 
-    const TenantNamespace& tenantNs() const {
-        return _tenantNs;
-    }
-
-    Status rename(OperationContext* opCtx, const TenantNamespace& tenantNs, bool stayTemp) final {
-        _tenantNs = std::move(tenantNs);
+    Status rename(OperationContext* opCtx, const NamespaceString& nss, bool stayTemp) final {
+        _nss = std::move(nss);
         return Status::OK();
     }
 
@@ -501,7 +497,7 @@ public:
 
 private:
     UUID _uuid = UUID::gen();
-    TenantNamespace _tenantNs;
+    NamespaceString _nss;
     RecordId _catalogId{0};
     clonable_ptr<IndexCatalog> _indexCatalog;
     bool _committed = true;

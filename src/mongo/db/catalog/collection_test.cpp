@@ -462,7 +462,7 @@ TEST_F(CollectionTest, CheckTimeseriesBucketDocsForMixedSchemaData) {
 }
 
 TEST_F(CatalogTestFixture, CollectionPtrNoYieldTag) {
-    CollectionMock mock(TenantNamespace(boost::none, NamespaceString("test.t")));
+    CollectionMock mock(NamespaceString("test.t"));
 
     CollectionPtr coll(&mock, CollectionPtr::NoYieldTag{});
     ASSERT_TRUE(coll);
@@ -483,8 +483,8 @@ TEST_F(CatalogTestFixture, CollectionPtrNoYieldTag) {
 }
 
 TEST_F(CatalogTestFixture, CollectionPtrYieldable) {
-    CollectionMock beforeYield(TenantNamespace(boost::none, NamespaceString("test.t")));
-    CollectionMock afterYield(TenantNamespace(boost::none, NamespaceString("test.t")));
+    CollectionMock beforeYield(NamespaceString("test.t"));
+    CollectionMock afterYield(NamespaceString("test.t"));
 
     int numRestoreCalls = 0;
 

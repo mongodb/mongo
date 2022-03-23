@@ -61,7 +61,7 @@ SbeStageBuilderTestFixture::buildPlanStage(
         CanonicalQuery::canonicalize(opCtx(), std::move(findCommand), false, expCtx);
     ASSERT_OK(statusWithCQ.getStatus());
 
-    CollectionMock coll(TenantNamespace(boost::none, _nss));
+    CollectionMock coll(_nss);
     CollectionPtr collPtr(&coll);
     MultipleCollectionAccessor& colls = _collections;
     if (shardFiltererInterface) {
