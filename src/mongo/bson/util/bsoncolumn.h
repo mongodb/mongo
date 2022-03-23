@@ -119,19 +119,13 @@ public:
         void _handleEOO();
 
         // Checks if control byte is literal
-        static bool _isLiteral(uint8_t control) {
-            return (control & 0xE0) == 0;
-        }
+        static bool _isLiteral(char control);
 
         // Checks if control byte is interleaved mode start
-        static bool _isInterleavedStart(uint8_t control) {
-            return control == 0xF0;
-        }
+        static bool _isInterleavedStart(char control);
 
         // Returns number of Simple-8b blocks from control byte
-        static uint8_t _numSimple8bBlocks(uint8_t control) {
-            return (control & 0x0F) + 1;
-        }
+        static uint8_t _numSimple8bBlocks(char control);
 
         // Pointer to BSONColumn this Iterator is created from, this will be stale when moving the
         // BSONColumn. All iterators are invalidated on move!
@@ -213,6 +207,12 @@ public:
         // We setup a decoding state for each scalar field in this object. The object hierarchy is
         // used to re-construct with full objects with the correct hierachy to the user.
         BSONObj _interleavedReferenceObj;
+
+        // Indicates if decoding states should be opened when encountering arrays
+        bool _interleavedArrays;
+
+        // Type for root object/reference object. May be Object or Array.
+        BSONType _interleavedRootType;
     };
 
     /**

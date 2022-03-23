@@ -938,7 +938,7 @@ void BSONColumnBuilder::_startDetermineSubObjReference(const BSONObj& obj) {
 
 void BSONColumnBuilder::_finishDetermineSubObjReference() {
     // Done determining reference sub-object. Write this control byte and object to stream.
-    _bufBuilder.appendChar(bsoncolumn::kInterleavedStartControlByte);
+    _bufBuilder.appendChar(bsoncolumn::kInterleavedStartControlByteLegacy);
     _bufBuilder.appendBuf(_referenceSubObj.objdata(), _referenceSubObj.objsize());
     ++_numInterleavedStartWritten;
 
