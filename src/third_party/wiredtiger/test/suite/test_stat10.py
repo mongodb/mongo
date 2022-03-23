@@ -207,7 +207,10 @@ class test_stat10(wttest.WiredTigerTestCase):
 
         # column_tws: for FLCS only.
         if self.key_format == 'r' and self.value_format == '8t':
-            if self.oldest > 20:
+            if self.oldest > 30:
+                # Everything should be stable.
+                self.assertEqual(column_tws, 0)
+            elif self.oldest > 20:
                 # Only the deletions show.
                 self.assertEqual(column_tws, 2)
             else:
