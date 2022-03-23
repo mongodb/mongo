@@ -178,16 +178,20 @@ class TestSetResmokeCmd(unittest.TestCase):
         resmoke_args = ["arg1", "arg2"]
 
         resmoke_cmd = under_test._set_resmoke_cmd(repeat_config, resmoke_args)
+        expected_resmoke_cmd = [sys.executable, 'buildscripts/resmoke.py', 'run'
+                                ] + resmoke_args + ['--repeatSuites=2']
 
-        self.assertListEqual(resmoke_args + ['--repeatSuites=2'], resmoke_cmd)
+        self.assertListEqual(expected_resmoke_cmd, resmoke_cmd)
 
     def test__set_resmoke_cmd(self):
         repeat_config = under_test.RepeatConfig(repeat_tests_num=3)
         resmoke_args = ["arg1", "arg2"]
 
         resmoke_cmd = under_test._set_resmoke_cmd(repeat_config, resmoke_args)
+        expected_resmoke_cmd = [sys.executable, 'buildscripts/resmoke.py', 'run'
+                                ] + resmoke_args + ['--repeatSuites=3']
 
-        self.assertListEqual(resmoke_args + ['--repeatSuites=3'], resmoke_cmd)
+        self.assertListEqual(expected_resmoke_cmd, resmoke_cmd)
 
 
 class RunTests(unittest.TestCase):

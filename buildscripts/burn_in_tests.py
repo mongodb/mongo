@@ -316,7 +316,7 @@ def _set_resmoke_cmd(repeat_config: RepeatConfig, resmoke_args: [str]) -> [str]:
     """Build the resmoke command, if a resmoke.py command wasn't passed in."""
     new_args = [sys.executable, "buildscripts/resmoke.py", "run"]
     if resmoke_args:
-        new_args = copy.deepcopy(resmoke_args)
+        new_args += copy.deepcopy(resmoke_args)
 
     new_args += repeat_config.generate_resmoke_options().split()
     LOGGER.debug("set resmoke command", new_args=new_args)
@@ -569,7 +569,7 @@ class BurnInOrchestrator:
         self.burn_in_executor.execute(tests_by_task)
 
 
-@click.command()
+@click.command(context_settings=dict(ignore_unknown_options=True))
 @click.option("--no-exec", "no_exec", default=False, is_flag=True,
               help="Do not execute the found tests.")
 @click.option("--build-variant", "build_variant", default=DEFAULT_VARIANT, metavar='BUILD_VARIANT',
@@ -607,6 +607,10 @@ def main(build_variant: str, no_exec: bool, repeat_tests_num: Optional[int],
     The `--repeat-*` arguments allow configuration of how burn_in_tests repeats tests. Tests can
     either be repeated a specified number of times with the `--repeat-tests` option, or they can
     be repeated for a certain time period with the `--repeat-tests-secs` option.
+
+    Any unknown arguments appended to burn_in_tests are further passed to resmoke, e.g.,
+    `python buildscripts/burn_in_tests.py --dbpathPrefix /some/other/directory`
+    passes `--dbpathPrefix /some/other/directory` to resmoke.
     \f
 
     :param build_variant: Build variant to query tasks from.
