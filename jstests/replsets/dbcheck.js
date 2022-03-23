@@ -306,13 +306,16 @@ function testDbCheckParameters() {
 
             assert(keyBoundsResult.hasNext(), "dbCheck put no batches in health log");
 
-            let bounds = keyBoundsResult.next();
+            const bounds = keyBoundsResult.next();
+            const counts = healthLogCounts(healthlog);
             assert.eq(bounds.minKey, start, "dbCheck minKey field incorrect");
-            assert.eq(bounds.maxKey, end, "dbCheck maxKey field incorrect");
 
-            let counts = healthLogCounts(healthlog);
-            assert.eq(counts.totalDocs, end - start);
-            assert.eq(counts.totalBytes, (end - start) * docSize);
+            // dbCheck evaluates some exit conditions like maxCount and maxBytes at batch boundary.
+            // The batch boundary isn't generally deterministic (e.g. can be time-dependent per
+            // maxBatchTimeMillis) hence the greater-than-or-equal comparisons.
+            assert.gte(bounds.maxKey, end, "dbCheck maxKey field incorrect");
+            assert.gte(counts.totalDocs, end - start);
+            assert.gte(counts.totalBytes, (end - start) * docSize);
         });
     }
 
