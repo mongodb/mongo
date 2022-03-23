@@ -4167,10 +4167,10 @@ buildvariants:
     - name: verify-datafile-big-endian
     - name: verify-datafile-from-little-endian
 
-- name: ubuntu1804-ppc
-  display_name: "~ Ubuntu 18.04 PPC"
+- name: rhel8-ppc
+  display_name: "~ RHEL8 PPC"
   run_on:
-  - ubuntu1804-power8-test
+  - rhel81-power8-small
   batchtime: 120 # 2 hours
   expansions:
     format_test_setting: ulimit -c unlimited
