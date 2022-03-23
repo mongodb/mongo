@@ -977,6 +977,10 @@ ReshardingCoordinatorService::ReshardingCoordinator::ReshardingCoordinator(
     : PrimaryOnlyService::TypedInstance<ReshardingCoordinator>(),
       _id(coordinatorDoc.getReshardingUUID().toBSON()),
       _coordinatorService(coordinatorService),
+      _metricsNew{
+          ShardingDataTransformMetrics::isEnabled()
+              ? ReshardingMetricsNew::initializeFrom(coordinatorDoc, getGlobalServiceContext())
+              : nullptr},
       _metadata(coordinatorDoc.getCommonReshardingMetadata()),
       _coordinatorDoc(coordinatorDoc),
       _markKilledExecutor(std::make_shared<ThreadPool>([] {
@@ -1259,6 +1263,9 @@ ReshardingCoordinatorService::ReshardingCoordinator::_commitAndFinishReshardOper
                    })
                    .then([this, executor] { return _awaitAllParticipantShardsDone(executor); })
                    .then([this, executor] {
+                       if (ShardingDataTransformMetrics::isEnabled()) {
+                           _metricsNew->onCriticalSectionEnd();
+                       }
                        // Best-effort attempt to trigger a refresh on the participant shards so
                        // they see the collection metadata without reshardingFields and no longer
                        // throw ReshardCollectionInProgress. There is no guarantee this logic ever
@@ -1685,6 +1692,9 @@ ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllRecipientsFinished
 
             this->_updateCoordinatorDocStateAndCatalogEntries(CoordinatorStateEnum::kBlockingWrites,
                                                               _coordinatorDoc);
+            if (ShardingDataTransformMetrics::isEnabled()) {
+                _metricsNew->onCriticalSectionBegin();
+            }
         })
         .then([this] { return _waitForMajority(_ctHolder->getAbortToken()); })
         .thenRunOn(**executor)

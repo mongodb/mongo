@@ -33,6 +33,7 @@
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/resharding_coordinator_observer.h"
+#include "mongo/db/s/resharding/resharding_metrics_new.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
@@ -505,6 +506,8 @@ private:
 
     // The primary-only service instance corresponding to the coordinator instance. Not owned.
     const ReshardingCoordinatorService* const _coordinatorService;
+
+    std::unique_ptr<ReshardingMetricsNew> _metricsNew;
 
     // The in-memory representation of the immutable portion of the document in
     // config.reshardingOperations.

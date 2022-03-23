@@ -34,7 +34,10 @@
 #include "mongo/base/checked_cast.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/global_settings.h"
+#include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
+#include "mongo/db/s/sharding_data_transform_metrics.h"
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
@@ -348,21 +351,6 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
 
     auto csrLock = CSRLock::lockShared(opCtx, this);
 
-    {
-        auto criticalSectionSignal = _critSec.getSignal(
-            opCtx->lockState()->isWriteLocked() ? ShardingMigrationCriticalSection::kWrite
-                                                : ShardingMigrationCriticalSection::kRead);
-        std::string reason = _critSec.getReason() ? _critSec.getReason()->toString() : "unknown";
-        uassert(StaleConfigInfo(_nss,
-                                receivedShardVersion,
-                                boost::none /* wantedVersion */,
-                                ShardingState::get(opCtx)->shardId(),
-                                std::move(criticalSectionSignal)),
-                str::stream() << "The critical section for " << _nss.ns()
-                              << " is acquired with reason: " << reason,
-                !criticalSectionSignal);
-    }
-
     auto optCurrentMetadata = _getCurrentMetadataIfKnown(atClusterTime);
     uassert(StaleConfigInfo(_nss,
                             receivedShardVersion,
@@ -373,6 +361,51 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
             optCurrentMetadata);
 
     const auto& currentMetadata = optCurrentMetadata->get();
+
+    {
+        auto operationType = opCtx->lockState()->isWriteLocked()
+            ? ShardingMigrationCriticalSection::kWrite
+            : ShardingMigrationCriticalSection::kRead;
+        auto criticalSectionSignal = _critSec.getSignal(operationType);
+        std::string reason = _critSec.getReason() ? _critSec.getReason()->toString() : "unknown";
+        if (criticalSectionSignal) {
+            [&] {
+                if (!ShardingDataTransformMetrics::isEnabled()) {
+                    return;
+                }
+                if (!currentMetadata.isSharded()) {
+                    return;
+                }
+                const auto& reshardingFields = currentMetadata.getReshardingFields();
+                if (!reshardingFields) {
+                    return;
+                }
+                auto stateMachine = resharding::tryGetReshardingStateMachine<
+                    ReshardingDonorService,
+                    ReshardingDonorService::DonorStateMachine,
+                    ReshardingDonorDocument>(opCtx, reshardingFields->getReshardingUUID());
+                if (!stateMachine) {
+                    return;
+                }
+                switch (operationType) {
+                    case ShardingMigrationCriticalSection::kWrite:
+                        (*stateMachine)->onWriteDuringCriticalSection();
+                        return;
+                    case ShardingMigrationCriticalSection::kRead:
+                        return;
+                }
+                MONGO_UNREACHABLE;
+            }();
+
+            uasserted(StaleConfigInfo(_nss,
+                                      receivedShardVersion,
+                                      boost::none /* wantedVersion */,
+                                      ShardingState::get(opCtx)->shardId(),
+                                      std::move(criticalSectionSignal)),
+                      str::stream() << "The critical section for " << _nss.ns()
+                                    << " is acquired with reason: " << reason);
+        }
+    }
 
     auto wantedShardVersion = currentMetadata.getShardVersion();
 
