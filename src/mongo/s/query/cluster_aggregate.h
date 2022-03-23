@@ -35,6 +35,7 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/s/chunk_manager.h"
 #include "mongo/s/query/cluster_client_cursor_params.h"
 #include "mongo/s/query/document_source_merge_cursors.h"
 
@@ -74,6 +75,10 @@ public:
      * 'privileges' contains the privileges that were required to run this aggregation, to be used
      * later for re-checking privileges for GetMore commands.
      *
+     * 'cm' is the routing table used by the higher level code that the aggregation
+     * should use during its execution. If it's empty, the routing table will be requested
+     * internally.
+     *
      * On success, fills out 'result' with the command response.
      */
     static Status runAggregate(OperationContext* opCtx,
@@ -81,7 +86,19 @@ public:
                                const AggregateCommandRequest& request,
                                const LiteParsedPipeline& liteParsedPipeline,
                                const PrivilegeVector& privileges,
+                               boost::optional<ChunkManager> cm,
                                BSONObjBuilder* result);
+
+    /**
+     * Convenience version that requests routing table internally.
+     */
+    static Status runAggregate(OperationContext* opCtx,
+                               const Namespaces& namespaces,
+                               const AggregateCommandRequest& request,
+                               const LiteParsedPipeline& liteParsedPipeline,
+                               const PrivilegeVector& privileges,
+                               BSONObjBuilder* result);
+
 
     /**
      * Convenience version that internally constructs the LiteParsedPipeline.

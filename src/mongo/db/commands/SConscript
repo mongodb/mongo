@@ -421,6 +421,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/timeseries/catalog_helper',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_collmod',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_conversion_util',
+        '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_stats',
         '$BUILD_DIR/mongo/db/transaction',
         '$BUILD_DIR/mongo/db/views/view_catalog_helpers',

@@ -39,6 +39,12 @@ namespace mongo {
 namespace timeseries {
 
 /**
+ * Returns true if the granularity transition is valid.
+ */
+bool isValidTimeseriesGranularityTransition(BucketGranularityEnum current,
+                                            BucketGranularityEnum target);
+
+/**
  * Returns the default bucket timespan associated with the given granularity.
  */
 int getMaxSpanSecondsFromGranularity(BucketGranularityEnum granularity);

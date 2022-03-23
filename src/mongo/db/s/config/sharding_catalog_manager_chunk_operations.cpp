@@ -479,6 +479,65 @@ std::vector<ShardId> getShardsOwningChunksForCollection(OperationContext* opCtx,
 
 }  // namespace
 
+void ShardingCatalogManager::bumpMajorVersionOneChunkPerShard(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    TxnNumber txnNumber,
+    const std::vector<ShardId>& shardIds) {
+    auto curCollectionVersion = uassertStatusOK(getCollectionVersion(opCtx, nss));
+    ChunkVersion targetChunkVersion(curCollectionVersion.majorVersion() + 1,
+                                    0,
+                                    curCollectionVersion.epoch(),
+                                    curCollectionVersion.getTimestamp());
+
+    auto const configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+    auto findCollResponse = uassertStatusOK(
+        configShard->exhaustiveFindOnConfig(opCtx,
+                                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                            repl::ReadConcernLevel::kLocalReadConcern,
+                                            CollectionType::ConfigNS,
+                                            BSON(CollectionType::kNssFieldName << nss.ns()),
+                                            {},
+                                            1));
+    uassert(ErrorCodes::ConflictingOperationInProgress,
+            "Collection does not exist",
+            !findCollResponse.docs.empty());
+    const CollectionType coll(findCollResponse.docs[0]);
+
+    for (const auto& shardId : shardIds) {
+        BSONObjBuilder updateBuilder;
+        BSONObjBuilder updateVersionClause(updateBuilder.subobjStart("$set"));
+        updateVersionClause.appendTimestamp(ChunkType::lastmod(), targetChunkVersion.toLong());
+        updateVersionClause.doneFast();
+        auto chunkUpdate = updateBuilder.obj();
+
+        const auto query = BSON(ChunkType::collectionUUID << coll.getUuid()
+                                                          << ChunkType::shard(shardId.toString()));
+        auto request = BatchedCommandRequest::buildUpdateOp(ChunkType::ConfigNS,
+                                                            query,        // query
+                                                            chunkUpdate,  // update
+                                                            false,        // upsert
+                                                            false         // multi
+        );
+
+        auto res = ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
+            opCtx, ChunkType::ConfigNS, request, txnNumber);
+
+        auto numDocsExpectedModified = 1;
+        auto numDocsModified = res.getIntField("n");
+
+        uassert(6102800,
+                str::stream() << "Expected to match " << numDocsExpectedModified
+                              << " docs, but only matched " << numDocsModified
+                              << " for write request " << request.toString(),
+                numDocsExpectedModified == numDocsModified);
+
+        // There exists a constraint that a chunk version must be unique for a given namespace,
+        // so the minor version is incremented for each chunk placed.
+        targetChunkVersion.incMinor();
+    }
+}
+
 StatusWith<BSONObj> ShardingCatalogManager::commitChunkSplit(
     OperationContext* opCtx,
     const NamespaceString& nss,

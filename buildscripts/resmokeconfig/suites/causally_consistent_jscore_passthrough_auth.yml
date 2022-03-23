@@ -92,7 +92,7 @@ selector:
   - jstests/core/dbstats.js
 
   # These include operations the root user auth'd on the test database is not authorized to perform,
-  # e.g. dropping or creating system collections.
+  # e.g. reading system.views, dropping or creating system collections.
   - jstests/core/list_collections_no_views.js
   - jstests/core/rename_collection_system_db.js
   - jstests/core/views/invalid_system_views.js
@@ -100,6 +100,7 @@ selector:
   - jstests/core/views/views_creation.js
   - jstests/core/views/views_drop.js
   - jstests/core/disallow_system_views_user_writes.js
+  - jstests/core/timeseries/bucket_granularity.js
 
   # These tests expect listCollections to return system.bucket.* collections, which are filtered
   # out by mongos when authentication is enabled.

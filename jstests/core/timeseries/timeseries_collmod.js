@@ -2,7 +2,6 @@
  * This tests which collMod options are allowed on a time-series collection.
  *
  * @tags: [
- *  # TODO SERVER-61028: Remove this tag.
  *  # Cannot implicitly shard accessed collections because of collection existing when none
  *  # expected.
  *  assumes_no_implicit_collection_creation_after_drop,

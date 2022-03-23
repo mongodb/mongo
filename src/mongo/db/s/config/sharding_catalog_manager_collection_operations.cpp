@@ -59,6 +59,7 @@
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_util.h"
+#include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/transaction_api.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/executor/network_interface.h"
@@ -690,6 +691,44 @@ void ShardingCatalogManager::renameShardedMetadata(
                                                BSONObj(),
                                                ShardingCatalogClient::kLocalWriteConcern);
     }
+}
+
+void ShardingCatalogManager::updateTimeSeriesGranularity(OperationContext* opCtx,
+                                                         const NamespaceString& nss,
+                                                         BucketGranularityEnum granularity) {
+    const auto cm = uassertStatusOK(
+        Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx, nss));
+    std::set<ShardId> shardIds;
+    cm.getAllShardIds(&shardIds);
+
+    withTransaction(
+        opCtx, CollectionType::ConfigNS, [&](OperationContext* opCtx, TxnNumber txnNumber) {
+            // Update granularity value in config.collections.
+            auto granularityFieldName = CollectionType::kTimeseriesFieldsFieldName + "." +
+                TypeCollectionTimeseriesFields::kGranularityFieldName;
+            auto bucketSpanFieldName = CollectionType::kTimeseriesFieldsFieldName + "." +
+                TypeCollectionTimeseriesFields::kBucketMaxSpanSecondsFieldName;
+            auto bucketSpan = timeseries::getMaxSpanSecondsFromGranularity(granularity);
+            writeToConfigDocumentInTxn(
+                opCtx,
+                CollectionType::ConfigNS,
+                BatchedCommandRequest::buildUpdateOp(
+                    CollectionType::ConfigNS,
+                    BSON(CollectionType::kNssFieldName << nss.ns()) /* query */,
+                    BSON("$set" << BSON(granularityFieldName
+                                        << BucketGranularity_serializer(granularity)
+                                        << bucketSpanFieldName << bucketSpan)) /* update */,
+                    false /* upsert */,
+                    false /* multi */),
+                txnNumber);
+
+            // Bump the chunk version for shards.
+            bumpMajorVersionOneChunkPerShard(opCtx,
+                                             nss,
+                                             txnNumber,
+                                             {std::make_move_iterator(shardIds.begin()),
+                                              std::make_move_iterator(shardIds.end())});
+        });
 }
 
 }  // namespace mongo

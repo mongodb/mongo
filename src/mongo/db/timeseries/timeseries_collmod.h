@@ -51,11 +51,12 @@ std::unique_ptr<CollMod> makeTimeseriesViewCollModCommand(OperationContext* opCt
 
 /**
  * Performs the collection modification described in "cmd" on the collection "nss". May perform
- * timeseries view translation to multiple collMod.
+ * timeseries view translation to multiple collMod if "performViewChange" flag is set.
  */
 Status processCollModCommandWithTimeSeriesTranslation(OperationContext* opCtx,
                                                       const NamespaceString& nss,
                                                       const CollMod& cmd,
+                                                      bool performViewChange,
                                                       BSONObjBuilder* result);
 
 }  // namespace timeseries

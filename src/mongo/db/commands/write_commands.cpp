@@ -65,12 +65,14 @@
 #include "mongo/db/repl/tenant_migration_conflict_info.h"
 #include "mongo/db/repl/tenant_migration_decoration.h"
 #include "mongo/db/retryable_writes_stats.h"
+#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
+#include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/timeseries/timeseries_stats.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/db/write_concern.h"
@@ -933,6 +935,28 @@ public:
             return TimeseriesAtomicWriteResult::kSuccess;
         }
 
+        // For sharded time-series collections, we need to use the granularity from the config
+        // server (through shard filtering information) as the source of truth for the current
+        // granularity value, due to the possible inconsistency in the process of granularity
+        // updates.
+        static void _rebuildOptionsWithGranularityFromConfigServer(
+            OperationContext* opCtx,
+            TimeseriesOptions& timeSeriesOptions,
+            const NamespaceString& bucketsNs) {
+            AutoGetCollectionForRead coll(opCtx, bucketsNs);
+            auto collDesc =
+                CollectionShardingState::get(opCtx, bucketsNs)->getCollectionDescription(opCtx);
+            if (collDesc.isSharded()) {
+                tassert(6102801,
+                        "Sharded time-series buckets collection is missing time-series fields",
+                        collDesc.getTimeseriesFields());
+                auto granularity = collDesc.getTimeseriesFields()->getGranularity();
+                auto bucketSpan = timeseries::getMaxSpanSecondsFromGranularity(granularity);
+                timeSeriesOptions.setGranularity(granularity);
+                timeSeriesOptions.setBucketMaxSpanSeconds(bucketSpan);
+            }
+        }
+
         std::tuple<TimeseriesBatches,
                    TimeseriesStmtIds,
                    size_t /* numInserted */,
@@ -957,6 +981,9 @@ public:
                     "Time-series buckets collection is missing time-series options",
                     bucketsColl->getTimeseriesOptions());
 
+            auto timeSeriesOptions = *bucketsColl->getTimeseriesOptions();
+            _rebuildOptionsWithGranularityFromConfigServer(opCtx, timeSeriesOptions, bucketsNs);
+
             TimeseriesBatches batches;
             TimeseriesStmtIds stmtIds;
             bool canContinue = true;
@@ -980,7 +1007,7 @@ public:
                     opCtx,
                     ns().isTimeseriesBucketsCollection() ? ns().getTimeseriesViewNamespace() : ns(),
                     bucketsColl->getDefaultCollator(),
-                    *bucketsColl->getTimeseriesOptions(),
+                    timeSeriesOptions,
                     request().getDocuments()[start + index],
                     _canCombineTimeseriesInsertWithOtherClients(opCtx));
 

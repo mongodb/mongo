@@ -48,6 +48,7 @@ BSONObj wrapInArrayIf(bool doWrap, BSONObj&& obj) {
     return std::move(obj);
 }
 
+}  // namespace
 
 bool isValidTimeseriesGranularityTransition(BucketGranularityEnum current,
                                             BucketGranularityEnum target) {
@@ -75,8 +76,6 @@ bool isValidTimeseriesGranularityTransition(BucketGranularityEnum current,
 
     return validTransition;
 }
-
-}  // namespace
 
 int getMaxSpanSecondsFromGranularity(BucketGranularityEnum granularity) {
     switch (granularity) {

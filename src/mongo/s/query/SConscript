@@ -40,6 +40,9 @@ env.Library(
         '$BUILD_DIR/mongo/db/views/views',
         '$BUILD_DIR/mongo/s/query/cluster_client_cursor',
         'cluster_query',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
     ]
 )
 

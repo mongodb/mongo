@@ -83,6 +83,7 @@ let viewsCommandTests = {
     _configsvrBalancerStatus: {skip: isAnInternalCommand},
     _configsvrBalancerStop: {skip: isAnInternalCommand},
     _configsvrCleanupReshardCollection: {skip: isAnInternalCommand},
+    _configsvrCollMod: {skip: isAnInternalCommand},
     _configsvrClearJumboFlag: {skip: isAnInternalCommand},
     _configsvrCommitChunksMerge: {skip: isAnInternalCommand},
     _configsvrCommitChunkMigration: {skip: isAnInternalCommand},
@@ -171,6 +172,7 @@ let viewsCommandTests = {
         {skip: isAnInternalCommand},  // TODO SERVER-58843: Remove once 6.0 becomes last LTS
     _shardsvrCollMod: {skip: isAnInternalCommand},
     _shardsvrCollModParticipant: {skip: isAnInternalCommand},
+    _shardsvrParticipantBlock: {skip: isAnInternalCommand},
     _transferMods: {skip: isAnInternalCommand},
     _vectorClockPersist: {skip: isAnInternalCommand},
     abortReshardCollection: {skip: isUnrelated},

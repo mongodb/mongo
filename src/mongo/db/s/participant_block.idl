@@ -29,36 +29,14 @@ global:
     cpp_namespace: "mongo"
 
 imports:
-    - "mongo/db/coll_mod.idl"
     - "mongo/idl/basic_types.idl"
 
 commands:
-    _configsvrCollMod:
-        command_name: _configsvrCollMod
-        cpp_name: ConfigsvrCollMod
-        description: "Internal command sent to config server to update routing related information"
+    # TODO(SERVER-64346): Generalize this command to be reusable in other DDL context
+    _shardsvrParticipantBlock:
+        command_name: _shardsvrParticipantBlock
+        cpp_name: ShardsvrParticipantBlock
+        description: "Internal command sent to shards to block CRUD operations"
         strict: false
         api_version: ""
         namespace: concatenate_with_db
-        fields:
-            collModRequest:
-                type: CollModRequest
-                description: "Initial collMod request"
-
-    _shardsvrCollModParticipant:
-        command_name: _shardsvrCollModParticipant
-        cpp_name: ShardsvrCollModParticipant
-        description: "Internal command sent to all shards to implement collMod locally"
-        strict: false
-        api_version: ""
-        namespace: concatenate_with_db
-        fields:
-            collModRequest:
-                type: CollModRequest
-                description: "Initial collMod request"
-            needsUnblock:
-                type: optionalBool
-                description: "If needs to refresh the shard filtering information and unblock CRUD operations"
-            performViewChange:
-                type: optionalBool
-                description: "Whether should perform view catalog change, set only for commands sent to the primary shard"

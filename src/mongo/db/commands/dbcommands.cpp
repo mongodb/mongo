@@ -586,7 +586,7 @@ public:
         }
 
         uassertStatusOK(timeseries::processCollModCommandWithTimeSeriesTranslation(
-            opCtx, cmd->getNamespace(), *cmd, &result));
+            opCtx, cmd->getNamespace(), *cmd, true, &result));
         return true;
     }
 

@@ -124,6 +124,7 @@ std::unique_ptr<CollMod> makeTimeseriesViewCollModCommand(OperationContext* opCt
 Status processCollModCommandWithTimeSeriesTranslation(OperationContext* opCtx,
                                                       const NamespaceString& nss,
                                                       const CollMod& cmd,
+                                                      bool performViewChange,
                                                       BSONObjBuilder* result) {
     const auto* mainCmd = &cmd;
     // If the target namespace refers to a time-series collection, we will redirect the
@@ -149,7 +150,7 @@ Status processCollModCommandWithTimeSeriesTranslation(OperationContext* opCtx,
         // If the timeseries options were updated without updating the view pipeline, we could
         // end up with incorrect query behavior (namely data missing from some queries).
         auto timeseriesViewCmd = makeTimeseriesViewCollModCommand(opCtx, cmd);
-        if (timeseriesViewCmd) {
+        if (timeseriesViewCmd && performViewChange) {
             auto status = processCollModCommand(opCtx, nss, *timeseriesViewCmd, result);
             if (!status.isOK()) {
                 return status;

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2022-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,32 +29,30 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog_raii.h"
+#include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/s/collmod_coordinator.h"
-#include "mongo/db/s/database_sharding_state.h"
-#include "mongo/db/s/recoverable_critical_section_service.h"
-#include "mongo/db/s/shard_filtering_metadata_refresh.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/repl_set_config.h"
+#include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/sharded_collmod_gen.h"
-#include "mongo/db/s/sharding_state.h"
-#include "mongo/db/timeseries/catalog_helper.h"
-#include "mongo/db/timeseries/timeseries_collmod.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/catalog/sharding_catalog_client.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace {
 
-class ShardSvrCollModParticipantCommand final
-    : public TypedCommand<ShardSvrCollModParticipantCommand> {
+class ConfigsvrCollModCommand final : public TypedCommand<ConfigsvrCollModCommand> {
 public:
-    using Request = ShardsvrCollModParticipant;
-    using Response = CollModReply;
+    using Request = ConfigsvrCollMod;
 
     std::string help() const override {
-        return "Internal command, which is exported by the shards. Do not call "
-               "directly. Unblocks CRUD and processes collMod.";
+        return "Internal command, which is exported by the config server. Do not call "
+               "directly. Runs the collMod command on the config server, potentially "
+               "updating some of the collection metadata present on the config server.";
     }
 
     bool skipApiVersionCheck() const override {
@@ -70,43 +68,26 @@ public:
     public:
         using InvocationBase::InvocationBase;
 
-        Response typedRun(OperationContext* opCtx) {
-            uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
-
+        void typedRun(OperationContext* opCtx) {
+            uassert(ErrorCodes::IllegalOperation,
+                    "_configsvrCollMod can only be run on config servers",
+                    serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
             CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
                                                           opCtx->getWriteConcern());
 
             opCtx->setAlwaysInterruptAtStepDownOrUp();
 
-            // If the needsUnblock flag is set, we must have blocked the CRUD operations in the
-            // previous phase of collMod operation for granularity updates. Unblock it now after we
-            // have updated the granularity.
-            if (request().getNeedsUnblock()) {
-                // This is only ever used for time-series collection as of now.
-                uassert(6102802,
-                        "collMod unblocking should always be on a time-series collection",
-                        timeseries::getTimeseriesOptions(opCtx, ns(), true));
-                auto bucketNs = ns().makeTimeseriesBucketsNamespace();
-                forceShardFilteringMetadataRefresh(opCtx, bucketNs);
+            // Set the operation context read concern level to local for reads into the config
+            // database.
+            repl::ReadConcernArgs::get(opCtx) =
+                repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
-                auto service = RecoverableCriticalSectionService::get(opCtx);
-                const auto reason = BSON("command"
-                                         << "ShardSvrParticipantBlockCommand"
-                                         << "ns" << bucketNs.toString());
-                service->releaseRecoverableCriticalSection(
-                    opCtx, bucketNs, reason, ShardingCatalogClient::kLocalWriteConcern);
+            const auto& collMod = request().getCollModRequest();
+            if (collMod.getTimeseries() && collMod.getTimeseries().get().getGranularity()) {
+                auto granularity = collMod.getTimeseries().get().getGranularity().get();
+                ShardingCatalogManager::get(opCtx)->updateTimeSeriesGranularity(
+                    opCtx, ns(), granularity);
             }
-
-            BSONObjBuilder builder;
-            CollMod cmd(ns());
-            cmd.setCollModRequest(request().getCollModRequest());
-
-            // This flag is set from the collMod coordinator. We do not allow view definition change
-            // on non-primary shards since it's not in the view catalog.
-            auto performViewChange = request().getPerformViewChange();
-            uassertStatusOK(timeseries::processCollModCommandWithTimeSeriesTranslation(
-                opCtx, ns(), cmd, performViewChange, &builder));
-            return CollModReply::parse(IDLParserErrorContext("CollModReply"), builder.obj());
         }
 
     private:
@@ -126,7 +107,7 @@ public:
                                                            ActionType::internal));
         }
     };
-} shardsvrCollModParticipantCommand;
+} configsvrCollModCmd;
 
 }  // namespace
 }  // namespace mongo

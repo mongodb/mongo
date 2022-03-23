@@ -87,6 +87,7 @@ let testCases = {
     _configsvrBalancerStatus: {skip: "internal command"},
     _configsvrBalancerStop: {skip: "internal command"},
     _configsvrCleanupReshardCollection: {skip: "internal command"},
+    _configsvrCollMod: {skip: "internal command"},
     _configsvrClearJumboFlag: {skip: "internal command"},
     _configsvrCommitChunksMerge: {skip: "internal command"},
     _configsvrCommitChunkMigration: {skip: "internal command"},
@@ -168,6 +169,7 @@ let testCases = {
     _shardsvrSetUserWriteBlockMode: {skip: "internal command"},
     _shardsvrCollMod: {skip: "internal command"},
     _shardsvrCollModParticipant: {skip: "internal command"},
+    _shardsvrParticipantBlock: {skip: "internal command"},
     _shardsvrShardCollection:
         {skip: "internal command"},  // TODO SERVER-58843: Remove once 6.0 becomes last LTS
     _transferMods: {skip: "internal command"},
