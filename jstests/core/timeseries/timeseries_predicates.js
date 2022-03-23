@@ -24,7 +24,7 @@ const bucketsColl = db.getCollection('system.buckets.' + tsColl.getName());
 // by comparing the result on a time-series collection against a normal collection.
 function checkPredicateResult(predicate, documents) {
     assert.commandWorked(coll.deleteMany({}));
-    bucketsColl.deleteMany({});
+    assert.commandWorked(bucketsColl.deleteMany({}));
     assert.commandWorked(coll.insert(documents));
     assert.commandWorked(tsColl.insert(documents));
 

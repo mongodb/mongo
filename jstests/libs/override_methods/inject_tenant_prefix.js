@@ -552,7 +552,8 @@ Mongo.prototype.runCommandRetryOnTenantMigrationErrors = function(
                 }
             } else if (migrationAbortedErr) {
                 jsTestLog(`Got TenantMigrationAborted for command against database ${
-                    dbNameWithTenantId} after trying ${numAttempts} times: ${tojson(resObj)}`);
+                              dbNameWithTenantId} after trying ${numAttempts} times: ` +
+                          `${tojson(cmdObjWithTenantId)} -> ${tojson(resObj)}`);
             }
 
             // If the result has a TransientTransactionError label, the entire transaction must be
