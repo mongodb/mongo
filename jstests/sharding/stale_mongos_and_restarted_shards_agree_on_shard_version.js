@@ -214,10 +214,11 @@ const staleMongoS = st.s1;
     const catalogCacheStatistics =
         st.shard0.adminCommand({serverStatus: 1}).shardingStatistics.catalogCache;
 
-    assert.eq(kNumThreadsForConvoyTest,
-              (catalogCacheStatistics.countFullRefreshesStarted +
-               catalogCacheStatistics.countIncrementalRefreshesStarted) -
-                  catalogCacheStatistics.countFailedRefreshes);
+    // TODO (SERVER-64728): Remove the first predicate once 6.0 branches out.
+    const countRefreshes = catalogCacheStatistics.countFullRefreshesStarted +
+        catalogCacheStatistics.countIncrementalRefreshesStarted -
+        catalogCacheStatistics.countFailedRefreshes;
+    assert(countRefreshes == 20 || countRefreshes == 1, "Number of refreshes: " + countRefreshes);
 }
 
 st.stop();

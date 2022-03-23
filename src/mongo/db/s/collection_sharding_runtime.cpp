@@ -123,6 +123,7 @@ ScopedCollectionFilter CollectionShardingRuntime::getOwnershipFilter(
 ScopedCollectionDescription CollectionShardingRuntime::getCollectionDescription(
     OperationContext* opCtx) {
     auto& oss = OperationShardingState::get(opCtx);
+
     // If the server has been started with --shardsvr, but hasn't been added to a cluster we should
     // consider all collections as unsharded. Also, return unsharded if no shard version or db
     // version is present on the context.
@@ -132,9 +133,10 @@ ScopedCollectionDescription CollectionShardingRuntime::getCollectionDescription(
     }
 
     auto optMetadata = _getCurrentMetadataIfKnown(boost::none);
+    const auto receivedShardVersion{oss.getShardVersion(_nss)};
     uassert(
         StaleConfigInfo(_nss,
-                        ChunkVersion::IGNORED() /* receivedVersion */,
+                        receivedShardVersion ? *receivedShardVersion : ChunkVersion::IGNORED(),
                         boost::none /* wantedVersion */,
                         ShardingState::get(_serviceContext)->shardId()),
         str::stream() << "sharding status of collection " << _nss.ns()
