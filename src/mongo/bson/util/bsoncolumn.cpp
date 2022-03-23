@@ -84,24 +84,48 @@ constexpr std::array<uint8_t, 16> kControlToScaleIndex = {
 template <typename EnterSubObjFunc, typename ElementFunc>
 class BSONObjTraversal {
 public:
-    BSONObjTraversal(EnterSubObjFunc enterFunc, ElementFunc elemFunc)
-        : _enterFunc(std::move(enterFunc)), _elemFunc(std::move(elemFunc)) {}
+    BSONObjTraversal(bool recurseIntoArrays,
+                     BSONType rootType,
+                     EnterSubObjFunc enterFunc,
+                     ElementFunc elemFunc)
+        : _enterFunc(std::move(enterFunc)),
+          _elemFunc(std::move(elemFunc)),
+          _recurseIntoArrays(recurseIntoArrays),
+          _rootType(rootType) {}
 
     bool traverse(const BSONObj& obj) {
-        return _traverse(""_sd, std::move(obj));
+        if (_recurseIntoArrays) {
+            return _traverseIntoArrays(""_sd, obj, _rootType);
+        } else {
+            return _traverseNoArrays(""_sd, obj, _rootType);
+        }
     }
 
 private:
-    bool _traverse(StringData fieldName, const BSONObj& obj) {
-        [[maybe_unused]] auto raii = _enterFunc(fieldName, obj);
+    bool _traverseNoArrays(StringData fieldName, const BSONObj& obj, BSONType type) {
+        [[maybe_unused]] auto raii = _enterFunc(fieldName, obj, type);
+
         return std::all_of(obj.begin(), obj.end(), [this, &fieldName](auto&& elem) {
-            return elem.type() == Object ? _traverse(elem.fieldNameStringData(), elem.Obj())
-                                         : _elemFunc(elem);
+            return elem.type() == Object
+                ? _traverseNoArrays(elem.fieldNameStringData(), elem.Obj(), Object)
+                : _elemFunc(elem);
+        });
+    }
+
+    bool _traverseIntoArrays(StringData fieldName, const BSONObj& obj, BSONType type) {
+        [[maybe_unused]] auto raii = _enterFunc(fieldName, obj, type);
+
+        return std::all_of(obj.begin(), obj.end(), [this, &fieldName](auto&& elem) {
+            return elem.type() == Object || elem.type() == Array
+                ? _traverseIntoArrays(elem.fieldNameStringData(), elem.Obj(), elem.type())
+                : _elemFunc(elem);
         });
     }
 
     EnterSubObjFunc _enterFunc;
     ElementFunc _elemFunc;
+    bool _recurseIntoArrays;
+    BSONType _rootType;
 };
 
 std::size_t hashName(StringData sd) {
@@ -220,7 +244,10 @@ BSONColumn::ElementStorage::Element BSONColumn::ElementStorage::allocate(BSONTyp
 
 struct BSONColumn::SubObjectAllocator {
 public:
-    SubObjectAllocator(ElementStorage& allocator, StringData fieldName, const BSONObj& obj)
+    SubObjectAllocator(ElementStorage& allocator,
+                       StringData fieldName,
+                       const BSONObj& obj,
+                       BSONType type)
         : _allocator(allocator) {
         // Remember size of field name for this subobject in case it ends up being an empty
         // subobject and we need to 'deallocate' it.
@@ -231,7 +258,7 @@ public:
         // Start the subobject, allocate space for the field in the parent which is BSON type byte +
         // field name + null terminator
         char* objdata = _allocator.allocate(2 + _fieldNameSize);
-        objdata[0] = Object;
+        objdata[0] = type;
         if (_fieldNameSize > 0) {
             memcpy(objdata + 1, fieldName.rawData(), _fieldNameSize);
         }
@@ -298,9 +325,15 @@ void BSONColumn::Iterator::_initialize(size_t index) {
 }
 
 void BSONColumn::Iterator::_initializeInterleaving() {
+    _interleavedArrays = *_control == bsoncolumn::kInterleavedStartControlByte ||
+        *_control == bsoncolumn::kInterleavedStartArrayRootControlByte;
+    _interleavedRootType =
+        *_control == bsoncolumn::kInterleavedStartArrayRootControlByte ? Array : Object;
     _interleavedReferenceObj = BSONObj(_control + 1);
 
-    BSONObjTraversal t([](StringData fieldName, const BSONObj& obj) { return true; },
+    BSONObjTraversal t(_interleavedArrays,
+                       _interleavedRootType,
+                       [](StringData fieldName, const BSONObj& obj, BSONType type) { return true; },
                        [this](const BSONElement& elem) {
                            _states.emplace_back();
                            _states.back()._loadLiteral(elem);
@@ -406,10 +439,12 @@ void BSONColumn::Iterator::_incrementInterleaved() {
     auto stateEnd = _states.end();
     int processed = 0;
     BSONObjTraversal t(
-        [this](StringData fieldName, const BSONObj& obj) {
+        _interleavedArrays,
+        _interleavedRootType,
+        [this](StringData fieldName, const BSONObj& obj, BSONType type) {
             // Called every time we recurse into a subobject. It makes sure we write the size and
             // EOO bytes.
-            return SubObjectAllocator(_column->_elementStorage, fieldName, obj);
+            return SubObjectAllocator(_column->_elementStorage, fieldName, obj, type);
         },
         [this, &stateIt, &stateEnd, &processed](const BSONElement& referenceField) {
             // Called for every scalar field in the reference interleaved BSONObj. We have as many
@@ -509,6 +544,20 @@ void BSONColumn::Iterator::_handleEOO() {
     ++_control;
     _index = kEndIndex;
     _column->_fullyDecompressed = true;
+}
+
+bool BSONColumn::Iterator::_isLiteral(char control) {
+    return (control & 0xE0) == 0;
+}
+
+bool BSONColumn::Iterator::_isInterleavedStart(char control) {
+    return control == bsoncolumn::kInterleavedStartControlByteLegacy ||
+        control == bsoncolumn::kInterleavedStartControlByte ||
+        control == bsoncolumn::kInterleavedStartArrayRootControlByte;
+}
+
+uint8_t BSONColumn::Iterator::_numSimple8bBlocks(char control) {
+    return (control & 0x0F) + 1;
 }
 
 bool BSONColumn::Iterator::operator==(const Iterator& rhs) const {

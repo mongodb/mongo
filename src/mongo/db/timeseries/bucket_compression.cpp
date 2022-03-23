@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/bsoncolumn.h"
 #include "mongo/bson/util/bsoncolumnbuilder.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
@@ -263,7 +264,11 @@ CompressionResult compressBucket(const BSONObj& bucketDoc,
 
         // Add compressed time field first
         {
-            BSONColumnBuilder timeColumn(timeFieldName, std::move(columnBuffer));
+            BSONColumnBuilder timeColumn(
+                timeFieldName,
+                std::move(columnBuffer),
+                feature_flags::gTimeseriesBucketCompressionWithArrays.isEnabled(
+                    serverGlobalParams.featureCompatibility));
             for (const auto& measurement : measurements) {
                 timeColumn.append(measurement.timeField);
             }
@@ -296,7 +301,11 @@ CompressionResult compressBucket(const BSONObj& bucketDoc,
 
         // Then add compressed data fields.
         for (size_t i = 0; i < columns.size(); ++i) {
-            BSONColumnBuilder column(columns[i].first, std::move(columnBuffer));
+            BSONColumnBuilder column(
+                columns[i].first,
+                std::move(columnBuffer),
+                feature_flags::gTimeseriesBucketCompressionWithArrays.isEnabled(
+                    serverGlobalParams.featureCompatibility));
             for (const auto& measurement : measurements) {
                 if (auto elem = measurement.dataFields[i]) {
                     column.append(elem);

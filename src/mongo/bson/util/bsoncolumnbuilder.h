@@ -46,8 +46,8 @@ namespace mongo {
  */
 class BSONColumnBuilder {
 public:
-    BSONColumnBuilder(StringData fieldName);
-    BSONColumnBuilder(StringData fieldName, BufBuilder&& builder);
+    BSONColumnBuilder(StringData fieldName, bool arrayCompression = false);
+    BSONColumnBuilder(StringData fieldName, BufBuilder&& builder, bool arrayCompression = false);
 
     /**
      * Appends a BSONElement to this BSONColumnBuilder.
@@ -155,7 +155,7 @@ private:
     bool _appendSubElements(const BSONObj& obj);
 
     // Transition into kSubObjDeterminingReference mode
-    void _startDetermineSubObjReference(const BSONObj& obj);
+    void _startDetermineSubObjReference(const BSONObj& obj, BSONType type);
 
     // Transition from kSubObjDeterminingReference into kSubObjAppending
     void _finishDetermineSubObjReference();
@@ -176,6 +176,7 @@ private:
     // Reference object that is used to match object hierarchy to encoding states. Appending objects
     // for sub-object compression need to check their hierarchy against this object.
     BSONObj _referenceSubObj;
+    BSONType _referenceSubObjType;
 
     // Buffered BSONObj when determining reference object. Will be compressed when this is complete
     // and we transition into kSubObjAppending.
@@ -192,6 +193,9 @@ private:
 
     std::string _fieldName;
     int _numInterleavedStartWritten = 0;
+
+    // Indicates if array compression should be used
+    bool _arrayCompression = false;
 };
 
 }  // namespace mongo

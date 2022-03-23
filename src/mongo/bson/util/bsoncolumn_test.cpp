@@ -172,6 +172,10 @@ public:
         return _createElement(arr);
     }
 
+    BSONElement createElementArrayAsObject(BSONArray arr) {
+        return _createElement(*static_cast<BSONObj*>(&arr));
+    }
+
     static boost::optional<uint128_t> deltaBinData(BSONElement val, BSONElement prev) {
         if (val.binaryEqualValues(prev)) {
             return uint128_t(0);
@@ -318,8 +322,18 @@ public:
         builder.appendChar(control << 4 | count);
     }
 
-    static void appendInterleavedStart(BufBuilder& builder, BSONObj reference) {
+    static void appendInterleavedStartLegacy(BufBuilder& builder, BSONObj reference) {
         builder.appendChar((char)0xF0);
+        builder.appendBuf(reference.objdata(), reference.objsize());
+    }
+
+    static void appendInterleavedStart(BufBuilder& builder, BSONObj reference) {
+        builder.appendChar((char)0xF1);
+        builder.appendBuf(reference.objdata(), reference.objsize());
+    }
+
+    static void appendInterleavedStartArrayRoot(BufBuilder& builder, BSONObj reference) {
+        builder.appendChar((char)0xF2);
         builder.appendBuf(reference.objdata(), reference.objsize());
     }
 
@@ -2455,293 +2469,62 @@ TEST_F(BSONColumnTest, ArrayEqual) {
 }
 
 TEST_F(BSONColumnTest, Interleaved) {
-    BSONColumnBuilder cb("test"_sd);
+    auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
+        BSONColumnBuilder cb("test"_sd, arrayCompression);
 
-    std::vector<BSONElement> elems = {createElementObj(BSON("x" << 1 << "y" << 2)),
-                                      createElementObj(BSON("x" << 1 << "y" << 3)),
-                                      createElementObj(BSON("x" << 1 << "y" << 3)),
-                                      BSONElement(),
-                                      createElementObj(BSON("y" << 4)),
-                                      createElementObj(BSON("x" << 1 << "y" << 3))};
+        std::vector<BSONElement> elems = {createElementObj(BSON("x" << 1 << "y" << 2)),
+                                          createElementObj(BSON("x" << 1 << "y" << 3)),
+                                          createElementObj(BSON("x" << 1 << "y" << 3)),
+                                          BSONElement(),
+                                          createElementObj(BSON("y" << 4)),
+                                          createElementObj(BSON("x" << 1 << "y" << 3))};
 
-    for (auto elem : elems) {
-        if (!elem.eoo())
-            cb.append(elem);
-        else
-            cb.skip();
-    }
+        for (auto elem : elems) {
+            if (!elem.eoo())
+                cb.append(elem);
+            else
+                cb.skip();
+        }
 
-    BufBuilder expected;
-    appendInterleavedStart(expected, elems.front().Obj());
-    appendSimple8bControl(expected, 0b1000, 0b0000);
-    appendSimple8bBlocks64(expected,
-                           {kDeltaForBinaryEqualValues,
-                            deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd]),
-                            deltaInt32(elems[2].Obj()["x"_sd], elems[1].Obj()["x"_sd]),
-                            boost::none,
-                            boost::none,
-                            deltaInt32(elems[5].Obj()["x"_sd], elems[2].Obj()["x"_sd])},
-                           1);
-    appendSimple8bControl(expected, 0b1000, 0b0000);
-    appendSimple8bBlocks64(expected,
-                           {kDeltaForBinaryEqualValues,
-                            deltaInt32(elems[1].Obj()["y"_sd], elems[0].Obj()["y"_sd]),
-                            deltaInt32(elems[2].Obj()["y"_sd], elems[1].Obj()["y"_sd]),
-                            boost::none,
-                            deltaInt32(elems[4].Obj()["y"_sd], elems[2].Obj()["y"_sd]),
-                            deltaInt32(elems[5].Obj()["y"_sd], elems[4].Obj()["y"_sd])},
-                           1);
-    appendEOO(expected);
-    appendEOO(expected);
+        BufBuilder expected;
+        appendInterleavedStartFunc(expected, elems.front().Obj());
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected,
+                               {kDeltaForBinaryEqualValues,
+                                deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd]),
+                                deltaInt32(elems[2].Obj()["x"_sd], elems[1].Obj()["x"_sd]),
+                                boost::none,
+                                boost::none,
+                                deltaInt32(elems[5].Obj()["x"_sd], elems[2].Obj()["x"_sd])},
+                               1);
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected,
+                               {kDeltaForBinaryEqualValues,
+                                deltaInt32(elems[1].Obj()["y"_sd], elems[0].Obj()["y"_sd]),
+                                deltaInt32(elems[2].Obj()["y"_sd], elems[1].Obj()["y"_sd]),
+                                boost::none,
+                                deltaInt32(elems[4].Obj()["y"_sd], elems[2].Obj()["y"_sd]),
+                                deltaInt32(elems[5].Obj()["y"_sd], elems[4].Obj()["y"_sd])},
+                               1);
+        appendEOO(expected);
+        appendEOO(expected);
 
-    auto binData = cb.finalize();
-    verifyBinary(binData, expected);
-    verifyDecompression(binData, elems);
+        auto binData = cb.finalize();
+        verifyBinary(binData, expected);
+        verifyDecompression(binData, elems);
+    };
+
+    test(false, appendInterleavedStartLegacy);
+    test(true, appendInterleavedStart);
 }
 
-TEST_F(BSONColumnTest, InterleavedAfterNonInterleaved) {
-    BSONColumnBuilder cb("test"_sd);
-
-    std::vector<BSONElement> elems = {createElementInt32(1),
-                                      createElementObj(BSON("x" << 1 << "y" << 2)),
-                                      createElementObj(BSON("x" << 1 << "y" << 3)),
-                                      createElementObj(BSON("x" << 2 << "y" << 4))};
+TEST_F(BSONColumnTest, InterleavedArray) {
+    BSONColumnBuilder cb("test"_sd, true);
+    std::vector<BSONElement> elems = {createElementObj(BSON("x" << BSON_ARRAY(1 << 2))),
+                                      createElementObj(BSON("x" << BSON_ARRAY(2 << 3)))};
 
     for (auto elem : elems) {
-        if (!elem.eoo())
-            cb.append(elem);
-        else
-            cb.skip();
-    }
-
-    BufBuilder expected;
-    appendLiteral(expected, elems.front());
-    appendInterleavedStart(expected, elems[1].Obj());
-    appendSimple8bControl(expected, 0b1000, 0b0000);
-    appendSimple8bBlocks64(expected,
-                           {kDeltaForBinaryEqualValues,
-                            deltaInt32(elems[2].Obj()["x"_sd], elems[1].Obj()["x"_sd]),
-                            deltaInt32(elems[3].Obj()["x"_sd], elems[2].Obj()["x"_sd])},
-                           1);
-    appendSimple8bControl(expected, 0b1000, 0b0000);
-    appendSimple8bBlocks64(expected,
-                           {kDeltaForBinaryEqualValues,
-                            deltaInt32(elems[2].Obj()["y"_sd], elems[1].Obj()["y"_sd]),
-                            deltaInt32(elems[3].Obj()["y"_sd], elems[2].Obj()["y"_sd])},
-                           1);
-    appendEOO(expected);
-    appendEOO(expected);
-
-    auto binData = cb.finalize();
-    verifyBinary(binData, expected);
-    verifyDecompression(binData, elems);
-}
-
-TEST_F(BSONColumnTest, InterleavedLevels) {
-    BSONColumnBuilder cb("test"_sd);
-
-    std::vector<BSONElement> elems = {createElementObj(BSON("root" << BSON("x" << 1) << "y" << 2)),
-                                      createElementObj(BSON("root" << BSON("x" << 2) << "y" << 5)),
-                                      createElementObj(BSON("root" << BSON("x" << 2) << "y" << 5))};
-
-    for (auto elem : elems) {
-        if (!elem.eoo())
-            cb.append(elem);
-        else
-            cb.skip();
-    }
-
-    BufBuilder expected;
-    appendInterleavedStart(expected, elems.front().Obj());
-    appendSimple8bControl(expected, 0b1000, 0b0000);
-    appendSimple8bBlocks64(expected,
-                           {kDeltaForBinaryEqualValues,
-                            deltaInt32(elems[1].Obj()["root"_sd].Obj()["x"_sd],
-                                       elems[0].Obj()["root"_sd].Obj()["x"_sd]),
-                            deltaInt32(elems[2].Obj()["root"_sd].Obj()["x"_sd],
-                                       elems[1].Obj()["root"_sd].Obj()["x"_sd])},
-                           1);
-    appendSimple8bControl(expected, 0b1000, 0b0000);
-    appendSimple8bBlocks64(expected,
-                           {kDeltaForBinaryEqualValues,
-                            deltaInt32(elems[1].Obj()["y"_sd], elems[0].Obj()["y"_sd]),
-                            deltaInt32(elems[2].Obj()["y"_sd], elems[1].Obj()["y"_sd])},
-                           1);
-    appendEOO(expected);
-    appendEOO(expected);
-
-    auto binData = cb.finalize();
-    verifyBinary(binData, expected);
-    verifyDecompression(binData, elems);
-}
-
-TEST_F(BSONColumnTest, InterleavedDoubleDifferentScale) {
-    BSONColumnBuilder cb("test"_sd);
-
-    std::vector<BSONElement> elems = {createElementObj(BSON("x" << 1.0 << "y" << 2.0)),
-                                      createElementObj(BSON("x" << 1.1 << "y" << 3.0)),
-                                      createElementObj(BSON("x" << 1.2 << "y" << 2.0)),
-                                      createElementObj(BSON("x" << 1.0)),
-                                      createElementObj(BSON("x" << 1.5 << "y" << 2.0))};
-
-    for (auto elem : elems) {
-        if (!elem.eoo())
-            cb.append(elem);
-        else
-            cb.skip();
-    }
-
-    BufBuilder expected;
-    appendInterleavedStart(expected, elems.front().Obj());
-    appendSimple8bControl(expected, 0b1010, 0b0000);
-    appendSimple8bBlocks64(expected,
-                           {kDeltaForBinaryEqualValues,
-                            deltaDouble(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd], 10),
-                            deltaDouble(elems[2].Obj()["x"_sd], elems[1].Obj()["x"_sd], 10),
-                            deltaDouble(elems[3].Obj()["x"_sd], elems[2].Obj()["x"_sd], 10),
-                            deltaDouble(elems[4].Obj()["x"_sd], elems[3].Obj()["x"_sd], 10)},
-                           1);
-    appendSimple8bControl(expected, 0b1001, 0b0000);
-    appendSimple8bBlocks64(expected,
-                           {kDeltaForBinaryEqualValues,
-                            deltaDouble(elems[1].Obj()["y"_sd], elems[0].Obj()["y"_sd], 1),
-                            deltaDouble(elems[2].Obj()["y"_sd], elems[1].Obj()["y"_sd], 1),
-                            boost::none,
-                            deltaDouble(elems[4].Obj()["y"_sd], elems[2].Obj()["y"_sd], 1)},
-                           1);
-    appendEOO(expected);
-    appendEOO(expected);
-
-    auto binData = cb.finalize();
-    verifyBinary(binData, expected);
-    verifyDecompression(binData, elems);
-}
-
-TEST_F(BSONColumnTest, InterleavedDoubleIncreaseScaleFromDeltaNoRescale) {
-    BSONColumnBuilder cb("test"_sd);
-
-    std::vector<BSONElement> elems;
-    elems.push_back(createElementObj(BSON("x" << 1.1)));
-    elems.push_back(createElementObj(BSON("x" << 2.1)));
-    elems.push_back(createElementObj(BSON("x" << 2.2)));
-    elems.push_back(createElementObj(BSON("x" << 2.3)));
-    elems.push_back(createElementObj(BSON("x" << 3.12345678)));
-
-    for (const auto& elem : elems) {
         cb.append(elem);
-    }
-
-    BufBuilder expected;
-    appendInterleavedStart(expected, elems.front().Obj());
-
-    appendSimple8bControl(expected, 0b1010, 0b0000);
-    appendSimple8bBlocks64(expected,
-                           {kDeltaForBinaryEqualValues,
-                            deltaDouble(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd], 10),
-                            deltaDouble(elems[2].Obj()["x"_sd], elems[1].Obj()["x"_sd], 10),
-                            deltaDouble(elems[3].Obj()["x"_sd], elems[2].Obj()["x"_sd], 10)},
-                           1);
-    appendSimple8bControl(expected, 0b1101, 0b0000);
-    appendSimple8bBlocks64(
-        expected, {deltaDouble(elems[4].Obj()["x"_sd], elems[3].Obj()["x"_sd], 100000000)}, 1);
-    appendEOO(expected);
-    appendEOO(expected);
-
-    auto binData = cb.finalize();
-    verifyBinary(binData, expected);
-    verifyDecompression(binData, elems);
-}
-
-TEST_F(BSONColumnTest, InterleavedMix64And128Bit) {
-    BSONColumnBuilder cb("test"_sd);
-
-    std::vector<BSONElement> elems = {createElementObj(BSON("x" << 1 << "y"
-                                                                << "count0")),
-                                      createElementObj(BSON("x" << 2 << "y"
-                                                                << "count1")),
-                                      createElementObj(BSON("x" << 3 << "y"
-                                                                << "count2")),
-                                      createElementObj(BSON("x" << 4)),
-                                      createElementObj(BSON("x" << 5 << "y"
-                                                                << "count3"))};
-
-    for (auto elem : elems) {
-        if (!elem.eoo())
-            cb.append(elem);
-        else
-            cb.skip();
-    }
-
-    BufBuilder expected;
-    appendInterleavedStart(expected, elems.front().Obj());
-    appendSimple8bControl(expected, 0b1000, 0b0000);
-    appendSimple8bBlocks64(expected,
-                           {kDeltaForBinaryEqualValues,
-                            deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd]),
-                            deltaInt32(elems[2].Obj()["x"_sd], elems[1].Obj()["x"_sd]),
-                            deltaInt32(elems[3].Obj()["x"_sd], elems[2].Obj()["x"_sd]),
-                            deltaInt32(elems[4].Obj()["x"_sd], elems[3].Obj()["x"_sd])},
-                           1);
-    appendSimple8bControl(expected, 0b1000, 0b0000);
-    appendSimple8bBlocks128(expected,
-                            {kDeltaForBinaryEqualValues128,
-                             deltaString(elems[1].Obj()["y"_sd], elems[0].Obj()["y"_sd]),
-                             deltaString(elems[2].Obj()["y"_sd], elems[1].Obj()["y"_sd]),
-                             boost::none,
-                             deltaString(elems[4].Obj()["y"_sd], elems[2].Obj()["y"_sd])},
-                            1);
-    appendEOO(expected);
-    appendEOO(expected);
-
-    auto binData = cb.finalize();
-    verifyBinary(binData, expected);
-    verifyDecompression(binData, elems);
-}
-
-TEST_F(BSONColumnTest, InterleavedWithEmptySubObj) {
-    BSONColumnBuilder cb("test"_sd);
-
-    std::vector<BSONElement> elems = {
-        createElementObj(BSON("x" << 1 << "y" << BSONObjBuilder().obj())),
-        createElementObj(BSON("x" << 2 << "y" << BSONObjBuilder().obj())),
-        createElementObj(BSON("x" << 3 << "y" << BSONObjBuilder().obj()))};
-
-    for (auto elem : elems) {
-        if (!elem.eoo())
-            cb.append(elem);
-        else
-            cb.skip();
-    }
-
-    BufBuilder expected;
-    appendInterleavedStart(expected, elems.front().Obj());
-    appendSimple8bControl(expected, 0b1000, 0b0000);
-    appendSimple8bBlocks64(expected,
-                           {kDeltaForBinaryEqualValues,
-                            deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd]),
-                            deltaInt32(elems[2].Obj()["x"_sd], elems[1].Obj()["x"_sd])},
-                           1);
-    appendEOO(expected);
-    appendEOO(expected);
-
-    auto binData = cb.finalize();
-    verifyBinary(binData, expected);
-    verifyDecompression(binData, elems);
-}
-
-TEST_F(BSONColumnTest, InterleavedRemoveEmptySubObj) {
-    BSONColumnBuilder cb("test"_sd);
-
-    std::vector<BSONElement> elems = {
-        createElementObj(BSON("x" << 1 << "y" << BSONObjBuilder().obj())),
-        createElementObj(BSON("x" << 2 << "y" << BSONObjBuilder().obj())),
-        createElementObj(BSON("x" << 3))};
-
-    for (auto elem : elems) {
-        if (!elem.eoo())
-            cb.append(elem);
-        else
-            cb.skip();
     }
 
     BufBuilder expected;
@@ -2749,11 +2532,72 @@ TEST_F(BSONColumnTest, InterleavedRemoveEmptySubObj) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+        {kDeltaForBinaryEqualValues,
+         deltaInt32(elems[1].Obj()["x"_sd].Array()[0], elems[0].Obj()["x"_sd].Array()[0])},
+        1);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(
+        expected,
+        {kDeltaForBinaryEqualValues,
+         deltaInt32(elems[1].Obj()["x"_sd].Array()[1], elems[0].Obj()["x"_sd].Array()[1])},
         1);
     appendEOO(expected);
+    appendEOO(expected);
 
-    appendInterleavedStart(expected, elems[2].Obj());
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems);
+}
+
+TEST_F(BSONColumnTest, InterleavedArrayRoot) {
+    BSONColumnBuilder cb("test"_sd, true);
+    std::vector<BSONElement> elems = {createElementArray(BSON_ARRAY(1 << 2)),
+                                      createElementArray(BSON_ARRAY(2 << 3))};
+
+    for (auto elem : elems) {
+        cb.append(elem);
+    }
+
+    BufBuilder expected;
+    appendInterleavedStartArrayRoot(expected, elems.front().Obj());
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(
+        expected,
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Array()[0], elems[0].Array()[0])},
+        1);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(
+        expected,
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Array()[1], elems[0].Array()[1])},
+        1);
+    appendEOO(expected);
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems);
+}
+
+TEST_F(BSONColumnTest, InterleavedArrayRootTypeChange) {
+    BSONColumnBuilder cb("test"_sd, true);
+    std::vector<BSONElement> elems = {createElementArray(BSON_ARRAY(1 << 2)),
+                                      createElementArrayAsObject(BSON_ARRAY(2 << 3))};
+
+    for (auto elem : elems) {
+        cb.append(elem);
+    }
+
+    BufBuilder expected;
+    appendInterleavedStartArrayRoot(expected, elems.front().Obj());
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+    appendEOO(expected);
+
+    appendInterleavedStart(expected, elems[1].Obj());
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
     appendEOO(expected);
@@ -2765,12 +2609,351 @@ TEST_F(BSONColumnTest, InterleavedRemoveEmptySubObj) {
     verifyDecompression(binData, elems);
 }
 
+TEST_F(BSONColumnTest, InterleavedAfterNonInterleaved) {
+    auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
+        BSONColumnBuilder cb("test"_sd, arrayCompression);
+
+        std::vector<BSONElement> elems = {createElementInt32(1),
+                                          createElementObj(BSON("x" << 1 << "y" << 2)),
+                                          createElementObj(BSON("x" << 1 << "y" << 3)),
+                                          createElementObj(BSON("x" << 2 << "y" << 4))};
+
+        for (auto elem : elems) {
+            if (!elem.eoo())
+                cb.append(elem);
+            else
+                cb.skip();
+        }
+
+        BufBuilder expected;
+        appendLiteral(expected, elems.front());
+        appendInterleavedStartFunc(expected, elems[1].Obj());
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected,
+                               {kDeltaForBinaryEqualValues,
+                                deltaInt32(elems[2].Obj()["x"_sd], elems[1].Obj()["x"_sd]),
+                                deltaInt32(elems[3].Obj()["x"_sd], elems[2].Obj()["x"_sd])},
+                               1);
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected,
+                               {kDeltaForBinaryEqualValues,
+                                deltaInt32(elems[2].Obj()["y"_sd], elems[1].Obj()["y"_sd]),
+                                deltaInt32(elems[3].Obj()["y"_sd], elems[2].Obj()["y"_sd])},
+                               1);
+        appendEOO(expected);
+        appendEOO(expected);
+
+        auto binData = cb.finalize();
+        verifyBinary(binData, expected);
+        verifyDecompression(binData, elems);
+    };
+
+    test(false, appendInterleavedStartLegacy);
+    test(true, appendInterleavedStart);
+}
+
+TEST_F(BSONColumnTest, InterleavedLevels) {
+    auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
+        BSONColumnBuilder cb("test"_sd, arrayCompression);
+
+        std::vector<BSONElement> elems = {
+            createElementObj(BSON("root" << BSON("x" << 1) << "y" << 2)),
+            createElementObj(BSON("root" << BSON("x" << 2) << "y" << 5)),
+            createElementObj(BSON("root" << BSON("x" << 2) << "y" << 5))};
+
+        for (auto elem : elems) {
+            if (!elem.eoo())
+                cb.append(elem);
+            else
+                cb.skip();
+        }
+
+        BufBuilder expected;
+        appendInterleavedStartFunc(expected, elems.front().Obj());
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected,
+                               {kDeltaForBinaryEqualValues,
+                                deltaInt32(elems[1].Obj()["root"_sd].Obj()["x"_sd],
+                                           elems[0].Obj()["root"_sd].Obj()["x"_sd]),
+                                deltaInt32(elems[2].Obj()["root"_sd].Obj()["x"_sd],
+                                           elems[1].Obj()["root"_sd].Obj()["x"_sd])},
+                               1);
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected,
+                               {kDeltaForBinaryEqualValues,
+                                deltaInt32(elems[1].Obj()["y"_sd], elems[0].Obj()["y"_sd]),
+                                deltaInt32(elems[2].Obj()["y"_sd], elems[1].Obj()["y"_sd])},
+                               1);
+        appendEOO(expected);
+        appendEOO(expected);
+
+        auto binData = cb.finalize();
+        verifyBinary(binData, expected);
+        verifyDecompression(binData, elems);
+    };
+
+    test(false, appendInterleavedStartLegacy);
+    test(true, appendInterleavedStart);
+}
+
+TEST_F(BSONColumnTest, InterleavedDoubleDifferentScale) {
+    auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
+        BSONColumnBuilder cb("test"_sd, arrayCompression);
+
+        std::vector<BSONElement> elems = {createElementObj(BSON("x" << 1.0 << "y" << 2.0)),
+                                          createElementObj(BSON("x" << 1.1 << "y" << 3.0)),
+                                          createElementObj(BSON("x" << 1.2 << "y" << 2.0)),
+                                          createElementObj(BSON("x" << 1.0)),
+                                          createElementObj(BSON("x" << 1.5 << "y" << 2.0))};
+
+        for (auto elem : elems) {
+            if (!elem.eoo())
+                cb.append(elem);
+            else
+                cb.skip();
+        }
+
+        BufBuilder expected;
+        appendInterleavedStartFunc(expected, elems.front().Obj());
+        appendSimple8bControl(expected, 0b1010, 0b0000);
+        appendSimple8bBlocks64(expected,
+                               {kDeltaForBinaryEqualValues,
+                                deltaDouble(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd], 10),
+                                deltaDouble(elems[2].Obj()["x"_sd], elems[1].Obj()["x"_sd], 10),
+                                deltaDouble(elems[3].Obj()["x"_sd], elems[2].Obj()["x"_sd], 10),
+                                deltaDouble(elems[4].Obj()["x"_sd], elems[3].Obj()["x"_sd], 10)},
+                               1);
+        appendSimple8bControl(expected, 0b1001, 0b0000);
+        appendSimple8bBlocks64(expected,
+                               {kDeltaForBinaryEqualValues,
+                                deltaDouble(elems[1].Obj()["y"_sd], elems[0].Obj()["y"_sd], 1),
+                                deltaDouble(elems[2].Obj()["y"_sd], elems[1].Obj()["y"_sd], 1),
+                                boost::none,
+                                deltaDouble(elems[4].Obj()["y"_sd], elems[2].Obj()["y"_sd], 1)},
+                               1);
+        appendEOO(expected);
+        appendEOO(expected);
+
+        auto binData = cb.finalize();
+        verifyBinary(binData, expected);
+        verifyDecompression(binData, elems);
+    };
+
+    test(false, appendInterleavedStartLegacy);
+    test(true, appendInterleavedStart);
+}
+
+TEST_F(BSONColumnTest, InterleavedDoubleIncreaseScaleFromDeltaNoRescale) {
+    auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
+        BSONColumnBuilder cb("test"_sd, arrayCompression);
+
+        std::vector<BSONElement> elems;
+        elems.push_back(createElementObj(BSON("x" << 1.1)));
+        elems.push_back(createElementObj(BSON("x" << 2.1)));
+        elems.push_back(createElementObj(BSON("x" << 2.2)));
+        elems.push_back(createElementObj(BSON("x" << 2.3)));
+        elems.push_back(createElementObj(BSON("x" << 3.12345678)));
+
+        for (const auto& elem : elems) {
+            cb.append(elem);
+        }
+
+        BufBuilder expected;
+        appendInterleavedStartFunc(expected, elems.front().Obj());
+
+        appendSimple8bControl(expected, 0b1010, 0b0000);
+        appendSimple8bBlocks64(expected,
+                               {kDeltaForBinaryEqualValues,
+                                deltaDouble(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd], 10),
+                                deltaDouble(elems[2].Obj()["x"_sd], elems[1].Obj()["x"_sd], 10),
+                                deltaDouble(elems[3].Obj()["x"_sd], elems[2].Obj()["x"_sd], 10)},
+                               1);
+        appendSimple8bControl(expected, 0b1101, 0b0000);
+        appendSimple8bBlocks64(
+            expected, {deltaDouble(elems[4].Obj()["x"_sd], elems[3].Obj()["x"_sd], 100000000)}, 1);
+        appendEOO(expected);
+        appendEOO(expected);
+
+        auto binData = cb.finalize();
+        verifyBinary(binData, expected);
+        verifyDecompression(binData, elems);
+    };
+
+    test(false, appendInterleavedStartLegacy);
+    test(true, appendInterleavedStart);
+}
+
+TEST_F(BSONColumnTest, InterleavedMix64And128Bit) {
+    auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
+        BSONColumnBuilder cb("test"_sd, arrayCompression);
+
+        std::vector<BSONElement> elems = {createElementObj(BSON("x" << 1 << "y"
+                                                                    << "count0")),
+                                          createElementObj(BSON("x" << 2 << "y"
+                                                                    << "count1")),
+                                          createElementObj(BSON("x" << 3 << "y"
+                                                                    << "count2")),
+                                          createElementObj(BSON("x" << 4)),
+                                          createElementObj(BSON("x" << 5 << "y"
+                                                                    << "count3"))};
+
+        for (auto elem : elems) {
+            if (!elem.eoo())
+                cb.append(elem);
+            else
+                cb.skip();
+        }
+
+        BufBuilder expected;
+        appendInterleavedStartFunc(expected, elems.front().Obj());
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected,
+                               {kDeltaForBinaryEqualValues,
+                                deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd]),
+                                deltaInt32(elems[2].Obj()["x"_sd], elems[1].Obj()["x"_sd]),
+                                deltaInt32(elems[3].Obj()["x"_sd], elems[2].Obj()["x"_sd]),
+                                deltaInt32(elems[4].Obj()["x"_sd], elems[3].Obj()["x"_sd])},
+                               1);
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks128(expected,
+                                {kDeltaForBinaryEqualValues128,
+                                 deltaString(elems[1].Obj()["y"_sd], elems[0].Obj()["y"_sd]),
+                                 deltaString(elems[2].Obj()["y"_sd], elems[1].Obj()["y"_sd]),
+                                 boost::none,
+                                 deltaString(elems[4].Obj()["y"_sd], elems[2].Obj()["y"_sd])},
+                                1);
+        appendEOO(expected);
+        appendEOO(expected);
+
+        auto binData = cb.finalize();
+        verifyBinary(binData, expected);
+        verifyDecompression(binData, elems);
+    };
+
+    test(false, appendInterleavedStartLegacy);
+    test(true, appendInterleavedStart);
+}
+
+TEST_F(BSONColumnTest, InterleavedWithEmptySubObj) {
+    auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
+        BSONColumnBuilder cb("test"_sd, arrayCompression);
+
+        std::vector<BSONElement> elems = {
+            createElementObj(BSON("x" << 1 << "y" << BSONObjBuilder().obj())),
+            createElementObj(BSON("x" << 2 << "y" << BSONObjBuilder().obj())),
+            createElementObj(BSON("x" << 3 << "y" << BSONObjBuilder().obj()))};
+
+        for (auto elem : elems) {
+            if (!elem.eoo())
+                cb.append(elem);
+            else
+                cb.skip();
+        }
+
+        BufBuilder expected;
+        appendInterleavedStartFunc(expected, elems.front().Obj());
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected,
+                               {kDeltaForBinaryEqualValues,
+                                deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd]),
+                                deltaInt32(elems[2].Obj()["x"_sd], elems[1].Obj()["x"_sd])},
+                               1);
+        appendEOO(expected);
+        appendEOO(expected);
+
+        auto binData = cb.finalize();
+        verifyBinary(binData, expected);
+        verifyDecompression(binData, elems);
+    };
+
+    test(false, appendInterleavedStartLegacy);
+    test(true, appendInterleavedStart);
+}
+
+TEST_F(BSONColumnTest, InterleavedRemoveEmptySubObj) {
+    auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
+        BSONColumnBuilder cb("test"_sd, arrayCompression);
+
+        std::vector<BSONElement> elems = {
+            createElementObj(BSON("x" << 1 << "y" << BSONObjBuilder().obj())),
+            createElementObj(BSON("x" << 2 << "y" << BSONObjBuilder().obj())),
+            createElementObj(BSON("x" << 3))};
+
+        for (auto elem : elems) {
+            if (!elem.eoo())
+                cb.append(elem);
+            else
+                cb.skip();
+        }
+
+        BufBuilder expected;
+        appendInterleavedStartFunc(expected, elems.front().Obj());
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected,
+                               {kDeltaForBinaryEqualValues,
+                                deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+                               1);
+        appendEOO(expected);
+
+        appendInterleavedStartFunc(expected, elems[2].Obj());
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+        appendEOO(expected);
+
+        appendEOO(expected);
+
+        auto binData = cb.finalize();
+        verifyBinary(binData, expected);
+        verifyDecompression(binData, elems);
+    };
+
+    test(false, appendInterleavedStartLegacy);
+    test(true, appendInterleavedStart);
+}
+
 TEST_F(BSONColumnTest, InterleavedAddEmptySubObj) {
-    BSONColumnBuilder cb("test"_sd);
+    auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
+        BSONColumnBuilder cb("test"_sd, arrayCompression);
+
+        std::vector<BSONElement> elems = {
+            createElementObj(BSON("x" << 3)),
+            createElementObj(BSON("x" << 1 << "y" << BSONObjBuilder().obj()))};
+
+        for (auto elem : elems) {
+            if (!elem.eoo())
+                cb.append(elem);
+            else
+                cb.skip();
+        }
+
+        BufBuilder expected;
+        appendInterleavedStartFunc(expected, elems.front().Obj());
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+        appendEOO(expected);
+
+        appendInterleavedStartFunc(expected, elems[1].Obj());
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+        appendEOO(expected);
+
+        appendEOO(expected);
+
+        auto binData = cb.finalize();
+        verifyBinary(binData, expected);
+        verifyDecompression(binData, elems);
+    };
+
+    test(false, appendInterleavedStartLegacy);
+    test(true, appendInterleavedStart);
+}
+
+TEST_F(BSONColumnTest, InterleavedAddEmptySubArray) {
+    BSONColumnBuilder cb("test"_sd, true);
 
     std::vector<BSONElement> elems = {
         createElementObj(BSON("x" << 3)),
-        createElementObj(BSON("x" << 1 << "y" << BSONObjBuilder().obj()))};
+        createElementObj(BSON("x" << 1 << "y" << BSONArrayBuilder().arr()))};
 
     for (auto elem : elems) {
         if (!elem.eoo())
@@ -2798,129 +2981,191 @@ TEST_F(BSONColumnTest, InterleavedAddEmptySubObj) {
 }
 
 TEST_F(BSONColumnTest, InterleavedSchemaChange) {
-    BSONColumnBuilder cb("test"_sd);
+    auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
+        BSONColumnBuilder cb("test"_sd, arrayCompression);
 
-    std::vector<BSONElement> elems = {createElementObj(BSON("x" << 1 << "y" << 2)),
-                                      createElementObj(BSON("x" << 1 << "y" << 3)),
-                                      createElementObj(BSON("x" << 1 << "y" << 3.0)),
-                                      createElementObj(BSON("x" << 1 << "y" << 4.0))};
+        std::vector<BSONElement> elems = {createElementObj(BSON("x" << 1 << "y" << 2)),
+                                          createElementObj(BSON("x" << 1 << "y" << 3)),
+                                          createElementObj(BSON("x" << 1 << "y" << 3.0)),
+                                          createElementObj(BSON("x" << 1 << "y" << 4.0))};
 
-    for (auto elem : elems) {
-        if (!elem.eoo())
-            cb.append(elem);
-        else
-            cb.skip();
-    }
+        for (auto elem : elems) {
+            if (!elem.eoo())
+                cb.append(elem);
+            else
+                cb.skip();
+        }
 
-    BufBuilder expected;
-    appendInterleavedStart(expected, elems.front().Obj());
-    appendSimple8bControl(expected, 0b1000, 0b0000);
-    appendSimple8bBlocks64(expected,
-                           {kDeltaForBinaryEqualValues,
-                            deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd]),
-                            deltaInt32(elems[2].Obj()["x"_sd], elems[1].Obj()["x"_sd]),
-                            deltaInt32(elems[3].Obj()["x"_sd], elems[2].Obj()["x"_sd])},
-                           1);
-    appendSimple8bControl(expected, 0b1000, 0b0000);
-    appendSimple8bBlocks64(
-        expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["y"_sd], elems[0].Obj()["y"_sd])},
-        1);
-    appendLiteral(expected, elems[2].Obj()["y"_sd]);
-    appendSimple8bControl(expected, 0b1001, 0b0000);
-    appendSimple8bBlocks64(
-        expected, {deltaDouble(elems[3].Obj()["y"_sd], elems[2].Obj()["y"_sd], 1)}, 1);
-    appendEOO(expected);
-    appendEOO(expected);
+        BufBuilder expected;
+        appendInterleavedStartFunc(expected, elems.front().Obj());
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected,
+                               {kDeltaForBinaryEqualValues,
+                                deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd]),
+                                deltaInt32(elems[2].Obj()["x"_sd], elems[1].Obj()["x"_sd]),
+                                deltaInt32(elems[3].Obj()["x"_sd], elems[2].Obj()["x"_sd])},
+                               1);
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected,
+                               {kDeltaForBinaryEqualValues,
+                                deltaInt32(elems[1].Obj()["y"_sd], elems[0].Obj()["y"_sd])},
+                               1);
+        appendLiteral(expected, elems[2].Obj()["y"_sd]);
+        appendSimple8bControl(expected, 0b1001, 0b0000);
+        appendSimple8bBlocks64(
+            expected, {deltaDouble(elems[3].Obj()["y"_sd], elems[2].Obj()["y"_sd], 1)}, 1);
+        appendEOO(expected);
+        appendEOO(expected);
 
-    auto binData = cb.finalize();
-    verifyBinary(binData, expected);
-    verifyDecompression(binData, elems);
+        auto binData = cb.finalize();
+        verifyBinary(binData, expected);
+        verifyDecompression(binData, elems);
+    };
+
+    test(false, appendInterleavedStartLegacy);
+    test(true, appendInterleavedStart);
 }
 
 TEST_F(BSONColumnTest, InterleavedObjectSchemaChange) {
-    BSONColumnBuilder cb("test"_sd);
+    auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
+        BSONColumnBuilder cb("test"_sd, arrayCompression);
 
-    std::vector<BSONElement> elems = {createElementObj(BSON("x" << 1 << "y" << BSON("z" << 2))),
-                                      createElementObj(BSON("x" << 1 << "y" << BSON("z" << 3))),
-                                      createElementObj(BSON("x" << 1 << "y" << 3))};
+        std::vector<BSONElement> elems = {createElementObj(BSON("x" << 1 << "y" << BSON("z" << 2))),
+                                          createElementObj(BSON("x" << 1 << "y" << BSON("z" << 3))),
+                                          createElementObj(BSON("x" << 1 << "y" << 3))};
 
-    for (auto elem : elems) {
-        if (!elem.eoo())
-            cb.append(elem);
-        else
-            cb.skip();
-    }
+        for (auto elem : elems) {
+            if (!elem.eoo())
+                cb.append(elem);
+            else
+                cb.skip();
+        }
 
-    BufBuilder expected;
-    appendInterleavedStart(expected, elems.front().Obj());
-    appendSimple8bControl(expected, 0b1000, 0b0000);
-    appendSimple8bBlocks64(
-        expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
-        1);
-    appendSimple8bControl(expected, 0b1000, 0b0000);
-    appendSimple8bBlocks64(
-        expected,
-        {kDeltaForBinaryEqualValues,
-         deltaInt32(elems[1].Obj()["y"_sd].Obj()["z"_sd], elems[0].Obj()["y"_sd].Obj()["z"_sd])},
-        1);
-    appendEOO(expected);
+        BufBuilder expected;
+        appendInterleavedStartFunc(expected, elems.front().Obj());
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected,
+                               {kDeltaForBinaryEqualValues,
+                                deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+                               1);
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected,
+                               {kDeltaForBinaryEqualValues,
+                                deltaInt32(elems[1].Obj()["y"_sd].Obj()["z"_sd],
+                                           elems[0].Obj()["y"_sd].Obj()["z"_sd])},
+                               1);
+        appendEOO(expected);
 
-    appendInterleavedStart(expected, elems[2].Obj());
-    appendSimple8bControl(expected, 0b1000, 0b0000);
-    appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
-    appendSimple8bControl(expected, 0b1000, 0b0000);
-    appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
-    appendEOO(expected);
-    appendEOO(expected);
+        appendInterleavedStartFunc(expected, elems[2].Obj());
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+        appendEOO(expected);
+        appendEOO(expected);
 
-    auto binData = cb.finalize();
-    verifyBinary(binData, expected);
-    verifyDecompression(binData, elems);
+        auto binData = cb.finalize();
+        verifyBinary(binData, expected);
+        verifyDecompression(binData, elems);
+    };
+
+    test(false, appendInterleavedStartLegacy);
+    test(true, appendInterleavedStart);
 }
 
 TEST_F(BSONColumnTest, InterleavedObjectNameChange) {
-    BSONColumnBuilder cb("test"_sd);
+    auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
+        BSONColumnBuilder cb("test"_sd, arrayCompression);
 
-    std::vector<BSONElement> elems = {createElementObj(BSON("x" << 1 << "y" << BSON("z" << 2))),
-                                      createElementObj(BSON("x" << 1 << "y2" << BSON("z" << 3)))};
+        std::vector<BSONElement> elems = {
+            createElementObj(BSON("x" << 1 << "y" << BSON("z" << 2))),
+            createElementObj(BSON("x" << 1 << "y2" << BSON("z" << 3)))};
 
-    for (auto elem : elems) {
-        if (!elem.eoo())
-            cb.append(elem);
-        else
-            cb.skip();
-    }
+        for (auto elem : elems) {
+            if (!elem.eoo())
+                cb.append(elem);
+            else
+                cb.skip();
+        }
 
-    BufBuilder expected;
-    appendInterleavedStart(expected,
-                           BSON("x" << 1 << "y" << BSON("z" << 2) << "y2" << BSON("z" << 3)));
-    appendSimple8bControl(expected, 0b1000, 0b0000);
-    appendSimple8bBlocks64(
-        expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
-        1);
-    appendSimple8bControl(expected, 0b1000, 0b0000);
-    appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues, boost::none}, 1);
-    appendSimple8bControl(expected, 0b1000, 0b0000);
-    appendSimple8bBlocks64(expected, {boost::none, kDeltaForBinaryEqualValues}, 1);
-    appendEOO(expected);
+        BufBuilder expected;
+        appendInterleavedStartFunc(
+            expected, BSON("x" << 1 << "y" << BSON("z" << 2) << "y2" << BSON("z" << 3)));
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected,
+                               {kDeltaForBinaryEqualValues,
+                                deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+                               1);
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues, boost::none}, 1);
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected, {boost::none, kDeltaForBinaryEqualValues}, 1);
+        appendEOO(expected);
 
-    appendEOO(expected);
+        appendEOO(expected);
 
-    auto binData = cb.finalize();
-    verifyBinary(binData, expected);
-    verifyDecompression(binData, elems);
+        auto binData = cb.finalize();
+        verifyBinary(binData, expected);
+        verifyDecompression(binData, elems);
+    };
+
+    test(false, appendInterleavedStartLegacy);
+    test(true, appendInterleavedStart);
 }
 
 TEST_F(BSONColumnTest, InterleavedObjectEmptyObjChange) {
-    BSONColumnBuilder cb("test"_sd);
+    auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
+        BSONColumnBuilder cb("test"_sd, arrayCompression);
+
+        std::vector<BSONElement> elems = {
+            createElementObj(BSON("x" << 1 << "y" << BSON("z" << 2))),
+            createElementObj(BSON("x" << 1 << "y" << BSON("z" << 3))),
+            createElementObj(BSON("x" << 1 << "y" << BSONObjBuilder().obj()))};
+
+        for (auto elem : elems) {
+            if (!elem.eoo())
+                cb.append(elem);
+            else
+                cb.skip();
+        }
+
+        BufBuilder expected;
+        appendInterleavedStartFunc(expected, elems.front().Obj());
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected,
+                               {kDeltaForBinaryEqualValues,
+                                deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+                               1);
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected,
+                               {kDeltaForBinaryEqualValues,
+                                deltaInt32(elems[1].Obj()["y"_sd].Obj()["z"_sd],
+                                           elems[0].Obj()["y"_sd].Obj()["z"_sd])},
+                               1);
+        appendEOO(expected);
+
+        appendInterleavedStartFunc(expected, elems[2].Obj());
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+        appendEOO(expected);
+        appendEOO(expected);
+
+        auto binData = cb.finalize();
+        verifyBinary(binData, expected);
+        verifyDecompression(binData, elems);
+    };
+
+    test(false, appendInterleavedStartLegacy);
+    test(true, appendInterleavedStart);
+}
+
+TEST_F(BSONColumnTest, InterleavedObjectEmptyArrayChange) {
+    BSONColumnBuilder cb("test"_sd, true);
 
     std::vector<BSONElement> elems = {
         createElementObj(BSON("x" << 1 << "y" << BSON("z" << 2))),
         createElementObj(BSON("x" << 1 << "y" << BSON("z" << 3))),
-        createElementObj(BSON("x" << 1 << "y" << BSONObjBuilder().obj()))};
+        createElementObj(BSON("x" << 1 << "y" << BSONArrayBuilder().arr()))};
 
     for (auto elem : elems) {
         if (!elem.eoo())
@@ -2956,12 +3201,60 @@ TEST_F(BSONColumnTest, InterleavedObjectEmptyObjChange) {
 }
 
 TEST_F(BSONColumnTest, InterleavedObjectNewEmptyObjMiddle) {
-    BSONColumnBuilder cb("test"_sd);
+    auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
+        BSONColumnBuilder cb("test"_sd, arrayCompression);
+
+        std::vector<BSONElement> elems = {
+            createElementObj(BSON("x" << 1 << "z" << 2)),
+            createElementObj(BSON("x" << 1 << "z" << 3)),
+            createElementObj(BSON("x" << 1 << "y" << BSONObjBuilder().obj() << "z" << 4))};
+
+        for (auto elem : elems) {
+            if (!elem.eoo())
+                cb.append(elem);
+            else
+                cb.skip();
+        }
+
+        BufBuilder expected;
+        appendInterleavedStartFunc(expected, elems.front().Obj());
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected,
+                               {kDeltaForBinaryEqualValues,
+                                deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+                               1);
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected,
+                               {kDeltaForBinaryEqualValues,
+                                deltaInt32(elems[1].Obj()["z"_sd], elems[0].Obj()["z"_sd])},
+                               1);
+        appendEOO(expected);
+
+        appendInterleavedStartFunc(expected, elems[2].Obj());
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+        appendEOO(expected);
+
+        appendEOO(expected);
+
+        auto binData = cb.finalize();
+        verifyBinary(binData, expected);
+        verifyDecompression(binData, elems);
+    };
+
+    test(false, appendInterleavedStartLegacy);
+    test(true, appendInterleavedStart);
+}
+
+TEST_F(BSONColumnTest, InterleavedObjectNewEmptyArrayMiddle) {
+    BSONColumnBuilder cb("test"_sd, true);
 
     std::vector<BSONElement> elems = {
         createElementObj(BSON("x" << 1 << "z" << 2)),
         createElementObj(BSON("x" << 1 << "z" << 3)),
-        createElementObj(BSON("x" << 1 << "y" << BSONObjBuilder().obj() << "z" << 4))};
+        createElementObj(BSON("x" << 1 << "y" << BSONArrayBuilder().arr() << "z" << 4))};
 
     for (auto elem : elems) {
         if (!elem.eoo())
@@ -2999,13 +3292,62 @@ TEST_F(BSONColumnTest, InterleavedObjectNewEmptyObjMiddle) {
 }
 
 TEST_F(BSONColumnTest, InterleavedObjectNewEmptyObjUnderObj) {
-    BSONColumnBuilder cb("test"_sd);
+    auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
+        BSONColumnBuilder cb("test"_sd, arrayCompression);
+
+        std::vector<BSONElement> elems = {
+            createElementObj(BSON("x" << 1 << "z" << 2)),
+            createElementObj(BSON("x" << 1 << "z" << 3)),
+            createElementObj(
+                BSON("x" << 1 << "y" << BSON("y1" << BSONObjBuilder().obj()) << "z" << 4))};
+
+        for (auto elem : elems) {
+            if (!elem.eoo())
+                cb.append(elem);
+            else
+                cb.skip();
+        }
+
+        BufBuilder expected;
+        appendInterleavedStartFunc(expected, elems.front().Obj());
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected,
+                               {kDeltaForBinaryEqualValues,
+                                deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+                               1);
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected,
+                               {kDeltaForBinaryEqualValues,
+                                deltaInt32(elems[1].Obj()["z"_sd], elems[0].Obj()["z"_sd])},
+                               1);
+        appendEOO(expected);
+
+        appendInterleavedStartFunc(expected, elems[2].Obj());
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+        appendEOO(expected);
+
+        appendEOO(expected);
+
+        auto binData = cb.finalize();
+        verifyBinary(binData, expected);
+        verifyDecompression(binData, elems);
+    };
+
+    test(false, appendInterleavedStartLegacy);
+    test(true, appendInterleavedStart);
+}
+
+TEST_F(BSONColumnTest, InterleavedObjectNewEmptyArrayUnderObj) {
+    BSONColumnBuilder cb("test"_sd, true);
 
     std::vector<BSONElement> elems = {
         createElementObj(BSON("x" << 1 << "z" << 2)),
         createElementObj(BSON("x" << 1 << "z" << 3)),
         createElementObj(
-            BSON("x" << 1 << "y" << BSON("y1" << BSONObjBuilder().obj()) << "z" << 4))};
+            BSON("x" << 1 << "y" << BSON("y1" << BSONArrayBuilder().arr()) << "z" << 4))};
 
     for (auto elem : elems) {
         if (!elem.eoo())
@@ -3043,12 +3385,60 @@ TEST_F(BSONColumnTest, InterleavedObjectNewEmptyObjUnderObj) {
 }
 
 TEST_F(BSONColumnTest, InterleavedObjectNewEmptyObjEnd) {
-    BSONColumnBuilder cb("test"_sd);
+    auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
+        BSONColumnBuilder cb("test"_sd, arrayCompression);
+
+        std::vector<BSONElement> elems = {
+            createElementObj(BSON("x" << 1 << "y" << 2)),
+            createElementObj(BSON("x" << 1 << "y" << 3)),
+            createElementObj(BSON("x" << 1 << "y" << 4 << "z" << BSONObjBuilder().obj()))};
+
+        for (auto elem : elems) {
+            if (!elem.eoo())
+                cb.append(elem);
+            else
+                cb.skip();
+        }
+
+        BufBuilder expected;
+        appendInterleavedStartFunc(expected, elems.front().Obj());
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected,
+                               {kDeltaForBinaryEqualValues,
+                                deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+                               1);
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected,
+                               {kDeltaForBinaryEqualValues,
+                                deltaInt32(elems[1].Obj()["y"_sd], elems[0].Obj()["y"_sd])},
+                               1);
+        appendEOO(expected);
+
+        appendInterleavedStartFunc(expected, elems[2].Obj());
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+        appendEOO(expected);
+
+        appendEOO(expected);
+
+        auto binData = cb.finalize();
+        verifyBinary(binData, expected);
+        verifyDecompression(binData, elems);
+    };
+
+    test(false, appendInterleavedStartLegacy);
+    test(true, appendInterleavedStart);
+}
+
+TEST_F(BSONColumnTest, InterleavedObjectNewEmptyArrayEnd) {
+    BSONColumnBuilder cb("test"_sd, true);
 
     std::vector<BSONElement> elems = {
         createElementObj(BSON("x" << 1 << "y" << 2)),
         createElementObj(BSON("x" << 1 << "y" << 3)),
-        createElementObj(BSON("x" << 1 << "y" << 4 << "z" << BSONObjBuilder().obj()))};
+        createElementObj(BSON("x" << 1 << "y" << 4 << "z" << BSONArrayBuilder().arr()))};
 
     for (auto elem : elems) {
         if (!elem.eoo())
@@ -3086,13 +3476,106 @@ TEST_F(BSONColumnTest, InterleavedObjectNewEmptyObjEnd) {
 }
 
 TEST_F(BSONColumnTest, InterleavedObjectNewEmptyObjUnderObjEnd) {
-    BSONColumnBuilder cb("test"_sd);
+    auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
+        BSONColumnBuilder cb("test"_sd, arrayCompression);
+
+        std::vector<BSONElement> elems = {
+            createElementObj(BSON("x" << 1 << "y" << 2)),
+            createElementObj(BSON("x" << 1 << "y" << 3)),
+            createElementObj(
+                BSON("x" << 1 << "y" << 4 << "z" << BSON("z1" << BSONObjBuilder().obj())))};
+
+        for (auto elem : elems) {
+            if (!elem.eoo())
+                cb.append(elem);
+            else
+                cb.skip();
+        }
+
+        BufBuilder expected;
+        appendInterleavedStartFunc(expected, elems.front().Obj());
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected,
+                               {kDeltaForBinaryEqualValues,
+                                deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+                               1);
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected,
+                               {kDeltaForBinaryEqualValues,
+                                deltaInt32(elems[1].Obj()["y"_sd], elems[0].Obj()["y"_sd])},
+                               1);
+        appendEOO(expected);
+
+        appendInterleavedStartFunc(expected, elems[2].Obj());
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+        appendEOO(expected);
+
+        appendEOO(expected);
+
+        auto binData = cb.finalize();
+        verifyBinary(binData, expected);
+        verifyDecompression(binData, elems);
+    };
+
+    test(false, appendInterleavedStartLegacy);
+    test(true, appendInterleavedStart);
+}
+
+TEST_F(BSONColumnTest, InterleavedObjectNewEmptyArrayUnderObjEnd) {
+    BSONColumnBuilder cb("test"_sd, true);
 
     std::vector<BSONElement> elems = {
         createElementObj(BSON("x" << 1 << "y" << 2)),
         createElementObj(BSON("x" << 1 << "y" << 3)),
         createElementObj(
-            BSON("x" << 1 << "y" << 4 << "z" << BSON("z1" << BSONObjBuilder().obj())))};
+            BSON("x" << 1 << "y" << 4 << "z" << BSON("z1" << BSONArrayBuilder().arr())))};
+
+    for (auto elem : elems) {
+        if (!elem.eoo())
+            cb.append(elem);
+        else
+            cb.skip();
+    }
+
+    BufBuilder expected;
+    appendInterleavedStart(expected, elems.front().Obj());
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(
+        expected,
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+        1);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(
+        expected,
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["y"_sd], elems[0].Obj()["y"_sd])},
+        1);
+    appendEOO(expected);
+
+    appendInterleavedStart(expected, elems[2].Obj());
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+    appendEOO(expected);
+
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems);
+}
+
+TEST_F(BSONColumnTest, InterleavedObjectNewEmptyArrayUnderArrayEnd) {
+    BSONColumnBuilder cb("test"_sd, true);
+
+    std::vector<BSONElement> elems = {
+        createElementObj(BSON("x" << 1 << "y" << 2)),
+        createElementObj(BSON("x" << 1 << "y" << 3)),
+        createElementObj(
+            BSON("x" << 1 << "y" << 4 << "z" << BSON_ARRAY(BSONArrayBuilder().arr())))};
 
     for (auto elem : elems) {
         if (!elem.eoo())
@@ -3130,11 +3613,59 @@ TEST_F(BSONColumnTest, InterleavedObjectNewEmptyObjUnderObjEnd) {
 }
 
 TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyObjMiddle) {
-    BSONColumnBuilder cb("test"_sd);
+    auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
+        BSONColumnBuilder cb("test"_sd, arrayCompression);
+
+        std::vector<BSONElement> elems = {
+            createElementObj(BSON("x" << 1 << "y" << BSONObjBuilder().obj() << "z" << 2)),
+            createElementObj(BSON("x" << 1 << "y" << BSONObjBuilder().obj() << "z" << 3)),
+            createElementObj(BSON("x" << 1 << "z" << 4))};
+
+        for (auto elem : elems) {
+            if (!elem.eoo())
+                cb.append(elem);
+            else
+                cb.skip();
+        }
+
+        BufBuilder expected;
+        appendInterleavedStartFunc(expected, elems.front().Obj());
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected,
+                               {kDeltaForBinaryEqualValues,
+                                deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+                               1);
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected,
+                               {kDeltaForBinaryEqualValues,
+                                deltaInt32(elems[1].Obj()["z"_sd], elems[0].Obj()["z"_sd])},
+                               1);
+        appendEOO(expected);
+
+        appendInterleavedStartFunc(expected, elems[2].Obj());
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+        appendEOO(expected);
+
+        appendEOO(expected);
+
+        auto binData = cb.finalize();
+        verifyBinary(binData, expected);
+        verifyDecompression(binData, elems);
+    };
+
+    test(false, appendInterleavedStartLegacy);
+    test(true, appendInterleavedStart);
+}
+
+TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyArrayMiddle) {
+    BSONColumnBuilder cb("test"_sd, true);
 
     std::vector<BSONElement> elems = {
-        createElementObj(BSON("x" << 1 << "y" << BSONObjBuilder().obj() << "z" << 2)),
-        createElementObj(BSON("x" << 1 << "y" << BSONObjBuilder().obj() << "z" << 3)),
+        createElementObj(BSON("x" << 1 << "y" << BSONArrayBuilder().arr() << "z" << 2)),
+        createElementObj(BSON("x" << 1 << "y" << BSONArrayBuilder().arr() << "z" << 3)),
         createElementObj(BSON("x" << 1 << "z" << 4))};
 
     for (auto elem : elems) {
@@ -3172,12 +3703,150 @@ TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyObjMiddle) {
     verifyDecompression(binData, elems);
 }
 
-TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyObjUnderObj) {
-    BSONColumnBuilder cb("test"_sd);
+TEST_F(BSONColumnTest, InterleavedArrayMissingEmptyObjMiddle) {
+    BSONColumnBuilder cb("test"_sd, true);
 
     std::vector<BSONElement> elems = {
-        createElementObj(BSON("x" << 1 << "y" << BSON("y1" << BSONObjBuilder().obj()) << "z" << 2)),
-        createElementObj(BSON("x" << 1 << "y" << BSON("y1" << BSONObjBuilder().obj()) << "z" << 3)),
+        createElementArray(BSON_ARRAY(1 << BSONObjBuilder().obj() << 2)),
+        createElementArray(BSON_ARRAY(1 << BSONObjBuilder().obj() << 3)),
+        createElementArray(BSON_ARRAY(1 << 4))};
+
+    for (auto elem : elems) {
+        if (!elem.eoo())
+            cb.append(elem);
+        else
+            cb.skip();
+    }
+
+    BufBuilder expected;
+    appendInterleavedStartArrayRoot(expected, elems.front().Obj());
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(
+        expected,
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Array()[0], elems[0].Array()[0])},
+        1);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(
+        expected,
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Array()[2], elems[0].Array()[2])},
+        1);
+    appendEOO(expected);
+
+    appendInterleavedStartArrayRoot(expected, elems[2].Obj());
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+    appendEOO(expected);
+
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems);
+}
+
+TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyObjUnderObj) {
+    auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
+        BSONColumnBuilder cb("test"_sd, arrayCompression);
+
+        std::vector<BSONElement> elems = {
+            createElementObj(
+                BSON("x" << 1 << "y" << BSON("y1" << BSONObjBuilder().obj()) << "z" << 2)),
+            createElementObj(
+                BSON("x" << 1 << "y" << BSON("y1" << BSONObjBuilder().obj()) << "z" << 3)),
+            createElementObj(BSON("x" << 1 << "z" << 4))};
+
+        for (auto elem : elems) {
+            if (!elem.eoo())
+                cb.append(elem);
+            else
+                cb.skip();
+        }
+
+        BufBuilder expected;
+        appendInterleavedStartFunc(expected, elems.front().Obj());
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected,
+                               {kDeltaForBinaryEqualValues,
+                                deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+                               1);
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected,
+                               {kDeltaForBinaryEqualValues,
+                                deltaInt32(elems[1].Obj()["z"_sd], elems[0].Obj()["z"_sd])},
+                               1);
+        appendEOO(expected);
+
+        appendInterleavedStartFunc(expected, elems[2].Obj());
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+        appendEOO(expected);
+
+        appendEOO(expected);
+
+        auto binData = cb.finalize();
+        verifyBinary(binData, expected);
+        verifyDecompression(binData, elems);
+    };
+
+    test(false, appendInterleavedStartLegacy);
+    test(true, appendInterleavedStart);
+}
+
+TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyArrayUnderObj) {
+    BSONColumnBuilder cb("test"_sd, true);
+
+    std::vector<BSONElement> elems = {
+        createElementObj(
+            BSON("x" << 1 << "y" << BSON("y1" << BSONArrayBuilder().arr()) << "z" << 2)),
+        createElementObj(
+            BSON("x" << 1 << "y" << BSON("y1" << BSONArrayBuilder().arr()) << "z" << 3)),
+        createElementObj(BSON("x" << 1 << "z" << 4))};
+
+    for (auto elem : elems) {
+        if (!elem.eoo())
+            cb.append(elem);
+        else
+            cb.skip();
+    }
+
+    BufBuilder expected;
+    appendInterleavedStart(expected, elems.front().Obj());
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(
+        expected,
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+        1);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(
+        expected,
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["z"_sd], elems[0].Obj()["z"_sd])},
+        1);
+    appendEOO(expected);
+
+    appendInterleavedStart(expected, elems[2].Obj());
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+    appendEOO(expected);
+
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems);
+}
+
+TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyArrayUnderArray) {
+    BSONColumnBuilder cb("test"_sd, true);
+
+    std::vector<BSONElement> elems = {
+        createElementObj(BSON("x" << 1 << "y" << BSON_ARRAY(BSONArrayBuilder().arr()) << "z" << 2)),
+        createElementObj(BSON("x" << 1 << "y" << BSON_ARRAY(BSONArrayBuilder().arr()) << "z" << 3)),
         createElementObj(BSON("x" << 1 << "z" << 4))};
 
     for (auto elem : elems) {
@@ -3216,11 +3885,59 @@ TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyObjUnderObj) {
 }
 
 TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyObjEnd) {
-    BSONColumnBuilder cb("test"_sd);
+    auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
+        BSONColumnBuilder cb("test"_sd, arrayCompression);
+
+        std::vector<BSONElement> elems = {
+            createElementObj(BSON("x" << 1 << "y" << 2 << "z" << BSONObjBuilder().obj())),
+            createElementObj(BSON("x" << 1 << "y" << 3 << "z" << BSONObjBuilder().obj())),
+            createElementObj(BSON("x" << 1 << "y" << 4))};
+
+        for (auto elem : elems) {
+            if (!elem.eoo())
+                cb.append(elem);
+            else
+                cb.skip();
+        }
+
+        BufBuilder expected;
+        appendInterleavedStartFunc(expected, elems.front().Obj());
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected,
+                               {kDeltaForBinaryEqualValues,
+                                deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+                               1);
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected,
+                               {kDeltaForBinaryEqualValues,
+                                deltaInt32(elems[1].Obj()["y"_sd], elems[0].Obj()["y"_sd])},
+                               1);
+        appendEOO(expected);
+
+        appendInterleavedStartFunc(expected, elems[2].Obj());
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+        appendEOO(expected);
+
+        appendEOO(expected);
+
+        auto binData = cb.finalize();
+        verifyBinary(binData, expected);
+        verifyDecompression(binData, elems);
+    };
+
+    test(false, appendInterleavedStartLegacy);
+    test(true, appendInterleavedStart);
+}
+
+TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyArrayEnd) {
+    BSONColumnBuilder cb("test"_sd, true);
 
     std::vector<BSONElement> elems = {
-        createElementObj(BSON("x" << 1 << "y" << 2 << "z" << BSONObjBuilder().obj())),
-        createElementObj(BSON("x" << 1 << "y" << 3 << "z" << BSONObjBuilder().obj())),
+        createElementObj(BSON("x" << 1 << "y" << 2 << "z" << BSONArrayBuilder().arr())),
+        createElementObj(BSON("x" << 1 << "y" << 3 << "z" << BSONArrayBuilder().arr())),
         createElementObj(BSON("x" << 1 << "y" << 4))};
 
     for (auto elem : elems) {
@@ -3245,6 +3962,49 @@ TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyObjEnd) {
     appendEOO(expected);
 
     appendInterleavedStart(expected, elems[2].Obj());
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+    appendEOO(expected);
+
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems);
+}
+
+TEST_F(BSONColumnTest, InterleavedArrayMissingEmptyArrayEnd) {
+    BSONColumnBuilder cb("test"_sd, true);
+
+    std::vector<BSONElement> elems = {
+        createElementArray(BSON_ARRAY(1 << 2 << BSONArrayBuilder().arr())),
+        createElementArray(BSON_ARRAY(1 << 3 << BSONArrayBuilder().arr())),
+        createElementArray(BSON_ARRAY(1 << 4))};
+
+    for (auto elem : elems) {
+        if (!elem.eoo())
+            cb.append(elem);
+        else
+            cb.skip();
+    }
+
+    BufBuilder expected;
+    appendInterleavedStartArrayRoot(expected, elems.front().Obj());
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(
+        expected,
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Array()[0], elems[0].Array()[0])},
+        1);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(
+        expected,
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Array()[1], elems[0].Array()[1])},
+        1);
+    appendEOO(expected);
+
+    appendInterleavedStartArrayRoot(expected, elems[2].Obj());
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
@@ -3259,11 +4019,63 @@ TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyObjEnd) {
 }
 
 TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyObjUnderObjEnd) {
-    BSONColumnBuilder cb("test"_sd);
+    auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
+        BSONColumnBuilder cb("test"_sd, arrayCompression);
+
+        std::vector<BSONElement> elems = {
+            createElementObj(
+                BSON("x" << 1 << "y" << 2 << "z" << BSON("z1" << BSONObjBuilder().obj()))),
+            createElementObj(
+                BSON("x" << 1 << "y" << 3 << "z" << BSON("z1" << BSONObjBuilder().obj()))),
+            createElementObj(BSON("x" << 1 << "y" << 4))};
+
+        for (auto elem : elems) {
+            if (!elem.eoo())
+                cb.append(elem);
+            else
+                cb.skip();
+        }
+
+        BufBuilder expected;
+        appendInterleavedStartFunc(expected, elems.front().Obj());
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected,
+                               {kDeltaForBinaryEqualValues,
+                                deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+                               1);
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected,
+                               {kDeltaForBinaryEqualValues,
+                                deltaInt32(elems[1].Obj()["y"_sd], elems[0].Obj()["y"_sd])},
+                               1);
+        appendEOO(expected);
+
+        appendInterleavedStartFunc(expected, elems[2].Obj());
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+        appendEOO(expected);
+
+        appendEOO(expected);
+
+        auto binData = cb.finalize();
+        verifyBinary(binData, expected);
+        verifyDecompression(binData, elems);
+    };
+
+    test(false, appendInterleavedStartLegacy);
+    test(true, appendInterleavedStart);
+}
+
+TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyArrayUnderObjEnd) {
+    BSONColumnBuilder cb("test"_sd, true);
 
     std::vector<BSONElement> elems = {
-        createElementObj(BSON("x" << 1 << "y" << 2 << "z" << BSON("z1" << BSONObjBuilder().obj()))),
-        createElementObj(BSON("x" << 1 << "y" << 3 << "z" << BSON("z1" << BSONObjBuilder().obj()))),
+        createElementObj(
+            BSON("x" << 1 << "y" << 2 << "z" << BSON("z1" << BSONArrayBuilder().arr()))),
+        createElementObj(
+            BSON("x" << 1 << "y" << 3 << "z" << BSON("z1" << BSONArrayBuilder().arr()))),
         createElementObj(BSON("x" << 1 << "y" << 4))};
 
     for (auto elem : elems) {
@@ -3301,11 +4113,113 @@ TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyObjUnderObjEnd) {
     verifyDecompression(binData, elems);
 }
 
-TEST_F(BSONColumnTest, ReenterInterleaved) {
-    BSONColumnBuilder cb("test"_sd);
+TEST_F(BSONColumnTest, InterleavedArrayMissingEmptyObjUnderObjEnd) {
+    BSONColumnBuilder cb("test"_sd, true);
 
-    std::vector<BSONElement> elems = {createElementObj(BSON("x" << 1 << "y" << 2)),
-                                      createElementObj(BSON("x" << 1 << "y" << 3)),
+    std::vector<BSONElement> elems = {
+        createElementArray(BSON_ARRAY(1 << 2 << BSON("z1" << BSONObjBuilder().obj()))),
+        createElementArray(BSON_ARRAY(1 << 3 << BSON("z1" << BSONObjBuilder().obj()))),
+        createElementArray(BSON_ARRAY(1 << 4))};
+
+    for (auto elem : elems) {
+        if (!elem.eoo())
+            cb.append(elem);
+        else
+            cb.skip();
+    }
+
+    BufBuilder expected;
+    appendInterleavedStartArrayRoot(expected, elems.front().Obj());
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(
+        expected,
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Array()[0], elems[0].Array()[0])},
+        1);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(
+        expected,
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Array()[1], elems[0].Array()[1])},
+        1);
+    appendEOO(expected);
+
+    appendInterleavedStartArrayRoot(expected, elems[2].Obj());
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+    appendEOO(expected);
+
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems);
+}
+
+TEST_F(BSONColumnTest, ReenterInterleaved) {
+    auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
+        BSONColumnBuilder cb("test"_sd, arrayCompression);
+
+        std::vector<BSONElement> elems = {createElementObj(BSON("x" << 1 << "y" << 2)),
+                                          createElementObj(BSON("x" << 1 << "y" << 3)),
+                                          createElementInt32(1),
+                                          createElementObj(BSON("x" << 2 << "y" << 2 << "z" << 2)),
+                                          createElementObj(BSON("x" << 5 << "y" << 3 << "z" << 3))};
+
+        for (auto elem : elems) {
+            if (!elem.eoo())
+                cb.append(elem);
+            else
+                cb.skip();
+        }
+
+        BufBuilder expected;
+        appendInterleavedStartFunc(expected, elems.front().Obj());
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected,
+                               {kDeltaForBinaryEqualValues,
+                                deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+                               1);
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected,
+                               {kDeltaForBinaryEqualValues,
+                                deltaInt32(elems[1].Obj()["y"_sd], elems[0].Obj()["y"_sd])},
+                               1);
+        appendEOO(expected);
+        appendLiteral(expected, elems[2]);
+        appendInterleavedStartFunc(expected, elems[3].Obj());
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected,
+                               {kDeltaForBinaryEqualValues,
+                                deltaInt32(elems[4].Obj()["x"_sd], elems[3].Obj()["x"_sd])},
+                               1);
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected,
+                               {kDeltaForBinaryEqualValues,
+                                deltaInt32(elems[4].Obj()["y"_sd], elems[3].Obj()["y"_sd])},
+                               1);
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected,
+                               {kDeltaForBinaryEqualValues,
+                                deltaInt32(elems[4].Obj()["z"_sd], elems[3].Obj()["z"_sd])},
+                               1);
+        appendEOO(expected);
+        appendEOO(expected);
+
+        auto binData = cb.finalize();
+        verifyBinary(binData, expected);
+        verifyDecompression(binData, elems);
+    };
+
+    test(false, appendInterleavedStartLegacy);
+    test(true, appendInterleavedStart);
+}
+
+TEST_F(BSONColumnTest, ReenterInterleavedArrayRootToObj) {
+    BSONColumnBuilder cb("test"_sd, true);
+
+    std::vector<BSONElement> elems = {createElementArray(BSON_ARRAY(1 << 2)),
+                                      createElementArray(BSON_ARRAY(1 << 3)),
                                       createElementInt32(1),
                                       createElementObj(BSON("x" << 2 << "y" << 2 << "z" << 2)),
                                       createElementObj(BSON("x" << 5 << "y" << 3 << "z" << 3))};
@@ -3318,16 +4232,16 @@ TEST_F(BSONColumnTest, ReenterInterleaved) {
     }
 
     BufBuilder expected;
-    appendInterleavedStart(expected, elems.front().Obj());
+    appendInterleavedStartArrayRoot(expected, elems.front().Obj());
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Array()[0], elems[0].Array()[0])},
         1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["y"_sd], elems[0].Obj()["y"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Array()[1], elems[0].Array()[1])},
         1);
     appendEOO(expected);
     appendLiteral(expected, elems[2]);
@@ -3356,68 +4270,116 @@ TEST_F(BSONColumnTest, ReenterInterleaved) {
 }
 
 TEST_F(BSONColumnTest, InterleavedAlternatingMergeRight) {
-    BSONColumnBuilder cb("test"_sd);
+    auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
+        BSONColumnBuilder cb("test"_sd, arrayCompression);
 
-    std::vector<BSONElement> elems = {createElementObj(BSON("x" << 1)),
-                                      createElementObj(BSON("y" << 2)),
-                                      createElementObj(BSON("z" << 3)),
-                                      createElementObj(BSON("x" << 2)),
-                                      createElementObj(BSON("y" << 3)),
-                                      createElementObj(BSON("z" << 4))};
+        std::vector<BSONElement> elems = {createElementObj(BSON("x" << 1)),
+                                          createElementObj(BSON("y" << 2)),
+                                          createElementObj(BSON("z" << 3)),
+                                          createElementObj(BSON("x" << 2)),
+                                          createElementObj(BSON("y" << 3)),
+                                          createElementObj(BSON("z" << 4))};
 
-    for (auto elem : elems) {
-        if (!elem.eoo())
-            cb.append(elem);
-        else
-            cb.skip();
-    }
+        for (auto elem : elems) {
+            if (!elem.eoo())
+                cb.append(elem);
+            else
+                cb.skip();
+        }
 
-    BufBuilder expected;
-    appendInterleavedStart(expected,
-                           BSON("x" << elems[0].Obj().firstElement().Int() << "y"
-                                    << elems[1].Obj().firstElement().Int() << "z"
-                                    << elems[2].Obj().firstElement().Int()));
-    appendSimple8bControl(expected, 0b1000, 0b0000);
-    appendSimple8bBlocks64(expected,
-                           {kDeltaForBinaryEqualValues,
-                            boost::none,
-                            boost::none,
-                            deltaInt32(elems[3].Obj()["x"_sd], elems[0].Obj()["x"_sd]),
-                            boost::none,
-                            boost::none},
-                           1);
-    appendSimple8bControl(expected, 0b1000, 0b0000);
-    appendSimple8bBlocks64(expected,
-                           {boost::none,
-                            kDeltaForBinaryEqualValues,
-                            boost::none,
-                            boost::none,
-                            deltaInt32(elems[4].Obj()["y"_sd], elems[1].Obj()["y"_sd]),
-                            boost::none},
-                           1);
-    appendSimple8bControl(expected, 0b1000, 0b0000);
-    appendSimple8bBlocks64(expected,
-                           {boost::none,
-                            boost::none,
-                            kDeltaForBinaryEqualValues,
-                            boost::none,
-                            boost::none,
-                            deltaInt32(elems[5].Obj()["z"_sd], elems[2].Obj()["z"_sd])},
-                           1);
-    appendEOO(expected);
-    appendEOO(expected);
+        BufBuilder expected;
+        appendInterleavedStartFunc(expected,
+                                   BSON("x" << elems[0].Obj().firstElement().Int() << "y"
+                                            << elems[1].Obj().firstElement().Int() << "z"
+                                            << elems[2].Obj().firstElement().Int()));
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected,
+                               {kDeltaForBinaryEqualValues,
+                                boost::none,
+                                boost::none,
+                                deltaInt32(elems[3].Obj()["x"_sd], elems[0].Obj()["x"_sd]),
+                                boost::none,
+                                boost::none},
+                               1);
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected,
+                               {boost::none,
+                                kDeltaForBinaryEqualValues,
+                                boost::none,
+                                boost::none,
+                                deltaInt32(elems[4].Obj()["y"_sd], elems[1].Obj()["y"_sd]),
+                                boost::none},
+                               1);
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected,
+                               {boost::none,
+                                boost::none,
+                                kDeltaForBinaryEqualValues,
+                                boost::none,
+                                boost::none,
+                                deltaInt32(elems[5].Obj()["z"_sd], elems[2].Obj()["z"_sd])},
+                               1);
+        appendEOO(expected);
+        appendEOO(expected);
 
-    auto binData = cb.finalize();
-    verifyBinary(binData, expected);
-    verifyDecompression(binData, elems);
+        auto binData = cb.finalize();
+        verifyBinary(binData, expected);
+        verifyDecompression(binData, elems);
+    };
+
+    test(false, appendInterleavedStartLegacy);
+    test(true, appendInterleavedStart);
 }
 
 TEST_F(BSONColumnTest, InterleavedAlternatingMergeLeftThenRight) {
-    BSONColumnBuilder cb("test"_sd);
+    auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
+        BSONColumnBuilder cb("test"_sd, arrayCompression);
 
-    std::vector<BSONElement> elems = {createElementObj(BSON("z" << 1)),
-                                      createElementObj(BSON("y" << 2 << "z" << 2)),
-                                      createElementObj(BSON("x" << 3 << "z" << 3))};
+        std::vector<BSONElement> elems = {createElementObj(BSON("z" << 1)),
+                                          createElementObj(BSON("y" << 2 << "z" << 2)),
+                                          createElementObj(BSON("x" << 3 << "z" << 3))};
+
+        for (auto elem : elems) {
+            if (!elem.eoo())
+                cb.append(elem);
+            else
+                cb.skip();
+        }
+
+        BufBuilder expected;
+        appendInterleavedStartFunc(expected,
+                                   BSON("y" << elems[1].Obj().firstElement().Int() << "x"
+                                            << elems[2].Obj().firstElement().Int() << "z"
+                                            << elems[0].Obj().firstElement().Int()));
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected, {boost::none, kDeltaForBinaryEqualValues, boost::none}, 1);
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected, {boost::none, boost::none, kDeltaForBinaryEqualValues}, 1);
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected,
+                               {kDeltaForBinaryEqualValues,
+                                deltaInt32(elems[1].Obj()["z"_sd], elems[0].Obj()["z"_sd]),
+                                deltaInt32(elems[2].Obj()["z"_sd], elems[1].Obj()["z"_sd])},
+                               1);
+        appendEOO(expected);
+        appendEOO(expected);
+
+        auto binData = cb.finalize();
+        verifyBinary(binData, expected);
+        verifyDecompression(binData, elems);
+    };
+
+    test(false, appendInterleavedStartLegacy);
+    test(true, appendInterleavedStart);
+}
+
+TEST_F(BSONColumnTest, InterleavedMergeWithUnrelatedArray) {
+    BSONColumnBuilder cb("test"_sd, true);
+
+    std::vector<BSONElement> elems = {
+        createElementObj(BSON("a" << BSON_ARRAY(1 << 2) << "z" << 1)),
+        createElementObj(BSON("a" << BSON_ARRAY(1 << 2) << "y" << 2 << "z" << 2)),
+        createElementObj(BSON("a" << BSON_ARRAY(1 << 2) << "x" << 3 << "z" << 3))};
 
     for (auto elem : elems) {
         if (!elem.eoo())
@@ -3428,9 +4390,19 @@ TEST_F(BSONColumnTest, InterleavedAlternatingMergeLeftThenRight) {
 
     BufBuilder expected;
     appendInterleavedStart(expected,
-                           BSON("y" << elems[1].Obj().firstElement().Int() << "x"
-                                    << elems[2].Obj().firstElement().Int() << "z"
-                                    << elems[0].Obj().firstElement().Int()));
+                           BSON("a" << BSON_ARRAY(1 << 2) << "y" << elems[1].Obj()["y"].Int() << "x"
+                                    << elems[2].Obj()["x"].Int() << "z"
+                                    << elems[0].Obj()["z"].Int()));
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(
+        expected,
+        {kDeltaForBinaryEqualValues, kDeltaForBinaryEqualValues, kDeltaForBinaryEqualValues},
+        1);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(
+        expected,
+        {kDeltaForBinaryEqualValues, kDeltaForBinaryEqualValues, kDeltaForBinaryEqualValues},
+        1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(expected, {boost::none, kDeltaForBinaryEqualValues, boost::none}, 1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
@@ -3449,51 +4421,16 @@ TEST_F(BSONColumnTest, InterleavedAlternatingMergeLeftThenRight) {
     verifyDecompression(binData, elems);
 }
 
-TEST_F(BSONColumnTest, InterleavedIncompatibleMerge) {
-    BSONColumnBuilder cb("test"_sd);
-
-    std::vector<BSONElement> elems = {createElementObj(BSON("x" << 1)),
-                                      createElementObj(BSON("x" << 2 << "y" << 2)),
-                                      createElementObj(BSON("y" << 3 << "x" << 3))};
-
-    for (auto elem : elems) {
-        if (!elem.eoo())
-            cb.append(elem);
-        else
-            cb.skip();
-    }
-
-    BufBuilder expected;
-    appendInterleavedStart(
-        expected,
-        BSON("x" << elems[0].Obj().firstElement().Int() << "y" << elems[1].Obj()["y"_sd].Int()));
-    appendSimple8bControl(expected, 0b1000, 0b0000);
-    appendSimple8bBlocks64(
-        expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
-        1);
-    appendSimple8bControl(expected, 0b1000, 0b0000);
-    appendSimple8bBlocks64(expected, {boost::none, kDeltaForBinaryEqualValues}, 1);
-    appendEOO(expected);
-    appendInterleavedStart(expected, elems[2].Obj());
-    appendSimple8bControl(expected, 0b1000, 0b0000);
-    appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
-    appendSimple8bControl(expected, 0b1000, 0b0000);
-    appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
-    appendEOO(expected);
-    appendEOO(expected);
-
-    auto binData = cb.finalize();
-    verifyBinary(binData, expected);
-    verifyDecompression(binData, elems);
-}
-
-TEST_F(BSONColumnTest, InterleavedIncompatibleMergeMiddle) {
-    BSONColumnBuilder cb("test"_sd);
+TEST_F(BSONColumnTest, InterleavedArrayAppend) {
+    BSONColumnBuilder cb("test"_sd, true);
 
     std::vector<BSONElement> elems = {
-        createElementObj(BSON("a" << 1 << "x" << 2 << "y" << 2 << "b" << 2)),
-        createElementObj(BSON("a" << 1 << "y" << 3 << "x" << 3 << "b" << 2))};
+        createElementArray(BSONArrayBuilder().arr()),
+        createElementArray(BSON_ARRAY(1)),
+        createElementArray(BSON_ARRAY(1 << 2)),
+        createElementArray(BSON_ARRAY(1 << 2 << 3)),
+        createElementArray(BSON_ARRAY(1 << 2 << 3 << 4)),
+    };
 
     for (auto elem : elems) {
         if (!elem.eoo())
@@ -3503,73 +4440,31 @@ TEST_F(BSONColumnTest, InterleavedIncompatibleMergeMiddle) {
     }
 
     BufBuilder expected;
-
-    appendInterleavedStart(expected, elems[0].Obj());
-    appendSimple8bControl(expected, 0b1000, 0b0000);
-    appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
-    appendSimple8bControl(expected, 0b1000, 0b0000);
-    appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
-    appendSimple8bControl(expected, 0b1000, 0b0000);
-    appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
-    appendSimple8bControl(expected, 0b1000, 0b0000);
-    appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
-    appendEOO(expected);
-
-    appendInterleavedStart(expected, elems[1].Obj());
-    appendSimple8bControl(expected, 0b1000, 0b0000);
-    appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
-    appendSimple8bControl(expected, 0b1000, 0b0000);
-    appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
-    appendSimple8bControl(expected, 0b1000, 0b0000);
-    appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
-    appendSimple8bControl(expected, 0b1000, 0b0000);
-    appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
-    appendEOO(expected);
-
-    appendEOO(expected);
-
-    auto binData = cb.finalize();
-    verifyBinary(binData, expected);
-    verifyDecompression(binData, elems);
-}
-
-TEST_F(BSONColumnTest, InterleavedIncompatibleAfterDeterminedReference) {
-    BSONColumnBuilder cb("test"_sd);
-
-    std::vector<BSONElement> elems = {createElementObj(BSON("x" << 1)),
-                                      createElementObj(BSON("x" << 2)),
-                                      createElementObj(BSON("x" << 3)),
-                                      createElementObj(BSON("x" << 4)),
-                                      createElementObj(BSON("x" << 5)),
-                                      createElementObj(BSON("x" << 6)),
-                                      createElementObj(BSON("x" << 0 << "y" << 0))};
-
-    for (auto elem : elems) {
-        if (!elem.eoo())
-            cb.append(elem);
-        else
-            cb.skip();
-    }
-
-    BufBuilder expected;
-    appendInterleavedStart(expected, elems.front().Obj());
+    appendLiteral(expected, elems.front());
+    appendInterleavedStartArrayRoot(expected, elems[4].Obj());
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(expected,
                            {kDeltaForBinaryEqualValues,
-                            deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd]),
-                            deltaInt32(elems[2].Obj()["x"_sd], elems[1].Obj()["x"_sd]),
-                            deltaInt32(elems[3].Obj()["x"_sd], elems[2].Obj()["x"_sd]),
-                            deltaInt32(elems[4].Obj()["x"_sd], elems[3].Obj()["x"_sd]),
-                            deltaInt32(elems[5].Obj()["x"_sd], elems[4].Obj()["x"_sd])},
+                            kDeltaForBinaryEqualValues,
+                            kDeltaForBinaryEqualValues,
+                            kDeltaForBinaryEqualValues},
                            1);
-    appendEOO(expected);
-    appendInterleavedStart(expected, elems[6].Obj());
     appendSimple8bControl(expected, 0b1000, 0b0000);
-    appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+    appendSimple8bBlocks64(expected,
+                           {boost::none,
+                            kDeltaForBinaryEqualValues,
+                            kDeltaForBinaryEqualValues,
+                            kDeltaForBinaryEqualValues},
+                           1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
-    appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+    appendSimple8bBlocks64(
+        expected,
+        {boost::none, boost::none, kDeltaForBinaryEqualValues, kDeltaForBinaryEqualValues},
+        1);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(
+        expected, {boost::none, boost::none, boost::none, kDeltaForBinaryEqualValues}, 1);
     appendEOO(expected);
-
     appendEOO(expected);
 
     auto binData = cb.finalize();
@@ -3577,11 +4472,192 @@ TEST_F(BSONColumnTest, InterleavedIncompatibleAfterDeterminedReference) {
     verifyDecompression(binData, elems);
 }
 
+TEST_F(BSONColumnTest, InterleavedIncompatibleMerge) {
+    auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
+        BSONColumnBuilder cb("test"_sd, arrayCompression);
+
+        std::vector<BSONElement> elems = {createElementObj(BSON("x" << 1)),
+                                          createElementObj(BSON("x" << 2 << "y" << 2)),
+                                          createElementObj(BSON("y" << 3 << "x" << 3))};
+
+        for (auto elem : elems) {
+            if (!elem.eoo())
+                cb.append(elem);
+            else
+                cb.skip();
+        }
+
+        BufBuilder expected;
+        appendInterleavedStartFunc(expected,
+                                   BSON("x" << elems[0].Obj().firstElement().Int() << "y"
+                                            << elems[1].Obj()["y"_sd].Int()));
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected,
+                               {kDeltaForBinaryEqualValues,
+                                deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+                               1);
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected, {boost::none, kDeltaForBinaryEqualValues}, 1);
+        appendEOO(expected);
+        appendInterleavedStartFunc(expected, elems[2].Obj());
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+        appendEOO(expected);
+        appendEOO(expected);
+
+        auto binData = cb.finalize();
+        verifyBinary(binData, expected);
+        verifyDecompression(binData, elems);
+    };
+
+    test(false, appendInterleavedStartLegacy);
+    test(true, appendInterleavedStart);
+}
+
+TEST_F(BSONColumnTest, InterleavedIncompatibleMergeMiddle) {
+    auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
+        BSONColumnBuilder cb("test"_sd, arrayCompression);
+
+        std::vector<BSONElement> elems = {
+            createElementObj(BSON("a" << 1 << "x" << 2 << "y" << 2 << "b" << 2)),
+            createElementObj(BSON("a" << 1 << "y" << 3 << "x" << 3 << "b" << 2))};
+
+        for (auto elem : elems) {
+            if (!elem.eoo())
+                cb.append(elem);
+            else
+                cb.skip();
+        }
+
+        BufBuilder expected;
+
+        appendInterleavedStartFunc(expected, elems[0].Obj());
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+        appendEOO(expected);
+
+        appendInterleavedStartFunc(expected, elems[1].Obj());
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+        appendEOO(expected);
+
+        appendEOO(expected);
+
+        auto binData = cb.finalize();
+        verifyBinary(binData, expected);
+        verifyDecompression(binData, elems);
+    };
+
+    test(false, appendInterleavedStartLegacy);
+    test(true, appendInterleavedStart);
+}
+
+TEST_F(BSONColumnTest, InterleavedIncompatibleAfterDeterminedReference) {
+    auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
+        BSONColumnBuilder cb("test"_sd, arrayCompression);
+
+        std::vector<BSONElement> elems = {createElementObj(BSON("x" << 1)),
+                                          createElementObj(BSON("x" << 2)),
+                                          createElementObj(BSON("x" << 3)),
+                                          createElementObj(BSON("x" << 4)),
+                                          createElementObj(BSON("x" << 5)),
+                                          createElementObj(BSON("x" << 6)),
+                                          createElementObj(BSON("x" << 0 << "y" << 0))};
+
+        for (auto elem : elems) {
+            if (!elem.eoo())
+                cb.append(elem);
+            else
+                cb.skip();
+        }
+
+        BufBuilder expected;
+        appendInterleavedStartFunc(expected, elems.front().Obj());
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected,
+                               {kDeltaForBinaryEqualValues,
+                                deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd]),
+                                deltaInt32(elems[2].Obj()["x"_sd], elems[1].Obj()["x"_sd]),
+                                deltaInt32(elems[3].Obj()["x"_sd], elems[2].Obj()["x"_sd]),
+                                deltaInt32(elems[4].Obj()["x"_sd], elems[3].Obj()["x"_sd]),
+                                deltaInt32(elems[5].Obj()["x"_sd], elems[4].Obj()["x"_sd])},
+                               1);
+        appendEOO(expected);
+        appendInterleavedStartFunc(expected, elems[6].Obj());
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+        appendEOO(expected);
+
+        appendEOO(expected);
+
+        auto binData = cb.finalize();
+        verifyBinary(binData, expected);
+        verifyDecompression(binData, elems);
+    };
+
+    test(false, appendInterleavedStartLegacy);
+    test(true, appendInterleavedStart);
+}
+
 TEST_F(BSONColumnTest, InterleavedSkipAfterEmptySubObj) {
-    BSONColumnBuilder cb("test"_sd);
+    auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
+        BSONColumnBuilder cb("test"_sd, arrayCompression);
+
+        std::vector<BSONElement> elems = {
+            createElementObj(
+                BSON("x" << 1 << "y" << 2 << "z" << BSON("z1" << BSONObjBuilder().obj()))),
+            BSONElement()};
+
+        for (auto elem : elems) {
+            if (!elem.eoo())
+                cb.append(elem);
+            else
+                cb.skip();
+        }
+
+        BufBuilder expected;
+        appendInterleavedStartFunc(expected, elems.front().Obj());
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+        appendEOO(expected);
+
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlock64(expected, boost::none);
+        appendEOO(expected);
+
+        auto binData = cb.finalize();
+        verifyBinary(binData, expected);
+        verifyDecompression(binData, elems);
+    };
+
+    test(false, appendInterleavedStartLegacy);
+    test(true, appendInterleavedStart);
+}
+
+TEST_F(BSONColumnTest, InterleavedSkipAfterEmptySubArray) {
+    BSONColumnBuilder cb("test"_sd, true);
 
     std::vector<BSONElement> elems = {
-        createElementObj(BSON("x" << 1 << "y" << 2 << "z" << BSON("z1" << BSONObjBuilder().obj()))),
+        createElementObj(
+            BSON("x" << 1 << "y" << 2 << "z" << BSON("z1" << BSONArrayBuilder().arr()))),
         BSONElement()};
 
     for (auto elem : elems) {
@@ -3633,29 +4709,34 @@ TEST_F(BSONColumnTest, ObjectEmpty) {
 }
 
 TEST_F(BSONColumnTest, ObjectEmptyAfterNonEmpty) {
-    BSONColumnBuilder cb("test"_sd);
+    auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
+        BSONColumnBuilder cb("test"_sd, arrayCompression);
 
-    std::vector<BSONElement> elems = {createElementObj(BSON("x" << 1)),
-                                      createElementObj(BSONObjBuilder().obj())};
+        std::vector<BSONElement> elems = {createElementObj(BSON("x" << 1)),
+                                          createElementObj(BSONObjBuilder().obj())};
 
-    for (auto elem : elems) {
-        if (!elem.eoo())
-            cb.append(elem);
-        else
-            cb.skip();
-    }
+        for (auto elem : elems) {
+            if (!elem.eoo())
+                cb.append(elem);
+            else
+                cb.skip();
+        }
 
-    BufBuilder expected;
-    appendInterleavedStart(expected, elems.front().Obj());
-    appendSimple8bControl(expected, 0b1000, 0b0000);
-    appendSimple8bBlock64(expected, kDeltaForBinaryEqualValues);
-    appendEOO(expected);
-    appendLiteral(expected, elems[1]);
-    appendEOO(expected);
+        BufBuilder expected;
+        appendInterleavedStartFunc(expected, elems.front().Obj());
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlock64(expected, kDeltaForBinaryEqualValues);
+        appendEOO(expected);
+        appendLiteral(expected, elems[1]);
+        appendEOO(expected);
 
-    auto binData = cb.finalize();
-    verifyBinary(binData, expected);
-    verifyDecompression(binData, elems);
+        auto binData = cb.finalize();
+        verifyBinary(binData, expected);
+        verifyDecompression(binData, elems);
+    };
+
+    test(false, appendInterleavedStartLegacy);
+    test(true, appendInterleavedStart);
 }
 
 TEST_F(BSONColumnTest, ObjectWithOnlyEmptyObjsDoesNotStartInterleaving) {
@@ -3680,71 +4761,81 @@ TEST_F(BSONColumnTest, ObjectWithOnlyEmptyObjsDoesNotStartInterleaving) {
 }
 
 TEST_F(BSONColumnTest, ObjectWithOnlyEmptyObjsDoesNotStartInterleavingFromDetermine) {
-    BSONColumnBuilder cb("test"_sd);
+    auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
+        BSONColumnBuilder cb("test"_sd, arrayCompression);
 
-    // Append elements so we are in kSubObjDeterminingReference state when element with 'b' field is
-    // appended. Make sure this does not re-start subobj compression as it only contain empty
-    // subobj.
-    std::vector<BSONElement> elems;
-    elems.push_back(createElementObj(BSON("a" << 1)));
-    elems.push_back(createElementObj(BSON("b" << BSONObjBuilder().obj())));
+        // Append elements so we are in kSubObjDeterminingReference state when element with 'b'
+        // field is appended. Make sure this does not re-start subobj compression as it only contain
+        // empty subobj.
+        std::vector<BSONElement> elems;
+        elems.push_back(createElementObj(BSON("a" << 1)));
+        elems.push_back(createElementObj(BSON("b" << BSONObjBuilder().obj())));
 
-    for (const auto& elem : elems) {
-        cb.append(elem);
-    }
+        for (const auto& elem : elems) {
+            cb.append(elem);
+        }
 
-    BufBuilder expected;
-    appendInterleavedStart(expected, elems.front().Obj());
-    appendSimple8bControl(expected, 0b1000, 0b0000);
-    appendSimple8bBlock64(expected, kDeltaForBinaryEqualValues);
-    appendEOO(expected);
+        BufBuilder expected;
+        appendInterleavedStartFunc(expected, elems.front().Obj());
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlock64(expected, kDeltaForBinaryEqualValues);
+        appendEOO(expected);
 
-    appendLiteral(expected, elems[1]);
-    appendEOO(expected);
+        appendLiteral(expected, elems[1]);
+        appendEOO(expected);
 
-    auto binData = cb.finalize();
-    verifyBinary(binData, expected);
-    verifyDecompression(binData, elems);
+        auto binData = cb.finalize();
+        verifyBinary(binData, expected);
+        verifyDecompression(binData, elems);
+    };
+
+    test(false, appendInterleavedStartLegacy);
+    test(true, appendInterleavedStart);
 }
 
 TEST_F(BSONColumnTest, ObjectWithOnlyEmptyObjsDoesNotStartInterleavingFromAppending) {
-    BSONColumnBuilder cb("test"_sd);
+    auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
+        BSONColumnBuilder cb("test"_sd, arrayCompression);
 
-    // Append enough elements so we are in kSubObjAppending state when element with 'b' field is
-    // appended. Make sure this does not re-start subobj compression as it only contain empty
-    // subobj.
-    std::vector<BSONElement> elems;
-    elems.push_back(createElementObj(BSON("a" << 1)));
-    elems.push_back(createElementObj(BSON("a" << 2)));
-    elems.push_back(createElementObj(BSON("a" << 3)));
-    elems.push_back(createElementObj(BSON("a" << 4)));
-    elems.push_back(createElementObj(BSON("a" << 5)));
-    elems.push_back(createElementObj(BSON("a" << 6)));
-    elems.push_back(createElementObj(BSON("b" << BSONObjBuilder().obj())));
+        // Append enough elements so we are in kSubObjAppending state when element with 'b' field is
+        // appended. Make sure this does not re-start subobj compression as it only contain empty
+        // subobj.
+        std::vector<BSONElement> elems;
+        elems.push_back(createElementObj(BSON("a" << 1)));
+        elems.push_back(createElementObj(BSON("a" << 2)));
+        elems.push_back(createElementObj(BSON("a" << 3)));
+        elems.push_back(createElementObj(BSON("a" << 4)));
+        elems.push_back(createElementObj(BSON("a" << 5)));
+        elems.push_back(createElementObj(BSON("a" << 6)));
+        elems.push_back(createElementObj(BSON("b" << BSONObjBuilder().obj())));
 
-    for (const auto& elem : elems) {
-        cb.append(elem);
-    }
+        for (const auto& elem : elems) {
+            cb.append(elem);
+        }
 
-    BufBuilder expected;
-    appendInterleavedStart(expected, elems.front().Obj());
-    appendSimple8bControl(expected, 0b1000, 0b0000);
-    appendSimple8bBlocks64(expected,
-                           {kDeltaForBinaryEqualValues,
-                            deltaInt32(elems[1].Obj()["a"], elems[0].Obj()["a"]),
-                            deltaInt32(elems[2].Obj()["a"], elems[1].Obj()["a"]),
-                            deltaInt32(elems[3].Obj()["a"], elems[2].Obj()["a"]),
-                            deltaInt32(elems[4].Obj()["a"], elems[3].Obj()["a"]),
-                            deltaInt32(elems[5].Obj()["a"], elems[4].Obj()["a"])},
-                           1);
-    appendEOO(expected);
+        BufBuilder expected;
+        appendInterleavedStartFunc(expected, elems.front().Obj());
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected,
+                               {kDeltaForBinaryEqualValues,
+                                deltaInt32(elems[1].Obj()["a"], elems[0].Obj()["a"]),
+                                deltaInt32(elems[2].Obj()["a"], elems[1].Obj()["a"]),
+                                deltaInt32(elems[3].Obj()["a"], elems[2].Obj()["a"]),
+                                deltaInt32(elems[4].Obj()["a"], elems[3].Obj()["a"]),
+                                deltaInt32(elems[5].Obj()["a"], elems[4].Obj()["a"])},
+                               1);
+        appendEOO(expected);
 
-    appendLiteral(expected, elems[6]);
-    appendEOO(expected);
+        appendLiteral(expected, elems[6]);
+        appendEOO(expected);
 
-    auto binData = cb.finalize();
-    verifyBinary(binData, expected);
-    verifyDecompression(binData, elems);
+        auto binData = cb.finalize();
+        verifyBinary(binData, expected);
+        verifyDecompression(binData, elems);
+    };
+
+    test(false, appendInterleavedStartLegacy);
+    test(true, appendInterleavedStart);
 }
 
 TEST_F(BSONColumnTest, NonZeroRLEInFirstBlockAfterSimple8bBlocks) {
@@ -3931,8 +5022,25 @@ TEST_F(BSONColumnTest, NoLiteralStart) {
 TEST_F(BSONColumnTest, InvalidInterleavedCount) {
     // This test sets up an interleaved reference object with two fields but only provides one
     // interleaved substream.
+    auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
+        BSONColumnBuilder cb("test"_sd, arrayCompression);
+        BufBuilder expected;
+        appendInterleavedStartFunc(expected, BSON("a" << 1 << "b" << 1));
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+        appendEOO(expected);
+        appendEOO(expected);
+
+        BSONColumn col(createBSONColumn(expected.buf(), expected.len()));
+        ASSERT_THROWS(std::distance(col.begin(), col.end()), DBException);
+    };
+
+    test(false, appendInterleavedStartLegacy);
+    test(true, appendInterleavedStart);
+
+    BSONColumnBuilder cb("test"_sd, true);
     BufBuilder expected;
-    appendInterleavedStart(expected, BSON("a" << 1 << "b" << 1));
+    appendInterleavedStartArrayRoot(expected, BSON_ARRAY(1 << 1));
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
     appendEOO(expected);
@@ -3944,12 +5052,29 @@ TEST_F(BSONColumnTest, InvalidInterleavedCount) {
 
 TEST_F(BSONColumnTest, InvalidInterleavedWhenAlreadyInterleaved) {
     // This tests that we handle the interleaved start byte when already in interleaved mode.
+    auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
+        BSONColumnBuilder cb("test"_sd, arrayCompression);
+        BufBuilder expected;
+        appendInterleavedStartFunc(expected, BSON("a" << 1 << "b" << 1));
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+        appendInterleavedStartFunc(expected, BSON("a" << 1 << "b" << 1));
+        appendEOO(expected);
+        appendEOO(expected);
 
+        BSONColumn col(createBSONColumn(expected.buf(), expected.len()));
+        ASSERT_THROWS(std::distance(col.begin(), col.end()), DBException);
+    };
+
+    test(false, appendInterleavedStartLegacy);
+    test(true, appendInterleavedStart);
+
+    BSONColumnBuilder cb("test"_sd, true);
     BufBuilder expected;
     appendInterleavedStart(expected, BSON("a" << 1 << "b" << 1));
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
-    appendInterleavedStart(expected, BSON("a" << 1 << "b" << 1));
+    appendInterleavedStartArrayRoot(expected, BSON_ARRAY("a" << 1 << "b" << 1));
     appendEOO(expected);
     appendEOO(expected);
 
@@ -4056,12 +5181,12 @@ TEST_F(BSONColumnTest, FTDCRoundTrip) {
 
     std::string compressed = base64::decode(compressedBase64Encoded);
 
-    auto roundtrip = [](const auto& compressed) {
+    auto roundtrip = [](const auto& compressed, bool arrayCompression) {
         BSONObjBuilder builder;
         builder.appendBinData("data"_sd, compressed.size(), BinDataType::Column, compressed.data());
         BSONElement compressedFTDCElement = builder.done().firstElement();
 
-        BSONColumnBuilder columnBuilder("");
+        BSONColumnBuilder columnBuilder("", arrayCompression);
         BSONColumn column(compressedFTDCElement);
         for (auto&& decompressed : column) {
             if (!decompressed.eoo()) {
@@ -4075,7 +5200,18 @@ TEST_F(BSONColumnTest, FTDCRoundTrip) {
         return std::string((const char*)binData.data, binData.length);
     };
 
-    ASSERT_EQ(roundtrip(compressed), compressed);
+    // Test that we can decompress and re-compress without any data loss.
+    ASSERT_EQ(roundtrip(compressed, false), compressed);
+
+    // Re-compress with array support. This will change the interleaving start control bytes.
+    std::string compressedArraySupport = roundtrip(compressed, true);
+
+    // Verify that we can round-trip with array support
+    ASSERT_EQ(roundtrip(compressedArraySupport, true), compressedArraySupport);
+
+    // Last verify that we can roundtrip back to without array support. This tests that there was no
+    // data loss when using array support.
+    ASSERT_EQ(roundtrip(compressedArraySupport, false), compressed);
 }
 #endif
 

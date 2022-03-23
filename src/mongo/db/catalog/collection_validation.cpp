@@ -468,13 +468,18 @@ void _validateBSONColumnRoundtrip(OperationContext* opCtx,
     constexpr size_t kMaxMemoryUsageBytes = 25 * 1024 * 1024;
     size_t currentMemoryUsageBytes = 0;
 
-    BSONColumnBuilder columnBuilder("");
+    BSONColumnBuilder columnBuilder("",
+                                    feature_flags::gTimeseriesBucketCompressionWithArrays.isEnabled(
+                                        serverGlobalParams.featureCompatibility));
 
     auto doBSONColumnRoundtrip = [&]() {
         ON_BLOCK_EXIT([&] {
             // Reset the in-memory state to prepare for the next round of BSONColumn roundtripping.
             original.clear();
-            columnBuilder = BSONColumnBuilder("");
+            columnBuilder =
+                BSONColumnBuilder("",
+                                  feature_flags::gTimeseriesBucketCompressionWithArrays.isEnabled(
+                                      serverGlobalParams.featureCompatibility));
             currentMemoryUsageBytes = 0;
         });
 

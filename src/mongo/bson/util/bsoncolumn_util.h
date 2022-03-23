@@ -33,7 +33,9 @@
 #include "mongo/platform/int128.h"
 
 namespace mongo::bsoncolumn {
-static constexpr char kInterleavedStartControlByte = (char)0xF0;
+static constexpr char kInterleavedStartControlByteLegacy = (char)0xF0;
+static constexpr char kInterleavedStartControlByte = (char)0xF1;
+static constexpr char kInterleavedStartArrayRootControlByte = (char)0xF2;
 
 inline bool isLiteralControlByte(char control) {
     return (control & 0xE0) == 0;

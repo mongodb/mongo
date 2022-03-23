@@ -71,7 +71,7 @@ bool objectIdDeltaPossible(BSONElement elem, BSONElement prev) {
 template <typename ElementFunc>
 void _traverse(const BSONObj& reference, const ElementFunc& elemFunc) {
     for (const auto& elem : reference) {
-        if (elem.type() == Object) {
+        if (elem.type() == Object || elem.type() == Array) {
             _traverse(elem.Obj(), elemFunc);
         } else {
             elemFunc(elem, BSONElement());
@@ -85,7 +85,7 @@ void _traverse(const BSONObj& reference, const ElementFunc& elemFunc) {
 template <typename ElementFunc>
 bool _traverseUntilEmptyObj(const BSONObj& obj, const ElementFunc& elemFunc) {
     for (const auto& elem : obj) {
-        if (elem.type() == Object) {
+        if (elem.type() == Object || elem.type() == Array) {
             if (_traverseUntilEmptyObj(elem.Obj(), elemFunc)) {
                 return true;
             }
@@ -110,12 +110,12 @@ std::pair<BSONObj::iterator, bool> _traverseLockStep(const BSONObj& reference,
     auto it = obj.begin();
     auto end = obj.end();
     for (const auto& elem : reference) {
-        if (elem.type() == Object) {
+        if (elem.type() == Object || elem.type() == Array) {
             BSONObj refObj = elem.Obj();
             bool elemMatch = it != end && elem.fieldNameStringData() == it->fieldNameStringData();
             if (elemMatch) {
                 // If 'reference' element is Object then 'obj' must also be Object.
-                if (it->type() != Object) {
+                if (it->type() != elem.type()) {
                     return {it, false};
                 }
 
@@ -178,10 +178,11 @@ bool _mergeObj(BSONObjBuilder* builder, const BSONObj& reference, const BSONObj&
     while (refIt != refEnd && it != end) {
         StringData name = refIt->fieldNameStringData();
         if (name == it->fieldNameStringData()) {
-            bool refIsObj = refIt->type() == Object;
-            bool itIsObj = it->type() == Object;
+            bool refIsObjOrArray = refIt->type() == Object || refIt->type() == Array;
+            bool itIsObjOrArray = it->type() == Object || it->type() == Array;
 
-            if (refIsObj && itIsObj) {
+            // We can merge this sub-obj/array if both sides are Object or both are Array
+            if (refIsObjOrArray && itIsObjOrArray && refIt->type() == it->type()) {
                 BSONObj refObj = refIt->Obj();
                 BSONObj itObj = it->Obj();
                 // There may not be a mismatch in empty objects
@@ -189,12 +190,13 @@ bool _mergeObj(BSONObjBuilder* builder, const BSONObj& reference, const BSONObj&
                     return false;
 
                 // Recurse deeper
-                BSONObjBuilder subBuilder = builder->subobjStart(name);
+                BSONObjBuilder subBuilder = refIt->type() == Object ? builder->subobjStart(name)
+                                                                    : builder->subarrayStart(name);
                 bool res = _mergeObj(&subBuilder, refObj, itObj);
                 if (!res) {
                     return false;
                 }
-            } else if (refIsObj || itIsObj) {
+            } else if (refIsObjOrArray || itIsObjOrArray) {
                 // Both or neither elements must be Object to be mergable
                 return false;
             } else {
@@ -208,15 +210,15 @@ bool _mergeObj(BSONObjBuilder* builder, const BSONObj& reference, const BSONObj&
             continue;
         }
 
-        // Name mismatch, first search in 'obj' if reference element exist later.
+        // Name mismatch, first search in 'obj' if reference element exists later.
         auto n = std::next(it);
         auto namePos = std::find_if(
             n, end, [&name](const auto& elem) { return elem.fieldNameStringData() == name; });
         if (namePos == end) {
             // Reference element does not exist in 'obj' so add it and continue merging with just
-            // this iterator incremented. Unless it is or contains an empty object which is
-            // incompatible.
-            if (refIt->type() == Object && _hasEmptyObj(refIt->Obj())) {
+            // this iterator incremented. Unless it is an empty object or contains an empty object
+            // which is incompatible.
+            if ((refIt->type() == Object || refIt->type() == Array) && _hasEmptyObj(refIt->Obj())) {
                 return false;
             }
 
@@ -226,10 +228,10 @@ bool _mergeObj(BSONObjBuilder* builder, const BSONObj& reference, const BSONObj&
 
             builder->append(*(refIt++));
         } else {
-            // Reference element do exist later in 'obj'. Add element in 'it' if it is the first
+            // Reference element does exist later in 'obj'. Add element in 'it' if it is the first
             // time we see it, fail otherwise (incompatible ordering). Unless 'it' is or contains an
             // empty object which is incompatible.
-            if (it->type() == Object && _hasEmptyObj(it->Obj())) {
+            if ((it->type() == Object || it->type() == Array) && _hasEmptyObj(it->Obj())) {
                 return false;
             }
             if (builder->hasField(it->fieldNameStringData())) {
@@ -241,8 +243,8 @@ bool _mergeObj(BSONObjBuilder* builder, const BSONObj& reference, const BSONObj&
 
     // Add remaining reference elements when we reached end in 'obj'.
     for (; refIt != refEnd; ++refIt) {
-        // We cannot allow empty object mismatch
-        if (refIt->type() == Object && _hasEmptyObj(refIt->Obj())) {
+        // We cannot allow empty object/array mismatch
+        if ((refIt->type() == Object || refIt->type() == Array) && _hasEmptyObj(refIt->Obj())) {
             return false;
         }
         if (builder->hasField(refIt->fieldNameStringData())) {
@@ -253,8 +255,8 @@ bool _mergeObj(BSONObjBuilder* builder, const BSONObj& reference, const BSONObj&
 
     // Add remaining 'obj' elements when we reached end in 'reference'.
     for (; it != end; ++it) {
-        // We cannot allow empty object mismatch
-        if (it->type() == Object && _hasEmptyObj(it->Obj())) {
+        // We cannot allow empty object/array mismatch
+        if ((it->type() == Object || it->type() == Array) && _hasEmptyObj(it->Obj())) {
             return false;
         }
 
@@ -281,13 +283,232 @@ BSONObj mergeObj(const BSONObj& reference, const BSONObj& obj) {
     return builder.obj();
 }
 
+// Traverses object and calls 'ElementFunc' on every scalar subfield encountered.
+template <typename ElementFunc>
+void _traverseLegacy(const BSONObj& reference, const ElementFunc& elemFunc) {
+    for (const auto& elem : reference) {
+        if (elem.type() == Object) {
+            _traverseLegacy(elem.Obj(), elemFunc);
+        } else {
+            elemFunc(elem, BSONElement());
+        }
+    }
+}
+
+// Internal recursion function for traverseLockStep() when we just need to traverse reference
+// object. Like '_traverse' above but exits when an empty sub object is encountered. Returns 'true'
+// if empty subobject found.
+template <typename ElementFunc>
+bool _traverseUntilEmptyObjLegacy(const BSONObj& obj, const ElementFunc& elemFunc) {
+    for (const auto& elem : obj) {
+        if (elem.type() == Object) {
+            if (_traverseUntilEmptyObjLegacy(elem.Obj(), elemFunc)) {
+                return true;
+            }
+        } else {
+            elemFunc(elem, BSONElement());
+        }
+    }
+
+    return obj.isEmpty();
+}
+
+// Helper function for mergeObj() to detect if Object contain subfields of empty Objects
+bool _hasEmptyObjLegacy(const BSONObj& obj) {
+    return _traverseUntilEmptyObjLegacy(obj, [](const BSONElement&, const BSONElement&) {});
+}
+
+// Internal recursion function for traverseLockStep(). See documentation for traverseLockStep.
+template <typename ElementFunc>
+std::pair<BSONObj::iterator, bool> _traverseLockStepLegacy(const BSONObj& reference,
+                                                           const BSONObj& obj,
+                                                           const ElementFunc& elemFunc) {
+    auto it = obj.begin();
+    auto end = obj.end();
+    for (const auto& elem : reference) {
+        if (elem.type() == Object) {
+            BSONObj refObj = elem.Obj();
+            bool elemMatch = it != end && elem.fieldNameStringData() == it->fieldNameStringData();
+            if (elemMatch) {
+                // If 'reference' element is Object then 'obj' must also be Object.
+                if (it->type() != Object) {
+                    return {it, false};
+                }
+
+                // Differences in empty objects are not allowed.
+                if (refObj.isEmpty() != it->Obj().isEmpty()) {
+                    return {it, false};
+                }
+
+                // Everything match, recurse deeper.
+                auto [_, compatible] = _traverseLockStepLegacy(refObj, (it++)->Obj(), elemFunc);
+                if (!compatible) {
+                    return {it, false};
+                }
+            } else {
+                // Assume field name at 'it' is coming later in 'reference'. Traverse as if it is
+                // missing from 'obj'. We don't increment the iterator in this case. If it is a
+                // mismatch we will detect that at end when 'it' is not at 'end'. Nothing can fail
+                // below this so traverse without all the checks. Any empty object detected is an
+                // error.
+                if (_traverseUntilEmptyObjLegacy(refObj, elemFunc)) {
+                    return {it, false};
+                }
+            }
+        } else {
+            // Non-object, call provided function with the two elements
+            elemFunc(elem,
+                     it != end && elem.fieldNameStringData() == it->fieldNameStringData()
+                         ? *(it++)
+                         : BSONElement());
+        }
+    }
+    // Extra elements in 'obj' are not allowed. These needs to be merged in to 'reference' to be
+    // able to compress.
+    return {it, it == end};
+}
+
+// Traverses and validates BSONObj's in reference and obj in lock-step. Returns true if the object
+// hierarchies are compatible for sub-object compression. To be compatible fields in 'obj' must be
+// in the same order as in 'reference' and sub-objects in 'reference' must be sub-objects in 'obj'.
+// The only difference between the two objects that is allowed is missing fields in 'obj' compared
+// to 'reference'. 'ElementFunc' is called for every matching pair of BSONElement. Function
+// signature should be void(const BSONElement&, const BSONElement&).
+template <typename ElementFunc>
+bool traverseLockStepLegacy(const BSONObj& reference, const BSONObj& obj, ElementFunc elemFunc) {
+    auto [it, hierachyMatch] = _traverseLockStepLegacy(reference, obj, elemFunc);
+    // Extra elements in 'obj' are not allowed. These needs to be merged in to 'reference' to be
+    // able to compress.
+    return hierachyMatch && it == obj.end();
+}
+
+// Internal recursion function for mergeObj(). See documentation for mergeObj. Returns true if merge
+// was successful.
+bool _mergeObjLegacy(BSONObjBuilder* builder, const BSONObj& reference, const BSONObj& obj) {
+    auto refIt = reference.begin();
+    auto refEnd = reference.end();
+    auto it = obj.begin();
+    auto end = obj.end();
+
+    // Iterate until we reach end of any of the two objects.
+    while (refIt != refEnd && it != end) {
+        StringData name = refIt->fieldNameStringData();
+        if (name == it->fieldNameStringData()) {
+            bool refIsObj = refIt->type() == Object;
+            bool itIsObj = it->type() == Object;
+
+            if (refIsObj && itIsObj) {
+                BSONObj refObj = refIt->Obj();
+                BSONObj itObj = it->Obj();
+                // There may not be a mismatch in empty objects
+                if (refObj.isEmpty() != itObj.isEmpty())
+                    return false;
+
+                // Recurse deeper
+                BSONObjBuilder subBuilder = builder->subobjStart(name);
+                bool res = _mergeObjLegacy(&subBuilder, refObj, itObj);
+                if (!res) {
+                    return false;
+                }
+            } else if (refIsObj || itIsObj) {
+                // Both or neither elements must be Object to be mergable
+                return false;
+            } else {
+                // If name match and neither is Object we can append from reference and increment
+                // both objects.
+                builder->append(*refIt);
+            }
+
+            ++refIt;
+            ++it;
+            continue;
+        }
+
+        // Name mismatch, first search in 'obj' if reference element exist later.
+        auto n = std::next(it);
+        auto namePos = std::find_if(
+            n, end, [&name](const auto& elem) { return elem.fieldNameStringData() == name; });
+        if (namePos == end) {
+            // Reference element does not exist in 'obj' so add it and continue merging with just
+            // this iterator incremented. Unless it is or contains an empty object which is
+            // incompatible.
+            if (refIt->type() == Object && _hasEmptyObjLegacy(refIt->Obj())) {
+                return false;
+            }
+
+            if (builder->hasField(refIt->fieldNameStringData())) {
+                return false;
+            }
+
+            builder->append(*(refIt++));
+        } else {
+            // Reference element do exist later in 'obj'. Add element in 'it' if it is the first
+            // time we see it, fail otherwise (incompatible ordering). Unless 'it' is or contains an
+            // empty object which is incompatible.
+            if (it->type() == Object && _hasEmptyObjLegacy(it->Obj())) {
+                return false;
+            }
+            if (builder->hasField(it->fieldNameStringData())) {
+                return false;
+            }
+            builder->append(*(it++));
+        }
+    }
+
+    // Add remaining reference elements when we reached end in 'obj'.
+    for (; refIt != refEnd; ++refIt) {
+        // We cannot allow empty object mismatch
+        if (refIt->type() == Object && _hasEmptyObjLegacy(refIt->Obj())) {
+            return false;
+        }
+        if (builder->hasField(refIt->fieldNameStringData())) {
+            return false;
+        }
+        builder->append(*refIt);
+    }
+
+    // Add remaining 'obj' elements when we reached end in 'reference'.
+    for (; it != end; ++it) {
+        // We cannot allow empty object mismatch
+        if (it->type() == Object && _hasEmptyObjLegacy(it->Obj())) {
+            return false;
+        }
+
+        if (builder->hasField(it->fieldNameStringData())) {
+            return false;
+        }
+        builder->append(*it);
+    }
+
+    return true;
+}
+
+// Tries to merge in elements from 'obj' into 'reference'. For successful merge the elements that
+// already exist in 'reference' must be in 'obj' in the same order. The merged object is returned in
+// case of a successful merge, empty BSONObj is returned for failure. This is quite an expensive
+// operation as we are merging unsorted objects. Time complexity is O(N^2).
+BSONObj mergeObjLegacy(const BSONObj& reference, const BSONObj& obj) {
+    BSONObjBuilder builder;
+    if (!_mergeObjLegacy(&builder, reference, obj)) {
+        builder.abandon();
+        return BSONObj();
+    }
+
+    return builder.obj();
+}
+
 }  // namespace
 
-BSONColumnBuilder::BSONColumnBuilder(StringData fieldName)
-    : BSONColumnBuilder(fieldName, BufBuilder()) {}
+BSONColumnBuilder::BSONColumnBuilder(StringData fieldName, bool arrayCompression)
+    : BSONColumnBuilder(fieldName, BufBuilder(), arrayCompression) {}
 
-BSONColumnBuilder::BSONColumnBuilder(StringData fieldName, BufBuilder&& builder)
-    : _state(&_bufBuilder, nullptr), _bufBuilder(std::move(builder)), _fieldName(fieldName) {
+BSONColumnBuilder::BSONColumnBuilder(StringData fieldName,
+                                     BufBuilder&& builder,
+                                     bool arrayCompression)
+    : _state(&_bufBuilder, nullptr),
+      _bufBuilder(std::move(builder)),
+      _fieldName(fieldName),
+      _arrayCompression(arrayCompression) {
     _bufBuilder.reset();
 }
 
@@ -297,7 +518,7 @@ BSONColumnBuilder& BSONColumnBuilder::append(BSONElement elem) {
             "MinKey or MaxKey is not valid for storage",
             type != MinKey && type != MaxKey);
 
-    if (type != Object || elem.Obj().isEmpty()) {
+    if ((type != Object && (!_arrayCompression || type != Array)) || elem.Obj().isEmpty()) {
         // Flush previous sub-object compression when non-object is appended
         if (_mode != Mode::kRegular) {
             _flushSubObjMode();
@@ -310,20 +531,32 @@ BSONColumnBuilder& BSONColumnBuilder::append(BSONElement elem) {
     // First validate that we don't store MinKey or MaxKey anywhere in the Object. If this is the
     // case, throw exception before we modify any state.
     uint32_t numElements = 0;
-    _traverse(obj, [&numElements](const BSONElement& elem, const BSONElement&) {
+    auto perElement = [&numElements](const BSONElement& elem, const BSONElement&) {
         ++numElements;
         uassert(ErrorCodes::InvalidBSONType,
                 "MinKey or MaxKey is not valid for storage",
                 elem.type() != MinKey && elem.type() != MaxKey);
-    });
+    };
+    if (_arrayCompression) {
+        _traverse(obj, perElement);
+    } else {
+        _traverseLegacy(obj, perElement);
+    }
 
     if (_mode == Mode::kRegular) {
         if (numElements == 0) {
             _state.append(elem);
         } else {
-            _startDetermineSubObjReference(obj);
+            _startDetermineSubObjReference(obj, type);
         }
 
+        return *this;
+    }
+
+    // Different types on root is not allowed
+    if (type != _referenceSubObjType) {
+        _flushSubObjMode();
+        _startDetermineSubObjReference(obj, type);
         return *this;
     }
 
@@ -331,13 +564,25 @@ BSONColumnBuilder& BSONColumnBuilder::append(BSONElement elem) {
         // We are in DeterminingReference mode, check if this current object is compatible and merge
         // in any new fields that are discovered.
         uint32_t numElementsReferenceObj = 0;
-        if (!traverseLockStep(
-                _referenceSubObj,
-                obj,
-                [this, &numElementsReferenceObj](const BSONElement& ref, const BSONElement& elem) {
-                    ++numElementsReferenceObj;
-                })) {
-            BSONObj merged = mergeObj(_referenceSubObj, obj);
+        auto perElementLockStep = [this, &numElementsReferenceObj](const BSONElement& ref,
+                                                                   const BSONElement& elem) {
+            ++numElementsReferenceObj;
+        };
+        bool traverseResult = [&] {
+            if (_arrayCompression) {
+                return traverseLockStep(_referenceSubObj, obj, perElementLockStep);
+            } else {
+                return traverseLockStepLegacy(_referenceSubObj, obj, perElementLockStep);
+            }
+        }();
+        if (!traverseResult) {
+            BSONObj merged = [&] {
+                if (_arrayCompression) {
+                    return mergeObj(_referenceSubObj, obj);
+                } else {
+                    return mergeObjLegacy(_referenceSubObj, obj);
+                }
+            }();
             if (merged.isEmptyPrototype()) {
                 // If merge failed, flush current sub-object compression and start over.
                 _flushSubObjMode();
@@ -374,7 +619,7 @@ BSONColumnBuilder& BSONColumnBuilder::append(BSONElement elem) {
         if (numElements == 0) {
             _state.append(elem);
         } else {
-            _startDetermineSubObjReference(obj);
+            _startDetermineSubObjReference(obj, type);
         }
     }
     return *this;
@@ -389,7 +634,14 @@ BSONColumnBuilder& BSONColumnBuilder::skip() {
 
     // If the reference object contain any empty subobjects we need to end interleaved mode as
     // skipping in all substreams would not be encoded as skipped root object.
-    if (_hasEmptyObj(_referenceSubObj)) {
+    bool emptyObj = [&] {
+        if (_arrayCompression) {
+            return _hasEmptyObj(_referenceSubObj);
+        } else {
+            return _hasEmptyObjLegacy(_referenceSubObj);
+        }
+    }();
+    if (emptyObj) {
         _flushSubObjMode();
         return skip();
     }
@@ -922,10 +1174,18 @@ bool BSONColumnBuilder::_appendSubElements(const BSONObj& obj) {
     // Check if added object is compatible with selected reference object. Collect a flat vector of
     // all elements while we are doing this.
     _flattenedAppendedObj.clear();
-    if (!traverseLockStep(
-            _referenceSubObj, obj, [this](const BSONElement& ref, const BSONElement& elem) {
-                _flattenedAppendedObj.push_back(elem);
-            })) {
+
+    auto perElement = [this](const BSONElement& ref, const BSONElement& elem) {
+        _flattenedAppendedObj.push_back(elem);
+    };
+    bool traverseResult = [&] {
+        if (_arrayCompression) {
+            return traverseLockStep(_referenceSubObj, obj, perElement);
+        } else {
+            return traverseLockStepLegacy(_referenceSubObj, obj, perElement);
+        }
+    }();
+    if (!traverseResult) {
         _flushSubObjMode();
         return false;
     }
@@ -949,54 +1209,69 @@ bool BSONColumnBuilder::_appendSubElements(const BSONObj& obj) {
     return true;
 }
 
-void BSONColumnBuilder::_startDetermineSubObjReference(const BSONObj& obj) {
+void BSONColumnBuilder::_startDetermineSubObjReference(const BSONObj& obj, BSONType type) {
     // Start sub-object compression. Enter DeterminingReference mode, we use this first Object
     // as the first reference
     _state.flush();
     _state = {&_bufBuilder, nullptr};
 
     _referenceSubObj = obj.getOwned();
+    _referenceSubObjType = type;
     _bufferedObjElements.push_back(_referenceSubObj);
     _mode = Mode::kSubObjDeterminingReference;
 }
 
 void BSONColumnBuilder::_finishDetermineSubObjReference() {
     // Done determining reference sub-object. Write this control byte and object to stream.
-    _bufBuilder.appendChar(bsoncolumn::kInterleavedStartControlByte);
+    const char interleavedStartControlByte = [&] {
+        if (_arrayCompression) {
+            return _referenceSubObjType == Object
+                ? bsoncolumn::kInterleavedStartControlByte
+                : bsoncolumn::kInterleavedStartArrayRootControlByte;
+        } else {
+            return bsoncolumn::kInterleavedStartControlByteLegacy;
+        }
+    }();
+    _bufBuilder.appendChar(interleavedStartControlByte);
     _bufBuilder.appendBuf(_referenceSubObj.objdata(), _referenceSubObj.objsize());
     ++_numInterleavedStartWritten;
 
     // Initialize all encoding states. We do this by traversing in lock-step between the reference
     // object and first buffered element. We can use the fact if sub-element exists in reference to
     // determine if we should start with a zero delta or skip.
-    bool res =
-        traverseLockStep(_referenceSubObj,
-                         _bufferedObjElements.front(),
-                         [this](const BSONElement& ref, const BSONElement& elem) {
-                             _subobjBuffers.emplace_back();
-                             auto* buffer = &_subobjBuffers.back().first;
-                             auto* controlBlocks = &_subobjBuffers.back().second;
+    auto perElement = [this](const BSONElement& ref, const BSONElement& elem) {
+        _subobjBuffers.emplace_back();
+        auto* buffer = &_subobjBuffers.back().first;
+        auto* controlBlocks = &_subobjBuffers.back().second;
 
-                             // We need to buffer all control blocks written by the EncodingStates
-                             // so they can be added to the main buffer in the right order.
-                             auto controlBlockWriter = [buffer, controlBlocks](
-                                                           const char* controlBlock, size_t size) {
-                                 controlBlocks->emplace_back(controlBlock - buffer->buf(), size);
-                             };
+        // We need to buffer all control blocks written by the EncodingStates
+        // so they can be added to the main buffer in the right order.
+        auto controlBlockWriter = [buffer, controlBlocks](const char* controlBlock, size_t size) {
+            controlBlocks->emplace_back(controlBlock - buffer->buf(), size);
+        };
 
-                             // Set a valid 'previous' into the encoding state to avoid a full
-                             // literal to be written when we append the first element. We want this
-                             // to be a zero delta as the reference object already contain this
-                             // literal.
-                             _subobjStates.emplace_back(buffer, controlBlockWriter);
-                             _subobjStates.back()._storePrevious(ref);
-                             _subobjStates.back()._initializeFromPrevious();
-                             if (!elem.eoo()) {
-                                 _subobjStates.back().append(elem);
-                             } else {
-                                 _subobjStates.back().skip();
-                             }
-                         });
+        // Set a valid 'previous' into the encoding state to avoid a full
+        // literal to be written when we append the first element. We want this
+        // to be a zero delta as the reference object already contain this
+        // literal.
+        _subobjStates.emplace_back(buffer, controlBlockWriter);
+        _subobjStates.back()._storePrevious(ref);
+        _subobjStates.back()._initializeFromPrevious();
+        if (!elem.eoo()) {
+            _subobjStates.back().append(elem);
+        } else {
+            _subobjStates.back().skip();
+        }
+    };
+    bool res = [&] {
+        if (_arrayCompression) {
+            return traverseLockStep(_referenceSubObj, _bufferedObjElements.front(), perElement);
+        } else {
+            return traverseLockStepLegacy(
+                _referenceSubObj, _bufferedObjElements.front(), perElement);
+        }
+    }();
+
     invariant(res);
     _mode = Mode::kSubObjAppending;
 

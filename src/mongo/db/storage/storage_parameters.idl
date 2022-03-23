@@ -161,3 +161,7 @@ feature_flags:
         description: "When enabled, allow renaming databases during restore"
         cpp_varname: feature_flags::gDatabaseRenameDuringRestore
         default: false
+    featureFlagTimeseriesBucketCompressionWithArrays:
+        description: "Enable array compression support for time-series bucket compression"
+        cpp_varname: feature_flags::gTimeseriesBucketCompressionWithArrays
+        default: false
