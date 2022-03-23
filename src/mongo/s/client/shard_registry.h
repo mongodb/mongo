@@ -438,9 +438,7 @@ private:
 
     void _initializeCacheIfNecessary() const;
 
-    void _periodicReload(const executor::TaskExecutor::CallbackArgs& cbArgs);
-
-    void _reloadInternal(OperationContext* opCtx);
+    SharedSemiFuture<Cache::ValueHandle> _reloadInternal();
 
     /**
      * Factory to create shards.  Never changed after startup so safe to access outside of _mutex.
@@ -463,7 +461,7 @@ private:
     ThreadPool _threadPool;
 
     // Executor for periodically reloading the registry (ie. in which _periodicReload() runs).
-    std::unique_ptr<executor::TaskExecutor> _executor{};
+    std::shared_ptr<executor::TaskExecutor> _executor{};
 
     mutable Mutex _cacheMutex = MONGO_MAKE_LATCH("ShardRegistry::_cacheMutex");
     std::unique_ptr<Cache> _cache;
