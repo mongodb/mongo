@@ -59,6 +59,7 @@ WouldChangeOwningShardInfo WouldChangeOwningShardInfo::parseFromCommandError(con
     return WouldChangeOwningShardInfo(obj[kPreImage].Obj().getOwned(),
                                       obj[kPostImage].Obj().getOwned(),
                                       obj[kShouldUpsert].Bool(),
+                                      boost::none,
                                       boost::none);
 }
 

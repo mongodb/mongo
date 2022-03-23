@@ -62,6 +62,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/retryable_writes_stats.h"
+#include "mongo/db/s/sharding_write_router.h"
 #include "mongo/db/server_recovery.h"
 #include "mongo/db/server_transactions_metrics.h"
 #include "mongo/db/stats/fill_locker_info.h"
@@ -71,6 +72,7 @@
 #include "mongo/db/txn_retry_counter_too_old_info.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/log_with_sampling.h"
@@ -3121,6 +3123,21 @@ void TransactionParticipant::Participant::handleWouldChangeOwningShardError(
         repl::ReplOperation operation;
         operation.setOpType(repl::OpTypeEnum::kNoop);
         operation.setObject(kWouldChangeOwningShardSentinel);
+        // Set the "o2" field to differentiate between a WouldChangeOwningShard noop oplog entry
+        // written while handling a WouldChangeOwningShard error and a noop oplog entry with
+        // {"o": {$wouldChangeOwningShard: 1}} written by an external client through the
+        // appendOplogNote command.
+        operation.setObject2(BSONObj());
+
+        // Required by chunk migration and resharding.
+        invariant(wouldChangeOwningShardInfo->getNs());
+        invariant(wouldChangeOwningShardInfo->getUuid());
+        operation.setNss(*wouldChangeOwningShardInfo->getNs());
+        operation.setUuid(*wouldChangeOwningShardInfo->getUuid());
+        ShardingWriteRouter shardingWriteRouter(
+            opCtx, *wouldChangeOwningShardInfo->getNs(), Grid::get(opCtx)->catalogCache());
+        operation.setDestinedRecipient(shardingWriteRouter.getReshardingDestinedRecipient(
+            wouldChangeOwningShardInfo->getPreImage()));
 
         // Required by chunk migration.
         invariant(wouldChangeOwningShardInfo->getNs());

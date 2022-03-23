@@ -147,7 +147,8 @@ void UpsertStage::_performInsert(BSONObj newDocument) {
                 uasserted(WouldChangeOwningShardInfo(_params.request->getQuery(),
                                                      newDocument,
                                                      true /* upsert */,
-                                                     collection()->ns()),
+                                                     collection()->ns(),
+                                                     collection()->uuid()),
                           "The document we are inserting belongs on a different shard");
             }
         }

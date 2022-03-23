@@ -35,6 +35,7 @@
 
 #include "mongo/bson/bsonelement_comparator.h"
 #include "mongo/db/logical_session_id.h"
+#include "mongo/db/ops/write_ops_retryability.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/repl/apply_ops.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
@@ -128,8 +129,6 @@ WriterVectors ReshardingOplogBatchPreparer::makeCrudOpWriterVectors(
             }
 
             auto applyOpsInfo = repl::ApplyOpsCommandInfo::parse(op.getObject());
-            // TODO (SERVER-63880): Make resharding handle applyOps oplog entries with
-            // WouldChangeOwningShard sentinel noop entry.
             uassert(
                 ErrorCodes::OplogOperationUnsupported,
                 str::stream() << "Commands within applyOps are not supported during resharding: "
@@ -142,6 +141,10 @@ WriterVectors ReshardingOplogBatchPreparer::makeCrudOpWriterVectors(
             for (const auto& innerOp : applyOpsInfo.getOperations()) {
                 unrolledOp.setDurableReplOperation(repl::DurableReplOperation::parse(
                     {"ReshardingOplogBatchPreparer::makeCrudOpWriterVectors innerOp"}, innerOp));
+
+                if (isWouldChangeOwningShardSentinelOplogEntry(unrolledOp)) {
+                    continue;
+                }
 
                 // There isn't a direct way to convert from a MutableOplogEntry to a
                 // DurableOplogEntry or OplogEntry. We serialize the unrolledOp to have it get
@@ -214,8 +217,6 @@ WriterVectors ReshardingOplogBatchPreparer::makeSessionOpWriterVectors(
                 // transaction applyOps oplog entry.
 
                 auto applyOpsInfo = repl::ApplyOpsCommandInfo::parse(op.getObject());
-                // TODO (SERVER-63880): Make resharding handle applyOps oplog entries with
-                // WouldChangeOwningShard sentinel noop entry.
                 uassert(ErrorCodes::OplogOperationUnsupported,
                         str::stream()
                             << "Commands within applyOps are not supported during resharding: "
@@ -241,7 +242,8 @@ WriterVectors ReshardingOplogBatchPreparer::makeSessionOpWriterVectors(
                     // DurableOplogEntry or OplogEntry. We serialize the unrolledOp to have it get
                     // re-parsed into an OplogEntry.
                     auto& derivedOp = derivedOps.emplace_back(unrolledOp.toBSON());
-                    invariant(derivedOp.isCrudOpType());
+                    invariant(derivedOp.isCrudOpType() ||
+                              isWouldChangeOwningShardSentinelOplogEntry(unrolledOp));
 
                     // `&derivedOp` is guaranteed to remain stable while we append more derived
                     // oplog entries because `derivedOps` is a std::list.

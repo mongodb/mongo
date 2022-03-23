@@ -32,6 +32,7 @@
 #include <boost/optional/optional_io.hpp>
 
 #include "mongo/db/logical_session_id_helpers.h"
+#include "mongo/db/ops/write_ops_retryability.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/s/resharding/resharding_oplog_batch_preparer.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
@@ -77,19 +78,31 @@ protected:
                                            boost::optional<TxnNumber> txnNumber = boost::none,
                                            boost::optional<bool> isPrepare = boost::none,
                                            boost::optional<bool> isPartial = boost::none) {
-        BSONObjBuilder applyOpsBuilder;
-
-        BSONArrayBuilder opsArrayBuilder = applyOpsBuilder.subarrayStart("applyOps");
+        std::vector<repl::DurableReplOperation> ops;
         for (const auto& document : documents) {
             auto insertOp = repl::DurableReplOperation(repl::OpTypeEnum::kInsert, {}, document);
             if (lsid && isInternalSessionForRetryableWrite(*lsid)) {
-                if (!document.hasField("_id")) {
-                    continue;
+                if (document.hasField("_id")) {
+                    auto id = document.getIntField("_id");
+                    insertOp.setStatementIds({{id}});
                 }
-                auto id = document.getIntField("_id");
-                insertOp.setStatementIds({{id}});
             }
-            opsArrayBuilder.append(insertOp.toBSON());
+            ops.emplace_back(insertOp);
+        }
+
+        return makeApplyOpsOplogEntry(ops, lsid, txnNumber, isPrepare, isPartial);
+    }
+
+    repl::OplogEntry makeApplyOpsOplogEntry(std::vector<repl::DurableReplOperation> ops,
+                                            boost::optional<LogicalSessionId> lsid = boost::none,
+                                            boost::optional<TxnNumber> txnNumber = boost::none,
+                                            boost::optional<bool> isPrepare = boost::none,
+                                            boost::optional<bool> isPartial = boost::none) {
+        BSONObjBuilder applyOpsBuilder;
+
+        BSONArrayBuilder opsArrayBuilder = applyOpsBuilder.subarrayStart("applyOps");
+        for (const auto& op : ops) {
+            opsArrayBuilder.append(op.toBSON());
         }
         opsArrayBuilder.done();
 
@@ -412,6 +425,41 @@ TEST_F(ReshardingOplogBatchPreparerTest, DiscardsNoops) {
     runTest(makeLogicalSessionIdForTest(), txnNumber);
     runTest(makeLogicalSessionIdWithTxnUUIDForTest(), txnNumber);
     runTest(makeLogicalSessionIdWithTxnNumberAndUUIDForTest(), txnNumber);
+}
+
+TEST_F(ReshardingOplogBatchPreparerTest,
+       SessionWriterDoesNotDiscardWouldChangeOwningShardNoopForRetryableInternalTransaction) {
+
+    const auto lsid = makeLogicalSessionIdWithTxnNumberAndUUIDForTest();
+    const TxnNumber txnNumber{1};
+
+    OplogBatch batch;
+
+    auto op =
+        repl::DurableReplOperation(repl::OpTypeEnum::kNoop, {}, kWouldChangeOwningShardSentinel);
+    op.setObject2(BSONObj());
+    op.setStatementIds({{0}});
+    batch.emplace_back(makeApplyOpsOplogEntry(
+        {op}, lsid, txnNumber, false /* isPrepare */, false /* isPartial */));
+
+    std::list<repl::OplogEntry> derivedOpsForCrudWriters;
+    auto crudWriterVectors =
+        _batchPreparer.makeCrudOpWriterVectors(batch, derivedOpsForCrudWriters);
+    ASSERT_EQ(crudWriterVectors.size(), kNumWriterVectors);
+    ASSERT_EQ(derivedOpsForCrudWriters.size(), 0U);
+    ASSERT_EQ(crudWriterVectors[0].size(), 0U);
+    ASSERT_EQ(crudWriterVectors[1].size(), 0U);
+
+    std::list<repl::OplogEntry> derivedOpsForSessionWriters;
+    auto sessionWriterVectors =
+        _batchPreparer.makeSessionOpWriterVectors(batch, derivedOpsForSessionWriters);
+    ASSERT_EQ(sessionWriterVectors.size(), kNumWriterVectors);
+    auto writer = getNonEmptyWriterVector(sessionWriterVectors);
+    ASSERT_EQ(writer.size(), 1U);
+    ASSERT_EQ(derivedOpsForSessionWriters.size(), 1U);
+    ASSERT_EQ(writer[0]->getSessionId(), *getParentSessionId(lsid));
+    ASSERT_EQ(*writer[0]->getTxnNumber(), *lsid.getTxnNumber());
+    ASSERT(isWouldChangeOwningShardSentinelOplogEntry(*writer[0]));
 }
 
 TEST_F(ReshardingOplogBatchPreparerTest, SessionWriteVectorsForApplyOpsWithoutTxnNumber) {

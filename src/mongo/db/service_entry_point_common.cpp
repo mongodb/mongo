@@ -798,6 +798,17 @@ Future<void> CheckoutSessionAndInvokeCommand::run() {
             uassertStatusOK(tenant_migration_access_blocker::handleTenantMigrationConflict(
                 _ecd->getExecutionContext()->getOpCtx(), std::move(status)));
         })
+        .onError<ErrorCodes::WouldChangeOwningShard>([this](Status status) -> Future<void> {
+            auto wouldChangeOwningShardInfo = status.extraInfo<WouldChangeOwningShardInfo>();
+            invariant(wouldChangeOwningShardInfo);
+            _txnParticipant->handleWouldChangeOwningShardError(
+                _ecd->getExecutionContext()->getOpCtx(), wouldChangeOwningShardInfo);
+            _stashTransaction();
+
+            auto txnResponseMetadata = _txnParticipant->getResponseMetadata();
+            txnResponseMetadata.serialize(_ecd->getExtraFieldsBuilder());
+            return status;
+        })
         .tapError([this](Status status) { _tapError(status); })
         .then([this] { return _commitInvocation(); });
 }
@@ -967,7 +978,6 @@ void CheckoutSessionAndInvokeCommand::_checkOutSession() {
 }
 
 void CheckoutSessionAndInvokeCommand::_tapError(Status status) {
-    auto opCtx = _ecd->getExecutionContext()->getOpCtx();
     const OperationSessionInfoFromClient& sessionOptions = _ecd->getSessionOptions();
     if (status.code() == ErrorCodes::CommandOnShardedViewNotSupportedOnMongod) {
         // Exceptions are used to resolve views in a sharded cluster, so they should be handled
@@ -988,14 +998,6 @@ void CheckoutSessionAndInvokeCommand::_tapError(Status status) {
         // If this shard has completed an earlier statement for this transaction, it must already be
         // in the transaction's participant list, so it is guaranteed to learn its outcome.
         _stashTransaction();
-    } else if (status.code() == ErrorCodes::WouldChangeOwningShard) {
-        auto wouldChangeOwningShardInfo = status.extraInfo<WouldChangeOwningShardInfo>();
-        invariant(wouldChangeOwningShardInfo);
-        _txnParticipant->handleWouldChangeOwningShardError(opCtx, wouldChangeOwningShardInfo);
-        _stashTransaction();
-
-        auto txnResponseMetadata = _txnParticipant->getResponseMetadata();
-        txnResponseMetadata.serialize(_ecd->getExtraFieldsBuilder());
     }
 }
 

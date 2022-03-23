@@ -43,7 +43,8 @@ const BSONObj kWouldChangeOwningShardSentinel(BSON("$wouldChangeOwningShard" << 
 template <typename OplogEntryType>
 bool isWouldChangeOwningShardSentinelOplogEntry(const OplogEntryType& oplogEntry) {
     return (oplogEntry.getOpType() == repl::OpTypeEnum::kNoop) &&
-        (oplogEntry.getObject().woCompare(kWouldChangeOwningShardSentinel) == 0);
+        (oplogEntry.getObject().woCompare(kWouldChangeOwningShardSentinel) == 0) &&
+        oplogEntry.getObject2() && oplogEntry.getObject2()->isEmpty();
 }
 
 /**

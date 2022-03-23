@@ -50,11 +50,13 @@ public:
     explicit WouldChangeOwningShardInfo(const BSONObj& preImage,
                                         const BSONObj& postImage,
                                         const bool shouldUpsert,
-                                        boost::optional<NamespaceString> ns)
+                                        boost::optional<NamespaceString> ns,
+                                        boost::optional<UUID> uuid)
         : _preImage(preImage.getOwned()),
           _postImage(postImage.getOwned()),
           _shouldUpsert(shouldUpsert),
-          _ns(ns) {}
+          _ns(ns),
+          _uuid(uuid) {}
 
     const auto& getPreImage() const {
         return _preImage;
@@ -70,6 +72,10 @@ public:
 
     const auto& getNs() const {
         return _ns;
+    }
+
+    const auto& getUuid() const {
+        return _uuid;
     }
 
     BSONObj toBSON() const {
@@ -95,6 +101,10 @@ private:
     // The namespace of the collection containing the document. Does not get serialized into the
     // BSONObj for this error.
     boost::optional<NamespaceString> _ns;
+
+    // The uuid of collection containing the document. Does not get serialized into the BSONObj for
+    // this error.
+    boost::optional<UUID> _uuid;
 };
 using WouldChangeOwningShardException = ExceptionFor<ErrorCodes::WouldChangeOwningShard>;
 
