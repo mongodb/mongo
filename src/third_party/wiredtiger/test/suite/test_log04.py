@@ -141,11 +141,20 @@ class test_log04(wttest.WiredTigerTestCase):
         self.check(c_ts, 30, key, value60)
         self.check(c_nots, 30, key, value60)
 
+        # Close cursors before calling RTS.
+        c_log.close()
+        c_ts.close()
+        c_nots.close()
+
         # Move the stable timestamp to 25. Checkpoint and rollback to a timestamp.
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(25))
         if self.ckpt:
             self.session.checkpoint()
         self.conn.rollback_to_stable()
+
+        c_log = self.session.open_cursor(uri_log)
+        c_ts = self.session.open_cursor(uri_ts)
+        c_nots = self.session.open_cursor(uri_nots)
 
         # Confirm data at time 20 and 30.
         self.check(c_log, 20, key, value60)

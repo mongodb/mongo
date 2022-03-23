@@ -1708,8 +1708,8 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
     }
 
     /*
-     * We're between transactions, if we need to block for eviction, it's a good time to do so. Note
-     * that we must ignore any error return because the user's data is committed.
+     * We're between transactions, if we need to block for eviction, it's a good time to do so.
+     * Ignore error returns, the return must reflect the fate of the transaction.
      */
     if (!readonly)
         WT_IGNORE_RET(__wt_cache_eviction_check(session, false, false, NULL));
@@ -1720,12 +1720,6 @@ err:
     if (cursor != NULL)
         WT_TRET(cursor->close(cursor));
 
-    /*
-     * If anything went wrong, roll back.
-     *
-     * !!!
-     * Nothing can fail after this point.
-     */
     if (locked)
         __wt_readunlock(session, &txn_global->visibility_rwlock);
 
@@ -1741,6 +1735,7 @@ err:
     if (prepare)
         WT_RET_PANIC(session, ret, "failed to commit prepared transaction, failing the system");
 
+    WT_TRET(__wt_session_reset_cursors(session, false));
     WT_TRET(__wt_txn_rollback(session, cfg));
     return (ret);
 }
@@ -1918,7 +1913,7 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
     WT_ASSERT(session, F_ISSET(txn, WT_TXN_RUNNING));
 
     /* Configure the timeout for this rollback operation. */
-    WT_RET(__txn_config_operation_timeout(session, cfg, true));
+    WT_TRET(__txn_config_operation_timeout(session, cfg, true));
 
     /*
      * Resolving prepared updates is expensive. Sort prepared modifications so all updates for each
@@ -1994,9 +1989,10 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
     }
 
     __wt_txn_release(session);
+
     /*
-     * We're between transactions, if we need to block for eviction, it's a good time to do so. Note
-     * that we must ignore any error return because the user's data is committed.
+     * We're between transactions, if we need to block for eviction, it's a good time to do so.
+     * Ignore error returns, the return must reflect the fate of the transaction.
      */
     if (!readonly)
         WT_IGNORE_RET(__wt_cache_eviction_check(session, false, false, NULL));
