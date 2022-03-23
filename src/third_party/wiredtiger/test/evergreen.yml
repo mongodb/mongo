@@ -1545,6 +1545,15 @@ tasks:
         vars:
           test_name: wt8659_reconstruct_database_from_logs
 
+  - name: csuite-wt8963-insert-stress-test
+    tags: ["stress-test-1"]
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+      - func: "csuite test"
+        vars:
+          test_name: wt8963_insert_stress
+
   # End of csuite test tasks
 
   # Start of Python unit test tasks
