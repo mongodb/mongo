@@ -37,6 +37,7 @@
 #include <boost/optional.hpp>
 #include <climits>
 #include <cstdlib>
+#include <cxxabi.h>
 #include <dlfcn.h>
 #include <iomanip>
 #include <iostream>
@@ -164,6 +165,11 @@ void appendBacktrace(BSONObjBuilder* obj, IterationIface& iter, const Options& o
         }
         if (const auto& sym = meta.symbol(); sym) {
             frame.append("s", sym.name());
+            int status;
+            char* realname = abi::__cxa_demangle(std::string(sym.name()).c_str(), 0, 0, &status);
+            if (status == 0)
+                frame.append("C", realname);
+            std::free(realname);
             frame.append("s+", Hex(offsetFromBase(sym.base(), addr)));
         }
     }
