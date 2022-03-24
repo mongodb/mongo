@@ -376,11 +376,6 @@ void DocumentSourceLookUp::determineSbeCompatibility() {
         // syntax.
         && !_userPipeline && _localField &&
         _foreignField
-        // SERVER-64423: disable lowering of $lookup with paths in local/foreign fields until
-        // SERVER-63690 is implemented (this check subsumes the one about numeric componets, but
-        // because it's temporary, we are keeping both for now).
-        && FieldRef(_localField->fullPath()).numParts() == 1 &&
-        FieldRef(_foreignField->fullPath()).numParts() == 1
         // SBE doesn't support match-like paths with numeric components. (Note: "as" field is a
         // project-like field and numbers in it are treated as literal names of fields rather
         // than indexes into arrays, which is compatible with SBE.)

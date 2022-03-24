@@ -60,22 +60,94 @@ namespace {
 using namespace sbe;
 using namespace sbe::value;
 
+/**
+ * De-facto MQL semantics for matching local or foreign records to 'null' is complex and therefore
+ * is causing complex SBE trees to implement it. This comment describes the semantics.
+ *
+ * =================================================================================================
+ * Definitions:
+ *  1. "path" or "path spec" - the sequence of field names to access nested objects
+ *  2. "resolved path" - the sequence of objects a path has been resolved to inside a particular
+ *      object. If some of the fields are arrays, there might be multiple resolved paths that
+ *      correspond to the same path spec. We'll denote a resolved path with a string that encodes
+ *      which elements of the arrays have been accessed. For example, for a path "a.b.c" resolved
+ *      paths might look like "a.b.c", "a.b._", "a.0.b.0.c" or "a.0.b.1._" (underscore shows that
+ *      couldn't continue resolving the path).
+ *  3. "terminal" - the value at the end of a resolved path, if the resolved path terminates before
+ *      fully implementing a path spec, we'll call the terminal "missing".
+ *
+ * For example, given object {a: [{b: [{c: [1,2]}, {no_c: 3}]}, {b: {c: 4}}, {no_b: 5}]} and path
+ * spec 'a.b.c', there are four resolved paths:
+ *  - a.0.b.0.c - terminal: [1,2]
+ *  - a.0.b.1._ - terminal: missing
+ *  - a.1.b.c   - terminal: 4
+ *  - a.2._     - terminal: missing
+ *
+ * =================================================================================================
+ * Matching local records to null
+ *
+ * Foreign record {key: null}, assuming foreignField:'key', would match to local records that meet
+ * the following conditions when traversing localField path:
+ *
+ * 1. there is a terminal with value 'null' or a value of array that contains 'null'. For example,
+ *    if localField:"a.b", the following records would match:
+ *      {a: {b: null}}
+ *      {a: {b: [1, null, 2]}
+ *      {a: [{b: [1, null, 2]}, {b: 3}]}
+ *
+ * 2. all terminals are either missing or have value of an empty array. For example, if
+ *    localField:'a.b', the following records would match:
+ *      {a: {b: []}}
+ *      {a: {no_b: 1}}
+ *      {a: [{b: []}, {no_b: 1}]}
+ *      {a: [1, 2]}
+ *      {no_a: 1}
+ *
+ * =================================================================================================
+ * Matching foreign records to null (same as in the 'find' sub-system)
+ *
+ * Local record {key: null}, assuming localField:'key', would match to foreign records that meet the
+ * following conditions when traversing foreignField path:
+
+ * 1. (same as when matching local) there is a terminal with value 'null' or a value of array that
+ *    contains 'null'. For example, if foreignField:'a.b', the following records would match:
+ *      {a: {b: null}}
+ *      {a: {b: [1, null, 2]}
+ *      {a: [{b: [1, null, 2]}, {b: 3}]}
+ *
+ * 2. there is a missing terminal, such that the last value on the resolved path to this terminal
+ *    is not a scalar inside array. For example, if foreignField:"a.b.c", the following records
+ *    would match:
+ *      {a: {b: {no_c: 1}}} // a.b._ last value {no_c: 1} isn't a scalar
+ *      {a: {b: 1}} // a.b._ last value 1 is a scalar but it's not inside an array
+ *      {a: [{b: {no_c: 1}}, {b: {c: 2}}]} // a.0.b._ last value {no_c: 1} isn't a scalar
+ *      {a: [{b: [{c: 1}, {c: 2}]}, {b: [{c: 3}, {no_c: 4}]]} // a.1.b.1._ last value {no_c: 4}
+ *      {a: 1} // a._ last value 1 is a scalar but it's not inside an array
+ *      {no_a: 1} // _ last value {no_a: 1} isn't a scalar
+ *
+ *    but these records won't match:
+ *      {a: [1, 2]} // a.0._ and a.1._ end in scalar values inside array
+ *      {a: {b: [1, 2]}} // a.b.0._ and a.b.1._ end in scalar values inside array
+ *      {a: [{b: [1, 2]}, 3]} // a.0.b.0._, a.0.b.1._ and a.1.b._ end in scalar values inside arrays
+ */
+
 enum class JoinSide { Local = 0, Foreign = 1 };
 
-// Creates stages for traversing path 'fp' in the record from 'inputSlot'. Returns one key value at
-// a time, including terminal arrays as whole values if 'joinSide' is JoinSide::Local. For example,
-// if the record in the 'inputSlot' is:
+// Creates stages for traversing path 'fp' in the record from 'inputSlot' that implement MQL
+// semantics for local collections. The semantics never treat terminal arrays as whole values and
+// match to null per "Matching local records to null" above. Returns one key value at a time.
+// For example, if the record in the 'inputSlot' is:
 //     {a: [{b:[1,[2,3]]}, {b:4}, {b:1}, {b:2}]},
-// the returned values for path "a.b" will be streamed as: 1, [2,3], [1, [2, 3]], 4, 1, 2 for
-// JoinSide::Foreign and as: 1, [2,3], 4, 1, 2 for JoinSide::Local.
-std::pair<SlotId /*keyValueSlot*/, std::unique_ptr<sbe::PlanStage>> buildKeysStream(
-    JoinSide joinSide,
+// the returned values for path "a.b" will be streamed as: 1, [2,3], 4, 1, 2.
+// Empty arrays and missing are skipped, that is, if the record in the 'inputSlot' is:
+//     {a: [{b:1}, {b:[]}, {no_b:42}, {b:2}]},
+// the returned values for path "a.b" will be streamed as: 1, 2.
+std::pair<SlotId /* keyValueSlot */, std::unique_ptr<sbe::PlanStage>> buildLocalKeysStream(
     SlotId inputSlot,
     const FieldPath& fp,
     const PlanNodeId nodeId,
     SlotIdGenerator& slotIdGenerator) {
     const FieldIndex numParts = fp.getPathLength();
-    invariant(numParts > 0);
 
     std::unique_ptr<sbe::PlanStage> currentStage = makeLimitCoScanTree(nodeId, 1);
     SlotId keyValueSlot = inputSlot;
@@ -83,71 +155,123 @@ std::pair<SlotId /*keyValueSlot*/, std::unique_ptr<sbe::PlanStage>> buildKeysStr
         const StringData fieldName = fp.getFieldName(i);
 
         SlotId getFieldSlot = slotIdGenerator.generate();
-        EvalStage getFieldStage = makeProject(
-            EvalStage{std::move(currentStage), makeSV()},
+        currentStage = makeProjectStage(
+            std::move(currentStage),
             nodeId,
             getFieldSlot,
             makeFunction("getField"_sd, makeVariable(keyValueSlot), makeConstant(fieldName)));
-        currentStage = std::move(getFieldStage.stage);
+
+        SlotId unwindOutputSlot = slotIdGenerator.generate();
+        currentStage = makeS<UnwindStage>(std::move(currentStage) /* child stage */,
+                                          getFieldSlot,
+                                          unwindOutputSlot,
+                                          slotIdGenerator.generate() /* outIndex */,
+                                          true /* preserveNullAndEmptyArrays */,
+                                          nodeId);
+        keyValueSlot = unwindOutputSlot;
+    }
+    return {keyValueSlot, std::move(currentStage)};
+}
+
+// Creates stages for traversing path 'fp' in the record from 'inputSlot' that implement MQL
+// semantics for foreign collections. Returns one key value at a time, including terminal arrays as
+// a whole value. For example,
+// if the record in the 'inputSlot' is:
+//     {a: [{b:[1,[2,3]]}, {b:4}, {b:1}, {b:2}]},
+// the returned values for path "a.b" will be streamed as: 1, [2,3], [1, [2, 3]], 4, 1, 2.
+// Scalars inside arrays on the path are skipped, that is, if the record in the 'inputSlot' is:
+//     {a: [42, {b:{c:1}}, {b: [41,42,{c:2}]}, {b:42}, {b:{c:3}}]},
+// the returned values for path "a.b.c" will be streamed as: 1, 2, null, 3.
+// Replaces other missing terminals with 'null', that is, if the record in the 'inputSlot' is:
+//     {a: [{b:1}, {b:[]}, {no_b:42}, {b:2}]},
+// the returned values for path "a.b" will be streamed as: 1, [], null, 2.
+std::pair<SlotId /* keyValueSlot */, std::unique_ptr<sbe::PlanStage>> buildForeignKeysStream(
+    SlotId inputSlot,
+    const FieldPath& fp,
+    const PlanNodeId nodeId,
+    SlotIdGenerator& slotIdGenerator) {
+    const FieldIndex numParts = fp.getPathLength();
+
+    SlotId keyValueSlot = inputSlot;
+    SlotId prevKeyValueSlot = inputSlot;
+    std::unique_ptr<sbe::PlanStage> currentStage = makeLimitCoScanTree(nodeId, 1);
+
+    for (size_t i = 0; i < numParts; i++) {
+        const StringData fieldName = fp.getFieldName(i);
+
+        std::unique_ptr<EExpression> getFieldFromObject;
+        if (i == 0) {
+            // 'inputSlot' must contain a document and, by definition, it's not inside an array, so
+            // can get field unconditionally.
+            getFieldFromObject = makeFillEmptyNull(
+                makeFunction("getField"_sd, makeVariable(keyValueSlot), makeConstant(fieldName)));
+        } else {
+            // Don't get field from scalars inside arrays (it would fail but we also don't want to
+            // fill with "null" in this case to match the MQL semantics described above.)
+            std::unique_ptr<EExpression> shouldGetField =
+                makeBinaryOp(EPrimBinary::logicOr,
+                             makeFunction("isObject", makeVariable(keyValueSlot)),
+                             makeUnaryOp(EPrimUnary::logicNot,
+                                         makeFunction("isArray", makeVariable(prevKeyValueSlot))));
+            getFieldFromObject =
+                makeE<EIf>(std::move(shouldGetField),
+                           makeFillEmptyNull(makeFunction(
+                               "getField"_sd, makeVariable(keyValueSlot), makeConstant(fieldName))),
+                           makeConstant(TypeTags::Nothing, 0));
+        }
+
+        SlotId getFieldSlot = slotIdGenerator.generate();
+        currentStage = makeProjectStage(
+            move(currentStage), nodeId, getFieldSlot, std::move(getFieldFromObject));
         keyValueSlot = getFieldSlot;
 
-        // For the terminal array we might need to do extra work -- see below.
+        // For the terminal array we will do the extra work of adding the array itself to the stream
+        // (see below) but for the non-termial path components we only need to unwind array
+        // elements.
         if (i + 1 < numParts) {
             SlotId unwindOutputSlot = slotIdGenerator.generate();
-            currentStage = makeS<UnwindStage>(std::move(currentStage) /*child stage*/,
+            currentStage = makeS<UnwindStage>(std::move(currentStage) /* child stage */,
                                               keyValueSlot,
                                               unwindOutputSlot,
-                                              slotIdGenerator.generate() /*outIndex*/,
-                                              true /*preserveNullAndEmptyArrays*/,
+                                              slotIdGenerator.generate() /* outIndex */,
+                                              true /* preserveNullAndEmptyArrays */,
                                               nodeId);
+            prevKeyValueSlot = keyValueSlot;
             keyValueSlot = unwindOutputSlot;
         }
     }
 
-    if (joinSide == JoinSide::Local) {
-        // For the terminal field in local, only the elements of the array are considered to be the
-        // keys, so we can unwind the same way as above in the loop and do nothing else.
-        SlotId unwindOutputSlot = slotIdGenerator.generate();
-        currentStage = makeS<UnwindStage>(std::move(currentStage) /*child stage*/,
-                                          keyValueSlot,
-                                          unwindOutputSlot,
-                                          slotIdGenerator.generate() /*outIndex*/,
-                                          true /*preserveNullAndEmptyArrays*/,
-                                          nodeId);
-        keyValueSlot = unwindOutputSlot;
-    } else {
-        // For the terminal field part in foreign, if the field is an array, we need to add to the
-        // keys both, the elements of the array and the array itself. We do this with a union stage,
-        // but to avoid re-traversing the path, we pass the already extracted path to the union via
-        // nlj stage.
-        SlotId terminalUnwindOutputSlot = slotIdGenerator.generate();
-        std::unique_ptr<sbe::PlanStage> terminalUnwind =
-            makeS<UnwindStage>(makeLimitCoScanTree(nodeId, 1) /*child stage*/,
-                               keyValueSlot,
-                               terminalUnwindOutputSlot,
-                               slotIdGenerator.generate() /*outIndex*/,
-                               true /*preserveNullAndEmptyArrays*/,
+    // For the terminal field part, both the array elements and the array itself are considered as
+    // keys. To implement this, we use a "union" stage, where the first branch produces array
+    // elements and the second branch produces the array itself. To avoid re-traversing the path, we
+    // pass the already traversed path to the "union" via "nlj" stage.
+    SlotId terminalUnwindOutputSlot = slotIdGenerator.generate();
+    std::unique_ptr<sbe::PlanStage> terminalUnwind =
+        makeS<UnwindStage>(makeLimitCoScanTree(nodeId, 1) /* child stage */,
+                           keyValueSlot,
+                           terminalUnwindOutputSlot,
+                           slotIdGenerator.generate() /* outIndex */,
+                           true /* preserveNullAndEmptyArrays */,
+                           nodeId);
+
+    SlotId unionOutputSlot = slotIdGenerator.generate();
+    sbe::PlanStage::Vector terminalStagesToUnion;
+    terminalStagesToUnion.push_back(std::move(terminalUnwind));
+    terminalStagesToUnion.emplace_back(makeLimitCoScanTree(nodeId, 1));
+
+    std::unique_ptr<sbe::PlanStage> unionStage =
+        sbe::makeS<UnionStage>(std::move(terminalStagesToUnion),
+                               std::vector{makeSV(terminalUnwindOutputSlot), makeSV(keyValueSlot)},
+                               makeSV(unionOutputSlot),
                                nodeId);
 
-        SlotId unionOutputSlot = slotIdGenerator.generate();
-        sbe::PlanStage::Vector terminalStagesToUnion;
-        terminalStagesToUnion.push_back(std::move(terminalUnwind));
-        terminalStagesToUnion.emplace_back(makeLimitCoScanTree(nodeId, 1));
-
-        std::unique_ptr<sbe::PlanStage> unionStage = sbe::makeS<UnionStage>(
-            std::move(terminalStagesToUnion),
-            std::vector{makeSV(terminalUnwindOutputSlot), makeSV(keyValueSlot)},
-            makeSV(unionOutputSlot),
-            nodeId);
-
-        currentStage = makeS<LoopJoinStage>(std::move(currentStage),
-                                            std::move(unionStage),
-                                            makeSV() /*outerProjects*/,
-                                            makeSV(keyValueSlot) /*outerCorrelated*/,
-                                            nullptr /*predicate*/,
-                                            nodeId);
-        keyValueSlot = unionOutputSlot;
-    }
+    currentStage = makeS<LoopJoinStage>(std::move(currentStage),
+                                        std::move(unionStage),
+                                        makeSV() /* outerProjects */,
+                                        makeSV(keyValueSlot) /* outerCorrelated */,
+                                        nullptr /* predicate */,
+                                        nodeId);
+    keyValueSlot = unionOutputSlot;
 
     return {keyValueSlot, std::move(currentStage)};
 }
@@ -159,7 +283,7 @@ std::pair<SlotId /*keyValueSlot*/, std::unique_ptr<sbe::PlanStage>> buildKeysStr
 // If the stream produces no values, that is, would result in an empty set, the empty set is
 // replaced with a set that contains a single 'null' value, so that it matches MQL semantics when
 // empty arrays and all missing are matched to 'null'.
-std::pair<SlotId /*keyValuesSetSlot*/, std::unique_ptr<sbe::PlanStage>> buildKeySet(
+std::pair<SlotId /* keyValuesSetSlot */, std::unique_ptr<sbe::PlanStage>> buildKeySet(
     JoinSide joinSide,
     std::unique_ptr<sbe::PlanStage> inputStage,
     SlotId recordSlot,
@@ -167,56 +291,62 @@ std::pair<SlotId /*keyValuesSetSlot*/, std::unique_ptr<sbe::PlanStage>> buildKey
     const PlanNodeId nodeId,
     SlotIdGenerator& slotIdGenerator) {
     // Create the branch to stream individual key values from every terminal of the path.
-    auto [keyValueSlot, keyValuesStage] =
-        buildKeysStream(joinSide, recordSlot, fp, nodeId, slotIdGenerator);
+    auto [keyValueSlot, keyValuesStage] = (joinSide == JoinSide::Local)
+        ? buildLocalKeysStream(recordSlot, fp, nodeId, slotIdGenerator)
+        : buildForeignKeysStream(recordSlot, fp, nodeId, slotIdGenerator);
 
     // Re-pack the individual key values into a set.
     SlotId keyValuesSetSlot = slotIdGenerator.generate();
     EvalStage packedKeyValuesStage = makeHashAgg(
         EvalStage{std::move(keyValuesStage), SlotVector{}},
-        makeSV(), /*groupBy slots - "none" means creating a single group*/
+        makeSV(), /* groupBy slots - "none" means creating a single group */
         makeEM(keyValuesSetSlot, makeFunction("addToSet"_sd, makeVariable(keyValueSlot))),
-        {} /*collatorSlot*/,
-        false /*allowDiskUse*/,
+        {} /* collatorSlot */,
+        false /* allowDiskUse */,
         nodeId);
 
     // The set in 'keyValuesSetSlot' might end up empty if the localField contained only missing and
-    // empty arrays (e.g. path "a.b" in {a: [{no_b:1}, {b:[]}]}). The semantics of MQL require these
-    // cases to match to 'null', so we replace the empty set with a constant set that contains a
-    // single 'null' value.
-    auto [arrayWithNullTag, arrayWithNullVal] = makeNewArray();
-    std::unique_ptr<EExpression> arrayWithNull = makeConstant(arrayWithNullTag, arrayWithNullVal);
-    value::Array* arrayWithNullView = getArrayView(arrayWithNullVal);
-    arrayWithNullView->push_back(TypeTags::Null, 0);
+    // empty arrays (e.g. path "a.b" in {a: [{no_b:1}, {b:[]}]}). The semantics of MQL for local
+    // keys require these cases to match to 'null', so we replace the empty set with a constant set
+    // that contains a single 'null' value. The set of foreign key values also can be empty but it
+    // should produce no matches so we leave it empty.
+    if (joinSide == JoinSide::Local) {
+        auto [arrayWithNullTag, arrayWithNullVal] = makeNewArray();
+        std::unique_ptr<EExpression> arrayWithNull =
+            makeConstant(arrayWithNullTag, arrayWithNullVal);
+        value::Array* arrayWithNullView = getArrayView(arrayWithNullVal);
+        arrayWithNullView->push_back(TypeTags::Null, 0);
 
-    std::unique_ptr<EExpression> isNonEmptySetExpr =
-        makeBinaryOp(sbe::EPrimBinary::greater,
-                     makeFunction("getArraySize", makeVariable(keyValuesSetSlot)),
-                     makeConstant(TypeTags::NumberInt32, 0));
+        std::unique_ptr<EExpression> isNonEmptySetExpr =
+            makeBinaryOp(sbe::EPrimBinary::greater,
+                         makeFunction("getArraySize", makeVariable(keyValuesSetSlot)),
+                         makeConstant(TypeTags::NumberInt32, 0));
 
-    SlotId nonEmptySetSlot = slotIdGenerator.generate();
-    packedKeyValuesStage = makeProject(std::move(packedKeyValuesStage),
-                                       nodeId,
-                                       nonEmptySetSlot,
-                                       sbe::makeE<sbe::EIf>(std::move(isNonEmptySetExpr),
-                                                            makeVariable(keyValuesSetSlot),
-                                                            std::move(arrayWithNull)));
+        SlotId nonEmptySetSlot = slotIdGenerator.generate();
+        packedKeyValuesStage = makeProject(std::move(packedKeyValuesStage),
+                                           nodeId,
+                                           nonEmptySetSlot,
+                                           sbe::makeE<sbe::EIf>(std::move(isNonEmptySetExpr),
+                                                                makeVariable(keyValuesSetSlot),
+                                                                std::move(arrayWithNull)));
+        keyValuesSetSlot = nonEmptySetSlot;
+    }
 
     // Attach the set of key values to the original local record.
     std::unique_ptr<sbe::PlanStage> nljLocalWithKeyValuesSet =
         makeS<LoopJoinStage>(std::move(inputStage),
                              std::move(packedKeyValuesStage.stage),
-                             makeSV(recordSlot) /*outerProjects*/,
-                             makeSV(recordSlot) /*outerCorrelated*/,
-                             nullptr /*predicate*/,
+                             makeSV(recordSlot) /* outerProjects */,
+                             makeSV(recordSlot) /* outerCorrelated */,
+                             nullptr /* predicate */,
                              nodeId);
 
-    return {nonEmptySetSlot, std::move(nljLocalWithKeyValuesSet)};
+    return {keyValuesSetSlot, std::move(nljLocalWithKeyValuesSet)};
 }
 
 // Creates stages for grouping matched foreign records into an array. If there's no match, the
 // stages return an empty array instead.
-std::pair<SlotId /*resultSlot*/, std::unique_ptr<sbe::PlanStage>> buildForeignMatchedArray(
+std::pair<SlotId /* resultSlot */, std::unique_ptr<sbe::PlanStage>> buildForeignMatchedArray(
     EvalStage innerBranch,
     SlotId foreignRecordSlot,
     const PlanNodeId nodeId,
@@ -228,10 +358,10 @@ std::pair<SlotId /*resultSlot*/, std::unique_ptr<sbe::PlanStage>> buildForeignMa
     SlotId accumulatorSlot = slotIdGenerator.generate();
     innerBranch = makeHashAgg(
         std::move(innerBranch),
-        makeSV(), /*groupBy slots*/
+        makeSV(), /* groupBy slots */
         makeEM(accumulatorSlot, makeFunction("addToArray"_sd, makeVariable(foreignRecordSlot))),
-        {} /*collatorSlot*/,
-        false /*allowDiskUse*/,
+        {} /* collatorSlot */,
+        false /* allowDiskUse */,
         nodeId);
 
     // $lookup is an _outer_ left join that returns an empty array for "as" field rather than
@@ -252,16 +382,16 @@ std::pair<SlotId /*resultSlot*/, std::unique_ptr<sbe::PlanStage>> buildForeignMa
     EvalStage unionStage =
         makeUnion(makeVector(EvalStage{std::move(innerBranch.stage), SlotVector{}},
                              EvalStage{std::move(emptyArrayStage), SlotVector{}}),
-                  {makeSV(accumulatorSlot), makeSV(emptyArraySlot)} /*inputs*/,
+                  {makeSV(accumulatorSlot), makeSV(emptyArraySlot)} /* inputs */,
                   makeSV(unionOutputSlot),
                   nodeId);
 
     return std::make_pair(
         unionOutputSlot,
-        std::move(makeLimitSkip(std::move(unionStage), nodeId, 1 /*limit*/).stage));
+        std::move(makeLimitSkip(std::move(unionStage), nodeId, 1 /* limit */).stage));
 }
 
-std::pair<SlotId /*matched docs*/, std::unique_ptr<sbe::PlanStage>> buildNljLookupStage(
+std::pair<SlotId /* matched docs */, std::unique_ptr<sbe::PlanStage>> buildNljLookupStage(
     std::unique_ptr<sbe::PlanStage> localStage,
     SlotId localRecordSlot,
     const FieldPath& localFieldName,
@@ -296,7 +426,7 @@ std::pair<SlotId /*matched docs*/, std::unique_ptr<sbe::PlanStage>> buildNljLook
                                                             makeE<EVariable>(foreignKeySlot)))),
         makeConstant(TypeTags::NumberInt32, 0));
 
-    EvalStage innerBranch = makeFilter<false /*IsConst*/, false /*IsEof*/>(
+    EvalStage innerBranch = makeFilter<false /* IsConst */, false /* IsEof */>(
         EvalStage{std::move(foreignKeyStage), SlotVector{}}, std::move(haveMatchingKeys), nodeId);
 
     // Group the matched foreign documents into a list, stored in the 'innerResultSlot'.
@@ -311,9 +441,9 @@ std::pair<SlotId /*matched docs*/, std::unique_ptr<sbe::PlanStage>> buildNljLook
     std::unique_ptr<sbe::PlanStage> nlj =
         makeS<LoopJoinStage>(std::move(outerRootStage),
                              std::move(innerRootStage),
-                             makeSV(localRecordSlot) /*outerProjects*/,
-                             makeSV(localKeySlot) /*outerCorrelated*/,
-                             nullptr /*predicate*/,
+                             makeSV(localRecordSlot) /* outerProjects */,
+                             makeSV(localKeySlot) /* outerCorrelated */,
+                             nullptr /* predicate */,
                              nodeId);
 
     return {innerResultSlot, std::move(nlj)};
@@ -432,11 +562,11 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
     // 'localFieldSlot' is a set even if it contains a single item. Extract this single value until
     // SERVER-63574 is implemented.
     SlotId localFieldSlot = slotIdGenerator.generate();
-    auto localFieldStage = makeS<UnwindStage>(std::move(localKeysSetStage) /*child stage*/,
+    auto localFieldStage = makeS<UnwindStage>(std::move(localKeysSetStage) /* child stage */,
                                               localKeysSetSlot,
                                               localFieldSlot,
-                                              slotIdGenerator.generate() /*outIndex*/,
-                                              true /*preserveNullAndEmptyArrays*/,
+                                              slotIdGenerator.generate() /* outIndex */,
+                                              true /* preserveNullAndEmptyArrays */,
                                               nodeId);
 
     // Calculate the low key and high key of each individual local field. They are stored in
