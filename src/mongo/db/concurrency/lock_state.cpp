@@ -41,6 +41,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/flow_control.h"
+#include "mongo/db/storage/ticketholders.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/stdx/new.h"
@@ -359,8 +360,8 @@ void LockerImpl::reacquireTicket(OperationContext* opCtx) {
 
 bool LockerImpl::_acquireTicket(OperationContext* opCtx, LockMode mode, Date_t deadline) {
     const bool reader = isSharedLockMode(mode);
-    auto lockManager = getGlobalLockManager();
-    auto holder = shouldAcquireTicket() ? lockManager->getTicketHolder(mode) : nullptr;
+    auto& ticketHolders = ticketHoldersDecoration(getGlobalServiceContext());
+    auto holder = shouldAcquireTicket() ? ticketHolders.getTicketHolder(mode) : nullptr;
     if (holder) {
         _clientState.store(reader ? kQueuedReader : kQueuedWriter);
 
@@ -1069,8 +1070,8 @@ void LockerImpl::releaseTicket() {
 }
 
 void LockerImpl::_releaseTicket() {
-    auto ticketManager = getGlobalLockManager();
-    auto holder = shouldAcquireTicket() ? ticketManager->getTicketHolder(_modeForTicket) : nullptr;
+    auto& ticketHolders = ticketHoldersDecoration(getGlobalServiceContext());
+    auto holder = shouldAcquireTicket() ? ticketHolders.getTicketHolder(_modeForTicket) : nullptr;
     if (holder) {
         holder->release();
     }

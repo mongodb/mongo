@@ -43,6 +43,7 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
+#include "mongo/db/storage/ticketholders.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/thread.h"
@@ -69,19 +70,15 @@ const auto kMaxClockJitterMillis = Milliseconds(0);
  */
 class UseGlobalThrottling {
 public:
-    explicit UseGlobalThrottling(OperationContext* opCtx, int numTickets) : _opCtx(opCtx) {
-        auto lockManager = LockManager::get(_opCtx);
-        lockManager->setTicketHolders(std::make_unique<SemaphoreTicketHolder>(numTickets),
-                                      std::make_unique<SemaphoreTicketHolder>(numTickets));
+    explicit UseGlobalThrottling(OperationContext* opCtx, int numTickets) {
+        auto& ticketHolders = ticketHoldersDecoration(getGlobalServiceContext());
+        ticketHolders.setGlobalThrottling(std::make_unique<SemaphoreTicketHolder>(numTickets),
+                                          std::make_unique<SemaphoreTicketHolder>(numTickets));
     }
     ~UseGlobalThrottling() noexcept(false) {
-        // Reset the global setting as we're about to destroy the ticket holder.
-        auto lockManager = LockManager::get(_opCtx);
-        lockManager->setTicketHolders(nullptr, nullptr);
+        auto& ticketHolders = ticketHoldersDecoration(getGlobalServiceContext());
+        ticketHolders.setGlobalThrottling(nullptr, nullptr);
     }
-
-private:
-    OperationContext* _opCtx;
 };
 
 

@@ -45,11 +45,14 @@
 #include "mongo/db/storage/storage_engine_change_context.h"
 #include "mongo/db/storage/storage_engine_lock_file.h"
 #include "mongo/db/storage/storage_engine_metadata.h"
+#include "mongo/db/storage/storage_engine_parameters.h"
+#include "mongo/db/storage/storage_engine_parameters_gen.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/storage_repair_observer.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -156,6 +159,32 @@ StorageEngine::LastShutdownState initializeStorageEngine(OperationContext* opCtx
         uassertStatusOK(factory->validateMetadata(*metadata, storageGlobalParams));
     }
 
+    if (storageGlobalParams.engine != "ephemeralForTest") {
+        auto readTransactions = gConcurrentReadTransactions.load();
+        static constexpr auto DEFAULT_TICKETS_VALUE = 128;
+        readTransactions = readTransactions == 0 ? DEFAULT_TICKETS_VALUE : readTransactions;
+        auto writeTransactions = gConcurrentWriteTransactions.load();
+        writeTransactions = writeTransactions == 0 ? DEFAULT_TICKETS_VALUE : writeTransactions;
+
+        // TODO SERVER-64467: Remove the globalServiceContext for TicketHolders
+        auto serviceContext = getGlobalServiceContext();
+        auto& ticketHolders = ticketHoldersDecoration(serviceContext);
+        switch (gTicketQueueingPolicy) {
+            case QueueingPolicyEnum::Semaphore:
+                LOGV2_DEBUG(6382201, 1, "Using Semaphore-based ticketing scheduler");
+                ticketHolders.setGlobalThrottling(
+                    std::make_unique<SemaphoreTicketHolder>(readTransactions),
+                    std::make_unique<SemaphoreTicketHolder>(writeTransactions));
+                break;
+            case QueueingPolicyEnum::FifoQueue:
+                LOGV2_DEBUG(6382200, 1, "Using FIFO queue-based ticketing scheduler");
+                ticketHolders.setGlobalThrottling(
+                    std::make_unique<FifoTicketHolder>(readTransactions),
+                    std::make_unique<FifoTicketHolder>(writeTransactions));
+                break;
+        }
+    }
+
     ScopeGuard guard([&] {
         auto& lockFile = StorageEngineLockFile::get(service);
         if (lockFile) {
@@ -213,6 +242,13 @@ void shutdownGlobalStorageEngineCleanly(ServiceContext* service, Status errorToR
     if (lockFile) {
         lockFile->clearPidAndUnlock();
         lockFile = boost::none;
+    }
+    // TODO SERVER-64467: Remove the globalServiceContext for TicketHolders
+    // Cleanup the ticket holders.
+    if (hasGlobalServiceContext()) {
+        auto serviceContext = getGlobalServiceContext();
+        auto& ticketHolders = ticketHoldersDecoration(serviceContext);
+        ticketHolders.setGlobalThrottling(nullptr, nullptr);
     }
 }
 } /* namespace */

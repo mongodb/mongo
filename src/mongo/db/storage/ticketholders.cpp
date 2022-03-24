@@ -28,7 +28,6 @@
  */
 
 #include "mongo/db/storage/ticketholders.h"
-#include "mongo/db/concurrency/lock_manager.h"
 #include "mongo/util/concurrency/ticketholder.h"
 
 namespace mongo {
@@ -36,10 +35,10 @@ namespace mongo {
 Status TicketHolders::updateConcurrentWriteTransactions(const int& newWriteTransactions) {
     if (hasGlobalServiceContext()) {
         auto serviceContext = getGlobalServiceContext();
-        auto lockManager = LockManager::get(serviceContext);
-        auto ticketHolder = lockManager->getTicketHolder(LockMode::MODE_IX);
-        if (ticketHolder) {
-            return ticketHolder->resize(newWriteTransactions);
+        auto& ticketHolders = ticketHoldersDecoration(serviceContext);
+        auto& writer = ticketHolders._openWriteTransaction;
+        if (writer) {
+            return writer->resize(newWriteTransactions);
         }
     }
     return Status::OK();
@@ -48,13 +47,35 @@ Status TicketHolders::updateConcurrentWriteTransactions(const int& newWriteTrans
 Status TicketHolders::updateConcurrentReadTransactions(const int& newReadTransactions) {
     if (hasGlobalServiceContext()) {
         auto serviceContext = getGlobalServiceContext();
-        auto lockManager = LockManager::get(serviceContext);
-        auto ticketHolder = lockManager->getTicketHolder(LockMode::MODE_IS);
-        if (ticketHolder) {
-            return ticketHolder->resize(newReadTransactions);
+        auto& ticketHolders = ticketHoldersDecoration(serviceContext);
+        auto& reader = ticketHolders._openReadTransaction;
+        if (reader) {
+            return reader->resize(newReadTransactions);
         }
     }
     return Status::OK();
-};
+}
+
+void TicketHolders::setGlobalThrottling(std::unique_ptr<TicketHolder> reading,
+                                        std::unique_ptr<TicketHolder> writing) {
+    _openReadTransaction = std::move(reading);
+    _openWriteTransaction = std::move(writing);
+}
+
+TicketHolder* TicketHolders::getTicketHolder(LockMode mode) {
+    switch (mode) {
+        case MODE_S:
+        case MODE_IS:
+            return _openReadTransaction.get();
+        case MODE_IX:
+            return _openWriteTransaction.get();
+        default:
+            return nullptr;
+    }
+}
+
+const Decorable<ServiceContext>::Decoration<TicketHolders> ticketHoldersDecoration =
+    ServiceContext::declareDecoration<TicketHolders>();
+
 
 }  // namespace mongo

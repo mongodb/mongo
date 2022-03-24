@@ -49,7 +49,6 @@ namespace mongo {
 
 class OperationContext;
 class ServiceContext;
-class TicketHolder;
 
 /**
  * Entry point for the lock manager scheduling functionality. Don't use it directly, but
@@ -168,18 +167,6 @@ public:
     void getLockInfoBSON(const std::map<LockerId, BSONObj>& lockToClientMap,
                          BSONObjBuilder* result);
 
-    /**
-     * Sets the TicketHolder implementation to use to obtain tickets from 'reading' (for MODE_S and
-     * MODE_IS), and from 'writing' (for MODE_IX) in order to throttle database access. There is no
-     * throttling for MODE_X, as there can only ever be a single locker using this mode. The
-     * throttling is intended to defend against large drops in throughput under high load due to too
-     * much concurrency.
-     */
-    void setTicketHolders(std::unique_ptr<TicketHolder> readTickets,
-                          std::unique_ptr<TicketHolder> writeTickets);
-
-    TicketHolder* getTicketHolder(LockMode mode);
-
 private:
     // The lockheads need access to the partitions
     friend struct LockHead;
@@ -250,8 +237,5 @@ private:
 
     static const unsigned _numPartitions;
     Partition* _partitions;
-
-    std::unique_ptr<TicketHolder> _readingTicketholder;
-    std::unique_ptr<TicketHolder> _writingTicketholder;
 };
 }  // namespace mongo

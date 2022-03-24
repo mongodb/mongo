@@ -47,7 +47,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/str.h"
 #include "mongo/util/timer.h"
@@ -877,24 +876,6 @@ void LockManager::getLockInfoBSON(const std::map<LockerId, BSONObj>& lockToClien
                                   BSONObjBuilder* result) {
     auto lockInfoArr = BSONArrayBuilder(result->subarrayStart("lockInfo"));
     _buildLocksArray(lockToClientMap, false, this, &lockInfoArr);
-}
-
-void LockManager::setTicketHolders(std::unique_ptr<TicketHolder> reading,
-                                   std::unique_ptr<TicketHolder> writing) {
-    _readingTicketholder = std::move(reading);
-    _writingTicketholder = std::move(writing);
-}
-
-TicketHolder* LockManager::getTicketHolder(LockMode mode) {
-    switch (mode) {
-        case MODE_IS:
-        case MODE_S:
-            return _readingTicketholder.get();
-        case MODE_IX:
-            return _writingTicketholder.get();
-        default:
-            return nullptr;
-    }
 }
 
 void LockManager::_buildLocksArray(const std::map<LockerId, BSONObj>& lockToClientMap,

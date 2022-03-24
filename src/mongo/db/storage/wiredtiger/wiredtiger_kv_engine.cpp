@@ -74,12 +74,11 @@
 #include "mongo/db/snapshot_window_options_gen.h"
 #include "mongo/db/storage/journal_listener.h"
 #include "mongo/db/storage/key_format.h"
-#include "mongo/db/storage/storage_engine_parameters.h"
-#include "mongo/db/storage/storage_engine_parameters_gen.h"
 #include "mongo/db/storage/storage_file_util.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/storage_repair_observer.h"
+#include "mongo/db/storage/ticketholders.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_extensions.h"
@@ -572,28 +571,6 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
 
     _sizeStorer = std::make_unique<WiredTigerSizeStorer>(_conn, _sizeStorerUri, _readOnly);
 
-    auto readTransactions = gConcurrentReadTransactions.load();
-    static constexpr auto DEFAULT_TICKETS_VALUE = 128;
-    readTransactions = readTransactions == 0 ? DEFAULT_TICKETS_VALUE : readTransactions;
-    auto writeTransactions = gConcurrentWriteTransactions.load();
-    writeTransactions = writeTransactions == 0 ? DEFAULT_TICKETS_VALUE : writeTransactions;
-
-    auto serviceContext = getGlobalServiceContext();
-    auto lockManager = LockManager::get(serviceContext);
-    switch (gTicketQueueingPolicy) {
-        case QueueingPolicyEnum::Semaphore:
-            LOGV2_DEBUG(6382201, 1, "Using Semaphore-based ticketing scheduler");
-            lockManager->setTicketHolders(
-                std::make_unique<SemaphoreTicketHolder>(readTransactions),
-                std::make_unique<SemaphoreTicketHolder>(writeTransactions));
-            break;
-        case QueueingPolicyEnum::FifoQueue:
-            LOGV2_DEBUG(6382200, 1, "Using FIFO queue-based ticketing scheduler");
-            lockManager->setTicketHolders(std::make_unique<FifoTicketHolder>(readTransactions),
-                                          std::make_unique<FifoTicketHolder>(writeTransactions));
-            break;
-    }
-
     _runTimeConfigParam.reset(makeServerParameter<WiredTigerEngineRuntimeConfigParameter>(
         "wiredTigerEngineRuntimeConfig", ServerParameterType::kRuntimeOnly));
     _runTimeConfigParam->_data.second = this;
@@ -606,13 +583,6 @@ WiredTigerKVEngine::~WiredTigerKVEngine() {
 
     cleanShutdown();
 
-    // Cleanup the ticket holders.
-    if (hasGlobalServiceContext()) {
-        auto serviceContext = getGlobalServiceContext();
-        auto lockManager = LockManager::get(serviceContext);
-        lockManager->setTicketHolders(nullptr, nullptr);
-    }
-
     _sessionCache.reset(nullptr);
 }
 
@@ -624,10 +594,9 @@ void WiredTigerKVEngine::notifyStartupComplete() {
 void WiredTigerKVEngine::appendGlobalStats(BSONObjBuilder& b) {
     BSONObjBuilder bb(b.subobjStart("concurrentTransactions"));
     auto serviceContext = getGlobalServiceContext();
-    auto lockManager = LockManager::get(serviceContext);
-    auto writer = lockManager->getTicketHolder(MODE_IX);
-    auto reader = lockManager->getTicketHolder(MODE_IS);
+    auto& ticketHolders = ticketHoldersDecoration(serviceContext);
     {
+        auto writer = ticketHolders.getTicketHolder(MODE_IX);
         BSONObjBuilder bbb(bb.subobjStart("write"));
         bbb.append("out", writer->used());
         bbb.append("available", writer->available());
@@ -635,6 +604,7 @@ void WiredTigerKVEngine::appendGlobalStats(BSONObjBuilder& b) {
         bbb.done();
     }
     {
+        auto reader = ticketHolders.getTicketHolder(MODE_IS);
         BSONObjBuilder bbb(bb.subobjStart("read"));
         bbb.append("out", reader->used());
         bbb.append("available", reader->available());
