@@ -569,6 +569,11 @@ err:
 int
 __wt_curhs_search_near_before(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
 {
+    /*
+     * If the btree id is set alone, it is not possible to position the cursor at a place that is
+     * smaller than set search key, therefore assert that the key must be set to use this function.
+     */
+    WT_ASSERT(session, F_ISSET((WT_CURSOR_HS *)cursor, WT_HS_CUR_KEY_SET));
     return (__curhs_search_near_helper(session, cursor, true));
 }
 
@@ -684,7 +689,10 @@ __curhs_search_near(WT_CURSOR *cursor, int *exactp)
                   file_cursor->get_key(file_cursor, &btree_id, datastore_key, &start_ts, &counter));
 
                 /* We are back in the specified btree range. */
-                if (btree_id == hs_cursor->btree_id && F_ISSET(hs_cursor, WT_HS_CUR_KEY_SET)) {
+                if (btree_id == hs_cursor->btree_id) {
+                    if (!F_ISSET(hs_cursor, WT_HS_CUR_KEY_SET))
+                        break;
+
                     WT_ERR(
                       __wt_compare(session, NULL, datastore_key, hs_cursor->datastore_key, &cmp));
 
@@ -760,7 +768,10 @@ __curhs_search_near(WT_CURSOR *cursor, int *exactp)
                   file_cursor->get_key(file_cursor, &btree_id, datastore_key, &start_ts, &counter));
 
                 /* We are back in the specified btree range. */
-                if (btree_id == hs_cursor->btree_id && F_ISSET(hs_cursor, WT_HS_CUR_KEY_SET)) {
+                if (btree_id == hs_cursor->btree_id) {
+                    if (!F_ISSET(hs_cursor, WT_HS_CUR_KEY_SET))
+                        break;
+
                     WT_ERR(
                       __wt_compare(session, NULL, datastore_key, hs_cursor->datastore_key, &cmp));
 
