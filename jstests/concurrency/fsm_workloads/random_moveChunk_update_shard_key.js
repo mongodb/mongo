@@ -454,7 +454,6 @@ var $config = extendWorkload($config, function($config, $super) {
      * document is given to each one.
      */
     $config.setup = function setup(db, collName, cluster) {
-        db.setLogLevel(3);
         const ns = db[collName].getFullName();
 
         for (let tid = 0; tid < this.threadCount; ++tid) {

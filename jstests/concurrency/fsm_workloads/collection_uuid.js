@@ -235,8 +235,6 @@ var $config = (function() {
     })();
 
     const setup = function(db, collName, cluster) {
-        db.setLogLevel(3);
-
         // Add documents with wide range '_id' to end up with the data distributed across multiple
         // shards in the sharded scenario.
         for (let i = 0; i < this.threadCount; ++i) {
