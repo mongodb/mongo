@@ -44,14 +44,23 @@ using boost::intrusive_ptr;
 
 DocumentSourceTeeConsumer::DocumentSourceTeeConsumer(const intrusive_ptr<ExpressionContext>& expCtx,
                                                      size_t facetId,
-                                                     const intrusive_ptr<TeeBuffer>& bufferSource)
-    : DocumentSource(kStageName, expCtx), _facetId(facetId), _bufferSource(bufferSource) {}
+                                                     const intrusive_ptr<TeeBuffer>& bufferSource,
+                                                     const StringData& stageName)
+    : DocumentSource(stageName, expCtx),
+      _facetId(facetId),
+      _bufferSource(bufferSource),
+      _stageName(stageName.toString()) {}
 
 boost::intrusive_ptr<DocumentSourceTeeConsumer> DocumentSourceTeeConsumer::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     size_t facetId,
-    const boost::intrusive_ptr<TeeBuffer>& bufferSource) {
-    return new DocumentSourceTeeConsumer(expCtx, facetId, bufferSource);
+    const boost::intrusive_ptr<TeeBuffer>& bufferSource,
+    const StringData& stageName) {
+    return new DocumentSourceTeeConsumer(expCtx, facetId, bufferSource, stageName);
+}
+
+const char* DocumentSourceTeeConsumer::getSourceName() const {
+    return _stageName.c_str();
 }
 
 DocumentSource::GetNextResult DocumentSourceTeeConsumer::doGetNext() {
@@ -65,6 +74,6 @@ void DocumentSourceTeeConsumer::doDispose() {
 Value DocumentSourceTeeConsumer::serialize(
     boost::optional<ExplainOptions::Verbosity> explain) const {
     // We only serialize this stage in the context of explain.
-    return explain ? Value(DOC(kStageName << Document())) : Value();
+    return explain ? Value(DOC(_stageName << Document())) : Value();
 }
 }  // namespace mongo

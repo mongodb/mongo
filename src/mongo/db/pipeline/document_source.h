@@ -378,7 +378,7 @@ public:
     /**
      * Get the stage's name.
      */
-    virtual const char* getSourceName() const;
+    virtual const char* getSourceName() const = 0;
 
     /**
      * Set the underlying source this source should use to get Documents from. Must not throw

@@ -142,11 +142,6 @@ list<intrusive_ptr<DocumentSource>> DocumentSource::parse(
     return it->second.parser(stageSpec, expCtx);
 }
 
-const char* DocumentSource::getSourceName() const {
-    static const char unknown[] = "[UNKNOWN]";
-    return unknown;
-}
-
 intrusive_ptr<DocumentSource> DocumentSource::optimize() {
     return this;
 }

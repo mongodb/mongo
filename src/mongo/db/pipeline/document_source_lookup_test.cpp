@@ -1068,7 +1068,7 @@ TEST_F(DocumentSourceLookUpTest,
                                   " {$sort: {sortKey: {x: 1}}},"
                                << sequentialCacheStageObj()
                                << ",{$facet: {facetPipe: ["
-                                  "   {$teeConsumer: {}},"
+                                  "   {$internalFacetTeeConsumer: {}},"
                                   "   {$match: {$and: [{_id: {$_internalExprEq: 5}},"
                                   "                    {$expr: {$eq: ['$_id', {$const: 5}]}}]}},"
                                   "   {$group: {_id: '$_id'}}]}}]");

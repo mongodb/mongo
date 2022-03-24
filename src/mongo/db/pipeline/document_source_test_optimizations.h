@@ -43,6 +43,9 @@ public:
     DocumentSourceTestOptimizations(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSource(DocumentSourceTestOptimizations::kStageName, expCtx) {}
     virtual ~DocumentSourceTestOptimizations() = default;
+    const char* getSourceName() const override {
+        return DocumentSourceTestOptimizations::kStageName.rawData();
+    }
     virtual GetNextResult doGetNext() override {
         MONGO_UNREACHABLE;
     }

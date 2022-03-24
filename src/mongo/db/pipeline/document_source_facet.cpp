@@ -66,7 +66,7 @@ DocumentSourceFacet::DocumentSourceFacet(std::vector<FacetPipeline> facetPipelin
     for (size_t facetId = 0; facetId < _facets.size(); ++facetId) {
         auto& facet = _facets[facetId];
         facet.pipeline->addInitialSource(
-            DocumentSourceTeeConsumer::create(pExpCtx, facetId, _teeBuffer));
+            DocumentSourceTeeConsumer::create(pExpCtx, facetId, _teeBuffer, kTeeConsumerStageName));
     }
 }
 

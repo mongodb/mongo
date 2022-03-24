@@ -59,6 +59,7 @@ class NamespaceString;
 class DocumentSourceFacet final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$facet"_sd;
+    static constexpr StringData kTeeConsumerStageName = "$internalFacetTeeConsumer"_sd;
     struct FacetPipeline {
         FacetPipeline(std::string name, std::unique_ptr<Pipeline, PipelineDeleter> pipeline)
             : name(std::move(name)), pipeline(std::move(pipeline)) {}

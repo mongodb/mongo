@@ -49,11 +49,11 @@ class Value;
  */
 class DocumentSourceTeeConsumer : public DocumentSource {
 public:
-    static constexpr StringData kStageName = "$teeConsumer"_sd;
     static boost::intrusive_ptr<DocumentSourceTeeConsumer> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         size_t facetId,
-        const boost::intrusive_ptr<TeeBuffer>& bufferSource);
+        const boost::intrusive_ptr<TeeBuffer>& bufferSource,
+        const StringData& stageName);
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         return {StreamType::kStreaming,
@@ -77,6 +77,8 @@ public:
         return DepsTracker::State::SEE_NEXT;
     }
 
+    const char* getSourceName() const override;
+
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final;
 
 protected:
@@ -86,9 +88,13 @@ protected:
 private:
     DocumentSourceTeeConsumer(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                               size_t facetId,
-                              const boost::intrusive_ptr<TeeBuffer>& bufferSource);
+                              const boost::intrusive_ptr<TeeBuffer>& bufferSource,
+                              const StringData& stageName);
 
     size_t _facetId;
     boost::intrusive_ptr<TeeBuffer> _bufferSource;
+
+    // Specific name of the tee consumer.
+    std::string _stageName;
 };
 }  // namespace mongo
