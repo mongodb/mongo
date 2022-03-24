@@ -44,6 +44,7 @@
 #include "mongo/db/operation_time_tracker.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/query/cursor_response.h"
+#include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/session_catalog.h"
 #include "mongo/db/transaction_validation.h"
@@ -304,16 +305,31 @@ SemiFuture<BatchedCommandResponse> SEPTransactionClient::runCRUDOp(
 
 SemiFuture<std::vector<BSONObj>> SEPTransactionClient::exhaustiveFind(
     const FindCommandRequest& cmd) const {
-    // TODO SERVER-61779 Support cursors.
-    uassert(ErrorCodes::IllegalOperation,
-            "Only single batch finds are supported",
-            cmd.getSingleBatch());
+    // TODO SERVER-64793: Make exhaustiveFind asynchronous
     return runCommand(cmd.getDbName(), cmd.toBSON({}))
         .thenRunOn(_executor)
-        .then([](BSONObj reply) {
-            // Will throw if the response has a non OK top level status.
+        .then([this, batchSize = cmd.getBatchSize()](BSONObj reply) {
+            std::vector<BSONObj> response;
             auto cursorResponse = uassertStatusOK(CursorResponse::parseFromBSON(reply));
-            return cursorResponse.releaseBatch();
+            while (true) {
+                auto releasedBatch = cursorResponse.releaseBatch();
+                response.insert(response.end(), releasedBatch.begin(), releasedBatch.end());
+
+                // We keep issuing getMores until the cursorId signifies that there are no more
+                // documents to fetch.
+                if (!cursorResponse.getCursorId()) {
+                    break;
+                }
+
+                GetMoreCommandRequest getMoreRequest(cursorResponse.getCursorId(),
+                                                     cursorResponse.getNSS().coll().toString());
+                getMoreRequest.setBatchSize(batchSize);
+
+                // We block until we get the response back from runCommand().
+                cursorResponse = uassertStatusOK(CursorResponse::parseFromBSON(
+                    runCommand(cursorResponse.getNSS().db(), getMoreRequest.toBSON({})).get()));
+            }
+            return response;
         })
         .semi();
 }
