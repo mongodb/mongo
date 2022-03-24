@@ -268,10 +268,6 @@ create_database(const char *home, WT_CONNECTION **connp)
         CONFIG_APPEND(p, ",checkpoint_reserved_txnid_delay");
     if (g.c_timing_stress_failpoint_hs_delete_key_from_ts)
         CONFIG_APPEND(p, ",failpoint_history_store_delete_key_from_ts");
-    if (g.c_timing_stress_failpoint_hs_insert_1)
-        CONFIG_APPEND(p, ",failpoint_history_store_insert_1");
-    if (g.c_timing_stress_failpoint_hs_insert_2)
-        CONFIG_APPEND(p, ",failpoint_history_store_insert_2");
     if (g.c_timing_stress_hs_checkpoint_delay)
         CONFIG_APPEND(p, ",history_store_checkpoint_delay");
     if (g.c_timing_stress_hs_search)
@@ -497,10 +493,6 @@ wts_open(const char *home, WT_CONNECTION **connp, WT_SESSION **sessionp, bool al
         CONFIG_APPEND(p, ",prepare_checkpoint_delay");
     if (g.c_timing_stress_failpoint_hs_delete_key_from_ts)
         CONFIG_APPEND(p, ",failpoint_history_store_delete_key_from_ts");
-    if (g.c_timing_stress_failpoint_hs_insert_1)
-        CONFIG_APPEND(p, ",failpoint_history_store_insert_1");
-    if (g.c_timing_stress_failpoint_hs_insert_2)
-        CONFIG_APPEND(p, ",failpoint_history_store_insert_2");
     if (g.c_timing_stress_hs_checkpoint_delay)
         CONFIG_APPEND(p, ",history_store_checkpoint_delay");
     if (g.c_timing_stress_hs_search)

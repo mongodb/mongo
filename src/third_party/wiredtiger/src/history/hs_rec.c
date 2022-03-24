@@ -189,6 +189,24 @@ __hs_insert_record(WT_SESSION_IMPL *session, WT_CURSOR *cursor, WT_BTREE *btree,
         cursor->set_key(cursor, 3, btree->id, key, tw->start_ts + 1);
         WT_ERR_NOTFOUND_OK(__wt_curhs_search_near_after(session, cursor), true);
     }
+
+    /*
+     * It is possible to insert a globally visible update into the history store with larger
+     * timestamps ahead of it. An example would be a mixed-mode update getting moved to the history
+     * store. This scenario can avoid detection earlier in reconciliation and result in an EBUSY
+     * being returned as it detects out-of-order timestamps. To prevent this we allow globally
+     * visible updates to fix history store content even if eviction is running concurrently with a
+     * checkpoint.
+     *
+     * This is safe because global visibility considers the checkpoint transaction id and timestamp
+     * while it is running, i.e. if the update is globally visible to eviction it will be globally
+     * visible to checkpoint and the modifications it makes to the history store will be the same as
+     * what checkpoint would've done.
+     */
+    if (error_on_ooo_ts && __wt_txn_tw_start_visible_all(session, tw)) {
+        error_on_ooo_ts = false;
+    }
+
     if (ret == 0)
         WT_ERR(__hs_delete_reinsert_from_pos(
           session, cursor, btree->id, key, tw->start_ts + 1, true, error_on_ooo_ts, &counter));
@@ -657,11 +675,6 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_MULTI *mult
             /* Clear out the insert success flag prior to our insert attempt. */
             __wt_curhs_clear_insert_success(hs_cursor);
 
-            /* Fail here 0.05% of the time if we are in the eviction path. */
-            if (F_ISSET(r, WT_REC_EVICT) &&
-              __wt_failpoint(session, WT_TIMING_STRESS_FAILPOINT_HISTORY_STORE_INSERT_1, 0.05))
-                WT_ERR(EBUSY);
-
             /*
              * Calculate reverse modify and clear the history store records with timestamps when
              * inserting the first update. Always write the newest update in the history store as a
@@ -732,11 +745,6 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_MULTI *mult
         }
 #endif
     }
-
-    /* Fail here 0.5% of the time if we are an eviction thread. */
-    if (F_ISSET(r, WT_REC_EVICT) &&
-      __wt_failpoint(session, WT_TIMING_STRESS_FAILPOINT_HISTORY_STORE_INSERT_2, 0.05))
-        WT_ERR(EBUSY);
 
     WT_ERR(__wt_block_manager_named_size(session, WT_HS_FILE, &hs_size));
     hs_btree = __wt_curhs_get_btree(hs_cursor);

@@ -64,7 +64,7 @@ main(int argc, char *argv[])
     g.ntables = 3;
     g.nworkers = 1;
     g.sweep_stress = g.use_timestamps = false;
-    g.failpoint_hs_delete_key_from_ts = g.failpoint_hs_insert_1 = g.failpoint_hs_insert_2 = false;
+    g.failpoint_hs_delete_key_from_ts = false;
     g.hs_checkpoint_timing_stress = g.reserved_txnid_timing_stress = false;
     g.checkpoint_slow_timing_stress = false;
     g.mixed_mode_deletes = false;
@@ -115,18 +115,12 @@ main(int argc, char *argv[])
                 g.failpoint_hs_delete_key_from_ts = true;
                 break;
             case '3':
-                g.failpoint_hs_insert_1 = true;
-                break;
-            case '4':
-                g.failpoint_hs_insert_2 = true;
-                break;
-            case '5':
                 g.hs_checkpoint_timing_stress = true;
                 break;
-            case '6':
+            case '4':
                 g.reserved_txnid_timing_stress = true;
                 break;
-            case '7':
+            case '5':
                 g.checkpoint_slow_timing_stress = true;
                 break;
             default:
@@ -272,10 +266,8 @@ wt_connect(const char *config_open)
       g.checkpoint_slow_timing_stress) {
         timing_stress = true;
         testutil_check(__wt_snprintf(timing_stress_cofing, sizeof(timing_stress_cofing),
-          ",timing_stress_for_test=[%s%s%s%s%s%s%s]", g.sweep_stress ? "aggressive_sweep" : "",
+          ",timing_stress_for_test=[%s%s%s%s%s]", g.sweep_stress ? "aggressive_sweep" : "",
           g.failpoint_hs_delete_key_from_ts ? "failpoint_history_store_delete_key_from_ts" : "",
-          g.failpoint_hs_insert_1 ? "failpoint_history_store_insert_1" : "",
-          g.failpoint_hs_insert_2 ? "failpoint_history_store_insert_2" : "",
           g.hs_checkpoint_timing_stress ? "history_store_checkpoint_delay" : "",
           g.reserved_txnid_timing_stress ? "checkpoint_reserved_txnid_delay" : "",
           g.checkpoint_slow_timing_stress ? "checkpoint_slow" : ""));
@@ -432,14 +424,12 @@ usage(void)
       "\t-n set number of operations each thread does\n"
       "\t-p use prepare\n"
       "\t-r set number of runs (0 for continuous)\n"
-      "\t-s specify which timing stress configuration to use ( 1 | 2 | 3 | 4 | 5 | 6 | 7 )\n"
+      "\t-s specify which timing stress configuration to use ( 1 | 2 | 3 | 4 | 5 )\n"
       "\t\t1: sweep_stress\n"
       "\t\t2: failpoint_hs_delete_key_from_ts\n"
-      "\t\t3: failpoint_hs_insert_1\n"
-      "\t\t4: failpoint_hs_insert_2\n"
-      "\t\t5: hs_checkpoint_timing_stress\n"
-      "\t\t6: reserved_txnid_timing_stress\n"
-      "\t\t7: checkpoint_slow_timing_stress\n"
+      "\t\t3: hs_checkpoint_timing_stress\n"
+      "\t\t4: reserved_txnid_timing_stress\n"
+      "\t\t5: checkpoint_slow_timing_stress\n"
       "\t-T specify a table configuration\n"
       "\t-t set a file type ( col | mix | row | lsm )\n"
       "\t-v verify only\n"

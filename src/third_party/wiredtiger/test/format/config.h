@@ -312,14 +312,6 @@ static CONFIG c[] = {
   {"stress.failpoint_hs_delete_key_from_ts", "stress failpoint history store delete key from ts",
     C_BOOL, 30, 0, 0, &g.c_timing_stress_failpoint_hs_delete_key_from_ts, NULL},
 
-  /* 30% */
-  {"stress.failpoint_hs_insert_1", "stress failpoint history store insert (#1)", C_BOOL, 30, 0, 0,
-    &g.c_timing_stress_failpoint_hs_insert_1, NULL},
-
-  /* 30% */
-  {"stress.failpoint_hs_insert_2", "stress failpoint history store insert (#2)", C_BOOL, 30, 0, 0,
-    &g.c_timing_stress_failpoint_hs_insert_2, NULL},
-
   /* 2% */
   {"stress.hs_checkpoint_delay", "stress history store checkpoint delay", C_BOOL, 2, 0, 0,
     &g.c_timing_stress_hs_checkpoint_delay, NULL},

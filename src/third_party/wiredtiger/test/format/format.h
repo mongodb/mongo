@@ -251,8 +251,6 @@ typedef struct {
     uint32_t c_timing_stress_checkpoint;
     uint32_t c_timing_stress_checkpoint_reserved_txnid_delay;
     uint32_t c_timing_stress_failpoint_hs_delete_key_from_ts;
-    uint32_t c_timing_stress_failpoint_hs_insert_1;
-    uint32_t c_timing_stress_failpoint_hs_insert_2;
     uint32_t c_timing_stress_hs_checkpoint_delay;
     uint32_t c_timing_stress_hs_search;
     uint32_t c_timing_stress_hs_sweep;

@@ -20,6 +20,22 @@
 #define WT_REC_SPLIT_MIN_ITEMS_USE_MEM 10
 
 /*
+ * WT_REC_TW_START_VISIBLE_ALL
+ *     Check if the provided time window's start is globally visible as per the saved state on the
+ *     reconciliation structure.
+ *
+ *     An update is considered to be globally visible when its transaction id is less than the
+ *     pinned id, and when its start timestamp is less than or equal to the pinned timestamp.
+ *     Due to a difference in transaction id based visibility and timestamp visibility the timestamp
+ *     comparison is inclusive whereas the transaction id comparison isn't.
+ */
+#define WT_REC_TW_START_VISIBLE_ALL(r, tw)                     \
+    (WT_TXNID_LT((tw)->start_txn, (r)->rec_start_oldest_id) && \
+      ((tw)->durable_start_ts == WT_TS_NONE ||                 \
+        ((r)->rec_start_pinned_ts != WT_TS_NONE &&             \
+          (tw)->durable_start_ts <= (r)->rec_start_pinned_ts)))
+
+/*
  * __rec_cell_addr_stats --
  *     Track statistics for time values associated with an address.
  */
@@ -424,4 +440,46 @@ __wt_rec_dict_replace(
         val->buf.size = 0;
     }
     return (0);
+}
+
+/*
+ * __wt_rec_time_window_clear_obsolete --
+ *     Where possible modify time window values to avoid writing obsolete values to the cell later.
+ */
+static inline void
+__wt_rec_time_window_clear_obsolete(
+  WT_SESSION_IMPL *session, WT_UPDATE_SELECT *upd_select, WT_CELL_UNPACK_KV *vpack, WT_RECONCILE *r)
+{
+    WT_TIME_WINDOW *tw;
+
+    WT_ASSERT(
+      session, (upd_select != NULL && vpack == NULL) || (upd_select == NULL && vpack != NULL));
+    tw = upd_select != NULL ? &upd_select->tw : &vpack->tw;
+
+    /* Return if the time window is empty. */
+    if (WT_TIME_WINDOW_IS_EMPTY(tw))
+        return;
+
+    /*
+     * In memory database don't need to avoid writing values to the cell. If we remove this check we
+     * create an extra update on the end of the chain later in reconciliation as we'll re-append the
+     * disk image value to the update chain.
+     */
+    if (!tw->prepare && !F_ISSET(S2C(session), WT_CONN_IN_MEMORY)) {
+        /*
+         * Check if the start of the time window is globally visible, and if so remove unnecessary
+         * values.
+         */
+        if (WT_REC_TW_START_VISIBLE_ALL(r, tw)) {
+            /* The durable timestamp should never be less than the start timestamp. */
+            WT_ASSERT(session, tw->start_ts <= tw->durable_start_ts);
+
+            tw->start_ts = tw->durable_start_ts = WT_TS_NONE;
+            tw->start_txn = WT_TXN_NONE;
+
+            /* Mark the cell with time window cleared flag to let the cell to be rebuild again. */
+            if (vpack)
+                F_SET(vpack, WT_CELL_UNPACK_TIME_WINDOW_CLEARED);
+        }
+    }
 }

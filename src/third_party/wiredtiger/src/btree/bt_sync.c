@@ -392,7 +392,7 @@ __sync_page_skip(WT_SESSION_IMPL *session, WT_REF *ref, void *context, bool *ski
     }
 
     /* Don't read pages into cache during startup or shutdown phase. */
-    if (F_ISSET(S2C(session), WT_CONN_RECOVERING | WT_CONN_CLOSING_TIMESTAMP)) {
+    if (F_ISSET(S2C(session), WT_CONN_RECOVERING | WT_CONN_CLOSING_CHECKPOINT)) {
         *skipp = true;
         return (0);
     }
@@ -565,7 +565,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
          * reads all of the internal pages to improve cleanup).
          */
         if (btree->type == BTREE_ROW)
-            internal_cleanup = !F_ISSET(conn, WT_CONN_RECOVERING | WT_CONN_CLOSING_TIMESTAMP);
+            internal_cleanup = !F_ISSET(conn, WT_CONN_RECOVERING | WT_CONN_CLOSING_CHECKPOINT);
         else {
             LF_SET(WT_READ_CACHE);
             internal_cleanup = false;
