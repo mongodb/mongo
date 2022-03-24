@@ -71,8 +71,10 @@ class BalancerDefragmentationPolicyImpl : public BalancerDefragmentationPolicy {
     BalancerDefragmentationPolicyImpl& operator=(const BalancerDefragmentationPolicyImpl&) = delete;
 
 public:
-    BalancerDefragmentationPolicyImpl(ClusterStatistics* clusterStats, BalancerRandomSource& random)
-        : _clusterStats(clusterStats), _random(random) {}
+    BalancerDefragmentationPolicyImpl(ClusterStatistics* clusterStats,
+                                      BalancerRandomSource& random,
+                                      const std::function<void()>& onStateUpdated)
+        : _clusterStats(clusterStats), _random(random), _onStateUpdated(onStateUpdated) {}
 
     ~BalancerDefragmentationPolicyImpl() {}
 
@@ -83,46 +85,20 @@ public:
     MigrateInfoVector selectChunksToMove(OperationContext* opCtx,
                                          stdx::unordered_set<ShardId>* usedShards) override;
 
-    SemiFuture<DefragmentationAction> getNextStreamingAction(OperationContext* opCtx) override;
+    boost::optional<DefragmentationAction> getNextStreamingAction(OperationContext* opCtx) override;
 
-    void acknowledgeMergeResult(OperationContext* opCtx,
-                                MergeInfo action,
-                                const Status& result) override;
+    void applyActionResult(OperationContext* opCtx,
+                           const DefragmentationAction& action,
+                           const DefragmentationActionResponse& response) override;
 
-    void acknowledgeAutoSplitVectorResult(
-        OperationContext* opCtx,
-        AutoSplitVectorInfo action,
-        const StatusWith<AutoSplitVectorResponse>& result) override;
-
-    void acknowledgeSplitResult(OperationContext* opCtx,
-                                SplitInfoWithKeyPattern action,
-                                const Status& result) override;
-
-    void acknowledgeDataSizeResult(OperationContext* opCtx,
-                                   DataSizeInfo action,
-                                   const StatusWith<DataSizeResponse>& result) override;
-
-    void acknowledgeMoveResult(OperationContext* opCtx,
-                               MigrateInfo action,
-                               const Status& result) override;
-
-    void closeActionStream() override;
-
-    void refreshCollectionDefragmentationStatus(OperationContext* opCtx,
-                                                const CollectionType& coll) override;
+    void startCollectionDefragmentation(OperationContext* opCtx,
+                                        const CollectionType& coll) override;
 
     void abortCollectionDefragmentation(OperationContext* opCtx,
                                         const NamespaceString& nss) override;
 
 private:
     static constexpr int kMaxConcurrentOperations = 50;
-
-    /**
-     * Returns the next action from any collection in phase 1 or 3 or boost::none if there are no
-     * actions to perform.
-     * Must be called while holding the _stateMutex.
-     */
-    boost::optional<DefragmentationAction> _nextStreamingAction(OperationContext* opCtx);
 
     /**
      * Advances the defragmentation state of the specified collection to the next actionable phase
@@ -161,21 +137,15 @@ private:
      */
     void _clearDefragmentationState(OperationContext* opCtx, const UUID& uuid);
 
-    void _processEndOfAction(WithLock, OperationContext* opCtx);
-
-    void _yieldNextStreamingAction(WithLock, OperationContext* opCtx);
-
     Mutex _stateMutex = MONGO_MAKE_LATCH("BalancerChunkMergerImpl::_stateMutex");
 
-    unsigned _concurrentStreamingOps{0};
-
-    boost::optional<Promise<DefragmentationAction>> _nextStreamingActionPromise{boost::none};
-
-    bool _streamClosed{false};
+    int _concurrentStreamingOps{0};
 
     ClusterStatistics* const _clusterStats;
 
     BalancerRandomSource& _random;
+
+    const std::function<void()> _onStateUpdated;
 
     stdx::unordered_map<UUID, std::unique_ptr<DefragmentationPhase>, UUID::Hash>
         _defragmentationStates;

@@ -195,15 +195,9 @@ struct DataSizeResponse {
     long long numObjects;
 };
 
-struct EndOfActionStream {};
-
-typedef stdx::variant<MergeInfo,
-                      AutoSplitVectorInfo,
-                      DataSizeInfo,
-                      SplitInfoWithKeyPattern,
-                      MigrateInfo,
-                      EndOfActionStream>
-    DefragmentationAction;
+typedef stdx::
+    variant<MergeInfo, AutoSplitVectorInfo, DataSizeInfo, SplitInfoWithKeyPattern, MigrateInfo>
+        DefragmentationAction;
 
 typedef stdx::variant<Status, StatusWith<AutoSplitVectorResponse>, StatusWith<DataSizeResponse>>
     DefragmentationActionResponse;

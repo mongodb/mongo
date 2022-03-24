@@ -320,6 +320,8 @@ private:
     // changes (in particular, state/balancer round and number of balancer rounds).
     stdx::condition_variable _condVar;
 
+    stdx::condition_variable _defragmentationCondVar;
+
     // Number of moved chunks in last round
     int _balancedLastTime;
 

@@ -45,11 +45,12 @@ public:
     virtual ~BalancerDefragmentationPolicy() {}
 
     /**
-     * Checks if the collection should be running defragmentation. If a new defragmentation should
-     * be started, this will initialize the defragmentation.
+     * Requests the execution of the defragmentation algorithm on the specified collection.
+     * Returns true if the request is accepted, false if ignored (meaning, the specified collection
+     * is already being processed)
      */
-    virtual void refreshCollectionDefragmentationStatus(OperationContext* opCtx,
-                                                        const CollectionType& coll) = 0;
+    virtual void startCollectionDefragmentation(OperationContext* opCtx,
+                                                const CollectionType& coll) = 0;
 
     /**
      * Checks if the collection is currently being defragmented, and signals the defragmentation
@@ -75,39 +76,18 @@ public:
      * The balancer is expected to execute a command matching the content of the descriptor and to
      * invoke the related acknowledge() method on the defragmentation policy once the result is
      * available (this will allow to update the progress of the algorithm).
-     *
-     * This call blocks when there is no action to be performed (no collection to be defragmented),
-     * or when there are too many outstanding actions (too many calls to getStreamingAction() that
-     * have not been acknowledged).
      */
-    virtual SemiFuture<DefragmentationAction> getNextStreamingAction(OperationContext* opCtx) = 0;
+    virtual boost::optional<DefragmentationAction> getNextStreamingAction(
+        OperationContext* opCtx) = 0;
 
     /**
-     * Stops the generation of new actions: any new call to (or currently blocked ones on)
-     * getNextStreamingAction() will receive an empty descriptor. Meant to be invoked as part of the
-     * balancer shutdown sequence.
+     * Updates the internal status of the policy by notifying the result of an action previously
+     * retrieved through getNextStreamingAction() or selectChunksToMove().
+     * The types of action and response are expected to match - or an stdx::bad_variant_access
+     * error will be thrown.
      */
-    virtual void closeActionStream() = 0;
-
-    virtual void acknowledgeMergeResult(OperationContext* opCtx,
-                                        MergeInfo action,
-                                        const Status& result) = 0;
-
-    virtual void acknowledgeAutoSplitVectorResult(
-        OperationContext* opCtx,
-        AutoSplitVectorInfo action,
-        const StatusWith<AutoSplitVectorResponse>& result) = 0;
-
-    virtual void acknowledgeSplitResult(OperationContext* opCtx,
-                                        SplitInfoWithKeyPattern action,
-                                        const Status& result) = 0;
-
-    virtual void acknowledgeDataSizeResult(OperationContext* opCtx,
-                                           DataSizeInfo action,
-                                           const StatusWith<DataSizeResponse>& result) = 0;
-
-    virtual void acknowledgeMoveResult(OperationContext* opCtx,
-                                       MigrateInfo action,
-                                       const Status& result) = 0;
+    virtual void applyActionResult(OperationContext* opCtx,
+                                   const DefragmentationAction& action,
+                                   const DefragmentationActionResponse& response) = 0;
 };
 }  // namespace mongo
