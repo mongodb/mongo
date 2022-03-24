@@ -267,7 +267,7 @@ public:
     /**
      * @return a new full (and owned) redacted copy of the object.
      */
-    BSONObj redact() const;
+    BSONObj redact(bool onlyEncryptedFields = false) const;
 
     /**
      * Readable representation of a BSON object in an extended JSON-style notation.

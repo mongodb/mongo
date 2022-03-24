@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/bson/bsonelement.h"
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 #include "mongo/db/jsobj.h"
@@ -137,25 +138,42 @@ BSONObj BSONObj::getOwned(const BSONObj& obj) {
     return obj.getOwned();
 }
 
-BSONObj BSONObj::redact() const {
+BSONObj BSONObj::redact(bool onlyEncryptedFields) const {
     _validateUnownedSize(objsize());
 
     // Helper to get an "internal function" to be able to do recursion
     struct redactor {
-        void operator()(BSONObjBuilder& builder, const BSONObj& obj, bool appendMask) {
+        void appendRedactedElem(BSONObjBuilder& builder, const BSONElement& e, bool appendMask) {
+            if (appendMask) {
+                builder.append(e.fieldNameStringData(), "###"_sd);
+            } else {
+                builder.appendNull(e.fieldNameStringData());
+            }
+        }
+
+        void operator()(BSONObjBuilder& builder,
+                        const BSONObj& obj,
+                        bool appendMask,
+                        bool onlyEncryptedFields) {
             for (BSONElement e : obj) {
                 if (e.type() == Object) {
                     BSONObjBuilder subBuilder = builder.subobjStart(e.fieldNameStringData());
-                    operator()(subBuilder, e.Obj(), appendMask);
+                    operator()(subBuilder, e.Obj(), appendMask, onlyEncryptedFields);
                     subBuilder.done();
                 } else if (e.type() == Array) {
                     BSONObjBuilder subBuilder = builder.subarrayStart(e.fieldNameStringData());
-                    operator()(subBuilder, e.Obj(), appendMask);
+                    operator()(subBuilder, e.Obj(), appendMask, onlyEncryptedFields);
                     subBuilder.done();
-                } else if (appendMask) {
-                    builder.append(e.fieldNameStringData(), "###"_sd);
                 } else {
-                    builder.appendNull(e.fieldNameStringData());
+                    if (onlyEncryptedFields) {
+                        if (e.type() == BinData && e.binDataType() == BinDataType::Encrypt) {
+                            appendRedactedElem(builder, e, appendMask);
+                        } else {
+                            builder.append(e);
+                        }
+                    } else {
+                        appendRedactedElem(builder, e, appendMask);
+                    }
                 }
             }
         }
@@ -163,7 +181,7 @@ BSONObj BSONObj::redact() const {
 
     try {
         BSONObjBuilder builder;
-        redactor()(builder, *this, /*appendMask=*/true);
+        redactor()(builder, *this, /*appendMask=*/true, onlyEncryptedFields);
         return builder.obj();
     } catch (const ExceptionFor<ErrorCodes::BSONObjectTooLarge>&) {
     }
@@ -173,7 +191,7 @@ BSONObj BSONObj::redact() const {
     // we use BSONType::jstNull, which ensures the redacted object will not be larger than the
     // original.
     BSONObjBuilder builder;
-    redactor()(builder, *this, /*appendMask=*/false);
+    redactor()(builder, *this, /*appendMask=*/false, onlyEncryptedFields);
     return builder.obj();
 }
 

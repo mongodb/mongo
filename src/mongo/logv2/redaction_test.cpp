@@ -31,6 +31,9 @@
 
 #include "mongo/logv2/redaction.h"
 
+#include "mongo/base/error_extra_info.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/logv2/log_util.h"
 #include "mongo/unittest/unittest.h"
@@ -120,6 +123,30 @@ TEST(RedactBSONTest, BasicBSON) {
                    BSONStringPair(BSON("a" << 1 << "a"
                                            << "1"),
                                   "{ a: \"###\", a: \"###\" }")});
+}
+
+unsigned char zero[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
+TEST(RedactEncryptedStringTest, BasicStrings) {
+    logv2::setShouldRedactBinDataEncrypt(true);
+    logv2::setShouldRedactLogs(false);
+
+    BSONObjBuilder builder{};
+    builder.appendBinData("type6", sizeof(zero), BinDataType::Encrypt, zero);
+    builder.append("string", "string");
+    {
+        BSONObjBuilder sub(builder.subobjStart("nestedobj"));
+        sub.appendBinData("subobj", sizeof(zero), BinDataType::Encrypt, zero);
+    }
+    BSONObj obj = builder.done();
+
+    std::cout << "This is obj: " << obj.toString() << std::endl;
+
+    auto redactedStr = R"({ type6: "###", string: "string", nestedobj: { subobj: "###" } })";
+    ASSERT_EQ(redact(obj).toString(), redactedStr);
+
+    logv2::setShouldRedactBinDataEncrypt(false);
+    ASSERT_EQ(redact(obj).toString(), obj.toString());
 }
 
 void testBSONCases(std::vector<BSONStringPair>& testCases) {

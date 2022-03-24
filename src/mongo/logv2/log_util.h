@@ -90,4 +90,15 @@ bool shouldRedactLogs();
  * Set the 'redact' mode of the server.
  */
 void setShouldRedactLogs(bool enabled);
+
+/**
+ * Returns true if the BinData Encrypt should be redacted. Default true.
+ */
+bool shouldRedactBinDataEncrypt();
+
+/**
+ * Sets the redact mode of the bin data encrypt field.
+ */
+void setShouldRedactBinDataEncrypt(bool enabled);
+
 }  // namespace mongo::logv2

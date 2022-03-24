@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2022-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -26,69 +26,46 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/logv2/redaction.h"
-
 #include "mongo/base/status.h"
-#include "mongo/bson/bsonobj.h"
 #include "mongo/logv2/log_util.h"
 #include "mongo/logv2/logv2_options_gen.h"
-#include "mongo/util/assert_util.h"
+#include "mongo/util/options_parser/option_section.h"
+#include "mongo/util/options_parser/startup_option_init.h"
+#include "mongo/util/options_parser/startup_options.h"
 
 namespace mongo {
 
-namespace {
-
-constexpr auto kRedactionDefaultMask = "###"_sd;
-
-}  // namespace
-
-BSONObj redact(const BSONObj& objectToRedact) {
-    if (!logv2::shouldRedactLogs()) {
-        if (!logv2::shouldRedactBinDataEncrypt()) {
-            return objectToRedact;
-        }
-        return objectToRedact.redact(true /* onlyEncryptedFields */);
-    }
-
-    return objectToRedact.redact(false /* onlyEncryptedFields */);
+void RedactEncryptedFields::append(OperationContext* opCtx,
+                                   BSONObjBuilder& b,
+                                   const std::string& name) {
+    b << name << logv2::shouldRedactBinDataEncrypt();
 }
 
-StringData redact(StringData stringToRedact) {
-    if (!logv2::shouldRedactLogs()) {
-        return stringToRedact;
+Status RedactEncryptedFields::set(const BSONElement& newValueElement) {
+    bool newVal;
+    if (!newValueElement.coerce(&newVal)) {
+        return {ErrorCodes::BadValue,
+                str::stream() << "Invalid value for redactEncryptedFields: " << newValueElement};
     }
 
-    // Return the default mask.
-    return kRedactionDefaultMask;
+    logv2::setShouldRedactBinDataEncrypt(newVal);
+    return Status::OK();
 }
 
-std::string redact(const Status& statusToRedact) {
-    if (!logv2::shouldRedactLogs()) {
-        return statusToRedact.toString();
+Status RedactEncryptedFields::setFromString(const std::string& str) {
+    if (str == "true" || str == "1") {
+        logv2::setShouldRedactBinDataEncrypt(true);
+    } else if (str == "false" || str == "0") {
+        logv2::setShouldRedactBinDataEncrypt(false);
+    } else {
+        return {ErrorCodes::BadValue,
+                str::stream() << "Invalid value for redactEncryptedFields: " << str};
     }
-
-    // Construct a status representation without the reason()
-    StringBuilder sb;
-    sb << statusToRedact.codeString();
-    if (!statusToRedact.isOK())
-        sb << ": " << kRedactionDefaultMask;
-    return sb.str();
-}
-
-std::string redact(const DBException& exceptionToRedact) {
-    if (!logv2::shouldRedactLogs()) {
-        return exceptionToRedact.toString();
-    }
-
-    // Construct an exception representation with the what()
-    std::stringstream ss;
-    ss << exceptionToRedact.code() << " " << kRedactionDefaultMask;
-    return ss.str();
+    return Status::OK();
 }
 
 }  // namespace mongo
