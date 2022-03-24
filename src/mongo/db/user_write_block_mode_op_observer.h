@@ -217,6 +217,8 @@ public:
     void onTransactionAbort(OperationContext* opCtx,
                             boost::optional<OplogSlot> abortOplogEntryOpTime) final {}
 
+    void onBatchedWriteCommit(OperationContext* opCtx) final {}
+
     void onMajorityCommitPointUpdate(ServiceContext* service,
                                      const repl::OpTime& newCommitPoint) final {}
 

@@ -161,6 +161,7 @@ public:
     void onUnpreparedTransactionCommit(OperationContext* opCtx,
                                        std::vector<repl::ReplOperation>* statements,
                                        size_t numberOfPrePostImagesToWrite) override {}
+    void onBatchedWriteCommit(OperationContext* opCtx) final {}
     void onPreparedTransactionCommit(
         OperationContext* opCtx,
         OplogSlot commitOplogEntryOpTime,

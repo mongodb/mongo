@@ -1007,6 +1007,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/timeseries/bucket_catalog',
         '$BUILD_DIR/mongo/s/coreshard',
         '$BUILD_DIR/mongo/s/grid',
+        'batched_write_context',
         'catalog/collection_options',
         'catalog/database_holder',
         'op_observer',
@@ -1026,6 +1027,16 @@ env.Library(
         'repl/image_collection_entry',
         'repl/repl_server_parameters',
         'transaction',
+    ],
+)
+
+env.Library(
+    target="batched_write_context",
+    source=[
+        "batched_write_context.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
     ],
 )
 

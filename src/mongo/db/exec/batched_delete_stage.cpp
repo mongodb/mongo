@@ -127,7 +127,7 @@ BatchedDeleteStage::BatchedDeleteStage(ExpressionContext* expCtx,
     : DeleteStage::DeleteStage(
           kStageType.rawData(), expCtx, std::move(params), ws, collection, child),
       _batchParams(std::move(batchParams)) {
-    uassert(6303800,
+    tassert(6303800,
             "batched deletions only support multi-document deletions (multi: true)",
             _params->isMulti);
     tassert(6303801,
@@ -165,14 +165,13 @@ PlanStage::StageState BatchedDeleteStage::_deleteBatch(WorkingSetID* out) {
         std::terminate();
     }
 
-    // TODO (SERVER-63047): use a single write timestamp by grouping oplog entries.
-    opCtx()->recoveryUnit()->ignoreAllMultiTimestampConstraints();
-
     const auto startOfBatchTimestampMillis = Date_t::now().toMillisSinceEpoch();
     unsigned int docsDeleted = 0;
     std::vector<RecordId> recordsThatNoLongerMatch;
     try {
-        WriteUnitOfWork wuow(opCtx());
+        // Start a WUOW with 'groupOplogEntries' which groups a delete batch into a single timestamp
+        // and oplog entry
+        WriteUnitOfWork wuow(opCtx(), true /* groupOplogEntries */);
 
         for (auto& [rid, snapshotId] : _ridMap) {
             if (MONGO_unlikely(throwWriteConflictExceptionInBatchedDeleteStage.shouldFail())) {

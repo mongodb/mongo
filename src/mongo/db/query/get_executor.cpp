@@ -1647,7 +1647,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
     deleteStageParams->canonicalQuery = cq.get();
 
     if (MONGO_unlikely(gInternalBatchUserMultiDeletesForTest.load() &&
-                       nss.ns() == "__internalBatchedDeletesTesting.Collection0")) {
+                       nss.ns() == "__internalBatchedDeletesTesting.Collection0" &&
+                       deleteStageParams->isMulti)) {
         root =
             std::make_unique<BatchedDeleteStage>(cq->getExpCtxRaw(),
                                                  std::move(deleteStageParams),

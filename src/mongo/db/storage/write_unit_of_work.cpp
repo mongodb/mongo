@@ -33,7 +33,9 @@
 
 #include "mongo/db/storage/write_unit_of_work.h"
 
+#include "mongo/db/batched_write_context.h"
 #include "mongo/db/catalog/uncommitted_collections.h"
+#include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
@@ -43,11 +45,21 @@ namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(sleepBeforeCommit);
 
-WriteUnitOfWork::WriteUnitOfWork(OperationContext* opCtx)
-    : _opCtx(opCtx), _toplevel(opCtx->_ruState == RecoveryUnitState::kNotInUnitOfWork) {
+WriteUnitOfWork::WriteUnitOfWork(OperationContext* opCtx, bool groupOplogEntries)
+    : _opCtx(opCtx),
+      _toplevel(opCtx->_ruState == RecoveryUnitState::kNotInUnitOfWork),
+      _groupOplogEntries(groupOplogEntries) {
     uassert(ErrorCodes::IllegalOperation,
             "Cannot execute a write operation in read-only mode",
             !storageGlobalParams.readOnly);
+    // Grouping oplog entries doesn't support WUOW nesting (e.g. multi-doc transactions).
+    invariant(_toplevel || !_groupOplogEntries);
+
+    if (_groupOplogEntries) {
+        auto& batchedWriteContext = BatchedWriteContext::get(_opCtx);
+        batchedWriteContext.setWritesAreBatched(true);
+    }
+
     _opCtx->lockState()->beginWriteUnitOfWork();
     if (_toplevel) {
         _opCtx->recoveryUnit()->beginUnitOfWork(_opCtx);
@@ -69,6 +81,12 @@ WriteUnitOfWork::~WriteUnitOfWork() {
             _opCtx->_ruState = RecoveryUnitState::kFailedUnitOfWork;
         }
         _opCtx->lockState()->endWriteUnitOfWork();
+    }
+
+    if (_groupOplogEntries) {
+        auto& batchedWriteContext = BatchedWriteContext::get(_opCtx);
+        batchedWriteContext.clearBatchedOperations(_opCtx);
+        batchedWriteContext.setWritesAreBatched(false);
     }
 }
 
@@ -107,6 +125,12 @@ void WriteUnitOfWork::commit() {
     invariant(!_committed);
     invariant(!_released);
     invariant(_opCtx->_ruState == RecoveryUnitState::kActiveUnitOfWork);
+
+    if (_groupOplogEntries) {
+        const auto opObserver = _opCtx->getServiceContext()->getOpObserver();
+        invariant(opObserver);
+        opObserver->onBatchedWriteCommit(_opCtx);
+    }
     if (_toplevel) {
         if (MONGO_unlikely(sleepBeforeCommit.shouldFail())) {
             sleepFor(Milliseconds(100));

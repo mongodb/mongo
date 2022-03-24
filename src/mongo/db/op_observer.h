@@ -413,6 +413,8 @@ public:
         Timestamp commitTimestamp,
         const std::vector<repl::ReplOperation>& statements) noexcept = 0;
 
+    virtual void onBatchedWriteCommit(OperationContext* opCtx) = 0;
+
     /**
      * Contains "applyOps" oplog entries and oplog slots to be used for writing pre- and post- image
      * oplog entries for a transaction. "applyOps" entries are not actual "applyOps" entries to be

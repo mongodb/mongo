@@ -15,7 +15,9 @@ load("jstests/libs/fail_point_util.js");           // For 'configureFailPoint()'
 
 const conn = MongoRunner.runMongod();
 
-// This specific namespace is required to activate batched multi-delete behavior.
+// '__internalBatchedDeletesTesting.Collection0' is a special, hardcoded namespace that batches
+// multi-doc deletes if the 'internalBatchUserMultiDeletesForTest' server parameter is set.
+// TODO (SERVER-63044): remove this special handling.
 const testDB = conn.getDB("__internalBatchedDeletesTesting");
 const coll = testDB.getCollection("Collection0");
 const collName = coll.getName();

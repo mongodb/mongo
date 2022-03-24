@@ -59,7 +59,7 @@ public:
         kFailedUnitOfWork   // in a unit of work that has failed and must be aborted
     };
 
-    WriteUnitOfWork(OperationContext* opCtx);
+    WriteUnitOfWork(OperationContext* opCtx, bool groupOplogEntries = false);
 
     ~WriteUnitOfWork();
 
@@ -101,6 +101,7 @@ private:
     OperationContext* _opCtx;
 
     bool _toplevel;
+    bool _groupOplogEntries;
 
     bool _committed = false;
     bool _prepared = false;

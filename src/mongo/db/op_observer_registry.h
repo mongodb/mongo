@@ -430,6 +430,13 @@ public:
             o->onTransactionAbort(opCtx, abortOplogEntryOpTime);
     }
 
+    void onBatchedWriteCommit(OperationContext* opCtx) override {
+        ReservedTimes times{opCtx};
+        for (auto& o : _observers) {
+            o->onBatchedWriteCommit(opCtx);
+        }
+    }
+
     void onMajorityCommitPointUpdate(ServiceContext* service,
                                      const repl::OpTime& newCommitPoint) override {
         for (auto& o : _observers)

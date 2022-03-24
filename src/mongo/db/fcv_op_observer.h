@@ -179,12 +179,12 @@ public:
     void onUnpreparedTransactionCommit(OperationContext* opCtx,
                                        std::vector<repl::ReplOperation>* statements,
                                        size_t numberOfPrePostImagesToWrite) final {}
+
     void onPreparedTransactionCommit(
         OperationContext* opCtx,
         OplogSlot commitOplogEntryOpTime,
         Timestamp commitTimestamp,
         const std::vector<repl::ReplOperation>& statements) noexcept final{};
-
     std::unique_ptr<ApplyOpsOplogSlotAndOperationAssignment> preTransactionPrepare(
         OperationContext* opCtx,
         const std::vector<OplogSlot>& reservedSlots,
@@ -201,8 +201,12 @@ public:
         const ApplyOpsOplogSlotAndOperationAssignment* applyOpsOperationAssignment,
         size_t numberOfPrePostImagesToWrite,
         Date_t wallClockTime) final{};
+
     void onTransactionAbort(OperationContext* opCtx,
                             boost::optional<OplogSlot> abortOplogEntryOpTime) final{};
+
+    void onBatchedWriteCommit(OperationContext* opCtx) final {}
+
     void onMajorityCommitPointUpdate(ServiceContext* service,
                                      const repl::OpTime& newCommitPoint) final {}
 
