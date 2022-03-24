@@ -118,7 +118,7 @@ Status isSpecOKClusteredIndexCheck(const BSONObj& indexSpec,
     bool keysMatch = clustered_util::matchesClusterKey(key, collInfo);
 
     bool clusteredOptionPresent =
-        indexSpec.hasField("clustered") && indexSpec.getBoolField("clustered");
+        indexSpec.hasField("clustered") && indexSpec["clustered"].trueValue();
 
     if (clusteredOptionPresent && !keysMatch) {
         // The 'clustered' option implies the indexSpec must match the clustered index.
@@ -135,6 +135,12 @@ Status isSpecOKClusteredIndexCheck(const BSONObj& indexSpec,
     if (!keysMatch && !namesMatch) {
         // The indexes don't conflict at all.
         return Status::OK();
+    }
+
+    if (!collInfo) {
+        return Status(ErrorCodes::Error(6479600),
+                      str::stream() << "Cannot create an index with 'clustered' in the spec on a "
+                                    << "collection that is not clustered");
     }
 
     // The collection is guaranteed to be clustered since at least the name or key matches a

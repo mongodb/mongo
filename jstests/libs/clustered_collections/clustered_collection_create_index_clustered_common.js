@@ -17,6 +17,15 @@ const CreateIndexesClusteredTest = (function() {
         // Start with the collection empty.
         assert.commandFailedWithCode(
             testColl.createIndex({_id: 1}, {clustered: true, unique: true}), 6243700);
+
+        // Pass non-boolean value to safeBool 'clustered' option. Should be equivalent to next
+        // command.
+        assert.commandFailedWithCode(testDB.runCommand({
+            createIndexes: collName,
+            "indexes": [{key: {"newKey": 1}, name: "anyName", clustered: 2, unique: true}],
+        }),
+                                     6243700);
+
         assert.commandFailedWithCode(testColl.createIndex({a: 1}, {clustered: true, unique: true}),
                                      6243700);
 
@@ -30,6 +39,15 @@ const CreateIndexesClusteredTest = (function() {
         assert.commandWorked(bulk.execute());
         assert.commandFailedWithCode(
             testColl.createIndex({_id: 1}, {clustered: true, unique: true}), 6243700);
+
+        // Pass non-boolean value to safeBool 'clustered' option. Should be equivalent to next
+        // command.
+        assert.commandFailedWithCode(testDB.runCommand({
+            createIndexes: collName,
+            "indexes": [{key: {"newKey2": 1}, name: "anyName2", clustered: 2, unique: true}],
+        }),
+                                     6243700);
+
         assert.commandFailedWithCode(testColl.createIndex({a: 1}, {clustered: true, unique: true}),
                                      6243700);
     };
@@ -67,6 +85,14 @@ const CreateIndexesClusteredTest = (function() {
         // createIndex on the cluster key with the 'clustered' option is a no-op.
         assert.commandWorked(testColl.createIndex({_id: 1}, {clustered: true, unique: true}));
 
+        // Pass non-boolean value to safeBool 'clustered' option. Should be equivalent to next
+        // command.
+        assert.commandFailedWithCode(testDB.runCommand({
+            createIndexes: collName,
+            "indexes": [{key: {"newKey": 1}, name: "anyName", clustered: 2, unique: true}],
+        }),
+                                     6243700);
+
         // 'clustered' is not a valid option for an index not on the cluster key.
         assert.commandFailedWithCode(
             testColl.createIndex({notMyIndex: 1}, {clustered: true, unique: true}), 6243700);
@@ -82,6 +108,14 @@ const CreateIndexesClusteredTest = (function() {
 
         assert.commandWorked(testColl.createIndex({_id: 1}));
         assert.commandWorked(testColl.createIndex({_id: 1}, {clustered: true, unique: true}));
+
+        // Pass non-boolean value to safeBool 'clustered' option. Should be equivalent to next
+        // command.
+        assert.commandFailedWithCode(testDB.runCommand({
+            createIndexes: collName,
+            "indexes": [{key: {"newKey2": 1}, name: "anyName2", clustered: 2, unique: true}],
+        }),
+                                     6243700);
 
         // 'clustered' is still not a valid option for an index not on the cluster key.
         assert.commandFailedWithCode(testColl.createIndex({a: 1}, {clustered: true, unique: true}),
