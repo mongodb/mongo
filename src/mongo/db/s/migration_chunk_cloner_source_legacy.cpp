@@ -162,10 +162,17 @@ void LogTransactionOperationsForShardingHandler::commit(boost::optional<Timestam
 
     // Inform the session migration subsystem that a transaction has committed for the given
     // namespace.
-    auto addToSessionMigrationOptimeQueue =
-        [&namespacesTouchedByTransaction](MigrationChunkClonerSourceLegacy* const cloner,
-                                          const NamespaceString& nss,
-                                          const repl::OpTime opTime) {
+    auto addToSessionMigrationOptimeQueueIfNeeded =
+        [&namespacesTouchedByTransaction,
+         lsid = _lsid](MigrationChunkClonerSourceLegacy* const cloner,
+                       const NamespaceString& nss,
+                       const repl::OpTime opTime) {
+            if (isInternalSessionForNonRetryableWrite(lsid)) {
+                // Transactions inside internal sessions for non-retryable writes are not
+                // retryable so there is no need to transfer the write history to the
+                // recipient.
+                return;
+            }
             if (namespacesTouchedByTransaction.find(nss) == namespacesTouchedByTransaction.end()) {
                 cloner->_addToSessionMigrationOptimeQueue(
                     opTime, SessionCatalogMigrationSource::EntryAtOpTimeType::kTransaction);
@@ -203,7 +210,7 @@ void LogTransactionOperationsForShardingHandler::commit(boost::optional<Timestam
         auto* const cloner = dynamic_cast<MigrationChunkClonerSourceLegacy*>(clonerPtr.get());
 
         if (isWouldChangeOwningShardSentinelOplogEntry(stmt)) {
-            addToSessionMigrationOptimeQueue(cloner, nss, _prepareOrCommitOpTime);
+            addToSessionMigrationOptimeQueueIfNeeded(cloner, nss, _prepareOrCommitOpTime);
             continue;
         }
 
@@ -237,10 +244,8 @@ void LogTransactionOperationsForShardingHandler::commit(boost::optional<Timestam
             }
         }
 
-        addToSessionMigrationOptimeQueue(cloner, nss, _prepareOrCommitOpTime);
+        addToSessionMigrationOptimeQueueIfNeeded(cloner, nss, _prepareOrCommitOpTime);
 
-        // Pass an empty prePostOpTime to the queue because retryable write history doesn't care
-        // about writes in transactions.
         cloner->_addToTransferModsQueue(idElement.wrap(), getOpCharForCrudOpType(opType), {});
     }
 }

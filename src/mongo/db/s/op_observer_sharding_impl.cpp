@@ -237,7 +237,8 @@ void OpObserverShardingImpl::shardObserveTransactionPrepareOrUnpreparedCommit(
     const repl::OpTime& prepareOrCommitOptime) {
 
     opCtx->recoveryUnit()->registerChange(
-        std::make_unique<LogTransactionOperationsForShardingHandler>(stmts, prepareOrCommitOptime));
+        std::make_unique<LogTransactionOperationsForShardingHandler>(
+            *opCtx->getLogicalSessionId(), stmts, prepareOrCommitOptime));
 }
 
 }  // namespace mongo

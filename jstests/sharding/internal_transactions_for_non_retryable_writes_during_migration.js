@@ -2,9 +2,6 @@
  * Tests that a chunk migration does not transfer the history for non-retryable internal
  * transactions that commit or abort on the donor during the migration to the recipient.
  *
- * TODO (SERVER-64331): Determine if chunk migration should migrate internal sessions for
- * non-retryable writes.
- *
  * @tags: [requires_fcv_53, featureFlagInternalTransactions]
  */
 (function() {

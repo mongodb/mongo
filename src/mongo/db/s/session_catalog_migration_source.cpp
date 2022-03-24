@@ -221,10 +221,10 @@ SessionCatalogMigrationSource::SessionCatalogMigrationSource(OperationContext* o
     // tests.
     DBDirectClient client(opCtx);
     FindCommandRequest findRequest{NamespaceString::kSessionTransactionsTableNamespace};
-    // Skip retryable internal transactions that are either aborted or still in progress so there is
-    // no write history to transfer at this point.
-    // TODO (SERVER-64331): Determine if chunk migration should migrate internal sessions for
-    // non-retryable writes.
+    // Skip internal sessions for retryable writes with aborted or in progress transactions since
+    // there is no write history to transfer at this point. Skip all internal sessions for
+    // non-retryable writes since they only support transactions and those transactions are not
+    // retryable so there is no need to transfer their write history to the recipient.
     findRequest.setFilter(BSON(
         "$or" << BSON_ARRAY(BSON((SessionTxnRecord::kSessionIdFieldName + "." +
                                   InternalSessionFields::kTxnUUIDFieldName)
@@ -597,7 +597,7 @@ bool SessionCatalogMigrationSource::_fetchNextNewWriteOplog(OperationContext* op
             auto nextNewWriteOplog = uassertStatusOK(repl::OplogEntry::parse(nextNewWriteOplogDoc));
             lk.lock();
 
-            // Determine if this oplog entry should be migrated. If so, add the oplog entry or the
+            // Determine how this oplog entry should be migrated. Either add the oplog entry or the
             // oplog entries derived from it to the oplog buffer. Finally, dequeue the opTime.
 
             if (entryAtOpTimeType == EntryAtOpTimeType::kRetryableWrite) {
@@ -608,12 +608,13 @@ bool SessionCatalogMigrationSource::_fetchNextNewWriteOplog(OperationContext* op
                           repl::OplogEntry::CommandType::kApplyOps);
                 const auto sessionId = *nextNewWriteOplog.getSessionId();
 
-                if (isInternalSessionForNonRetryableWrite(sessionId)) {
-                    // TODO (SERVER-64331): Determine if chunk migration should migrate internal
-                    // sessions for non-retryable writes.
-                    _newWriteOpTimeList.pop_front();
-                    return false;
-                }
+                // The opTimes for transactions inside internal sessions for non-retryable writes
+                // should never get added to the opTime queue since those transactions are not
+                // retryable so there is no need to transfer their write history to the
+                // recipient.
+                invariant(!isInternalSessionForNonRetryableWrite(sessionId),
+                          "Cannot add op time for a non-retryable internal transaction to the "
+                          "session migration op time queue");
 
                 if (isInternalSessionForRetryableWrite(sessionId)) {
                     // Derive retryable write oplog entries from this retryable internal
@@ -695,8 +696,8 @@ SessionCatalogMigrationSource::SessionOplogIterator::SessionOplogIterator(
               invariant(_record.getState() == DurableTxnStateEnum::kCommitted);
               return EntryType::kRetryableTransaction;
           }
-          // TODO (SERVER-64331): Determine if chunk migration should migrate internal sessions for
-          // non-retryable writes.
+          // The SessionCatalogMigrationSource should not try to create a SessionOplogIterator for
+          // internal sessions for non-retryable writes.
           invariant(!getParentSessionId(txnRecord.getSessionId()));
           return _record.getState() ? EntryType::kNonRetryableTransaction
                                     : EntryType::kRetryableWrite;

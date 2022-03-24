@@ -49,6 +49,7 @@
 #include "mongo/db/transaction_participant.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -937,8 +938,9 @@ TEST_F(SessionCatalogMigrationSourceTest,
     ASSERT_FALSE(migrationSource.fetchNextOplog(opCtx()));
 }
 
-TEST_F(SessionCatalogMigrationSourceTest,
-       IgnoreNewCommittedForInternalTransactionForNonRetryableWrite) {
+DEATH_TEST_F(SessionCatalogMigrationSourceTest,
+             ThrowUponSeeingNewCommittedForInternalTransactionForNonRetryableWrite,
+             "Cannot add op time for a non-retryable internal transaction") {
     SessionCatalogMigrationSource migrationSource(opCtx(), kNs, kChunkRange, kShardKey);
     ASSERT_FALSE(migrationSource.fetchNextOplog(opCtx()));
 
