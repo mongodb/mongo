@@ -193,7 +193,6 @@ env.Library(
         'request_types/cleanup_reshard_collection.idl',
         'request_types/clear_jumbo_flag.idl',
         'request_types/clone_catalog_data.idl',
-        'request_types/clone_collection_options_from_primary_shard.idl',
         'request_types/commit_chunk_migration_request_type.cpp',
         'request_types/commit_reshard_collection.idl',
         'request_types/configure_collection_balancing.idl',

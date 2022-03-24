@@ -311,7 +311,6 @@ env.Library(
         'check_sharding_index_command.cpp',
         'cleanup_orphaned_cmd.cpp',
         'clone_catalog_data_command.cpp',
-        'clone_collection_options_from_primary_shard_cmd.cpp',
         'cluster_abort_transaction_cmd_d.cpp',
         'cluster_commit_transaction_cmd_d.cpp',
         'cluster_find_cmd_d.cpp',
