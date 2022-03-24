@@ -8,7 +8,6 @@ import pymongo
 import pymongo.errors
 
 import buildscripts.resmokelib.testing.fixtures.interface as interface
-import buildscripts.resmokelib.utils.registry as registry
 
 
 class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-instance-attributes
@@ -281,7 +280,8 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
         replset_config_options["configsvr"] = True
 
         mongod_options = self.mongod_options.copy()
-        mongod_options.update(
+        mongod_options = self.fixturelib.merge_mongo_option_dicts(
+            mongod_options,
             self.fixturelib.make_historic(configsvr_options.pop("mongod_options", {})))
         mongod_options["configsvr"] = ""
         mongod_options["dbpath"] = os.path.join(self._dbpath_prefix, "config")
@@ -321,8 +321,8 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
         replset_config_options["configsvr"] = False
 
         mongod_options = self.mongod_options.copy()
-        mongod_options.update(
-            self.fixturelib.make_historic(shard_options.pop("mongod_options", {})))
+        mongod_options = self.fixturelib.merge_mongo_option_dicts(
+            mongod_options, self.fixturelib.make_historic(shard_options.pop("mongod_options", {})))
         mongod_options["shardsvr"] = ""
         mongod_options["dbpath"] = os.path.join(self._dbpath_prefix, "shard{}".format(index))
         mongod_options["replSet"] = self._SHARD_REPLSET_NAME_PREFIX + str(index)
