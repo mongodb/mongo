@@ -55,15 +55,26 @@ assert.commandFailedWithCode(
 // Test create unique index fails if prefix is an encrypted field
 res = dbTest.basic.createIndex({"paymentMethods.creditCards.number.lastFour": 1}, {unique: true});
 assert.commandFailedWithCode(
-    res, 6346503, "Create unique index on key with encrypted field prefix passed");
+    res, 6346502, "Create unique index on key with encrypted field prefix passed");
 
-// Test create single-field index without options on encrypted field succeeeds
+// Test create single-field index on an encrypted field or prefix of an encrypted field fails.
 res = dbTest.basic.createIndex({"firstName": 1});
-assert.commandWorked(res);
+assert.commandFailedWithCode(res, 6346502, "Create index on prefix of encrypted field passed");
 
 res = dbTest.basic.createIndex({"paymentMethods.creditCards": 1});
-assert.commandWorked(res);
+assert.commandFailedWithCode(res, 6346502, "Create index on prefix of encrypted field passed");
 
 res = dbTest.basic.createIndex({"firstName.$**": 1});
-assert.commandWorked(res);
+assert.commandFailedWithCode(
+    res, 6346502, "Create wildcard index on prefix of encrypted field passed");
+
+// Test that a compound index cannot contain an encrypted field.
+res = dbTest.basic.createIndex({"notEncrypted": 1, "paymentMethods.creditCards": 1});
+assert.commandFailedWithCode(res, 6346502, "Create compound index on encrypted field passed");
+
+// The index key may share a prefix with an encrypted field.
+assert.commandWorked(dbTest.basic.createIndex({"paymentMethods.creditCards.notNumber": 1}));
+
+// A wildcard index on the entire document is allowed.
+assert.commandWorked(dbTest.basic.createIndex({"$**": 1}));
 }());
