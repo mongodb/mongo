@@ -45,6 +45,7 @@
 #include "mongo/db/server_options_general_gen.h"
 #include "mongo/db/snapshot_window_options_gen.h"
 #include "mongo/db/storage/storage_file_util.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_parameters_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
@@ -68,6 +69,8 @@ MONGO_FAIL_POINT_DEFINE(crashAfterUpdatingFirstTableLoggingSettings);
 namespace {
 
 const std::string kTableChecksFileName = "_wt_table_checks";
+const std::string kTableExtension = ".wt";
+const std::string kWiredTigerBackupFile = "WiredTiger.backup";
 
 /**
  * Returns true if the 'kTableChecksFileName' file exists in the dbpath.
@@ -1151,6 +1154,47 @@ StatusWith<std::string> WiredTigerUtil::generateImportString(const StringData& i
     ss << "file_metadata=(" << fileMetadata.String() << "))";
 
     return StatusWith<std::string>(ss.str());
+}
+
+std::string WiredTigerUtil::generateRestoreConfig() {
+    std::stringstream ss;
+    ss << "backup_restore_target=[";
+
+    const auto dbpath = boost::filesystem::path(storageGlobalParams.dbpath);
+    for (const auto& entry : boost::filesystem::recursive_directory_iterator(dbpath)) {
+        if (boost::filesystem::is_directory(entry)) {
+            continue;
+        }
+
+        if (entry.path().extension() != kTableExtension) {
+            continue;
+        }
+
+        // Skip WiredTiger metadata files with the ".wt" extension.
+        const std::string filename = entry.path().filename().string();
+        if (filename == "WiredTiger.wt" || filename == "WiredTigerHS.wt") {
+            continue;
+        }
+
+        boost::filesystem::path relativePath =
+            boost::filesystem::relative(entry.path(), dbpath).parent_path();
+        relativePath /= entry.path().stem();
+
+        ss << "\"table:" << relativePath.string() << "\",";
+    }
+
+    ss << "]";
+
+    return ss.str();
+}
+
+bool WiredTigerUtil::isRestoringFromBackup() {
+    if (!storageGlobalParams.restore) {
+        return false;
+    }
+
+    const auto dbpath = boost::filesystem::path(storageGlobalParams.dbpath);
+    return boost::filesystem::exists(dbpath / kWiredTigerBackupFile);
 }
 
 void WiredTigerUtil::appendSnapshotWindowSettings(WiredTigerKVEngine* engine,

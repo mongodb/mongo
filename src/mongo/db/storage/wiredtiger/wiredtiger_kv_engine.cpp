@@ -457,6 +457,10 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
         ss << ",log=(enabled=false),";
     }
 
+    if (WiredTigerUtil::isRestoringFromBackup()) {
+        ss << WiredTigerUtil::generateRestoreConfig() << ",";
+    }
+
     string config = ss.str();
     LOGV2(22315, "Opening WiredTiger", "config"_attr = config);
     auto startTime = Date_t::now();

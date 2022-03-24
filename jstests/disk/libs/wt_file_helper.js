@@ -234,35 +234,3 @@ let truncateUriAndRestartMongod = function(uri, conn, mongodOptions) {
     runWiredTigerTool("-h", conn.dbpath, "truncate", uri);
     return startMongodOnExistingPath(conn.dbpath, mongodOptions);
 };
-
-/**
- * Modifies the WiredTiger.backup file to remove metadata for `uri`. This simulates WT-8703.
- * TODO SERVER-62605: remove this function after WT-8703 is complete.
- */
-let removeUriFromWiredTigerBackup = function(dbpath, uri) {
-    const wiredTigerBackupPath = dbpath + "/WiredTiger.backup";
-
-    const fileContents = cat(wiredTigerBackupPath);
-    const fileLines = fileContents.split("\n");
-
-    let newFileContents = "";
-
-    let continueAgain = false;
-    for (let line of fileLines) {
-        if (continueAgain) {
-            continueAgain = false;
-            continue;
-        }
-
-        if (line.includes(uri)) {
-            // Skip this and the next line.
-            continueAgain = true;
-            continue;
-        }
-
-        newFileContents += line + "\n";
-    }
-
-    removeFile(wiredTigerBackupPath);
-    writeFile(wiredTigerBackupPath, newFileContents);
-};

@@ -193,6 +193,21 @@ public:
                                                         const ImportOptions& importOptions);
 
     /**
+     * Creates the configuration string for the 'backup_restore_target' config option passed into
+     * wiredtiger_open().
+     *
+     * When restoring from a backup, WiredTiger will only restore the table objects present in the
+     * dbpath. WiredTiger will remove all the metadata entries for the tables that are not listed in
+     * the list from the reconstructed metadata.
+     */
+    static std::string generateRestoreConfig();
+
+    /**
+     * Returns true if WiredTiger startup will restore from a backup.
+     */
+    static bool isRestoringFromBackup();
+
+    /**
      * Appends information about the storage engine's currently available snapshots and the settings
      * that affect that window of maintained history.
      *
