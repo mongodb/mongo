@@ -29,6 +29,8 @@ def parse(sys_args, usage=None):
 
     parser = argparse.ArgumentParser(usage=usage)
     subparsers = parser.add_subparsers(dest="command")
+    parser.add_argument("--configDir", dest="config_dir", metavar="CONFIG_DIR",
+                        help="Directory to search for resmoke configuration files")
 
     # Add sub-commands.
     for plugin in _PLUGINS:

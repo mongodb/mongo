@@ -4,7 +4,7 @@ from typing import List, Optional
 import yaml
 from pydantic import BaseModel
 
-import buildscripts.resmokelib.parser as _parser
+from buildscripts.resmokelib import configure_resmoke
 from buildscripts.resmokelib import suitesconfig
 from buildscripts.resmokelib.plugin import PluginInterface, Subcommand
 from buildscripts.resmokelib.testing.suite import Suite
@@ -30,7 +30,6 @@ class TestDiscoverySubcommand(Subcommand):
 
         :param suite_name: Suite to discover.
         """
-        _parser.set_run_options()
         self.suite_name = suite_name
         self.suite_config = suitesconfig
 
@@ -72,7 +71,6 @@ class SuiteConfigSubcommand(Subcommand):
 
         :param suite_name: Suite to discover.
         """
-        _parser.set_run_options()
         self.suite_name = suite_name
         self.suite_config = suitesconfig
 
@@ -137,6 +135,7 @@ class DiscoveryPlugin(PluginInterface):
         :param kwargs: additional args.
         :return: None or a Subcommand.
         """
+        configure_resmoke.validate_and_update_config(parser, parsed_args)
         if subcommand == TEST_DISCOVERY_SUBCOMMAND:
             return TestDiscoverySubcommand(parsed_args.suite)
         if subcommand == SUITECONFIG_SUBCOMMAND:
