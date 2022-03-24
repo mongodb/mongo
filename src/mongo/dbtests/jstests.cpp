@@ -885,6 +885,7 @@ public:
     void run() {
         auto scopePF = makePromiseFuture<Scope*>();
         auto awakenedPF = makePromiseFuture<void>();
+        auto safeToDestroyScopePF = makePromiseFuture<void>();
 
         // Spawn a thread which attempts to sleep indefinitely.
         stdx::thread thread([&] {
@@ -904,6 +905,12 @@ public:
                     false,
                     true);
             });
+
+            // The parent thread uses the 'scope' pointer to send the "kill" signal, making it
+            // unsafe to destroy 'scope' until we have confirmation that the parent no longer needs
+            // it. This wait protects against a use-after-free error that can occur if Scope::exec()
+            // fails instead of executing its long sleep.
+            safeToDestroyScopePF.future.wait();
         });
 
         // Wait until just before the sleep begins.
@@ -916,6 +923,7 @@ public:
 
         // Send the operation a kill signal.
         scope->kill();
+        safeToDestroyScopePF.promise.setWith([&scope] { scope = nullptr; });
 
         // Wait for the error.
         auto result = awakenedPF.future.getNoThrow();
