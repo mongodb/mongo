@@ -432,11 +432,10 @@ __session_reconfigure(WT_SESSION *wt_session, const char *config)
      * and no longer needed.
      */
     if ((ret = __wt_config_getones(session, config, "debug.release_evict_page", &cval)) == 0) {
-        if (cval.val) {
+        if (cval.val)
             F_SET(session, WT_SESSION_DEBUG_RELEASE_EVICT);
-        } else {
+        else
             F_CLR(session, WT_SESSION_DEBUG_RELEASE_EVICT);
-        }
     }
 
     WT_ERR_NOTFOUND_OK(ret, false);

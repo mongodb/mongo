@@ -60,6 +60,12 @@ __verify_config(WT_SESSION_IMPL *session, const char *cfg[], WT_VSTUFF *vs)
 
     txn_global = &S2C(session)->txn_global;
 
+    WT_RET(__wt_config_gets(session, cfg, "do_not_clear_txn_id", &cval));
+    if (cval.val)
+        F_SET(session, WT_SESSION_DEBUG_DO_NOT_CLEAR_TXN_ID);
+    else
+        F_CLR(session, WT_SESSION_DEBUG_DO_NOT_CLEAR_TXN_ID);
+
     WT_RET(__wt_config_gets(session, cfg, "dump_address", &cval));
     vs->dump_address = cval.val != 0;
 

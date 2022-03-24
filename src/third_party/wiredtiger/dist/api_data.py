@@ -1697,6 +1697,10 @@ methods = {
 'WT_SESSION.truncate' : Method([]),
 'WT_SESSION.upgrade' : Method([]),
 'WT_SESSION.verify' : Method([
+    Config('do_not_clear_txn_id', 'false', r'''
+        Turn off transaction id clearing, intended for debugging and better
+        diagnosis of crashes or failures.''',
+        type='boolean'),
     Config('dump_address', 'false', r'''
         Display page addresses, time windows, and page types as
         pages are verified, using the application's message handler,

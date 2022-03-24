@@ -1039,6 +1039,9 @@ __cell_unpack_window_cleanup(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk
     if (dsk->write_gen > S2BT(session)->base_write_gen)
         return;
 
+    if (F_ISSET(session, WT_SESSION_DEBUG_DO_NOT_CLEAR_TXN_ID))
+        return;
+
     __cell_addr_window_cleanup(session, unpack_addr);
     __cell_kv_window_cleanup(session, unpack_kv);
 }

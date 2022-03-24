@@ -1639,6 +1639,8 @@ struct __wt_session {
 	 * @param name the URI of the table or file to verify, optional if verifying the history
 	 * store
 	 * @configstart{WT_SESSION.verify, see dist/api_data.py}
+	 * @config{do_not_clear_txn_id, Turn off transaction id clearing\, intended for debugging
+	 * and better diagnosis of crashes or failures., a boolean flag; default \c false.}
 	 * @config{dump_address, Display page addresses\, time windows\, and page types as pages are
 	 * verified\, using the application's message handler\, intended for debugging., a boolean
 	 * flag; default \c false.}
