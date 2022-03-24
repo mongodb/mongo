@@ -3187,7 +3187,7 @@ tasks:
   - func: "run tests"
     vars:
       suite: benchmarks
-      exec_timeout_secs: 10800  # 3 hour timeout.
+      exec_timeout_secs: 14400  # 4 hour timeout.
       resmoke_jobs_max: 1
   - func: "send benchmark results"
   - func: "analyze benchmark results"
