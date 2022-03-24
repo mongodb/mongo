@@ -48,16 +48,10 @@ class test_durable_rollback_to_stable(wttest.WiredTigerTestCase, suite_subproces
         ('table-simple', dict(uri='table', ds=SimpleDataSet)),
     ]
 
-    iso_types = [
-        ('isolation_read_committed', dict(isolation='read-committed')),
-        ('isolation_default', dict(isolation='')),
-        ('isolation_snapshot', dict(isolation='snapshot'))
-    ]
-
     def keep(name, d):
         return d['keyfmt'] != 'r' or (d['uri'] != 'lsm' and not d['ds'].is_lsm())
 
-    scenarios = make_scenarios(types, format_values, iso_types, include=keep)
+    scenarios = make_scenarios(types, format_values, include=keep)
 
     # Test durable timestamp.
     def test_durable_rollback_to_stable(self):
@@ -124,7 +118,7 @@ class test_durable_rollback_to_stable(wttest.WiredTigerTestCase, suite_subproces
             self.assertEquals(cursor.update(), 0)
             self.assertEquals(cursor.next(), 0)
 
-        session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(200))
+        session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(230))
 
         # Set a stable timestamp so that first update value is durable.
         # (Must be done after preparing since preparing before stable is prohibited.)
