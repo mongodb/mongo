@@ -48,9 +48,10 @@
 namespace mongo {
 namespace {
 
-struct WriteErrorDetailComp {
-    bool operator()(const WriteErrorDetail* errorA, const WriteErrorDetail* errorB) const {
-        return errorA->getIndex() < errorB->getIndex();
+struct WriteErrorComp {
+    bool operator()(const write_ops::WriteError& errorA,
+                    const write_ops::WriteError& errorB) const {
+        return errorA.getIndex() < errorB.getIndex();
     }
 };
 
@@ -83,10 +84,6 @@ BSONObj upgradeWriteConcern(const BSONObj& origWriteConcern) {
     }
 
     return newWriteConcern.obj();
-}
-
-void buildTargetError(const Status& errStatus, WriteErrorDetail* details) {
-    details->setStatus(errStatus);
 }
 
 /**
@@ -245,11 +242,11 @@ int getWriteSizeBytes(const WriteOp& writeOp) {
  * into a TrackedErrorMap
  */
 void trackErrors(const ShardEndpoint& endpoint,
-                 const std::vector<WriteErrorDetail*> itemErrors,
+                 const std::vector<write_ops::WriteError>& itemErrors,
                  TrackedErrors* trackedErrors) {
-    for (const auto error : itemErrors) {
-        if (trackedErrors->isTracking(error->toStatus().code())) {
-            trackedErrors->addError(ShardError(endpoint, *error));
+    for (auto&& error : itemErrors) {
+        if (trackedErrors->isTracking(error.getStatus().code())) {
+            trackedErrors->addError(ShardError(endpoint, error));
         }
     }
 }
@@ -259,29 +256,24 @@ void trackErrors(const ShardEndpoint& endpoint,
  * populated already, contacting the primary shard if necessary.
  */
 void populateCollectionUUIDMismatch(OperationContext* opCtx,
-                                    WriteErrorDetail* error,
+                                    write_ops::WriteError* error,
                                     boost::optional<std::string>* actualCollection,
                                     bool* hasContactedPrimaryShard) {
-    auto status = error->toStatus();
-    if (status.code() != ErrorCodes::CollectionUUIDMismatch) {
+    if (error->getStatus() != ErrorCodes::CollectionUUIDMismatch) {
         return;
     }
-    auto info = status.extraInfo<CollectionUUIDMismatchInfo>();
 
+    auto info = error->getStatus().extraInfo<CollectionUUIDMismatchInfo>();
     if (info->actualCollection()) {
         return;
     }
 
-    auto setErrorStatus = [&] {
+    if (*actualCollection) {
         error->setStatus({CollectionUUIDMismatchInfo{info->db(),
                                                      info->collectionUUID(),
                                                      info->expectedCollection(),
                                                      **actualCollection},
-                          status.reason()});
-    };
-
-    if (*actualCollection) {
-        setErrorStatus();
+                          error->getStatus().reason()});
         return;
     }
 
@@ -290,7 +282,7 @@ void populateCollectionUUIDMismatch(OperationContext* opCtx,
     }
 
     // The listCollections command cannot be run in multi-document transactions, so run it using an
-    // alterative client.
+    // alternative client.
     auto client = opCtx->getServiceContext()->makeClient("populateCollectionUUIDMismatch");
     auto alternativeOpCtx = client->makeOperationContext();
     opCtx = alternativeOpCtx.get();
@@ -328,10 +320,16 @@ void populateCollectionUUIDMismatch(OperationContext* opCtx,
     if (auto actualCollectionElem = dotted_path_support::extractElementAtPath(
             response.swResponse.getValue().data, "cursor.firstBatch.0.name")) {
         *actualCollection = actualCollectionElem.str();
-        setErrorStatus();
+        error->setStatus({CollectionUUIDMismatchInfo{info->db(),
+                                                     info->collectionUUID(),
+                                                     info->expectedCollection(),
+                                                     **actualCollection},
+                          error->getStatus().reason()});
+        return;
     }
 
     *hasContactedPrimaryShard = true;
+    return;
 }
 
 }  // namespace
@@ -414,8 +412,7 @@ Status BatchWriteOp::targetBatch(
         }
 
         if (!targetStatus.isOK()) {
-            WriteErrorDetail targetError;
-            buildTargetError(targetStatus, &targetError);
+            write_ops::WriteError targetError(0, targetStatus);
 
             if (TransactionRouter::get(_opCtx)) {
                 writeOp.setOpError(targetError);
@@ -670,8 +667,7 @@ void BatchWriteOp::noteBatchResponse(const TargetedWriteBatch& targetedBatch,
                                      const BatchedCommandResponse& response,
                                      TrackedErrors* trackedErrors) {
     if (!response.getOk()) {
-        WriteErrorDetail error;
-        error.setStatus(response.getTopLevelStatus());
+        write_ops::WriteError error(0, response.getTopLevelStatus());
 
         // Treat command errors exactly like other failures of the batch.
         //
@@ -696,7 +692,7 @@ void BatchWriteOp::noteBatchResponse(const TargetedWriteBatch& targetedBatch,
         _wcErrors.emplace_back(targetedBatch.getEndpoint(), *response.getWriteConcernError());
     }
 
-    std::vector<WriteErrorDetail*> itemErrors;
+    std::vector<write_ops::WriteError> itemErrors;
 
     // Handle batch and per-item errors
     if (response.isErrDetailsSet()) {
@@ -705,7 +701,7 @@ void BatchWriteOp::noteBatchResponse(const TargetedWriteBatch& targetedBatch,
             itemErrors.begin(), response.getErrDetails().begin(), response.getErrDetails().end());
 
         // Sort per-item errors by index
-        std::sort(itemErrors.begin(), itemErrors.end(), WriteErrorDetailComp());
+        std::sort(itemErrors.begin(), itemErrors.end(), WriteErrorComp());
     }
 
     //
@@ -717,25 +713,24 @@ void BatchWriteOp::noteBatchResponse(const TargetedWriteBatch& targetedBatch,
 
     const bool ordered = _clientRequest.getWriteCommandRequestBase().getOrdered();
 
-    std::vector<WriteErrorDetail*>::iterator itemErrorIt = itemErrors.begin();
+    auto itemErrorIt = itemErrors.begin();
     int index = 0;
-    WriteErrorDetail* lastError = nullptr;
+    write_ops::WriteError* lastError = nullptr;
     for (auto&& write : targetedBatch.getWrites()) {
         WriteOp& writeOp = _writeOps[write->writeOpRef.first];
-
-        dassert(writeOp.getWriteState() == WriteOpState_Pending);
+        invariant(writeOp.getWriteState() == WriteOpState_Pending);
 
         // See if we have an error for the write
-        WriteErrorDetail* writeError = nullptr;
+        write_ops::WriteError* writeError = nullptr;
 
-        if (itemErrorIt != itemErrors.end() && (*itemErrorIt)->getIndex() == index) {
+        if (itemErrorIt != itemErrors.end() && itemErrorIt->getIndex() == index) {
             // We have an per-item error for this write op's index
-            writeError = *itemErrorIt;
+            writeError = &(*itemErrorIt);
             ++itemErrorIt;
         }
 
         // Finish the response (with error, if needed)
-        if (nullptr == writeError) {
+        if (!writeError) {
             if (!ordered || !lastError) {
                 writeOp.noteWriteComplete(*write);
             } else {
@@ -778,7 +773,7 @@ void BatchWriteOp::noteBatchResponse(const TargetedWriteBatch& targetedBatch,
 }
 
 void BatchWriteOp::noteBatchError(const TargetedWriteBatch& targetedBatch,
-                                  const WriteErrorDetail& error) {
+                                  const write_ops::WriteError& error) {
     // Treat errors to get a batch response as failures of the contained writes
     BatchedCommandResponse emulatedResponse;
     emulatedResponse.setStatus(Status::OK());
@@ -789,16 +784,15 @@ void BatchWriteOp::noteBatchError(const TargetedWriteBatch& targetedBatch,
         : targetedBatch.getWrites().size();
 
     for (int i = 0; i < numErrors; i++) {
-        auto errorClone(std::make_unique<WriteErrorDetail>());
-        error.cloneTo(errorClone.get());
-        errorClone->setIndex(i);
-        emulatedResponse.addToErrDetails(errorClone.release());
+        write_ops::WriteError errorClone = error;
+        errorClone.setIndex(i);
+        emulatedResponse.addToErrDetails(std::move(errorClone));
     }
 
     noteBatchResponse(targetedBatch, emulatedResponse, nullptr);
 }
 
-void BatchWriteOp::abortBatch(const WriteErrorDetail& error) {
+void BatchWriteOp::abortBatch(const write_ops::WriteError& error) {
     dassert(!isFinished());
     dassert(numWriteOpsIn(WriteOpState_Pending) == 0);
 
@@ -876,26 +870,26 @@ void BatchWriteOp::buildClientResponse(BatchedCommandResponse* batchResp) {
 
         for (std::vector<WriteOp*>::iterator it = errOps.begin(); it != errOps.end(); ++it) {
             WriteOp& writeOp = **it;
-            WriteErrorDetail* error = new WriteErrorDetail();
-            writeOp.getOpError().cloneTo(error);
-            batchResp->addToErrDetails(error);
+            write_ops::WriteError error = writeOp.getOpError();
+            auto status = error.getStatus();
 
             // For CollectionUUIDMismatch error, check if there is a response from a shard that
             // aleady has the actualCollection information. If there is none, make an additional
             // call to the primary shard to fetch this info in case the collection is unsharded or
             // the targeted shard does not own any chunk of the collection with the requested uuid.
-            auto status = error->toStatus();
             if (!collectionUUIDMismatchActualCollection &&
                 status.code() == ErrorCodes::CollectionUUIDMismatch) {
                 collectionUUIDMismatchActualCollection =
                     status.extraInfo<CollectionUUIDMismatchInfo>()->actualCollection();
             }
+
+            batchResp->addToErrDetails(std::move(error));
         }
 
         bool hasContactedPrimaryShard = false;
-        for (auto error : batchResp->getErrDetails()) {
+        for (auto& error : batchResp->getErrDetails()) {
             populateCollectionUUIDMismatch(
-                _opCtx, error, &collectionUUIDMismatchActualCollection, &hasContactedPrimaryShard);
+                _opCtx, &error, &collectionUUIDMismatchActualCollection, &hasContactedPrimaryShard);
         }
     }
 
@@ -984,7 +978,7 @@ void BatchWriteOp::_incBatchStats(const BatchedCommandResponse& response) {
     }
 }
 
-void BatchWriteOp::_cancelBatches(const WriteErrorDetail& why,
+void BatchWriteOp::_cancelBatches(const write_ops::WriteError& why,
                                   TargetedBatchMap&& batchMapToCancel) {
     // Collect all the writeOps that are currently targeted
     for (TargetedBatchMap::iterator it = batchMapToCancel.begin(); it != batchMapToCancel.end();) {
@@ -1049,7 +1043,7 @@ bool TrackedErrors::isTracking(int errCode) const {
 }
 
 void TrackedErrors::addError(ShardError error) {
-    TrackedErrorMap::iterator seenIt = _errorMap.find(error.error.toStatus().code());
+    TrackedErrorMap::iterator seenIt = _errorMap.find(error.error.getStatus().code());
     if (seenIt == _errorMap.end())
         return;
     seenIt->second.emplace_back(std::move(error));

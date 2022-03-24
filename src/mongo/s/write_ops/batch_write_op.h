@@ -59,12 +59,11 @@ const int kWriteCommandBSONArrayPerElementOverheadBytes = 7;
  * Certain types of errors are not stored in WriteOps or must be returned to a caller.
  */
 struct ShardError {
-    ShardError(const ShardEndpoint& endpoint, const WriteErrorDetail& error) : endpoint(endpoint) {
-        error.cloneTo(&this->error);
-    }
+    ShardError(const ShardEndpoint& endpoint, const write_ops::WriteError& error)
+        : endpoint(endpoint), error(error) {}
 
     ShardEndpoint endpoint;
-    WriteErrorDetail error;
+    write_ops::WriteError error;
 };
 
 /**
@@ -168,7 +167,8 @@ public:
      * Stores an error that occurred trying to send/recv a TargetedWriteBatch for this
      * BatchWriteOp.
      */
-    void noteBatchError(const TargetedWriteBatch& targetedBatch, const WriteErrorDetail& error);
+    void noteBatchError(const TargetedWriteBatch& targetedBatch,
+                        const write_ops::WriteError& error);
 
     /**
      * Aborts any further writes in the batch with the provided error.  There must be no pending
@@ -176,7 +176,7 @@ public:
      *
      * Batch is finished immediately after aborting.
      */
-    void abortBatch(const WriteErrorDetail& error);
+    void abortBatch(const write_ops::WriteError& error);
 
     /**
      * Disposes of all tracked targeted batches when an error is encountered during a transaction.
@@ -212,7 +212,7 @@ private:
     /**
      * Helper function to cancel all the write ops of targeted batches in a map.
      */
-    void _cancelBatches(const WriteErrorDetail& why, TargetedBatchMap&& batchMapToCancel);
+    void _cancelBatches(const write_ops::WriteError& why, TargetedBatchMap&& batchMapToCancel);
 
     OperationContext* const _opCtx;
 

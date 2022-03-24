@@ -90,20 +90,13 @@ BSONObj expectInsertsReturnStaleVersionErrorsBase(const NamespaceString& nss,
     // Report a stale version error for each write in the batch.
     int i = 0;
     for (itInserted = inserted.begin(); itInserted != inserted.end(); ++itInserted) {
-        WriteErrorDetail* error = new WriteErrorDetail;
-        error->setStatus({ErrorCodes::StaleShardVersion, ""});
-        error->setErrInfo([&] {
-            StaleConfigInfo sci(nss,
-                                ChunkVersion(1, 0, epoch, timestamp),
-                                ChunkVersion(2, 0, epoch, timestamp),
-                                ShardId(kShardName1));
-            BSONObjBuilder builder;
-            sci.serialize(&builder);
-            return builder.obj();
-        }());
-        error->setIndex(i);
-
-        staleResponse.addToErrDetails(error);
+        staleResponse.addToErrDetails(
+            write_ops::WriteError(i,
+                                  Status(StaleConfigInfo(nss,
+                                                         ChunkVersion(1, 0, epoch, timestamp),
+                                                         ChunkVersion(2, 0, epoch, timestamp),
+                                                         ShardId(kShardName1)),
+                                         "Stale error")));
         ++i;
     }
 
@@ -616,8 +609,8 @@ TEST_F(BatchWriteExecTest, SingleOpUnorderedError) {
         ASSERT(response.getOk());
         ASSERT_EQ(0, response.getN());
         ASSERT(response.isErrDetailsSet());
-        ASSERT_EQ(errResponse.toStatus().code(), response.getErrDetailsAt(0)->toStatus().code());
-        ASSERT(response.getErrDetailsAt(0)->toStatus().reason().find(
+        ASSERT_EQ(errResponse.toStatus().code(), response.getErrDetailsAt(0).getStatus().code());
+        ASSERT(response.getErrDetailsAt(0).getStatus().reason().find(
                    errResponse.toStatus().reason()) != std::string::npos);
 
         ASSERT_EQ(1, stats.numRounds);
@@ -732,23 +725,13 @@ TEST_F(BatchWriteExecTest, StaleShardVersionReturnedFromBatchWithSingleMultiWrit
         BatchedCommandResponse response;
         response.setStatus(Status::OK());
         response.setNModified(0);
-        response.addToErrDetails([&] {
-            WriteErrorDetail* errDetail = new WriteErrorDetail();
-            errDetail->setIndex(0);
-            errDetail->setStatus({ErrorCodes::StaleShardVersion, "Stale shard version"});
-            errDetail->setErrInfo([&] {
-                Status ssvStatus(StaleConfigInfo(nss,
-                                                 ChunkVersion(101, 200, epoch, timestamp),
-                                                 ChunkVersion(105, 200, epoch, timestamp),
-                                                 ShardId(kShardName2)),
-                                 "Stale shard version");
-                BSONObjBuilder builder;
-                ssvStatus.serializeErrorToBSON(&builder);
-                return builder.obj();
-            }());
-            return errDetail;
-        }());
-
+        response.addToErrDetails(
+            write_ops::WriteError(0,
+                                  Status(StaleConfigInfo(nss,
+                                                         ChunkVersion(101, 200, epoch, timestamp),
+                                                         ChunkVersion(105, 200, epoch, timestamp),
+                                                         ShardId(kShardName2)),
+                                         "Stale error")));
         return response.toBSON();
     });
 
@@ -840,39 +823,20 @@ TEST_F(BatchWriteExecTest,
         BatchedCommandResponse response;
         response.setStatus(Status::OK());
         response.setNModified(0);
-        response.addToErrDetails([&] {
-            WriteErrorDetail* errDetail = new WriteErrorDetail();
-            errDetail->setIndex(0);
-            errDetail->setStatus({ErrorCodes::StaleShardVersion, "Stale shard version"});
-            errDetail->setErrInfo([&] {
-                Status ssvStatus(StaleConfigInfo(nss,
-                                                 ChunkVersion(101, 200, epoch, timestamp),
-                                                 ChunkVersion(105, 200, epoch, timestamp),
-                                                 ShardId(kShardName2)),
-                                 "Stale shard version");
-                BSONObjBuilder builder;
-                ssvStatus.serializeErrorToBSON(&builder);
-                return builder.obj();
-            }());
-            return errDetail;
-        }());
-        response.addToErrDetails([&] {
-            WriteErrorDetail* errDetail = new WriteErrorDetail();
-            errDetail->setIndex(1);
-            errDetail->setStatus({ErrorCodes::StaleShardVersion, "Stale shard version"});
-            errDetail->setErrInfo([&] {
-                Status ssvStatus(StaleConfigInfo(nss,
-                                                 ChunkVersion(101, 200, epoch, timestamp),
-                                                 ChunkVersion(105, 200, epoch, timestamp),
-                                                 ShardId(kShardName2)),
-                                 "Stale shard version");
-                BSONObjBuilder builder;
-                ssvStatus.serializeErrorToBSON(&builder);
-                return builder.obj();
-            }());
-            return errDetail;
-        }());
-
+        response.addToErrDetails(
+            write_ops::WriteError(0,
+                                  Status(StaleConfigInfo(nss,
+                                                         ChunkVersion(101, 200, epoch, timestamp),
+                                                         ChunkVersion(105, 200, epoch, timestamp),
+                                                         ShardId(kShardName2)),
+                                         "Stale error")));
+        response.addToErrDetails(
+            write_ops::WriteError(1,
+                                  Status(StaleConfigInfo(nss,
+                                                         ChunkVersion(101, 200, epoch, timestamp),
+                                                         ChunkVersion(105, 200, epoch, timestamp),
+                                                         ShardId(kShardName2)),
+                                         "Stale error")));
         return response.toBSON();
     });
 
@@ -953,23 +917,13 @@ TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromMultiWriteWithShard1Firs) {
         BatchedCommandResponse response;
         response.setStatus(Status::OK());
         response.setNModified(0);
-        response.addToErrDetails([&] {
-            WriteErrorDetail* errDetail = new WriteErrorDetail();
-            errDetail->setIndex(1);
-            errDetail->setStatus({ErrorCodes::StaleShardVersion, "Stale shard version"});
-            errDetail->setErrInfo([&] {
-                Status ssvStatus(StaleConfigInfo(nss,
-                                                 ChunkVersion(101, 200, epoch, timestamp),
-                                                 ChunkVersion(105, 200, epoch, timestamp),
-                                                 ShardId(kShardName1)),
-                                 "Stale shard version");
-                BSONObjBuilder builder;
-                ssvStatus.serializeErrorToBSON(&builder);
-                return builder.obj();
-            }());
-            return errDetail;
-        }());
-
+        response.addToErrDetails(
+            write_ops::WriteError(1,
+                                  Status(StaleConfigInfo(nss,
+                                                         ChunkVersion(101, 200, epoch, timestamp),
+                                                         ChunkVersion(105, 200, epoch, timestamp),
+                                                         ShardId(kShardName2)),
+                                         "Stale error")));
         return response.toBSON();
     });
 
@@ -979,23 +933,13 @@ TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromMultiWriteWithShard1Firs) {
         BatchedCommandResponse response;
         response.setStatus(Status::OK());
         response.setNModified(0);
-        response.addToErrDetails([&] {
-            WriteErrorDetail* errDetail = new WriteErrorDetail();
-            errDetail->setIndex(0);
-            errDetail->setStatus({ErrorCodes::StaleShardVersion, "Stale shard version"});
-            errDetail->setErrInfo([&] {
-                Status ssvStatus(StaleConfigInfo(nss,
-                                                 ChunkVersion(101, 200, epoch, timestamp),
-                                                 ChunkVersion(105, 200, epoch, timestamp),
-                                                 ShardId(kShardName2)),
-                                 "Stale shard version");
-                BSONObjBuilder builder;
-                ssvStatus.serializeErrorToBSON(&builder);
-                return builder.obj();
-            }());
-            return errDetail;
-        }());
-
+        response.addToErrDetails(
+            write_ops::WriteError(0,
+                                  Status(StaleConfigInfo(nss,
+                                                         ChunkVersion(101, 200, epoch, timestamp),
+                                                         ChunkVersion(105, 200, epoch, timestamp),
+                                                         ShardId(kShardName2)),
+                                         "Stale error")));
         return response.toBSON();
     });
 
@@ -1087,23 +1031,13 @@ TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromMultiWriteWithShard1FirstOK
         BatchedCommandResponse response;
         response.setStatus(Status::OK());
         response.setNModified(0);
-        response.addToErrDetails([&] {
-            WriteErrorDetail* errDetail = new WriteErrorDetail();
-            errDetail->setIndex(1);
-            errDetail->setStatus({ErrorCodes::StaleShardVersion, "Stale shard version"});
-            errDetail->setErrInfo([&] {
-                Status ssvStatus(StaleConfigInfo(nss,
-                                                 ChunkVersion(101, 200, epoch, timestamp),
-                                                 ChunkVersion(105, 200, epoch, timestamp),
-                                                 ShardId(kShardName1)),
-                                 "Stale shard version");
-                BSONObjBuilder builder;
-                ssvStatus.serializeErrorToBSON(&builder);
-                return builder.obj();
-            }());
-            return errDetail;
-        }());
-
+        response.addToErrDetails(
+            write_ops::WriteError(1,
+                                  Status(StaleConfigInfo(nss,
+                                                         ChunkVersion(101, 200, epoch, timestamp),
+                                                         ChunkVersion(105, 200, epoch, timestamp),
+                                                         ShardId(kShardName2)),
+                                         "Stale error")));
         return response.toBSON();
     });
 
@@ -1113,23 +1047,13 @@ TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromMultiWriteWithShard1FirstOK
         BatchedCommandResponse response;
         response.setStatus(Status::OK());
         response.setNModified(0);
-        response.addToErrDetails([&] {
-            WriteErrorDetail* errDetail = new WriteErrorDetail();
-            errDetail->setIndex(1);
-            errDetail->setStatus({ErrorCodes::StaleShardVersion, "Stale shard version"});
-            errDetail->setErrInfo([&] {
-                Status ssvStatus(StaleConfigInfo(nss,
-                                                 ChunkVersion(101, 200, epoch, timestamp),
-                                                 ChunkVersion(105, 200, epoch, timestamp),
-                                                 ShardId(kShardName2)),
-                                 "Stale shard version");
-                BSONObjBuilder builder;
-                ssvStatus.serializeErrorToBSON(&builder);
-                return builder.obj();
-            }());
-            return errDetail;
-        }());
-
+        response.addToErrDetails(
+            write_ops::WriteError(1,
+                                  Status(StaleConfigInfo(nss,
+                                                         ChunkVersion(101, 200, epoch, timestamp),
+                                                         ChunkVersion(105, 200, epoch, timestamp),
+                                                         ShardId(kShardName2)),
+                                         "Stale error")));
         return response.toBSON();
     });
 
@@ -1226,22 +1150,13 @@ TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromWriteWithShard1SSVShard2OK)
         response.setStatus(Status::OK());
         response.setNModified(0);
         response.setN(0);
-        response.addToErrDetails([&] {
-            WriteErrorDetail* errDetail = new WriteErrorDetail();
-            errDetail->setIndex(0);
-            errDetail->setStatus({ErrorCodes::StaleShardVersion, "Stale shard version"});
-            errDetail->setErrInfo([&] {
-                Status ssvStatus(StaleConfigInfo(nss,
-                                                 ChunkVersion(101, 200, epoch, timestamp),
-                                                 ChunkVersion(105, 200, epoch, timestamp),
-                                                 ShardId(kShardName1)),
-                                 "Migration happened");
-                BSONObjBuilder builder;
-                ssvStatus.serializeErrorToBSON(&builder);
-                return builder.obj();
-            }());
-            return errDetail;
-        }());
+        response.addToErrDetails(
+            write_ops::WriteError(0,
+                                  Status(StaleConfigInfo(nss,
+                                                         ChunkVersion(101, 200, epoch, timestamp),
+                                                         ChunkVersion(105, 200, epoch, timestamp),
+                                                         ShardId(kShardName2)),
+                                         "Stale error")));
 
         // This simulates a migration of the last chunk on shard 1 to shard 2, which means that
         // future rounds on the batchExecutor should only target shard 2
@@ -1361,8 +1276,8 @@ TEST_F(BatchWriteExecTest, TooManyStaleShardOp) {
         ASSERT(response.getOk());
         ASSERT_EQ(0, response.getN());
         ASSERT(response.isErrDetailsSet());
-        ASSERT_EQUALS(response.getErrDetailsAt(0)->toStatus().code(), ErrorCodes::NoProgressMade);
-        ASSERT_EQUALS(response.getErrDetailsAt(1)->toStatus().code(), ErrorCodes::NoProgressMade);
+        ASSERT_EQUALS(response.getErrDetailsAt(0).getStatus().code(), ErrorCodes::NoProgressMade);
+        ASSERT_EQUALS(response.getErrDetailsAt(1).getStatus().code(), ErrorCodes::NoProgressMade);
 
         ASSERT_EQUALS(stats.numStaleShardBatches, (1 + kMaxRoundsWithoutProgress));
     });
@@ -1466,8 +1381,8 @@ TEST_F(BatchWriteExecTest, TooManyStaleDbOp) {
         ASSERT(response.getOk());
         ASSERT_EQ(0, response.getN());
         ASSERT(response.isErrDetailsSet());
-        ASSERT_EQUALS(response.getErrDetailsAt(0)->toStatus().code(), ErrorCodes::NoProgressMade);
-        ASSERT_EQUALS(response.getErrDetailsAt(1)->toStatus().code(), ErrorCodes::NoProgressMade);
+        ASSERT_EQUALS(response.getErrDetailsAt(0).getStatus().code(), ErrorCodes::NoProgressMade);
+        ASSERT_EQUALS(response.getErrDetailsAt(1).getStatus().code(), ErrorCodes::NoProgressMade);
 
         ASSERT_EQUALS(stats.numStaleDbBatches, (1 + kMaxRoundsWithoutProgress));
     });
@@ -1551,9 +1466,9 @@ TEST_F(BatchWriteExecTest, RetryableErrorNoTxnNumber) {
         ASSERT(response.getOk());
         ASSERT_EQ(0, response.getN());
         ASSERT(response.isErrDetailsSet());
-        ASSERT_EQUALS(response.getErrDetailsAt(0)->toStatus().code(),
+        ASSERT_EQUALS(response.getErrDetailsAt(0).getStatus().code(),
                       retryableErrResponse.toStatus().code());
-        ASSERT(response.getErrDetailsAt(0)->toStatus().reason().find(
+        ASSERT(response.getErrDetailsAt(0).getStatus().reason().find(
                    retryableErrResponse.toStatus().reason()) != std::string::npos);
         ASSERT_EQ(1, stats.numRounds);
     });
@@ -1631,9 +1546,9 @@ TEST_F(BatchWriteExecTest, NonRetryableErrorTxnNumber) {
         ASSERT(response.getOk());
         ASSERT_EQ(0, response.getN());
         ASSERT(response.isErrDetailsSet());
-        ASSERT_EQUALS(response.getErrDetailsAt(0)->toStatus().code(),
+        ASSERT_EQUALS(response.getErrDetailsAt(0).getStatus().code(),
                       nonRetryableErrResponse.toStatus().code());
-        ASSERT(response.getErrDetailsAt(0)->toStatus().reason().find(
+        ASSERT(response.getErrDetailsAt(0).getStatus().reason().find(
                    nonRetryableErrResponse.toStatus().reason()) != std::string::npos);
         ASSERT_EQ(1, stats.numRounds);
     });
@@ -1672,9 +1587,9 @@ TEST_F(BatchWriteExecTest, StaleEpochIsNotRetryable) {
         ASSERT(response.getOk());
         ASSERT_EQ(0, response.getN());
         ASSERT(response.isErrDetailsSet());
-        ASSERT_EQUALS(response.getErrDetailsAt(0)->toStatus().code(),
+        ASSERT_EQUALS(response.getErrDetailsAt(0).getStatus().code(),
                       nonRetryableErrResponse.toStatus().code());
-        ASSERT(response.getErrDetailsAt(0)->toStatus().reason().find(
+        ASSERT(response.getErrDetailsAt(0).getStatus().reason().find(
                    nonRetryableErrResponse.toStatus().reason()) != std::string::npos);
         ASSERT_EQ(1, stats.numRounds);
     });
@@ -1980,7 +1895,7 @@ TEST_F(BatchWriteExecTargeterErrorTest, TargetedFailedAndErrorResponse) {
         BatchWriteExec::executeBatch(
             operationContext(), multiShardNSTargeter, request, &response, &stats);
         ASSERT(response.isErrDetailsSet());
-        auto code = response.getErrDetailsAt(0)->toStatus().code();
+        auto code = response.getErrDetailsAt(0).getStatus().code();
         ASSERT_EQUALS(code, ErrorCodes::MultipleErrorsOccurred);
     });
 
@@ -1989,13 +1904,8 @@ TEST_F(BatchWriteExecTargeterErrorTest, TargetedFailedAndErrorResponse) {
 
         BatchedCommandResponse response;
         response.setStatus(Status::OK());
-        response.addToErrDetails([&] {
-            WriteErrorDetail* errDetail = new WriteErrorDetail();
-            errDetail->setIndex(0);
-            errDetail->setStatus({ErrorCodes::UnknownError, "mock non-retryable error"});
-            return errDetail;
-        }());
-
+        response.addToErrDetails(
+            write_ops::WriteError(0, {ErrorCodes::UnknownError, "mock non-retryable error"}));
         return response.toBSON();
     });
 
@@ -2121,7 +2031,7 @@ TEST_F(BatchWriteExecTransactionTargeterErrorTest, TargetedFailedAndErrorRespons
         BatchWriteExec::executeBatch(
             operationContext(), multiShardNSTargeter, request, &response, &stats);
         ASSERT(response.isErrDetailsSet());
-        auto code = response.getErrDetailsAt(0)->toStatus().code();
+        auto code = response.getErrDetailsAt(0).getStatus().code();
         ASSERT_EQUALS(code, ErrorCodes::ShardNotFound);
     });
 
@@ -2265,7 +2175,7 @@ TEST_F(BatchWriteExecTransactionMultiShardTest, TargetedSucceededAndErrorRespons
         BatchWriteExec::executeBatch(
             operationContext(), multiShardNSTargeter, request, &response, &stats);
         ASSERT(response.isErrDetailsSet());
-        auto code = response.getErrDetailsAt(0)->toStatus().code();
+        auto code = response.getErrDetailsAt(0).getStatus().code();
         ASSERT_EQUALS(code, ErrorCodes::UnknownError);
     });
 
@@ -2416,7 +2326,7 @@ TEST_F(BatchWriteExecTransactionTest, ErrorInBatchThrows_CommandError) {
 
         ASSERT(response.isErrDetailsSet());
         ASSERT_GT(response.sizeErrDetails(), 0u);
-        ASSERT_EQ(ErrorCodes::UnknownError, response.getErrDetailsAt(0)->toStatus().code());
+        ASSERT_EQ(ErrorCodes::UnknownError, response.getErrDetailsAt(0).getStatus().code());
     });
 
     BatchedCommandResponse failedResponse;
@@ -2448,7 +2358,7 @@ TEST_F(BatchWriteExecTransactionTest, ErrorInBatchSets_WriteError) {
 
         ASSERT(response.isErrDetailsSet());
         ASSERT_GT(response.sizeErrDetails(), 0u);
-        ASSERT_EQ(ErrorCodes::StaleShardVersion, response.getErrDetailsAt(0)->toStatus().code());
+        ASSERT_EQ(ErrorCodes::StaleConfig, response.getErrDetailsAt(0).getStatus().code());
     });
 
     // Any write error works, using SSV for convenience.
@@ -2478,7 +2388,7 @@ TEST_F(BatchWriteExecTransactionTest, ErrorInBatchSets_WriteErrorOrdered) {
 
         ASSERT(response.isErrDetailsSet());
         ASSERT_GT(response.sizeErrDetails(), 0u);
-        ASSERT_EQ(ErrorCodes::StaleShardVersion, response.getErrDetailsAt(0)->toStatus().code());
+        ASSERT_EQ(ErrorCodes::StaleConfig, response.getErrDetailsAt(0).getStatus().code());
     });
 
     // Any write error works, using SSV for convenience.
@@ -2537,7 +2447,7 @@ TEST_F(BatchWriteExecTransactionTest, ErrorInBatchSets_DispatchError) {
 
         ASSERT(response.isErrDetailsSet());
         ASSERT_GT(response.sizeErrDetails(), 0u);
-        ASSERT_EQ(ErrorCodes::CallbackCanceled, response.getErrDetailsAt(0)->toStatus().code());
+        ASSERT_EQ(ErrorCodes::CallbackCanceled, response.getErrDetailsAt(0).getStatus().code());
     });
 
     onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {

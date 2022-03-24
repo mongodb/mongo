@@ -27,14 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "mongo/db/fle_crud.h"
 
 #include <cstdint>
 #include <memory>
 #include <string>
 #include <utility>
-
-#include "mongo/db/fle_crud.h"
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
@@ -52,7 +50,6 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/transaction_router_resource_yielder.h"
 #include "mongo/s/write_ops/batch_write_exec.h"
-#include "mongo/s/write_ops/write_error_detail.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
 
@@ -160,21 +157,6 @@ uint64_t FLEQueryInterfaceImpl::countDocuments(const NamespaceString& nss) {
     return docCount;
 }
 
-write_ops::WriteError writeErrorDetailToWriteError(const WriteErrorDetail* detail) {
-    return write_ops::WriteError(detail->getIndex(), detail->toStatus());
-}
-
-
-std::vector<write_ops::WriteError> writeErrorsDetailToWriteErrors(
-    const std::vector<WriteErrorDetail*>& details) {
-    std::vector<write_ops::WriteError> errors;
-    errors.reserve(details.size());
-    for (const auto& detail : details) {
-        errors.push_back(writeErrorDetailToWriteError(detail));
-    }
-    return errors;
-}
-
 std::vector<write_ops::WriteError> singleStatusToWriteErrors(const Status& status) {
     std::vector<write_ops::WriteError> errors;
 
@@ -196,17 +178,6 @@ void appendSingleStatusToWriteErrors(const Status& status,
     replyBase->setWriteErrors(errors);
 }
 
-void writeErrorsToWriteDetails(const std::vector<write_ops::WriteError>& errors,
-                               BatchedCommandResponse* response) {
-    for (const auto& error : errors) {
-        auto detail = std::make_unique<WriteErrorDetail>();
-        detail->setIndex(error.getIndex());
-        detail->setStatus(error.getStatus());
-
-        response->addToErrDetails(detail.release());
-    }
-}
-
 void replyToResponse(write_ops::WriteCommandReplyBase* replyBase,
                      BatchedCommandResponse* response) {
     response->setStatus(Status::OK());
@@ -217,8 +188,10 @@ void replyToResponse(write_ops::WriteCommandReplyBase* replyBase,
     if (replyBase->getOpTime()) {
         response->setLastOp(replyBase->getOpTime().value());
     }
-    if (replyBase->getWriteErrors().has_value()) {
-        writeErrorsToWriteDetails(replyBase->getWriteErrors().value(), response);
+    if (replyBase->getWriteErrors()) {
+        for (const auto& error : *replyBase->getWriteErrors()) {
+            response->addToErrDetails(error);
+        }
     }
 }
 
@@ -248,11 +221,7 @@ StatusWith<write_ops::InsertCommandReply> FLEQueryInterfaceImpl::insertDocument(
     }
 
     reply.getWriteCommandReplyBase().setN(response.getN());
-    if (response.isErrDetailsSet()) {
-        reply.getWriteCommandReplyBase().setWriteErrors(
-            writeErrorsDetailToWriteErrors(response.getErrDetails()));
-    }
-
+    reply.getWriteCommandReplyBase().setWriteErrors(response.getErrDetails());
     reply.getWriteCommandReplyBase().setRetriedStmtIds(reply.getRetriedStmtIds());
 
     return {reply};
