@@ -391,17 +391,15 @@ Status Balancer::moveRange(OperationContext* opCtx,
     const auto maxChunkSize = getMaxChunkSizeBytes(opCtx, coll);
 
     const auto chunk = [&]() {
-        const auto cm =
-            Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfo(opCtx, nss);
+        const auto cm = uassertStatusOK(
+            Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx,
+                                                                                         nss));
         return cm.findIntersectingChunkWithSimpleCollation(request.getMin());
     }();
 
-    // TODO SERVER-64148 handle `moveRange` with bound(s) not necessarily matching a chunk
-    bool validBounds = request.getMin().woCompare(chunk.getMin()) == 0 &&
-        request.getMax().woCompare(chunk.getMax()) == 0;
-    uassert(ErrorCodes::CommandFailed,
-            "No chunk found with the provided shard key bounds",
-            validBounds);
+    if (chunk.getShardId() == request.getToShard()) {
+        return Status::OK();
+    }
 
     ShardsvrMoveRange shardSvrRequest(nss);
     shardSvrRequest.setDbName(NamespaceString::kAdminDb);

@@ -50,13 +50,16 @@ const std::string kPattern = "_id";
  * Call the autoSplitVector function of the test collection on a chunk with bounds [0, 100) and with
  * the specified `maxChunkSizeMB`.
  */
-std::pair<std::vector<BSONObj>, bool> autoSplit(OperationContext* opCtx, int maxChunkSizeMB) {
+std::pair<std::vector<BSONObj>, bool> autoSplit(OperationContext* opCtx,
+                                                int maxChunkSizeMB,
+                                                boost::optional<int> limit = boost::none) {
     return autoSplitVector(opCtx,
                            kNss,
                            BSON(kPattern << 1) /* shard key pattern */,
                            BSON(kPattern << 0) /* min */,
                            BSON(kPattern << 1000) /* max */,
-                           maxChunkSizeMB * 1024 * 1024 /* max chunk size in bytes*/);
+                           maxChunkSizeMB * 1024 * 1024 /* max chunk size in bytes*/,
+                           limit);
 }
 
 class AutoSplitVectorTest : public ShardServerTestFixture {
@@ -221,6 +224,25 @@ TEST_F(AutoSplitVectorTest10MB, NoRecalculateIfBigLastChunk) {
     ASSERT_EQ(splitKeys.size(), 1);
     ASSERT_EQ(9, splitKeys.front().getIntField(kPattern));
     ASSERT_FALSE(continuation);
+}
+
+// Test that the limit argument is honored and that split points are correctly repositioned
+TEST_F(AutoSplitVectorTest10MB, LimitArgIsRespected) {
+    const auto surplus = 4;
+    insertNDocsOf1MB(operationContext(), surplus /* nDocs */);
+
+    // Maximum split keys returned (no limit)
+    const auto numPossibleSplitKeys = [&]() {
+        auto [splitKeys, continuation] = autoSplit(operationContext(), 2 /* maxChunkSizeMB */);
+        return splitKeys.size();
+    }();
+
+    ASSERT_GT(numPossibleSplitKeys, 3);
+    for (auto limit : {1, 2, 3}) {
+        const auto [splitKeys, continuation] =
+            autoSplit(operationContext(), 2 /* maxChunkSizeMB */, limit);
+        ASSERT_EQ(splitKeys.size(), limit);
+    }
 }
 
 class RepositionLastSplitPointsTest : public AutoSplitVectorTest {

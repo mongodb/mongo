@@ -260,7 +260,7 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
                             shardVersion /* wantedVersion */,
                             shardId,
                             boost::none),
-            str::stream() << "Chunk with bounds "
+            str::stream() << "Range with bounds "
                           << ChunkRange(_args.getMinKey(), _args.getMaxKey()).toString()
                           << " is not owned by this shard.",
             collectionMetadata.getNextChunk(_args.getMinKey(), &existingChunk));
@@ -269,12 +269,11 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
                             shardVersion /* wantedVersion */,
                             shardId,
                             boost::none),
-            str::stream() << "Chunk with bounds "
+            str::stream() << "Unable to move range with bounds "
                           << ChunkRange(_args.getMinKey(), _args.getMaxKey()).toString()
-                          << " does not exist. The closest owned chunk is "
+                          << " . The closest owned chunk is "
                           << ChunkRange(existingChunk.getMin(), existingChunk.getMax()).toString(),
-            existingChunk.getMin().woCompare(_args.getMinKey()) == 0 &&
-                existingChunk.getMax().woCompare(_args.getMaxKey()) == 0);
+            collectionMetadata.checkRangeIsValid(_args.getMinKey(), _args.getMaxKey()).isOK());
 
     _collectionEpoch = collectionVersion.epoch();
     _collectionUUID = collectionUUID;

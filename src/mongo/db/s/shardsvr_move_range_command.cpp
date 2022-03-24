@@ -33,6 +33,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/active_migrations_registry.h"
+#include "mongo/db/s/auto_split_vector.h"
 #include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_statistics.h"
@@ -85,13 +86,30 @@ public:
         void typedRun(OperationContext* opCtx) {
             uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
             opCtx->setAlwaysInterruptAtStepDownOrUp();
+            const auto& originalReq = request();
 
             const auto WC = opCtx->getWriteConcern();
-            const auto req =
-                request().toBSON(BSON(WriteConcernOptions::kWriteConcernField << WC.toBSON()));
+            BSONObjBuilder moveChunkReqBuilder(originalReq.toBSON({}));
+            moveChunkReqBuilder.append(WriteConcernOptions::kWriteConcernField, WC.toBSON());
 
-            const MoveChunkRequest moveChunkRequest =
-                uassertStatusOK(MoveChunkRequest::createFromCommand(ns(), req));
+            const auto& min = request().getMin();
+
+            // TODO SERVER-64817 compute missing bound of `moveRange` within MigrationSourceManager
+            if (!originalReq.getMax().is_initialized()) {
+                // Compute the max bound in case only `min` is set (moveRange)
+                const auto cm = uassertStatusOK(
+                    Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, ns()));
+                uassert(ErrorCodes::NamespaceNotSharded,
+                        "Could not move chunk. Collection is no longer sharded",
+                        cm.isSharded());
+
+                const auto owningChunk = cm.findIntersectingChunkWithSimpleCollation(min);
+                const auto max = computeMaxBound(opCtx, owningChunk, cm.getShardKeyPattern());
+                moveChunkReqBuilder.append(MoveRangeRequest::kMaxFieldName, max);
+            }
+
+            MoveChunkRequest moveChunkRequest = uassertStatusOK(
+                MoveChunkRequest::createFromCommand(ns(), moveChunkReqBuilder.obj()));
 
             // Make sure we're as up-to-date as possible with shard information. This catches the
             // case where we might have changed a shard's host by removing/adding a shard with the
@@ -193,6 +211,31 @@ public:
                     AuthorizationSession::get(opCtx->getClient())
                         ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
                                                            ActionType::internal));
+        }
+
+        /*
+         * Compute the max bound in case only `min` is set (moveRange).
+         *
+         * Taking into account the provided max chunk size, returns:
+         * - A `max` bound to perform split+move in case the chunk owning `min` is splittable.
+         * - The `max` bound of the chunk owning `min in case it can't be split (too small or
+         * jumbo).
+         */
+        BSONObj computeMaxBound(OperationContext* opCtx,
+                                const Chunk& owningChunk,
+                                const ShardKeyPattern& skPattern) {
+            auto [splitKeys, _] = autoSplitVector(opCtx,
+                                                  ns(),
+                                                  skPattern.toBSON(),
+                                                  request().getMin(),
+                                                  owningChunk.getMax(),
+                                                  *request().getMaxChunkSizeBytes(),
+                                                  1);
+            if (splitKeys.size()) {
+                return std::move(splitKeys.front());
+            }
+
+            return owningChunk.getMax();
         }
 
         static void _runImpl(OperationContext* opCtx, const MoveChunkRequest& moveChunkRequest) {

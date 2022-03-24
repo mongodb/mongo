@@ -97,7 +97,12 @@ std::pair<std::vector<BSONObj>, bool> autoSplitVector(OperationContext* opCtx,
                                                       const BSONObj& keyPattern,
                                                       const BSONObj& min,
                                                       const BSONObj& max,
-                                                      long long maxChunkSizeBytes) {
+                                                      long long maxChunkSizeBytes,
+                                                      boost::optional<int> limit) {
+    if (limit) {
+        uassert(ErrorCodes::InvalidOptions, "autoSplitVector expects a positive limit", *limit > 0);
+    }
+
     std::vector<BSONObj> splitKeys;
     bool reachedMaxBSONSize = false;  // True if the split points vector becomes too big
 
@@ -253,6 +258,12 @@ std::pair<std::vector<BSONObj>, bool> autoSplitVector(OperationContext* opCtx,
                 lastSplitPoint = splitKeys.back();
                 numScannedKeys = 0;
 
+                if (limit && splitKeys.size() == static_cast<size_t>(std::max(2, *limit))) {
+                    // If the user has specified a limit, calculate the first 2 split points (avoid
+                    // creating small chunks)
+                    break;
+                }
+
                 LOGV2_DEBUG(5865003, 4, "Picked a split key", "key"_attr = redact(currentKey));
             }
         }
@@ -353,6 +364,10 @@ std::pair<std::vector<BSONObj>, bool> autoSplitVector(OperationContext* opCtx,
                       "keyPattern"_attr = redact(keyPattern),
                       "numSplits"_attr = splitKeys.size(),
                       "duration"_attr = Milliseconds(elapsedMillisToFindSplitPoints));
+    }
+
+    if (limit && splitKeys.size() > static_cast<size_t>(*limit)) {
+        splitKeys.resize(*limit);
     }
 
     return std::make_pair(std::move(splitKeys), reachedMaxBSONSize);

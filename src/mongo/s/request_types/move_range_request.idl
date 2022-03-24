@@ -57,9 +57,10 @@ structs:
             min:
                 type: object
                 description: "The min key of the range to move"
-            max: # TODO SERVER-64148 make this bound optional
+            max:
                 type: object
                 description: "The max key of the range to move"
+                optional: true
             waitForDelete:
                 type: bool
                 description: "If set, wait for the chunk migration to finish before returning"
