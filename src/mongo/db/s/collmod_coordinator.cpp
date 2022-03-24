@@ -80,9 +80,12 @@ CollModCollectionInfo getCollModCollectionInfo(OperationContext* opCtx,
     info.setIsSharded(isShardedColl(opCtx, info.getNsForTargetting()));
     if (info.getIsSharded()) {
         const auto chunkManager =
-            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(
+            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(
                 opCtx, info.getNsForTargetting()));
         info.setPrimaryShard(chunkManager.dbPrimary());
+        tassert(8423352,
+                "Unexpected unsharded collection info found on local catalog cache during collMod",
+                chunkManager.isSharded());
         std::set<ShardId> shardIdsSet;
         chunkManager.getAllShardIds(&shardIdsSet);
         std::vector<ShardId> shardIdsVec{shardIdsSet.begin(), shardIdsSet.end()};
