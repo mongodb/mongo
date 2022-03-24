@@ -56,8 +56,10 @@ CandidatePlans CachedSolutionPlanner::plan(
     // during multiplanning even though multiplanning ran trials of pre-extended plans.
     if (!_cq.pipeline().empty()) {
         _yieldPolicy->clearRegisteredPlans();
+        auto secondaryCollectionsInfo =
+            fillOutSecondaryCollectionsInformation(_opCtx, _collections, &_cq);
         solutions[0] = QueryPlanner::extendWithAggPipeline(
-            _cq, std::move(solutions[0]), _queryParams.secondaryCollectionsInfo);
+            _cq, std::move(solutions[0]), secondaryCollectionsInfo);
         roots[0] = stage_builder::buildSlotBasedExecutableTree(
             _opCtx, _collections, _cq, *solutions[0], _yieldPolicy);
     }
