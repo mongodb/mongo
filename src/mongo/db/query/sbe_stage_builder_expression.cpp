@@ -2445,14 +2445,13 @@ public:
     }
     void visit(const ExpressionObject* expr) final {
         auto&& childExprs = expr->getChildExpressions();
-        tassert(5995102,
-                "All child expressions must have been compiled",
-                childExprs.size() == _context->evalStack.topFrame().exprsCount());
+        size_t childSize = childExprs.size();
+        _context->ensureArity(childSize);
 
         // The expression argument for 'newObj' must be a sequence of a field name constant
         // expression and an expression for the value. So, we need 2 * childExprs.size() elements in
         // the expression vector.
-        sbe::EExpression::Vector exprs(childExprs.size() * 2);
+        sbe::EExpression::Vector exprs(childSize * 2);
         size_t i = exprs.size();
         for (auto rit = childExprs.rbegin(); rit != childExprs.rend(); ++rit) {
             exprs[--i] = _context->popExpr();
