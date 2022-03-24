@@ -1366,6 +1366,8 @@ void writeChangeStreamPreImagesForApplyOpsEntries(
 std::vector<BSONObj> packTransactionOperationsIntoApplyOps(
     std::vector<repl::ReplOperation>::const_iterator operationsBegin,
     std::vector<repl::ReplOperation>::const_iterator operationsEnd) {
+    // Conservative BSON array element overhead assuming maximum 6 digit array index.
+    constexpr size_t kBSONArrayElementOverhead{8};
     tassert(6278503,
             "gMaxNumberOfTransactionOperationsInSingleOplogEntry should be positive number",
             gMaxNumberOfTransactionOperationsInSingleOplogEntry > 0);
@@ -1389,6 +1391,11 @@ std::vector<BSONObj> packTransactionOperationsIntoApplyOps(
         }
         auto serializedOperation = operation.toBSON();
         totalOperationsSize += static_cast<size_t>(serializedOperation.objsize());
+
+        // Add BSON array element overhead since operations will ultimately be packed into BSON
+        // array.
+        totalOperationsSize += kBSONArrayElementOverhead;
+
         operations.emplace_back(std::move(serializedOperation));
     }
     return operations;

@@ -112,7 +112,5 @@ function runTestInIsolation(testFunc) {
 }
 
 runTestInIsolation(validateBatchedDeletesOplogDocsPerBatch);
-
-// TODO (SERVER-64860): re-enable this test.
-// runTestInIsolation(validateBatchedDeletesOplogBatchAbove16MB);
+runTestInIsolation(validateBatchedDeletesOplogBatchAbove16MB);
 })();
