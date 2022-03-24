@@ -1188,7 +1188,7 @@ std::string WiredTigerUtil::generateRestoreConfig() {
     return ss.str();
 }
 
-bool WiredTigerUtil::isRestoringFromBackup() {
+bool WiredTigerUtil::willRestoreFromBackup() {
     if (!storageGlobalParams.restore) {
         return false;
     }

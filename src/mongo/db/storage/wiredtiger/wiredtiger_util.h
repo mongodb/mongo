@@ -205,7 +205,7 @@ public:
     /**
      * Returns true if WiredTiger startup will restore from a backup.
      */
-    static bool isRestoringFromBackup();
+    static bool willRestoreFromBackup();
 
     /**
      * Appends information about the storage engine's currently available snapshots and the settings

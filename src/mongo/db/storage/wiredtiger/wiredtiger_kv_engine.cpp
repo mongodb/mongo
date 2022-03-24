@@ -457,7 +457,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
         ss << ",log=(enabled=false),";
     }
 
-    if (WiredTigerUtil::isRestoringFromBackup()) {
+    if (WiredTigerUtil::willRestoreFromBackup()) {
         ss << WiredTigerUtil::generateRestoreConfig() << ",";
     }
 
