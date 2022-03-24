@@ -463,6 +463,8 @@ last-lts:
       test_file: jstests/sharding/shard_collection_basic.js
     - ticket: SERVER-6491
       test_file: jstests/sharding/shard_key_index_must_exist.js
+    - ticket: SERVER-63531
+      test_file: jstests/replsets/buildindexes_false_commit_quorum.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
