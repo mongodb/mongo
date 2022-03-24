@@ -1357,7 +1357,7 @@ __split_multi_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_MULTI *multi, WT
     WT_PAGE *page;
     WT_PAGE_MODIFY *mod;
     WT_SAVE_UPD *supd;
-    WT_UPDATE *prev_onpage, *upd;
+    WT_UPDATE *prev_onpage, *upd, *tmp;
     uint64_t recno;
     uint32_t i, slot;
     bool prepare;
@@ -1432,19 +1432,39 @@ __split_multi_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_MULTI *multi, WT
          */
         if (supd->onpage_upd != NULL && !F_ISSET(S2C(session), WT_CONN_IN_MEMORY)) {
             /*
+             * If there is an on-page tombstone we need to remove it as well while performing update
+             * restore eviction.
+             */
+            tmp = supd->onpage_tombstone != NULL ? supd->onpage_tombstone : supd->onpage_upd;
+
+            /*
              * We have decided to restore this update chain so it must have newer updates than the
              * onpage value on it.
              */
-            WT_ASSERT(session, upd != supd->onpage_upd);
+            WT_ASSERT(session, upd != tmp);
+            WT_ASSERT(session, F_ISSET(tmp, WT_UPDATE_DS));
+
             /*
              * Move the pointer to the position before the onpage value and truncate all the updates
              * starting from the onpage value.
              */
-            for (prev_onpage = upd;
-                 prev_onpage->next != NULL && prev_onpage->next != supd->onpage_upd;
+            for (prev_onpage = upd; prev_onpage->next != NULL && prev_onpage->next != tmp;
                  prev_onpage = prev_onpage->next)
                 ;
-            WT_ASSERT(session, prev_onpage->next == supd->onpage_upd);
+            WT_ASSERT(session, prev_onpage->next == tmp);
+#ifdef HAVE_DIAGNOSTIC
+            /*
+             * During update restore eviction we remove anything older than the on-page update,
+             * including the on-page update. However it is possible a tombstone is also written as
+             * the stop time of the on-page value. To handle this we also need to remove the
+             * tombstone from the update chain.
+             *
+             * This assertion checks that there aren't any unexpected updates between that tombstone
+             * and the subsequent value which both make up the on-page value.
+             */
+            for (; tmp != NULL && tmp != supd->onpage_upd; tmp = tmp->next)
+                WT_ASSERT(session, tmp == supd->onpage_tombstone || tmp->txnid == WT_TXN_ABORTED);
+#endif
             prev_onpage->next = NULL;
         }
 
