@@ -340,6 +340,15 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
                 break;
             }
 
+            // Check if this is a migration of the last chunk off a shard.
+            if (!input.getNestedField("o2.migrateLastChunkFromShard").missing()) {
+                const auto o2Field = input[repl::OplogEntry::kObject2FieldName].getDocument();
+                operationType = DocumentSourceChangeStream::kMigrateLastChunkFromShardOpType;
+                operationDescription =
+                    Value(copyDocExceptFields(o2Field, {"migrateLastChunkFromShard"_sd}));
+                break;
+            }
+
             // Otherwise, o2.type determines the message type.
             auto o2Type = input.getNestedField("o2.type");
             tassert(5052200, "o2.type is missing from noop oplog event", !o2Type.missing());
