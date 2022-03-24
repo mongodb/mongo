@@ -76,6 +76,7 @@ MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationDonorWhileUpdatingStateDoc);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeInsertingDonorStateDoc);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeCreatingStateDocumentTTLIndex);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeCreatingExternalKeysTTLIndex);
+MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeLeavingCommittedState);
 
 const std::string kTTLIndexName = "TenantMigrationDonorTTLIndex";
 const std::string kExternalKeysTTLIndexName = "ExternalKeysTTLIndex";
@@ -1295,6 +1296,8 @@ TenantMigrationDonorService::Instance::_waitForRecipientToReachBlockTimestampAnd
                 .then([this, self = shared_from_this(), executor, token](repl::OpTime opTime) {
                     return _waitForMajorityWriteConcern(executor, std::move(opTime), token)
                         .then([this, self = shared_from_this()] {
+                            pauseTenantMigrationBeforeLeavingCommittedState.pauseWhileSet();
+
                             stdx::lock_guard<Latch> lg(_mutex);
                             // If interrupt is called at some point during execution, it is
                             // possible that interrupt() will fulfill the promise before we
