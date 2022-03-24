@@ -163,6 +163,23 @@ std::string DocumentSourceChangeStream::getNsRegexForChangeStream(
     }
 }
 
+std::string DocumentSourceChangeStream::getViewNsRegexForChangeStream(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    const auto& nss = expCtx->ns;
+    switch (getChangeStreamType(nss)) {
+        case ChangeStreamType::kSingleDatabase:
+            // For a single database, match any events on the system.views collection on that
+            // database.
+            return "^" + regexEscapeNsForChangeStream(nss.db().toString()) + "\\.system.views$";
+        case ChangeStreamType::kAllChangesForCluster:
+            // Match all system.views collections on all databases.
+            return kRegexAllDBs + "\\.system.views$";
+        default:
+            // We should never attempt to generate this regex for a single-collection stream.
+            MONGO_UNREACHABLE_TASSERT(6394400);
+    }
+}
+
 std::string DocumentSourceChangeStream::getCollRegexForChangeStream(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     const auto type = getChangeStreamType(expCtx->ns);

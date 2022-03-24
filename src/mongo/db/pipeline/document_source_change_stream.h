@@ -256,16 +256,18 @@ public:
      * Helpers for Determining which regex to match a change stream against.
      */
     static ChangeStreamType getChangeStreamType(const NamespaceString& nss);
+    static std::string regexEscapeNsForChangeStream(StringData source);
+    static StringData resolveAllCollectionsRegex(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
     static std::string getNsRegexForChangeStream(
         const boost::intrusive_ptr<ExpressionContext>& expCtx);
     static std::string getCollRegexForChangeStream(
         const boost::intrusive_ptr<ExpressionContext>& expCtx);
     static std::string getCmdNsRegexForChangeStream(
         const boost::intrusive_ptr<ExpressionContext>& expCtx);
-    static StringData resolveAllCollectionsRegex(
+    static std::string getViewNsRegexForChangeStream(
         const boost::intrusive_ptr<ExpressionContext>& expCtx);
-
-    static std::string regexEscapeNsForChangeStream(StringData source);
 
     /**
      * Parses a $changeStream stage from 'elem' and produces the $match and transformation

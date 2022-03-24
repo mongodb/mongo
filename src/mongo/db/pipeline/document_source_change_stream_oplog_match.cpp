@@ -59,12 +59,15 @@ namespace change_stream_filter {
 std::unique_ptr<MatchExpression> buildOplogMatchFilter(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     Timestamp startFromInclusive,
-    bool showMigrationEvents,
     const MatchExpression* userMatch = nullptr) {
+    tassert(6394401,
+            "Expected changeStream spec to be present while building the oplog match filter",
+            expCtx->changeStreamSpec);
+
     // Start building the oplog filter by adding predicates that apply to every entry.
     auto oplogFilter = std::make_unique<AndMatchExpression>();
     oplogFilter->add(buildTsFilter(expCtx, startFromInclusive, userMatch));
-    if (!showMigrationEvents) {
+    if (!expCtx->changeStreamSpec->getShowMigrationEvents()) {
         oplogFilter->add(buildNotFromMigrateFilter(expCtx, userMatch));
     }
 
@@ -75,6 +78,13 @@ std::unique_ptr<MatchExpression> buildOplogMatchFilter(
     eventFilter->add(buildTransactionFilter(expCtx, userMatch));
     eventFilter->add(buildInternalOpFilter(expCtx, userMatch));
 
+    // We currently do not support opening a change stream on a view namespace. So we only need to
+    // add this filter when the change stream type is whole-db or whole cluster.
+    if (expCtx->changeStreamSpec->getShowExpandedEvents() &&
+        expCtx->ns.isCollectionlessAggregateNS()) {
+        eventFilter->add(buildViewDefinitionEventFilter(expCtx, userMatch));
+    }
+
     // Build the final $match filter to be applied to the oplog.
     oplogFilter->add(std::move(eventFilter));
 
@@ -83,14 +93,19 @@ std::unique_ptr<MatchExpression> buildOplogMatchFilter(
 }
 }  // namespace change_stream_filter
 
+DocumentSourceChangeStreamOplogMatch::DocumentSourceChangeStreamOplogMatch(
+    Timestamp clusterTime, const boost::intrusive_ptr<ExpressionContext>& expCtx)
+    : DocumentSourceMatch(change_stream_filter::buildOplogMatchFilter(expCtx, clusterTime),
+                          expCtx) {
+    _clusterTime = clusterTime;
+    expCtx->tailableMode = TailableModeEnum::kTailableAndAwaitData;
+}
+
 boost::intrusive_ptr<DocumentSourceChangeStreamOplogMatch>
 DocumentSourceChangeStreamOplogMatch::create(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                              const DocumentSourceChangeStreamSpec& spec) {
     auto resumeToken = DocumentSourceChangeStream::resolveResumeTokenFromSpec(spec);
-    auto oplogFilter = change_stream_filter::buildOplogMatchFilter(
-        expCtx, resumeToken.clusterTime, spec.getShowMigrationEvents());
-    return make_intrusive<DocumentSourceChangeStreamOplogMatch>(
-        oplogFilter->serialize(), resumeToken.clusterTime, spec.getShowMigrationEvents(), expCtx);
+    return make_intrusive<DocumentSourceChangeStreamOplogMatch>(resumeToken.clusterTime, expCtx);
 }
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceChangeStreamOplogMatch::createFromBson(
@@ -175,13 +190,11 @@ Pipeline::SourceContainer::iterator DocumentSourceChangeStreamOplogMatch::doOpti
         return std::prev(itr);
     }
 
-    tassert(5687204,
-            "Attempt to rewrite an interalOplogMatch after deserialization",
-            _clusterTime && _showMigrationEvents.has_value());
+    tassert(5687204, "Attempt to rewrite an interalOplogMatch after deserialization", _clusterTime);
 
     // Recreate the change stream filter with additional predicates from the user's $match.
     auto filterWithUserPredicates = change_stream_filter::buildOplogMatchFilter(
-        pExpCtx, *_clusterTime, _showMigrationEvents, matchStage->getMatchExpression());
+        pExpCtx, *_clusterTime, matchStage->getMatchExpression());
 
     // Set the internal DocumentSourceMatch state to the new filter.
     rebuild(filterWithUserPredicates->serialize());

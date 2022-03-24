@@ -39,6 +39,7 @@
 
 namespace mongo {
 namespace change_stream_filter {
+
 std::unique_ptr<MatchExpression> buildTsFilter(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     Timestamp startFromInclusive,
@@ -143,6 +144,26 @@ std::unique_ptr<MatchExpression> buildOperationFilter(
     }
 
     return operationFilter;
+}
+
+std::unique_ptr<MatchExpression> buildViewDefinitionEventFilter(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, const MatchExpression* userMatch) {
+    // The view op filter is as follows:
+    // {
+    //   ns: nsSystemViewsRegex, // match system.views for relevant DBs
+    //   $nor: [                 // match only CRUD events
+    //     {op: "n"},
+    //     {op: "c"}
+    //   ]
+    // }
+    auto nsSystemViewsRegex = DocumentSourceChangeStream::getViewNsRegexForChangeStream(expCtx);
+    auto viewEventsFilter = BSON("ns" << BSONRegEx(nsSystemViewsRegex) << "$nor"
+                                      << BSON_ARRAY(BSON("op"
+                                                         << "n")
+                                                    << BSON("op"
+                                                            << "c")));
+
+    return MatchExpressionParser::parseAndNormalize(viewEventsFilter, expCtx);
 }
 
 std::unique_ptr<MatchExpression> buildInvalidationFilter(
