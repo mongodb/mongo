@@ -22,14 +22,16 @@ Updating a key without a commit timestamp creates a value that has "always
 existed" and is visible regardless of timestamp. This makes sense when
 loading initial data into an object or in applications wishing to clear
 historic values, but once timestamps are used to update a particular value,
-subsequent updates will likely also use a commit timestamp. Updating a key
-with a commit timestamp and then subsequently updating it without a commit
-timestamp will discard all prior historical values, and future reads will
-read the new value regardless of read timestamp. In other words, readers
-with already acquired snapshots will see prior historical values based
-on their timestamps. Readers acquiring a snapshot after the commit of the
-update without a timestamp will not see prior historical values regardless
-of their read timestamps.
+subsequent updates will likely also use a commit timestamp. Similarly, because
+implicit transactions have no associated timestamp, implicit transactions
+are generally only useful until timestamps have been used to update a table.
+Updating a key with a commit timestamp and then subsequently updating it
+without a commit timestamp will discard all prior historical values, and
+future reads will read the new value regardless of read timestamp. In other
+words, readers with already acquired snapshots will see prior historical
+values based on their timestamps. Readers acquiring a snapshot after the
+commit of the update without a timestamp will not see prior historical values
+regardless of their read timestamps.
 
 @section timestamp_txn_api_configure Enforcing application timestamp behavior
 

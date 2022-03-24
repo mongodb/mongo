@@ -73,32 +73,32 @@ class test_alter05(wttest.WiredTigerTestCase):
         c = self.session.open_cursor(uri, None)
         for k in range(entries):
             c[k+1] = 1
-        c.close()
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
+        c.close()
 
-        prev_alter_chceckpoints = self.get_stat(stat.conn.session_table_alter_trigger_checkpoint)
+        prev_alter_checkpoints = self.get_stat(stat.conn.session_table_alter_trigger_checkpoint)
 
         # Alter the table and verify.
         self.session.alter(uri, 'log=(enabled=false)')
         self.verify_metadata('log=(enabled=false)')
 
-        alter_chceckpoints = self.get_stat(stat.conn.session_table_alter_trigger_checkpoint)
-        self.assertEqual(prev_alter_chceckpoints + 1, alter_chceckpoints)
-        prev_alter_chceckpoints = alter_chceckpoints
+        alter_checkpoints = self.get_stat(stat.conn.session_table_alter_trigger_checkpoint)
+        self.assertEqual(prev_alter_checkpoints + 1, alter_checkpoints)
+        prev_alter_checkpoints = alter_checkpoints
 
         # Open a cursor, insert some data and try to alter with cursor open.
-        c2 = self.session.open_cursor(uri, None)
+        c = self.session.open_cursor(uri, None)
+        self.session.begin_transaction()
         for k in range(entries):
-            c2[k+1] = 2
+            c[k+1] = 2
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(3))
 
         self.assertRaisesException(wiredtiger.WiredTigerError,
             lambda: self.session.alter(uri, 'log=(enabled=true)'))
         self.verify_metadata('log=(enabled=false)')
 
-        alter_chceckpoints = self.get_stat(stat.conn.session_table_alter_trigger_checkpoint)
-        self.assertEqual(prev_alter_chceckpoints + 1, alter_chceckpoints)
-
-        c2.close()
+        alter_checkpoints = self.get_stat(stat.conn.session_table_alter_trigger_checkpoint)
+        self.assertEqual(prev_alter_checkpoints + 1, alter_checkpoints)
 
 if __name__ == '__main__':
     wttest.run()
