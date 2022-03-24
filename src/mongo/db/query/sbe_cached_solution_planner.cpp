@@ -36,6 +36,7 @@
 #include "mongo/db/exec/sbe/stages/plan_stats.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/explain.h"
+#include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_cache_key_factory.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/sbe_multi_planner.h"
@@ -167,15 +168,10 @@ CandidatePlans CachedSolutionPlanner::replan(bool shouldCache, std::string reaso
     // The plan drawn from the cache is being discarded, and should no longer be registered with the
     // yield policy.
     _yieldPolicy->clearRegisteredPlans();
-
-    // We're planning from scratch, using the original set of indexes provided in '_queryParams'.
-    // Therefore, if any of the collection's indexes have been dropped, the query should fail with
-    // a 'QueryPlanKilled' error.
-    _indexExistenceChecker.check();
+    const auto& mainColl = _collections.getMainCollection();
 
     if (shouldCache) {
         // Deactivate the current cache entry.
-        const auto& mainColl = _collections.getMainCollection();
         auto cache = CollectionQueryInfo::get(mainColl).getPlanCache();
         cache->deactivate(plan_cache_key_factory::make<mongo::PlanCacheKey>(_cq, mainColl));
     }
@@ -187,8 +183,11 @@ CandidatePlans CachedSolutionPlanner::replan(bool shouldCache, std::string reaso
         return std::make_pair(std::move(root), std::move(data));
     };
 
+    QueryPlannerParams plannerParams;
+    plannerParams.options = _queryParams.options;
+    fillOutPlannerParams(_opCtx, mainColl, &_cq, &plannerParams);
     // Use the query planning module to plan the whole query.
-    auto statusWithMultiPlanSolns = QueryPlanner::plan(_cq, _queryParams);
+    auto statusWithMultiPlanSolns = QueryPlanner::plan(_cq, plannerParams);
     auto solutions = uassertStatusOK(std::move(statusWithMultiPlanSolns));
 
     if (solutions.size() == 1) {
@@ -217,7 +216,7 @@ CandidatePlans CachedSolutionPlanner::replan(bool shouldCache, std::string reaso
     std::vector<std::pair<std::unique_ptr<PlanStage>, stage_builder::PlanStageData>> roots;
     for (auto&& solution : solutions) {
         if (solution->cacheData.get()) {
-            solution->cacheData->indexFilterApplied = _queryParams.indexFiltersApplied;
+            solution->cacheData->indexFilterApplied = plannerParams.indexFiltersApplied;
         }
 
         roots.push_back(buildExecutableTree(*solution));
@@ -225,7 +224,7 @@ CandidatePlans CachedSolutionPlanner::replan(bool shouldCache, std::string reaso
 
     const auto cachingMode =
         shouldCache ? PlanCachingMode::AlwaysCache : PlanCachingMode::NeverCache;
-    MultiPlanner multiPlanner{_opCtx, _collections, _cq, _queryParams, cachingMode, _yieldPolicy};
+    MultiPlanner multiPlanner{_opCtx, _collections, _cq, plannerParams, cachingMode, _yieldPolicy};
     auto&& [candidates, winnerIdx] = multiPlanner.plan(std::move(solutions), std::move(roots));
     auto explainer = plan_explainer_factory::make(candidates[winnerIdx].root.get(),
                                                   &candidates[winnerIdx].data,

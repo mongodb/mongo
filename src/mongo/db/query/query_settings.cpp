@@ -105,7 +105,7 @@ void QuerySettings::setAllowedIndices(const CanonicalQuery& canonicalQuery,
     const BSONObj& query = findCommand.getFilter();
     const BSONObj& sort = findCommand.getSort();
     const BSONObj& projection = findCommand.getProjection();
-    const auto key = canonicalQuery.encodeKey();
+    const auto key = canonicalQuery.encodeKeyForIndexFilters();
     const BSONObj collation =
         canonicalQuery.getCollator() ? canonicalQuery.getCollator()->getSpec().toBSON() : BSONObj();
 

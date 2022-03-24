@@ -48,9 +48,14 @@ class OperationContext;
 
 class CanonicalQuery {
 public:
-    // A type that encodes the notion of query shape. Essentialy a query's match, projection and
-    // sort with the values taken out.
+    // A type that encodes the notion of query shape suitable for use with the plan cache. Encodes
+    // the query's match, projection, sort, etc. potentially with some constants removed or replaced
+    // with parameter markers.
     typedef std::string QueryShapeString;
+    // A second encoding of query shape similar to 'QueryShapeString' above, except designed to work
+    // with index filters rather than the plan cache key. A caller can encode a query into an
+    // 'IndexFilterKey' in order to look for matching index filters that should apply to the query.
+    typedef std::string IndexFilterKey;
 
     /**
      * If parsing succeeds, returns a std::unique_ptr<CanonicalQuery> representing the parsed
@@ -173,6 +178,13 @@ public:
      * approaches.
      */
     QueryShapeString encodeKey() const;
+
+    /**
+     * Encode a shape string for the query suitable for matching the query against the set of
+     * pre-defined index filters. Similar to 'encodeKey()' above, but intended for use with index
+     * filters rather than the plan cache.
+     */
+    IndexFilterKey encodeKeyForIndexFilters() const;
 
     /**
      * Sets this CanonicalQuery's collator, and sets the collator on this CanonicalQuery's match

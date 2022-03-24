@@ -264,7 +264,7 @@ void applyIndexFilters(const CollectionPtr& collection,
     if (!isIdHackEligibleQuery(collection, canonicalQuery)) {
         const QuerySettings* querySettings =
             QuerySettingsDecoration::get(collection->getSharedDecorations());
-        const auto key = canonicalQuery.encodeKey();
+        const auto key = canonicalQuery.encodeKeyForIndexFilters();
 
         // Filter index catalog if index filters are specified for query.
         // Also, signal to planner that application hint should be ignored.
@@ -278,7 +278,7 @@ void applyIndexFilters(const CollectionPtr& collection,
 
 void fillOutIndexEntries(OperationContext* opCtx,
                          bool apiStrict,
-                         CanonicalQuery* canonicalQuery,
+                         const CanonicalQuery* canonicalQuery,
                          const CollectionPtr& collection,
                          std::vector<IndexEntry>& entries) {
     // TODO SERVER-63352: Eliminate this check once we support auto-parameterized index scan plans.
@@ -310,7 +310,7 @@ void fillOutIndexEntries(OperationContext* opCtx,
 
 void fillOutPlannerParams(OperationContext* opCtx,
                           const CollectionPtr& collection,
-                          CanonicalQuery* canonicalQuery,
+                          const CanonicalQuery* canonicalQuery,
                           QueryPlannerParams* plannerParams) {
     invariant(canonicalQuery);
     bool apiStrict = APIParameters::get(opCtx).getAPIStrict().value_or(false);
@@ -390,7 +390,7 @@ void fillOutPlannerParams(OperationContext* opCtx,
 std::map<NamespaceString, SecondaryCollectionInfo> fillOutSecondaryCollectionsInformation(
     OperationContext* opCtx,
     const MultipleCollectionAccessor& collections,
-    CanonicalQuery* canonicalQuery) {
+    const CanonicalQuery* canonicalQuery) {
     std::map<NamespaceString, SecondaryCollectionInfo> infoMap;
     bool apiStrict = APIParameters::get(opCtx).getAPIStrict().value_or(false);
     auto fillOutSecondaryInfo = [&](const NamespaceString& nss,
@@ -423,7 +423,7 @@ std::map<NamespaceString, SecondaryCollectionInfo> fillOutSecondaryCollectionsIn
 
 void fillOutPlannerParams(OperationContext* opCtx,
                           const MultipleCollectionAccessor& collections,
-                          CanonicalQuery* canonicalQuery,
+                          const CanonicalQuery* canonicalQuery,
                           QueryPlannerParams* plannerParams) {
     fillOutPlannerParams(opCtx, collections.getMainCollection(), canonicalQuery, plannerParams);
     plannerParams->secondaryCollectionsInfo =
@@ -588,8 +588,9 @@ public:
                            CanonicalQuery* cq,
                            PlanYieldPolicy* yieldPolicy,
                            size_t plannerOptions)
-        : _opCtx{opCtx}, _cq{cq}, _yieldPolicy{yieldPolicy}, _plannerOptions{plannerOptions} {
+        : _opCtx{opCtx}, _cq{cq}, _yieldPolicy{yieldPolicy} {
         invariant(_cq);
+        _plannerParams.options = plannerOptions;
     }
 
     /**
@@ -616,41 +617,24 @@ public:
             return std::move(result);
         }
 
-        // Fill out the planning params.  We use these for both cached solutions and non-cached.
-        QueryPlannerParams plannerParams;
-        plannerParams.options = _plannerOptions;
-        fillOutPlannerParams(_opCtx, getMainCollection(), _cq, &plannerParams);
         tassert(
             5842901,
             "Fast count queries aren't supported in SBE, therefore, should never lower parts of "
             "the aggregation pipeline for these queries either.",
-            (!(plannerParams.options & QueryPlannerParams::IS_COUNT) || _cq->pipeline().empty()));
-
-        // If the canonical query does not have a user-specified collation and no one has given the
-        // CanonicalQuery a collation already, set it from the collection default.
-        if (_cq->getFindCommandRequest().getCollation().isEmpty() &&
-            _cq->getCollator() == nullptr && mainColl->getDefaultCollator()) {
-            _cq->setCollator(mainColl->getDefaultCollator()->clone());
-        }
-
-        // If we have an _id index we can use an idhack plan.
-        if (const IndexDescriptor* idIndexDesc = mainColl->getIndexCatalog()->findIdIndex(_opCtx);
-            idIndexDesc && isIdHackEligibleQuery(mainColl, *_cq)) {
-            LOGV2_DEBUG(
-                20922, 2, "Using idhack", "canonicalQuery"_attr = redact(_cq->toStringShort()));
-            // If an IDHACK plan is not supported, we will use the normal plan generation process
-            // to force an _id index scan plan. If an IDHACK plan was generated we return
-            // immediately, otherwise we fall through and continue.
-            if (auto result = buildIdHackPlan(idIndexDesc, &plannerParams)) {
-                return std::move(result);
-            }
-        }
+            (!(_plannerParams.options & QueryPlannerParams::IS_COUNT) || _cq->pipeline().empty()));
 
         // Tailable: If the query requests tailable the collection must be capped.
         if (_cq->getFindCommandRequest().getTailable() && !mainColl->isCapped()) {
             return Status(ErrorCodes::BadValue,
                           str::stream() << "error processing query: " << _cq->toString()
                                         << " tailable cursor requested on non capped collection");
+        }
+
+        // If the canonical query does not have a user-specified collation and no one has given the
+        // CanonicalQuery a collation already, set it from the collection default.
+        if (_cq->getFindCommandRequest().getCollation().isEmpty() &&
+            _cq->getCollator() == nullptr && mainColl->getDefaultCollator()) {
+            _cq->setCollator(mainColl->getDefaultCollator()->clone());
         }
 
         auto planCacheKey = plan_cache_key_factory::make<KeyType>(*_cq, mainColl);
@@ -660,23 +644,20 @@ public:
             opDebug.queryHash = planCacheKey.queryHash();
         }
 
-        // Try recovering a plan from the cache.
-        if (shouldCacheQuery(*_cq)) {
-            auto result = buildCachedPlan(plannerParams, planCacheKey);
-            if (result) {
-                return {std::move(result)};
-            }
+        if (auto result = buildCachedPlan(planCacheKey)) {
+            return {std::move(result)};
         }
 
+        initializePlannerParamsIfNeeded();
         if (SubplanStage::needsSubplanning(*_cq)) {
             LOGV2_DEBUG(20924,
                         2,
                         "Running query as sub-queries",
                         "query"_attr = redact(_cq->toStringShort()));
-            return buildSubPlan(plannerParams);
+            return buildSubPlan();
         }
 
-        auto statusWithMultiPlanSolns = QueryPlanner::plan(*_cq, plannerParams);
+        auto statusWithMultiPlanSolns = QueryPlanner::plan(*_cq, _plannerParams);
 
         if (!statusWithMultiPlanSolns.isOK()) {
             return statusWithMultiPlanSolns.getStatus().withContext(
@@ -689,7 +670,7 @@ public:
         invariant(solutions.size() > 0);
 
         // See if one of our solutions is a fast count hack in disguise.
-        if (plannerParams.options & QueryPlannerParams::IS_COUNT) {
+        if (_plannerParams.options & QueryPlannerParams::IS_COUNT) {
             for (size_t i = 0; i < solutions.size(); ++i) {
                 if (turnIxscanIntoCount(solutions[i].get())) {
                     auto result = makeResult();
@@ -721,7 +702,7 @@ public:
             return std::move(result);
         }
 
-        return buildMultiPlan(std::move(solutions), plannerParams);
+        return buildMultiPlan(std::move(solutions));
     }
 
 protected:
@@ -733,25 +714,26 @@ protected:
         return std::make_unique<ResultType>();
     }
 
+    void initializePlannerParamsIfNeeded() {
+        if (_plannerParamsInitialized) {
+            return;
+        }
+        fillOutPlannerParams(_opCtx, getMainCollection(), _cq, &_plannerParams);
+
+        _plannerParamsInitialized = true;
+    }
+
     /**
      * Constructs a PlanStage tree from the given query 'solution'.
      */
     virtual PlanStageType buildExecutableTree(const QuerySolution& solution) const = 0;
 
     /**
-     * If supported, constructs a special PlanStage tree for fast-path document retrievals via the
-     * _id index. Otherwise, nullptr should be returned and  this helper will fall back to the
-     * normal plan generation.
+     * Either constructs a PlanStage tree from a cached plan (if exists in the plan cache), or
+     * constructs a "id hack" PlanStage tree. Returns nullptr if no cached plan or id hack plan can
+     * be constructed.
      */
-    virtual std::unique_ptr<ResultType> buildIdHackPlan(const IndexDescriptor* descriptor,
-                                                        QueryPlannerParams* plannerParams) = 0;
-
-    /**
-     * Constructs a PlanStage tree from a cached plan (if exists in the plan cache). Returns
-     * nullptr if no cached plan found.
-     */
-    virtual std::unique_ptr<ResultType> buildCachedPlan(const QueryPlannerParams& plannerParams,
-                                                        const KeyType& planCacheKey) = 0;
+    virtual std::unique_ptr<ResultType> buildCachedPlan(const KeyType& planCacheKey) = 0;
 
     /**
      * Constructs a special PlanStage tree for rooted $or queries. Each clause of the $or is planned
@@ -762,7 +744,7 @@ protected:
      * execution tree, this method can populate the result object with additional information
      * required to perform the sub-planning.
      */
-    virtual std::unique_ptr<ResultType> buildSubPlan(const QueryPlannerParams& plannerParams) = 0;
+    virtual std::unique_ptr<ResultType> buildSubPlan() = 0;
 
     /**
      * If the query have multiple solutions, this method either:
@@ -772,13 +754,14 @@ protected:
      *      object, if multi-planning is implemented as a standalone component.
      */
     virtual std::unique_ptr<ResultType> buildMultiPlan(
-        std::vector<std::unique_ptr<QuerySolution>> solutions,
-        const QueryPlannerParams& plannerParams) = 0;
+        std::vector<std::unique_ptr<QuerySolution>> solutions) = 0;
 
     OperationContext* _opCtx;
     CanonicalQuery* _cq;
     PlanYieldPolicy* _yieldPolicy;
-    const size_t _plannerOptions;
+    QueryPlannerParams _plannerParams;
+    // Used to avoid filling out the planner params twice.
+    bool _plannerParamsInitialized = false;
 };
 
 /**
@@ -808,14 +791,24 @@ protected:
         return stage_builder::buildClassicExecutableTree(_opCtx, _collection, *_cq, solution, _ws);
     }
 
-    std::unique_ptr<ClassicPrepareExecutionResult> buildIdHackPlan(
-        const IndexDescriptor* descriptor, QueryPlannerParams* plannerParams) final {
+    std::unique_ptr<ClassicPrepareExecutionResult> buildIdHackPlan() {
+        if (!isIdHackEligibleQuery(_collection, *_cq))
+            return nullptr;
+        const IndexDescriptor* descriptor = _collection->getIndexCatalog()->findIdIndex(_opCtx);
+        if (!descriptor)
+            return nullptr;
+
+        LOGV2_DEBUG(20922,
+                    2,
+                    "Using classic engine idhack",
+                    "canonicalQuery"_attr = redact(_cq->toStringShort()));
+
         auto result = makeResult();
         std::unique_ptr<PlanStage> stage =
             std::make_unique<IDHackStage>(_cq->getExpCtxRaw(), _cq, _ws, _collection, descriptor);
 
         // Might have to filter out orphaned docs.
-        if (plannerParams->options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
+        if (_plannerParams.options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
             stage = std::make_unique<ShardFilterStage>(
                 _cq->getExpCtxRaw(),
                 CollectionShardingState::get(_opCtx, _cq->nss())
@@ -873,63 +866,72 @@ protected:
     }
 
     std::unique_ptr<ClassicPrepareExecutionResult> buildCachedPlan(
-        const QueryPlannerParams& plannerParams, const PlanCacheKey& planCacheKey) final {
-        OpDebug& opDebug = CurOp::get(_opCtx)->debug();
-        if (!opDebug.planCacheKey) {
-            opDebug.planCacheKey = planCacheKey.planCacheKeyHash();
+        const PlanCacheKey& planCacheKey) final {
+        initializePlannerParamsIfNeeded();
+
+        // Before consulting the plan cache, check if we should short-circuit and construct a
+        // find-by-_id plan.
+        std::unique_ptr<ClassicPrepareExecutionResult> result = buildIdHackPlan();
+
+        if (result) {
+            return result;
         }
-        // Try to look up a cached solution for the query.
-        if (auto cs = CollectionQueryInfo::get(_collection)
-                          .getPlanCache()
-                          ->getCacheEntryIfActive(planCacheKey)) {
-            // We have a CachedSolution.  Have the planner turn it into a QuerySolution.
-            auto statusWithQs = QueryPlanner::planFromCache(*_cq, plannerParams, *cs);
 
-            if (statusWithQs.isOK()) {
-                auto querySolution = std::move(statusWithQs.getValue());
-                if ((plannerParams.options & QueryPlannerParams::IS_COUNT) &&
-                    turnIxscanIntoCount(querySolution.get())) {
-                    LOGV2_DEBUG(5968201,
-                                2,
-                                "Using fast count",
-                                "query"_attr = redact(_cq->toStringShort()));
+        if (shouldCacheQuery(*_cq)) {
+            OpDebug& opDebug = CurOp::get(_opCtx)->debug();
+            if (!opDebug.planCacheKey) {
+                opDebug.planCacheKey = planCacheKey.planCacheKeyHash();
+            }
+            // Try to look up a cached solution for the query.
+            if (auto cs = CollectionQueryInfo::get(_collection)
+                              .getPlanCache()
+                              ->getCacheEntryIfActive(planCacheKey)) {
+                // We have a CachedSolution.  Have the planner turn it into a QuerySolution.
+                auto statusWithQs = QueryPlanner::planFromCache(*_cq, _plannerParams, *cs);
+
+                if (statusWithQs.isOK()) {
+                    auto querySolution = std::move(statusWithQs.getValue());
+                    if ((_plannerParams.options & QueryPlannerParams::IS_COUNT) &&
+                        turnIxscanIntoCount(querySolution.get())) {
+                        LOGV2_DEBUG(5968201,
+                                    2,
+                                    "Using fast count",
+                                    "query"_attr = redact(_cq->toStringShort()));
+                    }
+
+                    result = makeResult();
+                    auto&& root = buildExecutableTree(*querySolution);
+
+                    // Add a CachedPlanStage on top of the previous root.
+                    //
+                    // 'decisionWorks' is used to determine whether the existing cache entry should
+                    // be evicted, and the query replanned.
+                    result->emplace(std::make_unique<CachedPlanStage>(_cq->getExpCtxRaw(),
+                                                                      _collection,
+                                                                      _ws,
+                                                                      _cq,
+                                                                      _plannerParams,
+                                                                      cs->decisionWorks.get(),
+                                                                      std::move(root)),
+                                    std::move(querySolution));
+                    return result;
                 }
-
-                auto result = makeResult();
-                auto&& root = buildExecutableTree(*querySolution);
-
-                // Add a CachedPlanStage on top of the previous root.
-                //
-                // 'decisionWorks' is used to determine whether the existing cache entry should
-                // be evicted, and the query replanned.
-                tassert(6108303, "Cached entry has no decisionWorks", cs->decisionWorks);
-                result->emplace(std::make_unique<CachedPlanStage>(_cq->getExpCtxRaw(),
-                                                                  _collection,
-                                                                  _ws,
-                                                                  _cq,
-                                                                  plannerParams,
-                                                                  cs->decisionWorks.get(),
-                                                                  std::move(root)),
-                                std::move(querySolution));
-                return result;
             }
         }
 
         return nullptr;
     }
 
-    std::unique_ptr<ClassicPrepareExecutionResult> buildSubPlan(
-        const QueryPlannerParams& plannerParams) final {
+    std::unique_ptr<ClassicPrepareExecutionResult> buildSubPlan() final {
         auto result = makeResult();
         result->emplace(std::make_unique<SubplanStage>(
-                            _cq->getExpCtxRaw(), _collection, _ws, plannerParams, _cq),
+                            _cq->getExpCtxRaw(), _collection, _ws, _plannerParams, _cq),
                         nullptr /* solution */);
         return result;
     }
 
     std::unique_ptr<ClassicPrepareExecutionResult> buildMultiPlan(
-        std::vector<std::unique_ptr<QuerySolution>> solutions,
-        const QueryPlannerParams& plannerParams) final {
+        std::vector<std::unique_ptr<QuerySolution>> solutions) final {
         // Many solutions. Create a MultiPlanStage to pick the best, update the cache,
         // and so on. The working set will be shared by all candidate plans.
         auto multiPlanStage =
@@ -937,7 +939,7 @@ protected:
 
         for (size_t ix = 0; ix < solutions.size(); ++ix) {
             if (solutions[ix]->cacheData.get()) {
-                solutions[ix]->cacheData->indexFilterApplied = plannerParams.indexFiltersApplied;
+                solutions[ix]->cacheData->indexFilterApplied = _plannerParams.indexFiltersApplied;
             }
 
             auto&& nextPlanRoot = buildExecutableTree(*solutions[ix]);
@@ -986,11 +988,7 @@ public:
     }
 
 protected:
-    std::unique_ptr<SlotBasedPrepareExecutionResult> buildIdHackPlan(
-        const IndexDescriptor* descriptor, QueryPlannerParams* plannerParams) final {
-        invariant(descriptor);
-        invariant(plannerParams);
-
+    std::unique_ptr<SlotBasedPrepareExecutionResult> buildIdHackPlan() {
         // Auto-parameterization currently only works for collection scan plans, but idhack plans
         // use the _id index. Therefore, we inhibit idhack when auto-parametrization is enabled.
         //
@@ -1000,6 +998,15 @@ protected:
             return nullptr;
         }
 
+        const auto& mainColl = getMainCollection();
+        if (!isIdHackEligibleQuery(mainColl, *_cq))
+            return nullptr;
+        const IndexDescriptor* descriptor = mainColl->getIndexCatalog()->findIdIndex(_opCtx);
+        if (!descriptor)
+            return nullptr;
+
+        LOGV2_DEBUG(
+            6006801, 2, "Using SBE idhack", "canonicalQuery"_attr = redact(_cq->toStringShort()));
         tassert(5536100,
                 "SBE cannot handle query with metadata",
                 !_cq->metadataDeps()[DocumentMetadataFields::kSortKey]);
@@ -1029,7 +1036,8 @@ protected:
         // useful for an existence check, but we don't go out of our way to support it.
         root = std::make_unique<FetchNode>(std::move(root));
 
-        if (plannerParams->options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
+        initializePlannerParamsIfNeeded();
+        if (_plannerParams.options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
             auto shardFilter = std::make_unique<ShardingFilterNode>();
             shardFilter->children.push_back(root.release());
             root = std::move(shardFilter);
@@ -1058,44 +1066,50 @@ protected:
     }
 
     std::unique_ptr<SlotBasedPrepareExecutionResult> buildCachedPlan(
-        const QueryPlannerParams& plannerParams, const sbe::PlanCacheKey& planCacheKey) final {
-        if (!feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV() ||
-            !_cq->pipeline().empty()) {
-            // If the feature flag is off we fall back to use the classic plan cache just as what we
-            // do in caching SBE plans.
-            // TODO SERVER-61507: remove _cq->pipeline().empty() check when $group pushdown is
-            // integrated with SBE plan cache.
-            return buildCachedPlanFromClassicCache(plannerParams);
+        const sbe::PlanCacheKey& planCacheKey) final {
+        if (shouldCacheQuery(*_cq)) {
+            if (!feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
+                // If the feature flag is off, we first try to build an "id hack" plan because the
+                // id hack plans are not cached in the classic cache. We then fall back to use the
+                // classic plan cache.
+                if (auto result = buildIdHackPlan()) {
+                    return result;
+                } else {
+                    return buildCachedPlanFromClassicCache();
+                }
+            } else {
+                OpDebug& opDebug = CurOp::get(_opCtx)->debug();
+                if (!opDebug.planCacheKey) {
+                    opDebug.planCacheKey = planCacheKey.planCacheKeyHash();
+                }
+
+                auto&& planCache = sbe::getPlanCache(_opCtx);
+                auto cacheEntry = planCache.getCacheEntryIfActive(planCacheKey);
+                if (!cacheEntry) {
+                    return nullptr;
+                }
+
+                auto&& cachedPlan = std::move(cacheEntry->cachedPlan);
+                auto root = std::move(cachedPlan->root);
+                auto stageData = std::move(cachedPlan->planStageData);
+                stageData.debugInfo = std::move(cacheEntry->debugInfo);
+
+                auto result = makeResult();
+                result->setDecisionWorks(cacheEntry->decisionWorks);
+                result->setRecoveredPinnedCacheEntry(cacheEntry->isPinned());
+                result->emplace(std::make_pair(std::move(root), std::move(stageData)));
+                return result;
+            }
         }
 
-        OpDebug& opDebug = CurOp::get(_opCtx)->debug();
-        if (!opDebug.planCacheKey) {
-            opDebug.planCacheKey = planCacheKey.planCacheKeyHash();
-        }
-
-        auto&& planCache = sbe::getPlanCache(_opCtx);
-        auto cacheEntry = planCache.getCacheEntryIfActive(planCacheKey);
-        if (!cacheEntry) {
-            return nullptr;
-        }
-
-        auto&& cachedPlan = std::move(cacheEntry->cachedPlan);
-        auto root = std::move(cachedPlan->root);
-        auto stageData = std::move(cachedPlan->planStageData);
-        stageData.debugInfo = std::move(cacheEntry->debugInfo);
-
-        auto result = makeResult();
-        result->setDecisionWorks(cacheEntry->decisionWorks);
-        result->setRecoveredPinnedCacheEntry(cacheEntry->isPinned());
-        result->emplace(std::make_pair(std::move(root), std::move(stageData)));
-
-        return result;
+        // If a cached plan can be used we will have already returned the resulting plan. Otherwise
+        // we try to construct a find-by-_id plan
+        return buildIdHackPlan();
     }
 
     // A temporary function to allow recovering SBE plans from the classic plan cache.
     // TODO SERVER-61314: Remove this function when "featureFlagSbePlanCache" is removed.
-    std::unique_ptr<SlotBasedPrepareExecutionResult> buildCachedPlanFromClassicCache(
-        const QueryPlannerParams& plannerParams) {
+    std::unique_ptr<SlotBasedPrepareExecutionResult> buildCachedPlanFromClassicCache() {
         const auto& mainColl = getMainCollection();
         auto planCacheKey = plan_cache_key_factory::make<PlanCacheKey>(*_cq, mainColl);
         OpDebug& opDebug = CurOp::get(_opCtx)->debug();
@@ -1105,12 +1119,13 @@ protected:
         // Try to look up a cached solution for the query.
         if (auto cs = CollectionQueryInfo::get(mainColl).getPlanCache()->getCacheEntryIfActive(
                 planCacheKey)) {
+            initializePlannerParamsIfNeeded();
             // We have a CachedSolution.  Have the planner turn it into a QuerySolution.
-            auto statusWithQs = QueryPlanner::planFromCache(*_cq, plannerParams, *cs);
+            auto statusWithQs = QueryPlanner::planFromCache(*_cq, _plannerParams, *cs);
 
             if (statusWithQs.isOK()) {
                 auto querySolution = std::move(statusWithQs.getValue());
-                if ((plannerParams.options & QueryPlannerParams::IS_COUNT) &&
+                if ((_plannerParams.options & QueryPlannerParams::IS_COUNT) &&
                     turnIxscanIntoCount(querySolution.get())) {
                     LOGV2_DEBUG(
                         20923, 2, "Using fast count", "query"_attr = redact(_cq->toStringShort()));
@@ -1129,8 +1144,7 @@ protected:
         return nullptr;
     }
 
-    std::unique_ptr<SlotBasedPrepareExecutionResult> buildSubPlan(
-        const QueryPlannerParams& plannerParams) final {
+    std::unique_ptr<SlotBasedPrepareExecutionResult> buildSubPlan() final {
         // Nothing to be done here, all planning and stage building will be done by a SubPlanner.
         auto result = makeResult();
         result->setNeedsSubplanning(true);
@@ -1138,12 +1152,11 @@ protected:
     }
 
     std::unique_ptr<SlotBasedPrepareExecutionResult> buildMultiPlan(
-        std::vector<std::unique_ptr<QuerySolution>> solutions,
-        const QueryPlannerParams& plannerParams) final {
+        std::vector<std::unique_ptr<QuerySolution>> solutions) final {
         auto result = makeResult();
         for (size_t ix = 0; ix < solutions.size(); ++ix) {
             if (solutions[ix]->cacheData.get()) {
-                solutions[ix]->cacheData->indexFilterApplied = plannerParams.indexFiltersApplied;
+                solutions[ix]->cacheData->indexFilterApplied = _plannerParams.indexFiltersApplied;
             }
 
             auto execTree = buildExecutableTree(*solutions[ix]);
@@ -1241,7 +1254,6 @@ std::unique_ptr<sbe::RuntimePlanner> makeRuntimePlannerIfNeeded(
     if (decisionWorks) {
         QueryPlannerParams plannerParams;
         plannerParams.options = plannerOptions;
-        fillOutPlannerParams(opCtx, collections, canonicalQuery, &plannerParams);
         return std::make_unique<sbe::CachedSolutionPlanner>(
             opCtx, collections, *canonicalQuery, plannerParams, *decisionWorks, yieldPolicy);
     }

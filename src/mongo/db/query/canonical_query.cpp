@@ -538,4 +538,8 @@ CanonicalQuery::QueryShapeString CanonicalQuery::encodeKey() const {
         ? canonical_query_encoder::encodeSBE(*this)
         : canonical_query_encoder::encode(*this);
 }
+
+CanonicalQuery::QueryShapeString CanonicalQuery::encodeKeyForIndexFilters() const {
+    return canonical_query_encoder::encodeForIndexFilters(*this);
+}
 }  // namespace mongo

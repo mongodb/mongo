@@ -107,8 +107,8 @@ void generatePlannerInfo(PlanExecutor* exec,
                 plan_cache_key_factory::make<PlanCacheKey>(*exec->getCanonicalQuery(), collection);
             planCacheKeyHash = planCacheKeyInfo.planCacheKeyHash();
             queryHash = planCacheKeyInfo.queryHash();
-            if (auto allowedIndicesFilter =
-                    querySettings->getAllowedIndicesFilter(planCacheKeyInfo.getQueryShape())) {
+            if (auto allowedIndicesFilter = querySettings->getAllowedIndicesFilter(
+                    exec->getCanonicalQuery()->encodeKeyForIndexFilters())) {
                 // Found an index filter set on the query shape.
                 indexFilterSet = true;
             }

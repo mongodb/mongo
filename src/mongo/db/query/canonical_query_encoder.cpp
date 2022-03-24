@@ -1078,6 +1078,21 @@ std::string encodeSBE(const CanonicalQuery& cq) {
     return base64::encode(StringData(bufBuilder.buf(), bufBuilder.len()));
 }
 
+CanonicalQuery::QueryShapeString encodeForIndexFilters(const CanonicalQuery& cq) {
+    StringBuilder keyBuilder;
+    encodeKeyForMatch(cq.root(), &keyBuilder);
+    encodeKeyForSort(cq.getFindCommandRequest().getSort(), &keyBuilder);
+    encodeKeyForProj(cq.getProj(), &keyBuilder);
+
+    // We only encode user-specified collation. Collation inherited from the collection should not
+    // be encoded.
+    if (!cq.getFindCommandRequest().getCollation().isEmpty()) {
+        encodeCollation(cq.getCollator(), &keyBuilder);
+    }
+
+    return keyBuilder.str();
+}
+
 uint32_t computeHash(StringData key) {
     return SimpleStringDataComparator::kInstance.hash(key);
 }

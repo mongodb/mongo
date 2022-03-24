@@ -29,6 +29,9 @@ const caseInsensitive = {
     strength: 2
 };
 coll.drop();
+// Create the collection with a default collation. This test also ensures that index filters will
+// be applied before the resolution of collection's collation if users did not specify a collation
+// for the queries.
 assert.commandWorked(db.createCollection(collName, {collation: caseInsensitive}));
 
 function checkIndexFilterSet(explain, shouldBeSet) {
@@ -41,7 +44,8 @@ function checkIndexFilterSet(explain, shouldBeSet) {
     }
 }
 
-// Now create an index filter on a query with no collation specified.
+// Now create an index filter on a query with no collation specified. The index filter does not
+// inherit the collection's default collation.
 assert.commandWorked(coll.createIndexes([{x: 1}, {x: 1, y: 1}]));
 assert.commandWorked(
     db.runCommand({planCacheSetFilter: collName, query: {"x": 3}, indexes: [{x: 1, y: 1}]}));
@@ -59,10 +63,26 @@ assert.commandWorked(db.runCommand({
     indexes: [{x: 1}]
 }));
 
+// The index filters with projection are for testing distinct commands.
+assert.commandWorked(db.runCommand({
+    planCacheSetFilter: collName,
+    query: {"x": 5},
+    projection: {"_id": 1},
+    indexes: [{x: 1, y: 1}]
+}));
+
+assert.commandWorked(db.runCommand({
+    planCacheSetFilter: collName,
+    query: {"x": 5},
+    projection: {"_id": 1},
+    collation: caseInsensitive,
+    indexes: [{x: 1}]
+}));
+
 // Although these two queries would run with the same collation, they have different "shapes"
-// so we expect there to be two index filters present.
+// so we expect there to be four index filters present.
 let res = assert.commandWorked(db.runCommand({planCacheListFilters: collName}));
-assert.eq(res.filters.length, 2);
+assert.eq(res.filters.length, 4);
 
 // One of the filters should only be applied to queries with the "fr" collation
 // and use the {x: 1} index.
@@ -80,13 +100,25 @@ function assertIsIxScanOnIndex(winningPlan, keyPattern) {
     assert.eq(ixScans[0].keyPattern, keyPattern);
 }
 
-// Run the queries and be sure the correct indexes are used.
+// Run a query that does not specify the collation, and therefore will inherit the default
+// collation. Index filters are applied prior to resolving the collation. Therefore, the index
+// filter without a collation should apply to this query.
 let explain = coll.find({x: 3}).explain();
 checkIndexFilterSet(explain, true);
 assertIsIxScanOnIndex(getWinningPlan(explain.queryPlanner), {x: 1, y: 1});
 
-// Run the queries and be sure the correct indexes are used.
+// When the query specifies the collation, the index filter that also specifies the collation should
+// apply.
 explain = coll.find({x: 3}).collation(caseInsensitive).explain();
+checkIndexFilterSet(explain, true);
+assertIsIxScanOnIndex(getWinningPlan(explain.queryPlanner), {x: 1});
+
+// Ensure distinct commands behave correctly and consistently with the find commands.
+explain = coll.explain().distinct("_id", {x: 3});
+checkIndexFilterSet(explain, true);
+assertIsIxScanOnIndex(getWinningPlan(explain.queryPlanner), {x: 1, y: 1});
+
+explain = coll.explain().distinct("_id", {x: 3}, {collation: caseInsensitive});
 checkIndexFilterSet(explain, true);
 assertIsIxScanOnIndex(getWinningPlan(explain.queryPlanner), {x: 1});
 })();

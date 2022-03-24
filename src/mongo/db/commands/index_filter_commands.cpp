@@ -258,7 +258,7 @@ Status ClearFilters::clear(OperationContext* opCtx,
         }
 
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
-        querySettings->removeAllowedIndices(cq->encodeKey());
+        querySettings->removeAllowedIndices(cq->encodeKeyForIndexFilters());
 
         // Remove entry from plan cache
         planCache->remove(plan_cache_key_factory::make<PlanCacheKey>(*cq, collection));

@@ -78,7 +78,7 @@ void filterAllowedIndexEntries(const AllowedIndicesFilter& allowedIndicesFilter,
  */
 void fillOutIndexEntries(OperationContext* opCtx,
                          bool apiStrict,
-                         CanonicalQuery* canonicalQuery,
+                         const CanonicalQuery* canonicalQuery,
                          const CollectionPtr& collection,
                          std::vector<IndexEntry>& entries);
 
@@ -88,15 +88,15 @@ void fillOutIndexEntries(OperationContext* opCtx,
 std::map<NamespaceString, SecondaryCollectionInfo> fillOutSecondaryCollectionsInformation(
     OperationContext* opCtx,
     const MultipleCollectionAccessor& collections,
-    CanonicalQuery* canonicalQuery);
+    const CanonicalQuery* canonicalQuery);
 
 /**
  * Fill out the provided 'plannerParams' for the 'canonicalQuery' operating on the collection
- * 'collection'.  Exposed for testing.
+ * 'collection'.
  */
 void fillOutPlannerParams(OperationContext* opCtx,
                           const CollectionPtr& collection,
-                          CanonicalQuery* canonicalQuery,
+                          const CanonicalQuery* canonicalQuery,
                           QueryPlannerParams* plannerParams);
 /**
  * Overload of the above function that does two things:
@@ -107,7 +107,7 @@ void fillOutPlannerParams(OperationContext* opCtx,
  */
 void fillOutPlannerParams(OperationContext* opCtx,
                           const MultipleCollectionAccessor& collections,
-                          CanonicalQuery* canonicalQuery,
+                          const CanonicalQuery* canonicalQuery,
                           QueryPlannerParams* plannerParams);
 
 /**
