@@ -10,6 +10,7 @@ from buildscripts.resmokelib import errors
 from buildscripts.resmokelib import utils
 from buildscripts.resmokelib.testing import suite as _suite
 from buildscripts.resmokelib.utils import load_yaml_file
+from buildscripts.resmokelib.utils.dictionary import merge_dicts
 
 SuiteName = str
 
@@ -39,8 +40,7 @@ def get_named_suites() -> List[SuiteName]:
 
 def get_suite_files() -> Dict[str, str]:
     """Get the physical files defining these suites for parsing comments."""
-    return MatrixSuiteConfig.merge_dicts(ExplicitSuiteConfig.get_suite_files(),
-                                         MatrixSuiteConfig.get_suite_files())
+    return merge_dicts(ExplicitSuiteConfig.get_suite_files(), MatrixSuiteConfig.get_suite_files())
 
 
 def create_test_membership_map(fail_on_missing_selector=False, test_kind=None):
@@ -237,7 +237,7 @@ class MatrixSuiteConfig(SuiteConfigInterface):
 
         if override_names:
             for override_name in override_names:
-                cls.merge_dicts(res, overrides[override_name])
+                merge_dicts(res, overrides[override_name])
 
         return res
 
@@ -289,20 +289,6 @@ class MatrixSuiteConfig(SuiteConfigInterface):
                         raise ValueError("Invalid suite configuration, missing required keys. ",
                                          suite_config)
         return cls._all_mappings
-
-    @classmethod
-    def merge_dicts(cls, dict1, dict2):
-        """Recursively merges dict2 into dict1."""
-        if not isinstance(dict1, dict) or not isinstance(dict2, dict):
-            return dict2
-        for k in dict2:
-            if dict2[k] is None:
-                dict1.pop(k)
-            elif k in dict1:
-                dict1[k] = cls.merge_dicts(dict1[k], dict2[k])
-            else:
-                dict1[k] = dict2[k]
-        return dict1
 
     @classmethod
     def __get_suite_files_in_dir(cls, target_dir):

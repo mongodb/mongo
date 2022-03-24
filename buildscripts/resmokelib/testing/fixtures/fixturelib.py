@@ -1,4 +1,5 @@
 """Facade wrapping the resmokelib dependencies used by fixtures."""
+from typing import Dict
 
 from buildscripts.resmokelib import config
 from buildscripts.resmokelib import core
@@ -6,6 +7,7 @@ from buildscripts.resmokelib import errors
 from buildscripts.resmokelib import utils
 from buildscripts.resmokelib import logging
 from buildscripts.resmokelib.core import network
+from buildscripts.resmokelib.utils.dictionary import merge_dicts
 from buildscripts.resmokelib.utils.history import make_historic as _make_historic
 from buildscripts.resmokelib.testing.fixtures import _builder
 
@@ -93,6 +95,23 @@ class FixtureLib:
     def get_next_port(self, job_num):
         """Return the next available port that fixture can use."""
         return network.PortAllocator.next_fixture_port(job_num)
+
+    SET_PARAMETERS_KEY = "set_parameters"
+
+    def merge_mongo_option_dicts(self, original: Dict, override: Dict):
+        """
+        Merge mongod/s options such that --setParameter is merged recursively.
+
+        Values from `original` are replaced in-place with those of `override` where they exist.
+        """
+        original_set_parameters = original.get(self.SET_PARAMETERS_KEY, {})
+        override_set_parameters = override.get(self.SET_PARAMETERS_KEY, {})
+
+        merged_set_parameters = merge_dicts(original_set_parameters, override_set_parameters)
+        original.update(override)
+        original[self.SET_PARAMETERS_KEY] = merged_set_parameters
+
+        return original
 
 
 class _FixtureConfig(object):  # pylint: disable=too-many-instance-attributes
