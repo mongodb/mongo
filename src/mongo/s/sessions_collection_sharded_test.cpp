@@ -134,8 +134,12 @@ TEST_F(SessionsCollectionShardedTest, RefreshOneSessionWriteErrTest) {
         BatchedCommandResponse response;
         response.setStatus(Status::OK());
         response.setNModified(0);
-        response.addToErrDetails(
-            write_ops::WriteError(0, {ErrorCodes::NotWritablePrimary, "not primary"}));
+        response.addToErrDetails([&] {
+            WriteErrorDetail* errDetail = new WriteErrorDetail();
+            errDetail->setIndex(0);
+            errDetail->setStatus({ErrorCodes::NotWritablePrimary, "not primary"});
+            return errDetail;
+        }());
         return response.toBSON();
     });
 
@@ -185,8 +189,12 @@ TEST_F(SessionsCollectionShardedTest, RemoveOneSessionWriteErrTest) {
         BatchedCommandResponse response;
         response.setStatus(Status::OK());
         response.setNModified(0);
-        response.addToErrDetails(
-            write_ops::WriteError(0, {ErrorCodes::NotWritablePrimary, "not primary"}));
+        response.addToErrDetails([&] {
+            WriteErrorDetail* errDetail = new WriteErrorDetail();
+            errDetail->setIndex(0);
+            errDetail->setStatus({ErrorCodes::NotWritablePrimary, "not primary"});
+            return errDetail;
+        }());
         return response.toBSON();
     });
 

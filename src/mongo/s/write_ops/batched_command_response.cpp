@@ -40,13 +40,17 @@
 
 namespace mongo {
 
-MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(MultipleErrorsOccurredInfo);
+using std::string;
+using std::unique_ptr;
+
+using str::stream;
 
 const BSONField<long long> BatchedCommandResponse::n("n", 0);
 const BSONField<long long> BatchedCommandResponse::nModified("nModified", 0);
 const BSONField<std::vector<BatchedUpsertDetail*>> BatchedCommandResponse::upsertDetails(
     "upserted");
 const BSONField<OID> BatchedCommandResponse::electionId("electionId");
+const BSONField<std::vector<WriteErrorDetail*>> BatchedCommandResponse::writeErrors("writeErrors");
 const BSONField<WriteConcernErrorDetail*> BatchedCommandResponse::writeConcernError(
     "writeConcernError");
 const BSONField<std::vector<std::string>> BatchedCommandResponse::errorLabels("errorLabels");
@@ -93,31 +97,41 @@ BSONObj BatchedCommandResponse::toBSON() const {
     if (_isElectionIdSet)
         builder.appendOID(electionId(), const_cast<OID*>(&_electionId));
 
-    if (_writeErrors) {
-        auto truncateErrorMessage = [errorCount = size_t(0),
-                                     errorSize = size_t(0)](StringData rawMessage) mutable {
+    if (_writeErrorDetails.get()) {
+        auto errorMessage = [errorCount = size_t(0),
+                             errorSize = size_t(0)](StringData rawMessage) mutable {
             // Start truncating error messages once both of these limits are exceeded.
             constexpr size_t kErrorSizeTruncationMin = 1024 * 1024;
             constexpr size_t kErrorCountTruncationMin = 2;
             if (errorSize >= kErrorSizeTruncationMin && errorCount >= kErrorCountTruncationMin) {
-                return true;
+                return ""_sd;
             }
 
             errorCount++;
             errorSize += rawMessage.size();
-            return false;
+            return rawMessage;
         };
 
-        BSONArrayBuilder errDetailsBuilder(
-            builder.subarrayStart(write_ops::WriteCommandReplyBase::kWriteErrorsFieldName));
-        for (auto&& writeError : *_writeErrors) {
-            if (truncateErrorMessage(writeError.getStatus().reason())) {
-                write_ops::WriteError truncatedError(writeError.getIndex(),
-                                                     writeError.getStatus().withReason(""));
-                errDetailsBuilder.append(truncatedError.serialize());
-            } else {
-                errDetailsBuilder.append(writeError.serialize());
-            }
+        BSONArrayBuilder errDetailsBuilder(builder.subarrayStart(writeErrors()));
+        for (auto&& writeError : *_writeErrorDetails) {
+            BSONObjBuilder errDetailsDocument(errDetailsBuilder.subobjStart());
+
+            if (writeError->isIndexSet())
+                errDetailsDocument.append(WriteErrorDetail::index(), writeError->getIndex());
+
+            auto status = writeError->toStatus();
+            errDetailsDocument.append(WriteErrorDetail::errCode(), status.code());
+            errDetailsDocument.append(WriteErrorDetail::errCodeName(), status.codeString());
+            errDetailsDocument.append(WriteErrorDetail::errMessage(),
+                                      errorMessage(status.reason()));
+            if (auto extra = status.extraInfo())
+                extra->serialize(
+                    &errDetailsDocument);  // TODO consider extra info size for truncation.
+
+            // Only set 'errInfo' if it hasn't been added by serializing 'extra'.
+            if (writeError->isErrInfoSet() &&
+                !errDetailsDocument.hasField(WriteErrorDetail::errInfo()))
+                errDetailsDocument.append(WriteErrorDetail::errInfo(), writeError->getErrInfo());
         }
         errDetailsBuilder.done();
     }
@@ -133,7 +147,7 @@ BSONObj BatchedCommandResponse::toBSON() const {
     return builder.obj();
 }
 
-bool BatchedCommandResponse::parseBSON(const BSONObj& source, std::string* errMsg) {
+bool BatchedCommandResponse::parseBSON(const BSONObj& source, string* errMsg) {
     clear();
 
     std::string dummy;
@@ -203,14 +217,11 @@ bool BatchedCommandResponse::parseBSON(const BSONObj& source, std::string* errMs
         return false;
     _isElectionIdSet = fieldState == FieldParser::FIELD_SET;
 
-    if (auto writeErrorsElem = source[write_ops::WriteCommandReplyBase::kWriteErrorsFieldName]) {
-        for (auto writeError : writeErrorsElem.Array()) {
-            if (!_writeErrors)
-                _writeErrors.emplace();
-            _writeErrors->emplace_back(write_ops::WriteError::parse(writeError.Obj()));
-        }
-    }
-
+    std::vector<WriteErrorDetail*>* tempErrDetails = nullptr;
+    fieldState = FieldParser::extract(source, writeErrors, &tempErrDetails, errMsg);
+    if (fieldState == FieldParser::FIELD_INVALID)
+        return false;
+    _writeErrorDetails.reset(tempErrDetails);
     WriteConcernErrorDetail* wcError = nullptr;
     fieldState = FieldParser::extract(source, writeConcernError, &wcError, errMsg);
     if (fieldState == FieldParser::FIELD_INVALID)
@@ -257,7 +268,14 @@ void BatchedCommandResponse::clear() {
     _electionId = OID();
     _isElectionIdSet = false;
 
-    _writeErrors.reset();
+    if (_writeErrorDetails.get()) {
+        for (std::vector<WriteErrorDetail*>::const_iterator it = _writeErrorDetails->begin();
+             it != _writeErrorDetails->end();
+             ++it) {
+            delete *it;
+        };
+        _writeErrorDetails.reset();
+    }
 
     _wcErrDetails.reset();
 }
@@ -299,7 +317,7 @@ void BatchedCommandResponse::setUpsertDetails(
     for (std::vector<BatchedUpsertDetail*>::const_iterator it = upsertDetails.begin();
          it != upsertDetails.end();
          ++it) {
-        std::unique_ptr<BatchedUpsertDetail> tempBatchedUpsertDetail(new BatchedUpsertDetail);
+        unique_ptr<BatchedUpsertDetail> tempBatchedUpsertDetail(new BatchedUpsertDetail);
         (*it)->cloneTo(tempBatchedUpsertDetail.get());
         addToUpsertDetails(tempBatchedUpsertDetail.release());
     }
@@ -371,39 +389,42 @@ OID BatchedCommandResponse::getElectionId() const {
     return _electionId;
 }
 
-void BatchedCommandResponse::addToErrDetails(write_ops::WriteError error) {
-    if (!_writeErrors)
-        _writeErrors.emplace();
-    _writeErrors->emplace_back(std::move(error));
+void BatchedCommandResponse::addToErrDetails(WriteErrorDetail* errDetails) {
+    if (_writeErrorDetails.get() == nullptr) {
+        _writeErrorDetails.reset(new std::vector<WriteErrorDetail*>);
+    }
+    _writeErrorDetails->push_back(errDetails);
 }
 
 void BatchedCommandResponse::unsetErrDetails() {
-    _writeErrors.reset();
+    if (_writeErrorDetails.get() != nullptr) {
+        for (std::vector<WriteErrorDetail*>::iterator it = _writeErrorDetails->begin();
+             it != _writeErrorDetails->end();
+             ++it) {
+            delete *it;
+        }
+        _writeErrorDetails.reset();
+    }
 }
 
 bool BatchedCommandResponse::isErrDetailsSet() const {
-    return _writeErrors.is_initialized();
+    return _writeErrorDetails.get() != nullptr;
 }
 
 size_t BatchedCommandResponse::sizeErrDetails() const {
-    dassert(isErrDetailsSet());
-    return _writeErrors->size();
+    dassert(_writeErrorDetails.get());
+    return _writeErrorDetails->size();
 }
 
-std::vector<write_ops::WriteError>& BatchedCommandResponse::getErrDetails() {
-    dassert(isErrDetailsSet());
-    return *_writeErrors;
+const std::vector<WriteErrorDetail*>& BatchedCommandResponse::getErrDetails() const {
+    dassert(_writeErrorDetails.get());
+    return *_writeErrorDetails;
 }
 
-const std::vector<write_ops::WriteError>& BatchedCommandResponse::getErrDetails() const {
-    dassert(isErrDetailsSet());
-    return *_writeErrors;
-}
-
-const write_ops::WriteError& BatchedCommandResponse::getErrDetailsAt(size_t pos) const {
-    dassert(isErrDetailsSet());
-    dassert(pos < _writeErrors->size());
-    return _writeErrors->at(pos);
+const WriteErrorDetail* BatchedCommandResponse::getErrDetailsAt(size_t pos) const {
+    dassert(_writeErrorDetails.get());
+    dassert(_writeErrorDetails->size() > pos);
+    return _writeErrorDetails->at(pos);
 }
 
 void BatchedCommandResponse::setWriteConcernError(WriteConcernErrorDetail* error) {
@@ -424,7 +445,7 @@ Status BatchedCommandResponse::toStatus() const {
     }
 
     if (isErrDetailsSet()) {
-        return getErrDetails().front().getStatus();
+        return getErrDetails().front()->toStatus();
     }
 
     if (isWriteConcernErrorSet()) {
@@ -448,19 +469,6 @@ bool BatchedCommandResponse::areRetriedStmtIdsSet() const {
 
 const std::vector<StmtId>& BatchedCommandResponse::getRetriedStmtIds() const {
     return _retriedStmtIds;
-}
-
-std::shared_ptr<const ErrorExtraInfo> MultipleErrorsOccurredInfo::parse(const BSONObj& obj) {
-    // The server never receives this error as a response from another node, so there is never
-    // need to parse it.
-    uasserted(645200,
-              "The MultipleErrorsOccurred error should never be used for intra-cluster "
-              "communication");
-}
-
-void MultipleErrorsOccurredInfo::serialize(BSONObjBuilder* bob) const {
-    BSONObjBuilder errInfoBuilder(bob->subobjStart(write_ops::WriteError::kErrInfoFieldName));
-    errInfoBuilder.append("causedBy", _arr);
 }
 
 }  // namespace mongo

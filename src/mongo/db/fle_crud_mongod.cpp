@@ -27,10 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/db/fle_crud.h"
+#include "mongo/platform/basic.h"
 
 #include <string>
 #include <utility>
+
+#include "mongo/db/fle_crud.h"
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
@@ -54,6 +56,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/transaction_router_resource_yielder.h"
 #include "mongo/s/write_ops/batch_write_exec.h"
+#include "mongo/s/write_ops/write_error_detail.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
 

@@ -32,10 +32,10 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/logical_session_id.h"
-#include "mongo/db/ops/write_ops.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/rpc/write_concern_error_detail.h"
 #include "mongo/s/write_ops/batched_upsert_detail.h"
+#include "mongo/s/write_ops/write_error_detail.h"
 
 namespace mongo {
 
@@ -52,6 +52,7 @@ public:
     static const BSONField<long long> nModified;
     static const BSONField<std::vector<BatchedUpsertDetail*>> upsertDetails;
     static const BSONField<OID> electionId;
+    static const BSONField<std::vector<WriteErrorDetail*>> writeErrors;
     static const BSONField<WriteConcernErrorDetail*> writeConcernError;
     static const BSONField<std::vector<std::string>> errorLabels;
     static const BSONField<std::vector<StmtId>> retriedStmtIds;
@@ -113,13 +114,12 @@ public:
     OID getElectionId() const;
 
     // errDetails ownership is transferred to here.
-    void addToErrDetails(write_ops::WriteError error);
+    void addToErrDetails(WriteErrorDetail* errDetails);
     void unsetErrDetails();
     bool isErrDetailsSet() const;
     std::size_t sizeErrDetails() const;
-    std::vector<write_ops::WriteError>& getErrDetails();
-    const std::vector<write_ops::WriteError>& getErrDetails() const;
-    const write_ops::WriteError& getErrDetailsAt(std::size_t pos) const;
+    const std::vector<WriteErrorDetail*>& getErrDetails() const;
+    const WriteErrorDetail* getErrDetailsAt(std::size_t pos) const;
 
     void setWriteConcernError(WriteConcernErrorDetail* error);
     bool isWriteConcernErrorSet() const;
@@ -165,7 +165,7 @@ private:
     bool _isElectionIdSet;
 
     // (O)  Array of item-level error information
-    boost::optional<std::vector<write_ops::WriteError>> _writeErrors;
+    std::unique_ptr<std::vector<WriteErrorDetail*>> _writeErrorDetails;
 
     // (O)  errors that occurred while trying to satisfy the write concern.
     std::unique_ptr<WriteConcernErrorDetail> _wcErrDetails;
@@ -175,24 +175,6 @@ private:
 
     // (O)  Array containing the retried statement ids from the response.
     std::vector<StmtId> _retriedStmtIds;
-};
-
-/**
- * Error, which is very specific to the batch write commands execution and should never be used
- * internally between the cluster nodes. Indicates that more than one type of error occurred while
- * executing a batch write command and contains the details for each type.
- */
-class MultipleErrorsOccurredInfo final : public ErrorExtraInfo {
-public:
-    static constexpr auto code = ErrorCodes::MultipleErrorsOccurred;
-
-    MultipleErrorsOccurredInfo(BSONArray arr) : _arr(std::move(arr)) {}
-
-    static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj& obj);
-    void serialize(BSONObjBuilder* bob) const;
-
-private:
-    BSONArray _arr;
 };
 
 }  // namespace mongo

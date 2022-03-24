@@ -54,6 +54,17 @@ namespace {
 
 const ReadPreferenceSetting kPrimaryOnlyReadPreference(ReadPreference::PrimaryOnly);
 
+//
+// Map which allows associating ConnectionString hosts with TargetedWriteBatches
+// This is needed since the dispatcher only returns hosts with responses.
+//
+
+WriteErrorDetail errorFromStatus(const Status& status) {
+    WriteErrorDetail error;
+    error.setStatus(status);
+    return error;
+}
+
 // Helper to note several stale shard errors from a response
 void noteStaleShardResponses(OperationContext* opCtx,
                              const std::vector<ShardError>& staleErrors,
@@ -64,11 +75,12 @@ void noteStaleShardResponses(OperationContext* opCtx,
                     "Noting stale config response from {shardId}: {errorInfo}",
                     "Noting stale config response",
                     "shardId"_attr = error.endpoint.shardName,
-                    "status"_attr = error.error.getStatus());
-
-        auto extraInfo = error.error.getStatus().extraInfo<StaleConfigInfo>();
-        invariant(extraInfo);
-        targeter->noteStaleShardResponse(opCtx, error.endpoint, *extraInfo);
+                    "errorInfo"_attr = error.error.getErrInfo());
+        targeter->noteStaleShardResponse(
+            opCtx,
+            error.endpoint,
+            StaleConfigInfo::parseFromCommandError(
+                error.error.isErrInfoSet() ? error.error.getErrInfo() : BSONObj()));
     }
 }
 
@@ -81,10 +93,11 @@ void noteStaleDbResponses(OperationContext* opCtx,
                     4,
                     "Noting stale database response",
                     "shardId"_attr = error.endpoint.shardName,
-                    "status"_attr = error.error.getStatus());
-        auto extraInfo = error.error.getStatus().extraInfo<StaleDbRoutingVersion>();
-        invariant(extraInfo);
-        targeter->noteStaleDbResponse(opCtx, error.endpoint, *extraInfo);
+                    "errorInfo"_attr = error.error);
+        targeter->noteStaleDbResponse(
+            opCtx,
+            error.endpoint,
+            StaleDbRoutingVersion::parseFromCommandError(error.error.toBSON()));
     }
 }
 
@@ -279,7 +292,6 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
 
                 if (responseStatus.isOK()) {
                     TrackedErrors trackedErrors;
-                    trackedErrors.startTracking(ErrorCodes::StaleConfig);
                     trackedErrors.startTracking(ErrorCodes::StaleShardVersion);
                     trackedErrors.startTracking(ErrorCodes::StaleDbVersion);
                     trackedErrors.startTracking(ErrorCodes::TenantMigrationAborted);
@@ -318,26 +330,20 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                     }
 
                     // Note if anything was stale
-                    auto staleConfigErrors = trackedErrors.getErrors(ErrorCodes::StaleConfig);
-                    {
-                        const auto& staleShardVersionErrors =
-                            trackedErrors.getErrors(ErrorCodes::StaleShardVersion);
-                        staleConfigErrors.insert(staleConfigErrors.begin(),
-                                                 staleShardVersionErrors.begin(),
-                                                 staleShardVersionErrors.end());
-                    }
+                    const auto& staleShardErrors =
+                        trackedErrors.getErrors(ErrorCodes::StaleShardVersion);
                     const auto& staleDbErrors = trackedErrors.getErrors(ErrorCodes::StaleDbVersion);
                     const auto& tenantMigrationAbortedErrors =
                         trackedErrors.getErrors(ErrorCodes::TenantMigrationAborted);
 
-                    if (!staleConfigErrors.empty()) {
+                    if (!staleShardErrors.empty()) {
                         invariant(staleDbErrors.empty());
-                        noteStaleShardResponses(opCtx, staleConfigErrors, &targeter);
+                        noteStaleShardResponses(opCtx, staleShardErrors, &targeter);
                         ++stats->numStaleShardBatches;
                     }
 
                     if (!staleDbErrors.empty()) {
-                        invariant(staleConfigErrors.empty());
+                        invariant(staleShardErrors.empty());
                         noteStaleDbResponses(opCtx, staleDbErrors, &targeter);
                         ++stats->numStaleDbBatches;
                     }
@@ -375,7 +381,7 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                                               : "from failing to target a host in the shard ")
                                       << shardInfo);
 
-                    batchOp.noteBatchError(*batch, write_ops::WriteError(0, status));
+                    batchOp.noteBatchError(*batch, errorFromStatus(status));
 
                     LOGV2_DEBUG(22908,
                                 4,
@@ -431,8 +437,8 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                                 {logv2::LogComponent::kShardMigrationPerf},
                                 "Finished post-migration commit refresh on the router with error",
                                 "error"_attr = redact(ex));
-            batchOp.abortBatch(write_ops::WriteError(
-                0, ex.toStatus("collection was dropped in the middle of the operation")));
+            batchOp.abortBatch(errorFromStatus(
+                ex.toStatus("collection was dropped in the middle of the operation")));
             break;
         } catch (const DBException& ex) {
             LOGV2_DEBUG_OPTIONS(4817409,
@@ -460,8 +466,7 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
         numCompletedOps = currCompletedOps;
 
         if (numRoundsWithoutProgress > kMaxRoundsWithoutProgress) {
-            batchOp.abortBatch(write_ops::WriteError(
-                0,
+            batchOp.abortBatch(errorFromStatus(
                 {ErrorCodes::NoProgressMade,
                  str::stream() << "no progress was made executing batch write op in "
                                << clientRequest.getNS().ns() << " after "

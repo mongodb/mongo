@@ -482,8 +482,12 @@ TEST_F(UpdateRetryTest, OperationInterruptedDueToPrimaryStepDown) {
 
         BatchedCommandResponse response;
         response.setStatus(Status::OK());
-        response.addToErrDetails(write_ops::WriteError(
-            0, {ErrorCodes::InterruptedDueToReplStateChange, "Operation interrupted"}));
+
+        auto writeErrDetail = std::make_unique<WriteErrorDetail>();
+        writeErrDetail->setIndex(0);
+        writeErrDetail->setStatus(
+            {ErrorCodes::InterruptedDueToReplStateChange, "Operation interrupted"});
+        response.addToErrDetails(writeErrDetail.release());
 
         return response.toBSON();
     });

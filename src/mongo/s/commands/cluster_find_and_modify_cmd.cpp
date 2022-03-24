@@ -185,7 +185,7 @@ void handleWouldChangeOwningShardErrorRetryableWrite(
         (bodyStatus == ErrorCodes::DuplicateKey &&
          !bodyStatus.extraInfo<DuplicateKeyErrorInfo>()->getKeyPattern().hasField("_id"))) {
         bodyStatus.addContext(documentShardKeyUpdateUtil::kNonDuplicateKeyErrorContext);
-    }
+    };
     uassertStatusOK(bodyStatus);
 
     uassertStatusOK(swCommitResult.getValue().cmdStatus);
@@ -622,7 +622,7 @@ private:
                 (e.code() == ErrorCodes::DuplicateKey &&
                  !e.extraInfo<DuplicateKeyErrorInfo>()->getKeyPattern().hasField("_id"))) {
                 e.addContext(documentShardKeyUpdateUtil::kNonDuplicateKeyErrorContext);
-            }
+            };
 
             auto txnRouterForAbort = TransactionRouter::get(opCtx);
             if (txnRouterForAbort)
