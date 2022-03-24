@@ -13,8 +13,8 @@ const JoinAlgorithm = {
     Classic: 0,
     NLJ: 1,
     INLJ: 2,
-    // These two joins aren't implemented yet and will throw errors with the corresponding codes.
-    HJ: 5842602,
+    HJ: 3,
+    // These joins aren't implemented yet and will throw errors with the corresponding codes.
     INLJHashedIndex: 6357203,
 };
 
@@ -33,21 +33,27 @@ const viewName = "view_lookup_pushdown";
  * In particular, if 'IndexedLoopJoin' was chosen, we verify that the index described by
  * 'indexKeyPattern' was chosen. Otherwise, we verify that 'NestedLoopJoin' was chosen.
  */
-function verifyEqLookupNodeStrategy(explain, eqLookupNodeIndex, indexKeyPattern = {}) {
+function verifyEqLookupNodeStrategy(
+    explain, eqLookupNodeIndex, expectedStrategy, indexKeyPattern = {}) {
     const eqLookupNodes = getAggPlanStages(explain, "EQ_LOOKUP");
     assert.gt(
         eqLookupNodes.length, 0, "expected at least one EQ_LOOKUP node; got " + tojson(explain));
 
     // Verify that we're selecting an EQ_LOOKUP node within range.
     assert(eqLookupNodeIndex >= 0 && eqLookupNodeIndex < eqLookupNodes.length,
-           "expected eqLookupNodeIndex within range of available EQ_LOOKUP nodes; got " +
-               tojson(explain));
+           "expected eqLookupNodeIndex of '" + eqLookupNodeIndex +
+               "' to be within range of available EQ_LOOKUP nodes; got " + tojson(explain));
 
     // Fetch the requested EQ_LOOKUP node.
     const eqLookupNode = eqLookupNodes[eqLookupNodes.length - 1 - eqLookupNodeIndex];
     assert(eqLookupNode, "expected EQ_LOOKUP node; explain: " + tojson(explain));
     const strategy = eqLookupNode.strategy;
     assert(strategy, "expected EQ_LOOKUP node to have a strategy " + tojson(eqLookupNode));
+    assert.eq(
+        expectedStrategy,
+        strategy,
+        "Incorrect strategy; expected " + tojson(expectedStrategy) + ", got " + tojson(strategy));
+
     if (strategy === "IndexedLoopJoin") {
         assert(indexKeyPattern,
                "expected indexKeyPattern should be set for IndexedLoopJoin algorithm");
@@ -55,10 +61,21 @@ function verifyEqLookupNodeStrategy(explain, eqLookupNodeIndex, indexKeyPattern 
                      indexKeyPattern,
                      "expected IndexedLoopJoin node to have index " + tojson(indexKeyPattern) +
                          ", got plan " + tojson(eqLookupNode));
-    } else {
-        assert.eq("NestedLoopJoin",
-                  strategy,
-                  "Incorrect strategy; expected NestedLoopJoin, got " + tojson(strategy));
+    }
+}
+
+function getJoinAlgorithmStrategyName(joinAlgorithm) {
+    switch (joinAlgorithm) {
+        case JoinAlgorithm.NLJ:
+            return "NestedLoopJoin";
+        case JoinAlgorithm.INLJ:
+        case JoinAlgorithm.INLJHashedIndex:
+            return "IndexedLoopJoin";
+        case JoinAlgorithm.HJ:
+            return "HashJoin";
+        case JoinAlgorithm.Classic:
+        default:
+            assert(false, "No strategy for JoinAlgorithm: " + joinAlgorithm);
     }
 }
 
@@ -84,8 +101,7 @@ function runTest(coll,
         assert.eq(eqLookupNodes.length,
                   0,
                   "there should be no lowered EQ_LOOKUP stages; got " + tojson(explain));
-    } else if (expectedJoinAlgorithm === JoinAlgorithm.HJ ||
-               expectedJoinAlgorithm === JoinAlgorithm.INLJHashedIndex) {
+    } else if (expectedJoinAlgorithm === JoinAlgorithm.INLJHashedIndex) {
         const result = assert.commandFailedWithCode(response, expectedJoinAlgorithm);
         if (errMsgRegex) {
             const errorMessage = result.errmsg;
@@ -96,7 +112,8 @@ function runTest(coll,
     } else {
         assert.commandWorked(response);
         const explain = coll.explain().aggregate(pipeline, aggOptions);
-        verifyEqLookupNodeStrategy(explain, eqLookupNodeIndex, indexKeyPattern);
+        const expectedStrategy = getJoinAlgorithmStrategyName(expectedJoinAlgorithm);
+        verifyEqLookupNodeStrategy(explain, eqLookupNodeIndex, expectedStrategy, indexKeyPattern);
 
         // Verify that multiplanning took place by verifying that there was at least one
         // rejected plan.
@@ -549,7 +566,7 @@ let view = db[viewName];
 
             // Wrap the subpipeline's explain output in a format that can be parsed by
             // 'getAggPlanStages'.
-            verifyEqLookupNodeStrategy({stages: unionWithSpec["pipeline"]}, 0);
+            verifyEqLookupNodeStrategy({stages: unionWithSpec["pipeline"]}, 0, "NestedLoopJoin");
             assert(unionColl.drop());
         }());
 

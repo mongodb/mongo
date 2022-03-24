@@ -1580,6 +1580,8 @@ void EqLookupNode::appendToString(str::stream* ss, int indent) const {
     *ss << "localField = " << joinFieldLocal.fullPath() << "\n";
     addIndent(ss, indent + 1);
     *ss << "foreignField = " << joinFieldForeign.fullPath() << "\n";
+    addIndent(ss, indent + 1);
+    *ss << "lookupStrategy = " << serializeLookupStrategy(lookupStrategy) << "\n";
     addCommon(ss, indent);
     addIndent(ss, indent + 1);
     *ss << "Child:" << '\n';

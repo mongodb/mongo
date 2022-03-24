@@ -48,10 +48,11 @@ namespace mongo::sbe {
 using namespace value;
 
 class LookupStageBuilderTest : public SbeStageBuilderTestFixture {
+protected:
     // Set to "true" and recompile the tests to dump plans and skip asserts in favor of printing
     // more data. Because asserts are suppressed in this mode tests might pass while being broken.
     // Do not check in with 'enableDebugOutput' set to "true".
-    const bool enableDebugOutput = false;
+    bool enableDebugOutput = false;
 
 public:
     void setUp() override {
@@ -117,7 +118,8 @@ public:
     };
 
     // Constructs ready-to-execute SBE tree for $lookup specified by the arguments.
-    CompiledTree buildLookupSbeTree(const std::string& localKey,
+    CompiledTree buildLookupSbeTree(EqLookupNode::LookupStrategy strategy,
+                                    const std::string& localKey,
                                     const std::string& foreignKey,
                                     const std::string& asKey) {
         // Documents from the local collection are provided using collection scan.
@@ -128,6 +130,7 @@ public:
         auto foreignCollName = _foreignNss.toString();
         auto lookupNode = std::make_unique<EqLookupNode>(
             std::move(localScanNode), foreignCollName, localKey, foreignKey, asKey);
+        lookupNode->lookupStrategy = strategy;
         auto solution = makeQuerySolution(std::move(lookupNode));
 
         // Convert logical solution into the physical SBE plan.
@@ -151,11 +154,18 @@ public:
     }
 
     // Check that SBE plan for '$lookup' returns expected documents.
-    void assertReturnedDocuments(const std::string& localKey,
+    void assertReturnedDocuments(EqLookupNode::LookupStrategy strategy,
+                                 const std::string& localKey,
                                  const std::string& foreignKey,
                                  const std::string& asKey,
                                  const std::vector<BSONObj>& expected) {
-        auto tree = buildLookupSbeTree(localKey, foreignKey, asKey);
+        if (enableDebugOutput) {
+            std::cout << std::endl
+                      << "LookupStrategy: " << EqLookupNode::serializeLookupStrategy(strategy)
+                      << std::endl;
+        }
+
+        auto tree = buildLookupSbeTree(strategy, localKey, foreignKey, asKey);
         auto& stage = tree.stage;
 
         size_t i = 0;
@@ -192,13 +202,28 @@ public:
         stage->close();
     }
 
+    void assertReturnedDocuments(const std::string& localKey,
+                                 const std::string& foreignKey,
+                                 const std::string& asKey,
+                                 const std::vector<BSONObj>& expected) {
+        for (auto strategy : strategies) {
+            assertReturnedDocuments(strategy, localKey, foreignKey, asKey, expected);
+        }
+    }
+
     // Check that SBE plan for '$lookup' returns expected documents. Expected documents are
     // described in pairs '(local document, matched foreign documents)'.
     void assertMatchedDocuments(
+        EqLookupNode::LookupStrategy strategy,
         const std::string& localKey,
         const std::string& foreignKey,
         const std::vector<std::pair<BSONObj, std::vector<BSONObj>>>& expectedPairs) {
         const std::string resultFieldName{"result"};
+        if (enableDebugOutput) {
+            std::cout << std::endl
+                      << "LookupStrategy: " << EqLookupNode::serializeLookupStrategy(strategy)
+                      << std::endl;
+        }
 
         // Construct expected documents.
         std::vector<BSONObj> expectedDocuments;
@@ -215,8 +240,22 @@ public:
             expectedDocuments.push_back(expectedBson);
         }
 
-        assertReturnedDocuments(localKey, foreignKey, resultFieldName, expectedDocuments);
+        assertReturnedDocuments(strategy, localKey, foreignKey, resultFieldName, expectedDocuments);
     }
+
+    void assertMatchedDocuments(
+        const std::string& localKey,
+        const std::string& foreignKey,
+        const std::vector<std::pair<BSONObj, std::vector<BSONObj>>>& expectedPairs) {
+
+        for (auto strategy : strategies) {
+            assertMatchedDocuments(strategy, localKey, foreignKey, expectedPairs);
+        }
+    }
+
+protected:
+    std::vector<EqLookupNode::LookupStrategy> strategies = {
+        EqLookupNode::LookupStrategy::kNestedLoopJoin, EqLookupNode::LookupStrategy::kHashJoin};
 
 private:
     std::unique_ptr<repl::StorageInterface> _storage;

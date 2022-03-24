@@ -36,6 +36,7 @@
 #include <fmt/format.h>
 
 #include "mongo/db/exec/sbe/stages/hash_agg.h"
+#include "mongo/db/exec/sbe/stages/hash_lookup.h"
 #include "mongo/db/exec/sbe/stages/ix_scan.h"
 #include "mongo/db/exec/sbe/stages/loop_join.h"
 #include "mongo/db/exec/sbe/stages/scan.h"
@@ -261,7 +262,6 @@ std::pair<SlotId /*resultSlot*/, std::unique_ptr<sbe::PlanStage>> buildForeignMa
 }
 
 std::pair<SlotId /*matched docs*/, std::unique_ptr<sbe::PlanStage>> buildNljLookupStage(
-    StageBuilderState& state,
     std::unique_ptr<sbe::PlanStage> localStage,
     SlotId localRecordSlot,
     const FieldPath& localFieldName,
@@ -538,11 +538,97 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
     return {foreignGroupSlot, std::move(nljStage)};
 }
 
+std::pair<SlotId /*matched docs*/, std::unique_ptr<sbe::PlanStage>> buildHashJoinLookupStage(
+    std::unique_ptr<sbe::PlanStage> localStage,
+    SlotId localRecordSlot,
+    const FieldPath& localFieldName,
+    std::unique_ptr<sbe::PlanStage> foreignStage,
+    SlotId foreignRecordSlot,
+    const FieldPath& foreignFieldName,
+    const PlanNodeId nodeId,
+    SlotIdGenerator& slotIdGenerator) {
+
+    // Build the outer branch that produces the set of local key values.
+    auto [localKeySlot, outerRootStage] = buildKeySet(JoinSide::Local,
+                                                      std::move(localStage),
+                                                      localRecordSlot,
+                                                      localFieldName,
+                                                      nodeId,
+                                                      slotIdGenerator);
+
+    // Build the inner branch that produces the set of foreign key values.
+    auto [foreignKeySlot, foreignKeyStage] = buildKeySet(JoinSide::Foreign,
+                                                         std::move(foreignStage),
+                                                         foreignRecordSlot,
+                                                         foreignFieldName,
+                                                         nodeId,
+                                                         slotIdGenerator);
+
+    // Build lookup stage that matches the local and foreign rows and aggregates the
+    // foreign values in an array.
+    auto lookupAggSlot = slotIdGenerator.generate();
+    auto aggs =
+        makeEM(lookupAggSlot,
+               stage_builder::makeFunction("addToArray", makeE<EVariable>(foreignRecordSlot)));
+    std::unique_ptr<sbe::PlanStage> hl = makeS<HashLookupStage>(std::move(outerRootStage),
+                                                                std::move(foreignKeyStage),
+                                                                localKeySlot,
+                                                                foreignKeySlot,
+                                                                makeSV(foreignRecordSlot),
+                                                                std::move(aggs),
+                                                                boost::none /*collatorSlot*/,
+                                                                nodeId);
+
+    // Add a projection that makes so that empty array is returned if no foreign row were matched.
+    auto innerResultSlot = slotIdGenerator.generate();
+    auto [emptyArrayTag, emptyArrayVal] = makeNewArray();
+    std::unique_ptr<EExpression> innerResultProjection = makeFunction(
+        "fillEmpty"_sd, makeVariable(lookupAggSlot), makeConstant(emptyArrayTag, emptyArrayVal));
+
+    std::unique_ptr<sbe::PlanStage> resultStage =
+        makeProjectStage(std::move(hl), nodeId, innerResultSlot, std::move(innerResultProjection));
+
+    return {innerResultSlot, std::move(resultStage)};
+}
+
+std::pair<SlotId /*matched docs*/, std::unique_ptr<sbe::PlanStage>> buildLookupStage(
+    EqLookupNode::LookupStrategy lookupStrategy,
+    std::unique_ptr<sbe::PlanStage> localStage,
+    SlotId localRecordSlot,
+    const FieldPath& localFieldName,
+    std::unique_ptr<sbe::PlanStage> foreignStage,
+    SlotId foreignRecordSlot,
+    const FieldPath& foreignFieldName,
+    const PlanNodeId nodeId,
+    SlotIdGenerator& slotIdGenerator) {
+    switch (lookupStrategy) {
+        case EqLookupNode::LookupStrategy::kNestedLoopJoin:
+            return buildNljLookupStage(std::move(localStage),
+                                       localRecordSlot,
+                                       localFieldName,
+                                       std::move(foreignStage),
+                                       foreignRecordSlot,
+                                       foreignFieldName.fullPath(),
+                                       nodeId,
+                                       slotIdGenerator);
+        case EqLookupNode::LookupStrategy::kHashJoin:
+            return buildHashJoinLookupStage(std::move(localStage),
+                                            localRecordSlot,
+                                            localFieldName,
+                                            std::move(foreignStage),
+                                            foreignRecordSlot,
+                                            foreignFieldName,
+                                            nodeId,
+                                            slotIdGenerator);
+        default:
+            MONGO_UNREACHABLE_TASSERT(5842606);
+    }
+}
+
 /*
  * Builds a project stage that projects an empty array for each local document.
  */
 std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildNonExistentForeignCollLookupStage(
-    StageBuilderState& state,
     std::unique_ptr<sbe::PlanStage> localStage,
     const PlanNodeId nodeId,
     SlotIdGenerator& slotIdGenerator) {
@@ -578,13 +664,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         // document.
         if (!foreignColl) {
             return buildNonExistentForeignCollLookupStage(
-                _state, std::move(localStage), eqLookupNode->nodeId(), _slotIdGenerator);
+                std::move(localStage), eqLookupNode->nodeId(), _slotIdGenerator);
         }
 
         switch (eqLookupNode->lookupStrategy) {
-            case EqLookupNode::LookupStrategy::kHashJoin:
-                uasserted(5842602, "$lookup planning logic picked hash join");
-                break;
             case EqLookupNode::LookupStrategy::kIndexedLoopJoin: {
                 tassert(
                     6357201,
@@ -609,7 +692,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                                  eqLookupNode->nodeId(),
                                                  _slotIdGenerator);
             }
-            case EqLookupNode::LookupStrategy::kNestedLoopJoin: {
+            case EqLookupNode::LookupStrategy::kNestedLoopJoin:
+            case EqLookupNode::LookupStrategy::kHashJoin: {
                 auto numChildren = eqLookupNode->children.size();
                 tassert(6355300, "An EqLookupNode can only have one child", numChildren == 1);
 
@@ -632,15 +716,15 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                                      eqLookupNode->nodeId(),
                                                      ScanCallbacks{});
 
-                return buildNljLookupStage(_state,
-                                           std::move(localStage),
-                                           localDocumentSlot,
-                                           eqLookupNode->joinFieldLocal,
-                                           std::move(foreignStage),
-                                           foreignResultSlot,
-                                           eqLookupNode->joinFieldForeign.fullPath(),
-                                           eqLookupNode->nodeId(),
-                                           _slotIdGenerator);
+                return buildLookupStage(eqLookupNode->lookupStrategy,
+                                        std::move(localStage),
+                                        localDocumentSlot,
+                                        eqLookupNode->joinFieldLocal,
+                                        std::move(foreignStage),
+                                        foreignResultSlot,
+                                        eqLookupNode->joinFieldForeign,
+                                        eqLookupNode->nodeId(),
+                                        _slotIdGenerator);
             }
             default:
                 MONGO_UNREACHABLE_TASSERT(5842605);
