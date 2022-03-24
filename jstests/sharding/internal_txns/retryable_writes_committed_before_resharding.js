@@ -1,0 +1,17 @@
+/**
+ * Tests that retryable insert, update and delete statements that are executed inside internal
+ * transactions that start and commit on the donor(s) before resharding are not retryable on the
+ * recipient after resharding.
+ *
+ * @tags: [requires_fcv_53, featureFlagInternalTransactions]
+ */
+(function() {
+"use strict";
+
+load("jstests/sharding/internal_txns/libs/resharding_test.js");
+
+const transactionTest = new InternalTransactionReshardingTest({reshardInPlace: false});
+transactionTest.runTestForInsertUpdateDeleteBeforeResharding(
+    transactionTest.InternalTxnType.kRetryable, false /* abortOnInitialTry */);
+transactionTest.stop();
+})();

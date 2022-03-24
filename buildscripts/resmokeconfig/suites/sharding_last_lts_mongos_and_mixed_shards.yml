@@ -3,7 +3,9 @@ test_kind: js_test
 selector:
   roots:
   # shardingtest.js relies on FCV and bin versions to be equal; this can be re-enabled after FCV constants are updated.
-  #  - jstests/sharding/*.js
+  # TODO (SERVER-64909): Re-enable non-query sharding tests in the
+  # sharding_last_lts_mongos_and_mixed_shards suite.
+  #  - jstests/sharding/**/*.js
   - jstests/sharding/query/*.js
   - jstests/sharding/change_streams/*.js
   exclude_with_any_tags:

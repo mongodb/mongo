@@ -196,12 +196,16 @@
         - replica_sets_multiversion_backport_required_multiversion
         - disabled_due_to_server_60490
       exclude_files:
+        - jstests/sharding/**/libs/**/*.js
         # Enable when 4.6 becomes last stable
         - jstests/sharding/query/merge_command_options.js
         - jstests/sharding/max_time_ms_enforced_on_shard.js
         # TODO SERVER-46040: Enable when SERVER-46040 is backported
         - jstests/sharding/drop_indexes_with_stale_config_error.js
         - jstests/sharding/query/merge_write_concern.js
+        # TODO (SERVER-64908): Enable lookup_graph_lookup_foreign_becomes_sharded.js in the
+        # sharding_multiversion suite
+        - jstests/sharding/query/lookup_graph_lookup_foreign_becomes_sharded.js
 
 - name: sharding_multiversion_testdata_last_lts
   value:

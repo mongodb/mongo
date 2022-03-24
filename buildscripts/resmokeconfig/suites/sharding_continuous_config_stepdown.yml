@@ -2,16 +2,15 @@ test_kind: js_test
 
 selector:
   roots:
-  - jstests/sharding/*.js
-  - jstests/sharding/change_streams/*.js
-  - jstests/sharding/query/*.js
+  - jstests/sharding/**/*.js
   exclude_files:
+  - jstests/sharding/**/libs/**/*.js
     # Skip any tests that run with auth explicitly.
     # Auth tests require authentication on the stepdown thread's connection
   - jstests/sharding/*[aA]uth*.js
   - jstests/sharding/query/*[aA]uth*.js
   - jstests/sharding/change_streams/*[aA]uth*.js
-  - jstests/sharding/internal_transactions_internal_client_restrictions.js
+  - jstests/sharding/internal_txns/internal_client_restrictions.js
 
   - jstests/sharding/localhostAuthBypass.js
   - jstests/sharding/kill_sessions.js
@@ -136,6 +135,7 @@ selector:
   - jstests/sharding/mongos_no_replica_set_refresh.js
   - jstests/sharding/primary_config_server_blackholed_from_mongos.js
   - jstests/sharding/reconfig_fails_no_cwwc_set_sharding.js
+  - jstests/sharding/health_monitor/config_server_health_observer_crash.js
   # Nothing is affected by config server step down
   - jstests/sharding/basic_sharding_params.js
   # ShardingTest is never used, so continuous step down thread never starts
