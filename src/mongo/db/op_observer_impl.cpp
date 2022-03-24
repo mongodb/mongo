@@ -1939,10 +1939,7 @@ void OpObserverImpl::onUnpreparedTransactionCommit(OperationContext* opCtx,
     const auto applyOpsOplogSlotAndOperationAssignment =
         getApplyOpsOplogSlotAndOperationAssignmentForTransaction(
             opCtx, oplogSlots, numberOfPrePostImagesToWrite, false /*prepare*/, *statements);
-
     const auto wallClockTime = getWallClockTimeForOpLog(opCtx);
-    writeChangeStreamPreImagesForTransaction(
-        opCtx, *statements, applyOpsOplogSlotAndOperationAssignment, wallClockTime);
 
     // Log in-progress entries for the transaction along with the implicit commit.
     boost::optional<ImageBundle> imageToWrite;
@@ -1954,6 +1951,13 @@ void OpObserverImpl::onUnpreparedTransactionCommit(OperationContext* opCtx,
                                           numberOfPrePostImagesToWrite,
                                           false /* prepare*/,
                                           wallClockTime);
+
+    // Write change stream pre-images. At this point the pre-images will be written at the
+    // transaction commit timestamp as driven (implicitly) by the last written "applyOps" oplog
+    // entry.
+    writeChangeStreamPreImagesForTransaction(
+        opCtx, *statements, applyOpsOplogSlotAndOperationAssignment, wallClockTime);
+
     if (imageToWrite) {
         writeToImageCollection(opCtx,
                                *opCtx->getLogicalSessionId(),

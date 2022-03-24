@@ -6,7 +6,6 @@ selector:
   exclude_files:
   # Linearizable read concern is not supported for transactions.
   - jstests/core/txns/**/*.js
-  - jstests/core/write_change_stream_pit_preimage_in_transaction.js
 
   # These tests use benchRun(), which isn't configured to use the overridden writeConcern.
   - jstests/core/bench_test*.js

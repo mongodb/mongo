@@ -122,7 +122,7 @@ var TransactionsUtil = (function() {
         const state = beforeTransactionFunc(sessionDb, session);
         session.startTransaction(transactionOptions);
         func(sessionDb, state);
-        session.commitTransaction_forTesting();
+        return session.commitTransaction_forTesting();
     }
 
     return {

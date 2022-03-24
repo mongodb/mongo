@@ -11,7 +11,6 @@ selector:
   # Transactions do not support retryability of individual operations.
   # TODO: Remove this once it is supported (SERVER-33952).
   - jstests/core/txns/**/*.js
-  - jstests/core/write_change_stream_pit_preimage_in_transaction.js
   # The set_param1.js test attempts to compare the response from running the {getParameter: "*"}
   # command multiple times, which may observe the change to the "transactionLifetimeLimitSeconds"
   # server parameter.
