@@ -303,11 +303,13 @@ TEST_F(ShardSplitDonorServiceTest, ShardSplitDonorServiceTimeout) {
 // Abort scenario : abortSplit called before startSplit.
 TEST_F(ShardSplitDonorServiceTest, CreateInstanceInAbortState) {
     auto opCtx = makeOperationContext();
+    auto serviceContext = getServiceContext();
 
     test::shard_split::ScopedTenantAccessBlocker scopedTenants(_tenantIds, opCtx.get());
+    test::shard_split::reconfigToAddRecipientNodes(
+        serviceContext, _recipientTagName, _replSet.getHosts(), _recipientSet.getHosts());
 
-    auto stateDocument = ShardSplitDonorDocument::parse(
-        {"donor.document"}, BSON("_id" << _uuid << "tenantIds" << _tenantIds));
+    auto stateDocument = defaultStateDocument();
     stateDocument.setState(ShardSplitDonorStateEnum::kAborted);
 
     auto serviceInstance = ShardSplitDonorService::DonorStateMachine::getOrCreate(
@@ -427,6 +429,34 @@ TEST_F(ShardSplitDonorServiceTest, DeleteStateDocMarkedGarbageCollectable) {
 
     ASSERT_EQ(serverless::getStateDocument(opCtx.get(), _uuid).getStatus().code(),
               ErrorCodes::NoMatchingDocument);
+}
+
+TEST_F(ShardSplitDonorServiceTest, AbortDueToRecipientNodesValidation) {
+    auto opCtx = makeOperationContext();
+    auto serviceContext = getServiceContext();
+    test::shard_split::ScopedTenantAccessBlocker scopedTenants(_tenantIds, opCtx.get());
+
+    // Matching recipientSetName to the replSetName to fail validation and abort shard split.
+    test::shard_split::reconfigToAddRecipientNodes(
+        serviceContext, _recipientTagName, _replSet.getHosts(), _recipientSet.getHosts());
+
+    auto stateDocument = defaultStateDocument();
+    stateDocument.setRecipientSetName("donor"_sd);
+
+    // Create and start the instance.
+    auto serviceInstance = ShardSplitDonorService::DonorStateMachine::getOrCreate(
+        opCtx.get(), _service, stateDocument.toBSON());
+    ASSERT(serviceInstance.get());
+    ASSERT_EQ(_uuid, serviceInstance->getId());
+
+    auto decisionFuture = serviceInstance->decisionFuture();
+
+    auto result = decisionFuture.get();
+
+    ASSERT_EQ(result.state, mongo::ShardSplitDonorStateEnum::kCommitted);
+
+    ASSERT_OK(serviceInstance->completionFuture().getNoThrow());
+    ASSERT_TRUE(!serviceInstance->isGarbageCollectable());
 }
 
 class SplitReplicaSetObserverTest : public ServiceContextTest {

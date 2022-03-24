@@ -118,6 +118,12 @@ bool shouldRemoveStateDocumentOnRecipient(OperationContext* opCtx,
                                           const ShardSplitDonorDocument& stateDocument);
 
 /**
+ * Returns StatusWith true if the validation succeeds otherwise returns different error status with
+ * the proper error causing the failure.
+ */
+Status validateRecipientNodesForShardSplit(const ShardSplitDonorDocument& stateDocument,
+                                           const repl::ReplSetConfig& localConfig);
+/**
  * Listener that receives heartbeat events and fulfills a future once it sees the expected number
  * of nodes in the recipient replica set to monitor.
  */

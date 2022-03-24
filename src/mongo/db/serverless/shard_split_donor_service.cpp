@@ -55,6 +55,7 @@ namespace mongo {
 
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(pauseShardSplitBeforeBlocking);
 MONGO_FAIL_POINT_DEFINE(pauseShardSplitAfterBlocking);
 MONGO_FAIL_POINT_DEFINE(skipShardSplitWaitForSplitAcceptance);
 MONGO_FAIL_POINT_DEFINE(pauseShardSplitBeforeRecipientCleanup);
@@ -355,6 +356,23 @@ SemiFuture<void> ShardSplitDonorService::DonorStateMachine::run(
             return _decisionPromise.getFuture().semi().ignoreValue().unsafeToInlineFuture();
         });
 
+        return _completionPromise.getFuture().semi();
+    }
+
+    auto isConfigValidWithStatus = [&]() {
+        auto replCoord = repl::ReplicationCoordinator::get(cc().getServiceContext());
+        invariant(replCoord);
+        stdx::lock_guard<Latch> lg(_mutex);
+        return serverless::validateRecipientNodesForShardSplit(_stateDoc, replCoord->getConfig());
+    }();
+    if (!isConfigValidWithStatus.isOK()) {
+        LOGV2_ERROR(6395900,
+                    "Failed to validate recipient nodes for shard split",
+                    "id"_attr = _migrationId,
+                    "error"_attr = isConfigValidWithStatus.reason());
+        _decisionPromise.emplaceValue(DurableState{ShardSplitDonorStateEnum::kCommitted});
+        _completionPromise.setFrom(
+            _decisionPromise.getFuture().semi().ignoreValue().unsafeToInlineFuture());
         return _completionPromise.getFuture().semi();
     }
 
@@ -895,5 +913,4 @@ ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_cleanRecipientS
         .on(**executor, token)
         .ignoreValue();
 }
-
 }  // namespace mongo

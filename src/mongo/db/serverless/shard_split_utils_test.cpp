@@ -173,6 +173,81 @@ TEST(MakeSplitConfig, SplitConfigAssertionsTest) {
                        AssertionException,
                        6201802 /*no donor members created*/);
 }
+
+TEST(MakeSplitConfig, RecipientConfigValidationTest) {
+    std::vector<std::string> tenantIds = {"tenant1", "tenantAB"};
+    std::string recipientSetName{"recipientSetName"};
+    const std::string recipientTagName{"recipient"};
+    const std::string donorConfigSetName{"rs0"};
+    const std::string recipientConfigSetName{"newSet"};
+
+    auto statedoc = ShardSplitDonorDocument::parse(
+        {"donor.document"},
+        BSON("_id" << UUID::gen() << "tenantIds" << tenantIds << "recipientTagName"
+                   << recipientTagName << "recipientSetName" << recipientSetName));
+
+    auto makeConfig = [&](auto setName, bool shouldVote, bool uniqueTagValue) {
+        auto vote = shouldVote ? 1 : 0;
+        return ReplSetConfig::parse(BSON(
+            "_id"
+            << setName << "version" << 1 << "protocolVersion" << 1 << "members"
+            << BSON_ARRAY(
+                   BSON("_id" << 0 << "host"
+                              << "localhost:20001"
+                              << "priority" << 0 << "votes" << vote << "tags"
+                              << BSON(recipientTagName
+                                      << (uniqueTagValue ? UUID::gen().toString() : "") + "one"))
+                   << BSON("_id" << 1 << "host"
+                                 << "localhost:20002"
+                                 << "priority" << 0 << "votes" << vote << "tags"
+                                 << BSON(recipientTagName
+                                         << (uniqueTagValue ? UUID::gen().toString() : "") + "one"))
+                   << BSON(
+                          "_id" << 2 << "host"
+                                << "localhost:20003"
+                                << "priority" << 0 << "votes" << vote << "tags"
+                                << BSON(recipientTagName
+                                        << (uniqueTagValue ? UUID::gen().toString() : "") + "one")))
+            << "settings" << BSON("electionTimeoutMillis" << 1000)));
+    };
+
+    auto recipientSetNameOptional = boost::make_optional<StringData>(recipientSetName);
+    auto recipientTagNameOptional = boost::make_optional<StringData>(recipientTagName);
+
+    // Test we fail here because recipientSetName == localConfig.getReplSetName.
+    ReplSetConfig config = makeConfig(recipientSetName, false, true);
+    ASSERT_EQ(serverless::validateRecipientNodesForShardSplit(statedoc, config).code(),
+              ErrorCodes::BadValue);
+
+    // Test we fail here with insufficient recipient member nodes.
+    config = ReplSetConfig::parse(
+        BSON("_id" << donorConfigSetName << "version" << 1 << "protocolVersion" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                            << "localhost:20001"
+                                            << "priority" << 0 << "votes" << 0 << "tags"
+                                            << BSON(recipientTagName << "one"))
+                                 << BSON("_id" << 1 << "host"
+                                               << "localhost:20002"
+                                               << "priority" << 0 << "votes" << 0 << "tags"
+                                               << BSON(recipientTagName << "one")))
+                   << "settings" << BSON("electionTimeoutMillis" << 1000)));
+    ASSERT_EQ(serverless::validateRecipientNodesForShardSplit(statedoc, config).code(),
+              ErrorCodes::InvalidReplicaSetConfig);
+
+    // Test we fail since recipient tags don't have unique value associated.
+    config = makeConfig(donorConfigSetName, false, false);
+    ASSERT_EQ(serverless::validateRecipientNodesForShardSplit(statedoc, config),
+              ErrorCodes::InvalidOptions);
+
+    // Test we fail since recipient nodes should be non-voting.
+    config = makeConfig(donorConfigSetName, true, true);
+    ASSERT_EQ(serverless::validateRecipientNodesForShardSplit(statedoc, config),
+              ErrorCodes::InvalidOptions);
+
+    config = makeConfig(donorConfigSetName, false, true);
+    ASSERT_OK(serverless::validateRecipientNodesForShardSplit(statedoc, config));
+}
+
 }  // namespace
 }  // namespace repl
 }  // namespace mongo

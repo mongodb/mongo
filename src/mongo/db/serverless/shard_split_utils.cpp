@@ -39,6 +39,9 @@
 namespace mongo {
 
 namespace serverless {
+
+const size_t kMinimumRequiredRecipientNodes = 3;
+
 std::vector<repl::MemberConfig> getRecipientMembers(const repl::ReplSetConfig& config,
                                                     const StringData& recipientTagName) {
     std::vector<repl::MemberConfig> result;
@@ -236,6 +239,64 @@ bool shouldRemoveStateDocumentOnRecipient(OperationContext* opCtx,
     auto config = repl::ReplicationCoordinator::get(cc().getServiceContext())->getConfig();
     return recipientSetName == config.getReplSetName() &&
         stateDocument.getState() == ShardSplitDonorStateEnum::kBlocking;
+}
+
+Status validateRecipientNodesForShardSplit(const ShardSplitDonorDocument& stateDocument,
+                                           const repl::ReplSetConfig& localConfig) {
+    if (stateDocument.getState() == ShardSplitDonorStateEnum::kAborted) {
+        return Status::OK();
+    }
+
+    auto recipientSetName = stateDocument.getRecipientSetName();
+    auto recipientTagName = stateDocument.getRecipientTagName();
+    uassert(6395901, "Missing recipientTagName when validating recipient nodes.", recipientTagName);
+    uassert(6395902, "Missing recipientSetName when validating recipient nodes.", recipientSetName);
+
+    if (*recipientSetName == localConfig.getReplSetName()) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream()
+                          << "Recipient set name '" << *recipientSetName << "' and local set name '"
+                          << localConfig.getReplSetName() << "' must be different.");
+    }
+
+    auto recipientNodes = getRecipientMembers(localConfig, *recipientTagName);
+    if (recipientNodes.size() < kMinimumRequiredRecipientNodes) {
+        return Status(ErrorCodes::InvalidReplicaSetConfig,
+                      str::stream() << "Local set config has " << recipientNodes.size()
+                                    << " nodes when it requires at least "
+                                    << kMinimumRequiredRecipientNodes << " in its config.");
+    }
+
+    stdx::unordered_set<std::string> uniqueTagValues;
+    const auto& tagConfig = localConfig.getTagConfig();
+    for (auto member : recipientNodes) {
+        for (repl::MemberConfig::TagIterator it = member.tagsBegin(); it != member.tagsEnd();
+             ++it) {
+            if (tagConfig.getTagKey(*it) == *recipientTagName) {
+                auto tagValue = tagConfig.getTagValue(*it);
+                if (!uniqueTagValues.insert(tagValue).second) {
+                    return Status(ErrorCodes::InvalidOptions,
+                                  str::stream() << "Local member '" << member.getId().toString()
+                                                << "' does not have a unique value for the tag '"
+                                                << *recipientTagName << ". Current value is '"
+                                                << tagValue << "'.");
+                }
+            }
+        }
+    }
+
+    bool allRecipientNodesNonVoting =
+        std::none_of(recipientNodes.cbegin(), recipientNodes.cend(), [&](const auto& member) {
+            return member.isVoter() || member.getPriority() != 0;
+        });
+
+    if (!allRecipientNodesNonVoting) {
+        return Status(ErrorCodes::InvalidOptions,
+                      str::stream() << "Local members tagged with '" << *recipientTagName
+                                    << "' must be non-voting and with a priority set to 0.");
+    }
+
+    return Status::OK();
 }
 
 RecipientAcceptSplitListener::RecipientAcceptSplitListener(
