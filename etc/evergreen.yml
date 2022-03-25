@@ -5097,14 +5097,6 @@ tasks:
       use_large_distro: "true"
 
 - <<: *gen_task_template
-  name: talk_directly_to_shardsvrs_jscore_passthrough_gen
-  tags: ["serverless"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
   name: tenant_migration_causally_consistent_jscore_passthrough_gen
   tags: ["serverless"]
   commands:
