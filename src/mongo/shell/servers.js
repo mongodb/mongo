@@ -1115,6 +1115,7 @@ MongoRunner.EXIT_POSSIBLE_CORRUPTION = 60;
 MongoRunner.EXIT_NEED_DOWNGRADE = 62;
 MongoRunner.EXIT_UNCAUGHT = 100;  // top level exception that wasn't caught
 MongoRunner.EXIT_TEST = 101;
+MongoRunner.EXIT_AUDIT_ROTATE_ERROR = 102;
 
 MongoRunner.validateCollectionsCallback = function(port) {};
 
