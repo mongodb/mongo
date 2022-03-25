@@ -62,9 +62,10 @@ bool executeOperationsAsPartOfShardKeyUpdate(OperationContext* opCtx,
 
     BatchedCommandResponse deleteResponse;
     BatchWriteExecStats deleteStats;
-
     cluster::write(opCtx, deleteRequest, &deleteStats, &deleteResponse);
-    uassertStatusOK(deleteResponse.toStatus());
+    uassertStatusOKWithContext(deleteResponse.toStatus(),
+                               "During delete stage of updating a shard key");
+
     // If shouldUpsert is true, this means the original command specified {upsert: true} and did not
     // match any docs, so we should not match any when doing this delete. If shouldUpsert is false
     // and we do not delete any document, this is essentially equivalent to not matching a doc and
@@ -88,7 +89,9 @@ bool executeOperationsAsPartOfShardKeyUpdate(OperationContext* opCtx,
     BatchedCommandResponse insertResponse;
     BatchWriteExecStats insertStats;
     cluster::write(opCtx, insertRequest, &insertStats, &insertResponse);
-    uassertStatusOK(insertResponse.toStatus());
+    uassertStatusOKWithContext(insertResponse.toStatus(),
+                               "During insert stage of updating a shard key");
+
     uassert(ErrorCodes::NamespaceNotFound,
             "Document not successfully inserted while changing shard key for namespace " +
                 insertRequest.getNS().toString(),

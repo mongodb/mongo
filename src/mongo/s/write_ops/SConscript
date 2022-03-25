@@ -10,7 +10,6 @@ env.Library(
         'batched_command_request.cpp',
         'batched_command_response.cpp',
         'batched_upsert_detail.cpp',
-        'write_error_detail.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

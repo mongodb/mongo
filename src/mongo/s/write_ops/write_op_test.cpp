@@ -42,14 +42,6 @@ namespace {
 
 const NamespaceString kNss("foo.bar");
 
-WriteErrorDetail buildError(int code, const BSONObj& info, const std::string& message) {
-    WriteErrorDetail error;
-    error.setStatus({ErrorCodes::Error(code), message});
-    error.setErrInfo(info);
-
-    return error;
-}
-
 write_ops::DeleteOpEntry buildDelete(const BSONObj& query, bool multi) {
     write_ops::DeleteOpEntry entry;
     entry.setQ(query);
@@ -91,14 +83,11 @@ TEST_F(WriteOpTest, BasicError) {
     WriteOp writeOp(BatchItemRef(&request, 0), false);
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Ready);
 
-    const auto error(buildError(ErrorCodes::UnknownError, BSON("data" << 12345), "some message"));
-
+    write_ops::WriteError error(0, {ErrorCodes::UnknownError, "some message"});
     writeOp.setOpError(error);
+
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Error);
-    ASSERT_EQUALS(writeOp.getOpError().toStatus().code(), error.toStatus().code());
-    ASSERT_EQUALS(writeOp.getOpError().getErrInfo()["data"].Int(),
-                  error.getErrInfo()["data"].Int());
-    ASSERT_EQUALS(writeOp.getOpError().toStatus().reason(), error.toStatus().reason());
+    ASSERT_EQUALS(writeOp.getOpError().getStatus(), error.getStatus());
 }
 
 TEST_F(WriteOpTest, TargetSingle) {
@@ -236,9 +225,8 @@ TEST_F(WriteOpTest, TargetMultiAllShardsAndErrorSingleChildOp) {
     ASSERT(ChunkVersion::isIgnoredVersion(*targeted[1]->endpoint.shardVersion));
 
     // Simulate retryable error.
-    WriteErrorDetail retryableError;
-    retryableError.setIndex(0);
-    retryableError.setStatus({ErrorCodes::StaleShardVersion, "simulate ssv error for test"});
+    write_ops::WriteError retryableError(
+        0, {ErrorCodes::StaleShardVersion, "simulate ssv error for test"});
     writeOp.noteWriteError(*targeted[0], retryableError);
 
     // State should not change until we have result from all nodes.
@@ -272,15 +260,11 @@ TEST_F(WriteOpTest, ErrorSingle) {
     ASSERT_EQUALS(targeted.size(), 1u);
     assertEndpointsEqual(targeted.front()->endpoint, endpoint);
 
-    const auto error(buildError(ErrorCodes::UnknownError, BSON("data" << 12345), "some message"));
-
+    write_ops::WriteError error(0, {ErrorCodes::UnknownError, "some message"});
     writeOp.noteWriteError(*targeted.front(), error);
 
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Error);
-    ASSERT_EQUALS(writeOp.getOpError().toStatus().code(), error.toStatus().code());
-    ASSERT_EQUALS(writeOp.getOpError().getErrInfo()["data"].Int(),
-                  error.getErrInfo()["data"].Int());
-    ASSERT_EQUALS(writeOp.getOpError().toStatus().reason(), error.toStatus().reason());
+    ASSERT_EQUALS(writeOp.getOpError().getStatus(), error.getStatus());
 }
 
 // Cancel single targeting test
@@ -338,8 +322,7 @@ TEST_F(WriteOpTest, RetrySingleOp) {
     assertEndpointsEqual(targeted.front()->endpoint, endpoint);
 
     // Stale exception
-    const auto error(
-        buildError(ErrorCodes::StaleShardVersion, BSON("data" << 12345), "some message"));
+    write_ops::WriteError error(0, {ErrorCodes::StaleShardVersion, "some message"});
     writeOp.noteWriteError(*targeted.front(), error);
 
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Ready);
@@ -428,13 +411,13 @@ TEST_F(WriteOpTransactionTest, TargetMultiAllShardsAndErrorSingleChildOp) {
     ASSERT_EQUALS(targeted[1]->endpoint.shardName, endpointB.shardName);
 
     // Simulate retryable error.
-    WriteErrorDetail retryableError;
-    retryableError.setIndex(0);
-    retryableError.setStatus({ErrorCodes::StaleShardVersion, "simulate ssv error for test"});
+    write_ops::WriteError retryableError(
+        0, {ErrorCodes::StaleShardVersion, "simulate ssv error for test"});
     writeOp.noteWriteError(*targeted[0], retryableError);
 
     // State should change to error right away even with retryable error when in a transaction.
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Error);
+    ASSERT_EQUALS(writeOp.getOpError().getStatus(), retryableError.getStatus());
 }
 
 }  // namespace
