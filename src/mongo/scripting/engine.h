@@ -47,6 +47,15 @@ struct JSFile {
     const StringData source;
 };
 
+struct JSRegEx {
+    std::string pattern;
+    std::string flags;
+
+    JSRegEx() = default;
+    JSRegEx(std::string pattern, std::string flags)
+        : pattern(std::move(pattern)), flags(std::move(flags)) {}
+};
+
 class Scope {
     Scope(const Scope&) = delete;
     Scope& operator=(const Scope&) = delete;
@@ -75,10 +84,14 @@ public:
     virtual bool getBoolean(const char* field) = 0;
     virtual double getNumber(const char* field) = 0;
     virtual int getNumberInt(const char* field) = 0;
-
     virtual long long getNumberLongLong(const char* field) = 0;
-
     virtual Decimal128 getNumberDecimal(const char* field) = 0;
+    virtual OID getOID(const char* field) = 0;
+    // Note: The resulting BSONBinData is only valid within the scope of the 'withBinData' callback.
+    virtual void getBinData(const char* field,
+                            std::function<void(const BSONBinData&)> withBinData) = 0;
+    virtual Timestamp getTimestamp(const char* field) = 0;
+    virtual JSRegEx getRegEx(const char* field) = 0;
 
     virtual void setElement(const char* field, const BSONElement& e, const BSONObj& parent) = 0;
     virtual void setNumber(const char* field, double val) = 0;

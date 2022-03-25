@@ -158,6 +158,29 @@ BSONObj MozJSProxyScope::getObject(const char* field) {
     return out;
 }
 
+OID MozJSProxyScope::getOID(const char* field) {
+    OID out;
+    run([&] { out = _implScope->getOID(field); });
+    return out;
+}
+
+void MozJSProxyScope::getBinData(const char* field,
+                                 std::function<void(const BSONBinData&)> withBinData) {
+    run([&] { _implScope->getBinData(field, std::move(withBinData)); });
+}
+
+Timestamp MozJSProxyScope::getTimestamp(const char* field) {
+    Timestamp out;
+    run([&] { out = _implScope->getTimestamp(field); });
+    return out;
+}
+
+JSRegEx MozJSProxyScope::getRegEx(const char* field) {
+    JSRegEx out;
+    run([&] { out = _implScope->getRegEx(field); });
+    return out;
+}
+
 void MozJSProxyScope::setNumber(const char* field, double val) {
     run([&] { _implScope->setNumber(field, val); });
 }

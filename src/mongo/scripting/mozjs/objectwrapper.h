@@ -37,6 +37,7 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/platform/decimal128.h"
+#include "mongo/scripting/engine.h"
 #include "mongo/scripting/mozjs/exception.h"
 #include "mongo/scripting/mozjs/internedstring.h"
 #include "mongo/scripting/mozjs/jsstringwrapper.h"
@@ -116,6 +117,11 @@ public:
     bool getBoolean(Key key);
     BSONObj getObject(Key key);
     void getValue(Key key, JS::MutableHandleValue value);
+    OID getOID(Key key);
+    // Note: The resulting BSONBinData is only valid within the scope of the 'withBinData' callback.
+    void getBinData(Key key, std::function<void(const BSONBinData&)> withBinData);
+    Timestamp getTimestamp(Key key);
+    JSRegEx getRegEx(Key key);
 
     void setNumber(Key key, double val);
     void setString(Key key, StringData val);

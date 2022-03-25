@@ -121,6 +121,28 @@ void Scope::append(BSONObjBuilder& builder, const char* fieldName, const char* s
         case Code:
             builder.appendCode(fieldName, getString(scopeName));
             break;
+        case jstOID:
+            builder.append(fieldName, getOID(scopeName));
+            break;
+        case BinData:
+            getBinData(scopeName, [&fieldName, &builder](const BSONBinData& binData) {
+                builder.append(fieldName, binData);
+            });
+            break;
+        case bsonTimestamp:
+            builder.append(fieldName, getTimestamp(scopeName));
+            break;
+        case MinKey:
+            builder.appendMinKey(fieldName);
+            break;
+        case MaxKey:
+            builder.appendMaxKey(fieldName);
+            break;
+        case RegEx: {
+            auto regEx = getRegEx(scopeName);
+            builder.append(fieldName, BSONRegEx{regEx.pattern, regEx.flags});
+            break;
+        }
         default:
             uassert(10206, str::stream() << "can't append type from: " << t, 0);
     }
@@ -504,6 +526,18 @@ public:
     BSONObj getObject(const char* field) {
         return _real->getObject(field);
     }
+    OID getOID(const char* field) {
+        return _real->getOID(field);
+    };
+    void getBinData(const char* field, std::function<void(const BSONBinData&)> withBinData) {
+        _real->getBinData(field, std::move(withBinData));
+    }
+    Timestamp getTimestamp(const char* field) {
+        return _real->getTimestamp(field);
+    };
+    JSRegEx getRegEx(const char* field) {
+        return _real->getRegEx(field);
+    };
     void setNumber(const char* field, double val) {
         _real->setNumber(field, val);
     }

@@ -62,6 +62,11 @@ public:
     int64_t toInt64();
     Decimal128 toDecimal128();
     bool toBoolean();
+    OID toOID();
+    // Note: The resulting BSONBinData is only valid within the scope of the 'withBinData' callback.
+    void toBinData(std::function<void(const BSONBinData&)> withBinData);
+    Timestamp toTimestamp();
+    JSRegEx toRegEx();
 
     /**
      * Provides the type of the value. For objects, it fetches the class name if possible.
