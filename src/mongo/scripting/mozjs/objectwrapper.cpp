@@ -390,6 +390,34 @@ void ObjectWrapper::getValue(Key key, JS::MutableHandleValue value) {
     key.get(_context, _object, value);
 }
 
+OID ObjectWrapper::getOID(Key key) {
+    JS::RootedValue x(_context);
+    getValue(key, &x);
+
+    return ValueWriter(_context, x).toOID();
+}
+
+void ObjectWrapper::getBinData(Key key, std::function<void(const BSONBinData&)> withBinData) {
+    JS::RootedValue x(_context);
+    getValue(key, &x);
+
+    ValueWriter(_context, x).toBinData(std::move(withBinData));
+}
+
+Timestamp ObjectWrapper::getTimestamp(Key key) {
+    JS::RootedValue x(_context);
+    getValue(key, &x);
+
+    return ValueWriter(_context, x).toTimestamp();
+}
+
+JSRegEx ObjectWrapper::getRegEx(Key key) {
+    JS::RootedValue x(_context);
+    getValue(key, &x);
+
+    return ValueWriter(_context, x).toRegEx();
+}
+
 void ObjectWrapper::setNumber(Key key, double val) {
     JS::RootedValue jsValue(_context);
     ValueReader(_context, &jsValue).fromDouble(val);
