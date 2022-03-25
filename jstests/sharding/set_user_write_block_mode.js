@@ -33,6 +33,16 @@ function removeShard(shardName) {
 
 const st = new ShardingTest({shards: 2});
 
+const dbName = "test";
+const collName = "foo";
+const ns = dbName + "." + collName;
+
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+
+let db = st.s.getDB(dbName);
+let coll = db[collName];
+
 const newShardName = 'newShard';
 const newShard = new ReplSetTest({name: newShardName, nodes: 1});
 newShard.startSet({shardsvr: ''});
@@ -95,6 +105,63 @@ newShard.initiate();
 
     assert.commandWorked(st.s.adminCommand({addShard: newShard.getURL(), name: newShardName}));
     assert.commandWorked(st.s.adminCommand({removeShard: newShardName}));
+
+    assert.commandWorked(st.s.adminCommand({setUserWriteBlockMode: 1, global: false}));
+}
+
+// Test chunk migrations work even if user writes are blocked
+{
+    coll.drop();
+    assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
+    // Insert a document to the chunk that will be migrated to ensure that the recipient will at
+    // least insert one document as part of the migration.
+    coll.insert({_id: 1});
+
+    // Create an index to check that the recipient, upon receiving its first chunk, can create it.
+    const indexKey = {x: 1};
+    assert.commandWorked(coll.createIndex(indexKey));
+
+    // Start blocking user writes.
+    assert.commandWorked(st.s.adminCommand({setUserWriteBlockMode: 1, global: true}));
+
+    // Move one chunk to shard1.
+    assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard1.shardName}));
+
+    assert.eq(1, coll.find({_id: 1}).itcount());
+    assert.eq(1, st.shard1.getDB(dbName)[collName].find({_id: 1}).itcount());
+
+    // Check that the index has been created on recipient.
+    ShardedIndexUtil.assertIndexExistsOnShard(st.shard1, dbName, collName, indexKey);
+
+    // Check that orphans are deleted from the donor.
+    assert.soon(() => {
+        return st.shard0.getDB(dbName)[collName].find({_id: 1}).itcount() === 0;
+    });
+
+    // Create an extra index on shard1. This index is not present in the shard0, thus shard1 will
+    // drop it when it receives its first chunk.
+    {
+        // Leave shard1 without any chunk.
+        assert.commandWorked(
+            st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard0.shardName}));
+
+        // Create an extra index on shard1.
+        assert.commandWorked(st.s.adminCommand({setUserWriteBlockMode: 1, global: false}));
+        const extraIndexKey = {y: 1};
+        assert.commandWorked(st.shard1.getDB(dbName)[collName].createIndex(extraIndexKey));
+        assert.commandWorked(st.s.adminCommand({setUserWriteBlockMode: 1, global: true}));
+
+        // Move a chunk to shard1.
+        assert.commandWorked(
+            st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard1.shardName}));
+
+        // Check the mismatched index was dropped.
+        ShardedIndexUtil.assertIndexDoesNotExistOnShard(st.shard1, dbName, collName, extraIndexKey);
+    }
+
+    assert.commandWorked(st.s.adminCommand({setUserWriteBlockMode: 1, global: false}));
 }
 
 st.stop();

@@ -71,6 +71,7 @@
 #include "mongo/db/storage/remove_saver.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/db/vector_clock.h"
+#include "mongo/db/write_block_bypass.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog_cache_loader.h"
@@ -1207,6 +1208,10 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
                 Grid::get(outerOpCtx->getServiceContext())->getExecutorPool()->getFixedExecutor();
             auto altOpCtx = CancelableOperationContext(
                 cc().makeOperationContext(), outerOpCtx->getCancellationToken(), executor);
+
+            // Enable write blocking bypass to allow migrations to create the collection and indexes
+            // even when user writes are blocked.
+            WriteBlockBypass::get(altOpCtx.get()).set(true);
 
             _dropLocalIndexesIfNecessary(altOpCtx.get(), _nss, donorCollectionOptionsAndIndexes);
             cloneCollectionIndexesAndOptions(

@@ -64,28 +64,36 @@ public:
 protected:
     // Ensure that inserts, updates, and deletes with the given opCtx on the given namespace will
     // succeed or fail depending on the value of shouldSucceed.
-    void runCUD(OperationContext* opCtx, const NamespaceString& nss, bool shouldSucceed) {
+    void runCUD(OperationContext* opCtx,
+                const NamespaceString& nss,
+                bool shouldSucceed,
+                bool fromMigrate = false) {
         UserWriteBlockModeOpObserver opObserver;
         std::vector<InsertStatement> inserts;
+        CollectionUpdateArgs collectionUpdateArgs;
+        collectionUpdateArgs.source =
+            fromMigrate ? OperationSource::kFromMigrate : OperationSource::kStandard;
         auto uuid = UUID::gen();
-        OplogUpdateEntryArgs updateArgs(nullptr, nss, uuid);
+        OplogUpdateEntryArgs updateArgs(&collectionUpdateArgs, nss, uuid);
         updateArgs.nss = nss;
+        OplogDeleteEntryArgs deleteArgs;
+        deleteArgs.fromMigrate = fromMigrate;
 
         if (shouldSucceed) {
             try {
-                opObserver.onInserts(opCtx, nss, uuid, inserts.begin(), inserts.end(), false);
+                opObserver.onInserts(opCtx, nss, uuid, inserts.begin(), inserts.end(), fromMigrate);
                 opObserver.onUpdate(opCtx, updateArgs);
-                opObserver.onDelete(opCtx, nss, uuid, StmtId(), OplogDeleteEntryArgs{});
+                opObserver.onDelete(opCtx, nss, uuid, StmtId(), deleteArgs);
             } catch (...) {
                 // Make it easier to see that this is where we failed.
                 ASSERT_OK(exceptionToStatus());
             }
         } else {
             ASSERT_THROWS(
-                opObserver.onInserts(opCtx, nss, uuid, inserts.begin(), inserts.end(), false),
+                opObserver.onInserts(opCtx, nss, uuid, inserts.begin(), inserts.end(), fromMigrate),
                 AssertionException);
             ASSERT_THROWS(opObserver.onUpdate(opCtx, updateArgs), AssertionException);
-            ASSERT_THROWS(opObserver.onDelete(opCtx, nss, uuid, StmtId(), OplogDeleteEntryArgs{}),
+            ASSERT_THROWS(opObserver.onDelete(opCtx, nss, uuid, StmtId(), deleteArgs),
                           AssertionException);
         }
     }
@@ -148,6 +156,9 @@ TEST_F(UserWriteBlockModeOpObserverTest, WriteBlockingEnabledNoBypass) {
     runCUD(opCtx.get(), NamespaceString("admin"), true);
     runCUD(opCtx.get(), NamespaceString("local"), true);
     runCUD(opCtx.get(), NamespaceString("config"), true);
+
+    // Ensure that writes from migrations succeed
+    runCUD(opCtx.get(), NamespaceString("a.b"), true, true /* fromMigrate */);
 }
 
 TEST_F(UserWriteBlockModeOpObserverTest, WriteBlockingEnabledWithBypass) {
