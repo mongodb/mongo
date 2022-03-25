@@ -47,8 +47,6 @@ class ReplicatorFixture(interface.Fixture):
 
     def _launch_replicator_process(self):
         """Launch the replicator binary."""
-        if "sourceURI" not in self.cli_options or "destinationURI" not in self.cli_options:
-            raise ValueError("Cannot launch the replicator without source and destination URIs.")
 
         replicator = self.fixturelib.generic_program(self.logger, [self.executable], self.job_num,
                                                      test_id=None, process_kwargs=None,
@@ -70,7 +68,8 @@ class ReplicatorFixture(interface.Fixture):
         url = self.get_api_url() + '/api/v1/start'
         # Right now we set reversible to false, at some point this could be an
         # argument to start.
-        data = '{"reversible": false}'.encode('ascii')
+        data = '{"reversible": false, "source": "cluster0", "destination": "cluster1"}'.encode(
+            'ascii')
         headers = {'Content-Type': 'application/json'}
 
         req = request.Request(url=url, data=data, headers=headers)

@@ -83,7 +83,7 @@ class ClusterToClusterFixture(interface.MultiClusterFixture):  # pylint: disable
         dest_url = self.clusters[1 - self.source_cluster_index].get_driver_connection_url()
         self.logger.info("Setting source cluster string: '%s', destination cluster string: '%s'",
                          source_url, dest_url)
-        self.replicator.set_cli_options({'sourceURI': source_url, 'destinationURI': dest_url})
+        self.replicator.set_cli_options({'cluster0': source_url, 'cluster1': dest_url})
 
         self.replicator.setup()
 
