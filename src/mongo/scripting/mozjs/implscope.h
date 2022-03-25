@@ -127,6 +127,11 @@ public:
     std::string getString(const char* field) override;
     bool getBoolean(const char* field) override;
     BSONObj getObject(const char* field) override;
+    OID getOID(const char* field) override;
+    // Note: The resulting BSONBinData is only valid within the scope of the 'withBinData' callback.
+    void getBinData(const char* field, std::function<void(const BSONBinData&)> withBinData);
+    Timestamp getTimestamp(const char* field) override;
+    JSRegEx getRegEx(const char* field) override;
 
     void setNumber(const char* field, double val) override;
     void setString(const char* field, StringData val) override;

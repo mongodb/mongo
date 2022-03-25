@@ -55,44 +55,78 @@ void ValueWriter::setOriginalBSON(BSONObj* obj) {
 
 int ValueWriter::type() {
     if (_value.isNull())
-        return jstNULL;
+        return BSONType::jstNULL;
     if (_value.isUndefined())
-        return Undefined;
+        return BSONType::Undefined;
     if (_value.isString())
-        return String;
+        return BSONType::String;
 
     bool isArray;
 
     if (!JS_IsArrayObject(_context, _value, &isArray)) {
         uasserted(ErrorCodes::BadValue, "unable to check if type is an array");
     }
-    if (isArray)
-        return Array;
+    if (isArray) {
+        return BSONType::Array;
+    }
 
-    if (_value.isBoolean())
-        return Bool;
+    if (_value.isBoolean()) {
+        return BSONType::Bool;
+    }
 
     // We could do something more sophisticated here by checking to see if we
     // round trip through int32_t, int64_t and double and picking a type that
     // way, for now just always come back as double for numbers though (it's
     // what we did for v8)
-    if (_value.isNumber())
-        return NumberDouble;
+    if (_value.isNumber()) {
+        return BSONType::NumberDouble;
+    }
 
     if (_value.isObject()) {
         JS::RootedObject obj(_context, _value.toObjectOrNull());
-        bool isDate;
 
+        bool isDate;
         if (!JS_ObjectIsDate(_context, obj, &isDate)) {
             uasserted(ErrorCodes::BadValue, "unable to check if type is a date");
         }
-        if (isDate)
-            return Date;
+        if (isDate) {
+            return BSONType::Date;
+        }
 
-        if (JS_ObjectIsFunction(_context, obj))
-            return Code;
+        bool isRegExp;
+        if (!JS_ObjectIsRegExp(_context, obj, &isRegExp)) {
+            uasserted(ErrorCodes::BadValue, "unable to check if type is a regexp");
+        }
+        if (isRegExp) {
+            return BSONType::RegEx;
+        }
 
-        return Object;
+        if (JS_ObjectIsFunction(_context, obj)) {
+            return BSONType::Code;
+        }
+
+        if (auto jsClass = JS_GetClass(obj)) {
+            auto scope = getScope(_context);
+            if (scope->getProto<NumberIntInfo>().getJSClass() == jsClass) {
+                return BSONType::NumberInt;
+            } else if (scope->getProto<NumberLongInfo>().getJSClass() == jsClass) {
+                return BSONType::NumberLong;
+            } else if (scope->getProto<NumberDecimalInfo>().getJSClass() == jsClass) {
+                return BSONType::NumberDecimal;
+            } else if (scope->getProto<OIDInfo>().getJSClass() == jsClass) {
+                return BSONType::jstOID;
+            } else if (scope->getProto<BinDataInfo>().getJSClass() == jsClass) {
+                return BSONType::BinData;
+            } else if (scope->getProto<TimestampInfo>().getJSClass() == jsClass) {
+                return BSONType::bsonTimestamp;
+            } else if (scope->getProto<MinKeyInfo>().getJSClass() == jsClass) {
+                return BSONType::MinKey;
+            } else if (scope->getProto<MaxKeyInfo>().getJSClass() == jsClass) {
+                return BSONType::MaxKey;
+            }
+        }
+
+        return BSONType::Object;
     }
 
     uasserted(ErrorCodes::BadValue, "unable to get type");
@@ -228,6 +262,53 @@ Decimal128 ValueWriter::toDecimal128() {
         return decimal;
     }
     uasserted(ErrorCodes::BadValue, str::stream() << "Unable to write Decimal128 value.");
+}
+
+OID ValueWriter::toOID() {
+    if (getScope(_context)->getProto<OIDInfo>().instanceOf(_value)) {
+        return OIDInfo::getOID(_context, _value);
+    }
+
+    throwCurrentJSException(_context, ErrorCodes::BadValue, "Unable to write ObjectId value.");
+}
+
+void ValueWriter::toBinData(std::function<void(const BSONBinData&)> withBinData) {
+    if (!getScope(_context)->getProto<BinDataInfo>().instanceOf(_value)) {
+        throwCurrentJSException(_context, ErrorCodes::BadValue, "Unable to write BinData value.");
+    }
+
+    JS::RootedObject obj(_context, _value.toObjectOrNull());
+    ObjectWrapper wrapper(_context, obj);
+    auto subType = wrapper.getNumber(InternedString::type);
+    uassert(6123400, "BinData sub type must be between 0 and 255", subType >= 0 && subType <= 255);
+
+    auto binDataStr = static_cast<std::string*>(JS_GetPrivate(obj));
+    uassert(ErrorCodes::BadValue, "Cannot call getter on BinData prototype", binDataStr);
+
+    auto binData = base64::decode(*binDataStr);
+    withBinData(BSONBinData(binData.c_str(),
+                            binData.size(),
+                            static_cast<mongo::BinDataType>(static_cast<int>(subType))));
+}
+
+Timestamp ValueWriter::toTimestamp() {
+    JS::RootedObject obj(_context, _value.toObjectOrNull());
+    ObjectWrapper wrapper(_context, obj);
+
+    uassert(ErrorCodes::BadValue,
+            "Unable to write Timestamp value.",
+            getScope(_context)->getProto<TimestampInfo>().getJSClass() == JS_GetClass(obj));
+
+    return Timestamp(wrapper.getNumber("t"), wrapper.getNumber("i"));
+}
+
+JSRegEx ValueWriter::toRegEx() {
+    std::string regexStr = toString();
+    uassert(6123401, "Empty regular expression", regexStr.size() > 0);
+    uassert(6123402, "Invalid regular expression", regexStr[0] == '/');
+
+    return JSRegEx(regexStr.substr(1, regexStr.rfind('/')),
+                   regexStr.substr(regexStr.rfind('/') + 1));
 }
 
 void ValueWriter::writeThis(BSONObjBuilder* b,

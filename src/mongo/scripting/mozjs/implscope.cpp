@@ -555,6 +555,24 @@ BSONObj MozJSImplScope::getObject(const char* field) {
     return _runSafely([&] { return ObjectWrapper(_context, _global).getObject(field); });
 }
 
+OID MozJSImplScope::getOID(const char* field) {
+    return _runSafely([&] { return ObjectWrapper(_context, _global).getOID(field); });
+}
+
+void MozJSImplScope::getBinData(const char* field,
+                                std::function<void(const BSONBinData&)> withBinData) {
+    return _runSafely(
+        [&] { ObjectWrapper(_context, _global).getBinData(field, std::move(withBinData)); });
+}
+
+Timestamp MozJSImplScope::getTimestamp(const char* field) {
+    return _runSafely([&] { return ObjectWrapper(_context, _global).getTimestamp(field); });
+}
+
+JSRegEx MozJSImplScope::getRegEx(const char* field) {
+    return _runSafely([&] { return ObjectWrapper(_context, _global).getRegEx(field); });
+}
+
 void MozJSImplScope::newFunction(StringData raw, JS::MutableHandleValue out) {
     _runSafely([&] { _MozJSCreateFunction(raw, std::move(out)); });
 }
