@@ -41,7 +41,7 @@ class ReplicatorFixture(interface.Fixture):
         """
         Block until the fixture can be used for testing.
 
-        NOOP by default since on `setup` nothing is done.
+        NOOP since the binary is fully launched in `setup`.
         """
         pass
 

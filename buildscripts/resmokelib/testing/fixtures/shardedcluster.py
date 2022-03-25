@@ -108,6 +108,13 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
                              "command and continuing to wait")
             target.await_last_op_committed(target.AWAIT_REPL_TIMEOUT_FOREVER_MINS * 60)
 
+    def get_shard_ids(self):
+        """Get the list of shard ids in the cluster."""
+        client = self.mongo_client()
+        interface.authenticate(client, self.auth_options)
+        res = client.admin.command("listShards")
+        return [shard_info["_id"] for shard_info in res["shards"]]
+
     def await_ready(self):
         """Block until the fixture can be used for testing."""
         # Wait for the config server

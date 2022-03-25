@@ -59,22 +59,26 @@ class ClusterToClusterFixture(interface.MultiClusterFixture):  # pylint: disable
 
         # The cluster that starts off with the data.
         self.source_cluster_index = 0
+        self.replicator_options = replicator_options
 
         for cluster_options in self.both_cluster_options:
+            if replicator_options["class"] == "MultipleReplicatorFixture":
+                if cluster_options["class"] != "ShardedClusterFixture":
+                    raise ValueError(
+                        "MultipleReplicatorFixture can only be run with ShardedClusterFixture")
             cluster = self.fixturelib.make_fixture(cluster_options["class"], self.logger,
                                                    self.job_num, **cluster_options["settings"])
             self.clusters.append(cluster)
 
-        self.replicator_options = replicator_options
         replicator_logger = self.fixturelib.new_fixture_node_logger(replicator_options["class"],
                                                                     self.job_num, "replicator")
+
         self.replicator = self.fixturelib.make_fixture(replicator_options["class"],
                                                        replicator_logger, self.job_num,
-                                                       **replicator_options["settings"])
+                                                       **self.replicator_options["settings"])
 
     def setup(self):
         """Set up the cluster to cluster fixture according to the options provided."""
-
         for i, cluster in enumerate(self.clusters):
             self.logger.info(f"Setting up cluster {i}.")
             cluster.setup()
@@ -84,6 +88,19 @@ class ClusterToClusterFixture(interface.MultiClusterFixture):  # pylint: disable
         self.logger.info("Setting source cluster string: '%s', destination cluster string: '%s'",
                          source_url, dest_url)
         self.replicator.set_cli_options({'cluster0': source_url, 'cluster1': dest_url})
+
+        # If we are using multiple replicators, we must get the list of shard ids from the source
+        # cluster and pass the ids as CLI options to each replicator.
+        if self.replicator_options["class"] == "MultipleReplicatorFixture":
+            # Wait for the source cluster to be fully running
+            self.clusters[self.source_cluster_index].await_ready()
+            try:
+                shard_ids = self.clusters[self.source_cluster_index].get_shard_ids()
+            except Exception as err:
+                msg = f"Error getting shard ids from source cluster: {err}"
+                self.logger.exception(msg)
+                raise self.fixturelib.ServerFailure(msg)
+            self.replicator.set_shard_ids(shard_ids)
 
         self.replicator.setup()
 
@@ -104,9 +121,14 @@ class ClusterToClusterFixture(interface.MultiClusterFixture):  # pylint: disable
 
     def await_ready(self):
         """Block until the fixture can be used for testing."""
-        # Wait for each of the clusters and the replicator.
-        for cluster in self.clusters:
-            cluster.await_ready()
+        if self.replicator_options["class"] == "MultipleReplicatorFixture":
+            # We only need to call await_ready() on the dest cluster since await_ready() was already
+            # called on the source cluster in setup().
+            self.clusters[1 - self.source_cluster_index].await_ready()
+        else:
+            for cluster in self.clusters:
+                cluster.await_ready()
+
         self.replicator.await_ready()
 
     def _do_teardown(self, mode=None):
@@ -114,7 +136,8 @@ class ClusterToClusterFixture(interface.MultiClusterFixture):  # pylint: disable
         running_at_start = self.is_running()
         if not running_at_start:
             self.logger.warning(
-                "All clusters and replicators were expected to be running, but weren't.")
+                "All clusters and replicators were expected to be running before teardown, but weren't."
+            )
 
         teardown_handler = interface.FixtureTeardownHandler(self.logger)
 
