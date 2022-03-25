@@ -62,11 +62,7 @@ class test_rollback_to_stable30(wttest.WiredTigerTestCase):
 
         # Roll back to stable should fail because there's an active transaction.
         msg = '/rollback_to_stable.*active/'
-        if wiredtiger.diagnostic_build():
-            with self.expectedStdoutPattern('transaction state dump'):
-                self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-                    lambda:self.conn.rollback_to_stable(), msg)
-        else:
+        with self.expectedStdoutPattern('transaction state dump'):
             self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
                 lambda:self.conn.rollback_to_stable(), msg)
 
