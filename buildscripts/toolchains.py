@@ -3,16 +3,14 @@
 
 import argparse
 import enum
-import inspect
 import os
 import pathlib
 import string
 import sys
 import warnings
 
-from types import FunctionType
 from typing import Any, Callable, Dict, Generator, Iterator, List, Mapping
-from typing import Optional, Set, Sequence, Tuple, Type, Union, overload
+from typing import Optional, Set, Sequence, Tuple, Union
 
 import yaml
 
@@ -29,58 +27,56 @@ __all__ = [
 DEFAULT_DATA_FILE: pathlib.Path = pathlib.Path(__file__).parent / '../etc/toolchains.yaml'
 
 
-class ToolchainVersionName(enum.Enum):
+class ToolchainVersionName(str, enum.Enum):
     """Represents a "named" toolchain version, such as "stable" or "testing"."""
 
-    STABLE: str = 'stable'
-    TESTING: str = 'testing'
+    STABLE = 'stable'
+    TESTING = 'testing'
 
-    # TODO: SERVER-64481 - remove these false positives
     # pylint: disable=invalid-str-returned
     def __str__(self) -> str:
         return self.value
 
 
-class ToolchainReleaseName(enum.Enum):
+class ToolchainReleaseName(str, enum.Enum):
     """Represents a "named" toolchain release, such as "rollback" or "current"."""
 
-    ROLLBACK: str = 'rollback'
-    CURRENT: str = 'current'
-    LATEST: str = 'latest'
+    ROLLBACK = 'rollback'
+    CURRENT = 'current'
+    LATEST = 'latest'
 
-    # TODO: SERVER-64481 - remove these false positives
     # pylint: disable=invalid-str-returned
     def __str__(self) -> str:
         return self.value
 
 
-class ToolchainDistroName(enum.Enum):
+class ToolchainDistroName(Tuple[str, ...], enum.Enum):
     """Represents a distribution for which the toolchain is built."""
 
-    AMAZON1_2012: Tuple[str, ...] = (
+    AMAZON1_2012 = (
         'amazon1-2012',
         'linux-64-amzn',
     )
-    AMAZON1_2018: Tuple[str, ...] = ('amazon1-2018', )
-    AMAZON2: Tuple[str, ...] = ('amazon2', )
-    ARCHLINUX: Tuple[str, ...] = ('archlinux', )
-    CENTOS6: Tuple[str, ...] = ('centos6', )
-    DEBIAN8: Tuple[str, ...] = ('debian81', )
-    DEBIAN9: Tuple[str, ...] = ('debian92', )
-    DEBIAN10: Tuple[str, ...] = ('debian10', )
-    MACOS1012: Tuple[str, ...] = ('macos-1012', )
-    MACOS1014: Tuple[str, ...] = ('macos-1014', )
-    MACOS1100: Tuple[str, ...] = ('macos-1100', )
-    RHEL6: Tuple[str, ...] = ('rhel6', 'rhel62', 'rhel67')
-    RHEL7: Tuple[str, ...] = ('rhel7', 'rhel70', 'rhel71', 'rhel72', 'rhel76', 'ubi7')
-    RHEL8: Tuple[str, ...] = ('rhel8', 'rhel80', 'rhel81', 'rhel82', 'rhel83', 'rhel84', 'ubi8')
-    SUSE12: Tuple[str, ...] = ('suse12', 'suse12-sp5')
-    SUSE15: Tuple[str, ...] = ('suse15', 'suse15-sp0', 'suse15-sp2')
-    UBUNTU1404: Tuple[str, ...] = ('ubuntu1404', )
-    UBUNTU1604: Tuple[str, ...] = ('ubuntu1604', )
-    UBUNTU1804: Tuple[str, ...] = ('ubuntu1804', )
-    UBUNTU2004: Tuple[str, ...] = ('ubuntu2004', )
-    DEFAULT: Tuple[str, ...] = ('default', )
+    AMAZON1_2018 = ('amazon1-2018', )
+    AMAZON2 = ('amazon2', )
+    ARCHLINUX = ('archlinux', )
+    CENTOS6 = ('centos6', )
+    DEBIAN8 = ('debian81', )
+    DEBIAN9 = ('debian92', )
+    DEBIAN10 = ('debian10', )
+    MACOS1012 = ('macos-1012', )
+    MACOS1014 = ('macos-1014', )
+    MACOS1100 = ('macos-1100', )
+    RHEL6 = ('rhel6', 'rhel62', 'rhel67')
+    RHEL7 = ('rhel7', 'rhel70', 'rhel71', 'rhel72', 'rhel76', 'ubi7')
+    RHEL8 = ('rhel8', 'rhel80', 'rhel81', 'rhel82', 'rhel83', 'rhel84', 'ubi8')
+    SUSE12 = ('suse12', 'suse12-sp5')
+    SUSE15 = ('suse15', 'suse15-sp0', 'suse15-sp2')
+    UBUNTU1404 = ('ubuntu1404', )
+    UBUNTU1604 = ('ubuntu1604', )
+    UBUNTU1804 = ('ubuntu1804', )
+    UBUNTU2004 = ('ubuntu2004', )
+    DEFAULT = ('default', )
 
     @classmethod
     def from_str(cls, text: str) -> 'ToolchainDistroName':
@@ -92,20 +88,19 @@ class ToolchainDistroName(enum.Enum):
 
         raise ValueError(f"Unknown distro string: {text}")
 
-    # TODO: SERVER-64481 - remove these false positives
     # pylint: disable=unsubscriptable-object
     def __str__(self) -> str:
         return self.value[0]
 
 
-class ToolchainArchName(enum.Enum):
+class ToolchainArchName(Tuple[str, ...], enum.Enum):
     """Represents an architecture for which the toolchain is built."""
 
-    ARM64: Tuple[str, ...] = ('arm64', 'aarch64')
-    PPC64LE: Tuple[str, ...] = ('ppc64le', 'power8')
-    S390X: Tuple[str, ...] = ('s390x', 'zSeries')
-    X86_64: Tuple[str, ...] = ('x86_64', )
-    DEFAULT: Tuple[str, ...] = ('', )
+    ARM64 = ('arm64', 'aarch64')
+    PPC64LE = ('ppc64le', 'power8')
+    S390X = ('s390x', 'zSeries')
+    X86_64 = ('x86_64', )
+    DEFAULT = ('', )
 
     @classmethod
     def from_str(cls, text: str) -> 'ToolchainArchName':
@@ -117,7 +112,6 @@ class ToolchainArchName(enum.Enum):
 
         raise ValueError(f"Unknown arch string: {text}")
 
-    # TODO: SERVER-64481 - remove these false positives
     # pylint: disable=unsubscriptable-object
     def __str__(self) -> str:
         return self.value[0]
@@ -323,9 +317,9 @@ class ToolchainConfig:
     def revisions_dir(self) -> Optional[pathlib.Path]:
         """Return the legacy revisions directory for toolchain releases."""
 
-        warnings.warn(
-            f"This is legacy toolchain usage. Call {self.__class__.__name__}.releases_dir() instead.",
-            DeprecationWarning, stacklevel=2)
+        warnings.warn(("This is legacy toolchain usage. "
+                       f"Call {self.__class__.__name__}.releases_dir() instead."),
+                      DeprecationWarning, stacklevel=2)
 
         return self.base_path.joinpath('revisions')
 
@@ -363,24 +357,28 @@ class Toolchain:
     def install_path(self) -> pathlib.Path:
         """Return the path to where the toolchain should be installed."""
 
+        path = self._config.releases_dir / self.release
+
         # We need to determine if the configured release is a legacy release
         # that only appears in revisions_dir. We can tell the difference
         # because legacy releases are all identified by git commit hashes.
         if len(self.release) == 40 and set(self.release) <= set(string.hexdigits):
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
-                return self._config.revisions_dir / self.release
-        else:
-            return self._config.releases_dir / self.release
+                if self._config.revisions_dir:
+                    path = self._config.revisions_dir / self.release
 
-    def exec_path(self, version: Union[ToolchainVersionName, str] = None) -> Optional[pathlib.Path]:
+        return path
+
+    def exec_path(self, version: Union[ToolchainVersionName, str]) -> Optional[pathlib.Path]:
         """Return a path to a specific toolchain version."""
 
         install_path = self.install_path
 
         if isinstance(version, ToolchainVersionName):
             version = version.value
-        elif version not in self._config.versions:
+
+        if version not in self._config.versions:
             try:
                 version = self._config.aliases[version]
             except KeyError:
@@ -403,14 +401,14 @@ class Toolchains(Mapping[Union[ToolchainReleaseName, str], Toolchain]):
         release_dirs: List[pathlib.Path] = []
 
         releases_dir: Optional[pathlib.Path] = self._config.releases_dir
-        if releases_dir.exists():
+        if releases_dir and releases_dir.exists():
             release_dirs.extend([path for path in releases_dir.iterdir() if path.is_dir()])
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             revisions_dir: Optional[pathlib.Path] = self._config.revisions_dir
 
-        if revisions_dir.exists():
+        if revisions_dir and revisions_dir.exists():
             release_dirs.extend([path for path in revisions_dir.iterdir() if path.is_dir()])
 
         if release_dirs:
@@ -434,7 +432,7 @@ class Toolchains(Mapping[Union[ToolchainReleaseName, str], Toolchain]):
     def configured(self) -> List[str]:
         """Return a list of all configured toolchain releases."""
 
-        configured: Set[str] = {
+        configured: Set[Union[str, None]] = {
             self._config.search_releases(name.value)
             for name in ToolchainReleaseName
         }
@@ -459,7 +457,7 @@ class Toolchains(Mapping[Union[ToolchainReleaseName, str], Toolchain]):
         except AttributeError:
             latest_symlink = None
 
-        if latest_symlink.exists():
+        if latest_symlink and latest_symlink.exists():
             return pathlib.Path(os.readlink(latest_symlink.absolute())).name
 
         return self.available[0] or None
@@ -470,18 +468,6 @@ class Toolchains(Mapping[Union[ToolchainReleaseName, str], Toolchain]):
 
     def __len__(self) -> int:
         return len(list(self.__iter__()))
-
-    @overload
-    def __getitem__(self, key: ToolchainReleaseName) -> Toolchain:
-        ...
-
-    @overload
-    def __getitem__(self, key: str) -> Toolchain:
-        ...
-
-    @overload
-    def __getitem__(self, key: Union[ToolchainReleaseName, str]) -> Toolchain:
-        ...
 
     def __getitem__(self, key: Union[ToolchainReleaseName, str]) -> Toolchain:
         """Return the named toolchain release.
@@ -535,7 +521,7 @@ class _FormatterClass:
     here for NicerHelpFormatter to inherit from it and prevent the error.
     """
 
-    def __call__(self, prog: str) -> argparse.HelpFormatter:
+    def __call__(self, _: str) -> argparse.HelpFormatter:
         ...
 
 
@@ -564,21 +550,21 @@ class NicerHelpFormatter(argparse.HelpFormatter, _FormatterClass):
             default = self._get_default_metavar_for_optional(action)
             metavar, = self._metavar_formatter(action, default)(1)
             return metavar
+
+        parts: List[str] = []
+
+        if action.nargs == 0:
+            parts.extend(action.option_strings)
         else:
-            parts: List[str] = []
+            default = self._get_default_metavar_for_optional(action)
+            args_string = self._format_args(action, default)
 
-            if action.nargs == 0:
-                parts.extend(action.option_strings)
-            else:
-                default = self._get_default_metavar_for_optional(action)
-                args_string = self._format_args(action, default)
+            for option_string in action.option_strings:
+                parts.append(option_string)
 
-                for option_string in action.option_strings:
-                    parts.append(option_string)
+            return f"{' '.join(parts)} {args_string}"
 
-                return f"{' '.join(parts)} {args_string}"
-
-            return ' '.join(parts)
+        return ' '.join(parts)
 
     def _iter_indented_subactions(
             self, action: argparse.Action) -> Generator[argparse.Action, None, None]:
@@ -611,8 +597,7 @@ class NicerHelpFormatter(argparse.HelpFormatter, _FormatterClass):
         def _format(tuple_size: int) -> Tuple[str, ...]:
             if isinstance(result, tuple):
                 return result
-            else:
-                return (result, ) * tuple_size
+            return (result, ) * tuple_size
 
         return _format
 
@@ -622,7 +607,7 @@ class DictChoiceAction(argparse._StoreAction):
     """An action with nicer per-choice formatting."""
 
     class _ChoicesPseudoAction(argparse.Action):
-        def __init__(self, name: str, aliases: str, help: Optional[str] = None) -> None:
+        def __init__(self, name: str, aliases: List[str], help: Optional[str] = None) -> None:
 
             metavar = dest = name
             if aliases:
@@ -635,20 +620,25 @@ class DictChoiceAction(argparse._StoreAction):
             super().__init__(option_strings=[], dest=dest, help=help, metavar=metavar)
 
         def __call__(self, parser: argparse.ArgumentParser, namespace: argparse.Namespace,
-                     values: Union[str, Sequence[Any]], __: Optional[str] = None) -> None:
+                     values: Union[str, Sequence[Any], None],
+                     option_string: Optional[str] = None) -> None:
 
             parser.print_help()
             parser.exit()
 
-    def __init__(self, option_strings: Optional[List[str]] = None, dest: Optional[str] = None,
-                 nargs: Optional[int] = None, const: Optional[Any] = None,
-                 default: Optional[Any] = None, type: Optional[type] = None,
-                 choices: Optional[Dict[str, str]] = None, required: bool = False,
-                 help: Optional[str] = None, metavar: Optional[str] = None) -> None:
+    # pylint: disable=too-many-arguments
+    def __init__(self, option_strings: List[str], dest: str, nargs: Optional[int] = None,
+                 const: Optional[Any] = None, default: Optional[Any] = None,
+                 type: Optional[type] = None, choices: Optional[Dict[str, str]] = None,
+                 required: bool = False, help: Optional[str] = None,
+                 metavar: Optional[str] = None) -> None:
 
         super().__init__(option_strings=option_strings, dest=dest, nargs=nargs, const=const,
                          default=default, type=type, choices=choices, required=required, help=help,
                          metavar=metavar)
+        self.choices: Dict[str, str] = {}
+        if choices:
+            self.choices = choices
 
     def _get_subactions(self):
         choices_actions: List[argparse.Action] = []
@@ -661,9 +651,10 @@ class DictChoiceAction(argparse._StoreAction):
 class NicerArgumentParser(argparse.ArgumentParser):
     """An argument parser with nicer help output."""
 
+    # pylint: disable=too-many-arguments
     def __init__(self, prog: Optional[str] = None, usage: Optional[str] = None,
                  description: Optional[str] = None, epilog: Optional[str] = None,
-                 parents: List[argparse.ArgumentParser] = None, prefix_chars: Optional[str] = '-',
+                 parents: Optional[List[argparse.ArgumentParser]] = None, prefix_chars: str = '-',
                  fromfile_prefix_chars: Optional[str] = None,
                  argument_default: Optional[Any] = None, conflict_handler: str = 'error',
                  add_help: bool = True, allow_abbrev: bool = True) -> None:
@@ -761,11 +752,13 @@ if __name__ == '__main__':
         })
 
     parsed_args = parser.parse_args()
+    obj: Optional[object] = None
 
     # Set up the objects required for each command
     toolchain_platform = ToolchainPlatform(distro_id=parsed_args.distro_id, arch=parsed_args.arch)
-
-    if parsed_args.command in ('show', 'config', 'toolchain'):
+    if parsed_args.command == 'platform':
+        obj = toolchain_platform
+    elif parsed_args.command in ('show', 'config', 'toolchain'):
         try:
             toolchain_config = ToolchainConfig(
                 pathlib.Path(parsed_args.from_file), platform=toolchain_platform)
@@ -775,19 +768,15 @@ if __name__ == '__main__':
 
         toolchains = Toolchains(config=toolchain_config)
 
-    if parsed_args.command == 'toolchain':
-        toolchain = toolchains[parsed_args.release]
-
-    # Set the object to query for each command
-    obj: object
-    if parsed_args.command == 'platform':
-        obj = toolchain_platform
-    if parsed_args.command == 'show':
-        obj = toolchains
-    elif parsed_args.command == 'config':
-        obj = toolchain_config
-    elif parsed_args.command == 'toolchain':
-        obj = toolchain
+        if parsed_args.command == 'show':
+            obj = toolchains
+        elif parsed_args.command == 'config':
+            obj = toolchain_config
+        elif parsed_args.command == 'toolchain':
+            obj = toolchains[parsed_args.release]
+    else:
+        print(f"Unknown command: {parsed_args.command}", file=sys.stderr)
+        sys.exit(1)
 
     # Get and handle output
     output: Any
