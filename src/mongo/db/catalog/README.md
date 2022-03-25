@@ -390,6 +390,11 @@ snapshot, and all writes in the scope of a WUOW are transactional; they are eith
 all rolled-back. The WUOW commits writes that took place in its scope by a call to commit(). It
 rolls-back writes when it goes out of scope and its destructor is called before a call to commit().
 
+See
+[WriteUnitOfWork](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/storage/write_unit_of_work.h)
+
+## WriteConflictException
+
 Writers may conflict with each other when more than one operation stages an uncommitted write to the
 same document concurrently. To force one or more of the writers to retry, the storage engine may
 throw a WriteConflictException at any point, up to and including the the call to commit(). This is
@@ -397,11 +402,35 @@ referred to as optimistic concurrency control because it allows uncontended writ
 quickly. Because of this behavior, most WUOWs are enclosed in a writeConflictRetry loop that retries
 the write transaction until it succeeds, accompanied by a bounded exponential back-off.
 
-See
-[WriteUnitOfWork](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/storage/write_unit_of_work.h)
-and
-[writeConflictRetry](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/concurrency/write_conflict_exception.h).
+See [writeConflictRetry](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/concurrency/write_conflict_exception.h).
 
+## TemporarilyUnavailableException
+
+A TemporarilyUnavailableException may be thrown inside the server to indicate that an operation
+cannot complete without blocking and must be retried. The storage engine may throw a
+TemporarilyUnavailableException (converted to a TemporarilyUnavailable error for users) when an
+operation is excessively rolled-back in the storage engine due to cache pressure or any reason that
+would prevent the operation from completing without impacting concurrent operations. The operation
+may be at fault for writing too much uncommitted data, or it may be a victim. That information is
+not exposed. However, if this error is returned, it is likely that the operation was the cause of
+the problem, rather than a victim.
+
+Before 6.0, this type of error was returned as a WriteConflict and retried indefinitely inside a
+writeConflictRetry loop. As of 6.0, MongoDB will retry the operation internally at most
+`temporarilyUnavailableMaxRetries` times, backing off for `temporarilyUnavailableBackoffBaseMs`
+milliseconds, with a linearly-increasing backoff on each attempt. After this point, the error will
+escape the handler and be returned to the client.
+
+If an operation receives a TemporarilyUnavailable error internally, a `temporarilyUnavailableErrors`
+counter will be displayed in the slow query logs and in FTDC.
+
+Notably, this behavior does not apply to multi-document transactions, which continue to return a
+WriteConflict to the client in this scenario without retrying internally.
+
+See
+[wtRcToStatus](https://github.com/mongodb/mongo/blob/c799851554dc01493d35b43701416e9c78b3665c/src/mongo/db/storage/wiredtiger/wiredtiger_util.cpp#L178-L183)
+where we throw the exception in WiredTiger.
+See [TemporarilyUnavailableException](https://github.com/mongodb/mongo/blob/c799851554dc01493d35b43701416e9c78b3665c/src/mongo/db/concurrency/temporarily_unavailable_exception.h#L39-L45).
 ## Collection and Index Writes
 
 Collection write operations (inserts, updates, and deletes) perform storage engine writes to both
