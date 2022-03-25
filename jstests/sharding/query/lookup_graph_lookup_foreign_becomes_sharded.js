@@ -12,7 +12,6 @@
 load("jstests/aggregation/extras/utils.js");         // For assertErrorCode.
 load("jstests/libs/profiler.js");                    // For profilerHasSingleMatchingEntryOrThrow.
 load("jstests/multiVersion/libs/multi_cluster.js");  // For ShardingTest.waitUntilStable.
-load("jstests/libs/sbe_util.js");                    // For checkSBEEnabled.
 
 // Currently, even if the 'featureFlagShardedLookup' flag is enabled, $graphLookup into a
 // sharded collection is not supported (testing this functionality should assert that the
@@ -25,7 +24,10 @@ const freshMongos = st.s0.getDB(jsTestName());
 const staleMongos = st.s1.getDB(jsTestName());
 
 // TODO SERVER-64714 Reenable this test after SERVER-64714 is fixed.
-if (checkSBEEnabled(freshMongos, ["featureFlagSBELookupPushdown"])) {
+const res = shard0.getPrimary().getDB("admin").adminCommand(
+    {getParameter: 1, featureFlagSBELookupPushdown: 1});
+if (!res.ok ||
+    res.hasOwnProperty("featureFlagSBELookupPushdown") && res.featureFlagSBELookupPushdown.value) {
     jsTestLog("Skipping test because SBE and SBE $lookup features are both enabled.");
     st.stop();
     return;
