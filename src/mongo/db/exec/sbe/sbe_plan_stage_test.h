@@ -114,10 +114,10 @@ public:
     /**
      * Compare two SBE values for equality.
      */
-    bool valueEquals(value::TypeTags lhsTag,
-                     value::Value lhsVal,
-                     value::TypeTags rhsTag,
-                     value::Value rhsVal) {
+    static bool valueEquals(value::TypeTags lhsTag,
+                            value::Value lhsVal,
+                            value::TypeTags rhsTag,
+                            value::Value rhsVal) {
         auto [cmpTag, cmpVal] = value::compareValue(lhsTag, lhsVal, rhsTag, rhsVal);
         return (cmpTag == value::TypeTags::NumberInt32 && value::bitcastTo<int32_t>(cmpVal) == 0);
     }
@@ -125,10 +125,10 @@ public:
     /**
      * Asserts the two values are equal. Will write a log message and abort() if they are not.
      */
-    void assertValuesEqual(value::TypeTags lhsTag,
-                           value::Value lhsVal,
-                           value::TypeTags rhsTag,
-                           value::Value rhsVal);
+    static void assertValuesEqual(value::TypeTags lhsTag,
+                                  value::Value lhsVal,
+                                  value::TypeTags rhsTag,
+                                  value::Value rhsVal);
 
     /**
      * This method takes an SBE array and returns an output slot and a unwind/project/limit/coscan

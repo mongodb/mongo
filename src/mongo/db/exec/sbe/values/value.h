@@ -692,6 +692,10 @@ public:
         return {TypeTags::Nothing, 0};
     }
 
+    bool contains(StringData field) const {
+        return std::find(_names.begin(), _names.end(), field) != _names.end();
+    }
+
     auto size() const noexcept {
         return _values.size();
     }

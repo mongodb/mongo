@@ -365,6 +365,24 @@ struct SplitCellView {
         return Cursor{firstElementPtr, arrInfo.rawData(), std::forward<ValueEncoder>(valEncoder)};
     }
 
+    // If there isn't a number at this position, returns 0 and doesn't advance itInOut.
+    static size_t readNumber(StringData::const_iterator* itInOut, StringData::const_iterator end) {
+        auto it = *itInOut;  // Use local to allow compiler to assume it doesn't point to itself.
+        size_t res = 0;
+        while (it != end && *it >= '0' && *it <= '9') {
+            res *= 10;  // noop first pass.
+            res += (*it++) - '0';
+        }
+        *itInOut = it;
+        return res;
+    }
+    static size_t readNumber(StringData str, size_t* indexInOut) {
+        auto it = str.begin() + *indexInOut;
+        auto out = readNumber(&it, str.end());
+        *indexInOut = it - str.begin();
+        return out;
+    }
+
     static SplitCellView parse(CellView cell) {
         using Bytes = ColumnStore::Bytes;
         using TinySize = ColumnStore::Bytes::TinySize;
