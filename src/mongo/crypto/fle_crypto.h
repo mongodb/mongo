@@ -1048,4 +1048,13 @@ public:
  */
 std::pair<EncryptedBinDataType, ConstDataRange> fromEncryptedConstDataRange(ConstDataRange cdr);
 
+struct ParsedFindPayload {
+    ESCDerivedFromDataToken escToken;
+    ECCDerivedFromDataToken eccToken;
+    EDCDerivedFromDataToken edcToken;
+    boost::optional<std::int64_t> maxCounter;
+
+    explicit ParsedFindPayload(BSONElement fleFindPayload);
+};
+
 }  // namespace mongo

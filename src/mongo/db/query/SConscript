@@ -9,7 +9,6 @@ env.SConscript(
         "ce",
         "collation",
         "datetime",
-        "fle",
         'optimizer',
     ],
     exports=[
@@ -29,7 +28,6 @@ env.Library(
         "$BUILD_DIR/mongo/db/matcher/expressions",
         "collation/collator_factory_interface",
         "collation/collator_interface",
-        "fle/server_rewrite",
         "projection_ast",
         "sort_pattern",
     ],

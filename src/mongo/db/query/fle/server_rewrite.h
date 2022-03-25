@@ -31,41 +31,65 @@
 
 #include <memory>
 
+#include "boost/smart_ptr/intrusive_ptr.hpp"
+
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsontypes.h"
 #include "mongo/crypto/fle_crypto.h"
-#include "mongo/crypto/fle_field_schema_gen.h"
-#include "mongo/db/matcher/expression.h"
-#include "mongo/db/matcher/expression_leaf.h"
-#include "mongo/db/matcher/expression_tree.h"
-#include "mongo/db/matcher/expression_visitor.h"
-#include "mongo/db/matcher/match_expression_walker.h"
-#include "mongo/util/assert_util.h"
+#include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/expression_context.h"
 
 namespace mongo::fle {
 
-class FLEFindRewriter {
-public:
-    using GetDocumentByIdCallback = std::function<BSONObj(BSONElement _id)>;
+/**
+ * Helper function to determine if an IDL object with encryption information should be rewritten.
+ */
+template <typename T>
+bool shouldRewrite(const T& cmd) {
+    return gFeatureFlagFLE2.isEnabledAndIgnoreFCV() && cmd->getEncryptionInformation();
+}
 
-    // The public constructor takes a reference to EncryptionInformation since it should never be
-    // null, but it stores a pointer since mock rewriters for tests might not need
-    // EncryptionInformation.
-    FLEFindRewriter(const EncryptionInformation& info, GetDocumentByIdCallback callback)
-        : _info(&info), _getById(callback) {
-        invariant(callback);
+/**
+ * Process a find command with encryptionInformation in-place, rewriting the filter condition so
+ * that any query on an encrypted field will properly query the underlying tags array.
+ */
+void processFindCommand(OperationContext* opCtx,
+                        NamespaceString nss,
+                        FindCommandRequest* findCommand);
+
+/**
+ * Class which handles rewriting filter MatchExpressions for FLE2. The functionality is encapsulated
+ * as a class rather than just a namespace so that the collection readers don't have to be passed
+ * around as extra arguments to every function.
+ *
+ * Exposed in the header file for unit testing purposes. External callers should use the
+ * rewriteEncryptedFilter() helper function defined below.
+ */
+class MatchExpressionRewrite {
+public:
+    /**
+     * Takes in references to collection readers for the ESC and ECC that are used during tag
+     * computation, along with a BSONObj holding a MatchExpression to rewrite. The rewritten
+     * BSON is then retrieved by calling get() on the rewriter object.
+     */
+    MatchExpressionRewrite(boost::intrusive_ptr<ExpressionContext> expCtx,
+                           const FLEStateCollectionReader& escReader,
+                           const FLEStateCollectionReader& eccReader,
+                           BSONObj filter)
+        : _escReader(&escReader), _eccReader(&eccReader) {
+        // This isn't the "real" query so we don't want to increment Expression
+        // counters here.
+        expCtx->stopExpressionCounters();
+        auto expr = uassertStatusOK(MatchExpressionParser::parse(filter, expCtx));
+        _result = _rewriteMatchExpression(std::move(expr))->serialize();
     }
 
-
     /**
-     * Rewrites a match expression with FLE find payloads into a disjunction on the __safeContent__
-     * array of tags. Can rewrite the passed-in MatchExpression in place, which is why
-     * a unique_ptr is required.
-     *
-     * Will rewrite top-level $eq and $in expressions, as well as recursing through $and, $or,
-     * $not and $nor. All other MatchExpressions, notably $elemMatch, are ignored.
+     * Get the rewritten MatchExpression from the object.
      */
-    std::unique_ptr<MatchExpression> rewriteMatchExpression(std::unique_ptr<MatchExpression> expr);
+    BSONObj get() {
+        return _result.getOwned();
+    }
 
     /**
      * Determine whether a given BSONElement is in fact a FLE find payload.
@@ -82,25 +106,42 @@ public:
     }
 
 protected:
+    /**
+     * Rewrites a match expression with FLE find payloads into a disjunction on the __safeContent__
+     * array of tags.
+     *
+     * Will rewrite top-level $eq and $in expressions, as well as recursing through $and, $or, $not
+     * and $nor. All other MatchExpressions, notably $elemMatch, are ignored. This function is only
+     * used directly during unit testing.
+     */
+    std::unique_ptr<MatchExpression> _rewriteMatchExpression(std::unique_ptr<MatchExpression> expr);
+
     // The default constructor should only be used for mocks in testing.
-    FLEFindRewriter() : _info(nullptr), _getById(nullptr) {}
+    MatchExpressionRewrite() : _escReader(nullptr), _eccReader(nullptr) {}
 
 private:
     /**
-     * A single rewrite step, used in the expression walker as well as at the top-level.
+     * A single rewrite step, called recursively on child expressions.
      */
     std::unique_ptr<MatchExpression> _rewrite(MatchExpression* me);
-    // BSONElements are always owned by a BSONObj. So we just return the owning BSONObj and can
-    // extract the elements out later.
-    // TODO: SERVER-63293
+
     virtual BSONObj rewritePayloadAsTags(BSONElement fleFindPayload);
     std::unique_ptr<InMatchExpression> rewriteEq(const EqualityMatchExpression* expr);
     std::unique_ptr<InMatchExpression> rewriteIn(const InMatchExpression* expr);
 
-    // Holds a pointer so that it can be null for tests, even though the public constructor
+    // Holds a pointer so that these can be null for tests, even though the public constructor
     // takes a const reference.
-    const EncryptionInformation* _info;
-    GetDocumentByIdCallback _getById;
+    const FLEStateCollectionReader* _escReader;
+    const FLEStateCollectionReader* _eccReader;
+    BSONObj _result;
 };
+
+/**
+ * Rewrite a filter MatchExpression with FLE Find Payloads into a disjunction over the tag array.
+ */
+BSONObj rewriteEncryptedFilter(boost::intrusive_ptr<ExpressionContext> expCtx,
+                               const FLEStateCollectionReader& escReader,
+                               const FLEStateCollectionReader& eccReader,
+                               BSONObj filter);
 
 }  // namespace mongo::fle

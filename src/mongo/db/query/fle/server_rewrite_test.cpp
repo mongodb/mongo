@@ -42,9 +42,9 @@
 namespace mongo {
 namespace {
 
-class MockFindRewriter : public fle::FLEFindRewriter {
+class MockMatchExpressionRewrite : public fle::MatchExpressionRewrite {
 public:
-    MockFindRewriter() : fle::FLEFindRewriter(), _tags() {}
+    MockMatchExpressionRewrite() : fle::MatchExpressionRewrite(), _tags() {}
 
     bool isFleFindPayload(const BSONElement& fleFindPayload) override {
         return _encryptedFields.find(fleFindPayload.fieldNameStringData()) !=
@@ -54,6 +54,10 @@ public:
     void setEncryptedTags(std::pair<StringData, int> fieldvalue, BSONObj tags) {
         _encryptedFields.insert(fieldvalue.first);
         _tags[fieldvalue] = tags;
+    }
+
+    std::unique_ptr<MatchExpression> rewriteMatchExpression(std::unique_ptr<MatchExpression> expr) {
+        return _rewriteMatchExpression(std::move(expr));
     }
 
 private:
@@ -81,7 +85,7 @@ public:
     }
 
 protected:
-    MockFindRewriter _mock;
+    MockMatchExpressionRewrite _mock;
 };
 
 TEST_F(FLEServerRewriteTest, NoFFP_Equality) {

@@ -47,7 +47,6 @@
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/db/query/find_command_gen.h"
-#include "mongo/db/transaction_api.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/transaction_router_resource_yielder.h"
@@ -59,106 +58,6 @@
 namespace mongo {
 namespace {
 
-class FLEQueryInterfaceImpl : public FLEQueryInterface {
-public:
-    FLEQueryInterfaceImpl(const txn_api::TransactionClient& txnClient) : _txnClient(txnClient) {}
-
-    BSONObj getById(const NamespaceString& nss, BSONElement element) final;
-
-    uint64_t countDocuments(const NamespaceString& nss) final;
-
-    StatusWith<write_ops::InsertCommandReply> insertDocument(const NamespaceString& nss,
-                                                             BSONObj obj,
-                                                             bool translateDuplicateKey) final;
-
-    std::pair<write_ops::DeleteCommandReply, BSONObj> deleteWithPreimage(
-        const NamespaceString& nss,
-        const EncryptionInformation& ei,
-        const write_ops::DeleteCommandRequest& deleteRequest) final;
-
-    std::pair<write_ops::UpdateCommandReply, BSONObj> updateWithPreimage(
-        const NamespaceString& nss,
-        const EncryptionInformation& ei,
-        const write_ops::UpdateCommandRequest& updateRequest) final;
-
-    write_ops::FindAndModifyCommandReply findAndModify(
-        const NamespaceString& nss,
-        const EncryptionInformation& ei,
-        const write_ops::FindAndModifyCommandRequest& findAndModifyRequest) final;
-
-private:
-    const txn_api::TransactionClient& _txnClient;
-};
-
-BSONObj FLEQueryInterfaceImpl::getById(const NamespaceString& nss, BSONElement element) {
-    FindCommandRequest find(nss);
-    find.setFilter(BSON("_id" << element));
-    find.setSingleBatch(true);
-
-    // Throws on error
-    auto docs = _txnClient.exhaustiveFind(find).get();
-
-    if (docs.size() == 0) {
-        return BSONObj();
-    } else {
-        // We only expect one document in the state collection considering that _id is a unique
-        // index
-        uassert(6371201,
-                "Unexpected to find more then one FLE state collection document",
-                docs.size() == 1);
-        return docs[0];
-    }
-}
-
-uint64_t FLEQueryInterfaceImpl::countDocuments(const NamespaceString& nss) {
-    // TODO - what about
-    // count cmd
-    // $collStats
-    // approxCount
-
-    // Build the following pipeline:
-    //
-    //{ aggregate : "testColl", pipeline: [{$match:{}}, {$group : {_id: null, n : {$sum:1}
-    //}} ], cursor: {}}
-
-    BSONObjBuilder builder;
-    // $db - TXN API DOES THIS FOR US by building OP_MSG
-    builder.append("aggregate", nss.coll());
-
-    AggregateCommandRequest request(nss);
-
-    std::vector<BSONObj> pipeline;
-    pipeline.push_back(BSON("$match" << BSONObj()));
-
-    {
-        BSONObjBuilder sub;
-        {
-            BSONObjBuilder sub2(sub.subobjStart("$group"));
-            sub2.appendNull("_id");
-            {
-                BSONObjBuilder sub3(sub.subobjStart("n"));
-                sub3.append("$sum", 1);
-            }
-        }
-
-        pipeline.push_back(sub.obj());
-    }
-
-    request.setPipeline(pipeline);
-
-    auto commandResponse = _txnClient.runCommand(nss.db(), request.toBSON({})).get();
-
-    uint64_t docCount = 0;
-    auto cursorResponse = uassertStatusOK(CursorResponse::parseFromBSON(commandResponse));
-
-    auto firstBatch = cursorResponse.getBatch();
-    if (!firstBatch.empty()) {
-        auto countObj = firstBatch.front();
-        docCount = countObj.getIntField("n"_sd);
-    }
-
-    return docCount;
-}
 
 write_ops::WriteError writeErrorDetailToWriteError(const WriteErrorDetail* detail) {
     return write_ops::WriteError(detail->getIndex(), detail->toStatus());
@@ -223,79 +122,6 @@ void replyToResponse(write_ops::WriteCommandReplyBase* replyBase,
 }
 
 
-StatusWith<write_ops::InsertCommandReply> FLEQueryInterfaceImpl::insertDocument(
-    const NamespaceString& nss, BSONObj obj, bool translateDuplicateKey) {
-    write_ops::InsertCommandRequest insertRequest(nss);
-    insertRequest.setDocuments({obj});
-    // TODO SERVER-64143 - insertRequest.setWriteConcern
-
-    // TODO SERVER-64143 - propagate the retryable statement ids to runCRUDOp
-    auto response = _txnClient.runCRUDOp(BatchedCommandRequest(insertRequest), {}).get();
-
-    auto status = response.toStatus();
-    if (translateDuplicateKey && status.code() == ErrorCodes::DuplicateKey) {
-        return Status(ErrorCodes::FLEStateCollectionContention, status.reason());
-    }
-
-    write_ops::InsertCommandReply reply;
-
-    if (response.isLastOpSet()) {
-        reply.getWriteCommandReplyBase().setOpTime(response.getLastOp());
-    }
-
-    if (response.isElectionIdSet()) {
-        reply.getWriteCommandReplyBase().setElectionId(response.getElectionId());
-    }
-
-    reply.getWriteCommandReplyBase().setN(response.getN());
-    if (response.isErrDetailsSet()) {
-        reply.getWriteCommandReplyBase().setWriteErrors(
-            writeErrorsDetailToWriteErrors(response.getErrDetails()));
-    }
-
-    reply.getWriteCommandReplyBase().setRetriedStmtIds(reply.getRetriedStmtIds());
-
-    return {reply};
-}
-
-std::pair<write_ops::DeleteCommandReply, BSONObj> FLEQueryInterfaceImpl::deleteWithPreimage(
-
-    const NamespaceString& nss,
-    const EncryptionInformation& ei,
-    const write_ops::DeleteCommandRequest& deleteRequest) {
-    auto deleteOpEntry = deleteRequest.getDeletes()[0];
-
-    write_ops::FindAndModifyCommandRequest findAndModifyRequest(nss);
-    findAndModifyRequest.setQuery(deleteOpEntry.getQ());
-    findAndModifyRequest.setHint(deleteOpEntry.getHint());
-    findAndModifyRequest.setBatchSize(1);
-    findAndModifyRequest.setSingleBatch(true);
-    findAndModifyRequest.setRemove(true);
-    findAndModifyRequest.setCollation(deleteOpEntry.getCollation());
-    findAndModifyRequest.setLet(deleteRequest.getLet());
-    // TODO SERVER-64143 - writeConcern
-    auto ei2 = ei;
-    ei2.setCrudProcessed(true);
-    findAndModifyRequest.setEncryptionInformation(ei2);
-
-    auto response = _txnClient.runCommand(nss.db(), findAndModifyRequest.toBSON({})).get();
-    auto status = getStatusFromWriteCommandReply(response);
-
-    auto reply =
-        write_ops::FindAndModifyCommandReply::parse(IDLParserErrorContext("reply"), response);
-
-    write_ops::DeleteCommandReply deleteReply;
-
-    if (!status.isOK()) {
-        deleteReply.getWriteCommandReplyBase().setN(0);
-        deleteReply.getWriteCommandReplyBase().setWriteErrors(singleStatusToWriteErrors(status));
-    } else if (reply.getLastErrorObject().getNumDocs() > 0) {
-        deleteReply.getWriteCommandReplyBase().setN(1);
-    }
-
-    return {deleteReply, reply.getValue().value_or(BSONObj())};
-}
-
 boost::optional<BSONObj> mergeLetAndCVariables(const boost::optional<BSONObj>& let,
                                                const boost::optional<BSONObj>& c) {
     if (!let.has_value() && !c.has_value()) {
@@ -310,106 +136,6 @@ boost::optional<BSONObj> mergeLetAndCVariables(const boost::optional<BSONObj>& l
     return c;
 }
 
-std::pair<write_ops::UpdateCommandReply, BSONObj> FLEQueryInterfaceImpl::updateWithPreimage(
-    const NamespaceString& nss,
-    const EncryptionInformation& ei,
-    const write_ops::UpdateCommandRequest& updateRequest) {
-    auto updateOpEntry = updateRequest.getUpdates()[0];
-
-    write_ops::FindAndModifyCommandRequest findAndModifyRequest(nss);
-    findAndModifyRequest.setQuery(updateOpEntry.getQ());
-    findAndModifyRequest.setUpdate(updateOpEntry.getU());
-    findAndModifyRequest.setBatchSize(1);
-    findAndModifyRequest.setUpsert(updateOpEntry.getUpsert());
-    findAndModifyRequest.setSingleBatch(true);
-    findAndModifyRequest.setRemove(false);
-    findAndModifyRequest.setArrayFilters(updateOpEntry.getArrayFilters());
-    findAndModifyRequest.setCollation(updateOpEntry.getCollation());
-    findAndModifyRequest.setHint(updateOpEntry.getHint());
-    findAndModifyRequest.setLet(
-        mergeLetAndCVariables(updateRequest.getLet(), updateOpEntry.getC()));
-    // TODO SERVER-64143 - writeConcern
-    auto ei2 = ei;
-    ei2.setCrudProcessed(true);
-    findAndModifyRequest.setEncryptionInformation(ei2);
-
-    auto response = _txnClient.runCommand(nss.db(), findAndModifyRequest.toBSON({})).get();
-    auto status = getStatusFromWriteCommandReply(response);
-    uassertStatusOK(status);
-
-    auto reply =
-        write_ops::FindAndModifyCommandReply::parse(IDLParserErrorContext("reply"), response);
-
-    write_ops::UpdateCommandReply updateReply;
-
-    if (!status.isOK()) {
-        updateReply.getWriteCommandReplyBase().setN(0);
-        updateReply.getWriteCommandReplyBase().setWriteErrors(singleStatusToWriteErrors(status));
-    } else {
-        if (reply.getRetriedStmtId().has_value()) {
-            updateReply.getWriteCommandReplyBase().setRetriedStmtIds(
-                std::vector<std::int32_t>{reply.getRetriedStmtId().value()});
-        }
-        updateReply.getWriteCommandReplyBase().setN(reply.getLastErrorObject().getNumDocs());
-
-        if (reply.getLastErrorObject().getUpserted().has_value()) {
-            write_ops::Upserted upserted;
-            upserted.setIndex(0);
-            upserted.set_id(reply.getLastErrorObject().getUpserted().value());
-            updateReply.setUpserted(std::vector<mongo::write_ops::Upserted>{upserted});
-        }
-
-        if (reply.getLastErrorObject().getNumDocs() > 0) {
-            updateReply.setNModified(1);
-            updateReply.getWriteCommandReplyBase().setN(1);
-        }
-    }
-
-    return {updateReply, reply.getValue().value_or(BSONObj())};
-}
-
-write_ops::FindAndModifyCommandReply FLEQueryInterfaceImpl::findAndModify(
-    const NamespaceString& nss,
-    const EncryptionInformation& ei,
-    const write_ops::FindAndModifyCommandRequest& findAndModifyRequest) {
-
-    auto newFindAndModifyRequest = findAndModifyRequest;
-    auto ei2 = ei;
-    ei2.setCrudProcessed(true);
-    newFindAndModifyRequest.setEncryptionInformation(ei2);
-
-    auto response = _txnClient.runCommand(nss.db(), newFindAndModifyRequest.toBSON({})).get();
-    auto status = getStatusFromWriteCommandReply(response);
-    uassertStatusOK(status);
-
-    return write_ops::FindAndModifyCommandReply::parse(IDLParserErrorContext("reply"), response);
-}
-
-/**
- * Implementation of FLEStateCollectionReader for txn_api::TransactionClient
- *
- * Document count is cached since we only need it once per esc or ecc collection.
- */
-class TxnCollectionReader : public FLEStateCollectionReader {
-public:
-    TxnCollectionReader(uint64_t count, FLEQueryInterface* queryImpl, const NamespaceString& nss)
-        : _count(count), _queryImpl(queryImpl), _nss(nss) {}
-
-    uint64_t getDocumentCount() const override {
-        return _count;
-    }
-
-    BSONObj getById(PrfBlock block) const override {
-        auto doc = BSON("v" << BSONBinData(block.data(), block.size(), BinDataGeneral));
-        BSONElement element = doc.firstElement();
-        return _queryImpl->getById(_nss, element);
-    }
-
-private:
-    uint64_t _count;
-    FLEQueryInterface* _queryImpl;
-    const NamespaceString& _nss;
-};
 
 StatusWith<txn_api::CommitResult> runInTxnWithRetry(
     OperationContext* opCtx,
@@ -889,6 +615,8 @@ write_ops::DeleteCommandReply processDelete(FLEQueryInterface* queryImpl,
     auto efc = EncryptionInformationHelpers::getAndValidateSchema(edcNss, ei);
     auto tokenMap = EncryptionInformationHelpers::getDeleteTokens(edcNss, ei);
 
+    // TODO: SERVER-64358 rewrite MatchExpression in deleteRequest.getDeletes()[0].getQ()
+
     // TODO SERVER-64143 - use this delete for retryable writes
     auto [deleteReply, deletedDocument] = queryImpl->deleteWithPreimage(edcNss, ei, deleteRequest);
 
@@ -931,9 +659,13 @@ write_ops::UpdateCommandReply processUpdate(FLEQueryInterface* queryImpl,
 
     const auto updateModification = updateOpEntry.getU();
 
+
     // Step 1 ----
     std::vector<EDCServerPayloadInfo> serverPayload;
     auto newUpdateOpEntry = updateRequest.getUpdates()[0];
+
+    // TODO: SERVER-64358 rewrite any FLEFindPayloads in the MatchExpression held in
+    // updateOpEntry.getQ().
 
     if (updateModification.type() == write_ops::UpdateModification::Type::kModifier) {
         auto updateModifier = updateModification.getUpdateModifier();
@@ -1226,5 +958,221 @@ FLEBatchResult processFLEFindAndModify(OperationContext* opCtx,
     return FLEBatchResult::kProcessed;
 }
 
+BSONObj FLEQueryInterfaceImpl::getById(const NamespaceString& nss, BSONElement element) {
+    FindCommandRequest find(nss);
+    find.setFilter(BSON("_id" << element));
+    find.setSingleBatch(true);
 
+    // Throws on error
+    auto docs = _txnClient.exhaustiveFind(find).get();
+
+    if (docs.size() == 0) {
+        return BSONObj();
+    } else {
+        // We only expect one document in the state collection considering that _id is a unique
+        // index
+        uassert(6371201,
+                "Unexpected to find more then one FLE state collection document",
+                docs.size() == 1);
+        return docs[0];
+    }
+}
+
+uint64_t FLEQueryInterfaceImpl::countDocuments(const NamespaceString& nss) {
+    // TODO - what about
+    // count cmd
+    // $collStats
+    // approxCount
+
+    // Build the following pipeline:
+    //
+    //{ aggregate : "testColl", pipeline: [{$match:{}}, {$group : {_id: null, n : {$sum:1}
+    //}} ], cursor: {}}
+
+    BSONObjBuilder builder;
+    // $db - TXN API DOES THIS FOR US by building OP_MSG
+    builder.append("aggregate", nss.coll());
+
+    AggregateCommandRequest request(nss);
+
+    std::vector<BSONObj> pipeline;
+    pipeline.push_back(BSON("$match" << BSONObj()));
+
+    {
+        BSONObjBuilder sub;
+        {
+            BSONObjBuilder sub2(sub.subobjStart("$group"));
+            sub2.appendNull("_id");
+            {
+                BSONObjBuilder sub3(sub.subobjStart("n"));
+                sub3.append("$sum", 1);
+            }
+        }
+
+        pipeline.push_back(sub.obj());
+    }
+
+    request.setPipeline(pipeline);
+
+    auto commandResponse = _txnClient.runCommand(nss.db(), request.toBSON({})).get();
+
+    uint64_t docCount = 0;
+    auto cursorResponse = uassertStatusOK(CursorResponse::parseFromBSON(commandResponse));
+
+    auto firstBatch = cursorResponse.getBatch();
+    if (!firstBatch.empty()) {
+        auto countObj = firstBatch.front();
+        docCount = countObj.getIntField("n"_sd);
+    }
+
+    return docCount;
+}
+
+StatusWith<write_ops::InsertCommandReply> FLEQueryInterfaceImpl::insertDocument(
+    const NamespaceString& nss, BSONObj obj, bool translateDuplicateKey) {
+    write_ops::InsertCommandRequest insertRequest(nss);
+    insertRequest.setDocuments({obj});
+    // TODO SERVER-64143 - insertRequest.setWriteConcern
+
+    // TODO SERVER-64143 - propagate the retryable statement ids to runCRUDOp
+    auto response = _txnClient.runCRUDOp(BatchedCommandRequest(insertRequest), {}).get();
+
+    auto status = response.toStatus();
+    if (translateDuplicateKey && status.code() == ErrorCodes::DuplicateKey) {
+        return Status(ErrorCodes::FLEStateCollectionContention, status.reason());
+    }
+
+    write_ops::InsertCommandReply reply;
+
+    if (response.isLastOpSet()) {
+        reply.getWriteCommandReplyBase().setOpTime(response.getLastOp());
+    }
+
+    if (response.isElectionIdSet()) {
+        reply.getWriteCommandReplyBase().setElectionId(response.getElectionId());
+    }
+
+    reply.getWriteCommandReplyBase().setN(response.getN());
+    if (response.isErrDetailsSet()) {
+        reply.getWriteCommandReplyBase().setWriteErrors(
+            writeErrorsDetailToWriteErrors(response.getErrDetails()));
+    }
+
+    reply.getWriteCommandReplyBase().setRetriedStmtIds(reply.getRetriedStmtIds());
+
+    return {reply};
+}
+
+std::pair<write_ops::DeleteCommandReply, BSONObj> FLEQueryInterfaceImpl::deleteWithPreimage(
+
+    const NamespaceString& nss,
+    const EncryptionInformation& ei,
+    const write_ops::DeleteCommandRequest& deleteRequest) {
+    auto deleteOpEntry = deleteRequest.getDeletes()[0];
+
+    write_ops::FindAndModifyCommandRequest findAndModifyRequest(nss);
+    findAndModifyRequest.setQuery(deleteOpEntry.getQ());
+    findAndModifyRequest.setHint(deleteOpEntry.getHint());
+    findAndModifyRequest.setBatchSize(1);
+    findAndModifyRequest.setSingleBatch(true);
+    findAndModifyRequest.setRemove(true);
+    findAndModifyRequest.setCollation(deleteOpEntry.getCollation());
+    findAndModifyRequest.setLet(deleteRequest.getLet());
+    // TODO SERVER-64143 - writeConcern
+    auto ei2 = ei;
+    ei2.setCrudProcessed(true);
+    findAndModifyRequest.setEncryptionInformation(ei2);
+
+    auto response = _txnClient.runCommand(nss.db(), findAndModifyRequest.toBSON({})).get();
+    auto status = getStatusFromWriteCommandReply(response);
+
+    auto reply =
+        write_ops::FindAndModifyCommandReply::parse(IDLParserErrorContext("reply"), response);
+
+    write_ops::DeleteCommandReply deleteReply;
+
+    if (!status.isOK()) {
+        deleteReply.getWriteCommandReplyBase().setN(0);
+        deleteReply.getWriteCommandReplyBase().setWriteErrors(singleStatusToWriteErrors(status));
+    } else if (reply.getLastErrorObject().getNumDocs() > 0) {
+        deleteReply.getWriteCommandReplyBase().setN(1);
+    }
+
+    return {deleteReply, reply.getValue().value_or(BSONObj())};
+}
+
+std::pair<write_ops::UpdateCommandReply, BSONObj> FLEQueryInterfaceImpl::updateWithPreimage(
+    const NamespaceString& nss,
+    const EncryptionInformation& ei,
+    const write_ops::UpdateCommandRequest& updateRequest) {
+    auto updateOpEntry = updateRequest.getUpdates()[0];
+
+    write_ops::FindAndModifyCommandRequest findAndModifyRequest(nss);
+    findAndModifyRequest.setQuery(updateOpEntry.getQ());
+    findAndModifyRequest.setUpdate(updateOpEntry.getU());
+    findAndModifyRequest.setBatchSize(1);
+    findAndModifyRequest.setUpsert(updateOpEntry.getUpsert());
+    findAndModifyRequest.setSingleBatch(true);
+    findAndModifyRequest.setRemove(false);
+    findAndModifyRequest.setArrayFilters(updateOpEntry.getArrayFilters());
+    findAndModifyRequest.setCollation(updateOpEntry.getCollation());
+    findAndModifyRequest.setHint(updateOpEntry.getHint());
+    findAndModifyRequest.setLet(
+        mergeLetAndCVariables(updateRequest.getLet(), updateOpEntry.getC()));
+    // TODO SERVER-64143 - writeConcern
+    auto ei2 = ei;
+    ei2.setCrudProcessed(true);
+    findAndModifyRequest.setEncryptionInformation(ei2);
+
+    auto response = _txnClient.runCommand(nss.db(), findAndModifyRequest.toBSON({})).get();
+    auto status = getStatusFromWriteCommandReply(response);
+    uassertStatusOK(status);
+
+    auto reply =
+        write_ops::FindAndModifyCommandReply::parse(IDLParserErrorContext("reply"), response);
+
+    write_ops::UpdateCommandReply updateReply;
+
+    if (!status.isOK()) {
+        updateReply.getWriteCommandReplyBase().setN(0);
+        updateReply.getWriteCommandReplyBase().setWriteErrors(singleStatusToWriteErrors(status));
+    } else {
+        if (reply.getRetriedStmtId().has_value()) {
+            updateReply.getWriteCommandReplyBase().setRetriedStmtIds(
+                std::vector<std::int32_t>{reply.getRetriedStmtId().value()});
+        }
+        updateReply.getWriteCommandReplyBase().setN(reply.getLastErrorObject().getNumDocs());
+
+        if (reply.getLastErrorObject().getUpserted().has_value()) {
+            write_ops::Upserted upserted;
+            upserted.setIndex(0);
+            upserted.set_id(reply.getLastErrorObject().getUpserted().value());
+            updateReply.setUpserted(std::vector<mongo::write_ops::Upserted>{upserted});
+        }
+
+        if (reply.getLastErrorObject().getNumDocs() > 0) {
+            updateReply.setNModified(1);
+            updateReply.getWriteCommandReplyBase().setN(1);
+        }
+    }
+
+    return {updateReply, reply.getValue().value_or(BSONObj())};
+}
+
+write_ops::FindAndModifyCommandReply FLEQueryInterfaceImpl::findAndModify(
+    const NamespaceString& nss,
+    const EncryptionInformation& ei,
+    const write_ops::FindAndModifyCommandRequest& findAndModifyRequest) {
+
+    auto newFindAndModifyRequest = findAndModifyRequest;
+    auto ei2 = ei;
+    ei2.setCrudProcessed(true);
+    newFindAndModifyRequest.setEncryptionInformation(ei2);
+
+    auto response = _txnClient.runCommand(nss.db(), newFindAndModifyRequest.toBSON({})).get();
+    auto status = getStatusFromWriteCommandReply(response);
+    uassertStatusOK(status);
+
+    return write_ops::FindAndModifyCommandReply::parse(IDLParserErrorContext("reply"), response);
+}
 }  // namespace mongo

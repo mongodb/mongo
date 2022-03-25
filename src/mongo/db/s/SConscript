@@ -428,6 +428,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands/server_status',
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/db/commands/txn_cmd_request',
+        '$BUILD_DIR/mongo/db/fle_crud',
         '$BUILD_DIR/mongo/db/multitenancy',
         '$BUILD_DIR/mongo/db/repl/primary_only_service',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',

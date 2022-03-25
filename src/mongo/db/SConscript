@@ -860,6 +860,7 @@ env.Library(
     target='fle_crud',
     source=[
         'fle_crud.cpp',
+        'query/fle/server_rewrite.cpp'
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/crypto/encrypted_field_config',
@@ -868,6 +869,8 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/crypto/fle_crypto',
+        '$BUILD_DIR/mongo/db/matcher/expressions',
+        '$BUILD_DIR/mongo/db/query/collation/collator_factory_interface',
         '$BUILD_DIR/mongo/db/query/query_request',
         '$BUILD_DIR/mongo/executor/task_executor_pool',
         '$BUILD_DIR/mongo/s/grid',
@@ -2625,6 +2628,7 @@ if wiredtiger:
             'operation_id_test.cpp',
             'operation_time_tracker_test.cpp',
             'persistent_task_store_test.cpp',
+            'query/fle/server_rewrite_test.cpp',
             'range_arithmetic_test.cpp',
             'read_write_concern_defaults_test.cpp',
             'read_write_concern_provenance_test.cpp',

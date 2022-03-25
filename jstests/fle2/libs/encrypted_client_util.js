@@ -3,6 +3,9 @@ load("jstests/concurrency/fsm_workload_helpers/server_types.js");  // For isMong
 /**
  * Create a FLE client that has an unencrypted and encrypted client to the same database
  */
+
+const kSafeContentField = "__safeContent__";
+
 class EncryptedClient {
     /**
      * Create a new encrypted FLE connection to the target server with a local KMS
@@ -237,6 +240,19 @@ class EncryptedClient {
 
         assert.docEq(onDiskDocs, docs);
     }
+}
+
+function runEncryptedTest(db, dbName, collName, encryptedFields, runTestsCallback) {
+    const dbTest = db.getSiblingDB(dbName);
+    dbTest.dropDatabase();
+
+    let client = new EncryptedClient(db.getMongo(), dbName);
+
+    assert.commandWorked(
+        client.createEncryptionCollection(collName, {encryptedFields: encryptedFields}));
+
+    let edb = client.getDB();
+    runTestsCallback(edb);
 }
 
 // TODO - remove this when the feature flag is removed

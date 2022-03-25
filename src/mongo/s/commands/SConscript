@@ -119,6 +119,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands/shutdown_idl',
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/db/commands/validate_db_metadata_command',
+        '$BUILD_DIR/mongo/db/fle_crud',
         '$BUILD_DIR/mongo/db/ftdc/ftdc_server',
         '$BUILD_DIR/mongo/db/index_commands_idl',
         '$BUILD_DIR/mongo/db/initialize_api_parameters',

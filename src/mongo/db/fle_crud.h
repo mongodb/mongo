@@ -166,6 +166,66 @@ public:
         const EncryptionInformation& ei,
         const write_ops::FindAndModifyCommandRequest& findAndModifyRequest) = 0;
 };
+/**
+ * Implementation of the FLE Query interface that exposes the DB operations needed for FLE 2
+ * server-side work.
+ */
+class FLEQueryInterfaceImpl : public FLEQueryInterface {
+public:
+    FLEQueryInterfaceImpl(const txn_api::TransactionClient& txnClient) : _txnClient(txnClient) {}
+
+    BSONObj getById(const NamespaceString& nss, BSONElement element) final;
+
+    uint64_t countDocuments(const NamespaceString& nss) final;
+
+    StatusWith<write_ops::InsertCommandReply> insertDocument(const NamespaceString& nss,
+                                                             BSONObj obj,
+                                                             bool translateDuplicateKey) final;
+
+    std::pair<write_ops::DeleteCommandReply, BSONObj> deleteWithPreimage(
+        const NamespaceString& nss,
+        const EncryptionInformation& ei,
+        const write_ops::DeleteCommandRequest& deleteRequest) final;
+
+    std::pair<write_ops::UpdateCommandReply, BSONObj> updateWithPreimage(
+        const NamespaceString& nss,
+        const EncryptionInformation& ei,
+        const write_ops::UpdateCommandRequest& updateRequest) final;
+
+    write_ops::FindAndModifyCommandReply findAndModify(
+        const NamespaceString& nss,
+        const EncryptionInformation& ei,
+        const write_ops::FindAndModifyCommandRequest& findAndModifyRequest) final;
+
+private:
+    const txn_api::TransactionClient& _txnClient;
+};
+
+/**
+ * Implementation of FLEStateCollectionReader for txn_api::TransactionClient
+ *
+ * Document count is cached since we only need it once per esc or ecc collection.
+ */
+class TxnCollectionReader : public FLEStateCollectionReader {
+public:
+    TxnCollectionReader(uint64_t count, FLEQueryInterface* queryImpl, const NamespaceString& nss)
+        : _count(count), _queryImpl(queryImpl), _nss(nss) {}
+
+    uint64_t getDocumentCount() const override {
+        return _count;
+    }
+
+    BSONObj getById(PrfBlock block) const override {
+        auto doc = BSON("v" << BSONBinData(block.data(), block.size(), BinDataGeneral));
+        BSONElement element = doc.firstElement();
+        return _queryImpl->getById(_nss, element);
+    }
+
+private:
+    uint64_t _count;
+    FLEQueryInterface* _queryImpl;
+    NamespaceString _nss;
+};
 
 /**
  * Process a FLE insert with the query interface

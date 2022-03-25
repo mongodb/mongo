@@ -29,9 +29,125 @@
 
 
 #include "mongo/db/query/fle/server_rewrite.h"
-namespace mongo::fle {
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/crypto/fle_crypto.h"
+#include "mongo/crypto/fle_tags.h"
+#include "mongo/db/fle_crud.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/transaction_api.h"
+#include "mongo/s/grid.h"
+#include "mongo/s/transaction_router_resource_yielder.h"
+#include "mongo/util/assert_util.h"
 
-std::unique_ptr<MatchExpression> FLEFindRewriter::rewriteMatchExpression(
+namespace mongo::fle {
+namespace {
+boost::intrusive_ptr<ExpressionContext> makeExpCtx(OperationContext* opCtx,
+                                                   FindCommandRequest* findCommand) {
+    invariant(findCommand->getNamespaceOrUUID().nss());
+
+    std::unique_ptr<CollatorInterface> collator;
+    if (!findCommand->getCollation().isEmpty()) {
+        auto statusWithCollator = CollatorFactoryInterface::get(opCtx->getServiceContext())
+                                      ->makeFromBSON(findCommand->getCollation());
+
+        uassertStatusOK(statusWithCollator.getStatus());
+        collator = std::move(statusWithCollator.getValue());
+    }
+    return make_intrusive<ExpressionContext>(opCtx,
+                                             std::move(collator),
+                                             findCommand->getNamespaceOrUUID().nss().get(),
+                                             findCommand->getLegacyRuntimeConstants(),
+                                             findCommand->getLet());
+}
+}  // namespace
+
+BSONObj rewriteEncryptedFilter(boost::intrusive_ptr<ExpressionContext> expCtx,
+                               const FLEStateCollectionReader& escReader,
+                               const FLEStateCollectionReader& eccReader,
+                               BSONObj filter) {
+    return MatchExpressionRewrite(expCtx, escReader, eccReader, filter).get();
+}
+
+void processFindCommand(OperationContext* opCtx,
+                        NamespaceString nss,
+                        FindCommandRequest* findCommand) {
+    invariant(findCommand->getEncryptionInformation());
+
+    auto efc = EncryptionInformationHelpers::getAndValidateSchema(
+        nss, findCommand->getEncryptionInformation().get());
+
+    // The transaction runs in a separate executor, and so we can't pass data by
+    // reference into the lambda. This struct holds all the data we need inside the
+    // lambda, and is passed in a more threadsafe shared_ptr.
+    struct SharedBlock {
+        SharedBlock(NamespaceString nss,
+                    std::string esc,
+                    std::string ecc,
+                    const BSONObj userFilter,
+                    boost::intrusive_ptr<ExpressionContext> expCtx)
+            : esc(std::move(esc)),
+              ecc(std::move(ecc)),
+              userFilter(userFilter),
+              db(nss.db()),
+              expCtx(expCtx) {}
+        std::string esc;
+        std::string ecc;
+        const BSONObj userFilter;
+        BSONObj rewrittenFilter;
+        std::string db;
+        boost::intrusive_ptr<ExpressionContext> expCtx;
+    };
+
+    auto sharedBlock = std::make_shared<SharedBlock>(nss,
+                                                     efc.getEscCollection().get().toString(),
+                                                     efc.getEccCollection().get().toString(),
+                                                     findCommand->getFilter().getOwned(),
+                                                     makeExpCtx(opCtx, findCommand));
+
+    auto txn = std::make_shared<txn_api::TransactionWithRetries>(
+        opCtx,
+        Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
+        TransactionRouterResourceYielder::make());
+
+    auto swCommitResult = txn->runSyncNoThrow(
+        opCtx, [sharedBlock](const txn_api::TransactionClient& txnClient, auto txnExec) {
+            auto makeCollectionReader = [sharedBlock](FLEQueryInterface* queryImpl,
+                                                      const StringData& coll) {
+                NamespaceString nss(sharedBlock->db, coll);
+                auto docCount = queryImpl->countDocuments(nss);
+                return TxnCollectionReader(docCount, queryImpl, nss);
+            };
+
+            // Construct FLE rewriter from the transaction client and encryptionInformation.
+            auto queryInterface = FLEQueryInterfaceImpl(txnClient);
+            auto escReader = makeCollectionReader(&queryInterface, sharedBlock->esc);
+            auto eccReader = makeCollectionReader(&queryInterface, sharedBlock->ecc);
+
+            // Rewrite the MatchExpression.
+            sharedBlock->rewrittenFilter = rewriteEncryptedFilter(
+                sharedBlock->expCtx, escReader, eccReader, sharedBlock->userFilter);
+
+            return SemiFuture<void>::makeReady();
+        });
+
+    uassertStatusOK(swCommitResult);
+    uassertStatusOK(swCommitResult.getValue().cmdStatus);
+    uassertStatusOK(swCommitResult.getValue().getEffectiveStatus());
+
+    auto rewrittenFilter = sharedBlock->rewrittenFilter.getOwned();
+    findCommand->setFilter(std::move(rewrittenFilter));
+    findCommand->setEncryptionInformation(boost::none);
+
+    // If we are in a multi-document transaction, then the transaction API has taken
+    // care of setting the readConcern on the transaction, and the find command
+    // shouldn't provide its own readConcern.
+    if (opCtx->inMultiDocumentTransaction()) {
+        findCommand->setReadConcern(boost::none);
+    }
+}
+
+std::unique_ptr<MatchExpression> MatchExpressionRewrite::_rewriteMatchExpression(
     std::unique_ptr<MatchExpression> expr) {
     if (auto result = _rewrite(expr.get())) {
         return result;
@@ -41,7 +157,7 @@ std::unique_ptr<MatchExpression> FLEFindRewriter::rewriteMatchExpression(
 }
 
 // Rewrite the passed-in match expression in-place.
-std::unique_ptr<MatchExpression> FLEFindRewriter::_rewrite(MatchExpression* expr) {
+std::unique_ptr<MatchExpression> MatchExpressionRewrite::_rewrite(MatchExpression* expr) {
     switch (expr->matchType()) {
         case MatchExpression::EQ:
             return rewriteEq(std::move(static_cast<const EqualityMatchExpression*>(expr)));
@@ -63,11 +179,25 @@ std::unique_ptr<MatchExpression> FLEFindRewriter::_rewrite(MatchExpression* expr
     }
 }
 
-BSONObj FLEFindRewriter::rewritePayloadAsTags(BSONElement fleFindPayload) {
-    return BSONObj();
+BSONObj MatchExpressionRewrite::rewritePayloadAsTags(BSONElement fleFindPayload) {
+    auto tokens = ParsedFindPayload(fleFindPayload);
+    auto tags = readTags(*_escReader,
+                         *_eccReader,
+                         tokens.escToken,
+                         tokens.eccToken,
+                         tokens.edcToken,
+                         tokens.maxCounter);
+
+    auto bab = BSONArrayBuilder();
+    for (auto tag : tags) {
+        bab.appendBinData(tag.size(), BinDataType::BinDataGeneral, tag.data());
+    }
+
+    return bab.obj().getOwned();
 }
 
-std::unique_ptr<InMatchExpression> FLEFindRewriter::rewriteEq(const EqualityMatchExpression* expr) {
+std::unique_ptr<InMatchExpression> MatchExpressionRewrite::rewriteEq(
+    const EqualityMatchExpression* expr) {
     auto ffp = expr->getData();
     if (!isFleFindPayload(ffp)) {
         return nullptr;
@@ -85,7 +215,8 @@ std::unique_ptr<InMatchExpression> FLEFindRewriter::rewriteEq(const EqualityMatc
     return inExpr;
 }
 
-std::unique_ptr<InMatchExpression> FLEFindRewriter::rewriteIn(const InMatchExpression* expr) {
+std::unique_ptr<InMatchExpression> MatchExpressionRewrite::rewriteIn(
+    const InMatchExpression* expr) {
     auto backingBSONBuilder = BSONArrayBuilder();
     size_t numFFPs = 0;
     for (auto& eq : expr->getEqualities()) {

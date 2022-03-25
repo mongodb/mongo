@@ -1320,6 +1320,11 @@ std::pair<BSONType, std::vector<uint8_t>> FLEClientCrypto::decrypt(ConstDataRang
     } else if (pair.first == EncryptedBinDataType::kRandom ||
                pair.first == EncryptedBinDataType::kDeterministic) {
         return {EOO, std::vector<uint8_t>()};
+    } else if (pair.first == EncryptedBinDataType::kFLE2FindEqualityPayload) {
+        // FLE Find Payloads only contain non-encrypted data that is related to encryption, so
+        // return the unencrypted body. The EOO BSONType signals to the caller that this should
+        // maintain the encryption subtype.
+        return {EOO, vectorFromCDR(pair.second)};
     } else {
         uasserted(6373507, "Not supported");
     }
@@ -2264,6 +2269,23 @@ StringMap<FLEDeleteToken> EncryptionInformationHelpers::getDeleteTokens(
     }
 
     return map;
+}
+
+ParsedFindPayload::ParsedFindPayload(BSONElement fleFindPayload) {
+    auto [encryptedTypeBinding, subCdr] = fromEncryptedConstDataRange(binDataToCDR(fleFindPayload));
+    auto encryptedType = encryptedTypeBinding;
+
+    uassert(6435600,
+            str::stream() << "Unexpected encrypted payload type: "
+                          << static_cast<uint32_t>(encryptedType),
+            encryptedType == EncryptedBinDataType::kFLE2FindEqualityPayload);
+
+    auto payload = parseFromCDR<FLE2FindEqualityPayload>(subCdr);
+
+    escToken = FLETokenFromCDR<FLETokenType::ESCDerivedFromDataToken>(payload.getEscDerivedToken());
+    eccToken = FLETokenFromCDR<FLETokenType::ECCDerivedFromDataToken>(payload.getEccDerivedToken());
+    edcToken = FLETokenFromCDR<FLETokenType::EDCDerivedFromDataToken>(payload.getEdcDerivedToken());
+    maxCounter = payload.getMaxCounter();
 }
 
 }  // namespace mongo
