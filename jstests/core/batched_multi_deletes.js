@@ -6,6 +6,7 @@
  *  # TODO (SERVER-55909): make WUOW 'groupOplogEntries' the only mode of operation.
  *  does_not_support_transactions,
  *  multiversion_incompatible,
+ *  no_selinux,
  *  requires_fcv_60,
  *  requires_getmore,
  *  requires_non_retryable_writes,
