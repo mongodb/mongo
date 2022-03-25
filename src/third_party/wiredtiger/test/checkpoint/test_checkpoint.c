@@ -261,11 +261,13 @@ wt_connect(const char *config_open)
     static WT_EVENT_HANDLER event_handler = {
       handle_error, handle_message, NULL, NULL /* Close handler. */
     };
+    WT_RAND_STATE rnd;
     int ret;
     char config[512];
     char timing_stress_config[512];
-    bool timing_stress;
+    bool fast_eviction, timing_stress;
 
+    fast_eviction = false;
     timing_stress = false;
     if (g.sweep_stress || g.failpoint_hs_delete_key_from_ts || g.hs_checkpoint_timing_stress ||
       g.reserved_txnid_timing_stress || g.checkpoint_slow_timing_stress) {
@@ -279,22 +281,33 @@ wt_connect(const char *config_open)
     }
 
     /*
+     * Randomly decide on the eviction rate (fast or default).
+     */
+    __wt_random_init_seed(NULL, &rnd);
+    if ((__wt_random(&rnd) % 15) % 2 == 0)
+        fast_eviction = true;
+
+    /*
      * If we want to stress sweep, we have a lot of additional configuration settings to set.
      */
     if (g.sweep_stress)
         testutil_check(__wt_snprintf(config, sizeof(config),
           "create,cache_cursors=false,statistics=(fast),statistics_log=(json,wait=1),error_prefix="
           "\"%s\",file_manager=(close_handle_minimum=1,close_idle_time=1,close_scan_interval=1),"
-          "log=(enabled),cache_size=1GB%s%s%s%s",
-          progname, timing_stress_config, g.debug_mode ? DEBUG_MODE_CFG : "",
-          config_open == NULL ? "" : ",", config_open == NULL ? "" : config_open));
-    else {
+          "log=(enabled),cache_size=1GB, eviction_dirty_trigger=%i, "
+          "eviction_dirty_target=%i,%s%s%s%s",
+          progname, fast_eviction ? 5 : 20, fast_eviction ? 1 : 5, timing_stress_config,
+          g.debug_mode ? DEBUG_MODE_CFG : "", config_open == NULL ? "" : ",",
+          config_open == NULL ? "" : config_open));
+    else
         testutil_check(__wt_snprintf(config, sizeof(config),
           "create,cache_cursors=false,statistics=(fast),statistics_log=(json,wait=1),log=(enabled),"
-          "error_prefix=\"%s\",cache_size=1G%s%s%s%s",
-          progname, g.debug_mode ? DEBUG_MODE_CFG : "", config_open == NULL ? "" : ",",
+          "error_prefix=\"%s\",cache_size=1G, eviction_dirty_trigger=%i, "
+          "eviction_dirty_target=%i,%s%s%s%s",
+          progname, fast_eviction ? 5 : 20, fast_eviction ? 1 : 5,
+          g.debug_mode ? DEBUG_MODE_CFG : "", config_open == NULL ? "" : ",",
           config_open == NULL ? "" : config_open, timing_stress ? timing_stress_config : ""));
-    }
+
     printf("WT open config: %s\n", config);
     if ((ret = wiredtiger_open(g.home, &event_handler, config, &g.conn)) != 0)
         return (log_print_err("wiredtiger_open", ret, 1));
