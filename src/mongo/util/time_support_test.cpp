@@ -31,6 +31,7 @@
 
 #include <cstdlib>
 #include <ctime>
+#include <fmt/format.h>
 #include <string>
 
 #include "mongo/base/init.h"
@@ -41,8 +42,47 @@
 namespace mongo {
 namespace {
 
-const bool isTimeTSmall =
-    (sizeof(time_t) == sizeof(int32_t)) && std::numeric_limits<time_t>::is_signed;
+using namespace fmt::literals;
+
+const bool isTimeTSmall = std::numeric_limits<time_t>::digits == 31;
+
+constexpr bool isLeap(int y) {
+    return !(y % 400) || (y % 100 && !(y % 4));
+}
+
+constexpr long long daysBeforeYear(int y) {
+    --y;
+    return y * 365 + y / 4 - y / 100 + y / 400;
+}
+
+constexpr long long unixDaysBeforeYear(int y) {
+    return daysBeforeYear(y) - daysBeforeYear(1970);
+}
+
+constexpr Date_t mkDate(long long ms) {
+    return Date_t::fromMillisSinceEpoch(ms);
+}
+
+struct DateParts {
+    int year, mon, dom, h, m, s, ms;
+    int tzMinutes;
+};
+
+constexpr Date_t mkDate(DateParts dp) {
+    auto [year, mon, dom, h, m, s, ms, tzMinutes] = dp;
+    const int daysInMonths[12]{31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+    long long r = unixDaysBeforeYear(year);
+    for (int i = 1; i < mon; ++i)
+        r += daysInMonths[i - 1];
+    if (mon > 2 && isLeap(year))
+        ++r;
+    r = r + dom - 1;
+    r = r * 24 + h;
+    r = r * 60 + m - tzMinutes;
+    r = r * 60 + s;
+    r = r * 1000 + ms;
+    return mkDate(r);
+}
 
 /**
  * To make this test deterministic, we set the time zone to America/New_York.
@@ -53,52 +93,16 @@ char tzEnvString[] = "TZ=EST+5EDT";
 char tzEnvString[] = "TZ=America/New_York";
 #endif
 
-#pragma warning(push)
-// C4996:  The POSIX name for this item is deprecated. Instead, use the ISO C and C++ conformant
-// name: _putenv. See online help for details.
-#pragma warning(disable : 4996)
 MONGO_INITIALIZER(SetTimeZoneToEasternForTest)(InitializerContext*) {
-    if (-1 == putenv(tzEnvString)) {
+#ifdef _WIN32
+    int ret = _putenv(tzEnvString);
+#else
+    int ret = putenv(tzEnvString);
+#endif
+    if (ret == -1) {
         uasserted(ErrorCodes::BadValue, errnoWithDescription());
     }
     tzset();
-}
-#pragma warning(pop)
-
-TEST(TimeFormatting, DateAsISO8601UTCString) {
-    ASSERT_EQUALS(std::string("1970-01-01T00:00:00.000Z"), dateToISOStringUTC(Date_t()));
-    ASSERT_EQUALS(std::string("1970-06-30T01:06:40.981Z"),
-                  dateToISOStringUTC(Date_t::fromMillisSinceEpoch(15556000981LL)));
-    if (!isTimeTSmall) {
-        ASSERT_EQUALS(std::string("2058-02-20T18:29:11.100Z"),
-                      dateToISOStringUTC(Date_t::fromMillisSinceEpoch(2781455351100LL)));
-    }
-    ASSERT_EQUALS(std::string("2013-02-20T18:29:11.100Z"),
-                  dateToISOStringUTC(Date_t::fromMillisSinceEpoch(1361384951100LL)));
-}
-
-TEST(TimeFormatting, DateAsISO8601LocalString) {
-    ASSERT_EQUALS(std::string("1969-12-31T19:00:00.000-05:00"), dateToISOStringLocal(Date_t()));
-    ASSERT_EQUALS(std::string("1970-06-29T21:06:40.981-04:00"),
-                  dateToISOStringLocal(Date_t::fromMillisSinceEpoch(15556000981LL)));
-    if (!isTimeTSmall) {
-        ASSERT_EQUALS(std::string("2058-02-20T13:29:11.100-05:00"),
-                      dateToISOStringLocal(Date_t::fromMillisSinceEpoch(2781455351100LL)));
-    }
-    ASSERT_EQUALS(std::string("2013-02-20T13:29:11.100-05:00"),
-                  dateToISOStringLocal(Date_t::fromMillisSinceEpoch(1361384951100LL)));
-}
-
-TEST(TimeFormatting, DateAsCtimeString) {
-    ASSERT_EQUALS(std::string("Wed Dec 31 19:00:00.000"), dateToCtimeString(Date_t()));
-    ASSERT_EQUALS(std::string("Mon Jun 29 21:06:40.981"),
-                  dateToCtimeString(Date_t::fromMillisSinceEpoch(15556000981LL)));
-    if (!isTimeTSmall) {
-        ASSERT_EQUALS(std::string("Wed Feb 20 13:29:11.100"),
-                      dateToCtimeString(Date_t::fromMillisSinceEpoch(2781455351100LL)));
-    }
-    ASSERT_EQUALS(std::string("Wed Feb 20 13:29:11.100"),
-                  dateToCtimeString(Date_t::fromMillisSinceEpoch(1361384951100LL)));
 }
 
 static std::string stringstreamDate(void (*formatter)(std::ostream&, Date_t), Date_t date) {
@@ -107,100 +111,123 @@ static std::string stringstreamDate(void (*formatter)(std::ostream&, Date_t), Da
     return os.str();
 }
 
-TEST(TimeFormatting, DateAsISO8601UTCStream) {
-    ASSERT_EQUALS(std::string("1970-01-01T00:00:00.000Z"),
-                  stringstreamDate(outputDateAsISOStringUTC, Date_t()));
-    ASSERT_EQUALS(
-        std::string("1970-06-30T01:06:40.981Z"),
-        stringstreamDate(outputDateAsISOStringUTC, Date_t::fromMillisSinceEpoch(15556000981LL)));
+TEST(TimeFormattingTestHelpers, MkDate) {
+    static_assert(!isLeap(1970));
+    static_assert(isLeap(1972));
+    static_assert(!isLeap(1900));
+    static_assert(isLeap(2000));
+    ASSERT_EQ(mkDate(0), mkDate({1970, 1, 1, 0, 0, 0, 0}));
+    ASSERT_EQ(mkDate(15556000981), mkDate({1970, 6, 30, 1, 6, 40, 981}));
+    ASSERT_EQ(mkDate(1361384951100), mkDate({2013, 2, 20, 18, 29, 11, 100}));
+    ASSERT_EQ(mkDate(2781455351100), mkDate({2058, 2, 20, 18, 29, 11, 100}));
+}
+
+template <typename Run, typename GenExpected>
+void runFormatTest(Run run, GenExpected gen) {
+    struct DateFormatsRec {
+        DateParts parts;
+        std::string isoUtc;
+        std::string isoLocal;
+        std::string ctime;
+    };
+
+    std::vector<DateFormatsRec> v{
+        {
+            {1970, 1, 1, 0, 0, 0, 0},
+            "1970-01-01T00:00:00.000Z",
+            "1969-12-31T19:00:00.000-05:00",
+            "Wed Dec 31 19:00:00.000",
+        },
+        {
+            {1970, 6, 30, 1, 6, 40, 981},
+            "1970-06-30T01:06:40.981Z",
+            "1970-06-29T21:06:40.981-04:00",
+            "Mon Jun 29 21:06:40.981",
+        },
+        {
+            {2013, 2, 20, 18, 29, 11, 100},
+            "2013-02-20T18:29:11.100Z",
+            "2013-02-20T13:29:11.100-05:00",
+            "Wed Feb 20 13:29:11.100",
+        },
+    };
     if (!isTimeTSmall) {
-        ASSERT_EQUALS(std::string("2058-02-20T18:29:11.100Z"),
-                      stringstreamDate(outputDateAsISOStringUTC,
-                                       Date_t::fromMillisSinceEpoch(2781455351100LL)));
+        v.push_back({
+            {2058, 2, 20, 18, 29, 11, 100},
+            "2058-02-20T18:29:11.100Z",
+            "2058-02-20T13:29:11.100-05:00",
+            "Wed Feb 20 13:29:11.100",
+        });
     }
-    ASSERT_EQUALS(
-        std::string("2013-02-20T18:29:11.100Z"),
-        stringstreamDate(outputDateAsISOStringUTC, Date_t::fromMillisSinceEpoch(1361384951100LL)));
+
+    for (auto&& rec : v) {
+        ASSERT_EQ(run(mkDate(rec.parts)), gen(rec));
+    }
+}
+
+TEST(TimeFormatting, DateAsISO8601UTCString) {
+    runFormatTest([](Date_t d) { return dateToISOStringUTC(d); },
+                  [](const auto& rec) { return rec.isoUtc; });
+}
+
+TEST(TimeFormatting, DateAsISO8601LocalString) {
+    runFormatTest([](Date_t d) { return dateToISOStringLocal(d); },
+                  [](const auto& rec) { return rec.isoLocal; });
+}
+
+TEST(TimeFormatting, DateAsCtimeString) {
+    runFormatTest([](Date_t d) { return dateToCtimeString(d); },
+                  [](const auto& rec) { return rec.ctime; });
+}
+
+TEST(TimeFormatting, DateAsISO8601UTCStream) {
+    runFormatTest([](Date_t d) { return stringstreamDate(outputDateAsISOStringUTC, d); },
+                  [](const auto& rec) { return rec.isoUtc; });
 }
 
 TEST(TimeFormatting, DateAsISO8601LocalStream) {
-    ASSERT_EQUALS(std::string("1969-12-31T19:00:00.000-05:00"),
-                  stringstreamDate(outputDateAsISOStringLocal, Date_t()));
-    ASSERT_EQUALS(
-        std::string("1970-06-29T21:06:40.981-04:00"),
-        stringstreamDate(outputDateAsISOStringLocal, Date_t::fromMillisSinceEpoch(15556000981LL)));
-    if (!isTimeTSmall) {
-        ASSERT_EQUALS(std::string("2058-02-20T13:29:11.100-05:00"),
-                      stringstreamDate(outputDateAsISOStringLocal,
-                                       Date_t::fromMillisSinceEpoch(2781455351100LL)));
-    }
-    ASSERT_EQUALS(std::string("2013-02-20T13:29:11.100-05:00"),
-                  stringstreamDate(outputDateAsISOStringLocal,
-                                   Date_t::fromMillisSinceEpoch(1361384951100LL)));
+    runFormatTest([](Date_t d) { return stringstreamDate(outputDateAsISOStringLocal, d); },
+                  [](const auto& rec) { return rec.isoLocal; });
 }
 
 TEST(TimeFormatting, DateAsCtimeStream) {
-    ASSERT_EQUALS(std::string("Wed Dec 31 19:00:00.000"),
-                  stringstreamDate(outputDateAsCtime, Date_t::fromMillisSinceEpoch(0)));
-    ASSERT_EQUALS(std::string("Mon Jun 29 21:06:40.981"),
-                  stringstreamDate(outputDateAsCtime, Date_t::fromMillisSinceEpoch(15556000981LL)));
-    if (!isTimeTSmall) {
-        ASSERT_EQUALS(
-            std::string("Wed Feb 20 13:29:11.100"),
-            stringstreamDate(outputDateAsCtime, Date_t::fromMillisSinceEpoch(2781455351100LL)));
-    }
-    ASSERT_EQUALS(
-        std::string("Wed Feb 20 13:29:11.100"),
-        stringstreamDate(outputDateAsCtime, Date_t::fromMillisSinceEpoch(1361384951100LL)));
+    runFormatTest([](Date_t d) { return stringstreamDate(outputDateAsCtime, d); },
+                  [](const auto& rec) { return rec.ctime; });
 }
+
+struct ParseRec {
+    std::string in;
+    DateParts out;
+};
 
 TEST(TimeParsing, DateAsISO8601UTC) {
     // Allowed date format:
     // YYYY-MM-DDTHH:MM[:SS[.m[m[m]]]]Z
     // Year, month, day, hour, and minute are required, while the seconds component and one to
     // three milliseconds are optional.
-
-    StatusWith<Date_t> swull = dateFromISOString("1971-02-03T04:05:06.789Z");
-    ASSERT_OK(swull.getStatus());
-    ASSERT_EQUALS(swull.getValue().asInt64(), 34401906789LL);
-
-    swull = dateFromISOString("1971-02-03T04:05:06.78Z");
-    ASSERT_OK(swull.getStatus());
-    ASSERT_EQUALS(swull.getValue().asInt64(), 34401906780LL);
-
-    swull = dateFromISOString("1971-02-03T04:05:06.7Z");
-    ASSERT_OK(swull.getStatus());
-    ASSERT_EQUALS(swull.getValue().asInt64(), 34401906700LL);
-
-    swull = dateFromISOString("1971-02-03T04:05:06Z");
-    ASSERT_OK(swull.getStatus());
-    ASSERT_EQUALS(swull.getValue().asInt64(), 34401906000LL);
-
-    swull = dateFromISOString("1971-02-03T04:05Z");
-    ASSERT_OK(swull.getStatus());
-    ASSERT_EQUALS(swull.getValue().asInt64(), 34401900000LL);
-
-    swull = dateFromISOString("1970-01-01T00:00:00.000Z");
-    ASSERT_OK(swull.getStatus());
-    ASSERT_EQUALS(swull.getValue().asInt64(), 0LL);
-
-    swull = dateFromISOString("1970-06-30T01:06:40.981Z");
-    ASSERT_OK(swull.getStatus());
-    ASSERT_EQUALS(swull.getValue().asInt64(), 15556000981LL);
-
+    std::vector<ParseRec> v{
+        {"1971-02-03T04:05:06.789Z", {1971, 2, 3, 4, 5, 6, 789}},
+        {"1971-02-03T04:05:06.78Z", {1971, 2, 3, 4, 5, 6, 780}},
+        {"1971-02-03T04:05:06.7Z", {1971, 2, 3, 4, 5, 6, 700}},
+        {"1971-02-03T04:05:06Z", {1971, 2, 3, 4, 5, 6, 0}},
+        {"1971-02-03T04:05Z", {1971, 2, 3, 4, 5, 0, 0}},
+        {"1970-01-01T00:00:00.000Z", {1970, 1, 1, 0, 0, 0, 0}},
+        {"1970-06-30T01:06:40.981Z", {1970, 6, 30, 1, 6, 40, 981}},
+        {"2013-02-20T18:29:11.100Z", {2013, 2, 20, 18, 29, 11, 100}},
+    };
     if (!isTimeTSmall) {
-        swull = dateFromISOString("2058-02-20T18:29:11.100Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 2781455351100LL);
-
-        swull = dateFromISOString("3001-01-01T08:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 32535244800000LL);
+        v.insert(v.end(),
+                 {
+                     {"2058-02-20T18:29:11.100Z", {2058, 2, 20, 18, 29, 11, 100}},
+                     {"3001-01-01T08:00:00.000Z", {3001, 1, 1, 8, 0, 0, 0}},
+                 });
     }
 
-    swull = dateFromISOString("2013-02-20T18:29:11.100Z");
-    ASSERT_OK(swull.getStatus());
-    ASSERT_EQUALS(swull.getValue().asInt64(), 1361384951100LL);
+    for (const auto& [in, out] : v) {
+        auto d = dateFromISOString(in);
+        ASSERT_OK(d.getStatus()) << in;
+        ASSERT_EQUALS(d.getValue(), mkDate(out)) << in;
+    }
 }
 
 TEST(TimeParsing, DateAsISO8601Local) {
@@ -209,81 +236,42 @@ TEST(TimeParsing, DateAsISO8601Local) {
     // Year, month, day, hour, and minute are required, while the seconds component and one to
     // three milliseconds are optional.  The time zone offset must be four digits.
     // Test with colon in timezone offset, new for mongod version 4.4
-
-    StatusWith<Date_t> swull = dateFromISOString("1971-02-03T09:16:06.789+05:11");
-    ASSERT_OK(swull.getStatus());
-    ASSERT_EQUALS(swull.getValue().asInt64(), 34401906789LL);
-
-    swull = dateFromISOString("1971-02-03T09:16:06.78+05:11");
-    ASSERT_OK(swull.getStatus());
-    ASSERT_EQUALS(swull.getValue().asInt64(), 34401906780LL);
-
-    swull = dateFromISOString("1971-02-03T09:16:06.7+05:11");
-    ASSERT_OK(swull.getStatus());
-    ASSERT_EQUALS(swull.getValue().asInt64(), 34401906700LL);
-
-    swull = dateFromISOString("1971-02-03T09:16:06+05:11");
-    ASSERT_OK(swull.getStatus());
-    ASSERT_EQUALS(swull.getValue().asInt64(), 34401906000LL);
-
-    swull = dateFromISOString("1971-02-03T09:16+05:11");
-    ASSERT_OK(swull.getStatus());
-    ASSERT_EQUALS(swull.getValue().asInt64(), 34401900000LL);
-
-    swull = dateFromISOString("1970-01-01T00:00:00.000Z");
-    ASSERT_OK(swull.getStatus());
-    ASSERT_EQUALS(swull.getValue().asInt64(), 0LL);
-
-    swull = dateFromISOString("1970-06-30T01:06:40.981Z");
-    ASSERT_OK(swull.getStatus());
-    ASSERT_EQUALS(swull.getValue().asInt64(), 15556000981LL);
-
-    // Local times not supported
-    // swull = dateFromISOString("1970-01-01T00:00:00.001");
-    // ASSERT_OK(swull.getStatus());
-    // ASSERT_EQUALS(swull.getValue().asInt64(), 18000001LL);
-
-    // swull = dateFromISOString("1970-01-01T00:00:00.01");
-    // ASSERT_OK(swull.getStatus());
-    // ASSERT_EQUALS(swull.getValue().asInt64(), 18000010LL);
-
-    // swull = dateFromISOString("1970-01-01T00:00:00.1");
-    // ASSERT_OK(swull.getStatus());
-    // ASSERT_EQUALS(swull.getValue().asInt64(), 18000100LL);
-
-    // swull = dateFromISOString("1970-01-01T00:00:01");
-    // ASSERT_OK(swull.getStatus());
-    // ASSERT_EQUALS(swull.getValue().asInt64(), 18001000LL);
-
-    // swull = dateFromISOString("1970-01-01T00:01");
-    // ASSERT_OK(swull.getStatus());
-    // ASSERT_EQUALS(swull.getValue().asInt64(), 18060000LL);
-
-    swull = dateFromISOString("1970-06-29T21:06:40.981-04:00");
-    ASSERT_OK(swull.getStatus());
-    ASSERT_EQUALS(swull.getValue().asInt64(), 15556000981LL);
-
+    std::vector<ParseRec> v{
+        {"1971-02-03T09:16:06.789+05:11", {1971, 2, 3, 9, 16, 6, 789, 5 * 60 + 11}},
+        {"1971-02-03T09:16:06.78+05:11", {1971, 2, 3, 9, 16, 6, 780, 5 * 60 + 11}},
+        {"1971-02-03T09:16:06.7+05:11", {1971, 2, 3, 9, 16, 6, 700, 5 * 60 + 11}},
+        {"1971-02-03T09:16:06+05:11", {1971, 2, 3, 9, 16, 6, 0, 5 * 60 + 11}},
+        {"1971-02-03T09:16+05:11", {1971, 2, 3, 9, 16, 0, 0, 5 * 60 + 11}},
+        {"1970-01-01T00:00:00.000Z", {1970, 1, 1, 0, 0, 0, 0}},
+        {"1970-06-30T01:06:40.981Z", {1970, 6, 30, 1, 6, 40, 981}},
+        {"1970-06-29T21:06:40.981-04:00", {1970, 6, 29, 21, 6, 40, 981, -4 * 60}},
+        {"2038-01-19T03:14:07Z", {2038, 1, 19, 3, 14, 7, 0}},
+        {"2013-02-20T13:29:11.100-05:00", {2013, 2, 20, 13, 29, 11, 100, -5 * 60}},
+        {"2013-02-20T13:29:11.100-05:01", {2013, 2, 20, 13, 29, 11, 100, -(5 * 60 + 1)}},
+    };
     if (!isTimeTSmall) {
-        swull = dateFromISOString("2058-02-20T13:29:11.100-05:00");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 2781455351100LL);
-
-        swull = dateFromISOString("3000-12-31T23:59:59Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 32535215999000LL);
-    } else {
-        swull = dateFromISOString("2038-01-19T03:14:07Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 2147483647000LL);
+        v.insert(v.end(),
+                 {
+                     {"2058-02-20T13:29:11.100-05:00", {2058, 2, 20, 13, 29, 11, 100, -5 * 60}},
+                     {"3000-12-31T23:59:59Z", {3000, 12, 31, 23, 59, 59}},
+                 });
     }
-
-    swull = dateFromISOString("2013-02-20T13:29:11.100-05:00");
-    ASSERT_OK(swull.getStatus());
-    ASSERT_EQUALS(swull.getValue().asInt64(), 1361384951100LL);
-
-    swull = dateFromISOString("2013-02-20T13:29:11.100-05:01");
-    ASSERT_OK(swull.getStatus());
-    ASSERT_EQUALS(swull.getValue().asInt64(), 1361385011100LL);
+#if 0
+    // Local times not supported
+    v.insert(v.end(),
+             {
+                 {"1970-01-01T00:00:00.001", {1970, 1, 1, 0, 0, 0, 1}, 0},
+                 {"1970-01-01T00:00:00.01", {1970, 1, 1, 0, 0, 0, 10}, 0},
+                 {"1970-01-01T00:00:00.1", {1970, 1, 1, 0, 0, 0, 100}, 0},
+                 {"1970-01-01T00:00:01", {1970, 1, 1, 0, 0, 1, 0}, 0},
+                 {"1970-01-01T00:01", {1970, 1, 1, 0, 1, 0, 0}, 0},
+             });
+#endif
+    for (const auto& [in, outBase] : v) {
+        StatusWith<Date_t> d = dateFromISOString(in);
+        ASSERT_OK(d.getStatus()) << in;
+        ASSERT_EQUALS(d.getValue(), mkDate(outBase)) << in;
+    };
 }
 
 TEST(TimeParsing, DateAsISO8601LocalNoColon) {
@@ -292,581 +280,153 @@ TEST(TimeParsing, DateAsISO8601LocalNoColon) {
     // Year, month, day, hour, and minute are required, while the seconds component and one to
     // three milliseconds are optional.  The time zone offset must be four digits.
     // Test with colon in timezone offset, the format used by mongod version < 4.4
-
-    StatusWith<Date_t> swull = dateFromISOString("1971-02-03T09:16:06.789+0511");
-    ASSERT_OK(swull.getStatus());
-    ASSERT_EQUALS(swull.getValue().asInt64(), 34401906789LL);
-
-    swull = dateFromISOString("1971-02-03T09:16:06.78+0511");
-    ASSERT_OK(swull.getStatus());
-    ASSERT_EQUALS(swull.getValue().asInt64(), 34401906780LL);
-
-    swull = dateFromISOString("1971-02-03T09:16:06.7+0511");
-    ASSERT_OK(swull.getStatus());
-    ASSERT_EQUALS(swull.getValue().asInt64(), 34401906700LL);
-
-    swull = dateFromISOString("1971-02-03T09:16:06+0511");
-    ASSERT_OK(swull.getStatus());
-    ASSERT_EQUALS(swull.getValue().asInt64(), 34401906000LL);
-
-    swull = dateFromISOString("1971-02-03T09:16+0511");
-    ASSERT_OK(swull.getStatus());
-    ASSERT_EQUALS(swull.getValue().asInt64(), 34401900000LL);
-
-    swull = dateFromISOString("1970-06-29T21:06:40.981-0400");
-    ASSERT_OK(swull.getStatus());
-    ASSERT_EQUALS(swull.getValue().asInt64(), 15556000981LL);
-
+    std::vector<ParseRec> v{
+        {"1971-02-03T09:16:06.789+0511", {1971, 2, 3, 9, 16, 6, 789, 5 * 60 + 11}},
+        {"1971-02-03T09:16:06.78+0511", {1971, 2, 3, 9, 16, 6, 780, 5 * 60 + 11}},
+        {"1971-02-03T09:16:06.7+0511", {1971, 2, 3, 9, 16, 6, 700, 5 * 60 + 11}},
+        {"1971-02-03T09:16:06+0511", {1971, 2, 3, 9, 16, 6, 0, 5 * 60 + 11}},
+        {"1971-02-03T09:16+0511", {1971, 2, 3, 9, 16, 0, 0, 5 * 60 + 11}},
+        {"1970-06-29T21:06:40.981-0400", {1970, 6, 29, 21, 6, 40, 981, -4 * 60}},
+        {"2013-02-20T13:29:11.100-0500", {2013, 2, 20, 13, 29, 11, 100, -5 * 60}},
+        {"2013-02-20T13:29:11.100-0501", {2013, 2, 20, 13, 29, 11, 100, -(5 * 60 + 1)}},
+    };
     if (!isTimeTSmall) {
-        swull = dateFromISOString("2058-02-20T13:29:11.100-0500");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 2781455351100LL);
+        v.insert(v.end(),
+                 {
+                     {"2058-02-20T13:29:11.100-0500", {2058, 2, 20, 13, 29, 11, 100, -5 * 60}},
+                 });
     }
-
-    swull = dateFromISOString("2013-02-20T13:29:11.100-0500");
-    ASSERT_OK(swull.getStatus());
-    ASSERT_EQUALS(swull.getValue().asInt64(), 1361384951100LL);
-
-    swull = dateFromISOString("2013-02-20T13:29:11.100-0501");
-    ASSERT_OK(swull.getStatus());
-    ASSERT_EQUALS(swull.getValue().asInt64(), 1361385011100LL);
 }
 
 TEST(TimeParsing, InvalidDates) {
-    // Invalid decimal
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01T00:00:00.0.0Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01T00:00:.0.000Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01T00:.0:00.000Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01T.0:00:00.000Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-.1T00:00:00.000Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-.1-01T00:00:00.000Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString(".970-01-01T00:00:00.000Z").getStatus());
+    static constexpr const char* badDates[]{
+        // Invalid decimal
+        "1970-01-01T00:00:00.0.0Z",
+        "1970-01-01T00:00:.0.000Z",
+        "1970-01-01T00:.0:00.000Z",
+        "1970-01-01T.0:00:00.000Z",
+        "1970-01-.1T00:00:00.000Z",
+        "1970-.1-01T00:00:00.000Z",
+        ".970-01-01T00:00:00.000Z",
 
-    // Extra sign characters
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01T00:00:00.+00Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01T00:00:+0.000Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01T00:+0:00.000Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01T+0:00:00.000Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-+1T00:00:00.000Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-+1-01T00:00:00.000Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("+970-01-01T00:00:00.000Z").getStatus());
+        // Extra sign characters
+        "1970-01-01T00:00:00.+00Z",
+        "1970-01-01T00:00:+0.000Z",
+        "1970-01-01T00:+0:00.000Z",
+        "1970-01-01T+0:00:00.000Z",
+        "1970-01-+1T00:00:00.000Z",
+        "1970-+1-01T00:00:00.000Z",
+        "+970-01-01T00:00:00.000Z",
 
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01T00:00:00.-00Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01T00:00:-0.000Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01T00:-0:00.000Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01T-0:00:00.000Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01--1T00:00:00.000Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970--1-01T00:00:00.000Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("-970-01-01T00:00:00.000Z").getStatus());
+        "1970-01-01T00:00:00.-00Z",
+        "1970-01-01T00:00:-0.000Z",
+        "1970-01-01T00:-0:00.000Z",
+        "1970-01-01T-0:00:00.000Z",
+        "1970-01--1T00:00:00.000Z",
+        "1970--1-01T00:00:00.000Z",
+        "-970-01-01T00:00:00.000Z",
 
-    // Out of range
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01T00:00:60.000Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01T00:60:00.000Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01T24:00:00.000Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-32T00:00:00.000Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-00T00:00:00.000Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-13-01T00:00:00.000Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-00-01T00:00:00.000Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1969-01-01T00:00:00.000Z").getStatus());
+        // Out of range
+        "1970-01-01T00:00:60.000Z",
+        "1970-01-01T00:60:00.000Z",
+        "1970-01-01T24:00:00.000Z",
+        "1970-01-32T00:00:00.000Z",
+        "1970-01-00T00:00:00.000Z",
+        "1970-13-01T00:00:00.000Z",
+        "1970-00-01T00:00:00.000Z",
+        "1969-01-01T00:00:00.000Z",
 
-    // Invalid lengths
-    ASSERT_NOT_OK(dateFromISOString("01970-01-01T00:00:00.000Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-001-01T00:00:00.000Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-001T00:00:00.000Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01T000:00:00.000Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01T00:000:00.000Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01T00:00:000.000Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01T00:00:00.0000Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("197-01-01T00:00:00.000Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-1-01T00:00:00.000Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-1T00:00:00.000Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01T0:00:00.000Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01T00:0:00.000Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01T00:00:0.000Z").getStatus());
+        // Invalid lengths
+        "01970-01-01T00:00:00.000Z",
+        "1970-001-01T00:00:00.000Z",
+        "1970-01-001T00:00:00.000Z",
+        "1970-01-01T000:00:00.000Z",
+        "1970-01-01T00:000:00.000Z",
+        "1970-01-01T00:00:000.000Z",
+        "1970-01-01T00:00:00.0000Z",
+        "197-01-01T00:00:00.000Z",
+        "1970-1-01T00:00:00.000Z",
+        "1970-01-1T00:00:00.000Z",
+        "1970-01-01T0:00:00.000Z",
+        "1970-01-01T00:0:00.000Z",
+        "1970-01-01T00:00:0.000Z",
 
-    // Invalid delimiters
-    ASSERT_NOT_OK(dateFromISOString("1970+01-01T00:00:00.000Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01+01T00:00:00.000Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01Q00:00:00.000Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01T00-00:00.000Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01T00:00-00.000Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01T00:00:00-000Z").getStatus());
+        // Invalid delimiters
+        "1970+01-01T00:00:00.000Z",
+        "1970-01+01T00:00:00.000Z",
+        "1970-01-01Q00:00:00.000Z",
+        "1970-01-01T00-00:00.000Z",
+        "1970-01-01T00:00-00.000Z",
+        "1970-01-01T00:00:00-000Z",
 
-    // Missing numbers
-    ASSERT_NOT_OK(dateFromISOString("1970--01T00:00:00.000Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-T00:00:00.000Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01T:00:00.000Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01T00::00.000Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01T00:00:.000Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01T00:00:00.Z").getStatus());
+        // Missing numbers
+        "1970--01T00:00:00.000Z",
+        "1970-01-T00:00:00.000Z",
+        "1970-01-01T:00:00.000Z",
+        "1970-01-01T00::00.000Z",
+        "1970-01-01T00:00:.000Z",
+        "1970-01-01T00:00:00.Z",
 
-    // Bad time offset field
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01T05:00:01ZZ").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01T05:00:01+").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01T05:00:01-").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01T05:00:01-11111").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01T05:00:01Z1111").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01T05:00:01+111").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01T05:00:01+1160").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01T05:00:01+2400").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01T05:00:01+00+0").getStatus());
+        // Bad time offset field
+        "1970-01-01T05:00:01ZZ",
+        "1970-01-01T05:00:01+",
+        "1970-01-01T05:00:01-",
+        "1970-01-01T05:00:01-11111",
+        "1970-01-01T05:00:01Z1111",
+        "1970-01-01T05:00:01+111",
+        "1970-01-01T05:00:01+1160",
+        "1970-01-01T05:00:01+2400",
+        "1970-01-01T05:00:01+00+0",
 
-    // Bad prefixes
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01T05:00:01.").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01T05:00:").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01T05:").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01T").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01T05+0500").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01+0500").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01+0500").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970+0500").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01T01Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970Z").getStatus());
+        // Bad prefixes
+        "1970-01-01T05:00:01.",
+        "1970-01-01T05:00:",
+        "1970-01-01T05:",
+        "1970-01-01T",
+        "1970-01-",
+        "1970-",
+        "1970-01-01T05+0500",
+        "1970-01-01+0500",
+        "1970-01+0500",
+        "1970+0500",
+        "1970-01-01T01Z",
+        "1970-01-01Z",
+        "1970-01Z",
+        "1970Z",
 
-    // No local time
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01T00:00:00.000").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01T00:00:00").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01T00:00").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01T00").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970").getStatus());
+        // No local time
+        "1970-01-01T00:00:00.000",
+        "1970-01-01T00:00:00",
+        "1970-01-01T00:00",
+        "1970-01-01T00",
+        "1970-01-01",
+        "1970-01",
+        "1970",
 
-    // Invalid hex base specifiers
-    ASSERT_NOT_OK(dateFromISOString("x970-01-01T00:00:00.000Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-x1-01T00:00:00.000Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-x1T00:00:00.000Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01Tx0:00:00.000Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01T00:x0:00.000Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01T00:00:x0.000Z").getStatus());
-    ASSERT_NOT_OK(dateFromISOString("1970-01-01T00:00:00.x00Z").getStatus());
+        // Invalid hex base specifiers
+        "x970-01-01T00:00:00.000Z",
+        "1970-x1-01T00:00:00.000Z",
+        "1970-01-x1T00:00:00.000Z",
+        "1970-01-01Tx0:00:00.000Z",
+        "1970-01-01T00:x0:00.000Z",
+        "1970-01-01T00:00:x0.000Z",
+        "1970-01-01T00:00:00.x00Z",
+    };
+
+    for (const std::string& s : badDates) {
+        ASSERT_NOT_OK(dateFromISOString(s)) << s;
+    }
 }
 
 TEST(TimeParsing, LeapYears) {
-    StatusWith<Date_t> swull = dateFromISOString("1972-02-29T00:00:00.000Z");
-    ASSERT_OK(swull.getStatus());
-    ASSERT_EQUALS(swull.getValue().asInt64(), 68169600000LL);
-
-    swull = dateFromISOString("1976-02-29T00:00:00.000Z");
-    ASSERT_OK(swull.getStatus());
-    ASSERT_EQUALS(swull.getValue().asInt64(), 194400000000LL);
-
-    swull = dateFromISOString("1980-02-29T00:00:00.000Z");
-    ASSERT_OK(swull.getStatus());
-    ASSERT_EQUALS(swull.getValue().asInt64(), 320630400000LL);
-
-    swull = dateFromISOString("1984-02-29T00:00:00.000Z");
-    ASSERT_OK(swull.getStatus());
-    ASSERT_EQUALS(swull.getValue().asInt64(), 446860800000LL);
-
-    swull = dateFromISOString("1988-02-29T00:00:00.000Z");
-    ASSERT_OK(swull.getStatus());
-    ASSERT_EQUALS(swull.getValue().asInt64(), 573091200000LL);
-
-    swull = dateFromISOString("1992-02-29T00:00:00.000Z");
-    ASSERT_OK(swull.getStatus());
-    ASSERT_EQUALS(swull.getValue().asInt64(), 699321600000LL);
-
-    swull = dateFromISOString("1996-02-29T00:00:00.000Z");
-    ASSERT_OK(swull.getStatus());
-    ASSERT_EQUALS(swull.getValue().asInt64(), 825552000000LL);
-
-    swull = dateFromISOString("2000-02-29T00:00:00.000Z");
-    ASSERT_OK(swull.getStatus());
-    ASSERT_EQUALS(swull.getValue().asInt64(), 951782400000LL);
-
-    swull = dateFromISOString("2004-02-29T00:00:00.000Z");
-    ASSERT_OK(swull.getStatus());
-    ASSERT_EQUALS(swull.getValue().asInt64(), 1078012800000LL);
-
-    swull = dateFromISOString("2008-02-29T00:00:00.000Z");
-    ASSERT_OK(swull.getStatus());
-    ASSERT_EQUALS(swull.getValue().asInt64(), 1204243200000LL);
-
-    swull = dateFromISOString("2012-02-29T00:00:00.000Z");
-    ASSERT_OK(swull.getStatus());
-    ASSERT_EQUALS(swull.getValue().asInt64(), 1330473600000LL);
-
-    swull = dateFromISOString("2016-02-29T00:00:00.000Z");
-    ASSERT_OK(swull.getStatus());
-    ASSERT_EQUALS(swull.getValue().asInt64(), 1456704000000LL);
-
-    swull = dateFromISOString("2020-02-29T00:00:00.000Z");
-    ASSERT_OK(swull.getStatus());
-    ASSERT_EQUALS(swull.getValue().asInt64(), 1582934400000LL);
-
-    swull = dateFromISOString("2024-02-29T00:00:00.000Z");
-    ASSERT_OK(swull.getStatus());
-    ASSERT_EQUALS(swull.getValue().asInt64(), 1709164800000LL);
-
-    swull = dateFromISOString("2028-02-29T00:00:00.000Z");
-    ASSERT_OK(swull.getStatus());
-    ASSERT_EQUALS(swull.getValue().asInt64(), 1835395200000LL);
-
-    swull = dateFromISOString("2032-02-29T00:00:00.000Z");
-    ASSERT_OK(swull.getStatus());
-    ASSERT_EQUALS(swull.getValue().asInt64(), 1961625600000LL);
-
-    swull = dateFromISOString("2036-02-29T00:00:00.000Z");
-    ASSERT_OK(swull.getStatus());
-    ASSERT_EQUALS(swull.getValue().asInt64(), 2087856000000LL);
-
-    if (!isTimeTSmall) {
-        swull = dateFromISOString("2040-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 2214086400000LL);
-
-        swull = dateFromISOString("2044-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 2340316800000LL);
-
-        swull = dateFromISOString("2048-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 2466547200000LL);
-
-        swull = dateFromISOString("2052-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 2592777600000LL);
-
-        swull = dateFromISOString("2056-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 2719008000000LL);
-
-        swull = dateFromISOString("2060-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 2845238400000LL);
-
-        swull = dateFromISOString("2064-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 2971468800000LL);
-
-        swull = dateFromISOString("2068-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 3097699200000LL);
-
-        swull = dateFromISOString("2072-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 3223929600000LL);
-
-        swull = dateFromISOString("2076-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 3350160000000LL);
-
-        swull = dateFromISOString("2080-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 3476390400000LL);
-
-        swull = dateFromISOString("2084-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 3602620800000LL);
-
-        swull = dateFromISOString("2088-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 3728851200000LL);
-
-        swull = dateFromISOString("2092-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 3855081600000LL);
-
-        swull = dateFromISOString("2096-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 3981312000000LL);
-
-        swull = dateFromISOString("2104-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 4233686400000LL);
-
-        swull = dateFromISOString("2108-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 4359916800000LL);
-
-        swull = dateFromISOString("2112-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 4486147200000LL);
-
-        swull = dateFromISOString("2116-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 4612377600000LL);
-
-        swull = dateFromISOString("2120-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 4738608000000LL);
-
-        swull = dateFromISOString("2124-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 4864838400000LL);
-
-        swull = dateFromISOString("2128-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 4991068800000LL);
-
-        swull = dateFromISOString("2132-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 5117299200000LL);
-
-        swull = dateFromISOString("2136-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 5243529600000LL);
-
-        swull = dateFromISOString("2140-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 5369760000000LL);
-
-        swull = dateFromISOString("2144-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 5495990400000LL);
-
-        swull = dateFromISOString("2148-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 5622220800000LL);
-
-        swull = dateFromISOString("2152-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 5748451200000LL);
-
-        swull = dateFromISOString("2156-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 5874681600000LL);
-
-        swull = dateFromISOString("2160-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 6000912000000LL);
-
-        swull = dateFromISOString("2164-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 6127142400000LL);
-
-        swull = dateFromISOString("2168-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 6253372800000LL);
-
-        swull = dateFromISOString("2172-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 6379603200000LL);
-
-        swull = dateFromISOString("2176-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 6505833600000LL);
-
-        swull = dateFromISOString("2180-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 6632064000000LL);
-
-        swull = dateFromISOString("2184-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 6758294400000LL);
-
-        swull = dateFromISOString("2188-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 6884524800000LL);
-
-        swull = dateFromISOString("2192-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 7010755200000LL);
-
-        swull = dateFromISOString("2196-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 7136985600000LL);
-
-        swull = dateFromISOString("2204-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 7389360000000LL);
-
-        swull = dateFromISOString("2208-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 7515590400000LL);
-
-        swull = dateFromISOString("2212-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 7641820800000LL);
-
-        swull = dateFromISOString("2216-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 7768051200000LL);
-
-        swull = dateFromISOString("2220-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 7894281600000LL);
-
-        swull = dateFromISOString("2224-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 8020512000000LL);
-
-        swull = dateFromISOString("2228-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 8146742400000LL);
-
-        swull = dateFromISOString("2232-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 8272972800000LL);
-
-        swull = dateFromISOString("2236-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 8399203200000LL);
-
-        swull = dateFromISOString("2240-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 8525433600000LL);
-
-        swull = dateFromISOString("2244-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 8651664000000LL);
-
-        swull = dateFromISOString("2248-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 8777894400000LL);
-
-        swull = dateFromISOString("2252-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 8904124800000LL);
-
-        swull = dateFromISOString("2256-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 9030355200000LL);
-
-        swull = dateFromISOString("2260-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 9156585600000LL);
-
-        swull = dateFromISOString("2264-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 9282816000000LL);
-
-        swull = dateFromISOString("2268-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 9409046400000LL);
-
-        swull = dateFromISOString("2272-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 9535276800000LL);
-
-        swull = dateFromISOString("2276-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 9661507200000LL);
-
-        swull = dateFromISOString("2280-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 9787737600000LL);
-
-        swull = dateFromISOString("2284-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 9913968000000LL);
-
-        swull = dateFromISOString("2288-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 10040198400000LL);
-
-        swull = dateFromISOString("2292-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 10166428800000LL);
-
-        swull = dateFromISOString("2296-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 10292659200000LL);
-
-        swull = dateFromISOString("2304-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 10545033600000LL);
-
-        swull = dateFromISOString("2308-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 10671264000000LL);
-
-        swull = dateFromISOString("2312-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 10797494400000LL);
-
-        swull = dateFromISOString("2316-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 10923724800000LL);
-
-        swull = dateFromISOString("2320-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 11049955200000LL);
-
-        swull = dateFromISOString("2324-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 11176185600000LL);
-
-        swull = dateFromISOString("2328-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 11302416000000LL);
-
-        swull = dateFromISOString("2332-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 11428646400000LL);
-
-        swull = dateFromISOString("2336-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 11554876800000LL);
-
-        swull = dateFromISOString("2340-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 11681107200000LL);
-
-        swull = dateFromISOString("2344-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 11807337600000LL);
-
-        swull = dateFromISOString("2348-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 11933568000000LL);
-
-        swull = dateFromISOString("2352-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 12059798400000LL);
-
-        swull = dateFromISOString("2356-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 12186028800000LL);
-
-        swull = dateFromISOString("2360-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 12312259200000LL);
-
-        swull = dateFromISOString("2364-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 12438489600000LL);
-
-        swull = dateFromISOString("2368-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 12564720000000LL);
-
-        swull = dateFromISOString("2372-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 12690950400000LL);
-
-        swull = dateFromISOString("2376-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 12817180800000LL);
-
-        swull = dateFromISOString("2380-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 12943411200000LL);
-
-        swull = dateFromISOString("2384-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 13069641600000LL);
-
-        swull = dateFromISOString("2388-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 13195872000000LL);
-
-        swull = dateFromISOString("2392-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 13322102400000LL);
-
-        swull = dateFromISOString("2396-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 13448332800000LL);
-
-        swull = dateFromISOString("2400-02-29T00:00:00.000Z");
-        ASSERT_OK(swull.getStatus());
-        ASSERT_EQUALS(swull.getValue().asInt64(), 13574563200000LL);
+    int maxYear = isTimeTSmall ? 2036 : 9999;
+    for (int y = 1972; y <= maxYear; y += 4) {
+        if (!isLeap(y))
+            continue;
+        std::string in = "{:04}-02-29T00:00:00.000Z"_format(y);
+        StatusWith<Date_t> d = dateFromISOString(in);
+        ASSERT_OK(d.getStatus()) << y;
+        ASSERT_EQUALS(d.getValue(), mkDate({y, 2, 29})) << y;
     }
 }
 
