@@ -16,8 +16,11 @@ function shardSplitApplySplitConfig() {
     // Skip db hash check because secondary is left with a different config.
     TestData.skipCheckDBHashes = true;
 
-    const test =
-        new BasicServerlessTest({recipientTagName: "recipientNode", recipientSetName: "recipient"});
+    const test = new BasicServerlessTest({
+        recipientTagName: "recipientNode",
+        recipientSetName: "recipient",
+        quickGarbageCollection: true
+    });
     test.addRecipientNodes();
 
     const donorPrimary = test.donor.getPrimary();
@@ -27,10 +30,8 @@ function shardSplitApplySplitConfig() {
     jsTestLog("Asserting no state document exist before command");
     assert.isnull(findMigration(donorPrimary, migrationId));
 
-    const adminDb = donorPrimary.getDB("admin");
-    configureFailPoint(adminDb, "skipShardSplitWaitForSplitAcceptance");
-
     jsTestLog("Running commitShardSplit command");
+    const adminDb = donorPrimary.getDB("admin");
     assert.commandWorked(adminDb.runCommand({
         commitShardSplit: 1,
         migrationId,
@@ -42,6 +43,8 @@ function shardSplitApplySplitConfig() {
     jsTestLog("Asserting state document exist after command");
     assertMigrationState(donorPrimary, migrationId, "committed");
 
+    test.removeRecipientNodesFromDonor();
+
     jsTestLog("Asserting a split config has been applied");
     const configDoc = test.donor.getReplSetConfigFromNode();
     assert(configDoc, "There must be a config document");
@@ -50,9 +53,9 @@ function shardSplitApplySplitConfig() {
     assert.eq(configDoc["recipientConfig"]["_id"], "recipient");
     assert.eq(configDoc["recipientConfig"]["members"].length, 3);
 
-    jsTestLog("Running forgetShardSplit command");
-    assert.commandWorked(adminDb.runCommand({forgetShardSplit: 1, migrationId}));
+    test.forgetShardSplit(migrationId);
 
+    test.waitForGarbageCollection(migrationId, tenantIds);
     test.stop();
 }
 

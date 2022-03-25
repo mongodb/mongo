@@ -140,10 +140,11 @@ private:
     mutable Mutex _mutex =
         MONGO_MAKE_LATCH("ShardSplitDonorService::getRecipientAcceptSplitFuture::_mutex");
 
-    AtomicWord<bool> _fulfilled{false};
+    bool _fulfilled{false};
     const size_t _numberOfRecipient;
     std::string _recipientSetName;
     std::map<HostAndPort, std::string> _reportedSetNames;
+    bool _hasPrimary{false};
     SharedPromise<void> _promise;
 };
 

@@ -238,7 +238,7 @@ bool shouldRemoveStateDocumentOnRecipient(OperationContext* opCtx,
     auto recipientSetName = *stateDocument.getRecipientSetName();
     auto config = repl::ReplicationCoordinator::get(cc().getServiceContext())->getConfig();
     return recipientSetName == config.getReplSetName() &&
-        stateDocument.getState() == ShardSplitDonorStateEnum::kBlocking;
+        stateDocument.getState() >= ShardSplitDonorStateEnum::kBlocking;
 }
 
 Status validateRecipientNodesForShardSplit(const ShardSplitDonorDocument& stateDocument,
@@ -306,20 +306,24 @@ RecipientAcceptSplitListener::RecipientAcceptSplitListener(
 
 void RecipientAcceptSplitListener::onServerHeartbeatSucceededEvent(const HostAndPort& hostAndPort,
                                                                    const BSONObj reply) {
-    if (_fulfilled.load() || !reply["setName"]) {
+    stdx::lock_guard<Latch> lg(_mutex);
+    if (_fulfilled || !reply["setName"]) {
         return;
     }
 
-    stdx::lock_guard<Latch> lg(_mutex);
     _reportedSetNames[hostAndPort] = reply["setName"].str();
+
+    if (!_hasPrimary && reply["ismaster"].booleanSafe()) {
+        _hasPrimary = true;
+    }
 
     auto allReportCorrectly =
         std::all_of(_reportedSetNames.begin(),
                     _reportedSetNames.end(),
                     [&](const auto& entry) { return entry.second == _recipientSetName; }) &&
         _reportedSetNames.size() == _numberOfRecipient;
-    if (allReportCorrectly) {
-        _fulfilled.store(true);
+    if (allReportCorrectly && _hasPrimary) {
+        _fulfilled = true;
         _promise.emplaceValue();
     }
 }

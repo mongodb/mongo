@@ -17,8 +17,11 @@ jsTestLog("Starting runBlocking");
 // Skip db hash check because secondary is left with a different config.
 TestData.skipCheckDBHashes = true;
 
-const test =
-    new BasicServerlessTest({recipientTagName: "recipientNode", recipientSetName: "recipient"});
+const test = new BasicServerlessTest({
+    recipientTagName: "recipientNode",
+    recipientSetName: "recipient",
+    quickGarbageCollection: true
+});
 test.addRecipientNodes();
 
 const donorPrimary = test.donor.getPrimary();
@@ -39,9 +42,6 @@ tenantIds.forEach(id => {
 // configure failpoints
 const adminDb = donorPrimary.getDB("admin");
 const blockingFailPoint = configureFailPoint(adminDb, "pauseShardSplitAfterBlocking");
-
-// TODO(SERVER-64168): remove this when split is ready
-configureFailPoint(adminDb, "skipShardSplitWaitForSplitAcceptance");
 
 jsTestLog("Running commitShardSplit command");
 const awaitCommand = startParallelShell(
@@ -89,8 +89,9 @@ writeThreads.forEach(thread => thread.join());
 jsTestLog("Asserting state document exist after command");
 assertMigrationState(donorPrimary, migrationId, "committed");
 
-jsTestLog("Running forgetShardSplit command");
-assert.commandWorked(adminDb.runCommand({forgetShardSplit: 1, migrationId}));
+test.removeRecipientNodesFromDonor();
 
+test.forgetShardSplit(migrationId);
+test.waitForGarbageCollection(migrationId, tenantIds);
 test.stop();
 })();

@@ -505,7 +505,9 @@ TEST_F(SplitReplicaSetObserverTest, FutureReady) {
         ASSERT_FALSE(listener.getFuture().isReady());
         listener.onServerHeartbeatSucceededEvent(host, BSON("setName" << _validRepl.getSetName()));
     }
-
+    listener.onServerHeartbeatSucceededEvent(
+        _validRepl.getHosts().front(),
+        BSON("setName" << _validRepl.getSetName() << "ismaster" << true));
     ASSERT_TRUE(listener.getFuture().isReady());
 }
 
@@ -524,6 +526,9 @@ TEST_F(SplitReplicaSetObserverTest, FutureReadyNameChange) {
     for (const auto& host : _validRepl.getHosts()) {
         listener.onServerHeartbeatSucceededEvent(host, BSON("setName" << _validRepl.getSetName()));
     }
+    listener.onServerHeartbeatSucceededEvent(
+        _validRepl.getHosts().front(),
+        BSON("setName" << _validRepl.getSetName() << "ismaster" << true));
 
     ASSERT_TRUE(listener.getFuture().isReady());
 }

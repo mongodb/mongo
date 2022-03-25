@@ -16,9 +16,10 @@ const recipientSetName = "recipientSetName";
 const test = new BasicServerlessTest({
     recipientTagName,
     recipientSetName,
+    quickGarbageCollection: true,
     nodeOptions: {
-        // Set a short timeout to test that the operation times out waiting for replication
-        setParameter: "shardSplitTimeoutMS=100000"
+        setParameter:  // Timeout to test that the operation times out waiting for replication
+            {shardSplitTimeoutMS: 2000}
     }
 });
 
@@ -29,16 +30,14 @@ const migrationId = UUID();
 
 jsTestLog("Running the commitShardSplit operation");
 const admin = test.donor.getPrimary().getDB("admin");
-assert.commandWorked(admin.runCommand({
-    commitShardSplit: 1,
-    migrationId,
-    tenantIds: ["tenant1", "tenant2"],
-    recipientTagName,
-    recipientSetName
-}));
+const tenantIds = ["tenant1", "tenant2"];
+assert.commandWorked(admin.runCommand(
+    {commitShardSplit: 1, migrationId, tenantIds, recipientTagName, recipientSetName}));
 
-jsTestLog("Forgetting shard split");
-assert.commandWorked(test.donor.getPrimary().adminCommand({forgetShardSplit: 1, migrationId}));
+test.removeRecipientNodesFromDonor();
 
+test.forgetShardSplit(migrationId);
+
+test.waitForGarbageCollection(migrationId, tenantIds);
 test.stop();
 })();

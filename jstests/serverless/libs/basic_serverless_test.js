@@ -1,5 +1,11 @@
 class BasicServerlessTest {
-    constructor({recipientTagName, recipientSetName, nodeOptions}) {
+    constructor({recipientTagName, recipientSetName, quickGarbageCollection = false, nodeOptions}) {
+        nodeOptions = nodeOptions || {};
+        if (quickGarbageCollection) {
+            nodeOptions["setParameter"] = nodeOptions["setParameter"] || {};
+            Object.assign(nodeOptions["setParameter"],
+                          {shardSplitGarbageCollectionDelayMS: 1000, ttlMonitorSleepSecs: 1});
+        }
         this.donor = new ReplSetTest({name: "donor", nodes: 3, serverless: true, nodeOptions});
         this.donor.startSet();
         this.donor.initiate();
@@ -56,7 +62,13 @@ class BasicServerlessTest {
 
     removeAndStopRecipientNodes() {
         print("Removing and stopping recipient nodes");
-        this.recipientNodes.forEach(node => this.donor.remove(node));
+        this.recipientNodes.forEach(node => {
+            if (this.donor.nodes.includes(node)) {
+                this.donor.remove(node);
+            } else {
+                MongoRunner.stopMongod(node);
+            }
+        });
     }
 
     /**
@@ -65,15 +77,84 @@ class BasicServerlessTest {
     tenantDB(tenantId, dbName) {
         return `${tenantId}_${dbName}`;
     }
+
+    getTenantMigrationAccessBlocker({donorNode, tenantId}) {
+        const res = donorNode.adminCommand({serverStatus: 1});
+        assert.commandWorked(res);
+
+        const tenantMigrationAccessBlocker = res.tenantMigrationAccessBlocker;
+
+        if (!tenantMigrationAccessBlocker) {
+            return undefined;
+        }
+
+        tenantMigrationAccessBlocker.donor =
+            tenantMigrationAccessBlocker[tenantId] && tenantMigrationAccessBlocker[tenantId].donor;
+
+        return tenantMigrationAccessBlocker;
+    }
+
+    /*
+     *  Wait for state document garbage collection by polling for when the document has been removed
+     * from the tenantSplitDonors namespace, and all access blockers have been removed.
+     * @param {migrationId} id that was used for the commitShardSplit command.
+     * @param {tenantIds} tenant ids of the shard split.
+     */
+    waitForGarbageCollection(migrationId, tenantIds) {
+        jsTestLog("Wait for garbage collection");
+        const donorNodes = this.donor.nodes;
+        assert.soon(() => donorNodes.every(node => {
+            const donorDocumentDeleted =
+                node.getCollection(BasicServerlessTest.kConfigSplitDonorsNS).count({
+                    _id: migrationId
+                }) === 0;
+            const allAccessBlockersRemoved = tenantIds.every(
+                id => this.getTenantMigrationAccessBlocker({donorNode: node, id}) == null);
+
+            const result = donorDocumentDeleted && allAccessBlockersRemoved;
+            if (!result) {
+                const status = [];
+                if (!donorDocumentDeleted) {
+                    status.push(`donor document to be deleted (docCount=${
+                        node.getCollection(BasicServerlessTest.kConfigSplitDonorsNS).count({
+                            _id: migrationId
+                        })})`);
+                }
+
+                if (!allAccessBlockersRemoved) {
+                    const tenantsWithBlockers = tenantIds.filter(
+                        id => this.getTenantMigrationAccessBlocker({donorNode: node, id}) != null);
+                    status.push(`access blockers to be removed (${tenantsWithBlockers})`);
+                }
+            }
+            return donorDocumentDeleted && allAccessBlockersRemoved;
+        }));
+    }
+
+    forgetShardSplit(migrationId) {
+        jsTestLog("Running forgetShardSplit command");
+        const cmdObj = {forgetShardSplit: 1, migrationId: migrationId};
+        const primary = this.donor.getPrimary();
+        return assert.commandWorked(primary.getDB('admin').runCommand(cmdObj));
+    }
+
+    removeRecipientNodesFromDonor() {
+        jsTestLog("Removing recipient nodes from the donor.");
+        this.donor.nodes = this.donor.nodes.filter(node => !this.recipientNodes.includes(node));
+        this.donor.ports =
+            this.donor.ports.filter(port => !this.recipientNodes.some(node => node.port === port));
+    }
 }
 
+BasicServerlessTest.kConfigSplitDonorsNS = "config.tenantSplitDonors";
+
 function findMigration(primary, uuid) {
-    const donorsCollection = primary.getDB("config").getCollection("tenantSplitDonors");
+    const donorsCollection = primary.getCollection(BasicServerlessTest.kConfigSplitDonorsNS);
     return donorsCollection.findOne({"_id": uuid});
 }
 
 function cleanupMigrationDocument(primary, uuid) {
-    const donorsCollection = primary.getDB("config").getCollection("tenantSplitDonors");
+    const donorsCollection = primary.getCollection(BasicServerlessTest.kConfigSplitDonorsNS);
     return donorsCollection.deleteOne({"_id": uuid}, {w: "majority"});
 }
 
