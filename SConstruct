@@ -3568,6 +3568,7 @@ def doConfigure(myenv):
                 # https://github.com/ccache/ccache/pull/258
                 # https://github.com/ccache/ccache/issues/318
                 env.Append(CCACHE_EXTRAFILES=supportedDenyfiles)
+                env['CCACHE_EXTRAFILES_USE_SOURCE_PATHS'] = True
 
             def SanitizerDenylistGenerator(source, target, env, for_signature):
                 if for_signature:

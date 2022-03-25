@@ -112,11 +112,15 @@ def generate(env):
     # hash can be calculated on them. This both reduces the amount of work ccache needs to
     # do and increases the likelihood of a cache hit.
     if env.ToolchainIs("clang"):
-        env["ENV"].pop("CCACHE_CPP2", None)
-        env["ENV"]["CCACHE_NOCPP2"] = "1"
-        env.AppendUnique(CCFLAGS=["-frewrite-includes"])
+        if not env.get('CCACHE_EXTRAFILES_USE_SOURCE_PATHS', False):
+            env["ENV"].pop("CCACHE_CPP2", None)
+            env["ENV"]["CCACHE_NOCPP2"] = "1"
+            env.AppendUnique(CCFLAGS=["-frewrite-includes"])
+        else:
+            env["ENV"].pop("CCACHE_NOCPP2", None)
+            env["ENV"]["CCACHE_CPP2"] = "1"
     elif env.ToolchainIs("gcc"):
-        if icecream_enabled:
+        if icecream_enabled and not env.get('CCACHE_EXTRAFILES_USE_SOURCE_PATHS', False):
             # Newer versions of Icecream will drop -fdirectives-only from
             # preprocessor and compiler flags if it does not find a remote
             # build host to build on. ccache, on the other hand, will not
