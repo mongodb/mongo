@@ -54,6 +54,12 @@ public:
     void checkUserWritesAllowed(OperationContext* opCtx, const NamespaceString& nss) const;
 
     /**
+     * Returns whether user write blocking is enabled, disregarding a specific namespace and the
+     * state of WriteBlockBypass. Used for serverStatus.
+     */
+    bool isUserWriteBlockingEnabled(OperationContext* opCtx) const;
+
+    /**
      * Methods to enable/disable blocking new sharded DDL operations.
      */
     void enableUserShardedDDLBlocking(OperationContext* opCtx);

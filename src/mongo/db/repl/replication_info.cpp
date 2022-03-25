@@ -60,6 +60,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/s/global_user_write_block_state.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/network_interface.h"
@@ -175,6 +176,8 @@ TopologyVersion appendReplicationInfo(OperationContext* opCtx,
 
 class ReplicationInfoServerStatus : public ServerStatusSection {
 public:
+    enum class UserWriteBlockState { kUnknown = 0, kDisabled = 1, kEnabled = 2 };
+
     ReplicationInfoServerStatus() : ServerStatusSection("repl") {}
 
     bool includeByDefault() const override {
@@ -202,6 +205,24 @@ public:
         auto rbid = ReplicationProcess::get(opCtx)->getRollbackID();
         if (ReplicationProcess::kUninitializedRollbackId != rbid) {
             result.append("rbid", rbid);
+        }
+        {
+            auto state = UserWriteBlockState::kUnknown;
+            // Try to lock. If we fail (i.e. lock is already held in write mode), don't read the
+            // GlobalUserWriteBlockState and set the userWriteBlockMode field to kUnknown.
+            Lock::GlobalLock lk(opCtx,
+                                MODE_IS,
+                                Date_t::now(),
+                                Lock::InterruptBehavior::kLeaveUnlocked,
+                                true /* skipRSTLLock */);
+            if (!lk.isLocked()) {
+                LOGV2_DEBUG(6345700, 2, "Failed to retrieve user write block state");
+            } else {
+                state = GlobalUserWriteBlockState::get(opCtx)->isUserWriteBlockingEnabled(opCtx)
+                    ? UserWriteBlockState::kEnabled
+                    : UserWriteBlockState::kDisabled;
+            }
+            result.append("userWriteBlockMode", state);
         }
 
         return result.obj();

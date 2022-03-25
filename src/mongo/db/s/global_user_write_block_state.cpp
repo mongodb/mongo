@@ -65,6 +65,11 @@ void GlobalUserWriteBlockState::checkUserWritesAllowed(OperationContext* opCtx,
                 nss.isOnInternalDb());
 }
 
+bool GlobalUserWriteBlockState::isUserWriteBlockingEnabled(OperationContext* opCtx) const {
+    invariant(opCtx->lockState()->isLocked());
+    return _globalUserWritesBlocked;
+}
+
 void GlobalUserWriteBlockState::enableUserShardedDDLBlocking(OperationContext* opCtx) {
     invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
     _userShardedDDLBlocked.store(true);

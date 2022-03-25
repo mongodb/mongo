@@ -12,6 +12,12 @@
 (function() {
 'use strict';
 
+const WriteBlockState = {
+    UNKNOWN: 0,
+    DISABLED: 1,
+    ENABLED: 2
+};
+
 // For this test to work, we expect the state of the collection passed to be a single {a: 2}
 // document. This test is expected to maintain that state.
 function testCUD(coll, shouldSucceed, expectedFailure) {
@@ -41,10 +47,19 @@ const bypassUser = "adminUser";
 const noBypassUser = "user";
 const password = "password";
 
-function runTest(frontend) {
+function runTest(frontend, getStatus, hasReplStatus) {
     const db = frontend.getDB(jsTestName());
     const coll = db.test;
     const admin = frontend.getDB('admin');
+
+    function assertWriteBlockMode(expectedUserWriteBlockMode) {
+        const status = getStatus();
+        if (hasReplStatus) {
+            assert.eq(expectedUserWriteBlockMode, status.repl.userWriteBlockMode);
+        } else {
+            assert(!("repl" in status));
+        }
+    }
 
     function asUser(user, fun) {
         assert(admin.auth(user, password));
@@ -71,6 +86,7 @@ function runTest(frontend) {
         // Set up CUD test
         assert.commandWorked(coll.insert({a: 2}));
         // Ensure that without setUserWriteBlockMode, both users are privileged for CUD ops
+        assertWriteBlockMode(WriteBlockState.DISABLED);
         testCUD(coll, true);
     });
     asUser(noBypassUser, () => {
@@ -81,8 +97,10 @@ function runTest(frontend) {
     });
 
     asUser(bypassUser, () => {
+        assertWriteBlockMode(WriteBlockState.DISABLED);
         // Ensure that privileged user can run setUserWriteBlockMode
         assert.commandWorked(admin.runCommand({setUserWriteBlockMode: 1, global: true}));
+        assertWriteBlockMode(WriteBlockState.ENABLED);
         // Now with setUserWriteBlockMode enabled, ensure that only the bypassUser can CUD
         testCUD(coll, true);
     });
@@ -94,6 +112,7 @@ function runTest(frontend) {
     // Now disable userWriteBlockMode and ensure both users can CUD again
     asUser(bypassUser, () => {
         assert.commandWorked(admin.runCommand({setUserWriteBlockMode: 1, global: false}));
+        assertWriteBlockMode(WriteBlockState.DISABLED);
         testCUD(coll, true);
     });
 
@@ -104,7 +123,7 @@ function runTest(frontend) {
 
 // Validate that setting user write blocking fails on standalones
 const conn = MongoRunner.runMongod({auth: "", bind_ip: "127.0.0.1"});
-assert.throws(() => runTest(conn));
+assert.throws(() => runTest(conn, () => conn.getDB('admin').serverStatus(), false));
 MongoRunner.stopMongod(conn);
 
 const keyfile = "jstests/libs/key1";
@@ -114,11 +133,35 @@ const rst = new ReplSetTest({nodes: 3, nodeOptions: {auth: "", bind_ip_all: ""},
 rst.startSet();
 rst.initiate();
 const primary = rst.getPrimary();
-runTest(primary);
+const admin = primary.getDB('admin');
+runTest(primary, () => admin.serverStatus(), true);
+
+// Also, test that when we hold a write lock by sleeping in a parallel shell, the userWriteBlockMode
+// field in serverStatus will correctly return UNKNOWN and the serverStatus call will not hang.
+admin.auth(bypassUser, password);
+const parallelShell = startParallelShell(() => {
+    db.getSiblingDB('admin').auth("adminUser", "password");
+    assert.commandFailedWithCode(db.adminCommand({sleep: 1, lock: "w", seconds: 600}),
+                                 ErrorCodes.Interrupted);
+}, primary.port);
+assert.soon(() => admin.currentOp({"command.sleep": 1, active: true}).inprog.length === 1);
+
+const status = admin.serverStatus();
+assert.eq(WriteBlockState.UNKNOWN, status.repl.userWriteBlockMode);
+
+const sleepOps = admin.currentOp({"command.sleep": 1, active: true}).inprog;
+assert.eq(sleepOps.length, 1);
+const sleepOpId = sleepOps[0].opid;
+assert.commandWorked(admin.runCommand({killOp: 1, op: sleepOpId}));
+parallelShell();
+
 rst.stopSet();
 
 // Test on a sharded cluster
 const st = new ShardingTest({shards: 1, mongos: 1, config: 1, auth: "", other: {keyFile: keyfile}});
-runTest(st.s);
+const backend = st.rs0.getPrimary();
+runTest(st.s,
+        () => authutil.asCluster(backend, keyfile, () => backend.getDB('admin').serverStatus()),
+        true);
 st.stop();
 })();
