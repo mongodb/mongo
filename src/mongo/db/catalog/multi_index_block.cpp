@@ -52,6 +52,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/tenant_migration_conflict_info.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
@@ -271,10 +272,10 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
             info = statusWithInfo.getValue();
             indexInfoObjs.push_back(info);
 
-            // TODO SERVER-54592: Remove FCV check once feature flag is enabled.
             boost::optional<TimeseriesOptions> options = collection->getTimeseriesOptions();
             if (options &&
-                serverGlobalParams.featureCompatibility.isFCVUpgradingToOrAlreadyLatest() &&
+                feature_flags::gTimeseriesMetricIndexes.isEnabled(
+                    serverGlobalParams.featureCompatibility) &&
                 timeseries::doesBucketsIndexIncludeMeasurement(
                     opCtx, collection->ns(), *options, info)) {
                 invariant(collection->getTimeseriesBucketsMayHaveMixedSchemaData());
