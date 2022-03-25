@@ -30,16 +30,37 @@
 #pragma once
 
 #include "mongo/base/error_codes.h"
+#include "mongo/db/cancelable_operation_context.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/stale_exception.h"
+#include "mongo/util/future_util.h"
+#include "mongo/util/out_of_line_executor.h"
 
 namespace mongo {
 
+namespace shard_version_retry {
+
+void checkErrorStatusAndMaxRetries(const Status& status,
+                                   const NamespaceString& nss,
+                                   CatalogCache* catalogCache,
+                                   StringData taskDescription,
+                                   size_t numAttempts);
+
 /**
- * Adds a log message with the given message. Simple helper to avoid defining the log component in a
- * header file.
+ * Performs necessary cache invalidations based on the error status.
+ * Throws if it encountered an unexpected status or numAttempts exceeded maximum amount.
  */
-void logFailedRetryAttempt(StringData taskDescription, const DBException& ex);
+template <typename T>
+void checkErrorStatusAndMaxRetries(const StatusWith<T>& status,
+                                   const NamespaceString& nss,
+                                   CatalogCache* catalogCache,
+                                   StringData taskDescription,
+                                   size_t numAttempts) {
+    return checkErrorStatusAndMaxRetries(
+        status.getStatus(), nss, catalogCache, taskDescription, numAttempts);
+}
+
+}  // namespace shard_version_retry
 
 /**
  * A retry loop which handles errors in ErrorCategory::StaleShardVersionError. When such an error is
@@ -54,55 +75,65 @@ auto shardVersionRetry(OperationContext* opCtx,
                        StringData taskDescription,
                        F&& callbackFn) {
     size_t numAttempts = 0;
-    auto logAndTestMaxRetries = [&numAttempts, taskDescription](auto& exception) {
-        if (++numAttempts <= kMaxNumStaleVersionRetries) {
-            logFailedRetryAttempt(taskDescription, exception);
-            return true;
-        }
-        exception.addContext(str::stream()
-                             << "Exceeded maximum number of " << kMaxNumStaleVersionRetries
-                             << " retries attempting " << taskDescription);
-        return false;
-    };
 
     while (true) {
         catalogCache->setOperationShouldBlockBehindCatalogCacheRefresh(opCtx, numAttempts);
 
         try {
             return callbackFn();
-        } catch (ExceptionFor<ErrorCodes::StaleDbVersion>& ex) {
-            invariant(ex->getDb() == nss.db(),
-                      str::stream() << "StaleDbVersion error on unexpected database. Expected "
-                                    << nss.db() << ", received " << ex->getDb());
-
-            // If the database version is stale, refresh its entry in the catalog cache.
-            Grid::get(opCtx)->catalogCache()->onStaleDatabaseVersion(ex->getDb(),
-                                                                     ex->getVersionWanted());
-
-            if (!logAndTestMaxRetries(ex)) {
-                throw;
-            }
-        } catch (ExceptionForCat<ErrorCategory::StaleShardVersionError>& e) {
-            // If the exception provides a shardId, add it to the set of shards requiring a refresh.
-            // If the cache currently considers the collection to be unsharded, this will trigger an
-            // epoch refresh. If no shard is provided, then the epoch is stale and we must refresh.
-            if (auto staleInfo = e.extraInfo<StaleConfigInfo>()) {
-                invariant(staleInfo->getNss() == nss,
-                          str::stream() << "StaleConfig error on unexpected namespace. Expected "
-                                        << nss << ", received " << staleInfo->getNss());
-                catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
-                    nss, staleInfo->getVersionWanted(), staleInfo->getShardId());
-            } else {
-                catalogCache->invalidateCollectionEntry_LINEARIZABLE(nss);
-            }
-            if (!logAndTestMaxRetries(e)) {
-                throw;
-            }
-        } catch (ExceptionFor<ErrorCodes::ShardInvalidatedForTargeting>& e) {
-            if (!logAndTestMaxRetries(e)) {
-                throw;
-            }
+        } catch (const DBException& ex) {
+            shard_version_retry::checkErrorStatusAndMaxRetries(
+                ex.toStatus(), nss, catalogCache, taskDescription, ++numAttempts);
         }
     }
 }
+
+/**
+ * Async loop for retrying stale database/shard version a finite number of times. callbackFn should
+ * accept OperationContext* as an argument.
+ *
+ * Note: Currently only supports void return type for callbackFn.
+ */
+template <typename Callable>
+auto shardVersionRetry(ServiceContext* service,
+                       NamespaceString nss,
+                       CatalogCache* catalogCache,
+                       StringData taskDescription,
+                       ExecutorPtr executor,
+                       CancellationToken cancelToken,
+                       Callable&& callbackFn) {
+    auto numAttempts = std::make_shared<size_t>(0);
+
+    auto body = [service,
+                 catalogCache,
+                 taskDescription,
+                 numAttempts,
+                 _callbackFn = std::move(callbackFn),
+                 executor,
+                 cancelToken] {
+        ThreadClient tc(taskDescription, service);
+        CancelableOperationContextFactory opCtxFactory(cancelToken, executor);
+        auto cancelableOpCtx = opCtxFactory.makeOperationContext(tc.get());
+        auto opCtx = cancelableOpCtx.get();
+
+        catalogCache->setOperationShouldBlockBehindCatalogCacheRefresh(opCtx, *numAttempts);
+        return _callbackFn(opCtx);
+    };
+
+    using ResultType = std::invoke_result_t<Callable, OperationContext*>;
+
+    return AsyncTry<decltype(body)>(std::move(body))
+        .until([numAttempts, _nss = std::move(nss), catalogCache, taskDescription](
+                   const StatusOrStatusWith<ResultType>& statusOrStatusWith) {
+            if (statusOrStatusWith.isOK()) {
+                return true;
+            }
+
+            shard_version_retry::checkErrorStatusAndMaxRetries(
+                statusOrStatusWith, _nss, catalogCache, taskDescription, ++(*numAttempts));
+            return false;
+        })
+        .on(std::move(executor), cancelToken);
+}
+
 }  // namespace mongo

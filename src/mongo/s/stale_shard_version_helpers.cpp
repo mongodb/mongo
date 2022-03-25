@@ -37,12 +37,67 @@
 
 namespace mongo {
 
-void logFailedRetryAttempt(StringData taskDescription, const DBException& exception) {
-    LOGV2_DEBUG(4553800,
-                3,
-                "Retrying {task_description}. Got error: {exception}",
-                "task_description"_attr = taskDescription,
-                "exception"_attr = exception);
+namespace shard_version_retry {
+
+void checkErrorStatusAndMaxRetries(const Status& status,
+                                   const NamespaceString& nss,
+                                   CatalogCache* catalogCache,
+                                   StringData taskDescription,
+                                   size_t numAttempts) {
+    auto logAndTestMaxRetries = [numAttempts, taskDescription](const Status& status) {
+        if (numAttempts > kMaxNumStaleVersionRetries) {
+            uassertStatusOKWithContext(status,
+                                       str::stream() << "Exceeded maximum number of "
+                                                     << kMaxNumStaleVersionRetries
+                                                     << " retries attempting " << taskDescription);
+        }
+
+        LOGV2_DEBUG(4553800,
+                    3,
+                    "Retrying {task_description}. Got error: {exception}",
+                    "task_description"_attr = taskDescription,
+                    "exception"_attr = status);
+    };
+
+    if (status == ErrorCodes::StaleDbVersion) {
+        auto staleInfo = status.extraInfo<
+            error_details::ErrorExtraInfoForImpl<ErrorCodes::StaleDbVersion>::type>();
+        invariant(staleInfo->getDb() == nss.db(),
+                  str::stream() << "StaleDbVersion error on unexpected database. Expected "
+                                << nss.db() << ", received " << staleInfo->getDb());
+
+        // If the database version is stale, refresh its entry in the catalog cache.
+        catalogCache->onStaleDatabaseVersion(staleInfo->getDb(), staleInfo->getVersionWanted());
+
+        logAndTestMaxRetries(status);
+        return;
+    }
+
+    if (status.isA<ErrorCategory::StaleShardVersionError>()) {
+        // If the exception provides a shardId, add it to the set of shards requiring a refresh.
+        // If the cache currently considers the collection to be unsharded, this will trigger an
+        // epoch refresh. If no shard is provided, then the epoch is stale and we must refresh.
+        if (auto staleInfo = status.extraInfo<StaleConfigInfo>()) {
+            invariant(staleInfo->getNss() == nss,
+                      str::stream() << "StaleConfig error on unexpected namespace. Expected " << nss
+                                    << ", received " << staleInfo->getNss());
+            catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
+                nss, staleInfo->getVersionWanted(), staleInfo->getShardId());
+        } else {
+            catalogCache->invalidateCollectionEntry_LINEARIZABLE(nss);
+        }
+
+        logAndTestMaxRetries(status);
+        return;
+    }
+
+    if (status == ErrorCodes::ShardInvalidatedForTargeting) {
+        logAndTestMaxRetries(status);
+        return;
+    }
+
+    uassertStatusOK(status);
 }
 
+}  // namespace shard_version_retry
 }  // namespace mongo
