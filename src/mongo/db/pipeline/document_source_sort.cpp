@@ -466,7 +466,7 @@ boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceSort::distri
 
     DistributedPlanLogic split;
     split.shardsStage = this;
-    split.inputSortPattern = _sortExecutor->sortPattern()
+    split.mergeSortPattern = _sortExecutor->sortPattern()
                                  .serialize(SortPattern::SortKeySerialization::kForSortKeyMerging)
                                  .toBson();
     if (auto limit = getLimit()) {
