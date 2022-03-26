@@ -1,6 +1,11 @@
 /**
  * Tests that the "_configsvrRunRestore" command removes documents in config collections not
  * referenced in the "local.system.collections_to_restore" collection.
+ *
+ * @tags: [
+ *      requires_wiredtiger,
+ *      requires_persistence,
+ * ]
  */
 (function() {
 "use strict";
