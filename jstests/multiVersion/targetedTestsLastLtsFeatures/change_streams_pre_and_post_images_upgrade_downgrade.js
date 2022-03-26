@@ -2,8 +2,8 @@
  * Verifies that it is possible to upgrade a replica set with collections with 'recordPreImages'
  * option to use 'changeStreamPreAndPostImages' option, and to do a corresponding downgrade.
  * @tags: [
- * requires_fcv_52,
- * featureFlagChangeStreamPreAndPostImages,
+ *  requires_fcv_60,
+ *  featureFlagChangeStreamPreAndPostImages,
  * ]
  */
 (function() {
@@ -230,7 +230,7 @@ function testFCVDowngradeFailureWhenChangeStreamPreAndPostImagesEnabledForCollec
 function testFCVUpgradeFailureWhenCreationOfPreImagesCollectionFails(downgradeFCV) {
     const rst = new ReplSetTest({
         nodes: 2,
-        nodeOptions: {binVersion: binVersionFromFCV(downgradeFCV)},
+        nodeOptions: {binVersion: downgradeFCV},
     });
     rst.startSet();
     rst.initiate();
@@ -242,7 +242,7 @@ function testFCVUpgradeFailureWhenCreationOfPreImagesCollectionFails(downgradeFC
     assert.commandFailedWithCode(testDB.adminCommand({setFeatureCompatibilityVersion: latestFCV}),
                                  5868501);
 
-    // Verfiy that FCV version remains unchanged.
+    // Verify that FCV version remains unchanged.
     const fcvDoc = testDB.adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
     assert.eq(fcvDoc.featureCompatibilityVersion.version, downgradeFCV, fcvDoc);
 

@@ -7,8 +7,10 @@
  * @tags: [
  * # Change streams are only supported on WiredTiger.
  * requires_wiredtiger,
- * requires_fcv_52,
+ * requires_fcv_60,
  * featureFlagChangeStreamPreAndPostImages,
+ * # The test waits for the Checkpointer, but this process runs only for on-disk storage engines.
+ * requires_persistence,
  * ]
  */
 (function() {

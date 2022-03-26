@@ -3,8 +3,9 @@
  * commands. Also tests that this option cannot be set on collections in the 'local', 'admin',
  * 'config' databases as well as on view collections.
  * @tags: [
- * requires_fcv_52,
+ * requires_fcv_60,
  * featureFlagChangeStreamPreAndPostImages,
+ * requires_replication,
  * ]
  */
 (function() {

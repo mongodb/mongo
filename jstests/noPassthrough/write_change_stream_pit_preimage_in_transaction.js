@@ -2,10 +2,11 @@
  * Tests that pre-images are written to the pre-images collection on updates and deletes in
  * transactions and for non-atomic "applyOps" command.
  * @tags: [
- *  requires_fcv_53,
+ *  requires_fcv_60,
  *  featureFlagChangeStreamPreAndPostImages,
  *  requires_replication,
  *  no_selinux,
+ *  requires_majority_read_concern,
  * ]
  */
 (function() {

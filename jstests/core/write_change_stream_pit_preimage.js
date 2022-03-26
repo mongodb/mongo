@@ -1,7 +1,7 @@
 // Tests that pre-images are stored in the pre-images collection on updates and deletes in
 // collections with 'changeStreamPreAndPostImages' being enabled.
 // @tags: [
-//  requires_fcv_52,
+//  requires_fcv_60,
 //  featureFlagChangeStreamPreAndPostImages,
 //  assumes_against_mongod_not_mongos,
 //  requires_capped,

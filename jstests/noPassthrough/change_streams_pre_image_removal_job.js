@@ -2,10 +2,12 @@
 // removed from the pre-images collection via the 'PeriodicChangeStreamExpiredPreImagesRemover'
 // periodic job.
 // @tags: [
-//  requires_fcv_52,
+//  requires_fcv_60,
 //  featureFlagChangeStreamPreAndPostImages,
 //  assumes_against_mongod_not_mongos,
 //  change_stream_does_not_expect_txns,
+//  requires_replication,
+//  requires_majority_read_concern,
 // ]
 (function() {
 "use strict";

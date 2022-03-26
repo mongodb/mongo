@@ -2,7 +2,7 @@
  * Tests that point-in-time pre- and post-images are retrieved for update/replace/delete operations
  * performed in a transaction and non-atomic "applyOps" command.
  * @tags: [
- * requires_fcv_53,
+ * requires_fcv_60,
  * featureFlagChangeStreamPreAndPostImages,
  * uses_transactions,
  * ]

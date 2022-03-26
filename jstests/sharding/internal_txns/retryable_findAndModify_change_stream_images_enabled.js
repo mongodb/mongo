@@ -3,7 +3,7 @@
  * changeStreamPreAndPostImages enabled are retryable.
  *
  * @tags: [
- * requires_fcv_53,
+ * requires_fcv_60,
  * featureFlagInternalTransactions,
  * featureFlagChangeStreamPreAndPostImages
  * ]
