@@ -136,7 +136,7 @@ boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceSample::dist
     // just used to communicate ascending/descending information. A pattern like {$meta: "randVal"}
     // is neither ascending nor descending, and so will not be useful when constructing the merging
     // logic.
-    logic.inputSortPattern = BSON("$rand" << -1);
+    logic.mergeSortPattern = BSON("$rand" << -1);
     return logic;
 }
 }  // namespace mongo

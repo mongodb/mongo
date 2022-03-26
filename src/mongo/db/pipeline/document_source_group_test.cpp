@@ -604,7 +604,7 @@ protected:
         ASSERT(distributedPlanLogic);
         ASSERT(distributedPlanLogic->mergingStage);
         ASSERT_NOT_EQUALS(group(), distributedPlanLogic->mergingStage);
-        ASSERT_FALSE(static_cast<bool>(distributedPlanLogic->inputSortPattern));
+        ASSERT_FALSE(static_cast<bool>(distributedPlanLogic->mergeSortPattern));
         return distributedPlanLogic->mergingStage;
     }
     void checkResultSet(const intrusive_ptr<DocumentSource>& sink) {
