@@ -153,7 +153,7 @@ void SingleServerPingMonitor::_doServerPing() {
             }
             {
                 stdx::lock_guard lk(anchor->_mutex);
-                int rttValue;
+                int rttValue = 0;
                 if (anchor->_isDropped) {
                     return;
                 }
