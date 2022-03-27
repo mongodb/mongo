@@ -1,0 +1,81 @@
+# Build variants corresponding to Atlas's OS.
+
+buildvariants:
+- name: enterprise-rhel-70-64-bit
+  display_name: "Enterprise RHEL 7.0"
+  cron: "0 12 * * *" # Every day starting at 12:00
+  modules:
+  - enterprise
+  run_on:
+  - rhel70-small
+  expansions:
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
+    push_path: linux
+    push_bucket: downloads.10gen.com
+    push_name: linux
+    push_arch: x86_64-enterprise-rhel70
+    compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    csfle_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    multiversion_platform: rhel70
+    multiversion_edition: enterprise
+    has_packages: true
+    packager_script: packager_enterprise.py
+    packager_arch: x86_64
+    packager_distro: rhel70
+    repo_edition: enterprise
+    scons_cache_scope: shared
+  tasks:
+  - name: compile_test_and_package_serial_TG
+    distros:
+    - rhel70
+  - name: compile_build_tools_next_TG
+    distros:
+    - rhel70
+  - name: build_variant_gen
+  #  - name: .aggfuzzer # Disabled for FCV 5.3
+  - name: audit
+  - name: auth_audit_gen
+  - name: auth_gen
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: config_fuzzer_concurrency
+  - name: config_fuzzer_simulate_crash_concurrency_replication
+    distros:
+    - rhel70-large
+  - name: config_fuzzer_concurrency_replication
+    distros:
+    - rhel70-large
+  - name: config_fuzzer_jsCore
+  - name: config_fuzzer_replica_sets_jscore_passthrough
+    distros:
+    - rhel70-large
+  - name: .encrypt !.sharding !.replica_sets !.aggregation !.jscore
+  - name: external_auth
+  - name: external_auth_aws
+  - name: .jscore .common !.decimal !.sharding
+  - name: jsCore_txns_large_txns_format
+  - name: .jstestfuzz .common
+  - name: libunwind_tests
+  - name: .logical_session_cache .one_sec
+  - name: .ocsp
+  - name: replica_sets_auth_gen
+  - name: replica_sets_jscore_passthrough
+  - name: .replica_sets .multi_oplog
+  - name: sasl
+  - name: search
+  - name: search_auth
+  - name: search_ssl
+  - name: sharding_auth_audit_gen
+  - name: sharding_auth_gen
+  - name: snmp
+  - name: .stitch
+  - name: .csfle
+  - name: .publish_csfle
+  - name: unittest_shell_hang_analyzer_gen
+  - name: test_packages
+    distros:
+    - ubuntu2004-package
+  - name: selinux_rhel7_enterprise
+  - name: .publish
+    distros:
+    - rhel70-small
+  - name: generate_buildid_to_debug_symbols_mapping

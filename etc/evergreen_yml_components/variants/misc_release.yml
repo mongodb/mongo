@@ -1,0 +1,1794 @@
+# All remaining release variants not included in other files.
+
+buildvariants:
+- name: amazon
+  display_name: Amazon Linux
+  cron: "0 12 * * *" # Every day starting at 12:00
+  run_on:
+  - amazon1-2018-test
+  expansions:
+    push_path: linux
+    push_bucket: downloads.mongodb.org
+    push_name: linux
+    push_arch: x86_64-amazon
+    compile_flags: --ssl MONGO_DISTMOD=amazon -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux
+    multiversion_platform: amazon
+    multiversion_edition: targeted
+    has_packages: true
+    packager_script: packager.py
+    packager_arch: x86_64
+    packager_distro: amazon
+    repo_edition: org
+    scons_cache_scope: shared
+    virtualenv: /opt/mongodbtoolchain/v3/bin/virtualenv
+    large_distro_name: amazon1-2018-build
+  tasks:
+  - name: compile_test_and_package_serial_TG
+    distros:
+    - amazon1-2018-build
+  - name: build_variant_gen
+  #  - name: .aggfuzzer .common # Disabled for FCV 5.3
+  - name: aggregation
+  - name: .auth !.audit !.multiversion
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: .misc_js
+  - name: .concurrency .common
+  - name: concurrency_replication_causal_consistency_gen
+  - name: disk_wiredtiger
+  - name: free_monitoring
+  - name: .jscore .common
+  - name: .jstestfuzz .common
+  - name: libunwind_tests
+  - name: .logical_session_cache .one_sec
+  - name: multiversion_gen
+  - name: replica_sets_gen
+  - name: .replica_sets .common
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: .sharding .common !.csrs
+  - name: .sharding .txns
+  - name: .ssl
+  - name: .stitch
+  - name: test_packages
+    distros:
+    - ubuntu2004-package
+  - name: .publish
+    distros:
+    - amazon1-2018-small
+  - name: generate_buildid_to_debug_symbols_mapping
+
+- name: enterprise-linux-64-amazon-ami
+  display_name: "Enterprise Amazon Linux"
+  cron: "0 12 * * *" # Every day starting at 12:00
+  modules:
+  - enterprise
+  run_on:
+  - amazon1-2018-test
+  expansions:
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
+    push_path: linux
+    push_bucket: downloads.10gen.com
+    push_name: linux
+    push_arch: x86_64-enterprise-amzn64
+    compile_flags: --ssl MONGO_DISTMOD=amzn64 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    csfle_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux
+    multiversion_platform: amzn64
+    multiversion_edition: enterprise
+    has_packages: true
+    packager_script: packager_enterprise.py
+    packager_arch: x86_64
+    packager_distro: amazon
+    repo_edition: enterprise
+    scons_cache_scope: shared
+    virtualenv: /opt/mongodbtoolchain/v3/bin/virtualenv
+  tasks:
+  - name: compile_test_and_package_serial_TG
+    distros:
+    - amazon1-2018-build
+  - name: build_variant_gen
+  #  - name: .aggfuzzer .common # Disabled for FCV 5.3
+  - name: aggregation
+  - name: .auth !.multiversion
+  - name: audit
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: .encrypt !.aggregation
+  - name: .jscore .common
+  - name: .jstestfuzz .common
+  - name: libunwind_tests
+  - name: .logical_session_cache .one_sec
+  - name: noPassthrough_gen
+  - name: noPassthroughWithMongod_gen
+  - name: .powercycle
+  - name: .replica_sets .common
+  - name: sasl
+  - name: serial_run
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: .sharding .txns
+  - name: slow1_gen
+  - name: snmp
+  - name: .stitch
+  - name: .csfle
+  - name: .publish_csfle
+  - name: test_packages
+    distros:
+    - ubuntu2004-package
+  - name: .publish
+    distros:
+    - amazon1-2018-small
+  - name: generate_buildid_to_debug_symbols_mapping
+
+- name: amazon2
+  display_name: Amazon Linux 2
+  cron: "0 12 * * *" # Every day starting at 12:00
+  run_on:
+  - amazon2-test
+  expansions:
+    test_flags: >-
+      --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux
+    push_path: linux
+    push_bucket: downloads.mongodb.org
+    push_name: linux
+    push_arch: x86_64-amazon2
+    compile_flags: --ssl MONGO_DISTMOD=amazon2 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    multiversion_platform: amazon2
+    multiversion_edition: targeted
+    has_packages: true
+    packager_script: packager.py
+    packager_arch: x86_64
+    packager_distro: amazon2
+    repo_edition: org
+    scons_cache_scope: shared
+    large_distro_name: amazon2-large
+  tasks:
+  - name: compile_test_and_package_serial_TG
+    distros:
+    - amazon2-build
+  - name: build_variant_gen
+  #  - name: .aggfuzzer .common # Disabled for FCV 5.3
+  - name: aggregation
+  - name: .auth !.audit !.multiversion
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: .misc_js
+  - name: .concurrency .common
+  - name: concurrency_replication_causal_consistency_gen
+  - name: disk_wiredtiger
+  - name: free_monitoring
+  - name: .jscore .common
+  - name: .jstestfuzz .common
+  - name: libunwind_tests
+  - name: .logical_session_cache .one_sec
+  - name: multiversion_gen
+  - name: replica_sets_gen
+  - name: .replica_sets .common
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: .sharding .common !.csrs
+  - name: .sharding .txns
+  - name: .ssl
+  - name: .stitch
+  - name: test_packages
+    distros:
+    - ubuntu2004-package
+  - name: .publish
+    distros:
+    - amazon2-small
+  - name: generate_buildid_to_debug_symbols_mapping
+
+- name: enterprise-amazon2
+  display_name: "Enterprise Amazon Linux 2"
+  cron: "0 12 * * *" # Every day starting at 12:00
+  modules:
+  - enterprise
+  run_on:
+  - amazon2-test
+  expansions:
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
+    # TODO BUILD-13887 should fix uses_pykmip incompatibility.
+    test_flags: >-
+      --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux,uses_pykmip
+    push_path: linux
+    push_bucket: downloads.10gen.com
+    push_name: linux
+    push_arch: x86_64-enterprise-amazon2
+    compile_flags: --ssl MONGO_DISTMOD=amazon2 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    csfle_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    multiversion_platform: amazon2
+    multiversion_edition: enterprise
+    has_packages: true
+    packager_script: packager_enterprise.py
+    packager_arch: x86_64
+    packager_distro: amazon2
+    repo_edition: enterprise
+    scons_cache_scope: shared
+  tasks:
+  - name: compile_test_and_package_serial_TG
+    distros:
+    - amazon2-build
+  - name: build_variant_gen
+  #  - name: .aggfuzzer .common # Disabled for FCV 5.3
+  - name: aggregation
+  - name: audit
+  - name: .auth !.multiversion
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: .encrypt !.aggregation
+  - name: .jscore .common
+  - name: .jstestfuzz .common
+  - name: libunwind_tests
+  - name: .logical_session_cache .one_sec
+  - name: noPassthrough_gen
+  - name: noPassthroughWithMongod_gen
+  - name: .replica_sets .common
+  - name: sasl
+  - name: serial_run
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: .sharding .txns !.csrs
+  - name: slow1_gen
+  - name: snmp
+  - name: .stitch
+  - name: .csfle
+  - name: .publish_csfle
+  - name: test_packages
+    distros:
+    - ubuntu2004-package
+  - name: .publish
+    distros:
+    - amazon2-small
+  - name: generate_buildid_to_debug_symbols_mapping
+
+- name: amazon2-arm64
+  display_name: Amazon Linux 2 arm64
+  cron: "0 12 * * *" # Every day starting at 12:00
+  run_on:
+  - amazon2-arm64-small
+  expansions:
+    push_path: linux
+    push_bucket: downloads.mongodb.org
+    push_name: linux
+    push_arch: aarch64-amazon2
+    compile_flags: --ssl MONGO_DISTMOD=amazon2 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux
+    has_packages: true
+    packager_script: packager.py
+    packager_arch: aarch64
+    packager_distro: amazon2
+    repo_edition: org
+    scons_cache_scope: shared
+    large_distro_name: amazon2-arm64-large
+  tasks:
+  - name: compile_test_and_package_serial_TG
+    distros:
+    - amazon2-arm64-large
+  - name: build_variant_gen
+  - name: aggregation
+  - name: .auth !.audit !.multiversion
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: .misc_js
+  - name: .concurrency .common
+    distros:
+    - amazon2-arm64-large
+  - name: concurrency_replication_causal_consistency_gen
+  - name: disk_wiredtiger
+  - name: free_monitoring
+  - name: .jscore .common
+  - name: .jstestfuzz .common
+  - name: .logical_session_cache .one_sec
+  - name: replica_sets_gen
+  - name: .replica_sets .common
+  - name: .sharding .txns
+  - name: .sharding .common !.csrs !.multiversion
+  - name: .ssl
+  - name: .stitch
+  - name: test_packages
+    distros:
+    - ubuntu2004-package
+  - name: .publish
+    distros:
+    - rhel80-small
+  - name: generate_buildid_to_debug_symbols_mapping
+
+- name: enterprise-amazon2-arm64
+  display_name: "Enterprise Amazon Linux 2 arm64"
+  cron: "0 12 * * *" # Every day starting at 12:00
+  modules:
+  - enterprise
+  run_on:
+  - amazon2-arm64-small
+  expansions:
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
+    push_path: linux
+    push_bucket: downloads.10gen.com
+    push_name: linux
+    push_arch: aarch64-enterprise-amazon2
+    compile_flags: --ssl MONGO_DISTMOD=amazon2 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    csfle_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    # TODO BUILD-13887 should fix uses_pykmip incompatibility.
+    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,uses_pykmip
+    has_packages: true
+    packager_script: packager_enterprise.py
+    packager_arch: aarch64
+    packager_distro: amazon2
+    repo_edition: enterprise
+    scons_cache_scope: shared
+  tasks:
+  - name: compile_test_and_package_serial_TG
+    distros:
+    - amazon2-arm64-large
+  - name: build_variant_gen
+  #  - name: .aggfuzzer !.multiversion # Disabled for FCV 5.3
+  - name: audit
+  - name: auth_audit_gen
+  - name: auth_gen
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: .encrypt !.sharding !.replica_sets !.aggregation !.jscore
+  - name: external_auth
+  - name: external_auth_aws
+  - name: .jscore .common !.decimal !.sharding
+  - name: jsCore_txns_large_txns_format
+  - name: .jstestfuzz .common
+  - name: .logical_session_cache .one_sec
+  - name: replica_sets_auth_gen
+  - name: replica_sets_jscore_passthrough
+  - name: .replica_sets .multi_oplog
+  - name: sasl
+  - name: search
+  - name: search_auth
+  - name: search_ssl
+  - name: sharding_auth_audit_gen
+  - name: sharding_auth_gen
+  - name: snmp
+  - name: .stitch
+  - name: .csfle
+  - name: .publish_csfle
+  - name: test_packages
+    distros:
+    - ubuntu2004-package
+  - name: .publish
+    distros:
+    - rhel80-small
+  - name: generate_buildid_to_debug_symbols_mapping
+
+- name: debian10
+  display_name: Debian 10
+  cron: "0 12 * * *" # Every day starting at 12:00
+  run_on:
+  - debian10-test
+  expansions:
+    push_path: linux
+    push_bucket: downloads.mongodb.org
+    push_name: linux
+    push_arch: x86_64-debian10
+    compile_flags: --ssl MONGO_DISTMOD=debian10 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    multiversion_platform: linux_x86_64
+    multiversion_edition: base
+    multiversion_platform_42_or_later: debian10
+    multiversion_edition_42_or_later: targeted
+    has_packages: true
+    packager_script: packager.py
+    packager_arch: x86_64
+    packager_distro: debian10
+    repo_edition: org
+    scons_cache_scope: shared
+    large_distro_name: debian10-build
+  tasks:
+  - name: compile_test_and_package_serial_TG
+    distros:
+    - debian10-build
+  - name: build_variant_gen
+  #  - name: .aggfuzzer .common # Disabled for FCV 5.3
+  - name: aggregation
+  - name: aggregation_auth
+  - name: .auth !.audit !.multiversion
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: .misc_js
+  - name: .concurrency .common
+  - name: concurrency_replication_causal_consistency_gen
+  - name: disk_wiredtiger
+  - name: free_monitoring
+  - name: .jscore .common !.decimal
+  - name: .jstestfuzz .common
+  - name: .logical_session_cache .one_sec
+  - name: multiversion_gen
+  - name: replica_sets_gen
+  - name: .replica_sets .common
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: .sharding .common !.csrs
+  - name: .ssl
+  - name: .stitch
+  - name: test_packages
+    distros:
+    - ubuntu2004-package
+  - name: .publish
+    distros:
+    - debian10-small
+  - name: generate_buildid_to_debug_symbols_mapping
+
+- name: enterprise-debian10-64
+  display_name: Enterprise Debian 10
+  cron: "0 12 * * *" # Every day starting at 12:00
+  modules:
+  - enterprise
+  run_on:
+  - debian10-test
+  expansions:
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
+    push_path: linux
+    push_bucket: downloads.10gen.com
+    push_name: linux
+    push_arch: x86_64-enterprise-debian10
+    compile_flags: --ssl MONGO_DISTMOD=debian10 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    csfle_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    multiversion_platform: linux_x86_64
+    multiversion_edition: base
+    multiversion_platform_42_or_later: debian10
+    multiversion_edition_42_or_later: enterprise
+    has_packages: true
+    packager_script: packager_enterprise.py
+    packager_arch: x86_64
+    packager_distro: debian10
+    repo_edition: enterprise
+    scons_cache_scope: shared
+    large_distro_name: debian10-build
+  tasks:
+  - name: compile_test_and_package_serial_TG
+    distros:
+    - debian10-build
+  - name: build_variant_gen
+  #  - name: .aggfuzzer .common # Disabled for FCV 5.3
+  - name: audit
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: .encrypt !.replica_sets !.aggregation !.sharding !.jscore
+  - name: .jepsen_docker
+    distros:
+    - debian10-large
+  - name: .jscore .common !.decimal !.sharding
+  - name: .jstestfuzz .common
+  - name: .logical_session_cache .one_sec
+  - name: replica_sets_auth_gen
+  - name: replica_sets_jscore_passthrough
+  - name: sasl
+  - name: sharding_auth_gen
+  - name: snmp
+  - name: .stitch
+  - name: .csfle
+  - name: .publish_csfle
+  - name: test_packages
+    distros:
+    - ubuntu2004-package
+  - name: .publish
+    distros:
+    - debian10-small
+  - name: generate_buildid_to_debug_symbols_mapping
+
+- name: debian92
+  display_name: Debian 9.2
+  cron: "0 12 * * *" # Every day starting at 12:00
+  run_on:
+  - debian92-test
+  expansions:
+    push_path: linux
+    push_bucket: downloads.mongodb.org
+    push_name: linux
+    push_arch: x86_64-debian92
+    compile_flags: --ssl MONGO_DISTMOD=debian92 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    num_scons_link_jobs_available: 0.0625
+    multiversion_platform: debian92
+    multiversion_edition: targeted
+    has_packages: true
+    packager_script: packager.py
+    packager_arch: x86_64
+    packager_distro: debian92
+    repo_edition: org
+    scons_cache_scope: shared
+    large_distro_name: debian92-build
+  tasks:
+  - name: compile_test_and_package_serial_TG
+    distros:
+    - debian92-build
+  - name: build_variant_gen
+  #  - name: .aggfuzzer .common # Disabled for FCV 5.3
+  - name: aggregation
+  - name: aggregation_auth
+  - name: .auth !.audit !.multiversion
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: .misc_js
+  - name: .concurrency .common
+  - name: concurrency_replication_causal_consistency_gen
+  - name: disk_wiredtiger
+  - name: free_monitoring
+  - name: .jscore .common !.decimal
+  - name: .jstestfuzz .common
+  - name: .logical_session_cache .one_sec
+  - name: multiversion_gen
+  - name: replica_sets_gen
+  - name: .replica_sets .common
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: .sharding .common !.csrs
+  - name: .ssl
+  - name: .stitch
+  - name: test_packages
+    distros:
+    - ubuntu2004-package
+  - name: .publish
+    distros:
+    - debian92-small
+  - name: generate_buildid_to_debug_symbols_mapping
+
+- name: enterprise-debian92-64
+  display_name: Enterprise Debian 9.2
+  cron: "0 12 * * *" # Every day starting at 12:00
+  modules:
+  - enterprise
+  run_on:
+  - debian92-test
+  expansions:
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
+    push_path: linux
+    push_bucket: downloads.10gen.com
+    push_name: linux
+    push_arch: x86_64-enterprise-debian92
+    compile_flags: --ssl MONGO_DISTMOD=debian92 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    csfle_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    num_scons_link_jobs_available: 0.0625
+    multiversion_platform: debian92
+    multiversion_edition: enterprise
+    has_packages: true
+    packager_script: packager_enterprise.py
+    packager_arch: x86_64
+    packager_distro: debian92
+    repo_edition: enterprise
+    scons_cache_scope: shared
+    large_distro_name: debian92-build
+  tasks:
+  - name: compile_test_and_package_serial_TG
+    distros:
+    - debian92-build
+  - name: build_variant_gen
+  #  - name: .aggfuzzer .common # Disabled for FCV 5.3
+  - name: audit
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: .encrypt !.replica_sets !.aggregation !.sharding !.jscore
+  - name: .jscore .common !.decimal !.sharding
+  - name: .jstestfuzz .common
+  - name: .logical_session_cache .one_sec
+  - name: replica_sets_auth_gen
+  - name: replica_sets_jscore_passthrough
+  - name: sasl
+  - name: sharding_auth_gen
+  - name: snmp
+  - name: .stitch
+  - name: .csfle
+  - name: .publish_csfle
+  - name: test_packages
+    distros:
+    - ubuntu2004-package
+  - name: .publish
+    distros:
+    - debian92-small
+  - name: generate_buildid_to_debug_symbols_mapping
+
+- name: rhel70
+  display_name: RHEL 7.0
+  cron: "0 12 * * *" # Every day starting at 12:00
+  run_on:
+  - rhel70-small
+  expansions:
+    push_path: linux
+    push_bucket: downloads.mongodb.org
+    push_name: linux
+    push_arch: x86_64-rhel70
+    compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    multiversion_platform: rhel70
+    multiversion_edition: targeted
+    has_packages: true
+    packager_script: packager.py
+    packager_arch: x86_64
+    packager_distro: rhel70
+    repo_edition: org
+    scons_cache_scope: shared
+    large_distro_name: rhel70
+  tasks:
+  - name: compile_test_and_package_serial_TG
+    distros:
+    - rhel70
+  - name: build_variant_gen
+  - name: aggregation
+  - name: .auth !.audit !.multiversion
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: .misc_js
+  - name: .concurrency .common
+    distros:
+    - rhel70
+  - name: concurrency_replication_causal_consistency_gen
+  - name: disk_wiredtiger
+  - name: free_monitoring
+  - name: .jscore .common
+  - name: .jstestfuzz .common
+  - name: .logical_session_cache .one_sec
+  - name: multiversion_gen
+  - name: replica_sets_gen
+  - name: .replica_sets .common
+  - name: .sharding .txns
+  - name: .sharding .common !.csrs
+  - name: .ssl
+  - name: .stitch
+  - name: test_packages
+    distros:
+    - ubuntu2004-package
+  - name: selinux_rhel7_org
+  - name: .publish
+    distros:
+    - rhel70-small
+  - name: generate_buildid_to_debug_symbols_mapping
+
+  # This variant compiles on RHEL 7.0 and runs tests on RHEL 7.6
+- name: rhel76_compile_rhel70
+  display_name: RHEL 7.0/7.6 Cross-ABI
+  cron: "0 12 * * *" # Every day starting at 12:00
+  run_on:
+  - rhel76-test
+  expansions:
+    compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+  tasks:
+  - name: compile_and_archive_dist_test_then_package_TG
+    distros:
+    - rhel70
+  - name: build_variant_gen
+  - name: .ssl
+  - name: jsCore
+  - name: external_auth
+
+- name: ubi8
+  display_name: "UBI 8"
+  cron: "0 12 * * *" # Every day starting at 12:00
+  run_on:
+  - ubi8
+  expansions:
+    resmoke_jobs_factor: 1
+    disable_shared_scons_cache: true
+    compile_flags: MONGO_DISTMOD=rhel80 --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    tooltags: ""
+    build_mongoreplay: true
+    test_flags: >-
+      --excludeWithAnyTags=requires_os_access
+  tasks:
+  - name: compile_and_archive_dist_test_then_package_TG
+    distros:
+    - rhel80-large
+  - name: build_variant_gen
+  - name: jsCore
+  - name: sharding_gen
+  - name: replica_sets_gen
+
+- name: rhel80
+  display_name: RHEL 8.0
+  cron: "0 12 * * *" # Every day starting at 12:00
+  run_on:
+  - rhel80-build
+  expansions:
+    push_path: linux
+    push_bucket: downloads.mongodb.org
+    push_name: linux
+    push_arch: x86_64-rhel80
+    compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    multiversion_platform: rhel80
+    multiversion_edition: targeted
+    has_packages: true
+    packager_script: packager.py
+    packager_arch: x86_64
+    packager_distro: rhel80
+    repo_edition: org
+    scons_cache_scope: shared
+    large_distro_name: rhel80-build
+  tasks:
+  - name: compile_test_and_package_serial_TG
+    distros:
+    - rhel80-build
+  - name: build_variant_gen
+  - name: aggregation
+  - name: .auth !.audit !.multiversion
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: .misc_js
+  - name: .concurrency .common
+    distros:
+    - rhel80-build
+  - name: concurrency_replication_causal_consistency_gen
+  - name: disk_wiredtiger
+  - name: free_monitoring
+  - name: .jscore .common
+  - name: .jstestfuzz .common
+  - name: .logical_session_cache .one_sec
+  - name: multiversion_gen
+  - name: replica_sets_gen
+  - name: .replica_sets .common
+  - name: .sharding .txns
+  - name: .sharding .common !.csrs
+  - name: .ssl
+  - name: .stitch
+  - name: test_packages
+    distros:
+    - ubuntu2004-package
+  - name: .publish
+    distros:
+    - rhel80-small
+  - name: generate_buildid_to_debug_symbols_mapping
+
+- name: enterprise-rhel-80-64-bit
+  display_name: "Enterprise RHEL 8.0"
+  cron: "0 12 * * *" # Every day starting at 12:00
+  modules:
+  - enterprise
+  run_on:
+  - rhel80-small
+  expansions: &enterprise-rhel-80-64-bit-expansions
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
+    push_path: linux
+    push_bucket: downloads.10gen.com
+    push_name: linux
+    push_arch: x86_64-enterprise-rhel80
+    compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    multiversion_platform: rhel80
+    multiversion_edition: enterprise
+    has_packages: true
+    packager_script: packager_enterprise.py
+    packager_arch: x86_64
+    packager_distro: rhel80
+    repo_edition: enterprise
+    scons_cache_scope: shared
+    jstestfuzz_num_generated_files: 40
+    jstestfuzz_concurrent_num_files: 10
+    target_resmoke_time: 10
+    max_sub_suites: 3
+    large_distro_name: rhel80-medium
+  tasks:
+  - name: compile_test_and_package_serial_TG
+    distros:
+    - rhel80-large
+  - name: build_variant_gen
+  #  - name: .aggfuzzer # Disabled for FCV 5.3
+  - name: .aggregation
+  - name: audit
+  - name: .auth
+  - name: unittest_shell_hang_analyzer_gen
+  - name: .causally_consistent !.sharding
+  - name: .change_streams
+  - name: .change_stream_fuzzer
+  - name: .misc_js
+  - name: .concurrency !.large !.ubsan !.no_txns !.debug_only
+  - name: .concurrency .large !.ubsan !.no_txns !.debug_only
+    distros:
+    - rhel80-medium
+  - name: disk_wiredtiger
+  - name: .encrypt
+  - name: idl_tests
+  - name: initial_sync_fuzzer_gen
+  - name: .integration
+    distros:
+    - rhel80-medium
+  - name: .jscore .common
+  - name: jsCore_minimum_batch_size
+  - name: jsCore_txns_large_txns_format
+  - name: json_schema
+  - name: .jstestfuzz !.flow_control  # Flow control jstestfuzz take longer.
+  - name: libunwind_tests
+  - name: mqlrun
+  - name: .multi_shard
+  - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
+  - name: multiversion_gen
+  - name: .query_fuzzer
+  - name: .random_multiversion_ds
+  - name: .read_write_concern .large
+    distros:
+    - rhel80-medium
+  - name: .read_write_concern !.large
+  - name: .replica_sets !.encrypt !.auth
+    distros:
+    - rhel80-medium
+  - name: replica_sets_api_version_jscore_passthrough_gen
+  - name: replica_sets_reconfig_jscore_passthrough_gen
+  - name: replica_sets_reconfig_jscore_stepdown_passthrough_gen
+    distros:
+    - rhel80-medium
+  - name: replica_sets_reconfig_kill_primary_jscore_passthrough_gen
+    distros:
+    - rhel80-medium
+  - name: .resharding_fuzzer
+  - name: retryable_writes_jscore_passthrough_gen
+  - name: retryable_writes_jscore_stepdown_passthrough_gen
+    distros:
+    - rhel80-medium
+  - name: .read_only
+  - name: .rollbackfuzzer
+  - name: sasl
+  - name: search
+  - name: search_auth
+  - name: search_ssl
+  - name: session_jscore_passthrough
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: sharding_api_version_jscore_passthrough_gen
+  - name: .sharding .txns
+  - name: .sharding .common
+  - name: snmp
+  - name: .stitch
+  - name: .updatefuzzer
+  - name: secondary_reads_passthrough_gen
+  - name: server_discovery_and_monitoring_json_test_TG
+    distros:
+    - rhel80-large
+  - name: server_selection_json_test_TG
+    distros:
+    - rhel80-large
+  - name: test_packages
+    distros:
+    - ubuntu2004-package
+  - name: selinux_rhel8_enterprise
+  - name: .publish
+  - name: generate_buildid_to_debug_symbols_mapping
+
+- name: rhel-82-arm64
+  display_name: RHEL 8.2 arm64
+  cron: "0 12 * * *" # Every day starting at 12:00
+  run_on:
+  - rhel82-arm64-small
+  expansions:
+    push_path: linux
+    push_bucket: downloads.mongodb.org
+    push_name: linux
+    push_arch: aarch64-rhel82
+    compile_flags: --ssl MONGO_DISTMOD=rhel82 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    has_packages: true
+    packager_script: packager.py
+    packager_arch: aarch64
+    packager_distro: rhel82
+    repo_edition: org
+    scons_cache_scope: shared
+    large_distro_name: rhel82-arm64-large
+  tasks:
+  - name: compile_test_and_package_serial_TG
+    distros:
+    - rhel82-arm64-large
+  - name: build_variant_gen
+  - name: aggregation
+  - name: .auth !.audit !.multiversion
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: .misc_js
+  - name: .concurrency .common
+    distros:
+    - rhel82-arm64-large
+  - name: concurrency_replication_causal_consistency_gen
+  - name: disk_wiredtiger
+  - name: free_monitoring
+  - name: .jscore .common
+  - name: .jstestfuzz .common
+  - name: .logical_session_cache .one_sec
+  - name: replica_sets_gen
+  - name: .replica_sets .common
+  - name: .sharding .txns
+  - name: .sharding .common !.csrs !.multiversion
+  - name: .ssl
+  - name: .stitch
+  - name: test_packages
+    distros:
+    - ubuntu2004-package
+  - name: .publish
+    distros:
+    - rhel80-small
+  - name: generate_buildid_to_debug_symbols_mapping
+
+- name: enterprise-rhel-82-arm64
+  display_name: "Enterprise RHEL 8.2 arm64"
+  cron: "0 12 * * *" # Every day starting at 12:00
+  modules:
+  - enterprise
+  run_on:
+  - rhel82-arm64-small
+  expansions:
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
+    push_path: linux
+    push_bucket: downloads.10gen.com
+    push_name: linux
+    push_arch: aarch64-enterprise-rhel82
+    compile_flags: --ssl MONGO_DISTMOD=rhel82 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    csfle_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    has_packages: true
+    packager_script: packager_enterprise.py
+    packager_arch: aarch64
+    packager_distro: rhel82
+    repo_edition: enterprise
+    scons_cache_scope: shared
+  tasks:
+  - name: compile_test_and_package_serial_TG
+    distros:
+    - rhel82-arm64-large
+  - name: build_variant_gen
+  #  - name: .aggfuzzer !.multiversion # Disabled for FCV 5.3
+  - name: audit
+  - name: auth_audit_gen
+  - name: auth_gen
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: .encrypt !.sharding !.replica_sets !.aggregation !.jscore
+  - name: external_auth
+  - name: external_auth_aws
+  - name: .jscore .common !.decimal !.sharding
+  - name: jsCore_txns_large_txns_format
+  - name: .jstestfuzz .common
+  - name: .logical_session_cache .one_sec
+  - name: replica_sets_auth_gen
+  - name: replica_sets_jscore_passthrough
+  - name: .replica_sets .multi_oplog
+  - name: sasl
+  - name: search
+  - name: search_auth
+  - name: search_ssl
+  - name: sharding_auth_audit_gen
+  - name: sharding_auth_gen
+  - name: snmp
+  - name: .stitch
+  - name: .csfle
+    distros:
+    - rhel80-large
+  - name: .publish_csfle
+  - name: test_packages
+    distros:
+    - ubuntu2004-package
+  - name: .publish
+    distros:
+    - rhel80-small
+  - name: generate_buildid_to_debug_symbols_mapping
+
+- name: suse12
+  display_name: SUSE 12
+  cron: "0 12 * * *" # Every day starting at 12:00
+  run_on:
+  - suse12-sp5-small
+  expansions:
+    push_path: linux
+    push_bucket: downloads.mongodb.org
+    push_name: linux
+    push_arch: x86_64-suse12
+    compile_flags: --ssl MONGO_DISTMOD=suse12 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    multiversion_platform: suse12
+    multiversion_edition: targeted
+    has_packages: true
+    packager_script: packager.py
+    packager_arch: x86_64
+    packager_distro: suse12
+    repo_edition: org
+    scons_cache_scope: shared
+    large_distro_name: suse12-sp5-large
+  tasks:
+  - name: compile_test_and_package_serial_TG
+    distros:
+    - suse12-sp5-large
+  - name: build_variant_gen
+  #  - name: .aggfuzzer .common # Disabled for FCV 5.3
+  - name: aggregation
+  - name: .auth !.audit !.multiversion
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: .misc_js
+  - name: .concurrency .common !.large
+  - name: .concurrency .common .large
+    distros:
+    - suse12-sp5-large
+  - name: concurrency_replication_causal_consistency_gen
+  - name: disk_wiredtiger
+  - name: free_monitoring
+  - name: .jscore .common !.decimal
+  - name: .jstestfuzz .common
+  - name: multiversion_gen
+  - name: .logical_session_cache .one_sec
+  - name: replica_sets_gen
+  - name: .replica_sets .common
+  - name: .sharding .txns
+  - name: .sharding .common !.csrs
+  - name: .ssl
+  - name: .stitch
+  - name: .publish
+    distros:
+    - suse12-small
+  - name: generate_buildid_to_debug_symbols_mapping
+
+- name: enterprise-suse12-64
+  display_name: Enterprise SLES 12
+  cron: "0 12 * * *" # Every day starting at 12:00
+  modules:
+  - enterprise
+  run_on:
+  - suse12-sp5-small
+  expansions:
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
+    push_path: linux
+    push_bucket: downloads.10gen.com
+    push_name: linux
+    push_arch: x86_64-enterprise-suse12
+    compile_flags: --ssl MONGO_DISTMOD=suse12 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    csfle_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    multiversion_platform: suse12
+    multiversion_edition: enterprise
+    has_packages: true
+    packager_script: packager_enterprise.py
+    packager_arch: x86_64
+    packager_distro: suse12
+    repo_edition: enterprise
+    scons_cache_scope: shared
+  tasks:
+  - name: compile_test_and_package_serial_TG
+    distros:
+    - suse12-sp5-large
+  - name: build_variant_gen
+  #  - name: .aggfuzzer .common # Disabled for FCV 5.3
+  - name: audit
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: .encrypt !.replica_sets !.aggregation !.sharding !.jscore
+  - name: .jscore .common !.decimal !.sharding
+  - name: .jstestfuzz .common
+  - name: .logical_session_cache .one_sec
+  - name: replica_sets_auth_gen
+  - name: replica_sets_jscore_passthrough
+  - name: sasl
+  - name: sharding_auth_gen
+  - name: snmp
+  - name: .stitch
+  - name: .csfle
+  - name: .publish_csfle
+  - name: test_packages
+    distros:
+    - ubuntu2004-package
+  - name: .publish
+    distros:
+    - suse12-small
+  - name: generate_buildid_to_debug_symbols_mapping
+
+- name: enterprise-suse15-64
+  display_name: Enterprise SLES 15
+  cron: "0 12 * * *" # Every day starting at 12:00
+  modules:
+  - enterprise
+  run_on:
+  - suse15-test
+  expansions:
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
+    push_path: linux
+    push_bucket: downloads.10gen.com
+    push_name: linux
+    push_arch: x86_64-enterprise-suse15
+    compile_flags: --ssl MONGO_DISTMOD=suse15 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    csfle_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    has_packages: true
+    packager_script: packager_enterprise.py
+    packager_arch: x86_64
+    packager_distro: suse15
+    repo_edition: enterprise
+    scons_cache_scope: shared
+  tasks:
+  - name: compile_test_and_package_serial_TG
+    distros:
+    - suse15-build
+  - name: build_variant_gen
+  #  - name: .aggfuzzer .common !.multiversion # Disabled for FCV 5.3
+  - name: audit
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: .encrypt !.replica_sets !.aggregation !.sharding !.jscore
+  - name: .jscore .common !.decimal !.sharding
+  - name: .jstestfuzz .common
+  - name: .logical_session_cache .one_sec
+  - name: replica_sets_auth_gen
+  - name: replica_sets_jscore_passthrough
+  - name: sasl
+  - name: sharding_auth_gen
+  - name: snmp
+  - name: .stitch
+  - name: .csfle
+  - name: .publish_csfle
+  - name: .publish
+    distros:
+    - suse15-small
+  - name: generate_buildid_to_debug_symbols_mapping
+
+- name: suse15
+  display_name: SUSE 15
+  cron: "0 12 * * *" # Every day starting at 12:00
+  run_on:
+  - suse15-test
+  expansions:
+    push_path: linux
+    push_bucket: downloads.mongodb.org
+    push_name: linux
+    push_arch: x86_64-suse15
+    compile_flags: --ssl MONGO_DISTMOD=suse15 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    multiversion_platform: linux_x86_64
+    multiversion_edition: base
+    multiversion_platform_42_or_later: suse15
+    multiversion_edition_42_or_later: targeted
+    has_packages: true
+    packager_script: packager.py
+    packager_arch: x86_64
+    packager_distro: suse15
+    repo_edition: org
+    scons_cache_scope: shared
+    large_distro_name: suse15-build
+  tasks:
+  - name: compile_test_and_package_serial_TG
+    distros:
+    - suse15-build
+  - name: build_variant_gen
+  #  - name: .aggfuzzer .common !.multiversion # Disabled for FCV 5.3
+  - name: aggregation
+  - name: .auth !.audit !.multiversion
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: .misc_js
+  - name: .concurrency .common
+  - name: concurrency_replication_causal_consistency_gen
+  - name: disk_wiredtiger
+  - name: free_monitoring
+  - name: .jscore .common !.decimal
+  - name: .jstestfuzz .common
+  - name: .logical_session_cache .one_sec
+  - name: multiversion_gen
+  - name: replica_sets_gen
+  - name: .replica_sets .common
+  - name: .sharding .txns
+  - name: .sharding .common !.csrs !.multiversion
+  - name: .ssl
+  - name: .stitch
+  - name: .publish
+    distros:
+    - suse15-small
+  - name: generate_buildid_to_debug_symbols_mapping
+
+
+- name: ubuntu1804
+  display_name: Ubuntu 18.04
+  cron: "0 12 * * *" # Every day starting at 12:00
+  run_on:
+  - ubuntu1804-test
+  expansions:
+    push_path: linux
+    push_bucket: downloads.mongodb.org
+    push_name: linux
+    push_arch: x86_64-ubuntu1804
+    compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    multiversion_platform: ubuntu1804
+    multiversion_edition: targeted
+    test_flags: --excludeWithAnyTags=requires_ocsp_stapling
+    has_packages: true
+    packager_script: packager.py
+    packager_arch: x86_64
+    packager_distro: ubuntu1804
+    repo_edition: org
+    scons_cache_scope: shared
+    large_distro_name: ubuntu1804-build
+  tasks:
+  - name: compile_test_and_package_serial_TG
+    distros:
+    - ubuntu1804-build
+  - name: build_variant_gen
+  #  - name: .aggfuzzer .common # Disabled for FCV 5.3
+  - name: aggregation
+  - name: .auth !.audit !.multiversion
+  - name: .misc_js
+  - name: .concurrency .common
+  - name: concurrency_replication_causal_consistency_gen
+  - name: disk_wiredtiger
+  - name: free_monitoring
+  - name: .jepsen
+    distros:
+    - ubuntu1804-build
+  - name: .jscore .common
+  - name: .jstestfuzz .common
+  - name: libunwind_tests
+  - name: .logical_session_cache .one_sec
+  - name: multiversion_gen
+  - name: .powercycle
+  - name: replica_sets_gen
+  - name: replica_sets_jscore_passthrough
+  - name: .sharding .txns
+  - name: sharding_gen
+  - name: sharding_jscore_passthrough
+  - name: watchdog_wiredtiger
+  - name: .ssl
+  - name: .stitch
+  - name: test_packages
+    distros:
+    - ubuntu2004-package
+  - name: .publish
+    distros:
+    - ubuntu1804-small
+  - name: generate_buildid_to_debug_symbols_mapping
+
+- name: enterprise-ubuntu1804-64
+  display_name: Enterprise Ubuntu 18.04
+  cron: "0 12 * * *" # Every day starting at 12:00
+  modules:
+  - enterprise
+  run_on:
+  - ubuntu1804-test
+  stepback: false
+  expansions:
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
+    push_path: linux
+    push_bucket: downloads.10gen.com
+    push_name: linux
+    push_arch: x86_64-enterprise-ubuntu1804
+    compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    csfle_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    multiversion_platform: ubuntu1804
+    multiversion_edition: enterprise
+    test_flags: --excludeWithAnyTags=requires_ocsp_stapling
+    has_packages: true
+    packager_script: packager_enterprise.py
+    packager_arch: x86_64
+    packager_distro: ubuntu1804
+    repo_edition: enterprise
+    scons_cache_scope: shared
+    large_distro_name: ubuntu1804-build
+  tasks:
+  - name: compile_test_and_package_serial_TG
+    distros:
+    - ubuntu1804-build
+  - name: compile_build_tools_next_TG
+    distros:
+    - ubuntu1804-build
+  - name: libdeps_graph_linting_TG
+    distros:
+    - ubuntu1804-build
+  - name: build_variant_gen
+  - name: .csfle
+  - name: .publish_csfle
+  #  - name: .aggfuzzer .common # Disabled for FCV 5.3
+  - name: audit
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: .encrypt !.aggregation !.replica_sets !.sharding !.jscore
+  - name: external_auth
+  - name: external_auth_aws
+  - name: .jepsen
+    distros:
+    - ubuntu1804-build
+  - name: .jscore .common !.decimal !.sharding
+  - name: jsCore_auth
+  - name: .jstestfuzz .common
+  - name: libunwind_tests
+  - name: .logical_session_cache .one_sec
+  - name: .multiversion_fuzzer
+  - name: .multiversion_passthrough
+  - name: .ocsp
+  - name: .random_multiversion_ds
+  - name: replica_sets_auth_gen
+  - name: replica_sets_jscore_passthrough
+  - name: sasl
+  - name: sharding_auth_gen
+  - name: snmp
+  - name: .watchdog
+  - name: test_packages
+    distros:
+    - ubuntu2004-package
+  - name: .publish
+    distros:
+    - ubuntu1804-small
+  - name: generate_buildid_to_debug_symbols_mapping
+
+- name: enterprise-ubuntu1804-arm64
+  display_name: Enterprise Ubuntu 18.04 arm64
+  cron: "0 12 * * *" # Every day starting at 12:00
+  modules:
+  - enterprise
+  run_on:
+  - ubuntu1804-arm64-build
+  expansions:
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
+    push_path: linux
+    push_bucket: downloads.10gen.com
+    push_name: linux
+    push_arch: aarch64-enterprise-ubuntu1804
+    compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    csfle_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    test_flags: --excludeWithAnyTags=requires_ocsp_stapling
+    resmoke_jobs_max: 4 # Avoid starting too many mongod's on ARM test servers
+    has_packages: true
+    packager_script: packager_enterprise.py
+    packager_arch: arm64
+    packager_distro: ubuntu1804
+    repo_edition: enterprise
+    multiversion_platform: ubuntu1804
+    multiversion_architecture: arm64
+    multiversion_architecture_42_or_later: aarch64
+    multiversion_edition: enterprise
+    scons_cache_scope: shared
+  tasks:
+  - name: compile_test_and_package_serial_TG
+  - name: build_variant_gen
+  - name: aggregation
+  - name: aggregation_wildcard_fuzzer_gen
+  - name: .auth !.audit !.multiversion !.jscore
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: .misc_js
+  - name: .concurrency .common
+  - name: concurrency_replication_causal_consistency_gen
+  - name: fle
+  - name: .jscore .common !.auth
+  - name: .jstestfuzz .common
+  - name: .logical_session_cache .one_sec
+  - name: replica_sets_gen
+  - name: .replica_sets .common
+  - name: .sharding .txns
+  - name: sharding_gen
+  - name: sharding_jscore_passthrough
+  - name: .ssl
+  - name: .stitch
+  - name: .csfle
+  - name: .publish_csfle
+    distros:
+    - ubuntu1804-test
+  - name: test_packages
+    distros:
+    - ubuntu2004-package
+  - name: .publish
+    distros:
+    - ubuntu1804-test
+  - name: generate_buildid_to_debug_symbols_mapping
+
+- name: ubuntu1804-arm64
+  display_name: Ubuntu 18.04 arm64
+  cron: "0 12 * * *" # Every day starting at 12:00
+  run_on:
+  - ubuntu1804-arm64-build
+  expansions:
+    push_path: linux
+    push_bucket: downloads.mongodb.org
+    push_name: linux
+    push_arch: aarch64-ubuntu1804
+    compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    test_flags: --excludeWithAnyTags=requires_ocsp_stapling
+    resmoke_jobs_max: 8 # Avoid starting too many mongod's on ARM test servers
+    has_packages: true
+    packager_script: packager.py
+    packager_arch: arm64
+    packager_distro: ubuntu1804
+    repo_edition: org
+    multiversion_platform: ubuntu1804
+    multiversion_architecture: arm64
+    multiversion_architecture_42_or_later: aarch64
+    multiversion_edition: targeted
+    scons_cache_scope: shared
+  tasks:
+  - name: compile_test_and_package_serial_TG
+  - name: build_variant_gen
+  - name: free_monitoring
+  - name: jsCore
+  - name: replica_sets_jscore_passthrough
+  - name: test_packages
+    distros:
+    - ubuntu2004-package
+  - name: .publish
+    distros:
+    - ubuntu1804-test
+  - name: generate_buildid_to_debug_symbols_mapping
+
+- name: ubuntu2004
+  display_name: Ubuntu 20.04
+  cron: "0 12 * * *" # Every day starting at 12:00
+  run_on:
+  - ubuntu2004-small
+  expansions:
+    push_path: linux
+    push_bucket: downloads.mongodb.org
+    push_name: linux
+    push_arch: x86_64-ubuntu2004
+    compile_flags: --ssl MONGO_DISTMOD=ubuntu2004 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    multiversion_platform: ubuntu2004
+    multiversion_edition: targeted
+    has_packages: true
+    packager_script: packager.py
+    packager_arch: x86_64
+    packager_distro: ubuntu2004
+    repo_edition: org
+    scons_cache_scope: shared
+    large_distro_name: ubuntu2004-large
+  tasks:
+  - name: compile_test_and_package_serial_TG
+    distros:
+    - ubuntu2004-large
+  - name: build_variant_gen
+  #  - name: .aggfuzzer .common !.multiversion # Disabled for FCV 5.3
+  - name: aggregation
+  - name: .auth !.audit !.multiversion
+  - name: .misc_js
+  - name: .concurrency .common
+  - name: concurrency_replication_causal_consistency_gen
+  - name: disk_wiredtiger
+  - name: free_monitoring
+  - name: .jscore .common
+  - name: .jstestfuzz .common
+  - name: libunwind_tests
+  - name: .logical_session_cache .one_sec
+  # - name: multiversion_gen
+  - name: replica_sets_gen
+  - name: replica_sets_jscore_passthrough
+  - name: .sharding .txns
+  - name: sharding_gen
+  - name: sharding_jscore_passthrough
+  - name: .ssl
+  - name: .stitch
+  - name: test_packages
+    distros:
+    - ubuntu2004-package
+  - name: .publish
+    distros:
+    - ubuntu2004-small
+  - name: generate_buildid_to_debug_symbols_mapping
+
+- name: enterprise-ubuntu2004-64
+  display_name: Enterprise Ubuntu 20.04
+  cron: "0 12 * * *" # Every day starting at 12:00
+  modules:
+  - enterprise
+  run_on:
+  - ubuntu2004-small
+  stepback: false
+  expansions:
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
+    push_path: linux
+    push_bucket: downloads.10gen.com
+    push_name: linux
+    push_arch: x86_64-enterprise-ubuntu2004
+    compile_flags: --ssl MONGO_DISTMOD=ubuntu2004 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    csfle_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    multiversion_platform: ubuntu2004
+    multiversion_edition: enterprise
+    has_packages: true
+    packager_script: packager_enterprise.py
+    packager_arch: x86_64
+    packager_distro: ubuntu2004
+    repo_edition: enterprise
+    scons_cache_scope: shared
+    large_distro_name: ubuntu2004-large
+  tasks:
+  - name: compile_test_and_package_serial_TG
+    distros:
+    - ubuntu2004-large
+  - name: build_variant_gen
+  - name: .csfle
+  - name: .publish_csfle
+  #  - name: .aggfuzzer .common !.multiversion # Disabled for FCV 5.3
+  - name: audit
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: .encrypt !.aggregation !.replica_sets !.sharding !.jscore
+  - name: external_auth
+  - name: external_auth_aws
+  - name: .jscore .common !.decimal !.sharding
+  - name: jsCore_auth
+  - name: .jstestfuzz .common
+  - name: libunwind_tests
+  - name: .logical_session_cache .one_sec
+  - name: .ocsp
+  - name: replica_sets_auth_gen
+  - name: replica_sets_jscore_passthrough
+  - name: sasl
+  - name: sharding_auth_gen
+  - name: snmp
+  - name: test_packages
+    distros:
+    - ubuntu2004-package
+  - name: .publish
+    distros:
+    - ubuntu2004-small
+  - name: generate_buildid_to_debug_symbols_mapping
+
+- name: enterprise-ubuntu2004-arm64
+  display_name: Enterprise Ubuntu 20.04 arm64
+  cron: "0 12 * * *" # Every day starting at 12:00
+  modules:
+  - enterprise
+  run_on:
+  - ubuntu2004-arm64-large
+  expansions:
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
+    push_path: linux
+    push_bucket: downloads.10gen.com
+    push_name: linux
+    push_arch: aarch64-enterprise-ubuntu2004
+    compile_flags: --ssl MONGO_DISTMOD=ubuntu2004 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    csfle_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    resmoke_jobs_max: 4 # Avoid starting too many mongod's on ARM test servers
+    has_packages: true
+    packager_script: packager_enterprise.py
+    packager_arch: arm64
+    packager_distro: ubuntu2004
+    repo_edition: enterprise
+    multiversion_platform: ubuntu2004
+    multiversion_architecture: arm64
+    multiversion_architecture_42_or_later: aarch64
+    multiversion_edition: enterprise
+    scons_cache_scope: shared
+  tasks:
+  - name: compile_test_and_package_serial_TG
+  - name: build_variant_gen
+  - name: aggregation
+  - name: aggregation_wildcard_fuzzer_gen
+  - name: .auth !.audit !.multiversion !.jscore
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: .misc_js
+  - name: .concurrency .common
+  - name: concurrency_replication_causal_consistency_gen
+  - name: fle
+  - name: .jscore .common !.auth
+  - name: .jstestfuzz .common
+  - name: .logical_session_cache .one_sec
+  - name: replica_sets_gen
+  - name: .replica_sets .common
+  - name: .sharding .txns
+  - name: sharding_gen
+  - name: sharding_jscore_passthrough
+  - name: .ssl
+  - name: .stitch
+  - name: .csfle
+  - name: .publish_csfle
+  - name: test_packages
+    distros:
+    - ubuntu2004-package
+  - name: .publish
+    distros:
+    - ubuntu2004-test
+  - name: generate_buildid_to_debug_symbols_mapping
+
+- name: ubuntu2004-arm64
+  display_name: Ubuntu 20.04 arm64
+  cron: "0 12 * * *" # Every day starting at 12:00
+  run_on:
+  - ubuntu2004-arm64-large
+  expansions:
+    push_path: linux
+    push_bucket: downloads.mongodb.org
+    push_name: linux
+    push_arch: aarch64-ubuntu2004
+    compile_flags: --ssl MONGO_DISTMOD=ubuntu2004 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    resmoke_jobs_max: 8 # Avoid starting too many mongod's on ARM test servers
+    has_packages: true
+    packager_script: packager.py
+    packager_arch: arm64
+    packager_distro: ubuntu2004
+    repo_edition: org
+    multiversion_platform: ubuntu2004
+    multiversion_architecture: arm64
+    multiversion_architecture_42_or_later: aarch64
+    multiversion_edition: targeted
+    scons_cache_scope: shared
+  tasks:
+  - name: compile_test_and_package_serial_TG
+  - name: build_variant_gen
+  - name: free_monitoring
+  - name: jsCore
+  - name: replica_sets_jscore_passthrough
+  - name: test_packages
+    distros:
+    - ubuntu2004-package
+  - name: .publish
+    distros:
+    - ubuntu2004-test
+  - name: generate_buildid_to_debug_symbols_mapping
+
+- name: windows
+  display_name: Windows
+  cron: "0 12 * * *" # Every day starting at 12:00
+  run_on:
+  - windows-vsCurrent-small
+  expansions:
+    additional_package_targets: msi
+    exe: ".exe"
+    push_path: windows
+    push_bucket: downloads.mongodb.org
+    push_name: windows
+    push_arch: x86_64
+    multiversion_platform: windows_x86_64-2008plus-ssl
+    multiversion_platform_42_or_later: windows_x86_64-2012plus
+    multiversion_platform_44_or_later: windows
+    multiversion_edition: base
+    content_type: application/zip
+    compile_flags: --ssl MONGO_DISTMOD=windows -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5") --win-version-min=win10
+    num_scons_link_jobs_available: 0.25
+    python: '/cygdrive/c/python/python37/python.exe'
+    ext: zip
+    scons_cache_scope: shared
+    large_distro_name: windows-vsCurrent-large
+    test_flags: &windows_common_test_excludes --excludeWithAnyTags=incompatible_with_windows_tls
+  tasks:
+  - name: compile_test_and_package_serial_TG
+    distros:
+    - windows-vsCurrent-large
+  - name: build_variant_gen
+  #  - name: .aggfuzzer # Disabled for FCV 5.3
+  - name: .aggregation !.auth !.encrypt !.unwind
+  - name: auth_gen
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: .misc_js
+    # Some concurrency workloads require a lot of memory, so we use machines
+    # with more RAM for these suites.
+  - name: .concurrency !.ubsan !.no_txns !.kill_terminate !.common !.debug_only
+    distros:
+    - windows-vsCurrent-large
+  - name: .concurrency .common
+  - name: disk_wiredtiger
+  - name: free_monitoring
+  - name: .jscore .common !.auth
+  - name: json_schema
+  - name: .jstestfuzz !.initsync !.flow_control !.stepdowns
+  - name: multiversion_gen
+  - name: multiversion_auth_gen
+  - name: .query_fuzzer
+  - name: .read_write_concern
+  - name: replica_sets_gen
+  - name: replica_sets_jscore_passthrough
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: .sharding .txns
+  - name: .sharding .common !.csrs
+  - name: .ssl
+  - name: .stitch
+  - name: .updatefuzzer
+  - name: push
+    distros:
+    - rhel70-small
+
+- name: enterprise-windows
+  display_name: "Enterprise Windows"
+  cron: "0 12 * * *" # Every day starting at 12:00
+  modules:
+  - enterprise
+  run_on:
+  - windows-vsCurrent-small
+  expansions:
+    exe: ".exe"
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug msi archive-mh archive-mh-debug
+    content_type: application/zip
+    compile_flags: --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5") --win-version-min=win10
+    num_scons_link_jobs_available: 0.25
+    python: '/cygdrive/c/python/python37/python.exe'
+    ext: zip
+    scons_cache_scope: shared
+    multiversion_platform: windows
+    multiversion_edition: enterprise
+    jstestfuzz_num_generated_files: 35
+    target_resmoke_time: 20
+    max_sub_suites: 3
+    large_distro_name: windows-vsCurrent-large
+    push_path: windows
+    push_bucket: downloads.10gen.com
+    push_name: windows
+    push_arch: x86_64-enterprise
+    test_flags: *windows_common_test_excludes
+    exec_timeout_secs: 14400 # 3 hour timeout
+  tasks:
+  - name: compile_test_and_package_serial_TG
+    distros:
+    - windows-vsCurrent-large
+  - name: build_variant_gen
+  #  - name: .aggfuzzer # Disabled for FCV 5.3
+  - name: .aggregation !.auth !.encrypt !.unwind
+  - name: auth_gen
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: .misc_js
+    # Some concurrency workloads require a lot of memory, so we use machines
+    # with more RAM for these suites.
+  - name: .concurrency !.ubsan !.no_txns !.kill_terminate !.common !.debug_only
+    distros:
+    - windows-vsCurrent-large
+  - name: .concurrency .common
+  - name: .csfle
+    distros:
+    - windows-vsCurrent-large
+  - name: .publish_csfle
+    distros:
+    - rhel70-small
+  - name: disk_wiredtiger
+  - name: .jscore .common !.auth
+  - name: json_schema
+  - name: .jstestfuzz !.initsync !.flow_control !.stepdowns
+  - name: multiversion_gen
+  - name: multiversion_auth_gen
+  - name: powercycle_gen
+  - name: .query_fuzzer
+  - name: .read_write_concern
+  - name: replica_sets_gen
+  - name: replica_sets_jscore_passthrough
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: .sharding .txns
+  - name: .sharding .common !.csrs
+  - name: .ssl
+  - name: .stitch
+  - name: .updatefuzzer
+  - name: push
+    distros:
+    - rhel70-small
+
+  ###########################################
+  #           macOS buildvariants           #
+  ###########################################
+- name: macos
+  display_name: macOS
+  cron: "0 12 * * *" # Every day starting at 12:00
+  run_on:
+  - macos-1100
+  expansions:
+    test_flags: --excludeWithAnyTags=incompatible_with_macos
+    push_path: osx
+    push_bucket: downloads.mongodb.org
+    push_name: macos
+    push_arch: x86_64
+    compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
+    compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars
+    resmoke_jobs_max: 6
+  tasks:
+  - name: compile_test_and_package_serial_TG
+  - name: compile_build_tools_next_TG
+  - name: build_variant_gen
+  - name: .aggregation !.auth !.encrypt !.unwind
+  - name: auth_gen
+  - name: .causally_consistent !.sharding
+  - name: .change_streams !.secondary_reads
+  - name: .misc_js
+  - name: .concurrency !.ubsan !.no_txns !.debug_only !.kill_terminate
+  - name: disk_wiredtiger
+  - name: free_monitoring
+  - name: initial_sync_fuzzer_gen
+  - name: .jscore .common !.auth
+  - name: jsCore_txns_large_txns_format
+  - name: .jstestfuzz .causal
+  - name: .jstestfuzz .interrupt
+  - name: .jstestfuzz .common
+  - name: .jstestfuzz .session
+  - name: .logical_session_cache .one_sec
+  - name: .query_fuzzer
+  - name: .read_write_concern !.linearize
+  - name: replica_sets_gen
+  - name: replica_sets_kill_secondaries_jscore_passthrough
+  - name: replica_sets_large_txns_format_gen
+  - name: .replica_sets .common !.auth
+  - name: retryable_writes_jscore_passthrough_gen
+  - name: .rollbackfuzzer
+  - name: session_jscore_passthrough
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: .sharding .txns
+  - name: .ssl
+  - name: .stitch
+  - name: unittest_shell_hang_analyzer_gen
+  - name: push
+    distros:
+    - rhel70-small
+
+- name: enterprise-macos
+  display_name: Enterprise macOS
+  cron: "0 12 * * *" # Every day starting at 12:00
+  modules:
+  - enterprise
+  run_on:
+  - macos-1100
+  expansions:
+    test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
+    push_path: osx
+    push_bucket: downloads.10gen.com
+    push_name: macos
+    push_arch: x86_64-enterprise
+    compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
+    compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars
+    resmoke_jobs_max: 6
+  tasks:
+  - name: compile_test_and_package_serial_TG
+  - name: compile_build_tools_next_TG
+  - name: build_variant_gen
+  - name: audit
+  - name: auth_audit_gen
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: .encrypt !.replica_sets !.sharding !.aggregation !.jscore
+  - name: .jscore .common !.decimal !.sharding
+  - name: .jstestfuzz .common
+  - name: .logical_session_cache .one_sec
+  - name: mqlrun
+  - name: replica_sets_auth_gen
+  - name: replica_sets_jscore_passthrough
+  - name: sasl
+  - name: push
+    distros:
+    - rhel70-small
+  - name: .csfle
+  - name: .publish_csfle
+    distros:
+    - rhel70-small

@@ -1,6 +1,6 @@
 # These paths are relative to the directory containing this configuration file
 files:
-    - evergreen.yml
+    - evaluated_evergreen.yml
 help_url: https://wiki.corp.mongodb.com/pages/viewpage.action?pageId=133273894
 
 rules:
@@ -14,8 +14,8 @@ rules:
     - rule: "no-shell-exec"
     - rule: "no-multiline-expansions-update"
     - rule: "invalid-build-parameter"
-    - rule: "required-expansions-write"
-      regex: .*\/evergreen\/.*\.sh
+#    - rule: "required-expansions-write"
+#      regex: .*\/evergreen\/.*\.sh
     - rule: "dependency-for-func"
       dependencies:
         generate resmoke tasks: ["build_variant_gen", "archive_dist_test"]

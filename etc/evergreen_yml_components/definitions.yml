@@ -1,8 +1,11 @@
 ####################################################
 #               Static Definitions                 #
 ####################################################
-# This file contains static definitions used by other YAML files.
+# This file contains static Evergreen config definitions used by other YAML files.
 # It is not run directly by any Evergreen project.
+#
+# Any global task, function, or taskgroup definition can be added here. Note that if
+# the definition is added to another file, YAML anchors from this file can't be used.
 
 command_type: system
 exec_timeout_secs: 21600  # 6 hours.
@@ -2162,7 +2165,9 @@ tasks:
       - "./etc/backports_required_for_multiversion_tests.yml"
       - "./etc/evergreen_timeouts.yml"
       - "./etc/expansions.default.yml"
+      - "./etc/evergreen_nightly.yml"
       - "./etc/evergreen.yml"
+      - "./etc/evergreen_yml_components/**"
       - "./etc/pip/**"
       - "./etc/repo_config.yaml"
       - "./etc/scons/**"
@@ -3097,7 +3102,7 @@ tasks:
   - func: "run tests"
     vars:
       suite: benchmarks
-      exec_timeout_secs: 10800  # 3 hour timeout.
+      exec_timeout_secs: 14400  # 4 hour timeout.
       resmoke_jobs_max: 1
   - func: "send benchmark results"
   - func: "analyze benchmark results"

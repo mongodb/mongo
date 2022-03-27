@@ -9,6 +9,7 @@ activate_venv
 PATH=$PATH:$HOME:/ $python buildscripts/evergreen_gen_build_variant.py \
   --expansion-file ../expansions.yml \
   --evg-api-config ./.evergreen.yml \
+  --evg-project-config ${evergreen_config_file_path} \
   --output-file ${build_variant}.json \
   --verbose \
   $@

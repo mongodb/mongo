@@ -34,7 +34,7 @@ def ns(relative_name):  # pylint: disable-invalid-name
 def get_expansions_data():
     return {
             "branch_name": "fake_branch",
-            "build_variant": "enterprise-rhel-80-64-bit",
+            "build_variant": "enterprise-rhel-80-64-bit-suggested",
             "check_evergreen": 2,
             "distro_id": "rhel80-small",
             "is_patch": "true",

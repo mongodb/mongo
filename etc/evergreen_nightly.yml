@@ -1,0 +1,18 @@
+# Similar to etc/evergreen.yml, but for release builds.
+
+include:
+- filename: etc/evergreen_yml_components/definitions.yml
+- filename: etc/evergreen_yml_components/variants/atlas.yml
+- filename: etc/evergreen_yml_components/variants/misc_release.yml
+### Comment out when using this file for a LTS or Rapid release branch. ###
+- filename: etc/evergreen_yml_components/variants/ibm.yml
+### Uncomment when using this file for a LTS release branch. ###
+# - filename: etc/evergreen_yml_components/variants/in_memory.yml
+### Uncomment when using this file for a LTS or Rapid release branch. ###
+# - filename: etc/evergreen_yml_components/variants/sanitizer.yml
+
+
+parameters:
+- key: evergreen_config_file_path
+  value: "etc/evergreen_nightly.yml"
+  description: "path to this file"

@@ -1,0 +1,114 @@
+# InMemory build variants that need to be run on LTS but not Rapid releases.
+
+buildvariants:
+- name: enterprise-rhel-80-64-bit-inmem
+  display_name: Enterprise RHEL 8.0 (inMemory)
+  cron: "0 12 * * *" # Every day starting at 12:00
+  modules:
+  - enterprise
+  run_on:
+  - rhel80-small
+  expansions:
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
+    test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling
+    compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    multiversion_platform: rhel80
+    multiversion_edition: enterprise
+    scons_cache_scope: shared
+    large_distro_name: rhel80-large
+  tasks:
+  - name: compile_test_and_package_serial_TG
+    distros:
+    - rhel80-xlarge
+  - name: build_variant_gen
+  #  - name: .aggfuzzer .common # Disabled for FCV 5.3
+  - name: .aggregation !.unwind !.encrypt
+  - name: audit
+  - name: .auth !.multiversion
+  - name: .causally_consistent !.wo_snapshot !.durable_history
+  - name: .change_streams !.secondary_reads
+  - name: .change_stream_fuzzer
+  - name: .misc_js
+  - name: .concurrency !.ubsan !.no_txns !.debug_only !.kill_terminate
+    distros:
+    - rhel80-medium  # Some workloads require a lot of memory, use a bigger machine for this suite.
+  - name: initial_sync_fuzzer_gen
+  - name: .integration !.audit
+    distros:
+    - rhel80-medium
+  - name: .jscore .common !.decimal
+  - name: jsCore_txns_large_txns_format
+  - name: .jstestfuzz !.initsync
+  - name: .logical_session_cache
+  - name: .multi_shard .common
+  - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
+  - name: .read_write_concern !.durable_history
+  - name: replica_sets_gen
+  - name: .replica_sets .common
+  - name: .replica_sets .multi_oplog
+  - name: replica_sets_multi_stmt_txn_jscore_passthrough
+  - name: replica_sets_multi_stmt_txn_stepdown_jscore_passthrough_gen
+    distros:
+    - rhel80-medium
+  - name: .resharding_fuzzer
+  - name: .retry
+  - name: rollback_fuzzer_gen
+  - name: sasl
+  - name: secondary_reads_passthrough_gen
+  - name: session_jscore_passthrough
+  - name: sharded_multi_stmt_txn_jscore_passthrough
+    distros:
+    - rhel80-medium
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: .sharding .common !.multiversion !.csrs
+  - name: snmp
+  - name: .ssl
+  - name: .updatefuzzer
+
+- name: enterprise-windows-inmem
+  display_name: Enterprise Windows (inMemory)
+  cron: "0 12 * * *" # Every day starting at 12:00
+  modules:
+  - enterprise
+  run_on:
+  - windows-vsCurrent-small
+  expansions:
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug msi
+    exe: ".exe"
+    content_type: application/zip
+    compile_flags: --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5") --win-version-min=win10
+    num_scons_link_jobs_available: 0.25
+    python: '/cygdrive/c/python/python37/python.exe'
+    test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling,incompatible_with_windows_tls
+    ext: zip
+    scons_cache_scope: shared
+    multiversion_platform: windows
+    multiversion_edition: enterprise
+    large_distro_name: windows-vsCurrent-large
+  tasks:
+  - name: compile_test_and_package_serial_TG
+    distros:
+    - windows-vsCurrent-large
+  - name: build_variant_gen
+  #  - name: .aggfuzzer .common # Disabled for FCV 5.3
+  - name: audit
+  - name: auth_audit_gen
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: .concurrency .common
+    distros:
+    - windows-vsCurrent-large
+  - name: concurrency_replication_causal_consistency_gen
+  - name: initial_sync_fuzzer_gen
+  - name: .jscore .common !.decimal !.sharding
+  - name: .jstestfuzz .common !.flow_control  # Flow control jstestfuzz take longer.
+  - name: .read_write_concern .linearize !.durable_history
+  - name: replica_sets_auth_gen
+  - name: replica_sets_jscore_passthrough
+  - name: replica_sets_multi_stmt_txn_jscore_passthrough
+  - name: sasl
+  - name: .sharding .txns
+  - name: sharding_auth_gen
+  - name: sharding_auth_audit_gen
+  - name: snmp
+  - name: .ssl
+  - name: .resharding_fuzzer
