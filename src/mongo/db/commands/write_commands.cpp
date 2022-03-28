@@ -66,6 +66,7 @@
 #include "mongo/db/repl/tenant_migration_decoration.h"
 #include "mongo/db/retryable_writes_stats.h"
 #include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
@@ -982,7 +983,21 @@ public:
                     bucketsColl->getTimeseriesOptions());
 
             auto timeSeriesOptions = *bucketsColl->getTimeseriesOptions();
-            _rebuildOptionsWithGranularityFromConfigServer(opCtx, timeSeriesOptions, bucketsNs);
+
+            boost::optional<Status> rebuildOptionsError;
+            try {
+                _rebuildOptionsWithGranularityFromConfigServer(opCtx, timeSeriesOptions, bucketsNs);
+            } catch (const ExceptionForCat<ErrorCategory::StaleShardVersionError>& ex) {
+                // This could occur when the shard version attached to the request is for the time
+                // series namespace (unsharded), which is compared to the shard version of the
+                // bucket namespace. Consequently, every single entry fails but the whole operation
+                // succeeds.
+
+                rebuildOptionsError = ex.toStatus();
+
+                auto& oss{OperationShardingState::get(opCtx)};
+                oss.setShardingOperationFailedStatus(ex.toStatus());
+            }
 
             TimeseriesBatches batches;
             TimeseriesStmtIds stmtIds;
@@ -990,6 +1005,13 @@ public:
 
             auto insert = [&](size_t index) {
                 invariant(start + index < request().getDocuments().size());
+
+                if (rebuildOptionsError) {
+                    const auto error{
+                        generateError(opCtx, *rebuildOptionsError, start + index, errors->size())};
+                    errors->emplace_back(std::move(*error));
+                    return false;
+                }
 
                 auto stmtId = request().getStmtIds()
                     ? request().getStmtIds()->at(start + index)
