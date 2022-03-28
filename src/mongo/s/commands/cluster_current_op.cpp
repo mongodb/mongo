@@ -71,7 +71,7 @@ private:
     }
 
     virtual StatusWith<CursorResponse> runAggregation(
-        OperationContext* opCtx, const AggregateCommandRequest& request) const final {
+        OperationContext* opCtx, AggregateCommandRequest& request) const final {
         auto nss = request.getNamespace();
 
         BSONObjBuilder responseBuilder;

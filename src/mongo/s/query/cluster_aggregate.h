@@ -83,7 +83,7 @@ public:
      */
     static Status runAggregate(OperationContext* opCtx,
                                const Namespaces& namespaces,
-                               const AggregateCommandRequest& request,
+                               AggregateCommandRequest& request,
                                const LiteParsedPipeline& liteParsedPipeline,
                                const PrivilegeVector& privileges,
                                boost::optional<ChunkManager> cm,
@@ -94,7 +94,7 @@ public:
      */
     static Status runAggregate(OperationContext* opCtx,
                                const Namespaces& namespaces,
-                               const AggregateCommandRequest& request,
+                               AggregateCommandRequest& request,
                                const LiteParsedPipeline& liteParsedPipeline,
                                const PrivilegeVector& privileges,
                                BSONObjBuilder* result);
@@ -105,7 +105,7 @@ public:
      */
     static Status runAggregate(OperationContext* opCtx,
                                const Namespaces& namespaces,
-                               const AggregateCommandRequest& request,
+                               AggregateCommandRequest& request,
                                const PrivilegeVector& privileges,
                                BSONObjBuilder* result);
 

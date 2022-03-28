@@ -33,6 +33,7 @@ env.Library(
         'cluster_aggregation_planner.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/fle_crud',
         '$BUILD_DIR/mongo/db/pipeline/pipeline',
         '$BUILD_DIR/mongo/db/pipeline/process_interface/mongos_process_interface',
         '$BUILD_DIR/mongo/db/pipeline/sharded_agg_helpers',

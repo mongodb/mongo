@@ -34,6 +34,9 @@
 #include "mongo/crypto/fle_crypto.h"
 #include "mongo/crypto/fle_tags.h"
 #include "mongo/db/fle_crud.h"
+#include "mongo/db/pipeline/document_source_geo_near.h"
+#include "mongo/db/pipeline/document_source_graph_lookup.h"
+#include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/transaction_api.h"
 #include "mongo/s/grid.h"
@@ -60,51 +63,83 @@ boost::intrusive_ptr<ExpressionContext> makeExpCtx(OperationContext* opCtx,
                                              findCommand->getLegacyRuntimeConstants(),
                                              findCommand->getLet());
 }
-}  // namespace
 
-BSONObj rewriteEncryptedFilter(boost::intrusive_ptr<ExpressionContext> expCtx,
-                               const FLEStateCollectionReader& escReader,
-                               const FLEStateCollectionReader& eccReader,
-                               BSONObj filter) {
-    return MatchExpressionRewrite(expCtx, escReader, eccReader, filter).get();
-}
+class RewriteBase {
+public:
+    RewriteBase(boost::intrusive_ptr<ExpressionContext> expCtx,
+                const NamespaceString& nss,
+                const EncryptionInformation& encryptInfo)
+        : expCtx(expCtx), db(nss.db()) {
+        auto efc = EncryptionInformationHelpers::getAndValidateSchema(nss, encryptInfo);
+        esc = efc.getEscCollection()->toString();
+        ecc = efc.getEccCollection()->toString();
+    }
+    virtual ~RewriteBase(){};
+    virtual void doRewrite(FLEStateCollectionReader& escReader,
+                           FLEStateCollectionReader& eccReader){};
 
-void processFindCommand(OperationContext* opCtx,
-                        NamespaceString nss,
-                        FindCommandRequest* findCommand) {
-    invariant(findCommand->getEncryptionInformation());
+    boost::intrusive_ptr<ExpressionContext> expCtx;
+    std::string esc;
+    std::string ecc;
+    std::string db;
+};
 
-    auto efc = EncryptionInformationHelpers::getAndValidateSchema(
-        nss, findCommand->getEncryptionInformation().get());
+// This class handles rewriting of an entire pipeline.
+class PipelineRewrite : public RewriteBase {
+public:
+    PipelineRewrite(const NamespaceString& nss,
+                    const EncryptionInformation& encryptInfo,
+                    std::unique_ptr<Pipeline, PipelineDeleter> toRewrite)
+        : RewriteBase(toRewrite->getContext(), nss, encryptInfo), pipeline(std::move(toRewrite)) {}
 
-    // The transaction runs in a separate executor, and so we can't pass data by
-    // reference into the lambda. This struct holds all the data we need inside the
-    // lambda, and is passed in a more threadsafe shared_ptr.
-    struct SharedBlock {
-        SharedBlock(NamespaceString nss,
-                    std::string esc,
-                    std::string ecc,
-                    const BSONObj userFilter,
-                    boost::intrusive_ptr<ExpressionContext> expCtx)
-            : esc(std::move(esc)),
-              ecc(std::move(ecc)),
-              userFilter(userFilter),
-              db(nss.db()),
-              expCtx(expCtx) {}
-        std::string esc;
-        std::string ecc;
-        const BSONObj userFilter;
-        BSONObj rewrittenFilter;
-        std::string db;
-        boost::intrusive_ptr<ExpressionContext> expCtx;
-    };
+    ~PipelineRewrite(){};
+    void doRewrite(FLEStateCollectionReader& escReader, FLEStateCollectionReader& eccReader) final {
+        for (auto&& source : pipeline->getSources()) {
+            if (auto match = dynamic_cast<DocumentSourceMatch*>(source.get())) {
+                match->rebuild(
+                    rewriteEncryptedFilter(expCtx, escReader, eccReader, match->getQuery()));
+            } else if (auto geoNear = dynamic_cast<DocumentSourceGeoNear*>(source.get())) {
+                geoNear->setQuery(
+                    rewriteEncryptedFilter(expCtx, escReader, eccReader, geoNear->getQuery()));
+            } else if (auto graphLookup = dynamic_cast<DocumentSourceGraphLookUp*>(source.get());
+                       graphLookup && graphLookup->getAdditionalFilter()) {
+                graphLookup->setAdditionalFilter(rewriteEncryptedFilter(
+                    expCtx, escReader, eccReader, graphLookup->getAdditionalFilter().get()));
+            }
+        }
+    }
 
-    auto sharedBlock = std::make_shared<SharedBlock>(nss,
-                                                     efc.getEscCollection().get().toString(),
-                                                     efc.getEccCollection().get().toString(),
-                                                     findCommand->getFilter().getOwned(),
-                                                     makeExpCtx(opCtx, findCommand));
+    std::unique_ptr<Pipeline, PipelineDeleter> getPipeline() {
+        return std::move(pipeline);
+    }
 
+private:
+    std::unique_ptr<Pipeline, PipelineDeleter> pipeline;
+};
+
+// This class handles rewriting of a single match expression, represented as a BSONObj.
+class FilterRewrite : public RewriteBase {
+public:
+    FilterRewrite(boost::intrusive_ptr<ExpressionContext> expCtx,
+                  const NamespaceString& nss,
+                  const EncryptionInformation& encryptInfo,
+                  const BSONObj toRewrite)
+        : RewriteBase(expCtx, nss, encryptInfo), userFilter(toRewrite) {}
+
+    ~FilterRewrite(){};
+    void doRewrite(FLEStateCollectionReader& escReader, FLEStateCollectionReader& eccReader) final {
+        rewrittenFilter = rewriteEncryptedFilter(expCtx, escReader, eccReader, userFilter);
+    }
+
+    const BSONObj userFilter;
+    BSONObj rewrittenFilter;
+};
+
+// This helper executes the rewrite(s) inside a transaction. The transaction runs in a separate
+// executor, and so we can't pass data by reference into the lambda. The provided rewriter should
+// hold all the data we need to do the rewriting inside the lambda, and is passed in a more
+// threadsafe shared_ptr. The result of applying the rewrites can be accessed in the RewriteBase.
+void doFLERewriteInTxn(OperationContext* opCtx, std::shared_ptr<RewriteBase> sharedBlock) {
     auto txn = std::make_shared<txn_api::TransactionWithRetries>(
         opCtx,
         Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
@@ -125,8 +160,7 @@ void processFindCommand(OperationContext* opCtx,
             auto eccReader = makeCollectionReader(&queryInterface, sharedBlock->ecc);
 
             // Rewrite the MatchExpression.
-            sharedBlock->rewrittenFilter = rewriteEncryptedFilter(
-                sharedBlock->expCtx, escReader, eccReader, sharedBlock->userFilter);
+            sharedBlock->doRewrite(escReader, eccReader);
 
             return SemiFuture<void>::makeReady();
         });
@@ -134,17 +168,43 @@ void processFindCommand(OperationContext* opCtx,
     uassertStatusOK(swCommitResult);
     uassertStatusOK(swCommitResult.getValue().cmdStatus);
     uassertStatusOK(swCommitResult.getValue().getEffectiveStatus());
+}
+}  // namespace
+
+BSONObj rewriteEncryptedFilter(boost::intrusive_ptr<ExpressionContext> expCtx,
+                               const FLEStateCollectionReader& escReader,
+                               const FLEStateCollectionReader& eccReader,
+                               BSONObj filter) {
+    return MatchExpressionRewrite(expCtx, escReader, eccReader, filter).get();
+}
+
+void processFindCommand(OperationContext* opCtx,
+                        NamespaceString nss,
+                        FindCommandRequest* findCommand) {
+    invariant(findCommand->getEncryptionInformation());
+
+    auto sharedBlock =
+        std::make_shared<FilterRewrite>(makeExpCtx(opCtx, findCommand),
+                                        nss,
+                                        findCommand->getEncryptionInformation().get(),
+                                        findCommand->getFilter().getOwned());
+    doFLERewriteInTxn(opCtx, sharedBlock);
 
     auto rewrittenFilter = sharedBlock->rewrittenFilter.getOwned();
     findCommand->setFilter(std::move(rewrittenFilter));
     findCommand->setEncryptionInformation(boost::none);
+}
 
-    // If we are in a multi-document transaction, then the transaction API has taken
-    // care of setting the readConcern on the transaction, and the find command
-    // shouldn't provide its own readConcern.
-    if (opCtx->inMultiDocumentTransaction()) {
-        findCommand->setReadConcern(boost::none);
-    }
+std::unique_ptr<Pipeline, PipelineDeleter> processPipeline(
+    OperationContext* opCtx,
+    NamespaceString nss,
+    const EncryptionInformation& encryptInfo,
+    std::unique_ptr<Pipeline, PipelineDeleter> toRewrite) {
+
+    auto sharedBlock = std::make_shared<PipelineRewrite>(nss, encryptInfo, std::move(toRewrite));
+    doFLERewriteInTxn(opCtx, sharedBlock);
+
+    return sharedBlock->getPipeline();
 }
 
 std::unique_ptr<MatchExpression> MatchExpressionRewrite::_rewriteMatchExpression(

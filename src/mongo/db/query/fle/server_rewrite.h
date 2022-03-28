@@ -58,6 +58,17 @@ void processFindCommand(OperationContext* opCtx,
                         FindCommandRequest* findCommand);
 
 /**
+ * Process a pipeline with encryptionInformation by rewriting the pipeline to query against the
+ * underlying tags array, where appropriate. After this rewriting is complete, there is no more FLE
+ * work to be done. The encryption info does not need to be kept around (e.g. on a command object).
+ */
+std::unique_ptr<Pipeline, PipelineDeleter> processPipeline(
+    OperationContext* opCtx,
+    NamespaceString nss,
+    const EncryptionInformation& encryptInfo,
+    std::unique_ptr<Pipeline, PipelineDeleter> toRewrite);
+
+/**
  * Class which handles rewriting filter MatchExpressions for FLE2. The functionality is encapsulated
  * as a class rather than just a namespace so that the collection readers don't have to be passed
  * around as extra arguments to every function.

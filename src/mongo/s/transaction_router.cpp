@@ -442,11 +442,13 @@ BSONObj TransactionRouter::Participant::attachTxnFieldsIfNeeded(
     auto cmdName = cmd.firstElement().fieldNameStringData();
     bool mustStartTransaction = isFirstStatementInThisParticipant && !isTransactionCommand(cmdName);
 
+    // Strip the command of its read concern if it should not have one.
     if (!mustStartTransaction) {
         auto readConcernFieldName = repl::ReadConcernArgs::kReadConcernFieldName;
-        dassert(!cmd.hasField(readConcernFieldName) ||
-                cmd.getObjectField(readConcernFieldName).isEmpty() ||
-                sharedOptions.isInternalTransactionForRetryableWrite);
+        if (cmd.hasField(readConcernFieldName) &&
+            !sharedOptions.isInternalTransactionForRetryableWrite) {
+            cmd = cmd.removeField(readConcernFieldName);
+        }
     }
 
     BSONObjBuilder newCmd = mustStartTransaction

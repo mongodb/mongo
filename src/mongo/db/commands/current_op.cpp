@@ -67,7 +67,7 @@ public:
     }
 
     virtual StatusWith<CursorResponse> runAggregation(
-        OperationContext* opCtx, const AggregateCommandRequest& request) const final {
+        OperationContext* opCtx, AggregateCommandRequest& request) const final {
         auto aggCmdObj = aggregation_request_helper::serializeToCommandObj(request);
 
         rpc::OpMsgReplyBuilder replyBuilder;
