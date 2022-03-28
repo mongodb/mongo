@@ -43,7 +43,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/command_generic_argument.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/op_observer.h"
@@ -53,8 +52,6 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/durable_catalog.h"
-#include "mongo/db/storage/index_entry_comparison.h"
-#include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/views/view_catalog.h"
@@ -258,52 +255,6 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
     return {std::move(cmr)};
 }
 
-void scanIndexForDuplicates(OperationContext* opCtx, Collection* coll, const IndexDescriptor* idx) {
-    // Starting point of index traversal.
-    const Ordering ord = Ordering::make(idx->keyPattern());
-    auto keyStringVersion = KeyString::kLatestVersion;
-    bool isFirstEntry = true;
-    std::unique_ptr<KeyString> indexKeyString = std::make_unique<KeyString>(keyStringVersion);
-    std::unique_ptr<KeyString> prevIndexKeyString = std::make_unique<KeyString>(keyStringVersion);
-
-    // Scan index for duplicates, comparing consecutive index entries.
-    // KeyStrings will be in strictly increasing order because all keys are sorted and they are
-    // in the format (Key, RID), and all RecordIDs are unique.
-    auto entry = coll->getIndexCatalog()->getEntry(idx);
-    auto accessMethod = entry->accessMethod();
-    auto indexCursor = accessMethod->newCursor(opCtx, true /*forward=*/);
-    for (auto indexEntry = indexCursor->seek(BSONObj(), true); indexEntry;
-         indexEntry = indexCursor->next()) {
-        indexKeyString->resetToKey(indexEntry->key, ord, indexEntry->loc);
-        if (!isFirstEntry) {
-            int cmp = KeyString::compare(
-                indexKeyString->getBuffer(),
-                prevIndexKeyString->getBuffer(),
-                KeyString::sizeWithoutRecordIdAtEnd(indexKeyString->getBuffer(),
-                                                    indexKeyString->getSize()),
-                KeyString::sizeWithoutRecordIdAtEnd(prevIndexKeyString->getBuffer(),
-                                                    prevIndexKeyString->getSize()));
-            if (cmp == 0) {
-                auto dupKeyErrorStatus = buildDupKeyErrorStatus(indexEntry->key,
-                                                                coll->ns(),
-                                                                idx->indexName(),
-                                                                idx->keyPattern(),
-                                                                idx->collation());
-                auto firstRecordId = KeyString::decodeRecordIdAtEnd(prevIndexKeyString->getBuffer(),
-                                                                    prevIndexKeyString->getSize());
-                auto secondRecordId = KeyString::decodeRecordIdAtEnd(indexKeyString->getBuffer(),
-                                                                     indexKeyString->getSize());
-                uassertStatusOK(dupKeyErrorStatus.withContext(
-                    str::stream() << "Unique index '" << idx->indexName() << ", first record: "
-                                  << firstRecordId << ", second record: " << secondRecordId));
-            }
-        }
-
-        isFirstEntry = false;
-        prevIndexKeyString.swap(indexKeyString);
-    }
-}
-
 /**
  * If uuid is specified, add it to the collection specified by nss. This will error if the
  * collection already has a UUID.
@@ -312,8 +263,7 @@ Status _collModInternal(OperationContext* opCtx,
                         const NamespaceString& nss,
                         const BSONObj& cmdObj,
                         BSONObjBuilder* result,
-                        bool upgradeUniqueIndexes,
-                        boost::optional<repl::OplogApplication::Mode> mode) {
+                        bool upgradeUniqueIndexes) {
     StringData dbName = nss.db();
     AutoGetCollection autoColl(
         opCtx, nss, MODE_IX, MODE_X, AutoGetCollection::ViewMode::kViewsPermitted);
@@ -439,10 +389,6 @@ Status _collModInternal(OperationContext* opCtx,
         // UniqueIndex
         if (cmr.indexUnique) {
             if (!cmr.idx->infoObj().getField("unique").trueValue()) {
-                // Checks for duplicates on the primary or for the 'applyOps' command.
-                if (!mode || *mode == repl::OplogApplication::Mode::kApplyOpsCmd) {
-                    scanIndexForDuplicates(opCtx, coll, cmr.idx);
-                }
                 newUnique = cmr.indexUnique;
                 // Change the value of "unique" on disk.
                 DurableCatalog::get(opCtx)->updateUniqueSetting(
@@ -520,14 +466,12 @@ Status collMod(OperationContext* opCtx,
                             nss,
                             cmdObj,
                             result,
-                            /*upgradeUniqueIndexes*/ false,
-                            boost::none);
+                            /*upgradeUniqueIndexes*/ false);
 }
 
 Status collModWithUpgrade(OperationContext* opCtx,
                           const NamespaceString& nss,
-                          const BSONObj& cmdObj,
-                          boost::optional<repl::OplogApplication::Mode> mode) {
+                          const BSONObj& cmdObj) {
     // An empty collMod is used to upgrade unique index during FCV upgrade. If an application
     // executes the empty collMod when the secondary is upgrading FCV it is fine to upgrade the
     // unique index becuase the secondary will eventually get the real empty collMod. If the
@@ -546,7 +490,7 @@ Status collModWithUpgrade(OperationContext* opCtx,
     }
 
     BSONObjBuilder resultWeDontCareAbout;
-    return _collModInternal(opCtx, nss, cmdObj, &resultWeDontCareAbout, upgradeUniqueIndex, mode);
+    return _collModInternal(opCtx, nss, cmdObj, &resultWeDontCareAbout, upgradeUniqueIndex);
 }
 
 Status _updateNonReplicatedIndexPerCollection(OperationContext* opCtx, Collection* coll) {
@@ -559,8 +503,7 @@ Status _updateNonReplicatedIndexPerCollection(OperationContext* opCtx, Collectio
                                           coll->ns(),
                                           collModObj,
                                           &resultWeDontCareAbout,
-                                          /*upgradeUniqueIndexes*/ true,
-                                          boost::none);
+                                          /*upgradeUniqueIndexes*/ true);
     return collModStatus;
 }
 
@@ -623,7 +566,7 @@ void _updateUniqueIndexesForDatabase(OperationContext* opCtx, const std::string&
             collModObjBuilder.append("collMod", collNSS.coll());
             BSONObj collModObj = collModObjBuilder.done();
 
-            uassertStatusOK(collModWithUpgrade(opCtx, collNSS, collModObj, boost::none));
+            uassertStatusOK(collModWithUpgrade(opCtx, collNSS, collModObj));
         }
     }
 }

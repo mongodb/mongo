@@ -30,7 +30,6 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/repl/oplog.h"
 
 namespace mongo {
 class BSONObj;
@@ -59,8 +58,7 @@ Status collMod(OperationContext* opCtx,
  */
 Status collModWithUpgrade(OperationContext* opCtx,
                           const NamespaceString& nss,
-                          const BSONObj& cmdObj,
-                          boost::optional<repl::OplogApplication::Mode> mode);
+                          const BSONObj& cmdObj);
 
 /*
  * Updates the unique indexes to timestamp safe unique index format on setFCV=4.2. It also updates
