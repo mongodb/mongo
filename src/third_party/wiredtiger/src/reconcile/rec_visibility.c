@@ -581,6 +581,8 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, W
 
                 WT_ASSERT(session, upd->next == NULL || upd->next->txnid != WT_TXN_ABORTED);
                 upd_select->upd = upd = upd->next;
+                /* We should not see multiple consecutive tombstones. */
+                WT_ASSERT(session, upd == NULL || upd->type != WT_UPDATE_TOMBSTONE);
             }
         }
 

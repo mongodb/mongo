@@ -395,19 +395,19 @@ onint(int signo)
 }
 
 /*
- * log_print_err --
+ * log_print_err_worker --
  *     Report an error and return the error.
  */
 int
-log_print_err(const char *m, int e, int fatal)
+log_print_err_worker(const char *func, int line, const char *m, int e, int fatal)
 {
     if (fatal) {
         g.running = 0;
         g.status = e;
     }
-    fprintf(stderr, "%s: %s: %s\n", progname, m, wiredtiger_strerror(e));
+    fprintf(stderr, "%s: %s,%d: %s: %s\n", progname, func, line, m, wiredtiger_strerror(e));
     if (g.logfp != NULL)
-        fprintf(g.logfp, "%s: %s: %s\n", progname, m, wiredtiger_strerror(e));
+        fprintf(g.logfp, "%s: %s,%d: %s: %s\n", progname, func, line, m, wiredtiger_strerror(e));
     return (e);
 }
 

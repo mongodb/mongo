@@ -175,7 +175,7 @@ thread_run(void *arg)
         /* Remove the key using a higher timestamp. */
         testutil_check(session->begin_transaction(session, NULL));
         cursor->set_key(cursor, kname);
-        testutil_check(cursor->remove(cursor));
+        testutil_check_error_ok(cursor->remove(cursor), WT_NOTFOUND);
         testutil_check(__wt_snprintf(tscfg, sizeof(tscfg), "commit_timestamp=%" PRIx64, ts + 1));
         testutil_check(session->commit_transaction(session, tscfg));
 

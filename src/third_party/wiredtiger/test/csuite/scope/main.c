@@ -161,7 +161,7 @@ cursor_scope_ops(WT_SESSION *session, const char *uri)
 
         /* Remove any leftover key/value pair, start fresh. */
         SET_KEY;
-        testutil_check(cursor->remove(cursor));
+        testutil_check_error_ok(cursor->remove(cursor), WT_NOTFOUND);
 
         /* If not an insert operation, make sure there's a key/value pair to operate on. */
         if (op->func != INSERT_GET_KEY && op->func != INSERT_GET_VALUE) {

@@ -110,7 +110,8 @@ __wt_row_modify(WT_CURSOR_BTREE *cbt, const WT_ITEM *key, const WT_ITEM *value, 
 
         if (upd_arg == NULL) {
             /* Make sure the modify can proceed. */
-            WT_ERR(__wt_txn_modify_check(session, cbt, old_upd = *upd_entry, &prev_upd_ts));
+            WT_ERR(
+              __wt_txn_modify_check(session, cbt, old_upd = *upd_entry, &prev_upd_ts, modify_type));
 
             /* Allocate a WT_UPDATE structure and transaction ID. */
             WT_ERR(__wt_upd_alloc(session, value, modify_type, &upd, &upd_size));

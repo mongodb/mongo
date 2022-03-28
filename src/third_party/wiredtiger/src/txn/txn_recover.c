@@ -175,7 +175,12 @@ __txn_op_apply(WT_RECOVERY *r, WT_LSN *lsnp, const uint8_t **pp, const uint8_t *
         WT_ERR(__wt_logop_col_remove_unpack(session, pp, end, &fileid, &recno));
         GET_RECOVERY_CURSOR(session, r, lsnp, fileid, &cursor);
         cursor->set_key(cursor, recno);
-        WT_ERR(cursor->remove(cursor));
+        /*
+         * WT_NOTFOUND is an expected error because the checkpoint snapshot we're rolling forward
+         * may race with a remove, resulting in the key not being in the tree, but recovery still
+         * processing the log record of the remove.
+         */
+        WT_ERR_NOTFOUND_OK(cursor->remove(cursor), false);
         break;
 
     case WT_LOGOP_COL_TRUNCATE:
@@ -237,7 +242,12 @@ __txn_op_apply(WT_RECOVERY *r, WT_LSN *lsnp, const uint8_t **pp, const uint8_t *
         WT_ERR(__wt_logop_row_remove_unpack(session, pp, end, &fileid, &key));
         GET_RECOVERY_CURSOR(session, r, lsnp, fileid, &cursor);
         __wt_cursor_set_raw_key(cursor, &key);
-        WT_ERR(cursor->remove(cursor));
+        /*
+         * WT_NOTFOUND is an expected error because the checkpoint snapshot we're rolling forward
+         * may race with a remove, resulting in the key not being in the tree, but recovery still
+         * processing the log record of the remove.
+         */
+        WT_ERR_NOTFOUND_OK(cursor->remove(cursor), false);
         break;
 
     case WT_LOGOP_ROW_TRUNCATE:

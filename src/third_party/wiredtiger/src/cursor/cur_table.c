@@ -596,9 +596,12 @@ __curtable_update(WT_CURSOR *cursor)
           session, ctable->cg_cursors, ctable->plan, cursor->value_format, value_copy));
         APPLY_CG(ctable, search);
 
-        /* Remove only if the key exists. */
+        /*
+         * Remove if search found a key. The search key existing doesn't mean the value wasn't
+         * previously removed, anticipate a "does not exist" not-found error from the remove.
+         */
         if (ret == 0) {
-            WT_ERR(__apply_idx(ctable, offsetof(WT_CURSOR, remove), true));
+            WT_ERR_NOTFOUND_OK(__apply_idx(ctable, offsetof(WT_CURSOR, remove), true), false);
             WT_ERR(__wt_schema_project_slice(
               session, ctable->cg_cursors, ctable->plan, 0, cursor->value_format, value_copy));
         } else
@@ -641,27 +644,15 @@ __curtable_remove(WT_CURSOR *cursor)
     /* Find the old record so it can be removed from indices */
     if (ctable->table->nindices > 0) {
         APPLY_CG(ctable, search);
-        if (ret == WT_NOTFOUND)
-            goto notfound;
         WT_ERR(ret);
         WT_ERR(__apply_idx(ctable, offsetof(WT_CURSOR, remove), false));
     }
 
     APPLY_CG(ctable, remove);
-    if (ret == WT_NOTFOUND)
-        goto notfound;
     WT_ERR(ret);
 
-notfound:
     /*
-     * If the cursor is configured to overwrite and the record is not found, that is exactly what we
-     * want.
-     */
-    if (ret == WT_NOTFOUND && F_ISSET(primary, WT_CURSTD_OVERWRITE))
-        ret = 0;
-
-    /*
-     * If the cursor was positioned, it stays positioned with a key but no no value, otherwise,
+     * If the cursor was positioned, it stays positioned with a key but has no value, otherwise,
      * there's no position, key or value. This isn't just cosmetic, without a reset, iteration on
      * this cursor won't start at the beginning/end of the table.
      */

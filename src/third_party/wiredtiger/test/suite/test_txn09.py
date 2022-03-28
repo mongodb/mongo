@@ -143,8 +143,10 @@ class test_txn09(wttest.WiredTigerTestCase, suite_subprocess):
                 c[k] = c[k1] = i + 2
                 current[k] = current[k1] = i + 2
             elif op == 'remove':
-                del c[k]
-                del c[k1]
+                c.set_key(k)
+                c.remove()
+                c.set_key(k1)
+                c.remove()
                 if k in current:
                     del current[k]
                 if k1 in current:

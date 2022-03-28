@@ -172,7 +172,7 @@ worker_mm_delete(WT_CURSOR *cursor, uint64_t keyno)
     ret = cursor->search(cursor);
     if (ret == 0)
         ret = cursor->remove(cursor);
-    else if (ret == WT_NOTFOUND)
+    if (ret == WT_NOTFOUND)
         ret = 0;
 
     return (ret);
@@ -237,6 +237,8 @@ worker_op(WT_CURSOR *cursor, table_type type, uint64_t keyno, u_int new_val)
 
         for (int i = 10; i > 0; i--) {
             if ((ret = cursor->remove(cursor)) != 0) {
+                if (ret == WT_NOTFOUND)
+                    return (0);
                 if (ret == WT_ROLLBACK)
                     return (WT_ROLLBACK);
                 return (log_print_err("cursor.remove", ret, 1));

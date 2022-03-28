@@ -257,11 +257,10 @@ thread_insert(void *arg)
 #endif
         if (sharedopts->remove && __wt_random(&rnd) % 5 == 0 && maincur->search(maincur) == 0) {
             /*
-             * Another thread can be removing at the same time.
+             * Another thread can be removing at the same time, or we can remove twice in a row.
              */
             ret = maincur->remove(maincur);
-            testutil_assert(
-              ret == 0 || (N_INSERT_THREAD > 1 && (ret == WT_NOTFOUND || ret == WT_ROLLBACK)));
+            testutil_assert(ret == 0 || ret == WT_NOTFOUND || ret == WT_ROLLBACK);
             if (ret == 0)
                 threadargs->removes++;
             else if (ret == WT_NOTFOUND)

@@ -129,7 +129,7 @@ __wt_col_modify(WT_CURSOR_BTREE *cbt, uint64_t recno, const WT_ITEM *value, WT_U
         old_upd = cbt->ins->upd;
         if (upd_arg == NULL) {
             /* Make sure the modify can proceed. */
-            WT_ERR(__wt_txn_modify_check(session, cbt, old_upd, &prev_upd_ts));
+            WT_ERR(__wt_txn_modify_check(session, cbt, old_upd, &prev_upd_ts, modify_type));
 
             /* Allocate a WT_UPDATE structure and transaction ID. */
             WT_ERR(__wt_upd_alloc(session, value, modify_type, &upd, &upd_size));
@@ -175,7 +175,7 @@ __wt_col_modify(WT_CURSOR_BTREE *cbt, uint64_t recno, const WT_ITEM *value, WT_U
     } else {
         /* Make sure the modify can proceed. */
         if (cbt->compare == 0 && upd_arg == NULL)
-            WT_ERR(__wt_txn_modify_check(session, cbt, NULL, &prev_upd_ts));
+            WT_ERR(__wt_txn_modify_check(session, cbt, NULL, &prev_upd_ts, modify_type));
 
         /* Allocate the append/update list reference as necessary. */
         if (append) {

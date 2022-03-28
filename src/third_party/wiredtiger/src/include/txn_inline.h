@@ -1299,33 +1299,24 @@ __wt_txn_search_check(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_txn_modify_check --
+ * __wt_txn_modify_block --
  *     Check if the current transaction can modify an item.
  */
 static inline int
-__wt_txn_modify_check(
+__wt_txn_modify_block(
   WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd, wt_timestamp_t *prev_tsp)
 {
     WT_DECL_ITEM(buf);
     WT_DECL_RET;
     WT_TIME_WINDOW tw;
     WT_TXN *txn;
-    WT_TXN_GLOBAL *txn_global;
     uint32_t snap_count;
     char ts_string[WT_TS_INT_STRING_SIZE];
     bool ignore_prepare_set, rollback, tw_found;
 
     rollback = tw_found = false;
     txn = session->txn;
-    txn_global = &S2C(session)->txn_global;
 
-    /* Don't check if transaction isolation is not snapshot or the table is metadata. */
-    if (txn->isolation != WT_ISO_SNAPSHOT || WT_IS_METADATA(cbt->dhandle))
-        return (0);
-
-    if (txn_global->debug_rollback != 0 &&
-      ++txn_global->debug_ops % txn_global->debug_rollback == 0)
-        return (__wt_txn_rollback_required(session, "debug mode simulated conflict"));
     /*
      * Always include prepared transactions in this check: they are not supposed to affect
      * visibility for update operations.
@@ -1417,6 +1408,49 @@ __wt_txn_modify_check(
 err:
     __wt_scr_free(session, &buf);
     return (ret);
+}
+
+/*
+ * __wt_txn_modify_check --
+ *     Check if the current transaction can modify an item.
+ */
+static inline int
+__wt_txn_modify_check(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd,
+  wt_timestamp_t *prev_tsp, u_int modify_type)
+{
+    WT_TXN *txn;
+    WT_TXN_GLOBAL *txn_global;
+
+    txn = session->txn;
+
+    /*
+     * Check if this operation is permitted, skipping if transaction isolation is not snapshot or
+     * operating on the metadata table.
+     */
+    if (txn->isolation == WT_ISO_SNAPSHOT && !WT_IS_METADATA(cbt->dhandle))
+        WT_RET(__wt_txn_modify_block(session, cbt, upd, prev_tsp));
+
+    /*
+     * Prepending a tombstone to another tombstone indicates remove of a non-existent key and that
+     * isn't permitted, return a WT_NOTFOUND error.
+     */
+    if (modify_type == WT_UPDATE_TOMBSTONE) {
+        /* Loop until a valid update is found. */
+        while (upd != NULL && upd->txnid == WT_TXN_ABORTED)
+            upd = upd->next;
+
+        if (upd != NULL && upd->type == WT_UPDATE_TOMBSTONE)
+            return (WT_NOTFOUND);
+    }
+
+    /* Everything is OK, optionally rollback for testing (skipping metadata operations). */
+    if (!WT_IS_METADATA(cbt->dhandle)) {
+        txn_global = &S2C(session)->txn_global;
+        if (txn_global->debug_rollback != 0 &&
+          ++txn_global->debug_ops % txn_global->debug_rollback == 0)
+            return (__wt_txn_rollback_required(session, "debug mode simulated conflict"));
+    }
+    return (0);
 }
 
 /*

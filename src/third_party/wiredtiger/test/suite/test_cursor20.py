@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_cursor18.py
+# test_cursor20.py
 #   Test duplicate key return values.
 
 from suite_subprocess import suite_subprocess
@@ -34,7 +34,7 @@ from wtdataset import SimpleDataSet
 import wiredtiger, wttest
 from wtscenario import make_scenarios
 
-class test_cursor18(wttest.WiredTigerTestCase, suite_subprocess):
+class test_cursor20(wttest.WiredTigerTestCase, suite_subprocess):
     format_values = [
         ('row', dict(key_format = 'S', value_format='S')),
         ('var', dict(key_format = 'r', value_format='S')),

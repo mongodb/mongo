@@ -118,7 +118,7 @@ func_ok()
 	    -e '/int dir_store_file_lock$/d' \
 	    -e '/int dir_store_file_sync$/d' \
 	    -e '/int dir_store_fs_terminate$/d' \
-	    -e '/int log_print_err$/d' \
+	    -e '/int log_print_err_worker$/d' \
 	    -e '/int lz4_error$/d' \
 	    -e '/int lz4_pre_size$/d' \
 	    -e '/int lz4_terminate$/d' \

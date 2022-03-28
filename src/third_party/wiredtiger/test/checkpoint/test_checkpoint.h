@@ -85,10 +85,12 @@ typedef struct {
 } GLOBAL;
 extern GLOBAL g;
 
+#define log_print_err(m, e, fatal) log_print_err_worker(__func__, __LINE__, m, e, fatal)
+
 void end_checkpoints(void);
 uint8_t flcs_encode(const char *);
 uint8_t flcs_modify(WT_MODIFY *, int, uint8_t);
-int log_print_err(const char *, int, int);
+int log_print_err_worker(const char *, int, const char *, int, int);
 void start_checkpoints(void);
 int start_workers(void);
 const char *type_to_string(table_type);

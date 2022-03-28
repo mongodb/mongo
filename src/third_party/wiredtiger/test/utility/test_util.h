@@ -140,6 +140,17 @@ typedef struct {
     } while (0)
 
 /*
+ * testutil_check_error_ok --
+ *     Complain and quit if a function call fails, with specified error ok.
+ */
+#define testutil_check_error_ok(call, e)                                          \
+    do {                                                                          \
+        int __r;                                                                  \
+        if ((__r = (call)) != 0 && (__r != (e)))                                  \
+            testutil_die(__r, "%s/%d: %s", __PRETTY_FUNCTION__, __LINE__, #call); \
+    } while (0)
+
+/*
  * testutil_checkfmt --
  *     Complain and quit if a function call fails, with formatted output.
  */

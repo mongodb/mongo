@@ -176,7 +176,7 @@ main(int argc, char *argv[])
     testutil_check(session2->open_cursor(session2, name, NULL, "next_random=true", &rcursor));
 
     /* Delete all but one document */
-    testutil_check(session->open_cursor(session, name, NULL, "overwrite", &wcursor));
+    testutil_check(session->open_cursor(session, name, NULL, NULL, &wcursor));
     for (i = 0; i < NUM_DOCS - 1; i++) {
         wcursor->set_key(wcursor, i);
         testutil_check(wcursor->remove(wcursor));
@@ -224,7 +224,7 @@ main(int argc, char *argv[])
     testutil_check(pthread_join(thread, NULL));
 
     /* Delete everything. Check for infinite loops */
-    testutil_check(session->open_cursor(session, name, NULL, "overwrite", &wcursor));
+    testutil_check(session->open_cursor(session, name, NULL, NULL, &wcursor));
     for (i = 0; i < NUM_DOCS; i++) {
         wcursor->set_key(wcursor, i);
         testutil_check(wcursor->remove(wcursor));

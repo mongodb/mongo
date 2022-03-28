@@ -565,8 +565,7 @@ struct __wt_cursor {
 	/*!
 	 * Remove a record.
 	 *
-	 * The key must be set; the key's record will be removed if it exists,
-	 * no error will be returned if the record does not exist.
+	 * The key must be set; the key's record will be removed if it exists.
 	 *
 	 * @snippet ex_all.c Remove a record
 	 *
@@ -654,10 +653,10 @@ struct __wt_cursor {
 	 * @configstart{WT_CURSOR.reconfigure, see dist/api_data.py}
 	 * @config{append, append the value as a new record\, creating a new record number key;
 	 * valid only for cursors with record number keys., a boolean flag; default \c false.}
-	 * @config{overwrite, configures whether the cursor's insert\, update and remove methods
-	 * check the existing state of the record.  If \c overwrite is \c false\, WT_CURSOR::insert
-	 * fails with ::WT_DUPLICATE_KEY if the record exists\, WT_CURSOR::update fails with
-	 * ::WT_NOTFOUND if the record does not exist., a boolean flag; default \c true.}
+	 * @config{overwrite, configures whether the cursor's insert and update methods check the
+	 * existing state of the record.  If \c overwrite is \c false\, WT_CURSOR::insert fails with
+	 * ::WT_DUPLICATE_KEY if the record exists\, WT_CURSOR::update fails with ::WT_NOTFOUND if
+	 * the record does not exist., a boolean flag; default \c true.}
 	 * @configend
 	 * @errors
 	 */
@@ -975,10 +974,10 @@ struct __wt_session {
 	 * object into \c next_random_sample_size equal-sized pieces\, and each retrieval returns a
 	 * record from one of those pieces.  See @ref cursor_random for details., a string; default
 	 * \c 0.}
-	 * @config{overwrite, configures whether the cursor's insert\, update and remove methods
-	 * check the existing state of the record.  If \c overwrite is \c false\, WT_CURSOR::insert
-	 * fails with ::WT_DUPLICATE_KEY if the record exists\, WT_CURSOR::update fails with
-	 * ::WT_NOTFOUND if the record does not exist., a boolean flag; default \c true.}
+	 * @config{overwrite, configures whether the cursor's insert and update methods check the
+	 * existing state of the record.  If \c overwrite is \c false\, WT_CURSOR::insert fails with
+	 * ::WT_DUPLICATE_KEY if the record exists\, WT_CURSOR::update fails with ::WT_NOTFOUND if
+	 * the record does not exist., a boolean flag; default \c true.}
 	 * @config{raw, ignore the encodings for the key and value\, manage data as if the formats
 	 * were \c "u". See @ref cursor_raw for details., a boolean flag; default \c false.}
 	 * @config{read_once, results that are brought into cache from disk by this cursor will be
@@ -1575,11 +1574,11 @@ struct __wt_session {
 	 * contains.
 	 * @snippet ex_all.c Truncate a range
 	 *
-	 * When a range truncate is in progress, and another transaction inserts
-	 * a key into that range, the behavior is not well defined - a conflict
-	 * may be detected or both transactions may be permitted to commit. If
-	 * they do commit, and if there is a crash and recovery runs, the result
-	 * may be different than what was in cache before the crash.
+	 * Range truncate is implemented as a "scan and write" operation, specifically without range
+	 * locks. Inserts or other operations in the range, as well as operations before or after
+	 * the range when no explicit starting or ending key is set, are not well defined: conflicts
+	 * may be detected or both transactions may commit. If both commit, there's a failure and
+	 * recovery runs, the result may be different than what was in cache before the crash.
 	 *
 	 * The WT_CURSOR::truncate range truncate operation can only be used at snapshot isolation.
 	 *

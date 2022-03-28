@@ -86,7 +86,7 @@ WT_CURSOR::reset was called.
 Cursors can be configured to move to a random position with WT_CURSOR::next
 is called, see @subpage cursor_random for details.
 
-@section cursor_writes Inserting and updating
+@section cursor_writes Inserting, removing and updating
 
 To insert new data, and optionally update existing data, using a cursor,
 use the WT_CURSOR::insert method:
@@ -97,27 +97,27 @@ To update existing data using a cursor, use the WT_CURSOR::update method:
 
 @snippet ex_cursor.c cursor update
 
+The WT_SESSION::open_cursor \c overwrite configuration is \c true by default,
+causing WT_CURSOR::insert and WT_CURSOR::update to ignore the current state
+of the record, and these methods will succeed regardless of whether or not
+the record previously exists.  When an application configures \c overwrite to
+\c false, WT_CURSOR::insert will fail with ::WT_DUPLICATE_KEY if the record
+previously exists and WT_CURSOR::update will fail with ::WT_NOTFOUND if the
+record does not previously exist.
+
 To remove existing data using a cursor, use the WT_CURSOR::remove method:
 
 @snippet ex_cursor.c cursor remove
 
-The WT_SESSION::open_cursor \c overwrite configuration is \c true by default,
-causing WT_CURSOR::insert, WT_CURSOR::remove and WT_CURSOR::update to ignore
-the current state of the record, and these methods will succeed regardless of
-whether or not the record previously exists.
-
-When an application configures \c overwrite to \c false, WT_CURSOR::insert will
-fail with ::WT_DUPLICATE_KEY if the record previously exists, and
-WT_CURSOR::update and WT_CURSOR::remove will fail with ::WT_NOTFOUND if the
-record does not previously exist.
-
-@snippet ex_cursor.c cursor largest key
+@section cursor_largest Returning the largest key
 
 The WT_SESSION::largest_key \c gets the largest key in a table regardless of
-visibility.
+any underlying visibility considerations.
+
+@snippet ex_all.c Get the table's largest key
 
 Any following prev or next calls will behave as if they were invoked on an
-unpositioned cursor no matter the largest key call is successful or not.
+unpositioned cursor whether the largest key call is successful or not.
 
 @section cursor_error Cursor position after error
 

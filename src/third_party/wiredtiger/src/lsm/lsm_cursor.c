@@ -1550,23 +1550,28 @@ __clsm_remove(WT_CURSOR *cursor)
 
     clsm = (WT_CURSOR_LSM *)cursor;
 
-    /* Check if the cursor is positioned. */
+    /* Remember if the cursor is currently positioned. */
     positioned = F_ISSET(cursor, WT_CURSTD_KEY_INT);
 
     CURSOR_REMOVE_API_CALL(cursor, session, NULL);
     WT_ERR(__cursor_needkey(cursor));
     __cursor_novalue(cursor);
-    WT_ERR(__clsm_enter(clsm, false, true));
 
-    if (!F_ISSET(cursor, WT_CURSTD_OVERWRITE)) {
-        WT_ERR(__clsm_lookup(clsm, &value));
-        /*
-         * Copy the key out, since the insert resets non-primary chunk cursors which our lookup may
-         * have landed on.
-         */
-        WT_ERR(__cursor_needkey(cursor));
-    }
-    WT_ERR(__clsm_put(session, clsm, &cursor->key, &__tombstone, positioned, false));
+    /*
+     * Remove fails if the key doesn't exist, do a search first. This requires a second pair of LSM
+     * enter/leave calls as we search the full stack, but updates are limited to the top-level.
+     */
+    WT_ERR(__clsm_enter(clsm, false, false));
+    WT_ERR(__clsm_lookup(clsm, &value));
+    __clsm_leave(clsm);
+
+    WT_ERR(__clsm_enter(clsm, false, true));
+    /*
+     * Copy the key out, since the insert resets non-primary chunk cursors which our lookup may have
+     * landed on.
+     */
+    WT_ERR(__cursor_needkey(cursor));
+    WT_ERR(__clsm_put(session, clsm, &cursor->key, &__tombstone, true, false));
 
     /*
      * If the cursor was positioned, it stays positioned with a key but no no value, otherwise,

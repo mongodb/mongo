@@ -1344,11 +1344,11 @@ cursor_runtime_config = [
         number key; valid only for cursors with record number keys''',
         type='boolean'),
     Config('overwrite', 'true', r'''
-        configures whether the cursor's insert, update and remove
-        methods check the existing state of the record.  If \c overwrite
-        is \c false, WT_CURSOR::insert fails with ::WT_DUPLICATE_KEY
-        if the record exists, WT_CURSOR::update fails with ::WT_NOTFOUND
-        if the record does not exist''',
+        configures whether the cursor's insert and update methods check
+        the existing state of the record.  If \c overwrite is \c false,
+        WT_CURSOR::insert fails with ::WT_DUPLICATE_KEY if the record exists,
+        WT_CURSOR::update fails with ::WT_NOTFOUND if the record does not
+        exist''',
         type='boolean'),
     Config('prefix_search', 'false', r'''
         when performing a search near for a prefix, if set to true this

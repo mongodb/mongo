@@ -106,20 +106,20 @@ class test_bug001(wttest.WiredTigerTestCase):
         cursor = self.create_implicit(uri, 0, 50, 20)
 
         # Check cursor next/remove inside trailing implicit keys.
-        cursor.set_key(62)
+        cursor.set_key(60)
         self.assertEquals(cursor.search(), 0)
         for i in range(1, 5):
             self.assertEquals(cursor.next(), 0)
-            self.assertEqual(cursor.get_key(), 62 + i)
+            self.assertEqual(cursor.get_key(), 60 + i)
             self.assertEqual(cursor.get_value(), 0x00)
             self.assertEquals(cursor.remove(), 0)
 
         # Check cursor prev/remove inside trailing implicit keys.
-        cursor.set_key(68)
+        cursor.set_key(70)
         self.assertEquals(cursor.search(), 0)
         for i in range(1, 5):
             self.assertEquals(cursor.prev(), 0)
-            self.assertEqual(cursor.get_key(), 68 - i)
+            self.assertEqual(cursor.get_key(), 70 - i)
             self.assertEqual(cursor.get_value(), 0x00)
             self.assertEquals(cursor.remove(), 0)
 

@@ -38,7 +38,6 @@ int cursor_search_near(WT_CURSOR *cursor);
 int cursor_insert(WT_CURSOR *cursor);
 int cursor_update(WT_CURSOR *cursor);
 int cursor_remove(WT_CURSOR *cursor);
-int cursor_largest_key(WT_CURSOR *cursor);
 int version_cursor_dump(WT_CURSOR *cursor);
 
 static const char *home;
@@ -157,14 +156,6 @@ cursor_remove(WT_CURSOR *cursor)
 }
 /*! [cursor remove] */
 
-/*! [cursor largest key] */
-int
-cursor_largest_key(WT_CURSOR *cursor)
-{
-    return (cursor->largest_key(cursor));
-}
-/*! [cursor largest key] */
-
 /*! [version cursor dump] */
 int
 version_cursor_dump(WT_CURSOR *cursor)
@@ -225,7 +216,6 @@ main(int argc, char *argv[])
     error_check(cursor_update(cursor));
     error_check(cursor_remove(cursor));
     error_check(cursor_insert(cursor));
-    error_check(cursor_largest_key(cursor));
     error_check(cursor->close(cursor));
 
     /* Create a version cursor. */
