@@ -68,6 +68,8 @@ public:
             // Send it to the primary shard
             ShardsvrRefineCollectionShardKey refineCollectionShardKeyCommand(nss,
                                                                              request().getKey());
+            refineCollectionShardKeyCommand.setEnforceUniquenessCheck(
+                request().getEnforceUniquenessCheck());
 
             auto cmdResponse = executeCommandAgainstDatabasePrimary(
                 opCtx,

@@ -41,10 +41,14 @@
 namespace mongo {
 
 RefineCollectionShardKeyCoordinator::RefineCollectionShardKeyCoordinator(
-    OperationContext* opCtx, const NamespaceString& nss, const KeyPattern newShardKey)
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const KeyPattern newShardKey,
+    OptionalBool enforceUniquenessCheck)
     : ShardingDDLCoordinator_NORESILIENT(opCtx, nss),
       _serviceContext(opCtx->getServiceContext()),
-      _newShardKey(std::move(newShardKey)){};
+      _newShardKey(std::move(newShardKey)),
+      _enforceUniquenessCheck(std::move(enforceUniquenessCheck)) {}
 
 SemiFuture<void> RefineCollectionShardKeyCoordinator::runImpl(
     std::shared_ptr<executor::TaskExecutor> executor) {
@@ -79,6 +83,7 @@ SemiFuture<void> RefineCollectionShardKeyCoordinator::runImpl(
             configsvrRefineCollShardKey.setDbName(_nss.db().toString());
             // TODO SERVER-54810 don't set `setIsFromPrimaryShard` once 5.0 becomes last-LTS
             configsvrRefineCollShardKey.setIsFromPrimaryShard(true);
+            configsvrRefineCollShardKey.setEnforceUniquenessCheck(_enforceUniquenessCheck);
 
             auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
             auto cmdResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(

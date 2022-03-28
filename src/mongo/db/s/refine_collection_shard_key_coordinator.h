@@ -40,7 +40,8 @@ class RefineCollectionShardKeyCoordinator final
 public:
     RefineCollectionShardKeyCoordinator(OperationContext* opCtx,
                                         const NamespaceString& nss,
-                                        const KeyPattern newShardKey);
+                                        const KeyPattern newShardKey,
+                                        OptionalBool enforceUniquenessCheck);
 
 private:
     SemiFuture<void> runImpl(std::shared_ptr<executor::TaskExecutor> executor) override;
@@ -48,6 +49,7 @@ private:
     ServiceContext* _serviceContext;
 
     const KeyPattern _newShardKey;
+    const OptionalBool _enforceUniquenessCheck;
 };
 
 }  // namespace mongo

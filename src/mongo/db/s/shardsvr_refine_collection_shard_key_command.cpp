@@ -64,7 +64,7 @@ public:
             opCtx->setAlwaysInterruptAtStepDownOrUp();
 
             auto refineCoordinator = std::make_shared<RefineCollectionShardKeyCoordinator>(
-                opCtx, ns(), request().getNewShardKey());
+                opCtx, ns(), request().getNewShardKey(), request().getEnforceUniquenessCheck());
             refineCoordinator->run(opCtx).get(opCtx);
         }
 

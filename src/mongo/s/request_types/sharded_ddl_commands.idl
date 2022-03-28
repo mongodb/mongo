@@ -307,6 +307,12 @@ commands:
                 type: KeyPattern
                 description: "The index specification document to use as the new shard key."
                 optional: false
+            enforceUniquenessCheck:
+                description: >-
+                    Controls whether this command verifies that any unique indexes are prefixed by
+                    the shard key pattern if unique is true. If true then it will verify and if
+                    false then it won't.
+                type: optionalBool
 
     _configsvrCreateDatabase:
         description: "The internal createDatabase command on the config server"

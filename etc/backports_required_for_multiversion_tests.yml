@@ -112,6 +112,8 @@ last-continuous:
       test_file: jstests/sharding/append_oplog_note_mongos.js
     - ticket: SERVER-63732
       test_file: jstests/sharding/shard_collection_basic.js
+    - ticket: SERVER-64142
+      test_file: jstests/sharding/refine_collection_shard_key_basic.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -384,6 +386,8 @@ last-lts:
       test_file: jstests/sharding/append_oplog_note_mongos.js
     - ticket: SERVER-63732
       test_file: jstests/sharding/shard_collection_basic.js
+    - ticket: SERVER-64142
+      test_file: jstests/sharding/refine_collection_shard_key_basic.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
