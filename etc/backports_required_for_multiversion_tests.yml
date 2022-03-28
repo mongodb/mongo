@@ -227,6 +227,8 @@ all:
     test_file: jstests/sharding/append_oplog_note_mongos.js
   - ticket: SERVER-63732
     test_file: jstests/sharding/shard_collection_basic.js
+  - ticket: SERVER-64142
+    test_file: jstests/sharding/refine_collection_shard_key_basic.js
 
 suites:
 
@@ -271,3 +273,5 @@ suites:
     test_file: jstests/sharding/retryable_writes_nested_shard_key.js
   - ticket: SERVER-63732
     test_file: jstests/sharding/shard_collection_basic.js
+  - ticket: SERVER-64142
+    test_file: jstests/sharding/refine_collection_shard_key_basic.js

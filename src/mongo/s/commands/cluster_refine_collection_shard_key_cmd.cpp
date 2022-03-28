@@ -66,6 +66,8 @@ public:
             ConfigsvrRefineCollectionShardKey configsvrRefineCollShardKey(
                 nss, request().getKey(), routingInfo.cm()->getVersion().epoch());
             configsvrRefineCollShardKey.setDbName(request().getDbName());
+            configsvrRefineCollShardKey.setEnforceUniquenessCheck(
+                request().getEnforceUniquenessCheck());
 
             auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
             auto cmdResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
