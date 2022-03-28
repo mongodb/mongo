@@ -62,9 +62,3 @@ server_parameters:
         cpp_varname: gTakeUnstableCheckpointOnShutdown
         set_at: startup
         default: false
-    collModIndexUnique:
-        description: 'When enabled, collMod supports making an index unique'
-        cpp_vartype: bool
-        cpp_varname: gCollModIndexUnique
-        set_at: startup
-        default: false
