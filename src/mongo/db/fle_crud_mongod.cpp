@@ -219,4 +219,19 @@ write_ops::FindAndModifyCommandReply processFLEFindAndModify(
     return uassertStatusOK(reply);
 }
 
+write_ops::UpdateCommandReply processFLEUpdate(
+    OperationContext* opCtx, const write_ops::UpdateCommandRequest& updateRequest) {
+
+    uassert(6371905,
+            "Encrypted index operations are only supported on replica sets",
+            repl::ReplicationCoordinator::get(opCtx->getServiceContext())->getReplicationMode() ==
+                repl::ReplicationCoordinator::modeReplSet);
+
+    auto updateReply = processUpdate(opCtx, updateRequest, &getTransactionWithRetriesForMongoD);
+
+    setMongosFieldsInReply(opCtx, &updateReply.getWriteCommandReplyBase());
+
+    return updateReply;
+}
+
 }  // namespace mongo

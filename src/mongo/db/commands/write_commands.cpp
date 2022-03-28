@@ -1423,6 +1423,10 @@ public:
             write_ops::UpdateCommandReply updateReply;
             OperationSource source = OperationSource::kStandard;
 
+            if (request().getEncryptionInformation().has_value()) {
+                return processFLEUpdate(opCtx, request());
+            }
+
             if (isTimeseries(opCtx, request())) {
                 uassert(ErrorCodes::InvalidOptions,
                         "Time-series updates are not enabled",

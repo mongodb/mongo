@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWrite
+
 #include "mongo/platform/basic.h"
 
 #include <cstdint>
@@ -48,12 +50,18 @@
 #include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/db/query/find_command_gen.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/transaction_router_resource_yielder.h"
 #include "mongo/s/write_ops/batch_write_exec.h"
 #include "mongo/s/write_ops/write_error_detail.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
+
+MONGO_FAIL_POINT_DEFINE(fleCrudHangInsert);
+MONGO_FAIL_POINT_DEFINE(fleCrudHangUpdate);
+MONGO_FAIL_POINT_DEFINE(fleCrudHangDelete);
+MONGO_FAIL_POINT_DEFINE(fleCrudHangFindAndModify);
 
 namespace mongo {
 namespace {
@@ -236,6 +244,11 @@ std::pair<FLEBatchResult, write_ops::InsertCommandReply> processInsert(
             reply2 = uassertStatusOK(
                 processInsert(&queryImpl, edcNss2, *serverPayload2.get(), efc2, ownedDocument));
 
+            if (MONGO_unlikely(fleCrudHangInsert.shouldFail())) {
+                LOGV2(6371903, "Hanging due to fleCrudHangInsert fail point");
+                fleCrudHangInsert.pauseWhileSet();
+            }
+
             // If we have write errors but no unexpected internal errors, then we reach here
             // If we have write errors, we need to return a failed status to ensure the txn client
             // does not try to commit the transaction.
@@ -293,6 +306,11 @@ write_ops::DeleteCommandReply processDelete(OperationContext* opCtx,
 
             reply2 = processDelete(&queryImpl, deleteRequest2);
 
+            if (MONGO_unlikely(fleCrudHangDelete.shouldFail())) {
+                LOGV2(6371902, "Hanging due to fleCrudHangDelete fail point");
+                fleCrudHangDelete.pauseWhileSet();
+            }
+
             // If we have write errors but no unexpected internal errors, then we reach here
             // If we have write errors, we need to return a failed status to ensure the txn client
             // does not try to commit the transaction.
@@ -317,10 +335,9 @@ write_ops::DeleteCommandReply processDelete(OperationContext* opCtx,
     return reply;
 }
 
-StatusWith<write_ops::UpdateCommandReply> processUpdate(
-    OperationContext* opCtx,
-    const write_ops::UpdateCommandRequest& updateRequest,
-    GetTxnCallback getTxns) {
+write_ops::UpdateCommandReply processUpdate(OperationContext* opCtx,
+                                            const write_ops::UpdateCommandRequest& updateRequest,
+                                            GetTxnCallback getTxns) {
 
     auto updates = updateRequest.getUpdates();
     uassert(6371502, "Only single document updates are permitted", updates.size() == 1);
@@ -350,15 +367,34 @@ StatusWith<write_ops::UpdateCommandReply> processUpdate(
         [sharedupdateBlock](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
             FLEQueryInterfaceImpl queryImpl(txnClient);
 
-            auto [updateRequest2, reply] = *sharedupdateBlock.get();
+            auto [updateRequest2, reply2] = *sharedupdateBlock.get();
 
-            reply = processUpdate(&queryImpl, updateRequest2);
+            reply2 = processUpdate(&queryImpl, updateRequest2);
+
+            if (MONGO_unlikely(fleCrudHangUpdate.shouldFail())) {
+                LOGV2(6371901, "Hanging due to fleCrudHangUpdate fail point");
+                fleCrudHangUpdate.pauseWhileSet();
+            }
+
+            // If we have write errors but no unexpected internal errors, then we reach here
+            // If we have write errors, we need to return a failed status to ensure the txn client
+            // does not try to commit the transaction.
+            if (reply2.getWriteErrors().has_value() && !reply2.getWriteErrors().value().empty()) {
+                return SemiFuture<void>::makeReady(
+                    Status(ErrorCodes::FLETransactionAbort, "FLE2 write errors on delete"));
+            }
 
             return SemiFuture<void>::makeReady();
         });
 
     if (!swResult.isOK()) {
-        return swResult.getStatus();
+        // FLETransactionAbort is used for control flow so it means we have a valid
+        // InsertCommandReply with write errors so we should return that.
+        if (swResult.getStatus() == ErrorCodes::FLETransactionAbort) {
+            return reply;
+        }
+
+        appendSingleStatusToWriteErrors(swResult.getStatus(), &reply.getWriteCommandReplyBase());
     }
 
     return reply;
@@ -569,19 +605,25 @@ StatusWith<write_ops::FindAndModifyCommandReply> processFindAndModifyRequest(
     auto sharedFindAndModifyBlock =
         std::make_shared<decltype(findAndModifyBlock)>(findAndModifyBlock);
 
-    auto swResult =
-        runInTxnWithRetry(opCtx,
-                          trun,
-                          [sharedFindAndModifyBlock](const txn_api::TransactionClient& txnClient,
-                                                     ExecutorPtr txnExec) {
-                              FLEQueryInterfaceImpl queryImpl(txnClient);
+    auto swResult = runInTxnWithRetry(
+        opCtx,
+        trun,
+        [sharedFindAndModifyBlock](const txn_api::TransactionClient& txnClient,
+                                   ExecutorPtr txnExec) {
+            FLEQueryInterfaceImpl queryImpl(txnClient);
 
-                              auto [findAndModifyRequest2, reply] = *sharedFindAndModifyBlock.get();
+            auto [findAndModifyRequest2, reply2] = *sharedFindAndModifyBlock.get();
 
-                              reply = processFindAndModify(&queryImpl, findAndModifyRequest2);
+            reply2 = processFindAndModify(&queryImpl, findAndModifyRequest2);
 
-                              return SemiFuture<void>::makeReady();
-                          });
+
+            if (MONGO_unlikely(fleCrudHangFindAndModify.shouldFail())) {
+                LOGV2(6371900, "Hanging due to fleCrudHangFindAndModify fail point");
+                fleCrudHangFindAndModify.pauseWhileSet();
+            }
+
+            return SemiFuture<void>::makeReady();
+        });
 
     if (!swResult.isOK()) {
         return swResult.getStatus();
@@ -780,32 +822,24 @@ FLEBatchResult processFLEBatch(OperationContext* opCtx,
 
         auto updateRequest = request.getUpdateRequest();
 
-        auto swResult = processUpdate(opCtx, updateRequest, &getTransactionWithRetriesForMongoS);
+        auto updateReply = processUpdate(opCtx, updateRequest, &getTransactionWithRetriesForMongoS);
 
-        if (!swResult.isOK()) {
-            response->setStatus(swResult.getStatus());
-            response->setN(0);
-            response->setNModified(0);
-        } else {
-            response->setStatus(Status::OK());
-            auto updateReply = swResult.getValue();
-            response->setN(updateReply.getN());
-            response->setNModified(updateReply.getNModified());
+        replyToResponse(&updateReply.getWriteCommandReplyBase(), response);
 
-            if (updateReply.getUpserted().has_value() &&
-                updateReply.getUpserted().value().size() > 0) {
+        response->setNModified(updateReply.getNModified());
 
-                auto upsertReply = updateReply.getUpserted().value()[0];
+        if (updateReply.getUpserted().has_value() && updateReply.getUpserted().value().size() > 0) {
 
-                BatchedUpsertDetail upsert;
-                upsert.setIndex(upsertReply.getIndex());
-                upsert.setUpsertedID(upsertReply.get_id().getElement().wrap(""));
+            auto upsertReply = updateReply.getUpserted().value()[0];
 
-                std::vector<BatchedUpsertDetail*> upserts;
-                upserts.push_back(&upsert);
+            BatchedUpsertDetail upsert;
+            upsert.setIndex(upsertReply.getIndex());
+            upsert.setUpsertedID(upsertReply.get_id().getElement().wrap(""));
 
-                response->setUpsertDetails(upserts);
-            }
+            std::vector<BatchedUpsertDetail*> upserts;
+            upserts.push_back(&upsert);
+
+            response->setUpsertDetails(upserts);
         }
 
         return FLEBatchResult::kProcessed;

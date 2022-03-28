@@ -94,6 +94,11 @@ FLEBatchResult processFLEInsert(OperationContext* opCtx,
 write_ops::DeleteCommandReply processFLEDelete(
     OperationContext* opCtx, const write_ops::DeleteCommandRequest& deleteRequest);
 
+/**
+ * Process a replica set update.
+ */
+write_ops::UpdateCommandReply processFLEUpdate(
+    OperationContext* opCtx, const write_ops::UpdateCommandRequest& updateRequest);
 
 /**
  * Process a findAndModify request from mongos
@@ -291,4 +296,8 @@ StatusWith<write_ops::FindAndModifyCommandReply> processFindAndModifyRequest(
     const write_ops::FindAndModifyCommandRequest& findAndModifyRequest,
     GetTxnCallback getTxns);
 
+
+write_ops::UpdateCommandReply processUpdate(OperationContext* opCtx,
+                                            const write_ops::UpdateCommandRequest& updateRequest,
+                                            GetTxnCallback getTxns);
 }  // namespace mongo
