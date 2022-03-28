@@ -3,6 +3,11 @@
 // @tags: [
 //   # mapReduce does not support afterClusterTime.
 //   does_not_support_causal_consistency,
+//   # Global variables depend on the version of JavaScript engine being used, which can change from
+//   # one MongoDB version to another. There is a little value checking list of JavaScript global
+//   # variables in multiversion setup, so we just disable the test from multiversion suites
+//   # instead.
+//   multiversion_incompatible,
 // ]
 (function() {
 "use strict";
