@@ -34,4 +34,5 @@ PATH=$PATH:$HOME:/ $python buildscripts/evergreen_task_timeout.py $timeout_facto
   --timeout ${timeout_secs} \
   --exec-timeout ${exec_timeout_secs} \
   --evg-api-config ./.evergreen.yml \
+  --evg-project-config ${evergreen_config_file_path} \
   --out-file task_timeout_expansions.yml

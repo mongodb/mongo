@@ -333,6 +333,7 @@ variables:
   - rhel80
   - rhel-82-arm64
   - enterprise-rhel-80-64-bit
+  - enterprise-rhel-80-64-bit-suggested  # For testing selinux.
   - enterprise-rhel-82-arm64
   - suse12
   - enterprise-suse12-64
