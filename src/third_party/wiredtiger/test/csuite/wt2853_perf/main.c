@@ -45,7 +45,7 @@ static void *thread_get(void *);
 
 #define BLOOM false
 #define GAP_DISPLAY 3 /* Threshold for seconds of gap to be displayed */
-#define GAP_ERROR 7   /* Threshold for seconds of gap to be treated as error */
+#define GAP_ERROR 20  /* Threshold for seconds of gap to be treated as error */
 #define N_RECORDS 10000
 #define N_INSERT 1000000
 #define N_INSERT_THREAD 1
