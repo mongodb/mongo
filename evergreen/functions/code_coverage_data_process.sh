@@ -1,12 +1,17 @@
 set +o errexit
 
+if [ -z "${GCOV_TOOL:-}" ]; then
+  echo "No coverage tool defined. Set the gcov_tool expansion in evergreen.yml" >&2
+  exit 1
+fi
+
 cd src
 if [ -d "./build" ]; then
   file_list=$(find ./build -type f -name "*.gcda")
   if [ -n "$file_list" ]; then
     for gcda_file in $file_list; do
       echo "Processing file $gcda_file"
-      /opt/mongodbtoolchain/v4/bin/gcov -i "$gcda_file"
+      ${GCOV_TOOL[@]} -i "$gcda_file"
       base_name=$(echo "$gcda_file" | rev | cut -f1 -d '/' | cut -f2 -d '.' | rev)
       gcov_file=$base_name.gcda.gcov
       if [ -f "$gcov_file" ]; then

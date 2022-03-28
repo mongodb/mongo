@@ -2517,11 +2517,9 @@ if env.TargetOSIs('posix'):
             pass
 
     if has_option( "gcov" ):
-        if not (env.TargetOSIs('linux') and env.ToolchainIs('gcc')):
+        if not (env.TargetOSIs('linux') and (env.ToolchainIs('gcc', 'clang'))):
             # TODO: This should become supported under: https://jira.mongodb.org/browse/SERVER-49877
-            # TODO SERVER-63055: clang is not supported due to consistent
-            # failures in ValidateCollections when using gcov.
-            env.FatalError("Coverage option 'gcov' is currently only supported on linux with gcc. See SERVER-49877 and SERVER-63055.")
+            env.FatalError("Coverage option 'gcov' is currently only supported on linux with gcc and clang. See SERVER-49877.")
 
         env.AppendUnique(
             CCFLAGS=['--coverage'],

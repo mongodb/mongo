@@ -83,13 +83,8 @@ Status launchServiceWorkerThread(unique_function<void()> task) noexcept {
 
         struct rlimit limits;
         invariant(getrlimit(RLIMIT_STACK, &limits) == 0);
-        if (limits.rlim_cur > kStackSize) {
-            size_t stackSizeToSet = kStackSize;
-#if !__has_feature(address_sanitizer) && !__has_feature(thread_sanitizer)
-            if (kDebugBuild)
-                stackSizeToSet /= 2;
-#endif
-            int failed = pthread_attr_setstacksize(&attrs, stackSizeToSet);
+        if (limits.rlim_cur >= kStackSize) {
+            int failed = pthread_attr_setstacksize(&attrs, kStackSize);
             if (failed) {
                 const auto ewd = errnoWithDescription(failed);
                 LOGV2_WARNING(22949,
@@ -97,7 +92,7 @@ Status launchServiceWorkerThread(unique_function<void()> task) noexcept {
                               "pthread_attr_setstacksize failed",
                               "error"_attr = ewd);
             }
-        } else if (limits.rlim_cur < 1024 * 1024) {
+        } else if (limits.rlim_cur < kStackSize) {
             LOGV2_WARNING(22950,
                           "Stack size set to {stackSizeKiB}KiB. We suggest 1024KiB",
                           "Stack size not set to suggested 1024KiB",
