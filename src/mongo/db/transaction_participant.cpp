@@ -98,6 +98,8 @@ MONGO_FAIL_POINT_DEFINE(restoreLocksFail);
 
 MONGO_FAIL_POINT_DEFINE(failTransactionNoopWrite);
 
+MONGO_FAIL_POINT_DEFINE(hangAfterCheckingInternalTransactionsFeatureFlag);
+
 const auto getTransactionParticipant = Session::declareDecoration<TransactionParticipant>();
 
 const auto retryableWriteTransactionParticipantCatalogDecoration =
@@ -853,26 +855,43 @@ void TransactionParticipant::Participant::_beginMultiDocumentTransaction(
         retryableWriteTxnParticipantCatalog.reset();
     }
 
-    stdx::lock_guard<Client> lk(*opCtx->getClient());
-    o(lk).txnState.transitionTo(TransactionState::kInProgress);
+    {
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        o(lk).txnState.transitionTo(TransactionState::kInProgress);
+        // Start tracking various transactions metrics.
+        //
+        // We measure the start time in both microsecond and millisecond resolution. The TickSource
+        // provides microsecond resolution to record the duration of the transaction. The start
+        // "wall clock" time can be considered an approximation to the microsecond measurement.
+        auto now = opCtx->getServiceContext()->getPreciseClockSource()->now();
+        auto tickSource = opCtx->getServiceContext()->getTickSource();
 
-    // Start tracking various transactions metrics.
-    //
-    // We measure the start time in both microsecond and millisecond resolution. The TickSource
-    // provides microsecond resolution to record the duration of the transaction. The start "wall
-    // clock" time can be considered an approximation to the microsecond measurement.
-    auto now = opCtx->getServiceContext()->getPreciseClockSource()->now();
-    auto tickSource = opCtx->getServiceContext()->getTickSource();
+        o(lk).transactionExpireDate = now + Seconds(gTransactionLifetimeLimitSeconds.load());
 
-    o(lk).transactionExpireDate = now + Seconds(gTransactionLifetimeLimitSeconds.load());
+        o(lk).transactionMetricsObserver.onStart(
+            ServerTransactionsMetrics::get(opCtx->getServiceContext()),
+            *p().autoCommit,
+            tickSource,
+            now,
+            *o().transactionExpireDate);
+        invariant(p().transactionOperations.empty());
+    }
 
-    o(lk).transactionMetricsObserver.onStart(
-        ServerTransactionsMetrics::get(opCtx->getServiceContext()),
-        *p().autoCommit,
-        tickSource,
-        now,
-        *o().transactionExpireDate);
-    invariant(p().transactionOperations.empty());
+    // TODO: (SERVER-62375): Remove upgrade/downgrade code for internal transactions
+    if (_isInternalSession()) {
+        uassert(ErrorCodes::InternalTransactionNotSupported,
+                "Internal transactions are not enabled",
+                feature_flags::gFeatureFlagInternalTransactions.isEnabled(
+                    serverGlobalParams.featureCompatibility));
+        hangAfterCheckingInternalTransactionsFeatureFlag.pauseWhileSet(opCtx);
+    }
+    if (auto txnRetryCounter = txnNumberAndRetryCounter.getTxnRetryCounter();
+        txnRetryCounter && !isDefaultTxnRetryCounter(*txnRetryCounter)) {
+        uassert(ErrorCodes::TxnRetryCounterNotSupported,
+                "TxnRetryCounter support is not enabled",
+                feature_flags::gFeatureFlagInternalTransactions.isEnabled(
+                    serverGlobalParams.featureCompatibility));
+    }
 }
 
 void TransactionParticipant::Participant::beginOrContinue(
@@ -880,23 +899,6 @@ void TransactionParticipant::Participant::beginOrContinue(
     TxnNumberAndRetryCounter txnNumberAndRetryCounter,
     boost::optional<bool> autocommit,
     boost::optional<bool> startTransaction) {
-    if (startTransaction) {
-        if (_isInternalSession()) {
-            uassert(ErrorCodes::InternalTransactionNotSupported,
-                    "Internal transactions are not enabled",
-                    feature_flags::gFeatureFlagInternalTransactions.isEnabled(
-                        serverGlobalParams.featureCompatibility));
-        }
-        if (auto txnRetryCounter = txnNumberAndRetryCounter.getTxnRetryCounter();
-            txnRetryCounter && !isDefaultTxnRetryCounter(*txnRetryCounter)) {
-            // TODO: (SERVER-62375): Remove upgrade/downgrade code for internal transactions
-            uassert(ErrorCodes::TxnRetryCounterNotSupported,
-                    "TxnRetryCounter support is not enabled",
-                    feature_flags::gFeatureFlagInternalTransactions.isEnabled(
-                        serverGlobalParams.featureCompatibility));
-        }
-    }
-
     if (_isInternalSessionForRetryableWrite()) {
         auto parentTxnParticipant =
             TransactionParticipant::get(opCtx, _session()->getParentSession());

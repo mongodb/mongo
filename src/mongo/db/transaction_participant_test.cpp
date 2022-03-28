@@ -5174,10 +5174,12 @@ TEST_F(ShardTxnParticipantTest, CannotModifyParentLsidOfNonChildSession) {
     }
 }
 
-TEST_F(TxnParticipantTest,
+TEST_F(ShardTxnParticipantTest,
        ThrowIfTxnRetryCounterIsSpecifiedOnStartTransactionWithFeatureFlagDisabled) {
     MongoDOperationContextSession opCtxSession(opCtx());
     auto txnParticipant = TransactionParticipant::get(opCtx());
+
+    RAIIServerParameterControllerForTest controller{"featureFlagInternalTransactions", false};
     ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(opCtx(),
                                                       {*opCtx()->getTxnNumber(), 1},
                                                       false /* autocommit */,
