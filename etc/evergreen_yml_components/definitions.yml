@@ -175,6 +175,7 @@ variables:
   teardown_task:
   - func: "f_expansions_write"
   - func: "attach scons logs"
+  - func: "send scons cedar report"
   - func: "attach report"
   - func: "attach artifacts"
   - func: "kill processes"
@@ -244,6 +245,7 @@ variables:
   - func: "f_expansions_write"
   teardown_task:
   - func: "attach scons logs"
+  - func: "send scons cedar report"
   setup_group_can_fail_task: true
   setup_group:
   - command: manifest.load
@@ -2000,6 +2002,18 @@ functions:
       permissions: public-read
       display_name: SCons cache debug log
 
+  - command: s3.put
+    params:
+      optional: true
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/scons_stdout.log
+      content_type: text/plain
+      remote_file: ${project}/${build_variant}/${revision}/artifacts/scons-stdout.log.${build_id}-${task_name}.${execution}
+      bucket: mciuploads
+      permissions: public-read
+      display_name: SCons stdout log
+
   - *f_expansions_write
   - command: subprocess.exec
     params:
@@ -2007,6 +2021,21 @@ functions:
       binary: bash
       args:
       - "./src/evergreen/scons_splunk.sh"
+
+  "send scons cedar report":
+    - command: subprocess.exec
+      params:
+        binary: bash
+        args:
+          - "./src/evergreen/scons_metrics_report.sh"
+
+    - command: perf.send
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        bucket: mciuploads
+        prefix: ${task_id}_${execution}
+        file: src/scons_cedar_report.json
 
   "attach report":
     command: attach.results
@@ -2887,6 +2916,7 @@ tasks:
       targets: install-benchmarks
       compiling_for_test: true
   - func: "attach scons logs"
+  - func: "send scons cedar report"
   - command: archive.targz_pack
     params:
       target: "benchmarks.tgz"
@@ -4392,6 +4422,7 @@ tasks:
       targets: install-integration-tests
       compiling_for_test: true
   - func: "attach scons logs"
+  - func: "send scons cedar report"
   - func: "run tests"
 
 - <<: *task_template
@@ -4409,6 +4440,7 @@ tasks:
       targets: install-integration-tests
       compiling_for_test: true
   - func: "attach scons logs"
+  - func: "send scons cedar report"
   - func: "run tests"
 
 - <<: *task_template
@@ -4426,6 +4458,7 @@ tasks:
       targets: install-integration-tests
       compiling_for_test: true
   - func: "attach scons logs"
+  - func: "send scons cedar report"
   - func: "run tests"
 
 - <<: *task_template
@@ -4443,6 +4476,7 @@ tasks:
       targets: install-integration-tests
       compiling_for_test: true
   - func: "attach scons logs"
+  - func: "send scons cedar report"
   - func: "run tests"
 
 - <<: *task_template
@@ -4461,6 +4495,7 @@ tasks:
       targets: install-integration-tests
       compiling_for_test: true
   - func: "attach scons logs"
+  - func: "send scons cedar report"
   - func: "run tests"
 
 - <<: *task_template
@@ -7447,6 +7482,7 @@ task_groups:
   - func: "f_expansions_write"
   teardown_task:
   - func: "attach scons logs"
+  - func: "send scons cedar report"
   tasks:
   - compile_visibility_test
 
@@ -7473,6 +7509,7 @@ task_groups:
   - func: "f_expansions_write"
   teardown_task:
   - func: "attach scons logs"
+  - func: "send scons cedar report"
   tasks:
   - "embedded_sdk_build_cdriver"
   - "embedded_sdk_install_dev"
@@ -7504,6 +7541,7 @@ task_groups:
   - func: "f_expansions_write"
   teardown_task:
   - func: "attach scons logs"
+  - func: "send scons cedar report"
   setup_group_can_fail_task: true
   setup_group:
   - command: manifest.load
@@ -7533,6 +7571,7 @@ task_groups:
   - func: "f_expansions_write"
   teardown_task:
   - func: "attach scons logs"
+  - func: "send scons cedar report"
   setup_group_can_fail_task: true
   setup_group:
   - command: manifest.load

@@ -32,7 +32,7 @@ fi
 
 # Conditionally enable scons time debugging
 if [ "${show_scons_timings}" = "true" ]; then
-  extra_args="$extra_args --debug=time"
+  extra_args="$extra_args --debug=time,memory,count"
 fi
 
 # Build packages where the upload tasks expect them
@@ -64,10 +64,12 @@ if [ "${generating_for_ninja}" = "true" ] && [ "Windows_NT" = "$OS" ]; then
 fi
 activate_venv
 
+set -o pipefail
 eval ${compile_env} $python ./buildscripts/scons.py \
   ${compile_flags} ${task_compile_flags} ${task_compile_flags_extra} \
   ${scons_cache_args} $extra_args \
-  ${targets} MONGO_VERSION=${version} ${patch_compile_flags} || exit_status=$?
+  ${targets} MONGO_VERSION=${version} ${patch_compile_flags} | tee scons_stdout.log
+exit_status=$?
 
 # If compile fails we do not run any tests
 if [[ $exit_status -ne 0 ]]; then

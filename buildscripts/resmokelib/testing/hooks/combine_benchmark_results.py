@@ -3,47 +3,12 @@
 import collections
 import datetime
 import json
-from dataclasses import dataclass
-from typing import Union, List, Dict, Any
+from typing import List, Dict, Any
 
 from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib.errors import CedarReportError
 from buildscripts.resmokelib.testing.hooks import interface
-
-
-@dataclass
-class _CedarMetric:
-    """Structure that holds metrics for Cedar."""
-
-    name: str
-    type: str
-    value: Union[int, float]
-    user_submitted: bool = False
-
-    def as_dict(self) -> dict:
-        """Return dictionary representation."""
-        return {
-            "name": self.name,
-            "type": self.type,
-            "value": self.value,
-            "user_submitted": self.user_submitted,
-        }
-
-
-@dataclass
-class _CedarTestReport:
-    """Structure that holds test report for Cedar."""
-
-    test_name: str
-    thread_level: int
-    metrics: List[_CedarMetric]
-
-    def as_dict(self) -> dict:
-        """Return dictionary representation."""
-        return {
-            "info": {"test_name": self.test_name, "args": {"thread_level": self.thread_level, }},
-            "metrics": [metric.as_dict() for metric in self.metrics],
-        }
+from buildscripts.util.cedar_report import CedarMetric, CedarTestReport
 
 
 class CombineBenchmarkResults(interface.Hook):
@@ -140,8 +105,8 @@ class CombineBenchmarkResults(interface.Hook):
                     raise CedarReportError(msg)
 
             for threads_count, thread_metrics in cedar_metrics.items():
-                test_report = _CedarTestReport(test_name=name, thread_level=threads_count,
-                                               metrics=thread_metrics)
+                test_report = CedarTestReport(test_name=name, thread_level=threads_count,
+                                              metrics=thread_metrics)
                 cedar_report.append(test_report.as_dict())
 
         return cedar_report
@@ -275,7 +240,7 @@ class _BenchmarkThreadsReport(object):
 
         return res
 
-    def generate_cedar_metrics(self) -> Dict[int, List[_CedarMetric]]:
+    def generate_cedar_metrics(self) -> Dict[int, List[CedarMetric]]:
         """Generate metrics for Cedar."""
 
         res = {}
@@ -292,7 +257,7 @@ class _BenchmarkThreadsReport(object):
 
                 metric_type = self.BENCHMARK_TO_CEDAR_METRIC_TYPE_MAP[aggregate_name]
 
-                metric = _CedarMetric(name=metric_name, type=metric_type, value=report["cpu_time"])
+                metric = CedarMetric(name=metric_name, type=metric_type, value=report["cpu_time"])
                 threads = report["threads"]
                 if threads in res:
                     res[threads].append(metric)
@@ -302,7 +267,7 @@ class _BenchmarkThreadsReport(object):
         return res
 
     @staticmethod
-    def check_dup_metric_names(metrics: List[_CedarMetric]) -> bool:
+    def check_dup_metric_names(metrics: List[CedarMetric]) -> bool:
         """Check duplicated metric names for Cedar."""
         names = []
         for metric in metrics:
