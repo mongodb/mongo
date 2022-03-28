@@ -139,8 +139,7 @@ IndexCatalogEntry* IndexCatalogImpl::_setupInMemoryStructures(
     OperationContext* opCtx,
     std::unique_ptr<IndexDescriptor> descriptor,
     bool initFromDisk,
-    bool isReadyIndex,
-    bool updateMetadata) {
+    bool isReadyIndex) {
     Status status = _isSpecOk(opCtx, descriptor->infoObj());
     if (!status.isOK()) {
         severe() << "Found an invalid index " << descriptor->infoObj() << " on the "
@@ -158,9 +157,6 @@ IndexCatalogEntry* IndexCatalogImpl::_setupInMemoryStructures(
         DurableCatalog::get(opCtx)->getIndexIdent(opCtx, _collection->ns(), desc->indexName());
 
     auto engine = opCtx->getServiceContext()->getStorageEngine();
-    if (updateMetadata) {
-        engine->getEngine()->alterIdentMetadata(opCtx, ident, desc);
-    }
     SortedDataInterface* sdi =
         engine->getEngine()->getGroupedSortedDataInterface(opCtx, ident, desc, entry->getPrefix());
 
@@ -1246,8 +1242,7 @@ std::vector<std::shared_ptr<const IndexCatalogEntry>> IndexCatalogImpl::getAllRe
 }
 
 const IndexDescriptor* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
-                                                      const IndexDescriptor* oldDesc,
-                                                      bool updateMetadata) {
+                                                      const IndexDescriptor* oldDesc) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(_collection->ns(), MODE_X));
     invariant(_buildingIndexes.size() == 0);
 
@@ -1274,8 +1269,8 @@ const IndexDescriptor* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
         stdx::make_unique<IndexDescriptor>(_collection, _getAccessMethodName(keyPattern), spec);
     const bool initFromDisk = false;
     const bool isReadyIndex = true;
-    const IndexCatalogEntry* newEntry = _setupInMemoryStructures(
-        opCtx, std::move(newDesc), initFromDisk, isReadyIndex, updateMetadata);
+    const IndexCatalogEntry* newEntry =
+        _setupInMemoryStructures(opCtx, std::move(newDesc), initFromDisk, isReadyIndex);
     invariant(newEntry->isReady(opCtx));
     _collection->infoCache()->addedIndex(opCtx, newEntry->descriptor());
 

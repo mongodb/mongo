@@ -401,9 +401,6 @@ Status _collModInternal(OperationContext* opCtx,
                                                           : Seconds(oldExpireSecs.safeNumberLong()),
                              !cmr.indexUnique ? boost::optional<bool>() : newUnique.booleanSafe(),
                              cmr.idx->indexName()};
-
-        // Notify the index catalog that the definition of this index changed.
-        cmr.idx = coll->getIndexCatalog()->refreshEntry(opCtx, cmr.idx, !cmr.indexUnique.eoo());
     }
 
     if (cmr.collValidator) {
