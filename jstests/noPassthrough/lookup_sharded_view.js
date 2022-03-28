@@ -4,7 +4,6 @@
 "use strict";
 
 load("jstests/aggregation/extras/utils.js");  // For assertArrayEq.
-load("jstests/libs/log.js");                  // For findMatchingLogLines.
 load("jstests/libs/profiler.js");             // For profilerHasSingleMatchingEntryOrThrow.
 
 const sharded = new ShardingTest({
@@ -24,7 +23,15 @@ if (!isShardedLookupEnabled) {
 
 const testDBName = "test";
 const testDB = sharded.getDB(testDBName);
-sharded.ensurePrimaryShard(testDBName, sharded.shard0.shardName);
+const primaryShard = sharded.shard0;
+sharded.ensurePrimaryShard(testDBName, primaryShard.shardName);
+
+// Drop the 'profile' tables and then enable profiling on all shards.
+for (const shard of [sharded.shard0, sharded.shard1, sharded.shard2]) {
+    const db = shard.getDB(testDBName);
+    db.system.profile.drop();
+    assert.commandWorked(db.setProfilingLevel(2));
+}
 
 // Create 'local' collection which will be backed by shard 1 from which we will run aggregations.
 const local = testDB.local;
@@ -62,48 +69,41 @@ assert.commandWorked(otherForeign.insertMany(otherForeignDocs));
 assert(sharded.s.adminCommand({shardCollection: otherForeign.getFullName(), key: {shard_key: 1}}));
 
 let testCount = 0;
-function getMatchingLogsForTestRun(logs, fields) {
-    let foundTest = false;
 
-    // Filter out any logs that happened before the current aggregation.
-    function getLogsForTestRun(log) {
-        if (foundTest) {
-            return true;
-        }
-        const m = findMatchingLogLine([log], {comment: "test " + testCount});
-        if (m !== null) {
-            foundTest = true;
-        }
-        return foundTest;
-    }
-
-    // Pick only those remaining logs which match the input 'fields'.
-    return [...findMatchingLogLines(logs.filter(getLogsForTestRun), fields)];
-}
-
-function getShardedViewExceptions() {
-    const shard1Log = assert.commandWorked(sharded.shard1.adminCommand({getLog: "global"})).log;
-    return ["test.local", "test.foreign", "test.otherForeign"].map(ns => {
-        return {
-            ns: ns,
-            count: [...getMatchingLogsForTestRun(shard1Log, {id: 3254800, ns})].length +
-                [...getMatchingLogsForTestRun(shard1Log, {id: 3254801, ns})].length
-        };
-    });
+// To resolve view 'view1' defined on view 'view2' defined on collection 'coll', we would get a
+// dependency chain of the form [view1, view2, coll] in the 'resolvedViews' field of the
+// system.profile entry. This function combines all namespaces listed in the dependency chains of an
+// aggregation's resolved views to produce a map counting how many times each namesapce was seen,
+// e.g.: {"test.view1": 1, "test.view2": 1, "test.coll": 1}
+function getShardedViewExceptions(comment) {
+    return primaryShard.getDB(testDBName)
+        .system.profile.find({})
+        .toArray()
+        .filter((doc) => doc["command"] && doc["command"]["aggregate"] && doc["resolvedViews"] &&
+                    doc["command"]["comment"] === comment)
+        .flatMap((doc) =>
+                     doc["resolvedViews"].flatMap(resolvedView => resolvedView["dependencyChain"]))
+        .reduce((prev, curr) => {
+            const namespace = "test." + curr;
+            if (prev[namespace]) {
+                prev[namespace] += 1;
+            } else {
+                prev[namespace] = 1;
+            }
+            return prev;
+        }, {});
 }
 
 function testLookupView({pipeline, expectedResults, expectedExceptions}) {
-    assertArrayEq({
-        actual: local.aggregate(pipeline, {comment: "test " + testCount}).toArray(),
-        expected: expectedResults
-    });
+    const comment = "test " + testCount;
+    assertArrayEq(
+        {actual: local.aggregate(pipeline, {comment}).toArray(), expected: expectedResults});
     if (expectedExceptions) {
         // Count how many CommandOnShardedViewNotSupported exceptions we get and verify that they
         // match the number we were expecting.
-        const exceptionCounts = getShardedViewExceptions();
-        for (const actualEx of exceptionCounts) {
-            const ns = actualEx.ns;
-            const actualCount = actualEx.count;
+        const actualEx = getShardedViewExceptions(comment);
+        for (const ns in expectedExceptions) {
+            const actualCount = actualEx[ns] || 0;
             const expectedCount = expectedExceptions[ns];
             assert(actualCount == expectedCount,
                    "expected: " + expectedCount + " exceptions for ns " + ns + ", actually got " +
@@ -317,7 +317,7 @@ testLookupView({
             {join_field: 3, _id: 6, f: "c", shard_key: "shard2"},
         ]},
     ],
-    expectedExceptions: {"test.local": 0, "test.foreign": 0, "test.otherForeign": 0}
+    expectedExceptions: {"test.local": 0, "test.foreign": 1, "test.otherForeign": 0}
 });
 
 // Test that sharded view resolution works correctly with empty pipelines and a join field.
@@ -337,7 +337,7 @@ testLookupView({
         {_id: 2, f: 2, shard_key: "shard1", foreign: {join_field: 2, _id: 5, f: "b", shard_key: "shard2"}},
         {_id: 3, f: 3, shard_key: "shard1", foreign: {join_field: 3, _id: 6, f: "c", shard_key: "shard2"}},
     ],
-    expectedExceptions: {"test.local": 0, "test.foreign": 0, "test.otherForeign": 0}
+    expectedExceptions: {"test.local": 0, "test.foreign": 1, "test.otherForeign": 0}
 });
 
 // Test that sharded view resolution works correctly with a simple view and a join field.
@@ -355,7 +355,7 @@ testLookupView({
     expectedResults: [
         {_id: 2, f: 2, shard_key: "shard1", foreign: {join_field: 2, _id: 5, f: "b", shard_key: "shard2"}},
     ],
-    expectedExceptions: {"test.local": 0, "test.foreign": 0, "test.otherForeign": 0}
+    expectedExceptions: {"test.local": 0, "test.foreign": 1, "test.otherForeign": 0}
 });
 
 // Test that sharded view resolution works correctly with a simple view.
@@ -373,7 +373,7 @@ testLookupView({
     expectedResults: [
         {_id: 2, f: 2, shard_key: "shard1", foreign: {join_field: 2, _id: 5, f: "b", shard_key: "shard2"}},
     ],
-    expectedExceptions: {"test.local": 0, "test.foreign": 0, "test.otherForeign": 0}
+    expectedExceptions: {"test.local": 0, "test.foreign": 1, "test.otherForeign": 0}
 });
 
 testLookupView({
@@ -390,7 +390,7 @@ testLookupView({
         {_id: 2, f: 2, shard_key: "shard1", foreign: {join_field: 2, _id: 5, sum: 7}},
         {_id: 2, f: 2, shard_key: "shard1", foreign: {join_field: 3, _id: 6, sum: 9}},
     ],
-    expectedExceptions: {"test.local": 0, "test.foreign": 0, "test.otherForeign": 0}
+    expectedExceptions: {"test.local": 0, "test.foreign": 1, "test.otherForeign": 0}
 });
 
 testLookupView({
@@ -409,7 +409,7 @@ testLookupView({
     expectedResults: [
         {_id: 2, sum: 16},
     ],
-    expectedExceptions: {"test.local": 0, "test.foreign": 0, "test.otherForeign": 0}
+    expectedExceptions: {"test.local": 0, "test.foreign": 1, "test.otherForeign": 0}
 });
 
 testLookupView({
@@ -428,7 +428,7 @@ testLookupView({
                 {_id: 7, shard_key: "shard3"},
         }},
     ],
-    expectedExceptions: {"test.local": 0, "test.foreign": 0, "test.otherForeign": 0}
+    expectedExceptions: {"test.local": 0, "test.foreign": 1, "test.otherForeign": 1}
 });
 
 testLookupView({
@@ -460,7 +460,7 @@ testLookupView({
             }
         }
     ],
-    expectedExceptions: {"test.local": 0, "test.foreign": 0, "test.otherForeign": 0}
+    expectedExceptions: {"test.local": 1, "test.foreign": 1, "test.otherForeign": 1}
 });
 
 testLookupView({
@@ -481,7 +481,7 @@ testLookupView({
             {_id: 3, f: 3, shard_key: "shard1"},
         ]}},
     ],
-    expectedExceptions: {"test.local": 0, "test.foreign": 0, "test.otherForeign": 0}
+    expectedExceptions: {"test.local": 1, "test.foreign": 1, "test.otherForeign": 0}
 });
 
 // Test that sharded view resolution works correctly with a view pipeline containing a $lookup with
@@ -505,7 +505,7 @@ testLookupView({
             {_id: 3, f: 3, shard_key: "shard1"},
         ]}},
     ],
-    expectedExceptions: {"test.local": 0, "test.foreign": 0, "test.otherForeign": 0}
+    expectedExceptions: {"test.local": 1, "test.foreign": 1, "test.otherForeign": 0}
 });
 
 // Test that sharded view resolution works correctly with a view pipeline containing a $lookup and a
@@ -527,7 +527,7 @@ testLookupView({
         {_id: 2, f: 2, shard_key: "shard1", foreign: {join_field: 2, _id: 5, f: "b", shard_key:
         "shard2", local: {_id: 2, f: 2, shard_key: "shard1"}}}
     ],
-    expectedExceptions: {"test.local": 0, "test.foreign": 0, "test.otherForeign": 0}
+    expectedExceptions: {"test.local": 1, "test.foreign": 1, "test.otherForeign": 0}
 });
 
 // Test that sharded view resolution works correctly with a $lookup on a view whose pipeline
@@ -548,7 +548,7 @@ testLookupView({
             "shard1"}}
         },
     ],
-    expectedExceptions: {"test.local": 0, "test.foreign": 0, "test.otherForeign": 0}
+    expectedExceptions: {"test.local": 1, "test.foreign": 1, "test.otherForeign": 0}
 });
 
 // Test that $lookup with a subpipeline containing a non-correlated pipeline prefix can still use
@@ -577,7 +577,7 @@ testLookupView({
         {_id: 2, shard_key: "shard1", f: 2, foreign: [{_id: {oddId: 0}, f: ["a", "c"]}]},
         {_id: 3, shard_key: "shard1", f: 3, foreign: [{_id: {oddId: 1}, f: ["b", "d"]}]},
     ],
-    expectedExceptions: {"test.local": 0, "test.foreign": 0, "test.otherForeign": 0}
+    expectedExceptions: {"test.local": 0, "test.foreign": 1, "test.otherForeign": 0}
 });
 
 const comment = "test " + (testCount - 1);

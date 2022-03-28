@@ -4,7 +4,6 @@
 "use strict";
 
 load("jstests/aggregation/extras/utils.js");  // For assertArrayEq.
-load("jstests/libs/log.js");                  // For findMatchingLogLines.
 
 const sharded = new ShardingTest({
     mongos: 1,
@@ -23,7 +22,15 @@ if (!isShardedLookupEnabled) {
 
 const testDBName = "test";
 const testDB = sharded.getDB(testDBName);
-sharded.ensurePrimaryShard(testDBName, sharded.shard0.shardName);
+const primaryShard = sharded.shard0;
+sharded.ensurePrimaryShard(testDBName, primaryShard.shardName);
+
+// Drop the 'profile' tables and then enable profiling on all shards.
+for (const shard of [sharded.shard0, sharded.shard1, sharded.shard2]) {
+    const db = shard.getDB(testDBName);
+    db.system.profile.drop();
+    assert.commandWorked(db.setProfilingLevel(2));
+}
 
 // Create 'docs' collection which will be backed by shard 1 from which we will run aggregations.
 const docs = testDB.docs;
@@ -58,47 +65,41 @@ assert.commandWorked(subjects.insertMany(subjectsDocs));
 assert(sharded.s.adminCommand({shardCollection: subjects.getFullName(), key: {shard_key: 1}}));
 
 let testCount = 0;
-function getMatchingLogsForTestRun(logs, fields) {
-    let foundTest = false;
 
-    // Filter out any logs that happened before the current aggregation.
-    function getLogsForTestRun(log) {
-        if (foundTest) {
-            return true;
-        }
-        const m = findMatchingLogLine([log], {comment: "test " + testCount});
-        if (m !== null) {
-            foundTest = true;
-        }
-        return foundTest;
-    }
-
-    // Pick only those remaining logs which match the input 'fields'.
-    return [...findMatchingLogLines(logs.filter(getLogsForTestRun), fields)];
-}
-
-function getShardedViewExceptions(shard) {
-    const shardLog = assert.commandWorked(sharded[shard].adminCommand({getLog: "global"})).log;
-    return ["test.docs", "test.subjects"].map(namespace => {
-        return {
-            ns: namespace,
-            count: [...getMatchingLogsForTestRun(shardLog, {id: 5865400, namespace})].length
-        };
-    });
+// To resolve view 'view1' defined on view 'view2' defined on collection 'coll', we would get a
+// dependency chain of the form [view1, view2, coll] in the 'resolvedViews' field of the
+// system.profile entry. This function combines all namespaces listed in the dependency chains of an
+// aggregation's resolved views to produce a map counting how many times each namesapce was seen,
+// e.g.: {"test.view1": 1, "test.view2": 1, "test.coll": 1}
+function getShardedViewExceptions(comment) {
+    return primaryShard.getDB(testDBName)
+        .system.profile.find({})
+        .toArray()
+        .filter((doc) => doc["command"] && doc["command"]["aggregate"] && doc["resolvedViews"] &&
+                    doc["command"]["comment"] === comment)
+        .flatMap((doc) =>
+                     doc["resolvedViews"].flatMap(resolvedView => resolvedView["dependencyChain"]))
+        .reduce((prev, curr) => {
+            const namespace = "test." + curr;
+            if (prev[namespace]) {
+                prev[namespace] += 1;
+            } else {
+                prev[namespace] = 1;
+            }
+            return prev;
+        }, {});
 }
 
 function testGraphLookupView({collection, pipeline, expectedResults, expectedExceptions}) {
-    assertArrayEq({
-        actual: collection.aggregate(pipeline, {comment: "test " + testCount}).toArray(),
-        expected: expectedResults
-    });
+    const comment = "test " + testCount;
+    assertArrayEq(
+        {actual: collection.aggregate(pipeline, {comment}).toArray(), expected: expectedResults});
     if (expectedExceptions) {
         // Count how many CommandOnShardedViewNotSupported exceptions we get and verify that they
         // match the number we were expecting.
-        const exceptionCounts = getShardedViewExceptions(expectedExceptions.shard);
-        for (const actualEx of exceptionCounts) {
-            const ns = actualEx.ns;
-            const actualCount = actualEx.count;
+        const actualEx = getShardedViewExceptions(comment);
+        for (const ns in expectedExceptions) {
+            const actualCount = actualEx[ns] || 0;
             const expectedCount = expectedExceptions[ns];
             assert(actualCount == expectedCount,
                    "expected: " + expectedCount + " exceptions for ns " + ns + ", actually got " +
@@ -157,7 +158,7 @@ testGraphLookupView({
         {_id: 5, name: "Mann", subjects: ["Biology", "Science", "Xenobiology"]},
     ],
     // Expect only one exception when trying to resolve the view 'emptyViewOnSubjects'.
-    expectedExceptions: {"shard": "shard1", "test.docs": 0, "test.subjects": 1},
+    expectedExceptions: {"test.docs": 0, "test.subjects": 1},
 });
 
 // Test a $graphLookup with a restrictSearchWithMatch that triggers a
@@ -186,7 +187,7 @@ testGraphLookupView({
         {_id: 5, name: "Mann",  science: true},
     ],
     // Expect only one exception when trying to resolve the view 'emptyViewOnSubjects'.
-    expectedExceptions: {"shard": "shard1", "test.docs": 0, "test.subjects": 1},
+    expectedExceptions: {"test.docs": 0, "test.subjects": 1},
 });
 
 // Create a view with an empty pipeline on the existing empty view on 'subjects'.
@@ -219,7 +220,7 @@ testGraphLookupView({
         {_id: 5, name: "Mann", subjects: ["Biology", "Science", "Xenobiology"]},
     ],
     // Expect only one exception when trying to resolve the view 'emptyViewOnSubjects'.
-    expectedExceptions: {"shard": "shard1", "test.docs": 0, "test.subjects": 1},
+    expectedExceptions: {"test.docs": 0, "test.subjects": 1},
 });
 
 // Create a view with a pipeline on 'docs' that runs another $graphLookup.
@@ -279,7 +280,7 @@ testGraphLookupView({
     ],
     // Expect one exception when trying to resolve the view 'physicists' on collection 'docs' and
     // another four on 'subjects' when trying to resolve 'emptyViewOnSubjects'.
-    expectedExceptions: {"shard": "shard2", "test.docs": 1, "test.subjects": 4},
+    expectedExceptions: {"test.docs": 1, "test.subjects": 4},
 });
 
 // Create a view with a pipeline on 'physicists' to test resolution of a view on another view.
@@ -308,7 +309,7 @@ testGraphLookupView({
     ],
     // Expect one exception when trying to resolve the view 'physicists' on collection 'docs' and
     // one on 'subjects' when trying to resolve 'emptyViewOnSubjects'.
-    expectedExceptions: {"shard": "shard2", "test.docs": 1, "test.subjects": 1},
+    expectedExceptions: {"test.docs": 1, "test.subjects": 1},
 });
 
 // Test a $graphLookup with restrictSearchWithMatch that triggers a
@@ -334,7 +335,7 @@ testGraphLookupView({
     ],
     // Expect one exception when trying to resolve the view 'physicists' on collection 'docs' and
     // another two on 'subjects' when trying to resolve 'emptyViewOnSubjects'.
-    expectedExceptions: {"shard": "shard2", "test.docs": 1, "test.subjects": 2},
+    expectedExceptions: {"test.docs": 1, "test.subjects": 2},
 });
 
 sharded.stop();
