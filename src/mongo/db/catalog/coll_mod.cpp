@@ -390,9 +390,6 @@ Status _collModInternal(OperationContext* opCtx,
         if (cmr.indexUnique) {
             if (!cmr.idx->infoObj().getField("unique").trueValue()) {
                 newUnique = cmr.indexUnique;
-                // Change the value of "unique" on disk.
-                DurableCatalog::get(opCtx)->updateUniqueSetting(
-                    opCtx, coll->ns(), cmr.idx->indexName());
                 result->appendAs(newUnique, "unique_new");
             }
         }

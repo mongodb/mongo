@@ -122,10 +122,6 @@ public:
                           StringData idxName,
                           long long newExpireSeconds);
 
-    virtual void updateUniqueSetting(OperationContext* opCtx,
-                                     NamespaceString ns,
-                                     StringData idxName);
-
     bool isEqualToMetadataUUID(OperationContext* opCtx,
                                NamespaceString ns,
                                OptionalCollectionUUID uuid);
