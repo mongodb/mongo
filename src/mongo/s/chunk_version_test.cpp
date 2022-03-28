@@ -71,7 +71,7 @@ TEST(ChunkVersionParsing, FromBSONMissingTimestamp) {
             BSON("testVersionField" << BSON_ARRAY(Timestamp(Seconds(2), 3) << OID::gen())),
             "testVersionField")),
         AssertionException,
-        ErrorCodes::TypeMismatch);
+        ErrorCodes::StaleShardVersion);
 }
 
 TEST(ChunkVersionParsing, FromBSON) {
