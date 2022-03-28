@@ -13,7 +13,7 @@ function setup_db_contrib_tool_venv {
 
   activate_db_contrib_tool_venv
   python -m pip --disable-pip-version-check install "pip==21.0.1" "wheel==0.37.0" || exit 1
-  python -m pip --disable-pip-version-check install "db-contrib-tool==0.1.7" || exit 1
+  python -m pip --disable-pip-version-check install "db-contrib-tool==0.2.1" || exit 1
 }
 
 function activate_db_contrib_tool_venv {
