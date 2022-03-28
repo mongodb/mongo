@@ -31,7 +31,7 @@ var conn = MongoRunner.runMongod({
     // - Make the maximum file size small to encourage lots of file changes.  WT-2706 was
     // related to log file switches.
     wiredTigerEngineConfigString:
-        'checkpoint=(wait=60,log_size=0),log=(archive=false,compressor=none,file_max=10M)'
+        'checkpoint=(wait=60,log_size=0),log=(remove=false,compressor=none,file_max=10M)'
 });
 assert.neq(null, conn, 'mongod was unable to start up');
 
@@ -96,7 +96,7 @@ threads.forEach(function(t) {
 conn = MongoRunner.runMongod({
     dbpath: dbpath,
     noCleanData: true,
-    wiredTigerEngineConfigString: 'log=(archive=false,compressor=none,file_max=10M)'
+    wiredTigerEngineConfigString: 'log=(remove=false,compressor=none,file_max=10M)'
 });
 assert.neq(null, conn, 'mongod should have restarted');
 

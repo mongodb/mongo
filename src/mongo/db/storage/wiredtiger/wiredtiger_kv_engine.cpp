@@ -353,7 +353,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
     // The setting may have a later setting override it if not using the journal.  We make it
     // unconditional here because even nojournal may need this setting if it is a transition
     // from using the journal.
-    ss << "log=(enabled=true,archive=" << (_readOnly ? "false" : "true")
+    ss << "log=(enabled=true,remove=" << (_readOnly ? "false" : "true")
        << ",path=journal,compressor=";
     ss << wiredTigerGlobalOptions.journalCompressor << "),";
     ss << "builtin_extension_config=(zstd=(compression_level="
