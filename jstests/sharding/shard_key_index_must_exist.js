@@ -1,8 +1,6 @@
 (function() {
 'use strict';
 
-const kCantDropShardKeyIndexErrors = [649100, 649101];
-
 let st = new ShardingTest({shards: 1});
 
 assert.commandWorked(st.s.adminCommand({enableSharding: 'test'}));
@@ -27,7 +25,7 @@ let checkIndex = function(collName, expectedIndexNames) {
 (() => {
     assert.commandWorked(st.s.adminCommand({shardCollection: 'test.user', key: {x: 1}}));
     assert.commandFailedWithCode(testDB.runCommand({dropIndexes: 'user', index: {x: 1}}),
-                                 kCantDropShardKeyIndexErrors);
+                                 ErrorCodes.CannotDropShardKeyIndex);
 
     assert.commandWorked(testDB.runCommand({
         createIndexes: 'user',
@@ -45,9 +43,9 @@ let checkIndex = function(collName, expectedIndexNames) {
     assert.commandWorked(testDB.runCommand({dropIndexes: 'user', index: {x: 1, z: 1}}));
 
     assert.commandFailedWithCode(testDB.runCommand({dropIndexes: 'user', index: {x: 1, y: 1}}),
-                                 kCantDropShardKeyIndexErrors);
+                                 ErrorCodes.CannotDropShardKeyIndex);
     assert.commandFailedWithCode(testDB.runCommand({dropIndexes: 'user', index: 'xy'}),
-                                 kCantDropShardKeyIndexErrors);
+                                 ErrorCodes.CannotDropShardKeyIndex);
 
     checkIndex('user', ['_id_', 'xy']);
 
@@ -65,7 +63,7 @@ let checkIndex = function(collName, expectedIndexNames) {
     checkIndex('hashed', ['_id_', 'x_hashed']);
 
     assert.commandFailedWithCode(testDB.runCommand({dropIndexes: 'hashed', index: 'x_hashed'}),
-                                 kCantDropShardKeyIndexErrors);
+                                 ErrorCodes.CannotDropShardKeyIndex);
 
     checkIndex('hashed', ['_id_', 'x_hashed']);
 

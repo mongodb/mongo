@@ -476,6 +476,7 @@ error_codes:
     - {code: 367, name: FLECompactionPlaceholder}
     - {code: 368, name: FLEStateCollectionContention}
     - {code: 369, name: FLETransactionAbort}
+    - {code: 370, name: CannotDropShardKeyIndex}
 
     # Error codes 4000-8999 are reserved.
 
