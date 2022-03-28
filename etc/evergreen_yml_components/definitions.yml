@@ -5920,6 +5920,13 @@ tasks:
   - func: "run tests"
 
 - <<: *task_template
+  name: fle2_sharding
+  tags: ["encrypt"]
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+
+- <<: *task_template
   name: ocsp
   tags: ["ssl", "encrypt", "ocsp"]
   commands:
