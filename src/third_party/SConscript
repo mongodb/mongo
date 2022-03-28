@@ -17,6 +17,9 @@ tomcryptSuffix = '-1.18.2'
 variantSuffix = '-1.4.0'
 
 thirdPartyEnvironmentModifications = {
+    'abseil-cpp' : {
+        'CPPPATH' : ['#/src/third_party/abseil-cpp-master/abseil-cpp'],
+    },
    'fmt' : {
         'CPPPATH' : ['#src/third_party/fmt/dist/include'],
    },
@@ -99,11 +102,6 @@ if not use_system_version_of_library('boost'):
         # little harm in applying for all clang.
         'NOERROR_FOR_UNKNOWN_WARNING_OPTION_GEN' : NoErrorForUnknownWarningOptionGenerator,
         'CCFLAGS' : ['$NOERROR_FOR_UNKNOWN_WARNING_OPTION_GEN'] if env.ToolchainIs('clang') else []
-    }
-
-if not use_system_version_of_library('abseil-cpp'):
-    thirdPartyEnvironmentModifications['abseil-cpp'] = {
-        'CPPPATH' : ['#/src/third_party/abseil-cpp-master/abseil-cpp'],
     }
 
 if not use_system_version_of_library('snappy'):
@@ -373,25 +371,16 @@ else:
 
 boostEnv.ShimLibrary(name="boost")
 
+abseilDirectory = 'abseil-cpp-master'
 abseilEnv = env.Clone()
-if use_system_version_of_library("abseil-cpp"):
-    abseilEnv = abseilEnv.Clone(
-        SYSLIBDEPS=[
-            env['LIBDEPS_ABSL_CONTAINER_SYSLIBDEP'],
-            env['LIBDEPS_ABSL_HASH_SYSLIBDEP'],
-            env['LIBDEPS_ABSL_NUMERIC_SYSLIBDEP'],
-        ])
-else:
-    abseilDirectory = 'abseil-cpp-master'
-    abseilEnv = abseilEnv.Clone()
-    abseilEnv.InjectThirdParty(libraries=['abseil-cpp'])
-    abseilEnv.SConscript(abseilDirectory + '/SConscript', exports={ 'env' : abseilEnv })
-    abseilEnv = abseilEnv.Clone(
-        LIBDEPS_INTERFACE=[
-            abseilDirectory + '/absl_container',
-            abseilDirectory + '/absl_hash',
-            abseilDirectory + '/absl_numeric',
-        ])
+abseilEnv.InjectThirdParty(libraries=['abseil-cpp'])
+abseilEnv.SConscript(abseilDirectory + '/SConscript', exports={ 'env' : abseilEnv })
+abseilEnv = abseilEnv.Clone(
+    LIBDEPS_INTERFACE=[
+        abseilDirectory + '/absl_container',
+        abseilDirectory + '/absl_hash',
+        abseilDirectory + '/absl_numeric',
+    ])
 
 abseilEnv.ShimLibrary(name="abseil")
 

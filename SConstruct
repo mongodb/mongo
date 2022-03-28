@@ -369,7 +369,6 @@ add_option('use-diagnostic-latches',
 
 # Most of the "use-system-*" options follow a simple form.
 for pack in [
-    ('abseil-cpp',),
     ('asio', 'ASIO',),
     ('boost',),
     ('fmt',),
