@@ -135,25 +135,29 @@ function getGroupStage(accumulator) {
     index so that we can use the DISTINCT_SCAN optimization.
 */
 const testCases = [
-    {time: -1},
-    {time: 1},
-    {time: -1, bucketsIndex: {"meta.hostid": -1, "control.max.time": 1, "control.min.time": 1}}
+    {time: -1, useBucketsIndex: false},
+    {time: 1, useBucketsIndex: false},
+    {time: 1, useBucketsIndex: true}
 ];
 
-for (const {time, bucketsIndex} of testCases) {
+for (const {time, useBucketsIndex} of testCases) {
     const isTimeDescending = time < 0;
-    const canUseDistinct = isTimeDescending || bucketsIndex;
+    const canUseDistinct = isTimeDescending || useBucketsIndex;
     const groupStage = isTimeDescending ? getGroupStage("$first") : getGroupStage("$last");
 
     // Test both directions of the metaField sort for each direction of time.
-    for (const index of [{"tags.hostid": 1, time}, {"tags.hostid": -1, time}]) {
-        const canUseDistinctNoMeta =
-            (index["tags.hostid"] === 1) + isTimeDescending + (bucketsIndex !== undefined);
+    for (const metaDir of [1, -1]) {
+        const index = {"tags.hostid": metaDir, time};
+        const bucketsIndex = useBucketsIndex
+            ? {"meta.hostid": metaDir, "control.max.time": 1, "control.min.time": 1}
+            : undefined;
+        const canSortOnTimeUseDistinct = (metaDir > 0) && (isTimeDescending || useBucketsIndex);
+
         verifyTsResultsWithAndWithoutIndex({
             pipeline: [{$sort: {time}}, groupStage],
             index,
             bucketsIndex,
-            expectStage: (canUseDistinctNoMeta >= 2 ? expectDistinctScan : expectCollScan)
+            expectStage: (canSortOnTimeUseDistinct ? expectDistinctScan : expectCollScan)
         });
 
         // Test pipeline without a preceding $match stage.
