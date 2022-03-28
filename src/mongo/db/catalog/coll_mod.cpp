@@ -53,7 +53,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/recovery_unit.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
@@ -68,7 +67,6 @@ MONGO_FAIL_POINT_DEFINE(assertAfterIndexUpdate);
 struct CollModRequest {
     const IndexDescriptor* idx = nullptr;
     BSONElement indexExpireAfterSeconds = {};
-    BSONElement indexUnique = {};
     BSONElement viewPipeLine = {};
     std::string viewOn = {};
     boost::optional<BSONObj> collValidator;
@@ -124,23 +122,12 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
             }
 
             cmr.indexExpireAfterSeconds = indexObj["expireAfterSeconds"];
-            cmr.indexUnique = indexObj["unique"];
-
-            if (cmr.indexUnique) {
-                uassert(ErrorCodes::InvalidOptions,
-                        "collMod does not support converting an index to unique",
-                        gCollModIndexUnique);
+            if (cmr.indexExpireAfterSeconds.eoo()) {
+                return Status(ErrorCodes::InvalidOptions, "no expireAfterSeconds field");
             }
-
-            if (!cmr.indexExpireAfterSeconds && !cmr.indexUnique) {
-                return Status(ErrorCodes::InvalidOptions, "no expireAfterSeconds or unique field");
-            }
-            if (cmr.indexExpireAfterSeconds && !cmr.indexExpireAfterSeconds.isNumber()) {
+            if (!cmr.indexExpireAfterSeconds.isNumber()) {
                 return Status(ErrorCodes::InvalidOptions,
                               "expireAfterSeconds field must be a number");
-            }
-            if (cmr.indexUnique && !cmr.indexUnique.isBoolean()) {
-                return Status(ErrorCodes::InvalidOptions, "unique field must be a boolean");
             }
 
             if (!indexName.empty()) {
@@ -171,20 +158,13 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
                 cmr.idx = indexes[0];
             }
 
-            if (cmr.indexExpireAfterSeconds) {
-                BSONElement oldExpireSecs = cmr.idx->infoObj().getField("expireAfterSeconds");
-                if (oldExpireSecs.eoo()) {
-                    return Status(ErrorCodes::InvalidOptions,
-                                  "no expireAfterSeconds field to update");
-                }
-                if (!oldExpireSecs.isNumber()) {
-                    return Status(ErrorCodes::InvalidOptions,
-                                  "existing expireAfterSeconds field is not a number");
-                }
+            BSONElement oldExpireSecs = cmr.idx->infoObj().getField("expireAfterSeconds");
+            if (oldExpireSecs.eoo()) {
+                return Status(ErrorCodes::InvalidOptions, "no expireAfterSeconds field to update");
             }
-
-            if (cmr.indexUnique && !cmr.indexUnique.trueValue()) {
-                return Status(ErrorCodes::BadValue, "Cannot make index non-unique");
+            if (!oldExpireSecs.isNumber()) {
+                return Status(ErrorCodes::InvalidOptions,
+                              "existing expireAfterSeconds field is not a number");
             }
 
         } else if (fieldName == "validator" && !isView) {
@@ -355,52 +335,36 @@ Status _collModInternal(OperationContext* opCtx,
 
     CollectionOptions oldCollOptions = DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, nss);
 
-    boost::optional<IndexCollModInfo> indexCollModInfo;
-    BSONElement newExpireSecs = {};
-    BSONElement oldExpireSecs = {};
-    BSONElement newUnique = {};
+    boost::optional<TTLCollModInfo> ttlInfo;
 
     // Handle collMod operation type appropriately.
 
-    if (cmr.idx) {
-        // TTLIndex
-        if (cmr.indexExpireAfterSeconds) {
-            newExpireSecs = cmr.indexExpireAfterSeconds;
-            oldExpireSecs = cmr.idx->infoObj().getField("expireAfterSeconds");
+    // TTLIndex
+    if (!cmr.indexExpireAfterSeconds.eoo()) {
+        BSONElement& newExpireSecs = cmr.indexExpireAfterSeconds;
+        BSONElement oldExpireSecs = cmr.idx->infoObj().getField("expireAfterSeconds");
 
-            if (SimpleBSONElementComparator::kInstance.evaluate(oldExpireSecs != newExpireSecs)) {
-                result->appendAs(oldExpireSecs, "expireAfterSeconds_old");
+        if (SimpleBSONElementComparator::kInstance.evaluate(oldExpireSecs != newExpireSecs)) {
+            result->appendAs(oldExpireSecs, "expireAfterSeconds_old");
 
-                // Change the value of "expireAfterSeconds" on disk.
-                DurableCatalog::get(opCtx)->updateTTLSetting(
-                    opCtx, coll->ns(), cmr.idx->indexName(), newExpireSecs.safeNumberLong());
+            // Change the value of "expireAfterSeconds" on disk.
+            DurableCatalog::get(opCtx)->updateTTLSetting(
+                opCtx, coll->ns(), cmr.idx->indexName(), newExpireSecs.safeNumberLong());
 
-                // Notify the index catalog that the definition of this index changed.
-                cmr.idx = coll->getIndexCatalog()->refreshEntry(opCtx, cmr.idx);
-                result->appendAs(newExpireSecs, "expireAfterSeconds_new");
+            // Notify the index catalog that the definition of this index changed.
+            cmr.idx = coll->getIndexCatalog()->refreshEntry(opCtx, cmr.idx);
+            result->appendAs(newExpireSecs, "expireAfterSeconds_new");
 
-                if (MONGO_FAIL_POINT(assertAfterIndexUpdate)) {
-                    log() << "collMod - assertAfterIndexUpdate fail point enabled.";
-                    uasserted(50970, "trigger rollback after the index update");
-                }
+            if (MONGO_FAIL_POINT(assertAfterIndexUpdate)) {
+                log() << "collMod - assertAfterIndexUpdate fail point enabled.";
+                uasserted(50970, "trigger rollback after the index update");
             }
         }
 
-        // UniqueIndex
-        if (cmr.indexUnique) {
-            if (!cmr.idx->infoObj().getField("unique").trueValue()) {
-                newUnique = cmr.indexUnique;
-                result->appendAs(newUnique, "unique_new");
-            }
-        }
-
-        indexCollModInfo =
-            IndexCollModInfo{!cmr.indexExpireAfterSeconds ? boost::optional<Seconds>()
-                                                          : Seconds(newExpireSecs.safeNumberLong()),
-                             !cmr.indexExpireAfterSeconds ? boost::optional<Seconds>()
-                                                          : Seconds(oldExpireSecs.safeNumberLong()),
-                             !cmr.indexUnique ? boost::optional<bool>() : newUnique.booleanSafe(),
-                             cmr.idx->indexName()};
+        // Save previous TTL index expiration.
+        ttlInfo = TTLCollModInfo{Seconds(newExpireSecs.safeNumberLong()),
+                                 Seconds(oldExpireSecs.safeNumberLong()),
+                                 cmr.idx->indexName()};
     }
 
     if (cmr.collValidator) {
@@ -443,7 +407,7 @@ Status _collModInternal(OperationContext* opCtx,
     // Only observe non-view collMods, as view operations are observed as operations on the
     // system.views collection.
     getGlobalServiceContext()->getOpObserver()->onCollMod(
-        opCtx, nss, coll->uuid(), oplogEntryBuilder.obj(), oldCollOptions, indexCollModInfo);
+        opCtx, nss, coll->uuid(), oplogEntryBuilder.obj(), oldCollOptions, ttlInfo);
 
     wunit.commit();
 

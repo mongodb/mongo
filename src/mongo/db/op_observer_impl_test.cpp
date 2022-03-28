@@ -251,16 +251,16 @@ TEST_F(OpObserverTest, CollModWithCollectionOptionsAndTTLInfo) {
     oldCollOpts.validationLevel = "strict";
     oldCollOpts.validationAction = "error";
 
-    IndexCollModInfo indexInfo;
-    indexInfo.expireAfterSeconds = Seconds(10);
-    indexInfo.oldExpireAfterSeconds = Seconds(5);
-    indexInfo.indexName = "name_of_index";
+    TTLCollModInfo ttlInfo;
+    ttlInfo.expireAfterSeconds = Seconds(10);
+    ttlInfo.oldExpireAfterSeconds = Seconds(5);
+    ttlInfo.indexName = "name_of_index";
 
     // Write to the oplog.
     {
         AutoGetCollection autoColl(opCtx.get(), nss, MODE_IX, MODE_X);
         WriteUnitOfWork wunit(opCtx.get());
-        opObserver.onCollMod(opCtx.get(), nss, uuid, collModCmd, oldCollOpts, indexInfo);
+        opObserver.onCollMod(opCtx.get(), nss, uuid, collModCmd, oldCollOpts, ttlInfo);
         wunit.commit();
     }
 
@@ -268,14 +268,14 @@ TEST_F(OpObserverTest, CollModWithCollectionOptionsAndTTLInfo) {
 
     // Ensure that collMod fields were properly added to the oplog entry.
     auto o = oplogEntry.getObjectField("o");
-    auto oExpected = BSON(
-        "collMod" << nss.coll() << "validationLevel"
-                  << "off"
-                  << "validationAction"
-                  << "warn"
-                  << "index"
-                  << BSON("name" << indexInfo.indexName << "expireAfterSeconds"
-                                 << durationCount<Seconds>(indexInfo.expireAfterSeconds.get())));
+    auto oExpected =
+        BSON("collMod" << nss.coll() << "validationLevel"
+                       << "off"
+                       << "validationAction"
+                       << "warn"
+                       << "index"
+                       << BSON("name" << ttlInfo.indexName << "expireAfterSeconds"
+                                      << durationCount<Seconds>(ttlInfo.expireAfterSeconds)));
     ASSERT_BSONOBJ_EQ(oExpected, o);
 
     // Ensure that the old collection metadata was saved.
@@ -284,8 +284,7 @@ TEST_F(OpObserverTest, CollModWithCollectionOptionsAndTTLInfo) {
         BSON("collectionOptions_old"
              << BSON("validationLevel" << oldCollOpts.validationLevel << "validationAction"
                                        << oldCollOpts.validationAction)
-             << "expireAfterSeconds_old"
-             << durationCount<Seconds>(indexInfo.oldExpireAfterSeconds.get()));
+             << "expireAfterSeconds_old" << durationCount<Seconds>(ttlInfo.oldExpireAfterSeconds));
 
     ASSERT_BSONOBJ_EQ(o2Expected, o2);
 }

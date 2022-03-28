@@ -165,10 +165,10 @@ public:
                    OptionalCollectionUUID uuid,
                    const BSONObj& collModCmd,
                    const CollectionOptions& oldCollOptions,
-                   boost::optional<IndexCollModInfo> indexInfo) override {
+                   boost::optional<TTLCollModInfo> ttlInfo) override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers)
-            o->onCollMod(opCtx, nss, uuid, collModCmd, oldCollOptions, indexInfo);
+            o->onCollMod(opCtx, nss, uuid, collModCmd, oldCollOptions, ttlInfo);
     }
 
     void onDropDatabase(OperationContext* const opCtx, const std::string& dbName) override {

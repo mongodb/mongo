@@ -111,11 +111,11 @@ void AuthOpObserver::onCollMod(OperationContext* opCtx,
                                OptionalCollectionUUID uuid,
                                const BSONObj& collModCmd,
                                const CollectionOptions& oldCollOptions,
-                               boost::optional<IndexCollModInfo> indexInfo) {
+                               boost::optional<TTLCollModInfo> ttlInfo) {
     const auto cmdNss = nss.getCommandNS();
 
     // Create the 'o' field object.
-    const auto cmdObj = makeCollModCmdObj(collModCmd, oldCollOptions, indexInfo);
+    const auto cmdObj = makeCollModCmdObj(collModCmd, oldCollOptions, ttlInfo);
 
     AuthorizationManager::get(opCtx->getServiceContext())
         ->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);

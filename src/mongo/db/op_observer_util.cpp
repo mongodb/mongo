@@ -42,24 +42,21 @@ namespace mongo {
  */
 BSONObj makeCollModCmdObj(const BSONObj& collModCmd,
                           const CollectionOptions& oldCollOptions,
-                          boost::optional<IndexCollModInfo> indexInfo) {
+                          boost::optional<TTLCollModInfo> ttlInfo) {
     BSONObjBuilder cmdObjBuilder;
-    std::string indexFieldName = "index";
+    std::string ttlIndexFieldName = "index";
 
     // Add all fields from the original collMod command.
     for (auto elem : collModCmd) {
         // We normalize all TTL collMod oplog entry objects to use the index name, even if the
         // command used an index key pattern.
-        if (elem.fieldNameStringData() == indexFieldName && indexInfo) {
-            BSONObjBuilder indexObjBuilder;
-            indexObjBuilder.append("name", indexInfo->indexName);
-            if (indexInfo->expireAfterSeconds)
-                indexObjBuilder.append("expireAfterSeconds",
-                                       durationCount<Seconds>(indexInfo->expireAfterSeconds.get()));
-            if (indexInfo->unique)
-                indexObjBuilder.append("unique", indexInfo->unique.get());
+        if (elem.fieldNameStringData() == ttlIndexFieldName && ttlInfo) {
+            BSONObjBuilder ttlIndexObjBuilder;
+            ttlIndexObjBuilder.append("name", ttlInfo->indexName);
+            ttlIndexObjBuilder.append("expireAfterSeconds",
+                                      durationCount<Seconds>(ttlInfo->expireAfterSeconds));
 
-            cmdObjBuilder.append(indexFieldName, indexObjBuilder.obj());
+            cmdObjBuilder.append(ttlIndexFieldName, ttlIndexObjBuilder.obj());
         } else {
             cmdObjBuilder.append(elem);
         }

@@ -41,5 +41,5 @@ BSONObj makeCreateCollCmdObj(const NamespaceString& collectionName,
 
 BSONObj makeCollModCmdObj(const BSONObj& collModCmd,
                           const CollectionOptions& oldCollOptions,
-                          boost::optional<IndexCollModInfo> indexInfo);
+                          boost::optional<TTLCollModInfo> ttlInfo);
 }  // namespace mongo
