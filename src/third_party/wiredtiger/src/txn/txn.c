@@ -1141,6 +1141,59 @@ err:
 }
 
 /*
+ * __txn_resolve_prepared_update_chain --
+ *     Helper for resolving updates. Recursively visit the update chain and resolve the updates on
+ *     the way back out, so older updates are resolved first; this avoids a race with reconciliation
+ *     (see WT-6778).
+ */
+static void
+__txn_resolve_prepared_update_chain(WT_SESSION_IMPL *session, WT_UPDATE *upd, bool commit)
+{
+
+    /* If we've reached the end of the chain, we're done looking. */
+    if (upd == NULL)
+        return;
+
+    /*
+     * Aborted updates can exist in the update chain of our transaction. Generally this will occur
+     * due to a reserved update. As such we should skip over these updates entirely.
+     */
+    if (upd->txnid == WT_TXN_ABORTED) {
+        __txn_resolve_prepared_update_chain(session, upd->next, commit);
+        return;
+    }
+
+    /*
+     * If the transaction id is then different and not aborted we know we've reached the end of our
+     * update chain and don't need to look deeper.
+     */
+    if (upd->txnid != session->txn->id)
+        return;
+
+    /* Go down the chain. Do the resolves on the way back up. */
+    __txn_resolve_prepared_update_chain(session, upd->next, commit);
+
+    if (!commit) {
+        upd->txnid = WT_TXN_ABORTED;
+        WT_STAT_CONN_INCR(session, txn_prepared_updates_rolledback);
+        return;
+    }
+
+    /*
+     * Performing an update on the same key where the truncate operation is performed can lead to
+     * updates that are already resolved in the updated list. Ignore the already resolved updates.
+     */
+    if (upd->prepare_state == WT_PREPARE_RESOLVED) {
+        WT_ASSERT(session, upd->type == WT_UPDATE_TOMBSTONE);
+        return;
+    }
+
+    /* Resolve the prepared update to be a committed update. */
+    __txn_resolve_prepared_update(session, upd);
+    WT_STAT_CONN_INCR(session, txn_prepared_updates_committed);
+}
+
+/*
  * __txn_resolve_prepared_op --
  *     Resolve a transaction's operations indirect references.
  */
@@ -1290,61 +1343,28 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
             WT_ERR(__txn_append_tombstone(session, op, cbt));
     }
 
-    for (; upd != NULL; upd = upd->next) {
-        /*
-         * Aborted updates can exist in the update chain of our transaction. Generally this will
-         * occur due to a reserved update. As such we should skip over these updates. If the
-         * transaction id is then different and not aborted we know we've reached the end of our
-         * update chain and can exit.
-         */
-        if (upd->txnid == WT_TXN_ABORTED)
-            continue;
-        if (upd->txnid != txn->id)
-            break;
-
-        if (!commit) {
-            upd->txnid = WT_TXN_ABORTED;
-            WT_STAT_CONN_INCR(session, txn_prepared_updates_rolledback);
-            continue;
-        }
-
-        /*
-         * Performing an update on the same key where the truncate operation is performed can lead
-         * to updates that are already resolved in the updated list. Ignore the already resolved
-         * updates.
-         */
-        if (upd->prepare_state == WT_PREPARE_RESOLVED) {
-            WT_ASSERT(session, upd->type == WT_UPDATE_TOMBSTONE);
-            continue;
-        }
-
-        /*
-         * Newer updates are inserted at head of update chain, and transaction operations are added
-         * at the tail of the transaction modify chain.
-         *
-         * For example, a transaction has modified [k,v] as
-         *	[k, v]  -> [k, u1]   (txn_op : txn_op1)
-         *	[k, u1] -> [k, u2]   (txn_op : txn_op2)
-         *	update chain : u2->u1
-         *	txn_mod      : txn_op1->txn_op2.
-         *
-         * Only the key is saved in the transaction operation structure, hence we cannot identify
-         * whether "txn_op1" corresponds to "u2" or "u1" during commit/rollback.
-         *
-         * To make things simpler we will handle all the updates that match the key saved in a
-         * transaction operation in a single go. As a result, multiple updates of a key, if any
-         * will be resolved as part of the first transaction operation resolution of that key,
-         * and subsequent transaction operation resolution of the same key will be effectively a
-         * no-op.
-         *
-         * In the above example, we will resolve "u2" and "u1" as part of resolving "txn_op1" and
-         * will not do any significant thing as part of "txn_op2".
-         *
-         * Resolve the prepared update to be committed update.
-         */
-        __txn_resolve_prepared_update(session, upd);
-        WT_STAT_CONN_INCR(session, txn_prepared_updates_committed);
-    }
+    /*
+     * Newer updates are inserted at head of update chain, and transaction operations are added at
+     * the tail of the transaction modify chain.
+     *
+     * For example, a transaction has modified [k,v] as
+     *	[k, v]  -> [k, u1]   (txn_op : txn_op1)
+     *	[k, u1] -> [k, u2]   (txn_op : txn_op2)
+     *	update chain : u2->u1
+     *	txn_mod      : txn_op1->txn_op2.
+     *
+     * Only the key is saved in the transaction operation structure, hence we cannot identify
+     * whether "txn_op1" corresponds to "u2" or "u1" during commit/rollback.
+     *
+     * To make things simpler we will handle all the updates that match the key saved in a
+     * transaction operation in a single go. As a result, multiple updates of a key, if any will be
+     * resolved as part of the first transaction operation resolution of that key, and subsequent
+     * transaction operation resolution of the same key will be effectively a no-op.
+     *
+     * In the above example, we will resolve "u2" and "u1" as part of resolving "txn_op1" and will
+     * not do any significant thing as part of "txn_op2".
+     */
+    __txn_resolve_prepared_update_chain(session, upd, commit);
 
     /* Mark the page dirty once the prepared updates are resolved. */
     __wt_page_modify_set(session, page);
