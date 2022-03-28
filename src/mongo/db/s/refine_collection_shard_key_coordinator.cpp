@@ -140,6 +140,8 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
                 ConfigsvrRefineCollectionShardKey configsvrRefineCollShardKey(
                     nss(), _newShardKey.toBSON(), cm.getVersion().epoch());
                 configsvrRefineCollShardKey.setDbName(nss().db().toString());
+                configsvrRefineCollShardKey.setEnforceUniquenessCheck(
+                    _doc.getEnforceUniquenessCheck());
                 auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
                 if (_persistCoordinatorDocument) {

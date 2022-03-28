@@ -69,6 +69,7 @@ public:
             RefineCollectionShardKeyRequest requestParamObj;
             requestParamObj.setNewShardKey(request().getKey());
             requestParamObj.setCollectionUUID(request().getCollectionUUID());
+            requestParamObj.setEnforceUniquenessCheck(request().getEnforceUniquenessCheck());
             ShardsvrRefineCollectionShardKey refineCollectionShardKeyCommand(nss);
             refineCollectionShardKeyCommand.setRefineCollectionShardKeyRequest(requestParamObj);
 

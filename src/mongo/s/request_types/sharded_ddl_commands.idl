@@ -192,6 +192,12 @@ structs:
                 type: uuid
                 description: "The expected UUID of the collection."
                 optional: true
+            enforceUniquenessCheck:
+                description: >-
+                    Controls whether this command verifies that any unique indexes are prefixed by
+                    the shard key pattern if unique is true. If true then it will verify and if
+                    false then it won't.
+                type: optionalBool
 
     ReshardCollectionRequest:
         description: "Parameters for the reshard collection command"
