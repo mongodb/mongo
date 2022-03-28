@@ -441,7 +441,7 @@ public:
              BSONObjBuilder& result) override {
         const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
 
-        if (processFLEFindAndModify(opCtx, dbName, cmdObj, result) == FLEBatchResult::kProcessed) {
+        if (processFLEFindAndModify(opCtx, cmdObj, result) == FLEBatchResult::kProcessed) {
             return true;
         }
 
@@ -499,6 +499,7 @@ private:
                             const BSONObj& cmdObj,
                             BSONObjBuilder* result) {
         bool isRetryableWrite = opCtx->getTxnNumber() && !TransactionRouter::get(opCtx);
+
         const auto response = [&] {
             std::vector<AsyncRequestsSender::Request> requests;
             BSONObj filteredCmdObj = CommandHelpers::filterCommandRequestForPassthrough(cmdObj);

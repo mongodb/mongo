@@ -547,7 +547,13 @@ void FleCrudTest::doFindAndModify(write_ops::FindAndModifyCommandRequest& reques
 
     request.setEncryptionInformation(ei);
 
-    processFindAndModify(_queryImpl.get(), request);
+    std::unique_ptr<CollatorInterface> collator;
+    auto expCtx = make_intrusive<ExpressionContext>(_opCtx.get(),
+                                                    std::move(collator),
+                                                    request.getNamespace(),
+                                                    request.getLegacyRuntimeConstants(),
+                                                    request.getLet());
+    processFindAndModify(expCtx, _queryImpl.get(), request);
 }
 
 class CollectionReader : public FLEStateCollectionReader {

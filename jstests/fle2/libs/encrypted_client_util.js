@@ -149,7 +149,7 @@ class EncryptedClient {
         let encryptedDoc = encryptedDocs[0];
         let unEncryptedDoc = unEncryptedDocs[0];
 
-        assert(encryptedDoc["__safeContent__"] !== undefined);
+        assert(encryptedDoc[kSafeContentField] !== undefined);
 
         for (let field in fields) {
             assert(encryptedDoc.hasOwnProperty(field),
@@ -218,25 +218,16 @@ class EncryptedClient {
     }
 
     /**
-     * Take a snapshot of a collection sorted by _id, run a operation, take a second snapshot.
-     *
-     * Ensure that the documents listed by index in unchangedDocumentIndexArray remain unchanged.
-     * Ensure that the documents listed by index in changedDocumentIndexArray are changed.
+     * Verify that the collection 'collName' contains exactly the documents 'docs'.
      *
      * @param {string} collName
-     * @param {Array} unchangedDocumentIndexArray
-     * @param {Array} changedDocumentIndexArray
-     * @param {Function} func
+     * @param {Array} docs
      * @returns
      */
     assertEncryptedCollectionDocuments(collName, docs) {
         let coll = this._edb.getCollection(collName);
 
-        let onDiskDocs = coll.find({}).sort({_id: 1}).toArray();
-
-        for (let doc of onDiskDocs) {
-            delete doc.__safeContent__;
-        }
+        let onDiskDocs = coll.find({}, {[kSafeContentField]: 0}).sort({_id: 1}).toArray();
 
         assert.docEq(onDiskDocs, docs);
     }

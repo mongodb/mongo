@@ -44,6 +44,7 @@
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/find_command_gen.h"
 #include "mongo/db/query/fle/server_rewrite.h"
+#include "mongo/db/transaction_api.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
@@ -583,10 +584,12 @@ StatusWith<write_ops::FindAndModifyCommandReply> processFindAndModifyRequest(
 
     std::shared_ptr<txn_api::TransactionWithRetries> trun = getTxns(opCtx);
 
+    auto expCtx = makeExpCtx(opCtx, findAndModifyRequest, findAndModifyRequest);
+
     // The function that handles the transaction may outlive this function so we need to use
     // shared_ptrs
     write_ops::FindAndModifyCommandReply reply;
-    auto findAndModifyBlock = std::tie(findAndModifyRequest, reply);
+    auto findAndModifyBlock = std::tie(findAndModifyRequest, reply, expCtx);
     auto sharedFindAndModifyBlock =
         std::make_shared<decltype(findAndModifyBlock)>(findAndModifyBlock);
 
@@ -596,10 +599,9 @@ StatusWith<write_ops::FindAndModifyCommandReply> processFindAndModifyRequest(
                                    ExecutorPtr txnExec) {
             FLEQueryInterfaceImpl queryImpl(txnClient);
 
-            auto [findAndModifyRequest2, reply2] = *sharedFindAndModifyBlock.get();
+            auto [findAndModifyRequest2, reply2, expCtx] = *sharedFindAndModifyBlock.get();
 
-            reply2 = processFindAndModify(&queryImpl, findAndModifyRequest2);
-
+            reply2 = processFindAndModify(expCtx, &queryImpl, findAndModifyRequest2);
 
             if (MONGO_unlikely(fleCrudHangFindAndModify.shouldFail())) {
                 LOGV2(6371900, "Hanging due to fleCrudHangFindAndModify fail point");
@@ -855,6 +857,7 @@ FLEBatchResult processFLEBatch(OperationContext* opCtx,
 
 // See processUpdate for algorithm overview
 write_ops::FindAndModifyCommandReply processFindAndModify(
+    boost::intrusive_ptr<ExpressionContext> expCtx,
     FLEQueryInterface* queryImpl,
     const write_ops::FindAndModifyCommandRequest& findAndModifyRequest) {
 
@@ -865,9 +868,19 @@ write_ops::FindAndModifyCommandReply processFindAndModify(
     auto tokenMap = EncryptionInformationHelpers::getDeleteTokens(edcNss, ei);
     int32_t stmtId = findAndModifyRequest.getStmtId().value_or(0);
 
+    auto newFindAndModifyRequest = findAndModifyRequest;
+
+    // Step 0 ----
+    // Rewrite filter
+    newFindAndModifyRequest.setQuery(fle::rewriteEncryptedFilterInsideTxn(
+        queryImpl, edcNss.db(), efc, expCtx, findAndModifyRequest.getQuery()));
+
+    // Make sure not to inherit the command's writeConcern, this should be set at the transaction
+    // level.
+    newFindAndModifyRequest.setWriteConcern(boost::none);
+
     // Step 1 ----
     // If we have an update object, we have to process for ESC
-    auto newFindAndModifyRequest = findAndModifyRequest;
     if (findAndModifyRequest.getUpdate().has_value()) {
 
         std::vector<EDCServerPayloadInfo> serverPayload;
@@ -973,7 +986,6 @@ write_ops::FindAndModifyCommandReply processFindAndModify(
 }
 
 FLEBatchResult processFLEFindAndModify(OperationContext* opCtx,
-                                       const std::string& dbName,
                                        const BSONObj& cmdObj,
                                        BSONObjBuilder& result) {
     // There is no findAndModify parsing in mongos so we need to first parse to decide if it is for

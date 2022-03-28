@@ -106,7 +106,6 @@ write_ops::UpdateCommandReply processFLEUpdate(
  * Process a findAndModify request from mongos
  */
 FLEBatchResult processFLEFindAndModify(OperationContext* opCtx,
-                                       const std::string& dbName,
                                        const BSONObj& cmdObj,
                                        BSONObjBuilder& result);
 
@@ -356,6 +355,7 @@ write_ops::UpdateCommandReply processUpdate(FLEQueryInterface* queryImpl,
  * Used by unit tests.
  */
 write_ops::FindAndModifyCommandReply processFindAndModify(
+    boost::intrusive_ptr<ExpressionContext> expCtx,
     FLEQueryInterface* queryImpl,
     const write_ops::FindAndModifyCommandRequest& findAndModifyRequest);
 
