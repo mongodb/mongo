@@ -131,11 +131,16 @@ std::vector<CollectionImportMetadata> wiredTigerRollbackToStableAndGetMetadata(
     // only when opening and closing. We rely on checkpoints being disabled to make exporting the WT
     // metadata (byte offset to the root node) consistent with the new file that was written out.
     // TODO (SERVER-61475): Determine wiredtiger_open config string.
+    const auto wtConfig = "config_base=false,log=(enabled=true,path=journal,compressor=snappy)";
+    uassertWTOK(wiredtiger_open(importPath.c_str(), nullptr, wtConfig, &conn), nullptr);
+    // Reopen as read-only, to ensure the WT metadata we retrieve will be valid after closing again.
+    // Otherwise WT might change file offsets etc. between the time we get metadata and the time we
+    // close conn. In fact WT doesn't do this if we don't write, but relying on explicit readonly
+    // mode is better than relying implicitly on WT internals.
+    uassertWTOK(conn->close(conn, nullptr), nullptr);
     uassertWTOK(
-        wiredtiger_open(importPath.c_str(),
-                        nullptr,
-                        "config_base=false,log=(enabled=true,path=journal,compressor=snappy)",
-                        &conn),
+        wiredtiger_open(
+            importPath.c_str(), nullptr, "{},readonly=true"_format(wtConfig).c_str(), &conn),
         nullptr);
 
     ON_BLOCK_EXIT([&] {
