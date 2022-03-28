@@ -320,13 +320,6 @@ public:
         LockGuardWithPostUnlockDestructor guard(_mutex);
         Time currentTime, currentTimeInStore;
         _invalidate(&guard, key, _cache.find(key), &currentTime, &currentTimeInStore);
-        if constexpr (!std::is_same_v<Time, CacheNotCausallyConsistent>) {
-            tassert(6324102,
-                    str::stream() << "Time monotonicity violation: new lookup time "
-                                  << time.toString() << " which is less than the current time  "
-                                  << currentTime.toString() << ".",
-                    currentTime <= time);
-        }
 
         if (auto evicted =
                 _cache.add(key,
@@ -378,14 +371,6 @@ public:
         LockGuardWithPostUnlockDestructor guard(_mutex);
         Time currentTime, currentTimeInStore;
         _invalidate(&guard, key, _cache.find(key), &currentTime, &currentTimeInStore);
-
-        if constexpr (!std::is_same_v<Time, CacheNotCausallyConsistent>) {
-            tassert(6324101,
-                    str::stream() << "Time monotonicity violation: new lookup time "
-                                  << time.toString() << " which is less than the current time  "
-                                  << currentTime.toString() << ".",
-                    currentTime <= time);
-        }
 
         if (auto evicted =
                 _cache.add(key,
