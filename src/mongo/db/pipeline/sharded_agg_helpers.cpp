@@ -262,9 +262,18 @@ std::set<ShardId> getTargetedShards(boost::intrusive_ptr<ExpressionContext> expC
  * Returns the sort specification if the input streams are sorted, and false otherwise.
  */
 boost::optional<BSONObj> findSplitPoint(Pipeline::SourceContainer* shardPipe, Pipeline* mergePipe) {
+    // Stages can specify that a merge sort must be performed sometime during the pipeline. Keep
+    // track of it until we hit the actual split point.
+    boost::optional<BSONObj> mergeSort = boost::none;
     while (!mergePipe->getSources().empty()) {
         boost::intrusive_ptr<DocumentSource> current = mergePipe->popFront();
 
+        // If we've deferred a sort, only push it past stages that don't change the sort order.
+        if (mergeSort && !current->constraints().preservesOrderAndMetadata) {
+            // This will break the merge sort, keep it in the merging half of the pipeline.
+            mergePipe->addInitialSource(std::move(current));
+            return mergeSort;
+        }
         // Check if this source is splittable.
         auto distributedPlanLogic = current->distributedPlanLogic();
         if (!distributedPlanLogic) {
@@ -273,8 +282,25 @@ boost::optional<BSONObj> findSplitPoint(Pipeline::SourceContainer* shardPipe, Pi
             continue;
         }
 
+        // If we got a plan logic with a sort that doesn't require a split, save it and keep going.
+        if (distributedPlanLogic->mergeSortPattern && !distributedPlanLogic->needsSplit) {
+            tassert(6441000,
+                    "Cannot specify shardsStage or mergingStage and not require that the pipeline "
+                    "be split",
+                    !distributedPlanLogic->shardsStage && !distributedPlanLogic->mergingStage);
+            shardPipe->push_back(current);
+            mergeSort = distributedPlanLogic->mergeSortPattern;
+            continue;
+        }
+
         // A source may not simultaneously be present on both sides of the split.
         invariant(distributedPlanLogic->shardsStage != distributedPlanLogic->mergingStage);
+
+        tassert(
+            6441001,
+            "Cannot specify shardsStage or mergingStage and not require that the pipeline be split",
+            distributedPlanLogic->needsSplit);
+
 
         if (distributedPlanLogic->shardsStage)
             shardPipe->push_back(std::move(distributedPlanLogic->shardsStage));
@@ -282,9 +308,12 @@ boost::optional<BSONObj> findSplitPoint(Pipeline::SourceContainer* shardPipe, Pi
         if (distributedPlanLogic->mergingStage)
             mergePipe->addInitialSource(std::move(distributedPlanLogic->mergingStage));
 
-        return distributedPlanLogic->inputSortPattern;
+        /**
+         * The sort that was earlier in the pipeline takes precedence.
+         */
+        return mergeSort ? mergeSort : distributedPlanLogic->mergeSortPattern;
     }
-    return boost::none;
+    return mergeSort;
 }
 
 /**

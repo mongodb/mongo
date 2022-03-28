@@ -254,7 +254,7 @@ std::pair<Value, Document> DocumentSourceSort::extractSortKey(Document&& doc) co
 boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceSort::distributedPlanLogic() {
     DistributedPlanLogic split;
     split.shardsStage = this;
-    split.inputSortPattern = _sortExecutor->sortPattern()
+    split.mergeSortPattern = _sortExecutor->sortPattern()
                                  .serialize(SortPattern::SortKeySerialization::kForSortKeyMerging)
                                  .toBson();
     if (auto limit = getLimit()) {

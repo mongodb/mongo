@@ -267,9 +267,15 @@ public:
         boost::intrusive_ptr<DocumentSource> mergingStage = nullptr;
 
         // If set, each document is expected to have sort key metadata which will be serialized in
-        // the '$sortKey' field. 'inputSortPattern' will then be used to describe which fields are
+        // the '$sortKey' field. 'mergeSortPattern' will then be used to describe which fields are
         // ascending and which fields are descending when merging the streams together.
-        boost::optional<BSONObj> inputSortPattern = boost::none;
+        boost::optional<BSONObj> mergeSortPattern = boost::none;
+
+        // If mergeSortPattern is specified and needsSplit is false, the split point will be
+        // deferred to the next stage that would split the pipeline. The sortPattern will be taken
+        // into account at that split point. Should be true if a stage specifies 'shardsStage' or
+        // 'mergingStage'. Does not mean anything if the sort pattern is not set.
+        bool needsSplit = true;
     };
 
     virtual ~DocumentSource() {}
