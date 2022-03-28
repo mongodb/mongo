@@ -50,6 +50,10 @@ public:
         MongoProcessInterface::CurrentOpConnectionsMode connMode,
         MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept override;
 
+    bool canAlwaysStartWhenUserWritesAreDisabled() const override {
+        return true;
+    }
+
 private:
     ShardingDDLCoordinatorMetadata const& metadata() const override {
         return _doc.getShardingDDLCoordinatorMetadata();

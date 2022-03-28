@@ -164,6 +164,56 @@ newShard.initiate();
     assert.commandWorked(st.s.adminCommand({setUserWriteBlockMode: 1, global: false}));
 }
 
+// Test movePrimary works while user writes are blocked.
+{
+    // Create an unsharded collection so that its data needs to be cloned to the new db-primary.
+    const unshardedCollName = 'unshardedColl';
+    const unshardedColl = db[unshardedCollName];
+    assert.commandWorked(unshardedColl.createIndex({x: 1}));
+    unshardedColl.insert({x: 1});
+
+    // Start blocking user writes
+    assert.commandWorked(st.s.adminCommand({setUserWriteBlockMode: 1, global: true}));
+
+    const fromShard = st.getPrimaryShard(dbName);
+    const toShard = st.getOther(fromShard);
+    assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: toShard.name}));
+
+    // Check that the new primary has cloned the data.
+    assert.eq(1, toShard.getDB(dbName)[unshardedCollName].find().itcount());
+
+    // Check that the collection has been removed from the former primary.
+    assert.eq(0,
+              fromShard.getDB(dbName)
+                  .runCommand({listCollections: 1, filter: {name: unshardedCollName}})
+                  .cursor.firstBatch.length);
+
+    assert.commandWorked(st.s.adminCommand({setUserWriteBlockMode: 1, global: false}));
+}
+
+// Test setAllowMigrations works while user writes are blocked.
+{
+    coll.drop();
+    assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
+
+    // Start blocking user writes.
+    assert.commandWorked(st.s.adminCommand({setUserWriteBlockMode: 1, global: true}));
+
+    // Disable migrations for 'ns'.
+    assert.commandWorked(st.s.adminCommand({setAllowMigrations: ns, allowMigrations: false}));
+
+    const fromShard = st.getPrimaryShard(dbName);
+    const toShard = st.getOther(fromShard);
+    assert.commandFailedWithCode(
+        st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: toShard.shardName}),
+        ErrorCodes.ConflictingOperationInProgress);
+
+    // Reenable migrations for 'ns'.
+    assert.commandWorked(st.s.adminCommand({setAllowMigrations: ns, allowMigrations: true}));
+
+    assert.commandWorked(st.s.adminCommand({setUserWriteBlockMode: 1, global: false}));
+}
+
 st.stop();
 newShard.stopSet();
 })();

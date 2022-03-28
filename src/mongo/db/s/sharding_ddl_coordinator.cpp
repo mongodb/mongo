@@ -197,7 +197,9 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
             // critical section. If it is not the first execution, it means it had started already
             // and we are recovering this coordinator. In this case, let it be completed even though
             // new DDL operations may be prohibited now.
-            if (_firstExecution) {
+            // Coordinators that do not affect user data are allowed to start even when user writes
+            // are blocked.
+            if (_firstExecution && !canAlwaysStartWhenUserWritesAreDisabled()) {
                 GlobalUserWriteBlockState::get(opCtx)->checkShardedDDLAllowedToStart(opCtx, nss());
             }
         })

@@ -60,6 +60,15 @@ public:
      */
     virtual void checkIfOptionsConflict(const BSONObj& coorDoc) const = 0;
 
+    /**
+     * Whether this coordinator is allowed to start when user write blocking is enabled, even if the
+     * writeBlockingBypass flag is not set. Coordinators that don't affect user data shall always be
+     * allowed to run even when user write blocking is enabled.
+     */
+    virtual bool canAlwaysStartWhenUserWritesAreDisabled() const {
+        return false;
+    }
+
     /*
      * Returns a future that will be completed when the construction of this coordinator instance
      * is completed.

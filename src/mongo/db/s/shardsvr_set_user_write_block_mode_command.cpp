@@ -81,14 +81,25 @@ public:
                         // the user-write-blocking bypass enabled -- the ones allowed to bypass user
                         // write blocking don't care about the write blocking state.
                         {
-                            const auto mayNotBypassUserWriteBlockPred =
+                            const auto shouldWaitPred =
                                 [](const ShardingDDLCoordinator& coordinatorInstance) -> bool {
-                                return !coordinatorInstance.getForwardableOpMetadata()
-                                            .getMayBypassWriteBlocking();
+                                // No need to wait for coordinators that do not modify user data.
+                                if (coordinatorInstance.canAlwaysStartWhenUserWritesAreDisabled()) {
+                                    return false;
+                                }
+
+                                // Don't wait for coordinator instances that are allowed to bypass
+                                // user write blocking.
+                                if (coordinatorInstance.getForwardableOpMetadata()
+                                        .getMayBypassWriteBlocking()) {
+                                    return false;
+                                }
+
+                                return true;
                             };
+
                             ShardingDDLCoordinatorService::getService(opCtx)
-                                ->waitForOngoingCoordinatorsToFinish(
-                                    opCtx, mayNotBypassUserWriteBlockPred);
+                                ->waitForOngoingCoordinatorsToFinish(opCtx, shouldWaitPred);
                         }
                         break;
                     case ShardsvrSetUserWriteBlockModePhaseEnum::kComplete:

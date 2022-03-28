@@ -36,6 +36,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/s/move_primary_source_manager.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/write_block_bypass.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
@@ -112,6 +113,10 @@ ExecutorFuture<void> MovePrimaryCoordinator::_runImpl(
                 // The database primary is already the `to` shard
                 return;
             }
+
+            // Enable write blocking bypass to allow cloning and droping the stale collections even
+            // if user writes are currently disallowed.
+            WriteBlockBypass::get(opCtx).set(true);
 
             ShardMovePrimary movePrimaryRequest(nss(), _doc.getToShardId().toString());
 
