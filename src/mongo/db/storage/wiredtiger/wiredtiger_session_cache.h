@@ -259,6 +259,11 @@ public:
      */
     void shuttingDown();
 
+    /**
+     * True when in the process of shutting down.
+     */
+    bool isShuttingDown();
+
     bool isEphemeral();
     /**
      * Waits until all commits that happened before this call are durable, either by flushing

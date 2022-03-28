@@ -131,6 +131,11 @@ WT_CURSOR* WiredTigerSession::getReadOnceCursor(const std::string& uri, bool all
 }
 
 void WiredTigerSession::releaseCursor(uint64_t id, WT_CURSOR* cursor) {
+    // Avoids the cursor already being destroyed during the shutdown.
+    if (_cache->isShuttingDown()) {
+        return;
+    }
+
     invariant(_session);
     invariant(cursor);
     _cursorsOut--;
@@ -225,6 +230,10 @@ void WiredTigerSessionCache::shuttingDown() {
     }
 
     closeAll();
+}
+
+bool WiredTigerSessionCache::isShuttingDown() {
+    return _shuttingDown.load() & kShuttingDownMask;
 }
 
 void WiredTigerSessionCache::waitUntilDurable(bool forceCheckpoint, bool stableCheckpoint) {
@@ -416,7 +425,8 @@ UniqueWiredTigerSession WiredTigerSessionCache::getSession() {
 
 void WiredTigerSessionCache::releaseSession(WiredTigerSession* session) {
     invariant(session);
-    invariant(session->cursorsOut() == 0);
+    // We might have skipped releasing some cursors during the shutdown.
+    invariant(session->cursorsOut() == 0 || isShuttingDown());
 
     const int shuttingDown = _shuttingDown.fetchAndAdd(1);
     ON_BLOCK_EXIT([this] { _shuttingDown.fetchAndSubtract(1); });
