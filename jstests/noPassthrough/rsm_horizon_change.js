@@ -15,9 +15,11 @@ const knownTopologyChangeRegex = new RegExp(`Topology Change.*${
     st.configRS.name}.*topologyType":.*ReplicaSetWithPrimary.*type":.*RSPrimary`);
 const expeditedMonitoringAfterNetworkErrorRegex =
     new RegExp(`RSM monitoring host in expedited mode until we detect a primary`);
-const unknownServerDescriptionRegex =
-    new RegExp("(" + unknownTopologyChangeRegex.source + ")|(" +
-               expeditedMonitoringAfterNetworkErrorRegex.source + ")");
+const droppingAllPooledConnections = new RegExp('Dropping all pooled connections');
+
+const unknownServerDescriptionRegex = new RegExp("(" + unknownTopologyChangeRegex.source + ")|(" +
+                                                 expeditedMonitoringAfterNetworkErrorRegex.source +
+                                                 ")|(" + droppingAllPooledConnections.source + ")");
 
 jsTest.log("Wait until the RSM on the mongos finds out about the config server primary");
 checkLog.contains(st.s, knownTopologyChangeRegex);
