@@ -449,7 +449,7 @@ error_codes:
     - {code: 357, name: InvalidBSONType}
 
     - {code: 360, name: ShardVersionRefreshCanceled, categories: [InternalOnly]}
-
+    - {code: 370, name: CannotDropShardKeyIndex}
     - {code: 379, name: DatabaseMetadataRefreshCanceled, categories: [InternalOnly]}
 
     - {code: 388, name: TransactionTooLargeForCache}
