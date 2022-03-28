@@ -81,11 +81,12 @@ void ensureFulfilledPromise(SharedPromise<void>& sp, Status error) {
 
 std::unique_ptr<ReshardingCollectionCloner> ReshardingDataReplication::_makeCollectionCloner(
     ReshardingMetrics* metrics,
+    ReshardingMetricsNew* metricsNew,
     const CommonReshardingMetadata& metadata,
     const ShardId& myShardId,
     Timestamp cloneTimestamp) {
     return std::make_unique<ReshardingCollectionCloner>(
-        std::make_unique<ReshardingCollectionCloner::Env>(metrics),
+        std::make_unique<ReshardingCollectionCloner::Env>(metrics, metricsNew),
         ShardKeyPattern{metadata.getReshardingKey()},
         metadata.getSourceNss(),
         metadata.getSourceUUID(),
@@ -207,6 +208,7 @@ std::vector<std::unique_ptr<ReshardingOplogApplier>> ReshardingDataReplication::
 std::unique_ptr<ReshardingDataReplicationInterface> ReshardingDataReplication::make(
     OperationContext* opCtx,
     ReshardingMetrics* metrics,
+    ReshardingMetricsNew* metricsNew,
     ReshardingApplierMetricsMap* applierMetricsMap,
     CommonReshardingMetadata metadata,
     const std::vector<DonorShardFetchTimestamp>& donorShards,
@@ -218,7 +220,8 @@ std::unique_ptr<ReshardingDataReplicationInterface> ReshardingDataReplication::m
     std::vector<std::unique_ptr<ReshardingTxnCloner>> txnCloners;
 
     if (!cloningDone) {
-        collectionCloner = _makeCollectionCloner(metrics, metadata, myShardId, cloneTimestamp);
+        collectionCloner =
+            _makeCollectionCloner(metrics, metricsNew, metadata, myShardId, cloneTimestamp);
         txnCloners = _makeTxnCloners(metadata, donorShards);
     }
 

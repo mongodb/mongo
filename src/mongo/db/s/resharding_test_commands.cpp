@@ -39,6 +39,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/resharding/resharding_collection_cloner.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
+#include "mongo/db/s/resharding/resharding_metrics_new.h"
 #include "mongo/db/s/resharding_test_commands_gen.h"
 #include "mongo/db/vector_clock_metadata_hook.h"
 #include "mongo/executor/network_interface_factory.h"
@@ -82,6 +83,17 @@ public:
                             opCtx->getServiceContext()->getFastClockSource()->now());
             metrics.setRecipientState(RecipientStateEnum::kCloning);
 
+            std::unique_ptr<ReshardingMetricsNew> metricsNew;
+            if (ShardingDataTransformMetrics::isEnabled()) {
+                metricsNew = ReshardingMetricsNew::makeInstance(
+                    request().getUuid(),
+                    request().getShardKey(),
+                    ns(),
+                    ReshardingMetricsNew::Role::kRecipient,
+                    opCtx->getServiceContext()->getFastClockSource()->now(),
+                    opCtx->getServiceContext());
+            }
+
             auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
             hookList->addHook(
                 std::make_unique<rpc::VectorClockMetadataHook>(opCtx->getServiceContext()));
@@ -93,7 +105,7 @@ public:
             executor->startup();
 
             ReshardingCollectionCloner cloner(
-                std::make_unique<ReshardingCollectionCloner::Env>(&metrics),
+                std::make_unique<ReshardingCollectionCloner::Env>(&metrics, metricsNew.get()),
                 ShardKeyPattern(request().getShardKey()),
                 ns(),
                 request().getUuid(),

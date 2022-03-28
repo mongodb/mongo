@@ -499,6 +499,10 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
                 cloneDetails, (*executor)->now() + _minimumOperationDuration, factory);
             _metrics()->setDocumentsToCopy(cloneDetails.approxDocumentsToCopy,
                                            cloneDetails.approxBytesToCopy);
+            if (ShardingDataTransformMetrics::isEnabled()) {
+                _metricsNew->setDocumentsToCopyCounts(cloneDetails.approxDocumentsToCopy,
+                                                      cloneDetails.approxBytesToCopy);
+            }
         });
 }
 
@@ -558,6 +562,7 @@ ReshardingRecipientService::RecipientStateMachine::_makeDataReplication(Operatio
 
     return _dataReplicationFactory(opCtx,
                                    _metrics(),
+                                   _metricsNew.get(),
                                    &_applierMetricsMap,
                                    _metadata,
                                    _donorShards,
@@ -809,6 +814,9 @@ void ReshardingRecipientService::RecipientStateMachine::_transitionToCloning(
     newRecipientCtx.setState(RecipientStateEnum::kCloning);
     _transitionState(std::move(newRecipientCtx), boost::none, boost::none, factory);
     _metrics()->startCopyingDocuments(getCurrentTime());
+    if (ShardingDataTransformMetrics::isEnabled()) {
+        _metricsNew->onCopyingBegin();
+    }
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_transitionToApplying(
@@ -819,6 +827,9 @@ void ReshardingRecipientService::RecipientStateMachine::_transitionToApplying(
     auto currentTime = getCurrentTime();
     _metrics()->endCopyingDocuments(currentTime);
     _metrics()->startApplyingOplogEntries(currentTime);
+    if (ShardingDataTransformMetrics::isEnabled()) {
+        _metricsNew->onCopyingEnd();
+    }
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_transitionToStrictConsistency(

@@ -53,6 +53,7 @@
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_future_util.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
+#include "mongo/db/s/resharding/resharding_metrics_new.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/service_context.h"
@@ -289,6 +290,12 @@ bool ReshardingCollectionCloner::doOneBatch(OperationContext* opCtx, Pipeline& p
 
     _env->metrics()->onDocumentsCopied(batch.size(), bytesInserted);
     _env->metrics()->gotInserts(batch.size());
+    if (ShardingDataTransformMetrics::isEnabled()) {
+        _env->metricsNew()->onDocumentsCopied(batch.size(), bytesInserted);
+        // TODO: Remove this comment when ReshardingMetrics are replaced with ReshardingMetricsNew.
+        // ReshardingMetricsNew::onInsertsApplied is intentionally not called here. Documents copied
+        // are no longer considered applied inserts.
+    }
     return true;
 }
 

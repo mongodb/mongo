@@ -40,6 +40,7 @@
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/s/resharding/resharding_collection_cloner.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
+#include "mongo/db/s/resharding/resharding_metrics_new.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"
@@ -84,8 +85,16 @@ protected:
         std::deque<DocumentSource::GetNextResult> configCacheChunksData) {
         auto tempNss = constructTemporaryReshardingNss(_sourceNss.db(), _sourceUUID);
 
+        _metricsNew =
+            ReshardingMetricsNew::makeInstance(_sourceUUID,
+                                               newShardKeyPattern.toBSON(),
+                                               _sourceNss,
+                                               ReshardingMetricsNew::Role::kRecipient,
+                                               getServiceContext()->getFastClockSource()->now(),
+                                               getServiceContext());
+
         ReshardingCollectionCloner cloner(
-            std::make_unique<ReshardingCollectionCloner::Env>(&*_metrics),
+            std::make_unique<ReshardingCollectionCloner::Env>(_metrics.get(), _metricsNew.get()),
             std::move(newShardKeyPattern),
             _sourceNss,
             _sourceUUID,
@@ -127,6 +136,7 @@ private:
 
     ServiceContext::UniqueOperationContext _opCtx = makeOperationContext();
     std::unique_ptr<ReshardingMetrics> _metrics;
+    std::unique_ptr<ReshardingMetricsNew> _metricsNew;
 };
 
 }  // namespace

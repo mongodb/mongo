@@ -64,6 +64,10 @@ public:
     int64_t getLowEstimateRemainingTimeMillis() const;
     Date_t getStartTimestamp() const;
     const UUID& getInstanceId() const;
+    void onCopyingBegin();
+    void onCopyingEnd();
+    void onDocumentsCopied(int64_t documentCount, int64_t totalDocumentsSizeBytes);
+    void setDocumentsToCopyCounts(int64_t documentCount, int64_t totalDocumentsSizeBytes);
     void onInsertApplied();
     void onUpdateApplied();
     void onDeleteApplied();
@@ -120,6 +124,7 @@ protected:
 private:
     inline int64_t getOperationRunningTimeSecs() const;
     int64_t getCriticalSectionElapsedTimeSecs() const;
+    int64_t getCopyingElapsedTimeSecs() const;
 
     ClockSource* _clockSource;
     ObserverPtr _observer;
@@ -127,6 +132,13 @@ private:
     ShardingDataTransformCumulativeMetrics::DeregistrationFunction _deregister;
 
     const Date_t _startTime;
+
+    AtomicWord<Date_t> _copyingStartTime;
+    AtomicWord<Date_t> _copyingEndTime;
+    AtomicWord<int32_t> _approxDocumentsToCopy;
+    AtomicWord<int32_t> _documentsCopied;
+    AtomicWord<int32_t> _approxBytesToCopy;
+    AtomicWord<int32_t> _bytesCopied;
 
     AtomicWord<int64_t> _insertsApplied;
     AtomicWord<int64_t> _updatesApplied;

@@ -41,7 +41,21 @@ namespace mongo {
 
 namespace {
 constexpr auto kNoDate = Date_t::min();
+
+int64_t getElapsedTimeSeconds(const AtomicWord<Date_t>& startTime,
+                              const AtomicWord<Date_t>& endTime,
+                              ClockSource* clock) {
+    auto start = startTime.load();
+    if (start == kNoDate) {
+        return 0;
+    }
+    auto end = endTime.load();
+    if (end == kNoDate) {
+        end = clock->now();
+    }
+    return durationCount<Seconds>(end - start);
 }
+}  // namespace
 
 ShardingDataTransformInstanceMetrics::ShardingDataTransformInstanceMetrics(
     UUID instanceId,
@@ -79,6 +93,12 @@ ShardingDataTransformInstanceMetrics::ShardingDataTransformInstanceMetrics(
       _cumulativeMetrics{cumulativeMetrics},
       _deregister{_cumulativeMetrics->registerInstanceMetrics(_observer.get())},
       _startTime{startTime},
+      _copyingStartTime{kNoDate},
+      _copyingEndTime{kNoDate},
+      _approxDocumentsToCopy{0},
+      _documentsCopied{0},
+      _approxBytesToCopy{0},
+      _bytesCopied{0},
       _insertsApplied{0},
       _updatesApplied{0},
       _deletesApplied{0},
@@ -139,7 +159,7 @@ BSONObj ShardingDataTransformInstanceMetrics::reportForCurrentOp() const noexcep
             builder.append(kAllShardsLowestRemainingOperationTimeEstimatedSecs, TEMP_VALUE);
             builder.append(kCoordinatorState, getStateString());
             builder.append(kApplyTimeElapsed, TEMP_VALUE);
-            builder.append(kCopyTimeElapsed, TEMP_VALUE);
+            builder.append(kCopyTimeElapsed, getCopyingElapsedTimeSecs());
             builder.append(kCriticalSectionTimeElapsed, getCriticalSectionElapsedTimeSecs());
             break;
         case Role::kDonor:
@@ -151,24 +171,44 @@ BSONObj ShardingDataTransformInstanceMetrics::reportForCurrentOp() const noexcep
         case Role::kRecipient:
             builder.append(kRecipientState, getStateString());
             builder.append(kApplyTimeElapsed, TEMP_VALUE);
-            builder.append(kCopyTimeElapsed, TEMP_VALUE);
+            builder.append(kCopyTimeElapsed, getCopyingElapsedTimeSecs());
             builder.append(kRemainingOpTimeEstimated, TEMP_VALUE);
-            builder.append(kApproxDocumentsToCopy, TEMP_VALUE);
-            builder.append(kApproxBytesToCopy, TEMP_VALUE);
-            builder.append(kBytesCopied, TEMP_VALUE);
+            builder.append(kApproxDocumentsToCopy, _approxDocumentsToCopy.load());
+            builder.append(kApproxBytesToCopy, _approxBytesToCopy.load());
+            builder.append(kBytesCopied, _bytesCopied.load());
             builder.append(kCountWritesToStashCollections, _writesToStashCollections.load());
             builder.append(kInsertsApplied, _insertsApplied.load());
             builder.append(kUpdatesApplied, _updatesApplied.load());
             builder.append(kDeletesApplied, _deletesApplied.load());
             builder.append(kOplogEntriesApplied, _oplogEntriesApplied.load());
             builder.append(kOplogEntriesFetched, TEMP_VALUE);
-            builder.append(kDocumentsCopied, TEMP_VALUE);
+            builder.append(kDocumentsCopied, _documentsCopied.load());
             break;
         default:
             MONGO_UNREACHABLE;
     }
 
     return builder.obj();
+}
+
+void ShardingDataTransformInstanceMetrics::onCopyingBegin() {
+    _copyingStartTime.store(_clockSource->now());
+}
+
+void ShardingDataTransformInstanceMetrics::onCopyingEnd() {
+    _copyingEndTime.store(_clockSource->now());
+}
+
+void ShardingDataTransformInstanceMetrics::onDocumentsCopied(int64_t documentCount,
+                                                             int64_t totalDocumentsSizeBytes) {
+    _documentsCopied.addAndFetch(documentCount);
+    _bytesCopied.addAndFetch(totalDocumentsSizeBytes);
+}
+
+void ShardingDataTransformInstanceMetrics::setDocumentsToCopyCounts(
+    int64_t documentCount, int64_t totalDocumentsSizeBytes) {
+    _approxDocumentsToCopy.store(documentCount);
+    _approxBytesToCopy.store(totalDocumentsSizeBytes);
 }
 
 void ShardingDataTransformInstanceMetrics::onInsertApplied() {
@@ -204,15 +244,11 @@ inline int64_t ShardingDataTransformInstanceMetrics::getOperationRunningTimeSecs
 }
 
 int64_t ShardingDataTransformInstanceMetrics::getCriticalSectionElapsedTimeSecs() const {
-    auto start = _criticalSectionStartTime.load();
-    if (start == kNoDate) {
-        return 0;
-    }
-    auto end = _criticalSectionEndTime.load();
-    if (end == kNoDate) {
-        end = _clockSource->now();
-    }
-    return durationCount<Seconds>(end - start);
+    return getElapsedTimeSeconds(_criticalSectionStartTime, _criticalSectionEndTime, _clockSource);
+}
+
+int64_t ShardingDataTransformInstanceMetrics::getCopyingElapsedTimeSecs() const {
+    return getElapsedTimeSeconds(_copyingStartTime, _copyingEndTime, _clockSource);
 }
 
 void ShardingDataTransformInstanceMetrics::onWriteToStashedCollections() {

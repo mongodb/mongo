@@ -53,6 +53,7 @@ class TaskExecutor;
 class OperationContext;
 class MongoProcessInterface;
 class ReshardingMetrics;
+class ReshardingMetricsNew;
 class ServiceContext;
 
 /**
@@ -63,14 +64,20 @@ class ReshardingCollectionCloner {
 public:
     class Env {
     public:
-        explicit Env(ReshardingMetrics* metrics) : _metrics(metrics) {}
+        explicit Env(ReshardingMetrics* metrics, ReshardingMetricsNew* metricsNew)
+            : _metrics(metrics), _metricsNew(metricsNew) {}
 
         ReshardingMetrics* metrics() const {
             return _metrics;
         }
 
+        ReshardingMetricsNew* metricsNew() const {
+            return _metricsNew;
+        }
+
     private:
         ReshardingMetrics* const _metrics;
+        ReshardingMetricsNew* const _metricsNew;
     };
 
     ReshardingCollectionCloner(std::unique_ptr<Env> env,

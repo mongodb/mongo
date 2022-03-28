@@ -85,6 +85,43 @@ public:
             &_cumulativeMetrics,
             std::move(mock));
     }
+
+    using MetricsMutator = std::function<void(ShardingDataTransformInstanceMetrics*)>;
+    void runTimeReportTest(const std::string& testName,
+                           const std::initializer_list<Role>& roles,
+                           const std::string& timeField,
+                           const MetricsMutator& beginTimedSection,
+                           const MetricsMutator& endTimedSection) {
+        constexpr auto kIncrement = Milliseconds(5000);
+        const auto kIncrementInSeconds = durationCount<Seconds>(kIncrement);
+        for (const auto& role : roles) {
+            LOGV2(6437400, "", "TestName"_attr = testName, "Role"_attr = role);
+            auto uuid = UUID::gen();
+            const auto& clock = getClockSource();
+            auto metrics = std::make_unique<ShardingDataTransformInstanceMetrics>(
+                uuid, kTestCommand, kTestNamespace, role, clock->now(), clock, &_cumulativeMetrics);
+
+            // Reports 0 before timed section entered.
+            clock->advance(kIncrement);
+            auto report = metrics->reportForCurrentOp();
+            ASSERT_EQ(report.getIntField(timeField), 0);
+
+            // Reports time so far during critical section.
+            beginTimedSection(metrics.get());
+            clock->advance(kIncrement);
+            report = metrics->reportForCurrentOp();
+            ASSERT_EQ(report.getIntField(timeField), kIncrementInSeconds);
+            clock->advance(kIncrement);
+            report = metrics->reportForCurrentOp();
+            ASSERT_EQ(report.getIntField(timeField), kIncrementInSeconds * 2);
+
+            // Still reports total time after critical section ends.
+            endTimedSection(metrics.get());
+            clock->advance(kIncrement);
+            report = metrics->reportForCurrentOp();
+            ASSERT_EQ(report.getIntField(timeField), kIncrementInSeconds * 2);
+        }
+    }
 };
 
 TEST_F(ShardingDataTransformInstanceMetricsTest, RegisterAndDeregisterMetrics) {
@@ -213,35 +250,52 @@ TEST_F(ShardingDataTransformInstanceMetricsTest, DonorIncrementReadsDuringCritic
 }
 
 TEST_F(ShardingDataTransformInstanceMetricsTest, CurrentOpReportsCriticalSectionTime) {
-    const auto roles = {Role::kDonor, Role::kCoordinator};
-    for (const auto& role : roles) {
-        LOGV2(6437200, "CurrentOpReportsCriticalSectionTime", "role"_attr = role);
-        constexpr auto kFiveSeconds = Milliseconds(5000);
-        auto uuid = UUID::gen();
-        const auto& clock = getClockSource();
-        auto metrics = std::make_unique<ShardingDataTransformInstanceMetrics>(
-            uuid, kTestCommand, kTestNamespace, role, clock->now(), clock, &_cumulativeMetrics);
+    runTimeReportTest(
+        "CurrentOpReportsCriticalSectionTime",
+        {Role::kDonor, Role::kCoordinator},
+        "totalCriticalSectionTimeElapsedSecs",
+        [](ShardingDataTransformInstanceMetrics* metrics) { metrics->onCriticalSectionBegin(); },
+        [](ShardingDataTransformInstanceMetrics* metrics) { metrics->onCriticalSectionEnd(); });
+}
 
-        // Reports 0 before critical section entered.
-        clock->advance(kFiveSeconds);
-        auto report = metrics->reportForCurrentOp();
-        ASSERT_EQ(report.getIntField("totalCriticalSectionTimeElapsedSecs"), 0);
+TEST_F(ShardingDataTransformInstanceMetricsTest, RecipientSetsDocumentsAndBytesToCopy) {
+    auto metrics = createInstanceMetrics(UUID::gen(), Role::kRecipient);
 
-        // Reports time so far during critical section.
-        metrics->onCriticalSectionBegin();
-        clock->advance(kFiveSeconds);
-        report = metrics->reportForCurrentOp();
-        ASSERT_EQ(report.getIntField("totalCriticalSectionTimeElapsedSecs"), 5);
-        clock->advance(kFiveSeconds);
-        report = metrics->reportForCurrentOp();
-        ASSERT_EQ(report.getIntField("totalCriticalSectionTimeElapsedSecs"), 10);
+    auto report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("approxDocumentsToCopy"), 0);
+    ASSERT_EQ(report.getIntField("approxBytesToCopy"), 0);
+    metrics->setDocumentsToCopyCounts(5, 1000);
 
-        // Still reports total time after critical section ends.
-        metrics->onCriticalSectionEnd();
-        clock->advance(kFiveSeconds);
-        report = metrics->reportForCurrentOp();
-        ASSERT_EQ(report.getIntField("totalCriticalSectionTimeElapsedSecs"), 10);
-    }
+    report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("approxDocumentsToCopy"), 5);
+    ASSERT_EQ(report.getIntField("approxBytesToCopy"), 1000);
+
+    metrics->setDocumentsToCopyCounts(3, 750);
+    report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("approxDocumentsToCopy"), 3);
+    ASSERT_EQ(report.getIntField("approxBytesToCopy"), 750);
+}
+
+TEST_F(ShardingDataTransformInstanceMetricsTest, RecipientIncrementsDocumentsAndBytesCopied) {
+    auto metrics = createInstanceMetrics(UUID::gen(), Role::kRecipient);
+
+    auto report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("documentsCopied"), 0);
+    ASSERT_EQ(report.getIntField("bytesCopied"), 0);
+    metrics->onDocumentsCopied(5, 1000);
+
+    report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("documentsCopied"), 5);
+    ASSERT_EQ(report.getIntField("bytesCopied"), 1000);
+}
+
+TEST_F(ShardingDataTransformInstanceMetricsTest, CurrentOpReportsCopyingTime) {
+    runTimeReportTest(
+        "CurrentOpReportsCopyingTime",
+        {Role::kRecipient, Role::kCoordinator},
+        "totalCopyTimeElapsedSecs",
+        [](ShardingDataTransformInstanceMetrics* metrics) { metrics->onCopyingBegin(); },
+        [](ShardingDataTransformInstanceMetrics* metrics) { metrics->onCopyingEnd(); });
 }
 
 TEST_F(ShardingDataTransformInstanceMetricsTest, CurrentOpReportsRunningTime) {

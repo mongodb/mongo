@@ -1617,6 +1617,9 @@ ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllDonorsReadyToDonat
                 coordinatorDocChangedOnDisk,
                 highestMinFetchTimestamp,
                 computeApproxCopySize(coordinatorDocChangedOnDisk));
+            if (ShardingDataTransformMetrics::isEnabled()) {
+                _metricsNew->onCopyingBegin();
+            }
         })
         .then([this] { return _waitForMajority(_ctHolder->getAbortToken()); });
 }
@@ -1635,6 +1638,9 @@ ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllRecipientsFinished
         .then([this](ReshardingCoordinatorDocument coordinatorDocChangedOnDisk) {
             this->_updateCoordinatorDocStateAndCatalogEntries(CoordinatorStateEnum::kApplying,
                                                               coordinatorDocChangedOnDisk);
+            if (ShardingDataTransformMetrics::isEnabled()) {
+                _metricsNew->onCopyingEnd();
+            }
         })
         .then([this] { return _waitForMajority(_ctHolder->getAbortToken()); });
 }
