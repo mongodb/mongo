@@ -163,6 +163,18 @@ typedef struct {
     } while (0)
 
 /*
+ * WT_OP_CHECKPOINT_WAIT --
+ *	If an operation returns EBUSY checkpoint and retry.
+ */
+#define WT_OP_CHECKPOINT_WAIT(session, op)                      \
+    do {                                                        \
+        int __ret;                                              \
+        while ((__ret = (op)) == EBUSY)                         \
+            testutil_check(session->checkpoint(session, NULL)); \
+        testutil_check(__ret);                                  \
+    } while (0)
+
+/*
  * testutil_drop --
  *     Drop a table
  */
