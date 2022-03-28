@@ -1230,14 +1230,32 @@ buildvariants:
   run_on:
   - macos-1100-arm64
   expansions:
-    test_flags: --excludeWithAnyTags=incompatible_with_macos
+    test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm
     compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
     compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx_arm.vars
     resmoke_jobs_max: 6
     num_scons_link_jobs_available: 0.99
   tasks:
-  - name: compile_and_test_TG
+  - name: compile_test_and_package_serial_TG
+  - name: build_variant_gen
+  - name: audit
+  - name: auth_audit_gen
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: .encrypt !.replica_sets !.sharding !.aggregation !.jscore
+  - name: .jscore .common !.decimal !.sharding
+  - name: .jstestfuzz .common
+  - name: .logical_session_cache .one_sec
+  - name: mqlrun
+  - name: replica_sets_auth_gen
+  - name: replica_sets_jscore_passthrough
+  - name: sasl
+  - name: push
+    distros:
+    - rhel70-small
   - name: .csfle
+  - name: .publish_csfle
+    distros:
+    - rhel70-small
 
 ###########################################
 #          Embedded SDK buildvariants     #
