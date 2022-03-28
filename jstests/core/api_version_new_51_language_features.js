@@ -1,7 +1,5 @@
 /**
- * Tests that language features introduced in version 5.1 are not included in API Version 1
- * yet. This test should be updated or removed in a future release when we have more confidence that
- * the behavior and syntax is stable.
+ * Tests that language features introduced in version 5.1 are included in API Version 1.
  *
  * @tags: [
  *   requires_fcv_51,
@@ -18,18 +16,17 @@ const coll = db[collName];
 coll.drop();
 assert.commandWorked(coll.insert({a: 1, date: new ISODate()}));
 
-const unstablePipelines = [
+const stablePipelines = [
     [{$set: {x: {$tsSecond: new Timestamp(0, 0)}}}],
     [{$set: {x: {$tsIncrement: new Timestamp(0, 0)}}}],
 ];
 
-for (let pipeline of unstablePipelines) {
+for (let pipeline of stablePipelines) {
     // Assert error thrown when running a pipeline with stages not in API Version 1.
-    APIVersionHelpers.assertAggregateFailsWithAPIStrict(
-        pipeline, collName, ErrorCodes.APIStrictError);
+    APIVersionHelpers.assertAggregateSucceedsWithAPIStrict(pipeline, collName);
 
     // Assert error thrown when creating a view on a pipeline with stages not in API Version 1.
-    APIVersionHelpers.assertViewFailsWithAPIStrict(pipeline, collName);
+    APIVersionHelpers.assertViewSucceedsWithAPIStrict(pipeline, collName);
 
     // Assert error is not thrown when running without apiStrict=true.
     assert.commandWorked(db.runCommand({

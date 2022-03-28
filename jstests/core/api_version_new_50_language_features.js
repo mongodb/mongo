@@ -1,7 +1,5 @@
 /**
- * Tests that language features introduced in version 4.9 or 5.0 are not included in API Version 1
- * yet. This test should be updated or removed in a future release when we have more confidence that
- * the behavior and syntax is stable.
+ * Tests that language features introduced in version 4.9 or 5.0 are included in API Version 1.
  *
  * @tags: [
  *   uses_api_parameters,
@@ -17,7 +15,7 @@ const coll = db[collName];
 coll.drop();
 assert.commandWorked(coll.insert({a: 1, date: new ISODate()}));
 
-const unstablePipelines = [
+const stablePipelines = [
     [{$set: {x: {$dateTrunc: {date: "$date", unit: "second", binSize: 5}}}}],
     [{$set: {x: {$dateAdd: {startDate: "$date", unit: "day", amount: 1}}}}],
     [{$set: {x: {$dateSubtract: {startDate: "$date", unit: "day", amount: 1}}}}],
@@ -26,13 +24,53 @@ const unstablePipelines = [
     [{$set: {x: {$setField: {input: "$$ROOT", field: "x", value: "foo"}}}}],
 ];
 
-for (let pipeline of unstablePipelines) {
+function assertAggregateFailsWithAPIStrict(pipeline, errorCodes) {
+    assert.commandFailedWithCode(db.runCommand({
+        aggregate: collName,
+        pipeline: pipeline,
+        cursor: {},
+        apiStrict: true,
+        apiVersion: "1"
+    }),
+                                 errorCodes,
+                                 pipeline);
+}
+
+function assertAggregateSucceedsWithAPIStrict(pipeline) {
+    assert.commandWorked(db.runCommand(
+        {aggregate: collName, pipeline: pipeline, cursor: {}, apiStrict: true, apiVersion: "1"}));
+}
+
+function assertViewFailsWithAPIStrict(pipeline) {
+    assert.commandFailedWithCode(db.runCommand({
+        create: 'new_50_feature_view',
+        viewOn: collName,
+        pipeline: pipeline,
+        apiStrict: true,
+        apiVersion: "1"
+    }),
+                                 ErrorCodes.APIStrictError,
+                                 pipeline);
+}
+
+function assertViewSucceedsWithAPIStrict(pipeline) {
+    assert.commandWorked(db.runCommand({
+        create: 'new_50_feature_view',
+        viewOn: collName,
+        pipeline: pipeline,
+        apiStrict: true,
+        apiVersion: "1"
+    }));
+
+    assert.commandWorked(db.runCommand({drop: 'new_50_feature_view'}));
+}
+
+for (let pipeline of stablePipelines) {
     // Assert error thrown when running a pipeline with stages not in API Version 1.
-    APIVersionHelpers.assertAggregateFailsWithAPIStrict(
-        pipeline, collName, ErrorCodes.APIStrictError);
+    APIVersionHelpers.assertAggregateSucceedsWithAPIStrict(pipeline, collName);
 
     // Assert error thrown when creating a view on a pipeline with stages not in API Version 1.
-    APIVersionHelpers.assertViewFailsWithAPIStrict(pipeline, collName);
+    assertViewSucceedsWithAPIStrict(pipeline);
 
     // Assert error is not thrown when running without apiStrict=true.
     assert.commandWorked(db.runCommand({
@@ -51,20 +89,23 @@ const setWindowFieldsPipeline = [{
         output: {runningCount: {$sum: 1, window: {documents: ["unbounded", "current"]}}}
     }
 }];
-APIVersionHelpers.assertAggregateFailsWithAPIStrict(setWindowFieldsPipeline, collName, [
-    ErrorCodes.APIStrictError,
-    ErrorCodes.InvalidOptions,
-    ErrorCodes.OperationNotSupportedInTransaction
-]);
+assertAggregateSucceedsWithAPIStrict(setWindowFieldsPipeline);
 
-APIVersionHelpers.assertViewFailsWithAPIStrict(setWindowFieldsPipeline, collName);
+APIVersionHelpers.assertAggregateSucceedsWithAPIStrict(
+    setWindowFieldsPipeline,
+    collName,
+    [ErrorCodes.InvalidOptions, ErrorCodes.OperationNotSupportedInTransaction]);
 
-// Creating a collection with the unstable validator is not allowed with apiStrict:true.
-assert.commandFailedWithCode(db.runCommand({
+APIVersionHelpers.assertViewSucceedsWithAPIStrict(setWindowFieldsPipeline, collName);
+
+// Creating a collection with dotted paths is allowed with apiStrict:true.
+
+assert.commandWorked(db.runCommand({
     create: 'new_50_features_validator',
     validator: {$expr: {$eq: [{$getField: {input: "$$ROOT", field: "dotted.path"}}, 2]}},
     apiVersion: "1",
     apiStrict: true
-}),
-                             ErrorCodes.APIStrictError);
+}));
+
+assert.commandWorked(db.runCommand({drop: 'new_50_features_validator'}));
 })();
