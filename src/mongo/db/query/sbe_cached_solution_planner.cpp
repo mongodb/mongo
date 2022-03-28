@@ -187,7 +187,7 @@ CandidatePlans CachedSolutionPlanner::replan(bool shouldCache, std::string reaso
 
     QueryPlannerParams plannerParams;
     plannerParams.options = _queryParams.options;
-    fillOutPlannerParams(_opCtx, mainColl, &_cq, &plannerParams);
+    fillOutPlannerParams(_opCtx, _collections, &_cq, &plannerParams);
     // Use the query planning module to plan the whole query.
     auto statusWithMultiPlanSolns = QueryPlanner::plan(_cq, plannerParams);
     auto solutions = uassertStatusOK(std::move(statusWithMultiPlanSolns));
