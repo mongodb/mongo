@@ -92,6 +92,14 @@ public:
     virtual void getSummaryStats(PlanSummaryStats* statsOut) const = 0;
 
     /**
+     * Fills out 'statsOut' for the secondary collection 'secondaryColl'. Subclasses may
+     * override this function if the summary stats for secondary collections need to be reported
+     * separately.
+     */
+    virtual void getSecondarySummaryStats(std::string secondaryColl,
+                                          PlanSummaryStats* statsOut) const {}
+
+    /**
      * Returns statistics that detail the winning plan selected by the multi-planner, or, if no
      * multi-planning has been performed, for the single plan selected by the QueryPlanner.
      *

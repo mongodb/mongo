@@ -301,7 +301,7 @@ DocumentSourceCursor::~DocumentSourceCursor() {
 }
 
 DocumentSourceCursor::DocumentSourceCursor(
-    const CollectionPtr& collection,
+    const MultipleCollectionAccessor& collections,
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
     const intrusive_ptr<ExpressionContext>& pCtx,
     CursorType cursorType,
@@ -326,20 +326,27 @@ DocumentSourceCursor::DocumentSourceCursor(
         _winningPlanTrialStats = explainer.getWinningPlanTrialStats();
     }
 
-    if (collection) {
-        CollectionQueryInfo::get(collection)
-            .notifyOfQuery(pExpCtx->opCtx, collection, _stats.planSummaryStats);
+    if (collections.hasMainCollection()) {
+        const auto& coll = collections.getMainCollection();
+        CollectionQueryInfo::get(coll).notifyOfQuery(pExpCtx->opCtx, coll, _stats.planSummaryStats);
+    }
+    for (auto& [nss, coll] : collections.getSecondaryCollections()) {
+        if (coll) {
+            PlanSummaryStats stats;
+            explainer.getSecondarySummaryStats(nss.toString(), &stats);
+            CollectionQueryInfo::get(coll).notifyOfQuery(pExpCtx->opCtx, coll, stats);
+        }
     }
 }
 
 intrusive_ptr<DocumentSourceCursor> DocumentSourceCursor::create(
-    const CollectionPtr& collection,
+    const MultipleCollectionAccessor& collections,
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
     const intrusive_ptr<ExpressionContext>& pExpCtx,
     CursorType cursorType,
     bool trackOplogTimestamp) {
     intrusive_ptr<DocumentSourceCursor> source(new DocumentSourceCursor(
-        collection, std::move(exec), pExpCtx, cursorType, trackOplogTimestamp));
+        collections, std::move(exec), pExpCtx, cursorType, trackOplogTimestamp));
     return source;
 }
 }  // namespace mongo

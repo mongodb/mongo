@@ -1015,15 +1015,28 @@ Status runAggregate(OperationContext* opCtx,
             cursorFreer.dismiss();
         }
 
+        const auto& planExplainer = pins[0].getCursor()->getExecutor()->getPlanExplainer();
         PlanSummaryStats stats;
-        pins[0].getCursor()->getExecutor()->getPlanExplainer().getSummaryStats(&stats);
+        planExplainer.getSummaryStats(&stats);
         curOp->debug().setPlanSummaryMetrics(stats);
         curOp->debug().nreturned = stats.nReturned;
+
         // For an optimized away pipeline, signal the cache that a query operation has completed.
         // For normal pipelines this is done in DocumentSourceCursor.
-        if (ctx && ctx->getCollection()) {
-            const CollectionPtr& coll = ctx->getCollection();
-            CollectionQueryInfo::get(coll).notifyOfQuery(opCtx, coll, stats);
+        if (ctx) {
+            if (const auto& coll = ctx->getCollection()) {
+                CollectionQueryInfo::get(coll).notifyOfQuery(opCtx, coll, stats);
+            }
+            // For SBE pushed down pipelines, we may need to report stats saved for secondary
+            // collections separately.
+            for (const auto& [secondaryNss, coll] : collections.getSecondaryCollections()) {
+                if (coll) {
+                    PlanSummaryStats secondaryStats;
+                    planExplainer.getSecondarySummaryStats(secondaryNss.toString(),
+                                                           &secondaryStats);
+                    CollectionQueryInfo::get(coll).notifyOfQuery(opCtx, coll, secondaryStats);
+                }
+            }
         }
     }
 

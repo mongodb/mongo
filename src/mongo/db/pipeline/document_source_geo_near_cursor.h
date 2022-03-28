@@ -41,6 +41,7 @@
 #include "mongo/db/pipeline/document_source_cursor.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_executor.h"
 
 namespace mongo {
@@ -60,7 +61,7 @@ public:
      * nonnegative.
      */
     static boost::intrusive_ptr<DocumentSourceGeoNearCursor> create(
-        const CollectionPtr&,
+        const MultipleCollectionAccessor&,
         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>,
         const boost::intrusive_ptr<ExpressionContext>&,
         FieldPath distanceField,
@@ -70,7 +71,7 @@ public:
     const char* getSourceName() const final;
 
 private:
-    DocumentSourceGeoNearCursor(const CollectionPtr&,
+    DocumentSourceGeoNearCursor(const MultipleCollectionAccessor&,
                                 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>,
                                 const boost::intrusive_ptr<ExpressionContext>&,
                                 FieldPath distanceField,

@@ -51,13 +51,13 @@
 namespace mongo {
 
 boost::intrusive_ptr<DocumentSourceGeoNearCursor> DocumentSourceGeoNearCursor::create(
-    const CollectionPtr& collection,
+    const MultipleCollectionAccessor& collections,
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     FieldPath distanceField,
     boost::optional<FieldPath> locationField,
     double distanceMultiplier) {
-    return {new DocumentSourceGeoNearCursor(collection,
+    return {new DocumentSourceGeoNearCursor(collections,
                                             std::move(exec),
                                             expCtx,
                                             std::move(distanceField),
@@ -66,17 +66,20 @@ boost::intrusive_ptr<DocumentSourceGeoNearCursor> DocumentSourceGeoNearCursor::c
 }
 
 DocumentSourceGeoNearCursor::DocumentSourceGeoNearCursor(
-    const CollectionPtr& collection,
+    const MultipleCollectionAccessor& collections,
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     FieldPath distanceField,
     boost::optional<FieldPath> locationField,
     double distanceMultiplier)
     : DocumentSourceCursor(
-          collection, std::move(exec), expCtx, DocumentSourceCursor::CursorType::kRegular),
+          collections, std::move(exec), expCtx, DocumentSourceCursor::CursorType::kRegular),
       _distanceField(std::move(distanceField)),
       _locationField(std::move(locationField)),
       _distanceMultiplier(distanceMultiplier) {
+    tassert(6466203,
+            "$geoNear cursor shouldn't have secondary collections",
+            collections.getSecondaryCollections().empty());
     invariant(_distanceMultiplier >= 0);
 }
 

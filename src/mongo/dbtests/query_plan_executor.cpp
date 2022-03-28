@@ -51,6 +51,7 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/plan_executor_pipeline.h"
+#include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_solution.h"
@@ -219,8 +220,9 @@ TEST_F(PlanExecutorTest, DropIndexScanAgg) {
     // Wrap the "inner" plan executor in a DocumentSourceCursor and add it as the first source
     // in the pipeline.
     innerExec->saveState();
+    MultipleCollectionAccessor collections(collection);
     auto cursorSource = DocumentSourceCursor::create(
-        collection, std::move(innerExec), _expCtx, DocumentSourceCursor::CursorType::kRegular);
+        collections, std::move(innerExec), _expCtx, DocumentSourceCursor::CursorType::kRegular);
     auto pipeline = Pipeline::create({cursorSource}, _expCtx);
 
     auto outerExec = plan_executor_factory::make(_expCtx, std::move(pipeline));

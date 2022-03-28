@@ -657,11 +657,11 @@ PipelineD::buildInnerQueryExecutorSample(DocumentSourceSample* sampleStage,
             ? DocumentSourceCursor::CursorType::kEmptyDocuments
             : DocumentSourceCursor::CursorType::kRegular;
         attachExecutorCallback =
-            [cursorType](const CollectionPtr& collection,
+            [cursorType](const MultipleCollectionAccessor& collections,
                          std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
                          Pipeline* pipeline) {
                 auto cursor = DocumentSourceCursor::create(
-                    collection, std::move(exec), pipeline->getContext(), cursorType);
+                    collections, std::move(exec), pipeline->getContext(), cursorType);
                 pipeline->addInitialSource(std::move(cursor));
             };
         return std::pair(std::move(attachExecutorCallback), std::move(exec));
@@ -719,7 +719,7 @@ void PipelineD::attachInnerQueryExecutorToPipeline(
     // PlanExecutor provided in the 'attachExecutorCallback' object, so we don't need to do
     // anything.
     if (attachExecutorCallback && exec) {
-        attachExecutorCallback(collections.getMainCollection(), std::move(exec), pipeline);
+        attachExecutorCallback(collections, std::move(exec), pipeline);
     }
 }
 
@@ -940,11 +940,11 @@ PipelineD::buildInnerQueryExecutorGeneric(const MultipleCollectionAccessor& coll
         (aggRequest && aggRequest->getRequestReshardingResumeToken());
 
     auto attachExecutorCallback =
-        [cursorType, trackOplogTS](const CollectionPtr& collection,
+        [cursorType, trackOplogTS](const MultipleCollectionAccessor& collections,
                                    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
                                    Pipeline* pipeline) {
             auto cursor = DocumentSourceCursor::create(
-                collection, std::move(exec), pipeline->getContext(), cursorType, trackOplogTS);
+                collections, std::move(exec), pipeline->getContext(), cursorType, trackOplogTS);
             pipeline->addInitialSource(std::move(cursor));
         };
     return std::make_pair(std::move(attachExecutorCallback), std::move(exec));
@@ -997,10 +997,10 @@ PipelineD::buildInnerQueryExecutorGeoNear(const MultipleCollectionAccessor& coll
                                    locationField = geoNearStage->getLocationField(),
                                    distanceMultiplier =
                                        geoNearStage->getDistanceMultiplier().value_or(1.0)](
-                                      const CollectionPtr& collection,
+                                      const MultipleCollectionAccessor& collections,
                                       std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
                                       Pipeline* pipeline) {
-        auto cursor = DocumentSourceGeoNearCursor::create(collection,
+        auto cursor = DocumentSourceGeoNearCursor::create(collections,
                                                           std::move(exec),
                                                           pipeline->getContext(),
                                                           distanceField,

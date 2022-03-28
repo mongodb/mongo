@@ -71,8 +71,10 @@ public:
      * creating a specific DocumentSourceCursor stage using the provided PlanExecutor, and adding
      * the new stage to the pipeline.
      */
-    using AttachExecutorCallback = std::function<void(
-        const CollectionPtr&, std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>, Pipeline*)>;
+    using AttachExecutorCallback =
+        std::function<void(const MultipleCollectionAccessor&,
+                           std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>,
+                           Pipeline*)>;
 
     /**
      * This method looks for early pipeline stages that can be folded into the underlying

@@ -365,7 +365,7 @@ std::string PlanExplainerSBE::getPlanSummary() const {
 }
 
 void PlanExplainerSBE::getSummaryStats(PlanSummaryStats* statsOut) const {
-    invariant(statsOut);
+    tassert(6466201, "statsOut should be a valid pointer", statsOut);
 
     if (!_root) {
         return;
@@ -386,10 +386,27 @@ void PlanExplainerSBE::getSummaryStats(PlanSummaryStats* statsOut) const {
     _root->accumulate(kEmptyPlanNodeId, &visitor);
 
     // Use the pre-computed summary stats instead of traversing the QuerySolution tree.
-    const auto& indexesUsed = _debugInfo->indexesUsed;
+    const auto& indexesUsed = _debugInfo->mainStats.indexesUsed;
     statsOut->indexesUsed.insert(indexesUsed.begin(), indexesUsed.end());
-    statsOut->collectionScans += _debugInfo->collectionScans;
-    statsOut->collectionScansNonTailable += _debugInfo->collectionScansNonTailable;
+    statsOut->collectionScans += _debugInfo->mainStats.collectionScans;
+    statsOut->collectionScansNonTailable += _debugInfo->mainStats.collectionScansNonTailable;
+}
+
+void PlanExplainerSBE::getSecondarySummaryStats(std::string secondaryColl,
+                                                PlanSummaryStats* statsOut) const {
+    tassert(6466202, "statsOut should be a valid pointer", statsOut);
+
+    // Use the pre-computed summary stats instead of traversing the QuerySolution tree.
+    const auto& entry = _debugInfo->secondaryStats.find(secondaryColl);
+    // The secondary collection stats may not be filled in debugInfo if the SBE engine is only
+    // responsible for the subtree of the query.
+    if (entry != _debugInfo->secondaryStats.end()) {
+        const auto& secondaryStats = entry->second;
+        const auto& indexesUsed = secondaryStats.indexesUsed;
+        statsOut->indexesUsed.insert(indexesUsed.begin(), indexesUsed.end());
+        statsOut->collectionScans += secondaryStats.collectionScans;
+        statsOut->collectionScansNonTailable += secondaryStats.collectionScansNonTailable;
+    }
 }
 
 PlanExplainer::PlanStatsDetails PlanExplainerSBE::getWinningPlanStats(

@@ -35,6 +35,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/query/explain_options.h"
+#include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
 
@@ -63,7 +64,7 @@ public:
      * $cursor stage can return a sequence of empty documents for the caller to count.
      */
     static boost::intrusive_ptr<DocumentSourceCursor> create(
-        const CollectionPtr& collection,
+        const MultipleCollectionAccessor& collections,
         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
         const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
         CursorType cursorType,
@@ -132,7 +133,7 @@ public:
     }
 
 protected:
-    DocumentSourceCursor(const CollectionPtr& collection,
+    DocumentSourceCursor(const MultipleCollectionAccessor& collections,
                          std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
                          const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                          CursorType cursorType,

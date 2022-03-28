@@ -117,23 +117,33 @@ struct DebugInfo {
     std::unique_ptr<const plan_ranker::PlanRankingDecision> decision;
 };
 
+struct CollectionDebugInfoSBE {
+    long long collectionScans = 0;
+    long long collectionScansNonTailable = 0;
+    std::vector<std::string> indexesUsed;
+};
+
 /*
  * Similar to "DebugInfo" above. This debug info struct is only for SBE plan cache.
  */
 struct DebugInfoSBE {
     uint64_t estimateObjectSizeInBytes() const {
-        return sizeof(DebugInfoSBE) + planSummary.capacity() +
-            container_size_helper::estimateObjectSizeInBytes(
-                   indexesUsed, [](std::string str) { return str.capacity(); }, true);
+        uint64_t size = sizeof(DebugInfoSBE) + planSummary.capacity();
+        size += container_size_helper::estimateObjectSizeInBytes(
+            mainStats.indexesUsed, [](std::string str) { return str.capacity(); }, true);
+        for (auto& [_, stats] : secondaryStats) {
+            size += container_size_helper::estimateObjectSizeInBytes(
+                stats.indexesUsed, [](std::string str) { return str.capacity(); }, true);
+        }
+        return size;
     }
 
     std::string debugString() const {
         return planSummary;
     }
 
-    long long collectionScans = 0;
-    long long collectionScansNonTailable = 0;
+    CollectionDebugInfoSBE mainStats;
+    StringMap<CollectionDebugInfoSBE> secondaryStats;
     std::string planSummary;
-    std::vector<std::string> indexesUsed;
 };
 }  // namespace mongo::plan_cache_debug_info

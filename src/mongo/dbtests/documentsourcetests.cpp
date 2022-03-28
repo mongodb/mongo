@@ -49,6 +49,7 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/mock_yield_policies.h"
+#include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/stage_builder.h"
@@ -106,8 +107,10 @@ protected:
                                                 PlanYieldPolicy::YieldPolicy::NO_YIELD,
                                                 QueryPlannerParams::RETURN_OWNED_DATA));
 
-        _source = DocumentSourceCursor::create(
-            _coll, std::move(exec), _ctx, DocumentSourceCursor::CursorType::kRegular);
+        _source = DocumentSourceCursor::create(MultipleCollectionAccessor(_coll),
+                                               std::move(exec),
+                                               _ctx,
+                                               DocumentSourceCursor::CursorType::kRegular);
     }
 
     intrusive_ptr<ExpressionContextForTest> ctx() {
@@ -330,7 +333,7 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterTimeout)
     ctx()->tailableMode = TailableModeEnum::kTailableAndAwaitData;
     // DocumentSourceCursor expects a PlanExecutor that has had its state saved.
     planExecutor->saveState();
-    auto cursor = DocumentSourceCursor::create(readLock.getCollection(),
+    auto cursor = DocumentSourceCursor::create(MultipleCollectionAccessor(readLock.getCollection()),
                                                std::move(planExecutor),
                                                ctx(),
                                                DocumentSourceCursor::CursorType::kRegular);
@@ -374,7 +377,7 @@ TEST_F(DocumentSourceCursorTest, NonAwaitDataCursorShouldErrorAfterTimeout) {
     ctx()->tailableMode = TailableModeEnum::kNormal;
     // DocumentSourceCursor expects a PlanExecutor that has had its state saved.
     planExecutor->saveState();
-    auto cursor = DocumentSourceCursor::create(readLock.getCollection(),
+    auto cursor = DocumentSourceCursor::create(MultipleCollectionAccessor(readLock.getCollection()),
                                                std::move(planExecutor),
                                                ctx(),
                                                DocumentSourceCursor::CursorType::kRegular);
@@ -426,7 +429,7 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterBeingKil
     ctx()->tailableMode = TailableModeEnum::kTailableAndAwaitData;
     // DocumentSourceCursor expects a PlanExecutor that has had its state saved.
     planExecutor->saveState();
-    auto cursor = DocumentSourceCursor::create(readLock.getCollection(),
+    auto cursor = DocumentSourceCursor::create(MultipleCollectionAccessor(readLock.getCollection()),
                                                std::move(planExecutor),
                                                ctx(),
                                                DocumentSourceCursor::CursorType::kRegular);
@@ -467,7 +470,7 @@ TEST_F(DocumentSourceCursorTest, NormalCursorShouldErrorAfterBeingKilled) {
     ctx()->tailableMode = TailableModeEnum::kNormal;
     // DocumentSourceCursor expects a PlanExecutor that has had its state saved.
     planExecutor->saveState();
-    auto cursor = DocumentSourceCursor::create(readLock.getCollection(),
+    auto cursor = DocumentSourceCursor::create(MultipleCollectionAccessor(readLock.getCollection()),
                                                std::move(planExecutor),
                                                ctx(),
                                                DocumentSourceCursor::CursorType::kRegular);

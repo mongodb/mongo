@@ -132,41 +132,52 @@ plan_cache_debug_info::DebugInfoSBE buildDebugInfo(const QuerySolution* solution
         switch (node->getType()) {
             case STAGE_COUNT_SCAN: {
                 auto csn = static_cast<const CountScanNode*>(node);
-                debugInfo.indexesUsed.push_back(csn->index.identifier.catalogName);
+                debugInfo.mainStats.indexesUsed.push_back(csn->index.identifier.catalogName);
                 break;
             }
             case STAGE_DISTINCT_SCAN: {
                 auto dn = static_cast<const DistinctNode*>(node);
-                debugInfo.indexesUsed.push_back(dn->index.identifier.catalogName);
+                debugInfo.mainStats.indexesUsed.push_back(dn->index.identifier.catalogName);
                 break;
             }
             case STAGE_GEO_NEAR_2D: {
                 auto geo2d = static_cast<const GeoNear2DNode*>(node);
-                debugInfo.indexesUsed.push_back(geo2d->index.identifier.catalogName);
+                debugInfo.mainStats.indexesUsed.push_back(geo2d->index.identifier.catalogName);
                 break;
             }
             case STAGE_GEO_NEAR_2DSPHERE: {
                 auto geo2dsphere = static_cast<const GeoNear2DSphereNode*>(node);
-                debugInfo.indexesUsed.push_back(geo2dsphere->index.identifier.catalogName);
+                debugInfo.mainStats.indexesUsed.push_back(
+                    geo2dsphere->index.identifier.catalogName);
                 break;
             }
             case STAGE_IXSCAN: {
                 auto ixn = static_cast<const IndexScanNode*>(node);
-                debugInfo.indexesUsed.push_back(ixn->index.identifier.catalogName);
+                debugInfo.mainStats.indexesUsed.push_back(ixn->index.identifier.catalogName);
                 break;
             }
             case STAGE_TEXT_MATCH: {
                 auto tn = static_cast<const TextMatchNode*>(node);
-                debugInfo.indexesUsed.push_back(tn->index.identifier.catalogName);
+                debugInfo.mainStats.indexesUsed.push_back(tn->index.identifier.catalogName);
                 break;
             }
             case STAGE_COLLSCAN: {
-                debugInfo.collectionScans++;
+                debugInfo.mainStats.collectionScans++;
                 auto csn = static_cast<const CollectionScanNode*>(node);
                 if (!csn->tailable) {
-                    debugInfo.collectionScansNonTailable++;
+                    debugInfo.mainStats.collectionScansNonTailable++;
                 }
                 break;
+            }
+            case STAGE_EQ_LOOKUP: {
+                auto eln = static_cast<const EqLookupNode*>(node);
+                auto& secondaryStats = debugInfo.secondaryStats[eln->foreignCollection];
+                if (eln->lookupStrategy == EqLookupNode::LookupStrategy::kIndexedLoopJoin) {
+                    tassert(6466200, "Index join lookup should have an index entry", eln->idxEntry);
+                    secondaryStats.indexesUsed.push_back(eln->idxEntry->identifier.catalogName);
+                } else {
+                    secondaryStats.collectionScans++;
+                }
             }
             default:
                 break;
