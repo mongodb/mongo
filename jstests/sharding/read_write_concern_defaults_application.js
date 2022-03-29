@@ -477,7 +477,8 @@ let testCases = {
     fsync: {skip: "does not accept read or write concern"},
     fsyncUnlock: {skip: "does not accept read or write concern"},
     getAuditConfig: {skip: "does not accept read or write concern"},
-    getChangeStreamOptions: {skip: "TODO PM-2502"},
+    getChangeStreamOptions:
+        {skip: "does not accept read or write concern"},  // TODO SERVER-65353 remove in 6.1.
     getClusterParameter: {skip: "does not accept read or write concern"},
     getCmdLineOpts: {skip: "does not accept read or write concern"},
     getDatabaseVersion: {skip: "does not accept read or write concern"},
@@ -689,7 +690,8 @@ let testCases = {
     serverStatus: {skip: "does not accept read or write concern"},
     setAllowMigrations: {skip: "does not accept read or write concern"},
     setAuditConfig: {skip: "does not accept read or write concern"},
-    setChangeStreamOptions: {skip: "TODO PM-2502"},
+    setChangeStreamOptions:
+        {skip: "does not accept read or write concern"},  // TODO SERVER-65353 remove in 6.1.
     setCommittedSnapshot: {skip: "internal command"},
     setDefaultRWConcern: {skip: "special case (must run after all other commands)"},
     setFeatureCompatibilityVersion: {skip: "does not accept read or write concern"},

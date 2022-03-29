@@ -203,18 +203,6 @@ env.Library(
 )
 
 env.Library(
-    target='change_stream_options',
-    source=[
-        'change_stream_options.idl',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/auth',
-        '$BUILD_DIR/mongo/db/auth/authprivilege',
-        '$BUILD_DIR/mongo/db/read_write_concern_defaults',
-    ]
-)
-
-env.Library(
     target="authentication_commands",
     source=[
         'authentication_commands.cpp',
@@ -515,7 +503,6 @@ env.Library(
     target="mongod",
     source=[
         "apply_ops_cmd.cpp",
-        "change_stream_options_command.cpp",
         "collection_to_capped.cpp",
         "compact.cpp",
         "cpuload.cpp",
@@ -568,7 +555,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/index_key_validate',
         '$BUILD_DIR/mongo/db/change_stream_options_manager',
         '$BUILD_DIR/mongo/db/commands',
-        '$BUILD_DIR/mongo/db/commands/change_stream_options',
         '$BUILD_DIR/mongo/db/curop_failpoint_helpers',
         '$BUILD_DIR/mongo/db/dbhelpers',
         '$BUILD_DIR/mongo/db/exec/sbe_cmd',

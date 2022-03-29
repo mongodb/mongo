@@ -63,7 +63,7 @@ ERROR_ID_BAD_BSON_BINDATA_SUBTYPE_TYPE = "ID0015"
 ERROR_ID_BAD_BSON_BINDATA_SUBTYPE_VALUE = "ID0016"
 ERROR_ID_NO_STRINGDATA = "ID0017"
 ERROR_ID_FIELD_MUST_BE_EMPTY_FOR_IGNORED = "ID0018"
-ERROR_ID_FIELD_MUST_BE_EMPTY_FOR_STRUCT = "ID0019"
+ERROR_ID_DEFAULT_MUST_BE_TRUE_OR_EMPTY_FOR_STRUCT = "ID0019"
 ERROR_ID_CUSTOM_SCALAR_SERIALIZATION_NOT_SUPPORTED = "ID0020"
 ERROR_ID_BAD_ANY_TYPE_USE = "ID0021"
 ERROR_ID_BAD_NUMERIC_CPP_TYPE = "ID0022"
@@ -462,14 +462,13 @@ class ParserContext(object):
             ("Field '%s' cannot contain a value for property '%s' when a field is marked as ignored"
              ) % (name, field_name))
 
-    def add_struct_field_must_be_empty_error(self, location, name, field_name):
-        # type: (common.SourceLocation, str, str) -> None
-        """Add an error about field must be empty for fields of type struct."""
+    def add_struct_default_must_be_true_or_empty_error(self, location, name):
+        # type: (common.SourceLocation, str) -> None
+        """Add an error about default must be True or empty for fields of type struct."""
         # pylint: disable=invalid-name
-        self._add_error(
-            location, ERROR_ID_FIELD_MUST_BE_EMPTY_FOR_STRUCT,
-            ("Field '%s' cannot contain a value for property '%s' when a field's type is a struct")
-            % (name, field_name))
+        self._add_error(location, ERROR_ID_DEFAULT_MUST_BE_TRUE_OR_EMPTY_FOR_STRUCT, (
+            "Field '%s' can only contain value 'true' for property 'default' when a field's type is a struct"
+        ) % (name))
 
     def add_not_custom_scalar_serialization_not_supported_error(self, location, ast_type,
                                                                 ast_parent, bson_type_name):

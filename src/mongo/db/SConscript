@@ -490,13 +490,23 @@ env.Library(
 )
 
 env.Library(
+    target='change_stream_options',
+    source=[
+        'change_stream_options.idl',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/idl/cluster_server_parameter',
+    ],
+)
+
+env.Library(
     target='change_stream_options_manager',
     source=[
         'change_stream_options_manager.cpp',
+        'change_stream_options_parameter.idl',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/commands/change_stream_options',
-        '$BUILD_DIR/mongo/idl/feature_flag',
+        'change_stream_options',
     ],
 )
 

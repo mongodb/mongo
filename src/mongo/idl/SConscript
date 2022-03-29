@@ -55,11 +55,10 @@ env.Library(
         'cluster_server_parameter.idl',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/logical_time',
+        'feature_flag',
     ],
     LIBDEPS_PRIVATE=[
-        'feature_flag',
         'idl_parser',
     ],
 )
@@ -87,6 +86,7 @@ env.CppUnitTest(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/change_stream_options_manager',
         '$BUILD_DIR/mongo/db/repl/oplog',
         '$BUILD_DIR/mongo/db/repl/oplog_interface_local',
         '$BUILD_DIR/mongo/db/repl/replmocks',

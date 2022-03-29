@@ -942,6 +942,23 @@ class TestBinder(testcase.IDLTestcase):
                             always_serialize: true
             """))
 
+        # Test field of a struct type with default=true
+        self.assert_bind(test_preamble + textwrap.dedent("""
+            structs:
+                foo:
+                    description: foo
+                    fields:
+                        field1: string
+
+                bar:
+                    description: foo
+                    fields:
+                        field2:
+                            type: foo
+                            default: true
+
+            """))
+
     def test_field_negative(self):
         # type: () -> None
         """Negative field tests."""
@@ -964,7 +981,7 @@ class TestBinder(testcase.IDLTestcase):
                 bindata_subtype: uuid
         """)
 
-        # Test field of a struct type with a default
+        # Test field of a struct type with a non-true default
         self.assert_bind_fail(
             test_preamble + textwrap.dedent("""
             structs:
@@ -980,7 +997,7 @@ class TestBinder(testcase.IDLTestcase):
                             type: foo
                             default: foo
 
-            """), idl.errors.ERROR_ID_FIELD_MUST_BE_EMPTY_FOR_STRUCT)
+            """), idl.errors.ERROR_ID_DEFAULT_MUST_BE_TRUE_OR_EMPTY_FOR_STRUCT)
 
         # Test array as field name
         self.assert_bind_fail(

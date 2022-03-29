@@ -438,7 +438,7 @@ def _bind_struct_field(ctxt, ast_field, idl_type):
     ast_field.type = _bind_struct_type(struct)
     ast_field.type.is_array = isinstance(idl_type, syntax.ArrayType)
 
-    _validate_field_of_type_struct(ctxt, ast_field)
+    _validate_default_of_type_struct(ctxt, ast_field)
 
 
 def _bind_variant_field(ctxt, ast_field, idl_type):
@@ -747,11 +747,11 @@ def _validate_ignored_field(ctxt, field):
         ctxt.add_ignored_field_must_be_empty_error(field, field.name, "default")
 
 
-def _validate_field_of_type_struct(ctxt, field):
+def _validate_default_of_type_struct(ctxt, field):
     # type: (errors.ParserContext, Union[syntax.Field, ast.Field]) -> None
-    """Validate that for fields with a type of struct, no other properties are set."""
-    if field.default is not None:
-        ctxt.add_struct_field_must_be_empty_error(field, field.name, "default")
+    """Validate that for fields with a type of struct, the only default permitted is true, which causes it to be default-constructed."""
+    if (field.default is not None) and (field.default != "true"):
+        ctxt.add_struct_default_must_be_true_or_empty_error(field, field.name)
 
 
 def _validate_variant_type(ctxt, syntax_symbol, field):

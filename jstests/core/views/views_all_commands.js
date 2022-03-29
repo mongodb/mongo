@@ -364,7 +364,7 @@ let viewsCommandTests = {
     fsyncUnlock: {skip: isUnrelated},
     getAuditConfig: {skip: isUnrelated},
     getDatabaseVersion: {skip: isUnrelated},
-    getChangeStreamOptions: {skip: isUnrelated},
+    getChangeStreamOptions: {skip: isUnrelated},  // TODO SERVER-65353 remove in 6.1.
     getClusterParameter: {skip: isUnrelated},
     getCmdLineOpts: {skip: isUnrelated},
     getDefaultRWConcern: {skip: isUnrelated},
@@ -605,7 +605,7 @@ let viewsCommandTests = {
     saslStart: {skip: isUnrelated},
     sbe: {skip: isAnInternalCommand},
     serverStatus: {command: {serverStatus: 1}, skip: isUnrelated},
-    setChangeStreamOptions: {skip: isUnrelated},
+    setChangeStreamOptions: {skip: isUnrelated},  // TODO SERVER-65353 remove in 6.1.
     setIndexCommitQuorum: {skip: isUnrelated},
     setAuditConfig: {skip: isUnrelated},
     setCommittedSnapshot: {skip: isAnInternalCommand},

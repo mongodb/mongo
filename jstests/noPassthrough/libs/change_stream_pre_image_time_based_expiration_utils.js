@@ -1,11 +1,4 @@
-// Tests time-based pre-image retention policy of change stream pre-images remover job.
-// @tags: [
-//  requires_fcv_60,
-//  featureFlagChangeStreamPreAndPostImages,
-//  featureFlagChangeStreamPreAndPostImagesTimeBasedRetentionPolicy,
-// ]
-(function() {
-"use strict";
+// Library functions for change_stream_pre_image_time_based_expiration tests.
 
 load("jstests/libs/fail_point_util.js");  // For configureFailPoint.
 
@@ -32,6 +25,10 @@ function verifyPreImages(preImageColl, expectedPreImages, collectionsInfo) {
 }
 
 // Tests time-based change stream pre-image retention policy.
+// When run on a replica set, both 'conn' and 'primary' store connections to the
+// replica set primary node.
+// When run on a sharded cluster, 'conn' represents the connection to the mongos while
+// 'primary' represents the connection to the shard primary node.
 function testTimeBasedPreImageRetentionPolicy(conn, primary) {
     // Status for pre-images that define if pre-image is expected to expire or not.
     const shouldExpire = "shouldExpire";
@@ -55,7 +52,7 @@ function testTimeBasedPreImageRetentionPolicy(conn, primary) {
     ];
 
     const collectionCount = docsStatePerCollection.length;
-    const testDB = conn.getDB("test");
+    const testDB = primary.getDB("test");
 
     // Create several collections with pre- and post-images enabled.
     for (let collIdx = 0; collIdx < collectionCount; collIdx++) {
@@ -75,8 +72,9 @@ function testTimeBasedPreImageRetentionPolicy(conn, primary) {
     });
 
     // Disable pre-image time-based expiration policy.
-    assert.commandWorked(conn.getDB("admin").runCommand(
-        {setChangeStreamOptions: 1, preAndPostImages: {expireAfterSeconds: "off"}}));
+    assert.commandWorked(conn.getDB("admin").runCommand({
+        setClusterParameter: {changeStreamOptions: {preAndPostImages: {expireAfterSeconds: "off"}}}
+    }));
 
     let shouldRetainDocs = [];
     let shouldExpireDocs = [];
@@ -161,8 +159,10 @@ function testTimeBasedPreImageRetentionPolicy(conn, primary) {
     verifyPreImages(preImageColl, allDocs, collectionsInfo);
 
     // Enable time-based pre-image expiration and configure the 'expireAfterSeconds' to 1 seconds.
-    assert.commandWorked(conn.getDB("admin").runCommand(
-        {setChangeStreamOptions: 1, preAndPostImages: {expireAfterSeconds: expireAfterSeconds}}));
+    assert.commandWorked(conn.getDB("admin").runCommand({
+        setClusterParameter:
+            {changeStreamOptions: {preAndPostImages: {expireAfterSeconds: expireAfterSeconds}}}
+    }));
 
     // Verify that at some point in time, all expired pre-images will be deleted.
     assert.soon(() => {
@@ -175,17 +175,3 @@ function testTimeBasedPreImageRetentionPolicy(conn, primary) {
 
     currentTimeFailPoint.off();
 }
-
-// Tests pre-image time based expiration on a replica-set.
-// TODO SERVER-61802: Add test cases for shared cluster.
-(function testChangeStreamPreImagesforTimeBasedExpirationOnReplicaSet() {
-    const replSetTest = new ReplSetTest({name: "replSet", nodes: 1});
-    replSetTest.startSet();
-    replSetTest.initiate();
-
-    const conn = replSetTest.getPrimary();
-    const primary = replSetTest.getPrimary();
-    testTimeBasedPreImageRetentionPolicy(conn, primary);
-    replSetTest.stopSet();
-})();
-}());

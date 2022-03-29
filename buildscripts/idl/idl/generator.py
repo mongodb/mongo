@@ -617,10 +617,14 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         member_type = cpp_type_info.get_storage_type()
         member_name = _get_field_member_name(field)
 
+        # Struct fields are allowed to specify default: true so that the member gets default-
+        # constructed.
         if field.default and not field.constructed:
             if field.type.is_enum:
                 self._writer.write_line('%s %s{%s::%s};' % (member_type, member_name,
                                                             field.type.cpp_type, field.default))
+            elif field.type.is_struct:
+                self._writer.write_line('%s %s;' % (member_type, member_name))
             else:
                 self._writer.write_line('%s %s{%s};' % (member_type, member_name, field.default))
         else:

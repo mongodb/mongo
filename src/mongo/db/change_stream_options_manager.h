@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/commands/change_stream_options_gen.h"
+#include "mongo/db/change_stream_options_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/mutex.h"
@@ -63,9 +63,9 @@ public:
     static ChangeStreamOptionsManager& get(OperationContext* opCtx);
 
     /**
-     * Returns the change-streams options if present, boost::none otherwise.
+     * Returns the change-streams options.
      */
-    boost::optional<ChangeStreamOptions> getOptions(OperationContext* opCtx);
+    const ChangeStreamOptions& getOptions(OperationContext* opCtx);
 
     /**
      * Sets the provided change-streams options. Returns OK on success, otherwise appropriate error
@@ -74,11 +74,18 @@ public:
     StatusWith<ChangeStreamOptions> setOptions(OperationContext* opCtx,
                                                ChangeStreamOptions optionsToSet);
 
+    /**
+     * Returns the clusterParameterTime of the current change stream options.
+     */
+    const LogicalTime& getClusterParameterTime() {
+        return _changeStreamOptions.getClusterParameterTime();
+    }
+
 private:
     ChangeStreamOptionsManager(const ChangeStreamOptionsManager&) = delete;
     ChangeStreamOptionsManager& operator=(const ChangeStreamOptionsManager&) = delete;
 
-    boost::optional<ChangeStreamOptions> _changeStreamOptions;
+    ChangeStreamOptions _changeStreamOptions;
 
     Mutex _mutex = MONGO_MAKE_LATCH("ChangeStreamOptionsManager::mutex");
 };

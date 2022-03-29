@@ -11,8 +11,12 @@
  *
  */
 
-const clusterParameterNames =
-    ["testStrClusterParameter", "testIntClusterParameter", "testBoolClusterParameter"];
+const clusterParameterNames = [
+    "testStrClusterParameter",
+    "testIntClusterParameter",
+    "testBoolClusterParameter",
+    "changeStreamOptions"
+];
 const clusterParametersDefault = [
     {
         _id: "testStrClusterParameter",
@@ -25,6 +29,12 @@ const clusterParametersDefault = [
     {
         _id: "testBoolClusterParameter",
         boolData: false,
+    },
+    {
+        _id: "changeStreamOptions",
+        preAndPostImages: {
+            expireAfterSeconds: "off",
+        },
     }
 ];
 
@@ -40,6 +50,12 @@ const clusterParametersInsert = [
     {
         _id: "testBoolClusterParameter",
         boolData: true,
+    },
+    {
+        _id: "changeStreamOptions",
+        preAndPostImages: {
+            expireAfterSeconds: 30,
+        },
     }
 ];
 
@@ -55,6 +71,12 @@ const clusterParametersUpdate = [
     {
         _id: "testBoolClusterParameter",
         boolData: false,
+    },
+    {
+        _id: "changeStreamOptions",
+        preAndPostImages: {
+            expireAfterSeconds: "off",
+        },
     }
 ];
 
@@ -226,6 +248,8 @@ function testValidClusterParameterCommands(conn) {
 function testInvalidGetClusterParameter(conn) {
     const adminDB = conn.getDB('admin');
     // Assert that specifying a nonexistent parameter returns an error.
+    assert.commandFailed(
+        adminDB.runCommand({setClusterParameter: {nonexistentParam: {intData: 5}}}));
     assert.commandFailedWithCode(adminDB.runCommand({getClusterParameter: "nonexistentParam"}),
                                  ErrorCodes.NoSuchKey);
     assert.commandFailedWithCode(adminDB.runCommand({getClusterParameter: ["nonexistentParam"]}),
@@ -233,6 +257,9 @@ function testInvalidGetClusterParameter(conn) {
     assert.commandFailedWithCode(
         adminDB.runCommand({getClusterParameter: ["testIntClusterParameter", "nonexistentParam"]}),
         ErrorCodes.NoSuchKey);
+
+    // Assert that specifying a known parameter with a scalar value fails.
+    assert.commandFailed(adminDB.runCommand({setClusterParameter: {testIntClusterParameter: 5}}));
 }
 
 // Tests that invalid uses of set/getClusterParameter fail with the appropriate errors.

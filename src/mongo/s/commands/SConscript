@@ -33,7 +33,6 @@ env.Library(
         'cluster_abort_transaction_cmd_s.cpp',
         'cluster_available_query_options_cmd.cpp',
         'cluster_build_info.cpp',
-        'cluster_change_stream_options_command.cpp',
         'cluster_cleanup_reshard_collection_cmd.cpp',
         'cluster_coll_stats_cmd.cpp',
         'cluster_collection_mod_cmd.cpp',
@@ -107,7 +106,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/api_parameters',
         '$BUILD_DIR/mongo/db/auth/auth_checks',
-        '$BUILD_DIR/mongo/db/commands/change_stream_options',
+        '$BUILD_DIR/mongo/db/change_stream_options_manager',
         '$BUILD_DIR/mongo/db/commands/cluster_server_parameter_cmds_idl',
         '$BUILD_DIR/mongo/db/commands/core',
         '$BUILD_DIR/mongo/db/commands/create_command',

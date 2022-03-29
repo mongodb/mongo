@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/commands/change_stream_options_gen.h"
+#include "mongo/db/change_stream_options_gen.h"
 #include "mongo/db/service_context.h"
 
 namespace mongo {

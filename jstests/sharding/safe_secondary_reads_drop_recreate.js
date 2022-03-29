@@ -213,7 +213,8 @@ let testCases = {
     fsync: {skip: "does not return user data"},
     fsyncUnlock: {skip: "does not return user data"},
     getAuditConfig: {skip: "does not return user data"},
-    getChangeStreamOptions: {skip: "does not return user data"},
+    getChangeStreamOptions:
+        {skip: "does not return user data"},  // TODO SERVER-65353 remove in 6.1.
     getClusterParameter: {skip: "does not return user data"},
     getCmdLineOpts: {skip: "does not return user data"},
     getDefaultRWConcern: {skip: "does not return user data"},
@@ -323,7 +324,7 @@ let testCases = {
     serverStatus: {skip: "does not return user data"},
     setAllowMigrations: {skip: "primary only"},
     setAuditConfig: {skip: "does not return user data"},
-    setChangeStreamOptions: {skip: "primary only"},
+    setChangeStreamOptions: {skip: "primary only"},  // TODO SERVER-65353 remove in 6.1.
     setCommittedSnapshot: {skip: "does not return user data"},
     setDefaultRWConcern: {skip: "primary only"},
     setIndexCommitQuorum: {skip: "primary only"},

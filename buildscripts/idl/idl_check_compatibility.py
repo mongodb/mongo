@@ -191,6 +191,15 @@ SKIPPED_FILES = [
     "nsICollation.idl", "nsIStringBundle.idl", "nsIScriptableUConv.idl", "nsITextToSubURI.idl"
 ]
 
+# Do not add commands that were visible to users in previously released versions.
+IGNORE_COMMANDS_LIST: List[str] = [
+    # The following commands were released behind a feature flag in 5.3 but were shelved in
+    # favor of getClusterParameter and setClusterParameter. Since the feature flag was not enabled
+    # in 5.3, they were effectively unusable and so can be safely removed from the strict API.
+    'getChangeStreamOptions',
+    'setChangeStreamOptions',
+]
+
 
 class FieldCompatibility:
     """Information about a Field to check compatibility."""
@@ -1191,6 +1200,12 @@ def check_compatibility(old_idl_dir: str, new_idl_dir: str, old_import_directori
                 for old_cmd in old_idl_file.spec.symbols.commands:
                     # Ignore imported commands as they will be processed in their own file.
                     if old_cmd.api_version == "" or old_cmd.imported:
+                        continue
+
+                    # Ignore select commands that were removed after being added to the strict API.
+                    # Only commands that were never visible to the end-user in previous releases
+                    # (i.e., hidden behind a feature flag) should be allowed here.
+                    if old_cmd.command_name in IGNORE_COMMANDS_LIST:
                         continue
 
                     if old_cmd.api_version != "1":

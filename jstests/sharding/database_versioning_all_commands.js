@@ -456,8 +456,10 @@ let testCases = {
     flushRouterConfig: {skip: "executes locally on mongos (not sent to any remote node)"},
     fsync: {skip: "broadcast to all shards"},
     getAuditConfig: {skip: "not on a user database", conditional: true},
-    getChangeStreamOptions:
-        {skip: "executes locally on mongos (not sent to any remote node)", conditional: true},
+    getChangeStreamOptions: {
+        skip: "executes locally on mongos (not sent to any remote node)",
+        conditional: true
+    },  // TODO SERVER-65353 remove in 6.1.
     getClusterParameter: {skip: "always targets the config server"},
     getCmdLineOpts: {skip: "executes locally on mongos (not sent to any remote node)"},
     getDefaultRWConcern: {skip: "executes locally on mongos (not sent to any remote node)"},
@@ -626,7 +628,10 @@ let testCases = {
     serverStatus: {skip: "executes locally on mongos (not sent to any remote node)"},
     setAllowMigrations: {skip: "not on a user database"},
     setAuditConfig: {skip: "not on a user database", conditional: true},
-    setChangeStreamOptions: {skip: "always targets the config server", conditional: true},
+    setChangeStreamOptions: {
+        skip: "always targets the config server",
+        conditional: true
+    },  // TODO SERVER-65353 remove in 6.1.
     setDefaultRWConcern: {skip: "always targets the config server"},
     setIndexCommitQuorum: {
         run: {

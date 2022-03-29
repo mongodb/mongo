@@ -70,13 +70,14 @@ bool PreImageAttributes::isExpiredPreImage(const boost::optional<Date_t>& preIma
     return preImageOplogEntryIsDeleted || operationTime <= expirationTime;
 }
 
-// Get the 'expireAfterSeconds' from the 'ChangeStreamOptions' if present, boost::none otherwise.
+// Get the 'expireAfterSeconds' from the 'ChangeStreamOptions' if not 'off', boost::none otherwise.
 boost::optional<std::int64_t> getExpireAfterSecondsFromChangeStreamOptions(
     ChangeStreamOptions& changeStreamOptions) {
-    if (auto preAndPostImages = changeStreamOptions.getPreAndPostImages(); preAndPostImages &&
-        preAndPostImages->getExpireAfterSeconds() &&
-        !stdx::holds_alternative<std::string>(*preAndPostImages->getExpireAfterSeconds())) {
-        return stdx::get<std::int64_t>(*preAndPostImages->getExpireAfterSeconds());
+    const stdx::variant<std::string, std::int64_t>& expireAfterSeconds =
+        changeStreamOptions.getPreAndPostImages().getExpireAfterSeconds();
+
+    if (!stdx::holds_alternative<std::string>(expireAfterSeconds)) {
+        return stdx::get<std::int64_t>(expireAfterSeconds);
     }
 
     return boost::none;
@@ -88,9 +89,8 @@ boost::optional<Date_t> getPreImageExpirationTime(OperationContext* opCtx, Date_
     boost::optional<std::int64_t> expireAfterSeconds = boost::none;
 
     // Get the expiration time directly from the change stream manager.
-    if (auto changeStreamOptions = ChangeStreamOptionsManager::get(opCtx).getOptions(opCtx)) {
-        expireAfterSeconds = getExpireAfterSecondsFromChangeStreamOptions(*changeStreamOptions);
-    }
+    auto changeStreamOptions = ChangeStreamOptionsManager::get(opCtx).getOptions(opCtx);
+    expireAfterSeconds = getExpireAfterSecondsFromChangeStreamOptions(changeStreamOptions);
 
     // A pre-image is eligible for deletion if:
     //   pre-image's op-time + expireAfterSeconds  < currentTime.

@@ -254,8 +254,6 @@ MONGO_INITIALIZER(AuthorizationBuiltinRoles)(InitializerContext* context) {
         << ActionType::setDefaultRWConcern
         << ActionType::setFeatureCompatibilityVersion
         << ActionType::setFreeMonitoring
-        << ActionType::setChangeStreamOptions
-        << ActionType::getChangeStreamOptions
         << ActionType::setClusterParameter
         << ActionType::getClusterParameter;
 

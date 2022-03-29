@@ -31,6 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/change_stream_options_manager.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_interface_local.h"
@@ -153,6 +154,9 @@ public:
             service,
             std::make_unique<repl::ReplicationCoordinatorMock>(service, createReplSettings()));
         repl::createOplog(opCtx.get());
+
+        // Set up the ChangeStreamOptionsManager so that it can be retrieved/set.
+        ChangeStreamOptionsManager::create(service);
 
         // Ensure that we are primary.
         auto replCoord = repl::ReplicationCoordinator::get(opCtx.get());
