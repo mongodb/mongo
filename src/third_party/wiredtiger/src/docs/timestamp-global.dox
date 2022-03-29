@@ -127,19 +127,20 @@ USING THE FORCE FLAG NEEDS MOTIVATION AND DISCUSSION. -->
 @section timestamp_global_querying_timestamps Querying global timestamps
 
 The following table lists the global timestamps an application can query using
-the WT_CONNECTION::set_timestamp method, including constraints.
+the WT_CONNECTION::set_timestamp method, including constraints. In all cases,
+a timestamp of 0 is returned if the timestamp is not available or has not been
+set, for example, the \c last_checkpoint timestamp if no checkpoints have run,
+or \c oldest_reader if there are no active transactions.
 
 | Timestamp | Constraints | Description |
 |-----------|-------------|-------------|
 | all_durable | None | The largest timestamp such that all timestamps up to that value have been made durable (see @ref timestamp_prepare for discussion of the durable timestamp). |
-| last_checkpoint | <= stable | The stable timestamp at which the last checkpoint ran (or 0 if no checkpoints have run). |
+| last_checkpoint | <= stable | The stable timestamp at which the last checkpoint ran. |
 | oldest_reader | None | The timestamp of the oldest currently active read transaction. |
 | oldest_timestamp | <= stable | The current application-set \c oldest_timestamp value. |
 | pinned | <= oldest | The minimum of the \c oldest_timestamp and the oldest active reader. |
-| recovery | <= stable | The stable timestamp used in the most recent checkpoint prior to the last shutdown (or 0 if none available). |
+| recovery | <= stable | The stable timestamp used in the most recent checkpoint prior to the last shutdown. |
 | stable_timestamp | None | The current application-set \c stable_timestamp value. |
-
-In all cases, ::WT_NOTFOUND is returned if there is no matching timestamp.
 
 @subsection timestamp_global_query_api_all_durable Reading the "all_durable" timestamp
 

@@ -1647,11 +1647,11 @@ methods = {
 
 'WT_SESSION.query_timestamp' : Method([
     Config('get', 'read', r'''
-        specify which timestamp to query: \c commit returns the most recently
-        set commit_timestamp; \c first_commit returns the first set
-        commit_timestamp; \c prepare returns the timestamp used in preparing a
-        transaction; \c read returns the timestamp at which the transaction is
-        reading at. See @ref timestamp_txn_api''',
+        specify which timestamp to query: \c commit returns the most
+        recently set commit_timestamp; \c first_commit returns the first set
+        commit_timestamp; \c prepare returns the timestamp used in preparing
+        a transaction; \c read returns the timestamp at which the transaction
+        is reading. See @ref timestamp_txn_api''',
         choices=['commit', 'first_commit', 'prepare', 'read']),
 ]),
 
@@ -1666,10 +1666,6 @@ methods = {
 ]),
 
 'WT_SESSION.flush_tier' : Method([
-    Config('flush_timestamp', '', r'''
-        flush objects to all storage sources using the specified timestamp.
-        The value must not be older than the current oldest timestamp and it must
-        not be newer than the stable timestamp'''),
     Config('force', 'false', r'''
         force sharing of all data''',
         type='boolean'),
@@ -1823,6 +1819,7 @@ methods = {
         be newer than the current stable timestamp. See @ref timestamp_prepare'''),
 ]),
 
+'WT_SESSION.timestamp_transaction_uint' : Method([]),
 'WT_SESSION.timestamp_transaction' : Method([
     Config('commit_timestamp', '', r'''
         set the commit timestamp for the current transaction. For non-prepared transactions,
@@ -1962,8 +1959,8 @@ methods = {
         recent \c oldest_timestamp set with WT_CONNECTION::set_timestamp; \c oldest_reader
         returns the minimum of the read timestamps of all active readers; \c pinned returns
         the minimum of the \c oldest_timestamp and the read timestamps of all active readers;
-        \c recovery returns the timestamp of the most recent stable checkpoint taken prior to a
-        shutdown; \c stable_timestamp returns the most recent \c stable_timestamp set with
+        \c recovery returns the timestamp of the most recent stable checkpoint taken prior
+        to a shutdown; \c stable_timestamp returns the most recent \c stable_timestamp set with
         WT_CONNECTION::set_timestamp. (The \c oldest and \c stable arguments are deprecated
         short-hand for \c oldest_timestamp and \c stable_timestamp, respectively.) See @ref
         timestamp_global_api''',

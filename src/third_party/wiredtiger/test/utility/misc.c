@@ -261,19 +261,6 @@ testutil_clean_test_artifacts(const char *dir)
 }
 
 /*
- * testutil_timestamp_parse --
- *     Parse a timestamp to an integral value.
- */
-void
-testutil_timestamp_parse(const char *str, uint64_t *tsp)
-{
-    char *p;
-
-    *tsp = __wt_strtouq(str, &p, 16);
-    testutil_assert(p - str <= 16);
-}
-
-/*
  * testutil_create_backup_directory --
  *     TODO: Add a comment describing this function.
  */

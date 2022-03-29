@@ -63,8 +63,7 @@ class test_timestamp14(wttest.WiredTigerTestCase, suite_subprocess):
         cur1 = session1.open_cursor(all_durable_uri)
         cur1[1]=1
         session1.commit_transaction()
-        self.assertRaisesException(wiredtiger.WiredTigerError,
-            lambda: self.conn.query_timestamp('get=all_durable'))
+        self.assertEquals(self.conn.query_timestamp('get=all_durable'), "0")
 
         # Scenario 1: A single transaction with a commit timestamp, will
         # result in the all_durable timestamp being set.
@@ -143,8 +142,7 @@ class test_timestamp14(wttest.WiredTigerTestCase, suite_subprocess):
         session2.create(oldest_reader_uri, format)
 
         # Nothing is reading so there is no oldest reader.
-        self.assertRaisesException(wiredtiger.WiredTigerError,
-            lambda: self.conn.query_timestamp('get=oldest_reader'))
+        self.assertEquals(self.conn.query_timestamp('get=oldest_reader'), "0")
 
         # Write some data for reading.
         session1.begin_transaction()
@@ -153,8 +151,7 @@ class test_timestamp14(wttest.WiredTigerTestCase, suite_subprocess):
         session1.commit_transaction('commit_timestamp=5')
 
         # No active sessions so no oldest reader.
-        self.assertRaisesException(wiredtiger.WiredTigerError,
-            lambda: self.conn.query_timestamp('get=oldest_reader'))
+        self.assertEquals(self.conn.query_timestamp('get=oldest_reader'), "0")
 
         # Create an active read session.
         session1.begin_transaction('read_timestamp=5')
@@ -191,8 +188,7 @@ class test_timestamp14(wttest.WiredTigerTestCase, suite_subprocess):
 
         # Now that all read transactions have completed we will be back
         # to having no oldest reader.
-        self.assertRaisesException(wiredtiger.WiredTigerError,
-            lambda: self.conn.query_timestamp('get=oldest_reader'))
+        self.assertEquals(self.conn.query_timestamp('get=oldest_reader'), "0")
 
     def test_pinned_oldest(self):
         pinned_oldest_uri = self.uri + 'pinned_oldest'
@@ -200,12 +196,10 @@ class test_timestamp14(wttest.WiredTigerTestCase, suite_subprocess):
         format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         session1.create(pinned_oldest_uri, format)
         # Confirm no oldest timestamp exists.
-        self.assertRaisesException(wiredtiger.WiredTigerError,
-            lambda: self.conn.query_timestamp('get=oldest_timestamp'))
+        self.assertEquals(self.conn.query_timestamp('get=oldest_timestamp'), "0")
 
         # Confirm no pinned timestamp exists.
-        self.assertRaisesException(wiredtiger.WiredTigerError,
-            lambda: self.conn.query_timestamp('get=pinned'))
+        self.assertEquals(self.conn.query_timestamp('get=pinned'), "0")
 
         # Write some data for reading.
         session1.begin_transaction()
@@ -214,12 +208,10 @@ class test_timestamp14(wttest.WiredTigerTestCase, suite_subprocess):
         session1.commit_transaction('commit_timestamp=5')
 
         # Confirm no oldest timestamp exists.
-        self.assertRaisesException(wiredtiger.WiredTigerError,
-            lambda: self.conn.query_timestamp('get=oldest_timestamp'))
+        self.assertEquals(self.conn.query_timestamp('get=oldest_timestamp'), "0")
 
         # Confirm no pinned timestamp exists.
-        self.assertRaisesException(wiredtiger.WiredTigerError,
-            lambda: self.conn.query_timestamp('get=pinned'))
+        self.assertEquals(self.conn.query_timestamp('get=pinned'), "0")
 
         self.conn.set_timestamp('oldest_timestamp=5')
 

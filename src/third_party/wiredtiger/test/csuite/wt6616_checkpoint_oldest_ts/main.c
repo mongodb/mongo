@@ -372,11 +372,11 @@ main(int argc, char *argv[])
 
     /* Get the stable timestamp from the stable timestamp of the last successful checkpoint. */
     testutil_check(conn->query_timestamp(conn, ts_string, "get=stable_timestamp"));
-    testutil_timestamp_parse(ts_string, &stable_ts);
+    stable_ts = testutil_timestamp_parse(ts_string);
 
     /* Get the oldest timestamp from the oldest timestamp of the last successful checkpoint. */
     testutil_check(conn->query_timestamp(conn, ts_string, "get=oldest_timestamp"));
-    testutil_timestamp_parse(ts_string, &oldest_ts);
+    oldest_ts = testutil_timestamp_parse(ts_string);
 
     printf("Verify data from oldest timestamp %" PRIu64 " to stable timestamp %" PRIu64 "\n",
       oldest_ts, stable_ts);
