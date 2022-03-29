@@ -983,22 +983,15 @@ public:
 
     boost::optional<IndexKeyEntry> seek(const KeyString::Value& keyString,
                                         RequestedInfo parts = kKeyAndLoc) override {
-        seekForKeyString(keyString);
+        seekForKeyStringInternal(keyString);
         return curr(parts);
     }
 
     boost::optional<KeyStringEntry> seekForKeyString(
         const KeyString::Value& keyStringValue) override {
-        dassert(_opCtx->lockState()->isReadLocked());
-        seekWTCursor(keyStringValue);
-
-        updatePosition();
-        if (_eof)
-            return {};
-
-        dassert(!atOrPastEndPointAfterSeeking());
-        dassert(!_id.isNull());
-
+        if (!seekForKeyStringInternal(keyStringValue)) {
+            return boost::none;
+        }
         return getKeyStringEntry();
     }
 
@@ -1290,6 +1283,20 @@ protected:
         }
 
         updateIdAndTypeBits();
+    }
+
+    bool seekForKeyStringInternal(const KeyString::Value& keyStringValue) {
+        dassert(_opCtx->lockState()->isReadLocked());
+        seekWTCursor(keyStringValue);
+
+        updatePosition();
+        if (_eof)
+            return false;
+
+        dassert(!atOrPastEndPointAfterSeeking());
+        dassert(!_id.isNull());
+
+        return true;
     }
 
     bool advanceNext() {
