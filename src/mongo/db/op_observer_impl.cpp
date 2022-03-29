@@ -1981,6 +1981,10 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx) {
     auto& batchedWriteContext = BatchedWriteContext::get(opCtx);
     auto& batchedOps = batchedWriteContext.getBatchedOperations(opCtx);
 
+    if (!batchedOps.size()) {
+        return;
+    }
+
     // Reserve all the optimes in advance, so we only need to get the optime mutex once.  We
     // reserve enough entries for all statements in the transaction.
     auto oplogSlots = repl::getNextOpTimes(opCtx, batchedOps.size());

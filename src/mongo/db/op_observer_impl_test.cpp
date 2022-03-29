@@ -2494,6 +2494,23 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsGrouping) {
     }
 }
 
+// Verifies an empty WUOW doesn't generate an oplog entry.
+TEST_F(BatchedWriteOutputsTest, testEmptyWUOW) {
+    // Setup.
+    auto opCtxRaii = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxRaii.get();
+    reset(opCtx, NamespaceString::kRsOplogNamespace);
+    auto opObserverRegistry = std::make_unique<OpObserverRegistry>();
+    opObserverRegistry->addObserver(std::make_unique<OpObserverImpl>());
+    opCtx->getServiceContext()->setOpObserver(std::move(opObserverRegistry));
+
+    // Start and commit an empty WUOW.
+    WriteUnitOfWork wuow(opCtx, true /* groupOplogEntries */);
+    wuow.commit();
+
+    // The getNOplogEntries call below asserts that the oplog is empty.
+    getNOplogEntries(opCtx, 0);
+}
 class OnDeleteOutputsTest : public OpObserverTest {
 
 protected:

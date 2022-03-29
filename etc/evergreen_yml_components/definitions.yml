@@ -5116,6 +5116,38 @@ tasks:
       use_large_distro: "true"
 
 - <<: *gen_task_template
+  name: replica_sets_batched_deletes_passthrough_gen
+  tags: ["large", "batched_deletes"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+
+- <<: *gen_task_template
+  name: sharding_batched_deletes_passthrough_gen
+  tags: ["sharding", "large", "batched_deletes"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+
+- <<: *gen_task_template
+  name: change_streams_batched_deletes_passthrough_gen
+  tags: ["change_streams", "large", "batched_deletes"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+
+- <<: *gen_task_template
+  name: concurrency_replication_batched_deletes_passthrough_gen
+  tags: ["large", "batched_deletes"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+
+- <<: *gen_task_template
   name: parallel_gen
   tags: ["misc_js", "parallel"]
   commands:

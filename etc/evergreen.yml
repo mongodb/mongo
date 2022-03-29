@@ -241,6 +241,7 @@ buildvariants:
   - name: build_variant_gen
   - name: .aggregation !.encrypt
   - name: .auth !.audit !.multiversion
+  - name: .batched_deletes
   - name: .causally_consistent !.wo_snapshot
   - name: .change_streams !.secondary_reads
   - name: .clustered_collections
@@ -1511,6 +1512,7 @@ buildvariants:
   - name: audit
   - name: .auth
   - name: unittest_shell_hang_analyzer_gen
+  - name: .batched_deletes
   - name: .causally_consistent !.sharding
   - name: .change_streams
   - name: .change_stream_fuzzer

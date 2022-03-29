@@ -37,7 +37,7 @@ function populateAndMassDelete(queryPredicate) {
 
     // Verify the delete will involve the BATCHED_DELETE stage.
     const expl = testDB.runCommand({
-        explain: {delete: coll.getName(), deletes: [{q: {_id: {$gte: 0}}, limit: 0}]},
+        explain: {delete: coll.getName(), deletes: [{q: queryPredicate, limit: 0}]},
         verbosity: "executionStats"
     });
     assert.commandWorked(expl);
