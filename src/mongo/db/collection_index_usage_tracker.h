@@ -33,6 +33,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/global_index_usage_tracker.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/string_map.h"
@@ -41,6 +42,7 @@
 namespace mongo {
 
 class ClockSource;
+class ServiceContext;
 
 /**
  * CollectionIndexUsageTracker tracks index usage statistics for a collection.  An index is
@@ -68,18 +70,20 @@ public:
 
     struct IndexUsageStats : public RefCountable {
         IndexUsageStats() = default;
-        explicit IndexUsageStats(Date_t now, const BSONObj& key)
-            : trackerStartTime(now), indexKey(key.getOwned()) {}
+        explicit IndexUsageStats(Date_t now, const BSONObj& key, const IndexFeatures& idxFeatures)
+            : trackerStartTime(now), indexKey(key.getOwned()), features(idxFeatures) {}
 
         IndexUsageStats(const IndexUsageStats& other)
             : accesses(other.accesses.load()),
               trackerStartTime(other.trackerStartTime),
-              indexKey(other.indexKey) {}
+              indexKey(other.indexKey),
+              features(other.features) {}
 
         IndexUsageStats& operator=(const IndexUsageStats& other) {
             accesses.store(other.accesses.load());
             trackerStartTime = other.trackerStartTime;
             indexKey = other.indexKey;
+            features = other.features;
             return *this;
         }
 
@@ -91,6 +95,9 @@ public:
 
         // An owned copy of the associated IndexDescriptor's index key.
         BSONObj indexKey;
+
+        // Features in use by this index for global feature usage tracking.
+        IndexFeatures features;
     };
 
     /**
@@ -107,7 +114,8 @@ public:
      * Does not take ownership of 'clockSource'. 'clockSource' must refer to a non-null clock
      * source that is valid for the lifetime of the constructed CollectionIndexUsageTracker.
      */
-    explicit CollectionIndexUsageTracker(ClockSource* clockSource);
+    explicit CollectionIndexUsageTracker(GlobalIndexUsageTracker* globalTracker,
+                                         ClockSource* clockSource);
 
     /**
      * Record that an operation used index 'indexName'. Safe to be called by multiple threads
@@ -121,7 +129,9 @@ public:
      * Must be called under an exclusive collection lock in order to serialize calls to
      * registerIndex() and unregisterIndex().
      */
-    void registerIndex(StringData indexName, const BSONObj& indexKey);
+    void registerIndex(StringData indexName,
+                       const BSONObj& indexKey,
+                       const IndexFeatures& features);
 
     /**
      * Erase statistics for index 'indexName'. Can be safely called even if indexName is not
@@ -166,6 +176,10 @@ private:
     // Clock source. Used when the 'trackerStartTime' time for an IndexUsageStats object needs to
     // be set.
     ClockSource* _clockSource;
+
+    // All CollectionIndexUsageTrackers also update the GlobalIndexUsageTracker to report global
+    // index statistics for the server.
+    GlobalIndexUsageTracker* _globalIndexUsageTracker;
 
     AtomicWord<unsigned long long> _collectionScans{0};
     AtomicWord<unsigned long long> _collectionScansNonTailable{0};
