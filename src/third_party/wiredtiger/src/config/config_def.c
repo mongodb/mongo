@@ -354,7 +354,8 @@ static const WT_CONFIG_CHECK confchk_WT_SESSION_drop[] = {
   {NULL, NULL, NULL, NULL, NULL, 0}};
 
 static const WT_CONFIG_CHECK confchk_WT_SESSION_flush_tier[] = {
-  {"force", "boolean", NULL, NULL, NULL, 0}, {"lock_wait", "boolean", NULL, NULL, NULL, 0},
+  {"flush_timestamp", "string", NULL, NULL, NULL, 0}, {"force", "boolean", NULL, NULL, NULL, 0},
+  {"lock_wait", "boolean", NULL, NULL, NULL, 0},
   {"sync", "string", NULL, "choices=[\"off\",\"on\"]", NULL, 0},
   {"timeout", "int", NULL, NULL, NULL, 0}, {NULL, NULL, NULL, NULL, NULL, 0}};
 
@@ -1276,8 +1277,8 @@ static const WT_CONFIG_ENTRY config_entries[] = {{"WT_CONNECTION.add_collator", 
     "checkpoint_wait=true,force=false,lock_wait=true,"
     "remove_files=true",
     confchk_WT_SESSION_drop, 4},
-  {"WT_SESSION.flush_tier", "force=false,lock_wait=true,sync=on,timeout=0",
-    confchk_WT_SESSION_flush_tier, 4},
+  {"WT_SESSION.flush_tier", "flush_timestamp=,force=false,lock_wait=true,sync=on,timeout=0",
+    confchk_WT_SESSION_flush_tier, 5},
   {"WT_SESSION.join",
     "bloom_bit_count=16,bloom_false_positives=false,"
     "bloom_hash_count=8,compare=\"eq\",count=,operation=\"and\","
@@ -1312,8 +1313,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {{"WT_CONNECTION.add_collator", 
     "commit_timestamp=,durable_timestamp=,prepare_timestamp=,"
     "read_timestamp=",
     confchk_WT_SESSION_timestamp_transaction, 4},
-  {"WT_SESSION.timestamp_transaction_uint", "", NULL, 0}, {"WT_SESSION.truncate", "", NULL, 0},
-  {"WT_SESSION.upgrade", "", NULL, 0},
+  {"WT_SESSION.truncate", "", NULL, 0}, {"WT_SESSION.upgrade", "", NULL, 0},
   {"WT_SESSION.verify",
     "do_not_clear_txn_id=false,dump_address=false,dump_blocks=false,"
     "dump_layout=false,dump_offsets=,dump_pages=false,"

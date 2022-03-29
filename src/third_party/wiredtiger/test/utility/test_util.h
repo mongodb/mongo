@@ -234,12 +234,6 @@ typedef struct {
  */
 #define scan_end_check(a) testutil_assert(a)
 
-#ifdef _WIN32
-__declspec(noreturn)
-#endif
-  void testutil_die(int, const char *, ...) WT_GCC_FUNC_ATTRIBUTE((cold))
-    WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
-
 /*
  * u64_to_string --
  *     Convert a uint64_t to a text string. Algorithm from Andrei Alexandrescu's talk: "Three
@@ -295,23 +289,14 @@ u64_to_string_zf(uint64_t n, char *buf, size_t len)
         *--p = '0';
 }
 
-/*
- * testutil_timestamp_parse --
- *     Parse a timestamp to an integral value.
- */
-static inline uint64_t
-testutil_timestamp_parse(const char *str)
-{
-    uint64_t ts;
-    char *p;
-
-    ts = __wt_strtouq(str, &p, 16);
-    testutil_assert((size_t)(p - str) <= WT_TS_HEX_STRING_SIZE);
-    return (ts);
-}
-
 /* Allow tests to add their own death handling. */
 extern void (*custom_die)(void);
+
+#ifdef _WIN32
+__declspec(noreturn)
+#endif
+  void testutil_die(int, const char *, ...) WT_GCC_FUNC_ATTRIBUTE((cold))
+    WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 
 void *dcalloc(size_t, size_t);
 void *dmalloc(size_t);
@@ -348,6 +333,7 @@ void testutil_progress(TEST_OPTS *, const char *);
 #ifndef _WIN32
 void testutil_sleep_wait(uint32_t, pid_t);
 #endif
+void testutil_timestamp_parse(const char *, uint64_t *);
 void testutil_work_dir_from_path(char *, size_t, const char *);
 WT_THREAD_RET thread_append(void *);
 

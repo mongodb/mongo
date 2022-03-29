@@ -896,7 +896,6 @@ transaction_ops(WT_SESSION *session_arg)
     {
         /*! [hexadecimal timestamp] */
         uint64_t ts;
-
         /* 2 bytes for each byte converted to hexadecimal; sizeof includes the trailing nul byte */
         char timestamp_buf[sizeof("commit_timestamp=") + 2 * sizeof(uint64_t)];
 
@@ -921,12 +920,6 @@ transaction_ops(WT_SESSION *session_arg)
 
         error_check(conn->query_timestamp(conn, timestamp_buf, "get=all_durable"));
         /*! [query timestamp] */
-
-        error_check(session->begin_transaction(session, NULL));
-        /*! [transaction timestamp_uint] */
-        error_check(session->timestamp_transaction_uint(session, WT_TS_TXN_TYPE_COMMIT, 42));
-        /*! [transaction timestamp_uint] */
-        error_check(session->commit_transaction(session, NULL));
     }
 
     /*! [set durable timestamp] */

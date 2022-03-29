@@ -43,9 +43,7 @@ see @ref timestamp_misc_diagnostic.
 @section timestamp_txn_api_query Querying transaction timestamp information
 
 The following table lists the timestamps that can be queried using
-WT_SESSION::query_timestamp. In all cases, a timestamp of 0 is returned
-if the timestamp is not available or has not been set, for example, the
-\c commit timestamp if no commit timestamp has been set.
+WT_SESSION::query_timestamp:
 
 | Timestamp | Description |
 |-----------|-------------|
@@ -53,6 +51,8 @@ if the timestamp is not available or has not been set, for example, the
 | first_commit | the transaction's first/earliest set commit timestamp |
 | prepare | the timestamp used to prepare the transaction |
 | read | the timestamp at which the transaction is reading |
+
+In all cases, ::WT_NOTFOUND is returned if there is no matching timestamp.
 
 @section timestamp_txn_api_begin Configuring transaction timestamp information with WT_SESSION::begin_transaction
 

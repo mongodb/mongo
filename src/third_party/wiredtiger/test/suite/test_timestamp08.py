@@ -47,14 +47,10 @@ class test_timestamp08(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.commit_transaction(
             'commit_timestamp=' + self.timestamp_str(1))
 
-        # Cannot set a zero timestamp.
+        # Can set a zero timestamp. These calls shouldn't raise any errors.
         self.session.begin_transaction()
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.session.timestamp_transaction_uint(wiredtiger.WT_TS_TXN_TYPE_COMMIT, 0),
-            '/zero not permitted/')
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.session.timestamp_transaction_uint(wiredtiger.WT_TS_TXN_TYPE_READ, 0),
-            '/zero not permitted/')
+        self.session.timestamp_transaction_uint(wiredtiger.WT_TS_TXN_TYPE_COMMIT, 0)
+        self.session.timestamp_transaction_uint(wiredtiger.WT_TS_TXN_TYPE_READ, 0)
         self.session.rollback_transaction()
 
         # In a single transaction it is illegal to set a commit timestamp

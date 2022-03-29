@@ -31,25 +31,19 @@ timestamp_txn_api for a full explanation.
 @section timestamps_format Timestamp format
 
 Timestamps are 64-bit unsigned integers naming a point in application time.
-WiredTiger does not interpret timestamps other than expecting larger
-timestamps to correspond to later times. The timestamp value of zero is
-reserved, timestamps must be non-zero. It is not necessary for timestamp
-values to be clock time of any kind; an expected timestamp source is a global
-counter shared by instances of an application distributed across a network,
-individually running local WiredTiger databases.
+WiredTiger does not interpret timestamps other than expecting larger timestamps
+to correspond to later times. Timestamp 0 is reserved, so timestamps must
+start at 1 or greater. It is not necessary for timestamp values to be clock time
+of any kind; an expected timestamp source is a global counter shared by
+instances of an application distributed across a network, individually running
+local WiredTiger databases.
 
-Timestamps can be read from and written to the WiredTiger API as hexadecimal
-strings without any leading prefix like "0x". Applications using timestamps
-must format those values as hexadecimal when querying or setting timestamps
-in WiredTiger:
+Timestamps are read from and written to the WiredTiger API as hexadecimal
+strings without any leading prefix like "0x".  Applications using timestamps
+must format those time values as hexadecimal when querying or setting
+timestamps in WiredTiger:
 
 @snippet ex_all.c hexadecimal timestamp
-
-Also, timestamps can be written to the WiredTiger API as 64-bit unsigned
-integers in one fast-path case (where handling hexadecimal strings has shown
-itself to be a bottle-neck):
-
-@snippet ex_all.c transaction timestamp_uint
 
 @section timestamps_durability_commit Logged objects, commit-level durability and timestamps
 

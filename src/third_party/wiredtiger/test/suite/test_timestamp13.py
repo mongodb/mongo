@@ -50,9 +50,11 @@ class test_timestamp13(wttest.WiredTigerTestCase, suite_subprocess):
             'key_format=i,value_format=i' + self.extra_config)
 
         query_choices = ['commit', 'first_commit', 'prepare', 'read']
-        # Querying a session's timestamps when not in a transaction returns not-set values.
+        # Querying a session's timestamps will error when not in a transaction.
         for query in query_choices:
-            self.assertEqual(self.session.query_timestamp('get=' + query), "0")
+            self.assertRaises(
+                wiredtiger.WiredTigerError,
+                lambda: self.session.query_timestamp('get=' + query))
 
         self.session.begin_transaction()
         # Nothing has been set, all queries will return timestamp 0.
@@ -66,9 +68,11 @@ class test_timestamp13(wttest.WiredTigerTestCase, suite_subprocess):
             '/not a permitted choice for key/')
 
         self.session.rollback_transaction()
-        # Querying a session's timestamps when not in a transaction will return 0.
+        # Querying a session's timestamps will error when not in a transaction.
         for query in query_choices:
-            self.assertEqual(self.session.query_timestamp('get=' + query), '0')
+            self.assertRaises(
+                wiredtiger.WiredTigerError,
+                lambda: self.session.query_timestamp('get=' + query))
 
     def test_query_read_commit_timestamps(self):
         self.session.create(self.uri,

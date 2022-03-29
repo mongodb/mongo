@@ -823,6 +823,9 @@ struct __wt_session {
 	 *
 	 * @param session the session handle
 	 * @configstart{WT_SESSION.flush_tier, see dist/api_data.py}
+	 * @config{flush_timestamp, flush objects to all storage sources using the specified
+	 * timestamp.  The value must not be older than the current oldest timestamp and it must not
+	 * be newer than the stable timestamp., a string; default empty.}
 	 * @config{force, force sharing of all data., a boolean flag; default \c false.}
 	 * @config{lock_wait, wait for locks\, if \c lock_wait=false\, fail if any required locks
 	 * are not available immediately., a boolean flag; default \c true.}
@@ -1839,13 +1842,13 @@ struct __wt_session {
 	 * @config{get, specify which timestamp to query: \c commit returns the most recently set
 	 * commit_timestamp; \c first_commit returns the first set commit_timestamp; \c prepare
 	 * returns the timestamp used in preparing a transaction; \c read returns the timestamp at
-	 * which the transaction is reading.  See @ref timestamp_txn_api., a string\, chosen from
+	 * which the transaction is reading at.  See @ref timestamp_txn_api., a string\, chosen from
 	 * the following options: \c "commit"\, \c "first_commit"\, \c "prepare"\, \c "read";
 	 * default \c read.}
 	 * @configend
-	 *
-	 * A timestamp of 0 is returned if the timestamp is not available or has not been set.
 	 * @errors
+	 * ::WT_NOTFOUND is returned if the session is not in a transaction or there is no matching
+	 * timestamp.
 	 */
 	int __F(query_timestamp)(
 	    WT_SESSION *session, char *hex_timestamp, const char *config);
@@ -1889,19 +1892,18 @@ struct __wt_session {
 	int __F(timestamp_transaction)(WT_SESSION *session, const char *config);
 
 	/*!
-	 * Set a timestamp on a transaction numerically.  Prefer this method over
-	 * WT_SESSION::timestamp_transaction if the hexadecimal string parsing done in that method
-	 * becomes a bottleneck.
+	 * Set a timestamp on a transaction numerically.  Prefer this over @ref
+	 * timestamp_transaction when the string parsing done in that method becomes a bottleneck.
 	 *
-	 * The WT_SESSION.timestamp_transaction_uint method can only be used at snapshot isolation.
-	 *
-	 * @snippet ex_all.c transaction timestamp_uint
+	 * The WT_SESSION.timestamp_transaction_uint method can only be used at snapshot
+	 * isolation.
 	 *
 	 * @requires_transaction
 	 *
 	 * @param session the session handle
-	 * @param which the timestamp being set (see ::WT_TS_TXN_TYPE for available options, and
-	 * WT_SESSION::timestamp_transaction for constraints on the timestamps).
+	 * @param which the timestamp you wish to set. See @ref WT_TS_TXN_TYPE for available
+	 * options, and @ref timestamp_transaction for constraints on when timestamps can be
+	 * set.
 	 * @param ts the timestamp.
 	 * @errors
 	 */
@@ -2517,9 +2519,8 @@ struct __wt_connection {
 	 * "oldest_reader"\, \c "oldest_timestamp"\, \c "pinned"\, \c "recovery"\, \c "stable"\, \c
 	 * "stable_timestamp"; default \c all_durable.}
 	 * @configend
-	 *
-	 * A timestamp of 0 is returned if the timestamp is not available or has not been set.
 	 * @errors
+	 * ::WT_NOTFOUND is returned if there is no matching timestamp.
 	 */
 	int __F(query_timestamp)(
 	    WT_CONNECTION *connection, char *hex_timestamp, const char *config);

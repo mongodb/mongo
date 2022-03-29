@@ -429,7 +429,7 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, uint32_t flags)
 
     /* Try to move the pinned timestamp forward. */
     if (strict)
-        __wt_txn_update_pinned_timestamp(session, false);
+        WT_RET(__wt_txn_update_pinned_timestamp(session, false));
 
     /*
      * For pure read-only workloads, or if the update isn't forced and the oldest ID isn't too far
@@ -2096,14 +2096,13 @@ __wt_txn_stats_update(WT_SESSION_IMPL *session)
     WT_STAT_SET(session, stats, txn_pinned_timestamp_oldest,
       durable_timestamp - txn_global->oldest_timestamp);
 
-    __wt_txn_get_pinned_timestamp(session, &oldest_active_read_timestamp, 0);
-    if (oldest_active_read_timestamp == 0) {
-        WT_STAT_SET(session, stats, txn_timestamp_oldest_active_read, 0);
-        WT_STAT_SET(session, stats, txn_pinned_timestamp_reader, 0);
-    } else {
+    if (__wt_txn_get_pinned_timestamp(session, &oldest_active_read_timestamp, 0) == 0) {
         WT_STAT_SET(session, stats, txn_timestamp_oldest_active_read, oldest_active_read_timestamp);
         WT_STAT_SET(session, stats, txn_pinned_timestamp_reader,
           durable_timestamp - oldest_active_read_timestamp);
+    } else {
+        WT_STAT_SET(session, stats, txn_timestamp_oldest_active_read, 0);
+        WT_STAT_SET(session, stats, txn_pinned_timestamp_reader, 0);
     }
 
     WT_STAT_SET(session, stats, txn_pinned_checkpoint_range,

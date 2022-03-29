@@ -130,8 +130,11 @@ run_test(bool column_store, const char *uri, bool preserve)
     WT_CONNECTION *conn;
     WT_SESSION *session;
     pid_t pid;
+    uint64_t oldest_ts, stable_ts;
     int status;
-    char compact_file[2048], home[1024];
+    char compact_file[2048];
+    char home[1024];
+    char ts_string[WT_TS_HEX_STRING_SIZE];
 
     testutil_work_dir_from_path(
       home, sizeof(home), column_store ? working_dir_col : working_dir_row);
@@ -183,6 +186,14 @@ run_test(bool column_store, const char *uri, bool preserve)
     /* Open the connection which forces recovery to be run. */
     testutil_check(wiredtiger_open(home, NULL, ENV_CONFIG_REC, &conn));
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
+
+    /* Get the stable timestamp from the stable timestamp of the last successful checkpoint. */
+    testutil_check(conn->query_timestamp(conn, ts_string, "get=stable_timestamp"));
+    testutil_timestamp_parse(ts_string, &stable_ts);
+
+    /* Get the oldest timestamp from the oldest timestamp of the last successful checkpoint. */
+    testutil_check(conn->query_timestamp(conn, ts_string, "get=oldest_timestamp"));
+    testutil_timestamp_parse(ts_string, &oldest_ts);
 
     /*
      * Verify data is visible and correct after compact operation was killed and RTS is performed in
