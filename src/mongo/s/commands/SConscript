@@ -25,6 +25,7 @@ env.Library(
     source=[
         'cluster_abort_reshard_collection_cmd.cpp',
         'cluster_abort_transaction_cmd_s.cpp',
+        'cluster_oplog_note_cmd.cpp',
         'cluster_available_query_options_cmd.cpp',
         'cluster_build_info.cpp',
         'cluster_change_stream_options_command.cpp',
