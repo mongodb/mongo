@@ -54,7 +54,7 @@ Grid* Grid::get(OperationContext* operationContext) {
 
 void Grid::init(std::unique_ptr<ShardingCatalogClient> catalogClient,
                 std::unique_ptr<CatalogCache> catalogCache,
-                std::unique_ptr<ShardRegistry> shardRegistry,
+                std::shared_ptr<ShardRegistry> shardRegistry,
                 std::unique_ptr<ClusterCursorManager> cursorManager,
                 std::unique_ptr<BalancerConfiguration> balancerConfig,
                 std::unique_ptr<executor::TaskExecutorPool> executorPool,

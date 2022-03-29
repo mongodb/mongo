@@ -72,7 +72,7 @@ public:
      */
     void init(std::unique_ptr<ShardingCatalogClient> catalogClient,
               std::unique_ptr<CatalogCache> catalogCache,
-              std::unique_ptr<ShardRegistry> shardRegistry,
+              std::shared_ptr<ShardRegistry> shardRegistry,
               std::unique_ptr<ClusterCursorManager> cursorManager,
               std::unique_ptr<BalancerConfiguration> balancerConfig,
               std::unique_ptr<executor::TaskExecutorPool> executorPool,
@@ -145,7 +145,7 @@ public:
 private:
     std::unique_ptr<ShardingCatalogClient> _catalogClient;
     std::unique_ptr<CatalogCache> _catalogCache;
-    std::unique_ptr<ShardRegistry> _shardRegistry;
+    std::shared_ptr<ShardRegistry> _shardRegistry;
     std::unique_ptr<ClusterCursorManager> _cursorManager;
     std::unique_ptr<BalancerConfiguration> _balancerConfig;
 
