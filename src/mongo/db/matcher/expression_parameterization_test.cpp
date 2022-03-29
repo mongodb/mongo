@@ -36,17 +36,6 @@
 namespace mongo {
 
 namespace {
-struct MatchExpressionParameterizationTestVisitorContext
-    : public MatchExpressionParameterizationVisitorContext {
-    InputParamId nextInputParamId() override {
-        auto paramId = MatchExpressionParameterizationVisitorContext::nextInputParamId();
-        inputParamIds.insert(paramId);
-        return paramId;
-    }
-
-    std::set<MatchExpression::InputParamId> inputParamIds{};
-};
-
 void walkExpression(MatchExpressionParameterizationVisitorContext* context,
                     MatchExpression* expression) {
     MatchExpressionParameterizationVisitor visitor{context};
@@ -57,100 +46,100 @@ void walkExpression(MatchExpressionParameterizationVisitorContext* context,
 
 TEST(MatchExpressionParameterizationVisitor, AlwaysFalseMatchExpressionSetsNoParamIds) {
     AlwaysFalseMatchExpression expr{};
-    MatchExpressionParameterizationTestVisitorContext context{};
+    MatchExpressionParameterizationVisitorContext context{};
     MatchExpressionParameterizationVisitor visitor{&context};
     expr.acceptVisitor(&visitor);
-    ASSERT_EQ(0, context.inputParamIds.size());
+    ASSERT_EQ(0, context.inputParamIdToExpressionMap.size());
 }
 
 TEST(MatchExpressionParameterizationVisitor, AlwaysTrueMatchExpressionSetsNoParamIds) {
     AlwaysTrueMatchExpression expr{};
-    MatchExpressionParameterizationTestVisitorContext context{};
+    MatchExpressionParameterizationVisitorContext context{};
     MatchExpressionParameterizationVisitor visitor{&context};
     expr.acceptVisitor(&visitor);
-    ASSERT_EQ(0, context.inputParamIds.size());
+    ASSERT_EQ(0, context.inputParamIdToExpressionMap.size());
 }
 
 TEST(MatchExpressionParameterizationVisitor, BitsAllClearMatchExpressionSetsTwoParamIds) {
     std::vector<uint32_t> bitPositions;
     BitsAllClearMatchExpression expr{"a", bitPositions};
-    MatchExpressionParameterizationTestVisitorContext context{};
+    MatchExpressionParameterizationVisitorContext context{};
     MatchExpressionParameterizationVisitor visitor{&context};
     expr.acceptVisitor(&visitor);
-    ASSERT_EQ(2, context.inputParamIds.size());
+    ASSERT_EQ(2, context.inputParamIdToExpressionMap.size());
 }
 
 TEST(MatchExpressionParameterizationVisitor, BitsAllSetMatchExpressionSetsTwoParamIds) {
     std::vector<uint32_t> bitPositions;
     BitsAllSetMatchExpression expr{"a", bitPositions};
-    MatchExpressionParameterizationTestVisitorContext context{};
+    MatchExpressionParameterizationVisitorContext context{};
     MatchExpressionParameterizationVisitor visitor{&context};
     expr.acceptVisitor(&visitor);
-    ASSERT_EQ(2, context.inputParamIds.size());
+    ASSERT_EQ(2, context.inputParamIdToExpressionMap.size());
 }
 
 TEST(MatchExpressionParameterizationVisitor, BitsAnyClearMatchExpressionSetsTwoParamIds) {
     std::vector<uint32_t> bitPositions{0, 1, 8};
     BitsAnyClearMatchExpression expr{"a", bitPositions};
-    MatchExpressionParameterizationTestVisitorContext context{};
+    MatchExpressionParameterizationVisitorContext context{};
     MatchExpressionParameterizationVisitor visitor{&context};
     expr.acceptVisitor(&visitor);
-    ASSERT_EQ(2, context.inputParamIds.size());
+    ASSERT_EQ(2, context.inputParamIdToExpressionMap.size());
 }
 
 TEST(MatchExpressionParameterizationVisitor, BitsAnySetMatchExpressionSetsTwoParamIds) {
     std::vector<uint32_t> bitPositions{0, 1, 8};
     BitsAnySetMatchExpression expr{"a", bitPositions};
-    MatchExpressionParameterizationTestVisitorContext context{};
+    MatchExpressionParameterizationVisitorContext context{};
     MatchExpressionParameterizationVisitor visitor{&context};
     expr.acceptVisitor(&visitor);
-    ASSERT_EQ(2, context.inputParamIds.size());
+    ASSERT_EQ(2, context.inputParamIdToExpressionMap.size());
 }
 
 TEST(MatchExpressionParameterizationVisitor,
      EqualityMatchExpressionWithScalarParameterSetsOneParamId) {
     BSONObj query = BSON("a" << 5);
     EqualityMatchExpression eq("a", query["a"]);
-    MatchExpressionParameterizationTestVisitorContext context{};
+    MatchExpressionParameterizationVisitorContext context{};
     MatchExpressionParameterizationVisitor visitor{&context};
     eq.acceptVisitor(&visitor);
-    ASSERT_EQ(1, context.inputParamIds.size());
+    ASSERT_EQ(1, context.inputParamIdToExpressionMap.size());
 }
 
 TEST(MatchExpressionParameterizationVisitor, EqualityMatchExpressionWithNullSetsNoParamIds) {
     BSONObj query = BSON("a" << BSONNULL);
     EqualityMatchExpression eq{"a", query["a"]};
-    MatchExpressionParameterizationTestVisitorContext context{};
+    MatchExpressionParameterizationVisitorContext context{};
     MatchExpressionParameterizationVisitor visitor{&context};
     eq.acceptVisitor(&visitor);
-    ASSERT_EQ(0, context.inputParamIds.size());
+    ASSERT_EQ(0, context.inputParamIdToExpressionMap.size());
 }
 
 TEST(MatchExpressionParameterizationVisitor, EqualityMatchExpressionWithArraySetsNoParamIds) {
     BSONObj query = BSON("a" << BSON_ARRAY(1 << 2));
     EqualityMatchExpression eq{"a", query["a"]};
-    MatchExpressionParameterizationTestVisitorContext context{};
+    MatchExpressionParameterizationVisitorContext context{};
     MatchExpressionParameterizationVisitor visitor{&context};
     eq.acceptVisitor(&visitor);
-    ASSERT_EQ(0, context.inputParamIds.size());
+    ASSERT_EQ(0, context.inputParamIdToExpressionMap.size());
 }
 
 TEST(MatchExpressionParameterizationVisitor, EqualityMatchExpressionWithMinKeySetsNoParamIds) {
     BSONObj query = BSON("a" << MINKEY);
     EqualityMatchExpression eq{"a", query["a"]};
-    MatchExpressionParameterizationTestVisitorContext context{};
+    MatchExpressionParameterizationVisitorContext context{};
     MatchExpressionParameterizationVisitor visitor{&context};
     eq.acceptVisitor(&visitor);
-    ASSERT_EQ(0, context.inputParamIds.size());
+    ASSERT_EQ(0, context.inputParamIdToExpressionMap.size());
 }
 
 TEST(MatchExpressionParameterizationVisitor, EqualityMatchExpressionWithMaxKeySetsNoParamIds) {
     BSONObj query = BSON("a" << MAXKEY);
     EqualityMatchExpression eq{"a", query["a"]};
-    MatchExpressionParameterizationTestVisitorContext context{};
+    MatchExpressionParameterizationVisitorContext context{};
     MatchExpressionParameterizationVisitor visitor{&context};
     eq.acceptVisitor(&visitor);
-    ASSERT_EQ(0, context.inputParamIds.size());
+    ASSERT_EQ(0, context.inputParamIdToExpressionMap.size());
 }
 
 TEST(MatchExpressionParameterizationVisitor, EqualityMatchExpressionWithUndefinedThrows) {
@@ -161,10 +150,10 @@ TEST(MatchExpressionParameterizationVisitor, EqualityMatchExpressionWithUndefine
 TEST(MatchExpressionParameterizationVisitor, GTEMatchExpressionWithScalarParameterSetsOneParamId) {
     BSONObj query = BSON("$gte" << 5);
     GTEMatchExpression expr{"a", query["$gte"]};
-    MatchExpressionParameterizationTestVisitorContext context{};
+    MatchExpressionParameterizationVisitorContext context{};
     MatchExpressionParameterizationVisitor visitor{&context};
     expr.acceptVisitor(&visitor);
-    ASSERT_EQ(1, context.inputParamIds.size());
+    ASSERT_EQ(1, context.inputParamIdToExpressionMap.size());
 }
 
 TEST(MatchExpressionParameterizationVisitor, GTEMatchExpressionWithUndefinedThrows) {
@@ -175,28 +164,28 @@ TEST(MatchExpressionParameterizationVisitor, GTEMatchExpressionWithUndefinedThro
 TEST(MatchExpressionParameterizationVisitor, GTMatchExpressionWithScalarParameterSetsOneParamId) {
     BSONObj query = BSON("$gte" << 5);
     GTMatchExpression expr{"a", query["$gte"]};
-    MatchExpressionParameterizationTestVisitorContext context{};
+    MatchExpressionParameterizationVisitorContext context{};
     MatchExpressionParameterizationVisitor visitor{&context};
     expr.acceptVisitor(&visitor);
-    ASSERT_EQ(1, context.inputParamIds.size());
+    ASSERT_EQ(1, context.inputParamIdToExpressionMap.size());
 }
 
 TEST(MatchExpressionParameterizationVisitor, LTEMatchExpressionWithScalarParameterSetsOneParamId) {
     BSONObj query = BSON("$lte" << 5);
     LTEMatchExpression expr("a", query["$lte"]);
-    MatchExpressionParameterizationTestVisitorContext context{};
+    MatchExpressionParameterizationVisitorContext context{};
     MatchExpressionParameterizationVisitor visitor{&context};
     expr.acceptVisitor(&visitor);
-    ASSERT_EQ(1, context.inputParamIds.size());
+    ASSERT_EQ(1, context.inputParamIdToExpressionMap.size());
 }
 
 TEST(MatchExpressionParameterizationVisitor, LTMatchExpressionWithScalarParameterSetsOneParamId) {
     BSONObj query = BSON("$lt" << 5);
     LTMatchExpression expr{"a", query["$lt"]};
-    MatchExpressionParameterizationTestVisitorContext context{};
+    MatchExpressionParameterizationVisitorContext context{};
     MatchExpressionParameterizationVisitor visitor{&context};
     expr.acceptVisitor(&visitor);
-    ASSERT_EQ(1, context.inputParamIds.size());
+    ASSERT_EQ(1, context.inputParamIdToExpressionMap.size());
 }
 
 TEST(MatchExpressionParameterizationVisitor, ComparisonMatchExpressionsWithNaNSetsNoParamIds) {
@@ -214,10 +203,10 @@ TEST(MatchExpressionParameterizationVisitor, ComparisonMatchExpressionsWithNaNSe
 
     OrMatchExpression expr{std::move(expressions)};
 
-    MatchExpressionParameterizationTestVisitorContext context{};
+    MatchExpressionParameterizationVisitorContext context{};
     walkExpression(&context, &expr);
 
-    ASSERT_EQ(0, context.inputParamIds.size());
+    ASSERT_EQ(0, context.inputParamIdToExpressionMap.size());
 }
 
 TEST(MatchExpressionParameterizationVisitor, InMatchExpressionWithScalarsSetsOneParamId) {
@@ -226,10 +215,10 @@ TEST(MatchExpressionParameterizationVisitor, InMatchExpressionWithScalarsSetsOne
     std::vector<BSONElement> equalities{operand[0], operand[1], operand[2], operand[3]};
     ASSERT_OK(expr.setEqualities(std::move(equalities)));
 
-    MatchExpressionParameterizationTestVisitorContext context{};
+    MatchExpressionParameterizationVisitorContext context{};
     MatchExpressionParameterizationVisitor visitor{&context};
     expr.acceptVisitor(&visitor);
-    ASSERT_EQ(1, context.inputParamIds.size());
+    ASSERT_EQ(1, context.inputParamIdToExpressionMap.size());
 }
 
 TEST(MatchExpressionParameterizationVisitor, InMatchExpressionWithNullSetsNoParamIds) {
@@ -238,10 +227,10 @@ TEST(MatchExpressionParameterizationVisitor, InMatchExpressionWithNullSetsNoPara
     std::vector<BSONElement> equalities{operand[0], operand[1], operand[2], operand[3]};
     ASSERT_OK(expr.setEqualities(std::move(equalities)));
 
-    MatchExpressionParameterizationTestVisitorContext context{};
+    MatchExpressionParameterizationVisitorContext context{};
     MatchExpressionParameterizationVisitor visitor{&context};
     expr.acceptVisitor(&visitor);
-    ASSERT_EQ(0, context.inputParamIds.size());
+    ASSERT_EQ(0, context.inputParamIdToExpressionMap.size());
 }
 
 TEST(MatchExpressionParameterizationVisitor, InMatchExpressionWithRegexSetsNoParamIds) {
@@ -251,57 +240,57 @@ TEST(MatchExpressionParameterizationVisitor, InMatchExpressionWithRegexSetsNoPar
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_TRUE(result.isOK());
 
-    MatchExpressionParameterizationTestVisitorContext context{};
+    MatchExpressionParameterizationVisitorContext context{};
     walkExpression(&context, result.getValue().get());
-    ASSERT_EQ(0, context.nextInputParamId());
+    ASSERT_EQ(0, context.inputParamIdToExpressionMap.size());
 }
 
 TEST(MatchExpressionParameterizationVisitor, ModMatchExpressionSetsTwoParamIds) {
     ModMatchExpression expr{"a", 1, 2};
 
-    MatchExpressionParameterizationTestVisitorContext context{};
+    MatchExpressionParameterizationVisitorContext context{};
     MatchExpressionParameterizationVisitor visitor{&context};
     expr.acceptVisitor(&visitor);
-    ASSERT_EQ(2, context.inputParamIds.size());
+    ASSERT_EQ(2, context.inputParamIdToExpressionMap.size());
 }
 
 TEST(MatchExpressionParameterizationVisitor, RegexMatchExpressionSetsTwoParamIds) {
     RegexMatchExpression expr{"", "b", ""};
 
-    MatchExpressionParameterizationTestVisitorContext context{};
+    MatchExpressionParameterizationVisitorContext context{};
     MatchExpressionParameterizationVisitor visitor{&context};
     expr.acceptVisitor(&visitor);
-    ASSERT_EQ(2, context.inputParamIds.size());
-    ASSERT_EQ(2, context.nextInputParamId());
+    ASSERT_EQ(2, context.inputParamIdToExpressionMap.size());
+    ASSERT_EQ(2, context.nextInputParamId(nullptr));
 }
 
 TEST(MatchExpressionParameterizationVisitor, SizeMatchExpressionSetsOneParamId) {
     SizeMatchExpression expr{"a", 2};
 
-    MatchExpressionParameterizationTestVisitorContext context{};
+    MatchExpressionParameterizationVisitorContext context{};
     MatchExpressionParameterizationVisitor visitor{&context};
     expr.acceptVisitor(&visitor);
-    ASSERT_EQ(1, context.inputParamIds.size());
-    ASSERT_EQ(1, context.nextInputParamId());
+    ASSERT_EQ(1, context.inputParamIdToExpressionMap.size());
+    ASSERT_EQ(1, context.nextInputParamId(nullptr));
 }
 
 TEST(MatchExpressionParameterizationVisitor, TypeMatchExpressionWithStringSetsOneParamId) {
     TypeMatchExpression expr{"a", BSONType::String};
 
-    MatchExpressionParameterizationTestVisitorContext context{};
+    MatchExpressionParameterizationVisitorContext context{};
     MatchExpressionParameterizationVisitor visitor{&context};
     expr.acceptVisitor(&visitor);
     // TODO SERVER-64776: fix the test case
-    ASSERT_EQ(0, context.inputParamIds.size());
+    ASSERT_EQ(0, context.inputParamIdToExpressionMap.size());
 }
 
 TEST(MatchExpressionParameterizationVisitor, TypeMatchExpressionWithArraySetsNoParamIds) {
     TypeMatchExpression expr{"a", BSONType::Array};
 
-    MatchExpressionParameterizationTestVisitorContext context{};
+    MatchExpressionParameterizationVisitorContext context{};
     MatchExpressionParameterizationVisitor visitor{&context};
     expr.acceptVisitor(&visitor);
-    ASSERT_EQ(0, context.inputParamIds.size());
+    ASSERT_EQ(0, context.inputParamIdToExpressionMap.size());
 }
 
 TEST(MatchExpressionParameterizationVisitor, ExprMatchExpressionSetsNoParamsIds) {
@@ -312,9 +301,9 @@ TEST(MatchExpressionParameterizationVisitor, ExprMatchExpressionSetsNoParamsIds)
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_TRUE(result.isOK());
 
-    MatchExpressionParameterizationTestVisitorContext context{};
+    MatchExpressionParameterizationVisitorContext context{};
     walkExpression(&context, result.getValue().get());
-    ASSERT_EQ(0, context.nextInputParamId());
+    ASSERT_EQ(0, context.inputParamIdToExpressionMap.size());
 }
 
 TEST(MatchExpressionParameterizationVisitor,
@@ -335,8 +324,8 @@ TEST(MatchExpressionParameterizationVisitor,
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_TRUE(result.isOK());
 
-    MatchExpressionParameterizationTestVisitorContext context{};
+    MatchExpressionParameterizationVisitorContext context{};
     walkExpression(&context, result.getValue().get());
-    ASSERT_EQ(6, context.nextInputParamId());
+    ASSERT_EQ(6, context.inputParamIdToExpressionMap.size());
 }
 }  // namespace mongo

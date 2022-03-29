@@ -41,6 +41,7 @@ env.Library(
         "expression_index_knobs.idl",
         "expression_index.cpp",
         "index_bounds_builder.cpp",
+        "interval_evaluation_tree.cpp",
         "plan_cache_indexability.cpp",
         "plan_enumerator.cpp",
         "planner_access.cpp",
@@ -80,7 +81,6 @@ env.Library(
         "index_entry.cpp",
         "index_tag.cpp",
         "interval.cpp",
-        "interval_evaluation_tree.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",

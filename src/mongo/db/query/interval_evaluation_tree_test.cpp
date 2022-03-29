@@ -56,10 +56,10 @@ public:
         BSONObj obj = BSON("a" << predicate);
         auto expr = parseMatchExpression(obj);
         expr = MatchExpression::normalize(std::move(expr));
-        [[maybe_unused]] bool parameterized = MatchExpression::parameterize(expr.get());
+        auto inputParamIdMap = MatchExpression::parameterize(expr.get());
         BSONElement elt = obj.firstElement();
 
-        std::string actualResult = build(expr.get(), elt);
+        std::string actualResult = build(expr.get(), elt, inputParamIdMap);
 
         ASSERT_EQ(expectedResult, actualResult);
     }
@@ -69,11 +69,14 @@ public:
      *
      * Returns the built IET serialised as a string
      */
-    std::string build(const MatchExpression* expr, BSONElement elt) const {
+    std::string build(const MatchExpression* expr,
+                      BSONElement elt,
+                      const std::vector<const MatchExpression*>& inputParamIdMap) const {
         if (expr->matchType() == MatchExpression::AND) {
-            return buildIntersect(checked_cast<const AndMatchExpression*>(expr), elt);
+            return buildIntersect(
+                checked_cast<const AndMatchExpression*>(expr), elt, inputParamIdMap);
         } else {
-            return buildPredicate(expr, elt);
+            return buildPredicate(expr, elt, inputParamIdMap);
         }
     }
 
@@ -83,7 +86,9 @@ public:
      *
      * Returns the built IET serialised as a string
      */
-    std::string buildIntersect(const AndMatchExpression* expr, BSONElement elt) const {
+    std::string buildIntersect(const AndMatchExpression* expr,
+                               BSONElement elt,
+                               const std::vector<const MatchExpression*>& inputParamIdMap) const {
         OrderedIntervalList oil;
         IndexBoundsBuilder::BoundsTightness tightness;
         interval_evaluation_tree::Builder ietBuilder{};
@@ -100,6 +105,11 @@ public:
 
         auto iet = ietBuilder.done();
         ASSERT_TRUE(iet);
+
+        auto restoredOil =
+            interval_evaluation_tree::evaluateIntervals(*iet, inputParamIdMap, elt, _index);
+        ASSERT(oil == restoredOil);
+
         return ietToString(*iet);
     }
 
@@ -109,7 +119,9 @@ public:
      *
      * Returns the built IET serialised as a string
      */
-    std::string buildPredicate(const MatchExpression* expr, BSONElement elt) const {
+    std::string buildPredicate(const MatchExpression* expr,
+                               BSONElement elt,
+                               const std::vector<const MatchExpression*>& inputParamIdMap) const {
         OrderedIntervalList oil;
         IndexBoundsBuilder::BoundsTightness tightness;
         interval_evaluation_tree::Builder ietBuilder{};
@@ -118,6 +130,11 @@ public:
 
         auto iet = ietBuilder.done();
         ASSERT_TRUE(iet);
+
+        auto restoredOil =
+            interval_evaluation_tree::evaluateIntervals(*iet, inputParamIdMap, elt, _index);
+        ASSERT(oil == restoredOil);
+
         return ietToString(*iet);
     }
 

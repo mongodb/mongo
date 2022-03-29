@@ -53,10 +53,11 @@ TEST_F(IndexBoundsBuilderTest, TranslateExprEqualToNullIsInexactFetch) {
     BSONElement elt = keyPattern.firstElement();
     auto testIndex = buildSimpleIndexEntry(keyPattern);
     BSONObj obj = BSON("a" << BSON("$_internalExprEq" << BSONNULL));
-    auto expr = parseMatchExpression(obj);
+    auto [expr, inputParamIdMap] = parseMatchExpression(obj);
     OrderedIntervalList oil;
     IndexBoundsBuilder::BoundsTightness tightness;
-    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+    interval_evaluation_tree::Builder ietBuilder{};
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness, &ietBuilder);
     ASSERT_EQUALS(oil.name, "a");
     ASSERT_EQUALS(oil.intervals.size(), 2U);
     ASSERT_EQUALS(
@@ -65,6 +66,7 @@ TEST_F(IndexBoundsBuilderTest, TranslateExprEqualToNullIsInexactFetch) {
     ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
                   oil.intervals[1].compare(Interval(fromjson("{'': null, '': null}"), true, true)));
     ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
+    assertIET(inputParamIdMap, ietBuilder, elt, testIndex, oil);
 }
 
 TEST_F(IndexBoundsBuilderTest, TranslateEqualsToNullShouldBuildInexactBounds) {
@@ -72,16 +74,18 @@ TEST_F(IndexBoundsBuilderTest, TranslateEqualsToNullShouldBuildInexactBounds) {
     auto testIndex = buildSimpleIndexEntry(indexPattern);
 
     BSONObj obj = BSON("a" << BSONNULL);
-    auto expr = parseMatchExpression(obj);
+    auto [expr, inputParamIdMap] = parseMatchExpression(obj);
 
     OrderedIntervalList oil;
     IndexBoundsBuilder::BoundsTightness tightness;
+    interval_evaluation_tree::Builder ietBuilder{};
     IndexBoundsBuilder::translate(
-        expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness);
+        expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness, &ietBuilder);
 
     ASSERT_EQUALS(oil.name, "a");
     ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
     assertBoundsRepresentEqualsNull(oil);
+    assertIET(inputParamIdMap, ietBuilder, indexPattern.firstElement(), testIndex, oil);
 }
 
 TEST_F(IndexBoundsBuilderTest, TranslateDottedEqualsToNullShouldBuildInexactBounds) {
@@ -89,16 +93,18 @@ TEST_F(IndexBoundsBuilderTest, TranslateDottedEqualsToNullShouldBuildInexactBoun
     auto testIndex = buildSimpleIndexEntry(indexPattern);
 
     BSONObj obj = BSON("a.b" << BSONNULL);
-    auto expr = parseMatchExpression(obj);
+    auto [expr, inputParamIdMap] = parseMatchExpression(obj);
 
     OrderedIntervalList oil;
     IndexBoundsBuilder::BoundsTightness tightness;
+    interval_evaluation_tree::Builder ietBuilder{};
     IndexBoundsBuilder::translate(
-        expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness);
+        expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness, &ietBuilder);
 
     ASSERT_EQUALS(oil.name, "a.b");
     ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
     assertBoundsRepresentEqualsNull(oil);
+    assertIET(inputParamIdMap, ietBuilder, indexPattern.firstElement(), testIndex, oil);
 }
 
 TEST_F(IndexBoundsBuilderTest, TranslateEqualsToNullMultiKeyShouldBuildInexactBounds) {
@@ -107,16 +113,18 @@ TEST_F(IndexBoundsBuilderTest, TranslateEqualsToNullMultiKeyShouldBuildInexactBo
     testIndex.multikey = true;
 
     BSONObj obj = BSON("a" << BSONNULL);
-    auto expr = parseMatchExpression(obj);
+    auto [expr, inputParamIdMap] = parseMatchExpression(obj);
 
     OrderedIntervalList oil;
     IndexBoundsBuilder::BoundsTightness tightness;
+    interval_evaluation_tree::Builder ietBuilder{};
     IndexBoundsBuilder::translate(
-        expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness);
+        expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness, &ietBuilder);
 
     ASSERT_EQUALS(oil.name, "a");
     ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
     assertBoundsRepresentEqualsNull(oil);
+    assertIET(inputParamIdMap, ietBuilder, indexPattern.firstElement(), testIndex, oil);
 }
 
 TEST_F(IndexBoundsBuilderTest, TranslateEqualsToNullShouldBuildTwoIntervalsForHashedIndex) {
@@ -126,12 +134,13 @@ TEST_F(IndexBoundsBuilderTest, TranslateEqualsToNullShouldBuildTwoIntervalsForHa
     testIndex.type = IndexType::INDEX_HASHED;
 
     BSONObj obj = BSON("a" << BSONNULL);
-    auto expr = parseMatchExpression(obj);
+    auto [expr, inputParamIdMap] = parseMatchExpression(obj);
 
     OrderedIntervalList oil;
     IndexBoundsBuilder::BoundsTightness tightness;
+    interval_evaluation_tree::Builder ietBuilder{};
     IndexBoundsBuilder::translate(
-        expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness);
+        expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness, &ietBuilder);
 
     ASSERT_EQUALS(oil.name, "a");
     ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
@@ -163,6 +172,7 @@ TEST_F(IndexBoundsBuilderTest, TranslateEqualsToNullShouldBuildTwoIntervalsForHa
         ASSERT_EQ(secondInterval.start.numberLong(),
                   hashedNullInterval.firstElement().numberLong());
     }
+    assertIET(inputParamIdMap, ietBuilder, indexPattern.firstElement(), testIndex, oil);
 }
 
 /**
@@ -198,17 +208,20 @@ TEST_F(IndexBoundsBuilderTest, TranslateNotEqualToNullShouldBuildExactBoundsIfIn
     for (BSONObj obj : kNeNullQueries) {
         // It's necessary to call optimize since the $not will have a singleton $and child, which
         // IndexBoundsBuilder::translate cannot handle.
-        auto expr = MatchExpression::optimize(parseMatchExpression(obj));
+        auto [expr, inputParamIdMap] = parseMatchExpression(obj);
+        expr = MatchExpression::optimize(std::move(expr));
 
         OrderedIntervalList oil;
         IndexBoundsBuilder::BoundsTightness tightness;
+        interval_evaluation_tree::Builder ietBuilder{};
         IndexBoundsBuilder::translate(
-            expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness);
+            expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness, &ietBuilder);
 
         // Bounds should be [MinKey, undefined), (null, MaxKey].
         ASSERT_EQUALS(oil.name, "a");
         ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
         assertBoundsRepresentNotEqualsNull(oil);
+        assertIET(inputParamIdMap, ietBuilder, indexPattern.firstElement(), testIndex, oil);
     }
 }
 
@@ -222,17 +235,20 @@ TEST_F(IndexBoundsBuilderTest,
     for (BSONObj obj : kNeNullQueries) {
         // It's necessary to call optimize since the $not will have a singleton $and child, which
         // IndexBoundsBuilder::translate cannot handle.
-        auto expr = MatchExpression::optimize(parseMatchExpression(obj));
+        auto [expr, inputParamIdMap] = parseMatchExpression(obj);
+        expr = MatchExpression::optimize(std::move(expr));
 
         OrderedIntervalList oil;
         IndexBoundsBuilder::BoundsTightness tightness;
+        interval_evaluation_tree::Builder ietBuilder{};
         IndexBoundsBuilder::translate(
-            expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness);
+            expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness, &ietBuilder);
 
         // Bounds should be [MinKey, undefined), (null, MaxKey].
         ASSERT_EQUALS(oil.name, "a");
         ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
         assertBoundsRepresentNotEqualsNull(oil);
+        assertIET(inputParamIdMap, ietBuilder, indexPattern.firstElement(), testIndex, oil);
     }
 }
 
@@ -243,17 +259,20 @@ TEST_F(IndexBoundsBuilderTest, TranslateNotEqualToNullShouldBuildExactBoundsOnRe
     for (BSONObj obj : kNeNullQueries) {
         // It's necessary to call optimize since the $not will have a singleton $and child, which
         // IndexBoundsBuilder::translate cannot handle.
-        auto expr = MatchExpression::optimize(parseMatchExpression(obj));
+        auto [expr, inputParamIdMap] = parseMatchExpression(obj);
+        expr = MatchExpression::optimize(std::move(expr));
 
         OrderedIntervalList oil;
         IndexBoundsBuilder::BoundsTightness tightness;
+        interval_evaluation_tree::Builder ietBuilder{};
         IndexBoundsBuilder::translate(
-            expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness);
+            expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness, &ietBuilder);
 
         // Bounds should be [MinKey, undefined), (null, MaxKey].
         ASSERT_EQUALS(oil.name, "a");
         ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
         assertBoundsRepresentNotEqualsNull(oil);
+        assertIET(inputParamIdMap, ietBuilder, indexPattern.firstElement(), testIndex, oil);
     }
 }
 
@@ -265,16 +284,19 @@ TEST_F(IndexBoundsBuilderTest, TranslateNotEqualToNullShouldBuildInexactBoundsIf
     for (BSONObj obj : kNeNullQueries) {
         // It's necessary to call optimize since the $not will have a singleton $and child, which
         // IndexBoundsBuilder::translate cannot handle.
-        auto expr = MatchExpression::optimize(parseMatchExpression(obj));
+        auto [expr, inputParamIdMap] = parseMatchExpression(obj);
+        expr = MatchExpression::optimize(std::move(expr));
 
         OrderedIntervalList oil;
         IndexBoundsBuilder::BoundsTightness tightness;
+        interval_evaluation_tree::Builder ietBuilder{};
         IndexBoundsBuilder::translate(
-            expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness);
+            expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness, &ietBuilder);
 
         ASSERT_EQUALS(oil.name, "a");
         ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
         assertBoundsRepresentNotEqualsNull(oil);
+        assertIET(inputParamIdMap, ietBuilder, indexPattern.firstElement(), testIndex, oil);
     }
 }
 
@@ -288,16 +310,18 @@ TEST_F(IndexBoundsBuilderTest, TranslateInequalityToNullShouldProduceExactEmptyB
     for (BSONObj obj : inequalities) {
         // It's necessary to call optimize since the $not will have a singleton $and child, which
         // IndexBoundsBuilder::translate cannot handle.
-        auto expr = parseMatchExpression(obj);
+        auto [expr, inputParamIdMap] = parseMatchExpression(obj);
 
         OrderedIntervalList oil;
         IndexBoundsBuilder::BoundsTightness tightness;
+        interval_evaluation_tree::Builder ietBuilder{};
         IndexBoundsBuilder::translate(
-            expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness);
+            expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness, &ietBuilder);
 
         ASSERT_EQUALS(oil.name, "a");
         ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
         ASSERT(oil.intervals.empty());
+        assertIET(inputParamIdMap, ietBuilder, indexPattern.firstElement(), testIndex, oil);
     }
 }
 
@@ -312,17 +336,20 @@ TEST_F(IndexBoundsBuilderTest, TranslateNotInequalityToNullShouldProduceExactFul
     for (BSONObj obj : inequalities) {
         // It's necessary to call optimize since the $not will have a singleton $and child, which
         // IndexBoundsBuilder::translate cannot handle.
-        auto expr = MatchExpression::optimize(parseMatchExpression(obj));
+        auto [expr, inputParamIdMap] = parseMatchExpression(obj);
+        expr = MatchExpression::optimize(std::move(expr));
 
         OrderedIntervalList oil;
         IndexBoundsBuilder::BoundsTightness tightness;
+        interval_evaluation_tree::Builder ietBuilder{};
         IndexBoundsBuilder::translate(
-            expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness);
+            expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness, &ietBuilder);
 
         ASSERT_EQUALS(oil.name, "a");
         ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
         ASSERT_EQ(oil.intervals.size(), 1);
         ASSERT(oil.intervals.front().isMinToMax());
+        assertIET(inputParamIdMap, ietBuilder, indexPattern.firstElement(), testIndex, oil);
     }
 }
 
@@ -339,17 +366,20 @@ TEST_F(IndexBoundsBuilderTest,
     for (BSONObj obj : inequalities) {
         // It's necessary to call optimize since the $not will have a singleton $and child, which
         // IndexBoundsBuilder::translate cannot handle.
-        auto expr = MatchExpression::optimize(parseMatchExpression(obj));
+        auto [expr, inputParamIdMap] = parseMatchExpression(obj);
+        expr = MatchExpression::optimize(std::move(expr));
 
         OrderedIntervalList oil;
         IndexBoundsBuilder::BoundsTightness tightness;
+        interval_evaluation_tree::Builder ietBuilder{};
         IndexBoundsBuilder::translate(
-            expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness);
+            expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness, &ietBuilder);
 
         ASSERT_EQUALS(oil.name, "a");
         ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
         ASSERT_EQ(oil.intervals.size(), 1);
         ASSERT(oil.intervals.front().isMinToMax());
+        assertIET(inputParamIdMap, ietBuilder, indexPattern.firstElement(), testIndex, oil);
     }
 }
 
@@ -360,16 +390,18 @@ TEST_F(IndexBoundsBuilderTest,
     testIndex.multikeyPaths = {{1}};  // "a.b" is multikey.
 
     BSONObj matchObj = BSON("a.b" << BSON("$elemMatch" << BSON("$ne" << BSONNULL)));
-    auto expr = parseMatchExpression(matchObj);
+    auto [expr, inputParamIdMap] = parseMatchExpression(matchObj);
 
     OrderedIntervalList oil;
     IndexBoundsBuilder::BoundsTightness tightness;
+    interval_evaluation_tree::Builder ietBuilder{};
     IndexBoundsBuilder::translate(
-        expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness);
+        expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness, &ietBuilder);
 
     ASSERT_EQUALS(oil.name, "a.b");
     ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
     assertBoundsRepresentNotEqualsNull(oil);
+    assertIET(inputParamIdMap, ietBuilder, indexPattern.firstElement(), testIndex, oil);
 }
 
 TEST_F(IndexBoundsBuilderTest,
@@ -379,16 +411,18 @@ TEST_F(IndexBoundsBuilderTest,
     testIndex.multikey = true;
 
     BSONObj matchObj = BSON("a.b" << BSON("$ne" << BSONNULL));
-    auto expr = parseMatchExpression(matchObj);
+    auto [expr, inputParamIdMap] = parseMatchExpression(matchObj);
 
     OrderedIntervalList oil;
     IndexBoundsBuilder::BoundsTightness tightness;
+    interval_evaluation_tree::Builder ietBuilder{};
     IndexBoundsBuilder::translate(
-        expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness);
+        expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness, &ietBuilder);
 
     ASSERT_EQUALS(oil.name, "a.b");
     ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
     assertBoundsRepresentNotEqualsNull(oil);
+    assertIET(inputParamIdMap, ietBuilder, indexPattern.firstElement(), testIndex, oil);
 }
 
 TEST_F(IndexBoundsBuilderTest,
@@ -398,16 +432,18 @@ TEST_F(IndexBoundsBuilderTest,
     testIndex.multikey = true;
 
     BSONObj obj = BSON("a" << BSON("$elemMatch" << BSON("$ne" << BSONNULL)));
-    auto expr = parseMatchExpression(obj);
+    auto [expr, inputParamIdMap] = parseMatchExpression(obj);
     BSONElement elt = obj.firstElement();
 
     OrderedIntervalList oil;
     IndexBoundsBuilder::BoundsTightness tightness;
-    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+    interval_evaluation_tree::Builder ietBuilder{};
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness, &ietBuilder);
 
     ASSERT_EQUALS(oil.name, "a");
     ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
     assertBoundsRepresentNotEqualsNull(oil);
+    assertIET(inputParamIdMap, ietBuilder, elt, testIndex, oil);
 }
 
 TEST_F(IndexBoundsBuilderTest,
@@ -416,16 +452,18 @@ TEST_F(IndexBoundsBuilderTest,
     auto testIndex = buildSimpleIndexEntry(indexPattern);
 
     BSONObj matchObj = BSON("a" << BSON("$elemMatch" << BSON("$ne" << BSONNULL)));
-    auto expr = parseMatchExpression(matchObj);
+    auto [expr, inputParamIdMap] = parseMatchExpression(matchObj);
 
     OrderedIntervalList oil;
     IndexBoundsBuilder::BoundsTightness tightness;
+    interval_evaluation_tree::Builder ietBuilder{};
     IndexBoundsBuilder::translate(
-        expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness);
+        expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness, &ietBuilder);
 
     ASSERT_EQUALS(oil.name, "a");
     ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
     assertBoundsRepresentNotEqualsNull(oil);
+    assertIET(inputParamIdMap, ietBuilder, indexPattern.firstElement(), testIndex, oil);
 }
 
 }  // namespace

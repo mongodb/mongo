@@ -207,7 +207,7 @@ Status CanonicalQuery::init(OperationContext* opCtx,
         feature_flags::gFeatureFlagAutoParameterization.isEnabledAndIgnoreFCV()) {
         // Both the SBE plan cache and auto-parameterization are enabled. Add parameter markers to
         // the appropriate match expression leaf nodes.
-        _parameterized = MatchExpression::parameterize(_root.get());
+        _inputParamIdToExpressionMap = MatchExpression::parameterize(_root.get());
     }
     // The tree must always be valid after normalization.
     dassert(isValid(_root.get(), *_findCommand).isOK());

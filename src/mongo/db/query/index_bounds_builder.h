@@ -113,7 +113,7 @@ public:
                           const IndexEntry& index,
                           OrderedIntervalList* oilOut,
                           BoundsTightness* tightnessOut,
-                          interval_evaluation_tree::Builder* ietBuilder = nullptr);
+                          interval_evaluation_tree::Builder* ietBuilder);
 
     /**
      * Creates bounds for 'expr' (indexed according to 'elt').  Intersects those bounds

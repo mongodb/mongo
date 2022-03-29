@@ -132,4 +132,19 @@ public:
 private:
     std::stack<IET> _intervals;
 };
+
+/**
+ * Evaluate OrderedIntervalList for the given MatchExpression tree using pre-built IET.
+ *
+ * @param iet is Interval Evaluation Tree to evaluate index intervals
+ * @param inputParamIdMap is a map from assigned inputParamId to MatchExpression, it is used to
+ * evaluate EvalNodes
+ * @param elt is the index pattern field for which intervals are evaluated
+ * @param index is the index entry for which intervals are evaluated
+ * @return evaluted ordered interval list
+ */
+OrderedIntervalList evaluateIntervals(const IET& iet,
+                                      const std::vector<const MatchExpression*>& inputParamIdMap,
+                                      const BSONElement& elt,
+                                      const IndexEntry& index);
 }  // namespace mongo::interval_evaluation_tree

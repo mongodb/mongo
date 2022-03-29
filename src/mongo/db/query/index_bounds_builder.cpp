@@ -387,7 +387,7 @@ bool IndexBoundsBuilder::canUseCoveredMatching(const MatchExpression* expr,
                                                const IndexEntry& index) {
     IndexBoundsBuilder::BoundsTightness tightness;
     OrderedIntervalList oil;
-    translate(expr, BSONElement{}, index, &oil, &tightness);
+    translate(expr, BSONElement{}, index, &oil, &tightness, /* iet::Builder */ nullptr);
     return tightness >= IndexBoundsBuilder::INEXACT_COVERED;
 }
 

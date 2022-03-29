@@ -234,7 +234,11 @@ public:
     }
 
     bool isParameterized() const {
-        return _parameterized;
+        return !_inputParamIdToExpressionMap.empty();
+    }
+
+    const std::vector<const MatchExpression*>& getInputParamIdToMatchExpressionMap() const {
+        return _inputParamIdToExpressionMap;
     }
 
     void setExplain(bool explain) {
@@ -299,8 +303,8 @@ private:
     // True if this query can be executed by the SBE.
     bool _sbeCompatible = false;
 
-    // True if the query has at least one parameter marker.
-    bool _parameterized = false;
+    // A map from assigned InputParamId's to parameterised MatchExpression's.
+    std::vector<const MatchExpression*> _inputParamIdToExpressionMap;
 };
 
 }  // namespace mongo

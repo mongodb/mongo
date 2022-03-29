@@ -32,6 +32,7 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/index_bounds_builder.h"
+#include "mongo/db/query/interval_evaluation_tree.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -41,11 +42,14 @@ public:
     /**
      * Utility function to create MatchExpression
      */
-    std::unique_ptr<MatchExpression> parseMatchExpression(const BSONObj& obj) {
+    std::pair<std::unique_ptr<MatchExpression>, std::vector<const MatchExpression*>>
+    parseMatchExpression(const BSONObj& obj) {
         boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
         StatusWithMatchExpression status = MatchExpressionParser::parse(obj, std::move(expCtx));
         ASSERT_TRUE(status.isOK());
-        return std::unique_ptr<MatchExpression>(status.getValue().release());
+        auto expr = MatchExpression::normalize(std::move(status.getValue()));
+        auto inputParamIdMap = MatchExpression::parameterize(expr.get());
+        return {std::move(expr), inputParamIdMap};
     }
 
     /**
@@ -97,14 +101,23 @@ public:
         auto testIndex = buildSimpleIndexEntry();
 
         for (auto it = toUnion.begin(); it != toUnion.end(); ++it) {
-            auto expr = parseMatchExpression(*it);
+            auto [expr, inputParamIdMap] = parseMatchExpression(*it);
             BSONElement elt = it->firstElement();
             if (toUnion.begin() == it) {
-                IndexBoundsBuilder::translate(
-                    expr.get(), elt, testIndex, oilOut, tightnessOut, /* iet::Builder */ nullptr);
+                IndexBoundsBuilder::translate(expr.get(),
+                                              elt,
+                                              testIndex,
+                                              oilOut,
+                                              tightnessOut,
+                                              /* interval_evaluation_tree::Builder */ nullptr);
             } else {
                 IndexBoundsBuilder::translateAndUnion(
-                    expr.get(), elt, testIndex, oilOut, tightnessOut, /* iet::Builder */ nullptr);
+                    expr.get(),
+                    elt,
+                    testIndex,
+                    oilOut,
+                    tightnessOut,
+                    /* interval_evaluation_tree::Builder */ nullptr);
             }
         }
     }
@@ -119,14 +132,23 @@ public:
         auto testIndex = buildSimpleIndexEntry();
 
         for (auto it = toIntersect.begin(); it != toIntersect.end(); ++it) {
-            auto expr = parseMatchExpression(*it);
+            auto [expr, inputParamIdMap] = parseMatchExpression(*it);
             BSONElement elt = it->firstElement();
             if (toIntersect.begin() == it) {
-                IndexBoundsBuilder::translate(
-                    expr.get(), elt, testIndex, oilOut, tightnessOut, /* iet::Builder */ nullptr);
+                IndexBoundsBuilder::translate(expr.get(),
+                                              elt,
+                                              testIndex,
+                                              oilOut,
+                                              tightnessOut,
+                                              /* interval_evaluation_tree::Builder */ nullptr);
             } else {
                 IndexBoundsBuilder::translateAndIntersect(
-                    expr.get(), elt, testIndex, oilOut, tightnessOut, /* iet::Builder */ nullptr);
+                    expr.get(),
+                    elt,
+                    testIndex,
+                    oilOut,
+                    tightnessOut,
+                    /* interval_evaluation_tree::Builder */ nullptr);
             }
         }
     }
@@ -146,17 +168,31 @@ public:
         for (auto it = constraints.begin(); it != constraints.end(); ++it) {
             BSONObj obj = it->first;
             bool isIntersect = it->second;
-            auto expr = parseMatchExpression(obj);
+            auto [expr, inputParamIdMap] = parseMatchExpression(obj);
             BSONElement elt = obj.firstElement();
             if (constraints.begin() == it) {
-                IndexBoundsBuilder::translate(
-                    expr.get(), elt, testIndex, oilOut, tightnessOut, /* iet::Builder */ nullptr);
+                IndexBoundsBuilder::translate(expr.get(),
+                                              elt,
+                                              testIndex,
+                                              oilOut,
+                                              tightnessOut,
+                                              /* interval_evaluation_tree::Builder */ nullptr);
             } else if (isIntersect) {
                 IndexBoundsBuilder::translateAndIntersect(
-                    expr.get(), elt, testIndex, oilOut, tightnessOut, /* iet::Builder */ nullptr);
+                    expr.get(),
+                    elt,
+                    testIndex,
+                    oilOut,
+                    tightnessOut,
+                    /* interval_evaluation_tree::Builder */ nullptr);
             } else {
                 IndexBoundsBuilder::translateAndUnion(
-                    expr.get(), elt, testIndex, oilOut, tightnessOut, /* iet::Builder */ nullptr);
+                    expr.get(),
+                    elt,
+                    testIndex,
+                    oilOut,
+                    tightnessOut,
+                    /* interval_evaluation_tree::Builder */ nullptr);
             }
         }
     }
@@ -179,6 +215,19 @@ public:
         bob.appendNumber("", start);
         bob.appendMaxKey("");
         return bob.obj();
+    }
+
+    static void assertIET(const std::vector<const MatchExpression*>& inputParamIdMap,
+                          const interval_evaluation_tree::Builder& ietBuilder,
+                          const BSONElement& elt,
+                          const IndexEntry& index,
+                          const OrderedIntervalList& oil) {
+        auto iet = ietBuilder.done();
+        ASSERT(iet);
+
+        auto restoredOil =
+            interval_evaluation_tree::evaluateIntervals(*iet, inputParamIdMap, elt, index);
+        ASSERT(oil == restoredOil);
     }
 };
 

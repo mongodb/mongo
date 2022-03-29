@@ -113,6 +113,64 @@ auto extractInputParamId(const MatchExpression* expr) {
     return checked_cast<const T*>(expr)->getInputParamId();
 }
 
+/**
+ * Evaluates given Interval Evalution Tree to index bounds represented by OrderedIntervalList.
+ *
+ * This class is intended to live for a short period only as it keeps references to some external
+ * objects such as the index entry, BSONElement and inputParamIdMap and it is imperative that the
+ * referenced objects stay alive for the lifetime of the class.
+ */
+class IntervalEvalTransporter {
+public:
+    IntervalEvalTransporter(const std::vector<const MatchExpression*>& inputParamIdMap,
+                            const IndexEntry& index,
+                            const BSONElement& elt)
+        : _index{index}, _elt{elt}, _inputParamIdMap{inputParamIdMap} {}
+
+    OrderedIntervalList transport(const IntersectNode&,
+                                  OrderedIntervalList&& left,
+                                  OrderedIntervalList&& right) const {
+        IndexBoundsBuilder::intersectize(right, &left);
+        return std::move(left);
+    }
+
+    OrderedIntervalList transport(const UnionNode&,
+                                  OrderedIntervalList&& left,
+                                  OrderedIntervalList&& right) const {
+        for (auto&& interval : right.intervals) {
+            left.intervals.emplace_back(std::move(interval));
+        }
+
+        IndexBoundsBuilder::unionize(&left);
+        return std::move(left);
+    }
+
+    OrderedIntervalList transport(const ComplementNode&, OrderedIntervalList&& child) const {
+        child.complement();
+        return std::move(child);
+    }
+
+    OrderedIntervalList transport(const EvalNode& node) const {
+        tassert(6335000,
+                "InputParamId is not found",
+                static_cast<size_t>(node.inputParamId()) < _inputParamIdMap.size());
+        auto expr = _inputParamIdMap[node.inputParamId()];
+
+        OrderedIntervalList oil{};
+        IndexBoundsBuilder::BoundsTightness tightness;
+        IndexBoundsBuilder::translate(expr, _elt, _index, &oil, &tightness, nullptr);
+        return oil;
+    }
+
+    OrderedIntervalList transport(const ConstNode& node) const {
+        return node.oil;
+    }
+
+private:
+    const IndexEntry& _index;
+    const BSONElement& _elt;
+    const std::vector<const MatchExpression*>& _inputParamIdMap;
+};
 }  // namespace
 
 std::string ietToString(const IET& iet) {
@@ -210,5 +268,13 @@ boost::optional<IET> Builder::done() const {
 
     tassert(6334807, "All intervals should be merged into one", _intervals.size() == 1);
     return _intervals.top();
+}
+
+OrderedIntervalList evaluateIntervals(const IET& iet,
+                                      const std::vector<const MatchExpression*>& inputParamIdMap,
+                                      const BSONElement& elt,
+                                      const IndexEntry& index) {
+    IntervalEvalTransporter transporter{inputParamIdMap, index, elt};
+    return optimizer::algebra::transport(iet, transporter);
 }
 }  // namespace mongo::interval_evaluation_tree
