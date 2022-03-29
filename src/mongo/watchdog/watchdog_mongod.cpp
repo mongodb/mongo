@@ -117,9 +117,13 @@ public:
     }
 
     BSONObj generateSection(OperationContext* opCtx, const BSONElement& configElement) const {
-        BSONObjBuilder result;
+        if (!watchdogEnabled) {
+            return BSONObj();
+        }
 
+        BSONObjBuilder result;
         WatchdogMonitor* watchdog = getWatchdogMonitor(opCtx->getServiceContext()).get();
+        invariant(watchdog);
 
         result.append("checkGeneration", watchdog->getCheckGeneration());
         result.append("monitorGeneration", watchdog->getMonitorGeneration());
