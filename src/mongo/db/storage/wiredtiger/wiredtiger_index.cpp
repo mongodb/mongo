@@ -82,7 +82,6 @@ namespace mongo {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(WTCompactIndexEBUSY);
-MONGO_FAIL_POINT_DEFINE(WTEmulateOutOfOrderNextIndexKey);
 MONGO_FAIL_POINT_DEFINE(WTIndexPauseAfterSearchNear);
 
 static const WiredTigerItem emptyItem(nullptr, 0);
@@ -1242,35 +1241,23 @@ protected:
         WT_ITEM item;
         getKey(c, &item);
 
-        const auto isForwardNextCall = _forward && inNext && !_key.isEmpty();
-        if (isForwardNextCall) {
-            // Due to a bug in wired tiger (SERVER-21867) sometimes calling next
-            // returns something prev.
+        if (kDebugBuild && inNext && !_key.isEmpty()) {
+            // In debug mode, let's ensure that our index keys are actually in order. We've had
+            // issues in the past with our underlying cursors (WT-2307), but also with cursor
+            // mis-use (SERVER-55658). This check can help us catch such things earlier rather than
+            // later.
             const int cmp =
                 std::memcmp(_key.getBuffer(), item.data, std::min(_key.getSize(), item.size));
-            bool nextNotIncreasing = cmp > 0 || (cmp == 0 && _key.getSize() > item.size);
+            bool outOfOrder = _forward ? (cmp > 0 || (cmp == 0 && _key.getSize() > item.size))
+                                       : (cmp < 0 || (cmp == 0 && _key.getSize() < item.size));
 
-            if (MONGO_unlikely(WTEmulateOutOfOrderNextIndexKey.shouldFail())) {
-                LOGV2(51789, "WTIndex::updatePosition simulating next key not increasing.");
-                nextNotIncreasing = true;
-            }
-
-            if (nextNotIncreasing) {
-                // Our new key is less than the old key which means the next call moved to !next.
-                LOGV2_ERROR(
-                    51790,
-                    "WTIndex::updatePosition -- the new key ({newKey}) is less than the previous "
-                    "key ({prevKey}), which is a bug.",
-                    "WTIndex::updatePosition -- new key is less than previous key",
-                    "newKey"_attr = redact(hexblob::encode(item.data, item.size)),
-                    "prevKey"_attr = redact(_key.toString()));
-
-                // Crash when testing diagnostics are enabled.
-                invariant(!TestingProctor::instance().isEnabled());
-
-                // Force a retry of the operation from our last known position by acting as-if
-                // we received a WT_ROLLBACK error.
-                throw WriteConflictException();
+            if (outOfOrder) {
+                LOGV2_FATAL(51790,
+                            "WTIndex::updatePosition: the new key is out of order with respect to "
+                            "the previous key",
+                            "newKey"_attr = redact(hexblob::encode(item.data, item.size)),
+                            "prevKey"_attr = redact(_key.toString()),
+                            "isForwardCursor"_attr = _forward);
             }
         }
 
