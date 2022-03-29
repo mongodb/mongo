@@ -6,7 +6,8 @@ let ClusterToClusterUtil = (function() {
 
     // System databases and collections that are excluded from copying. We also exclude the
     // "mongosync" database since that stores metadata used by the replicator.
-    const excludedSystemDatabases = ["admin", "config", "local", "mongosync"];
+    const excludedSystemDatabases =
+        ["admin", "config", "local", "mongosync_reserved_for_internal_use"];
     const excludedSystemCollections =
         ["system.views", "system.profile", "system.resharding.", "system.buckets.", "system.drop."];
 
