@@ -935,7 +935,6 @@ struct StageBuilderState {
     PlanStageData* const data;
 
     const Variables& variables;
-    stdx::unordered_map<Variables::Id, sbe::value::SlotId> globalVariables;
     // When the mongos splits $group stage and sends it to shards, it adds 'needsMerge'/'fromMongs'
     // flags to true so that shards can sends special partial aggregation results to the mongos.
     bool needsMerge;

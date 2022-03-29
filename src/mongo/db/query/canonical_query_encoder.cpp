@@ -1041,10 +1041,9 @@ std::string encodeSBE(const CanonicalQuery& cq) {
             "attempting to encode SBE plan cache key for SBE-incompatible query",
             cq.isSbeCompatible());
 
-    const auto& filter = cq.getQueryObj();
+    auto serializedFilter = cq.root()->serialize(true);
     const auto& proj = cq.getFindCommandRequest().getProjection();
     const auto& sort = cq.getFindCommandRequest().getSort();
-    const auto& let = cq.getFindCommandRequest().getLet();
 
     StringBuilder strBuilder;
     encodeKeyForSort(sort, &strBuilder);
@@ -1054,8 +1053,8 @@ std::string encodeSBE(const CanonicalQuery& cq) {
     // A constant for reserving buffer size. It should be large enough to reserve the space required
     // to encode various properties from the FindCommandRequest and query knobs.
     const int kBufferSizeConstant = 200;
-    size_t bufSize = filter.objsize() + proj.objsize() + strBuilderEncoded.size() +
-        kBufferSizeConstant + (let ? let->objsize() : 0);
+    size_t bufSize = serializedFilter.objsize() + proj.objsize() + strBuilderEncoded.size() +
+        kBufferSizeConstant;
 
     BufBuilder bufBuilder(bufSize);
     if (feature_flags::gFeatureFlagAutoParameterization.isEnabledAndIgnoreFCV()) {
@@ -1063,14 +1062,10 @@ std::string encodeSBE(const CanonicalQuery& cq) {
     } else {
         // When auto-parameterization is off, just add the entire filter BSON to the cache key,
         // including any constants.
-        bufBuilder.appendBuf(filter.objdata(), filter.objsize());
+        bufBuilder.appendBuf(serializedFilter.objdata(), serializedFilter.objsize());
     }
 
     bufBuilder.appendBuf(proj.objdata(), proj.objsize());
-    // TODO SERVER-62100: No need to encode the entire "let" object.
-    if (let) {
-        bufBuilder.appendBuf(let->objdata(), let->objsize());
-    }
     bufBuilder.appendStr(strBuilderEncoded, false /* includeEndingNull */);
 
     encodeFindCommandRequest(cq.getFindCommandRequest(), &bufBuilder);

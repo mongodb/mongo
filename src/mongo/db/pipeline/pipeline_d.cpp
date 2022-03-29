@@ -223,22 +223,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
     if (aggRequest) {
         findCommand->setAllowDiskUse(aggRequest->getAllowDiskUse());
         findCommand->setHint(aggRequest->getHint().value_or(BSONObj()).getOwned());
-        // TODO SERVER-62100: No need to populate the "let" object to FindCommand for encoding.
-        if (auto let = aggRequest->getLet()) {
-            findCommand->setLet(let);
-        }
-    }
-
-    // TODO SERVER-62100: No need to populate the "let" object to FindCommand for encoding.
-    if (!findCommand->getLet() && expCtx->variablesParseState.hasDefinedVariables()) {
-        auto varIds = expCtx->variablesParseState.getDefinedVariableIDs();
-        for (auto&& id : varIds) {
-            // Only serialize "let" if there is user-defined "let" variable.
-            if (expCtx->variables.hasValue(id)) {
-                findCommand->setLet(expCtx->variablesParseState.serialize(expCtx->variables));
-                break;
-            }
-        }
     }
 
     // The collation on the ExpressionContext has been resolved to either the user-specified

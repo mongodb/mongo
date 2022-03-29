@@ -245,6 +245,7 @@ void PlanStageSlots::forEachSlot(const PlanStageReqs& reqs,
 }
 
 using InputParamToSlotMap = stdx::unordered_map<MatchExpression::InputParamId, sbe::value::SlotId>;
+using VariableIdToSlotMap = stdx::unordered_map<Variables::Id, sbe::value::SlotId>;
 
 /**
  * Some auxiliary data returned by a 'SlotBasedStageBuilder' along with a PlanStage tree root, which
@@ -313,6 +314,9 @@ struct PlanStageData {
     //
     // A new query {a: 5, b: 6} runs. Using this mapping, we set a value of 5 in s3 and 6 in s4.
     InputParamToSlotMap inputParamToSlotMap;
+    // This Variable-to-SlotId map stores all the Variables that were translated into corresponding
+    // SBE Slots. The slots are registered in the 'RuntimeEnvironment'.
+    VariableIdToSlotMap variableIdToSlotMap;
 
 private:
     // This copy function copies data from 'other' but will not create a copy of its
@@ -335,6 +339,7 @@ private:
             debugInfo.reset();
         }
         inputParamToSlotMap = other.inputParamToSlotMap;
+        variableIdToSlotMap = other.variableIdToSlotMap;
     }
 };
 

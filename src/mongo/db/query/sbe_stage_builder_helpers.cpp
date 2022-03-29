@@ -789,15 +789,14 @@ sbe::value::SlotVector makeIndexKeyOutputSlotsMatchingParentReqs(
 }
 
 sbe::value::SlotId StageBuilderState::getGlobalVariableSlot(Variables::Id variableId) {
-    if (auto it = globalVariables.find(variableId); it != globalVariables.end()) {
+    if (auto it = data->variableIdToSlotMap.find(variableId);
+        it != data->variableIdToSlotMap.end()) {
         return it->second;
     }
 
-    // Convert value of variable into SBE value.
-    auto [tag, val] = makeValue(variables.getValue(variableId));
-
-    auto slotId = data->env->registerSlot(tag, val, true, slotIdGenerator);
-    globalVariables.emplace(variableId, slotId);
+    auto slotId = data->env->registerSlot(
+        sbe::value::TypeTags::Nothing, 0, false /* owned */, slotIdGenerator);
+    data->variableIdToSlotMap.emplace(variableId, slotId);
     return slotId;
 }
 

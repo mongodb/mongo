@@ -377,8 +377,8 @@ std::unique_ptr<sbe::RuntimeEnvironment> makeRuntimeEnvironment(
     }
 
     for (auto&& [id, name] : Variables::kIdToBuiltinVarName) {
-        if ((id != Variables::kRootId && id != Variables::kRemoveId &&
-             cq.getExpCtx()->variables.hasValue(id))) {
+        if (id != Variables::kRootId && id != Variables::kRemoveId &&
+            cq.getExpCtx()->variables.hasValue(id)) {
             auto [tag, val] = makeValue(cq.getExpCtx()->variables.getValue(id));
             env->registerSlot(name, tag, val, true, slotIdGenerator);
         } else if (id == Variables::kSearchMetaId) {
@@ -418,9 +418,10 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
 
     root->prepare(data->ctx);
 
+    auto env = data->env;
     // Populate/renew "shardFilterer" if there exists a "shardFilterer" slot. The slot value should
     // be set to Nothing in the plan cache to avoid extending the lifetime of the ownership filter.
-    if (auto shardFiltererSlot = data->env->getSlotIfExists("shardFilterer"_sd)) {
+    if (auto shardFiltererSlot = env->getSlotIfExists("shardFilterer"_sd)) {
         const auto& collection = collections.getMainCollection();
         tassert(6108307,
                 "Setting shard filterer slot on un-sharded collection",
@@ -428,15 +429,34 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
 
         auto shardFiltererFactory = std::make_unique<ShardFiltererFactoryImpl>(collection);
         auto shardFilterer = shardFiltererFactory->makeShardFilterer(opCtx);
-        data->env->resetSlot(*shardFiltererSlot,
-                             sbe::value::TypeTags::shardFilterer,
-                             sbe::value::bitcastFrom<ShardFilterer*>(shardFilterer.release()),
-                             true);
+        env->resetSlot(*shardFiltererSlot,
+                       sbe::value::TypeTags::shardFilterer,
+                       sbe::value::bitcastFrom<ShardFilterer*>(shardFilterer.release()),
+                       true);
+    }
+
+    // Refresh "let" variables in the 'RuntimeEnvironment'.
+    auto ids = expCtx->variablesParseState.getDefinedVariableIDs();
+    for (auto id : ids) {
+        // Variables defined in "ExpressionContext" may not always be translated into SBE slots.
+        if (auto it = data->variableIdToSlotMap.find(id); it != data->variableIdToSlotMap.end()) {
+            auto slotId = it->second;
+            auto [tag, val] = makeValue(expCtx->variables.getValue(id));
+            env->resetSlot(slotId, tag, val, true);
+        }
+    }
+
+    for (auto&& [id, name] : Variables::kIdToBuiltinVarName) {
+        if (id != Variables::kRootId && id != Variables::kRemoveId &&
+            expCtx->variables.hasValue(id)) {
+            auto [tag, val] = makeValue(expCtx->variables.getValue(id));
+            env->resetSlot(env->getSlot(name), tag, val, true);
+        }
     }
 
     // If the cached plan is parameterized, bind new values for the parameters into the runtime
     // environment.
-    input_params::bind(cq, data->inputParamToSlotMap, data->env);
+    input_params::bind(cq, data->inputParamToSlotMap, env);
 }
 
 PlanStageSlots::PlanStageSlots(const PlanStageReqs& reqs,
