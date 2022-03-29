@@ -28,7 +28,7 @@
 
 import os, wttest
 from helper_tiered import generate_s3_prefix, get_auth_token, get_bucket1_name
-from wtdataset import SimpleDataSet
+from wtdataset import SimpleDataSet, ComplexDataSet
 from wtscenario import make_scenarios
 
 # test_tiered02.py
@@ -44,8 +44,17 @@ class test_tiered02(wttest.WiredTigerTestCase):
             bucket_prefix = generate_s3_prefix(),
             ss_name = 's3_store')),
     ]
+
+    complex_dataset = [
+        ('simple_ds', dict(complex_dataset=False)),
+        
+        # Commented out compplex dataset that tests column groups and indexes because it crashes
+        # in the middle of the test. FIXME: WT-9001
+        #('complex_ds', dict(complex_dataset=True)),
+    ]
+
     # Make scenarios for different cloud service providers
-    scenarios = make_scenarios(storage_sources)
+    scenarios = make_scenarios(storage_sources, complex_dataset)
 
     uri = "table:test_tiered02"
 
@@ -106,18 +115,21 @@ class test_tiered02(wttest.WiredTigerTestCase):
             self.assertEqual(len(got), self.flushed_objects)
         self.flushed_objects = len(got)
 
+    def get_dataset(self, rows):
+        args = 'key_format=S'
+
+        if self.complex_dataset:
+            return ComplexDataSet(self, self.uri, rows, config=args)
+        else:
+            return SimpleDataSet(self, self.uri, rows, config=args)
+
     # Test tiered storage with checkpoints and flush_tier calls.
     def test_tiered(self):
         self.flushed_objects = 0
-        args = 'key_format=S'
 
-        intl_page = 'internal_page_max=16K'
-        base_create = 'key_format=S,value_format=S,' + intl_page
         self.pr("create sys")
-        #self.session.create(self.uri + 'xxx', base_create)
-
         self.progress('Create simple data set (10)')
-        ds = SimpleDataSet(self, self.uri, 10, config=args)
+        ds = self.get_dataset(10)
         self.progress('populate')
         ds.populate()
         ds.check()
@@ -132,11 +144,11 @@ class test_tiered02(wttest.WiredTigerTestCase):
         self.progress('reopen_conn')
         self.reopen_conn()
         # Check what was there before.
-        ds = SimpleDataSet(self, self.uri, 10, config=args)
+        ds = self.get_dataset(10)
         ds.check()
 
         self.progress('Create simple data set (50)')
-        ds = SimpleDataSet(self, self.uri, 50, config=args)
+        ds = self.get_dataset(50)
         self.progress('populate')
         ds.populate()
         ds.check()
@@ -151,7 +163,7 @@ class test_tiered02(wttest.WiredTigerTestCase):
         self.confirm_flush()
 
         self.progress('Create simple data set (100)')
-        ds = SimpleDataSet(self, self.uri, 100, config=args)
+        ds = self.get_dataset(100)
         self.progress('populate')
         ds.populate()
         ds.check()
@@ -162,7 +174,7 @@ class test_tiered02(wttest.WiredTigerTestCase):
         self.confirm_flush()
 
         self.progress('Create simple data set (200)')
-        ds = SimpleDataSet(self, self.uri, 200, config=args)
+        ds = self.get_dataset(200)
         self.progress('populate')
         ds.populate()
         ds.check()
@@ -174,12 +186,12 @@ class test_tiered02(wttest.WiredTigerTestCase):
         self.reopen_conn()
 
         # Check what was there before.
-        ds = SimpleDataSet(self, self.uri, 200, config=args)
+        ds = self.get_dataset(200)
         ds.check()
 
         # Now add some more.
         self.progress('Create simple data set (300)')
-        ds = SimpleDataSet(self, self.uri, 300, config=args)
+        ds = self.get_dataset(300)
         self.progress('populate')
         ds.populate()
         ds.check()
