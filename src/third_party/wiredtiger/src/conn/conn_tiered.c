@@ -815,14 +815,12 @@ __wt_tiered_storage_destroy(WT_SESSION_IMPL *session)
         conn->tiered_mgr_tid_set = false;
     }
 
-    /* Stop the internal server thread. */
+    /*
+     * Stop the internal server thread. If there is unfinished work, we will recover it on startup
+     * just as if there had been a system failure.
+     */
     if (conn->flush_cond != NULL)
         __wt_cond_signal(session, conn->flush_cond);
-    if (conn->tiered_cond != NULL) {
-        __wt_cond_signal(session, conn->tiered_cond);
-        /* Give thread time to drain the work. */
-        __wt_sleep(1, 0);
-    }
     FLD_CLR(conn->server_flags, WT_CONN_SERVER_TIERED);
     if (conn->tiered_tid_set) {
         WT_ASSERT(session, conn->tiered_cond != NULL);
