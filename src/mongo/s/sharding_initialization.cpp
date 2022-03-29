@@ -194,8 +194,10 @@ Status initializeGlobalShardingState(OperationContext* opCtx,
                                      rpc::ShardingEgressMetadataHookBuilder hookBuilder,
                                      boost::optional<size_t> taskExecutorPoolSize) {
     ConnectionPool::Options connPoolOptions;
-    connPoolOptions.controllerFactory = []() noexcept {
-        return std::make_shared<ShardingTaskExecutorPoolController>();
+    std::shared_ptr<ShardRegistry> srsp(std::move(shardRegistry));
+    std::weak_ptr<ShardRegistry> srwp{srsp};
+    connPoolOptions.controllerFactory = [srwp] {
+        return std::make_shared<ShardingTaskExecutorPoolController>(srwp);
     };
 
     auto network = executor::makeNetworkInterface(
@@ -213,7 +215,7 @@ Status initializeGlobalShardingState(OperationContext* opCtx,
 
     grid->init(makeCatalogClient(service, distLockProcessId),
                std::move(catalogCache),
-               std::move(shardRegistry),
+               std::move(srsp),
                stdx::make_unique<ClusterCursorManager>(service->getPreciseClockSource()),
                stdx::make_unique<BalancerConfiguration>(),
                std::move(executorPool),

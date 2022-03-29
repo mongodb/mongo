@@ -224,7 +224,7 @@ public:
      * Finds the Shard that the mongod listening at this HostAndPort is a member of. Will not
      * refresh the shard registry or otherwise perform any network traffic.
      */
-    std::shared_ptr<Shard> getShardForHostNoReload(const HostAndPort& shardHost);
+    std::shared_ptr<Shard> getShardForHostNoReload(const HostAndPort& shardHost) const;
 
     /**
      * Returns shared pointer to the shard object representing the config servers.
