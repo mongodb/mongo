@@ -196,6 +196,12 @@ public:
     virtual std::deque<BSONObj> listCatalog(OperationContext* opCtx) const = 0;
 
     /**
+     * Returns the catalog entry for the given namespace, if it exists.
+     */
+    virtual boost::optional<BSONObj> getCatalogEntry(OperationContext* opCtx,
+                                                     const NamespaceString& ns) const = 0;
+
+    /**
      * Appends operation latency statistics for collection "nss" to "builder"
      */
     virtual void appendLatencyStats(OperationContext* opCtx,

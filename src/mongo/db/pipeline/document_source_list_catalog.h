@@ -51,11 +51,11 @@ public:
     public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec) {
-            return std::make_unique<LiteParsed>(spec.fieldName());
+            return std::make_unique<LiteParsed>(spec.fieldName(), nss);
         }
 
-        explicit LiteParsed(std::string parseTimeName)
-            : LiteParsedDocumentSource(std::move(parseTimeName)) {}
+        explicit LiteParsed(std::string parseTimeName, NamespaceString ns)
+            : LiteParsedDocumentSource(std::move(parseTimeName)), _ns(std::move(ns)) {}
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
             return stdx::unordered_set<NamespaceString>();
@@ -68,6 +68,9 @@ public:
         bool isInitialSource() const final {
             return true;
         }
+
+    private:
+        NamespaceString _ns;
     };
 
     // virtuals from DocumentSource
@@ -84,7 +87,7 @@ public:
                                      LookupRequirement::kAllowed,
                                      UnionRequirement::kAllowed);
 
-        constraints.isIndependentOfAnyCollection = true;
+        constraints.isIndependentOfAnyCollection = pExpCtx->ns.isCollectionlessAggregateNS();
         constraints.requiresInputDocSource = false;
         return constraints;
     }
@@ -100,8 +103,7 @@ private:
     DocumentSourceListCatalog(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
     GetNextResult doGetNext() final;
 
-    bool _catalogDocsInitialized = false;
-    std::deque<BSONObj> _catalogDocs;
+    boost::optional<std::deque<BSONObj>> _catalogDocs;
 };
 
 }  // namespace mongo

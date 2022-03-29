@@ -126,6 +126,10 @@ commands:
                     action_type: listCachedAndActiveUsers
                 - privilege: # $listCatalog
                     agg_stage: listCatalog
+                    resource_pattern: exact_namespace
+                    action_type: [listCollections, listIndexes]
+                - privilege: # $listCatalog
+                    agg_stage: listCatalog
                     resource_pattern: cluster
                     action_type: listDatabases
                 - privilege: # $listCatalog

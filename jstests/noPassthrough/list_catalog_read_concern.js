@@ -1,5 +1,6 @@
 /**
- * Tests listCatalog aggregation stage with local and majority read concerns.
+ * Tests the $listCatalog aggregation stage with local and majority read concerns.
+ *
  * @tags: [
  *     requires_majority_read_concern,
  *     requires_replication,
@@ -8,87 +9,65 @@
 (function() {
 'use strict';
 
-load("jstests/libs/fail_point_util.js");  // For configureFailPoint
+load('jstests/libs/write_concern_util.js');
 
-const rst = new ReplSetTest({nodes: 3});
+const rst = new ReplSetTest({nodes: 2});
 rst.startSet();
 rst.initiate();
 
 const primary = rst.getPrimary();
-const documentSourceListCatalogEnabled =
-    assert
-        .commandWorked(
-            primary.adminCommand({getParameter: 1, featureFlagDocumentSourceListCatalog: 1}))
-        .featureFlagDocumentSourceListCatalog.value;
+const db = primary.getDB(jsTestName());
+const coll1 = db.coll_1;
+const coll2 = db.coll_2;
+const view = db.view;
 
-if (!documentSourceListCatalogEnabled) {
-    jsTestLog('Skipping test because the $listCatalog aggregation stage feature flag is disabled.');
-    rst.stopSet();
-    return;
-}
+assert.commandWorked(
+    db.runCommand({createIndexes: coll1.getName(), indexes: [{key: {a: 1}, name: 'a_1'}]}));
+assert.commandWorked(
+    db.runCommand({create: view.getName(), viewOn: coll1.getName(), pipeline: []}));
 
-const testDB = primary.getDB('test');
-const coll = testDB.getCollection('t');
-assert.commandWorked(coll.insert({_id: 0}));
-const view = testDB.getCollection('view1');
-assert.commandWorked(testDB.createView(view.getName(), coll.getName(), []));
-rst.awaitReplication();
+stopReplicationOnSecondaries(rst);
 
-const secondaries = rst.getSecondaries();
-assert.eq(2, secondaries.length);
+assert.commandWorked(db.runCommand({
+    createIndexes: coll1.getName(),
+    indexes: [{key: {b: 1}, name: 'b_1'}],
+    writeConcern: {w: 1},
+    commitQuorum: 0,
+}));
+assert.commandWorked(db.runCommand({create: coll2.getName(), writeConcern: {w: 1}}));
+assert.commandWorked(db.runCommand({collMod: view.getName(), viewOn: coll2.getName()}));
 
-let failpoints = [];
-try {
-    failpoints.push(configureFailPoint(secondaries[0], 'rsSyncApplyStop'));
-    failpoints.push(configureFailPoint(secondaries[1], 'rsSyncApplyStop'));
+let entries = coll1.aggregate([{$listCatalog: {}}], {readConcern: {level: 'local'}}).toArray();
+jsTestLog(coll1.getFullName() + ' local $listCatalog: ' + tojson(entries));
+assert.eq(entries.length, 1);
+assert.eq(entries[0].ns, coll1.getFullName());
+assert.eq(entries[0].md.indexes.length, 3);
 
-    const collOnPrimaryOnly = testDB.getCollection('w');
-    assert.commandWorked(collOnPrimaryOnly.insert({_id: 1}, {writeConcern: {w: 1}}));
+entries = coll1.aggregate([{$listCatalog: {}}], {readConcern: {level: 'majority'}}).toArray();
+jsTestLog(coll1.getFullName() + ' majority $listCatalog: ' + tojson(entries));
+assert.eq(entries.length, 1);
+assert.eq(entries[0].ns, coll1.getFullName());
+assert.eq(entries[0].md.indexes.length, 2);
 
-    const viewOnPrimaryOnly = testDB.getCollection('view2');
-    assert.commandWorked(
-        testDB.createView(viewOnPrimaryOnly.getName(), coll.getName(), [], {writeConcern: {w: 1}}));
+const adminDB = primary.getDB('admin');
 
-    const adminDB = testDB.getSiblingDB('admin');
-    const resultLocal = adminDB
-                            .aggregate([{$listCatalog: {}}, {$match: {db: testDB.getName()}}],
-                                       {readConcern: {level: 'local'}})
-                            .toArray();
-    const resultMajority = adminDB
-                               .aggregate([{$listCatalog: {}}, {$match: {db: testDB.getName()}}],
-                                          {readConcern: {level: 'majority'}})
-                               .toArray();
+entries = adminDB
+              .aggregate([{$listCatalog: {}}, {$match: {db: db.getName()}}],
+                         {readConcern: {level: 'local'}})
+              .toArray();
+jsTestLog('Collectionless local $listCatalog: ' + tojson(entries));
+assert.eq(entries.length, 4);
+assert.eq(entries.find((entry) => entry.name === view.getName()).viewOn, coll2.getName());
 
-    jsTestLog('$listCatalog result (local read concern): ' + tojson(resultLocal));
-    jsTestLog('$listCatalog result (majority read concern): ' + tojson(resultMajority));
+entries = adminDB
+              .aggregate([{$listCatalog: {}}, {$match: {db: db.getName()}}],
+                         {readConcern: {level: 'majority'}})
+              .toArray();
+jsTestLog('Collectionless majority $listCatalog: ' + tojson(entries));
+assert.eq(entries.length, 3);
+assert.eq(entries.find((entry) => entry.name === view.getName()).viewOn, coll1.getName());
 
-    const catalogEntriesLocal = Object.assign({}, ...resultLocal.map(doc => ({[doc.ns]: doc})));
-    const catalogEntriesMajority =
-        Object.assign({}, ...resultMajority.map(doc => ({[doc.ns]: doc})));
-    jsTestLog('Catalog entries keyed by namespace (local read concern): ' +
-              tojson(catalogEntriesLocal));
-    jsTestLog('Catalog entries keyed by namespace (majority read concern): ' +
-              tojson(catalogEntriesMajority));
-
-    // $listCatalog result should have all the collections and views we have created.
-    assert.hasFields(catalogEntriesLocal, [
-        coll.getFullName(),
-        view.getFullName(),
-        collOnPrimaryOnly.getFullName(),
-        viewOnPrimaryOnly.getFullName()
-    ]);
-
-    // $listCatalog result should not contain the namespaces not replicated to the secondaries.
-    assert.hasFields(catalogEntriesMajority, [coll.getFullName(), view.getFullName()]);
-    assert(!catalogEntriesMajority.hasOwnProperty(collOnPrimaryOnly.getFullName()),
-           tojson(catalogEntriesMajority));
-    assert(!catalogEntriesMajority.hasOwnProperty(viewOnPrimaryOnly.getFullName()),
-           tojson(catalogEntriesMajority));
-} finally {
-    for (const fp of failpoints) {
-        fp.off();
-    }
-}
+restartReplicationOnSecondaries(rst);
 
 rst.stopSet();
 })();

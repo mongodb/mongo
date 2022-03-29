@@ -59,6 +59,9 @@ public:
 
     std::deque<BSONObj> listCatalog(OperationContext* opCtx) const final;
 
+    boost::optional<BSONObj> getCatalogEntry(OperationContext* opCtx,
+                                             const NamespaceString& ns) const final;
+
     void appendLatencyStats(OperationContext* opCtx,
                             const NamespaceString& nss,
                             bool includeHistograms,

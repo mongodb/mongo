@@ -119,6 +119,7 @@ void assertIgnorePrepareConflictsBehavior(const boost::intrusive_ptr<ExpressionC
  * <db>.system.views namespaces found.
  */
 void listDurableCatalog(OperationContext* opCtx,
+                        StringData shardName,
                         std::deque<BSONObj>* docs,
                         std::vector<NamespaceStringOrUUID>* systemViewsNamespaces) {
     auto durableCatalog = DurableCatalog::get(opCtx);
@@ -146,6 +147,9 @@ void listDurableCatalog(OperationContext* opCtx,
         builder.append("db", ns.db());
         builder.append("name", ns.coll());
         builder.append("type", "collection");
+        if (!shardName.empty()) {
+            builder.append("shard", shardName);
+        }
         builder.appendElements(obj);
         docs->push_back(builder.obj());
     }
@@ -224,7 +228,7 @@ std::deque<BSONObj> CommonMongodProcessInterface::listCatalog(OperationContext* 
         std::vector<NamespaceStringOrUUID> systemViewsNamespaces;
         {
             Lock::GlobalLock globalLock(opCtx, MODE_IS);
-            listDurableCatalog(opCtx, &docs, &systemViewsNamespaces);
+            listDurableCatalog(opCtx, getShardName(opCtx), &docs, &systemViewsNamespaces);
         }
 
         if (systemViewsNamespaces.empty()) {
@@ -257,7 +261,8 @@ std::deque<BSONObj> CommonMongodProcessInterface::listCatalog(OperationContext* 
         // we read it, we should discard this set of results and retry from the top (with the
         // global read lock) of this loop.
         std::vector<NamespaceStringOrUUID> systemViewsNamespacesFromSecondCatalogRead;
-        listDurableCatalog(opCtx, &docs, &systemViewsNamespacesFromSecondCatalogRead);
+        listDurableCatalog(
+            opCtx, getShardName(opCtx), &docs, &systemViewsNamespacesFromSecondCatalogRead);
         if (!std::equal(
                 systemViewsNamespaces.cbegin(),
                 systemViewsNamespaces.cend(),
@@ -288,6 +293,9 @@ std::deque<BSONObj> CommonMongodProcessInterface::listCatalog(OperationContext* 
                 } else {
                     builder.append("type", "view");
                 }
+                if (auto shardName = getShardName(opCtx); !shardName.empty()) {
+                    builder.append("shard", shardName);
+                }
                 builder.appendAs(obj["_id"], "ns");
                 builder.appendElements(obj);
                 docs.push_back(builder.obj());
@@ -296,6 +304,37 @@ std::deque<BSONObj> CommonMongodProcessInterface::listCatalog(OperationContext* 
 
         return docs;
     }
+}
+
+boost::optional<BSONObj> CommonMongodProcessInterface::getCatalogEntry(
+    OperationContext* opCtx, const NamespaceString& ns) const {
+    Lock::GlobalLock globalLock{opCtx, MODE_IS};
+
+    auto rs = DurableCatalog::get(opCtx)->getRecordStore();
+    if (!rs) {
+        return boost::none;
+    }
+
+    auto cursor = rs->getCursor(opCtx);
+    while (auto record = cursor->next()) {
+        auto obj = record->data.toBson();
+        if (NamespaceString{obj.getStringField("ns")} != ns) {
+            continue;
+        }
+
+        BSONObjBuilder builder;
+        builder.append("db", ns.db());
+        builder.append("name", ns.coll());
+        builder.append("type", "collection");
+        if (auto shardName = getShardName(opCtx); !shardName.empty()) {
+            builder.append("shard", shardName);
+        }
+        builder.appendElements(obj);
+
+        return builder.obj();
+    }
+
+    return boost::none;
 }
 
 void CommonMongodProcessInterface::appendLatencyStats(OperationContext* opCtx,

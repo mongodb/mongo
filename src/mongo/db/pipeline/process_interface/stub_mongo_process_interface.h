@@ -93,6 +93,11 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    boost::optional<BSONObj> getCatalogEntry(OperationContext* opCtx,
+                                             const NamespaceString& ns) const override {
+        MONGO_UNREACHABLE;
+    }
+
     void appendLatencyStats(OperationContext* opCtx,
                             const NamespaceString& nss,
                             bool includeHistograms,

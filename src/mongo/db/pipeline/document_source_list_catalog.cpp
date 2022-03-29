@@ -47,7 +47,7 @@ REGISTER_DOCUMENT_SOURCE_WITH_MIN_VERSION(listCatalog,
                                           DocumentSourceListCatalog::LiteParsed::parse,
                                           DocumentSourceListCatalog::createFromBson,
                                           AllowedWithApiStrict::kNeverInVersion1,
-                                          multiversion::FeatureCompatibilityVersion::kVersion_5_3);
+                                          multiversion::FeatureCompatibilityVersion::kVersion_6_0);
 
 const char* DocumentSourceListCatalog::getSourceName() const {
     return kStageName.rawData();
@@ -60,22 +60,34 @@ PrivilegeVector DocumentSourceListCatalog::LiteParsed::requiredPrivileges(
     // See builtin_roles.cpp.
     ActionSet listCollectionsAndIndexesActions{ActionType::listCollections,
                                                ActionType::listIndexes};
-    return {Privilege(ResourcePattern::forClusterResource(), ActionType::listDatabases),
-            Privilege(ResourcePattern::forAnyNormalResource(), listCollectionsAndIndexesActions),
-            Privilege(ResourcePattern::forCollectionName("system.js"),
-                      listCollectionsAndIndexesActions),
-            Privilege(ResourcePattern::forAnySystemBuckets(), listCollectionsAndIndexesActions)};
+    return _ns.isCollectionlessAggregateNS()
+        ? PrivilegeVector{Privilege(ResourcePattern::forClusterResource(),
+                                    ActionType::listDatabases),
+                          Privilege(ResourcePattern::forAnyNormalResource(),
+                                    listCollectionsAndIndexesActions),
+                          Privilege(ResourcePattern::forCollectionName("system.js"),
+                                    listCollectionsAndIndexesActions),
+                          Privilege(ResourcePattern::forAnySystemBuckets(),
+                                    listCollectionsAndIndexesActions)}
+        : PrivilegeVector{
+              Privilege(ResourcePattern::forExactNamespace(_ns), listCollectionsAndIndexesActions)};
 }
 
 DocumentSource::GetNextResult DocumentSourceListCatalog::doGetNext() {
-    if (!_catalogDocsInitialized) {
-        _catalogDocs = pExpCtx->mongoProcessInterface->listCatalog(pExpCtx->opCtx);
-        _catalogDocsInitialized = true;
+    if (!_catalogDocs) {
+        if (pExpCtx->ns.isCollectionlessAggregateNS()) {
+            _catalogDocs = pExpCtx->mongoProcessInterface->listCatalog(pExpCtx->opCtx);
+        } else if (auto catalogDoc = pExpCtx->mongoProcessInterface->getCatalogEntry(pExpCtx->opCtx,
+                                                                                     pExpCtx->ns)) {
+            _catalogDocs = {{std::move(*catalogDoc)}};
+        } else {
+            _catalogDocs.emplace();
+        }
     }
 
-    if (!_catalogDocs.empty()) {
-        Document doc{_catalogDocs.front()};
-        _catalogDocs.pop_front();
+    if (!_catalogDocs->empty()) {
+        Document doc{std::move(_catalogDocs->front())};
+        _catalogDocs->pop_front();
         return doc;
     }
 
@@ -94,9 +106,10 @@ intrusive_ptr<DocumentSource> DocumentSourceListCatalog::createFromBson(
 
     const NamespaceString& nss = pExpCtx->ns;
 
-    uassert(ErrorCodes::InvalidNamespace,
-            "$listCatalog must be run against the 'admin' database with {aggregate: 1}",
-            nss.db() == NamespaceString::kAdminDb && nss.isCollectionlessAggregateNS());
+    uassert(
+        ErrorCodes::InvalidNamespace,
+        "Collectionless $listCatalog must be run against the 'admin' database with {aggregate: 1}",
+        nss.db() == NamespaceString::kAdminDb || !nss.isCollectionlessAggregateNS());
 
     uassert(ErrorCodes::QueryFeatureNotAllowed,
             fmt::format("The {} aggregation stage is not enabled", kStageName),
