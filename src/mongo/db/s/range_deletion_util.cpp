@@ -688,10 +688,15 @@ void clearOrphanCountersFromRangeDeletionTasks(OperationContext* opCtx) {
     BSONObj allDocsQuery;
     PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
     try {
-        store.update(opCtx,
-                     allDocsQuery,
-                     BSON("$unset" << BSON(RangeDeletionTask::kNumOrphanDocsFieldName << "")),
-                     WriteConcerns::kMajorityWriteConcernNoTimeout);
+        // TODO (SERVER-54284) Remove writeConflictRetry loop
+        writeConflictRetry(
+            opCtx, "clearOrphanCounters", NamespaceString::kRangeDeletionNamespace.ns(), [&] {
+                store.update(
+                    opCtx,
+                    allDocsQuery,
+                    BSON("$unset" << BSON(RangeDeletionTask::kNumOrphanDocsFieldName << "")),
+                    WriteConcerns::kMajorityWriteConcernNoTimeout);
+            });
     } catch (const ExceptionFor<ErrorCodes::NoMatchingDocument>&) {
         // There may be no range deletion tasks, so it is possible no document is updated
     }

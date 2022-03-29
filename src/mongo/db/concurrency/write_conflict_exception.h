@@ -106,10 +106,17 @@ auto writeConflictRetry(OperationContext* opCtx, StringData opStr, StringData ns
 
     int attempts = 0;
     int attemptsTempUnavailable = 0;
+    // TODO (SERVER-54284) Remove redundant catch for WriteConflictExpection and
+    // ExceptionFor<ErrorCodes::WriteConflict>
     while (true) {
         try {
             return f();
         } catch (WriteConflictException const&) {
+            CurOp::get(opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
+            WriteConflictException::logAndBackoff(attempts, opStr, ns);
+            ++attempts;
+            opCtx->recoveryUnit()->abandonSnapshot();
+        } catch (ExceptionFor<ErrorCodes::WriteConflict> const&) {
             CurOp::get(opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
             WriteConflictException::logAndBackoff(attempts, opStr, ns);
             ++attempts;

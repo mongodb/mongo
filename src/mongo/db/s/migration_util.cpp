@@ -673,11 +673,15 @@ void persistUpdatedNumOrphans(OperationContext* opCtx,
                               const BSONObj& rangeDeletionQuery,
                               const int& changeInOrphans) {
     PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
-    store.update(
-        opCtx,
-        rangeDeletionQuery,
-        BSON("$inc" << BSON(RangeDeletionTask::kNumOrphanDocsFieldName << changeInOrphans)),
-        WriteConcernOptions());
+    // TODO (SERVER-54284) Remove writeConflictRetry loop
+    writeConflictRetry(
+        opCtx, "updateOrphanCount", NamespaceString::kRangeDeletionNamespace.ns(), [&] {
+            store.update(
+                opCtx,
+                rangeDeletionQuery,
+                BSON("$inc" << BSON(RangeDeletionTask::kNumOrphanDocsFieldName << changeInOrphans)),
+                WriteConcernOptions());
+        });
 }
 
 int retrieveNumOrphansFromRecipient(OperationContext* opCtx,
