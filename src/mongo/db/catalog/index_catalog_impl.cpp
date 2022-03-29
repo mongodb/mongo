@@ -1048,9 +1048,11 @@ namespace {
 class IndexRemoveChange final : public RecoveryUnit::Change {
 public:
     IndexRemoveChange(IndexCatalogEntryContainer* entries,
+                      const NamespaceString& nss,
                       std::shared_ptr<IndexCatalogEntry> entry,
                       SharedCollectionDecorations* collectionDecorations)
         : _entries(entries),
+          _nss(nss),
           _entry(std::move(entry)),
           _collectionDecorations(collectionDecorations) {}
 
@@ -1064,11 +1066,14 @@ public:
         // Refresh the CollectionIndexUsageTrackerDecoration's knowledge of what indices are
         // present as it is shared state across Collection copies.
         CollectionIndexUsageTrackerDecoration::get(_collectionDecorations)
-            .registerIndex(indexDescriptor->indexName(), indexDescriptor->keyPattern());
+            .registerIndex(indexDescriptor->indexName(),
+                           indexDescriptor->keyPattern(),
+                           IndexFeatures::make(indexDescriptor, _nss.isOnInternalDb()));
     }
 
 private:
     IndexCatalogEntryContainer* _entries;
+    const NamespaceString _nss;
     std::shared_ptr<IndexCatalogEntry> _entry;
     SharedCollectionDecorations* _collectionDecorations;
 };
@@ -1087,13 +1092,19 @@ Status IndexCatalogImpl::dropIndexEntry(OperationContext* opCtx,
     auto released = _readyIndexes.release(entry->descriptor());
     if (released) {
         invariant(released.get() == entry);
-        opCtx->recoveryUnit()->registerChange(std::make_unique<IndexRemoveChange>(
-            &_readyIndexes, std::move(released), collection->getSharedDecorations()));
+        opCtx->recoveryUnit()->registerChange(
+            std::make_unique<IndexRemoveChange>(&_readyIndexes,
+                                                collection->ns(),
+                                                std::move(released),
+                                                collection->getSharedDecorations()));
     } else {
         released = _buildingIndexes.release(entry->descriptor());
         invariant(released.get() == entry);
-        opCtx->recoveryUnit()->registerChange(std::make_unique<IndexRemoveChange>(
-            &_buildingIndexes, std::move(released), collection->getSharedDecorations()));
+        opCtx->recoveryUnit()->registerChange(
+            std::make_unique<IndexRemoveChange>(&_buildingIndexes,
+                                                collection->ns(),
+                                                std::move(released),
+                                                collection->getSharedDecorations()));
     }
 
     CollectionQueryInfo::get(collection).rebuildIndexData(opCtx, collection);
@@ -1278,7 +1289,7 @@ const IndexDescriptor* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
     auto oldEntry = _readyIndexes.release(oldDesc);
     invariant(oldEntry);
     opCtx->recoveryUnit()->registerChange(std::make_unique<IndexRemoveChange>(
-        &_readyIndexes, std::move(oldEntry), collection->getSharedDecorations()));
+        &_readyIndexes, collection->ns(), std::move(oldEntry), collection->getSharedDecorations()));
     CollectionIndexUsageTrackerDecoration::get(collection->getSharedDecorations())
         .unregisterIndex(indexName);
 
@@ -1294,7 +1305,9 @@ const IndexDescriptor* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
     invariant(newEntry->isReady(opCtx, collection));
     auto desc = newEntry->descriptor();
     CollectionIndexUsageTrackerDecoration::get(collection->getSharedDecorations())
-        .registerIndex(desc->indexName(), desc->keyPattern());
+        .registerIndex(desc->indexName(),
+                       desc->keyPattern(),
+                       IndexFeatures::make(desc, collection->ns().isOnInternalDb()));
 
     // Last rebuild index data for CollectionQueryInfo for this Collection.
     CollectionQueryInfo::get(collection).rebuildIndexData(opCtx, collection);
