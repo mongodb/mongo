@@ -24,3 +24,19 @@ __wt_yield(void) WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 
     sched_yield();
 }
+
+/*
+ * __wt_yield_no_barrier --
+ *     Yield the thread of control. Don't set any memory barriers as this may hide memory
+ *     synchronization errors in the surrounding code. It's not explicitly documented that yielding
+ *     without a memory barrier is safe, so this function should only be used for testing in
+ *     diagnostic mode.
+ */
+void
+__wt_yield_no_barrier(void) WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
+{
+#ifndef HAVE_DIAGNOSTIC
+    __wt_abort(NULL);
+#endif
+    sched_yield();
+}

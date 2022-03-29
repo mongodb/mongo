@@ -61,6 +61,7 @@ extern void __wt_stream_set_line_buffer(FILE *fp);
 extern void __wt_stream_set_no_buffer(FILE *fp);
 extern void __wt_thread_id(uintmax_t *id);
 extern void __wt_yield(void);
+extern void __wt_yield_no_barrier(void) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("default")));
 
 #ifdef HAVE_UNITTEST
 

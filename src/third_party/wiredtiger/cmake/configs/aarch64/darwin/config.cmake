@@ -17,3 +17,10 @@ if(has_moutline_atomics)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -moutline-atomics" CACHE STRING "" FORCE)
 endif()
 unset(has_moutline_atomics CACHE)
+
+# Enable ARM Neon SIMD instrinsics when available.
+CHECK_INCLUDE_FILE("arm_neon.h" has_arm_neon)
+if(has_arm_neon)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DHAVE_ARM_NEON_INTRIN_H" CACHE STRING "" FORCE)
+endif()
+unset(has_arm_neon CACHE)
