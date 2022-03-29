@@ -151,7 +151,7 @@ shared_ptr<Shard> ShardRegistry::getShardNoReload(const ShardId& shardId) {
     return _data.findShard(shardId);
 }
 
-shared_ptr<Shard> ShardRegistry::getShardForHostNoReload(const HostAndPort& host) {
+shared_ptr<Shard> ShardRegistry::getShardForHostNoReload(const HostAndPort& host) const {
     return _data.findByHostAndPort(host);
 }
 

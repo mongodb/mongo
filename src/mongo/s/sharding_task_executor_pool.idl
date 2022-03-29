@@ -91,3 +91,22 @@ server_parameters:
     cpp_varname: "ShardingTaskExecutorPoolController::gParameters.matchingStrategyString"
     on_update: "ShardingTaskExecutorPoolController::onUpdateMatchingStrategy"
     default: "automatic" # matchPrimaryNode on mongos; disabled on mongod
+
+  ShardingTaskExecutorPoolMinSizeForConfigServers:
+    description: <-
+        Overrides ShardingTaskExecutorPoolMinSize for pools targeting config servers.
+        Has no effect if set to -1 (the default).
+    set_at: [ startup, runtime ]
+    cpp_varname: "ShardingTaskExecutorPoolController::gParameters.minConnectionsForConfigServers"
+    validator:
+        gte: -1
+    default: -1
+  ShardingTaskExecutorPoolMaxSizeForConfigServers:
+    description: <-
+        Overrides ShardingTaskExecutorPoolMaxSize for pools targeting config servers.
+        Has no effect if set to -1 (the default).
+    set_at: [ startup, runtime ]
+    cpp_varname: "ShardingTaskExecutorPoolController::gParameters.maxConnectionsForConfigServers"
+    validator:
+        gte: -1
+    default: -1
