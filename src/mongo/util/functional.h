@@ -34,8 +34,116 @@
 
 #include "mongo/stdx/type_traits.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/concepts.h"
 
 namespace mongo {
+template <typename Function>
+class function_ref;
+
+/**
+ * A function_ref is a type-erased callable similar to std::function, however it does not own the
+ * underlying object, similar to StringData vs std::string. It should generally only be used as a
+ * parameter to functions that invoke their callback while running. It should generally not be put
+ * in a variable or stashed for calling later.
+ *
+ * In the specific case of a function_ref constructed from a function or function pointer it will
+ * store the function pointer directly rather than a pointer to the function pointer, so you do not
+ * need to keep function pointers alive.
+ *
+ * function_refs are intended to be passed by value.
+ *
+ * Like a reference, this type has no "null" state. It is not default constructable, and moves are
+ * (trivial) copies.
+ *
+ * This API is based on the proposed std::function_ref from https://wg21.link/P0792. It was at R8 at
+ * the time this class was initially written.
+ */
+template <typename RetType, typename... Args>
+class function_ref<RetType(Args...)> {
+public:
+    TEMPLATE(typename F)
+    REQUIRES(std::is_invocable_r_v<RetType, F&, Args...> &&
+             !std::is_same_v<stdx::remove_cvref_t<F>, function_ref>)
+    /*implicit*/ function_ref(F&& f) noexcept {
+        // removing then re-adding pointer ensures that (language-level) function references and
+        // function pointer are treated the same.
+        using Pointer = std::add_pointer_t<std::remove_pointer_t<std::remove_reference_t<F>>>;
+
+        // Using reinterpret_cast rather than static cast to map to and from void* in order to
+        // support function pointers. For object pointers, reinterpret_cast is defined by doing as
+        // static_cast through a void* anyway, so this isn't actually doing anything different in
+        // that case.
+
+        if constexpr (std::is_function_v<std::remove_pointer_t<Pointer>>) {
+            Pointer pointer = f;  // allow function references to decay to function pointer.
+            _target = reinterpret_cast<void*>(pointer);  // store the pointer directly in _target.
+        } else {
+            // Make sure we didn't lose any important qualifications.
+            static_assert(std::is_same_v<Pointer, decltype(&f)>);
+            _target = reinterpret_cast<void*>(&f);
+        }
+
+        _adapter = +[](const void* data, Args... args) -> RetType {
+            // The reinterpret_cast will add-back the const qualification removed by the const_cast
+            // if F is const-qualified. This means that func will have the same const-qualifications
+            // as the object passed into the constructor. The const_cast is needed in order to
+            // support non-const callable objects correctly. An alternative would be to make _target
+            // a non-const void*, but then we would need to remove const in the constructor and this
+            // seemed cleaner.
+            auto func = reinterpret_cast<Pointer>(const_cast<void*>(data));
+            if constexpr (std::is_void_v<RetType>) {
+                // Implicitly ignore the return. This avoids issues if func() returns a value,
+                // while ensuring we still get a warning if the value is [[nodiscard]].
+                (*func)(std::forward<Args...>(args)...);
+            } else {
+                return (*func)(std::forward<Args...>(args)...);
+            }
+        };
+    }
+
+    function_ref(const function_ref&) noexcept = default;
+    function_ref& operator=(const function_ref&) noexcept = default;
+
+    /**
+     * function_ref<Sig> may only be assigned from a function_ref<Sig> (with an identical Sig), or a
+     * function pointer/reference.
+     *
+     * Other cases are likely to dangle because they may capture a reference to a temporary that is
+     * about to be destoyed, and unlike in the case we are implicitly constructing an argument, we
+     * can't usefully use the function_ref before that happens (ignoring comma shenanigans). If
+     * somebody really needs it, we could try to allow T& but not T&&, since T& is less likely to
+     * dangle, but I don't think there is an actual use case for this, so not doing it at this time.
+     */
+    TEMPLATE(typename T)
+    REQUIRES(!std::is_function_v<std::remove_pointer_t<T>>)
+    function_ref& operator=(T) = delete;
+
+    RetType operator()(Args... args) const {
+        return _adapter(_target, std::forward<Args>(args)...);
+    }
+
+private:
+    // Optimization note: An argument could be made for putting the arguments first and the data
+    // last. That would mean that each argument is in the same slot it will need to be so that we
+    // don't need to waste instructions sliding them around in registers. However, a very common
+    // case is lambdas, and in particular lambdas like this:
+    //    [&](SomeArgs args) { return this->method(args); }
+    // Since that lambda is likely to be directly inlined into the type-erasure lambda, and
+    // function_ref::operator() is likely to be inlined into its caller, the current argument order
+    // will result in the arguments being in the correct slots, with the only fixup being to replace
+    // the data pointer with the stored this pointer, since in most ABIs the implicit argument
+    // parameter is treated as if it were the first argument.
+    // There is also a trade-off of Args vs Args&&. The former is more efficient for trivially
+    // copiable types like int and StringData, but the latter is better for expensive-to-move types
+    // like std::string. I opted for the former so that this is cheap when doing cheap things and
+    // because you can always pass expensive-to-move types by reference if you want to, but if we
+    // added a reference here, you couldn't remove it.
+    using Erased = RetType(const void*, Args...);
+
+    const void* _target;
+    Erased* _adapter;
+};
+
 template <typename Function>
 class unique_function;
 
@@ -137,26 +245,19 @@ private:
         virtual RetType call(Args&&... args) = 0;
     };
 
-    // These overload helpers are needed to squelch problems in the `T ()` -> `void ()` case.
-    template <typename Functor>
-    static void callRegularVoid(const std::true_type isVoid, Functor& f, Args&&... args) {
-        // The result of this call is not cast to void, to help preserve detection of
-        // `[[nodiscard]]` violations.
-        f(std::forward<Args>(args)...);
-    }
-
-    template <typename Functor>
-    static RetType callRegularVoid(const std::false_type isNotVoid, Functor& f, Args&&... args) {
-        return f(std::forward<Args>(args)...);
-    }
-
     template <typename Functor>
     static auto makeImpl(Functor&& functor) {
         struct SpecificImpl : Impl {
             explicit SpecificImpl(Functor&& func) : f(std::forward<Functor>(func)) {}
 
             RetType call(Args&&... args) override {
-                return callRegularVoid(std::is_void<RetType>(), f, std::forward<Args>(args)...);
+                if constexpr (std::is_void_v<RetType>) {
+                    // Implicitly ignore the return. This avoids issues if func() returns a value,
+                    // while ensuring we still get a warning if the value is [[nodiscard]].
+                    f(std::forward<Args>(args)...);
+                } else {
+                    return f(std::forward<Args>(args)...);
+                }
             }
 
             std::decay_t<Functor> f;
