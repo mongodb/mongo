@@ -970,7 +970,6 @@ buildvariants:
       --excludeWithAnyTags=incompatible_with_windows_tls
       --excludeWithAnyTags=incompatible_with_shard_merge
   tasks:
-  - name: change_streams_per_shard_cursor_passthrough
   - name: cqf
   - name: cqf_parallel
   - name: compile_and_archive_dist_test_then_package_TG
@@ -1489,7 +1488,6 @@ buildvariants:
       --runAllFeatureFlagTests
       --excludeWithAnyTags=incompatible_with_shard_merge
   tasks: &enterprise-rhel-80-64-bit-dynamic-all-feature-flags-tasks
-  - name: change_streams_per_shard_cursor_passthrough
   - name: cqf
   - name: cqf_parallel
   - name: compile_test_and_package_parallel_core_stream_TG
@@ -2261,7 +2259,6 @@ buildvariants:
       --excludeWithAnyTags=incompatible_with_shard_merge
     separate_debug: off
   tasks:
-  - name: change_streams_per_shard_cursor_passthrough
   - name: cqf
   - name: cqf_parallel
   - name: compile_and_archive_dist_test_then_package_TG
@@ -2410,7 +2407,6 @@ buildvariants:
     scons_cache_scope: shared
     separate_debug: off
   tasks:
-  - name: change_streams_per_shard_cursor_passthrough
   - name: cqf
   - name: cqf_parallel
   - name: compile_and_archive_dist_test_then_package_TG

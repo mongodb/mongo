@@ -4375,7 +4375,7 @@ tasks:
 
 - <<: *task_template
   name: change_streams_per_shard_cursor_passthrough
-  tags: []
+  tags: ["change_streams"]
   commands:
   - func: "do setup"
   - func: "run tests"
