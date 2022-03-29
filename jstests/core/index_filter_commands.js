@@ -87,6 +87,25 @@ function getFilters(collection) {
     return res.filters;
 }
 
+// Utility function to clear index filters set on the 'collection'. The 'queryShape', if provided,
+// is used to ensure that plans with the given shape have been removed from the cache.
+function clearFilters(collection, queryShape) {
+    if (collection == undefined) {
+        collection = coll;
+    }
+
+    // Clear the filters set earlier.
+    assert.commandWorked(collection.runCommand('planCacheClearFilters'));
+    filters = getFilters(collection);
+    assert.eq(
+        0, filters.length, 'filters not cleared after successful planCacheClearFilters command');
+
+    // Plans should be removed after clearing filters.
+    if (queryShape) {
+        assert.eq(null, planCacheEntryForQuery(queryShape), collection.getPlanCache().list());
+    }
+}
+
 // Returns the plan cache entry for the given value of 'createdFromQuery', or null if no such plan
 // cache entry exists.
 function planCacheEntryForQuery(createdFromQuery) {
@@ -169,16 +188,9 @@ if (collectionIsClustered) {
     engineSpecificAssertion(
         isIdhack(db, winningPlan), isIdIndexScan(db, winningPlan, "FETCH"), db, winningPlan);
 }
-// Clear filters
+
 // Clearing filters on a missing collection should be a no-op.
 assert.commandWorked(missingCollection.runCommand('planCacheClearFilters'));
-// Clear the filters set earlier.
-assert.commandWorked(coll.runCommand('planCacheClearFilters'));
-filters = getFilters();
-assert.eq(0, filters.length, 'filters not cleared after successful planCacheClearFilters command');
-
-// Plans should be removed after clearing filters.
-assert.eq(null, planCacheEntryForQuery(shape), coll.getPlanCache().list());
 
 print('Plan details before setting filter = ' + tojson(planBeforeSetFilter.details, '', true));
 print('Plan details after setting filter = ' + tojson(planAfterSetFilter.details, '', true));
@@ -186,36 +198,52 @@ print('Plan details after setting filter = ' + tojson(planAfterSetFilter.details
 //
 // Tests for the 'indexFilterSet' explain field.
 //
-
 if (!FixtureHelpers.isMongos(db)) {
-    // No filter.
-    coll.getPlanCache().clear();
-    assert.eq(false, coll.find({z: 1}).explain('queryPlanner').queryPlanner.indexFilterSet);
-    assert.eq(false,
-              coll.find(queryA1, projectionA1)
-                  .sort(sortA1)
-                  .explain('queryPlanner')
-                  .queryPlanner.indexFilterSet);
+    ['queryPlanner', 'executionStats', 'allPlansExecution'].forEach((verbosity) => {
+        // Make sure to clean index filters before we run the test for each verbosity level.
+        clearFilters(coll, shape);
 
-    // With one filter set.
-    assert.commandWorked(coll.runCommand('planCacheSetFilter', {query: {z: 1}, indexes: [{z: 1}]}));
-    assert.eq(true, coll.find({z: 1}).explain('queryPlanner').queryPlanner.indexFilterSet);
-    assert.eq(false,
-              coll.find(queryA1, projectionA1)
-                  .sort(sortA1)
-                  .explain('queryPlanner')
-                  .queryPlanner.indexFilterSet);
+        // No filter.
+        coll.getPlanCache().clear();
+        assert.eq(
+            false, coll.find({z: 1}).explain(verbosity).queryPlanner.indexFilterSet, verbosity);
+        assert.eq(false,
+                  coll.find(queryA1, projectionA1)
+                      .sort(sortA1)
+                      .explain(verbosity)
+                      .queryPlanner.indexFilterSet,
+                  verbosity);
 
-    // With two filters set.
-    assert.commandWorked(coll.runCommand(
-        'planCacheSetFilter',
-        {query: queryA1, projection: projectionA1, sort: sortA1, indexes: [indexA1B1, indexA1C1]}));
-    assert.eq(true, coll.find({z: 1}).explain('queryPlanner').queryPlanner.indexFilterSet);
-    assert.eq(true,
-              coll.find(queryA1, projectionA1)
-                  .sort(sortA1)
-                  .explain('queryPlanner')
-                  .queryPlanner.indexFilterSet);
+        // With one filter set.
+        assert.commandWorked(
+            coll.runCommand('planCacheSetFilter', {query: {z: 1}, indexes: [{z: 1}]}));
+        assert.eq(
+            true, coll.find({z: 1}).explain(verbosity).queryPlanner.indexFilterSet, verbosity);
+        assert.eq(false,
+                  coll.find(queryA1, projectionA1)
+                      .sort(sortA1)
+                      .explain(verbosity)
+                      .queryPlanner.indexFilterSet,
+                  verbosity);
+
+        // With two filters set.
+        assert.commandWorked(coll.runCommand('planCacheSetFilter', {
+            query: queryA1,
+            projection: projectionA1,
+            sort: sortA1,
+            indexes: [indexA1B1, indexA1C1]
+        }));
+        assert.eq(
+            true, coll.find({z: 1}).explain(verbosity).queryPlanner.indexFilterSet, verbosity);
+        assert.eq(true,
+                  coll.find(queryA1, projectionA1)
+                      .sort(sortA1)
+                      .explain(verbosity)
+                      .queryPlanner.indexFilterSet,
+                  verbosity);
+    });
+} else {
+    clearFilters(coll, shape);
 }
 
 //

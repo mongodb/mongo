@@ -383,7 +383,7 @@ void Explain::explainStages(PlanExecutor* exec,
         // If executing the query failed, for any number of reasons other than a planning failure,
         // then the collection may no longer be valid. We conservatively set our collection pointer
         // to null in case it is invalid.
-        if (executePlanStatus != ErrorCodes::NoQueryExecutionPlans) {
+        if (!executePlanStatus.isOK() && executePlanStatus != ErrorCodes::NoQueryExecutionPlans) {
             collectionPtr = &CollectionPtr::null;
         }
     }
