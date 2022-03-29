@@ -662,6 +662,12 @@ public:
      *      for (BSONElement elem : BSON("a" << 1 << "b" << 2)) {
      *          ... // Do something with elem
      *      }
+     *
+     * You can also loop over a bson object as-if it were a map<StringData, BSONElement>:
+     *
+     *      for (auto [fieldName, elem] : BSON("a" << 1 << "b" << 2)) {
+     *          ... // Do something with fieldName and elem
+     *      }
      */
     iterator begin() const;
     iterator end() const;

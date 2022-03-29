@@ -621,6 +621,16 @@ TEST(Looping, Cpp11Auto) {
     ASSERT_EQUALS(count, 1 + 2 + 3);
 }
 
+TEST(Looping, Cpp17StructuredBindings) {
+    int count = 0;
+    for (auto [name, e] : BSON("a" << 1 << "a" << 2 << "a" << 3)) {
+        ASSERT_EQUALS(name, "a");
+        count += e.Int();
+    }
+
+    ASSERT_EQUALS(count, 1 + 2 + 3);
+}
+
 TEST(BSONObj, getFields) {
     auto e = BSON("a" << 1 << "b" << 2 << "c" << 3 << "d" << 4 << "e" << 5 << "f" << 6);
     std::array<StringData, 3> fieldNames{"c", "d", "f"};

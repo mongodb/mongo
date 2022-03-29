@@ -901,6 +901,24 @@ public:
 
 private:
     /**
+     * This is to enable structured bindings for BSONElement, it should not be used explicitly.
+     * When used in a structed binding, BSONElement behaves as-if it is a
+     * std::pair<StringData, BSONElement>.
+     *
+     * Example:
+     *   for (auto [name, elem] : someBsonObj) {...}
+     */
+    template <size_t I>
+    friend auto get(const BSONElement& elem) {
+        static_assert(I <= 1);
+        if constexpr (I == 0) {
+            return elem.fieldNameStringData();
+        } else if constexpr (I == 1) {
+            return elem;
+        }
+    }
+
+    /**
      * Get a string's value. Also gives you start of the real data for an embedded object.
      * You must assure data is of an appropriate type first, like the type check in
      * valueStringDataSafe(). You should use the string's size when performing any operations
@@ -1227,3 +1245,13 @@ inline BSONElement::BSONElement() {
     totalSize = 1;
 }
 }  // namespace mongo
+
+// These template specializations in namespace std are required in order to support structured
+// bindings using the "tuple protocol".
+namespace std {
+template <>
+struct tuple_size<mongo::BSONElement> : std::integral_constant<size_t, 2> {};
+template <size_t I>
+struct tuple_element<I, mongo::BSONElement>
+    : std::tuple_element<I, std::pair<mongo::StringData, mongo::BSONElement>> {};
+}  // namespace std
