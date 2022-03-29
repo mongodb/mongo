@@ -264,6 +264,7 @@ let testCases = {
             }
         }
     },
+    appendOplogNote: {skip: "unversioned and executes on all shards"},
     authenticate: {skip: "does not forward command to primary shard"},
     availableQueryOptions: {skip: "executes locally on mongos (not sent to any remote node)"},
     balancerCollectionStatus: {skip: "does not forward command to primary shard"},
