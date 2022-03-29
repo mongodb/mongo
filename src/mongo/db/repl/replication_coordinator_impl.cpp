@@ -150,8 +150,6 @@ MONGO_FAIL_POINT_DEFINE(skipBeforeFetchingConfig);
 MONGO_FAIL_POINT_DEFINE(stepdownHangAfterGrabbingRSTL);
 // Simulates returning a specified error in the hello response.
 MONGO_FAIL_POINT_DEFINE(setCustomErrorInHelloResponseMongoD);
-// Throws right before the call into recoverTenantMigrationAccessBlockers.
-MONGO_FAIL_POINT_DEFINE(throwBeforeRecoveringTenantMigrationAccessBlockers);
 
 // Number of times we tried to go live as a secondary.
 Counter64 attemptsToBecomeSecondary;
@@ -523,13 +521,6 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(
     _replicationProcess->getReplicationRecovery()->recoverFromOplog(opCtx, stableTimestamp);
     LOGV2(4280505,
           "Creating any necessary TenantMigrationAccessBlockers for unfinished migrations");
-
-    if (MONGO_unlikely(throwBeforeRecoveringTenantMigrationAccessBlockers.shouldFail())) {
-        uasserted(6111700,
-                  "Failpoint 'throwBeforeRecoveringTenantMigrationAccessBlockers' triggered. "
-                  "Throwing exception.");
-    }
-
     tenant_migration_access_blocker::recoverTenantMigrationAccessBlockers(opCtx);
     LOGV2(4280506, "Reconstructing prepared transactions");
     reconstructPreparedTransactions(opCtx, OplogApplication::Mode::kRecovering);
@@ -923,38 +914,29 @@ void ReplicationCoordinatorImpl::startup(OperationContext* opCtx,
 
     _storage->initializeStorageControlsForReplication(opCtx->getServiceContext());
 
-    // We are expected to be able to transition out of the kConfigStartingUp state by the end
-    // of this function. Any uncaught exceptions here leave us in an invalid state and we will
-    // not be able to shut down by normal means, as clean shutdown assumes we can leave that state.
-    try {
-        {
-            stdx::lock_guard<Latch> lk(_mutex);
-            fassert(18822, !_inShutdown);
-            _setConfigState_inlock(kConfigStartingUp);
-            _topCoord->setStorageEngineSupportsReadCommitted(
-                _externalState->isReadCommittedSupportedByStorageEngine(opCtx));
-        }
+    {
+        stdx::lock_guard<Latch> lk(_mutex);
+        fassert(18822, !_inShutdown);
+        _setConfigState_inlock(kConfigStartingUp);
+        _topCoord->setStorageEngineSupportsReadCommitted(
+            _externalState->isReadCommittedSupportedByStorageEngine(opCtx));
+    }
 
-        // Initialize the cached pointer to the oplog collection.
-        acquireOplogCollectionForLogging(opCtx);
+    // Initialize the cached pointer to the oplog collection.
+    acquireOplogCollectionForLogging(opCtx);
 
-        _replExecutor->startup();
+    _replExecutor->startup();
 
-        LOGV2(6005300, "Starting up replica set aware services");
-        ReplicaSetAwareServiceRegistry::get(_service).onStartup(opCtx);
+    LOGV2(6005300, "Starting up replica set aware services");
+    ReplicaSetAwareServiceRegistry::get(_service).onStartup(opCtx);
 
-        bool doneLoadingConfig = _startLoadLocalConfig(opCtx, lastShutdownState);
-        if (doneLoadingConfig) {
-            // If we're not done loading the config, then the config state will be set by
-            // _finishLoadLocalConfig.
-            stdx::lock_guard<Latch> lk(_mutex);
-            invariant(!_rsConfig.isInitialized());
-            _setConfigState_inlock(kConfigUninitialized);
-        }
-    } catch (DBException& e) {
-        auto status = e.toStatus();
-        LOGV2_FATAL_NOTRACE(
-            6111701, "Failed to load local replica set config on startup", "status"_attr = status);
+    bool doneLoadingConfig = _startLoadLocalConfig(opCtx, lastShutdownState);
+    if (doneLoadingConfig) {
+        // If we're not done loading the config, then the config state will be set by
+        // _finishLoadLocalConfig.
+        stdx::lock_guard<Latch> lk(_mutex);
+        invariant(!_rsConfig.isInitialized());
+        _setConfigState_inlock(kConfigUninitialized);
     }
 }
 
