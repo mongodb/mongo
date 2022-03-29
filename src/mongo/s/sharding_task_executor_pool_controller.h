@@ -40,6 +40,8 @@
 
 namespace mongo {
 
+class ShardRegistry;
+
 /**
  * A special Controller for the sharding ConnectionPool
  *
@@ -102,6 +104,9 @@ public:
 
         synchronized_value<std::string> matchingStrategyString;
         AtomicWord<MatchingStrategy> matchingStrategy;
+
+        AtomicWord<int> minConnectionsForConfigServers;
+        AtomicWord<int> maxConnectionsForConfigServers;
     };
 
     static inline Parameters gParameters;
@@ -123,7 +128,8 @@ public:
      */
     static Status onUpdateMatchingStrategy(const std::string& str);
 
-    ShardingTaskExecutorPoolController() = default;
+    explicit ShardingTaskExecutorPoolController(std::weak_ptr<ShardRegistry> shardRegistry)
+        : _shardRegistry(std::move(shardRegistry)) {}
     ShardingTaskExecutorPoolController& operator=(ShardingTaskExecutorPoolController&&) = delete;
 
     void init(ConnectionPool* parent) override;
@@ -185,6 +191,9 @@ private:
         // The host associated with this pool
         HostAndPort host;
 
+        // A pool connected to a config server gets special treatment
+        bool isConfigServer = false;
+
         // The GroupData associated with this pool.
         // Note that this will be invalid if there was a replica set change
         std::weak_ptr<GroupData> groupData;
@@ -207,6 +216,9 @@ private:
         std::shared_ptr<GroupData> groupData;
         boost::optional<PoolId> maybeId;
     };
+
+    /** Needed by isConfigServer */
+    std::weak_ptr<ShardRegistry> const _shardRegistry;
 
     std::shared_ptr<ReplicaSetChangeNotifier::Listener> _listener;
 

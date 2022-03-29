@@ -33,6 +33,8 @@
 
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/executor/connection_pool_stats.h"
+#include "mongo/logv2/log.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/is_mongos.h"
 #include "mongo/s/sharding_task_executor_pool_controller.h"
 
@@ -52,6 +54,15 @@ template <typename Map, typename... Args>
 void emplaceOrInvariant(Map&& map, Args&&... args) noexcept {
     auto ret = std::forward<Map>(map).emplace(std::forward<Args>(args)...);
     invariant(ret.second, "Element already existed in map/set");
+}
+
+bool isConfigServer(const ShardRegistry* sr, const HostAndPort& peer) {
+    if (!sr)
+        return false;
+    auto shard = sr->getShardForHostNoReload(peer);
+    if (!shard)
+        return false;
+    return shard->isConfig();
 }
 
 }  // namespace
@@ -196,6 +207,7 @@ void ShardingTaskExecutorPoolController::addHost(PoolId id, const HostAndPort& h
 
     PoolData poolData;
     poolData.host = host;
+    poolData.isConfigServer = isConfigServer(_shardRegistry.lock().get(), host);
 
     // Set up the GroupAndId
     auto& groupAndId = _groupAndIds[host];
@@ -219,8 +231,26 @@ auto ShardingTaskExecutorPoolController::updateHost(PoolId id, const HostState& 
 
     auto& poolData = getOrInvariant(_poolDatas, id);
 
-    const size_t minConns = gParameters.minConnections.load();
-    const size_t maxConns = gParameters.maxConnections.load();
+    const auto [minConns, maxConns] = [&] {
+        size_t lo = gParameters.minConnections.load();
+        size_t hi = gParameters.maxConnections.load();
+        if (poolData.isConfigServer) {
+            auto maybeOverride = [](size_t& t, int val) {
+                if (val >= 0)
+                    t = val;
+            };
+            maybeOverride(lo, gParameters.minConnectionsForConfigServers.load());
+            maybeOverride(hi, gParameters.maxConnectionsForConfigServers.load());
+        }
+        return std::tuple(lo, hi);
+    }();
+    // conn_pool_csrs.js looks for this message in the log.
+    LOGV2_DEBUG(6265600,
+                5,
+                "Update connection pool",
+                "host"_attr = poolData.host,
+                "minConns"_attr = minConns,
+                "maxConns"_attr = maxConns);
 
     // Update the target for just the pool first
     poolData.target = stats.requests + stats.active;
