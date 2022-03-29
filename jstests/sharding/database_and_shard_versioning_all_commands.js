@@ -57,6 +57,7 @@ let testCases = {
         sendsShardVersion: true,
         command: {aggregate: collName, pipeline: [{$match: {x: 1}}], cursor: {batchSize: 10}},
     },
+    appendOplogNote: {skip: "unversioned and executes on all shards"},
     authenticate: {skip: "does not forward command to primary shard"},
     availableQueryOptions: {skip: "executes locally on mongos (not sent to any remote node)"},
     balancerStart: {skip: "not on a user database"},
