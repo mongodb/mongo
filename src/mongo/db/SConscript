@@ -270,12 +270,16 @@ env.Library(
 env.Library(
     target='collection_index_usage_tracker',
     source=[
-        'collection_index_usage_tracker.cpp'
+        'collection_index_usage_tracker.cpp',
+        'global_index_usage_tracker.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/commands/server_status_core',
     ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/index_names',
+    ]
 )
 
 env.Library(

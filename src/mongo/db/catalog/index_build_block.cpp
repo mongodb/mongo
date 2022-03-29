@@ -81,7 +81,9 @@ void IndexBuildBlock::_completeInit(OperationContext* opCtx, Collection* collect
     auto desc = getEntry(opCtx, collection)->descriptor();
     CollectionQueryInfo::get(collection).rebuildIndexData(opCtx, collection);
     CollectionIndexUsageTrackerDecoration::get(collection->getSharedDecorations())
-        .registerIndex(desc->indexName(), desc->keyPattern());
+        .registerIndex(desc->indexName(),
+                       desc->keyPattern(),
+                       IndexFeatures::make(desc, collection->ns().isOnInternalDb()));
 }
 
 Status IndexBuildBlock::initForResume(OperationContext* opCtx,

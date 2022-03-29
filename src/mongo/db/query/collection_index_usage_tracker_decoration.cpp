@@ -51,6 +51,7 @@ CollectionIndexUsageTracker& CollectionIndexUsageTrackerDecoration::get(
 }
 
 CollectionIndexUsageTrackerDecoration::CollectionIndexUsageTrackerDecoration()
-    : _indexUsageTracker(getGlobalServiceContext()->getPreciseClockSource()) {}
+    : _indexUsageTracker(GlobalIndexUsageTracker::get(getGlobalServiceContext()),
+                         getGlobalServiceContext()->getPreciseClockSource()) {}
 
 }  // namespace mongo

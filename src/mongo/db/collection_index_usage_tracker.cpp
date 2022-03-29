@@ -37,6 +37,7 @@
 
 #include "mongo/base/counter.h"
 #include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 
@@ -49,10 +50,14 @@ ServerStatusMetricField<Counter64> displayCollectionScans("queryExecutor.collect
                                                           &collectionScansCounter);
 ServerStatusMetricField<Counter64> displayCollectionScansNonTailable(
     "queryExecutor.collectionScans.nonTailable", &collectionScansNonTailableCounter);
+
 }  // namespace
 
-CollectionIndexUsageTracker::CollectionIndexUsageTracker(ClockSource* clockSource)
-    : _indexUsageStatsMap(std::make_shared<CollectionIndexUsageMap>()), _clockSource(clockSource) {
+CollectionIndexUsageTracker::CollectionIndexUsageTracker(
+    GlobalIndexUsageTracker* globalIndexUsageTracker, ClockSource* clockSource)
+    : _indexUsageStatsMap(std::make_shared<CollectionIndexUsageMap>()),
+      _clockSource(clockSource),
+      _globalIndexUsageTracker(globalIndexUsageTracker) {
     invariant(_clockSource);
 }
 
@@ -69,6 +74,8 @@ void CollectionIndexUsageTracker::recordIndexAccess(StringData indexName) {
         return;
     }
 
+    _globalIndexUsageTracker->onAccess(it->second->features);
+
     // Increment the index usage atomic counter.
     it->second->accesses.fetchAndAdd(1);
 }
@@ -84,7 +91,9 @@ void CollectionIndexUsageTracker::recordCollectionScansNonTailable(
     collectionScansNonTailableCounter.increment(collectionScansNonTailable);
 }
 
-void CollectionIndexUsageTracker::registerIndex(StringData indexName, const BSONObj& indexKey) {
+void CollectionIndexUsageTracker::registerIndex(StringData indexName,
+                                                const BSONObj& indexKey,
+                                                const IndexFeatures& features) {
     invariant(!indexName.empty());
 
     // Create a copy of the map to modify.
@@ -95,8 +104,10 @@ void CollectionIndexUsageTracker::registerIndex(StringData indexName, const BSON
 
     // Create the map entry.
     auto inserted = mapCopy->try_emplace(
-        indexName, make_intrusive<IndexUsageStats>(_clockSource->now(), indexKey));
+        indexName, make_intrusive<IndexUsageStats>(_clockSource->now(), indexKey, features));
     invariant(inserted.second);
+
+    _globalIndexUsageTracker->onRegister(inserted.first->second->features);
 
     // Swap the modified map into place atomically.
     atomic_store(&_indexUsageStatsMap, std::move(mapCopy));
@@ -109,11 +120,16 @@ void CollectionIndexUsageTracker::unregisterIndex(StringData indexName) {
     auto mapSharedPtr = atomic_load(&_indexUsageStatsMap);
     auto mapCopy = std::make_shared<CollectionIndexUsageMap>(*mapSharedPtr);
 
-    // Remove the map entry.
-    mapCopy->erase(indexName);
+    auto it = mapCopy->find(indexName);
+    if (it != mapCopy->end()) {
+        _globalIndexUsageTracker->onUnregister(it->second->features);
 
-    // Swap the modified map into place atomically.
-    atomic_store(&_indexUsageStatsMap, std::move(mapCopy));
+        // Remove the map entry.
+        mapCopy->erase(it);
+
+        // Swap the modified map into place atomically.
+        atomic_store(&_indexUsageStatsMap, std::move(mapCopy));
+    }
 }
 
 std::shared_ptr<CollectionIndexUsageTracker::CollectionIndexUsageMap>

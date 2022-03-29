@@ -1227,7 +1227,9 @@ public:
         // Refresh the CollectionIndexUsageTrackerDecoration's knowledge of what indices are
         // present as it is shared state across Collection copies.
         CollectionIndexUsageTrackerDecoration::get(_collectionDecorations)
-            .registerIndex(indexDescriptor->indexName(), indexDescriptor->keyPattern());
+            .registerIndex(indexDescriptor->indexName(),
+                           indexDescriptor->keyPattern(),
+                           IndexFeatures::make(indexDescriptor, _nss.isOnInternalDb()));
     }
 
 private:
@@ -1444,7 +1446,9 @@ const IndexDescriptor* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
     invariant(newEntry->isReady(opCtx));
     auto desc = newEntry->descriptor();
     CollectionIndexUsageTrackerDecoration::get(collection->getSharedDecorations())
-        .registerIndex(desc->indexName(), desc->keyPattern());
+        .registerIndex(desc->indexName(),
+                       desc->keyPattern(),
+                       IndexFeatures::make(desc, collection->ns().isOnInternalDb()));
 
     // Last rebuild index data for CollectionQueryInfo for this Collection.
     CollectionQueryInfo::get(collection).rebuildIndexData(opCtx, collection);

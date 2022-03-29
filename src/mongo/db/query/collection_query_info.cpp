@@ -244,7 +244,9 @@ void CollectionQueryInfo::init(OperationContext* opCtx, const CollectionPtr& col
     while (ii->more()) {
         const IndexDescriptor* desc = ii->next()->descriptor();
         CollectionIndexUsageTrackerDecoration::get(coll->getSharedDecorations())
-            .registerIndex(desc->indexName(), desc->keyPattern());
+            .registerIndex(desc->indexName(),
+                           desc->keyPattern(),
+                           IndexFeatures::make(desc, coll->ns().isOnInternalDb()));
     }
 
     rebuildIndexData(opCtx, coll);
