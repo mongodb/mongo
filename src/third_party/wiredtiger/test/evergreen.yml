@@ -168,7 +168,7 @@ functions:
             mkdir -p cmake_build
             cd cmake_build
             $CMAKE -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_v4_clang.cmake -DCMAKE_C_FLAGS="-ggdb" -DWITH_PIC=1 \
-              -DHAVE_DIAGNOSTIC=1 ${NON_BARRIER_DIAGNOSTIC_YIELDS|} -DCMAKE_BUILD_TYPE=ASan \
+              -DHAVE_DIAGNOSTIC=1 -DCMAKE_BUILD_TYPE=ASan \
               -DHAVE_BUILTIN_EXTENSION_LZ4=1 -DHAVE_BUILTIN_EXTENSION_SNAPPY=1 -DHAVE_BUILTIN_EXTENSION_ZLIB=1 ${configure_python_setting|} \
               -G "${cmake_generator|Ninja}" ../.
           fi
@@ -187,7 +187,7 @@ functions:
             mkdir -p cmake_build
             cd cmake_build
             $CMAKE -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_v3_gcc.cmake -DCMAKE_C_FLAGS="-ggdb" -DWITH_PIC=1 \
-              -DHAVE_DIAGNOSTIC=1 ${NON_BARRIER_DIAGNOSTIC_YIELDS|} -DENABLE_STRICT=1  \
+              -DHAVE_DIAGNOSTIC=1 -DENABLE_STRICT=1  \
               -DHAVE_BUILTIN_EXTENSION_LZ4=1 -DHAVE_BUILTIN_EXTENSION_SNAPPY=1 -DHAVE_BUILTIN_EXTENSION_ZLIB=1 ${configure_python_setting|} \
               -G "${cmake_generator|Ninja}" ../.
           fi
@@ -2680,60 +2680,6 @@ tasks:
     name: recovery-stress-test-3
     tags: ["stress-test-3", "stress-test-zseries-3"]
 
-  - name: format-stress-test-no-barrier
-    tags: ["stress-test-no-barrier"]
-    exec_timeout_secs: 25200
-    commands:
-      - func: "get project"
-      - func: "compile wiredtiger with builtins"
-        vars: 
-          NON_BARRIER_DIAGNOSTIC_YIELDS: -DNON_BARRIER_DIAGNOSTIC_YIELDS=1
-      - func: "format test script"
-        vars:
-          format_test_script_args: -e "SEGFAULT_SIGNALS=all" -b "catchsegv ./t" -t 360
-
-  - name: format-stress-sanitizer-test-no-barrier
-    tags: ["stress-test-no-barrier"]
-    exec_timeout_secs: 25200
-    commands:
-      - func: "get project"
-      - func: "compile wiredtiger address sanitizer"
-        vars: 
-          NON_BARRIER_DIAGNOSTIC_YIELDS: -DNON_BARRIER_DIAGNOSTIC_YIELDS=1
-      - func: "format test script"
-        vars:
-          format_test_script_args: -t 360
-          test_env_vars:
-            ASAN_OPTIONS="detect_leaks=1:abort_on_error=1:disable_coredump=0:unmap_shadow_on_exit=1"
-            ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer
-
-  - name: race-condition-stress-sanitizer-test-no-barier
-    tags: ["stress-test-no-barrier"]
-    exec_timeout_secs: 25200
-    commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
-        vars: 
-          posix_configure_flags: -DENABLE_STRICT=1 -DHAVE_DIAGNOSTIC=1 -DNON_BARRIER_DIAGNOSTIC_YIELDS=1 -DHAVE_BUILTIN_EXTENSION_LZ4=1 -DHAVE_BUILTIN_EXTENSION_SNAPPY=1 -DHAVE_BUILTIN_EXTENSION_ZLIB=1 -DHAVE_BUILTIN_EXTENSION_ZSTD=1
-      - func: "format test script"
-        vars:
-          format_test_script_args: -R -t 360
-          test_env_vars:
-            ASAN_OPTIONS="detect_leaks=1:abort_on_error=1:disable_coredump=0:unmap_shadow_on_exit=1"
-            ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer
-
-  - name: recovery-stress-test-no-barrier
-    tags: ["stress-test-no-barrier"]
-    exec_timeout_secs: 25200
-    commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
-        vars:
-          posix_configure_flags: -DENABLE_STRICT=1 -DHAVE_DIAGNOSTIC=1 -DNON_BARRIER_DIAGNOSTIC_YIELDS=1 -DHAVE_BUILTIN_EXTENSION_LZ4=1 -DHAVE_BUILTIN_EXTENSION_SNAPPY=1 -DHAVE_BUILTIN_EXTENSION_ZLIB=1
-      - func: "recovery stress test script"
-        vars:
-          times: 25
-
   - name: format-abort-recovery-stress-test
     commands:
       # Allow 30 minutes beyond test runtime because recovery under load can cause the test to
@@ -3856,7 +3802,6 @@ buildvariants:
     - name: ".stress-test-2"
     - name: ".stress-test-3"
     - name: ".stress-test-4"
-    - name: ".stress-test-no-barrier"
     - name: format-abort-recovery-stress-test
 
 - name: ubuntu2004-stress-tests-arm64
@@ -3895,7 +3840,6 @@ buildvariants:
     - name: ".stress-test-2"
     - name: ".stress-test-3"
     - name: ".stress-test-4"
-    - name: ".stress-test-no-barrier"
     - name: format-abort-recovery-stress-test
 
 - name: ubuntu2004-perf-tests

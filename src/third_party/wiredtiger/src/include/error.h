@@ -11,12 +11,7 @@
 #define WT_DEBUG_BYTE (0xab)
 
 /* In DIAGNOSTIC mode, yield in places where we want to encourage races. */
-#if defined HAVE_DIAGNOSTIC && defined NON_BARRIER_DIAGNOSTIC_YIELDS
-#define WT_DIAGNOSTIC_YIELD      \
-    do {                         \
-        __wt_yield_no_barrier(); \
-    } while (0)
-#elif defined HAVE_DIAGNOSTIC && !defined NON_BARRIER_DIAGNOSTIC_YIELDS
+#ifdef HAVE_DIAGNOSTIC
 #define WT_DIAGNOSTIC_YIELD \
     do {                    \
         __wt_yield();       \

@@ -105,11 +105,6 @@ Configure WiredTiger to sleep and wait for a debugger to attach on failure.
 Configure WiredTiger to perform various run-time diagnostic tests.
 <b>DO NOT</b> configure this option in production environments.
 
-@par \c -DNON_BARRIER_DIAGNOSTIC_YIELDS=1
-Configure WiredTiger to not use memory barriers when yielding threads for diagnostic purposes.
-Requires that HAVE_DIAGNOSTIC is also enabled.
-<b>DO NOT</b> configure this option in production environments.
-
 @par \c -DENABLE_LZ4=1
 Configure WiredTiger for <a href="https://github.com/Cyan4973/lz4">LZ4</a>
 compression; see @ref compression for more information.
