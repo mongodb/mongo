@@ -1654,12 +1654,23 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::_buildIndexedDataAccess(
             IndexTag* tag = static_cast<IndexTag*>(root->getTag());
 
             IndexBoundsBuilder::BoundsTightness tightness = IndexBoundsBuilder::EXACT;
-            // TODO SERVER-64816: Add IET suport.
-            auto soln =
-                makeLeafNode(query, indices[tag->index], tag->pos, root, &tightness, nullptr);
+
+            const auto& index = indices[tag->index];
+
+            std::vector<interval_evaluation_tree::Builder> ietBuilders{};
+            interval_evaluation_tree::Builder* ietBuilder = nullptr;
+            if (query.isParameterized()) {
+                ietBuilders.resize(index.keyPattern.nFields());
+                tassert(6481601,
+                        "IET Builder list size must be equal to the number of fields in the key "
+                        "pattern",
+                        tag->pos < ietBuilders.size());
+                ietBuilder = &ietBuilders[tag->pos];
+            }
+
+            auto soln = makeLeafNode(query, index, tag->pos, root, &tightness, ietBuilder);
             verify(nullptr != soln);
-            finishLeafNode(
-                soln.get(), indices[tag->index], std::vector<interval_evaluation_tree::Builder>{});
+            finishLeafNode(soln.get(), index, ietBuilders);
 
             if (!ownedRoot) {
                 // We're performing access planning for the child of an array operator such as
@@ -1887,4 +1898,21 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeIndexScan(
     return solnRoot;
 }
 
+void QueryPlannerAccess::ScanBuildingState::resetForNextScan(IndexTag* newTag,
+                                                             bool isQueryParameterized) {
+    currentScan.reset(nullptr);
+    currentIndexNumber = newTag->index;
+    tightness = IndexBoundsBuilder::INEXACT_FETCH;
+    loosestBounds = IndexBoundsBuilder::EXACT;
+
+    ietBuilders.clear();
+    if (isQueryParameterized) {
+        const auto& index = indices[newTag->index];
+        ietBuilders.resize(index.keyPattern.nFields());
+    }
+
+    if (MatchExpression::OR == root->matchType()) {
+        curOr = std::make_unique<OrMatchExpression>();
+    }
+}
 }  // namespace mongo

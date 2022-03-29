@@ -165,23 +165,7 @@ private:
          * If `isQueryParameterized` is true an Interval Evaluation Tree will be built for every key
          * element.
          */
-        void resetForNextScan(IndexTag* newTag, bool isQueryParameterized) {
-            currentScan.reset(nullptr);
-            currentIndexNumber = newTag->index;
-            tightness = IndexBoundsBuilder::INEXACT_FETCH;
-            loosestBounds = IndexBoundsBuilder::EXACT;
-
-            if (isQueryParameterized) {
-                const auto& index = indices[newTag->index];
-                for (int i = 0; i < index.keyPattern.nFields(); ++i) {
-                    ietBuilders.emplace_back();
-                }
-            }
-
-            if (MatchExpression::OR == root->matchType()) {
-                curOr = std::make_unique<OrMatchExpression>();
-            }
-        }
+        void resetForNextScan(IndexTag* newTag, bool isQueryParameterized);
 
         interval_evaluation_tree::Builder* getCurrentIETBuilder() {
             if (ietBuilders.empty()) {
