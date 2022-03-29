@@ -394,7 +394,8 @@ Status Balancer::moveRange(OperationContext* opCtx,
         const auto cm = uassertStatusOK(
             Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx,
                                                                                          nss));
-        return cm.findIntersectingChunkWithSimpleCollation(request.getMin());
+        // TODO SERVER-64926 do not assume min always present
+        return cm.findIntersectingChunkWithSimpleCollation(*request.getMin());
     }();
 
     if (chunk.getShardId() == request.getToShard()) {

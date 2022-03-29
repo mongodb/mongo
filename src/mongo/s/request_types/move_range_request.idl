@@ -57,6 +57,7 @@ structs:
             min:
                 type: object
                 description: "The min key of the range to move"
+                optional: true
             max:
                 type: object
                 description: "The max key of the range to move"

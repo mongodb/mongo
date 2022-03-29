@@ -92,7 +92,8 @@ public:
             BSONObjBuilder moveChunkReqBuilder(originalReq.toBSON({}));
             moveChunkReqBuilder.append(WriteConcernOptions::kWriteConcernField, WC.toBSON());
 
-            const auto& min = request().getMin();
+            // TODO SERVER-64926 do not assume min always present
+            const auto& min = *request().getMin();
 
             // TODO SERVER-64817 compute missing bound of `moveRange` within MigrationSourceManager
             if (!originalReq.getMax().is_initialized()) {
@@ -224,10 +225,12 @@ public:
         BSONObj computeMaxBound(OperationContext* opCtx,
                                 const Chunk& owningChunk,
                                 const ShardKeyPattern& skPattern) {
+            // TODO SERVER-64926 do not assume min always present
+            const auto& min = *request().getMin();
             auto [splitKeys, _] = autoSplitVector(opCtx,
                                                   ns(),
                                                   skPattern.toBSON(),
-                                                  request().getMin(),
+                                                  min,
                                                   owningChunk.getMax(),
                                                   *request().getMaxChunkSizeBytes(),
                                                   1);
