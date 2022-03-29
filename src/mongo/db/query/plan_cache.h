@@ -61,8 +61,7 @@ public:
     CachedPlanHolder(const PlanCacheEntryBase<CachedPlanType, DebugInfoType>& entry)
         : cachedPlan(entry.cachedPlan->clone()),
           decisionWorks(entry.works),
-          debugInfo(entry.debugInfo ? std::make_unique<DebugInfoType>(*entry.debugInfo) : nullptr) {
-    }
+          debugInfo(entry.debugInfo) {}
 
     /**
      * Indicates whether or not the cached plan is pinned to cache.
@@ -79,8 +78,9 @@ public:
     // is not subject to replanning.
     const boost::optional<size_t> decisionWorks;
 
-    // Per-plan cache entry information that is used for debugging purpose.
-    std::unique_ptr<DebugInfoType> debugInfo;
+    // Per-plan cache entry information that is used for debugging purpose. Shared across all plans
+    // recovered from the same cached entry.
+    const std::shared_ptr<const DebugInfoType> debugInfo;
 };
 
 /**
@@ -113,9 +113,9 @@ public:
             includeDebugInfo = true;
         }
 
-        boost::optional<DebugInfoType> debugInfoOpt;
+        std::shared_ptr<const DebugInfoType> debugInfoOpt;
         if (includeDebugInfo) {
-            debugInfoOpt.emplace(std::move(debugInfo));
+            debugInfoOpt = std::make_shared<const DebugInfoType>(std::move(debugInfo));
         }
 
         return std::unique_ptr<Entry>(new Entry(std::move(cachedPlan),
@@ -137,13 +137,14 @@ public:
                                                uint32_t planCacheKey,
                                                Date_t timeOfCreation,
                                                DebugInfoType debugInfo) {
-        return std::unique_ptr<Entry>(new Entry(std::move(cachedPlan),
-                                                timeOfCreation,
-                                                queryHash,
-                                                planCacheKey,
-                                                true,         // isActive
-                                                boost::none,  // decisionWorks
-                                                std::move(debugInfo)));
+        return std::unique_ptr<Entry>(
+            new Entry(std::move(cachedPlan),
+                      timeOfCreation,
+                      queryHash,
+                      planCacheKey,
+                      true,         // isActive
+                      boost::none,  // decisionWorks
+                      std::make_shared<const DebugInfoType>(std::move(debugInfo))));
     }
 
     ~PlanCacheEntryBase() {
@@ -159,21 +160,17 @@ public:
     }
 
     /**
-     * Make a deep copy.
+     * Make a copy of this plan cache entry. For all members a deep copy will be made, apart from
+     * 'debugInfo' which is shared among all clone entries.
      */
     std::unique_ptr<Entry> clone() const {
-        boost::optional<DebugInfoType> debugInfoCopy;
-        if (debugInfo) {
-            debugInfoCopy.emplace(*debugInfo);
-        }
-
         return std::unique_ptr<Entry>(new Entry(cachedPlan->clone(),
                                                 timeOfCreation,
                                                 queryHash,
                                                 planCacheKey,
                                                 isActive,
                                                 works,
-                                                std::move(debugInfoCopy)));
+                                                debugInfo));
     }
 
     std::string debugString() const {
@@ -214,8 +211,8 @@ public:
     boost::optional<size_t> works;
 
     // Optional debug info containing plan cache entry information that is used strictly as
-    // debug information.
-    const boost::optional<DebugInfoType> debugInfo;
+    // debug information. Read-only and shared between all plans recovered from this entry.
+    const std::shared_ptr<const DebugInfoType> debugInfo;
 
     // An estimate of the size in bytes of this plan cache entry. This is the "deep size",
     // calculated by recursively incorporating the size of owned objects, the objects that they in
@@ -232,7 +229,7 @@ private:
                        uint32_t planCacheKey,
                        bool isActive,
                        boost::optional<size_t> works,
-                       boost::optional<DebugInfoType> debugInfo)
+                       std::shared_ptr<const DebugInfoType> debugInfo)
         : cachedPlan(std::move(cachedPlan)),
           timeOfCreation(timeOfCreation),
           queryHash(queryHash),

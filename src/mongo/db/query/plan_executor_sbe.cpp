@@ -121,7 +121,7 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
                                                   std::move(optimizerData),
                                                   std::move(candidates.plans),
                                                   isMultiPlan,
-                                                  std::move(_rootData.debugInfo));
+                                                  _rootData.debugInfo);
 }
 
 void PlanExecutorSBE::saveState() {

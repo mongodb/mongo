@@ -54,11 +54,12 @@ std::unique_ptr<PlanExplainer> make(sbe::PlanStage* root,
                                     std::vector<sbe::plan_ranker::CandidatePlan> rejectedCandidates,
                                     bool isMultiPlan);
 
-std::unique_ptr<PlanExplainer> make(sbe::PlanStage* root,
-                                    const stage_builder::PlanStageData* data,
-                                    const QuerySolution* solution,
-                                    std::unique_ptr<optimizer::AbstractABTPrinter> optimizerData,
-                                    std::vector<sbe::plan_ranker::CandidatePlan> rejectedCandidates,
-                                    bool isMultiPlan,
-                                    std::unique_ptr<plan_cache_debug_info::DebugInfoSBE> debugInfo);
+std::unique_ptr<PlanExplainer> make(
+    sbe::PlanStage* root,
+    const stage_builder::PlanStageData* data,
+    const QuerySolution* solution,
+    std::unique_ptr<optimizer::AbstractABTPrinter> optimizerData,
+    std::vector<sbe::plan_ranker::CandidatePlan> rejectedCandidates,
+    bool isMultiPlan,
+    std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfo);
 }  // namespace mongo::plan_explainer_factory

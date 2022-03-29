@@ -1106,7 +1106,7 @@ protected:
                 auto&& cachedPlan = std::move(cacheEntry->cachedPlan);
                 auto root = std::move(cachedPlan->root);
                 auto stageData = std::move(cachedPlan->planStageData);
-                stageData.debugInfo = std::move(cacheEntry->debugInfo);
+                stageData.debugInfo = cacheEntry->debugInfo;
 
                 auto result = makeResult();
                 result->setDecisionWorks(cacheEntry->decisionWorks);

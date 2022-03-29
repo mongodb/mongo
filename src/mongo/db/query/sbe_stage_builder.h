@@ -298,7 +298,7 @@ struct PlanStageData {
 
     // Stores plan cache entry information used as debug information or for "explain" purpose.
     // Note that 'debugInfo' is present only if this PlanStageData is recovered from the plan cache.
-    std::unique_ptr<plan_cache_debug_info::DebugInfoSBE> debugInfo;
+    std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfo;
 
     // If the query has been auto-parameterized, then the mapping from input parameter id to the
     // id of a slot in the runtime environment is maintained here. This mapping is established
