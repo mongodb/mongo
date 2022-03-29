@@ -107,7 +107,8 @@ void TenantMigrationRecipientOpObserver::onCreateCollection(OperationContext* op
                                                             const NamespaceString& collectionName,
                                                             const CollectionOptions& options,
                                                             const BSONObj& idIndex,
-                                                            const OplogSlot& createOpTime) {
+                                                            const OplogSlot& createOpTime,
+                                                            bool fromMigrate) {
     if (!shard_merge_utils::isDonatedFilesCollection(collectionName))
         return;
 

@@ -534,7 +534,8 @@ void ShardServerOpObserver::onCreateCollection(OperationContext* opCtx,
                                                const NamespaceString& collectionName,
                                                const CollectionOptions& options,
                                                const BSONObj& idIndex,
-                                               const OplogSlot& createOpTime) {
+                                               const OplogSlot& createOpTime,
+                                               bool fromMigrate) {
     // Only the shard primay nodes control the collection creation and secondaries just follow
     if (!opCtx->writesAreReplicated()) {
         return;

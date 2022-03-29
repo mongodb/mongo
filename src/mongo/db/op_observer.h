@@ -228,7 +228,8 @@ public:
                                     const NamespaceString& collectionName,
                                     const CollectionOptions& options,
                                     const BSONObj& idIndex,
-                                    const OplogSlot& createOpTime) = 0;
+                                    const OplogSlot& createOpTime,
+                                    bool fromMigrate) = 0;
     /**
      * This function logs an oplog entry when a 'collMod' command on a collection is executed.
      * Since 'collMod' commands can take a variety of different formats, the 'o' field of the

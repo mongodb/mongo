@@ -790,7 +790,8 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
                                            const NamespaceString& nss,
                                            const CollectionOptions& options,
                                            bool createIdIndex,
-                                           const BSONObj& idIndex) const {
+                                           const BSONObj& idIndex,
+                                           bool fromMigrate) const {
     invariant(!options.isView());
 
     invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX));
@@ -895,7 +896,7 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
     hangBeforeLoggingCreateCollection.pauseWhileSet();
 
     opCtx->getServiceContext()->getOpObserver()->onCreateCollection(
-        opCtx, collection, nss, optionsWithUUID, fullIdIndexSpec, createOplogSlot);
+        opCtx, collection, nss, optionsWithUUID, fullIdIndexSpec, createOplogSlot, fromMigrate);
 
     // It is necessary to create the system index *after* running the onCreateCollection so that
     // the storage timestamp for the index creation is after the storage timestamp for the
@@ -904,7 +905,7 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
     // after the collection is created.
     if (canAcceptWrites && createIdIndex && nss.isSystem()) {
         CollectionWriter collWriter(collection);
-        createSystemIndexes(opCtx, collWriter);
+        createSystemIndexes(opCtx, collWriter, fromMigrate);
     }
 
     return collection;
@@ -1010,7 +1011,8 @@ Status DatabaseImpl::userCreateNS(OperationContext* opCtx,
                                   const NamespaceString& nss,
                                   CollectionOptions collectionOptions,
                                   bool createDefaultIndexes,
-                                  const BSONObj& idIndex) const {
+                                  const BSONObj& idIndex,
+                                  bool fromMigrate) const {
     LOGV2_DEBUG(20324,
                 1,
                 "create collection {namespace} {collectionOptions}",
@@ -1110,7 +1112,8 @@ Status DatabaseImpl::userCreateNS(OperationContext* opCtx,
 
         uassertStatusOK(createView(opCtx, nss, collectionOptions));
     } else {
-        invariant(createCollection(opCtx, nss, collectionOptions, createDefaultIndexes, idIndex),
+        invariant(createCollection(
+                      opCtx, nss, collectionOptions, createDefaultIndexes, idIndex, fromMigrate),
                   str::stream() << "Collection creation failed after validating options: " << nss
                                 << ". Options: " << collectionOptions.toBSON());
     }

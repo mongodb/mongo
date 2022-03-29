@@ -996,6 +996,7 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(
         auto db = autoDb.ensureDbExists(opCtx);
 
         auto collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
+        auto fromMigrate = true;
         if (collection) {
             checkUUIDsMatch(collection);
         } else {
@@ -1022,7 +1023,8 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(
                                              nss,
                                              collectionOptions,
                                              createDefaultIndexes,
-                                             collectionOptionsAndIndexes.idIndexSpec));
+                                             collectionOptionsAndIndexes.idIndexSpec,
+                                             fromMigrate));
             wuow.commit();
             collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
         }
@@ -1030,7 +1032,6 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(
         auto indexSpecs = checkEmptyOrGetMissingIndexesFromDonor(collection);
         if (!indexSpecs.empty()) {
             WriteUnitOfWork wunit(opCtx);
-            auto fromMigrate = true;
             CollectionWriter collWriter(opCtx, collection->uuid());
             IndexBuildsCoordinator::get(opCtx)->createIndexesOnEmptyCollection(
                 opCtx, collWriter, indexSpecs, fromMigrate);

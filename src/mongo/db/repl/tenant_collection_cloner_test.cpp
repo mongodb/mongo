@@ -71,7 +71,8 @@ public:
                             const NamespaceString& collectionName,
                             const CollectionOptions& options,
                             const BSONObj& idIndex,
-                            const OplogSlot& createOpTime) final {
+                            const OplogSlot& createOpTime,
+                            bool fromMigrate) final {
         if (collectionName == nssToCapture) {
             collCreated = true;
             collectionOptions = options;

@@ -79,13 +79,15 @@ public:
                         const NamespaceString& nss,
                         CollectionOptions collectionOptions,
                         bool createDefaultIndexes,
-                        const BSONObj& idIndex) const final;
+                        const BSONObj& idIndex,
+                        bool fromMigrate) const final;
 
     Collection* createCollection(OperationContext* opCtx,
                                  const NamespaceString& nss,
                                  const CollectionOptions& options = CollectionOptions(),
                                  bool createDefaultIndexes = true,
-                                 const BSONObj& idIndex = BSONObj()) const final;
+                                 const BSONObj& idIndex = BSONObj(),
+                                 bool fromMigrate = false) const final;
 
     Status createView(OperationContext* opCtx,
                       const NamespaceString& viewName,

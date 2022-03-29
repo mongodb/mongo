@@ -197,7 +197,7 @@ Status verifySystemIndexes(OperationContext* opCtx) {
     return Status::OK();
 }
 
-void createSystemIndexes(OperationContext* opCtx, CollectionWriter& collection) {
+void createSystemIndexes(OperationContext* opCtx, CollectionWriter& collection, bool fromMigrate) {
     invariant(collection);
     const NamespaceString& ns = collection->ns();
     BSONObj indexSpec;
@@ -210,7 +210,6 @@ void createSystemIndexes(OperationContext* opCtx, CollectionWriter& collection) 
             40457, index_key_validate::validateIndexSpec(opCtx, v3SystemRolesIndexSpec.toBSON()));
     }
     if (!indexSpec.isEmpty()) {
-        auto fromMigrate = false;
         try {
             IndexBuildsCoordinator::get(opCtx)->createIndexesOnEmptyCollection(
                 opCtx, collection, {indexSpec}, fromMigrate);

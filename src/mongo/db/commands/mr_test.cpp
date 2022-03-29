@@ -275,7 +275,8 @@ public:
                             const NamespaceString& collectionName,
                             const CollectionOptions& options,
                             const BSONObj& idIndex,
-                            const OplogSlot& createOpTime) override;
+                            const OplogSlot& createOpTime,
+                            bool fromMigrate) override;
 
     using OpObserver::onDropCollection;
     repl::OpTime onDropCollection(OperationContext* opCtx,
@@ -330,7 +331,8 @@ void MapReduceOpObserver::onCreateCollection(OperationContext*,
                                              const NamespaceString& collectionName,
                                              const CollectionOptions& options,
                                              const BSONObj&,
-                                             const OplogSlot&) {
+                                             const OplogSlot&,
+                                             bool fromMigrate) {
     if (!options.temp) {
         return;
     }

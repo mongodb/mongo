@@ -48,9 +48,40 @@ std::unique_ptr<MatchExpression> buildTsFilter(
                                                     expCtx);
 }
 
+std::unique_ptr<MatchExpression> buildFromMigrateSystemOpFilter(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, const MatchExpression* userMatch) {
+    auto cmdNsRegex = DocumentSourceChangeStream::getCmdNsRegexForChangeStream(expCtx);
+
+    // The filter {fromMigrate:true} allows quickly skip nonrelevant oplog entries
+    auto andMigrateEvents = std::make_unique<AndMatchExpression>();
+    andMigrateEvents->add(
+        MatchExpressionParser::parseAndNormalize(BSON("fromMigrate" << true), expCtx));
+    andMigrateEvents->add(
+        MatchExpressionParser::parseAndNormalize(BSON("ns" << BSONRegEx(cmdNsRegex)), expCtx));
+
+    auto orMigrateEvents = std::make_unique<OrMatchExpression>();
+    auto collRegex = DocumentSourceChangeStream::getCollRegexForChangeStream(expCtx);
+    orMigrateEvents->add(
+        MatchExpressionParser::parseAndNormalize(BSON("o.create" << BSONRegEx(collRegex)), expCtx));
+    orMigrateEvents->add(MatchExpressionParser::parseAndNormalize(
+        BSON("o.createIndexes" << BSONRegEx(collRegex)), expCtx));
+    andMigrateEvents->add(std::move(orMigrateEvents));
+    return andMigrateEvents;
+}
+
 std::unique_ptr<MatchExpression> buildNotFromMigrateFilter(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, const MatchExpression* userMatch) {
-    return MatchExpressionParser::parseAndNormalize(BSON("fromMigrate" << NE << true), expCtx);
+    // Exclude any events that are marked as 'fromMigrate' in the oplog.
+    auto fromMigrateFilter =
+        MatchExpressionParser::parseAndNormalize(BSON("fromMigrate" << NE << true), expCtx);
+
+    // If 'showSystemEvents' is set, however, we do return some specific 'fromMigrate' events.
+    if (expCtx->changeStreamSpec->getShowSystemEvents()) {
+        auto orMigrateEvents = std::make_unique<OrMatchExpression>(std::move(fromMigrateFilter));
+        orMigrateEvents->add(buildFromMigrateSystemOpFilter(expCtx, userMatch));
+        fromMigrateFilter = std::move(orMigrateEvents);
+    }
+    return fromMigrateFilter;
 }
 
 std::unique_ptr<MatchExpression> buildOperationFilter(

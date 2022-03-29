@@ -1014,7 +1014,8 @@ void OpObserverImpl::onCreateCollection(OperationContext* opCtx,
                                         const NamespaceString& collectionName,
                                         const CollectionOptions& options,
                                         const BSONObj& idIndex,
-                                        const OplogSlot& createOpTime) {
+                                        const OplogSlot& createOpTime,
+                                        bool fromMigrate) {
     // do not replicate system.profile modifications
     if (collectionName.isSystemDotProfile()) {
         return;
@@ -1035,6 +1036,7 @@ void OpObserverImpl::onCreateCollection(OperationContext* opCtx,
         oplogEntry.setObject(
             MutableOplogEntry::makeCreateCollCmdObj(collectionName, options, idIndex));
         oplogEntry.setOpTime(createOpTime);
+        oplogEntry.setFromMigrateIfTrue(fromMigrate);
         logOperation(opCtx, &oplogEntry);
     }
 }

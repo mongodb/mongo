@@ -65,7 +65,8 @@ public:
                                 const NamespaceString& fullns,
                                 CollectionOptions collectionOptions,
                                 bool createDefaultIndexes = true,
-                                const BSONObj& idIndex = BSONObj()) const = 0;
+                                const BSONObj& idIndex = BSONObj(),
+                                bool fromMigrate = false) const = 0;
 
     Database() = default;
 
@@ -135,7 +136,8 @@ public:
                                          const NamespaceString& nss,
                                          const CollectionOptions& options = CollectionOptions(),
                                          bool createDefaultIndexes = true,
-                                         const BSONObj& idIndex = BSONObj()) const = 0;
+                                         const BSONObj& idIndex = BSONObj(),
+                                         bool fromMigrate = false) const = 0;
 
     virtual Status createView(OperationContext* opCtx,
                               const NamespaceString& viewName,

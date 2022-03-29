@@ -39,7 +39,7 @@ class Status;
  * Creates the appropriate indexes on _new_ system collections for authentication,
  * authorization, and sessions.
  */
-void createSystemIndexes(OperationContext* opCtx, CollectionWriter& collection);
+void createSystemIndexes(OperationContext* opCtx, CollectionWriter& collection, bool fromMigrate);
 
 /**
  * Verifies that only the appropriate indexes to support authentication, authorization, and

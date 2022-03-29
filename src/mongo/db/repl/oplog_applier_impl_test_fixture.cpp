@@ -93,7 +93,8 @@ void OplogApplierImplOpObserver::onCreateCollection(OperationContext* opCtx,
                                                     const NamespaceString& collectionName,
                                                     const CollectionOptions& options,
                                                     const BSONObj& idIndex,
-                                                    const OplogSlot& createOpTime) {
+                                                    const OplogSlot& createOpTime,
+                                                    bool fromMigrate) {
     if (!onCreateCollectionFn) {
         return;
     }

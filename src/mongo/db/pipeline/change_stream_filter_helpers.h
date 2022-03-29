@@ -50,6 +50,13 @@ std::unique_ptr<MatchExpression> buildNotFromMigrateFilter(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, const MatchExpression* userMatch);
 
 /**
+ * Produce a filter that includes operations marked fromMigrate:true when showSystemEvents feature
+ * is set.
+ */
+std::unique_ptr<MatchExpression> buildFromMigrateSystemOpFilter(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, const MatchExpression* userMatch);
+
+/**
  * Produce an oplog filter which captures all operations relevant to change streams, including CRUD
  * events and certain commands. Depending on the 'userMatch' $match expression, this filter may be
  * able to reject some entries before they get transformed into change stream entries.
