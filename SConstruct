@@ -1575,9 +1575,8 @@ use_libunwind = get_option("use-libunwind")
 use_system_libunwind = use_system_version_of_library("libunwind")
 
 # Assume system libunwind works if it's installed and selected.
-# Vendored libunwind, however, works only on linux-x86_64.
 can_use_libunwind = (use_system_libunwind or
-    env.TargetOSIs('linux') and (env['TARGET_ARCH'] == 'x86_64' or env['TARGET_ARCH'] == 'aarch64'))
+    env.TargetOSIs('linux') and (env['TARGET_ARCH'] in ('x86_64', 'aarch64', 'ppc64le', 's390x')))
 
 if use_libunwind == "off":
     use_libunwind = False
