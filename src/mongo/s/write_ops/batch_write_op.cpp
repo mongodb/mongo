@@ -939,6 +939,9 @@ void BatchWriteOp::buildClientResponse(BatchedCommandResponse* batchResp) {
         _numModified >= 0) {
         batchResp->setNModified(_numModified);
     }
+    if (!_retriedStmtIds.empty()) {
+        batchResp->setRetriedStmtIds(_retriedStmtIds);
+    }
 }
 
 int BatchWriteOp::numWriteOpsIn(WriteOpState opState) const {
@@ -975,6 +978,10 @@ void BatchWriteOp::_incBatchStats(const BatchedCommandResponse& response) {
     } else {
         dassert(batchType == BatchedCommandRequest::BatchType_Delete);
         _numDeleted += response.getN();
+    }
+
+    if (auto retriedStmtIds = response.getRetriedStmtIds(); !retriedStmtIds.empty()) {
+        _retriedStmtIds.insert(_retriedStmtIds.end(), retriedStmtIds.begin(), retriedStmtIds.end());
     }
 }
 

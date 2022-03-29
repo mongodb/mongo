@@ -452,6 +452,10 @@ const std::vector<StmtId>& BatchedCommandResponse::getRetriedStmtIds() const {
     return _retriedStmtIds;
 }
 
+void BatchedCommandResponse::setRetriedStmtIds(std::vector<StmtId> retriedStmtIds) {
+    _retriedStmtIds = std::move(retriedStmtIds);
+}
+
 std::shared_ptr<const ErrorExtraInfo> MultipleErrorsOccurredInfo::parse(const BSONObj& obj) {
     // The server never receives this error as a response from another node, so there is never
     // need to parse it.

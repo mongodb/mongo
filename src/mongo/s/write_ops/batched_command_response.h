@@ -130,6 +130,7 @@ public:
 
     bool areRetriedStmtIdsSet() const;
     const std::vector<StmtId>& getRetriedStmtIds() const;
+    void setRetriedStmtIds(std::vector<StmtId> retriedStmtIds);
 
 private:
     // Convention: (M)andatory, (O)ptional
