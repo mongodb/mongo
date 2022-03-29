@@ -350,12 +350,14 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
         auto criticalSectionSignal = _critSec.getSignal(
             opCtx->lockState()->isWriteLocked() ? ShardingMigrationCriticalSection::kWrite
                                                 : ShardingMigrationCriticalSection::kRead);
+        std::string reason = _critSec.getReason() ? _critSec.getReason()->toString() : "unknown";
         uassert(StaleConfigInfo(_nss,
                                 receivedShardVersion,
                                 boost::none /* wantedVersion */,
                                 ShardingState::get(opCtx)->shardId(),
                                 std::move(criticalSectionSignal)),
-                str::stream() << "migration commit in progress for " << _nss.ns(),
+                str::stream() << "The critical section for " << _nss.ns()
+                              << " is acquired with reason: " << reason,
                 !criticalSectionSignal);
     }
 
