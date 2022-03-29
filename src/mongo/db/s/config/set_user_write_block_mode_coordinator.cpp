@@ -62,18 +62,19 @@ ShardsvrSetUserWriteBlockMode makeShardsvrSetUserWriteBlockModeCommand(
 void sendSetUserWriteBlockModeCmdToAllShards(OperationContext* opCtx,
                                              std::shared_ptr<executor::TaskExecutor> executor,
                                              bool block,
-                                             ShardsvrSetUserWriteBlockModePhaseEnum phase) {
+                                             ShardsvrSetUserWriteBlockModePhaseEnum phase,
+                                             const OperationSessionInfo& osi) {
     const auto allShards = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
 
     const auto shardsvrSetUserWriteBlockModeCmd =
         makeShardsvrSetUserWriteBlockModeCommand(block, phase);
 
-    sharding_util::sendCommandToShards(
-        opCtx,
-        shardsvrSetUserWriteBlockModeCmd.getDbName(),
-        CommandHelpers::appendMajorityWriteConcern(shardsvrSetUserWriteBlockModeCmd.toBSON({})),
-        allShards,
-        executor);
+    sharding_util::sendCommandToShards(opCtx,
+                                       shardsvrSetUserWriteBlockModeCmd.getDbName(),
+                                       CommandHelpers::appendMajorityWriteConcern(
+                                           shardsvrSetUserWriteBlockModeCmd.toBSON(osi.toBSON())),
+                                       allShards,
+                                       executor);
 }
 
 }  // namespace
@@ -115,13 +116,14 @@ void SetUserWriteBlockModeCoordinator::_enterPhase(Phase newPhase) {
     if (_doc.getPhase() == Phase::kUnset) {
         store.add(opCtx.get(), newDoc, WriteConcerns::kMajorityWriteConcernShardingTimeout);
     } else {
-        store.update(opCtx.get(),
-                     BSON(StateDoc::kIdFieldName << _coordId.toBSON()),
-                     newDoc.toBSON(),
-                     WriteConcerns::kMajorityWriteConcernNoTimeout);
+        _updateStateDocument(opCtx.get(), newDoc);
     }
 
     _doc = std::move(newDoc);
+}
+
+const ConfigsvrCoordinatorMetadata& SetUserWriteBlockModeCoordinator::metadata() const {
+    return _doc.getConfigsvrCoordinatorMetadata();
 }
 
 ExecutorFuture<void> SetUserWriteBlockModeCoordinator::_runImpl(
@@ -135,6 +137,11 @@ ExecutorFuture<void> SetUserWriteBlockModeCoordinator::_runImpl(
                 auto* opCtx = opCtxHolder.get();
                 auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
 
+                // Get an incremented {lsid, txNnumber} pair that will be attached to the command
+                // sent to the shards to guarantee message replay protection.
+                _doc = _updateSession(opCtx, _doc);
+                const auto session = _getCurrentSession();
+
                 // Ensure the topology is stable so we don't miss propagating the write blocking
                 // state to any concurrently added shard. Keep it stable until we have persisted the
                 // user write blocking state on the configsvr so that new shards that get added will
@@ -147,7 +154,8 @@ ExecutorFuture<void> SetUserWriteBlockModeCoordinator::_runImpl(
                     opCtx,
                     executor,
                     _doc.getBlock(),
-                    ShardsvrSetUserWriteBlockModePhaseEnum::kPrepare);
+                    ShardsvrSetUserWriteBlockModePhaseEnum::kPrepare,
+                    session);
 
                 // Durably store the state on the configsvr.
                 if (_doc.getBlock()) {
@@ -177,6 +185,11 @@ ExecutorFuture<void> SetUserWriteBlockModeCoordinator::_runImpl(
             auto* opCtx = opCtxHolder.get();
             auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
 
+            // Get an incremented {lsid, txNnumber} pair that will be attached to the command sent
+            // to the shards to guarantee message replay protection.
+            _doc = _updateSession(opCtx, _doc);
+            const auto session = _getCurrentSession();
+
             // Ensure the topology is stable so we don't miss propagating the write blocking state
             // to any concurrently added shard. Keep it stable until we have persisted the user
             // write blocking state on the configsvr so that new shards that get added will e see
@@ -189,7 +202,8 @@ ExecutorFuture<void> SetUserWriteBlockModeCoordinator::_runImpl(
                 opCtx,
                 executor,
                 _doc.getBlock(),
-                ShardsvrSetUserWriteBlockModePhaseEnum::kComplete);
+                ShardsvrSetUserWriteBlockModePhaseEnum::kComplete,
+                session);
 
             // Durably store the state on the configsvr.
             if (_doc.getBlock()) {

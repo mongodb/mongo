@@ -65,9 +65,46 @@ protected:
     virtual ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                           const CancellationToken& token) noexcept = 0;
 
+    virtual const ConfigsvrCoordinatorMetadata& metadata() const = 0;
+
     void interrupt(Status status) noexcept override final;
 
     void _removeStateDocument(OperationContext* opCtx);
+
+    template <typename StateDoc>
+    void _updateStateDocument(OperationContext* opCtx, const StateDoc& newDoc) {
+        PersistentTaskStore<StateDoc> store(NamespaceString::kConfigsvrCoordinatorsNamespace);
+        store.update(opCtx,
+                     BSON(StateDoc::kIdFieldName << newDoc.getId().toBSON()),
+                     newDoc.toBSON(),
+                     WriteConcerns::kMajorityWriteConcernShardingTimeout);
+    }
+
+    template <typename StateDoc>
+    StateDoc _updateSession(OperationContext* opCtx, const StateDoc& doc) {
+        const auto newCoordinatorMetadata = [&] {
+            ConfigsvrCoordinatorMetadata newMetadata = doc.getConfigsvrCoordinatorMetadata();
+
+            const auto optPrevSession = doc.getSession();
+            if (optPrevSession) {
+                newMetadata.setSession(ConfigsvrCoordinatorSession(
+                    optPrevSession->getLsid(), optPrevSession->getTxnNumber() + 1));
+            } else {
+                const auto newSession = InternalSessionPool::get(opCtx)->acquireSystemSession();
+                newMetadata.setSession(ConfigsvrCoordinatorSession(newSession.getSessionId(),
+                                                                   newSession.getTxnNumber()));
+            }
+
+            return newMetadata;
+        }();
+
+        StateDoc newDoc(doc);
+        newDoc.setConfigsvrCoordinatorMetadata(std::move(newCoordinatorMetadata));
+        _updateStateDocument(opCtx, newDoc);
+        return newDoc;
+    }
+
+    OperationSessionInfo _getCurrentSession() const;
 
     Mutex _mutex = MONGO_MAKE_LATCH("ConfigsvrCoordinator::_mutex");
     SharedPromise<void> _completionPromise;

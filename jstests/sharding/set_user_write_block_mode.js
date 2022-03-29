@@ -214,6 +214,84 @@ newShard.initiate();
     assert.commandWorked(st.s.adminCommand({setUserWriteBlockMode: 1, global: false}));
 }
 
+{
+    const db2Name = 'db2';
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: db2Name, primaryShard: st.shard0.shardName}));
+    const db2 = st.s.getDB(db2Name);
+
+    let lsid = assert.commandWorked(st.s.getDB("admin").runCommand({startSession: 1})).id;
+
+    // Send _shardsvrSetUserWriteBlockMode commands to directly to shard0 so that it starts blocking
+    // user writes.
+    assert.commandWorked(st.shard0.adminCommand({
+        _shardsvrSetUserWriteBlockMode: 1,
+        global: true,
+        phase: 'prepare',
+        lsid: lsid,
+        txnNumber: NumberLong(1),
+        writeConcern: {w: "majority"}
+    }));
+    assert.commandWorked(st.shard0.adminCommand({
+        _shardsvrSetUserWriteBlockMode: 1,
+        global: true,
+        phase: 'complete',
+        lsid: lsid,
+        txnNumber: NumberLong(2),
+        writeConcern: {w: "majority"}
+    }));
+
+    // Check shard0 is now blocking writes.
+    assert.commandFailed(db2.bar.insert({x: 1}));
+
+    // Send _shardsvrSetUserWriteBlockMode commands to directly to shard0 so that it stops blocking
+    // user writes.
+    assert.commandWorked(st.shard0.adminCommand({
+        _shardsvrSetUserWriteBlockMode: 1,
+        global: false,
+        phase: 'prepare',
+        lsid: lsid,
+        txnNumber: NumberLong(3),
+        writeConcern: {w: "majority"}
+    }));
+    assert.commandWorked(st.shard0.adminCommand({
+        _shardsvrSetUserWriteBlockMode: 1,
+        global: false,
+        phase: 'complete',
+        lsid: lsid,
+        txnNumber: NumberLong(4),
+        writeConcern: {w: "majority"}
+    }));
+
+    // Check shard0 is no longer blocking writes.
+    assert.commandWorked(db2.bar.insert({x: 1}));
+
+    // Replay the first two _shardsvrSetUserWriteBlockMode commands (as if it was due to a duplicate
+    // network packet). These messages should fail to process, so write blocking should not be
+    // re-enabled.
+    assert.commandFailedWithCode(st.shard0.adminCommand({
+        _shardsvrSetUserWriteBlockMode: 1,
+        global: true,
+        phase: 'prepare',
+        lsid: lsid,
+        txnNumber: NumberLong(1),
+        writeConcern: {w: "majority"}
+    }),
+                                 ErrorCodes.TransactionTooOld);
+    assert.commandFailedWithCode(st.shard0.adminCommand({
+        _shardsvrSetUserWriteBlockMode: 1,
+        global: true,
+        phase: 'complete',
+        lsid: lsid,
+        txnNumber: NumberLong(2),
+        writeConcern: {w: "majority"}
+    }),
+                                 ErrorCodes.TransactionTooOld);
+
+    // Check shard0 is not blocking writes.
+    assert.commandWorked(db2.bar.insert({x: 2}));
+}
+
 st.stop();
 newShard.stopSet();
 })();

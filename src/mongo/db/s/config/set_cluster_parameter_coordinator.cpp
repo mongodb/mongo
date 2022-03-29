@@ -87,6 +87,10 @@ void SetClusterParameterCoordinator::_enterPhase(Phase newPhase) {
     _doc = std::move(newDoc);
 }
 
+const ConfigsvrCoordinatorMetadata& SetClusterParameterCoordinator::metadata() const {
+    return _doc.getConfigsvrCoordinatorMetadata();
+}
+
 ExecutorFuture<void> SetClusterParameterCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {

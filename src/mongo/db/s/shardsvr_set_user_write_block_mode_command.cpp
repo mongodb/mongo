@@ -33,6 +33,8 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/sharding_ddl_coordinator.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/db/s/user_writes_recoverable_critical_section_service.h"
@@ -63,10 +65,25 @@ public:
 
             hangInShardsvrSetUserWriteBlockMode.pauseWhileSet();
 
-            const auto startBlocking = request().getGlobal();
+            _runImpl(opCtx, request());
+
+            // Since it is possible that no actual write happened with this txnNumber, we need to
+            // make a dummy write so that secondaries can be aware of this txn.
+            DBDirectClient client(opCtx);
+            client.update(NamespaceString::kServerConfigurationNamespace.ns(),
+                          BSON("_id"
+                               << "SetUseWriteBlockModeStats"),
+                          BSON("$inc" << BSON("count" << 1)),
+                          true /* upsert */,
+                          false /* multi */);
+        }
+
+    private:
+        void _runImpl(OperationContext* opCtx, const Request& request) {
+            const auto startBlocking = request.getGlobal();
 
             if (startBlocking) {
-                switch (request().getPhase()) {
+                switch (request.getPhase()) {
                     case ShardsvrSetUserWriteBlockModePhaseEnum::kPrepare:
                         UserWritesRecoverableCriticalSectionService::get(opCtx)
                             ->acquireRecoverableCriticalSectionBlockNewShardedDDL(
@@ -77,8 +94,8 @@ public:
                         // Wait for ongoing ShardingDDLCoordinators to finish. This ensures that all
                         // coordinators that started before enabling blocking have finish, and that
                         // any new coordinator that is started after this point will see the
-                        // blocking is enabled. Wait only for coordinators that don't have
-                        // the user-write-blocking bypass enabled -- the ones allowed to bypass user
+                        // blocking is enabled. Wait only for coordinators that don't have the
+                        // user-write-blocking bypass enabled -- the ones allowed to bypass user
                         // write blocking don't care about the write blocking state.
                         {
                             const auto shouldWaitPred =
@@ -113,7 +130,7 @@ public:
                         MONGO_UNREACHABLE;
                 }
             } else {
-                switch (request().getPhase()) {
+                switch (request.getPhase()) {
                     case ShardsvrSetUserWriteBlockModePhaseEnum::kPrepare:
                         UserWritesRecoverableCriticalSectionService::get(opCtx)
                             ->demoteRecoverableCriticalSectionToNoLongerBlockUserWrites(
@@ -134,7 +151,6 @@ public:
             }
         }
 
-    private:
         NamespaceString ns() const override {
             return NamespaceString();
         }

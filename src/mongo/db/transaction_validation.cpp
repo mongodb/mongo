@@ -60,7 +60,8 @@ const StringMap<int> retryableWriteCommands = {{"delete", 1},
                                                {"_configsvrRenameCollectionMetadata", 1},
                                                {"_shardsvrParticipantBlock", 1},
                                                {"_configsvrCollMod", 1},
-                                               {"_shardsvrCollModParticipant", 1}};
+                                               {"_shardsvrCollModParticipant", 1},
+                                               {"_shardsvrSetUserWriteBlockMode", 1}};
 
 // Commands that can be sent with session info but should not check out a session.
 const StringMap<int> skipSessionCheckoutList = {

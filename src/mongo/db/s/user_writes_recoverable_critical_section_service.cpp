@@ -334,12 +334,25 @@ void UserWritesRecoverableCriticalSectionService::releaseRecoverableCriticalSect
 
         // Release the critical section by deleting the critical section document. The OpObserver
         // will release the in-memory CS when reacting to the delete event.
-        PersistentTaskStore<UserWriteBlockingCriticalSectionDocument> store(
-            NamespaceString::kUserWritesCriticalSectionsNamespace);
-        store.remove(
-            opCtx,
-            BSON(UserWriteBlockingCriticalSectionDocument::kNssFieldName << nss.toString()),
-            ShardingCatalogClient::kLocalWriteConcern);
+        DBDirectClient dbClient(opCtx);
+        const auto cmdResponse = dbClient.runCommand([&] {
+            write_ops::DeleteCommandRequest deleteOp(
+                NamespaceString::kUserWritesCriticalSectionsNamespace);
+
+            deleteOp.setDeletes({[&] {
+                write_ops::DeleteOpEntry entry;
+                entry.setQ(BSON(UserWriteBlockingCriticalSectionDocument::kNssFieldName
+                                << nss.toString()));
+                // At most one doc can possibly match the above query.
+                entry.setMulti(false);
+                return entry;
+            }()});
+
+            return deleteOp.serialize({});
+        }());
+
+        const auto commandReply = cmdResponse->getCommandReply();
+        uassertStatusOK(getStatusFromWriteCommandReply(commandReply));
     }
 
     LOGV2_DEBUG(
