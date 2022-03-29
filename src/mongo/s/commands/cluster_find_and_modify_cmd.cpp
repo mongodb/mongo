@@ -41,7 +41,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/update_metrics.h"
 #include "mongo/db/fle_crud.h"
-#include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
@@ -57,6 +56,7 @@
 #include "mongo/s/commands/cluster_explain.h"
 #include "mongo/s/commands/document_shard_key_update_util.h"
 #include "mongo/s/commands/strategy.h"
+#include "mongo/s/commands/update_document_shard_key_using_transaction_api_feature_flag_gen.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
 #include "mongo/s/session_catalog_router.h"
@@ -541,7 +541,7 @@ private:
         }
 
         if (responseStatus.code() == ErrorCodes::WouldChangeOwningShard) {
-            if (feature_flags::gFeatureFlagInternalTransactions.isEnabled(
+            if (feature_flags::gFeatureFlagUpdateDocumentShardKeyUsingTransactionApi.isEnabled(
                     serverGlobalParams.featureCompatibility)) {
                 auto parsedRequest = write_ops::FindAndModifyCommandRequest::parse(
                     IDLParserErrorContext("ClusterFindAndModify"), cmdObj);

@@ -162,6 +162,7 @@ env.Library(
         'cluster_write_cmd.cpp',
         'document_shard_key_update_util.cpp',
         'strategy.cpp',
+        'update_document_shard_key_using_transaction_api_feature_flag.idl',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/core',
