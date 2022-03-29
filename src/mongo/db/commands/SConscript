@@ -372,6 +372,7 @@ env.Library(
         "plan_cache_clear_command.cpp",
         "plan_cache_commands.cpp",
         "rename_collection_cmd.cpp",
+        "rename_database_for_restore_command.cpp",
         "run_aggregate.cpp",
         "sleep_command.cpp",
         "validate.cpp",
@@ -440,6 +441,7 @@ env.Library(
         'list_collections_filter',
         'list_databases_command',
         'rename_collection_idl',
+        'rename_database_for_restore_command_idl',
         'test_commands_enabled',
         'validate_db_metadata_command',
     ],
@@ -461,6 +463,16 @@ env.Library(
         '$BUILD_DIR/mongo/db/query_exec',
         '$BUILD_DIR/mongo/db/write_ops',
         'test_commands_enabled',
+    ],
+)
+
+env.Library(
+    target='rename_database_for_restore_command_idl',
+    source=[
+        'rename_database_for_restore_command.idl',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/idl/idl_parser',
     ],
 )
 
