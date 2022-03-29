@@ -124,14 +124,12 @@ TEST_F(CollectionWriterTest, Commit) {
         // Regular catalog lookups for this OperationContext should see the uncommitted Collection
         ASSERT_EQ(writable, lookupCollectionFromCatalog().get());
 
+        // Lookup for read should also see uncommitted collection. This in theory supports nested
+        // read-only operations, if they ever occur during a top level write operation.
+        ASSERT_EQ(writable, lookupCollectionFromCatalogForRead());
+
         // Regular catalog lookups for different clients should not see any change in the catalog
         verifyCollectionInCatalogUsingDifferentClient(before);
-
-        // Lookup for read should not see the uncommitted Collection. This is fine as in reality
-        // this API should only be used for readers and there should be no uncommitted writes as
-        // there are in this unittest.
-        ASSERT_NE(writable, lookupCollectionFromCatalogForRead());
-
         wuow.commit();
     }
 
@@ -149,8 +147,9 @@ TEST_F(CollectionWriterTest, Commit) {
 
         ASSERT_EQ(writer.get().get(), writable);
         ASSERT_EQ(writable, lookupCollectionFromCatalog().get());
+        ASSERT_EQ(writable, lookupCollectionFromCatalogForRead());
+
         verifyCollectionInCatalogUsingDifferentClient(before);
-        ASSERT_NE(writable, lookupCollectionFromCatalogForRead());
         wuow.commit();
     }
 
@@ -173,8 +172,8 @@ TEST_F(CollectionWriterTest, Rollback) {
 
         ASSERT_EQ(writer.get().get(), writable);
         ASSERT_EQ(writable, lookupCollectionFromCatalog().get());
+        ASSERT_EQ(writable, lookupCollectionFromCatalogForRead());
         verifyCollectionInCatalogUsingDifferentClient(before);
-        ASSERT_NE(writable, lookupCollectionFromCatalogForRead());
     }
 
     // No update in the catalog should have happened
