@@ -57,8 +57,7 @@ try {
         resourceConsumption: 1,
         sharding: 1,
         tenantMigrationAccessBlocker: 1,
-        // TODO: uncomment this when SERVER-63271 gets fixed.
-        // watchdog: 1,
+        watchdog: 1,
         maxTimeMS: 20 * 1000
     }));
     jsTestLog("ServerStatus results: " + tojson(serverStatusResult));
