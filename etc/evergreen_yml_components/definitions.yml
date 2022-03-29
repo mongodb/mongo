@@ -284,6 +284,7 @@ variables:
   - enterprise-rhel-80-64-bit-multiversion
   - enterprise-rhel-80-64-bit-suggested
   - enterprise-rhel-82-arm64
+  - enterprise-rhel-83-s390x
   - enterprise-suse12-64
   - enterprise-suse15-64
   - enterprise-ubuntu1804-64
@@ -337,6 +338,7 @@ variables:
   - enterprise-rhel-80-64-bit
   - enterprise-rhel-80-64-bit-suggested  # For testing selinux.
   - enterprise-rhel-82-arm64
+  - enterprise-rhel-83-s390x
   - suse12
   - enterprise-suse12-64
   - suse15

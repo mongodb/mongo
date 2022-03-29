@@ -23,6 +23,7 @@ build_variant_large_distro_exceptions:
   - enterprise-rhel-80-64-bit-coverage
   - enterprise-rhel-81-ppc64le
   - enterprise-rhel-82-arm64
+  - enterprise-rhel-83-s390x
   - enterprise-suse12-64
   - enterprise-suse12-s390x
   - enterprise-suse15-64

@@ -114,3 +114,60 @@ buildvariants:
     distros:
     - rhel70-small
   - name: generate_buildid_to_debug_symbols_mapping
+
+- name: enterprise-rhel-83-s390x
+  display_name: Enterprise RHEL 8.3 s390x
+  modules:
+  - enterprise
+  run_on:
+  - rhel83-zseries-small
+  cron: "0 0 1 1 *" # Every year starting 1/1 at 00:00
+  stepback: false
+  expansions:
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
+    release_buid: true
+    compile_flags: --ssl MONGO_DISTMOD=rhel83 -j3 --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    csfle_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    resmoke_jobs_max: 2
+    has_packages: true
+    packager_script: packager_enterprise.py
+    packager_arch: s390x
+    packager_distro: rhel83
+    push_path: linux
+    push_bucket: downloads.10gen.com
+    push_name: linux
+    push_arch: s390x-enterprise-rhel83
+    repo_edition: enterprise
+    multiversion_platform: rhel83
+    multiversion_architecture: s390x
+    multiversion_edition: enterprise
+  tasks:
+  - name: compile_test_and_package_serial_TG
+    distros:
+    - rhel83-zseries-large
+  - name: build_variant_gen
+  - name: .aggregation .common
+  - name: audit
+  - name: .auth !.multiversion !.jscore
+  - name: .misc_js
+  - name: .encrypt
+  - name: .integration !.audit
+    distros:
+    - rhel83-zseries-large
+  - name: .jscore .common !.auth
+  - name: .read_write_concern
+  - name: replica_sets_gen
+  - name: .replica_sets .common
+  - name: sasl
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: .sharding .common !.multiversion
+  - name: snmp
+  - name: .stitch
+  - name: .csfle
+  - name: .publish_csfle
+    distros:
+    - rhel80-small
+  - name: .publish
+    distros:
+    - rhels80-small
+  - name: generate_buildid_to_debug_symbols_mapping
