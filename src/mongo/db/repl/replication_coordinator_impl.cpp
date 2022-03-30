@@ -55,6 +55,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/curop_failpoint_helpers.h"
@@ -2570,6 +2571,9 @@ ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::AutoGetRstlForStepUpSt
 
     } catch (const ExceptionFor<ErrorCodes::LockTimeout>&) {
         if (rstlTimeout > 0 && Date_t::now() - start >= Seconds(rstlTimeout)) {
+            // Dump all locks to identify which thread(s) are holding RSTL.
+            getGlobalLockManager()->dump();
+
             auto lockerInfo =
                 opCtx->lockState()->getLockerInfo(CurOp::get(opCtx)->getLockStatsBase());
             BSONObjBuilder lockRep;
