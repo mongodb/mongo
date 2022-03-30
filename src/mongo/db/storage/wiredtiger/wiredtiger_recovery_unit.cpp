@@ -759,8 +759,8 @@ Status WiredTigerRecoveryUnit::setTimestamp(Timestamp timestamp) {
         return Status::OK();
     }
 
-    const std::string conf = "commit_timestamp=" + integerToHex(timestamp.asULL());
-    auto rc = session->timestamp_transaction(session, conf.c_str());
+    auto rc =
+        session->timestamp_transaction_uint(session, WT_TS_TXN_TYPE_COMMIT, timestamp.asULL());
     if (rc == 0) {
         _isTimestamped = true;
     }
