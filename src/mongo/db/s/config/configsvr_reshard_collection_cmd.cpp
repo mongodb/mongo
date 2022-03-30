@@ -169,6 +169,13 @@ public:
                     return existingInstance;
                 }
 
+                // (Generic FCV reference): To run this command and ensure the consistency of the
+                // metadata we need to make sure we are on a stable state.
+                uassert(ErrorCodes::CommandNotSupported,
+                        "Resharding is not supported for this version, please update the FCV to "
+                        "latest.",
+                        !serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading());
+
                 const auto cm = uassertStatusOK(
                     Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(
                         opCtx, nss));

@@ -568,6 +568,11 @@ private:
                 !failUpgrading.shouldFail());
 
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+            // Always abort the reshardCollection regardless of version to ensure that it will run
+            // on a consistent version from start to finish. This will ensure that it will be able
+            // to apply the oplog entries correctly.
+            abortAllReshardCollection(opCtx);
+
             // Tell the shards to enter phase-2 of setFCV (fully upgraded)
             auto requestPhase2 = request;
             requestPhase2.setFromConfigServer(true);
@@ -576,11 +581,6 @@ private:
             uassertStatusOK(
                 ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
                     opCtx, CommandHelpers::appendMajorityWriteConcern(requestPhase2.toBSON({}))));
-
-            // Always abort the reshardCollection regardless of version to ensure that it will run
-            // on a consistent version from start to finish. This will ensure that it will be able
-            // to apply the oplog entries correctly.
-            abortAllReshardCollection(opCtx);
         }
 
         // Create the pre-images collection if the feature flag is enabled on the requested version.

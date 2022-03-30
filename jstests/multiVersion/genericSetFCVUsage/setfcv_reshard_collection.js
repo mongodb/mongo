@@ -111,6 +111,7 @@ function runTest(forcePooledConnectionsDropped) {
         },
         {
             expectedErrorCode: [
+                ErrorCodes.CommandNotSupported,
                 ErrorCodes.ReshardCollectionAborted,
                 ErrorCodes.Interrupted,
             ]

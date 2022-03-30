@@ -61,11 +61,15 @@ BSONObj createOriginalCommand(const NamespaceString& nss, BSONObj shardKey) {
 }
 
 Date_t readStartTime(const CommonReshardingMetadata& metadata, ClockSource* fallbackSource) {
-    const auto& startTime = metadata.getStartTime();
-    if (startTime.has_value()) {
+    try {
+        const auto& startTime = metadata.getStartTime();
+        tassert(6503901,
+                "Metadata is missing start time despite feature flag being enabled",
+                startTime.has_value());
         return startTime.get();
+    } catch (const DBException&) {
+        return fallbackSource->now();
     }
-    return fallbackSource->now();
 }
 
 }  // namespace
