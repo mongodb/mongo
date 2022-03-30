@@ -88,4 +88,13 @@ bool doesBucketsIndexIncludeMeasurement(OperationContext* opCtx,
                                         const TimeseriesOptions& timeseriesOptions,
                                         const BSONObj& bucketsIndex);
 
+/**
+ * Takes a 'hint' object, in the same format used by FindCommandRequest, and returns
+ * true if the hint is an index key.
+ *
+ * Besides an index key, a hint can be {$hint: <index name>} or {$natural: <direction>},
+ * or it can be {} which means no hint is given.
+ */
+bool isHintIndexKey(const BSONObj& obj);
+
 }  // namespace mongo::timeseries

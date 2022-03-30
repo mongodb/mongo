@@ -39,6 +39,9 @@ const dbName = jsTestName();
  */
 const testUpdateHintSucceeded =
     ({initialDocList, indexes, updateList, resultDocList, nModifiedBuckets, expectedPlan}) => {
+        const testDB = db.getSiblingDB(dbName);
+        const coll = testDB.getCollection(collName);
+
         const awaitTestUpdate = startParallelShell(funWithArgs(
             function(dbName,
                      collName,
@@ -88,20 +91,18 @@ const testUpdateHintSucceeded =
             updateList,
             resultDocList,
             nModifiedBuckets));
+        try {
+            const childCurOp =
+                waitForCurOpByFailPoint(testDB, coll.getFullName(), "hangAfterBatchUpdate")[0];
 
-        const testDB = db.getSiblingDB(dbName);
-        const coll = testDB.getCollection(collName);
+            // Verify that the query plan uses the expected index.
+            assert.eq(childCurOp.planSummary, expectedPlan);
+        } finally {
+            assert.commandWorked(
+                testDB.adminCommand({configureFailPoint: "hangAfterBatchUpdate", mode: "off"}));
 
-        const childCurOp =
-            waitForCurOpByFailPoint(testDB, coll.getFullName(), "hangAfterBatchUpdate")[0];
-
-        // Verify that the query plan uses the expected index.
-        assert.eq(childCurOp.planSummary, expectedPlan);
-
-        assert.commandWorked(
-            testDB.adminCommand({configureFailPoint: "hangAfterBatchUpdate", mode: "off"}));
-
-        awaitTestUpdate();
+            awaitTestUpdate();
+        }
     };
 
 /**
@@ -153,6 +154,44 @@ const hintDoc3 = {
 };
 
 /************* Tests passing a hint to an update on a collection with a single index. *************/
+// Query on and update the metaField using a forward collection scan: hint: {$natural 1}.
+testUpdateHintSucceeded({
+    initialDocList: [hintDoc1, hintDoc2, hintDoc3],
+    indexes: [{[metaFieldName]: 1}],
+    updateList: [{
+        q: {[metaFieldName + ".a"]: {$lte: 2}},
+        u: {$inc: {[metaFieldName + ".a"]: 10}},
+        multi: true,
+        hint: {$natural: 1}
+    }],
+    resultDocList: [
+        {_id: 1, [timeFieldName]: dateTime, [metaFieldName]: {"a": 11}},
+        {_id: 2, [timeFieldName]: dateTime, [metaFieldName]: {"a": 12}},
+        hintDoc3
+    ],
+    nModifiedBuckets: 2,
+    expectedPlan: "COLLSCAN",
+});
+
+// Query on and update the metaField using a backward collection scan: hint: {$natural -1}.
+testUpdateHintSucceeded({
+    initialDocList: [hintDoc1, hintDoc2, hintDoc3],
+    indexes: [{[metaFieldName]: 1}],
+    updateList: [{
+        q: {[metaFieldName + ".a"]: {$lte: 2}},
+        u: {$inc: {[metaFieldName + ".a"]: 10}},
+        multi: true,
+        hint: {$natural: -1}
+    }],
+    resultDocList: [
+        {_id: 1, [timeFieldName]: dateTime, [metaFieldName]: {"a": 11}},
+        {_id: 2, [timeFieldName]: dateTime, [metaFieldName]: {"a": 12}},
+        hintDoc3
+    ],
+    nModifiedBuckets: 2,
+    expectedPlan: "COLLSCAN",
+});
+
 // Query on and update the metaField using the metaField index as a hint, specifying the hint with
 // an index specification document.
 testUpdateHintSucceeded({

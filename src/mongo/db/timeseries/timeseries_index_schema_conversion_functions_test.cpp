@@ -128,14 +128,6 @@ TEST(TimeseriesIndexSchemaConversionTest, OriginalSpecFieldName) {
     }
 }
 
-// {} <=> {}
-TEST(TimeseriesIndexSchemaConversionTest, EmptyTimeseriesIndexSpecDoesNothing) {
-    TimeseriesOptions timeseriesOptions = makeTimeseriesOptions();
-    BSONObj emptyIndexSpec = {};
-
-    testBothWaysIndexSpecConversion(timeseriesOptions, emptyIndexSpec, emptyIndexSpec);
-}
-
 // {tm: 1} <=> {control.min.tm: 1, control.max.tm: 1}
 TEST(TimeseriesIndexSchemaConversionTest, AscendingTimeIndexSpecConversion) {
     TimeseriesOptions timeseriesOptions = makeTimeseriesOptions();

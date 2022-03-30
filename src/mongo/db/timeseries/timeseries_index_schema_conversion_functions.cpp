@@ -71,6 +71,14 @@ std::pair<std::string, std::string> extractControlPrefixAndKey(const StringData&
 StatusWith<BSONObj> createBucketsSpecFromTimeseriesSpec(const TimeseriesOptions& timeseriesOptions,
                                                         const BSONObj& timeseriesIndexSpecBSON,
                                                         bool isShardKeySpec) {
+    tassert(6390200, "Empty object is not a valid index spec", !timeseriesIndexSpecBSON.isEmpty());
+    tassert(6390201,
+            str::stream() << "Invalid index spec (perhaps it's a valid hint, that was incorrectly "
+                          << "passed to createBucketsSpecFromTimeseriesSpec): "
+                          << timeseriesIndexSpecBSON,
+            timeseriesIndexSpecBSON.firstElement().fieldNameStringData() != "$hint"_sd &&
+                timeseriesIndexSpecBSON.firstElement().fieldNameStringData() != "$natural"_sd);
+
     auto timeField = timeseriesOptions.getTimeField();
     auto metaField = timeseriesOptions.getMetaField();
 
@@ -472,6 +480,18 @@ bool doesBucketsIndexIncludeMeasurement(OperationContext* opCtx,
     }
 
     return false;
+}
+
+bool isHintIndexKey(const BSONObj& obj) {
+    if (obj.isEmpty())
+        return false;
+    StringData fieldName = obj.firstElement().fieldNameStringData();
+    if (fieldName == "$hint"_sd)
+        return false;
+    if (fieldName == "$natural"_sd)
+        return false;
+
+    return true;
 }
 
 }  // namespace mongo::timeseries

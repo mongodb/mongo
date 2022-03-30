@@ -131,6 +131,20 @@ const objC = {
     [metaFieldName]: {c: "C"}
 };
 
+// Query using a $natural hint.
+validateDeleteIndex([objA, objB, objC],
+                    [objB, objC],
+                    1,
+                    [{q: {[metaFieldName]: {a: "A"}}, limit: 0, hint: {$natural: 1}}],
+                    [{[metaFieldName]: 1}],
+                    "COLLSCAN");
+validateDeleteIndex([objA, objB, objC],
+                    [objB, objC],
+                    1,
+                    [{q: {[metaFieldName]: {a: "A"}}, limit: 0, hint: {$natural: -1}}],
+                    [{[metaFieldName]: 1}],
+                    "COLLSCAN");
+
 // Query using the metaField index as a hint.
 validateDeleteIndex([objA, objB, objC],
                     [objB, objC],

@@ -183,9 +183,8 @@ AggregateCommandRequest ResolvedView::asExpandedViewAggregation(
     if (request.getHint() && _timeseriesOptions) {
         BSONObj original = *request.getHint();
         BSONObj rewritten = original;
-        // Only convert if we are given an index spec, not an index name. An index name is provided
-        // in the form of {"$hint": <name>}.
-        if (!original.isEmpty() && original.firstElementFieldNameStringData() != "$hint"_sd) {
+        // Only convert if we are given an index spec, not an index name or a $natural hint.
+        if (timeseries::isHintIndexKey(original)) {
             auto converted = timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(
                 *_timeseriesOptions, original);
             if (converted.isOK()) {

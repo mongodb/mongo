@@ -809,10 +809,8 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
                 "Cannot perform an upsert on a time-series collection",
                 !updateRequest->isUpsert());
 
-        // Only translate the hint (if there is one) if it is specified with an index specification
-        // document.
-        if (!updateRequest->getHint().isEmpty() &&
-            updateRequest->getHint().firstElement().fieldNameStringData() != "$hint"_sd) {
+        // Only translate the hint if it is specified with an index key.
+        if (timeseries::isHintIndexKey(updateRequest->getHint())) {
             updateRequest->setHint(
                 uassertStatusOK(timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(
                     *timeseriesOptions, updateRequest->getHint())));
@@ -1144,10 +1142,8 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
                 "Time-series buckets collection is missing time-series options",
                 timeseriesOptions);
 
-        // Only translate the hint if it is specified by index spec.
-        if (!request.getHint().isEmpty() &&
-            (request.getHint().firstElement().fieldNameStringData() != "$hint"_sd ||
-             request.getHint().firstElement().type() != BSONType::String)) {
+        // Only translate the hint if it is specified by index key.
+        if (timeseries::isHintIndexKey(request.getHint())) {
             request.setHint(
                 uassertStatusOK(timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(
                     *timeseriesOptions, request.getHint())));
