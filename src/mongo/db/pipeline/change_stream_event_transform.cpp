@@ -495,15 +495,22 @@ Document ChangeStreamViewDefinitionEventTransformation::applyTransformation(
             operationDescription = Value(copyDocExceptFields(oField, {"_id"_sd}));
             break;
         }
-        default: {
-            // TODO SERVER-61886: This should be changed to a tassert after we implement
-            // transformation logic for modify and drop views.
-            //
-            // To be able to generate a 'modify' event, we need the collMod of a view defintion to
-            // to always log the update as replacement.
-            // TODO SERVER-61886: Add a tassert to validate this.
-            operationType = DocumentSourceChangeStream::kInvalidateOpType;
+        case repl::OpTypeEnum::kUpdate: {
+            // To be able to generate a 'modify' event, we need the collMod of a view definition to
+            // always log the update as replacement.
+            tassert(6188601, "Expected replacement update", !oField["_id"].missing());
+
+            operationType = DocumentSourceChangeStream::kModifyOpType;
+            operationDescription = Value(copyDocExceptFields(oField, {"_id"_sd}));
             break;
+        }
+        case repl::OpTypeEnum::kDelete: {
+            operationType = DocumentSourceChangeStream::kDropCollectionOpType;
+            break;
+        }
+        default: {
+            // We shouldn't see an op other than insert, update or delete.
+            MONGO_UNREACHABLE_TASSERT(6188600);
         }
     };
 

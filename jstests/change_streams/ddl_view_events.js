@@ -56,21 +56,106 @@ if (!isChangeStreamsVisibilityEnabled(testDB)) {
     assert.commandWorked(testDB.createView("viewOnView", "view", viewPipeline));
     assert.soon(() => cursor.hasNext());
 
-    event = cursor.next();
-    assertChangeStreamEventEq(event, {
+    const events = [];
+    const createEvent = cursor.next();
+    events.push(createEvent);
+
+    assertChangeStreamEventEq(createEvent, {
         operationType: "create",
         ns: {db: dbName, coll: "viewOnView"},
         operationDescription: {viewOn: "view", pipeline: viewPipeline}
     });
 
-    // TODO SERVER-61886 : Add tests for modify a view events.
-
-    assertDropCollection(testDB, "view");
-
-    // TODO SERVER-63306 : This should produce a 'drop' event.
+    // Test 'collMod' command on views.
+    const updatedViewPipeline = [{$match: {a: 1}}, {$project: {a: 1}}];
+    assert.commandWorked(
+        testDB.runCommand({collMod: "viewOnView", viewOn: "view", pipeline: updatedViewPipeline}));
     assert.soon(() => cursor.hasNext());
-    const eventForDrop = cursor.next();
-    assert(eventForDrop.operationType == "invalidate");
+    const modifyEvent = cursor.next();
+    events.push(modifyEvent);
+
+    assertChangeStreamEventEq(modifyEvent, {
+        operationType: "modify",
+        ns: {db: dbName, coll: "viewOnView"},
+        operationDescription: {viewOn: "view", pipeline: updatedViewPipeline}
+    });
+
+    // Test 'drop' events.
+    assertDropCollection(testDB, "view");
+    assert.soon(() => cursor.hasNext());
+    const dropEvent = cursor.next();
+    events.push(dropEvent);
+
+    assertChangeStreamEventEq(dropEvent, {operationType: "drop", ns: {db: dbName, coll: "view"}});
+
+    assertDropCollection(testDB, "viewOnView");
+    assert.soon(() => cursor.hasNext());
+    const dropEventView = cursor.next();
+    events.push(dropEventView);
+
+    assertChangeStreamEventEq(dropEventView,
+                              {operationType: "drop", ns: {db: dbName, coll: "viewOnView"}});
+
+    // Test view change stream events on a timeseries collection.
+    assert.commandWorked(
+        testDB.createCollection("timeseries_coll", {timeseries: {timeField: "time"}}));
+    assert.soon(() => cursor.hasNext());
+    const createTimeseriesEvent = cursor.next();
+    events.push(createTimeseriesEvent);
+
+    assertChangeStreamEventEq(createTimeseriesEvent, {
+        operationType: "create",
+        ns: {db: dbName, coll: "timeseries_coll"},
+        operationDescription: {
+            viewOn: "system.buckets.timeseries_coll",
+            pipeline: [{$_internalUnpackBucket: {timeField: "time", bucketMaxSpanSeconds: 3600}}]
+        }
+    });
+
+    assert.commandWorked(
+        testDB.runCommand({collMod: "timeseries_coll", timeseries: {granularity: 'minutes'}}));
+    assert.soon(() => cursor.hasNext());
+    const modifyTimeseriesEvent = cursor.next();
+    events.push(modifyTimeseriesEvent);
+
+    assertChangeStreamEventEq(modifyTimeseriesEvent, {
+        operationType: "modify",
+        ns: {db: dbName, coll: "timeseries_coll"},
+        operationDescription: {
+            viewOn: "system.buckets.timeseries_coll",
+            pipeline: [{$_internalUnpackBucket: {timeField: "time", bucketMaxSpanSeconds: 86400}}]
+        }
+    });
+
+    assertDropCollection(testDB, "timeseries_coll");
+    assert.soon(() => cursor.hasNext());
+    const dropTimeseriesEvent = cursor.next();
+    events.push(dropTimeseriesEvent);
+
+    assertChangeStreamEventEq(dropTimeseriesEvent, {
+        operationType: "drop",
+        ns: {db: dbName, coll: "timeseries_coll"},
+    });
+
+    // Generate a dummy event so that we can test all events for resumability.
+    assert.commandWorked(testDB.createView("dummyView", "view", viewPipeline));
+    assert.soon(() => cursor.hasNext());
+
+    const dummyEvent = cursor.next();
+    events.push(dummyEvent);
+
+    assertDropCollection(testDB, "dummyView");
+    assert.soon(() => cursor.hasNext());
+
+    // Test that for all the commands we can resume the change stream using a resume token.
+    for (let idx = 0; idx < events.length - 1; idx++) {
+        const event = events[idx];
+        const subsequent = events[idx + 1];
+        const newCursor =
+            testDB.aggregate([{$changeStream: {resumeAfter: event._id, showExpandedEvents: true}}]);
+        assert.soon(() => newCursor.hasNext());
+        assertChangeStreamEventEq(newCursor.next(), subsequent);
+    }
 })();
 
 const cst = new ChangeStreamTest(testDB);
