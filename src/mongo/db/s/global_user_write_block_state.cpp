@@ -71,7 +71,6 @@ bool GlobalUserWriteBlockState::isUserWriteBlockingEnabled(OperationContext* opC
 }
 
 void GlobalUserWriteBlockState::enableUserShardedDDLBlocking(OperationContext* opCtx) {
-    invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
     _userShardedDDLBlocked.store(true);
 }
 

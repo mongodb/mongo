@@ -177,7 +177,9 @@ void UserWriteBlockModeOpObserver::_onReplicationRollback(OperationContext* opCt
 
 void UserWriteBlockModeOpObserver::_checkWriteAllowed(OperationContext* opCtx,
                                                       const NamespaceString& nss) {
-    if (isStandaloneOrPrimary(opCtx)) {
+    // Evaluate write blocking only on replica set primaries.
+    const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    if (replCoord->isReplEnabled() && isStandaloneOrPrimary(opCtx)) {
         GlobalUserWriteBlockState::get(opCtx)->checkUserWritesAllowed(opCtx, nss);
     }
 }
