@@ -39,9 +39,11 @@
 #include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/delete_stage.h"
 #include "mongo/db/exec/queued_data_stage.h"
+#include "mongo/db/op_observer_noop.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/service_context.h"
 #include "mongo/dbtests/dbtests.h"
+#include "mongo/util/tick_source_mock.h"
 
 namespace mongo {
 namespace QueryStageBatchedDelete {
@@ -50,13 +52,55 @@ static const NamespaceString nss("unittests.QueryStageBatchedDelete");
 
 // For the following tests, fix the targetBatchDocs to 10 documents.
 static const int targetBatchDocs = 10;
+static const Milliseconds targetBatchTimeMS = Milliseconds(5);
+
+/**
+ * Simulates how long each document takes to delete.
+ *
+ * Deletes on a batch of documents are executed in a single call to BatchedDeleteStage::work(). The
+ * ClockAdvancingOpObserver is necessary to advance time per document delete, rather than per batch
+ * delete.
+ */
+class ClockAdvancingOpObserver : public OpObserverNoop {
+public:
+    void aboutToDelete(OperationContext* opCtx,
+                       const NamespaceString& nss,
+                       const UUID& uuid,
+                       const BSONObj& doc) override {
+
+        if (docDurationMap.find(doc) != docDurationMap.end()) {
+            tickSource->advance(docDurationMap.find(doc)->second);
+        }
+    }
+
+    void setDeleteRecordDurationMillis(BSONObj targetDoc, Milliseconds duration) {
+        docDurationMap.insert(std::make_pair(targetDoc, duration));
+    }
+
+    SimpleBSONObjUnorderedMap<Milliseconds> docDurationMap;
+    TickSourceMock<Milliseconds>* tickSource;
+};
 
 class QueryStageBatchedDeleteTest : public unittest::Test {
 public:
-    QueryStageBatchedDeleteTest() : _client(&_opCtx) {}
+    QueryStageBatchedDeleteTest() : _client(&_opCtx) {
+        auto tickSource = std::make_unique<TickSourceMock<Milliseconds>>();
+        tickSource->reset(1);
+        _tickSource = tickSource.get();
+        _opCtx.getServiceContext()->setTickSource(std::move(tickSource));
+        std::unique_ptr<ClockAdvancingOpObserver> opObserverUniquePtr =
+            std::make_unique<ClockAdvancingOpObserver>();
+        opObserverUniquePtr->tickSource = _tickSource;
+        _opObserver = opObserverUniquePtr.get();
+        _opCtx.getServiceContext()->setOpObserver(std::move(opObserverUniquePtr));
+    }
 
     virtual ~QueryStageBatchedDeleteTest() {
         _client.dropCollection(nss.ns());
+    }
+
+    TickSourceMock<Milliseconds>* tickSource() {
+        return _tickSource;
     }
 
     // Populates the collection with nDocs of shape {_id: <int i>, a: <int i>}.
@@ -68,6 +112,26 @@ public:
 
     void insert(const BSONObj& obj) {
         _client.insert(nss.ns(), obj);
+    }
+
+    // Inserts documents later deleted in a single 'batch' due to targetBatchTimMS or
+    // targetBatchDocs. Tells the opObserver how much to advance the clock when a document is about
+    // to be deleted.
+    void insertTimedBatch(std::vector<std::pair<BSONObj, Milliseconds>> timedBatch) {
+        Milliseconds totalDurationOfBatch{0};
+        for (auto [doc, duration] : timedBatch) {
+            _client.insert(nss.ns(), doc);
+            _opObserver->setDeleteRecordDurationMillis(doc, duration);
+            totalDurationOfBatch += duration;
+        }
+
+        // Enfore test correctness:
+        // If the totalDurationOfBatch is larger than the targetBatchTimeMS, the last document of
+        // the 'timedBatch' made the batch exceed targetBatchTimeMS.
+        if (totalDurationOfBatch > targetBatchTimeMS) {
+            auto batchSize = timedBatch.size();
+            ASSERT_LT(totalDurationOfBatch - timedBatch[batchSize - 1].second, targetBatchTimeMS);
+        }
     }
 
     void remove(const BSONObj& obj) {
@@ -123,6 +187,7 @@ public:
         CollectionScanParams collScanParams;
         auto batchedDeleteParams = std::make_unique<BatchedDeleteStageBatchParams>();
         batchedDeleteParams->targetBatchDocs = targetBatchDocs;
+        batchedDeleteParams->targetBatchTimeMS = targetBatchTimeMS;
 
         // DeleteStageParams must always be multi.
         auto deleteParams = std::make_unique<DeleteStageParams>();
@@ -144,6 +209,8 @@ protected:
 
     boost::intrusive_ptr<ExpressionContext> _expCtx =
         make_intrusive<ExpressionContext>(&_opCtx, nullptr, nss);
+    ClockAdvancingOpObserver* _opObserver;
+    TickSourceMock<Milliseconds>* _tickSource;
 
 private:
     DBDirectClient _client;
@@ -421,6 +488,169 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteStagedDocIsUpdatedToNotMatchCli
 
     ASSERT_EQUALS(state, PlanStage::IS_EOF);
     ASSERT_EQUALS(stats->docsDeleted, nDocs - 1);
+}
+
+// Tests targetBatchTimeMS is enforced.
+TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetBatchTimeMSBasic) {
+    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
+
+    std::vector<std::pair<BSONObj, Milliseconds>> timedBatch0{
+        {BSON("_id" << 1 << "a" << 1), Milliseconds(2)},
+        {BSON("_id" << 2 << "a" << 2), Milliseconds(2)},
+        {BSON("_id" << 3 << "a" << 3), Milliseconds(2)},
+    };
+    std::vector<std::pair<BSONObj, Milliseconds>> timedBatch1{
+        {BSON("_id" << 4 << "a" << 4), Milliseconds(2)},
+        {BSON("_id" << 5 << "a" << 5), Milliseconds(2)},
+    };
+
+    insertTimedBatch(timedBatch0);
+    insertTimedBatch(timedBatch1);
+
+    int batchSize0 = timedBatch0.size();
+    int batchSize1 = timedBatch1.size();
+    int nDocs = batchSize0 + batchSize1;
+
+    const CollectionPtr& coll = ctx.getCollection();
+    ASSERT(coll);
+
+    WorkingSet ws;
+    auto deleteStage = makeBatchedDeleteStage(&ws, coll);
+    const DeleteStats* stats = static_cast<const DeleteStats*>(deleteStage->getSpecificStats());
+
+    PlanStage::StageState state = PlanStage::NEED_TIME;
+    WorkingSetID id = WorkingSet::INVALID_ID;
+
+    // Stages all documents in the buffer before executing deletes since nDocs <
+    // targetBatchDocs.
+    {
+        ASSERT_LTE(nDocs, targetBatchDocs);
+        for (auto i = 0; i <= nDocs; i++) {
+            state = deleteStage->work(&id);
+            ASSERT_EQ(stats->docsDeleted, 0);
+            ASSERT_EQ(state, PlanStage::NEED_TIME);
+        }
+    }
+
+    // Batch 0 deletions.
+    {
+        Timer timer(tickSource());
+        state = deleteStage->work(&id);
+        ASSERT_EQ(stats->docsDeleted, batchSize0);
+        ASSERT_EQ(state, PlanStage::NEED_TIME);
+        ASSERT_GTE(Milliseconds(timer.millis()), targetBatchTimeMS);
+    }
+
+    // Batch 1 deletions.
+    {
+        // Drain the rest of the buffer before fetching from a new WorkingSetMember.
+        Timer timer(tickSource());
+        state = deleteStage->work(&id);
+        ASSERT_EQ(stats->docsDeleted, nDocs);
+        ASSERT_EQ(state, PlanStage::NEED_TIME);
+        ASSERT_LTE(Milliseconds(timer.millis()), targetBatchTimeMS);
+    }
+
+    // Completes multi delete execution.
+    {
+        state = deleteStage->work(&id);
+        ASSERT_EQ(stats->docsDeleted, nDocs);
+        ASSERT_EQ(state, PlanStage::IS_EOF);
+    }
+}
+
+// Tests when the total time it takes to delete targetBatchDocs exceeds targetBatchTimeMS.
+TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetBatchTimeMSWithTargetBatchDocs) {
+    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
+
+    std::vector<std::pair<BSONObj, Milliseconds>> timedBatch0{
+        {BSON("_id" << 1 << "a" << 1), Milliseconds(1)},
+        {BSON("_id" << 2 << "a" << 2), Milliseconds(0)},
+        {BSON("_id" << 3 << "a" << 3), Milliseconds(0)},
+        {BSON("_id" << 4 << "a" << 4), Milliseconds(0)},
+        {BSON("_id" << 5 << "a" << 5), Milliseconds(0)},
+        {BSON("_id" << 6 << "a" << 6), Milliseconds(0)},
+        {BSON("_id" << 7 << "a" << 7), Milliseconds(0)},
+        {BSON("_id" << 8 << "a" << 8), Milliseconds(4)},
+    };
+
+    std::vector<std::pair<BSONObj, Milliseconds>> timedBatch1{
+        {BSON("_id" << 9 << "a" << 9), Milliseconds(1)},
+        {BSON("_id" << 10 << "a" << 10), Milliseconds(1)},
+    };
+
+    std::vector<std::pair<BSONObj, Milliseconds>> timedBatch2{
+        {BSON("_id" << 11 << "a" << 11), Milliseconds(1)},
+        {BSON("_id" << 12 << "a" << 12), Milliseconds(1)},
+    };
+
+    // Populate the collection before executing the BatchedDeleteStage.
+    insertTimedBatch(timedBatch0);
+    insertTimedBatch(timedBatch1);
+    insertTimedBatch(timedBatch2);
+
+    int batchSize0 = timedBatch0.size();
+    int batchSize1 = timedBatch1.size();
+    int batchSize2 = timedBatch2.size();
+    int nDocs = batchSize0 + batchSize1 + batchSize2;
+
+    const CollectionPtr& coll = ctx.getCollection();
+    ASSERT(coll);
+
+    WorkingSet ws;
+    auto deleteStage = makeBatchedDeleteStage(&ws, coll);
+
+    const DeleteStats* stats = static_cast<const DeleteStats*>(deleteStage->getSpecificStats());
+
+    PlanStage::StageState state = PlanStage::NEED_TIME;
+    WorkingSetID id = WorkingSet::INVALID_ID;
+
+    // Stages up to targetBatchDocs - 1 documents in the buffer.
+    {
+        for (auto i = 0; i < targetBatchDocs; i++) {
+            state = deleteStage->work(&id);
+            ASSERT_EQ(stats->docsDeleted, 0);
+            ASSERT_EQ(state, PlanStage::NEED_TIME);
+        }
+    }
+
+    // Batch0 deletions.
+    {
+        Timer timer(tickSource());
+        state = deleteStage->work(&id);
+        ASSERT_EQ(stats->docsDeleted, batchSize0);
+        ASSERT_EQ(state, PlanStage::NEED_TIME);
+        ASSERT_GTE(Milliseconds(timer.millis()), targetBatchTimeMS);
+    }
+
+    // Batch1 deletions.
+    {
+        Timer timer(tickSource());
+
+        // Drain the rest of the buffer before fetching from a new WorkingSetMember.
+        state = deleteStage->work(&id);
+        ASSERT_EQ(stats->docsDeleted, batchSize0 + batchSize1);
+        ASSERT_EQ(state, PlanStage::NEED_TIME);
+        ASSERT_LTE(Milliseconds(timer.millis()), targetBatchTimeMS);
+    }
+
+    // Stages the remaining documents.
+    {
+        for (auto i = 0; i < batchSize2; i++) {
+            state = deleteStage->work(&id);
+            ASSERT_EQ(stats->docsDeleted, batchSize0 + batchSize1);
+            ASSERT_EQ(state, PlanStage::NEED_TIME);
+        }
+    }
+
+    // Batch 2 deletions.
+    {
+        Timer timer(tickSource());
+        state = deleteStage->work(&id);
+        ASSERT_EQ(stats->docsDeleted, nDocs);
+        ASSERT_EQ(state, PlanStage::IS_EOF);
+        ASSERT_LT(Milliseconds(timer.millis()), targetBatchTimeMS);
+    }
 }
 }  // namespace QueryStageBatchedDelete
 }  // namespace mongo

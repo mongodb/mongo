@@ -88,15 +88,31 @@ public:
 
 private:
     /**
-     * Deletes the documents staged in _ridMap in a batch.
-     * Returns NEED_TIME on success.
+     * Returns NEED_YIELD when there is a write conflict. Otherwise, returns NEED_TIME when
+     * some, or all, of the documents staged in the _stagedDeletesBuffer are successfully deleted.
      */
     PlanStage::StageState _deleteBatch(WorkingSetID* out);
 
-    // Maps records to delete to the latest snapshot their data matched the query. Records must be
-    // deleted in a single WriteUnitOrWork. Operation order has no impact on the outcome of the
-    // WriteUnitOfWork since all operations become visible at the same time.
-    stdx::unordered_map<RecordId, SnapshotId, RecordId::Hasher> _ridMap;
+    // Tries to restore the child's state. Returns NEED_TIME if the restore succeeds, NEED_YIELD
+    // upon write conflict.
+    PlanStage::StageState _tryRestoreState(WorkingSetID* out);
+
+    // Prepares to retry draining the _stagedDeletesBuffer after a write conflict. Removes
+    // 'recordsThatNoLongerMatch' then yields.
+    PlanStage::StageState _prepareToRetryDrainAfterWCE(
+        WorkingSetID* out, const std::set<RecordId>& recordsThatNoLongerMatch);
+
+    // Metadata of a document staged for deletion.
+    struct StagedDocumentMetadata {
+        RecordId rid;
+
+        // SnapshotId associated with the document when it is staged for deletion. Must be checked
+        // before deletion to ensure the document still matches the query.
+        SnapshotId snapshotId;
+    };
+
+    // Stores documents staged for deletion.
+    std::vector<StagedDocumentMetadata> _stagedDeletesBuffer;
 
     // Whether there are remaining docs in the buffer from a previous call to doWork() that should
     // be drained before fetching more documents.
