@@ -99,7 +99,7 @@ __metadata_load_hot_backup(WT_SESSION_IMPL *session, WT_BACKUPHASH *backuphash)
 
     allocated_name = file_len = max_len = slot = 0;
     conn = S2C(session);
-    filename = NULL;
+    filename = metadata_conf = NULL;
     partial_backup_names = NULL;
 
     /* Look for a hot backup file: if we find it, load it. */
@@ -180,10 +180,14 @@ __metadata_load_hot_backup(WT_SESSION_IMPL *session, WT_BACKUPHASH *backuphash)
               WT_WITH_TABLE_WRITE_LOCK(
                 session, ret = __wt_schema_drop(session, partial_backup_names[slot], drop_cfg)));
             WT_ERR(ret);
+            __wt_free(session, metadata_conf);
         }
     }
 
 err:
+    if (metadata_conf != NULL)
+        __wt_free(session, metadata_conf);
+
     if (filename != NULL)
         __wt_free(session, filename);
 
