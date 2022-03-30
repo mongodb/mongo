@@ -19,7 +19,7 @@ static int __checkpoint_tree_helper(WT_SESSION_IMPL *, const char *[]);
  *     Complain if the checkpoint name isn't acceptable.
  */
 static int
-__checkpoint_name_ok(WT_SESSION_IMPL *session, const char *name, size_t len)
+__checkpoint_name_ok(WT_SESSION_IMPL *session, const char *name, size_t len, bool allow_all)
 {
     /* Check for characters we don't want to see in a metadata file. */
     WT_RET(__wt_name_check(session, name, len, true));
@@ -28,12 +28,14 @@ __checkpoint_name_ok(WT_SESSION_IMPL *session, const char *name, size_t len)
      * The internal checkpoint name is special, applications aren't allowed to use it. Be aggressive
      * and disallow any matching prefix, it makes things easier when checking in other places.
      */
-    if (len < strlen(WT_CHECKPOINT))
-        return (0);
-    if (!WT_PREFIX_MATCH(name, WT_CHECKPOINT))
-        return (0);
+    if (len >= strlen(WT_CHECKPOINT) && WT_PREFIX_MATCH(name, WT_CHECKPOINT))
+        WT_RET_MSG(session, EINVAL, "the checkpoint name \"%s\" is reserved", WT_CHECKPOINT);
 
-    WT_RET_MSG(session, EINVAL, "the checkpoint name \"%s\" is reserved", WT_CHECKPOINT);
+    /* The name "all" is also special. */
+    if (!allow_all && WT_STRING_MATCH("all", name, len))
+        WT_RET_MSG(session, EINVAL, "the checkpoint name \"all\" is reserved");
+
+    return (0);
 }
 
 /*
@@ -126,7 +128,7 @@ __checkpoint_apply_operation(
     WT_RET(__wt_config_gets(session, cfg, "name", &cval));
     named = cval.len != 0;
     if (named)
-        WT_RET(__checkpoint_name_ok(session, cval.str, cval.len));
+        WT_RET(__checkpoint_name_ok(session, cval.str, cval.len, false));
 
     /* Step through the targets and optionally operate on each one. */
     WT_ERR(__wt_config_gets(session, cfg, "target", &cval));
@@ -1479,7 +1481,7 @@ __checkpoint_lock_dirty_tree(
         name = WT_CHECKPOINT;
         is_wt_ckpt = true;
     } else {
-        WT_ERR(__checkpoint_name_ok(session, cval.str, cval.len));
+        WT_ERR(__checkpoint_name_ok(session, cval.str, cval.len, false));
         WT_ERR(__wt_strndup(session, cval.str, cval.len, &name_alloc));
         name = name_alloc;
     }
@@ -1541,9 +1543,9 @@ __checkpoint_lock_dirty_tree(
             while ((ret = __wt_config_next(&dropconf, &k, &v)) == 0) {
                 /* Disallow unsafe checkpoint names. */
                 if (v.len == 0)
-                    WT_ERR(__checkpoint_name_ok(session, k.str, k.len));
+                    WT_ERR(__checkpoint_name_ok(session, k.str, k.len, true));
                 else
-                    WT_ERR(__checkpoint_name_ok(session, v.str, v.len));
+                    WT_ERR(__checkpoint_name_ok(session, v.str, v.len, true));
 
                 if (v.len == 0)
                     __drop(ckptbase, k.str, k.len);

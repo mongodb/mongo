@@ -94,6 +94,8 @@ string are reserved.) Applications can open the most recent of these checkpoints
 by specifying \c WiredTigerCheckpoint as the checkpoint name to
 WT_SESSION::open_cursor.
 
+The name "all" is also reserved as it is used when dropping checkpoints.
+
 \warning
 Applications wanting a consistent view of the data in two separate tables must
 either use named checkpoints or explicitly control when checkpoints are taken,
