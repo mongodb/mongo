@@ -43,6 +43,7 @@
 #include "mongo/db/timeseries/bucket_catalog.h"
 #include "mongo/db/timeseries/timeseries_stats.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 
 #include "mongo/db/stats/storage_stats.h"
 
@@ -142,8 +143,11 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
         }
     }
 
-    result->appendNumber(kOrphanCountField,
-                         countOrphanDocsForCollection(opCtx, collection->uuid()));
+    if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+        feature_flags::gOrphanTracking.isEnabled(serverGlobalParams.featureCompatibility)) {
+        result->appendNumber(kOrphanCountField,
+                             countOrphanDocsForCollection(opCtx, collection->uuid()));
+    }
 
     const RecordStore* recordStore = collection->getRecordStore();
     auto storageSize =

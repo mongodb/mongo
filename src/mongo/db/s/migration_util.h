@@ -148,7 +148,7 @@ void persistRangeDeletionTaskLocally(OperationContext* opCtx,
  * write concern.
  */
 void persistUpdatedNumOrphans(OperationContext* opCtx,
-                              const BSONObj& rangeDeletionQuery,
+                              const UUID& migrationId,
                               const int& changeInOrphans);
 
 /**

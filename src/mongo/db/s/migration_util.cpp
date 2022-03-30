@@ -56,6 +56,7 @@
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/migration_coordinator.h"
 #include "mongo/db/s/migration_destination_manager.h"
+#include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_state.h"
@@ -670,18 +671,28 @@ void persistRangeDeletionTaskLocally(OperationContext* opCtx,
 }
 
 void persistUpdatedNumOrphans(OperationContext* opCtx,
-                              const BSONObj& rangeDeletionQuery,
+                              const UUID& migrationId,
                               const int& changeInOrphans) {
-    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
-    // TODO (SERVER-54284) Remove writeConflictRetry loop
-    writeConflictRetry(
-        opCtx, "updateOrphanCount", NamespaceString::kRangeDeletionNamespace.ns(), [&] {
-            store.update(
-                opCtx,
-                rangeDeletionQuery,
-                BSON("$inc" << BSON(RangeDeletionTask::kNumOrphanDocsFieldName << changeInOrphans)),
-                WriteConcernOptions());
-        });
+    // TODO (SERVER-63819) Remove numOrphanDocsFieldName field from the query
+    // Add $exists to the query to ensure that on upgrade and downgrade, the numOrphanDocs field
+    // is only updated after the upgrade procedure has populated it with an initial value.
+    BSONObj query = BSON("_id" << migrationId << RangeDeletionTask::kNumOrphanDocsFieldName
+                               << BSON("$exists" << true));
+    try {
+        PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
+        ScopedRangeDeleterLock rangeDeleterLock(opCtx);
+        // TODO (SERVER-54284) Remove writeConflictRetry loop
+        writeConflictRetry(
+            opCtx, "updateOrphanCount", NamespaceString::kRangeDeletionNamespace.ns(), [&] {
+                store.update(opCtx,
+                             query,
+                             BSON("$inc" << BSON(RangeDeletionTask::kNumOrphanDocsFieldName
+                                                 << changeInOrphans)),
+                             WriteConcerns::kLocalWriteConcern);
+            });
+    } catch (const ExceptionFor<ErrorCodes::NoMatchingDocument>&) {
+        // When upgrading or downgrading, there may be no documents with the orphan count field.
+    }
 }
 
 int retrieveNumOrphansFromRecipient(OperationContext* opCtx,

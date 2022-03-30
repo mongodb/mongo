@@ -344,15 +344,14 @@ TEST_F(MigrationUtilsTest, TestUpdateNumberOfOrphans) {
     const auto uuid = UUID::gen();
     PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
     auto rangeDeletionDoc = createDeletionTask(opCtx, kTestNss, uuid, 0, 10);
+    rangeDeletionDoc.setNumOrphanDocs(0);
     store.add(opCtx, rangeDeletionDoc);
 
-    auto rangeDeletionQuery = BSON("_id" << rangeDeletionDoc.getId());
-
-    migrationutil::persistUpdatedNumOrphans(opCtx, rangeDeletionQuery, 5);
+    migrationutil::persistUpdatedNumOrphans(opCtx, rangeDeletionDoc.getId(), 5);
     rangeDeletionDoc.setNumOrphanDocs(5);
     ASSERT_EQ(store.count(opCtx, rangeDeletionDoc.toBSON().removeField("timestamp")), 1);
 
-    migrationutil::persistUpdatedNumOrphans(opCtx, rangeDeletionQuery, -5);
+    migrationutil::persistUpdatedNumOrphans(opCtx, rangeDeletionDoc.getId(), -5);
     rangeDeletionDoc.setNumOrphanDocs(0);
     ASSERT_EQ(store.count(opCtx, rangeDeletionDoc.toBSON().removeField("timestamp")), 1);
 }

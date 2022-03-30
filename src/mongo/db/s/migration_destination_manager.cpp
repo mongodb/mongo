@@ -80,6 +80,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/pm2423_feature_flags_gen.h"
 #include "mongo/s/shard_key_pattern.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/stdx/chrono.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/producer_consumer_queue.h"
@@ -1233,6 +1234,9 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
             recipientDeletionTask.setPending(true);
             const auto currentTime = VectorClock::get(outerOpCtx)->getTime();
             recipientDeletionTask.setTimestamp(currentTime.clusterTime().asTimestamp());
+            if (feature_flags::gOrphanTracking.isEnabled(serverGlobalParams.featureCompatibility)) {
+                recipientDeletionTask.setNumOrphanDocs(0);
+            }
 
             // It is illegal to wait for write concern with a session checked out, so persist the
             // range deletion task with an immediately satsifiable write concern and then wait for
@@ -1323,7 +1327,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
                     }
 
                     migrationutil::persistUpdatedNumOrphans(
-                        opCtx, BSON("_id" << _migrationId.get()), batchNumCloned);
+                        opCtx, _migrationId.get(), batchNumCloned);
 
                     {
                         stdx::lock_guard<Latch> statsLock(_mutex);
@@ -1748,8 +1752,7 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx, const
     }
 
     if (changeInOrphans != 0) {
-        migrationutil::persistUpdatedNumOrphans(
-            opCtx, BSON("_id" << _migrationId.get()), changeInOrphans);
+        migrationutil::persistUpdatedNumOrphans(opCtx, _migrationId.get(), changeInOrphans);
     }
     return didAnything;
 }

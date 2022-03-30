@@ -40,6 +40,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/s/pm2423_feature_flags_gen.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/fail_point.h"
 
 namespace mongo {
@@ -125,6 +126,9 @@ void MigrationCoordinator::startMigration(OperationContext* opCtx) {
     donorDeletionTask.setPending(true);
     const auto currentTime = VectorClock::get(opCtx)->getTime();
     donorDeletionTask.setTimestamp(currentTime.clusterTime().asTimestamp());
+    if (feature_flags::gOrphanTracking.isEnabled(serverGlobalParams.featureCompatibility)) {
+        donorDeletionTask.setNumOrphanDocs(0);
+    }
     migrationutil::persistRangeDeletionTaskLocally(
         opCtx, donorDeletionTask, WriteConcerns::kMajorityWriteConcernShardingTimeout);
 }
@@ -239,8 +243,7 @@ SemiFuture<void> MigrationCoordinator::_commitMigrationOnDonorAndRecipient(
     auto numOrphans = migrationutil::retrieveNumOrphansFromRecipient(opCtx, _migrationInfo);
 
     if (numOrphans > 0) {
-        migrationutil::persistUpdatedNumOrphans(
-            opCtx, BSON("_id" << _migrationInfo.getId()), numOrphans);
+        migrationutil::persistUpdatedNumOrphans(opCtx, _migrationInfo.getId(), numOrphans);
     }
 
     LOGV2_DEBUG(23896,

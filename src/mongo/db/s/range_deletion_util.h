@@ -32,6 +32,7 @@
 
 #include <boost/optional.hpp>
 
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/executor/task_executor.h"
@@ -50,6 +51,19 @@ extern AtomicWord<int> rangeDeleterBatchSize;
 // After completing a batch of document deletions, the time in millis to wait before commencing the
 // next batch of deletions.
 extern AtomicWord<int> rangeDeleterBatchDelayMS;
+
+/**
+ * Acquires the config db lock in IX mode and the collection lock for config.rangeDeletions in X
+ * mode.
+ */
+class ScopedRangeDeleterLock {
+public:
+    ScopedRangeDeleterLock(OperationContext* opCtx);
+
+private:
+    Lock::DBLock _configLock;
+    Lock::CollectionLock _rangeDeletionLock;
+};
 
 /**
  * Deletes a range of orphaned documents for the given namespace and collection UUID. Returns a
