@@ -35,7 +35,6 @@ env.SConscript(
         'installer',
         'logv2',
         'platform',
-        'resmoke',
         'rpc',
         's',
         'scripting',

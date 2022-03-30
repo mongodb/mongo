@@ -5362,6 +5362,24 @@ if has_option("cache"):
         addNoCacheEmitter(env['BUILDERS']['SharedLibrary'])
         addNoCacheEmitter(env['BUILDERS']['LoadableModule'])
 
+
+# We need to be explicit about including $DESTDIR here, unlike most
+# other places. Normally, auto_install_binaries will take care of
+# injecting DESTDIR for us, but we aren't using that now.
+resmoke_install_dir = env.subst("$DESTDIR/$PREFIX_BINDIR")
+resmoke_install_dir = os.path.normpath(resmoke_install_dir).replace("\\", r"\\")
+
+# Much blood sweat and tears were shed getting to this point. Any version of
+# this that uses SCons builders and a scanner will either not regenerate when it
+# should, cause everything to rebuild, or conflict with ninja. Sometimes all
+# three. So we've decided it's best to just write this file here every time
+# because it's the only solution that always works.
+with open("resmoke.ini", "w") as resmoke_config:
+    resmoke_config.write("""
+[resmoke]
+install_dir = {install_dir}
+""".format(install_dir=resmoke_install_dir))
+
 env.SConscript(
     dirs=[
         'src',

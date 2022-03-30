@@ -133,14 +133,7 @@ def collect_transitive_files(env, entry):
         # anyway.
         stack.extend(env.GetTransitivelyInstalledFiles(s))
 
-    # Setting the AIB_NO_ARCHIVE attribute to True prevents outputs from an
-    # AutoInstall builder from being included into archives produced by this
-    # tool
-    # Usage:
-    # node = env.AutoInstall(...)
-    # setattr(node[0].attributes, 'AIB_NO_ARCHIVE', True)
-    # TODO SERVER-61013 Update documentation once AutoInstall is a real builder
-    return sorted(f for f in files if not getattr(f.attributes, 'AIB_NO_ARCHIVE', False))
+    return sorted(files)
 
 
 def auto_archive_gen(first_env, make_archive_script, pkg_fmt):

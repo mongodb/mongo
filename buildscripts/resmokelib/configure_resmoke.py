@@ -9,9 +9,6 @@ import distutils.spawn
 import sys
 import platform
 import random
-import glob
-import textwrap
-import shlex
 
 import pymongo.uri_parser
 
@@ -136,19 +133,6 @@ def _validate_config(parser):  # pylint: disable=too-many-branches
             parser.error(f"Found '{resolved_path}', but it is not an executable file")
 
 
-def _find_resmoke_wrappers():
-    # This is technically incorrect. PREFIX_BINDIR defaults to $PREFIX/bin, so
-    # if the user changes it to any some other value, this glob will fail to
-    # detect the resmoke wrapper.
-    # Additionally, the resmoke wrapper will not be found if a user performs
-    # their builds outside of the git repository root, (ex checkout at
-    # /data/mongo, build-dir at /data/build)
-    # We assume that users who fall under either case will explicitly pass the
-    # --installDir argument.
-    candidate_installs = glob.glob("**/bin/resmoke.py", recursive=True)
-    return list(map(os.path.dirname, candidate_installs))
-
-
 def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many-locals,too-many-branches
     """Update the variables of the config module."""
 
@@ -164,25 +148,11 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
             config[cmdline_key] = cmdline_vars[cmdline_key]
 
     if os.path.isfile("resmoke.ini"):
-        err = textwrap.dedent("""\
-Support for resmoke.ini has been removed. You must delete
-resmoke.ini and rerun your build to run resmoke. If only one testable
-installation is present, resmoke will automatically locate that installation.
-If you have multiple installations, you must either pass an explicit
---installDir argument to the run subcommand to identify the installation you
-would like to test, or invoke the customized resmoke.py wrapper script staged
-into the bin directory of each installation.""")
         config_parser = configparser.ConfigParser()
         config_parser.read("resmoke.ini")
         if "resmoke" in config_parser.sections():
             user_config = dict(config_parser["resmoke"])
-            err += textwrap.dedent(f"""
-
-Based on the current value of resmoke.ini, after rebuilding, resmoke.py should
-be invoked as either:
-- {shlex.quote(f"{user_config['install_dir']}/resmoke.py")}
-- buildscripts/resmoke.py --installDir {shlex.quote(user_config['install_dir'])}""")
-        raise RuntimeError(err)
+            config.update(user_config)
 
     def setup_feature_flags():
         _config.RUN_ALL_FEATURE_FLAG_TESTS = config.pop("run_all_feature_flag_tests")
@@ -254,18 +224,6 @@ be invoked as either:
     _config.MULTIVERSION_BIN_VERSION = config.pop("old_bin_version")
 
     _config.INSTALL_DIR = config.pop("install_dir")
-    if _config.INSTALL_DIR is None:
-        resmoke_wrappers = _find_resmoke_wrappers()
-        if len(resmoke_wrappers) == 1:
-            _config.INSTALL_DIR = resmoke_wrappers[0]
-        elif len(resmoke_wrappers) > 1:
-            err = textwrap.dedent(f"""\
-Multiple testable installations were found, but installDir was not specified.
-You must either call resmoke via one of the following scripts:
-{os.linesep.join(shlex.quote(resmoke_wrappers))}
-
-or explicitly pass --installDir to the run subcommand of buildscripts/resmoke.py.""")
-            raise RuntimeError(err)
     if _config.INSTALL_DIR is not None:
         # Normalize the path so that on Windows dist-test/bin
         # translates to .\dist-test\bin then absolutify it since the
