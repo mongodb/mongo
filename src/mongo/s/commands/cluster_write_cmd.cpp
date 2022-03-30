@@ -35,6 +35,7 @@
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
@@ -48,7 +49,6 @@
 #include "mongo/s/cluster_write.h"
 #include "mongo/s/commands/cluster_explain.h"
 #include "mongo/s/commands/document_shard_key_update_util.h"
-#include "mongo/s/commands/update_document_shard_key_using_transaction_api_feature_flag_gen.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/session_catalog_router.h"
 #include "mongo/s/transaction_router.h"
@@ -288,7 +288,8 @@ bool handleWouldChangeOwningShardError(OperationContext* opCtx,
 
     bool updatedShardKey = false;
     boost::optional<BSONObj> upsertedId;
-    if (feature_flags::gFeatureFlagUpdateDocumentShardKeyUsingTransactionApi.isEnabled(
+
+    if (feature_flags::gFeatureFlagInternalTransactions.isEnabled(
             serverGlobalParams.featureCompatibility)) {
         if (isRetryableWrite) {
             if (MONGO_unlikely(hangAfterThrowWouldChangeOwningShardRetryableWrite.shouldFail())) {
