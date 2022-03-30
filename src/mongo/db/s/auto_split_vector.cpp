@@ -258,9 +258,9 @@ std::pair<std::vector<BSONObj>, bool> autoSplitVector(OperationContext* opCtx,
                 lastSplitPoint = splitKeys.back();
                 numScannedKeys = 0;
 
-                if (limit && splitKeys.size() == static_cast<size_t>(std::max(2, *limit))) {
-                    // If the user has specified a limit, calculate the first 2 split points (avoid
-                    // creating small chunks)
+                if (limit && splitKeys.size() == static_cast<size_t>(*limit + 1)) {
+                    // If the user has specified a limit, calculate the first `limit + 1` split
+                    // points (avoid creating small chunks)
                     break;
                 }
 
