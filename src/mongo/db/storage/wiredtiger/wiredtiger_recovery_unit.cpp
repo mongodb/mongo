@@ -829,15 +829,8 @@ Status WiredTigerRecoveryUnit::setTimestamp(Timestamp timestamp) {
         return Status::OK();
     }
 
-    // Avoid heap allocation in favour of a stack allocation.
-    static constexpr auto formatString = "commit_timestamp={:X}";
-    static constexpr auto bytesToAllocate = std::char_traits<char>::length(formatString) +
-        (sizeof(decltype(timestamp.asULL())) * 2) + 1;
-    std::array<char, bytesToAllocate> conf;
-    auto end = fmt::format_to(conf.begin(), FMT_COMPILE(formatString), timestamp.asULL());
-    // Manual null-termination
-    *end = '\0';
-    auto rc = session->timestamp_transaction(session, conf.data());
+    auto rc =
+        session->timestamp_transaction_uint(session, WT_TS_TXN_TYPE_COMMIT, timestamp.asULL());
     if (rc == 0) {
         _isTimestamped = true;
     }

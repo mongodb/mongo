@@ -88,16 +88,9 @@ WiredTigerBeginTxnBlock::~WiredTigerBeginTxnBlock() {
 
 Status WiredTigerBeginTxnBlock::setReadSnapshot(Timestamp readTimestamp) {
     invariant(_rollback);
-    // Avoid heap allocation in favour of a stack allocation for the configuration string.
-    static constexpr auto configFmtString = "read_timestamp={:x}";
-    static constexpr auto numBytesRequired = std::char_traits<char>::length(configFmtString) +
-        (sizeof(decltype(readTimestamp.asULL())) * 2) + 1;
-    std::array<char, numBytesRequired> configString;
-    auto end =
-        fmt::format_to(configString.begin(), FMT_STRING(configFmtString), readTimestamp.asULL());
-    *end = '\0';
-
-    return wtRCToStatus(_session->timestamp_transaction(_session, configString.data()), _session);
+    return wtRCToStatus(
+        _session->timestamp_transaction_uint(_session, WT_TS_TXN_TYPE_READ, readTimestamp.asULL()),
+        _session);
 }
 
 void WiredTigerBeginTxnBlock::done() {
