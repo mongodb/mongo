@@ -66,51 +66,51 @@ REGISTER_WINDOW_FUNCTION_CONDITIONALLY(
     minN,
     (ExpressionN<WindowFunctionMinN, AccumulatorMinN>::parse),
     feature_flags::gFeatureFlagExactTopNAccumulator.getVersion(),
-    AllowedWithApiStrict::kNeverInVersion1,
+    AllowedWithApiStrict::kAlways,
     feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
 REGISTER_WINDOW_FUNCTION_CONDITIONALLY(
     maxN,
     (ExpressionN<WindowFunctionMaxN, AccumulatorMaxN>::parse),
     feature_flags::gFeatureFlagExactTopNAccumulator.getVersion(),
-    AllowedWithApiStrict::kNeverInVersion1,
+    AllowedWithApiStrict::kAlways,
     feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
 REGISTER_WINDOW_FUNCTION_CONDITIONALLY(
     firstN,
     (ExpressionN<WindowFunctionFirstN, AccumulatorFirstN>::parse),
     feature_flags::gFeatureFlagExactTopNAccumulator.getVersion(),
-    AllowedWithApiStrict::kNeverInVersion1,
+    AllowedWithApiStrict::kAlways,
     feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
 REGISTER_WINDOW_FUNCTION_CONDITIONALLY(
     lastN,
     (ExpressionN<WindowFunctionLastN, AccumulatorLastN>::parse),
     feature_flags::gFeatureFlagExactTopNAccumulator.getVersion(),
-    AllowedWithApiStrict::kNeverInVersion1,
+    AllowedWithApiStrict::kAlways,
     feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
 REGISTER_WINDOW_FUNCTION_CONDITIONALLY(
     topN,
     (ExpressionN<WindowFunctionTopN, AccumulatorTopBottomN<TopBottomSense::kTop, false>>::parse),
     feature_flags::gFeatureFlagExactTopNAccumulator.getVersion(),
-    AllowedWithApiStrict::kNeverInVersion1,
+    AllowedWithApiStrict::kAlways,
     feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
 REGISTER_WINDOW_FUNCTION_CONDITIONALLY(
     bottomN,
     (ExpressionN<WindowFunctionBottomN,
                  AccumulatorTopBottomN<TopBottomSense::kBottom, false>>::parse),
     feature_flags::gFeatureFlagExactTopNAccumulator.getVersion(),
-    AllowedWithApiStrict::kNeverInVersion1,
+    AllowedWithApiStrict::kAlways,
     feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
 REGISTER_WINDOW_FUNCTION_CONDITIONALLY(
     top,
     (ExpressionN<WindowFunctionTop, AccumulatorTopBottomN<TopBottomSense::kTop, true>>::parse),
     feature_flags::gFeatureFlagExactTopNAccumulator.getVersion(),
-    AllowedWithApiStrict::kNeverInVersion1,
+    AllowedWithApiStrict::kAlways,
     feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
 REGISTER_WINDOW_FUNCTION_CONDITIONALLY(
     bottom,
     (ExpressionN<WindowFunctionBottom,
                  AccumulatorTopBottomN<TopBottomSense::kBottom, true>>::parse),
     feature_flags::gFeatureFlagExactTopNAccumulator.getVersion(),
-    AllowedWithApiStrict::kNeverInVersion1,
+    AllowedWithApiStrict::kAlways,
     feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
 
 StringMap<Expression::ExpressionParserRegistration> Expression::parserMap;

@@ -4617,10 +4617,9 @@ Value ExpressionSortArray::evaluate(const Document& root, Variables* variables) 
     return Value(array);
 }
 
-// TODO: SERVER-61855 Add the expression to the stable API with others that have been introduced.
 REGISTER_EXPRESSION_CONDITIONALLY(sortArray,
                                   ExpressionSortArray::parse,
-                                  AllowedWithApiStrict::kNeverInVersion1,
+                                  AllowedWithApiStrict::kAlways,
                                   AllowedWithClientType::kAny,
                                   feature_flags::gFeatureFlagSortArray.getVersion(),
                                   feature_flags::gFeatureFlagSortArray.isEnabledAndIgnoreFCV());

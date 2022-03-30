@@ -123,7 +123,7 @@ RangeStatement RangeStatement::parse(RangeSpec spec) {
 REGISTER_DOCUMENT_SOURCE_WITH_MIN_VERSION(densify,
                                           LiteParsedDocumentSourceDefault::parse,
                                           document_source_densify::createFromBson,
-                                          AllowedWithApiStrict::kNeverInVersion1,
+                                          AllowedWithApiStrict::kAlways,
                                           multiversion::FeatureCompatibilityVersion::kVersion_5_1)
 
 REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(_internalDensify,
