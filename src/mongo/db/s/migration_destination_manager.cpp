@@ -1648,7 +1648,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
 
 bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx, const BSONObj& xfer) {
     bool didAnything = false;
-    int changeInOrphans = 0;
+    long long changeInOrphans = 0;
 
     // Deleted documents
     if (xfer["deleted"].isABSONObj()) {

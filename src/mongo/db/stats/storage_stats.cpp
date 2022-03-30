@@ -50,7 +50,7 @@
 namespace mongo {
 
 namespace {
-int countOrphanDocsForCollection(OperationContext* opCtx, const UUID& uuid) {
+long long countOrphanDocsForCollection(OperationContext* opCtx, const UUID& uuid) {
     // TODO (SERVER-64162): move this function to range_deletion_util.cpp and replace
     // "collectionUuid" and "numOrphanDocs" with RangeDeletionTask field names.
     DBDirectClient client(opCtx);
@@ -75,7 +75,7 @@ int countOrphanDocsForCollection(OperationContext* opCtx, const UUID& uuid) {
     invariant(!cursor->more());
     auto numOrphans = res.getField("count");
     invariant(numOrphans);
-    return numOrphans.numberInt();
+    return numOrphans.exactNumberLong();
 }
 }  // namespace
 
@@ -83,7 +83,7 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
                                     const NamespaceString& nss,
                                     const StorageStatsSpec& storageStatsSpec,
                                     BSONObjBuilder* result) {
-    const std::string kOrphanCountField = "orphanCount";
+    static constexpr auto kOrphanCountField = "numOrphanDocs"_sd;
 
     auto scale = storageStatsSpec.getScale().value_or(1);
     bool verbose = storageStatsSpec.getVerbose();

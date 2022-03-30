@@ -672,7 +672,7 @@ void persistRangeDeletionTaskLocally(OperationContext* opCtx,
 
 void persistUpdatedNumOrphans(OperationContext* opCtx,
                               const UUID& migrationId,
-                              const int& changeInOrphans) {
+                              long long changeInOrphans) {
     // TODO (SERVER-63819) Remove numOrphanDocsFieldName field from the query
     // Add $exists to the query to ensure that on upgrade and downgrade, the numOrphanDocs field
     // is only updated after the upgrade procedure has populated it with an initial value.
@@ -695,8 +695,8 @@ void persistUpdatedNumOrphans(OperationContext* opCtx,
     }
 }
 
-int retrieveNumOrphansFromRecipient(OperationContext* opCtx,
-                                    const MigrationCoordinatorDocument& migrationInfo) {
+long long retrieveNumOrphansFromRecipient(OperationContext* opCtx,
+                                          const MigrationCoordinatorDocument& migrationInfo) {
     const auto recipientShard = uassertStatusOK(
         Grid::get(opCtx)->shardRegistry()->getShard(opCtx, migrationInfo.getRecipientShardId()));
     FindCommandRequest findCommand(NamespaceString::kRangeDeletionNamespace);
@@ -720,7 +720,9 @@ int retrieveNumOrphansFromRecipient(OperationContext* opCtx,
                     "migrationId"_attr = migrationInfo.getId());
         return 0;
     }
-    return rangeDeletionResponse.docs[0].getIntField("numOrphanDocs");
+    const auto numOrphanDocsElem =
+        rangeDeletionResponse.docs[0].getField(RangeDeletionTask::kNumOrphanDocsFieldName);
+    return numOrphanDocsElem ? numOrphanDocsElem.safeNumberLong() : 0;
 }
 
 void notifyChangeStreamsOnRecipientFirstChunk(OperationContext* opCtx,

@@ -23,12 +23,12 @@ const st = new ShardingTest({
 function assertCollStatsHasCorrectOrphanCount(coll, shardName, numOrphans) {
     const pipeline = [
         {'$collStats': {'storageStats': {}}},
-        {'$project': {'shard': true, 'storageStats': {'orphanCount': true}}}
+        {'$project': {'shard': true, 'storageStats': {'numOrphanDocs': true}}}
     ];
     const storageStats = coll.aggregate(pipeline).toArray();
     storageStats.forEach((stat) => {
         if (stat['shard'] === shardName) {
-            assert.eq(stat.storageStats.orphanCount, numOrphans);
+            assert.eq(stat.storageStats.numOrphanDocs, numOrphans);
         }
     });
 }
@@ -42,7 +42,7 @@ assert.commandWorked(
 // Test non-existing collection
 const noColl = db['unusedColl'];
 let res = db.runCommand({'collStats': noColl.getFullName()});
-assert.eq(res.shards[st.shard0.shardName].orphanCount, 0);
+assert.eq(res.shards[st.shard0.shardName].numOrphanDocs, 0);
 
 // Setup collection for test with orphans
 const coll = db['test'];
