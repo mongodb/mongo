@@ -41,7 +41,9 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/ops/write_ops_parsers.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/find_command_gen.h"
+#include "mongo/db/query/fle/server_rewrite.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
@@ -162,6 +164,31 @@ std::shared_ptr<txn_api::TransactionWithRetries> getTransactionWithRetriesForMon
         TransactionRouterResourceYielder::makeForLocalHandoff());
 }
 
+/**
+ * Make an expression context from a batch command request and a specific operation. Templated out
+ * to work with update and delete.
+ */
+template <typename T, typename O>
+boost::intrusive_ptr<ExpressionContext> makeExpCtx(OperationContext* opCtx,
+                                                   const T& request,
+                                                   const O& op) {
+    std::unique_ptr<CollatorInterface> collator;
+    if (op.getCollation()) {
+        auto statusWithCollator = CollatorFactoryInterface::get(opCtx->getServiceContext())
+                                      ->makeFromBSON(op.getCollation().get());
+
+        uassertStatusOK(statusWithCollator.getStatus());
+        collator = std::move(statusWithCollator.getValue());
+    }
+    auto expCtx = make_intrusive<ExpressionContext>(opCtx,
+                                                    std::move(collator),
+                                                    request.getNamespace(),
+                                                    request.getLegacyRuntimeConstants(),
+                                                    request.getLet());
+    expCtx->stopExpressionCounters();
+    return expCtx;
+}
+
 }  // namespace
 
 std::pair<FLEBatchResult, write_ops::InsertCommandReply> processInsert(
@@ -256,9 +283,10 @@ write_ops::DeleteCommandReply processDelete(OperationContext* opCtx,
 
     write_ops::DeleteCommandReply reply;
 
+    auto expCtx = makeExpCtx(opCtx, deleteRequest, deleteOpEntry);
     // The function that handles the transaction may outlive this function so we need to use
     // shared_ptrs
-    auto deleteBlock = std::tie(deleteRequest, reply);
+    auto deleteBlock = std::tie(deleteRequest, reply, expCtx);
     auto sharedDeleteBlock = std::make_shared<decltype(deleteBlock)>(deleteBlock);
 
     auto swResult = runInTxnWithRetry(
@@ -267,9 +295,9 @@ write_ops::DeleteCommandReply processDelete(OperationContext* opCtx,
         [sharedDeleteBlock](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
             FLEQueryInterfaceImpl queryImpl(txnClient);
 
-            auto [deleteRequest2, reply2] = *sharedDeleteBlock.get();
+            auto [deleteRequest2, reply2, expCtx2] = *sharedDeleteBlock.get();
 
-            reply2 = processDelete(&queryImpl, deleteRequest2);
+            reply2 = processDelete(&queryImpl, expCtx2, deleteRequest2);
 
             if (MONGO_unlikely(fleCrudHangDelete.shouldFail())) {
                 LOGV2(6371902, "Hanging due to fleCrudHangDelete fail point");
@@ -323,7 +351,8 @@ write_ops::UpdateCommandReply processUpdate(OperationContext* opCtx,
     // The function that handles the transaction may outlive this function so we need to use
     // shared_ptrs
     write_ops::UpdateCommandReply reply;
-    auto updateBlock = std::tie(updateRequest, reply);
+    auto expCtx = makeExpCtx(opCtx, updateRequest, updateOpEntry);
+    auto updateBlock = std::tie(updateRequest, reply, expCtx);
     auto sharedupdateBlock = std::make_shared<decltype(updateBlock)>(updateBlock);
 
     auto swResult = runInTxnWithRetry(
@@ -332,9 +361,9 @@ write_ops::UpdateCommandReply processUpdate(OperationContext* opCtx,
         [sharedupdateBlock](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
             FLEQueryInterfaceImpl queryImpl(txnClient);
 
-            auto [updateRequest2, reply2] = *sharedupdateBlock.get();
+            auto [updateRequest2, reply2, expCtx2] = *sharedupdateBlock.get();
 
-            reply2 = processUpdate(&queryImpl, updateRequest2);
+            reply2 = processUpdate(&queryImpl, expCtx2, updateRequest2);
 
             if (MONGO_unlikely(fleCrudHangUpdate.shouldFail())) {
                 LOGV2(6371901, "Hanging due to fleCrudHangUpdate fail point");
@@ -615,17 +644,25 @@ StatusWith<write_ops::InsertCommandReply> processInsert(
 }
 
 write_ops::DeleteCommandReply processDelete(FLEQueryInterface* queryImpl,
+                                            boost::intrusive_ptr<ExpressionContext> expCtx,
                                             const write_ops::DeleteCommandRequest& deleteRequest) {
+
     auto edcNss = deleteRequest.getNamespace();
     auto ei = deleteRequest.getEncryptionInformation().get();
 
     auto efc = EncryptionInformationHelpers::getAndValidateSchema(edcNss, ei);
     auto tokenMap = EncryptionInformationHelpers::getDeleteTokens(edcNss, ei);
 
-    // TODO: SERVER-64358 rewrite MatchExpression in deleteRequest.getDeletes()[0].getQ()
+    write_ops::DeleteCommandRequest newDeleteRequest = deleteRequest;
+
+    auto newDeleteOp = newDeleteRequest.getDeletes()[0];
+    newDeleteOp.setQ(fle::rewriteEncryptedFilterInsideTxn(
+        queryImpl, deleteRequest.getDbName(), efc, expCtx, newDeleteOp.getQ()));
+    newDeleteRequest.setDeletes({newDeleteOp});
 
     // TODO SERVER-64143 - use this delete for retryable writes
-    auto [deleteReply, deletedDocument] = queryImpl->deleteWithPreimage(edcNss, ei, deleteRequest);
+    auto [deleteReply, deletedDocument] =
+        queryImpl->deleteWithPreimage(edcNss, ei, newDeleteRequest);
 
     // If the delete did not actually delete anything, we are done
     if (deletedDocument.isEmpty()) {
@@ -655,6 +692,7 @@ write_ops::DeleteCommandReply processDelete(FLEQueryInterface* queryImpl,
  * 6. Remove the stale tags from the original document with a new push
  */
 write_ops::UpdateCommandReply processUpdate(FLEQueryInterface* queryImpl,
+                                            boost::intrusive_ptr<ExpressionContext> expCtx,
                                             const write_ops::UpdateCommandRequest& updateRequest) {
 
     auto edcNss = updateRequest.getNamespace();
@@ -670,9 +708,8 @@ write_ops::UpdateCommandReply processUpdate(FLEQueryInterface* queryImpl,
     // Step 1 ----
     std::vector<EDCServerPayloadInfo> serverPayload;
     auto newUpdateOpEntry = updateRequest.getUpdates()[0];
-
-    // TODO: SERVER-64358 rewrite any FLEFindPayloads in the MatchExpression held in
-    // updateOpEntry.getQ().
+    newUpdateOpEntry.setQ(fle::rewriteEncryptedFilterInsideTxn(
+        queryImpl, updateRequest.getDbName(), efc, expCtx, newUpdateOpEntry.getQ()));
 
     if (updateModification.type() == write_ops::UpdateModification::Type::kModifier) {
         auto updateModifier = updateModification.getUpdateModifier();
@@ -685,7 +722,6 @@ write_ops::UpdateCommandReply processUpdate(FLEQueryInterface* queryImpl,
 
         newUpdateOpEntry.setU(mongo::write_ops::UpdateModification(
             pushUpdate, write_ops::UpdateModification::ClassicTag(), false));
-
     } else {
         auto replacementDocument = updateModification.getUpdateReplacement();
         serverPayload = EDCServerCollection::getEncryptedFieldInfo(replacementDocument);

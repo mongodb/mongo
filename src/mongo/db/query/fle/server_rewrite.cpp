@@ -31,6 +31,7 @@
 #include "mongo/db/query/fle/server_rewrite.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/crypto/fle_crypto.h"
 #include "mongo/crypto/fle_tags.h"
 #include "mongo/db/fle_crud.h"
@@ -45,6 +46,16 @@
 
 namespace mongo::fle {
 namespace {
+BSONObj rewriteEncryptedFilter(const FLEStateCollectionReader& escReader,
+                               const FLEStateCollectionReader& eccReader,
+                               boost::intrusive_ptr<ExpressionContext> expCtx,
+                               BSONObj filter) {
+    return MatchExpressionRewrite(expCtx, escReader, eccReader, filter).get();
+}
+
+/**
+ * Make an expression context from a find command.
+ */
 boost::intrusive_ptr<ExpressionContext> makeExpCtx(OperationContext* opCtx,
                                                    FindCommandRequest* findCommand) {
     invariant(findCommand->getNamespaceOrUUID().nss());
@@ -57,12 +68,15 @@ boost::intrusive_ptr<ExpressionContext> makeExpCtx(OperationContext* opCtx,
         uassertStatusOK(statusWithCollator.getStatus());
         collator = std::move(statusWithCollator.getValue());
     }
-    return make_intrusive<ExpressionContext>(opCtx,
-                                             std::move(collator),
-                                             findCommand->getNamespaceOrUUID().nss().get(),
-                                             findCommand->getLegacyRuntimeConstants(),
-                                             findCommand->getLet());
+    auto expCtx = make_intrusive<ExpressionContext>(opCtx,
+                                                    std::move(collator),
+                                                    findCommand->getNamespaceOrUUID().nss().get(),
+                                                    findCommand->getLegacyRuntimeConstants(),
+                                                    findCommand->getLet());
+    expCtx->stopExpressionCounters();
+    return expCtx;
 }
+
 
 class RewriteBase {
 public:
@@ -97,14 +111,14 @@ public:
         for (auto&& source : pipeline->getSources()) {
             if (auto match = dynamic_cast<DocumentSourceMatch*>(source.get())) {
                 match->rebuild(
-                    rewriteEncryptedFilter(expCtx, escReader, eccReader, match->getQuery()));
+                    rewriteEncryptedFilter(escReader, eccReader, expCtx, match->getQuery()));
             } else if (auto geoNear = dynamic_cast<DocumentSourceGeoNear*>(source.get())) {
                 geoNear->setQuery(
-                    rewriteEncryptedFilter(expCtx, escReader, eccReader, geoNear->getQuery()));
+                    rewriteEncryptedFilter(escReader, eccReader, expCtx, geoNear->getQuery()));
             } else if (auto graphLookup = dynamic_cast<DocumentSourceGraphLookUp*>(source.get());
                        graphLookup && graphLookup->getAdditionalFilter()) {
                 graphLookup->setAdditionalFilter(rewriteEncryptedFilter(
-                    expCtx, escReader, eccReader, graphLookup->getAdditionalFilter().get()));
+                    escReader, eccReader, expCtx, graphLookup->getAdditionalFilter().get()));
             }
         }
     }
@@ -128,7 +142,7 @@ public:
 
     ~FilterRewrite(){};
     void doRewrite(FLEStateCollectionReader& escReader, FLEStateCollectionReader& eccReader) final {
-        rewrittenFilter = rewriteEncryptedFilter(expCtx, escReader, eccReader, userFilter);
+        rewrittenFilter = rewriteEncryptedFilter(escReader, eccReader, expCtx, userFilter);
     }
 
     const BSONObj userFilter;
@@ -171,12 +185,21 @@ void doFLERewriteInTxn(OperationContext* opCtx, std::shared_ptr<RewriteBase> sha
 }
 }  // namespace
 
-BSONObj rewriteEncryptedFilter(boost::intrusive_ptr<ExpressionContext> expCtx,
-                               const FLEStateCollectionReader& escReader,
-                               const FLEStateCollectionReader& eccReader,
-                               BSONObj filter) {
-    return MatchExpressionRewrite(expCtx, escReader, eccReader, filter).get();
+BSONObj rewriteEncryptedFilterInsideTxn(FLEQueryInterface* queryImpl,
+                                        StringData db,
+                                        const EncryptedFieldConfig& efc,
+                                        boost::intrusive_ptr<ExpressionContext> expCtx,
+                                        BSONObj filter) {
+    auto makeCollectionReader = [&](FLEQueryInterface* queryImpl, const StringData& coll) {
+        NamespaceString nss(db, coll);
+        auto docCount = queryImpl->countDocuments(nss);
+        return TxnCollectionReader(docCount, queryImpl, nss);
+    };
+    auto escReader = makeCollectionReader(queryImpl, efc.getEscCollection().get());
+    auto eccReader = makeCollectionReader(queryImpl, efc.getEccCollection().get());
+    return rewriteEncryptedFilter(escReader, eccReader, expCtx, filter);
 }
+
 
 void processFindCommand(OperationContext* opCtx,
                         NamespaceString nss,

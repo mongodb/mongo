@@ -39,7 +39,9 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context.h"
 
-namespace mongo::fle {
+namespace mongo {
+class FLEQueryInterface;
+namespace fle {
 
 /**
  * Helper function to determine if an IDL object with encryption information should be rewritten.
@@ -67,6 +69,17 @@ std::unique_ptr<Pipeline, PipelineDeleter> processPipeline(
     NamespaceString nss,
     const EncryptionInformation& encryptInfo,
     std::unique_ptr<Pipeline, PipelineDeleter> toRewrite);
+
+/**
+ * Rewrite a filter MatchExpression with FLE Find Payloads into a disjunction over the tag array
+ * from inside an existing transaction using a FLEQueryInterface constructed from a
+ * transaction client.
+ */
+BSONObj rewriteEncryptedFilterInsideTxn(FLEQueryInterface* queryImpl,
+                                        StringData db,
+                                        const EncryptedFieldConfig& efc,
+                                        boost::intrusive_ptr<ExpressionContext> expCtx,
+                                        BSONObj filter);
 
 /**
  * Class which handles rewriting filter MatchExpressions for FLE2. The functionality is encapsulated
@@ -147,12 +160,6 @@ private:
     BSONObj _result;
 };
 
-/**
- * Rewrite a filter MatchExpression with FLE Find Payloads into a disjunction over the tag array.
- */
-BSONObj rewriteEncryptedFilter(boost::intrusive_ptr<ExpressionContext> expCtx,
-                               const FLEStateCollectionReader& escReader,
-                               const FLEStateCollectionReader& eccReader,
-                               BSONObj filter);
 
-}  // namespace mongo::fle
+}  // namespace fle
+}  // namespace mongo

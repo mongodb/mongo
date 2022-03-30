@@ -36,6 +36,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include "boost/smart_ptr/intrusive_ptr.hpp"
+
 #include "mongo/base/data_range.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -147,8 +149,12 @@ std::pair<write_ops::DeleteCommandReply, BSONObj> FLEQueryTestImpl::deleteWithPr
     ASSERT_EQ(deleteRequest.getDeletes().size(), 1);
     auto deleteOpEntry = deleteRequest.getDeletes()[0];
     ASSERT_EQ("_id"_sd, deleteOpEntry.getQ().firstElementFieldNameStringData());
+    BSONElement id = deleteOpEntry.getQ().firstElement();
+    if (id.isABSONObj() && id.Obj().firstElementFieldNameStringData() == "$eq"_sd) {
+        id = id.Obj().firstElement();
+    }
 
-    auto swDoc = _storage->deleteById(_opCtx, nss, deleteOpEntry.getQ().firstElement());
+    auto swDoc = _storage->deleteById(_opCtx, nss, id);
 
     // Some of the unit tests delete documents that do not exist
     if (swDoc.getStatus() == ErrorCodes::NoSuchKey) {
@@ -167,19 +173,18 @@ std::pair<write_ops::UpdateCommandReply, BSONObj> FLEQueryTestImpl::updateWithPr
     ASSERT_EQ(updateRequest.getUpdates().size(), 1);
     auto updateOpEntry = updateRequest.getUpdates()[0];
     ASSERT_EQ("_id"_sd, updateOpEntry.getQ().firstElementFieldNameStringData());
-
-    BSONObj preimage = getById(nss, updateOpEntry.getQ().firstElement());
+    BSONElement id = updateOpEntry.getQ().firstElement();
+    if (id.isABSONObj() && id.Obj().firstElementFieldNameStringData() == "$eq"_sd) {
+        id = id.Obj().firstElement();
+    }
+    BSONObj preimage = getById(nss, id);
 
     if (updateOpEntry.getU().type() == write_ops::UpdateModification::Type::kModifier) {
-        uassertStatusOK(_storage->upsertById(_opCtx,
-                                             nss,
-                                             updateOpEntry.getQ().firstElement(),
-                                             updateOpEntry.getU().getUpdateModifier()));
+        uassertStatusOK(
+            _storage->upsertById(_opCtx, nss, id, updateOpEntry.getU().getUpdateModifier()));
     } else {
-        uassertStatusOK(_storage->upsertById(_opCtx,
-                                             nss,
-                                             updateOpEntry.getQ().firstElement(),
-                                             updateOpEntry.getU().getUpdateReplacement()));
+        uassertStatusOK(
+            _storage->upsertById(_opCtx, nss, id, updateOpEntry.getU().getUpdateReplacement()));
     }
 
 
@@ -645,7 +650,14 @@ void FleCrudTest::doSingleUpdateWithUpdateDoc(int id,
     updateRequest.setUpdates({entry});
     updateRequest.getWriteCommandRequestBase().setEncryptionInformation(ei);
 
-    processUpdate(_queryImpl.get(), updateRequest);
+
+    std::unique_ptr<CollatorInterface> collator;
+    auto expCtx = make_intrusive<ExpressionContext>(_opCtx.get(),
+                                                    std::move(collator),
+                                                    updateRequest.getNamespace(),
+                                                    updateRequest.getLegacyRuntimeConstants(),
+                                                    updateRequest.getLet());
+    processUpdate(_queryImpl.get(), expCtx, updateRequest);
 }
 
 void FleCrudTest::doSingleDelete(int id) {
@@ -665,7 +677,14 @@ void FleCrudTest::doSingleDelete(int id) {
     deleteRequest.setDeletes({entry});
     deleteRequest.getWriteCommandRequestBase().setEncryptionInformation(ei);
 
-    processDelete(_queryImpl.get(), deleteRequest);
+    std::unique_ptr<CollatorInterface> collator;
+    auto expCtx = make_intrusive<ExpressionContext>(_opCtx.get(),
+                                                    std::move(collator),
+                                                    deleteRequest.getNamespace(),
+                                                    deleteRequest.getLegacyRuntimeConstants(),
+                                                    deleteRequest.getLet());
+
+    processDelete(_queryImpl.get(), expCtx, deleteRequest);
 }
 
 void FleCrudTest::doFindAndModify(write_ops::FindAndModifyCommandRequest& request) {

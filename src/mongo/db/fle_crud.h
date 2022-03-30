@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "boost/smart_ptr/intrusive_ptr.hpp"
 #include <cstdint>
 
 #include "mongo/bson/bsonobj.h"
@@ -257,6 +258,7 @@ StatusWith<write_ops::InsertCommandReply> processInsert(
  * Used by unit tests.
  */
 write_ops::DeleteCommandReply processDelete(FLEQueryInterface* queryImpl,
+                                            boost::intrusive_ptr<ExpressionContext> expCtx,
                                             const write_ops::DeleteCommandRequest& deleteRequest);
 
 /**
@@ -265,6 +267,7 @@ write_ops::DeleteCommandReply processDelete(FLEQueryInterface* queryImpl,
  * Used by unit tests.
  */
 write_ops::UpdateCommandReply processUpdate(FLEQueryInterface* queryImpl,
+                                            boost::intrusive_ptr<ExpressionContext> expCtx,
                                             const write_ops::UpdateCommandRequest& updateRequest);
 
 /**
