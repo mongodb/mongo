@@ -783,10 +783,6 @@ selector:
   - jstests/core/exists9.js
   - jstests/core/exists8.js
 
-  # Timeseries collection expireAfterSeconds option requires the TTL Monitor,
-  # which is disabled in this test configuration.
-  - jstests/core/timeseries/timeseries_expire.js
-
   # TODO SERVER-54042 Time-series collection queries
   - jstests/core/timeseries/timeseries_bucket_limit_count.js
   - jstests/core/timeseries/timeseries_min_max.js

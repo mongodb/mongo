@@ -10,20 +10,25 @@
 (function() {
 "use strict";
 
+load('jstests/libs/fixture_helpers.js');  // For 'FixtureHelpers'
 load("jstests/core/timeseries/libs/timeseries.js");
 
+const conn = MongoRunner.runMongod({setParameter: 'ttlMonitorSleepSecs=1'});
+const testDB = conn.getDB(jsTestName());
+assert.commandWorked(testDB.dropDatabase());
+
 TimeseriesTest.run((insert) => {
-    const coll = db.timeseries_expire;
-    const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
+    const coll = testDB.timeseries_expire;
+    const bucketsColl = testDB.getCollection('system.buckets.' + coll.getName());
 
     coll.drop();
 
     const timeFieldName = 'time';
-    const expireAfterSeconds = NumberLong(5);
-    assert.commandWorked(db.createCollection(
+    const expireAfterSeconds = NumberLong(1);
+    assert.commandWorked(testDB.createCollection(
         coll.getName(),
         {timeseries: {timeField: timeFieldName}, expireAfterSeconds: expireAfterSeconds}));
-    assert.contains(bucketsColl.getName(), db.getCollectionNames());
+    assert.contains(bucketsColl.getName(), testDB.getCollectionNames());
 
     // Inserts a measurement with a time in the past to ensure the measurement will be removed
     // immediately.
@@ -46,4 +51,6 @@ TimeseriesTest.run((insert) => {
     const bucketDocs = bucketsColl.find().sort({'control.min._id': 1}).toArray();
     assert.eq(0, bucketDocs.length, bucketDocs);
 });
+
+MongoRunner.stopMongod(conn);
 })();
