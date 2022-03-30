@@ -256,8 +256,12 @@ std::unique_ptr<MatchExpression> buildTransactionFilter(
             // Match relevant command events on the monitored namespaces.
             orBuilder.append(BSON(
                 "o.applyOps" << BSON(
-                    "$elemMatch" << BSON("ns" << BSONRegEx(cmdNsRegex)
-                                              << OR(BSON("o.create" << BSONRegEx(collRegex)))))));
+                    "$elemMatch" << BSON(
+                        "ns" << BSONRegEx(cmdNsRegex)
+                             << OR(BSON("o.create" << BSONRegEx(collRegex)),
+                                   // We don't need to consider 'o.commitIndexBuild' here because
+                                   // creating an index on a non-empty collection is not allowed.
+                                   BSON("o.createIndexes" << BSONRegEx(collRegex)))))));
 
             // The default repl::OpTime is the value used to indicate a null "prevOpTime" link.
             orBuilder.append(BSON(repl::OplogEntry::kPrevWriteOpTimeInTransactionFieldName
