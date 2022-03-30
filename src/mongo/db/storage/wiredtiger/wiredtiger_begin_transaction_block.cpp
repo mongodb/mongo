@@ -91,9 +91,8 @@ WiredTigerBeginTxnBlock::~WiredTigerBeginTxnBlock() {
 
 Status WiredTigerBeginTxnBlock::setReadSnapshot(Timestamp readTimestamp) {
     invariant(_rollback);
-    std::string readTSConfigString = "read_timestamp={:x}"_format(readTimestamp.asULL());
-
-    return wtRCToStatus(_session->timestamp_transaction(_session, readTSConfigString.c_str()));
+    return wtRCToStatus(
+        _session->timestamp_transaction_uint(_session, WT_TS_TXN_TYPE_READ, readTimestamp.asULL()));
 }
 
 void WiredTigerBeginTxnBlock::done() {
