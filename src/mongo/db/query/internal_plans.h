@@ -31,6 +31,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/exec/batched_delete_stage.h"
 #include "mongo/db/exec/delete_stage.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/plan_executor.h"
@@ -89,7 +90,7 @@ public:
         PlanYieldPolicy::YieldPolicy yieldPolicy);
 
     /**
-     * Returns a FETCH => DELETE plan.
+     * Returns a FETCH => DELETE plan, or a FETCH => BATCHED_DELETE plan if 'batchParams' is set.
      */
     static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> deleteWithCollectionScan(
         OperationContext* opCtx,
@@ -98,7 +99,8 @@ public:
         PlanYieldPolicy::YieldPolicy yieldPolicy,
         Direction direction = FORWARD,
         boost::optional<RecordIdBound> minRecord = boost::none,
-        boost::optional<RecordIdBound> maxRecord = boost::none);
+        boost::optional<RecordIdBound> maxRecord = boost::none,
+        boost::optional<std::unique_ptr<BatchedDeleteStageBatchParams>> batchParams = boost::none);
 
     /**
      * Returns an index scan.  Caller owns returned pointer.

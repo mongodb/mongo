@@ -207,7 +207,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     Direction direction,
     boost::optional<RecordIdBound> minRecord,
-    boost::optional<RecordIdBound> maxRecord) {
+    boost::optional<RecordIdBound> maxRecord,
+    boost::optional<std::unique_ptr<BatchedDeleteStageBatchParams>> batchParams) {
     const auto& collection = *coll;
     invariant(collection);
     auto ws = std::make_unique<WorkingSet>();
@@ -221,8 +222,17 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
     auto root = _collectionScan(
         expCtx, ws.get(), &collection, collScanParams, true /* relaxCappedConstraints */);
 
-    root = std::make_unique<DeleteStage>(
-        expCtx.get(), std::move(params), ws.get(), collection, root.release());
+    if (batchParams) {
+        root = std::make_unique<BatchedDeleteStage>(expCtx.get(),
+                                                    std::move(params),
+                                                    std::move(*batchParams),
+                                                    ws.get(),
+                                                    collection,
+                                                    root.release());
+    } else {
+        root = std::make_unique<DeleteStage>(
+            expCtx.get(), std::move(params), ws.get(), collection, root.release());
+    }
 
     auto executor = plan_executor_factory::make(expCtx,
                                                 std::move(ws),

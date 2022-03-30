@@ -46,6 +46,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
@@ -344,6 +345,9 @@ void deleteExpiredChangeStreamPreImages(Client* client, Date_t currentTimeForTim
         repl::StorageInterface::get(client->getServiceContext())
             ->getEarliestOplogTimestamp(opCtx.get());
 
+    const bool isBatchedRemoval = gBatchedExpiredChangeStreamPreImageRemoval.load();
+    const bool isMultiDeletesFeatureFlagEnabled =
+        feature_flags::gBatchMultiDeletes.isEnabled(serverGlobalParams.featureCompatibility);
     size_t numberOfRemovals = 0;
 
     ChangeStreamExpiredPreImageIterator expiredPreImages(
@@ -354,23 +358,30 @@ void deleteExpiredChangeStreamPreImages(Client* client, Date_t currentTimeForTim
             opCtx.get(), currentTimeForTimeBasedExpiration));
 
     for (const auto& collectionRange : expiredPreImages) {
-        writeConflictRetry(opCtx.get(),
-                           "ChangeStreamExpiredPreImagesRemover",
-                           NamespaceString::kChangeStreamPreImagesNamespace.ns(),
-                           [&] {
-                               auto params = std::make_unique<DeleteStageParams>();
-                               params->isMulti = true;
+        writeConflictRetry(
+            opCtx.get(),
+            "ChangeStreamExpiredPreImagesRemover",
+            NamespaceString::kChangeStreamPreImagesNamespace.ns(),
+            [&] {
+                auto params = std::make_unique<DeleteStageParams>();
+                params->isMulti = true;
 
-                               const auto exec = InternalPlanner::deleteWithCollectionScan(
-                                   opCtx.get(),
-                                   &preImagesColl,
-                                   std::move(params),
-                                   PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                                   InternalPlanner::Direction::FORWARD,
-                                   RecordIdBound(collectionRange.first),
-                                   RecordIdBound(collectionRange.second));
-                               numberOfRemovals += exec->executeDelete();
-                           });
+                boost::optional<std::unique_ptr<BatchedDeleteStageBatchParams>> batchParams;
+                if (isMultiDeletesFeatureFlagEnabled && isBatchedRemoval) {
+                    batchParams = std::make_unique<BatchedDeleteStageBatchParams>();
+                }
+
+                auto exec = InternalPlanner::deleteWithCollectionScan(
+                    opCtx.get(),
+                    &preImagesColl,
+                    std::move(params),
+                    PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                    InternalPlanner::Direction::FORWARD,
+                    RecordIdBound(collectionRange.first),
+                    RecordIdBound(collectionRange.second),
+                    std::move(batchParams));
+                numberOfRemovals += exec->executeDelete();
+            });
     }
 
     LOGV2(5869104,
