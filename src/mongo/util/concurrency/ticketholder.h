@@ -127,6 +127,11 @@ private:
 #endif
 };
 
+/**
+ * A ticketholder implementation that uses a queue for pending operations.
+ * Any change to the implementation should be paired with a change to the _ticketholder.tla_ file in
+ * order to formally verify that the changes won't lead to a deadlock.
+ */
 class FifoTicketHolder final : public TicketHolder {
 public:
     explicit FifoTicketHolder(int num);
