@@ -80,13 +80,6 @@ protected:
                                                          {std::move(chunk)})),
                         boost::none);
 
-        if (!OperationShardingState::isOperationVersioned(opCtx)) {
-            OperationShardingState::setShardRole(opCtx,
-                                                 kTestNss,
-                                                 cm.getVersion(ShardId("0")) /* shardVersion */,
-                                                 boost::none /* databaseVersion */);
-        }
-
         return CollectionMetadata(std::move(cm), ShardId("0"));
     }
 };
@@ -96,7 +89,9 @@ TEST_F(CollectionShardingRuntimeTest,
     OperationContext* opCtx = operationContext();
     CollectionShardingRuntime csr(getServiceContext(), kTestNss, executor());
     ASSERT_FALSE(csr.getCollectionDescription(opCtx).isSharded());
-    makeShardedMetadata(opCtx);
+    auto metadata = makeShardedMetadata(opCtx);
+    ScopedSetShardRole scopedSetShardRole{
+        opCtx, kTestNss, metadata.getShardVersion(), boost::none /* databaseVersion */};
     ASSERT_THROWS_CODE(csr.getCollectionDescription(opCtx), DBException, ErrorCodes::StaleConfig);
 }
 
@@ -112,7 +107,10 @@ TEST_F(CollectionShardingRuntimeTest,
        GetCollectionDescriptionReturnsShardedAfterSetFilteringMetadataIsCalledWithShardedMetadata) {
     CollectionShardingRuntime csr(getServiceContext(), kTestNss, executor());
     OperationContext* opCtx = operationContext();
-    csr.setFilteringMetadata(opCtx, makeShardedMetadata(opCtx));
+    auto metadata = makeShardedMetadata(opCtx);
+    csr.setFilteringMetadata(opCtx, metadata);
+    ScopedSetShardRole scopedSetShardRole{
+        opCtx, kTestNss, metadata.getShardVersion(), boost::none /* databaseVersion */};
     ASSERT_TRUE(csr.getCollectionDescription(opCtx).isSharded());
 }
 
@@ -175,6 +173,8 @@ TEST_F(CollectionShardingRuntimeTest,
     OperationContext* opCtx = operationContext();
     auto metadata = makeShardedMetadata(opCtx);
     csr.setFilteringMetadata(opCtx, metadata);
+    ScopedSetShardRole scopedSetShardRole{
+        opCtx, kTestNss, metadata.getShardVersion(), boost::none /* databaseVersion */};
     ASSERT_EQ(csr.getNumMetadataManagerChanges_forTest(), 1);
 
     // Set it again with a different metadata object (UUID is generated randomly in

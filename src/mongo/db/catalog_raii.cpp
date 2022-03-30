@@ -283,6 +283,8 @@ AutoGetCollection::AutoGetCollection(
         //
         // Note: sharding versioning for an operation has no concept of multiple collections.
         auto css = CollectionShardingState::getSharedForLockFreeReads(opCtx, _resolvedNss);
+        css->checkShardVersionOrThrow(opCtx);
+
         auto collDesc = css->getCollectionDescription(opCtx);
         if (collDesc.isSharded()) {
             _coll.setShardKeyPattern(collDesc.getKeyPattern());

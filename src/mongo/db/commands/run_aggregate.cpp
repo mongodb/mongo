@@ -850,20 +850,6 @@ Status runAggregate(OperationContext* opCtx,
                                                   ChunkVersion::UNSHARDED() /* shardVersion */,
                                                   boost::none /* databaseVersion */);
 
-            bool collectionIsSharded = [opCtx, &resolvedView]() {
-                AutoGetCollection autoColl(opCtx,
-                                           resolvedView.getNamespace(),
-                                           MODE_IS,
-                                           AutoGetCollectionViewMode::kViewsPermitted);
-                return CollectionShardingState::get(opCtx, resolvedView.getNamespace())
-                    ->getCollectionDescription(opCtx)
-                    .isSharded();
-            }();
-
-            uassert(std::move(resolvedView),
-                    "Resolved views on sharded collections must be executed by mongos",
-                    !collectionIsSharded);
-
             uassert(std::move(resolvedView),
                     "Explain of a resolved view must be executed by mongos",
                     !ShardingState::get(opCtx)->enabled() || !request.getExplain());
@@ -872,7 +858,23 @@ Status runAggregate(OperationContext* opCtx,
             auto newRequest = resolvedView.asExpandedViewAggregation(request);
             auto newCmd = aggregation_request_helper::serializeToCommandObj(newRequest);
 
-            auto status = runAggregate(opCtx, origNss, newRequest, newCmd, privileges, result);
+            auto status{Status::OK()};
+            try {
+                status = runAggregate(opCtx, origNss, newRequest, newCmd, privileges, result);
+            } catch (const ExceptionForCat<ErrorCategory::StaleShardVersionError>& ex) {
+                // Since we expect the view to be UNSHARDED, if we reached to this point there are
+                // two possibilities:
+                //   1. The shard doesn't know what its shard version/state is and needs to recover
+                //      it (in which case we throw so that the shard can run recovery)
+                //   2. The collection references by the view is actually SHARDED, in which case the
+                //      router must execute it
+                if (const auto staleInfo{ex.extraInfo<StaleConfigInfo>()}) {
+                    uassert(std::move(resolvedView),
+                            "Resolved views on sharded collections must be executed by mongos",
+                            !staleInfo->getVersionWanted());
+                }
+                throw;
+            }
 
             {
                 // Set the namespace of the curop back to the view namespace so ctx records
