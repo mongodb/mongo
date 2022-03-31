@@ -4,6 +4,7 @@
  *
  * @tags: [
  *   requires_replication,
+ *   future_git_tag_incompatible,
  * ]
  */
 (function() {
