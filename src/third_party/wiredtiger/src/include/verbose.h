@@ -106,6 +106,9 @@ struct __wt_verbose_multi_category {
 #define WT_DECL_VERBOSE_MULTI_CATEGORY(items) \
     ((WT_VERBOSE_MULTI_CATEGORY){.categories = (items), .cnt = WT_ELEMENTS(items)})
 
+/* Set the verbosity level for a given category. */
+#define WT_SET_VERBOSE_LEVEL(session, category, level) S2C(session)->verbose[category] = level;
+
 /* Check if a given verbosity level satisfies the verbosity level of a category. */
 #define WT_VERBOSE_LEVEL_ISSET(session, category, level) (level <= S2C(session)->verbose[category])
 
