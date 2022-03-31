@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-from helper_tiered import generate_s3_prefix, get_auth_token, get_bucket1_name
+from helper_tiered import get_auth_token, get_bucket1_name
 from wtscenario import make_scenarios
 import os, wiredtiger, wttest
 StorageSource = wiredtiger.StorageSource  # easy access to constants
@@ -52,6 +52,7 @@ class test_tiered07(wttest.WiredTigerTestCase):
     uri = "table:abc"
     uri2 = "table:ab"
     uri3 = "table:abcd"
+    uri4 = "table:abcde"
     localuri = "table:local"
     newuri = "table:tier_new"
 
@@ -130,6 +131,25 @@ class test_tiered07(wttest.WiredTigerTestCase):
         self.session.drop(self.localuri)
         self.session.drop(self.uri)
 
+        # By default, the remove_files configuration for drop is true. This means that the
+        # drop operation for tiered tables should both remove the files from the metadata
+        # file and remove the corresponding local object files in the directory. Currently the
+        # below code is commented as the files are not removed from the directory. FIXME: WT-9003
+        # self.assertFalse(os.path.isfile("abc-0000000001.wtobj"))
+        # self.assertFalse(os.path.isfile("abc-0000000002.wtobj"))
+
+        # Dropping a table using the force setting should succeed even if the table does not exist.
+        self.session.drop(self.localuri, 'force=true')
+        self.session.drop(self.uri, 'force=true')
+
+        # Dropping a table should not succeed if the table does not exist.
+        # Test dropping a table that was previously dropped.
+        self.assertRaises(wiredtiger.WiredTigerError,
+            lambda: self.session.drop(self.localuri, None))
+        # Test dropping a table that does not exist.
+        self.assertRaises(wiredtiger.WiredTigerError,
+            lambda: self.session.drop("table:random_non_existent", None))
+
         # Create new table with same name. This should error.
         msg = "/already exists/"
         self.pr('check cannot create with same name')
@@ -148,6 +168,11 @@ class test_tiered07(wttest.WiredTigerTestCase):
         # Create new table with new name.
         self.pr('create new table')
         self.session.create(self.newuri, 'key_format=S')
+
+        # Test the drop operation without removing associated files.
+        self.session.create(self.uri4, 'key_format=S,value_format=S')
+        self.session.drop(self.uri4, 'remove_files=false')
+        self.assertTrue(os.path.isfile("abcde-0000000001.wtobj"))
 
 if __name__ == '__main__':
     wttest.run()
