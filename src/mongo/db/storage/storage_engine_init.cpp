@@ -169,19 +169,26 @@ StorageEngine::LastShutdownState initializeStorageEngine(OperationContext* opCtx
         // TODO SERVER-64467: Remove the globalServiceContext for TicketHolders
         auto serviceContext = getGlobalServiceContext();
         auto& ticketHolders = ticketHoldersDecoration(serviceContext);
-        switch (gTicketQueueingPolicy) {
-            case QueueingPolicyEnum::Semaphore:
-                LOGV2_DEBUG(6382201, 1, "Using Semaphore-based ticketing scheduler");
-                ticketHolders.setGlobalThrottling(
-                    std::make_unique<SemaphoreTicketHolder>(readTransactions),
-                    std::make_unique<SemaphoreTicketHolder>(writeTransactions));
-                break;
-            case QueueingPolicyEnum::FifoQueue:
-                LOGV2_DEBUG(6382200, 1, "Using FIFO queue-based ticketing scheduler");
-                ticketHolders.setGlobalThrottling(
-                    std::make_unique<FifoTicketHolder>(readTransactions),
-                    std::make_unique<FifoTicketHolder>(writeTransactions));
-                break;
+        if (feature_flags::gFeatureFlagExecutionControl.isEnabledAndIgnoreFCV()) {
+            LOGV2_DEBUG(5190400, 1, "Enabling new ticketing policies");
+            switch (gTicketQueueingPolicy) {
+                case QueueingPolicyEnum::Semaphore:
+                    LOGV2_DEBUG(6382201, 1, "Using Semaphore-based ticketing scheduler");
+                    ticketHolders.setGlobalThrottling(
+                        std::make_unique<SemaphoreTicketHolder>(readTransactions),
+                        std::make_unique<SemaphoreTicketHolder>(writeTransactions));
+                    break;
+                case QueueingPolicyEnum::FifoQueue:
+                    LOGV2_DEBUG(6382200, 1, "Using FIFO queue-based ticketing scheduler");
+                    ticketHolders.setGlobalThrottling(
+                        std::make_unique<FifoTicketHolder>(readTransactions),
+                        std::make_unique<FifoTicketHolder>(writeTransactions));
+                    break;
+            }
+        } else {
+            ticketHolders.setGlobalThrottling(
+                std::make_unique<SemaphoreTicketHolder>(readTransactions),
+                std::make_unique<SemaphoreTicketHolder>(writeTransactions));
         }
     }
 

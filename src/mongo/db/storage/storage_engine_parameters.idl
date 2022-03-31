@@ -67,6 +67,12 @@ server_parameters:
     validator:
       gt: 0
 
+feature_flags:
+  featureFlagEnableExecutionControl:
+    description: Enables the new execution control queueing policy
+    cpp_varname: feature_flags::gFeatureFlagExecutionControl
+    default: false
+
 enums:
   QueueingPolicy:
     description: Queueing policy to use for obtaining tickets

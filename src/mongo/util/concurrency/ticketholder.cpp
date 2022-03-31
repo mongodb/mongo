@@ -286,7 +286,7 @@ void FifoTicketHolder::release() {
     // a waiting operation to avoid leaving an operation waiting indefinitely.
     while (true) {
         if (!_queue.empty()) {
-            auto& elem = _queue.front();
+            auto elem = _queue.front();
             _enqueuedElements.subtractAndFetch(1);
             {
                 stdx::lock_guard elemLk(elem->modificationMutex);

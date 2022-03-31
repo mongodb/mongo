@@ -33,7 +33,7 @@
 
 namespace mongo {
 
-QueueingPolicyEnum gTicketQueueingPolicy{QueueingPolicyEnum::Semaphore};
+QueueingPolicyEnum gTicketQueueingPolicy{QueueingPolicyEnum::FifoQueue};
 
 void TicketQueueingPolicy::append(OperationContext*,
                                   BSONObjBuilder& builder,

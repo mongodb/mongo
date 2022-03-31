@@ -157,7 +157,7 @@ private:
     void _release(WithLock);
 
     Mutex _resizeMutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "FifoTicketHolder::_resizeMutex");
+        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(2), "FifoTicketHolder::_resizeMutex");
     AtomicWord<int> _capacity;
     enum class WaitingState { Waiting, Cancelled, Assigned };
     struct WaitingElement {
@@ -170,7 +170,7 @@ private:
     // _queueMutex protects all modifications made to either the _queue, or the statistics of the
     // queue.
     Mutex _queueMutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "FifoTicketHolder::_queueMutex");
+        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(1), "FifoTicketHolder::_queueMutex");
     AtomicWord<int> _enqueuedElements;
     AtomicWord<int> _ticketsAvailable;
 };
