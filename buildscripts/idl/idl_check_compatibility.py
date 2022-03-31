@@ -177,6 +177,13 @@ IGNORE_UNSTABLE_LIST: List[str] = [
     # can return one or more cursors. Multiple cursors are covered under the 'cursors' field.
     'find-reply-cursor',
     'aggregate-reply-cursor',
+    # The 'recordPreImages' field is only used by Realm and is not documented to users.
+    'collMod-param-recordPreImages',
+    # The 'ignoreUnknownIndexOptions' field is for internal use only and is not documented to users.
+    'createIndexes-param-ignoreUnknownIndexOptions',
+    # The 'runtimeConstants' field is a legacy field for internal use only and is not documented to
+    # users.
+    'delete-param-runtimeConstants',
 ]
 
 SKIPPED_FILES = [
@@ -922,7 +929,8 @@ def check_command_param_or_type_struct_field(
         is_command_parameter: bool):
     """Check compatibility between the old and new command parameter or command type struct field."""
     # pylint: disable=too-many-arguments
-    if not old_field.unstable and new_field.unstable:
+    field_name: str = cmd_name + "-param-" + new_field.name
+    if not old_field.unstable and new_field.unstable and field_name not in IGNORE_UNSTABLE_LIST:
         ctxt.add_new_param_or_command_type_field_unstable_error(
             cmd_name, old_field.name, old_idl_file_path, type_name, is_command_parameter)
     # If old field is unstable and new field is stable, the new field should either be optional or

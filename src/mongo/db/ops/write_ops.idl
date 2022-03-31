@@ -415,7 +415,7 @@ commands:
                 cpp_name: legacyRuntimeConstants
                 type: LegacyRuntimeConstants
                 optional: true
-                unstable: false
+                unstable: true
 
     findAndModify:
         description: "Parser for the 'findAndModify' command."

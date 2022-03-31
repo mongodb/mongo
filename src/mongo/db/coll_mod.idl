@@ -157,7 +157,7 @@ structs:
                               document in the oplog"
                 optional: true
                 type: safeBool
-                unstable: false
+                unstable: true
             changeStreamPreAndPostImages:
                 description: "The options for point-in-time pre- and post-images in change streams opened on this collection."
                 type: ChangeStreamPreAndPostImagesOptions

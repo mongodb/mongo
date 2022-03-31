@@ -213,7 +213,7 @@ commands:
                 description: 'Ignore unknown options in index spec'
                 type: safeBool
                 default: false
-                unstable: false
+                unstable: true
             commitQuorum:
                 description: 'Commit Quorum options'
                 type: CommitQuorum
