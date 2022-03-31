@@ -2,6 +2,7 @@
  * Tests that writes are disallowed while in kCommitted.
  *
  * @tags: [
+ *   multiversion_incompatible,
  * ]
  */
 (function() {
