@@ -43,6 +43,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index_builds_coordinator.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/server_options.h"
@@ -51,6 +52,7 @@
 #include "mongo/util/fail_point.h"
 
 namespace mongo {
+namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangDropCollectionBeforeLockAcquisition);
 MONGO_FAIL_POINT_DEFINE(hangDuringDropCollection);
@@ -67,6 +69,44 @@ Status _checkNssAndReplState(OperationContext* opCtx, const CollectionPtr& coll)
     }
 
     return Status::OK();
+}
+
+void checkForCollection(std::shared_ptr<const CollectionCatalog> collectionCatalog,
+                        OperationContext* opCtx,
+                        const NamespaceString& baseNss,
+                        boost::optional<StringData> collName,
+                        std::vector<std::string>* pLeaked) {
+
+    if (collName.has_value()) {
+        auto nss = NamespaceString(baseNss.db(), collName.value());
+
+        if (collectionCatalog->lookupCollectionByNamespace(opCtx, nss)) {
+            pLeaked->push_back(nss.toString());
+        }
+    }
+}
+
+void warnEncryptedCollectionsIfNeeded(OperationContext* opCtx, const CollectionPtr& coll) {
+    if (!coll->getCollectionOptions().encryptedFieldConfig.has_value()) {
+        return;
+    }
+
+    auto catalog = CollectionCatalog::get(opCtx);
+    auto efc = coll->getCollectionOptions().encryptedFieldConfig.get();
+
+    std::vector<std::string> leaked;
+
+    checkForCollection(catalog, opCtx, coll->ns(), efc.getEscCollection(), &leaked);
+    checkForCollection(catalog, opCtx, coll->ns(), efc.getEccCollection(), &leaked);
+    checkForCollection(catalog, opCtx, coll->ns(), efc.getEcocCollection(), &leaked);
+
+    if (!leaked.empty()) {
+        LOGV2_WARNING(
+            6491401,
+            "An encrypted collection was dropped before one or more of its state collections",
+            "name"_attr = coll->ns(),
+            "stateCollections"_attr = leaked);
+    }
 }
 
 Status _dropView(OperationContext* opCtx,
@@ -317,7 +357,11 @@ Status _dropCollection(OperationContext* opCtx,
                 return Status(ErrorCodes::NamespaceNotFound, "ns not found");
             }
 
-            if (CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, collectionName)) {
+            auto collectionPtr =
+                CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, collectionName);
+            if (collectionPtr) {
+                warnEncryptedCollectionsIfNeeded(opCtx, collectionPtr);
+
                 return _abortIndexBuildsAndDrop(
                     opCtx,
                     std::move(autoDb),
@@ -421,6 +465,7 @@ Status _dropCollection(OperationContext* opCtx,
         return Status(ErrorCodes::NamespaceNotFound, "ns not found");
     }
 }
+}  // namespace
 
 Status dropCollection(OperationContext* opCtx,
                       const NamespaceString& nss,
