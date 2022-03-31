@@ -22,7 +22,7 @@ const viewNss = `${dbName}.${collName}`;
 const bucketNss = `${dbName}.system.buckets.${collName}`;
 const controlTimeField = `control.min.${timeField}`;
 
-function runBasicTest(primaryDispatching) {
+function runBasicTest(failPoint) {
     const st = new ShardingTest({shards: 2, rs: {nodes: 2}});
     const mongos = st.s0;
     const db = mongos.getDB(dbName);
@@ -39,10 +39,10 @@ function runBasicTest(primaryDispatching) {
 
     // Setting collModPrimaryDispatching failpoint to make sure the fallback logic of dispatching
     // collMod command at primary shard works.
-    if (primaryDispatching) {
+    if (failPoint) {
         const primary = st.getPrimaryShard(dbName);
-        assert.commandWorked(primary.adminCommand(
-            {configureFailPoint: 'collModPrimaryDispatching', mode: 'alwaysOn'}));
+        assert.commandWorked(
+            primary.adminCommand({configureFailPoint: failPoint, mode: 'alwaysOn'}));
     }
 
     // Updates for timeField and metaField are disabled.
@@ -74,7 +74,7 @@ function runBasicTest(primaryDispatching) {
     assert.commandWorked(
         db.runCommand({collMod: collName, index: {name: indexName, hidden: false}}));
 
-    if (primaryDispatching) {
+    if (failPoint) {
         // Granularity update disabled for sharded time-series collection, when we're using primary
         // dispatching logic.
         assert.commandFailedWithCode(
@@ -175,8 +175,9 @@ function runReadAfterWriteTest() {
     st.stop();
 }
 
-runBasicTest(false);
-runBasicTest(true);
+runBasicTest('collModPrimaryDispatching');
+runBasicTest('collModCoordinatorPre60Compatible');
+runBasicTest();
 
 runReadAfterWriteTest();
 })();

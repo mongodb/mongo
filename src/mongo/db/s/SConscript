@@ -317,6 +317,7 @@ env.Library(
         'cluster_write_cmd_d.cpp',
         'collmod_coordinator.cpp',
         'collmod_coordinator_document.idl',
+        'collmod_coordinator_pre60_compatible.cpp',
         'config/set_cluster_parameter_coordinator.cpp',
         'config/set_cluster_parameter_coordinator_document.idl',
         'config/set_user_write_block_mode_coordinator.cpp',

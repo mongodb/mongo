@@ -403,7 +403,7 @@ public:
 
                 // TODO (SERVER-62325): Remove collMod draining mechanism after 6.0 branching.
                 if (actualVersion > requestedVersion &&
-                    requestedVersion < multiversion::FeatureCompatibilityVersion::kVersion_5_3) {
+                    requestedVersion < multiversion::FeatureCompatibilityVersion::kVersion_6_0) {
                     // No more collMod coordinators will start because we have already switched
                     // the FCV value to kDowngrading. Wait for the ongoing collMod coordinators to
                     // finish.

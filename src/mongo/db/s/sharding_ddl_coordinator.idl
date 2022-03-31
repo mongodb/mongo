@@ -53,7 +53,9 @@ enums:
             kRefineCollectionShardKey: "refineCollectionShardKey"
             kRefineCollectionShardKeyNoResilient: "refineCollectionShardKeyNoResilient"
             kSetAllowMigrations: "setAllowMigrations"
-            kCollMod: "collMod"
+            # TODO (SERVER-62325): Remove pre60 compatible collMod coordinator after 6.0 branching.
+            kCollModPre60Compatible: "collMod"
+            kCollMod: "collMod_V2"
             kReshardCollection: "reshardCollection"
             kReshardCollectionNoResilient: "reshardCollectionNoResilient"
 

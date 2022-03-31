@@ -37,6 +37,7 @@
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/s/collmod_coordinator.h"
+#include "mongo/db/s/collmod_coordinator_pre60_compatible.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_util.h"
 #include "mongo/db/timeseries/catalog_helper.h"
@@ -51,6 +52,7 @@ namespace mongo {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(collModPrimaryDispatching);
+MONGO_FAIL_POINT_DEFINE(collModCoordinatorPre60Compatible);
 
 class ShardsvrCollModCommand final : public BasicCommandWithRequestParser<ShardsvrCollModCommand> {
 public:
@@ -109,10 +111,18 @@ public:
 
         boost::optional<FixedFCVRegion> fcvRegion;
         fcvRegion.emplace(opCtx);
-        bool useDDLCoordinator = fcvRegion.get()->isGreaterThanOrEqualTo(
-            multiversion::FeatureCompatibilityVersion::kVersion_5_3);
-        if (MONGO_unlikely(collModPrimaryDispatching.shouldFail()) || !useDDLCoordinator) {
+
+        if (MONGO_unlikely(collModPrimaryDispatching.shouldFail())) {
             return runWithDispatchingCommands(opCtx, result, cmd);
+        } else if (MONGO_unlikely(collModCoordinatorPre60Compatible.shouldFail())) {
+            return runWithDDLCoordinatorPre60Compatible(opCtx, result, cmd, fcvRegion);
+        }
+
+        if (fcvRegion.get()->isLessThan(multiversion::FeatureCompatibilityVersion::kVersion_5_3)) {
+            return runWithDispatchingCommands(opCtx, result, cmd);
+        } else if (fcvRegion.get()->isLessThan(
+                       multiversion::FeatureCompatibilityVersion::kVersion_6_0)) {
+            return runWithDDLCoordinatorPre60Compatible(opCtx, result, cmd, fcvRegion);
         } else {
             return runWithDDLCoordinator(opCtx, result, cmd, fcvRegion);
         }
@@ -128,6 +138,22 @@ public:
             {{cmd.getNamespace(), DDLCoordinatorTypeEnum::kCollMod}});
         auto service = ShardingDDLCoordinatorService::getService(opCtx);
         auto collModCoordinator = checked_pointer_cast<CollModCoordinator>(
+            service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));
+        fcvRegion = boost::none;
+        result.appendElements(collModCoordinator->getResult(opCtx));
+        return true;
+    }
+
+    bool runWithDDLCoordinatorPre60Compatible(OperationContext* opCtx,
+                                              BSONObjBuilder& result,
+                                              const ShardsvrCollMod& cmd,
+                                              boost::optional<FixedFCVRegion>& fcvRegion) {
+        auto coordinatorDoc = CollModCoordinatorDocument();
+        coordinatorDoc.setCollModRequest(cmd.getCollModRequest());
+        coordinatorDoc.setShardingDDLCoordinatorMetadata(
+            {{cmd.getNamespace(), DDLCoordinatorTypeEnum::kCollModPre60Compatible}});
+        auto service = ShardingDDLCoordinatorService::getService(opCtx);
+        auto collModCoordinator = checked_pointer_cast<CollModCoordinatorPre60Compatible>(
             service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));
         fcvRegion = boost::none;
         result.appendElements(collModCoordinator->getResult(opCtx));
