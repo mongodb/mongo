@@ -1083,7 +1083,10 @@ protected:
     std::unique_ptr<SlotBasedPrepareExecutionResult> buildCachedPlan(
         const sbe::PlanCacheKey& planCacheKey) final {
         if (shouldCacheQuery(*_cq)) {
-            if (!feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
+            // TODO SERVER-61507: remove _cq->pipeline().empty() check when $group pushdown is
+            // integrated with SBE plan cache.
+            if (!feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV() ||
+                !_cq->pipeline().empty()) {
                 // If the feature flag is off, we first try to build an "id hack" plan because the
                 // id hack plans are not cached in the classic cache. We then fall back to use the
                 // classic plan cache.

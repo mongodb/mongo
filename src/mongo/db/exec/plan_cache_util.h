@@ -107,13 +107,6 @@ void updatePlanCache(
     invariant(winnerIdx >= 0 && winnerIdx < candidates.size());
     auto& winningPlan = candidates[winnerIdx];
 
-    // TODO SERVER-61507: Integration between lowering parts of aggregation pipeline into the find
-    // subsystem and the new SBE cache isn't implemented yet.
-    if (!query.pipeline().empty() &&
-        feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
-        return;
-    }
-
     // Even if the query is of a cacheable shape, the caller might have indicated that we shouldn't
     // write to the plan cache.
     //
@@ -200,7 +193,10 @@ void updatePlanCache(
 
         if (winningPlan.solution->cacheData != nullptr) {
             if constexpr (std::is_same_v<PlanStageType, std::unique_ptr<sbe::PlanStage>>) {
-                if (feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
+                // TODO SERVER-61507: Integration between lowering parts of aggregation pipeline
+                // into the find subsystem and the new SBE cache isn't implemented yet.
+                if (feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV() &&
+                    query.pipeline().empty()) {
                     tassert(6142201,
                             "The winning CandidatePlan should contain the original plan",
                             winningPlan.clonedPlan);
@@ -222,8 +218,9 @@ void updatePlanCache(
                         &callbacks,
                         boost::none /* worksGrowthCoefficient */));
                 } else {
-                    // Fall back to use the classic plan cache. Remove this branch after
-                    // "gFeatureFlagSbePlanCache" is removed.
+                    // TODO(SERVER-61507, SERVER-64882): Fall back to use the classic plan cache.
+                    // Remove this branch after "gFeatureFlagSbePlanCache" is removed and lowering
+                    // parts of pipeline is integrated with SBE cache.
                     cacheClassicPlan();
                 }
             } else {
