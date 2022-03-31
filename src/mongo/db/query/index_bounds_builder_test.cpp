@@ -1124,7 +1124,8 @@ TEST_F(IndexBoundsBuilderTest, UnionDupEq) {
     toUnion.push_back(fromjson("{a: 1}"));
     OrderedIntervalList oil;
     IndexBoundsBuilder::BoundsTightness tightness;
-    testTranslateAndUnion(toUnion, &oil, &tightness);
+    // Disable normalization, otherwise it would be normalized into {$in: [1, 5]} expression.
+    testTranslateAndUnion(toUnion, &oil, &tightness, false);
     ASSERT_EQUALS(oil.name, "a");
     ASSERT_EQUALS(oil.intervals.size(), 2U);
     ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
@@ -1152,15 +1153,42 @@ TEST_F(IndexBoundsBuilderTest, UnionGtLt) {
 
 TEST_F(IndexBoundsBuilderTest, UnionTwoEmptyRanges) {
     auto testIndex = buildSimpleIndexEntry();
-    std::vector<std::pair<BSONObj, bool>> constraints;
-    constraints.push_back(std::make_pair(fromjson("{a: {$gt: 1}}"), true));
-    constraints.push_back(std::make_pair(fromjson("{a: {$lte: 0}}"), true));
-    constraints.push_back(std::make_pair(fromjson("{a: {$in:[]}}"), false));
+    std::vector<BSONObj> constraints;
+    constraints.push_back(fromjson("{a: {$gt: 1}}"));
+    constraints.push_back(fromjson("{a: {$lte: 0}}"));
+    constraints.push_back(fromjson("{a: {$in:[]}}"));
+    auto intersectObj = BSON("$and" << BSON_ARRAY(constraints[0] << constraints[1]));
+    auto orObj = BSON("$or" << BSON_ARRAY(intersectObj << constraints[2]));
+    auto [orExpr, inputParamIdMap] = parseMatchExpression(orObj, false);
+
+    // Decompose the expression and make sure the structure of the expression is as expected.
+    ASSERT_EQ(MatchExpression::OR, orExpr->matchType()) << orExpr->debugString();
+    ASSERT_EQ(2, orExpr->numChildren()) << orExpr->debugString();
+
+    const MatchExpression* andExpr = orExpr->getChild(0)->matchType() == MatchExpression::AND
+        ? orExpr->getChild(0)
+        : orExpr->getChild(1);
+    ASSERT_EQ(2, andExpr->numChildren()) << andExpr->debugString();
+
+    const MatchExpression* leafExpr = orExpr->getChild(0)->matchType() == MatchExpression::AND
+        ? orExpr->getChild(1)
+        : orExpr->getChild(0);
+    ASSERT_EQ(0, leafExpr->numChildren()) << leafExpr->debugString();
+
+    BSONElement elt = constraints[0].firstElement();
     OrderedIntervalList oil;
     IndexBoundsBuilder::BoundsTightness tightness;
-    testTranslate(constraints, &oil, &tightness);
+    interval_evaluation_tree::Builder ietBuilder{};
+    IndexBoundsBuilder::translate(
+        andExpr->getChild(0), elt, testIndex, &oil, &tightness, &ietBuilder);
+    IndexBoundsBuilder::translateAndIntersect(
+        andExpr->getChild(1), elt, testIndex, &oil, &tightness, &ietBuilder);
+    IndexBoundsBuilder::translateAndUnion(leafExpr, elt, testIndex, &oil, &tightness, &ietBuilder);
+
     ASSERT_EQUALS(oil.name, "a");
     ASSERT_EQUALS(oil.intervals.size(), 0U);
+
+    assertIET(inputParamIdMap, ietBuilder, elt, testIndex, oil);
 }
 
 //
