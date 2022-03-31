@@ -92,11 +92,9 @@ ChunkVersion ChunkVersion::_parseArrayOrObjectPositionalFormat(const BSONObj& ob
         timestamp =
             (epoch == UNSHARDED().epoch() ? UNSHARDED().getTimestamp() : IGNORED().getTimestamp());
     } else {
-        // TODO (SERVER-64813): remove this code once 6.0 becomes lastLTS
-        // Hack to solve a complex problem related to the addition of the timestamp in 5.0
-        uasserted(ErrorCodes::StaleShardVersion,
-                  str::stream() << "Failed to parse " << obj.toString()
-                                << " as a ChunkVersion because it is missing the timestamp field.");
+        uasserted(ErrorCodes::TypeMismatch,
+                  str::stream() << "Invalid type " << nextElem.type()
+                                << " for version timestamp part.");
     }
 
     ChunkVersion version;
@@ -164,13 +162,7 @@ StatusWith<ChunkVersion> ChunkVersion::_parseLegacyWithField(const BSONObj& obj,
             timestamp = (epoch == UNSHARDED().epoch() ? UNSHARDED().getTimestamp()
                                                       : IGNORED().getTimestamp());
         } else {
-            // TODO (SERVER-64813): remove this code once 6.0 becomes lastLTS
-            // Hack to solve a complex problem related to the addition of the timestamp in 5.0
-            uasserted(ErrorCodes::StaleShardVersion,
-                      str::stream()
-                          << "Failed to parse { epoch: " << epoch->toString()
-                          << ", combined: " << combined
-                          << "} as a ChunkVersion because it is missing the timestamp field.");
+            uasserted(6278300, "Timestamp must be present if epoch exists.");
         }
     } else if (!epoch && timestamp) {
         uasserted(6278301, "Epoch must be present if timestamp exists.");
