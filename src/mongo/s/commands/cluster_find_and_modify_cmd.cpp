@@ -540,7 +540,7 @@ private:
         }
 
         if (responseStatus.code() == ErrorCodes::WouldChangeOwningShard) {
-            if (feature_flags::gFeatureFlagInternalTransactions.isEnabled(
+            if (feature_flags::gFeatureFlagUpdateDocumentShardKeyUsingTransactionApi.isEnabled(
                     serverGlobalParams.featureCompatibility)) {
                 auto parsedRequest = write_ops::FindAndModifyCommandRequest::parse(
                     IDLParserErrorContext("ClusterFindAndModify"), cmdObj);

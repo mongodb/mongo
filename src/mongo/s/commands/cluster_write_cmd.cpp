@@ -287,7 +287,7 @@ bool handleWouldChangeOwningShardError(OperationContext* opCtx,
     bool updatedShardKey = false;
     boost::optional<BSONObj> upsertedId;
 
-    if (feature_flags::gFeatureFlagInternalTransactions.isEnabled(
+    if (feature_flags::gFeatureFlagUpdateDocumentShardKeyUsingTransactionApi.isEnabled(
             serverGlobalParams.featureCompatibility)) {
         if (isRetryableWrite) {
             if (MONGO_unlikely(hangAfterThrowWouldChangeOwningShardRetryableWrite.shouldFail())) {
