@@ -38,6 +38,7 @@
 #include "mongo/db/exec/sbe/stages/hash_agg.h"
 #include "mongo/db/exec/sbe/stages/hash_lookup.h"
 #include "mongo/db/exec/sbe/stages/ix_scan.h"
+#include "mongo/db/exec/sbe/stages/limit_skip.h"
 #include "mongo/db/exec/sbe/stages/loop_join.h"
 #include "mongo/db/exec/sbe/stages/scan.h"
 #include "mongo/db/exec/sbe/stages/union.h"
@@ -51,6 +52,8 @@
 #include "mongo/db/query/sbe_stage_builder_projection.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/logv2/log.h"
+
+#include "mongo/db/query/sbe_stage_builder_filter.h"
 
 namespace mongo::stage_builder {
 /**
@@ -494,36 +497,48 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildLookupResultObject(
 /*
  * Build $lookup stage using index join strategy. Below is an example plan for the aggregation
  * [{$lookup: {localField: "a", foreignField: "b"}}] with an index {b: 1} on the foreign
- * collection.
+ * collection. Note that parts reading the local values and constructing the resulting document are
+ * omitted.
  *
- * nlj [localRecord]
+ * nlj [foreignDocument] [foreignDocument]
  * left
- *     project [localField = getField (localRecord, "a")]
- *     scan localRecord
- * right
- *     limit 1
- *     union [foreignGroup] [
- *         group [] [foreignGroupOrNothing = addToArray (foreignRecord)]
- *         nlj []
- *         left
- *             nlj [indexId, indexKeyPattern]
- *             left
- *                 project [lowKey = ks (localField, _, _, kExclusiveBefore),
- *                          highKey = ks (localField, _, _, kExclusiveAfter),
- *                          indexId = "b_1",
- *                          indexKeyPattern = {"b" : 1}]
- *                 limit 1
- *                 coscan
- *             right
- *                 ixseek lowKey highKey indexKey foreignRecordId snapshotId _ @"b_1"
- *         right
- *             limit 1
- *             seek foreignRecordId foreignRecord _ snapshotId indexId indexKey indexKeyPattern
- *         ,
- *         project [emptyArray = []]
+ *   nlj
+ *   left
+ *     nlj [lowKey, highKey]
+ *     left
+ *       nlj
+ *       left
+ *         unwind localKeySet localValue
  *         limit 1
  *         coscan
- *     ]
+ *       right
+ *         project lowKey = ks (1, 0, valueForIndexBounds, 1),
+ *                 highKey = ks (1, 0, valueForIndexBounds, 2)
+ *         union [valueForIndexBounds] [
+ *           cfilter {isNull (localValue)}
+ *           project [valueForIndexBounds = undefined]
+ *           limit 1
+ *           coscan
+ *           ,
+ *           cfilter {isArray (localValue)}
+ *           project [valueForIndexBounds = fillEmpty (getElement (localValue, 0), undefined)]
+ *           limit 1
+ *           coscan
+ *           ,
+ *           project [valueForIndexBounds = localValue]
+ *           limit 1
+ *           coscan
+ *         ]
+ *     right
+ *       ixseek lowKey highKey recordId @"b_1"
+ *   right
+ *     limit 1
+ *     seek s21 foreignDocument recordId @"foreign collection"
+ * right
+ *   limit 1
+ *   filter {isMember (foreignValue, localValueSet)}
+ *   // Below is the tree performing path traversal on the 'foreignDocument' and producing value
+ *   // into 'foreignValue'.
  *
  */
 std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
@@ -531,12 +546,15 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
     std::unique_ptr<sbe::PlanStage> localStage,
     SlotId localRecordSlot,
     const FieldPath& localFieldName,
+    const FieldPath& foreignFieldName,
     const CollectionPtr& foreignColl,
     const IndexEntry& index,
     StringMap<const IndexAccessMethod*>& iamMap,
     PlanYieldPolicySBE* yieldPolicy,
     const PlanNodeId nodeId,
-    SlotIdGenerator& slotIdGenerator) {
+    SlotIdGenerator& slotIdGenerator,
+    FrameIdGenerator& frameIdGenerator,
+    RuntimeEnvironment* env) {
     const auto foreignCollUUID = foreignColl->uuid();
     const auto indexName = index.identifier.catalogName;
     const auto indexDescriptor =
@@ -559,15 +577,98 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
                                                              nodeId,
                                                              slotIdGenerator);
 
-    // 'localFieldSlot' is a set even if it contains a single item. Extract this single value until
-    // SERVER-63574 is implemented.
-    SlotId localFieldSlot = slotIdGenerator.generate();
-    auto localFieldStage = makeS<UnwindStage>(std::move(localKeysSetStage) /* child stage */,
-                                              localKeysSetSlot,
-                                              localFieldSlot,
-                                              slotIdGenerator.generate() /* outIndex */,
-                                              true /* preserveNullAndEmptyArrays */,
-                                              nodeId);
+    // Unwind local keys one by one into 'singleLocalValueSlot'.
+    auto singleLocalValueSlot = slotIdGenerator.generate();
+    auto unwindLocalKeysStage = makeS<UnwindStage>(makeLimitCoScanTree(nodeId, 1),
+                                                   localKeysSetSlot /* inSlot */,
+                                                   singleLocalValueSlot /* outField */,
+                                                   slotIdGenerator.generate() /* outIndex */,
+                                                   true /* preserveNullAndEmptyArrays */,
+                                                   nodeId);
+
+    // We need to lookup value in 'singleLocalValueSlot' in the index defined on the foreign
+    // collection. To do this, we need to generate set of point intervals corresponding to this
+    // value. Single value can correspond to multiple point intervals:
+    // - Null values:
+    //   a. [Null, Null]
+    //   b. [Undefined, Undefined]
+    // - Array values:
+    //   a. If array is empty, [Undefined, Undefined]
+    //   b. If array is NOT empty, [array[0], array[0]] (point interval composed from the first
+    //      array element)
+    // - All other types, single point interval [value, value]
+    //
+    // To implement these rules, we use the union stage:
+    //   union pointValue [
+    //       // Branch 1
+    //       cfilter isNull(rawValue)
+    //       project pointValue = Undefined
+    //       limit 1
+    //       coscan
+    //       ,
+    //       // Branch 2
+    //       cfilter isArray(rawValue)
+    //       project pointValue = fillEmpty(
+    //           getElement(rawValue, 0),
+    //           Undefined
+    //       )
+    //       limit 1
+    //       coscan
+    //       ,
+    //       // Branch 3
+    //       project pointValue = rawValue
+    //       limit 1
+    //       coscan
+    //   ]
+    //
+    // For null values, only branches (1) and (3) produce values. For array values, only branches
+    // (2) and (3) produce values. For all other types, only (3) produces value.
+    auto nullBranchOutput = slotIdGenerator.generate();
+    auto nullBranch = makeProjectStage(makeLimitCoScanTree(nodeId, 1),
+                                       nodeId,
+                                       nullBranchOutput,
+                                       makeConstant(TypeTags::bsonUndefined, 0));
+    nullBranch = makeS<FilterStage<true>>(
+        std::move(nullBranch), makeFunction("isNull", makeVariable(singleLocalValueSlot)), nodeId);
+
+    auto arrayBranchOutput = slotIdGenerator.generate();
+    auto arrayBranch =
+        makeProjectStage(makeLimitCoScanTree(nodeId, 1),
+                         nodeId,
+                         arrayBranchOutput,
+                         makeFunction("fillEmpty",
+                                      makeFunction("getElement",
+                                                   makeVariable(singleLocalValueSlot),
+                                                   makeConstant(TypeTags::NumberInt32, 0)),
+                                      makeConstant(TypeTags::bsonUndefined, 0)));
+    arrayBranch =
+        makeS<FilterStage<true>>(std::move(arrayBranch),
+                                 makeFunction("isArray", makeVariable(singleLocalValueSlot)),
+                                 nodeId);
+
+    auto valueBranchOutput = slotIdGenerator.generate();
+    auto valueBranch = makeProjectStage(makeLimitCoScanTree(nodeId, 1),
+                                        nodeId,
+                                        valueBranchOutput,
+                                        makeVariable(singleLocalValueSlot));
+
+    auto valueForIndexBounds = slotIdGenerator.generate();
+    auto valueGeneratorStage = makeS<UnionStage>(
+        makeSs(std::move(nullBranch), std::move(arrayBranch), std::move(valueBranch)),
+        makeVector(makeSV(nullBranchOutput), makeSV(arrayBranchOutput), makeSV(valueBranchOutput)),
+        makeSV(valueForIndexBounds),
+        nodeId);
+
+    // For hashed indexes, we need to hash value before computing keystrings.
+    if (index.type == INDEX_HASHED) {
+        auto rawValueSlot = valueForIndexBounds;
+        valueForIndexBounds = slotIdGenerator.generate();
+        valueGeneratorStage =
+            makeProjectStage(std::move(valueGeneratorStage),
+                             nodeId,
+                             valueForIndexBounds,
+                             makeFunction("shardHash", makeVariable(rawValueSlot)));
+    }
 
     // Calculate the low key and high key of each individual local field. They are stored in
     // 'lowKeySlot' and 'highKeySlot', respectively. These two slots will be made available in
@@ -578,30 +679,39 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
     auto indexIdSlot = slotIdGenerator.generate();
     auto indexKeyPatternSlot = slotIdGenerator.generate();
     auto [_, indexKeyPatternValue] =
-        sbe::value::copyValue(sbe::value::TypeTags::bsonObject,
-                              sbe::value::bitcastFrom<const char*>(index.keyPattern.objdata()));
+        copyValue(TypeTags::bsonObject, bitcastFrom<const char*>(index.keyPattern.objdata()));
     auto indexBoundKeyStage = makeProjectStage(
-        makeLimitCoScanTree(nodeId, 1),
+        std::move(valueGeneratorStage),
         nodeId,
         lowKeySlot,
         makeFunction(
             "ks"_sd,
             makeConstant(value::TypeTags::NumberInt64, static_cast<int64_t>(indexVersion)),
             makeConstant(value::TypeTags::NumberInt32, indexOrdering.getBits()),
-            makeVariable(localFieldSlot),
+            makeVariable(valueForIndexBounds),
             makeConstant(value::TypeTags::NumberInt64,
                          static_cast<int64_t>(KeyString::Discriminator::kExclusiveBefore))),
         highKeySlot,
         makeFunction("ks"_sd,
                      makeConstant(value::TypeTags::NumberInt64, static_cast<int64_t>(indexVersion)),
                      makeConstant(value::TypeTags::NumberInt32, indexOrdering.getBits()),
-                     makeVariable(localFieldSlot),
+                     makeVariable(valueForIndexBounds),
                      makeConstant(value::TypeTags::NumberInt64,
                                   static_cast<int64_t>(KeyString::Discriminator::kExclusiveAfter))),
         indexIdSlot,
         makeConstant(indexName),
         indexKeyPatternSlot,
         makeConstant(value::TypeTags::bsonObject, indexKeyPatternValue));
+
+    // To ensure that we compute index bounds for all local values, introduce loop join, where
+    // unwinding of local values happens on the right side and index generation happens on the left
+    // side.
+    indexBoundKeyStage = makeS<LoopJoinStage>(std::move(unwindLocalKeysStage),
+                                              std::move(indexBoundKeyStage),
+                                              makeSV() /* outerProjects */,
+                                              makeSV(singleLocalValueSlot) /* outerCorrelated */,
+                                              nullptr /* predicate */,
+                                              nodeId);
 
     // Perform the index seek based on the 'lowKeySlot' and 'highKeySlot' from the outer side.
     // The foreign record id of the seek is stored in 'foreignRecordIdSlot'. We also keep
@@ -650,21 +760,50 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
                                                                       makeSV() /* slotsToForward */,
                                                                       slotIdGenerator);
 
+    // Some values are encoded with the same value in BTree index, such undefined, null and empty
+    // array. In hashed indexes, hash collisions are possible. We need to double check that the
+    // results returned from the index scan are what we expect. To do that, we traverse the path in
+    // 'foreignFieldName' and check if the set in 'localKeysSetSlot' contains any of the values
+    // returned.
+    auto [foreignValueSlot, foreignValueStage] =
+        buildForeignKeysStream(foreignRecordSlot, foreignFieldName, nodeId, slotIdGenerator);
+
+    // Check if local keys set contains the value from the foreign document.
+    auto foreignValueFilterStage = makeS<FilterStage<false>>(
+        std::move(foreignValueStage),
+        makeFunction("isMember", makeVariable(foreignValueSlot), makeVariable(localKeysSetSlot)),
+        nodeId);
+
+    // Path traversal of the foreign document may produce multiple values. To ensure that the
+    // foreign document is added only once to the resulting array, we put whole path traversal into
+    // the right branch of loop join and add 'limit 1' stage on top.
+    auto foreignValueMatchesStage = makeLimitTree(std::move(foreignValueFilterStage), nodeId, 1);
+
+    auto filteredForeignRecordsStage =
+        makeS<LoopJoinStage>(std::move(scanNljStage) /* outer */,
+                             std::move(foreignValueMatchesStage) /* inner */,
+                             makeSV(foreignRecordSlot) /* outerProjects */,
+                             makeSV(foreignRecordSlot) /* outerCorrelated */,
+                             nullptr,
+                             nodeId);
+
     // Group the matched foreign documents into a list, stored in the 'foreignGroupSlot'.
     // It creates a union stage internally so that when there's no matching foreign records, an
     // empty array will be returned.
     auto [foreignGroupSlot, foreignGroupStage] = buildForeignMatchedArray(
-        {std::move(scanNljStage), makeSV()}, foreignRecordSlot, nodeId, slotIdGenerator);
+        EvalStage{std::move(filteredForeignRecordsStage), makeSV(foreignRecordSlot)},
+        foreignRecordSlot,
+        nodeId,
+        slotIdGenerator);
 
     // The top level loop join stage that joins each local field with the matched foreign
     // documents.
-    auto nljStage = makeS<LoopJoinStage>(std::move(localFieldStage),
+    auto nljStage = makeS<LoopJoinStage>(std::move(localKeysSetStage),
                                          std::move(foreignGroupStage),
                                          makeSV(localRecordSlot) /* outerProjects */,
-                                         makeSV(localFieldSlot) /* outerCorrelated */,
+                                         makeSV(localKeysSetSlot) /* outerCorrelated */,
                                          nullptr,
                                          nodeId);
-
     return {foreignGroupSlot, std::move(nljStage)};
 }
 
@@ -804,23 +943,19 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                     "$lookup using index join should have one child and a populated index entry",
                     eqLookupNode->children.size() == 1 && eqLookupNode->idxEntry);
 
-                const auto& index = *eqLookupNode->idxEntry;
-
-                uassert(6357203,
-                        str::stream() << "$lookup using index join doesn't work for hashed index '"
-                                      << index.identifier.catalogName << "'",
-                        index.type != INDEX_HASHED);
-
                 return buildIndexJoinLookupStage(_state,
                                                  std::move(localStage),
                                                  localDocumentSlot,
                                                  eqLookupNode->joinFieldLocal,
+                                                 eqLookupNode->joinFieldForeign,
                                                  foreignColl,
-                                                 index,
+                                                 *eqLookupNode->idxEntry,
                                                  _data.iamMap,
                                                  _yieldPolicy,
                                                  eqLookupNode->nodeId(),
-                                                 _slotIdGenerator);
+                                                 _slotIdGenerator,
+                                                 _frameIdGenerator,
+                                                 _data.env);
             }
             case EqLookupNode::LookupStrategy::kNestedLoopJoin:
             case EqLookupNode::LookupStrategy::kHashJoin: {
