@@ -482,7 +482,7 @@ TEST(FLECollectionOptions, DuplicateQueryTypes) {
 TEST(FLECollectionOptions, AllowedTypes) {
     RAIIServerParameterControllerForTest featureFlagController("featureFlagFLE2", true);
 
-    std::vector<std::string> types({
+    std::vector<std::string> typesAllowedIndexed({
         "string",
         "binData",
         "objectId",
@@ -495,19 +495,27 @@ TEST(FLECollectionOptions, AllowedTypes) {
         "long",
     });
 
-    for (const auto& type : types) {
-        ASSERT_OK(CollectionOptions::parse(fromjson(str::stream() << R"({
-    encryptedFields: {
-        "fields": [
-            {
-                "path": "name.first",
-                "keyId": { '$uuid': '5f34e99a-b214-451f-b6f6-d3d28e933d15' },
-                "bsonType": ")" << type << R"("
-            }
-        ]
-    }})"))
-                      .getStatus());
+    std::vector<std::string> typesAllowedUnindexed({
+        "string",
+        "binData",
+        "objectId",
+        "bool",
+        "date",
+        "regex",
+        "javascript",
+        "int",
+        "timestamp",
+        "long",
+        "double",
+        "object",
+        "array",
+        "decimal",
+        "dbPointer",
+        "symbol",
+        "javascriptWithScope",
+    });
 
+    for (const auto& type : typesAllowedIndexed) {
         ASSERT_OK(CollectionOptions::parse(fromjson(str::stream() << R"({
         encryptedFields: {
             "fields": [
@@ -522,13 +530,27 @@ TEST(FLECollectionOptions, AllowedTypes) {
     }})"))
                       .getStatus());
     }
+
+    for (const auto& type : typesAllowedUnindexed) {
+        ASSERT_OK(CollectionOptions::parse(fromjson(str::stream() << R"({
+    encryptedFields: {
+        "fields": [
+            {
+                "path": "name.first",
+                "keyId": { '$uuid': '5f34e99a-b214-451f-b6f6-d3d28e933d15' },
+                "bsonType": ")" << type << R"("
+            }
+        ]
+    }})"))
+                      .getStatus());
+    }
 }
 
 
 TEST(FLECollectionOptions, DisAllowedTypes) {
     RAIIServerParameterControllerForTest featureFlagController("featureFlagFLE2", true);
 
-    std::vector<std::string> types({
+    std::vector<std::string> typesDisallowedIndexed({
         "minKey",
         "missing",
         "double",
@@ -543,19 +565,15 @@ TEST(FLECollectionOptions, DisAllowedTypes) {
         "maxKey",
     });
 
-    for (const auto& type : types) {
-        ASSERT_NOT_OK(CollectionOptions::parse(fromjson(str::stream() << R"({
-    encryptedFields: {
-        "fields": [
-            {
-                "path": "name.first",
-                "keyId": { '$uuid': '5f34e99a-b214-451f-b6f6-d3d28e933d15' },
-                "bsonType": ")" << type << R"("
-            }
-        ]
-    }})"))
-                          .getStatus());
+    std::vector<std::string> typesDisallowedUnindexed({
+        "minKey",
+        "missing",
+        "null",
+        "undefined",
+        "maxKey",
+    });
 
+    for (const auto& type : typesDisallowedIndexed) {
         ASSERT_NOT_OK(CollectionOptions::parse(fromjson(str::stream() << R"({
         encryptedFields: {
             "fields": [
@@ -567,6 +585,20 @@ TEST(FLECollectionOptions, DisAllowedTypes) {
                 }
             ]
         }
+    }})"))
+                          .getStatus());
+    }
+
+    for (const auto& type : typesDisallowedUnindexed) {
+        ASSERT_NOT_OK(CollectionOptions::parse(fromjson(str::stream() << R"({
+    encryptedFields: {
+        "fields": [
+            {
+                "path": "name.first",
+                "keyId": { '$uuid': '5f34e99a-b214-451f-b6f6-d3d28e933d15' },
+                "bsonType": ")" << type << R"("
+            }
+        ]
     }})"))
                           .getStatus());
     }

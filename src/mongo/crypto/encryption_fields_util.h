@@ -79,7 +79,40 @@ inline bool isFLE2EqualityIndexedSupportedType(BSONType type) {
 
 // Unindexed is the same as equality
 inline bool isFLE2UnindexedSupportedType(BSONType type) {
-    return isFLE2EqualityIndexedSupportedType(type);
+    switch (type) {
+        case BinData:
+        case Code:
+        case RegEx:
+        case String:
+
+        case NumberInt:
+        case NumberLong:
+        case Bool:
+        case bsonTimestamp:
+        case Date:
+        case jstOID:
+
+        case Array:
+        case Object:
+        case NumberDecimal:
+        case NumberDouble:
+
+        // Deprecated
+        case Symbol:
+        case CodeWScope:
+        case DBRef:
+            return true;
+
+        // Singletons
+        case EOO:
+        case jstNULL:
+        case MaxKey:
+        case MinKey:
+        case Undefined:
+            return false;
+        default:
+            MONGO_UNREACHABLE;
+    }
 }
 
 struct EncryptedFieldMatchResult {

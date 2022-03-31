@@ -926,6 +926,15 @@ void convertToFLE2Payload(FLEKeyVault* keyVault,
             } else {
                 uasserted(6410100, "No other FLE2 placeholders supported at this time.");
             }
+        } else if (ep.getAlgorithm() == Fle2AlgorithmInt::kUnindexed) {
+            uassert(6379102,
+                    str::stream() << "Type '" << typeName(el.type())
+                                  << "' is not a valid type for FLE 2 encryption",
+                    isFLE2UnindexedSupportedType(el.type()));
+
+            auto payload = FLE2UnindexedEncryptedValue::serialize(userKey, el);
+            builder->appendBinData(
+                fieldNameToSerialize, payload.size(), BinDataType::Encrypt, payload.data());
         } else {
             uasserted(6338603, "Only FLE 2 style encryption placeholders are supported");
         }
@@ -957,8 +966,6 @@ void collectEDCServerInfo(std::vector<EDCServerPayloadInfo>* pFields,
                           ConstDataRange cdr,
                           StringData fieldPath) {
 
-    // TODO - validate acceptable types - kFLE2InsertUpdatePayload or kFLE2UnindexedEncryptedValue
-    // or kFLE2EqualityIndexedValue
     // TODO - validate field is actually indexed in the schema?
 
     auto [encryptedTypeBinding, subCdr] = fromEncryptedConstDataRange(cdr);
@@ -968,6 +975,9 @@ void collectEDCServerInfo(std::vector<EDCServerPayloadInfo>* pFields,
         parseAndVerifyInsertUpdatePayload(pFields, fieldPath, encryptedType, subCdr);
         return;
     } else if (encryptedType == EncryptedBinDataType::kFLE2FindEqualityPayload) {
+        // No-op
+        return;
+    } else if (encryptedType == EncryptedBinDataType::kFLE2UnindexedEncryptedValue) {
         // No-op
         return;
     }
@@ -998,36 +1008,40 @@ void convertServerPayload(ConstDataRange cdr,
     if (encryptedTypeBinding == EncryptedBinDataType::kFLE2FindEqualityPayload) {
         builder->appendBinData(fieldPath, cdr.length(), BinDataType::Encrypt, cdr.data<char>());
         return;
-    }
+    } else if (encryptedTypeBinding == EncryptedBinDataType::kFLE2InsertUpdatePayload) {
 
-    if (it.it == it.end) {
+        if (it.it == it.end) {
+            return;
+        }
+
+        uassert(6373505, "Unexpected end of iterator", it.it != it.end);
+        auto payload = *(it.it);
+
+        // TODO - validate field is actually indexed in the schema?
+
+        FLE2IndexedEqualityEncryptedValue sp(payload.payload, payload.count);
+
+        uassert(6373506,
+                str::stream() << "Type '" << typeName(sp.bsonType)
+                              << "' is not a valid type for FLE 2 encryption",
+                isFLE2EqualityIndexedSupportedType(sp.bsonType));
+
+        auto swEncrypted =
+            sp.serialize(FLETokenFromCDR<FLETokenType::ServerDataEncryptionLevel1Token>(
+                payload.payload.getServerEncryptionToken()));
+        uassertStatusOK(swEncrypted);
+        toEncryptedBinData(fieldPath,
+                           EncryptedBinDataType::kFLE2EqualityIndexedValue,
+                           ConstDataRange(swEncrypted.getValue()),
+                           builder);
+
+        pTags->push_back({EDCServerCollection::generateTag(payload)});
+    } else if (encryptedTypeBinding == EncryptedBinDataType::kFLE2UnindexedEncryptedValue) {
+        builder->appendBinData(fieldPath, cdr.length(), BinDataType::Encrypt, cdr.data());
         return;
+    } else {
+        uassert(6379103, "Unexpected type binding", false);
     }
-
-    // TODO : renable this when find is working on query (find server number)
-    // uassert(6373505, "Unexpected end of iterator", it.it != it.end);
-    auto payload = *(it.it);
-
-    // TODO - validate acceptable types - kFLE2InsertUpdatePayload or kFLE2UnindexedEncryptedValue
-    // or kFLE2EqualityIndexedValue
-    // TODO - validate field is actually indexed in the schema?
-
-    FLE2IndexedEqualityEncryptedValue sp(payload.payload, payload.count);
-
-    uassert(6373506,
-            str::stream() << "Type '" << typeName(sp.bsonType)
-                          << "' is not a valid type for FLE 2 encryption",
-            isFLE2EqualityIndexedSupportedType(sp.bsonType));
-
-    auto swEncrypted = sp.serialize(FLETokenFromCDR<FLETokenType::ServerDataEncryptionLevel1Token>(
-        payload.payload.getServerEncryptionToken()));
-    uassertStatusOK(swEncrypted);
-    toEncryptedBinData(fieldPath,
-                       EncryptedBinDataType::kFLE2EqualityIndexedValue,
-                       ConstDataRange(swEncrypted.getValue()),
-                       builder);
-
-    pTags->push_back({EDCServerCollection::generateTag(payload)});
 
     it.it++;
 }
@@ -1317,6 +1331,8 @@ std::pair<BSONType, std::vector<uint8_t>> FLEClientCrypto::decrypt(ConstDataRang
 
         return {ieev.bsonType, userData};
 
+    } else if (pair.first == EncryptedBinDataType::kFLE2UnindexedEncryptedValue) {
+        return FLE2UnindexedEncryptedValue::deserialize(keyVault, cdr);
     } else if (pair.first == EncryptedBinDataType::kRandom ||
                pair.first == EncryptedBinDataType::kDeterministic) {
         return {EOO, std::vector<uint8_t>()};
@@ -1404,9 +1420,11 @@ void FLEClientCrypto::validateDocument(const BSONObj& doc,
 
             auto tag = EDCServerCollection::generateTag(ieev);
             tags.insert({tag, field.first});
+        } else {
+            uassert(6379105,
+                    str::stream() << "Field '" << field.first << "' must be marked unindexed",
+                    encryptedTypeBinding == EncryptedBinDataType::kFLE2UnindexedEncryptedValue);
         }
-
-        // TODO - support unindexed
     }
 
     BSONElement safeContent = doc[kSafeContent];
@@ -1944,6 +1962,52 @@ StatusWith<std::vector<uint8_t>> FLE2IndexedEqualityEncryptedValue::serialize(
               serializedServerValue.begin() + cdrKeyId.length() + 1);
 
     return serializedServerValue;
+}
+
+std::vector<uint8_t> FLE2UnindexedEncryptedValue::serialize(const FLEUserKeyAndId& userKey,
+                                                            const BSONElement& element) {
+    BSONType bsonType = element.type();
+    uassert(6379107, "Invalid BSON data type", isFLE2UnindexedSupportedType(bsonType));
+
+    auto value = ConstDataRange(element.value(), element.value() + element.valuesize());
+    auto cdrKeyId = userKey.keyId.toCDR();
+    auto cdrKey = userKey.key.toCDR();
+
+    auto cipherTextSize = crypto::fle2AeadCipherOutputLength(value.length());
+    std::vector<uint8_t> buf(assocDataSize + cipherTextSize);
+    DataRangeCursor adc(buf);
+    adc.writeAndAdvance(static_cast<uint8_t>(EncryptedBinDataType::kFLE2UnindexedEncryptedValue));
+    adc.writeAndAdvance(cdrKeyId);
+    adc.writeAndAdvance(static_cast<uint8_t>(bsonType));
+
+    ConstDataRange assocData(buf.data(), assocDataSize);
+    auto cipherText = uassertStatusOK(encryptDataWithAssociatedData(cdrKey, assocData, value));
+    uassert(6379106, "Cipher text size mismatch", cipherTextSize == cipherText.size());
+    adc.writeAndAdvance(ConstDataRange(cipherText));
+
+    return buf;
+}
+
+std::pair<BSONType, std::vector<uint8_t>> FLE2UnindexedEncryptedValue::deserialize(
+    FLEKeyVault* keyVault, ConstDataRange blob) {
+
+    auto [assocDataCdr, cipherTextCdr] = blob.split(assocDataSize);
+    ConstDataRangeCursor adc(assocDataCdr);
+
+    uint8_t marker = adc.readAndAdvance<uint8_t>();
+    uassert(6379110,
+            "Invalid data type",
+            static_cast<uint8_t>(EncryptedBinDataType::kFLE2UnindexedEncryptedValue) == marker);
+
+    UUID keyId = UUID::fromCDR(adc.readAndAdvance<UUIDBuf>());
+    auto userKey = keyVault->getUserKeyById(keyId);
+
+    BSONType bsonType = static_cast<BSONType>(adc.read<uint8_t>());
+    uassert(6379111, "Invalid BSON data type", isFLE2UnindexedSupportedType(bsonType));
+
+    auto data = uassertStatusOK(
+        decryptDataWithAssociatedData(userKey.key.toCDR(), assocDataCdr, cipherTextCdr));
+    return {bsonType, data};
 }
 
 ESCDerivedFromDataTokenAndContentionFactorToken EDCServerPayloadInfo::getESCToken() const {

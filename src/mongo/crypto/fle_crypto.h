@@ -896,6 +896,28 @@ struct FLE2IndexedEqualityEncryptedValue {
     std::vector<uint8_t> clientEncryptedValue;
 };
 
+/**
+ * Class to read/write FLE2 Unindexed Encrypted Values
+ *
+ * Fields are encrypted with the following:
+ *
+ * struct {
+ *   uint8_t fle_blob_subtype = 6;
+ *   uint8_t key_uuid[16];
+ *   uint8  original_bson_type;
+ *   ciphertext[ciphertext_length];
+ * } blob;
+ *
+ */
+struct FLE2UnindexedEncryptedValue {
+    static std::vector<uint8_t> serialize(const FLEUserKeyAndId& userKey,
+                                          const BSONElement& element);
+    static std::pair<BSONType, std::vector<uint8_t>> deserialize(FLEKeyVault* keyVault,
+                                                                 ConstDataRange blob);
+
+    static constexpr size_t assocDataSize = sizeof(uint8_t) + sizeof(UUID) + sizeof(uint8_t);
+};
+
 
 struct EDCServerPayloadInfo {
     ESCDerivedFromDataTokenAndContentionFactorToken getESCToken() const;

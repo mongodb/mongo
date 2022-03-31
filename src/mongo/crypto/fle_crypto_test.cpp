@@ -578,12 +578,13 @@ TEST(FLE_ESC, EmuBinary_NullRecord) {
     ASSERT_FALSE(i.has_value());
 }
 
-
 enum class Operation { kFind, kInsert };
 
-std::vector<char> generatePlaceholder(BSONElement value,
-                                      Operation operation,
-                                      boost::optional<UUID> key = boost::none) {
+std::vector<char> generatePlaceholder(
+    BSONElement value,
+    Operation operation,
+    mongo::Fle2AlgorithmInt algorithm = mongo::Fle2AlgorithmInt::kEquality,
+    boost::optional<UUID> key = boost::none) {
     FLE2EncryptionPlaceholder ep;
 
     if (operation == Operation::kFind) {
@@ -592,7 +593,7 @@ std::vector<char> generatePlaceholder(BSONElement value,
         ep.setType(mongo::Fle2PlaceholderType::kInsert);
     }
 
-    ep.setAlgorithm(mongo::Fle2AlgorithmInt::kEquality);
+    ep.setAlgorithm(algorithm);
     ep.setUserKeyId(userKeyId);
     ep.setIndexKeyId(key.value_or(indexKeyId));
     ep.setValue(value);
@@ -639,7 +640,7 @@ void assertPayload(BSONElement elem, Operation operation) {
     }
 }
 
-void roundTripTest(BSONObj doc, BSONType type, Operation operation) {
+void roundTripTest(BSONObj doc, BSONType type, Operation opType, Fle2AlgorithmInt algorithm) {
     auto element = doc.firstElement();
     ASSERT_EQ(element.type(), type);
 
@@ -649,7 +650,7 @@ void roundTripTest(BSONObj doc, BSONType type, Operation operation) {
                          << "sample"
                          << "encrypted" << element);
 
-    auto buf = generatePlaceholder(element, operation);
+    auto buf = generatePlaceholder(element, opType, algorithm);
     BSONObjBuilder builder;
     builder.append("plainText", "sample");
     builder.appendBinData("encrypted", buf.size(), BinDataType::Encrypt, buf.data());
@@ -662,8 +663,8 @@ void roundTripTest(BSONObj doc, BSONType type, Operation operation) {
 
     // TODO : when query enables server side work for Find, remove this
     // if statement.
-    if (operation == Operation::kFind) {
-        assertPayload(finalDoc["encrypted"], operation);
+    if (opType == Operation::kFind && algorithm == Fle2AlgorithmInt::kEquality) {
+        assertPayload(finalDoc["encrypted"], opType);
         return;
     }
 
@@ -674,6 +675,11 @@ void roundTripTest(BSONObj doc, BSONType type, Operation operation) {
     decryptedDoc = decryptedDoc.removeField(kSafeContent);
 
     ASSERT_BSONOBJ_EQ(inputDoc, decryptedDoc);
+}
+
+void roundTripTest(BSONObj doc, BSONType type, Operation opType) {
+    roundTripTest(doc, type, opType, Fle2AlgorithmInt::kEquality);
+    roundTripTest(doc, type, opType, Fle2AlgorithmInt::kUnindexed);
 }
 
 void roundTripMultiencrypted(BSONObj doc1,
@@ -689,8 +695,8 @@ void roundTripMultiencrypted(BSONObj doc1,
                          << "sample"
                          << "encrypted1" << element1 << "encrypted2" << element2);
 
-    auto buf1 = generatePlaceholder(element1, operation1, indexKeyId);
-    auto buf2 = generatePlaceholder(element2, operation2, indexKey2Id);
+    auto buf1 = generatePlaceholder(element1, operation1, Fle2AlgorithmInt::kEquality, indexKeyId);
+    auto buf2 = generatePlaceholder(element2, operation2, Fle2AlgorithmInt::kEquality, indexKey2Id);
 
     BSONObjBuilder builder;
     builder.append("plaintext", "sample");
@@ -709,33 +715,54 @@ void roundTripMultiencrypted(BSONObj doc1,
     assertPayload(finalDoc["encrypted2"], operation2);
 }
 
-const std::vector<std::pair<BSONObj, BSONType>> objects{
-    {BSON("sample"
-          << "value123"),
-     String},
-    {BSON("sample" << BSONBinData(testValue.data(), testValue.size(), BinDataType::BinDataGeneral)),
-     BinData},
-    {BSON("sample" << OID()), jstOID},
-    {BSON("sample" << false), Bool},
-    {BSON("sample" << true), Bool},
-    {BSON("sample" << Date_t()), Date},
-    {BSON("sample" << BSONRegEx("value1", "value2")), RegEx},
-    {BSON("sample" << 123456), NumberInt},
-    {BSON("sample" << Timestamp()), bsonTimestamp},
-    {BSON("sample" << 12345678901234567LL), NumberLong},
-    {BSON("sample" << BSONCode("value")), Code}};
-
 TEST(FLE_EDC, Allowed_Types) {
+    const std::vector<std::pair<BSONObj, BSONType>> universallyAllowedObjects{
+        {BSON("sample"
+              << "value123"),
+         String},
+        {BSON("sample" << BSONBinData(
+                  testValue.data(), testValue.size(), BinDataType::BinDataGeneral)),
+         BinData},
+        {BSON("sample" << OID()), jstOID},
+        {BSON("sample" << false), Bool},
+        {BSON("sample" << true), Bool},
+        {BSON("sample" << Date_t()), Date},
+        {BSON("sample" << BSONRegEx("value1", "value2")), RegEx},
+        {BSON("sample" << 123456), NumberInt},
+        {BSON("sample" << Timestamp()), bsonTimestamp},
+        {BSON("sample" << 12345678901234567LL), NumberLong},
+        {BSON("sample" << BSONCode("value")), Code}};
+
+    const std::vector<std::pair<BSONObj, BSONType>> unindexedAllowedObjects{
+        {BSON("sample" << 123.456), NumberDouble},
+        {BSON("sample" << Decimal128()), NumberDecimal},
+        {BSON("sample" << BSON("nested"
+                               << "value")),
+         Object},
+        {BSON("sample" << BSON_ARRAY(1 << 23)), Array},
+        {BSON("sample" << BSONDBRef("value1", OID())), DBRef},
+        {BSON("sample" << BSONSymbol("value")), Symbol},
+        {BSON("sample" << BSONCodeWScope("value",
+                                         BSON("code"
+                                              << "something"))),
+         CodeWScope},
+    };
+
+
     std::vector<Operation> opTypes{Operation::kInsert, Operation::kFind};
 
     for (const auto& opType : opTypes) {
-        for (const auto& [obj, objType] : objects) {
-            roundTripTest(obj, objType, opType);
+        for (const auto& [obj, objType] : universallyAllowedObjects) {
+            roundTripTest(obj, objType, opType, Fle2AlgorithmInt::kEquality);
+            roundTripTest(obj, objType, opType, Fle2AlgorithmInt::kUnindexed);
+        }
+        for (const auto& [obj, objType] : unindexedAllowedObjects) {
+            roundTripTest(obj, objType, opType, Fle2AlgorithmInt::kUnindexed);
         }
     };
 
-    for (const auto& [obj1, _] : objects) {
-        for (const auto& [obj2, _] : objects) {
+    for (const auto& [obj1, _] : universallyAllowedObjects) {
+        for (const auto& [obj2, _] : universallyAllowedObjects) {
             roundTripMultiencrypted(obj1, obj2, Operation::kInsert, Operation::kInsert);
             roundTripMultiencrypted(obj1, obj2, Operation::kInsert, Operation::kFind);
             roundTripMultiencrypted(obj1, obj2, Operation::kFind, Operation::kInsert);
@@ -744,50 +771,53 @@ TEST(FLE_EDC, Allowed_Types) {
     }
 }
 
-void illegalBSONType(BSONObj doc, BSONType type) {
+void illegalBSONType(BSONObj doc, BSONType type, Fle2AlgorithmInt algorithm, int expectCode) {
     auto element = doc.firstElement();
-    if (isValidBSONType(type)) {
-        ASSERT_EQ(element.type(), type);
-    }
+    ASSERT_EQ(element.type(), type);
 
     TestKeyVault keyVault;
 
-    auto buf = generatePlaceholder(element, Operation::kInsert);
+    auto buf = generatePlaceholder(element, Operation::kInsert, algorithm, boost::none);
     BSONObjBuilder builder;
     builder.append("plainText", "sample");
     builder.appendBinData("encrypted", buf.size(), BinDataType::Encrypt, buf.data());
     BSONObj obj = builder.obj();
 
     ASSERT_THROWS_CODE(
-        FLEClientCrypto::transformPlaceholders(obj, &keyVault), DBException, 6338602);
+        FLEClientCrypto::transformPlaceholders(obj, &keyVault), DBException, expectCode);
+}
+
+void illegalBSONType(BSONObj doc, BSONType type, Fle2AlgorithmInt algorithm) {
+    const int expectCode = algorithm == Fle2AlgorithmInt::kEquality ? 6338602 : 6379102;
+    illegalBSONType(doc, type, algorithm, expectCode);
 }
 
 TEST(FLE_EDC, Disallowed_Types) {
-    illegalBSONType(BSON("sample" << 123.456), NumberDouble);
-    illegalBSONType(BSON("sample" << Decimal128()), NumberDecimal);
+    illegalBSONType(BSON("sample" << 123.456), NumberDouble, Fle2AlgorithmInt::kEquality);
+    illegalBSONType(BSON("sample" << Decimal128()), NumberDecimal, Fle2AlgorithmInt::kEquality);
 
-    illegalBSONType(BSON("sample" << MINKEY), MinKey);
+    illegalBSONType(BSON("sample" << MINKEY), MinKey, Fle2AlgorithmInt::kEquality);
 
     illegalBSONType(BSON("sample" << BSON("nested"
                                           << "value")),
-                    Object);
-    illegalBSONType(BSON("sample" << BSON_ARRAY(1 << 23)), Array);
+                    Object,
+                    Fle2AlgorithmInt::kEquality);
+    illegalBSONType(BSON("sample" << BSON_ARRAY(1 << 23)), Array, Fle2AlgorithmInt::kEquality);
 
-    illegalBSONType(BSON("sample" << BSONUndefined), Undefined);
-    illegalBSONType(BSON("sample" << BSONNULL), jstNULL);
-    illegalBSONType(BSON("sample" << BSONDBRef("value1", OID())), DBRef);
-    illegalBSONType(BSON("sample" << BSONSymbol("value")), Symbol);
+    illegalBSONType(BSON("sample" << BSONUndefined), Undefined, Fle2AlgorithmInt::kEquality);
+    illegalBSONType(BSON("sample" << BSONUndefined), Undefined, Fle2AlgorithmInt::kUnindexed);
+    illegalBSONType(BSON("sample" << BSONNULL), jstNULL, Fle2AlgorithmInt::kEquality);
+    illegalBSONType(BSON("sample" << BSONNULL), jstNULL, Fle2AlgorithmInt::kUnindexed);
+    illegalBSONType(
+        BSON("sample" << BSONDBRef("value1", OID())), DBRef, Fle2AlgorithmInt::kEquality);
+    illegalBSONType(BSON("sample" << BSONSymbol("value")), Symbol, Fle2AlgorithmInt::kEquality);
     illegalBSONType(BSON("sample" << BSONCodeWScope("value",
                                                     BSON("code"
                                                          << "something"))),
-                    CodeWScope);
-
-    illegalBSONType(BSON("sample" << MAXKEY), MaxKey);
-
-
-    uint8_t fakeBSONType = 42;
-    ASSERT_FALSE(isValidBSONType(fakeBSONType));
-    illegalBSONType(BSON("sample" << 123.456), static_cast<BSONType>(fakeBSONType));
+                    CodeWScope,
+                    Fle2AlgorithmInt::kEquality);
+    illegalBSONType(BSON("sample" << MAXKEY), MaxKey, Fle2AlgorithmInt::kEquality);
+    illegalBSONType(BSON("sample" << MAXKEY), MaxKey, Fle2AlgorithmInt::kUnindexed);
 }
 
 
@@ -1176,11 +1206,13 @@ TEST(IndexedFields, FetchTwoLevels) {
     builder.appendBinData("encrypted", buf.size(), BinDataType::Encrypt, buf.data());
     {
         BSONObjBuilder sub(builder.subobjStart("nested"));
-        auto buf2 = generatePlaceholder(element, Operation::kInsert, indexKey2Id);
+        auto buf2 = generatePlaceholder(
+            element, Operation::kInsert, Fle2AlgorithmInt::kEquality, indexKey2Id);
         sub.appendBinData("encrypted", buf2.size(), BinDataType::Encrypt, buf2.data());
         {
             BSONObjBuilder sub2(sub.subobjStart("nested2"));
-            auto buf3 = generatePlaceholder(element, Operation::kInsert, indexKey3Id);
+            auto buf3 = generatePlaceholder(
+                element, Operation::kInsert, Fle2AlgorithmInt::kEquality, indexKey3Id);
             sub2.appendBinData("encrypted", buf3.size(), BinDataType::Encrypt, buf3.data());
         }
     }
@@ -1358,6 +1390,25 @@ TEST(TagDelta, Basic) {
     }
 }
 
+TEST(EDC, UnindexedEncryptDecrypt) {
+    TestKeyVault keyVault;
+    FLEUserKeyAndId userKey = keyVault.getUserKeyById(indexKey2Id);
+
+    auto inputDoc = BSON("a"
+                         << "sample");
+    auto element = inputDoc.firstElement();
+    auto const elementData =
+        std::vector<uint8_t>(element.value(), element.value() + element.valuesize());
+
+    auto blob = FLE2UnindexedEncryptedValue::serialize(userKey, element);
+    ASSERT_EQ(blob[0], 6);
+
+    auto [type, plainText] = FLE2UnindexedEncryptedValue::deserialize(&keyVault, {blob});
+    ASSERT_EQ(type, element.type());
+    ASSERT_TRUE(
+        std::equal(plainText.begin(), plainText.end(), elementData.begin(), elementData.end()));
+}
+
 TEST(EDC, ValidateDocument) {
     EncryptedFieldConfig efc = getTestEncryptedFieldConfig();
 
@@ -1378,9 +1429,18 @@ TEST(EDC, ValidateDocument) {
         auto element = doc.firstElement();
 
         BSONObjBuilder sub(builder.subobjStart("nested"));
-        auto buf = generatePlaceholder(element, Operation::kInsert, indexKey2Id);
+        auto buf = generatePlaceholder(
+            element, Operation::kInsert, Fle2AlgorithmInt::kEquality, indexKey2Id);
         builder.appendBinData("encrypted", buf.size(), BinDataType::Encrypt, buf.data());
-        // TODO - add support for unindexed
+    }
+    {
+        auto doc = BSON("a"
+                        << "bottom secret");
+        auto element = doc.firstElement();
+
+        BSONObjBuilder sub(builder.subobjStart("nested"));
+        auto buf = generatePlaceholder(element, Operation::kInsert, Fle2AlgorithmInt::kUnindexed);
+        builder.appendBinData("notindexed", buf.size(), BinDataType::Encrypt, buf.data());
     }
 
     auto finalDoc = encryptDocument(builder.obj(), &keyVault);
@@ -1571,7 +1631,8 @@ TEST(FLE_Update, PullTokens) {
     builder.appendBinData("encrypted", buf.size(), BinDataType::Encrypt, buf.data());
     {
         BSONObjBuilder sub(builder.subobjStart("nested"));
-        auto buf2 = generatePlaceholder(element, Operation::kInsert, indexKey2Id);
+        auto buf2 = generatePlaceholder(
+            element, Operation::kInsert, Fle2AlgorithmInt::kEquality, indexKey2Id);
         sub.appendBinData("encrypted", buf2.size(), BinDataType::Encrypt, buf2.data());
     }
     auto encDoc = encryptDocument(builder.obj(), &keyVault);

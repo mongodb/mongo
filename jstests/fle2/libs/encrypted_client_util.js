@@ -293,3 +293,15 @@ function assertIsIndexedEncryptedField(value) {
     assert(value.hex().startsWith("07"),
            "Expected subtype 7 but found the wrong type: " + value.hex());
 }
+
+/**
+ * Assert a field is an unindexed encrypted field
+ *
+ * @param {BinData} value bindata value
+ */
+function assertIsUnindexedEncryptedField(value) {
+    assert(value instanceof BinData, "Expected BinData, found: " + value);
+    assert.eq(value.subtype(), 6, "Expected Encrypted bindata: " + value);
+    assert(value.hex().startsWith("06"),
+           "Expected subtype 6 but found the wrong type: " + value.hex());
+}
