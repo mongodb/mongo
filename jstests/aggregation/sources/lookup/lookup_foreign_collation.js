@@ -6,7 +6,6 @@
  * ]
  */
 load("jstests/aggregation/extras/utils.js");  // For anyEq.
-load("jstests/libs/sbe_util.js");             // For checkSBEEnabled.
 
 (function() {
 
@@ -15,13 +14,6 @@ load("jstests/libs/sbe_util.js");             // For checkSBEEnabled.
 load("jstests/libs/fixture_helpers.js");  // For isSharded.
 
 const testDB = db.getSiblingDB(jsTestName());
-
-// TODO SERVER-64482 Reenable this test when SERVER-64482 is done.
-if (checkSBEEnabled(testDB, ["featureFlagSBELookupPushdown"])) {
-    jsTestLog("Skipping test because SBE and SBE $lookup features are both enabled.");
-    return;
-}
-
 const localColl = testDB.local_no_collation;
 const localCaseInsensitiveColl = testDB.local_collation;
 const foreignColl = testDB.foreign_no_collation;
@@ -71,15 +63,15 @@ function setup() {
     // Pipeline style $lookup with cases insensitive collation.
     const lookupWithPipeline = (foreignColl) => {
         return {
-         $lookup: {from: foreignColl.getName(), as: "foreignMatch", _internalCollation: caseInsensitiveCollation, let: {l_id: "$_id"}, pipeline: [{$match: {$expr: {$eq: ["$_id", "$$l_id"]}}}]}
-     };
+          $lookup: {from: foreignColl.getName(), as: "foreignMatch", _internalCollation: caseInsensitiveCollation, let: {l_id: "$_id"}, pipeline: [{$match: {$expr: {$eq: ["$_id", "$$l_id"]}}}]}
+      };
     };
 
     // Local-field foreign-field style $lookup with cases insensitive collation.
     const lookupWithLocalForeignField = (foreignColl) => {
         return {
-         $lookup: {from: foreignColl.getName(), localField: "_id", foreignField: "_id", as: "foreignMatch", _internalCollation: caseInsensitiveCollation}
-     };
+          $lookup: {from: foreignColl.getName(), localField: "_id", foreignField: "_id", as: "foreignMatch", _internalCollation: caseInsensitiveCollation}
+      };
     };
 
     const resultSetCaseInsensitive = [
@@ -110,14 +102,14 @@ function setup() {
     function assertExpectedResultSet(
         localColl, foreignColl, commandCollation, lookupCollation, expectedResults) {
         const lookupWithPipeline = {$lookup: {from: foreignColl.getName(), 
-                                as: "foreignMatch",
-                                let: {l_id: "$_id"}, 
-                                pipeline: [{$match: {$expr: {$eq: ["$_id", "$$l_id"]}}}]}};
+                                 as: "foreignMatch",
+                                 let: {l_id: "$_id"}, 
+                                 pipeline: [{$match: {$expr: {$eq: ["$_id", "$$l_id"]}}}]}};
 
         const lookupWithLocalForeignField = {$lookup: {from: foreignColl.getName(), 
-        localField: "_id", 
-        foreignField: "_id", 
-        as: "foreignMatch"}};
+         localField: "_id", 
+         foreignField: "_id", 
+         as: "foreignMatch"}};
 
         if (lookupCollation) {
             lookupWithPipeline.$lookup._internalCollation = lookupCollation;
@@ -162,15 +154,15 @@ function setup() {
     setup();
 
     const lookupWithPipeline = {$lookup: {from: foreignColl.getName(), 
-        as: "foreignMatch",
-        let: {l_id: "$_id"}, 
-        pipeline: [{$match: {$expr: {$eq: ["$_id", "$$l_id"]}}},
-                     {$lookup: {from: localColl.getName(),
-                        as: "foreignMatch2",
-                        let: {l_id: "$_id"},
-                        pipeline: [{$match: {$expr: {$eq: ["$_id", "$$l_id"]}}}],
-                        _internalCollation: simpleCollation}}],
-        _internalCollation: caseInsensitiveCollation}};
+         as: "foreignMatch",
+         let: {l_id: "$_id"}, 
+         pipeline: [{$match: {$expr: {$eq: ["$_id", "$$l_id"]}}},
+                      {$lookup: {from: localColl.getName(),
+                         as: "foreignMatch2",
+                         let: {l_id: "$_id"},
+                         pipeline: [{$match: {$expr: {$eq: ["$_id", "$$l_id"]}}}],
+                         _internalCollation: simpleCollation}}],
+         _internalCollation: caseInsensitiveCollation}};
 
     const resultSet = [
         {_id: "a", foreignMatch: [{_id: "a", "foreignMatch2": [{"_id": "a"}]}]},
@@ -190,12 +182,12 @@ function setup() {
     // A $lookup stage with a collation that differs from the collection and command collation
     // will not absorb a $match on unwound results.
     let pipeline = [{$lookup: {from: foreignColl.getName(), 
-        as: "foreignMatch",
-        let: {l_id: "$_id"}, 
-        pipeline: [{$match: {$expr: {$eq: ["$_id", "$$l_id"]}}}],
-        _internalCollation: caseInsensitiveCollation}},
-        {$unwind: "$foreignMatch"},
-        {$match: {"foreignMatch._id": "b"}}];
+         as: "foreignMatch",
+         let: {l_id: "$_id"}, 
+         pipeline: [{$match: {$expr: {$eq: ["$_id", "$$l_id"]}}}],
+         _internalCollation: caseInsensitiveCollation}},
+         {$unwind: "$foreignMatch"},
+         {$match: {"foreignMatch._id": "b"}}];
 
     let results = localColl.aggregate(pipeline).toArray();
     assert.eq(0, results.length);
@@ -210,12 +202,12 @@ function setup() {
     // A $lookup stage with a collation that matches the command collation will absorb a $match
     // stage.
     pipeline = [{$lookup: {from: foreignColl.getName(), 
-        as: "foreignMatch",
-        let: {l_id: "$_id"}, 
-        pipeline: [{$match: {$expr: {$eq: ["$_id", "$$l_id"]}}}],
-        _internalCollation: caseInsensitiveCollation}},
-        {$unwind: "$foreignMatch"},
-        {$match: {"foreignMatch._id": "b"}}];
+         as: "foreignMatch",
+         let: {l_id: "$_id"}, 
+         pipeline: [{$match: {$expr: {$eq: ["$_id", "$$l_id"]}}}],
+         _internalCollation: caseInsensitiveCollation}},
+         {$unwind: "$foreignMatch"},
+         {$match: {"foreignMatch._id": "b"}}];
 
     let expectedResults = [{"_id": "b", "foreignMatch": {"_id": "B"}}];
 
@@ -229,12 +221,12 @@ function setup() {
     // A $lookup stage with a collation that matches the local collection collation will absorb
     // a $match stage.
     pipeline = [{$lookup: {from: foreignColl.getName(), 
-        as: "foreignMatch",
-        let: {l_id: "$_id"},
-        pipeline: [{$match: {$expr: {$eq: ["$_id", "$$l_id"]}}}],
-        _internalCollation: caseInsensitiveCollation}},
-        {$unwind: "$foreignMatch"},
-        {$match: {"foreignMatch._id": "b"}}];
+         as: "foreignMatch",
+         let: {l_id: "$_id"},
+         pipeline: [{$match: {$expr: {$eq: ["$_id", "$$l_id"]}}}],
+         _internalCollation: caseInsensitiveCollation}},
+         {$unwind: "$foreignMatch"},
+         {$match: {"foreignMatch._id": "b"}}];
 
     expectedResults = [{"_id": "b", "foreignMatch": {"_id": "B"}}];
 

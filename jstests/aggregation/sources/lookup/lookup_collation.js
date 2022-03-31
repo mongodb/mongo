@@ -2,6 +2,15 @@
  * Tests that $lookup respects the user-specified collation or the inherited local collation
  * when performing comparisons on a foreign collection with a different default collation. Exercises
  * the fix for SERVER-43350.
+ *
+ * Collation can be set at three different levels for $lookup stage
+ *  1. on the local collection (collation on the foreign collection is always ignored)
+ *  2. on the $lookup stage via '_internalCollation' property
+ *  3. on the aggregation command via 'collation' property in options
+ *
+ * The three settings have the following precedence:
+ *  1. '_internalCollation' overrides all others
+ *  2. 'collation' option overrides local collection's collation
  */
 load("jstests/aggregation/extras/utils.js");  // For anyEq.
 load("jstests/libs/sbe_util.js");             // For checkSBEEnabled.
@@ -15,103 +24,177 @@ load("jstests/libs/fixture_helpers.js");  // For isSharded.
 const testDB = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());
 
-// TODO SERVER-64482 Reenable this test when SERVER-64482 is done.
-if (checkSBEEnabled(testDB, ["featureFlagSBELookupPushdown"])) {
-    jsTestLog("Skipping test because SBE and SBE $lookup features are both enabled.");
-    return;
-}
-
-const caseInsensitiveCollation = {
+const caseInsensitive = {
     locale: "en_US",
     strength: 1
 };
 
-const simpleCollation = {
+const caseSensitive = {
     locale: "simple"
 };
 
-assert.commandWorked(testDB.createCollection("no_collation"));
-assert.commandWorked(
-    testDB.createCollection("case_insensitive", {collation: caseInsensitiveCollation}));
+// When no collation is specified for a collection, it uses the default, case-sensitive collation.
+assert.commandWorked(testDB.createCollection("case_sensitive"));
+const collAa = testDB.case_sensitive;
+assert.commandWorked(testDB.createCollection("case_sensitive_indexed"));
+const collAa_indexed = testDB.case_sensitive_indexed;
 
-const noCollationColl = testDB.no_collation;
-const caseInsensitiveColl = testDB.case_insensitive;
+assert.commandWorked(testDB.createCollection("case_insensitive", {collation: caseInsensitive}));
+const collAA = testDB.case_insensitive;
 
 // Do not run the rest of the tests if the foreign collection is implicitly sharded but the flag to
 // allow $lookup/$graphLookup into a sharded collection is disabled.
 const getShardedLookupParam = db.adminCommand({getParameter: 1, featureFlagShardedLookup: 1});
 const isShardedLookupEnabled = getShardedLookupParam.hasOwnProperty("featureFlagShardedLookup") &&
     getShardedLookupParam.featureFlagShardedLookup.value;
-if (FixtureHelpers.isSharded(caseInsensitiveColl) && !isShardedLookupEnabled) {
+if (FixtureHelpers.isSharded(collAA) && !isShardedLookupEnabled) {
     return;
 }
 
-assert.commandWorked(
-    noCollationColl.insert([{_id: "a"}, {_id: "b"}, {_id: "c"}, {_id: "d"}, {_id: "e"}]));
-assert.commandWorked(
-    caseInsensitiveColl.insert([{_id: "a"}, {_id: "B"}, {_id: "c"}, {_id: "D"}, {_id: "e"}]));
+const records = [{_id: 0, key: "a"}, {_id: 1, key: "A"}];
+assert.commandWorked(collAa.insert(records));
+assert.commandWorked(collAA.insert(records));
+assert.commandWorked(collAa_indexed.insert(records));
+assert.commandWorked(collAa_indexed.createIndex({key: 1}));
 
 const lookupWithPipeline = (foreignColl) => {
     return {
-        $lookup: {from: foreignColl.getName(), as: "foreignMatch", let: {l_id: "$_id"}, pipeline: [{$match: {$expr: {$eq: ["$_id", "$$l_id"]}}}]}
+        $lookup: {
+            from: foreignColl.getName(),
+            as: "matched",
+            let: {l_key: "$key"},
+            pipeline: [{$match: {$expr: {$eq: ["$key", "$$l_key"]}}}]
+        }
     };
 };
 const lookupNoPipeline = (foreignColl) => {
     return {
-        $lookup: {from: foreignColl.getName(), localField: "_id", foreignField: "_id", as: "foreignMatch"}
+        $lookup:
+            {from: foreignColl.getName(), localField: "key", foreignField: "key", as: "matched"}
     };
 };
 
-for (let lookupInto of [lookupWithPipeline, lookupNoPipeline]) {
-    // Verify that a $lookup whose local collection has no default collation uses the simple
-    // collation for comparisons on a foreign collection with a non-simple default collation.
-    let results = noCollationColl.aggregate([lookupInto(caseInsensitiveColl)]).toArray();
-    assert(anyEq(results, [
-        {_id: "a", foreignMatch: [{_id: "a"}]},
-        {_id: "b", foreignMatch: []},
-        {_id: "c", foreignMatch: [{_id: "c"}]},
-        {_id: "d", foreignMatch: []},
-        {_id: "e", foreignMatch: [{_id: "e"}]}
-    ]));
+const resultCaseSensistive = [
+    {_id: 0, key: "a", matched: [{_id: 0, key: "a"}]},
+    {_id: 1, key: "A", matched: [{_id: 1, key: "A"}]},
+];
+const resultCaseInsensitive = [
+    {_id: 0, key: "a", matched: [{_id: 0, key: "a"}, {_id: 1, key: "A"}]},
+    {_id: 1, key: "A", matched: [{_id: 0, key: "a"}, {_id: 1, key: "A"}]},
+];
+let results = [];
 
-    // Verify that a $lookup whose local collection has no default collation but which is running in
-    // a pipeline with a non-simple user-specified collation uses the latter for comparisons on the
-    // foreign collection.
-    results =
-        noCollationColl
-            .aggregate([lookupInto(caseInsensitiveColl)], {collation: caseInsensitiveCollation})
-            .toArray();
-    assert(anyEq(results, [
-        {_id: "a", foreignMatch: [{_id: "a"}]},
-        {_id: "b", foreignMatch: [{_id: "B"}]},
-        {_id: "c", foreignMatch: [{_id: "c"}]},
-        {_id: "d", foreignMatch: [{_id: "D"}]},
-        {_id: "e", foreignMatch: [{_id: "e"}]}
-    ]));
+// Collation on the foreign collection should be ignored.
+(function testLocalCollationPrecedence() {
+    for (let lookupInto of [lookupWithPipeline, lookupNoPipeline]) {
+        results = collAa.aggregate([lookupInto(collAA)]).toArray();
+        assertArrayEq({
+            actual: results,
+            expected: resultCaseSensistive,
+            extraErrorMsg: " Default collation on local, running: " + tojson(lookupInto)
+        });
 
-    // Verify that a $lookup whose local collection has a non-simple collation uses the latter for
-    // comparisons on a foreign collection with no default collation.
-    results = caseInsensitiveColl.aggregate([lookupInto(noCollationColl)]).toArray();
-    assert(anyEq(results, [
-        {_id: "a", foreignMatch: [{_id: "a"}]},
-        {_id: "B", foreignMatch: [{_id: "b"}]},
-        {_id: "c", foreignMatch: [{_id: "c"}]},
-        {_id: "D", foreignMatch: [{_id: "d"}]},
-        {_id: "e", foreignMatch: [{_id: "e"}]}
-    ]));
+        results = collAA.aggregate([lookupInto(collAa)]).toArray();
+        assertArrayEq({
+            actual: results,
+            expected: resultCaseInsensitive,
+            extraErrorMsg: " Case-insensitive collation on local, running: " + tojson(lookupInto)
+        });
 
-    // Verify that a $lookup whose local collection has a non-simple collation but which is running
-    // in a pipeline with a user-specified simple collation uses the latter for comparisons on the
-    // foreign collection.
-    results =
-        caseInsensitiveColl.aggregate([lookupInto(noCollationColl)], {collation: simpleCollation})
-            .toArray();
-    assert(anyEq(results, [
-        {_id: "a", foreignMatch: [{_id: "a"}]},
-        {_id: "B", foreignMatch: []},
-        {_id: "c", foreignMatch: [{_id: "c"}]},
-        {_id: "D", foreignMatch: []},
-        {_id: "e", foreignMatch: [{_id: "e"}]}
-    ]));
-}
+        // When lowering to SBE a different join algorithm (HashJoin) is used if 'allowDiskUse' is
+        // set to true. We only need to verify the collation of HJ once, because it works the same
+        // independent of how the collation is chosen.
+        results = collAA.aggregate([lookupInto(collAa)], {allowDiskUse: true}).toArray();
+        assertArrayEq({
+            actual: results,
+            expected: resultCaseInsensitive,
+            extraErrorMsg: " Case-insensitive collation on local, disk use allowed, running: " +
+                tojson(lookupInto)
+        });
+    }
+})();
+
+// Collation at the command level should override collation of the local collection.
+(function testCommandCollationPrecedence() {
+    for (let lookupInto of [lookupWithPipeline, lookupNoPipeline]) {
+        results = collAa.aggregate([lookupInto(collAa)], {collation: caseInsensitive}).toArray();
+        assertArrayEq({
+            actual: results,
+            expected: resultCaseInsensitive,
+            extraErrorMsg: " Case-insensitive collation on command, running: " + tojson(lookupInto)
+        });
+
+        results = collAA.aggregate([lookupInto(collAa)], {collation: caseSensitive}).toArray();
+        assertArrayEq({
+            actual: results,
+            expected: resultCaseSensistive,
+            extraErrorMsg: " Case-sensitive collation on command, running: " + tojson(lookupInto)
+        });
+    }
+})();
+
+// Collation set on $lookup stage with '_internalCollation' should override collation of the local
+// collection and on the command.
+(function testStageCollationPrecedence() {
+    for (let lookupInto of [lookupWithPipeline, lookupNoPipeline]) {
+        let lookupStage = lookupInto(collAa);
+        lookupStage.$lookup._internalCollation = caseInsensitive;
+        results = collAa.aggregate([lookupStage], {collation: caseSensitive}).toArray();
+        assertArrayEq({
+            actual: results,
+            expected: resultCaseInsensitive,
+            extraErrorMsg: " Case-insensitive collation on stage, running: " + tojson(lookupInto)
+        });
+
+        lookupStage.$lookup._internalCollation = caseSensitive;
+        results = collAA.aggregate([lookupStage], {collation: caseInsensitive}).toArray();
+        assertArrayEq({
+            actual: results,
+            expected: resultCaseSensistive,
+            extraErrorMsg: " Case-sensitive collation on stage, running: " + tojson(lookupInto)
+        });
+    }
+})();
+
+// In presense of indexes lookup might choose a different strategy for the join, that relies on the
+// index (INLJ). It should respect the effective collation of $lookup.
+(function testCollationWithIndexes() {
+    // TODO SERVER-65115: integration of collation with INLJ NYI.
+    if (checkSBEEnabled(testDB, ["featureFlagSBELookupPushdown"])) {
+        jsTestLog("Skipping test because of SERVER-65115.");
+        return;
+    }
+
+    for (let lookupInto of [lookupWithPipeline, lookupNoPipeline]) {
+        // Local and foreign have different collations.
+        results = collAA.aggregate([lookupInto(collAa_indexed)]).toArray();
+        assertArrayEq({
+            actual: results,
+            expected: resultCaseInsensitive,
+            extraErrorMsg: " Case-insensitive collation on local, foreign is indexed, running: " +
+                tojson(lookupInto)
+        });
+
+        // Command-level collation overrides collection-level collation.
+        results =
+            collAa.aggregate([lookupInto(collAa_indexed)], {collation: caseInsensitive}).toArray();
+        assertArrayEq({
+            actual: results,
+            expected: resultCaseInsensitive,
+            extraErrorMsg: " Case-insensitive collation on command, foreign is indexed, running: " +
+                tojson(lookupInto)
+        });
+
+        // Stage-level collation overrides collection-level and command-level collations.
+        let lookupStage = lookupInto(collAa_indexed);
+        lookupStage.$lookup._internalCollation = caseInsensitive;
+        results = collAa.aggregate([lookupStage], {collation: caseSensitive}).toArray();
+        assertArrayEq({
+            actual: results,
+            expected: resultCaseInsensitive,
+            extraErrorMsg: " Case-insensitive collation on stage, foreign is indexed, running: " +
+                tojson(lookupInto)
+        });
+    }
+})();
 })();

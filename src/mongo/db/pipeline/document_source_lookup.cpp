@@ -381,6 +381,8 @@ void DocumentSourceLookUp::determineSbeCompatibility() {
         // than indexes into arrays, which is compatible with SBE.)
         && !FieldRef(_localField->fullPath()).hasNumericPathComponents() &&
         !FieldRef(_foreignField->fullPath()).hasNumericPathComponents()
+        // Setting a collator on an individual $lookup stage with _internalCollation isn't supported
+        && !_hasExplicitCollation
         // We currently don't lower $lookup against views ('_fromNs' does not correspond to a
         // view).
         && pExpCtx->getResolvedNamespace(_fromNs).pipeline.empty();
