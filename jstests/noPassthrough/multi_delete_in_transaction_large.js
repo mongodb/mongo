@@ -9,7 +9,7 @@ const rst = new ReplSetTest({
     nodes: 1,
     nodeOptions: {
         // Ensure the storage engine cache can accommodate large transactions.
-        wiredTigerCacheSizeGB: 1,
+        wiredTigerCacheSizeGB: 3,
     },
 });
 rst.startSet();
