@@ -74,8 +74,6 @@ public:
 
     std::vector<std::string> getIndexIdents(OperationContext* opCtx, RecordId catalogId) const;
 
-    bool isIndexInEntry(OperationContext* opCtx, RecordId catalogId, StringData idxIdent) const;
-
     BSONObj getCatalogEntry(OperationContext* opCtx, RecordId catalogId) const {
         return _findEntry(opCtx, catalogId);
     }

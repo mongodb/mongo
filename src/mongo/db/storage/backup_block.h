@@ -53,8 +53,12 @@ namespace mongo {
  */
 class BackupBlock final {
 public:
+    using IdentToNamespaceAndUUIDMap =
+        stdx::unordered_map<std::string, std::pair<NamespaceString, UUID>>;
+
     explicit BackupBlock(OperationContext* opCtx,
                          std::string filePath,
+                         const IdentToNamespaceAndUUIDMap& identToNamespaceAndUUIDMap,
                          boost::optional<Timestamp> checkpointTimestamp,
                          std::uint64_t offset = 0,
                          std::uint64_t length = 0,
@@ -101,9 +105,10 @@ private:
      * node.
      * A null opCtx is ignored. A null opCtx is exercised by FCBIS unit tests.
      */
-    void _initialize(OperationContext* opCtx, boost::optional<Timestamp> checkpointTimestamp);
+    void _initialize(OperationContext* opCtx,
+                     const IdentToNamespaceAndUUIDMap& identToNamespaceAndUUIDMap,
+                     boost::optional<Timestamp> checkpointTimestamp);
     void _setNamespaceString(const NamespaceString& nss);
-    void _setUuid(OperationContext* opCtx, DurableCatalog* catalog, RecordId catalogId);
 
     const std::string _filePath;
     const std::uint64_t _offset;

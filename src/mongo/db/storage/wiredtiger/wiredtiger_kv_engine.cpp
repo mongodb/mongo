@@ -1133,6 +1133,7 @@ public:
                 const std::uint64_t length = options.incrementalBackup ? fileSize : 0;
                 backupBlocks.push_back(BackupBlock(opCtx,
                                                    filePath.string(),
+                                                   _wtBackup->identToNamespaceAndUUIDMap,
                                                    _checkpointTimestamp,
                                                    0 /* offset */,
                                                    length,
@@ -1190,8 +1191,13 @@ private:
                         "offset"_attr = offset,
                         "size"_attr = size,
                         "type"_attr = type);
-            backupBlocks->push_back(BackupBlock(
-                opCtx, filePath.string(), _checkpointTimestamp, offset, size, fileSize));
+            backupBlocks->push_back(BackupBlock(opCtx,
+                                                filePath.string(),
+                                                _wtBackup->identToNamespaceAndUUIDMap,
+                                                _checkpointTimestamp,
+                                                offset,
+                                                size,
+                                                fileSize));
         }
 
         // If the file is unchanged, push a BackupBlock with offset=0 and length=0. This allows us
@@ -1199,6 +1205,7 @@ private:
         if (fileUnchangedFlag) {
             backupBlocks->push_back(BackupBlock(opCtx,
                                                 filePath.string(),
+                                                _wtBackup->identToNamespaceAndUUIDMap,
                                                 _checkpointTimestamp,
                                                 0 /* offset */,
                                                 0 /* length */,
@@ -1280,6 +1287,22 @@ WiredTigerKVEngine::beginNonBlockingBackup(OperationContext* opCtx,
 
     invariant(_wtBackup.logFilePathsSeenByExtendBackupCursor.empty());
     invariant(_wtBackup.logFilePathsSeenByGetNextBatch.empty());
+    invariant(_wtBackup.identToNamespaceAndUUIDMap.empty());
+
+    DurableCatalog* catalog = DurableCatalog::get(opCtx);
+    std::vector<DurableCatalog::Entry> catalogEntries = catalog->getAllCatalogEntries(opCtx);
+    for (const DurableCatalog::Entry& e : catalogEntries) {
+        // Populate the collection ident with its namespace and UUID.
+        UUID uuid = catalog->getMetaData(opCtx, e.catalogId)->options.uuid.get();
+        _wtBackup.identToNamespaceAndUUIDMap.emplace(e.ident, std::make_pair(e.nss, uuid));
+
+        // Populate the collection's index idents with the collection's namespace and UUID.
+        std::vector<std::string> idxIdents = catalog->getIndexIdents(opCtx, e.catalogId);
+        for (const std::string& idxIdent : idxIdents) {
+            _wtBackup.identToNamespaceAndUUIDMap.emplace(idxIdent, std::make_pair(e.nss, uuid));
+        }
+    }
+
     auto streamingCursor = std::make_unique<StreamingCursorImpl>(
         session, _path, checkpointTimestamp, options, &_wtBackup);
 
@@ -1303,6 +1326,7 @@ void WiredTigerKVEngine::endNonBlockingBackup(OperationContext* opCtx) {
     _wtBackup.dupCursor = nullptr;
     _wtBackup.logFilePathsSeenByExtendBackupCursor = {};
     _wtBackup.logFilePathsSeenByGetNextBatch = {};
+    _wtBackup.identToNamespaceAndUUIDMap = {};
 
     boost::filesystem::remove(getOngoingBackupPath());
 }

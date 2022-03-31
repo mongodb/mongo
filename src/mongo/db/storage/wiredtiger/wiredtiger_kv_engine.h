@@ -40,6 +40,7 @@
 #include "mongo/bson/ordering.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/storage/backup_block.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -79,6 +80,7 @@ struct WiredTigerBackup {
     WT_CURSOR* dupCursor = nullptr;
     std::set<std::string> logFilePathsSeenByExtendBackupCursor;
     std::set<std::string> logFilePathsSeenByGetNextBatch;
+    BackupBlock::IdentToNamespaceAndUUIDMap identToNamespaceAndUUIDMap;
 
     // 'wtBackupCursorMutex' provides concurrency control between beginNonBlockingBackup(),
     // endNonBlockingBackup(), and getNextBatch() because we stream the output of the backup cursor.

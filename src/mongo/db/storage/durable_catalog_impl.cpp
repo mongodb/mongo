@@ -412,27 +412,6 @@ std::vector<std::string> DurableCatalogImpl::getIndexIdents(OperationContext* op
     return idents;
 }
 
-bool DurableCatalogImpl::isIndexInEntry(OperationContext* opCtx,
-                                        RecordId catalogId,
-                                        StringData idxIdent) const {
-    BSONObj obj = _findEntry(opCtx, catalogId);
-    if (obj["idxIdent"].eoo()) {
-        return false;
-    }
-
-    BSONObj idxIdentObj = obj["idxIdent"].Obj();
-
-    BSONObjIterator it(idxIdentObj);
-    while (it.more()) {
-        BSONElement elem = it.next();
-        if (elem.valueStringData() == idxIdent) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
 BSONObj DurableCatalogImpl::_findEntry(OperationContext* opCtx, RecordId catalogId) const {
     LOGV2_DEBUG(22208, 3, "looking up metadata for: {catalogId}", "catalogId"_attr = catalogId);
     RecordData data;

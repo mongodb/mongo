@@ -51,6 +51,7 @@ const std::set<std::string> kRequiredMDBFiles = {"_mdb_catalog.wt", "sizeStorer.
 
 BackupBlock::BackupBlock(OperationContext* opCtx,
                          std::string filePath,
+                         const IdentToNamespaceAndUUIDMap& identToNamespaceAndUUIDMap,
                          boost::optional<Timestamp> checkpointTimestamp,
                          std::uint64_t offset,
                          std::uint64_t length,
@@ -58,7 +59,7 @@ BackupBlock::BackupBlock(OperationContext* opCtx,
     : _filePath(filePath), _offset(offset), _length(length), _fileSize(fileSize) {
     boost::filesystem::path path(filePath);
     _filenameStem = path.stem().string();
-    _initialize(opCtx, checkpointTimestamp);
+    _initialize(opCtx, identToNamespaceAndUUIDMap, checkpointTimestamp);
 }
 
 bool BackupBlock::isRequired() const {
@@ -112,40 +113,18 @@ void BackupBlock::_setNamespaceString(const NamespaceString& nss) {
     _nss = nss;
 }
 
-void BackupBlock::_setUuid(OperationContext* opCtx, DurableCatalog* catalog, RecordId catalogId) {
-    // Caller controls lifetime of catalog and relevant lock
-    std::shared_ptr<BSONCollectionCatalogEntry::MetaData> md =
-        catalog->getMetaData(opCtx, catalogId);
-    _uuid = md->options.uuid;
-}
-
 void BackupBlock::_initialize(OperationContext* opCtx,
+                              const IdentToNamespaceAndUUIDMap& identToNamespaceAndUUIDMap,
                               boost::optional<Timestamp> checkpointTimestamp) {
     if (!opCtx) {
         return;
     }
 
-    {
-        // Fetch the latest values for the ident.
-        Lock::GlobalLock lk(opCtx, MODE_IS);
-        DurableCatalog* catalog = DurableCatalog::get(opCtx);
-        std::vector<DurableCatalog::Entry> catalogEntries = catalog->getAllCatalogEntries(opCtx);
-        for (const DurableCatalog::Entry& e : catalogEntries) {
-            if (StringData(_filenameStem).startsWith("index-"_sd) &&
-                // Index idents will get the namespace and UUID of their respective collection.
-                catalog->isIndexInEntry(opCtx, e.catalogId, _filenameStem)) {
-                _setUuid(opCtx, catalog, e.catalogId);
-                _setNamespaceString(e.nss);
-                break;
-            }
-
-            if (e.ident == _filenameStem) {
-                // This ident represents the collection.
-                _setUuid(opCtx, catalog, e.catalogId);
-                _setNamespaceString(e.nss);
-                break;
-            }
-        }
+    // Fetch the latest values for the ident.
+    auto it = identToNamespaceAndUUIDMap.find(_filenameStem);
+    if (it != identToNamespaceAndUUIDMap.end()) {
+        _uuid = it->second.second;
+        _setNamespaceString(it->second.first);
     }
 
     if (!checkpointTimestamp) {

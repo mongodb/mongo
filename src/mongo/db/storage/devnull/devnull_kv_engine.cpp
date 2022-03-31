@@ -253,8 +253,10 @@ public:
 };
 
 DevNullKVEngine::DevNullKVEngine() {
-    _mockBackupBlocks.push_back(
-        BackupBlock(/*opCtx=*/nullptr, "filename.wt", /*checkpointTimestamp=*/boost::none));
+    _mockBackupBlocks.push_back(BackupBlock(/*opCtx=*/nullptr,
+                                            "filename.wt",
+                                            /*identToNamespaceAndUUIDMap=*/{},
+                                            /*checkpointTimestamp=*/boost::none));
 }
 
 std::unique_ptr<RecordStore> DevNullKVEngine::getRecordStore(OperationContext* opCtx,
