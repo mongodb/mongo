@@ -624,8 +624,8 @@ Status storeMongodOptions(const moe::Environment& params) {
     }
     if (params.count("sharding.clusterRole")) {
         auto clusterRoleParam = params["sharding.clusterRole"].as<std::string>();
-        const bool replicationEnabled =
-            params.count("replication.replSet") || params.count("replication.replSetName");
+        const bool replicationEnabled = params.count("replication.replSet") ||
+            params.count("replication.replSetName") || params.count("replication.serverless");
         // Force to set up the node as a replica set, unless we're a shard and we're using queryable
         // backup mode.
         if ((clusterRoleParam == "configsvr" || !params.count("storage.queryableBackupMode")) &&

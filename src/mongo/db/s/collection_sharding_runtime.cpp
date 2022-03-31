@@ -33,6 +33,7 @@
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/global_settings.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_state.h"
@@ -310,6 +311,12 @@ CollectionShardingRuntime::_getCurrentMetadataIfKnown(
     stdx::lock_guard lk(_metadataManagerLock);
     switch (_metadataType) {
         case MetadataType::kUnknown:
+            // Until user collections can be sharded in serverless, the sessions collection will be
+            // the only sharded collection.
+            if (getGlobalReplSettings().isServerless() &&
+                _nss != NamespaceString::kLogicalSessionsNamespace) {
+                return kUnshardedCollection;
+            }
             return nullptr;
         case MetadataType::kUnsharded:
             return kUnshardedCollection;

@@ -41,11 +41,6 @@ selector:
   - requires_capped
   # In this suite the test talks directly to shardsvrs (doesn't go through mongos).
   - directly_against_shardsvrs_incompatible
-  # TODO (SERVER-64132): Remove these tests from the exclude list. They may currently fail because
-  # they create a collection via the renameCollection path, so are not created with kUnsharded
-  # filtering metadata.
-  - uses_$out
-  - uses_map_reduce_with_temp_collections
 
 executor:
   archive:

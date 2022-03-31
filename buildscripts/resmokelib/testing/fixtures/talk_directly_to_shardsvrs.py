@@ -81,7 +81,7 @@ class TalkDirectlyToShardsvrsFixture(interface.MultiClusterFixture):  # pylint: 
                 mongod_options = self.common_mongod_options.copy()
                 mongod_options["shardsvr"] = ""
                 mongod_options["dbpath"] = os.path.join(self._dbpath_prefix, rs_name)
-                mongod_options["replSet"] = rs_name
+                mongod_options["serverless"] = True
 
                 self.replica_sets.append(
                     self.fixturelib.make_fixture(
