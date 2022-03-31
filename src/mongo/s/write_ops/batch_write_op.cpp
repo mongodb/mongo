@@ -34,14 +34,12 @@
 #include <numeric>
 
 #include "mongo/base/error_codes.h"
-#include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/catalog/collection_uuid_mismatch_info.h"
-#include "mongo/db/list_collections_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/s/client/num_hosts_targeted_metrics.h"
 #include "mongo/s/cluster_commands_helpers.h"
-#include "mongo/s/grid.h"
+#include "mongo/s/collection_uuid_mismatch.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
 
@@ -281,55 +279,14 @@ void populateCollectionUUIDMismatch(OperationContext* opCtx,
         return;
     }
 
-    // The listCollections command cannot be run in multi-document transactions, so run it using an
-    // alternative client.
-    auto client = opCtx->getServiceContext()->makeClient("populateCollectionUUIDMismatch");
-    auto alternativeOpCtx = client->makeOperationContext();
-    opCtx = alternativeOpCtx.get();
-    AlternativeClientRegion acr{client};
-
-    auto swDbInfo = Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, info->db());
-    if (!swDbInfo.isOK()) {
-        error->setStatus(swDbInfo.getStatus());
-        return;
+    error->setStatus(populateCollectionUUIDMismatch(opCtx, error->getStatus()));
+    if (error->getStatus() == ErrorCodes::CollectionUUIDMismatch) {
+        *hasContactedPrimaryShard = true;
+        if (auto& populatedActualCollection =
+                error->getStatus().extraInfo<CollectionUUIDMismatchInfo>()->actualCollection()) {
+            *actualCollection = populatedActualCollection;
+        }
     }
-
-    ListCollections listCollections;
-    listCollections.setDbName(info->db());
-    listCollections.setFilter(BSON("info.uuid" << info->collectionUUID()));
-
-    auto response =
-        executeCommandAgainstDatabasePrimary(opCtx,
-                                             info->db(),
-                                             swDbInfo.getValue(),
-                                             listCollections.toBSON({}),
-                                             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                             Shard::RetryPolicy::kIdempotent);
-    if (!response.swResponse.isOK()) {
-        error->setStatus(response.swResponse.getStatus());
-        return;
-    }
-
-
-    if (auto status = getStatusFromCommandResult(response.swResponse.getValue().data);
-        !status.isOK()) {
-        error->setStatus(status);
-        return;
-    }
-
-    if (auto actualCollectionElem = dotted_path_support::extractElementAtPath(
-            response.swResponse.getValue().data, "cursor.firstBatch.0.name")) {
-        *actualCollection = actualCollectionElem.str();
-        error->setStatus({CollectionUUIDMismatchInfo{info->db(),
-                                                     info->collectionUUID(),
-                                                     info->expectedCollection(),
-                                                     **actualCollection},
-                          error->getStatus().reason()});
-        return;
-    }
-
-    *hasContactedPrimaryShard = true;
-    return;
 }
 
 }  // namespace

@@ -47,6 +47,7 @@ env.Library(
     target='sharding_router_api',
     source=[
         'cluster_commands_helpers.cpp',
+        'collection_uuid_mismatch.cpp',
         'multi_statement_transaction_requests_sender.cpp',
         'router_transactions_metrics.cpp',
         'router_transactions_stats.idl',

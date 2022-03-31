@@ -54,6 +54,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/cluster_commands_helpers.h"
+#include "mongo/s/collection_uuid_mismatch.h"
 #include "mongo/s/query/cluster_query_knobs_gen.h"
 #include "mongo/s/query/document_source_merge_cursors.h"
 #include "mongo/s/query/establish_cursors.h"
@@ -1116,6 +1117,9 @@ DispatchShardPipelineResults dispatchShardPipeline(
                 uassert(5858100, *failOnShardedCollection, executionNsRoutingInfo->isSharded());
             }
             throw;
+        } catch (const ExceptionFor<ErrorCodes::CollectionUUIDMismatch>& ex) {
+            uassertStatusOK(populateCollectionUUIDMismatch(opCtx, ex.toStatus()));
+            MONGO_UNREACHABLE_TASSERT(6487201);
         }
         // If we thought the collection was sharded and the shard confirmed this, fail if the query
         // isn't valid on a sharded collection.
