@@ -24,18 +24,9 @@ const validateErrorResponse = function(
     assert.eq(res.actualCollection, actualCollection);
 };
 
-// On mongos, collectionUUID is only supported for $collStats and $indexStats aggregations.
-if (FixtureHelpers.isMongos(db)) {
-    assert.commandFailedWithCode(
-        testDB.runCommand(
-            {aggregate: 1, collectionUUID: UUID(), pipeline: [{$match: {}}], cursor: {}}),
-        6256300);
-    return;
-}
-
 const docs = [{_id: 1}, {_id: 2}];
 
-testColl.drop({writeConcern: {w: "majority"}});
+assert.commandWorked(testDB.dropDatabase());
 assert.commandWorked(testColl.insert(docs));
 
 // Get the namespace's initial UUID.
@@ -99,10 +90,9 @@ assert.sameMembers(collNameRes.cursor.firstBatch, docs);
 
 // An aggregation with a collectionUUID should fail with CollectionUUIDMismatch if the namespace is
 // a view.
-const testView = testDB.getCollection("viewCollection");
-testView.drop({writeConcern: {w: "majority"}});
-assert.commandWorked(testView.runCommand(
-    "create", {viewOn: testColl.getName(), pipeline: [], writeConcern: {w: "majority"}}));
+const viewName = 'view';
+assert.commandWorked(testDB.runCommand(
+    {create: viewName, viewOn: testColl.getName(), pipeline: [], writeConcern: {w: "majority"}}));
 
 res = assert.commandFailedWithCode(
     testDB.runCommand(
@@ -128,7 +118,7 @@ assert.commandFailedWithCode(
 
 // collectionUUID is not allowed with collectionless aggregations.
 assert.commandFailedWithCode(
-    testDB.runCommand(
-        {aggregate: 1, collectionUUID: uuid, pipeline: [{$listLocalSessions: {}}], cursor: {}}),
+    testDB.adminCommand(
+        {aggregate: 1, collectionUUID: uuid, pipeline: [{$currentOp: {}}], cursor: {}}),
     4928901);
 })();

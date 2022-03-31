@@ -302,12 +302,6 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     auto involvedNamespaces = liteParsedPipeline.getInvolvedNamespaces();
     auto shouldDoFLERewrite = ::mongo::shouldDoFLERewrite(request);
 
-    uassert(6256300,
-            str::stream() << "On mongos, " << AggregateCommandRequest::kCollectionUUIDFieldName
-                          << " is only supported for $collStats and $indexStats aggregation.",
-            !request.getCollectionUUID() || liteParsedPipeline.startsWithCollStats() ||
-                liteParsedPipeline.startsWithIndexStats());
-
     // If the routing table is not already taken by the higher level, fill it now.
     if (!cm) {
         // If the routing table is valid, we obtain a reference to it. If the table is not valid,
@@ -395,6 +389,14 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         hasChangeStream,
         allowedToPassthrough,
         request.getPassthroughToShard().has_value());
+
+    uassert(
+        6487500,
+        fmt::format("Cannot use {} with an aggregation that executes entirely on mongos",
+                    AggregateCommandRequest::kCollectionUUIDFieldName),
+        !request.getCollectionUUID() ||
+            targeter.policy !=
+                cluster_aggregation_planner::AggregationTargeter::TargetingPolicy::kMongosRequired);
 
     if (!expCtx) {
         // When the AggregationTargeter chooses a "passthrough" policy, it does not call the
