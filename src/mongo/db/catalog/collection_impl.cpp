@@ -606,54 +606,76 @@ Status CollectionImpl::checkValidatorAPIVersionCompatability(OperationContext* o
     return Status::OK();
 }
 
-Status CollectionImpl::checkValidation(OperationContext* opCtx, const BSONObj& document) const {
+std::pair<CollectionImpl::SchemaValidationResult, Status> CollectionImpl::checkValidation(
+    OperationContext* opCtx, const BSONObj& document) const {
     if (!_validator.isOK()) {
-        return _validator.getStatus();
+        return {SchemaValidationResult::kError, _validator.getStatus()};
     }
 
     const auto* const validatorMatchExpr = _validator.filter.getValue().get();
     if (!validatorMatchExpr)
-        return Status::OK();
+        return {SchemaValidationResult::kPass, Status::OK()};
 
     if (validationLevelOrDefault(_metadata->options.validationLevel) == ValidationLevelEnum::off)
-        return Status::OK();
+        return {SchemaValidationResult::kPass, Status::OK()};
 
     if (DocumentValidationSettings::get(opCtx).isSchemaValidationDisabled())
-        return Status::OK();
+        return {SchemaValidationResult::kPass, Status::OK()};
 
     if (ns().isTemporaryReshardingCollection()) {
         // In resharding, the donor shard primary is responsible for performing document validation
         // and the recipient should not perform validation on documents inserted into the temporary
         // resharding collection.
-        return Status::OK();
+        return {SchemaValidationResult::kPass, Status::OK()};
     }
 
     auto status = checkValidatorAPIVersionCompatability(opCtx);
     if (!status.isOK()) {
-        return status;
+        return {SchemaValidationResult::kError, status};
     }
 
     try {
         if (validatorMatchExpr->matchesBSON(document))
-            return Status::OK();
+            return {SchemaValidationResult::kPass, Status::OK()};
     } catch (DBException&) {
     };
 
     BSONObj generatedError = doc_validation_error::generateError(*validatorMatchExpr, document);
 
+    static constexpr auto kValidationFailureErrorStr = "Document failed validation"_sd;
+    status = Status(doc_validation_error::DocumentValidationFailureInfo(generatedError),
+                    kValidationFailureErrorStr);
+
     if (validationActionOrDefault(_metadata->options.validationAction) ==
         ValidationActionEnum::warn) {
-        LOGV2_WARNING(20294,
-                      "Document would fail validation",
-                      logAttrs(ns()),
-                      "document"_attr = redact(document),
-                      "errInfo"_attr = generatedError);
+        return {SchemaValidationResult::kWarn, status};
+    }
+
+    return {SchemaValidationResult::kError, status};
+}
+
+Status CollectionImpl::_checkValidationAndParseResult(OperationContext* opCtx,
+                                                      const BSONObj& document) const {
+    std::pair<CollectionImpl::SchemaValidationResult, Status> result =
+        checkValidation(opCtx, document);
+
+    if (result.first == CollectionImpl::SchemaValidationResult::kPass) {
         return Status::OK();
     }
 
-    static constexpr auto kValidationFailureErrorStr = "Document failed validation"_sd;
-    return {doc_validation_error::DocumentValidationFailureInfo(generatedError),
-            kValidationFailureErrorStr};
+    if (result.first == CollectionImpl::SchemaValidationResult::kWarn) {
+        LOGV2_WARNING(
+            20294,
+            "Document would fail validation",
+            logAttrs(ns()),
+            "document"_attr = redact(document),
+            "errInfo"_attr =
+                result.second.extraInfo<doc_validation_error::DocumentValidationFailureInfo>()
+                    ->getDetails());
+        return Status::OK();
+    }
+
+    return result.second;
 }
 
 Collection::Validator CollectionImpl::parseValidator(
@@ -797,7 +819,7 @@ Status CollectionImpl::insertDocuments(OperationContext* opCtx,
                               << _tenantNs.toString());
         }
 
-        auto status = checkValidation(opCtx, it->doc);
+        auto status = _checkValidationAndParseResult(opCtx, it->doc);
         if (!status.isOK())
             return status;
     }
@@ -858,7 +880,7 @@ Status CollectionImpl::insertDocumentForBulkLoader(
         return status;
     }
 
-    status = checkValidation(opCtx, doc);
+    status = _checkValidationAndParseResult(opCtx, doc);
     if (!status.isOK()) {
         return status;
     }
@@ -1299,14 +1321,14 @@ RecordId CollectionImpl::updateDocument(OperationContext* opCtx,
                                         OpDebug* opDebug,
                                         CollectionUpdateArgs* args) const {
     {
-        auto status = checkValidation(opCtx, newDoc);
+        auto status = _checkValidationAndParseResult(opCtx, newDoc);
         if (!status.isOK()) {
             if (validationLevelOrDefault(_metadata->options.validationLevel) ==
                 ValidationLevelEnum::strict) {
                 uassertStatusOK(status);
             }
             // moderate means we have to check the old doc
-            auto oldDocStatus = checkValidation(opCtx, oldDoc.value());
+            auto oldDocStatus = _checkValidationAndParseResult(opCtx, oldDoc.value());
             if (oldDocStatus.isOK()) {
                 // transitioning from good -> bad is not ok
                 uassertStatusOK(status);

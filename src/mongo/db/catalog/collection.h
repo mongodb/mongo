@@ -334,9 +334,18 @@ public:
     virtual const BSONObj getValidatorDoc() const = 0;
 
     /**
-     * Returns a non-ok Status if the document does not pass this collection's schema validator.
+     * Returns 'kPass' with an ok Status if the document passes this collection's schema validator.
+     *
+     * Returns a non-ok Status if the document does not pass this collection's schema validator and
+     * returns 'kWarn' or 'kError' based on the validation action.
+     *
+     * The validation action is set during collection creation and can be modified as part of
+     * collMod. It determines whether we should error for documents that violate the schema
+     * validation rules, or warn about, but allow invalid documents.
      */
-    virtual Status checkValidation(OperationContext* opCtx, const BSONObj& document) const = 0;
+    enum class SchemaValidationResult { kPass, kWarn, kError };
+    virtual std::pair<SchemaValidationResult, Status> checkValidation(
+        OperationContext* opCtx, const BSONObj& document) const = 0;
 
     virtual bool requiresIdIndex() const = 0;
 

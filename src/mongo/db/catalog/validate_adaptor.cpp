@@ -69,6 +69,10 @@ const long long kMaxErrorSizeBytes = 1 * 1024 * 1024;
 const long long kInterruptIntervalNumRecords = 4096;
 const long long kInterruptIntervalNumBytes = 50 * 1024 * 1024;  // 50MB.
 
+static constexpr const char* kSchemaValidationFailedReason =
+    "Detected one or more documents not compliant with the collection's schema. Check logs for log "
+    "id 5363500.";
+
 /**
  * Validate that for each record in a clustered RecordStore the record key (RecordId) matches the
  * document's cluster key in the record value.
@@ -99,6 +103,29 @@ void _validateClusteredCollectionRecordId(OperationContext* opCtx,
                           << " (RecordId KeyString='" << ksFromRid.toString()
                           << "', cluster key KeyString='" << ksFromBSON.toString() << "')");
         results->corruptRecords.push_back(rid);
+    }
+}
+
+void schemaValidationFailed(CollectionValidation::ValidateState* state,
+                            Collection::SchemaValidationResult result,
+                            ValidateResults* results) {
+    invariant(Collection::SchemaValidationResult::kPass != result);
+
+    if (state->isCollectionSchemaViolated()) {
+        // Only report the message once.
+        return;
+    }
+
+    state->setCollectionSchemaViolated();
+
+    // TODO SERVER-65078: remove the testing proctor check.
+    // When testing is enabled, only warn about non-compliant documents to prevent test failures.
+    if (TestingProctor::instance().isEnabled() ||
+        Collection::SchemaValidationResult::kWarn == result) {
+        results->warnings.push_back(kSchemaValidationFailedReason);
+    } else if (Collection::SchemaValidationResult::kError == result) {
+        results->errors.push_back(kSchemaValidationFailedReason);
+        results->valid = false;
     }
 }
 
@@ -496,10 +523,12 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
     long long dataSizeTotal = 0;
     long long interruptIntervalNumBytes = 0;
     long long nInvalid = 0;
+    long long nNonCompliantDocuments = 0;
     long long numCorruptRecordsSizeBytes = 0;
 
     ON_BLOCK_EXIT([&]() {
         output->appendNumber("nInvalidDocuments", nInvalid);
+        output->appendNumber("nNonCompliantDocuments", nNonCompliantDocuments);
         output->appendNumber("nrecords", _numRecords);
         _progress->finished();
     });
@@ -594,20 +623,18 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
             // If the document is not corrupted, validate the document against this collection's
             // schema validator. Don't treat invalid documents as errors since documents can bypass
             // document validation when being inserted or updated.
-            status = _validateState->getCollection()->checkValidation(opCtx, record->data.toBson());
-            if (!status.isOK()) {
+            auto result =
+                _validateState->getCollection()->checkValidation(opCtx, record->data.toBson());
+
+            if (result.first != Collection::SchemaValidationResult::kPass) {
                 LOGV2_WARNING(5363500,
                               "Document is not compliant with the collection's schema",
                               logAttrs(_validateState->getCollection()->ns()),
                               "recordId"_attr = record->id,
-                              "reason"_attr = status);
+                              "reason"_attr = result.second);
 
-                if (!_validateState->isCollectionSchemaViolated()) {
-                    _validateState->setCollectionSchemaViolated();
-                    results->warnings.push_back(
-                        "Detected one or more documents not compliant with the collection's "
-                        "schema. See logs.");
-                }
+                nNonCompliantDocuments++;
+                schemaValidationFailed(_validateState, result.first, results);
             }
         }
 

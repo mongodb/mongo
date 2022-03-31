@@ -122,7 +122,8 @@ public:
         return _validator.validatorDoc.getOwned();
     }
 
-    Status checkValidation(OperationContext* opCtx, const BSONObj& document) const final;
+    std::pair<SchemaValidationResult, Status> checkValidation(OperationContext* opCtx,
+                                                              const BSONObj& document) const final;
 
     bool requiresIdIndex() const final;
 
@@ -513,6 +514,8 @@ private:
      * exceeded. Generates oplog entries for the deleted records in FCV >= 5.0.
      */
     void _cappedDeleteAsNeeded(OperationContext* opCtx, const RecordId& justInserted) const;
+
+    Status _checkValidationAndParseResult(OperationContext* opCtx, const BSONObj& document) const;
 
     /**
      * Writes metadata to the DurableCatalog. Func should have the function signature
