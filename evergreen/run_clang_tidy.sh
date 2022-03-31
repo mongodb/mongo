@@ -12,7 +12,4 @@ jq -r '.[] | .file' compile_commands.json \
   | grep -v $BISON_GENERATED_PATTERN \
   | xargs -n 32 -P $(grep -c ^processor /proc/cpuinfo) -t \
     /opt/mongodbtoolchain/v3/bin/clang-tidy \
-    -p ./compile_commands.json \
-    -header-filter='(mongo/.*|build/.*)' \
-    --checks="-*,bugprone-unused-raii,bugprone-use-after-move,readability-const-return-type,readability-avoid-const-params-in-decls" \
-    -warnings-as-errors="*"
+    -p ./compile_commands.json

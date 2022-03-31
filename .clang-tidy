@@ -1,0 +1,3 @@
+Checks:          '-*,bugprone-unused-raii,bugprone-use-after-move,readability-const-return-type,readability-avoid-const-params-in-decls'
+WarningsAsErrors: '*'
+HeaderFilterRegex: '(mongo/.*|build/.*)'
