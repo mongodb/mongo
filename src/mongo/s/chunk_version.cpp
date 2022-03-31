@@ -97,11 +97,9 @@ StatusWith<ChunkVersion> ChunkVersion::fromBSON(const BSONObj& obj) {
         version._timestamp =
             (version.epoch() == UNSHARDED().epoch()) ? Timestamp() : Timestamp::max();
     } else {
-        // TODO (SERVER-64813): remove this code once 6.0 becomes lastLTS
-        // Hack to solve a complex problem related to the addition of the timestamp in 5.0
-        uasserted(ErrorCodes::StaleShardVersion,
-                  str::stream() << "Failed to parse " << obj.toString()
-                                << " as a ChunkVersion because it is missing the timestamp field.");
+        return {ErrorCodes::TypeMismatch,
+                str::stream() << "Invalid type " << nextElem.type()
+                              << " for version timestamp part."};
     }
 
     return version;
@@ -153,13 +151,9 @@ StatusWith<ChunkVersion> ChunkVersion::parseLegacyWithField(const BSONObj& obj, 
                 version._timestamp =
                     (version.epoch() == UNSHARDED().epoch()) ? Timestamp() : Timestamp::max();
             } else {
-                // TODO (SERVER-64813): remove this code once 6.0 becomes lastLTS
-                // Hack to solve a complex problem related to the addition of the timestamp in 5.0
-                uasserted(ErrorCodes::StaleShardVersion,
-                          str::stream()
-                              << "Failed to parse { epoch: " << version._epoch.toString()
-                              << ", combined: " << version._combined
-                              << "} as a ChunkVersion because it is missing the timestamp field.");
+                return {ErrorCodes::TypeMismatch,
+                        str::stream() << "Invalid type " << timestampElem.type()
+                                      << " for version timestamp part."};
             }
         } else {
             invariant(timestampElem.eoo());
