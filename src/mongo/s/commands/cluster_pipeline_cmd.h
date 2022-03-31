@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2022-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,9 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
-
-#include "mongo/platform/basic.h"
+#pragma once
 
 #include "mongo/base/status.h"
 #include "mongo/db/auth/authorization_checks.h"
@@ -43,12 +41,13 @@
 namespace mongo {
 namespace {
 
-class ClusterPipelineCommand final : public Command {
+template <typename Impl>
+class ClusterPipelineCommandBase final : public Command {
 public:
-    ClusterPipelineCommand() : Command("aggregate") {}
+    ClusterPipelineCommandBase() : Command(Impl::kName) {}
 
     const std::set<std::string>& apiVersions() const {
-        return kApiVersions1;
+        return Impl::getApiVersions();
     }
 
     /**
@@ -74,11 +73,10 @@ public:
         OperationContext* opCtx,
         const OpMsgRequest& opMsgRequest,
         boost::optional<ExplainOptions::Verbosity> explainVerbosity) override {
-        const auto aggregationRequest = aggregation_request_helper::parseFromBSON(
-            opMsgRequest.getDatabase().toString(),
-            opMsgRequest.body,
-            explainVerbosity,
-            APIParameters::get(opCtx).getAPIStrict().value_or(false));
+        const auto aggregationRequest =
+            Impl::parseAggregationRequest(opMsgRequest,
+                                          explainVerbosity,
+                                          APIParameters::get(opCtx).getAPIStrict().value_or(false));
 
         auto privileges = uassertStatusOK(
             auth::getPrivilegesForAggregate(AuthorizationSession::get(opCtx->getClient()),
@@ -147,6 +145,8 @@ public:
             CommandHelpers::handleMarkKillOnClientDisconnect(
                 opCtx, !Pipeline::aggHasWriteStage(_request.body));
 
+            Impl::checkCanRunHere(opCtx);
+
             auto bob = reply->getBodyBuilder();
             _runAggCommand(opCtx, _dbName, _request.body, &bob);
         }
@@ -159,10 +159,7 @@ public:
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const override {
-            uassert(ErrorCodes::Unauthorized,
-                    "unauthorized",
-                    AuthorizationSession::get(opCtx->getClient())
-                        ->isAuthorizedForPrivileges(_privileges));
+            Impl::doCheckAuthorization(opCtx, _privileges);
         }
 
         NamespaceString ns() const override {
@@ -192,7 +189,7 @@ public:
     const AuthorizationContract* getAuthorizationContract() const final {
         return &::mongo::AggregateCommandRequest::kAuthorizationContract;
     }
-} clusterPipelineCmd;
+};
 
 }  // namespace
 }  // namespace mongo

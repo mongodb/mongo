@@ -26,6 +26,7 @@ function runTestSuccess() {
         },
         {dbName: kDbName, command: {delete: kCollName, deletes: [{q: {_id: 3}, limit: 1}]}},
         {dbName: kDbName, command: {find: kCollName, singleBatch: true}},
+        {dbName: kDbName, command: {aggregate: kCollName, pipeline: [{$match: {}}], cursor: {}}},
     ];
 
     // Insert initial data.
@@ -44,6 +45,10 @@ function runTestSuccess() {
     assert.eq(res.responses[3], {n: 1, ok: 1}, tojson(res));
     assert.sameMembers(
         res.responses[4].cursor.firstBatch, [{_id: 1}, {_id: 2, updated: true}], tojson(res));
+    assert.eq(res.responses[4].cursor.id, 0, tojson(res));
+    assert.sameMembers(
+        res.responses[5].cursor.firstBatch, [{_id: 1}, {_id: 2, updated: true}], tojson(res));
+    assert.eq(res.responses[5].cursor.id, 0, tojson(res));
 
     // The written documents should be visible outside the transaction.
     assert.sameMembers(st.s.getCollection(kNs).find().toArray(),
@@ -84,12 +89,59 @@ function runTestFailure() {
     assert.commandWorked(st.s.getCollection(kNs).remove({}, false /* justOne */));
 }
 
+function runTestGetMore() {
+    // Insert initial data.
+    const startVal = -50;
+    const numDocs = 100;
+
+    let bulk = st.s.getCollection(kNs).initializeUnorderedBulkOp();
+    for (let i = startVal; i < startVal + numDocs; i++) {
+        bulk.insert({_id: i});
+    }
+    assert.commandWorked(bulk.execute());
+
+    const commands = [
+        // Use a batch size < number of documents so the API must use getMores to exhaust the
+        // cursor.
+        {dbName: kDbName, command: {find: kCollName, batchSize: 17}, exhaustCursor: true},
+    ];
+
+    const commandMetricsBefore = shard0Primary.getDB(kDbName).serverStatus().metrics.commands;
+
+    const res = assert.commandWorked(
+        shard0Primary.adminCommand({testInternalTransactions: 1, commandInfos: commands}));
+    assert.eq(res.responses.length, 1, tojson(res));
+
+    // The response from an exhausted cursor is an array of BSON objects, so we don't assert the
+    // command worked.
+    assert.eq(res.responses[0].docs.length, numDocs, tojson(res));
+    for (let i = 0; i < numDocs; ++i) {
+        assert.eq(res.responses[0].docs[i]._id, startVal + i, tojson(res.responses[0].docs[i]));
+    }
+
+    // Verify getMores were used by checking serverStatus metrics.
+    const commandMetricsAfter = shard0Primary.getDB(kDbName).serverStatus().metrics.commands;
+
+    assert.gt(commandMetricsAfter.clusterFind.total, commandMetricsBefore.clusterFind.total);
+    if (!commandMetricsBefore.clusterGetMore) {
+        // The unsharded case runs before any cluster getMores are run.
+        assert.gt(commandMetricsAfter.clusterGetMore.total, 0);
+    } else {
+        assert.gt(commandMetricsAfter.clusterGetMore.total,
+                  commandMetricsBefore.clusterGetMore.total);
+    }
+
+    // Clean up.
+    assert.commandWorked(st.s.getCollection(kNs).remove({}, false /* justOne */));
+}
+
 //
 // Unsharded collection case.
 //
 
 runTestSuccess();
 runTestFailure();
+runTestGetMore();
 
 //
 // Sharded collection case.
@@ -105,6 +157,7 @@ assert.commandWorked(st.s.adminCommand({moveChunk: kNs, find: {x: 0}, to: st.sha
 
 runTestSuccess();
 runTestFailure();
+runTestGetMore();
 
 st.stop();
 })();

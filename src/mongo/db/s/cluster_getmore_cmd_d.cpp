@@ -27,49 +27,43 @@
  *    it in the license file.
  */
 
-#include "mongo/db/cluster_transaction_api.h"
+#include "mongo/db/s/sharding_state.h"
+#include "mongo/s/commands/cluster_getmore_cmd.h"
+#include "mongo/s/grid.h"
 
-#include <fmt/format.h>
-
-#include "mongo/executor/task_executor.h"
-#include "mongo/rpc/factory.h"
-#include "mongo/rpc/op_msg_rpc_impls.h"
-#include "mongo/rpc/reply_interface.h"
-#include "mongo/stdx/future.h"
-
-namespace mongo::txn_api::details {
-
+namespace mongo {
 namespace {
 
-StringMap<std::string> clusterCommandTranslations = {
-    {"abortTransaction", "clusterAbortTransaction"},
-    {"aggregate", "clusterAggregate"},
-    {"commitTransaction", "clusterCommitTransaction"},
-    {"delete", "clusterDelete"},
-    {"find", "clusterFind"},
-    {"getMore", "clusterGetMore"},
-    {"insert", "clusterInsert"},
-    {"update", "clusterUpdate"}};
+/**
+ * Implements the cluster getMore command on mongod.
+ */
+struct ClusterGetMoreCmdD {
+    static constexpr StringData kName = "clusterGetMore"_sd;
 
-BSONObj replaceCommandNameWithClusterCommandName(BSONObj cmdObj) {
-    auto cmdName = cmdObj.firstElement().fieldNameStringData();
-    auto newNameIt = clusterCommandTranslations.find(cmdName);
-    uassert(6349501,
-            "Cannot use unsupported command {} with cluster transaction API"_format(cmdName),
-            newNameIt != clusterCommandTranslations.end());
+    static const std::set<std::string>& getApiVersions() {
+        return kNoApiVersions;
+    }
 
-    return cmdObj.replaceFieldNames(BSON(newNameIt->second << 1));
-}
+    static void doCheckAuthorization(OperationContext* opCtx,
+                                     const NamespaceString& nss,
+                                     long long cursorID,
+                                     bool hasTerm) {
+        uassert(ErrorCodes::Unauthorized,
+                "Unauthorized",
+                AuthorizationSession::get(opCtx->getClient())
+                    ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                       ActionType::internal));
+    }
+
+    static void checkCanRunHere(OperationContext* opCtx) {
+        Grid::get(opCtx)->assertShardingIsInitialized();
+
+        // A cluster command on the config server may attempt to use a ShardLocal to target itself,
+        // which triggers an invariant, so only shard servers can run this.
+        uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
+    }
+};
+ClusterGetMoreCmdBase<ClusterGetMoreCmdD> clusterGetMoreCmdD;
 
 }  // namespace
-
-BSONObj ClusterSEPTransactionClientBehaviors::maybeModifyCommand(BSONObj cmdObj) const {
-    return replaceCommandNameWithClusterCommandName(cmdObj);
-}
-
-Future<DbResponse> ClusterSEPTransactionClientBehaviors::handleRequest(
-    OperationContext* opCtx, const Message& request) const {
-    return ServiceEntryPointMongos::handleRequestImpl(opCtx, request);
-}
-
-}  // namespace mongo::txn_api::details
+}  // namespace mongo

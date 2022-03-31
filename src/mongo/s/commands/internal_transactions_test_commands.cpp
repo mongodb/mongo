@@ -32,6 +32,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/cluster_transaction_api.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/query/find_command_gen.h"
 #include "mongo/db/transaction_api.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/commands/internal_transactions_test_commands_gen.h"
@@ -81,6 +82,24 @@ public:
                         const auto& dbName = commandInfo.getDbName();
                         const auto& command = commandInfo.getCommand();
                         auto assertSucceeds = commandInfo.getAssertSucceeds();
+                        auto exhaustCursor = commandInfo.getExhaustCursor();
+
+                        if (exhaustCursor == boost::optional<bool>(true)) {
+                            // We can't call a getMore without knowing its cursor's id, so we
+                            // use the exhaustiveFind helper to test getMores. Make an OpMsgRequest
+                            // from the command to append $db, which FindCommandRequest expects.
+                            auto findOpMsgRequest = OpMsgRequest::fromDBAndBody(dbName, command);
+                            auto findCommand = FindCommandRequest::parse(
+                                IDLParserErrorContext("FindCommandRequest", false /* apiStrict */),
+                                findOpMsgRequest.body);
+
+                            auto docs = txnClient.exhaustiveFind(findCommand).get();
+
+                            BSONObjBuilder resBob;
+                            resBob.append("docs", std::move(docs));
+                            sharedBlock->responses.emplace_back(resBob.obj());
+                            continue;
+                        }
 
                         auto res = txnClient.runCommand(dbName, command).get();
                         sharedBlock->responses.emplace_back(

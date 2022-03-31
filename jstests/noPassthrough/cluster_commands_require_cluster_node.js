@@ -16,9 +16,14 @@ const kCollName = "bar";
 // error was different than when a command is rejected for not having sharding enabled.
 const clusterCommandsCases = [
     {cmd: {clusterAbortTransaction: 1}, expectedErr: ErrorCodes.InvalidOptions},
+    {cmd: {clusterAggregate: kCollName, pipeline: [{$match: {}}], cursor: {}}},
     {cmd: {clusterCommitTransaction: 1}, expectedErr: ErrorCodes.InvalidOptions},
     {cmd: {clusterDelete: kCollName, deletes: [{q: {}, limit: 1}]}},
     {cmd: {clusterFind: kCollName}},
+    {
+        cmd: {clusterGetMore: NumberLong(1), collection: kCollName},
+        expectedErr: ErrorCodes.CursorNotFound
+    },
     {cmd: {clusterInsert: kCollName, documents: [{x: 1}]}},
     {cmd: {clusterUpdate: kCollName, updates: [{q: {doesNotExist: 1}, u: {x: 1}}]}},
 ];

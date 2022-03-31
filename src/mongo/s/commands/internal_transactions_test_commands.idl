@@ -51,6 +51,9 @@ structs:
             assertSucceeds:
                 type: bool
                 default: true
+            exhaustCursor:
+                type: bool
+                optional: true
 
 commands:
     testInternalTransactions:

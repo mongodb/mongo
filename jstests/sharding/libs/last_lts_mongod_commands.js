@@ -13,9 +13,11 @@ const commandsRemovedFromMongodSinceLastLTS = [
 // test defined without always existing on the mongod being used.
 const commandsAddedToMongodSinceLastLTS = [
     "clusterAbortTransaction",
+    "clusterAggregate",
     "clusterCommitTransaction",
     "clusterDelete",
     "clusterFind",
+    "clusterGetMore",
     "clusterInsert",
     "clusterUpdate",
     "rotateCertificates",

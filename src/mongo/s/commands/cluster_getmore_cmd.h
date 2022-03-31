@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2022-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/authorization_checks.h"
@@ -56,12 +56,13 @@ static const ReadConcernSupportResult kSupportsReadConcernResult{
  * corresponding to the cursor id passed from the application. In order to generate these results,
  * may issue getMore commands to remote nodes in one or more shards.
  */
-class ClusterGetMoreCmd final : public Command {
+template <typename Impl>
+class ClusterGetMoreCmdBase final : public Command {
 public:
-    ClusterGetMoreCmd() : Command("getMore") {}
+    ClusterGetMoreCmdBase() : Command(Impl::kName) {}
 
     const std::set<std::string>& apiVersions() const {
-        return kApiVersions1;
+        return Impl::getApiVersions();
     }
 
     std::unique_ptr<CommandInvocation> parse(OperationContext* opCtx,
@@ -73,7 +74,7 @@ public:
     public:
         Invocation(Command* cmd, const OpMsgRequest& request)
             : CommandInvocation(cmd),
-              _cmd(GetMoreCommandRequest::parse({"getMore"}, request.body)) {}
+              _cmd(GetMoreCommandRequest::parse({Impl::kName}, request.body)) {}
 
     private:
         NamespaceString ns() const override {
@@ -90,15 +91,16 @@ public:
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const override {
-            uassertStatusOK(auth::checkAuthForGetMore(AuthorizationSession::get(opCtx->getClient()),
-                                                      ns(),
-                                                      _cmd.getCommandParameter(),
-                                                      _cmd.getTerm().is_initialized()));
+            Impl::doCheckAuthorization(
+                opCtx, ns(), _cmd.getCommandParameter(), _cmd.getTerm().is_initialized());
         }
 
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* reply) override {
             // Counted as a getMore, not as a command.
             globalOpCounters.gotGetMore();
+
+            Impl::checkCanRunHere(opCtx);
+
             auto bob = reply->getBodyBuilder();
             auto response = uassertStatusOK(ClusterFind::runGetMore(opCtx, _cmd));
             response.addToBSON(CursorResponse::ResponseType::SubsequentResponse, &bob);
@@ -141,7 +143,7 @@ public:
     LogicalOp getLogicalOp() const override {
         return LogicalOp::opGetMore;
     }
-} cmdGetMoreCluster;
+};
 
 }  // namespace
 }  // namespace mongo

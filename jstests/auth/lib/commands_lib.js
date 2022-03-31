@@ -1035,7 +1035,19 @@ var authCommandsLib = {
               },
           ]
         },
-
+        {
+          testname: "clusterAggregate",
+          command: {clusterAggregate: "foo", pipeline: [], cursor: {}},
+          skipSharded: true,
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                roles: {__system: 1},
+                privileges: [{resource: {cluster: true}, actions: ["internal"]}],
+                expectFail: true,
+              },
+          ]
+        },
         {
           testname: "aggregate_readonly",
           command: {aggregate: "foo", pipeline: [], cursor: {}},
@@ -4248,6 +4260,19 @@ var authCommandsLib = {
               },
               {runOnDb: firstDbName, roles: {}},
               {runOnDb: secondDbName, roles: {}}
+          ]
+        },
+        {
+          testname: "clusterGetMore",
+          command: {clusterGetMore: NumberLong(1), collection: "foo"},
+          skipSharded: true,
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                roles: {__system: 1},
+                privileges: [{resource: {cluster: true}, actions: ["internal"]}],
+                expectFail: true,
+              },
           ]
         },
         {

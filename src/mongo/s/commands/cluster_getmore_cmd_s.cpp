@@ -27,49 +27,34 @@
  *    it in the license file.
  */
 
-#include "mongo/db/cluster_transaction_api.h"
+#include "mongo/s/commands/cluster_getmore_cmd.h"
 
-#include <fmt/format.h>
-
-#include "mongo/executor/task_executor.h"
-#include "mongo/rpc/factory.h"
-#include "mongo/rpc/op_msg_rpc_impls.h"
-#include "mongo/rpc/reply_interface.h"
-#include "mongo/stdx/future.h"
-
-namespace mongo::txn_api::details {
-
+namespace mongo {
 namespace {
 
-StringMap<std::string> clusterCommandTranslations = {
-    {"abortTransaction", "clusterAbortTransaction"},
-    {"aggregate", "clusterAggregate"},
-    {"commitTransaction", "clusterCommitTransaction"},
-    {"delete", "clusterDelete"},
-    {"find", "clusterFind"},
-    {"getMore", "clusterGetMore"},
-    {"insert", "clusterInsert"},
-    {"update", "clusterUpdate"}};
+/**
+ * Implements the cluster getMore command on mongos.
+ */
+struct ClusterGetMoreCmdS {
+    static constexpr StringData kName = "getMore"_sd;
 
-BSONObj replaceCommandNameWithClusterCommandName(BSONObj cmdObj) {
-    auto cmdName = cmdObj.firstElement().fieldNameStringData();
-    auto newNameIt = clusterCommandTranslations.find(cmdName);
-    uassert(6349501,
-            "Cannot use unsupported command {} with cluster transaction API"_format(cmdName),
-            newNameIt != clusterCommandTranslations.end());
+    static const std::set<std::string>& getApiVersions() {
+        return kApiVersions1;
+    }
 
-    return cmdObj.replaceFieldNames(BSON(newNameIt->second << 1));
-}
+    static void doCheckAuthorization(OperationContext* opCtx,
+                                     const NamespaceString& nss,
+                                     long long cursorID,
+                                     bool hasTerm) {
+        uassertStatusOK(auth::checkAuthForGetMore(
+            AuthorizationSession::get(opCtx->getClient()), nss, cursorID, hasTerm));
+    }
+
+    static void checkCanRunHere(OperationContext* opCtx) {
+        // Can always run on a mongos.
+    }
+};
+ClusterGetMoreCmdBase<ClusterGetMoreCmdS> clusterGetMoreCmdS;
 
 }  // namespace
-
-BSONObj ClusterSEPTransactionClientBehaviors::maybeModifyCommand(BSONObj cmdObj) const {
-    return replaceCommandNameWithClusterCommandName(cmdObj);
-}
-
-Future<DbResponse> ClusterSEPTransactionClientBehaviors::handleRequest(
-    OperationContext* opCtx, const Message& request) const {
-    return ServiceEntryPointMongos::handleRequestImpl(opCtx, request);
-}
-
-}  // namespace mongo::txn_api::details
+}  // namespace mongo
