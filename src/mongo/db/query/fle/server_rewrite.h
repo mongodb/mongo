@@ -35,29 +35,23 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/crypto/fle_crypto.h"
+#include "mongo/db/fle_crud.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/transaction_api.h"
 
 namespace mongo {
 class FLEQueryInterface;
 namespace fle {
 
 /**
- * Helper function to determine if an IDL object with encryption information should be rewritten.
- */
-template <typename T>
-bool shouldRewrite(const T& cmd) {
-    return gFeatureFlagFLE2.isEnabledAndIgnoreFCV() && cmd->getEncryptionInformation();
-}
-
-/**
  * Process a find command with encryptionInformation in-place, rewriting the filter condition so
  * that any query on an encrypted field will properly query the underlying tags array.
  */
 void processFindCommand(OperationContext* opCtx,
-                        NamespaceString nss,
-                        FindCommandRequest* findCommand);
+                        FindCommandRequest* findCommand,
+                        GetTxnCallback txn);
 
 /**
  * Process a pipeline with encryptionInformation by rewriting the pipeline to query against the

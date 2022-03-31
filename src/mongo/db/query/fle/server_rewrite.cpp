@@ -29,6 +29,9 @@
 
 
 #include "mongo/db/query/fle/server_rewrite.h"
+
+#include <memory>
+
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/crypto/encryption_fields_gen.h"
@@ -39,7 +42,6 @@
 #include "mongo/db/pipeline/document_source_graph_lookup.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
-#include "mongo/db/transaction_api.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/transaction_router_resource_yielder.h"
 #include "mongo/util/assert_util.h"
@@ -153,11 +155,10 @@ public:
 // executor, and so we can't pass data by reference into the lambda. The provided rewriter should
 // hold all the data we need to do the rewriting inside the lambda, and is passed in a more
 // threadsafe shared_ptr. The result of applying the rewrites can be accessed in the RewriteBase.
-void doFLERewriteInTxn(OperationContext* opCtx, std::shared_ptr<RewriteBase> sharedBlock) {
-    auto txn = std::make_shared<txn_api::TransactionWithRetries>(
-        opCtx,
-        Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
-        TransactionRouterResourceYielder::makeForLocalHandoff());
+void doFLERewriteInTxn(OperationContext* opCtx,
+                       std::shared_ptr<RewriteBase> sharedBlock,
+                       GetTxnCallback getTxn) {
+    auto txn = getTxn(opCtx);
 
     auto swCommitResult = txn->runSyncNoThrow(
         opCtx, [sharedBlock](const txn_api::TransactionClient& txnClient, auto txnExec) {
@@ -202,16 +203,17 @@ BSONObj rewriteEncryptedFilterInsideTxn(FLEQueryInterface* queryImpl,
 
 
 void processFindCommand(OperationContext* opCtx,
-                        NamespaceString nss,
-                        FindCommandRequest* findCommand) {
+                        FindCommandRequest* findCommand,
+                        GetTxnCallback getTransaction) {
+    invariant(findCommand->getNamespaceOrUUID().nss());
     invariant(findCommand->getEncryptionInformation());
 
     auto sharedBlock =
         std::make_shared<FilterRewrite>(makeExpCtx(opCtx, findCommand),
-                                        nss,
+                                        findCommand->getNamespaceOrUUID().nss().get(),
                                         findCommand->getEncryptionInformation().get(),
                                         findCommand->getFilter().getOwned());
-    doFLERewriteInTxn(opCtx, sharedBlock);
+    doFLERewriteInTxn(opCtx, sharedBlock, getTransaction);
 
     auto rewrittenFilter = sharedBlock->rewrittenFilter.getOwned();
     findCommand->setFilter(std::move(rewrittenFilter));
@@ -225,7 +227,13 @@ std::unique_ptr<Pipeline, PipelineDeleter> processPipeline(
     std::unique_ptr<Pipeline, PipelineDeleter> toRewrite) {
 
     auto sharedBlock = std::make_shared<PipelineRewrite>(nss, encryptInfo, std::move(toRewrite));
-    doFLERewriteInTxn(opCtx, sharedBlock);
+    doFLERewriteInTxn(opCtx, sharedBlock, [](auto* opCtx) {
+        // TODO: SERVER-63312 pass in the right transaction callback for mongod.
+        return std::make_shared<txn_api::TransactionWithRetries>(
+            opCtx,
+            Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
+            TransactionRouterResourceYielder::makeForLocalHandoff());
+    });
 
     return sharedBlock->getPipeline();
 }

@@ -43,6 +43,7 @@
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/db/query/find_command_gen.h"
+#include "mongo/db/query/fle/server_rewrite.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/session.h"
 #include "mongo/db/session_catalog.h"
@@ -230,6 +231,10 @@ write_ops::UpdateCommandReply processFLEUpdate(
     setMongosFieldsInReply(opCtx, &updateReply.getWriteCommandReplyBase());
 
     return updateReply;
+}
+
+void processFLEFindD(OperationContext* opCtx, FindCommandRequest* findCommand) {
+    fle::processFindCommand(opCtx, findCommand, &getTransactionWithRetriesForMongoD);
 }
 
 }  // namespace mongo

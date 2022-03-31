@@ -115,6 +115,28 @@ FLEBatchResult processFLEFindAndModify(OperationContext* opCtx,
 write_ops::FindAndModifyCommandReply processFLEFindAndModify(
     OperationContext* opCtx, const write_ops::FindAndModifyCommandRequest& findAndModifyRequest);
 
+/**
+ * Process a find command from mongos.
+ */
+void processFLEFindS(OperationContext* opCtx, FindCommandRequest* findCommand);
+
+/**
+ * Process a find command from a replica set.
+ */
+void processFLEFindD(OperationContext* opCtx, FindCommandRequest* findCommand);
+
+/**
+ * Helper function to determine if an IDL object with encryption information should be rewritten.
+ */
+template <typename T>
+bool shouldDoFLERewrite(const std::unique_ptr<T>& cmd) {
+    return gFeatureFlagFLE2.isEnabledAndIgnoreFCV() && cmd->getEncryptionInformation();
+}
+
+template <typename T>
+bool shouldDoFLERewrite(const T& cmd) {
+    return gFeatureFlagFLE2.isEnabledAndIgnoreFCV() && cmd.getEncryptionInformation();
+}
 
 /**
  * Abstraction layer for FLE

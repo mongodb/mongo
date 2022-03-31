@@ -134,9 +134,6 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
 
     std::unique_ptr<MatchExpression> me = std::move(statusWithMatcher.getValue());
 
-    // TODO: SERVER-64055 if encryptionInformation is present, rewrite MatchExpression FLE find
-    // payloads.
-
     Status initStatus =
         cq->init(opCtx,
                  std::move(newExpCtx),

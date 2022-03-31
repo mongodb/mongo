@@ -35,9 +35,9 @@
 #include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/fle_crud.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/query/cursor_response.h"
-#include "mongo/db/query/fle/server_rewrite.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -128,9 +128,6 @@ public:
                      rpc::ReplyBuilderInterface* result) override {
             // Parse the command BSON to a FindCommandRequest.
             auto findCommand = _parseCmdObjectToFindCommandRequest(opCtx, ns(), _request.body);
-            if (fle::shouldRewrite(findCommand)) {
-                fle::processFindCommand(opCtx, ns(), findCommand.get());
-            }
 
             try {
                 const auto explainCmd =
@@ -206,9 +203,6 @@ public:
             });
 
             auto findCommand = _parseCmdObjectToFindCommandRequest(opCtx, ns(), _request.body);
-            if (fle::shouldRewrite(findCommand)) {
-                fle::processFindCommand(opCtx, ns(), findCommand.get());
-            }
 
             const boost::intrusive_ptr<ExpressionContext> expCtx;
             auto cq = uassertStatusOK(
@@ -293,6 +287,11 @@ public:
             uassert(5746101,
                     "Cannot specify ntoreturn in a find command against mongos",
                     findCommand->getNtoreturn() == boost::none);
+
+            if (shouldDoFLERewrite(findCommand)) {
+                processFLEFindS(opCtx, findCommand.get());
+            }
+
             return findCommand;
         }
 

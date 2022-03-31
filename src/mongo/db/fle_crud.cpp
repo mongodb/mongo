@@ -1209,4 +1209,8 @@ write_ops::FindAndModifyCommandReply FLEQueryInterfaceImpl::findAndModify(
     return write_ops::FindAndModifyCommandReply::parse(IDLParserErrorContext("reply"), response);
 }
 
+void processFLEFindS(OperationContext* opCtx, FindCommandRequest* findCommand) {
+    fle::processFindCommand(opCtx, findCommand, &getTransactionWithRetriesForMongoS);
+}
+
 }  // namespace mongo

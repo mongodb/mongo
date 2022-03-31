@@ -2,8 +2,9 @@ test_kind: js_test
 selector:
   roots:
   - jstests/fle2/**/*.js
-  - src/mongo/db/modules/*/jstests/fle2/*.js
-
+  - src/mongo/db/modules/*/jstests/fle2/**/*.js
+  exclude_files:
+  - src/mongo/db/modules/*/jstests/fle2/query/aggregate*.js # TODO: SERVER-63312
 executor:
   archive:
     hooks:

@@ -42,6 +42,7 @@
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/fle_crud.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/variables.h"
@@ -118,6 +119,11 @@ std::unique_ptr<FindCommandRequest> parseCmdObjectToFindCommandRequest(Operation
         std::move(cmdObj),
         std::move(nss),
         APIParameters::get(opCtx).getAPIStrict().value_or(false));
+
+    // Rewrite any FLE find payloads that exist in the query if this is a FLE 2 query.
+    if (shouldDoFLERewrite(findCommand)) {
+        processFLEFindD(opCtx, findCommand.get());
+    }
 
     return translateNtoReturnToLimitOrBatchSize(std::move(findCommand));
 }

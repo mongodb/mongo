@@ -40,6 +40,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/fle_crud.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
@@ -299,7 +300,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         opCtx, isSharded, request.getExplain(), serverGlobalParams.enableMajorityReadConcern);
     auto hasChangeStream = liteParsedPipeline.hasChangeStream();
     auto involvedNamespaces = liteParsedPipeline.getInvolvedNamespaces();
-    auto shouldDoFLERewrite = fle::shouldRewrite(&request);
+    auto shouldDoFLERewrite = ::mongo::shouldDoFLERewrite(request);
 
     uassert(6256300,
             str::stream() << "On mongos, " << AggregateCommandRequest::kCollectionUUIDFieldName
