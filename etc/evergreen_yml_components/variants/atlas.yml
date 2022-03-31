@@ -32,7 +32,7 @@ buildvariants:
     distros:
     - rhel70
   - name: build_variant_gen
-  - name: .aggfuzzer
+  #  - name: .aggfuzzer # Disabled for FCV 5.3
   - name: audit
   - name: auth_audit_gen
   - name: auth_gen

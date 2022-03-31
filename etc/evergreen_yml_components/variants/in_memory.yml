@@ -21,7 +21,7 @@ buildvariants:
     distros:
     - rhel80-xlarge
   - name: build_variant_gen
-  - name: .aggfuzzer .common
+  #  - name: .aggfuzzer .common # Disabled for FCV 5.3
   - name: .aggregation !.unwind !.encrypt
   - name: audit
   - name: .auth !.multiversion
@@ -90,7 +90,7 @@ buildvariants:
     distros:
     - windows-vsCurrent-large
   - name: build_variant_gen
-  - name: .aggfuzzer .common
+  #  - name: .aggfuzzer .common # Disabled for FCV 5.3
   - name: audit
   - name: auth_audit_gen
   - name: causally_consistent_jscore_txns_passthrough
