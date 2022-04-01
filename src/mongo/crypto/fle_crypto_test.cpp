@@ -1691,4 +1691,51 @@ TEST(CompactionHelpersTest, validateCompactionTokensTest) {
     CompactionHelpers::validateCompactionTokens(efc, builder.obj());
 }
 
+std::vector<ECCDocument> pairsToECCDocuments(
+    const std::vector<std::pair<uint64_t, uint64_t>>& pairs) {
+    std::vector<ECCDocument> output;
+    std::transform(pairs.begin(), pairs.end(), std::back_inserter(output), [](auto& pair) {
+        return ECCDocument{ECCValueType::kNormal, pair.first, pair.second};
+    });
+    return output;
+}
+
+TEST(CompactionHelpersTest, mergeECCDocumentsTest) {
+    std::vector<ECCDocument> input, output, expected;
+
+    // Test empty input
+    output = CompactionHelpers::mergeECCDocuments(input);
+    ASSERT(output.empty());
+
+    // Test single pair
+    input = pairsToECCDocuments({{15, 20}});
+    output = CompactionHelpers::mergeECCDocuments(input);
+    ASSERT(output == input);
+
+    // Test input with no gaps
+    input = pairsToECCDocuments({{15, 20}, {13, 13}, {1, 6}, {7, 12}, {14, 14}});
+    output = CompactionHelpers::mergeECCDocuments(input);
+    ASSERT_EQ(output.size(), 1);
+    ASSERT_EQ(output.front().start, 1);
+    ASSERT_EQ(output.front().end, 20);
+
+    // Test input with gaps; nothing is merged
+    input = pairsToECCDocuments({{5, 5}, {12, 16}, {9, 9}, {23, 45}});
+    output = CompactionHelpers::mergeECCDocuments(input);
+    ASSERT(output == input);
+
+    // Test input with gaps; at least one merged
+    input = pairsToECCDocuments({{5, 5}, {12, 16}, {6, 9}, {17, 23}, {45, 45}});
+    expected = pairsToECCDocuments({{5, 9}, {12, 23}, {45, 45}});
+    output = CompactionHelpers::mergeECCDocuments(input);
+    ASSERT(output == expected);
+}
+
+TEST(CompactionHelpersTest, countDeletedTest) {
+    ASSERT_EQ(CompactionHelpers::countDeleted({}), 0);
+
+    auto input = pairsToECCDocuments({{15, 20}, {13, 13}, {1, 6}, {7, 12}, {14, 14}});
+    ASSERT_EQ(CompactionHelpers::countDeleted(input), 20);
+}
+
 }  // namespace mongo

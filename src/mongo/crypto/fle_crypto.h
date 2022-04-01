@@ -617,6 +617,21 @@ struct ECCDocument {
     uint64_t end;
 };
 
+inline bool operator==(const ECCDocument& left, const ECCDocument& right) {
+    return (left.valueType == right.valueType && left.start == right.start &&
+            left.end == right.end);
+}
+
+inline bool operator<(const ECCDocument& left, const ECCDocument& right) {
+    if (left.start == right.start) {
+        if (left.end == right.end) {
+            return left.valueType < right.valueType;
+        }
+        return left.end < right.end;
+    }
+    return left.start < right.start;
+}
+
 class ECCCollection {
 public:
     /**
@@ -1105,6 +1120,8 @@ public:
      * adjacent to each other are combined into a single entry. For example,
      * the input [ (1,3), (11,11), (7,9), (4,6) ] outputs [ (1,9), (11,11) ].
      * Assumes none of the input entries overlap with each other.
+     *
+     * This will sort the input unmerged list as a side-effect.
      */
     static std::vector<ECCDocument> mergeECCDocuments(std::vector<ECCDocument>& unmerged);
 

@@ -2357,4 +2357,27 @@ void CompactionHelpers::validateCompactionTokens(const EncryptedFieldConfig& efc
     }
 }
 
+std::vector<ECCDocument> CompactionHelpers::mergeECCDocuments(std::vector<ECCDocument>& unmerged) {
+    std::vector<ECCDocument> merged;
+    std::sort(unmerged.begin(), unmerged.end());
+
+    for (size_t i = 0; i < unmerged.size();) {
+        merged.push_back(unmerged[i]);
+        auto& last = merged.back();
+        i++;
+        for (; i < unmerged.size() && ((last.end + 1) == unmerged[i].start); i++) {
+            last.end = unmerged[i].end;
+        }
+    }
+    return merged;
+}
+
+uint64_t CompactionHelpers::countDeleted(const std::vector<ECCDocument>& rangeList) {
+    uint64_t sum = 0;
+    for (auto& range : rangeList) {
+        sum += range.end - range.start + 1;
+    }
+    return sum;
+}
+
 }  // namespace mongo

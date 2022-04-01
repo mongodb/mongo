@@ -263,6 +263,86 @@ ESCPreCompactState prepareESCForCompaction(FLEQueryInterface* queryImpl,
     return state;
 }
 
+struct ECCPreCompactState {
+    uint64_t count{0};
+    uint64_t ipos{0};
+    uint64_t pos{0};
+    std::vector<ECCDocument> g_prime;
+    bool merged{false};
+};
+
+ECCPreCompactState prepareECCForCompaction(FLEQueryInterface* queryImpl,
+                                           const NamespaceString& nssEcc,
+                                           const ECCTwiceDerivedTagToken& tagToken,
+                                           const ECCTwiceDerivedValueToken& valueToken,
+                                           ECStats* eccStats) {
+    CompactStatsCounter<ECStats> stats(eccStats);
+
+    TxnCollectionReader reader(queryImpl, nssEcc, eccStats);
+
+    ECCPreCompactState state;
+    bool flag = true;
+    std::vector<ECCDocument> g;
+
+    // find the null doc
+    auto block = ECCCollection::generateId(tagToken, boost::none);
+    auto r_ecc = reader.getById(block);
+    if (r_ecc.isEmpty()) {
+        state.pos = 1;
+    } else {
+        auto nullDoc = uassertStatusOK(ECCCollection::decryptNullDocument(valueToken, r_ecc));
+        state.pos = nullDoc.position + 2;
+    }
+
+    // get all documents starting from ipos; set pos to one after position of last document found
+    state.ipos = state.pos;
+    while (flag) {
+        block = ECCCollection::generateId(tagToken, state.pos);
+        r_ecc = reader.getById(block);
+        if (!r_ecc.isEmpty()) {
+            auto doc = uassertStatusOK(ECCCollection::decryptDocument(valueToken, r_ecc));
+            g.push_back(std::move(doc));
+            state.pos += 1;
+        } else {
+            flag = false;
+        }
+    }
+
+    if (g.empty()) {
+        // if there's a null doc, then there must be at least one entry
+        uassert(6346901, "Found ECC null doc, but no ECC entries", state.ipos == 1);
+
+        // no null doc & no entries found, so nothing to compact
+        state.pos = 0;
+        state.ipos = 0;
+        state.count = 0;
+        return state;
+    }
+
+    // merge 'g'
+    state.g_prime = CompactionHelpers::mergeECCDocuments(g);
+    dassert(std::is_sorted(g.begin(), g.end()));
+    dassert(std::is_sorted(state.g_prime.begin(), state.g_prime.end()));
+    state.merged = (state.g_prime != g);
+    state.count = CompactionHelpers::countDeleted(state.g_prime);
+
+    if (state.merged) {
+        // Insert a placeholder at the next ECC position; this is deleted later in compact.
+        // This serves to trigger a write conflict if another write transaction is
+        // committed before the current compact transaction commits
+        auto placeholder =
+            ECCCollection::generateCompactionDocument(tagToken, valueToken, state.pos);
+        auto insertReply = uassertStatusOK(queryImpl->insertDocument(nssEcc, placeholder, true));
+        checkWriteErrors(insertReply);
+        stats.addInserts(1);
+    } else {
+        // adjust pos back to the last document found
+        state.pos -= 1;
+    }
+
+    return state;
+}
+
 }  // namespace
 
 
@@ -353,12 +433,58 @@ void compactOneFieldValuePair(FLEQueryInterface* queryImpl,
     // PART 2
     // prepare the ECC, and get back the merged set 'g_prime', whether (g_prime != g),
     // ipos_prime, and pos_prime
-    // TODO: SERVER-63469
+    auto eccTagToken = FLETwiceDerivedTokenGenerator::generateECCTwiceDerivedTagToken(ecocDoc.ecc);
+    auto eccValueToken =
+        FLETwiceDerivedTokenGenerator::generateECCTwiceDerivedValueToken(ecocDoc.ecc);
+    auto eccState =
+        prepareECCForCompaction(queryImpl, namespaces.eccNss, eccTagToken, eccValueToken, eccStats);
 
     // PART 3
     // A. compact the ECC
-    // TODO: SERVER-63469
-    bool allEntriesDeleted = false;
+    bool allEntriesDeleted = (escState.count == eccState.count);
+
+    if (eccState.count != 0) {
+        bool hasNullDoc = (eccState.ipos > 1);
+
+        if (!allEntriesDeleted) {
+            CompactStatsCounter<ECStats> stats(eccStats);
+
+            if (eccState.merged) {
+                // a. for each entry in g_prime at index k, insert
+                //  {_id: F(eccTagToken, pos'+ k), value: Enc(eccValueToken, g_prime[k])}
+                for (auto k = eccState.g_prime.size(); k > 0; k--) {
+                    const auto& range = eccState.g_prime[k - 1];
+                    auto insertReply = uassertStatusOK(queryImpl->insertDocument(
+                        namespaces.eccNss,
+                        ECCCollection::generateDocument(
+                            eccTagToken, eccValueToken, eccState.pos + k, range.start, range.end),
+                        true));
+                    checkWriteErrors(insertReply);
+                    stats.addInserts(1);
+                }
+
+                // b & c. update or insert the ECC null doc
+                auto newNullDoc = ECCCollection::generateNullDocument(
+                    eccTagToken, eccValueToken, eccState.pos - 1);
+                upsertNullDocument(queryImpl, hasNullDoc, newNullDoc, namespaces.eccNss, eccStats);
+
+                // d. delete entries between ipos' and pos', inclusive
+                for (auto k = eccState.ipos; k <= eccState.pos; k++) {
+                    deleteECCDocument(queryImpl, namespaces.eccNss, k, eccTagToken, eccStats);
+                }
+            }
+        } else {
+            // delete ECC entries between ipos' and pos', inclusive
+            for (auto k = eccState.ipos; k <= eccState.pos; k++) {
+                deleteECCDocument(queryImpl, namespaces.eccNss, k, eccTagToken, eccStats);
+            }
+
+            // delete the ECC null doc
+            if (hasNullDoc) {
+                deleteECCDocument(queryImpl, namespaces.eccNss, boost::none, eccTagToken, eccStats);
+            }
+        }
+    }
 
     // B. compact the ESC
     if (escState.count != 0) {

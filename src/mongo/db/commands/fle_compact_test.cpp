@@ -127,6 +127,7 @@ protected:
     void assertESCDocument(BSONObj obj, bool exists, uint64_t index, uint64_t count);
     void assertESCNullDocument(BSONObj obj, bool exists, uint64_t position, uint64_t count);
 
+    void assertECCDocument(BSONObj obj, bool exists, uint64_t index, uint64_t start, uint64_t end);
     void assertECCNullDocument(BSONObj obj, bool exists, uint64_t position);
 
     ESCTestTokens getTestESCTokens(BSONObj obj);
@@ -238,6 +239,23 @@ void FleCompactTest::assertESCNullDocument(BSONObj obj, bool exists, uint64_t po
             uassertStatusOK(ESCCollection::decryptNullDocument(tokens.twiceDerivedValue, doc));
         ASSERT_EQ(nullDoc.position, pos);
         ASSERT_EQ(nullDoc.count, count);
+    }
+}
+
+void FleCompactTest::assertECCDocument(
+    BSONObj obj, bool exists, uint64_t index, uint64_t start, uint64_t end) {
+    auto tokens = getTestECCTokens(obj);
+    auto doc = _queryImpl->getById(_namespaces.eccNss,
+                                   ECCCollection::generateId(tokens.twiceDerivedTag, index));
+
+    ASSERT_EQ(doc.isEmpty(), !exists);
+
+    if (exists) {
+        auto eccDoc =
+            uassertStatusOK(ECCCollection::decryptDocument(tokens.twiceDerivedValue, doc));
+        ASSERT(eccDoc.valueType == ECCValueType::kNormal);
+        ASSERT_EQ(eccDoc.start, start);
+        ASSERT_EQ(eccDoc.end, end);
     }
 }
 
@@ -562,6 +580,150 @@ TEST_F(FleCompactTest, CompactValueWithESCEntriesIncludingNullDoc) {
     compactOneFieldValuePair(_queryImpl.get(), ecocDoc, _namespaces, &escStats, &eccStats);
     assertDocumentCounts(51, 1, 0, 51);
     assertESCNullDocument(testPair, true, 54, 51);
+}
+
+TEST_F(FleCompactTest, CompactValueWithECCEntriesWithoutNullAndAllEntriesDeleted) {
+    ECStats escStats, eccStats;
+    std::map<std::string, InsertionState> values;
+    constexpr auto key = "first"_sd;
+    const std::string val1 = "reginald";
+    const std::string val2 = "rudolph";
+
+    values[val1].toInsertCount = 1;
+    values[val2].toInsertCount = 9;
+    insertFieldValues(key, values);
+    assertDocumentCounts(10, 10, 0, 10);
+
+    // delete all entries
+    values[val1].toDeleteRanges = {{1, 1}};
+    values[val2].toDeleteRanges = {{1, 9}};
+    deleteFieldValues(key, values);
+    assertDocumentCounts(0, 10, 10, 20);
+
+    // compact should clear ESC and ECC for each value
+    auto testPair = BSON(key << val1);
+    auto ecocDoc = generateTestECOCDocument(testPair);
+
+    compactOneFieldValuePair(_queryImpl.get(), ecocDoc, _namespaces, &escStats, &eccStats);
+    assertDocumentCounts(0, 9, 9, 20);
+
+    testPair = BSON(key << val2);
+    ecocDoc = generateTestECOCDocument(testPair);
+    compactOneFieldValuePair(_queryImpl.get(), ecocDoc, _namespaces, &escStats, &eccStats);
+    assertDocumentCounts(0, 0, 0, 20);
+}
+
+TEST_F(FleCompactTest, CompactValueWithECCEntriesWithNullAndAllEntriesDeleted) {
+    ECStats escStats, eccStats;
+    std::map<std::string, InsertionState> values;
+    constexpr auto key = "first"_sd;
+    const std::string val = "silas";
+    auto testPair = BSON(key << val);
+    auto ecocDoc = generateTestECOCDocument(testPair);
+
+    // insert entries 1 to 10
+    values[val].toInsertCount = 10;
+    insertFieldValues(key, values);
+    assertDocumentCounts(10, 10, 0, 10);
+
+    // delete entries 1, 4, and 5 (ECC inserts at pos 1 to 3)
+    values[val].toDeleteRanges = {{4, 5}, {1, 1}};
+    deleteFieldValues(key, values);
+    assertDocumentCounts(7, 10, 3, 13);
+    assertECCDocument(testPair, true, 1, 4, 4);
+    assertECCDocument(testPair, true, 2, 5, 5);
+    assertECCDocument(testPair, true, 3, 1, 1);
+
+    // first compact puts placeholder at pos 4 & merges deletes to {{1,1}, {4,5}} at pos 5 & 6
+    // null doc inserted with pos of 3
+    compactOneFieldValuePair(_queryImpl.get(), ecocDoc, _namespaces, &escStats, &eccStats);
+    assertDocumentCounts(7, 1, 3, 13);
+    assertECCNullDocument(testPair, true, 3);
+    assertECCDocument(testPair, false, 4, 0, 0);
+    assertECCDocument(testPair, true, 5, 1, 1);
+    assertECCDocument(testPair, true, 6, 4, 5);
+
+    // delete entries 2, 8, and 9 (ECC inserts at pos 7 to 9)
+    values[val].toDeleteRanges = {{8, 9}, {2, 2}};
+    deleteFieldValues(key, values);
+    assertDocumentCounts(4, 1, 6, 16);
+    assertECCDocument(testPair, true, 7, 8, 8);
+    assertECCDocument(testPair, true, 8, 9, 9);
+    assertECCDocument(testPair, true, 9, 2, 2);
+
+    // second compact puts placeholder at pos 10 & merges deletions to {{1,2}, {4,5}, {8,9}}
+    // at pos 11-13. Null doc updated with pos 9.
+    compactOneFieldValuePair(_queryImpl.get(), ecocDoc, _namespaces, &escStats, &eccStats);
+    assertDocumentCounts(4, 1, 4, 16);
+    assertECCNullDocument(testPair, true, 9);
+    assertECCDocument(testPair, false, 10, 0, 0);
+    assertECCDocument(testPair, true, 11, 1, 2);
+    assertECCDocument(testPair, true, 12, 4, 5);
+    assertECCDocument(testPair, true, 13, 8, 9);
+
+    // delete the remaining entries (ECC inserts at pos 14-17)
+    values[val].toDeleteRanges = {{3, 3}, {6, 7}, {10, 10}};
+    deleteFieldValues(key, values);
+    assertDocumentCounts(0, 1, 8, 20);
+    assertECCDocument(testPair, true, 14, 3, 3);
+    assertECCDocument(testPair, true, 15, 6, 6);
+    assertECCDocument(testPair, true, 16, 7, 7);
+    assertECCDocument(testPair, true, 17, 10, 10);
+
+    // final compact clears the ESC and ECC
+    compactOneFieldValuePair(_queryImpl.get(), ecocDoc, _namespaces, &escStats, &eccStats);
+    assertDocumentCounts(0, 0, 0, 20);
+}
+
+TEST_F(FleCompactTest, CompactValueWithECCEntriesThatAreNotMergeable) {
+    ECStats escStats, eccStats;
+    std::map<std::string, InsertionState> values;
+    constexpr auto key = "first"_sd;
+    const std::string val = "samson";
+    auto testPair = BSON(key << val);
+    auto ecocDoc = generateTestECOCDocument(testPair);
+
+    // insert entries 1 to 10
+    values[val].toInsertCount = 10;
+    insertFieldValues(key, values);
+    assertDocumentCounts(10, 10, 0, 10);
+
+    // delete odd numbered entries (ECC inserts at pos 1-5)
+    values[val].toDeleteRanges = {{1, 1}, {3, 3}, {5, 5}, {7, 7}, {9, 9}};
+    deleteFieldValues(key, values);
+    assertDocumentCounts(5, 10, 5, 15);
+
+    // compact is a no-op on ECC, hence no null doc was inserted
+    compactOneFieldValuePair(_queryImpl.get(), ecocDoc, _namespaces, &escStats, &eccStats);
+    assertDocumentCounts(5, 1, 5, 15);
+    assertECCNullDocument(testPair, false, 0);
+    assertECCDocument(testPair, true, 1, 1, 1);
+    assertECCDocument(testPair, true, 2, 3, 3);
+    assertECCDocument(testPair, true, 3, 5, 5);
+    assertECCDocument(testPair, true, 4, 7, 7);
+    assertECCDocument(testPair, true, 5, 9, 9);
+
+    // delete 2,4,6 & 8 (ECC inserts at pos 6-9)
+    values[val].toDeleteRanges = {{2, 2}, {4, 4}, {6, 6}, {8, 8}};
+    deleteFieldValues(key, values);
+    assertDocumentCounts(1, 1, 9, 19);
+    assertECCDocument(testPair, true, 6, 2, 2);
+    assertECCDocument(testPair, true, 7, 4, 4);
+    assertECCDocument(testPair, true, 8, 6, 6);
+    assertECCDocument(testPair, true, 9, 8, 8);
+
+    // compact puts placeholder at pos 10 & merges deletes to {{1,9}} at pos 11
+    // null doc inserted with pos 9
+    compactOneFieldValuePair(_queryImpl.get(), ecocDoc, _namespaces, &escStats, &eccStats);
+    assertDocumentCounts(1, 1, 2, 19);
+    assertECCNullDocument(testPair, true, 9);
+    assertECCDocument(testPair, true, 11, 1, 9);
+
+    // running compact again is a no-op on ECC, so null doc is unchanged
+    compactOneFieldValuePair(_queryImpl.get(), ecocDoc, _namespaces, &escStats, &eccStats);
+    assertDocumentCounts(1, 1, 2, 19);
+    assertECCNullDocument(testPair, true, 9);
+    assertECCDocument(testPair, true, 11, 1, 9);
 }
 
 }  // namespace
