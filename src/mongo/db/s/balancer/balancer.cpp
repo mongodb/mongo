@@ -237,6 +237,7 @@ Balancer::Balancer()
           _clusterStats.get(), _random, [this]() {
               // On any internal update of the defragmentation policy status, wake up the thread
               // consuming the stream of actions
+              _newInfoOnStreamingActions.store(true);
               _defragmentationCondVar.notify_all();
           })) {}
 
@@ -309,10 +310,6 @@ void Balancer::joinCurrentRound(OperationContext* opCtx) {
     opCtx->waitForConditionOrInterrupt(_condVar, scopedLock, [&] {
         return !_inBalancerRound || _numBalancerRounds != numRoundsAtStart;
     });
-}
-
-Balancer::ScopedPauseBalancerRequest Balancer::requestPause() {
-    return ScopedPauseBalancerRequest(this);
 }
 
 Status Balancer::rebalanceSingleChunk(OperationContext* opCtx,
@@ -430,17 +427,15 @@ void Balancer::report(OperationContext* opCtx, BSONObjBuilder* builder) {
 void Balancer::_consumeActionStreamLoop() {
     Client::initThread("BalancerSecondary");
     auto opCtx = cc().makeOperationContext();
+    // This thread never refreshes balancerConfig - instead, it relies on the requests
+    // performed by _mainThread() on each round to eventually see updated information.
+    auto balancerConfig = Grid::get(opCtx.get())->getBalancerConfiguration();
     executor::ScopedTaskExecutor executor(
         Grid::get(opCtx.get())->getExecutorPool()->getFixedExecutor());
 
-    boost::optional<DefragmentationAction> nextAction(boost::none);
-    auto newActionAvailable = [&] {
-        nextAction = _defragmentationPolicy->getNextStreamingAction(opCtx.get());
-        return nextAction.is_initialized();
-    };
-
     auto applyActionResponse = [this](const DefragmentationAction& action,
                                       const DefragmentationActionResponse& response) {
+        invariant(_outstandingStreamingOps.addAndFetch(-1) >= 0);
         ThreadClient tc("BalancerDefragmentationPolicy::applyActionResponse",
                         getGlobalServiceContext());
         auto opCtx = tc->makeOperationContext();
@@ -461,16 +456,27 @@ void Balancer::_consumeActionStreamLoop() {
         }
         lastActionTime = Date_t::now();
     };
-
+    bool streamDrained = false;
     while (true) {
         {
             stdx::unique_lock<Latch> ul(_mutex);
-            _defragmentationCondVar.wait(
-                ul, [&] { return _state != kRunning || newActionAvailable(); });
+            _defragmentationCondVar.wait(ul, [&] {
+                auto canConsumeStream = balancerConfig->shouldBalanceForAutoSplit() &&
+                    _outstandingStreamingOps.load() <= kMaxOutstandingStreamingOperations;
+                return _state != kRunning ||
+                    (canConsumeStream && (!streamDrained || _newInfoOnStreamingActions.load()));
+            });
             if (_state != kRunning) {
                 break;
             }
         }
+        _newInfoOnStreamingActions.store(false);
+        auto nextAction = _defragmentationPolicy->getNextStreamingAction(opCtx.get());
+        if ((streamDrained = !nextAction.is_initialized())) {
+            continue;
+        }
+
+        _outstandingStreamingOps.fetchAndAdd(1);
         stdx::visit(
             visit_helper::Overloaded{
                 [&](MergeInfo&& mergeAction) {
@@ -619,12 +625,15 @@ void Balancer::_mainThread() {
                 _endRound(opCtx.get(), kBalanceRoundDefaultInterval);
                 continue;
             }
-            if (!balancerConfig->shouldBalance() || _stopOrPauseRequested()) {
+            if (!balancerConfig->shouldBalance() || _stopRequested()) {
                 LOGV2_DEBUG(21859, 1, "Skipping balancing round because balancing is disabled");
                 _endRound(opCtx.get(), kBalanceRoundDefaultInterval);
                 continue;
             }
 
+            // The current configuration is allowing the balancer to perform operations.
+            // Unblock the secondary thread if needed.
+            _defragmentationCondVar.notify_all();
             {
                 LOGV2_DEBUG(21860,
                             1,
@@ -738,25 +747,9 @@ void Balancer::_mainThread() {
     LOGV2(21867, "CSRS balancer is now stopped");
 }
 
-void Balancer::_addPauseRequest() {
-    stdx::unique_lock<Latch> scopedLock(_mutex);
-    ++_numPauseRequests;
-}
-
-void Balancer::_removePauseRequest() {
-    stdx::unique_lock<Latch> scopedLock(_mutex);
-    invariant(_numPauseRequests > 0);
-    --_numPauseRequests;
-}
-
 bool Balancer::_stopRequested() {
     stdx::lock_guard<Latch> scopedLock(_mutex);
     return (_state != kRunning);
-}
-
-bool Balancer::_stopOrPauseRequested() {
-    stdx::lock_guard<Latch> scopedLock(_mutex);
-    return (_state != kRunning || _numPauseRequests > 0);
 }
 
 void Balancer::_beginRound(OperationContext* opCtx) {
@@ -903,7 +896,7 @@ int Balancer::_moveChunks(OperationContext* opCtx,
     auto catalogClient = Grid::get(opCtx)->catalogClient();
 
     // If the balancer was disabled since we started this round, don't start new chunk moves
-    if (_stopOrPauseRequested() || !balancerConfig->shouldBalance()) {
+    if (_stopRequested() || !balancerConfig->shouldBalance()) {
         LOGV2_DEBUG(21870, 1, "Skipping balancing round because balancer was stopped");
         return 0;
     }
@@ -979,7 +972,7 @@ int Balancer::_moveChunks(OperationContext* opCtx,
     return numChunksProcessed;
 }
 
-void Balancer::notifyPersistedBalancerSettingsChanged() {
+void Balancer::notifyPersistedBalancerSettingsChanged(OperationContext* opCtx) {
     _condVar.notify_all();
 }
 

@@ -1512,10 +1512,6 @@ MigrateInfoVector BalancerDefragmentationPolicyImpl::selectChunksToMove(
 boost::optional<DefragmentationAction> BalancerDefragmentationPolicyImpl::getNextStreamingAction(
     OperationContext* opCtx) {
     stdx::lock_guard<Latch> lk(_stateMutex);
-    if (_concurrentStreamingOps >= kMaxConcurrentOperations) {
-        return boost::none;
-    }
-
     // Visit the defrag state in round robin fashion starting from a random one
     auto stateIt = [&] {
         auto it = _defragmentationStates.begin();
@@ -1535,7 +1531,6 @@ boost::optional<DefragmentationAction> BalancerDefragmentationPolicyImpl::getNex
                 auto nextAction =
                     currentCollectionDefragmentationState->popNextStreamableAction(opCtx);
                 if (nextAction) {
-                    ++_concurrentStreamingOps;
                     return nextAction;
                 }
                 ++stateIt;
@@ -1594,15 +1589,8 @@ void BalancerDefragmentationPolicyImpl::applyActionResult(
             },
             action);
 
-        if (!targetState) {
-            return;
-        }
-
-        targetState->applyActionResult(opCtx, action, response);
-        bool streamingActionReceived = !stdx::holds_alternative<MigrateInfo>(action);
-        if (streamingActionReceived) {
-            --_concurrentStreamingOps;
-            invariant(_concurrentStreamingOps >= 0);
+        if (targetState) {
+            targetState->applyActionResult(opCtx, action, response);
         }
     }
     _onStateUpdated();

@@ -98,8 +98,6 @@ public:
                                         const NamespaceString& nss) override;
 
 private:
-    static constexpr int kMaxConcurrentOperations = 50;
-
     /**
      * Advances the defragmentation state of the specified collection to the next actionable phase
      * (or sets the related DefragmentationPhase object to nullptr if nothing more can be done).
@@ -138,8 +136,6 @@ private:
     void _clearDefragmentationState(OperationContext* opCtx, const UUID& uuid);
 
     Mutex _stateMutex = MONGO_MAKE_LATCH("BalancerChunkMergerImpl::_stateMutex");
-
-    int _concurrentStreamingOps{0};
 
     ClusterStatistics* const _clusterStats;
 

@@ -63,28 +63,6 @@ class Balancer : public ReplicaSetAwareServiceConfigSvr<Balancer> {
 
 public:
     /**
-     * Scoped class to manage the pause/resumeBalancer requests cycle.
-     * See Balancer::requestPause() for more details.
-     */
-    class ScopedPauseBalancerRequest {
-    public:
-        ~ScopedPauseBalancerRequest() {
-            _balancer->_removePauseRequest();
-        }
-
-    private:
-        Balancer* _balancer;
-
-        ScopedPauseBalancerRequest(Balancer* balancer) : _balancer(balancer) {
-            _balancer->_addPauseRequest();
-        }
-
-        ScopedPauseBalancerRequest(const ScopedPauseBalancerRequest&) = delete;
-        ScopedPauseBalancerRequest& operator=(const ScopedPauseBalancerRequest&) = delete;
-
-        friend class Balancer;
-    };
-    /**
      * Provide access to the Balancer decoration on ServiceContext.
      */
     static Balancer* get(ServiceContext* serviceContext);
@@ -135,14 +113,6 @@ public:
      */
     void joinCurrentRound(OperationContext* opCtx);
 
-
-    /**
-     * Invoked by any client requiring a temporary suspension of the balancer thread
-     * (I.E. the setFCV process). The request is NOT persisted by the balancer in its config
-     * document and remains active as long as the returned ScopedPauseRequest doesn't get destroyed.
-     */
-    ScopedPauseBalancerRequest requestPause();
-
     /**
      * Blocking call, which requests the balancer to move a single chunk to a more appropriate
      * shard, in accordance with the active balancer policy. It is not guaranteed that the chunk
@@ -190,7 +160,7 @@ public:
     /**
      * Informs the balancer that a setting that affects it changed.
      */
-    void notifyPersistedBalancerSettingsChanged();
+    void notifyPersistedBalancerSettingsChanged(OperationContext* opCtx);
 
     /**
      * Informs the balancer that the user has requested defragmentation to be stopped on a
@@ -206,6 +176,8 @@ public:
                                                             const NamespaceString& nss);
 
 private:
+    static constexpr int kMaxOutstandingStreamingOperations = 50;
+
     /**
      * Possible runtime states of the balancer. The comments indicate the allowed next state.
      */
@@ -241,21 +213,6 @@ private:
      * Checks whether the balancer main thread has been requested to stop.
      */
     bool _stopRequested();
-
-    /**
-     * Adds a request to pause the balancer main loop.
-     */
-    void _addPauseRequest();
-
-    /**
-     * Removes a previously added request to pause the balancer main loop.
-     */
-    void _removePauseRequest();
-
-    /**
-     * Assess whether the balancer has any active pause or stop request.
-     */
-    bool _stopOrPauseRequested();
 
     /**
      * Signals the beginning and end of a balancing round.
@@ -310,6 +267,10 @@ private:
     // thread.
     OperationContext* _threadOperationContext{nullptr};
 
+    AtomicWord<int> _outstandingStreamingOps{0};
+
+    AtomicWord<bool> _newInfoOnStreamingActions{true};
+
     // Indicates whether the balancer is currently executing a balancer round
     bool _inBalancerRound{false};
 
@@ -324,9 +285,6 @@ private:
 
     // Number of moved chunks in last round
     int _balancedLastTime;
-
-    // Number of active pause balancer requests
-    int _numPauseRequests{0};
 
     // Source of randomness when metadata needs to be randomized.
     BalancerRandomSource _random;

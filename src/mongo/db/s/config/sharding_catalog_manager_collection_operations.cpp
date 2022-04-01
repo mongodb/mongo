@@ -652,7 +652,7 @@ void ShardingCatalogManager::configureCollectionBalancing(
         nss,
         executor);
 
-    Balancer::get(opCtx)->notifyPersistedBalancerSettingsChanged();
+    Balancer::get(opCtx)->notifyPersistedBalancerSettingsChanged(opCtx);
 }
 
 void ShardingCatalogManager::renameShardedMetadata(
