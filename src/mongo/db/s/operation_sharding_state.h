@@ -84,11 +84,11 @@ public:
     static OperationShardingState& get(OperationContext* opCtx);
 
     /**
-     * Returns true if the the current operation was sent by the caller with shard version
-     * information attached, meaning that it must perform shard version checking and orphan
-     * filtering.
+     * Returns true if the the current operation was sent from an upstream router, rather than it
+     * being a direct connection against the shard. The way this decision is made is based on
+     * whether there is shard version declared for any namespace.
      */
-    static bool isOperationVersioned(OperationContext* opCtx);
+    static bool isComingFromRouter(OperationContext* opCtx);
 
     /**
      * NOTE: DO NOT ADD any new usages of this class without including someone from the Sharding
@@ -115,12 +115,6 @@ public:
                              const NamespaceString& nss,
                              const boost::optional<ChunkVersion>& shardVersion,
                              const boost::optional<DatabaseVersion>& dbVersion);
-
-    /**
-     * Returns whether or not there is a shard version for the namespace associated with this
-     * operation.
-     */
-    bool hasShardVersion(const NamespaceString& nss) const;
 
     /**
      * Returns the shard version (i.e. maximum chunk version) of a namespace being used by the
@@ -179,6 +173,7 @@ private:
         ShardVersionTracker(ChunkVersion v) : v(v) {}
         ShardVersionTracker(ShardVersionTracker&&) = default;
         ShardVersionTracker(const ShardVersionTracker&) = delete;
+        ShardVersionTracker& operator=(const ShardVersionTracker&) = delete;
         ChunkVersion v;
         int recursion{0};
     };
@@ -189,6 +184,7 @@ private:
         DatabaseVersionTracker(DatabaseVersion v) : v(v) {}
         DatabaseVersionTracker(DatabaseVersionTracker&&) = default;
         DatabaseVersionTracker(const DatabaseVersionTracker&) = delete;
+        DatabaseVersionTracker& operator=(const DatabaseVersionTracker&) = delete;
         DatabaseVersion v;
         int recursion{0};
     };

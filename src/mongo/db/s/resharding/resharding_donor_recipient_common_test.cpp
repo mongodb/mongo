@@ -129,10 +129,8 @@ protected:
                                                          {std::move(chunk)})),
                         boost::none);
 
-        if (!OperationShardingState::isOperationVersioned(opCtx)) {
-            OperationShardingState::setShardRole(
-                opCtx, nss, cm.getVersion(kThisShard.getShardId()), boost::none);
-        }
+        OperationShardingState::setShardRole(
+            opCtx, nss, cm.getVersion(kThisShard.getShardId()), boost::none);
 
         return CollectionMetadata(std::move(cm), kThisShard.getShardId());
     }
@@ -575,6 +573,6 @@ TEST_F(ReshardingDonorRecipientCommonInternalsTest, ClearReshardingFilteringMeta
         ASSERT(csr->getCurrentMetadataIfKnown() == boost::none);
     }
 }
-}  // namespace
 
+}  // namespace
 }  // namespace mongo

@@ -540,9 +540,8 @@ std::vector<OpTime> logInsertOps(
             oplogLink.prevOpTime = opTimes[i - 1];
 
         // Direct inserts to shards of orphan documents should not generate change stream events.
-        if (serverGlobalParams.clusterRole == ClusterRole::ShardServer &&
-            (!oplogEntry.getFromMigrate() || !*oplogEntry.getFromMigrate()) &&
-            !OperationShardingState::isOperationVersioned(opCtx) &&
+        if (!oplogEntry.getFromMigrate().value_or(false) &&
+            !OperationShardingState::isComingFromRouter(opCtx) &&
             preWriteFilter.computeAction(Document(begin[i].doc)) ==
                 write_stage_common::PreWriteFilter::Action::kWriteAsFromMigrate) {
             LOGV2_DEBUG(6258100,

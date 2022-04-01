@@ -105,8 +105,8 @@ void mergeChunks(OperationContext* opCtx,
         uassertStatusOK(ActiveMigrationsRegistry::get(opCtx).registerSplitOrMergeChunk(
             opCtx, nss, ChunkRange(minKey, maxKey))));
 
-    const bool isVersioned = OperationShardingState::isOperationVersioned(opCtx);
-    if (!isVersioned) {
+    auto& oss = OperationShardingState::get(opCtx);
+    if (!oss.getShardVersion(nss)) {
         onShardVersionMismatch(opCtx, nss, boost::none);
     }
 
@@ -114,7 +114,7 @@ void mergeChunks(OperationContext* opCtx,
         AutoGetCollection autoColl(opCtx, nss, MODE_IS);
         auto csr = CollectionShardingRuntime::get(opCtx, nss);
         // If there is a version attached to the OperationContext, validate it
-        if (isVersioned) {
+        if (oss.getShardVersion(nss)) {
             csr->checkShardVersionOrThrow(opCtx);
         }
         return csr->getCurrentMetadataIfKnown();

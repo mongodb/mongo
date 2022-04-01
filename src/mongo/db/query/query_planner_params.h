@@ -79,9 +79,9 @@ struct QueryPlannerParams {
         // Set this if you're running on a sharded cluster.  We'll add a "drop all docs that
         // shouldn't be on this shard" stage before projection.
         //
-        // In order to set this, you must check OperationShardingState::isOperationVersioned() in
-        // the same lock that you use to build the query executor. You must also wrap the
-        // PlanExecutor in a ClientCursor within the same lock.
+        // In order to set this, you must check OperationShardingState::isComingFromRouter() in the
+        // same lock that you use to build the query executor. You must also wrap the PlanExecutor
+        // in a ClientCursor within the same lock.
         //
         // See the comment on ShardFilterStage for details.
         INCLUDE_SHARD_FILTER = 1 << 2,

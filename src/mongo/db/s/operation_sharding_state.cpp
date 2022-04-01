@@ -49,9 +49,9 @@ OperationShardingState& OperationShardingState::get(OperationContext* opCtx) {
     return shardingMetadataDecoration(opCtx);
 }
 
-bool OperationShardingState::isOperationVersioned(OperationContext* opCtx) {
+bool OperationShardingState::isComingFromRouter(OperationContext* opCtx) {
     const auto& oss = get(opCtx);
-    return !oss._shardVersions.empty();
+    return !oss._databaseVersions.empty() || !oss._shardVersions.empty();
 }
 
 void OperationShardingState::setShardRole(OperationContext* opCtx,
@@ -84,10 +84,6 @@ void OperationShardingState::setShardRole(OperationContext* opCtx,
         }
         invariant(++tracker.recursion > 0);
     }
-}
-
-bool OperationShardingState::hasShardVersion(const NamespaceString& nss) const {
-    return _shardVersions.find(nss.ns()) != _shardVersions.end();
 }
 
 boost::optional<ChunkVersion> OperationShardingState::getShardVersion(const NamespaceString& nss) {

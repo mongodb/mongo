@@ -61,7 +61,7 @@ const auto kUnshardedCollection = std::make_shared<UnshardedCollection>();
 boost::optional<ChunkVersion> getOperationReceivedVersion(OperationContext* opCtx,
                                                           const NamespaceString& nss) {
     // If there is a version attached to the OperationContext, use it as the received version.
-    if (OperationShardingState::isOperationVersioned(opCtx)) {
+    if (OperationShardingState::isComingFromRouter(opCtx)) {
         return OperationShardingState::get(opCtx).getShardVersion(nss);
     }
 
@@ -128,8 +128,7 @@ ScopedCollectionDescription CollectionShardingRuntime::getCollectionDescription(
     // If the server has been started with --shardsvr, but hasn't been added to a cluster we should
     // consider all collections as unsharded. Also, return unsharded if no shard version or db
     // version is present on the context.
-    if (!ShardingState::get(_serviceContext)->enabled() ||
-        (!OperationShardingState::isOperationVersioned(opCtx) && !oss.hasDbVersion())) {
+    if (!OperationShardingState::isComingFromRouter(opCtx)) {
         return {kUnshardedCollection};
     }
 
@@ -343,13 +342,9 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
     if (!optReceivedShardVersion && !supportNonVersionedOperations)
         return kUnshardedCollection;
 
-    // Assume that the received shard version was IGNORED if the current operation wasn't verioned.
+    // Assume that the received shard version was IGNORED if the current operation wasn't versioned
     const auto& receivedShardVersion =
         optReceivedShardVersion ? *optReceivedShardVersion : ChunkVersion::IGNORED();
-
-    // An operation with read concern 'available' should never have shardVersion set.
-    invariant(repl::ReadConcernArgs::get(opCtx).getLevel() !=
-              repl::ReadConcernLevel::kAvailableReadConcern);
 
     auto csrLock = CSRLock::lockShared(opCtx, this);
 
