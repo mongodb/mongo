@@ -133,6 +133,11 @@ feature_flags:
       cpp_varname: gFeatureFlagSBELookupPushdown
       default: false
 
+    featureFlagSBELookupPushdownIndexJoin:
+      description: "Feature flag for allowing SBE $lookup pushdown to execute query using index join strategy"
+      cpp_varname: gFeatureFlagSBELookupPushdownIndexJoin
+      default: false
+
     featureFlagSearchShardedFacets:
       description: "Enable use of $$SEARCH_META on sharded collections"
       cpp_varname: gFeatureFlagSearchShardedFacets

@@ -14,10 +14,14 @@ const JoinAlgorithm = {
     NLJ: 1,
     INLJ: 2,
     HJ: 3,
+    // These joins aren't implemented yet and will throw errors with the corresponding codes.
+    INLJHashedIndex: 6357203,
 };
 
 // Standalone cases.
-const conn = MongoRunner.runMongod({setParameter: "featureFlagSBELookupPushdown=true"});
+const conn = MongoRunner.runMongod({
+    setParameter: {featureFlagSBELookupPushdown: true, featureFlagSBELookupPushdownIndexJoin: true}
+});
 assert.neq(null, conn, "mongod was unable to start up");
 const name = "lookup_pushdown";
 const foreignCollName = "foreign_lookup_pushdown";
@@ -97,6 +101,14 @@ function runTest(coll,
         assert.eq(eqLookupNodes.length,
                   0,
                   "there should be no lowered EQ_LOOKUP stages; got " + tojson(explain));
+    } else if (expectedJoinAlgorithm === JoinAlgorithm.INLJHashedIndex) {
+        const result = assert.commandFailedWithCode(response, expectedJoinAlgorithm);
+        if (errMsgRegex) {
+            const errorMessage = result.errmsg;
+            assert(errMsgRegex.test(errorMessage),
+                   "Error message '" + errorMessage + "' did not match the RegEx '" + errMsgRegex +
+                       "'");
+        }
     } else {
         assert.commandWorked(response);
         const explain = coll.explain().aggregate(pipeline, aggOptions);
@@ -285,11 +297,13 @@ let view = db[viewName];
 // join strategy should be used.
 (function testIndexNestedLoopJoinHashedIndex() {
     assert.commandWorked(foreignColl.dropIndexes());
-    assert.commandWorked(foreignColl.createIndex({b: "hashed"}));
+    assert.commandWorked(foreignColl.createIndex({b: 'hashed'}));
     runTest(coll,
             [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
-            JoinAlgorithm.INLJ /* expectedJoinAlgorithm */,
-            {b: "hashed"} /* indexKeyPattern */);
+            JoinAlgorithm.INLJHashedIndex /* expectedJoinAlgorithm */,
+            null /* indexKeyPattern */,
+            {} /* aggOptions */,
+            /b_hashed//* errMsgRegex */);
     assert.commandWorked(foreignColl.dropIndexes());
 })();
 
@@ -347,11 +361,13 @@ let view = db[viewName];
 (function testFewerComponentsFavoredOverIndexType() {
     assert.commandWorked(foreignColl.dropIndexes());
     assert.commandWorked(foreignColl.createIndex({b: 1, c: 1, d: 1}));
-    assert.commandWorked(foreignColl.createIndex({b: "hashed"}));
+    assert.commandWorked(foreignColl.createIndex({b: 'hashed'}));
     runTest(coll,
             [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
-            JoinAlgorithm.INLJ /* expectedJoinAlgorithm */,
-            {b: "hashed"} /* indexKeyPattern */);
+            JoinAlgorithm.INLJHashedIndex /* expectedJoinAlgorithm */,
+            null /* indexKeyPattern */,
+            {} /* aggOptions */,
+            /b_hashed//* errMsgRegex */);
     assert.commandWorked(foreignColl.dropIndexes());
 }());
 
@@ -667,7 +683,12 @@ MongoRunner.stopMongod(conn);
 const st = new ShardingTest({
     shards: 2,
     mongos: 1,
-    other: {shardOptions: {setParameter: "featureFlagSBELookupPushdown=true"}}
+    other: {
+        shardOptions: {
+            setParameter:
+                {featureFlagSBELookupPushdown: true, featureFlagSBELookupPushdownIndexJoin: true}
+        }
+    }
 });
 db = st.s.getDB(name);
 

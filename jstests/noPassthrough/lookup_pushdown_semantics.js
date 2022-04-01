@@ -8,7 +8,9 @@ load("jstests/libs/sbe_util.js");  // For 'checkSBEEnabled()'.
 load("jstests/aggregation/extras/utils.js");
 
 // Standalone cases.
-const conn = MongoRunner.runMongod({setParameter: "featureFlagSBELookupPushdown=true"});
+const conn = MongoRunner.runMongod({
+    setParameter: {featureFlagSBELookupPushdown: true, featureFlagSBELookupPushdownIndexJoin: true}
+});
 assert.neq(null, conn, "mongod was unable to start up");
 const db = conn.getDB("lookup_pushdown");
 if (!checkSBEEnabled(db, ["featureFlagSBELookupPushdown"])) {
@@ -46,7 +48,6 @@ function runTest_SingleForeignRecord({
 
     if (foreignIndex) {
         assert.commandWorked(foreignColl.createIndex(foreignIndex));
-        testDescription += ` (foreign index ${tojson(foreignIndex)})`;
     }
 
     const results = localColl.aggregate([{
@@ -97,7 +98,6 @@ function runTest_SingleLocalRecord({
 
     if (foreignIndex) {
         assert.commandWorked(foreignColl.createIndex(foreignIndex));
-        testDescription += ` (foreign index ${tojson(foreignIndex)})`;
     }
 
     const results = localColl.aggregate([{
@@ -148,26 +148,12 @@ function runTest_SingleLocalRecord({
         assert.eq(results[0].matched, []);
     })();
 
-function testMatchingTopLevelFieldToNonArray(indexType) {
-    // NOTE: There is no shell equivalent for the following BSON types:
-    // - Code (13)
-    // - Symbol (14)
-    // - CodeWScope (15)
+(function testMatchingTopLevelFieldToScalar() {
     const docs = [
         {_id: 0, a: NumberInt(0)},
         {_id: 1, a: 3.14},
         {_id: 2, a: NumberDecimal(3.14)},
         {_id: 3, a: "abc"},
-        {_id: 4, a: {b: 1, c: 2, d: 3}},
-        {_id: 5, a: true},
-        {_id: 6, a: false},
-        {_id: 7, a: new ISODate("2022-01-01T00:00:00.00Z")},
-        {_id: 8, a: new Timestamp(1, 123)},
-        {_id: 9, a: new ObjectId("0102030405060708090A0B0C")},
-        {_id: 10, a: new BinData(0, "BBBBBBBBBBBBBBBBBBBBBBBBBBBB")},
-        {_id: 11, a: /hjkl/},
-        {_id: 12, a: /hjkl/g},
-        {_id: 13, a: new DBRef("collection", "id", "database")},
     ];
 
     docs.forEach(doc => {
@@ -178,7 +164,7 @@ function testMatchingTopLevelFieldToNonArray(indexType) {
             localField: "a",
             foreignRecord: {b: doc.a},
             foreignField: "b",
-            foreignIndex: {b: indexType},
+            foreignIndex: {b: 1},
             idsExpectedToMatch: [doc._id]
         });
         runTest_SingleLocalRecord({
@@ -188,7 +174,7 @@ function testMatchingTopLevelFieldToNonArray(indexType) {
             localField: "b",
             foreignRecords: docs,
             foreignField: "a",
-            foreignIndex: {a: indexType},
+            foreignIndex: {a: 1},
             idsExpectedToMatch: [doc._id]
         });
     });
@@ -200,7 +186,7 @@ function testMatchingTopLevelFieldToNonArray(indexType) {
         localField: "a",
         foreignRecord: {b: 'xxx'},
         foreignField: "b",
-        foreignIndex: {b: indexType},
+        foreignIndex: {b: 1},
         idsExpectedToMatch: []
     });
     runTest_SingleLocalRecord({
@@ -210,172 +196,10 @@ function testMatchingTopLevelFieldToNonArray(indexType) {
         localField: "b",
         foreignRecords: docs,
         foreignField: "a",
-        foreignIndex: {a: indexType},
+        foreignIndex: {a: 1},
         idsExpectedToMatch: []
     });
-}
-
-testMatchingTopLevelFieldToNonArray(1 /* indexType */);
-testMatchingTopLevelFieldToNonArray(-1 /* indexType */);
-testMatchingTopLevelFieldToNonArray("hashed" /* indexType */);
-
-function testMatchingTopLevelFieldToNullAndUndefined(indexType) {
-    const foreignRecords = [
-        {_id: 0, a: null},
-        {_id: 1, a: undefined},
-    ];
-    // We do not currently support hashed indexes on the collections with arrays.
-    if (indexType != "hashed") {
-        foreignRecords.push({_id: 2, a: []}, {_id: 3, a: [[]]});
-    }
-
-    runTest_SingleLocalRecord({
-        testDescription: "Null should match only to null",
-        localRecord: {b: null},
-        localField: "b",
-        foreignRecords,
-        foreignField: "a",
-        foreignIndex: {a: indexType},
-        idsExpectedToMatch: [0]
-    });
-}
-
-testMatchingTopLevelFieldToNullAndUndefined(1 /* indexType */);
-testMatchingTopLevelFieldToNullAndUndefined(-1 /* indexType */);
-testMatchingTopLevelFieldToNullAndUndefined("hashed" /* indexType */);
-
-function testMatchingTopLevelFieldToArrays(indexType) {
-    runTest_SingleLocalRecord({
-        testDescription: "Scalar should match arrays containing that value",
-        localRecord: {b: 1},
-        localField: "b",
-        foreignRecords: [
-            {_id: 0, a: 1},
-            {_id: 1, a: [1]},
-            {_id: 2, a: [1, 2, 3]},
-            {_id: 3, a: [3, 2, 1]},
-            {_id: 4, a: [4, 5, 6]},
-            {_id: 5, a: []},
-        ],
-        foreignField: "a",
-        foreignIndex: {a: indexType},
-        idsExpectedToMatch: [0, 1, 2, 3]
-    });
-
-    runTest_SingleLocalRecord({
-        testDescription: "Empty array should only match to empty array",
-        localRecord: {b: [[]]},
-        localField: "b",
-        foreignRecords: [
-            {_id: 0, a: null},
-            {_id: 1, a: undefined},
-            {_id: 2, a: []},
-            {_id: 3, a: [[]]},
-            {_id: 4, a: [null]},
-            {_id: 5, a: [undefined]},
-            {_id: 6, a: [1]},
-            {_id: 7, a: [1, 2, 3]},
-        ],
-        foreignField: "a",
-        foreignIndex: {a: indexType},
-        idsExpectedToMatch: [2, 3]
-    });
-
-    runTest_SingleLocalRecord({
-        testDescription: "Single element arrays should match only single-element arrays",
-        localRecord: {b: [[1]]},
-        localField: "b",
-        foreignRecords: [
-            {_id: 0, a: 1},
-            {_id: 1, a: [1]},
-            {_id: 2, a: [1, 2, 3]},
-            {_id: 3, a: [3, 2, 1]},
-            {_id: 4, a: [4, 5, 6]},
-            {_id: 5, a: []},
-        ],
-        foreignField: "a",
-        foreignIndex: {a: indexType},
-        idsExpectedToMatch: [1]
-    });
-
-    runTest_SingleLocalRecord({
-        testDescription: "Arrays with multiple elements should only match itself",
-        localRecord: {b: [[1, 2, 3]]},
-        localField: "b",
-        foreignRecords: [
-            {_id: 0, a: 1},
-            {_id: 1, a: [1]},
-            {_id: 2, a: [1, 2, 3]},
-            {_id: 3, a: [3, 2, 1]},
-            {_id: 4, a: [4, 5, 6]},
-            {_id: 5, a: []},
-        ],
-        foreignField: "a",
-        foreignIndex: {a: indexType},
-        idsExpectedToMatch: [2]
-    });
-
-    runTest_SingleLocalRecord({
-        testDescription: "Array queries must work on hashed indexes",
-        localRecord: {b: [[1, 2, 3]]},
-        localField: "b",
-        foreignRecords: [
-            {_id: 0, a: 1},
-        ],
-        foreignField: "a",
-        foreignIndex: {a: "hashed"},
-        idsExpectedToMatch: []
-    });
-}
-
-testMatchingTopLevelFieldToArrays(1 /* indexType */);
-testMatchingTopLevelFieldToArrays(-1 /* indexType */);
-
-function testMatchingWithNestedPaths(indexType) {
-    const foreignRecords = [
-        {_id: 0, a: {b: {c: 1}}},
-        {_id: 1, a: {no_b: 1}},
-        {_id: 2, a: {b: {no_c: 1}}},
-    ];
-    const idsExpectedToMatch = [0];
-
-    // We do not currently support hashed indexes on the collections with arrays.
-    if (indexType != "hashed") {
-        foreignRecords.push({_id: 3, a: {b: {c: [1]}}},
-                            {_id: 4, a: [{b: [{c: 1}, {c: 2}]}, {b: [{c: 3}, {c: 4}]}]});
-        idsExpectedToMatch.push(3, 4);
-    }
-
-    runTest_SingleLocalRecord({
-        testDescription: "Index join with nested path in foreign field",
-        localRecord: {b: 1},
-        localField: "b",
-        foreignRecords,
-        foreignField: "a.b.c",
-        foreignIndex: {"a.b.c": indexType},
-        idsExpectedToMatch,
-    });
-
-    runTest_SingleForeignRecord({
-        testDescription: "Index join with nested path in local field",
-        localRecords: [
-            {_id: 0, a: {b: {c: 1}}},
-            {_id: 1, a: {b: {c: [1]}}},
-            {_id: 2, a: [{b: [{c: 1}, {c: 2}]}, {b: [{c: 3}, {c: 4}]}]},
-            {_id: 3, a: {no_b: 1}},
-            {_id: 4, a: {b: {no_c: 1}}},
-        ],
-        localField: "a.b.c",
-        foreignRecord: {b: 1},
-        foreignField: "b",
-        foreignIndex: {b: indexType},
-        idsExpectedToMatch: [0, 1, 2]
-    });
-}
-
-testMatchingWithNestedPaths(1 /* indexType */);
-testMatchingWithNestedPaths(-1 /* indexType */);
-testMatchingWithNestedPaths("hashed" /* indexType */);
+})();
 
 MongoRunner.stopMongod(conn);
 }());

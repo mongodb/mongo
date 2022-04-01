@@ -63,10 +63,6 @@ void appendValueToBsonObj(ObjBuilder& builder,
                           StringData name,
                           value::TypeTags tag,
                           value::Value val);
-
-template <class ArrayBuilder>
-void convertToBsonObj(ArrayBuilder& builder, value::ArrayEnumerator arr);
-
 }  // namespace bson
 }  // namespace sbe
 }  // namespace mongo

@@ -1663,7 +1663,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinNewKeyString(Ar
     uint32_t orderingBits = value::numericCast<int32_t>(tagOrdering, valOrdering);
     BSONObjBuilder bb;
     for (size_t i = 0; orderingBits != 0 && i < arity - 3u; ++i, orderingBits >>= 1) {
-        bb.append(""_sd, (orderingBits & 1) ? -1 : 1);
+        bb.append(""_sd, (orderingBits & 1) ? 1 : 0);
     }
 
     KeyString::HeapBuilder kb{ksVersion, Ordering::make(bb.done())};
@@ -1675,9 +1675,6 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinNewKeyString(Ar
         auto tagCopy = tag;
 
         switch (tag) {
-            case value::TypeTags::Boolean:
-                kb.appendBool(value::bitcastTo<bool>(val));
-                break;
             case value::TypeTags::NumberInt32:
                 kb.appendNumberInt(value::bitcastTo<int32_t>(val));
                 break;
@@ -1695,27 +1692,6 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinNewKeyString(Ar
             case value::TypeTags::bsonString:
                 kb.appendString(value::getStringView(tag, val));
                 break;
-            case value::TypeTags::Null:
-                kb.appendNull();
-                break;
-            case value::TypeTags::bsonUndefined:
-                kb.appendUndefined();
-                break;
-            case value::TypeTags::bsonJavascript:
-                kb.appendCode(value::getBsonJavascriptView(val));
-                break;
-            case value::TypeTags::Date: {
-                auto milliseconds = value::bitcastTo<int64_t>(val);
-                auto duration = stdx::chrono::duration<int64_t, std::milli>(milliseconds);
-                auto date = Date_t::fromDurationSinceEpoch(duration);
-                kb.appendDate(date);
-                break;
-            }
-            case value::TypeTags::Timestamp: {
-                Timestamp ts{value::bitcastTo<uint64_t>(val)};
-                kb.appendTimestamp(ts);
-                break;
-            }
             case value::TypeTags::MinKey: {
                 BSONObjBuilder bob;
                 bob.appendMinKey("");
@@ -1727,70 +1703,6 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinNewKeyString(Ar
                 bob.appendMaxKey("");
                 kb.appendBSONElement(bob.obj().firstElement(), nullptr);
                 break;
-            }
-            case value::TypeTags::bsonArray: {
-                BSONObj bson{value::getRawPointerView(val)};
-                kb.appendArray(BSONArray(BSONObj(bson)));
-                break;
-            }
-            case value::TypeTags::Array:
-            case value::TypeTags::ArraySet: {
-                value::ArrayEnumerator enumerator{tag, val};
-                BSONArrayBuilder arrayBuilder;
-                bson::convertToBsonObj(arrayBuilder, enumerator);
-                kb.appendArray(arrayBuilder.arr());
-                break;
-            }
-            case value::TypeTags::bsonObject: {
-                BSONObj bson{value::getRawPointerView(val)};
-                kb.appendObject(bson);
-                break;
-            }
-            case value::TypeTags::Object: {
-                BSONObjBuilder objBuilder;
-                bson::convertToBsonObj(objBuilder, value::getObjectView(val));
-                kb.appendObject(objBuilder.obj());
-                break;
-            }
-            case value::TypeTags::ObjectId: {
-                auto oid = OID::from(value::getObjectIdView(val)->data());
-                kb.appendOID(oid);
-                break;
-            }
-            case value::TypeTags::bsonObjectId: {
-                auto oid = OID::from(value::getRawPointerView(val));
-                kb.appendOID(oid);
-                break;
-            }
-            case value::TypeTags::bsonSymbol: {
-                auto symbolView = value::getStringOrSymbolView(tag, val);
-                kb.appendSymbol(symbolView);
-                break;
-            }
-            case value::TypeTags::bsonBinData: {
-                auto data = value::getBSONBinData(tag, val);
-                auto length = static_cast<int>(value::getBSONBinDataSize(tag, val));
-                auto type = value::getBSONBinDataSubtype(tag, val);
-                BSONBinData binData{data, length, type};
-                kb.appendBinData(binData);
-                break;
-            }
-            case value::TypeTags::bsonRegex: {
-                auto sbeRegex = value::getBsonRegexView(val);
-                BSONRegEx regex{sbeRegex.pattern, sbeRegex.flags};
-                kb.appendRegex(regex);
-                break;
-            }
-            case value::TypeTags::bsonCodeWScope: {
-                auto sbeCodeWScope = value::getBsonCodeWScopeView(val);
-                BSONCodeWScope codeWScope{sbeCodeWScope.code, BSONObj(sbeCodeWScope.scope)};
-                kb.appendCodeWString(codeWScope);
-                break;
-            }
-            case value::TypeTags::bsonDBPointer: {
-                auto dbPointer = value::getBsonDBPointerView(val);
-                BSONDBRef dbRef{dbPointer.ns, OID::from(dbPointer.id)};
-                kb.appendDBRef(dbRef);
             }
             default:
                 uasserted(4822802, str::stream() << "Unsuppored key string type: " << tagCopy);
