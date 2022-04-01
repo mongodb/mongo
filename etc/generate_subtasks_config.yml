@@ -34,6 +34,7 @@ build_variant_large_distro_exceptions:
   - hot_backups-rhel-70-64-bit
   - linux-64-ephemeralForTest
   - macos
+  - macos-arm64
   - macos-debug-suggested
   - rhel70
   - rhel80
