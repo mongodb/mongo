@@ -297,9 +297,12 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(OperationContext* opCtx,
             collection->getIndexCatalog()->prepareInsertDeleteOptions(
                 opCtx, descriptor, &index.options);
 
-            // Index builds always relax constraints and check for violations at commit-time.
+            // Foreground index builds have to check for duplicates. Other index builds can relax
+            // constraints and check for violations at commit-time.
             index.options.getKeysMode = IndexAccessMethod::GetKeysMode::kRelaxConstraints;
-            index.options.dupsAllowed = true;
+            index.options.dupsAllowed = _method == IndexBuildMethod::kForeground
+                ? !descriptor->unique() || _ignoreUnique
+                : true;
             index.options.fromIndexBuilder = true;
 
             logv2::DynamicAttributes attrs;
