@@ -48,7 +48,14 @@ const rolloverConfig = function(newConfig) {
         rst.nodeOptions[configId] = Object.merge(rst.nodeOptions[configId], newConfig, true);
         const newNode = rst.start(nodeId, {}, true, true);
         rst.awaitSecondaryNodes();
-        assert(newNode.getDB("admin").auth("root", "root"));
+        // Even though we waited for this node to become SECONDARY, it may go into rollback
+        // thereafter, so this auth command must be tolerant of that disconnection.
+        let authResult;
+        assert.soonNoExcept(function() {
+            authResult = newNode.getDB("admin").auth("root", "root");
+            return true;
+        });
+        assert(authResult);
     };
 
     rst.nodes.forEach(function(node) {
