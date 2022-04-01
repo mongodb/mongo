@@ -317,12 +317,24 @@ Status IndexCatalogEntryImpl::_setMultikeyInMultiDocumentTransaction(
                 // may not have a stable timestamp. Therefore, we need to round up
                 // the multi-key write timestamp to the max of the three so that we don't write
                 // behind the oldest/stable timestamp. This code path is only hit during initial
-                // sync/recovery when reconstructing prepared transactions and so we don't expect
+                // sync/recovery when reconstructing prepared transactions, and so we don't expect
                 // the oldest/stable timestamp to advance concurrently.
+                //
+                // WiredTiger disallows committing at the stable timestamp to avoid confusion during
+                // checkpoints, to overcome that we allow setting the timestamp slightly after the
+                // prepared timestamp of the original transaction. This is currently not an issue as
+                // the index metadata state is read from in-memory cache and this is modifying the
+                // state on-disk from the _mdb_catalog document. To put in other words, multikey
+                // doesn't go backwards. This would be a problem if we move to a versioned catalog
+                // world as a different transaction could choose an earlier timestamp (i.e. the
+                // original transaction timestamp) and encounter an invalid system state where the
+                // document that enables multikey hasn't enabled it yet but is present in the
+                // collection. In other words, the index is not set for multikey but there is
+                // already data present that relies on it.
                 auto status = opCtx->recoveryUnit()->setTimestamp(std::max(
                     {recoveryPrepareOpTime.getTimestamp(),
                      opCtx->getServiceContext()->getStorageEngine()->getOldestTimestamp(),
-                     opCtx->getServiceContext()->getStorageEngine()->getStableTimestamp()}));
+                     opCtx->getServiceContext()->getStorageEngine()->getStableTimestamp() + 1}));
                 fassert(31164, status);
             } else {
                 // If there is no recovery prepare OpTime, then this node must be a primary. We

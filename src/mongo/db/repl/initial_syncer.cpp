@@ -1468,11 +1468,17 @@ void InitialSyncer::_lastOplogEntryFetcherCallbackForStopTimestamp(
         // override its behavior in tests. See InitialSyncerReturnsCallbackCanceledAndDoesNot-
         // ScheduleRollbackCheckerIfShutdownAfterInsertingInsertOplogSeedDocument in
         // initial_syncer_test.cpp
-        auto status = _storage->insertDocument(
-            opCtx.get(),
-            NamespaceString::kRsOplogNamespace,
-            TimestampedBSONObj{oplogSeedDoc, resultOpTimeAndWallTime.opTime.getTimestamp()},
-            resultOpTimeAndWallTime.opTime.getTerm());
+        //
+        // Note that the initial seed oplog insertion is not timestamped, this is safe to do as the
+        // logic for navigating the oplog is reliant on the timestamp value of the oplog document
+        // itself. Additionally, this also prevents confusion in the storage engine as the last
+        // insertion can be produced at precisely the stable timestamp, which could lead to invalid
+        // data consistency due to the stable timestamp signalling that no operations before or at
+        // that point will be rolled back. So transactions shouldn't happen at precisely that point.
+        auto status = _storage->insertDocument(opCtx.get(),
+                                               NamespaceString::kRsOplogNamespace,
+                                               TimestampedBSONObj{oplogSeedDoc},
+                                               resultOpTimeAndWallTime.opTime.getTerm());
         if (!status.isOK()) {
             stdx::lock_guard<Latch> lock(_mutex);
             onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, status);

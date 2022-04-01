@@ -1071,7 +1071,7 @@ TEST_F(KVEngineTestHarness, RollingBackToLastStable) {
  */
 DEATH_TEST_REGEX_F(KVEngineTestHarness,
                    CommitBehindStable,
-                   ".*commit timestamp.*is less than the stable timestamp.*") {
+                   ".*commit timestamp.*(is less than|must be after) the stable timestamp.*") {
     std::unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create(getServiceContext()));
     KVEngine* engine = helper->getEngine();
     // TODO SERVER-48314: Remove after implementing correct behavior on biggie.
@@ -1102,76 +1102,11 @@ DEATH_TEST_REGEX_F(KVEngineTestHarness,
     }
 
     {
-        // Committing a behind the stable timestamp is not allowed.
+        // Committing at or behind the stable timestamp is not allowed.
         auto opCtx = _makeOperationContext(engine);
         WriteUnitOfWork uow(opCtx.get());
         auto swRid = rs->insertRecord(opCtx.get(), "abc", 4, Timestamp(1, 1));
         uow.commit();
-    }
-}
-
-/*
- * Commit at stable
- * | Session                         | GlobalActor                |
- * |---------------------------------+----------------------------|
- * |                                 | GlobalTimestamp :stable 2  |
- * | Begin                           |                            |
- * | Write A 1                       |                            |
- * | Timestamp :commit 2             |                            |
- */
-TEST_F(KVEngineTestHarness, CommitAtStable) {
-    std::unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create(getServiceContext()));
-    KVEngine* engine = helper->getEngine();
-    // TODO SERVER-48314: Remove after implementing correct behavior on biggie.
-    if (engine->isEphemeral())
-        return;
-
-    // The initial data timestamp has to be set to take stable checkpoints.
-    engine->setInitialDataTimestamp(Timestamp(1, 1));
-    std::string ns = "a.b";
-    std::unique_ptr<RecordStore> rs;
-    {
-        auto opCtx = _makeOperationContext(engine);
-        ASSERT_OK(engine->createRecordStore(opCtx.get(), ns, ns, CollectionOptions()));
-        rs = engine->getRecordStore(opCtx.get(), ns, ns, CollectionOptions());
-        ASSERT(rs);
-    }
-
-    {
-        // Set the stable timestamp to (2, 2).
-        ASSERT(!engine->getLastStableRecoveryTimestamp());
-        engine->setStableTimestamp(Timestamp(2, 2), false);
-        ASSERT(!engine->getLastStableRecoveryTimestamp());
-
-        // Force a checkpoint to be taken. This should advance the last stable timestamp.
-        auto opCtx = _makeOperationContext(engine);
-        engine->flushAllFiles(opCtx.get(), false);
-        ASSERT_EQ(engine->getLastStableRecoveryTimestamp(), Timestamp(2, 2));
-    }
-
-    RecordId rid;
-    {
-        // For a non-prepared transaction, the commit timestamp can be equal to the stable
-        // timestamp.
-        auto opCtx = _makeOperationContext(engine);
-        WriteUnitOfWork uow(opCtx.get());
-        auto swRid = rs->insertRecord(opCtx.get(), "abc", 4, Timestamp(2, 2));
-        ASSERT_OK(swRid);
-        rid = swRid.getValue();
-        uow.commit();
-    }
-
-    {
-        // Rollback to the last stable timestamp.
-        auto opCtx = _makeOperationContext(engine);
-        StatusWith<Timestamp> swTimestamp = engine->recoverToStableTimestamp(opCtx.get());
-        ASSERT_EQ(swTimestamp.getValue(), Timestamp(2, 2));
-
-        // Transaction with timestamps equal to lastStable will not be rolled back.
-        opCtx->recoveryUnit()->abandonSnapshot();
-        RecordData data;
-        ASSERT_TRUE(rs->findRecord(opCtx.get(), rid, &data));
-        ASSERT_EQUALS(1, rs->numRecords(opCtx.get()));
     }
 }
 

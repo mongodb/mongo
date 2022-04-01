@@ -55,6 +55,20 @@
 namespace mongo {
 namespace {
 
+void insertOplogDocument(OperationContext* opCtx, Timestamp ts, const char* ns) {
+    AutoGetCollection coll(opCtx, NamespaceString{ns}, MODE_IX);
+    WriteUnitOfWork wuow(opCtx);
+    auto doc = BSON("ts" << ts);
+    InsertStatement stmt;
+    stmt.doc = doc;
+    stmt.oplogSlot = OplogSlot{ts, OplogSlot::kInitialTerm};
+    auto status = coll->insertDocument(opCtx, stmt, nullptr);
+    if (!status.isOK()) {
+        std::cout << "Failed to insert oplog document: " << status.toString() << std::endl;
+    }
+    wuow.commit();
+}
+
 using std::endl;
 using std::string;
 using std::unique_ptr;
@@ -689,6 +703,7 @@ public:
     ~OplogScanWithGtTimstampPred() {
         _client.dropCollection(ns);
     }
+
     void run() {
         // Skip the test if the storage engine doesn't support capped collections.
         if (!_opCtx.getServiceContext()->getStorageEngine()->supportsCappedCollections()) {
@@ -712,9 +727,10 @@ public:
                                info);
         }
 
-        insert(ns, BSON("ts" << Timestamp(1000, 0)));
-        insert(ns, BSON("ts" << Timestamp(1000, 1)));
-        insert(ns, BSON("ts" << Timestamp(1000, 2)));
+
+        insertOplogDocument(&_opCtx, Timestamp(1000, 0), ns);
+        insertOplogDocument(&_opCtx, Timestamp(1000, 1), ns);
+        insertOplogDocument(&_opCtx, Timestamp(1000, 2), ns);
         FindCommandRequest findRequest{NamespaceString{ns}};
         findRequest.setFilter(BSON("ts" << GT << Timestamp(1000, 1)));
         findRequest.setHint(BSON("$natural" << 1));
@@ -739,6 +755,7 @@ public:
     ~OplogScanGtTsExplain() {
         _client.dropCollection(string(ns));
     }
+
     void run() {
         // Skip the test if the storage engine doesn't support capped collections.
         if (!_opCtx.getServiceContext()->getStorageEngine()->supportsCappedCollections()) {
@@ -762,9 +779,9 @@ public:
                                info);
         }
 
-        insert(ns, BSON("ts" << Timestamp(1000, 0)));
-        insert(ns, BSON("ts" << Timestamp(1000, 1)));
-        insert(ns, BSON("ts" << Timestamp(1000, 2)));
+        insertOplogDocument(&_opCtx, Timestamp(1000, 0), ns);
+        insertOplogDocument(&_opCtx, Timestamp(1000, 1), ns);
+        insertOplogDocument(&_opCtx, Timestamp(1000, 2), ns);
 
         BSONObj explainCmdObj =
             BSON("explain" << BSON("find"
@@ -1519,7 +1536,7 @@ public:
 
         while (1) {
             int oldCount = count();
-            _client.insert(ns(), BSON("ts" << Timestamp(1000, i++)));
+            insertOplogDocument(&_opCtx, Timestamp(1000, i++), ns());
             int newCount = count();
             if (oldCount == newCount || newCount < max)
                 break;
@@ -1529,7 +1546,8 @@ public:
         }
 
         for (int k = 0; k < 5; ++k) {
-            _client.insert(ns(), BSON("ts" << Timestamp(1000, i++)));
+            auto ts = Timestamp(1000, i++);
+            insertOplogDocument(&_opCtx, ts, ns());
             FindCommandRequest findRequest{NamespaceString{ns()}};
             findRequest.setSort(BSON("$natural" << 1));
             unsigned min = _client.find(findRequest)->next()["ts"].timestamp().getInc();
@@ -1583,11 +1601,11 @@ public:
         }
 
         unsigned i = 0;
-        for (; i < 150; _client.insert(ns(), BSON("ts" << Timestamp(1000, i++))))
+        for (; i < 150; insertOplogDocument(&_opCtx, Timestamp(1000, i++), ns()))
             ;
 
         for (int k = 0; k < 5; ++k) {
-            _client.insert(ns(), BSON("ts" << Timestamp(1000, i++)));
+            insertOplogDocument(&_opCtx, Timestamp(1000, i++), ns());
             FindCommandRequest findRequest{NamespaceString{ns()}};
             findRequest.setSort(BSON("$natural" << 1));
             unsigned min = _client.find(findRequest)->next()["ts"].timestamp().getInc();
@@ -1660,7 +1678,7 @@ public:
         ASSERT(!c->more());
 
         // Check with some docs in the collection.
-        for (int i = 100; i < 150; _client.insert(ns(), BSON("ts" << Timestamp(1000, i++))))
+        for (int i = 100; i < 150; insertOplogDocument(&_opCtx, Timestamp(1000, i++), ns()))
             ;
         c = _client.find(findRequest);
         ASSERT(c->more());

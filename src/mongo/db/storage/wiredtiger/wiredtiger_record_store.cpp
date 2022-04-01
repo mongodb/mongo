@@ -1369,18 +1369,19 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
         auto& record = records[i];
         invariant(!record.id.isNull());
         invariant(!record_id_helpers::isReserved(record.id));
-        Timestamp ts;
-        if (timestamps[i].isNull() && _isOplog) {
-            // If the timestamp is 0, that probably means someone inserted a document directly
-            // into the oplog.  In this case, use the RecordId as the timestamp, since they are
-            // one and the same. Setting this transaction to be unordered will trigger a journal
-            // flush. Because these are direct writes into the oplog, the machinery to trigger a
-            // journal flush is bypassed. A followup oplog read will require a fresh visibility
-            // value to make progress.
-            ts = Timestamp(record.id.getLong());
+        Timestamp ts = timestamps[i];
+        if (_isOplog) {
+            // Setting this transaction to be unordered will trigger a journal flush. Because these
+            // are direct writes into the oplog, the machinery to trigger a journal flush is
+            // bypassed. A followup oplog read will require a fres value to make progress.
             opCtx->recoveryUnit()->setOrderedCommit(false);
-        } else {
-            ts = timestamps[i];
+            auto oplogKeyTs = Timestamp(record.id.getLong());
+            if (!ts.isNull()) {
+                invariant(oplogKeyTs == ts);
+            }
+            if (!opCtx->recoveryUnit()->getCommitTimestamp().isNull()) {
+                invariant(oplogKeyTs == opCtx->recoveryUnit()->getCommitTimestamp());
+            }
         }
         if (!ts.isNull()) {
             LOGV2_DEBUG(22403, 4, "inserting record with timestamp {ts}", "ts"_attr = ts);
