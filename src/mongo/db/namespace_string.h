@@ -415,6 +415,11 @@ public:
     bool isConfigTransactionsCollection() const;
 
     /**
+     * Returns whether the specified namespace is <database>.fle2.<.+>.(esc|ecc|ecoc).
+     */
+    bool isFLE2StateCollection() const;
+
+    /**
      * Returns the time-series buckets namespace for this view.
      */
     NamespaceString makeTimeseriesBucketsNamespace() const;

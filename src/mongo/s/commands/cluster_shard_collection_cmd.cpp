@@ -90,6 +90,10 @@ public:
                 "Sharding a buckets collection is not allowed",
                 !nss.isTimeseriesBucketsCollection());
 
+        uassert(6464401,
+                "Sharding a FLE 2 state collection is not allowed",
+                !nss.isFLE2StateCollection());
+
         auto shardCollRequest =
             ShardCollection::parse(IDLParserErrorContext("ShardCollection"), cmdObj);
 
