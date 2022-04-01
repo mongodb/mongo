@@ -6375,64 +6375,32 @@ bool CacheIRCompiler::emitCompareBigIntStringResult(JSOp op,
 
   switch (op) {
     case JSOp::Eq: {
-#ifndef _MSC_VER
       constexpr auto Equal = EqualityKind::Equal;
-#else
-      // The static_cast works around an internal compiler error in MSVC.
-      constexpr auto Equal = static_cast<bool>(EqualityKind::Equal);
-#endif
       callvm.call<FnBigIntString, BigIntStringEqual<Equal>>();
       break;
     }
     case JSOp::Ne: {
-#ifndef _MSC_VER
       constexpr auto NotEqual = EqualityKind::NotEqual;
-#else
-      // The static_cast works around an internal compiler error in MSVC.
-      constexpr auto NotEqual = static_cast<bool>(EqualityKind::NotEqual);
-#endif
       callvm.call<FnBigIntString, BigIntStringEqual<NotEqual>>();
       break;
     }
     case JSOp::Lt: {
-#ifndef _MSC_VER
       constexpr auto LessThan = ComparisonKind::LessThan;
-#else
-      // The static_cast works around an internal compiler error in MSVC.
-      constexpr auto LessThan = static_cast<bool>(ComparisonKind::LessThan);
-#endif
       callvm.call<FnBigIntString, BigIntStringCompare<LessThan>>();
       break;
     }
     case JSOp::Gt: {
-#ifndef _MSC_VER
       constexpr auto LessThan = ComparisonKind::LessThan;
-#else
-      // The static_cast works around an internal compiler error in MSVC.
-      constexpr auto LessThan = static_cast<bool>(ComparisonKind::LessThan);
-#endif
       callvm.call<FnStringBigInt, StringBigIntCompare<LessThan>>();
       break;
     }
     case JSOp::Le: {
-#ifndef _MSC_VER
       constexpr auto GreaterThanOrEqual = ComparisonKind::GreaterThanOrEqual;
-#else
-      // The static_cast works around an internal compiler error in MSVC.
-      constexpr auto GreaterThanOrEqual =
-          static_cast<bool>(ComparisonKind::GreaterThanOrEqual);
-#endif
       callvm.call<FnStringBigInt, StringBigIntCompare<GreaterThanOrEqual>>();
       break;
     }
     case JSOp::Ge: {
-#ifndef _MSC_VER
       constexpr auto GreaterThanOrEqual = ComparisonKind::GreaterThanOrEqual;
-#else
-      // The static_cast works around an internal compiler error in MSVC.
-      constexpr auto GreaterThanOrEqual =
-          static_cast<bool>(ComparisonKind::GreaterThanOrEqual);
-#endif
       callvm.call<FnBigIntString, BigIntStringCompare<GreaterThanOrEqual>>();
       break;
     }
