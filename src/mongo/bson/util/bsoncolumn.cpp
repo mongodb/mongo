@@ -43,8 +43,9 @@ namespace {
 // Start capacity for memory blocks allocated by ElementStorage
 constexpr int kStartCapacity = 128;
 
-// Max capacity for memory blocks allocated by ElementStorage
-constexpr int kMaxCapacity = 1024 * 32;
+// Max capacity for memory blocks allocated by ElementStorage. We need to allow blocks to grow to at
+// least BSONObjMaxUserSize so we can construct user objects efficiently.
+constexpr int kMaxCapacity = BSONObjMaxUserSize;
 
 // Memory offset to get to BSONElement value when field name is an empty string.
 constexpr int kElementValueOffset = 2;
