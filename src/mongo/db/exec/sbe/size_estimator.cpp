@@ -54,7 +54,6 @@ size_t estimate(const Interval& interval) {
 size_t estimate(const IndexSeekPoint& indexSeekPoint) {
     size_t size = estimate(indexSeekPoint.keyPrefix);
     size += estimate(indexSeekPoint.keySuffix);
-    size += estimate(indexSeekPoint.suffixInclusive);
     return size;
 }
 

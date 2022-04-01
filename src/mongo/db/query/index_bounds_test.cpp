@@ -673,9 +673,8 @@ TEST(IndexBoundsCheckerTest, StartKey) {
     it.getStartSeekPoint(&seekPoint);
 
     ASSERT_EQUALS(seekPoint.keySuffix[0]->numberInt(), 7);
-    ASSERT_EQUALS(seekPoint.suffixInclusive[0], true);
     ASSERT_EQUALS(seekPoint.keySuffix[1]->numberInt(), 0);
-    ASSERT_EQUALS(seekPoint.suffixInclusive[1], false);
+    ASSERT_EQUALS(seekPoint.firstExclusive, 1);
 }
 
 TEST(IndexBoundsCheckerTest, CheckEnd) {
@@ -703,7 +702,7 @@ TEST(IndexBoundsCheckerTest, CheckEnd) {
     state = it.checkKey(BSON("" << 20 << "" << 5), &seekPoint);
     ASSERT_EQUALS(state, IndexBoundsChecker::MUST_ADVANCE);
     ASSERT_EQUALS(seekPoint.prefixLen, 1);
-    ASSERT(seekPoint.prefixExclusive);
+    ASSERT_EQUALS(seekPoint.firstExclusive, 0);
 
     // The next index key is in the second interval for 'foo' and there is a valid interval for
     // 'bar'.
@@ -716,7 +715,7 @@ TEST(IndexBoundsCheckerTest, CheckEnd) {
     state = it.checkKey(BSON("" << 29.9 << "" << 5), &seekPoint);
     ASSERT_EQUALS(state, IndexBoundsChecker::MUST_ADVANCE);
     ASSERT_EQUALS(seekPoint.prefixLen, 1);
-    ASSERT(seekPoint.prefixExclusive);
+    ASSERT_EQUALS(seekPoint.firstExclusive, 0);
 }
 
 TEST(IndexBoundsCheckerTest, MoveIntervalForwardToNextInterval) {
@@ -744,11 +743,9 @@ TEST(IndexBoundsCheckerTest, MoveIntervalForwardToNextInterval) {
     ASSERT_EQUALS(state, IndexBoundsChecker::MUST_ADVANCE);
     ASSERT_EQUALS(seekPoint.prefixLen, 0);
     // Should be told to move exactly to the next interval's beginning.
-    ASSERT_EQUALS(seekPoint.prefixExclusive, false);
     ASSERT_EQUALS(seekPoint.keySuffix[0]->numberInt(), 21);
-    ASSERT_EQUALS(seekPoint.suffixInclusive[0], true);
     ASSERT_EQUALS(seekPoint.keySuffix[1]->numberInt(), 0);
-    ASSERT_EQUALS(seekPoint.suffixInclusive[1], false);
+    ASSERT_EQUALS(seekPoint.firstExclusive, 1);
 }
 
 TEST(IndexBoundsCheckerTest, MoveIntervalForwardManyIntervals) {
@@ -798,15 +795,14 @@ TEST(IndexBoundsCheckerTest, SimpleCheckKey) {
     state = it.checkKey(BSON("" << 7 << "" << 5.00001), &seekPoint);
     ASSERT_EQUALS(state, IndexBoundsChecker::MUST_ADVANCE);
     ASSERT_EQUALS(seekPoint.prefixLen, 1);
-    ASSERT_EQUALS(seekPoint.prefixExclusive, true);
+    ASSERT_EQUALS(seekPoint.firstExclusive, 0);
 
     // Move a little forward, but note that the rightmost key isn't in the interval yet.
     state = it.checkKey(BSON("" << 7.2 << "" << 0), &seekPoint);
     ASSERT_EQUALS(state, IndexBoundsChecker::MUST_ADVANCE);
     ASSERT_EQUALS(seekPoint.prefixLen, 1);
-    ASSERT_EQUALS(seekPoint.prefixExclusive, false);
     ASSERT_EQUALS(seekPoint.keySuffix[1]->numberInt(), 0);
-    ASSERT_EQUALS(seekPoint.suffixInclusive[1], false);
+    ASSERT_EQUALS(seekPoint.firstExclusive, 1);
 
     // Move to the edge of both intervals, 20,5
     state = it.checkKey(BSON("" << 20 << "" << 5), &seekPoint);
@@ -841,9 +837,8 @@ TEST(IndexBoundsCheckerTest, FirstKeyMovedIsOKSecondKeyMustMove) {
     state = it.checkKey(BSON("" << 10 << "" << -1), &seekPoint);
     ASSERT_EQUALS(state, IndexBoundsChecker::MUST_ADVANCE);
     ASSERT_EQUALS(seekPoint.prefixLen, 1);
-    ASSERT_EQUALS(seekPoint.prefixExclusive, false);
     ASSERT_EQUALS(seekPoint.keySuffix[1]->numberInt(), 0);
-    ASSERT_EQUALS(seekPoint.suffixInclusive[1], false);
+    ASSERT_EQUALS(seekPoint.firstExclusive, 1);
 }
 
 TEST(IndexBoundsCheckerTest, SecondIntervalMustRewind) {
@@ -871,9 +866,8 @@ TEST(IndexBoundsCheckerTest, SecondIntervalMustRewind) {
     state = it.checkKey(BSON("" << 25 << "" << 1), &seekPoint);
     ASSERT_EQUALS(state, IndexBoundsChecker::MUST_ADVANCE);
     ASSERT_EQUALS(seekPoint.prefixLen, 1);
-    ASSERT_EQUALS(seekPoint.prefixExclusive, false);
     ASSERT_EQUALS(seekPoint.keySuffix[1]->numberInt(), 9);
-    ASSERT_EQUALS(seekPoint.suffixInclusive[1], true);
+    ASSERT_EQUALS(seekPoint.firstExclusive, -1);
 
     state = it.checkKey(BSON("" << 25 << "" << 9), &seekPoint);
     ASSERT_EQUALS(state, IndexBoundsChecker::VALID);
@@ -911,15 +905,14 @@ TEST(IndexBoundsCheckerTest, SimpleCheckKeyBackwards) {
     state = it.checkKey(BSON("" << 20 << "" << 0), &seekPoint);
     ASSERT_EQUALS(state, IndexBoundsChecker::MUST_ADVANCE);
     ASSERT_EQUALS(seekPoint.prefixLen, 1);
-    ASSERT_EQUALS(seekPoint.prefixExclusive, true);
+    ASSERT_EQUALS(seekPoint.firstExclusive, 0);
 
     // Move a little forward, but note that the rightmost key isn't in the interval yet.
     state = it.checkKey(BSON("" << 19 << "" << 6), &seekPoint);
     ASSERT_EQUALS(state, IndexBoundsChecker::MUST_ADVANCE);
     ASSERT_EQUALS(seekPoint.prefixLen, 1);
-    ASSERT_EQUALS(seekPoint.prefixExclusive, false);
     ASSERT_EQUALS(seekPoint.keySuffix[1]->numberInt(), 5);
-    ASSERT_EQUALS(seekPoint.suffixInclusive[1], true);
+    ASSERT_EQUALS(seekPoint.firstExclusive, -1);
 
     // Move to the edge of both intervals
     state = it.checkKey(BSON("" << 7 << "" << 0.01), &seekPoint);
@@ -958,7 +951,7 @@ TEST(IndexBoundsCheckerTest, CheckEndBackwards) {
     state = it.checkKey(BSON("" << 30 << "" << 5), &seekPoint);
     ASSERT_EQUALS(state, IndexBoundsChecker::MUST_ADVANCE);
     ASSERT_EQUALS(seekPoint.prefixLen, 1);
-    ASSERT(seekPoint.prefixExclusive);
+    ASSERT_EQUALS(seekPoint.firstExclusive, 0);
 
     // The next index key is in the second interval for 'foo' and there is a valid interval for
     // 'bar'.
@@ -971,7 +964,7 @@ TEST(IndexBoundsCheckerTest, CheckEndBackwards) {
     state = it.checkKey(BSON("" << 7.001 << "" << 5), &seekPoint);
     ASSERT_EQUALS(state, IndexBoundsChecker::MUST_ADVANCE);
     ASSERT_EQUALS(seekPoint.prefixLen, 1);
-    ASSERT(seekPoint.prefixExclusive);
+    ASSERT_EQUALS(seekPoint.firstExclusive, 0);
 }
 
 //

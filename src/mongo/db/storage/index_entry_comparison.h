@@ -115,14 +115,12 @@ struct KeyStringEntry {
  * expressing exclusiveness on a prefix of the key. This is mostly used to express a location to
  * seek to in an index that may not be representable as a valid key.
  *
- * The "key" used for comparison is the concatenation of the first 'prefixLen' elements of
- * 'keyPrefix' followed by the last 'keySuffix.size() - prefixLen' elements of
- * 'keySuffix'.
+ * If 'firstExclusive' is negative, the "key" used for comparison is the concatenation of the first
+ * 'prefixLen' elements of 'keyPrefix' followed by the last 'keySuffix.size() - prefixLen' elements
+ * of 'keySuffix'.
  *
- * The comparison is exclusive if either 'prefixExclusive' is true or if there are any false
- * values in 'suffixInclusive' that are false at index >= 'prefixLen'.
- *
- * Portions of the key following the first exclusive part may be ignored.
+ * The comparison is exclusive if 'firstExclusive' is non-negative, and any portion of the key after
+ * that index will be omitted. The value of 'firstExclusive' must be at least 'prefixLen' - 1.
  *
  * e.g.
  *
@@ -130,9 +128,8 @@ struct KeyStringEntry {
  *
  *      keyPrefix = { "" : 1, "" : 2 }
  *      prefixLen = 1
- *      prefixExclusive = false
- *      keySuffix = [ IGNORED, { "" : 5 } ]
- *      suffixInclusive = [ IGNORED, false ]
+ *      keySuffix = [ IGNORED, { "" : 5 }, { "" : 9 } ]
+ *      firstExclusive = 1
  *
  *      ==> key is { "" : 1, "" : 5 }
  *          with the comparison being done exclusively
@@ -141,14 +138,21 @@ struct KeyStringEntry {
  *
  *      keyPrefix = { "" : 1, "" : 2 }
  *      prefixLen = 1
- *      prefixExclusive = true
  *      keySuffix = IGNORED
- *      suffixInclusive = IGNORED
+ *      firstExclusive = 0
  *
  *      ==> represented key is { "" : 1 }
  *          with the comparison being done exclusively
  *
- * 'prefixLen = 0' and 'prefixExclusive = true' are mutually incompatible.
+ *  Suppose that
+ *
+ *      keyPrefix = { "" : 1, "" : 2 }
+ *      prefixLen = 1
+ *      keySuffix = [ IGNORED, { "" : 5 }, { "" : 9 } ]
+ *      firstExclusive = -1
+ *
+ *      ==> key is { "" : 1, "" : 5, "" : 9 }
+ *          with the comparison being done inclusively
  */
 struct IndexSeekPoint {
     BSONObj keyPrefix;
@@ -159,24 +163,17 @@ struct IndexSeekPoint {
     int prefixLen = 0;
 
     /**
-     * If true, compare exclusively on just the fields on keyPrefix and ignore the suffix.
-     */
-    bool prefixExclusive = false;
-
-    /**
      * Elements starting at index 'prefixLen' are logically appended to the prefix.
      * The elements before index 'prefixLen' should be ignored.
      */
     std::vector<const BSONElement*> keySuffix;
 
     /**
-     * If the ith element is false, ignore indexes > i in keySuffix and treat the
-     * concatenated key as exclusive.
-     * The elements before index 'prefixLen' should be ignored.
-     *
-     * Must have identical size as keySuffix.
+     * If non-negative, then the comparison will be exclusive and any elements after index
+     * 'firstExclusive' are ignored. Otherwise all elements are considered and the comparison will
+     * be inclusive.
      */
-    std::vector<bool> suffixInclusive;
+    int firstExclusive = -1;
 };
 
 /**
@@ -211,11 +208,9 @@ public:
      * isForward.
      *
      * If a field is marked as exclusive, then comparisons stop after that field and return
-     * either higher or lower, even if that field compares equal. If prefixExclusive is true and
-     * prefixLen is greater than 0, then the last field in the prefix is marked as exclusive. It
-     * is illegal to specify prefixExclusive as true with a prefixLen of 0. Each bool in
-     * suffixInclusive, starting at index prefixLen, indicates whether the corresponding element
-     * in keySuffix is inclusive or exclusive.
+     * either higher or lower, even if that field compares equal. If firstExclusive is non-negative,
+     * then the field at the corresponding index is marked as exclusive and any subsequent fields
+     * are ignored.
      *
      * Returned objects are for use in lookups only and should never be inserted into the
      * database, as their format may change. The only reason this is the same type as the

@@ -119,7 +119,7 @@ PlanStage::StageState DistinctScan::doWork(WorkingSetID* out) {
                 kv->key = kv->key.getOwned();
             _seekPoint.keyPrefix = kv->key;
             _seekPoint.prefixLen = _fieldNo + 1;
-            _seekPoint.prefixExclusive = true;
+            _seekPoint.firstExclusive = _fieldNo;
 
             // Package up the result for the caller.
             WorkingSetID id = _workingSet->allocate();

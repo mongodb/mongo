@@ -114,16 +114,7 @@ int IndexEntryComparison::compare(const IndexKeyEntry& lhs, const IndexKeyEntry&
 
 KeyString::Value IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
     const IndexSeekPoint& seekPoint, KeyString::Version version, Ordering ord, bool isForward) {
-
-    // Determines the discriminator used to build the KeyString.
-    auto suffixExclusive = [&]() {
-        for (size_t i = seekPoint.prefixLen; i < seekPoint.keySuffix.size(); i++) {
-            if (!seekPoint.suffixInclusive[i])
-                return true;
-        }
-        return false;
-    };
-    bool inclusive = !seekPoint.prefixExclusive && !suffixExclusive();
+    const bool inclusive = seekPoint.firstExclusive < 0;
     const auto discriminator = isForward == inclusive ? KeyString::Discriminator::kExclusiveBefore
                                                       : KeyString::Discriminator::kExclusiveAfter;
 
@@ -139,24 +130,13 @@ KeyString::Value IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
         }
     }
 
-    // If the prefix is exclusive then the suffix does not matter as it will never be used.
-    if (seekPoint.prefixExclusive) {
-        invariant(seekPoint.prefixLen > 0);
-        return builder.getValueCopy();
-    }
-
     // Handles the suffix. Note that the useful parts of the suffix start at index prefixLen rather
     // than at 0.
-    invariant(seekPoint.keySuffix.size() == seekPoint.suffixInclusive.size());
-    for (size_t i = seekPoint.prefixLen; i < seekPoint.keySuffix.size(); i++) {
+    size_t end = seekPoint.firstExclusive >= 0 ? static_cast<size_t>(seekPoint.firstExclusive + 1)
+                                               : seekPoint.keySuffix.size();
+    for (size_t i = seekPoint.prefixLen; i < end; i++) {
         invariant(seekPoint.keySuffix[i]);
         builder.appendBSONElement(*seekPoint.keySuffix[i]);
-
-        // If an exclusive field exists then no fields after this will matter, since an
-        // exclusive field never evaluates as equal.
-        if (!seekPoint.suffixInclusive[i]) {
-            return builder.getValueCopy();
-        }
     }
     return builder.getValueCopy();
 }
