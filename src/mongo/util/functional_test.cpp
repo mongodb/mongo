@@ -186,6 +186,30 @@ TEST(FunctionRefTest, returns_value) {
     ASSERT_EQ(mongo::function_ref<int()>([] { return 42; })(), 42);
 }
 
+TEST(UniqueFunctionTest, takes_arguments) {
+    RunDetection<0> runDetection;
+
+    mongo::unique_function<void(int, int)>([](int a, int b) {
+        ASSERT_EQ(a, 1);
+        ASSERT_EQ(b, 2);
+        RunDetection<0>::itRan = true;
+    })(1, 2);
+
+    ASSERT_TRUE(runDetection.itRan);
+}
+
+TEST(FunctionRefTest, takes_arguments) {
+    RunDetection<0> runDetection;
+
+    mongo::function_ref<void(int, int)>([](int a, int b) {
+        ASSERT_EQ(a, 1);
+        ASSERT_EQ(b, 2);
+        RunDetection<0>::itRan = true;
+    })(1, 2);
+
+    ASSERT_TRUE(runDetection.itRan);
+}
+
 TEST(UniqueFunctionTest, returns_reference) {
     struct Immobile {
         Immobile() = default;

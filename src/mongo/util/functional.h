@@ -94,9 +94,9 @@ public:
             if constexpr (std::is_void_v<RetType>) {
                 // Implicitly ignore the return. This avoids issues if func() returns a value,
                 // while ensuring we still get a warning if the value is [[nodiscard]].
-                (*func)(std::forward<Args...>(args)...);
+                (*func)(std::forward<Args>(args)...);
             } else {
-                return (*func)(std::forward<Args...>(args)...);
+                return (*func)(std::forward<Args>(args)...);
             }
         };
     }
