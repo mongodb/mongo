@@ -244,8 +244,8 @@ Status CollectionBulkLoaderImpl::commit() {
                 return status;
             }
 
-            // This should always return Status::OK() as secondary index builds ignore duplicate key
-            // constraints causing them to not be recorded.
+            // This should always return Status::OK() as the foreground index build doesn't install
+            // an interceptor.
             invariant(_secondaryIndexesBlock->checkConstraints(_opCtx.get(),
                                                                _collection->getCollection()));
 
