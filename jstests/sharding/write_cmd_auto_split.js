@@ -1,5 +1,9 @@
 /**
  * Tests the auto split will be triggered when using write commands.
+ *
+ * @tags: [
+ *   does_not_support_stepdowns,
+ * ]
  */
 (function() {
 'use strict';
