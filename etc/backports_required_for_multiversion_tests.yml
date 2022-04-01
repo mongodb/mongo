@@ -166,6 +166,8 @@ last-continuous:
       test_file: jstests/sharding/refine_collection_shard_key_basic.js
     - ticket: SERVER-64485
       test_file: jstests/sharding/update_with_dollar_fields.js
+    - ticket: SERVER-63531
+      test_file: jstests/replsets/buildindexes_false_commit_quorum.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
