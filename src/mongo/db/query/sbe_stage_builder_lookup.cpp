@@ -42,6 +42,7 @@
 #include "mongo/db/exec/sbe/stages/loop_join.h"
 #include "mongo/db/exec/sbe/stages/scan.h"
 #include "mongo/db/exec/sbe/stages/union.h"
+#include "mongo/db/exec/sbe/stages/unique.h"
 #include "mongo/db/exec/sbe/stages/unwind.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/query/sbe_stage_builder_coll_scan.h"
@@ -749,6 +750,18 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
                              makeSV(lowKeySlot, highKeySlot) /* outerCorrelated */,
                              nullptr /* predicate */,
                              nodeId);
+
+    // It is possible for the same record to be returned multiple times when the index is multikey
+    // (contains arrays). Consider an example where local values set is '(1, 2)' and we have a
+    // document with foreign field value '[1, 2]'. The same document will be returned twice:
+    //  - On the first index seek, where we are looking for value '1'
+    //  - On the second index seek, where we are looking for value '2'
+    // To avoid such situation, we are placing 'unique' stage to prevent repeating records from
+    // appearing in the result.
+    if (index.multikey) {
+        ixScanNljStage =
+            makeS<UniqueStage>(std::move(ixScanNljStage), makeSV(foreignRecordIdSlot), nodeId);
+    }
 
     // Loop join the foreign record id produced by the index seek on the outer side with seek
     // stage on the inner side to get matched foreign documents. The foreign documents are

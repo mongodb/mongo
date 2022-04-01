@@ -299,6 +299,25 @@ function testMatchingTopLevelFieldToArrays(indexType) {
     });
 
     runTest_SingleLocalRecord({
+        testDescription: "Local array field should match to every element of this array",
+        localRecord: {b: [1, 2]},
+        localField: "b",
+        foreignRecords: [
+            {_id: 0, a: 1},
+            {_id: 1, a: 2},
+            {_id: 2, a: [1, 2]},
+            {_id: 3, a: [2, 1]},
+            {_id: 4, a: [3, 1, 2]},
+            {_id: 5, a: [1, 2, 3]},
+            {_id: 6, a: [[1, 2]]},
+            {_id: 7, a: 3},
+        ],
+        foreignField: "a",
+        foreignIndex: {a: indexType},
+        idsExpectedToMatch: [0, 1, 2, 3, 4, 5],
+    });
+
+    runTest_SingleLocalRecord({
         testDescription: "Arrays with multiple elements should only match itself",
         localRecord: {b: [[1, 2, 3]]},
         localField: "b",
