@@ -5,7 +5,6 @@
 //   requires_fcv_60,
 //   requires_non_retryable_commands,
 //   requires_replication,
-//   featureFlagUserWriteBlocking,
 // ]
 
 (function() {

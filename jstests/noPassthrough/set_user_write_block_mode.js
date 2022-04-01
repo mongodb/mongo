@@ -7,7 +7,6 @@
 //   requires_non_retryable_commands,
 //   requires_persistence,
 //   requires_replication,
-//   featureFlagUserWriteBlocking,
 // ]
 
 (function() {
