@@ -37,6 +37,8 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/database_sharding_state.h"
+#include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
 
@@ -293,14 +295,27 @@ AutoGetCollection::AutoGetCollection(
         return;
     }
 
-    _view = catalog->lookupView(opCtx, _resolvedNss);
-    uassert(ErrorCodes::CommandNotSupportedOnView,
-            str::stream() << "Namespace " << _resolvedNss.ns() << " is a timeseries collection",
-            !_view || viewMode == AutoGetCollectionViewMode::kViewsPermitted ||
-                !_view->timeseries());
-    uassert(ErrorCodes::CommandNotSupportedOnView,
-            str::stream() << "Namespace " << _resolvedNss.ns() << " is a view, not a collection",
-            !_view || viewMode == AutoGetCollectionViewMode::kViewsPermitted);
+    if ((_view = catalog->lookupView(opCtx, _resolvedNss))) {
+        uassert(ErrorCodes::CommandNotSupportedOnView,
+                str::stream() << "Namespace " << _resolvedNss.ns() << " is a timeseries collection",
+                viewMode == AutoGetCollectionViewMode::kViewsPermitted || !_view->timeseries());
+
+        uassert(ErrorCodes::CommandNotSupportedOnView,
+                str::stream() << "Namespace " << _resolvedNss.ns()
+                              << " is a view, not a collection",
+                viewMode == AutoGetCollectionViewMode::kViewsPermitted);
+
+        const auto receivedShardVersion{
+            OperationShardingState::get(opCtx).getShardVersion(_resolvedNss)};
+        uassert(StaleConfigInfo(_resolvedNss,
+                                *receivedShardVersion,
+                                ChunkVersion::UNSHARDED() /* wantedVersion */,
+                                ShardingState::get(opCtx)->shardId()),
+                str::stream() << "Namespace " << _resolvedNss << " is a view and the shard version"
+                              << " attached to the request must be UNSHARDED, instead it is "
+                              << *receivedShardVersion,
+                !receivedShardVersion || *receivedShardVersion == ChunkVersion::UNSHARDED());
+    }
 }
 
 Collection* AutoGetCollection::getWritableCollection(OperationContext* opCtx,
