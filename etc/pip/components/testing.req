@@ -1,6 +1,6 @@
 curatorbin == 1.2.3
 PyKMIP == 0.10.0
-evergreen.py == 3.2.0
+evergreen.py == 3.4.4
 jinja2 <= 2.11.3
 MarkupSafe == 1.1.0  # See SERVER-57036, this is a transitive dependency of jinja2
 mock <= 4.0.3
