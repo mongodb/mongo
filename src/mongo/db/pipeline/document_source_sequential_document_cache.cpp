@@ -118,11 +118,14 @@ Pipeline::SourceContainer::iterator DocumentSourceSequentialDocumentCache::doOpt
     DepsTracker deps(DepsTracker::kNoMetadata);
 
     // Iterate through the pipeline stages until we find one which references an external variable.
+    DocumentSource* lastPtr = nullptr;
     for (; prefixSplit != container->end(); ++prefixSplit) {
         if (((*prefixSplit)->getDependencies(&deps) == DepsTracker::State::NOT_SUPPORTED) ||
             deps.hasVariableReferenceTo(varIDs)) {
             break;
         }
+
+        lastPtr = prefixSplit->get();
     }
 
     // The 'prefixSplit' iterator is now pointing to the first stage of the correlated suffix. If
@@ -135,6 +138,9 @@ Pipeline::SourceContainer::iterator DocumentSourceSequentialDocumentCache::doOpt
 
     // If the cache has been populated and is serving results, remove the non-correlated prefix.
     if (_cache->isServing()) {
+        // Need to dispose last stage to be removed.
+        Pipeline::stitch(container);
+        lastPtr->dispose();
         container->erase(container->begin(), prefixSplit);
     }
 
