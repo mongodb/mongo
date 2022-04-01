@@ -82,12 +82,9 @@ public:
     ~MultiIndexBlock();
 
     /**
-     * By default we enforce the 'unique' flag in specs when building an index by failing.
-     * If this is called before init(), we will ignore unique violations. This has no effect if
-     * no specs are unique.
-     *
-     * If this is called, any 'dupRecords' set passed to dumpInsertsFromBulk() will never be
-     * filled.
+     * When this is called:
+     * For hybrid index builds, the index interceptor will not track duplicates.
+     * For foreground index builds, the uniqueness constraint will be relaxed.
      */
     void ignoreUniqueConstraint();
 
