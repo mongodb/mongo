@@ -142,9 +142,9 @@ private:
 
 }  // namespace
 
-std::shared_ptr<txn_api::TransactionWithRetries> getTransactionWithRetriesForMongoD(
+std::shared_ptr<txn_api::SyncTransactionWithRetries> getTransactionWithRetriesForMongoD(
     OperationContext* opCtx) {
-    return std::make_shared<txn_api::TransactionWithRetries>(
+    return std::make_shared<txn_api::SyncTransactionWithRetries>(
         opCtx, _fleCrudthreadPool, std::make_unique<FLEMongoDResourceYielder>());
 }
 

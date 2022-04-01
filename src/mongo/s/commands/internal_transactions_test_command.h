@@ -76,7 +76,7 @@ public:
 
             // Swallow errors and let clients inspect the responses array to determine success /
             // failure.
-            (void)txn.runSyncNoThrow(
+            (void)txn.runNoThrow(
                 opCtx,
                 [sharedBlock](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
                     // Iterate through commands and record responses for each. Return immediately if

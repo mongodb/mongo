@@ -488,6 +488,9 @@ error_codes:
 
     - {code: 373, name: InternalTransactionsExhaustiveFindHasMore}
 
+    - {code: 374, name: TransactionAPIMustRetryTransaction, categories: [InternalOnly]}
+    - {code: 375, name: TransactionAPIMustRetryCommit, categories: [InternalOnly]}
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)

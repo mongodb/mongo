@@ -676,24 +676,24 @@ void ShardingCatalogManager::withTransactionAPI(OperationContext* opCtx,
                 serverGlobalParams.featureCompatibility));
 
     auto txn =
-        txn_api::TransactionWithRetries(opCtx,
-                                        Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
-                                        nullptr /* resourceYielder */);
-    txn.runSync(opCtx,
-                [innerCallback = std::move(callback),
-                 namespaceForInitialFind](const txn_api::TransactionClient& txnClient,
-                                          ExecutorPtr txnExec) -> SemiFuture<void> {
-                    // Begin the transaction with a noop find.
-                    FindCommandRequest findCommand(namespaceForInitialFind);
-                    findCommand.setBatchSize(0);
-                    findCommand.setSingleBatch(true);
-                    return txnClient.exhaustiveFind(findCommand)
-                        .thenRunOn(txnExec)
-                        .then([&innerCallback, &txnClient, txnExec](auto foundDocs) {
-                            return innerCallback(txnClient, txnExec);
-                        })
-                        .semi();
-                });
+        txn_api::SyncTransactionWithRetries(opCtx,
+                                            Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
+                                            nullptr /* resourceYielder */);
+    txn.run(opCtx,
+            [innerCallback = std::move(callback),
+             namespaceForInitialFind](const txn_api::TransactionClient& txnClient,
+                                      ExecutorPtr txnExec) -> SemiFuture<void> {
+                // Begin the transaction with a noop find.
+                FindCommandRequest findCommand(namespaceForInitialFind);
+                findCommand.setBatchSize(0);
+                findCommand.setSingleBatch(true);
+                return txnClient.exhaustiveFind(findCommand)
+                    .thenRunOn(txnExec)
+                    .then([&innerCallback, &txnClient, txnExec](auto foundDocs) {
+                        return innerCallback(txnClient, txnExec);
+                    })
+                    .semi();
+            });
 }
 
 void ShardingCatalogManager::withTransaction(

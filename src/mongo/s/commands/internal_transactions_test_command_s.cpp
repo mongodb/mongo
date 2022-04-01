@@ -36,11 +36,11 @@ namespace {
 class InternalTransactionsTestCommandS
     : public InternalTransactionsTestCommandBase<InternalTransactionsTestCommandS> {
 public:
-    static txn_api::TransactionWithRetries getTxn(OperationContext* opCtx,
-                                                  ExecutorPtr executor,
-                                                  StringData commandName,
-                                                  bool useClusterClient) {
-        return txn_api::TransactionWithRetries(
+    static txn_api::SyncTransactionWithRetries getTxn(OperationContext* opCtx,
+                                                      ExecutorPtr executor,
+                                                      StringData commandName,
+                                                      bool useClusterClient) {
+        return txn_api::SyncTransactionWithRetries(
             opCtx, executor, TransactionRouterResourceYielder::makeForLocalHandoff());
     }
 };

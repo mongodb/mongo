@@ -622,14 +622,14 @@ CompactStats processFLECompact(OperationContext* opCtx,
 
     // Read the ECOC documents in a transaction
     {
-        std::shared_ptr<txn_api::TransactionWithRetries> trun = getTxn(opCtx);
+        std::shared_ptr<txn_api::SyncTransactionWithRetries> trun = getTxn(opCtx);
 
         // The function that handles the transaction may outlive this function so we need to use
         // shared_ptrs
         auto argsBlock = std::tie(c, request, namespaces, ecocStats);
         auto sharedBlock = std::make_shared<decltype(argsBlock)>(argsBlock);
 
-        auto swResult = trun->runSyncNoThrow(
+        auto swResult = trun->runNoThrow(
             opCtx, [sharedBlock](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
                 FLEQueryInterfaceImpl queryImpl(txnClient);
 
@@ -649,14 +649,14 @@ CompactStats processFLECompact(OperationContext* opCtx,
     // compact the ESC & ECC entries for that field/value pair in one transaction.
     for (auto& ecocDoc : c) {
         // start a new transaction
-        std::shared_ptr<txn_api::TransactionWithRetries> trun = getTxn(opCtx);
+        std::shared_ptr<txn_api::SyncTransactionWithRetries> trun = getTxn(opCtx);
 
         // The function that handles the transaction may outlive this function so we need to use
         // shared_ptrs
         auto argsBlock = std::tie(ecocDoc, namespaces, escStats, eccStats);
         auto sharedBlock = std::make_shared<decltype(argsBlock)>(argsBlock);
 
-        auto swResult = trun->runSyncNoThrow(
+        auto swResult = trun->runNoThrow(
             opCtx, [sharedBlock](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
                 FLEQueryInterfaceImpl queryImpl(txnClient);
 
