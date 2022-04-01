@@ -87,17 +87,15 @@ size_t getEachIndexBuildMaxMemoryUsageBytes(size_t numIndexSpecs) {
 }
 
 Status timeseriesMixedSchemaDataFailure(const Collection* collection) {
-    // TODO SERVER-61070: Re-word the error message below if necessary and add a URL for
-    // workarounds.
     return Status(
         ErrorCodes::CannotCreateIndex,
-        str::stream() << "Index build on collection '" << collection->ns() << "' ("
-                      << collection->uuid()
-                      << ") failed due to the detection of mixed-schema data in the "
-                      << "time-series buckets collection. Starting as of v5.2, time-series "
-                      << "measurement bucketing has been modified to ensure that newly created "
-                      << "time-series buckets do not contain mixed-schema data. For workarounds, "
-                      << "see: <url>");
+        str::stream()
+            << "Index build on collection '" << collection->ns() << "' (" << collection->uuid()
+            << ") failed due to the detection of mixed-schema data in the "
+            << "time-series buckets collection. Starting as of v5.2, time-series "
+            << "measurement bucketing has been modified to ensure that newly created "
+            << "time-series buckets do not contain mixed-schema data. For details, "
+            << "see: https://www.mongodb.com/docs/manual/core/timeseries/timeseries-limitations/");
 }
 
 }  // namespace
