@@ -85,7 +85,7 @@ static opt::unordered_map<std::string, optimizer::IndexDefinition> buildIndexSpe
         {
             const Ordering ordering = catalogEntry.ordering();
             for (int i = 0; i < descriptor.getNumFields(); i++) {
-                if ((ordering.get(i) == 1)) {
+                if ((ordering.get(i) == -1)) {
                     orderingBits |= (1ull << i);
                 }
             }

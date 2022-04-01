@@ -235,14 +235,10 @@ if (!checkSBEEnabled(db, ["featureFlagSBELookupPushdown"])) {
     assert.eq(2,
               getUsageCount("_id_", foreignCollection),
               "Expected each lookup to be tracked as an index use");
-} else if (checkSBEEnabled(db, ["featureFlagSBELookupPushdownIndexJoin"])) {
+} else {
     assert.eq(1,
               getUsageCount("_id_", foreignCollection),
               "Expected the index join lookup to be tracked as a single index use");
-} else {
-    assert.eq(0,
-              getUsageCount("_id_", foreignCollection),
-              "Expected the nested loop join lookup have no index use");
 }
 
 //
@@ -277,14 +273,10 @@ if (!checkSBEEnabled(db, ["featureFlagSBELookupPushdown"])) {
     assert.eq(2,
               getUsageCount("_id_", foreignCollection),
               "Expected each lookup to be tracked as an index use");
-} else if (checkSBEEnabled(db, ["featureFlagSBELookupPushdownIndexJoin"])) {
+} else {
     assert.eq(1,
               getUsageCount("_id_", foreignCollection),
               "Expected the index join lookup to be tracked as a single index use");
-} else {
-    assert.eq(0,
-              getUsageCount("_id_", foreignCollection),
-              "Expected the nested loop join lookup have no index use");
 }
 const explain = col.explain().aggregate(pipeline);
 assert(getAggPlanStage(explain, "$cursor"),

@@ -3,7 +3,7 @@
 (function() {
 "use strict";
 
-load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
+load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and arrayEq.
 load("jstests/libs/fixture_helpers.js");      // For isSharded.
 load("jstests/libs/discover_topology.js");    // For findDataBearingNodes.
 
@@ -28,8 +28,8 @@ function compareId(a, b) {
 
 // Helper for testing that pipeline returns correct set of results.
 function testPipeline(pipeline, expectedResult, collection) {
-    assert.eq(collection.aggregate(pipeline).toArray().sort(compareId),
-              expectedResult.sort(compareId));
+    arrayEq(collection.aggregate(pipeline).toArray().sort(compareId),
+            expectedResult.sort(compareId));
 }
 
 function runTest(coll, from, thirdColl, fourthColl) {
