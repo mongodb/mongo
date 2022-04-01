@@ -42,9 +42,13 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/util/fail_point.h"
 
 namespace mongo {
 namespace {
+
+// Hang during the execution of SetDefaultRWConcernCommand.
+MONGO_FAIL_POINT_DEFINE(hangWhileSettingDefaultRWC);
 
 /**
  * Replaces the persisted default read/write concern document with a new one representing the given
@@ -113,6 +117,17 @@ public:
         auto typedRun(OperationContext* opCtx) {
             assertNotStandaloneOrShardServer(opCtx, SetDefaultRWConcern::kCommandName);
 
+            auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+            auto wcChanges = replCoord->getWriteConcernTagChanges();
+
+            // Synchronize this change with potential changes to the write concern tags.
+            uassert(ErrorCodes::ConfigurationInProgress,
+                    "Replica set reconfig in progress. Please retry the command later.",
+                    wcChanges->reserveDefaultWriteConcernChange());
+            ON_BLOCK_EXIT([&]() { wcChanges->releaseDefaultWriteConcernChange(); });
+
+            hangWhileSettingDefaultRWC.pauseWhileSet();
+
             auto& rwcDefaults = ReadWriteConcernDefaults::get(opCtx->getServiceContext());
             auto newDefaults = rwcDefaults.generateNewCWRWCToBeSavedOnDisk(
                 opCtx, request().getDefaultReadConcern(), request().getDefaultWriteConcern());
@@ -120,8 +135,7 @@ public:
             // because it only has to exist on the actual shards in order to be valid.
             if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
                 if (auto optWC = newDefaults.getDefaultWriteConcern()) {
-                    uassertStatusOK(
-                        repl::ReplicationCoordinator::get(opCtx)->validateWriteConcern(*optWC));
+                    uassertStatusOK(replCoord->validateWriteConcern(*optWC));
                 }
             }
 

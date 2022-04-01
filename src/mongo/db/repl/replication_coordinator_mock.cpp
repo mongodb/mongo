@@ -782,5 +782,11 @@ void ReplicationCoordinatorMock::recordIfCWWCIsSetOnConfigServerOnStartup(Operat
     MONGO_UNREACHABLE;
 }
 
+ReplicationCoordinatorMock::WriteConcernTagChanges*
+ReplicationCoordinatorMock::getWriteConcernTagChanges() {
+    MONGO_UNREACHABLE;
+    return nullptr;
+}
+
 }  // namespace repl
 }  // namespace mongo

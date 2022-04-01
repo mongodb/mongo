@@ -404,6 +404,21 @@ public:
 
     virtual void recordIfCWWCIsSetOnConfigServerOnStartup(OperationContext* opCtx) final;
 
+    class WriteConcernTagChangesMock : public WriteConcernTagChanges {
+        virtual ~WriteConcernTagChangesMock() = default;
+        virtual bool reserveDefaultWriteConcernChange() {
+            return false;
+        };
+        virtual void releaseDefaultWriteConcernChange() {}
+
+        virtual bool reserveConfigWriteConcernTagChange() {
+            return false;
+        };
+        virtual void releaseConfigWriteConcernTagChange() {}
+    };
+
+    virtual WriteConcernTagChanges* getWriteConcernTagChanges() override;
+
 private:
     ServiceContext* const _service;
     ReplSettings _settings;

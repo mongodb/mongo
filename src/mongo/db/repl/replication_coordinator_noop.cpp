@@ -607,5 +607,11 @@ void ReplicationCoordinatorNoOp::recordIfCWWCIsSetOnConfigServerOnStartup(Operat
     MONGO_UNREACHABLE;
 }
 
+ReplicationCoordinatorNoOp::WriteConcernTagChanges*
+ReplicationCoordinatorNoOp::getWriteConcernTagChanges() {
+    MONGO_UNREACHABLE;
+    return nullptr;
+}
+
 }  // namespace repl
 }  // namespace mongo

@@ -342,6 +342,21 @@ public:
 
     virtual void recordIfCWWCIsSetOnConfigServerOnStartup(OperationContext* opCtx) final;
 
+    class WriteConcernTagChangesEmbedded : public WriteConcernTagChanges {
+        virtual ~WriteConcernTagChangesEmbedded() = default;
+        virtual bool reserveDefaultWriteConcernChange() {
+            return false;
+        };
+        virtual void releaseDefaultWriteConcernChange() {}
+
+        virtual bool reserveConfigWriteConcernTagChange() {
+            return false;
+        };
+        virtual void releaseConfigWriteConcernTagChange() {}
+    };
+
+    virtual WriteConcernTagChanges* getWriteConcernTagChanges() override;
+
 private:
     // Back pointer to the ServiceContext that has started the instance.
     ServiceContext* const _service;

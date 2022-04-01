@@ -1147,6 +1147,28 @@ public:
      */
     virtual void recordIfCWWCIsSetOnConfigServerOnStartup(OperationContext* opCtx) = 0;
 
+    /**
+     * Interface used to synchronize changes to custom write concern tags in the config and
+     * custom default write concern settings.
+     *
+     * Use [reserve|release]DefaultWriteConcernChanges when making changes to the current
+     * default read/write concern.
+     * Use [reserve|release]ConfigWriteConcernTagChanges when executing a reconfig that
+     * could potentially change read/write concern tags.
+     */
+    class WriteConcernTagChanges {
+    public:
+        WriteConcernTagChanges() = default;
+        virtual ~WriteConcernTagChanges() = default;
+        virtual bool reserveDefaultWriteConcernChange() = 0;
+        virtual void releaseDefaultWriteConcernChange() = 0;
+
+        virtual bool reserveConfigWriteConcernTagChange() = 0;
+        virtual void releaseConfigWriteConcernTagChange() = 0;
+    };
+
+    virtual WriteConcernTagChanges* getWriteConcernTagChanges() = 0;
+
 protected:
     ReplicationCoordinator();
 };

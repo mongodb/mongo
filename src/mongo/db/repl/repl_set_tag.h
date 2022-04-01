@@ -154,6 +154,37 @@ public:
         return _constraints.end();
     }
 
+    /**
+     * Gets the number of constraints in this pattern.
+     */
+    size_t getNumConstraints() const {
+        return _constraints.size();
+    }
+
+    bool operator==(const ReplSetTagPattern& other) const {
+        if (getNumConstraints() != other.getNumConstraints()) {
+            return false;
+        }
+
+        for (auto itrA = constraintsBegin(); itrA != constraintsEnd(); itrA++) {
+            bool same = false;
+            for (auto itrB = other.constraintsBegin(); itrB != other.constraintsEnd(); itrB++) {
+                if (*itrA == *itrB) {
+                    same = true;
+                    break;
+                }
+            }
+            if (!same) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    bool operator!=(const ReplSetTagPattern& other) const {
+        return !operator==(other);
+    }
+
 private:
     std::vector<TagCountConstraint> _constraints;
 };

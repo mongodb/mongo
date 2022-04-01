@@ -552,6 +552,12 @@ public:
      */
     ReplSetConfigPtr getRecipientConfig() const;
 
+    /**
+     * Compares the write concern modes with another config and returns 'true' if they are
+     * identical.
+     */
+    bool areWriteConcernModesTheSame(ReplSetConfig* otherConfig) const;
+
 private:
     /**
      * Sets replica set ID to 'defaultReplicaSetId' if 'cfg' does not contain an ID.

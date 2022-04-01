@@ -766,6 +766,29 @@ ReplSetConfigPtr ReplSetConfig::getRecipientConfig() const {
     return _recipientConfig;
 }
 
+bool ReplSetConfig::areWriteConcernModesTheSame(ReplSetConfig* otherConfig) const {
+    auto modeNames = getWriteConcernNames();
+    auto otherModeNames = otherConfig->getWriteConcernNames();
+
+    if (modeNames.size() != otherModeNames.size()) {
+        return false;
+    }
+
+    for (auto it = modeNames.begin(); it != modeNames.end(); it++) {
+        auto swPatternA = findCustomWriteMode(*it);
+        auto swPatternB = otherConfig->findCustomWriteMode(*it);
+        if (!swPatternA.isOK() || !swPatternB.isOK()) {
+            return false;
+        }
+
+        if (swPatternA.getValue() != swPatternB.getValue()) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 MemberConfig* MutableReplSetConfig::_findMemberByID(MemberId id) {
     for (auto it = getMembers().begin(); it != getMembers().end(); ++it) {
         if (it->getId() == id) {

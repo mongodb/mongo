@@ -636,5 +636,10 @@ void ReplicationCoordinatorEmbedded::recordIfCWWCIsSetOnConfigServerOnStartup(
     MONGO_UNREACHABLE;
 }
 
+ReplicationCoordinatorEmbedded::WriteConcernTagChanges*
+ReplicationCoordinatorEmbedded::getWriteConcernTagChanges() {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
 }  // namespace embedded
 }  // namespace mongo

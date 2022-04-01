@@ -518,6 +518,74 @@ public:
      */
     void cancelElection_forTest();
 
+    /**
+     * Implementation of an interface used to synchronize changes to custom write concern tags in
+     * the config and custom default write concern settings.
+     * See base class fore more information.
+     */
+    class WriteConcernTagChangesImpl : public WriteConcernTagChanges {
+    public:
+        WriteConcernTagChangesImpl() = default;
+        virtual ~WriteConcernTagChangesImpl() = default;
+
+        bool reserveDefaultWriteConcernChange() override {
+            stdx::lock_guard lock(_mutex);
+            if (_configWriteConcernTagChanges > 0) {
+                return false;
+            }
+            _defaultWriteConcernChanges++;
+            return true;
+        }
+
+        void releaseDefaultWriteConcernChange() override {
+            stdx::lock_guard lock(_mutex);
+            invariant(_defaultWriteConcernChanges > 0);
+            _defaultWriteConcernChanges--;
+        }
+
+        bool reserveConfigWriteConcernTagChange() override {
+            stdx::lock_guard lock(_mutex);
+            if (_defaultWriteConcernChanges > 0) {
+                return false;
+            }
+            _configWriteConcernTagChanges++;
+            return true;
+        }
+
+        void releaseConfigWriteConcernTagChange() override {
+            stdx::lock_guard lock(_mutex);
+            invariant(_configWriteConcernTagChanges > 0);
+            _configWriteConcernTagChanges--;
+        }
+
+    private:
+        //
+        // All member variables are labeled with one of the following codes indicating the
+        // synchronization rules for accessing them.
+        //
+        // (R)  Read-only in concurrent operation; no synchronization required.
+        // (S)  Self-synchronizing; access in any way from any context.
+        // (PS) Pointer is read-only in concurrent operation, item pointed to is self-synchronizing;
+        //      Access in any context.
+        // (M)  Reads and writes guarded by _mutex
+        // (I)  Independently synchronized, see member variable comment.
+
+        // The number of config write concern tag changes currently underway.
+        size_t _configWriteConcernTagChanges{0};  // (M)
+
+        // The number of default write concern changes currently underway.
+        size_t _defaultWriteConcernChanges{0};  // (M)
+
+        // Used to synchronize access to the above variables.
+        Mutex _mutex = MONGO_MAKE_LATCH(
+            "ReplicationCoordinatorImpl::PendingWriteConcernTagChangesImpl::_mutex");  // (S)
+    };
+
+    /**
+     * Returns a pointer to the WriteConcernTagChanges used by this instance.
+     */
+    WriteConcernTagChanges* getWriteConcernTagChanges() override;
+
 private:
     using CallbackFn = executor::TaskExecutor::CallbackFn;
 
@@ -1766,6 +1834,10 @@ private:
     boost::optional<bool> _wasCWWCSetOnConfigServerOnStartup;
 
     InitialSyncerInterface::OnCompletionFn _onCompletion;
+
+    // Construct used to synchronize default write concern changes with config write concern
+    // changes.
+    WriteConcernTagChangesImpl _writeConcernTagChanges;
 };
 
 }  // namespace repl

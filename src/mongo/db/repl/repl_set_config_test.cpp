@@ -1931,6 +1931,193 @@ TEST(ReplSetConfig, MakeCustomWriteMode) {
     ASSERT_TRUE(swPattern.isOK());
 }
 
+TEST(ReplSetConfig, SameWriteConcernModesNoCustom) {
+    auto config = ReplSetConfig::parse(BSON("_id"
+                                            << "rs0"
+                                            << "version" << 1 << "term" << 1.0 << "protocolVersion"
+                                            << 1 << "members"
+                                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                     << "localhost:12345"))));
+
+    auto otherConfig = ReplSetConfig::parse(BSON("_id"
+                                                 << "rs0"
+                                                 << "version" << 2 << "term" << 1.0
+                                                 << "protocolVersion" << 1 << "members"
+                                                 << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                          << "localhost:6789"))));
+
+    ASSERT(config.areWriteConcernModesTheSame(&otherConfig));
+    ASSERT(otherConfig.areWriteConcernModesTheSame(&config));
+}
+
+TEST(ReplSetConfig, SameWriteConcernModesOneCustom) {
+    auto config = ReplSetConfig::parse(
+        BSON("_id"
+             << "rs0"
+             << "version" << 1 << "term" << 1.0 << "protocolVersion" << 1 << "members"
+             << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                      << "localhost:12345"
+                                      << "tags"
+                                      << BSON("NYC"
+                                              << "NY")))
+             << "settings" << BSON("getLastErrorModes" << BSON("eastCoast" << BSON("NYC" << 1)))));
+
+    auto otherConfig = ReplSetConfig::parse(
+        BSON("_id"
+             << "rs0"
+             << "version" << 2 << "term" << 1.0 << "protocolVersion" << 1 << "members"
+             << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                      << "localhost:6789"
+                                      << "tags"
+                                      << BSON("NYC"
+                                              << "NY")))
+             << "settings" << BSON("getLastErrorModes" << BSON("eastCoast" << BSON("NYC" << 1)))));
+
+    ASSERT(config.areWriteConcernModesTheSame(&otherConfig));
+    ASSERT(otherConfig.areWriteConcernModesTheSame(&config));
+}
+
+TEST(ReplSetConfig, DifferentWriteConcernModesOneCustomDifferentName) {
+    auto config = ReplSetConfig::parse(
+        BSON("_id"
+             << "rs0"
+             << "version" << 1 << "term" << 1.0 << "protocolVersion" << 1 << "members"
+             << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                      << "localhost:12345"
+                                      << "tags"
+                                      << BSON("NYC"
+                                              << "NY")))
+             << "settings" << BSON("getLastErrorModes" << BSON("somename" << BSON("NYC" << 1)))));
+
+    auto otherConfig = ReplSetConfig::parse(
+        BSON("_id"
+             << "rs0"
+             << "version" << 2 << "term" << 1.0 << "protocolVersion" << 1 << "members"
+             << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                      << "localhost:6789"
+                                      << "tags"
+                                      << BSON("NYC"
+                                              << "NY")))
+             << "settings" << BSON("getLastErrorModes" << BSON("othername" << BSON("NYC" << 1)))));
+
+    ASSERT_FALSE(config.areWriteConcernModesTheSame(&otherConfig));
+    ASSERT_FALSE(otherConfig.areWriteConcernModesTheSame(&config));
+}
+
+TEST(ReplSetConfig, DifferentWriteConcernModesOneCustomDifferentCounts) {
+    auto config = ReplSetConfig::parse(
+        BSON("_id"
+             << "rs0"
+             << "version" << 1 << "term" << 1.0 << "protocolVersion" << 1 << "members"
+             << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                      << "localhost:12345"
+                                      << "tags"
+                                      << BSON("NYC"
+                                              << "NY"))
+                           << BSON("_id" << 1 << "host"
+                                         << "otherhost:12345"
+                                         << "tags"
+                                         << BSON("NYC"
+                                                 << "NY")))
+             << "settings" << BSON("getLastErrorModes" << BSON("eastCoast" << BSON("NYC" << 1)))));
+
+    auto otherConfig = ReplSetConfig::parse(
+        BSON("_id"
+             << "rs0"
+             << "version" << 1 << "term" << 1.0 << "protocolVersion" << 1 << "members"
+             << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                      << "localhost:12345"
+                                      << "tags"
+                                      << BSON("NYC"
+                                              << "NY"))
+                           << BSON("_id" << 1 << "host"
+                                         << "otherhost:12345"
+                                         << "tags"
+                                         << BSON("NYC"
+                                                 << "NY")))
+             << "settings" << BSON("getLastErrorModes" << BSON("eastCoast" << BSON("NYC" << 2)))));
+
+    ASSERT_FALSE(config.areWriteConcernModesTheSame(&otherConfig));
+    ASSERT_FALSE(otherConfig.areWriteConcernModesTheSame(&config));
+}
+
+TEST(ReplSetConfig, DifferentWriteConcernModesExtraTag) {
+    auto config = ReplSetConfig::parse(BSON("_id"
+                                            << "rs0"
+                                            << "version" << 1 << "term" << 1.0 << "protocolVersion"
+                                            << 1 << "members"
+                                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                     << "localhost:12345"
+                                                                     << "tags"
+                                                                     << BSON("NYC"
+                                                                             << "NY"))
+                                                          << BSON("_id" << 1 << "host"
+                                                                        << "otherhost:12345"
+                                                                        << "tags"
+                                                                        << BSON("Boston"
+                                                                                << "MA")))
+                                            << "settings"
+                                            << BSON("getLastErrorModes"
+                                                    << BSON("nyonly" << BSON("NYC" << 1) << "maonly"
+                                                                     << BSON("Boston" << 1)))));
+
+    auto otherConfig = ReplSetConfig::parse(
+        BSON("_id"
+             << "rs0"
+             << "version" << 1 << "term" << 1.0 << "protocolVersion" << 1 << "members"
+             << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                      << "localhost:12345"
+                                      << "tags"
+                                      << BSON("NYC"
+                                              << "NY"))
+                           << BSON("_id" << 1 << "host"
+                                         << "otherhost:12345"
+                                         << "tags"
+                                         << BSON("Boston"
+                                                 << "MA")))
+             << "settings" << BSON("getLastErrorModes" << BSON("nyonly" << BSON("NYC" << 1)))));
+
+    ASSERT_FALSE(config.areWriteConcernModesTheSame(&otherConfig));
+    ASSERT_FALSE(otherConfig.areWriteConcernModesTheSame(&config));
+}
+
+TEST(ReplSetConfig, DifferentWriteConcernModesSameNameDifferentDefinition) {
+    auto config = ReplSetConfig::parse(
+        BSON("_id"
+             << "rs0"
+             << "version" << 1 << "term" << 1.0 << "protocolVersion" << 1 << "members"
+             << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                      << "localhost:12345"
+                                      << "tags"
+                                      << BSON("NYC"
+                                              << "NY"))
+                           << BSON("_id" << 1 << "host"
+                                         << "otherhost:12345"
+                                         << "tags"
+                                         << BSON("Boston"
+                                                 << "MA")))
+             << "settings" << BSON("getLastErrorModes" << BSON("eastCoast" << BSON("NYC" << 1)))));
+
+    auto otherConfig = ReplSetConfig::parse(BSON(
+        "_id"
+        << "rs0"
+        << "version" << 1 << "term" << 1.0 << "protocolVersion" << 1 << "members"
+        << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                 << "localhost:12345"
+                                 << "tags"
+                                 << BSON("NYC"
+                                         << "NY"))
+                      << BSON("_id" << 1 << "host"
+                                    << "otherhost:12345"
+                                    << "tags"
+                                    << BSON("Boston"
+                                            << "MA")))
+        << "settings" << BSON("getLastErrorModes" << BSON("eastCoast" << BSON("Boston" << 1)))));
+
+    ASSERT_FALSE(config.areWriteConcernModesTheSame(&otherConfig));
+    ASSERT_FALSE(otherConfig.areWriteConcernModesTheSame(&config));
+}
+
 }  // namespace
 }  // namespace repl
 }  // namespace mongo

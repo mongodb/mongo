@@ -149,6 +149,8 @@ MONGO_FAIL_POINT_DEFINE(hangAfterReconfig);
 MONGO_FAIL_POINT_DEFINE(skipBeforeFetchingConfig);
 // Hang after grabbing the RSTL but before we start rejecting writes.
 MONGO_FAIL_POINT_DEFINE(stepdownHangAfterGrabbingRSTL);
+// Hang before making checks on the new config relative to the current one.
+MONGO_FAIL_POINT_DEFINE(hangBeforeNewConfigValidationChecks);
 // Simulates returning a specified error in the hello response.
 MONGO_FAIL_POINT_DEFINE(setCustomErrorInHelloResponseMongoD);
 // Throws right before the call into recoverTenantMigrationAccessBlockers.
@@ -3690,6 +3692,27 @@ Status ReplicationCoordinatorImpl::_doReplSetReconfig(OperationContext* opCtx,
         return status;
     ReplSetConfig newConfig = newConfigStatus.getValue();
 
+    // Synchronize this change with potential changes to the default write concern.
+    auto wcChanges = getWriteConcernTagChanges();
+    auto mustReleaseWCChange = false;
+    if (!oldConfig.areWriteConcernModesTheSame(&newConfig)) {
+        if (!wcChanges->reserveConfigWriteConcernTagChange()) {
+            return Status(
+                ErrorCodes::ConflictingOperationInProgress,
+                "Default write concern change(s) in progress. Please retry the reconfig later.");
+        }
+        // Reservation OK.
+        mustReleaseWCChange = true;
+    }
+
+    ON_BLOCK_EXIT([&] {
+        if (mustReleaseWCChange) {
+            wcChanges->releaseConfigWriteConcernTagChange();
+        }
+    });
+
+    hangBeforeNewConfigValidationChecks.pauseWhileSet();
+
     // Excluding reconfigs that bump the config term during step-up from checking against changing
     // the implicit default write concern, as it is not needed.
     if (!skipSafetyChecks /* skipping step-up reconfig */) {
@@ -3738,6 +3761,30 @@ Status ReplicationCoordinatorImpl::_doReplSetReconfig(OperationContext* opCtx,
                                "to the config server is failing with error: " +
                                 ex.toString());
                 }
+            }
+        }
+
+        // If we are currently using a custom write concern as the default, check that the
+        // corresponding definition still exists in the new config.
+        if (serverGlobalParams.clusterRole == ClusterRole::None) {
+            try {
+                const auto rwcDefaults =
+                    ReadWriteConcernDefaults::get(opCtx->getServiceContext()).getDefault(opCtx);
+                const auto wcDefault = rwcDefaults.getDefaultWriteConcern();
+                if (wcDefault) {
+                    auto validateWCStatus = newConfig.validateWriteConcern(wcDefault.get());
+                    if (!validateWCStatus.isOK()) {
+                        return Status(ErrorCodes::NewReplicaSetConfigurationIncompatible,
+                                      str::stream() << "May not remove custom write concern "
+                                                       "definition from config while it is in "
+                                                       "use as the default write concern. "
+                                                       "Change the default write concern to a "
+                                                       "non-conflicting setting and try the "
+                                                       "reconfig again.");
+                    }
+                }
+            } catch (const DBException& e) {
+                return e.toStatus("Exception while loading write concern default during reconfig");
             }
         }
     }
@@ -6157,6 +6204,11 @@ void ReplicationCoordinatorImpl::_validateDefaultWriteConcernOnShardStartup(With
             fassert(5684400, {ErrorCodes::IllegalOperation, msg});
         }
     }
+}
+
+ReplicationCoordinatorImpl::WriteConcernTagChanges*
+ReplicationCoordinatorImpl::getWriteConcernTagChanges() {
+    return &_writeConcernTagChanges;
 }
 
 }  // namespace repl

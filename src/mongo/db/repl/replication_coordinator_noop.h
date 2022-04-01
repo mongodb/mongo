@@ -332,6 +332,21 @@ public:
 
     virtual void recordIfCWWCIsSetOnConfigServerOnStartup(OperationContext* opCtx) final;
 
+    class WriteConcernTagChangesNoOp : public WriteConcernTagChanges {
+        virtual ~WriteConcernTagChangesNoOp() = default;
+        virtual bool reserveDefaultWriteConcernChange() {
+            return false;
+        };
+        virtual void releaseDefaultWriteConcernChange() {}
+
+        virtual bool reserveConfigWriteConcernTagChange() {
+            return false;
+        };
+        virtual void releaseConfigWriteConcernTagChange() {}
+    };
+
+    virtual WriteConcernTagChanges* getWriteConcernTagChanges() override;
+
 private:
     ServiceContext* const _service;
 };
