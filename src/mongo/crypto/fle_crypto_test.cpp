@@ -804,9 +804,6 @@ TEST(FLE_EDC, Disallowed_Types) {
     illegalBSONType(BSON("sample" << BSONUndefined), Undefined, Fle2AlgorithmInt::kUnindexed);
     illegalBSONType(BSON("sample" << BSONNULL), jstNULL, Fle2AlgorithmInt::kEquality);
     illegalBSONType(BSON("sample" << BSONNULL), jstNULL, Fle2AlgorithmInt::kUnindexed);
-    illegalBSONType(
-        BSON("sample" << BSONDBRef("value1", OID())), DBRef, Fle2AlgorithmInt::kEquality);
-    illegalBSONType(BSON("sample" << BSONSymbol("value")), Symbol, Fle2AlgorithmInt::kEquality);
     illegalBSONType(BSON("sample" << BSONCodeWScope("value",
                                                     BSON("code"
                                                          << "something"))),
@@ -947,8 +944,6 @@ TEST(FLE_EDC, Disallowed_Types_FLE2InsertUpdatePayload) {
 
     disallowedEqualityPayloadType(Undefined);
     disallowedEqualityPayloadType(jstNULL);
-    disallowedEqualityPayloadType(DBRef);
-    disallowedEqualityPayloadType(Symbol);
     disallowedEqualityPayloadType(CodeWScope);
 
     disallowedEqualityPayloadType(MaxKey);

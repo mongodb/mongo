@@ -52,14 +52,13 @@ inline bool isFLE2EqualityIndexedSupportedType(BSONType type) {
         case bsonTimestamp:
         case Date:
         case jstOID:
+
+        case Symbol:
+        case DBRef:
             return true;
 
-        // Deprecated
-        case Symbol:
-        case CodeWScope:
-        case DBRef:
-
         // Non-deterministic
+        case CodeWScope:
         case Array:
         case Object:
         case NumberDecimal:
@@ -77,7 +76,6 @@ inline bool isFLE2EqualityIndexedSupportedType(BSONType type) {
     }
 }
 
-// Unindexed is the same as equality
 inline bool isFLE2UnindexedSupportedType(BSONType type) {
     switch (type) {
         case BinData:

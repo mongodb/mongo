@@ -493,6 +493,8 @@ TEST(FLECollectionOptions, AllowedTypes) {
         "int",
         "timestamp",
         "long",
+        "dbPointer",
+        "symbol",
     });
 
     std::vector<std::string> typesAllowedUnindexed({
@@ -558,8 +560,6 @@ TEST(FLECollectionOptions, DisAllowedTypes) {
         "array",
         "null",
         "undefined",
-        "dbPointer",
-        "symbol",
         "javascriptWithScope",
         "decimal",
         "maxKey",
