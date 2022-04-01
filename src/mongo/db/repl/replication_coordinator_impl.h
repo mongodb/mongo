@@ -1615,7 +1615,7 @@ private:
     /*
      * Calculates and returns the read preference for the node.
      */
-    const ReadPreference _getSyncSourceReadPreference(WithLock) const;
+    ReadPreference _getSyncSourceReadPreference(WithLock) const;
 
     /*
      * Performs the replica set reconfig procedure. Certain consensus safety checks are omitted when

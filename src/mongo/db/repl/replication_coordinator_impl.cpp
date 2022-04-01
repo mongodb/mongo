@@ -5137,7 +5137,7 @@ bool ReplicationCoordinatorImpl::isReplEnabled() const {
     return getReplicationMode() != modeNone;
 }
 
-const ReadPreference ReplicationCoordinatorImpl::_getSyncSourceReadPreference(WithLock) const {
+ReadPreference ReplicationCoordinatorImpl::_getSyncSourceReadPreference(WithLock) const {
     // Always allow chaining while in catchup and drain mode.
     auto memberState = _getMemberState_inlock();
     ReadPreference readPreference = ReadPreference::Nearest;
