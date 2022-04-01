@@ -148,8 +148,10 @@ void handleWouldChangeOwningShardErrorRetryableWrite(
     const NamespaceString& nss,
     const write_ops::FindAndModifyCommandRequest& request,
     BSONObjBuilder* result) {
-    auto txn = txn_api::TransactionWithRetries(
-        opCtx, Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(), nullptr);
+    auto txn =
+        txn_api::SyncTransactionWithRetries(opCtx,
+                                            Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
+                                            nullptr /* resourceYielder */);
 
     // Shared state for the transaction API use below.
     struct SharedBlock {
@@ -160,7 +162,7 @@ void handleWouldChangeOwningShardErrorRetryableWrite(
     };
     auto sharedBlock = std::make_shared<SharedBlock>(nss);
 
-    auto swCommitResult = txn.runSyncNoThrow(
+    auto swCommitResult = txn.runNoThrow(
         opCtx,
         [cmdObj = request.toBSON({}), sharedBlock](const txn_api::TransactionClient& txnClient,
                                                    ExecutorPtr txnExec) {
@@ -243,23 +245,22 @@ void handleWouldChangeOwningShardErrorTransaction(
         WouldChangeOwningShardInfo::parseFromCommandError(extraInfo), nss);
 
     try {
-        auto txn = txn_api::TransactionWithRetries(
+        auto txn = txn_api::SyncTransactionWithRetries(
             opCtx,
             Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
             TransactionRouterResourceYielder::makeForLocalHandoff());
 
-
-        txn.runSync(opCtx,
-                    [sharedBlock](const txn_api::TransactionClient& txnClient,
-                                  ExecutorPtr txnExec) -> SemiFuture<void> {
-                        return documentShardKeyUpdateUtil::updateShardKeyForDocument(
-                                   txnClient, txnExec, sharedBlock->nss, sharedBlock->changeInfo)
-                            .thenRunOn(txnExec)
-                            .then([sharedBlock](bool matchedDocOrUpserted) {
-                                sharedBlock->matchedDocOrUpserted = matchedDocOrUpserted;
-                            })
-                            .semi();
-                    });
+        txn.run(opCtx,
+                [sharedBlock](const txn_api::TransactionClient& txnClient,
+                              ExecutorPtr txnExec) -> SemiFuture<void> {
+                    return documentShardKeyUpdateUtil::updateShardKeyForDocument(
+                               txnClient, txnExec, sharedBlock->nss, sharedBlock->changeInfo)
+                        .thenRunOn(txnExec)
+                        .then([sharedBlock](bool matchedDocOrUpserted) {
+                            sharedBlock->matchedDocOrUpserted = matchedDocOrUpserted;
+                        })
+                        .semi();
+                });
 
         auto shouldReturnPostImage = request.getNew() && *request.getNew();
         updateReplyOnWouldChangeOwningShardSuccess(sharedBlock->matchedDocOrUpserted,

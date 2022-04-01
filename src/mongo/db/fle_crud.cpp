@@ -130,9 +130,9 @@ boost::optional<BSONObj> mergeLetAndCVariables(const boost::optional<BSONObj>& l
 }
 }  // namespace
 
-std::shared_ptr<txn_api::TransactionWithRetries> getTransactionWithRetriesForMongoS(
+std::shared_ptr<txn_api::SyncTransactionWithRetries> getTransactionWithRetriesForMongoS(
     OperationContext* opCtx) {
-    return std::make_shared<txn_api::TransactionWithRetries>(
+    return std::make_shared<txn_api::SyncTransactionWithRetries>(
         opCtx,
         Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
         TransactionRouterResourceYielder::makeForLocalHandoff());
@@ -195,7 +195,7 @@ std::pair<FLEBatchResult, write_ops::InsertCommandReply> processInsert(
 
     uint32_t stmtId = getStmtIdForWriteAt(insertRequest, 0);
 
-    std::shared_ptr<txn_api::TransactionWithRetries> trun = getTxns(opCtx);
+    std::shared_ptr<txn_api::SyncTransactionWithRetries> trun = getTxns(opCtx);
 
     // The function that handles the transaction may outlive this function so we need to use
     // shared_ptrs since it runs on another thread
@@ -203,7 +203,7 @@ std::pair<FLEBatchResult, write_ops::InsertCommandReply> processInsert(
     auto insertBlock = std::tie(edcNss, efc, serverPayload, reply, stmtId);
     auto sharedInsertBlock = std::make_shared<decltype(insertBlock)>(insertBlock);
 
-    auto swResult = trun->runSyncNoThrow(
+    auto swResult = trun->runNoThrow(
         opCtx,
         [sharedInsertBlock, ownedDocument](const txn_api::TransactionClient& txnClient,
                                            ExecutorPtr txnExec) {
@@ -260,7 +260,7 @@ write_ops::DeleteCommandReply processDelete(OperationContext* opCtx,
     uassert(
         6371303, "FLE only supports single document deletes", deleteOpEntry.getMulti() == false);
 
-    std::shared_ptr<txn_api::TransactionWithRetries> trun = getTxns(opCtx);
+    std::shared_ptr<txn_api::SyncTransactionWithRetries> trun = getTxns(opCtx);
 
     write_ops::DeleteCommandReply reply;
 
@@ -270,7 +270,7 @@ write_ops::DeleteCommandReply processDelete(OperationContext* opCtx,
     auto deleteBlock = std::tie(deleteRequest, reply, expCtx);
     auto sharedDeleteBlock = std::make_shared<decltype(deleteBlock)>(deleteBlock);
 
-    auto swResult = trun->runSyncNoThrow(
+    auto swResult = trun->runNoThrow(
         opCtx,
         [sharedDeleteBlock](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
             FLEQueryInterfaceImpl queryImpl(txnClient);
@@ -329,7 +329,7 @@ write_ops::UpdateCommandReply processUpdate(OperationContext* opCtx,
             updateOpEntry.getU().type() == write_ops::UpdateModification::Type::kModifier ||
                 updateOpEntry.getU().type() == write_ops::UpdateModification::Type::kReplacement);
 
-    std::shared_ptr<txn_api::TransactionWithRetries> trun = getTxns(opCtx);
+    std::shared_ptr<txn_api::SyncTransactionWithRetries> trun = getTxns(opCtx);
 
     // The function that handles the transaction may outlive this function so we need to use
     // shared_ptrs
@@ -338,7 +338,7 @@ write_ops::UpdateCommandReply processUpdate(OperationContext* opCtx,
     auto updateBlock = std::tie(updateRequest, reply, expCtx);
     auto sharedupdateBlock = std::make_shared<decltype(updateBlock)>(updateBlock);
 
-    auto swResult = trun->runSyncNoThrow(
+    auto swResult = trun->runNoThrow(
         opCtx,
         [sharedupdateBlock](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
             FLEQueryInterfaceImpl queryImpl(txnClient);
@@ -584,7 +584,7 @@ StatusWith<ReplyType> processFindAndModifyRequest(
             updateModicationType == write_ops::UpdateModification::Type::kModifier ||
                 updateModicationType == write_ops::UpdateModification::Type::kReplacement);
 
-    std::shared_ptr<txn_api::TransactionWithRetries> trun = getTxns(opCtx);
+    std::shared_ptr<txn_api::SyncTransactionWithRetries> trun = getTxns(opCtx);
 
     auto expCtx = makeExpCtx(opCtx, findAndModifyRequest, findAndModifyRequest);
 
@@ -595,7 +595,7 @@ StatusWith<ReplyType> processFindAndModifyRequest(
     auto sharedFindAndModifyBlock =
         std::make_shared<decltype(findAndModifyBlock)>(findAndModifyBlock);
 
-    auto swResult = trun->runSyncNoThrow(
+    auto swResult = trun->runNoThrow(
         opCtx,
         [sharedFindAndModifyBlock, processCallback](const txn_api::TransactionClient& txnClient,
                                                     ExecutorPtr txnExec) {

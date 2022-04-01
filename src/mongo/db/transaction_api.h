@@ -43,7 +43,7 @@
 namespace mongo::txn_api {
 namespace details {
 class TxnMetadataHooks;
-class Transaction;
+class TransactionWithRetries;
 }  // namespace details
 
 // Max number of retries allowed for a transaction operation.
@@ -139,61 +139,55 @@ using Callback =
 /**
  * Encapsulates the logic for executing an internal transaction based on the state in the given
  * OperationContext and automatically retrying on errors.
+ *
+ * TODO SERVER-65839: Make a version for async contexts that doesn't require an opCtx.
  */
-class TransactionWithRetries {
+class SyncTransactionWithRetries {
 public:
-    TransactionWithRetries(const TransactionWithRetries&) = delete;
-    TransactionWithRetries operator=(const TransactionWithRetries&) = delete;
+    SyncTransactionWithRetries(const SyncTransactionWithRetries&) = delete;
+    SyncTransactionWithRetries operator=(const SyncTransactionWithRetries&) = delete;
 
     /**
-     * Main constructor that constructs an internal transaction with the default options.
-     */
-    TransactionWithRetries(OperationContext* opCtx,
-                           ExecutorPtr executor,
-                           std::unique_ptr<ResourceYielder> resourceYielder);
-
-    /**
-     * Alternate constructor that accepts a custom transaction client.
-     */
-    TransactionWithRetries(OperationContext* opCtx,
-                           ExecutorPtr executor,
-                           std::unique_ptr<TransactionClient> txnClient,
-                           std::unique_ptr<ResourceYielder> resourceYielder)
-        : _internalTxn(
-              std::make_shared<details::Transaction>(opCtx, executor, std::move(txnClient))),
-          _resourceYielder(std::move(resourceYielder)) {}
-
-    /**
-     * Runs the given transaction callback synchronously.
+     * Returns a SyncTransactionWithRetries suitable for use within an existing operation. The
+     * session options from the given opCtx will be used to infer the transaction's options.
      *
+     * Optionally accepts a custom TransactionClient and will default to a client that runs commands
+     * against the local service entry point.
+     *
+     */
+    SyncTransactionWithRetries(OperationContext* opCtx,
+                               ExecutorPtr executor,
+                               std::unique_ptr<ResourceYielder> resourceYielder,
+                               std::unique_ptr<TransactionClient> txnClient = nullptr);
+
+    /**
      * Returns a bundle with the commit command status and write concern error, if any. Any error
      * prior to receiving a response from commit (e.g. an interruption or a user assertion in the
      * given callback) will result in a non-ok StatusWith. Note that abort errors are not returned
      * because an abort will only happen implicitly when another error has occurred, and that
      * original error is returned instead.
      *
-     * TODO SERVER-61782: Make this async.
-     * TODO SERVER-61782: Allow returning a SemiFuture with any type.
+     * Will yield resources on the given opCtx before running if a resourceYielder was provided in
+     * the constructor and unyield after running. Unyield will always be attempted if yield
+     * succeeded, but an error from unyield will not be returned if the transaction itself returned
+     * an error.
+     *
+     * TODO SERVER-65840: Allow returning any type.
      */
-    StatusWith<CommitResult> runSyncNoThrow(OperationContext* opCtx, Callback callback) noexcept;
+    StatusWith<CommitResult> runNoThrow(OperationContext* opCtx, Callback callback) noexcept;
 
     /**
      * Same as above except will throw if the commit result has a non-ok command status or a write
      * concern error.
      */
-    void runSync(OperationContext* opCtx, Callback callback) {
-        auto result = uassertStatusOK(runSyncNoThrow(opCtx, std::move(callback)));
+    void run(OperationContext* opCtx, Callback callback) {
+        auto result = uassertStatusOK(runNoThrow(opCtx, std::move(callback)));
         uassertStatusOK(result.getEffectiveStatus());
     }
 
 private:
-    /**
-     * Attempts to abort the active internal transaction, logging on errors.
-     */
-    void _bestEffortAbort(OperationContext* opCtx);
-
-    std::shared_ptr<details::Transaction> _internalTxn;
     std::unique_ptr<ResourceYielder> _resourceYielder;
+    std::shared_ptr<details::TransactionWithRetries> _txn;
 };
 
 /**
@@ -306,20 +300,8 @@ public:
     ~Transaction();
 
     /**
-     * Main constructor that extracts the session options and infers its execution context from the
-     * given OperationContext and constructs a default TransactionClient.
-     */
-    Transaction(OperationContext* opCtx, ExecutorPtr executor)
-        : _executor(executor),
-          _txnClient(std::make_unique<SEPTransactionClient>(
-              opCtx, executor, std::make_unique<DefaultSEPTransactionClientBehaviors>())),
-          _service(opCtx->getServiceContext()) {
-        _primeTransaction(opCtx);
-        _txnClient->injectHooks(_makeTxnMetadataHooks());
-    }
-
-    /**
-     * Alternate constructor that accepts a custom TransactionClient.
+     * Constructs a Transaction with the given TransactionClient and extracts the session options
+     * and infers its execution context from the given OperationContext.
      */
     Transaction(OperationContext* opCtx,
                 ExecutorPtr executor,
@@ -364,7 +346,7 @@ public:
      * transaction runner.
      */
     ErrorHandlingStep handleError(const StatusWith<CommitResult>& swResult,
-                                  int attemptCounter) const;
+                                  int attemptCounter) const noexcept;
 
     /**
      * Returns an object with info about the internal transaction for diagnostics.
@@ -385,12 +367,12 @@ public:
     /**
      * Prepares the internal transaction state for a full transaction retry.
      */
-    void primeForTransactionRetry();
+    void primeForTransactionRetry() noexcept;
 
     /**
      * Prepares the internal transaction state for a retry of commit.
      */
-    void primeForCommitRetry();
+    void primeForCommitRetry() noexcept;
 
     /**
      * Returns the latest operationTime returned by a command in this transaction.
@@ -474,6 +456,50 @@ public:
 
 private:
     Transaction& _internalTxn;
+};
+
+class TransactionWithRetries : public std::enable_shared_from_this<TransactionWithRetries> {
+public:
+    TransactionWithRetries(const TransactionWithRetries&) = delete;
+    TransactionWithRetries operator=(const TransactionWithRetries&) = delete;
+
+    TransactionWithRetries(OperationContext* opCtx,
+                           ExecutorPtr executor,
+                           std::unique_ptr<TransactionClient> txnClient)
+        : _internalTxn(std::make_shared<Transaction>(opCtx, executor, std::move(txnClient))),
+          _executor(executor) {}
+
+    /**
+     * Returns a bundle with the commit command status and write concern error, if any. Any error
+     * prior to receiving a response from commit (e.g. an interruption or a user assertion in the
+     * given callback) will result in a non-ok StatusWith. Note that abort errors are not returned
+     * because an abort will only happen implicitly when another error has occurred, and that
+     * original error is returned instead.
+     *
+     * TODO SERVER-65840: Allow returning a SemiFuture with any type.
+     */
+    SemiFuture<CommitResult> run(Callback callback) noexcept;
+
+    /**
+     * Returns the latest operationTime returned by a command in this transaction.
+     */
+    LogicalTime getOperationTime() const {
+        return _internalTxn->getOperationTime();
+    }
+
+private:
+    // Helper methods for running a transaction.
+    ExecutorFuture<void> _runBodyHandleErrors(int bodyAttempts);
+    ExecutorFuture<CommitResult> _runCommitHandleErrors(int commitAttempts);
+    ExecutorFuture<CommitResult> _runCommitWithRetries();
+
+    /**
+     * Attempts to abort the active internal transaction, logging on errors after swallowing them.
+     */
+    ExecutorFuture<void> _bestEffortAbort();
+
+    std::shared_ptr<Transaction> _internalTxn;
+    ExecutorPtr _executor;
 };
 
 }  // namespace details

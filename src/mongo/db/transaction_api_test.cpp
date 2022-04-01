@@ -318,8 +318,8 @@ protected:
         auto mockClient = std::make_unique<txn_api::details::MockTransactionClient>(
             opCtx(), _threadPool, nullptr);
         _mockClient = mockClient.get();
-        _txnWithRetries = std::make_unique<txn_api::TransactionWithRetries>(
-            opCtx(), _threadPool, std::move(mockClient), nullptr /* resourceYielder */);
+        _txnWithRetries = std::make_unique<txn_api::SyncTransactionWithRetries>(
+            opCtx(), _threadPool, nullptr /* resourceYielder */, std::move(mockClient));
     }
 
     void tearDown() override {
@@ -344,7 +344,7 @@ protected:
         return _resourceYielder;
     }
 
-    txn_api::TransactionWithRetries& txnWithRetries() {
+    txn_api::SyncTransactionWithRetries& txnWithRetries() {
         return *_txnWithRetries;
     }
 
@@ -359,8 +359,8 @@ protected:
         // Reset _txnWithRetries so it returns and reacquires the same session from the session
         // pool. This ensures that we can predictably monitor txnNumber's value.
         _txnWithRetries = nullptr;
-        _txnWithRetries = std::make_unique<txn_api::TransactionWithRetries>(
-            opCtx(), _threadPool, std::move(mockClient), std::move(resourceYielder));
+        _txnWithRetries = std::make_unique<txn_api::SyncTransactionWithRetries>(
+            opCtx(), _threadPool, std::move(resourceYielder), std::move(mockClient));
     }
 
     void expectSentAbort(TxnNumber txnNumber, BSONObj writeConcern) {
@@ -378,11 +378,11 @@ private:
     std::shared_ptr<ThreadPool> _threadPool;
     txn_api::details::MockTransactionClient* _mockClient{nullptr};
     MockResourceYielder* _resourceYielder{nullptr};
-    std::unique_ptr<txn_api::TransactionWithRetries> _txnWithRetries;
+    std::unique_ptr<txn_api::SyncTransactionWithRetries> _txnWithRetries;
 };
 
 TEST_F(TxnAPITest, OwnSession_AttachesTxnMetadata) {
-    auto swResult = txnWithRetries().runSyncNoThrow(
+    auto swResult = txnWithRetries().runNoThrow(
         opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
             mockClient()->setNextCommandResponse(kOKInsertResponse);
             auto insertRes = txnClient
@@ -438,7 +438,7 @@ TEST_F(TxnAPITest, AttachesAPIVersion) {
     resetTxnWithRetries();
 
     int attempt = -1;
-    auto swResult = txnWithRetries().runSyncNoThrow(
+    auto swResult = txnWithRetries().runNoThrow(
         opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
             attempt += 1;
 
@@ -510,7 +510,7 @@ TEST_F(TxnAPITest, OwnSession_AttachesWriteConcernOnCommit) {
         ++txnNumber;
 
         int attempt = -1;
-        auto swResult = txnWithRetries().runSyncNoThrow(
+        auto swResult = txnWithRetries().runNoThrow(
             opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
                 attempt += 1;
                 // No write concern on requests prior to commit/abort.
@@ -592,7 +592,7 @@ TEST_F(TxnAPITest, OwnSession_AttachesWriteConcernOnAbort) {
         resetTxnWithRetries();
         ++txnNumber;
 
-        auto swResult = txnWithRetries().runSyncNoThrow(
+        auto swResult = txnWithRetries().runNoThrow(
             opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
                 mockClient()->setNextCommandResponse(kOKInsertResponse);
                 auto insertRes = txnClient
@@ -632,7 +632,7 @@ TEST_F(TxnAPITest, OwnSession_AttachesReadConcernOnStartTransaction) {
         ++txnNumber;
 
         int attempt = -1;
-        auto swResult = txnWithRetries().runSyncNoThrow(
+        auto swResult = txnWithRetries().runNoThrow(
             opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
                 attempt += 1;
                 mockClient()->setNextCommandResponse(kOKInsertResponse);
@@ -697,7 +697,7 @@ TEST_F(TxnAPITest, OwnSession_AttachesReadConcernOnStartTransaction) {
 }
 
 TEST_F(TxnAPITest, OwnSession_AbortsOnError) {
-    auto swResult = txnWithRetries().runSyncNoThrow(
+    auto swResult = txnWithRetries().runNoThrow(
         opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
             mockClient()->setNextCommandResponse(kOKInsertResponse);
             auto insertRes = txnClient
@@ -720,7 +720,7 @@ TEST_F(TxnAPITest, OwnSession_AbortsOnError) {
 }
 
 TEST_F(TxnAPITest, OwnSession_SkipsCommitIfNoCommandsWereRun) {
-    auto swResult = txnWithRetries().runSyncNoThrow(
+    auto swResult = txnWithRetries().runNoThrow(
         opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
             // The commit response, the client should not receive this.
             mockClient()->setNextCommandResponse(kResWithBadValueError);
@@ -736,7 +736,7 @@ TEST_F(TxnAPITest, OwnSession_SkipsCommitIfNoCommandsWereRun) {
 
 TEST_F(TxnAPITest, OwnSession_RetriesOnTransientError) {
     int attempt = -1;
-    auto swResult = txnWithRetries().runSyncNoThrow(
+    auto swResult = txnWithRetries().runNoThrow(
         opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
             attempt += 1;
             if (attempt > 0) {
@@ -784,7 +784,7 @@ TEST_F(TxnAPITest, OwnSession_RetriesOnTransientError) {
 
 TEST_F(TxnAPITest, OwnSession_RetriesOnTransientClientError) {
     int attempt = -1;
-    auto swResult = txnWithRetries().runSyncNoThrow(
+    auto swResult = txnWithRetries().runNoThrow(
         opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
             attempt += 1;
             if (attempt > 0) {
@@ -827,7 +827,7 @@ TEST_F(TxnAPITest, OwnSession_RetriesOnTransientClientError) {
 }
 
 TEST_F(TxnAPITest, OwnSession_CommitError) {
-    auto swResult = txnWithRetries().runSyncNoThrow(
+    auto swResult = txnWithRetries().runNoThrow(
         opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
             mockClient()->setNextCommandResponse(kOKInsertResponse);
             auto insertRes = txnClient
@@ -861,7 +861,7 @@ TEST_F(TxnAPITest, OwnSession_CommitError) {
 
 TEST_F(TxnAPITest, OwnSession_TransientCommitError) {
     int attempt = -1;
-    auto swResult = txnWithRetries().runSyncNoThrow(
+    auto swResult = txnWithRetries().runNoThrow(
         opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
             attempt += 1;
             if (attempt > 0) {
@@ -907,7 +907,7 @@ TEST_F(TxnAPITest, OwnSession_TransientCommitError) {
 }
 
 TEST_F(TxnAPITest, OwnSession_RetryableCommitError) {
-    auto swResult = txnWithRetries().runSyncNoThrow(
+    auto swResult = txnWithRetries().runNoThrow(
         opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
             mockClient()->setNextCommandResponse(kOKInsertResponse);
             auto insertRes = txnClient
@@ -943,7 +943,7 @@ TEST_F(TxnAPITest, OwnSession_RetryableCommitError) {
 }
 
 TEST_F(TxnAPITest, OwnSession_NonRetryableCommitWCError) {
-    auto swResult = txnWithRetries().runSyncNoThrow(
+    auto swResult = txnWithRetries().runNoThrow(
         opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
             mockClient()->setNextCommandResponse(kOKInsertResponse);
             auto insertRes = txnClient
@@ -972,7 +972,7 @@ TEST_F(TxnAPITest, OwnSession_NonRetryableCommitWCError) {
 }
 
 TEST_F(TxnAPITest, OwnSession_RetryableCommitWCError) {
-    auto swResult = txnWithRetries().runSyncNoThrow(
+    auto swResult = txnWithRetries().runNoThrow(
         opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
             mockClient()->setNextCommandResponse(kOKInsertResponse);
             auto insertRes = txnClient
@@ -1006,26 +1006,26 @@ TEST_F(TxnAPITest, OwnSession_RetryableCommitWCError) {
     ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "commitTransaction"_sd);
 }
 
-TEST_F(TxnAPITest, RunSyncNoErrors) {
-    txnWithRetries().runSync(opCtx(),
+TEST_F(TxnAPITest, RunNoErrors) {
+    txnWithRetries().run(opCtx(),
+                         [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+                             return SemiFuture<void>::makeReady();
+                         });
+}
+
+TEST_F(TxnAPITest, RunThrowsOnBodyError) {
+    ASSERT_THROWS_CODE(
+        txnWithRetries().run(opCtx(),
                              [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+                                 uasserted(ErrorCodes::InternalError, "Mock error");
                                  return SemiFuture<void>::makeReady();
-                             });
+                             }),
+        DBException,
+        ErrorCodes::InternalError);
 }
 
-TEST_F(TxnAPITest, RunSyncThrowsOnBodyError) {
-    ASSERT_THROWS_CODE(txnWithRetries().runSync(
-                           opCtx(),
-                           [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
-                               uasserted(ErrorCodes::InternalError, "Mock error");
-                               return SemiFuture<void>::makeReady();
-                           }),
-                       DBException,
-                       ErrorCodes::InternalError);
-}
-
-TEST_F(TxnAPITest, RunSyncThrowsOnCommitCmdError) {
-    ASSERT_THROWS_CODE(txnWithRetries().runSync(
+TEST_F(TxnAPITest, RunThrowsOnCommitCmdError) {
+    ASSERT_THROWS_CODE(txnWithRetries().run(
                            opCtx(),
                            [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
                                mockClient()->setNextCommandResponse(kOKInsertResponse);
@@ -1048,8 +1048,8 @@ TEST_F(TxnAPITest, RunSyncThrowsOnCommitCmdError) {
                        ErrorCodes::InternalError);
 }
 
-TEST_F(TxnAPITest, RunSyncThrowsOnCommitWCError) {
-    ASSERT_THROWS_CODE(txnWithRetries().runSync(
+TEST_F(TxnAPITest, RunThrowsOnCommitWCError) {
+    ASSERT_THROWS_CODE(txnWithRetries().run(
                            opCtx(),
                            [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
                                mockClient()->setNextCommandResponse(kOKInsertResponse);
@@ -1071,11 +1071,10 @@ TEST_F(TxnAPITest, RunSyncThrowsOnCommitWCError) {
                        ErrorCodes::WriteConcernFailed);
 }
 
-TEST_F(TxnAPITest, HandlesExceptionWhileYieldingDuringBody) {
+TEST_F(TxnAPITest, UnyieldsAfterBodyError) {
     resetTxnWithRetries(std::make_unique<MockResourceYielder>());
-    resourceYielder()->throwInYield();
 
-    auto swResult = txnWithRetries().runSyncNoThrow(
+    auto swResult = txnWithRetries().runNoThrow(
         opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
             auto insertRes = txnClient
                                  .runCommand("user"_sd,
@@ -1083,110 +1082,52 @@ TEST_F(TxnAPITest, HandlesExceptionWhileYieldingDuringBody) {
                                                   << "foo"
                                                   << "documents" << BSON_ARRAY(BSON("x" << 1))))
                                  .get();
-            return SemiFuture<void>::makeReady();
-        });
-    ASSERT_EQ(swResult.getStatus(), ErrorCodes::Interrupted);
-    // 2 yields in body and abort but no unyields because both yields throw.
-    ASSERT_EQ(resourceYielder()->timesYielded(), 2);
-    ASSERT_EQ(resourceYielder()->timesUnyielded(), 0);
-}
-
-TEST_F(TxnAPITest, HandlesExceptionWhileUnyieldingDuringBody) {
-    resetTxnWithRetries(std::make_unique<MockResourceYielder>());
-    resourceYielder()->throwInUnyield();
-
-    auto swResult = txnWithRetries().runSyncNoThrow(
-        opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
-            auto insertRes = txnClient
-                                 .runCommand("user"_sd,
-                                             BSON("insert"
-                                                  << "foo"
-                                                  << "documents" << BSON_ARRAY(BSON("x" << 1))))
-                                 .get();
-            return SemiFuture<void>::makeReady();
-        });
-    ASSERT_EQ(swResult.getStatus(), ErrorCodes::Interrupted);
-    // 2 yields in body and abort and both corresponding unyields.
-    ASSERT_EQ(resourceYielder()->timesYielded(), 2);
-    ASSERT_EQ(resourceYielder()->timesUnyielded(), 2);
-}
-
-TEST_F(TxnAPITest, HandlesExceptionWhileYieldingDuringCommit) {
-    resetTxnWithRetries(std::make_unique<MockResourceYielder>());
-
-    auto swResult = txnWithRetries().runSyncNoThrow(
-        opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
-            mockClient()->setNextCommandResponse(kOKInsertResponse);
-            auto insertRes = txnClient
-                                 .runCommand("user"_sd,
-                                             BSON("insert"
-                                                  << "foo"
-                                                  << "documents" << BSON_ARRAY(BSON("x" << 1))))
-                                 .get();
-
-            resourceYielder()->throwInYield();
-
-            // The commit response.
-            mockClient()->setNextCommandResponse(kOKCommandResponse);
-            return SemiFuture<void>::makeReady();
-        });
-    ASSERT_EQ(swResult.getStatus(), ErrorCodes::Interrupted);
-    // 3 yields in body, commit, and best effort abort. Only unyield in body because the other
-    // yields throw.
-    ASSERT_EQ(resourceYielder()->timesYielded(), 3);
-    ASSERT_EQ(resourceYielder()->timesUnyielded(), 1);
-}
-
-TEST_F(TxnAPITest, HandlesExceptionWhileUnyieldingDuringCommit) {
-    resetTxnWithRetries(std::make_unique<MockResourceYielder>());
-
-    auto swResult = txnWithRetries().runSyncNoThrow(
-        opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
-            mockClient()->setNextCommandResponse(kOKInsertResponse);
-            auto insertRes = txnClient
-                                 .runCommand("user"_sd,
-                                             BSON("insert"
-                                                  << "foo"
-                                                  << "documents" << BSON_ARRAY(BSON("x" << 1))))
-                                 .get();
-
-            resourceYielder()->skipNTimes(1);  // Skip the unyield when the body is finished.
-            resourceYielder()->throwInUnyield();
-
-            // The commit response.
-            mockClient()->setNextCommandResponse(kOKCommandResponse);
-            return SemiFuture<void>::makeReady();
-        });
-    ASSERT_EQ(swResult.getStatus(), ErrorCodes::Interrupted);
-    // 3 yields in body, commit, and best effort abort and all of their corresponding unyields.
-    ASSERT_EQ(resourceYielder()->timesYielded(), 3);
-    ASSERT_EQ(resourceYielder()->timesUnyielded(), 3);
-}
-
-TEST_F(TxnAPITest, HandlesExceptionWhileYieldingDuringAbort) {
-    resetTxnWithRetries(std::make_unique<MockResourceYielder>());
-
-    auto swResult = txnWithRetries().runSyncNoThrow(
-        opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
-            mockClient()->setNextCommandResponse(kOKInsertResponse);
-            auto insertRes = txnClient
-                                 .runCommand("user"_sd,
-                                             BSON("insert"
-                                                  << "foo"
-                                                  << "documents" << BSON_ARRAY(BSON("x" << 1))))
-                                 .get();
-
-            resourceYielder()->throwInYield(ErrorCodes::Interrupted);
-
-            // No abort response necessary because the yielder throws before sending the command.
             uasserted(ErrorCodes::InternalError, "Simulated body error");
             return SemiFuture<void>::makeReady();
         });
-
-    // The transaction should fail with the original error instead of the ResourceYielder error.
     ASSERT_EQ(swResult.getStatus(), ErrorCodes::InternalError);
-    // 2 yields in body and best effort abort. Only unyield in body because the other yield throws.
-    ASSERT_EQ(resourceYielder()->timesYielded(), 2);
+    // Yield before starting and corresponding unyield.
+    ASSERT_EQ(resourceYielder()->timesYielded(), 1);
+    ASSERT_EQ(resourceYielder()->timesUnyielded(), 1);
+}
+
+TEST_F(TxnAPITest, HandlesExceptionWhileYielding) {
+    resetTxnWithRetries(std::make_unique<MockResourceYielder>());
+    resourceYielder()->throwInYield();
+
+    auto swResult = txnWithRetries().runNoThrow(
+        opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+            auto insertRes = txnClient
+                                 .runCommand("user"_sd,
+                                             BSON("insert"
+                                                  << "foo"
+                                                  << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                 .get();
+            return SemiFuture<void>::makeReady();
+        });
+    ASSERT_EQ(swResult.getStatus(), ErrorCodes::Interrupted);
+    // Yield before starting but no unyield because yield failed.
+    ASSERT_EQ(resourceYielder()->timesYielded(), 1);
+    ASSERT_EQ(resourceYielder()->timesUnyielded(), 0);
+}
+
+TEST_F(TxnAPITest, HandlesExceptionWhileUnyielding) {
+    resetTxnWithRetries(std::make_unique<MockResourceYielder>());
+    resourceYielder()->throwInUnyield();
+
+    auto swResult = txnWithRetries().runNoThrow(
+        opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+            auto insertRes = txnClient
+                                 .runCommand("user"_sd,
+                                             BSON("insert"
+                                                  << "foo"
+                                                  << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                 .get();
+            return SemiFuture<void>::makeReady();
+        });
+    ASSERT_EQ(swResult.getStatus(), ErrorCodes::Interrupted);
+    // Yield before starting and corresponding unyield.
+    ASSERT_EQ(resourceYielder()->timesYielded(), 1);
     ASSERT_EQ(resourceYielder()->timesUnyielded(), 1);
 }
 
@@ -1201,7 +1142,7 @@ TEST_F(TxnAPITest, UnyieldsAfterCancellation) {
         opCtx->markKilled();
     });
 
-    auto swResult = txnWithRetries().runSyncNoThrow(
+    auto swResult = txnWithRetries().runNoThrow(
         opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
             mockClient()->setNextCommandResponse(kOKInsertResponse);
             auto insertRes = txnClient
@@ -1222,9 +1163,9 @@ TEST_F(TxnAPITest, UnyieldsAfterCancellation) {
     // The transaction should fail with an Interrupted error from killing the opCtx using the
     // API instead of the ResourceYielder error from within the API callback.
     ASSERT_EQ(swResult.getStatus(), ErrorCodes::Interrupted);
-    // 2 yields in body and best effort abort and both of their corresponding unyields.
-    ASSERT_EQ(resourceYielder()->timesYielded(), 2);
-    ASSERT_EQ(resourceYielder()->timesUnyielded(), 2);
+    // Yield before starting and corresponding unyield.
+    ASSERT_EQ(resourceYielder()->timesYielded(), 1);
+    ASSERT_EQ(resourceYielder()->timesUnyielded(), 1);
 
     opCtxKilled.countDownAndWait();
     killerThread.join();
@@ -1233,42 +1174,13 @@ TEST_F(TxnAPITest, UnyieldsAfterCancellation) {
     waitForAllEarlierTasksToComplete();
 }
 
-TEST_F(TxnAPITest, HandlesExceptionWhileUnyieldingDuringAbort) {
-    resetTxnWithRetries(std::make_unique<MockResourceYielder>());
-
-    auto swResult = txnWithRetries().runSyncNoThrow(
-        opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
-            mockClient()->setNextCommandResponse(kOKInsertResponse);
-            auto insertRes = txnClient
-                                 .runCommand("user"_sd,
-                                             BSON("insert"
-                                                  << "foo"
-                                                  << "documents" << BSON_ARRAY(BSON("x" << 1))))
-                                 .get();
-
-            resourceYielder()->skipNTimes(1);  // Skip the unyield when the body is finished.
-            resourceYielder()->throwInUnyield(ErrorCodes::Interrupted);
-
-            // Best effort abort response.
-            mockClient()->setNextCommandResponse(kOKCommandResponse);
-            uasserted(ErrorCodes::InternalError, "Simulated body error");
-            return SemiFuture<void>::makeReady();
-        });
-
-    // The transaction should fail with the original error instead of the ResourceYielder error.
-    ASSERT_EQ(swResult.getStatus(), ErrorCodes::InternalError);
-    // 2 yields in body and best effort abort and both of their corresponding unyields.
-    ASSERT_EQ(resourceYielder()->timesYielded(), 2);
-    ASSERT_EQ(resourceYielder()->timesUnyielded(), 2);
-}
-
 TEST_F(TxnAPITest, ClientSession_UsesNonRetryableInternalSession) {
     opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
     resetTxnWithRetries();
 
     int attempt = -1;
     boost::optional<LogicalSessionId> firstAttemptLsid;
-    auto swResult = txnWithRetries().runSyncNoThrow(
+    auto swResult = txnWithRetries().runNoThrow(
         opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
             attempt += 1;
 
@@ -1319,7 +1231,7 @@ TEST_F(TxnAPITest, ClientRetryableWrite_UsesRetryableInternalSession) {
 
     int attempt = -1;
     boost::optional<LogicalSessionId> firstAttemptLsid;
-    auto swResult = txnWithRetries().runSyncNoThrow(
+    auto swResult = txnWithRetries().runNoThrow(
         opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
             attempt += 1;
 
@@ -1397,7 +1309,7 @@ DEATH_TEST_F(TxnAPITest,
     opCtx()->setTxnNumber(5);
     resetTxnWithRetries();
 
-    auto swResult = txnWithRetries().runSyncNoThrow(
+    auto swResult = txnWithRetries().runNoThrow(
         opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
             mockClient()->setNextCommandResponse(kOKInsertResponse);
             auto insertRes = txnClient
@@ -1419,7 +1331,7 @@ TEST_F(TxnAPITest, ClientTransaction_UsesClientTransactionOptionsAndDoesNotCommi
     opCtx()->setInMultiDocumentTransaction();
     resetTxnWithRetries();
 
-    auto swResult = txnWithRetries().runSyncNoThrow(
+    auto swResult = txnWithRetries().runNoThrow(
         opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
             mockClient()->setNextCommandResponse(kOKInsertResponse);
             auto insertRes = txnClient
@@ -1459,7 +1371,7 @@ TEST_F(TxnAPITest, ClientTransaction_DoesNotAppendStartTransactionFields) {
 
     resetTxnWithRetries();
 
-    auto swResult = txnWithRetries().runSyncNoThrow(
+    auto swResult = txnWithRetries().runNoThrow(
         opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
             mockClient()->setNextCommandResponse(kOKInsertResponse);
             auto insertRes = txnClient
@@ -1493,7 +1405,7 @@ TEST_F(TxnAPITest, ClientTransaction_DoesNotBestEffortAbortOnFailure) {
     opCtx()->setInMultiDocumentTransaction();
     resetTxnWithRetries();
 
-    auto swResult = txnWithRetries().runSyncNoThrow(
+    auto swResult = txnWithRetries().runNoThrow(
         opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
             mockClient()->setNextCommandResponse(kOKInsertResponse);
             auto insertRes = txnClient
@@ -1528,7 +1440,7 @@ TEST_F(TxnAPITest, ClientTransaction_DoesNotRetryOnTransientErrors) {
     opCtx()->setInMultiDocumentTransaction();
     resetTxnWithRetries();
 
-    auto swResult = txnWithRetries().runSyncNoThrow(
+    auto swResult = txnWithRetries().runNoThrow(
         opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
             mockClient()->setNextCommandResponse(kOKInsertResponse);
             auto insertRes = txnClient
@@ -1558,7 +1470,7 @@ TEST_F(TxnAPITest, ClientTransaction_DoesNotRetryOnTransientErrors) {
 }
 
 TEST_F(TxnAPITest, HandleErrorRetryCommitOnNetworkError) {
-    auto swResult = txnWithRetries().runSyncNoThrow(
+    auto swResult = txnWithRetries().runNoThrow(
         opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
             mockClient()->setNextCommandResponse(kOKInsertResponse);
             auto insertRes = txnClient
@@ -1612,7 +1524,7 @@ TEST_F(TxnAPITest, RetryCommitMultipleTimesIncludesMajorityWriteConcern) {
     mockClient()->setNextCommandResponse(kResWithRetryableWriteConcernError);
     mockClient()->setNextCommandResponse(kOKCommandResponse);
 
-    auto swResult = txnWithRetries().runSyncNoThrow(
+    auto swResult = txnWithRetries().runNoThrow(
         opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
             auto insertRes = txnClient
                                  .runCommand("user"_sd,
@@ -1672,7 +1584,7 @@ TEST_F(TxnAPITest, CommitAfterTransientErrorAfterRetryCommitUsesOriginalWriteCon
     mockClient()->setNextCommandResponse(Status(ErrorCodes::HostUnreachable, "Host Unreachable"));
     mockClient()->setNextCommandResponse(kOKCommandResponse);
 
-    auto swResult = txnWithRetries().runSyncNoThrow(
+    auto swResult = txnWithRetries().runNoThrow(
         opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
             auto insertRes = txnClient
                                  .runCommand("user"_sd,
@@ -1833,7 +1745,7 @@ TEST_F(TxnAPITest, TestExhaustiveFindErrorOnGetMore) {
 
 TEST_F(TxnAPITest, OwnSession_StartTransactionRetryLimitOnTransientErrors) {
     int retryCount = 0;
-    auto swResult = txnWithRetries().runSyncNoThrow(
+    auto swResult = txnWithRetries().runNoThrow(
         opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
             retryCount++;
 
@@ -1867,7 +1779,7 @@ TEST_F(TxnAPITest, OwnSession_StartTransactionRetryLimitOnTransientErrors) {
 TEST_F(TxnAPITest, OwnSession_CommitTransactionRetryLimitOnTransientErrors) {
     // If we are able to successfully finish this test, then we know that we have limited our
     // retries.
-    auto swResult = txnWithRetries().runSyncNoThrow(
+    auto swResult = txnWithRetries().runNoThrow(
         opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
             mockClient()->setNextCommandResponse(kOKInsertResponse);
             auto insertRes = txnClient
@@ -1910,7 +1822,7 @@ TEST_F(TxnAPITest, MaxTimeMSIsSetIfOperationContextHasDeadline) {
     // txnNumber will be incremented upon the release of a session.
     resetTxnWithRetries();
 
-    auto swResult = txnWithRetries().runSyncNoThrow(
+    auto swResult = txnWithRetries().runNoThrow(
         opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
             mockClient()->setNextCommandResponse(kOKInsertResponse);
             auto insertRes = txnClient

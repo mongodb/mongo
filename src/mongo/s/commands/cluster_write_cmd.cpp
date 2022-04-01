@@ -157,8 +157,10 @@ void handleWouldChangeOwningShardErrorRetryableWrite(OperationContext* opCtx,
     // Unset error details because they will be repopulated below.
     response->unsetErrDetails();
 
-    auto txn = txn_api::TransactionWithRetries(
-        opCtx, Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(), nullptr);
+    auto txn =
+        txn_api::SyncTransactionWithRetries(opCtx,
+                                            Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
+                                            nullptr /* resourceYielder */);
 
     // Shared state for the transaction API use below.
     struct SharedBlock {
@@ -172,7 +174,7 @@ void handleWouldChangeOwningShardErrorRetryableWrite(OperationContext* opCtx,
     cmdWithStmtId.append(write_ops::WriteCommandRequestBase::kStmtIdFieldName, 0);
     auto sharedBlock = std::make_shared<SharedBlock>(cmdWithStmtId.obj(), request->getNS());
 
-    auto swCommitResult = txn.runSyncNoThrow(
+    auto swCommitResult = txn.runNoThrow(
         opCtx, [sharedBlock](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
             return txnClient.runCommand(sharedBlock->nss.db(), sharedBlock->cmdObj)
                 .thenRunOn(txnExec)
@@ -234,23 +236,23 @@ UpdateShardKeyResult handleWouldChangeOwningShardErrorTransaction(
     };
     auto sharedBlock = std::make_shared<SharedBlock>(changeInfo, request->getNS());
 
-    auto txn =
-        txn_api::TransactionWithRetries(opCtx,
-                                        Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
-                                        TransactionRouterResourceYielder::makeForLocalHandoff());
+    auto txn = txn_api::SyncTransactionWithRetries(
+        opCtx,
+        Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
+        TransactionRouterResourceYielder::makeForLocalHandoff());
 
     try {
-        txn.runSync(opCtx,
-                    [sharedBlock](const txn_api::TransactionClient& txnClient,
-                                  ExecutorPtr txnExec) -> SemiFuture<void> {
-                        return documentShardKeyUpdateUtil::updateShardKeyForDocument(
-                                   txnClient, txnExec, sharedBlock->nss, sharedBlock->changeInfo)
-                            .thenRunOn(txnExec)
-                            .then([sharedBlock](bool updatedShardKey) {
-                                sharedBlock->updatedShardKey = updatedShardKey;
-                            })
-                            .semi();
-                    });
+        txn.run(opCtx,
+                [sharedBlock](const txn_api::TransactionClient& txnClient,
+                              ExecutorPtr txnExec) -> SemiFuture<void> {
+                    return documentShardKeyUpdateUtil::updateShardKeyForDocument(
+                               txnClient, txnExec, sharedBlock->nss, sharedBlock->changeInfo)
+                        .thenRunOn(txnExec)
+                        .then([sharedBlock](bool updatedShardKey) {
+                            sharedBlock->updatedShardKey = updatedShardKey;
+                        })
+                        .semi();
+                });
     } catch (const ExceptionFor<ErrorCodes::DuplicateKey>& ex) {
         Status status = ex->getKeyPattern().hasField("_id")
             ? ex.toStatus().withContext(documentShardKeyUpdateUtil::kDuplicateKeyErrorContext)

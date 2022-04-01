@@ -293,7 +293,7 @@ void doFLERewriteInTxn(OperationContext* opCtx,
                        GetTxnCallback getTxn) {
     auto txn = getTxn(opCtx);
 
-    auto swCommitResult = txn->runSyncNoThrow(
+    auto swCommitResult = txn->runNoThrow(
         opCtx, [sharedBlock](const txn_api::TransactionClient& txnClient, auto txnExec) {
             auto makeCollectionReader = [sharedBlock](FLEQueryInterface* queryImpl,
                                                       const StringData& coll) {
