@@ -87,7 +87,7 @@ jsTestLog("Wait for the new primary to apply the first op of transaction at time
 assert.soon(() => {
     const lastOpTime = getLastOpTime(newPrimary);
     jsTestLog("Current lastOpTime on the new primary: " + tojson(lastOpTime));
-    return lastOpTime >= startOpTime;
+    return rs.compareOpTimes(lastOpTime, startOpTime) >= 0;
 });
 
 // Now the transaction should be in-progress on newPrimary.
