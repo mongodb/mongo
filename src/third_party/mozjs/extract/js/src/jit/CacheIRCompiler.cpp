@@ -6395,22 +6395,44 @@ bool CacheIRCompiler::emitCompareBigIntStringResult(JSOp op,
       break;
     }
     case JSOp::Lt: {
+#ifndef _MSC_VER
       constexpr auto LessThan = ComparisonKind::LessThan;
+#else
+      // The static_cast works around an internal compiler error in MSVC.
+      constexpr auto LessThan = static_cast<bool>(ComparisonKind::LessThan);
+#endif
       callvm.call<FnBigIntString, BigIntStringCompare<LessThan>>();
       break;
     }
     case JSOp::Gt: {
+#ifndef _MSC_VER
       constexpr auto LessThan = ComparisonKind::LessThan;
+#else
+      // The static_cast works around an internal compiler error in MSVC.
+      constexpr auto LessThan = static_cast<bool>(ComparisonKind::LessThan);
+#endif
       callvm.call<FnStringBigInt, StringBigIntCompare<LessThan>>();
       break;
     }
     case JSOp::Le: {
+#ifndef _MSC_VER
       constexpr auto GreaterThanOrEqual = ComparisonKind::GreaterThanOrEqual;
+#else
+      // The static_cast works around an internal compiler error in MSVC.
+      constexpr auto GreaterThanOrEqual =
+          static_cast<bool>(ComparisonKind::GreaterThanOrEqual);
+#endif
       callvm.call<FnStringBigInt, StringBigIntCompare<GreaterThanOrEqual>>();
       break;
     }
     case JSOp::Ge: {
+#ifndef _MSC_VER
       constexpr auto GreaterThanOrEqual = ComparisonKind::GreaterThanOrEqual;
+#else
+      // The static_cast works around an internal compiler error in MSVC.
+      constexpr auto GreaterThanOrEqual =
+          static_cast<bool>(ComparisonKind::GreaterThanOrEqual);
+#endif
       callvm.call<FnBigIntString, BigIntStringCompare<GreaterThanOrEqual>>();
       break;
     }
