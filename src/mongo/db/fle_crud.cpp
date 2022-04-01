@@ -195,11 +195,17 @@ std::pair<FLEBatchResult, write_ops::InsertCommandReply> processInsert(
     const write_ops::InsertCommandRequest& insertRequest,
     GetTxnCallback getTxns) {
 
+    auto edcNss = insertRequest.getNamespace();
+    auto ei = insertRequest.getEncryptionInformation().get();
+
+    auto efc = EncryptionInformationHelpers::getAndValidateSchema(edcNss, ei);
+
     auto documents = insertRequest.getDocuments();
     // TODO - how to check if a document will be too large???
     uassert(6371202, "Only single insert batches are supported in FLE2", documents.size() == 1);
 
     auto document = documents[0];
+    EDCServerCollection::validateEncryptedFieldInfo(document, efc);
     auto serverPayload = std::make_shared<std::vector<EDCServerPayloadInfo>>(
         EDCServerCollection::getEncryptedFieldInfo(document));
 
@@ -209,10 +215,6 @@ std::pair<FLEBatchResult, write_ops::InsertCommandReply> processInsert(
             FLEBatchResult::kNotProcessed, write_ops::InsertCommandReply()};
     }
 
-    auto ei = insertRequest.getEncryptionInformation().get();
-
-    auto edcNss = insertRequest.getNamespace();
-    auto efc = EncryptionInformationHelpers::getAndValidateSchema(insertRequest.getNamespace(), ei);
     write_ops::InsertCommandReply reply;
 
     std::shared_ptr<txn_api::TransactionWithRetries> trun = getTxns(opCtx);
@@ -712,6 +714,8 @@ write_ops::UpdateCommandReply processUpdate(FLEQueryInterface* queryImpl,
 
     if (updateModification.type() == write_ops::UpdateModification::Type::kModifier) {
         auto updateModifier = updateModification.getUpdateModifier();
+        auto setObject = updateModifier.getObjectField("$set");
+        EDCServerCollection::validateEncryptedFieldInfo(setObject, efc);
         serverPayload = EDCServerCollection::getEncryptedFieldInfo(updateModifier);
 
         processFieldsForInsert(queryImpl, edcNss, serverPayload, efc);
@@ -723,6 +727,7 @@ write_ops::UpdateCommandReply processUpdate(FLEQueryInterface* queryImpl,
             pushUpdate, write_ops::UpdateModification::ClassicTag(), false));
     } else {
         auto replacementDocument = updateModification.getUpdateReplacement();
+        EDCServerCollection::validateEncryptedFieldInfo(replacementDocument, efc);
         serverPayload = EDCServerCollection::getEncryptedFieldInfo(replacementDocument);
 
         processFieldsForInsert(queryImpl, edcNss, serverPayload, efc);
@@ -869,6 +874,8 @@ write_ops::FindAndModifyCommandReply processFindAndModify(
 
         if (updateModification.type() == write_ops::UpdateModification::Type::kModifier) {
             auto updateModifier = updateModification.getUpdateModifier();
+            auto setObject = updateModifier.getObjectField("$set");
+            EDCServerCollection::validateEncryptedFieldInfo(setObject, efc);
             serverPayload = EDCServerCollection::getEncryptedFieldInfo(updateModifier);
             processFieldsForInsert(queryImpl, edcNss, serverPayload, efc);
 
@@ -879,6 +886,7 @@ write_ops::FindAndModifyCommandReply processFindAndModify(
                 pushUpdate, write_ops::UpdateModification::ClassicTag(), false);
         } else {
             auto replacementDocument = updateModification.getUpdateReplacement();
+            EDCServerCollection::validateEncryptedFieldInfo(replacementDocument, efc);
             serverPayload = EDCServerCollection::getEncryptedFieldInfo(replacementDocument);
 
             processFieldsForInsert(queryImpl, edcNss, serverPayload, efc);

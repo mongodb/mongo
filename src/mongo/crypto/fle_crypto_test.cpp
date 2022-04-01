@@ -598,9 +598,14 @@ std::vector<char> generatePlaceholder(
     return v;
 }
 
-
-BSONObj encryptDocument(BSONObj obj, FLEKeyVault* keyVault) {
+BSONObj encryptDocument(BSONObj obj,
+                        FLEKeyVault* keyVault,
+                        const EncryptedFieldConfig* efc = nullptr) {
     auto result = FLEClientCrypto::transformPlaceholders(obj, keyVault);
+
+    if (nullptr != efc) {
+        EDCServerCollection::validateEncryptedFieldInfo(result, *efc);
+    }
 
     // Start Server Side
     auto serverPayload = EDCServerCollection::getEncryptedFieldInfo(result);
@@ -1080,43 +1085,39 @@ bool vectorContains(const std::vector<T>& vec, Func func) {
 EncryptedFieldConfig getTestEncryptedFieldConfig() {
 
     constexpr auto schema = R"({
-    "escCollection": "esc",
-    "eccCollection": "ecc",
-    "ecocCollection": "ecoc",
-    "fields": [
-        {
-            "keyId":
-                            {
-                                "$uuid": "12345678-1234-9876-1234-123456789012"
-                            }
-                        ,
-            "path": "encrypted",
-            "bsonType": "string",
-            "queries": {"queryType": "equality"}
-
-        },
-        {
-            "keyId":
-                            {
-                                "$uuid": "12345678-1234-9876-1234-123456789013"
-                            }
-                        ,
-            "path": "nested.encrypted",
-            "bsonType": "string",
-            "queries": {"queryType": "equality"}
-
-        },
-        {
-            "keyId":
-                            {
-                                "$uuid": "12345678-1234-9876-1234-123456789014"
-                            }
-                        ,
-            "path": "nested.notindexed",
-            "bsonType": "string"
-        }
-    ]
-})";
+        "escCollection": "esc",
+        "eccCollection": "ecc",
+        "ecocCollection": "ecoc",
+        "fields": [
+            {
+                "keyId": {
+                    "$uuid": "12345678-1234-9876-1234-123456789012"
+                },
+                "path": "encrypted",
+                "bsonType": "string",
+                "queries": {
+                    "queryType": "equality"
+                }
+            },
+            {
+                "keyId": {
+                    "$uuid": "12345678-1234-9876-1234-123456789013"
+                },
+                "path": "nested.encrypted",
+                "bsonType": "string",
+                "queries": {
+                    "queryType": "equality"
+                }
+            },
+            {
+                "keyId": {
+                    "$uuid": "12345678-1234-9876-1234-123456789014"
+                },
+                "path": "nested.notindexed",
+                "bsonType": "string"
+            }
+        ]
+    })";
 
     return EncryptedFieldConfig::parse(IDLParserErrorContext("root"), fromjson(schema));
 }
@@ -1433,7 +1434,7 @@ TEST(EDC, ValidateDocument) {
         builder.appendBinData("notindexed", buf.size(), BinDataType::Encrypt, buf.data());
     }
 
-    auto finalDoc = encryptDocument(builder.obj(), &keyVault);
+    auto finalDoc = encryptDocument(builder.obj(), &keyVault, &efc);
 
     // Positive - Encrypted Doc
     FLEClientCrypto::validateDocument(finalDoc, efc, &keyVault);
@@ -1493,6 +1494,22 @@ TEST(EDC, ValidateDocument) {
         ASSERT_THROWS_CODE(
             FLEClientCrypto::validateDocument(testDoc, efc, &keyVault), DBException, 6371515);
     }
+}
+
+TEST(EDC, NonMatchingSchema) {
+    EncryptedFieldConfig efc = getTestEncryptedFieldConfig();
+
+    TestKeyVault keyVault;
+
+    BSONObjBuilder builder;
+    builder.append("plainText", "sample");
+    auto doc = BSON("a"
+                    << "not really a secret");
+    auto element = doc.firstElement();
+    auto buf = generatePlaceholder(element, Operation::kInsert);
+    builder.appendBinData("not-encrypted", buf.size(), BinDataType::Encrypt, buf.data());
+
+    ASSERT_THROWS_CODE(encryptDocument(builder.obj(), &keyVault, &efc), DBException, 6373601);
 }
 
 BSONObj encryptUpdateDocument(BSONObj obj, FLEKeyVault* keyVault) {

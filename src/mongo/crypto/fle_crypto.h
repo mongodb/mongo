@@ -994,6 +994,11 @@ struct FLEDeleteToken {
 class EDCServerCollection {
 public:
     /**
+     * Validate that payload is compatible with schema
+     */
+    static void validateEncryptedFieldInfo(BSONObj& obj, const EncryptedFieldConfig& efc);
+
+    /**
      * Get information about all FLE2InsertUpdatePayload payloads
      */
     static std::vector<EDCServerPayloadInfo> getEncryptedFieldInfo(BSONObj& obj);

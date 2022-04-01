@@ -1990,10 +1990,29 @@ ESCDerivedFromDataTokenAndContentionFactorToken EDCServerPayloadInfo::getESCToke
         payload.getEscDerivedToken());
 }
 
+void EDCServerCollection::validateEncryptedFieldInfo(BSONObj& obj,
+                                                     const EncryptedFieldConfig& efc) {
+    stdx::unordered_set<std::string> indexedFields;
+    for (auto f : efc.getFields()) {
+        if (f.getQueries().has_value()) {
+            indexedFields.insert(f.getPath().toString());
+        }
+    }
+
+    visitEncryptedBSON(obj, [&indexedFields](ConstDataRange cdr, StringData fieldPath) {
+        auto [encryptedTypeBinding, subCdr] = fromEncryptedConstDataRange(cdr);
+        if (encryptedTypeBinding == EncryptedBinDataType::kFLE2InsertUpdatePayload) {
+            uassert(6373601,
+                    str::stream() << "Field '" << fieldPath
+                                  << "' is encrypted, but absent from schema",
+                    indexedFields.contains(fieldPath.toString()));
+        }
+    });
+}
+
+
 std::vector<EDCServerPayloadInfo> EDCServerCollection::getEncryptedFieldInfo(BSONObj& obj) {
     std::vector<EDCServerPayloadInfo> fields;
-    // TODO (SERVER-63736) - Validate only fields listed in EncryptedFieldConfig are indexed
-
     visitEncryptedBSON(obj, [&fields](ConstDataRange cdr, StringData fieldPath) {
         collectEDCServerInfo(&fields, cdr, fieldPath);
     });
