@@ -56,6 +56,7 @@
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/write_block_bypass.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
@@ -777,9 +778,15 @@ void ReshardingDonorService::DonorStateMachine::_dropOriginalCollectionThenTrans
 
     if (_isAlsoRecipient) {
         auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+        // Allow bypassing user write blocking. The check has already been performed on the
+        // db-primary shard's ReshardCollectionCoordinator.
+        WriteBlockBypass::get(opCtx.get()).set(true);
         resharding::data_copy::ensureTemporaryReshardingCollectionRenamed(opCtx.get(), _metadata);
     } else {
         auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+        // Allow bypassing user write blocking. The check has already been performed on the
+        // db-primary shard's ReshardCollectionCoordinator.
+        WriteBlockBypass::get(opCtx.get()).set(true);
         resharding::data_copy::ensureCollectionDropped(
             opCtx.get(), _metadata.getSourceNss(), _metadata.getSourceUUID());
     }
