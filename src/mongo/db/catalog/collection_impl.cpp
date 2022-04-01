@@ -208,6 +208,24 @@ Status checkValidatorCanBeUsedOnNs(const BSONObj& validator,
     return Status::OK();
 }
 
+Status checkValidationOptionsCanBeUsed(const CollectionOptions& opts,
+                                       boost::optional<ValidationLevelEnum> newLevel,
+                                       boost::optional<ValidationActionEnum> newAction) {
+    if (!opts.encryptedFieldConfig) {
+        return Status::OK();
+    }
+    if (validationLevelOrDefault(newLevel) != ValidationLevelEnum::strict) {
+        return Status(
+            ErrorCodes::BadValue,
+            "Validation levels other than 'strict' are not allowed on encrypted collections");
+    }
+    if (validationActionOrDefault(newAction) == ValidationActionEnum::warn) {
+        return Status(ErrorCodes::BadValue,
+                      "Validation action of 'warn' is not allowed on encrypted collections");
+    }
+    return Status::OK();
+}
+
 Status validateIsNotInDbs(const NamespaceString& ns,
                           const std::vector<StringData>& disallowedDbs,
                           StringData optionName) {
@@ -481,6 +499,10 @@ void CollectionImpl::init(OperationContext* opCtx) {
 
     // Enforce that the validator can be used on this namespace.
     uassertStatusOK(checkValidatorCanBeUsedOnNs(validatorDoc, ns(), _uuid));
+
+    // Make sure validationAction and validationLevel are allowed on this collection
+    uassertStatusOK(checkValidationOptionsCanBeUsed(
+        collectionOptions, collectionOptions.validationLevel, collectionOptions.validationAction));
 
     // Make sure to copy the action and level before parsing MatchExpression, since certain features
     // are not supported with certain combinations of action and level.
@@ -1801,6 +1823,11 @@ boost::optional<ValidationActionEnum> CollectionImpl::getValidationAction() cons
 Status CollectionImpl::setValidationLevel(OperationContext* opCtx, ValidationLevelEnum newLevel) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(ns(), MODE_X));
 
+    auto status = checkValidationOptionsCanBeUsed(_metadata->options, newLevel, boost::none);
+    if (!status.isOK()) {
+        return status;
+    }
+
     auto storedValidationLevel = validationLevelOrDefault(newLevel);
 
     // Reparse the validator as there are some features which are only supported with certain
@@ -1826,6 +1853,11 @@ Status CollectionImpl::setValidationLevel(OperationContext* opCtx, ValidationLev
 Status CollectionImpl::setValidationAction(OperationContext* opCtx,
                                            ValidationActionEnum newAction) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(ns(), MODE_X));
+
+    auto status = checkValidationOptionsCanBeUsed(_metadata->options, boost::none, newAction);
+    if (!status.isOK()) {
+        return status;
+    }
 
     auto storedValidationAction = validationActionOrDefault(newAction);
 
@@ -1854,6 +1886,11 @@ Status CollectionImpl::updateValidator(OperationContext* opCtx,
                                        boost::optional<ValidationLevelEnum> newLevel,
                                        boost::optional<ValidationActionEnum> newAction) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(ns(), MODE_X));
+
+    auto status = checkValidationOptionsCanBeUsed(_metadata->options, newLevel, newAction);
+    if (!status.isOK()) {
+        return status;
+    }
 
     auto validator =
         parseValidator(opCtx, newValidator, MatchExpressionParser::kAllowAllSpecialFeatures);

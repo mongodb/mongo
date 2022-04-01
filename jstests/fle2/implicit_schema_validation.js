@@ -347,11 +347,10 @@ assert.commandFailed(dbTest.createCollection(
 
 jsTestLog("test FLE1 schema validator on FLE2 collection");
 dbTest.test.drop();
-
 assert.commandFailedWithCode(
     dbTest.createCollection("test",
                             {encryptedFields: sampleEncryptedFields, validator: fle1Schema}),
-    224);
+    ErrorCodes.QueryFeatureNotAllowed);
 
 jsTestLog("test collMod adding user validator on encrypted collection");
 dbTest.test.drop();
@@ -365,14 +364,6 @@ dbTest.test.drop();
 assert.commandWorked(dbTest.createCollection("test", {encryptedFields: sampleEncryptedFields}));
 assert.commandFailedWithCode(dbTest.runCommand({collMod: "test", validator: fle1Schema}),
                              ErrorCodes.QueryFeatureNotAllowed);
-
-jsTestLog("test implicit validation with validationAction set to 'warn'");
-dbTest.test.drop();
-// TODO: SERVER-64383 this should be prohibited
-assert.commandWorked(dbTest.createCollection(
-    "test", {encryptedFields: sampleEncryptedFields, validationAction: "warn"}));
-negativeTests(dbTest.test, false, true);
-positiveTests(dbTest.test, true);
 
 jsTestLog("test implicit validation works on updates");
 dbTest.test.drop();

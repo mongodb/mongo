@@ -46,10 +46,24 @@ assert.commandFailedWithCode(
     6367301,
     "Create with encryptedFields and capped passed");
 
+assert.commandFailedWithCode(
+    dbTest.createCollection("basic",
+                            {validationAction: "warn", encryptedFields: sampleEncryptedFields}),
+    ErrorCodes.BadValue);
+
+assert.commandFailedWithCode(
+    dbTest.createCollection("basic",
+                            {encryptedFields: sampleEncryptedFields, validationLevel: "off"}),
+    ErrorCodes.BadValue);
+
+assert.commandFailedWithCode(
+    dbTest.createCollection("basic",
+                            {encryptedFields: sampleEncryptedFields, validationLevel: "moderate"}),
+    ErrorCodes.BadValue);
+
 assert.commandWorked(dbTest.createCollection("basic", {encryptedFields: sampleEncryptedFields}));
 
 const result = dbTest.getCollectionInfos({name: "basic"});
-print("result" + tojson(result));
 const ef = result[0].options.encryptedFields;
 assert.eq(ef.escCollection, "fle2.basic.esc");
 assert.eq(ef.eccCollection, "fle2.basic.ecc");
