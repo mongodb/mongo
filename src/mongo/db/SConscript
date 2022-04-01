@@ -901,6 +901,19 @@ env.Library(
 )
 
 env.Library(
+    target='fle_mocks',
+    source=[
+        'fle_query_interface_mock.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/crypto/fle_crypto',
+        '$BUILD_DIR/mongo/db/repl/storage_interface_impl',
+        'fle_crud',
+        'write_ops',
+    ],
+)
+
+env.Library(
     target='cluster_transaction_api',
     source=[
         'cluster_transaction_api.cpp',
@@ -2710,6 +2723,7 @@ if wiredtiger:
             'dbmessage',
             'fcv_op_observer',
             'fle_crud',
+            'fle_mocks',
             'index_build_entry_helpers',
             'index_builds_coordinator_mongod',
             'keys_collection_client_direct',

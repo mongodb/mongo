@@ -139,14 +139,13 @@ private:
     bool _yielded = false;
 };
 
+}  // namespace
+
 std::shared_ptr<txn_api::TransactionWithRetries> getTransactionWithRetriesForMongoD(
     OperationContext* opCtx) {
     return std::make_shared<txn_api::TransactionWithRetries>(
         opCtx, _fleCrudthreadPool, std::make_unique<FLEMongoDResourceYielder>());
 }
-
-}  // namespace
-
 
 void startFLECrud(ServiceContext* serviceContext) {
     // FLE crud is only supported on replica sets so no reason to start thread pool on standalones

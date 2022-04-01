@@ -326,23 +326,13 @@ TEST(FLE_ESC, RoundTrip) {
     }
 
     {
-        BSONObj doc = ESCCollection::generatePositionalDocument(
-            escTwiceTag, escTwiceValue, 123, 456789, 123456789);
-        auto swDoc = ESCCollection::decryptDocument(escTwiceValue, doc);
-        ASSERT_OK(swDoc.getStatus());
-        ASSERT_EQ(swDoc.getValue().compactionPlaceholder, false);
-        ASSERT_EQ(swDoc.getValue().position, 456789);
-        ASSERT_EQ(swDoc.getValue().count, 123456789);
-    }
-
-    {
-        BSONObj doc =
-            ESCCollection::generateCompactionPlaceholderDocument(escTwiceTag, escTwiceValue, 123);
+        BSONObj doc = ESCCollection::generateCompactionPlaceholderDocument(
+            escTwiceTag, escTwiceValue, 123, 456789);
         auto swDoc = ESCCollection::decryptDocument(escTwiceValue, doc);
         ASSERT_OK(swDoc.getStatus());
         ASSERT_EQ(swDoc.getValue().compactionPlaceholder, true);
         ASSERT_EQ(swDoc.getValue().position, std::numeric_limits<uint64_t>::max());
-        ASSERT_EQ(swDoc.getValue().count, 0);
+        ASSERT_EQ(swDoc.getValue().count, 456789);
     }
 }
 
@@ -1652,6 +1642,53 @@ TEST(FLE_Update, PullTokens) {
     ASSERT_THROWS_CODE(EDCServerCollection::generateUpdateToRemoveTags(removedFields, tokenMap),
                        DBException,
                        6371513);
+}
+
+TEST(CompactionHelpersTest, parseCompactionTokensTest) {
+    auto result = CompactionHelpers::parseCompactionTokens(BSONObj());
+    ASSERT(result.empty());
+
+    ECOCToken token1(
+        decodePrf("7076c7b05fb4be4fe585eed930b852a6d088a0c55f3c96b50069e8a26ebfb347"_sd));
+    ECOCToken token2(
+        decodePrf("6ebfb347576b4be4fe585eed96d088a0c55f3c96b50069e8a230b852a05fb4be"_sd));
+    BSONObjBuilder builder;
+    builder.appendBinData(
+        "a.b.c", token1.toCDR().length(), BinDataType::BinDataGeneral, token1.toCDR().data());
+    builder.appendBinData(
+        "x.y", token2.toCDR().length(), BinDataType::BinDataGeneral, token2.toCDR().data());
+    result = CompactionHelpers::parseCompactionTokens(builder.obj());
+
+    ASSERT(result.size() == 2);
+    ASSERT(result[0].fieldPathName == "a.b.c");
+    ASSERT(result[0].token == token1);
+    ASSERT(result[1].fieldPathName == "x.y");
+    ASSERT(result[1].token == token2);
+
+    ASSERT_THROWS_CODE(CompactionHelpers::parseCompactionTokens(BSON("foo"
+                                                                     << "bar")),
+                       DBException,
+                       6346801);
+}
+
+TEST(CompactionHelpersTest, validateCompactionTokensTest) {
+    EncryptedFieldConfig efc = getTestEncryptedFieldConfig();
+
+    BSONObjBuilder builder;
+    for (auto& field : efc.getFields()) {
+        // validate fails until all fields are present
+        ASSERT_THROWS_CODE(CompactionHelpers::validateCompactionTokens(efc, builder.asTempObj()),
+                           DBException,
+                           6346806);
+
+        // validate doesn't care about the value, so this is fine
+        builder.append(field.getPath(), "foo");
+    }
+    CompactionHelpers::validateCompactionTokens(efc, builder.asTempObj());
+
+    // validate OK if obj has extra fields
+    builder.append("abc.xyz", "foo");
+    CompactionHelpers::validateCompactionTokens(efc, builder.obj());
 }
 
 }  // namespace mongo

@@ -191,6 +191,19 @@ struct FLEToken {
         return ConstDataRange(data.data(), data.data() + data.size());
     }
 
+    bool operator==(const FLEToken<TokenT>& other) const {
+        return (type == other.type) && (data == other.data);
+    }
+
+    bool operator!=(const FLEToken<TokenT>& other) const {
+        return !(*this == other);
+    }
+
+    template <typename H>
+    friend H AbslHashValue(H h, const FLEToken<TokenT>& token) {
+        return H::combine(std::move(h), token.type, token.data);
+    }
+
     FLETokenType type{TokenT};
     PrfBlock data;
 };
@@ -477,20 +490,12 @@ public:
                                           uint64_t count);
 
     /**
-     * Generate a positional ESC document.
-     */
-    static BSONObj generatePositionalDocument(ESCTwiceDerivedTagToken tagToken,
-                                              ESCTwiceDerivedValueToken valueToken,
-                                              uint64_t index,
-                                              uint64_t pos,
-                                              uint64_t count);
-
-    /**
      * Generate a compaction placeholder ESC document.
      */
     static BSONObj generateCompactionPlaceholderDocument(ESCTwiceDerivedTagToken tagToken,
                                                          ESCTwiceDerivedValueToken valueToken,
-                                                         uint64_t index);
+                                                         uint64_t index,
+                                                         uint64_t count);
 
     /**
      * Decrypt the null document.
@@ -813,12 +818,21 @@ public:
 
 
 struct ECOCCompactionDocument {
+
+    bool operator==(const ECOCCompactionDocument& other) const {
+        return (fieldName == other.fieldName) && (esc == other.esc) && (ecc == other.ecc);
+    }
+
+    template <typename H>
+    friend H AbslHashValue(H h, const ECOCCompactionDocument& doc) {
+        return H::combine(std::move(h), doc.fieldName, doc.esc, doc.ecc);
+    }
+
     // Id is not included as it unimportant
     std::string fieldName;
     ESCDerivedFromDataTokenAndContentionFactorToken esc;
     ECCDerivedFromDataTokenAndContentionFactorToken ecc;
 };
-
 
 /**
  * ECOC Collection schema
@@ -1060,6 +1074,46 @@ public:
      */
     static StringMap<FLEDeleteToken> getDeleteTokens(const NamespaceString& nss,
                                                      const EncryptionInformation& ei);
+};
+
+/**
+ * A parsed element in the compaction tokens BSON object from
+ * a compactStructuredEncryptionData command
+ */
+struct CompactionToken {
+    std::string fieldPathName;
+    ECOCToken token;
+};
+
+class CompactionHelpers {
+public:
+    /**
+     * Converts the compaction tokens BSON object that contains encrypted
+     * field paths as the key, and ECOC tokens as the value, to a list of
+     * string and ECOCToken pairs.
+     */
+    static std::vector<CompactionToken> parseCompactionTokens(BSONObj compactionTokens);
+
+    /**
+     * Validates the compaction tokens BSON contains an element for each field
+     * in the encrypted field config
+     */
+    static void validateCompactionTokens(const EncryptedFieldConfig& efc, BSONObj compactionTokens);
+
+    /**
+     * Merges the list of ECCDocuments so that entries whose tuple values are
+     * adjacent to each other are combined into a single entry. For example,
+     * the input [ (1,3), (11,11), (7,9), (4,6) ] outputs [ (1,9), (11,11) ].
+     * Assumes none of the input entries overlap with each other.
+     */
+    static std::vector<ECCDocument> mergeECCDocuments(std::vector<ECCDocument>& unmerged);
+
+    /**
+     * Given a list of ECCDocument, where each document is a range of
+     * deleted positions, this calculates the total number of deleted
+     * positions.
+     */
+    static uint64_t countDeleted(const std::vector<ECCDocument>& rangeList);
 };
 
 /**

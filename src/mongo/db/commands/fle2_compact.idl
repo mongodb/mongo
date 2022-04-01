@@ -36,16 +36,28 @@ structs:
     ECOCStats:
         description: "Stats about records in ECOC compact touched"
         fields:
-            read: exactInt64
-            deleted: exactInt64
+            read:
+                type: exactInt64
+                default: 0
+            deleted:
+                type: exactInt64
+                default: 0
 
     ECStats:
         description: "Stats about records in ECC & ESC compact touched"
         fields:
-            read: exactInt64
-            inserted: exactInt64
-            updated: exactInt64
-            deleted: exactInt64
+            read:
+                type: exactInt64
+                default: 0
+            inserted:
+                type: exactInt64
+                default: 0
+            updated:
+                type: exactInt64
+                default: 0
+            deleted:
+                type: exactInt64
+                default: 0
 
     CompactStats:
         description: "Stats about records in ECC, ECOC, and ESC compact touched"

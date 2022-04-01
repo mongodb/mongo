@@ -148,9 +148,18 @@ ExecutorFuture<void> CompactStructuredEncryptionDataCoordinator::_runImpl(
         .then(_executePhase(Phase::kCompactStructuredEncryptionData,
                             [this, anchor = shared_from_this()](const auto&) {
                                 // This will be implemented in a later phase.
-                                ECOCStats ecocStats(1, 2);
-                                ECStats eccStats(3, 4, 5, 6);
-                                ECStats escStats(7, 8, 9, 10);
+                                ECOCStats ecocStats;
+                                ECStats eccStats, escStats;
+                                ecocStats.setRead(1);
+                                ecocStats.setDeleted(2);
+                                eccStats.setRead(3);
+                                eccStats.setInserted(4);
+                                eccStats.setUpdated(5);
+                                eccStats.setDeleted(6);
+                                escStats.setRead(7);
+                                escStats.setInserted(8);
+                                escStats.setUpdated(9);
+                                escStats.setDeleted(10);
                                 _response = CompactStats(ecocStats, eccStats, escStats);
                             }))
         .then(_executePhase(Phase::kDropTempCollection, doDropOperation));

@@ -240,11 +240,36 @@ class EncryptedClient {
 
         assert.docEq(onDiskDocs, docs);
     }
+
+    assertStateCollectionsAfterCompact(collName) {
+        const suffixes = ['esc', 'ecc', 'ecoc'];
+        const prefix = "fle2." + collName + ".";
+
+        // assert the state collections still exist
+        suffixes.forEach((suffix) => {
+            let coll = prefix + suffix;
+            let cis = this._edb.getCollectionInfos({"name": coll});
+            assert.eq(cis.length, 1, coll + " does not exist after compact");
+        });
+
+        // assert the renamed ecoc collection does not exist
+        let coll = prefix + "ecoc.compact";
+        let cis = this._edb.getCollectionInfos({"name": coll});
+        assert.eq(cis.length, 0, coll + " still exists after compact");
+    }
 }
 
 function runEncryptedTest(db, dbName, collName, encryptedFields, runTestsCallback) {
     const dbTest = db.getSiblingDB(dbName);
     dbTest.dropDatabase();
+
+    // Delete existing keyIds from encryptedFields to force
+    // EncryptedClient to generate new keys on the new DB.
+    for (let field of encryptedFields.fields) {
+        if (field.hasOwnProperty("keyId")) {
+            delete field.keyId;
+        }
+    }
 
     let client = new EncryptedClient(db.getMongo(), dbName);
 
@@ -252,7 +277,7 @@ function runEncryptedTest(db, dbName, collName, encryptedFields, runTestsCallbac
         client.createEncryptionCollection(collName, {encryptedFields: encryptedFields}));
 
     let edb = client.getDB();
-    runTestsCallback(edb);
+    runTestsCallback(edb, client);
 }
 
 // TODO - remove this when the feature flag is removed

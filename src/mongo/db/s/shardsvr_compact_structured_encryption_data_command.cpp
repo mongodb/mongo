@@ -81,7 +81,7 @@ public:
             auto compact = makeRequest(opCtx);
             if (!compact) {
                 // Nothing to do.
-                return {{{0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}}};
+                return CompactStats({}, {}, {});
             }
 
             return checked_pointer_cast<CompactStructuredEncryptionDataCoordinator>(

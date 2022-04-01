@@ -36,9 +36,12 @@
 #include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/create_collection.h"
+#include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/create_gen.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
@@ -46,9 +49,7 @@ namespace {
 
 CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
                                                   const CompactStructuredEncryptionData& request) {
-    mongo::ECOCStats ecocStats(0, 0);
-    mongo::ECStats eccStats(0, 0, 0, 0);
-    mongo::ECStats escStats(0, 0, 0, 0);
+
     const auto& edcNss = request.getNamespace();
 
     LOGV2(6319900, "Compacting the encrypted compaction collection", "namespace"_attr = edcNss);
@@ -73,12 +74,21 @@ CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
 
     uassert(6319903, "Feature flag FLE2 is not enabled", gFeatureFlagFLE2.isEnabledAndIgnoreFCV());
 
+    uassert(6346807,
+            "Target namespace is not an encrypted collection",
+            edc->getCollectionOptions().encryptedFieldConfig);
+
+    // Validate the request contains a compaction token for each encrypted field
+    const auto& efc = edc->getCollectionOptions().encryptedFieldConfig.value();
+    CompactionHelpers::validateCompactionTokens(efc, request.getCompactionTokens());
+
     auto namespaces =
         uassertStatusOK(EncryptedStateCollectionsNamespaces::createFromDataCollection(*edc.get()));
 
-
+    // Step 1: rename the ECOC collection if it exists
     auto ecoc = catalog->lookupCollectionByNamespace(opCtx, namespaces.ecocNss);
     auto ecocRename = catalog->lookupCollectionByNamespace(opCtx, namespaces.ecocRenameNss);
+    bool renamed = false;
 
     if (ecoc && !ecocRename) {
         LOGV2(6319901,
@@ -89,12 +99,37 @@ CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
         validateAndRunRenameCollection(
             opCtx, namespaces.ecocNss, namespaces.ecocRenameNss, renameOpts);
         ecoc.reset();
+        renamed = true;
     }
+
+    // Step 2: create the ECOC collection if renamed or did not exist before the rename
+    if (!ecoc) {
+        uassertStatusOK(
+            createCollection(opCtx, namespaces.ecocNss, CreateCommand(namespaces.ecocNss)));
+    }
+    if (!ecocRename && !renamed) {
+        // no pre-existing renamed ECOC collection and the rename did not occur,
+        // so there is nothing to compact
+        return CompactStats(ECOCStats(), ECStats(), ECStats());
+    }
+
+    // Step 3: for each encrypted field in compactionTokens, get distinct set of entries 'C'
+    // from ECOC, and for each entry in 'C', compact ESC and ECC.
+    CompactStats stats =
+        processFLECompact(opCtx, request, &getTransactionWithRetriesForMongoD, namespaces);
+
+    // Step 4: drop the renamed ECOC collection
+    DropReply dropReply;
+    uassertStatusOK(
+        dropCollection(opCtx,
+                       namespaces.ecocRenameNss,
+                       &dropReply,
+                       DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
 
     LOGV2(6319902,
           "Done compacting the encrypted compaction collection",
           "namespace"_attr = request.getNamespace());
-    return CompactStats(ecocStats, eccStats, escStats);
+    return stats;
 }
 
 class CompactStructuredEncryptionDataCmd final

@@ -112,6 +112,7 @@ boost::optional<BSONObj> mergeLetAndCVariables(const boost::optional<BSONObj>& l
     return c;
 }
 
+}  // namespace
 
 StatusWith<txn_api::CommitResult> runInTxnWithRetry(
     OperationContext* opCtx,
@@ -188,8 +189,6 @@ boost::intrusive_ptr<ExpressionContext> makeExpCtx(OperationContext* opCtx,
     expCtx->stopExpressionCounters();
     return expCtx;
 }
-
-}  // namespace
 
 std::pair<FLEBatchResult, write_ops::InsertCommandReply> processInsert(
     OperationContext* opCtx,
@@ -1207,6 +1206,16 @@ write_ops::FindAndModifyCommandReply FLEQueryInterfaceImpl::findAndModify(
     uassertStatusOK(status);
 
     return write_ops::FindAndModifyCommandReply::parse(IDLParserErrorContext("reply"), response);
+}
+
+std::vector<BSONObj> FLEQueryInterfaceImpl::findDocuments(const NamespaceString& nss,
+                                                          BSONObj filter) {
+    FindCommandRequest find(nss);
+    find.setFilter(filter);
+    find.setSingleBatch(true);
+
+    // Throws on error
+    return _txnClient.exhaustiveFind(find).get();
 }
 
 void processFLEFindS(OperationContext* opCtx, FindCommandRequest* findCommand) {

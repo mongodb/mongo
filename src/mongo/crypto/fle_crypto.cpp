@@ -119,7 +119,6 @@ constexpr uint64_t kESCNonNullId = 1;
 
 constexpr uint64_t KESCInsertRecordValue = 0;
 constexpr uint64_t kESCompactionRecordValue = std::numeric_limits<uint64_t>::max();
-constexpr uint64_t kESCompactionRecordCountPlaceholder = 0;
 
 constexpr auto kId = "_id";
 constexpr auto kValue = "value";
@@ -1512,37 +1511,13 @@ BSONObj ESCCollection::generateInsertDocument(ESCTwiceDerivedTagToken tagToken,
     return builder.obj();
 }
 
-
-BSONObj ESCCollection::generatePositionalDocument(ESCTwiceDerivedTagToken tagToken,
-                                                  ESCTwiceDerivedValueToken valueToken,
-                                                  uint64_t index,
-                                                  uint64_t pos,
-                                                  uint64_t count) {
-    auto block = ESCCollection::generateId(tagToken, index);
-
-    auto swCipherText = packAndEncrypt(std::tie(pos, count), valueToken);
-    uassertStatusOK(swCipherText);
-
-    BSONObjBuilder builder;
-    toBinData(kId, block, &builder);
-    toBinData(kValue, swCipherText.getValue(), &builder);
-#ifdef FLE2_DEBUG_STATE_COLLECTIONS
-    builder.append(kDebugId, static_cast<int64_t>(index));
-    builder.append(kDebugValuePosition, static_cast<int64_t>(pos));
-    builder.append(kDebugValueCount, static_cast<int64_t>(count));
-#endif
-
-    return builder.obj();
-}
-
-
 BSONObj ESCCollection::generateCompactionPlaceholderDocument(ESCTwiceDerivedTagToken tagToken,
                                                              ESCTwiceDerivedValueToken valueToken,
-                                                             uint64_t index) {
+                                                             uint64_t index,
+                                                             uint64_t count) {
     auto block = ESCCollection::generateId(tagToken, index);
 
-    auto swCipherText = packAndEncrypt(
-        std::tie(kESCompactionRecordValue, kESCompactionRecordCountPlaceholder), valueToken);
+    auto swCipherText = packAndEncrypt(std::tie(kESCompactionRecordValue, count), valueToken);
     uassertStatusOK(swCipherText);
 
     BSONObjBuilder builder;
@@ -2350,6 +2325,36 @@ ParsedFindPayload::ParsedFindPayload(BSONElement fleFindPayload) {
     eccToken = FLETokenFromCDR<FLETokenType::ECCDerivedFromDataToken>(payload.getEccDerivedToken());
     edcToken = FLETokenFromCDR<FLETokenType::EDCDerivedFromDataToken>(payload.getEdcDerivedToken());
     maxCounter = payload.getMaxCounter();
+}
+
+std::vector<CompactionToken> CompactionHelpers::parseCompactionTokens(BSONObj compactionTokens) {
+    std::vector<CompactionToken> parsed;
+
+    for (auto& elem : compactionTokens) {
+        uassert(6346801,
+                str::stream() << "Field '" << elem.fieldNameStringData()
+                              << "' of compaction tokens must be a bindata and general subtype",
+                elem.isBinData(BinDataType::BinDataGeneral));
+
+        auto vec = elem._binDataVector();
+        auto block = PrfBlockfromCDR(vec);
+
+        parsed.push_back({elem.fieldNameStringData().toString(), ECOCToken(std::move(block))});
+    }
+    return parsed;
+}
+
+void CompactionHelpers::validateCompactionTokens(const EncryptedFieldConfig& efc,
+                                                 BSONObj compactionTokens) {
+    for (const auto& field : efc.getFields()) {
+        const auto& tokenElement = compactionTokens.getField(field.getPath());
+        uassert(
+            6346806,
+            str::stream()
+                << "Compaction tokens object is missing compaction token for the encrypted path '"
+                << field.getPath() << "'",
+            !tokenElement.eoo());
+    }
 }
 
 }  // namespace mongo

@@ -52,6 +52,7 @@
 #include "mongo/crypto/fle_tags.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/fle_crud.h"
+#include "mongo/db/fle_query_interface_mock.h"
 #include "mongo/db/matcher/schema/encrypt_schema_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/write_ops_gen.h"
@@ -70,155 +71,6 @@
 
 namespace mongo {
 namespace {
-
-class FLEQueryTestImpl : public FLEQueryInterface {
-public:
-    FLEQueryTestImpl(OperationContext* opCtx, repl::StorageInterface* storage)
-        : _opCtx(opCtx), _storage(storage) {}
-    ~FLEQueryTestImpl() = default;
-
-    BSONObj getById(const NamespaceString& nss, BSONElement element) final;
-
-    BSONObj getById(const NamespaceString& nss, PrfBlock block) {
-        auto doc = BSON("v" << BSONBinData(block.data(), block.size(), BinDataGeneral));
-        BSONElement element = doc.firstElement();
-        return getById(nss, element);
-    }
-
-    uint64_t countDocuments(const NamespaceString& nss) final;
-
-    StatusWith<write_ops::InsertCommandReply> insertDocument(const NamespaceString& nss,
-                                                             BSONObj obj,
-                                                             bool translateDuplicateKey) final;
-
-    std::pair<write_ops::DeleteCommandReply, BSONObj> deleteWithPreimage(
-        const NamespaceString& nss,
-        const EncryptionInformation& ei,
-        const write_ops::DeleteCommandRequest& deleteRequest) final;
-
-    std::pair<write_ops::UpdateCommandReply, BSONObj> updateWithPreimage(
-        const NamespaceString& nss,
-        const EncryptionInformation& ei,
-        const write_ops::UpdateCommandRequest& updateRequest) final;
-
-    write_ops::FindAndModifyCommandReply findAndModify(
-        const NamespaceString& nss,
-        const EncryptionInformation& ei,
-        const write_ops::FindAndModifyCommandRequest& findAndModifyRequest) final;
-
-private:
-    OperationContext* _opCtx;
-    repl::StorageInterface* _storage;
-};
-
-BSONObj FLEQueryTestImpl::getById(const NamespaceString& nss, BSONElement element) {
-    auto obj = BSON("_id" << element);
-    auto swDoc = _storage->findById(_opCtx, nss, obj.firstElement());
-    if (swDoc.getStatus() == ErrorCodes::NoSuchKey) {
-        return BSONObj();
-    }
-
-    return uassertStatusOK(swDoc);
-}
-
-uint64_t FLEQueryTestImpl::countDocuments(const NamespaceString& nss) {
-    return uassertStatusOK(_storage->getCollectionCount(_opCtx, nss));
-}
-
-StatusWith<write_ops::InsertCommandReply> FLEQueryTestImpl::insertDocument(
-    const NamespaceString& nss, BSONObj obj, bool translateDuplicateKey) {
-    repl::TimestampedBSONObj tb;
-    tb.obj = obj;
-
-    auto status = _storage->insertDocument(_opCtx, nss, tb, 0);
-
-    if (!status.isOK()) {
-        return status;
-    }
-
-    return write_ops::InsertCommandReply();
-}
-
-
-std::pair<write_ops::DeleteCommandReply, BSONObj> FLEQueryTestImpl::deleteWithPreimage(
-    const NamespaceString& nss,
-    const EncryptionInformation& ei,
-    const write_ops::DeleteCommandRequest& deleteRequest) {
-    // A limit of the API, we can delete by _id and get the pre-image so we limit our unittests to
-    // this
-    ASSERT_EQ(deleteRequest.getDeletes().size(), 1);
-    auto deleteOpEntry = deleteRequest.getDeletes()[0];
-    ASSERT_EQ("_id"_sd, deleteOpEntry.getQ().firstElementFieldNameStringData());
-    BSONElement id = deleteOpEntry.getQ().firstElement();
-    if (id.isABSONObj() && id.Obj().firstElementFieldNameStringData() == "$eq"_sd) {
-        id = id.Obj().firstElement();
-    }
-
-    auto swDoc = _storage->deleteById(_opCtx, nss, id);
-
-    // Some of the unit tests delete documents that do not exist
-    if (swDoc.getStatus() == ErrorCodes::NoSuchKey) {
-        return {write_ops::DeleteCommandReply(), BSONObj()};
-    }
-
-    return {write_ops::DeleteCommandReply(), uassertStatusOK(swDoc)};
-}
-
-std::pair<write_ops::UpdateCommandReply, BSONObj> FLEQueryTestImpl::updateWithPreimage(
-    const NamespaceString& nss,
-    const EncryptionInformation& ei,
-    const write_ops::UpdateCommandRequest& updateRequest) {
-    // A limit of the API, we can delete by _id and get the pre-image so we limit our unittests to
-    // this
-    ASSERT_EQ(updateRequest.getUpdates().size(), 1);
-    auto updateOpEntry = updateRequest.getUpdates()[0];
-    ASSERT_EQ("_id"_sd, updateOpEntry.getQ().firstElementFieldNameStringData());
-    BSONElement id = updateOpEntry.getQ().firstElement();
-    if (id.isABSONObj() && id.Obj().firstElementFieldNameStringData() == "$eq"_sd) {
-        id = id.Obj().firstElement();
-    }
-    BSONObj preimage = getById(nss, id);
-
-    if (updateOpEntry.getU().type() == write_ops::UpdateModification::Type::kModifier) {
-        uassertStatusOK(
-            _storage->upsertById(_opCtx, nss, id, updateOpEntry.getU().getUpdateModifier()));
-    } else {
-        uassertStatusOK(
-            _storage->upsertById(_opCtx, nss, id, updateOpEntry.getU().getUpdateReplacement()));
-    }
-
-
-    return {write_ops::UpdateCommandReply(), preimage};
-}
-
-write_ops::FindAndModifyCommandReply FLEQueryTestImpl::findAndModify(
-    const NamespaceString& nss,
-    const EncryptionInformation& ei,
-    const write_ops::FindAndModifyCommandRequest& findAndModifyRequest) {
-    // Repl storage interface does not have find and modify support directly. We emulate it, poorly
-    ASSERT_EQ("_id"_sd, findAndModifyRequest.getQuery().firstElementFieldNameStringData());
-    ASSERT_EQ(findAndModifyRequest.getNew().get_value_or(false), false);
-
-    BSONObj preimage = getById(nss, findAndModifyRequest.getQuery().firstElement());
-
-    if (findAndModifyRequest.getRemove().get_value_or(false)) {
-        // Remove
-        auto swDoc =
-            _storage->deleteById(_opCtx, nss, findAndModifyRequest.getQuery().firstElement());
-        uassertStatusOK(swDoc);
-
-    } else {
-        uassertStatusOK(
-            _storage->upsertById(_opCtx,
-                                 nss,
-                                 findAndModifyRequest.getQuery().firstElement(),
-                                 findAndModifyRequest.getUpdate()->getUpdateModifier()));
-    }
-
-    write_ops::FindAndModifyCommandReply reply;
-    reply.setValue(preimage);
-    return reply;
-}
 
 constexpr auto kIndexKeyId = "12345678-1234-9876-1234-123456789012"_sd;
 constexpr auto kUserKeyId = "ABCDEFAB-1234-9876-1234-123456789012"_sd;
@@ -339,7 +191,7 @@ protected:
 
     repl::StorageInterface* _storage{nullptr};
 
-    std::unique_ptr<FLEQueryTestImpl> _queryImpl;
+    std::unique_ptr<FLEQueryInterfaceMock> _queryImpl;
 
     TestKeyVault _keyVault;
 
@@ -361,7 +213,7 @@ void FleCrudTest::setUp() {
     repl::StorageInterface::set(service, std::make_unique<repl::StorageInterfaceImpl>());
     _storage = repl::StorageInterface::get(service);
 
-    _queryImpl = std::make_unique<FLEQueryTestImpl>(_opCtx.get(), _storage);
+    _queryImpl = std::make_unique<FLEQueryInterfaceMock>(_opCtx.get(), _storage);
 
     createCollection(_edcNs);
     createCollection(_escNs);
@@ -700,7 +552,7 @@ void FleCrudTest::doFindAndModify(write_ops::FindAndModifyCommandRequest& reques
 
 class CollectionReader : public FLEStateCollectionReader {
 public:
-    CollectionReader(std::string&& coll, FLEQueryTestImpl& queryImpl)
+    CollectionReader(std::string&& coll, FLEQueryInterfaceMock& queryImpl)
         : _coll(NamespaceString(coll)), _queryImpl(queryImpl) {}
 
     uint64_t getDocumentCount() const override {
@@ -714,7 +566,7 @@ public:
 
 private:
     NamespaceString _coll;
-    FLEQueryTestImpl& _queryImpl;
+    FLEQueryInterfaceMock& _queryImpl;
 };
 
 class FleTagsTest : public FleCrudTest {

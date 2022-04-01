@@ -200,6 +200,11 @@ public:
         const NamespaceString& nss,
         const EncryptionInformation& ei,
         const write_ops::FindAndModifyCommandRequest& findAndModifyRequest) = 0;
+
+    /**
+     * Find a document with the given filter.
+     */
+    virtual std::vector<BSONObj> findDocuments(const NamespaceString& nss, BSONObj filter) = 0;
 };
 /**
  * Implementation of the FLE Query interface that exposes the DB operations needed for FLE 2
@@ -232,6 +237,8 @@ public:
         const EncryptionInformation& ei,
         const write_ops::FindAndModifyCommandRequest& findAndModifyRequest) final;
 
+    std::vector<BSONObj> findDocuments(const NamespaceString& nss, BSONObj filter) final;
+
 private:
     const txn_api::TransactionClient& _txnClient;
 };
@@ -261,6 +268,30 @@ private:
     FLEQueryInterface* _queryImpl;
     NamespaceString _nss;
 };
+
+/**
+ * Runs a callback function inside a transaction, and retrying if the transaction fails
+ * with a retryable error status.
+ */
+StatusWith<txn_api::CommitResult> runInTxnWithRetry(
+    OperationContext* opCtx,
+    std::shared_ptr<txn_api::TransactionWithRetries> trun,
+    std::function<SemiFuture<void>(const txn_api::TransactionClient& txnClient,
+                                   ExecutorPtr txnExec)> callback);
+
+/**
+ * Creates a new TransactionWithRetries object that runs a transaction on the
+ * sharding fixed task executor.
+ */
+std::shared_ptr<txn_api::TransactionWithRetries> getTransactionWithRetriesForMongoS(
+    OperationContext* opCtx);
+
+/**
+ * Creates a new TransactionWithRetries object that runs a transaction on a
+ * thread pool local to mongod.
+ */
+std::shared_ptr<txn_api::TransactionWithRetries> getTransactionWithRetriesForMongoD(
+    OperationContext* opCtx);
 
 /**
  * Process a FLE insert with the query interface
