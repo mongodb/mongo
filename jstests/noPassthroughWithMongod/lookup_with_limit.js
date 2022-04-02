@@ -7,8 +7,8 @@
 load('jstests/libs/analyze_plan.js');  // For getWinningPlan().
 load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
 
-if (checkSBEEnabled(db, ["featureFlagSBELookupPushdown"])) {
-    jsTestLog("Skipping test because SBE and SBE $lookup features are both enabled.");
+if (!checkSBEEnabled(db, ["featureFlagSBELookupPushdown"])) {
+    jsTestLog("Skipping test because SBE $lookup is not enabled.");
     return;
 }
 
@@ -17,20 +17,22 @@ const other = db.lookup_with_limit_other;
 coll.drop();
 other.drop();
 
-// Checks that the order of the pipeline stages matches the expected ordering depending on whether
-// the pipeline is optimized or not.
+// Checks that the order of the query stages and pipeline stages matches the expected ordering
+// depending on whether the pipeline is optimized or not.
 function checkResults(pipeline, isOptimized, expected) {
     assert.commandWorked(db.adminCommand({
         "configureFailPoint": 'disablePipelineOptimization',
         "mode": isOptimized ? 'off' : 'alwaysOn'
     }));
     const explain = coll.explain().aggregate(pipeline);
-    if (expected.length > 0) {
-        assert.eq(
-            getWinningPlan(explain.stages[0].$cursor.queryPlanner).stage, expected[0], explain);
-    }
-    for (let i = 1; i < expected.length; i++) {
-        assert.eq(Object.keys(explain.stages[i]), expected[i], explain);
+    if (explain.stages) {
+        const queryStages =
+            flattenQueryPlanTree(getWinningPlan(explain.stages[0].$cursor.queryPlanner));
+        const pipelineStages = explain.stages.slice(1).map(s => Object.keys(s)[0]);
+        assert.eq(queryStages.concat(pipelineStages), expected, explain);
+    } else {
+        const queryStages = flattenQueryPlanTree(getWinningPlan(explain.queryPlanner));
+        assert.eq(queryStages, expected, explain);
     }
 }
 
@@ -51,8 +53,8 @@ var pipeline = [
     {$lookup: {from: other.getName(), localField: "x", foreignField: "x", as: "from_other"}},
     {$limit: 5}
 ];
-checkResults(pipeline, false, ["COLLSCAN", "$lookup", "$limit"]);
-checkResults(pipeline, true, ["LIMIT", "$lookup"]);
+checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "$limit"]);
+checkResults(pipeline, true, ["COLLSCAN", "LIMIT", "EQ_LOOKUP"]);
 
 // Check that lookup->addFields->lookup->limit is reordered to limit->lookup->addFields->lookup,
 // with the limit stage pushed down to query system.
@@ -62,8 +64,8 @@ pipeline = [
     {$lookup: {from: other.getName(), localField: "x", foreignField: "x", as: "additional"}},
     {$limit: 5}
 ];
-checkResults(pipeline, false, ["COLLSCAN", "$lookup", "$addFields", "$lookup", "$limit"]);
-checkResults(pipeline, true, ["LIMIT", "$lookup", "$addFields", "$lookup"]);
+checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "$addFields", "$lookup", "$limit"]);
+checkResults(pipeline, true, ["COLLSCAN", "LIMIT", "EQ_LOOKUP", "$addFields", "$lookup"]);
 
 // Check that lookup->unwind->limit is reordered to lookup->limit, with the unwind stage being
 // absorbed into the lookup stage and preventing the limit from swapping before it.
@@ -72,7 +74,7 @@ pipeline = [
     {$unwind: "$from_other"},
     {$limit: 5}
 ];
-checkResults(pipeline, false, ["COLLSCAN", "$lookup", "$unwind", "$limit"]);
+checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "$unwind", "$limit"]);
 checkResults(pipeline, true, ["COLLSCAN", "$lookup", "$limit"]);
 
 // Check that lookup->unwind->sort->limit is reordered to lookup->sort, with the unwind stage being
@@ -84,6 +86,6 @@ pipeline = [
     {$sort: {x: 1}},
     {$limit: 5}
 ];
-checkResults(pipeline, false, ["COLLSCAN", "$lookup", "$unwind", "$sort", "$limit"]);
+checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "$unwind", "$sort", "$limit"]);
 checkResults(pipeline, true, ["COLLSCAN", "$lookup", "$sort"]);
 }());

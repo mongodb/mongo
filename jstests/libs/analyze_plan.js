@@ -532,3 +532,16 @@ function getPlanCacheKeyFromShape({query = {}, projection = {}, sort = {}, colle
 
     return getPlanCacheKeyFromExplain(explainRes, db);
 }
+
+/**
+ * Given the winning query plan, flatten query plan tree into a list of plan stage names.
+ */
+function flattenQueryPlanTree(winningPlan) {
+    let stages = [];
+    while (winningPlan) {
+        stages.push(winningPlan.stage);
+        winningPlan = winningPlan.inputStage;
+    }
+    stages.reverse();
+    return stages;
+}

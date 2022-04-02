@@ -19,9 +19,8 @@ load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
 const st = new ShardingTest({shards: 2, config: 1});
 const db = st.s.getDB("test");
 
-// TODO SERVER-64614 Update test cases for the SBE $lookup and remove 'if' block.
-if (checkSBEEnabled(db, ["featureFlagSBELookupPushdown"])) {
-    jsTestLog("Skipping test because SBE and SBE $lookup features are both enabled.");
+if (!checkSBEEnabled(db, ["featureFlagSBELookupPushdown"])) {
+    jsTestLog("Skipping test because SBE $lookup is not enabled.");
     st.stop();
     return;
 }
@@ -31,14 +30,20 @@ const other = db.lookup_with_limit_other;
 coll.drop();
 other.drop();
 
-// Checks that the order of the pipeline stages matches the expected optimized ordering for an
-// unsharded collection.
-function checkUnshardedResults(pipeline, expectedPlanStage, expectedPipeline) {
+// Checks that the order of the query stages and pipeline stages matches the expected optimized
+// ordering for an unsharded collection.
+function checkUnshardedResults(pipeline, expectedPlanStages, expectedPipeline) {
     const explain = coll.explain().aggregate(pipeline);
-    assert.eq(
-        getWinningPlan(explain.stages[0].$cursor.queryPlanner).stage, expectedPlanStage, explain);
-    for (let i = 0; i < expectedPipeline.length; i++) {
-        assert.eq(Object.keys(explain.stages[i + 1]), expectedPipeline[i], explain);
+    if (explain.stages) {
+        const queryStages =
+            flattenQueryPlanTree(getWinningPlan(explain.stages[0].$cursor.queryPlanner));
+        const pipelineStages = explain.stages.slice(1).map(s => Object.keys(s)[0]);
+        assert.eq(queryStages, expectedPlanStages, explain);
+        assert.eq(pipelineStages, expectedPipeline, explain);
+    } else {
+        const queryStages = flattenQueryPlanTree(getWinningPlan(explain.queryPlanner));
+        assert.eq(queryStages, expectedPlanStages, explain);
+        assert.eq([], expectedPipeline, explain);
     }
 }
 
@@ -67,7 +72,7 @@ const lookupPipeline = [
     {$lookup: {from: other.getName(), localField: "x", foreignField: "x", as: "from_other"}},
     {$limit: 5}
 ];
-checkUnshardedResults(lookupPipeline, "LIMIT", ["$lookup"]);
+checkUnshardedResults(lookupPipeline, ["COLLSCAN", "LIMIT", "EQ_LOOKUP"], []);
 
 // Check that lookup->addFields->lookup->limit is reordered to limit->lookup->addFields->lookup,
 // with the limit stage pushed down to query system.
@@ -77,7 +82,8 @@ const multiLookupPipeline = [
     {$lookup: {from: other.getName(), localField: "x", foreignField: "x", as: "additional"}},
     {$limit: 5}
 ];
-checkUnshardedResults(multiLookupPipeline, "LIMIT", ["$lookup", "$addFields", "$lookup"]);
+checkUnshardedResults(
+    multiLookupPipeline, ["COLLSCAN", "LIMIT", "EQ_LOOKUP"], ["$addFields", "$lookup"]);
 
 // Check that lookup->unwind->limit is reordered to lookup->limit, with the unwind stage being
 // absorbed into the lookup stage and preventing the limit from swapping before it.
@@ -86,7 +92,7 @@ const unwindPipeline = [
     {$unwind: "$from_other"},
     {$limit: 5}
 ];
-checkUnshardedResults(unwindPipeline, "COLLSCAN", ["$lookup", "$limit"]);
+checkUnshardedResults(unwindPipeline, ["COLLSCAN"], ["$lookup", "$limit"]);
 
 // Check that lookup->unwind->sort->limit is reordered to lookup->sort, with the unwind stage being
 // absorbed into the lookup stage and preventing the limit from swapping before it, and the limit
@@ -106,9 +112,9 @@ const topKSortPipeline = [
     {$lookup: {from: other.getName(), localField: "x", foreignField: "x", as: "from_other"}},
     {$limit: 5}
 ];
-checkUnshardedResults(topKSortPipeline, "SORT", ["$lookup"]);
+checkUnshardedResults(topKSortPipeline, ["COLLSCAN", "SORT", "EQ_LOOKUP"], []);
 const explain = coll.explain().aggregate(topKSortPipeline);
-assert.eq(getWinningPlan(explain.stages[0].$cursor.queryPlanner).limitAmount, 5, explain);
+assert.eq(getPlanStage(getWinningPlan(explain.queryPlanner), "SORT").limitAmount, 5, explain);
 
 // Tests on a sharded collection.
 coll.createIndex({x: 1});
