@@ -167,7 +167,7 @@ public:
      * FLEStateCollectionContention instead.
      */
     virtual StatusWith<write_ops::InsertCommandReply> insertDocument(
-        const NamespaceString& nss, BSONObj obj, bool translateDuplicateKey) = 0;
+        const NamespaceString& nss, BSONObj obj, StmtId* pStmtId, bool translateDuplicateKey) = 0;
 
     /**
      * Delete a single document with the given query.
@@ -191,10 +191,21 @@ public:
         const EncryptionInformation& ei,
         const write_ops::UpdateCommandRequest& updateRequest) = 0;
 
+
+    /**
+     * Update a single document with the given query and update operators.
+     *
+     * Returns an update reply.
+     */
+    virtual write_ops::UpdateCommandReply update(
+        const NamespaceString& nss,
+        int32_t stmtId,
+        const write_ops::UpdateCommandRequest& updateRequest) = 0;
+
     /**
      * Do a single findAndModify request.
      *
-     * TODO
+     * Returns a findAndModify reply.
      */
     virtual write_ops::FindAndModifyCommandReply findAndModify(
         const NamespaceString& nss,
@@ -220,6 +231,7 @@ public:
 
     StatusWith<write_ops::InsertCommandReply> insertDocument(const NamespaceString& nss,
                                                              BSONObj obj,
+                                                             int32_t* pStmtId,
                                                              bool translateDuplicateKey) final;
 
     std::pair<write_ops::DeleteCommandReply, BSONObj> deleteWithPreimage(
@@ -230,6 +242,11 @@ public:
     std::pair<write_ops::UpdateCommandReply, BSONObj> updateWithPreimage(
         const NamespaceString& nss,
         const EncryptionInformation& ei,
+        const write_ops::UpdateCommandRequest& updateRequest) final;
+
+    write_ops::UpdateCommandReply update(
+        const NamespaceString& nss,
+        int32_t stmtId,
         const write_ops::UpdateCommandRequest& updateRequest) final;
 
     write_ops::FindAndModifyCommandReply findAndModify(
@@ -270,16 +287,6 @@ private:
 };
 
 /**
- * Runs a callback function inside a transaction, and retrying if the transaction fails
- * with a retryable error status.
- */
-StatusWith<txn_api::CommitResult> runInTxnWithRetry(
-    OperationContext* opCtx,
-    std::shared_ptr<txn_api::TransactionWithRetries> trun,
-    std::function<SemiFuture<void>(const txn_api::TransactionClient& txnClient,
-                                   ExecutorPtr txnExec)> callback);
-
-/**
  * Creates a new TransactionWithRetries object that runs a transaction on the
  * sharding fixed task executor.
  */
@@ -303,6 +310,7 @@ StatusWith<write_ops::InsertCommandReply> processInsert(
     const NamespaceString& edcNss,
     std::vector<EDCServerPayloadInfo>& serverPayload,
     const EncryptedFieldConfig& efc,
+    int32_t stmtId,
     BSONObj document);
 
 /**

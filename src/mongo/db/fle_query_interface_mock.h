@@ -49,6 +49,7 @@ public:
 
     StatusWith<write_ops::InsertCommandReply> insertDocument(const NamespaceString& nss,
                                                              BSONObj obj,
+                                                             StmtId* pStmtId,
                                                              bool translateDuplicateKey) final;
 
     std::pair<write_ops::DeleteCommandReply, BSONObj> deleteWithPreimage(
@@ -59,6 +60,11 @@ public:
     std::pair<write_ops::UpdateCommandReply, BSONObj> updateWithPreimage(
         const NamespaceString& nss,
         const EncryptionInformation& ei,
+        const write_ops::UpdateCommandRequest& updateRequest) final;
+
+    write_ops::UpdateCommandReply update(
+        const NamespaceString& nss,
+        int32_t stmtId,
         const write_ops::UpdateCommandRequest& updateRequest) final;
 
     write_ops::FindAndModifyCommandReply findAndModify(

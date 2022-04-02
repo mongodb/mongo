@@ -153,7 +153,8 @@ void upsertNullDocument(FLEQueryInterface* queryImpl,
         }
     } else {
         // insert the null doc; translate duplicate key error to a FLE contention error
-        auto reply = uassertStatusOK(queryImpl->insertDocument(nss, newNullDoc, true));
+        StmtId stmtId = kUninitializedStmtId;
+        auto reply = uassertStatusOK(queryImpl->insertDocument(nss, newNullDoc, &stmtId, true));
         checkWriteErrors(reply);
         statsCtr.addInserts(1);
     }
@@ -256,7 +257,9 @@ ESCPreCompactState prepareESCForCompaction(FLEQueryInterface* queryImpl,
     // committed before the current compact transaction commits
     auto placeholder = ESCCollection::generateCompactionPlaceholderDocument(
         tagToken, valueToken, state.pos, state.count);
-    auto insertReply = uassertStatusOK(queryImpl->insertDocument(nssEsc, placeholder, true));
+    StmtId stmtId = kUninitializedStmtId;
+    auto insertReply =
+        uassertStatusOK(queryImpl->insertDocument(nssEsc, placeholder, &stmtId, true));
     checkWriteErrors(insertReply);
     stats.addInserts(1);
 
@@ -332,7 +335,9 @@ ECCPreCompactState prepareECCForCompaction(FLEQueryInterface* queryImpl,
         // committed before the current compact transaction commits
         auto placeholder =
             ECCCollection::generateCompactionDocument(tagToken, valueToken, state.pos);
-        auto insertReply = uassertStatusOK(queryImpl->insertDocument(nssEcc, placeholder, true));
+        StmtId stmtId = kUninitializedStmtId;
+        auto insertReply =
+            uassertStatusOK(queryImpl->insertDocument(nssEcc, placeholder, &stmtId, true));
         checkWriteErrors(insertReply);
         stats.addInserts(1);
     } else {
@@ -442,6 +447,7 @@ void compactOneFieldValuePair(FLEQueryInterface* queryImpl,
     // PART 3
     // A. compact the ECC
     bool allEntriesDeleted = (escState.count == eccState.count);
+    StmtId stmtId = kUninitializedStmtId;
 
     if (eccState.count != 0) {
         bool hasNullDoc = (eccState.ipos > 1);
@@ -458,6 +464,7 @@ void compactOneFieldValuePair(FLEQueryInterface* queryImpl,
                         namespaces.eccNss,
                         ECCCollection::generateDocument(
                             eccTagToken, eccValueToken, eccState.pos + k, range.start, range.end),
+                        &stmtId,
                         true));
                     checkWriteErrors(insertReply);
                     stats.addInserts(1);
@@ -527,10 +534,8 @@ CompactStats processFLECompact(OperationContext* opCtx,
         auto argsBlock = std::tie(c, request, namespaces, ecocStats);
         auto sharedBlock = std::make_shared<decltype(argsBlock)>(argsBlock);
 
-        auto swResult = runInTxnWithRetry(
-            opCtx,
-            trun,
-            [sharedBlock](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+        auto swResult = trun->runSyncNoThrow(
+            opCtx, [sharedBlock](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
                 FLEQueryInterfaceImpl queryImpl(txnClient);
 
                 auto [c2, request2, namespaces2, ecocStats2] = *sharedBlock.get();
@@ -556,10 +561,8 @@ CompactStats processFLECompact(OperationContext* opCtx,
         auto argsBlock = std::tie(ecocDoc, namespaces, escStats, eccStats);
         auto sharedBlock = std::make_shared<decltype(argsBlock)>(argsBlock);
 
-        auto swResult = runInTxnWithRetry(
-            opCtx,
-            trun,
-            [sharedBlock](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+        auto swResult = trun->runSyncNoThrow(
+            opCtx, [sharedBlock](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
                 FLEQueryInterfaceImpl queryImpl(txnClient);
 
                 auto [ecocDoc2, namespaces2, escStats2, eccStats2] = *sharedBlock.get();

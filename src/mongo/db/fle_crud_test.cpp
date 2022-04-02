@@ -396,7 +396,7 @@ void FleCrudTest::doSingleWideInsert(int id, uint64_t fieldCount, ValueGenerator
 
     auto efc = getTestEncryptedFieldConfig();
 
-    uassertStatusOK(processInsert(_queryImpl.get(), _edcNs, serverPayload, efc, result));
+    uassertStatusOK(processInsert(_queryImpl.get(), _edcNs, serverPayload, efc, 0, result));
 }
 
 
@@ -457,7 +457,7 @@ void FleCrudTest::doSingleInsert(int id, BSONElement element) {
 
     auto efc = getTestEncryptedFieldConfig();
 
-    uassertStatusOK(processInsert(_queryImpl.get(), _edcNs, serverPayload, efc, result));
+    uassertStatusOK(processInsert(_queryImpl.get(), _edcNs, serverPayload, efc, 0, result));
 }
 
 void FleCrudTest::doSingleInsert(int id, BSONObj obj) {
