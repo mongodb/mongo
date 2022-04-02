@@ -81,7 +81,5 @@ protected:
     long long _term = 0;
 };
 
-std::shared_ptr<executor::TaskExecutor> makeTestExecutor();
-
 }  // namespace repl
 }  // namespace mongo

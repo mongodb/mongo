@@ -200,8 +200,22 @@ public:
         ClockSourceMock clockSource;
         clockSource.advance(Milliseconds(1000));
 
-        // Fake replSet just for creating consistent URI for monitor
-        _rsmMonitor.setup(_replSet.getURI());
+        // setup mock networking for split acceptance
+        auto network = std::make_unique<executor::NetworkInterfaceMock>();
+        _net = network.get();
+        _executor = std::make_shared<executor::ThreadPoolTaskExecutor>(
+            std::make_unique<executor::ThreadPoolMock>(
+                _net, 1, executor::ThreadPoolMock::Options{}),
+            std::move(network));
+        _executor->startup();
+    }
+
+    void tearDown() override {
+        _net->exitNetwork();
+        _executor->shutdown();
+        _executor->join();
+
+        repl::PrimaryOnlyServiceMongoDTest::tearDown();
     }
 
 protected:
@@ -227,11 +241,55 @@ protected:
         "recipientSetForTest", 3, true /* hasPrimary */, false /* dollarPrefixHosts */};
     const NamespaceString _nss{"testDB2", "testColl2"};
     std::vector<std::string> _tenantIds = {"tenant1", "tenantAB"};
-    StreamableReplicaSetMonitorForTesting _rsmMonitor;
     std::string _recipientTagName{"$recipientNode"};
-    std::string _recipientSetName{_replSet.getURI().getSetName()};
-    FailPointEnableBlock _skipAcceptanceFP{"skipShardSplitWaitForSplitAcceptance"};
+    std::string _recipientSetName{_recipientSet.getURI().getSetName()};
+
+    std::unique_ptr<FailPointEnableBlock> _skipAcceptanceFP =
+        std::make_unique<FailPointEnableBlock>("skipShardSplitWaitForSplitAcceptance");
+
+
+    // for mocking split acceptance
+    executor::NetworkInterfaceMock* _net;
+    TaskExecutorPtr _executor;
 };
+
+executor::RemoteCommandRequest assertRemoteCommandNameEquals(
+    StringData cmdName, const executor::RemoteCommandRequest& request) {
+    auto&& cmdObj = request.cmdObj;
+    ASSERT_FALSE(cmdObj.isEmpty());
+    if (cmdName != cmdObj.firstElementFieldName()) {
+        std::string msg = str::stream()
+            << "Expected command name \"" << cmdName << "\" in remote command request but found \""
+            << cmdObj.firstElementFieldName() << "\" instead: " << request.toString();
+        FAIL(msg);
+    }
+    return request;
+}
+
+void processHelloRequest(executor::NetworkInterfaceMock* net, MockReplicaSet* replSet) {
+    ASSERT(net->hasReadyRequests());
+    net->runReadyNetworkOperations();
+    auto noi = net->getNextReadyRequest();
+    auto request = noi->getRequest();
+
+    assertRemoteCommandNameEquals("isMaster", request);
+    auto requestHost = request.target.toString();
+    const auto node = replSet->getNode(requestHost);
+    if (node->isRunning()) {
+        const auto opmsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        const auto reply = node->runCommand(request.id, opmsg)->getCommandReply();
+        net->scheduleSuccessfulResponse(noi,
+                                        executor::RemoteCommandResponse(reply, Milliseconds(0)));
+    } else {
+        net->scheduleErrorResponse(noi, Status(ErrorCodes::HostUnreachable, ""));
+    }
+}
+
+void waitForHelloRequest(executor::NetworkInterfaceMock* net) {
+    while (!net->hasReadyRequests()) {
+        net->advanceTime(net->now() + Milliseconds{1});
+    }
+}
 
 TEST_F(ShardSplitDonorServiceTest, BasicShardSplitDonorServiceInstanceCreation) {
     auto opCtx = makeOperationContext();
@@ -239,11 +297,23 @@ TEST_F(ShardSplitDonorServiceTest, BasicShardSplitDonorServiceInstanceCreation) 
     test::shard_split::reconfigToAddRecipientNodes(
         getServiceContext(), _recipientTagName, _replSet.getHosts(), _recipientSet.getHosts());
 
+    ShardSplitDonorService::DonorStateMachine::setSplitAcceptanceTaskExecutor_forTest(_executor);
+    _skipAcceptanceFP.reset();
+
     // Create and start the instance.
     auto serviceInstance = ShardSplitDonorService::DonorStateMachine::getOrCreate(
         opCtx.get(), _service, defaultStateDocument().toBSON());
     ASSERT(serviceInstance.get());
     ASSERT_EQ(_uuid, serviceInstance->getId());
+
+    // Wait for monitors to start, and enqueue successfull hello responses
+    _net->enterNetwork();
+    waitForHelloRequest(_net);
+    processHelloRequest(_net, &_recipientSet);
+    processHelloRequest(_net, &_recipientSet);
+    processHelloRequest(_net, &_recipientSet);
+    _net->runReadyNetworkOperations();
+    _net->exitNetwork();
 
     auto decisionFuture = serviceInstance->decisionFuture();
     decisionFuture.wait();
@@ -459,63 +529,28 @@ TEST_F(ShardSplitDonorServiceTest, AbortDueToRecipientNodesValidation) {
     ASSERT_TRUE(!serviceInstance->isGarbageCollectable());
 }
 
-class SplitReplicaSetObserverTest : public ServiceContextTest {
-public:
-    void setUp() override {
-        ServiceContextTest::setUp();
-
-        // we need a mock replication coordinator in order to identify recipient nodes
-        auto serviceContext = getServiceContext();
-        auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(serviceContext);
-        repl::ReplicationCoordinator::set(serviceContext, std::move(replCoord));
-
-        _rsmMonitor.setup(_validRepl.getURI());
-        _otherRsmMonitor.setup(_invalidRepl.getURI());
-
-        _executor = repl::makeTestExecutor();
-
-        // Retrieve monitor installed by _rsmMonitor.setup(...)
-        auto monitor = checked_pointer_cast<StreamableReplicaSetMonitor>(
-            ReplicaSetMonitor::createIfNeeded(_validRepl.getURI()));
-        invariant(monitor);
-        _publisher = monitor->getEventsPublisher();
-    }
-
-protected:
-    MockReplicaSet _validRepl{
-        "replInScope", 3, true /* hasPrimary */, false /* dollarPrefixHosts */};
-    MockReplicaSet _recipientSet{
-        "recipientReplSet", 3, true /* hasPrimary */, false /* dollarPrefixHosts */};
-    MockReplicaSet _invalidRepl{
-        "replNotInScope", 3, true /* hasPrimary */, false /* dollarPrefixHosts */};
-
-    StreamableReplicaSetMonitorForTesting _rsmMonitor;
-    StreamableReplicaSetMonitorForTesting _otherRsmMonitor;
-    std::shared_ptr<executor::TaskExecutor> _executor;
-    std::shared_ptr<sdam::TopologyEventsPublisher> _publisher;
-    std::string _recipientTagName{"$recipientNode"};
-    std::string _recipientSetName{_validRepl.getURI().getSetName()};
-};
-
-TEST_F(SplitReplicaSetObserverTest, FutureReady) {
+TEST(RecipientAcceptSplitListenerTest, FutureReady) {
+    MockReplicaSet donor{"donor", 3, true /* hasPrimary */, false /* dollarPrefixHosts */};
     auto listener =
-        mongo::serverless::RecipientAcceptSplitListener(_validRepl.getURI().connectionString());
+        mongo::serverless::RecipientAcceptSplitListener(donor.getURI().connectionString());
 
-    for (const auto& host : _validRepl.getHosts()) {
+    for (const auto& host : donor.getHosts()) {
         ASSERT_FALSE(listener.getFuture().isReady());
-        listener.onServerHeartbeatSucceededEvent(host, BSON("setName" << _validRepl.getSetName()));
+        listener.onServerHeartbeatSucceededEvent(host, BSON("setName" << donor.getSetName()));
     }
+    ASSERT_FALSE(listener.getFuture().isReady());
+
     listener.onServerHeartbeatSucceededEvent(
-        _validRepl.getHosts().front(),
-        BSON("setName" << _validRepl.getSetName() << "ismaster" << true));
+        donor.getHosts().front(), BSON("setName" << donor.getSetName() << "ismaster" << true));
     ASSERT_TRUE(listener.getFuture().isReady());
 }
 
-TEST_F(SplitReplicaSetObserverTest, FutureReadyNameChange) {
+TEST(RecipientAcceptSplitListenerTest, FutureReadyNameChange) {
+    MockReplicaSet donor{"donor", 3, true /* hasPrimary */, false /* dollarPrefixHosts */};
     auto listener =
-        mongo::serverless::RecipientAcceptSplitListener(_validRepl.getURI().connectionString());
+        mongo::serverless::RecipientAcceptSplitListener(donor.getURI().connectionString());
 
-    for (const auto& host : _validRepl.getHosts()) {
+    for (const auto& host : donor.getHosts()) {
         listener.onServerHeartbeatSucceededEvent(host,
                                                  BSON("setName"
                                                       << "donorSetName"));
@@ -523,50 +558,110 @@ TEST_F(SplitReplicaSetObserverTest, FutureReadyNameChange) {
 
     ASSERT_FALSE(listener.getFuture().isReady());
 
-    for (const auto& host : _validRepl.getHosts()) {
-        listener.onServerHeartbeatSucceededEvent(host, BSON("setName" << _validRepl.getSetName()));
+    for (const auto& host : donor.getHosts()) {
+        listener.onServerHeartbeatSucceededEvent(host, BSON("setName" << donor.getSetName()));
     }
     listener.onServerHeartbeatSucceededEvent(
-        _validRepl.getHosts().front(),
-        BSON("setName" << _validRepl.getSetName() << "ismaster" << true));
+        donor.getHosts().front(), BSON("setName" << donor.getSetName() << "ismaster" << true));
 
     ASSERT_TRUE(listener.getFuture().isReady());
 }
 
-TEST_F(SplitReplicaSetObserverTest, FutureNotReadyMissingNodes) {
+TEST(RecipientAcceptSplitListenerTest, FutureNotReadyMissingNodes) {
+    MockReplicaSet donor{"donor", 3, false /* hasPrimary */, false /* dollarPrefixHosts */};
     auto listener =
-        mongo::serverless::RecipientAcceptSplitListener(_validRepl.getURI().connectionString());
+        mongo::serverless::RecipientAcceptSplitListener(donor.getURI().connectionString());
 
-    for (size_t i = 0; i < _validRepl.getHosts().size() - 1; ++i) {
-        listener.onServerHeartbeatSucceededEvent(_validRepl.getHosts()[i],
-                                                 BSON("setName" << _validRepl.getSetName()));
+
+    for (size_t i = 0; i < donor.getHosts().size() - 1; ++i) {
+        listener.onServerHeartbeatSucceededEvent(donor.getHosts()[i],
+                                                 BSON("setName" << donor.getSetName()));
+    }
+
+    ASSERT_FALSE(listener.getFuture().isReady());
+    listener.onServerHeartbeatSucceededEvent(donor.getHosts()[donor.getHosts().size() - 1],
+                                             BSON("setName" << donor.getSetName()));
+    ASSERT_FALSE(listener.getFuture().isReady());
+    donor.setPrimary(donor.getHosts()[0].host());
+    listener.onServerHeartbeatSucceededEvent(
+        donor.getHosts()[0], BSON("setName" << donor.getSetName() << "ismaster" << true));
+    ASSERT_TRUE(listener.getFuture().isReady());
+}
+
+TEST(RecipientAcceptSplitListenerTest, FutureNotReadyNoSetName) {
+    MockReplicaSet donor{"donor", 3, true /* hasPrimary */, false /* dollarPrefixHosts */};
+    auto listener =
+        mongo::serverless::RecipientAcceptSplitListener(donor.getURI().connectionString());
+
+    for (size_t i = 0; i < donor.getHosts().size() - 1; ++i) {
+        listener.onServerHeartbeatSucceededEvent(donor.getHosts()[i], BSONObj());
     }
 
     ASSERT_FALSE(listener.getFuture().isReady());
 }
 
-TEST_F(SplitReplicaSetObserverTest, FutureNotReadyNoSetName) {
+TEST(RecipientAcceptSplitListenerTest, FutureNotReadyWrongSet) {
+    MockReplicaSet donor{"donor", 3, true /* hasPrimary */, false /* dollarPrefixHosts */};
     auto listener =
-        mongo::serverless::RecipientAcceptSplitListener(_validRepl.getURI().connectionString());
+        mongo::serverless::RecipientAcceptSplitListener(donor.getURI().connectionString());
 
-    for (size_t i = 0; i < _validRepl.getHosts().size() - 1; ++i) {
-        listener.onServerHeartbeatSucceededEvent(_validRepl.getHosts()[i], BSONObj());
-    }
-
-    ASSERT_FALSE(listener.getFuture().isReady());
-}
-
-TEST_F(SplitReplicaSetObserverTest, FutureNotReadyWrongSet) {
-    auto listener =
-        mongo::serverless::RecipientAcceptSplitListener(_validRepl.getURI().connectionString());
-
-    for (const auto& host : _validRepl.getHosts()) {
+    for (const auto& host : donor.getHosts()) {
         listener.onServerHeartbeatSucceededEvent(host,
                                                  BSON("setName"
                                                       << "wrongSetName"));
     }
 
     ASSERT_FALSE(listener.getFuture().isReady());
+}
+
+TEST_F(ShardSplitDonorServiceTest, ResumeAfterStepdownTest) {
+    auto opCtx = makeOperationContext();
+    test::shard_split::ScopedTenantAccessBlocker scopedTenants(_tenantIds, opCtx.get());
+    test::shard_split::reconfigToAddRecipientNodes(
+        getServiceContext(), _recipientTagName, _replSet.getHosts(), _recipientSet.getHosts());
+
+    auto initialFuture = [&]() {
+        FailPointEnableBlock fp("pauseShardSplitAfterBlocking");
+        auto initialTimesEntered = fp.initialTimesEntered();
+
+        std::shared_ptr<ShardSplitDonorService::DonorStateMachine> serviceInstance =
+            ShardSplitDonorService::DonorStateMachine::getOrCreate(
+                opCtx.get(), _service, defaultStateDocument().toBSON());
+        ASSERT(serviceInstance.get());
+
+        fp->waitForTimesEntered(initialTimesEntered + 1);
+        stepDown();
+
+        return serviceInstance->decisionFuture();
+    }();
+
+    auto result = initialFuture.getNoThrow();
+    ASSERT_FALSE(result.isOK());
+    ASSERT_EQ(ErrorCodes::InterruptedDueToReplStateChange, result.getStatus().code());
+
+    // verify that the state document exists
+    ASSERT_OK(serverless::getStateDocument(opCtx.get(), _uuid).getStatus());
+
+    auto fp = std::make_unique<FailPointEnableBlock>("pauseShardSplitAfterBlocking");
+    auto initialTimesEntered = fp->initialTimesEntered();
+
+    stepUp(opCtx.get());
+
+    fp->failPoint()->waitForTimesEntered(initialTimesEntered + 1);
+
+    // verify that the state document exists
+    ASSERT_OK(serverless::getStateDocument(opCtx.get(), _uuid).getStatus());
+    auto donor = ShardSplitDonorService::DonorStateMachine::lookup(
+        opCtx.get(), _service, BSON("_id" << _uuid));
+    ASSERT(donor);
+
+    fp.reset();
+
+    ASSERT_OK((*donor)->decisionFuture().getNoThrow().getStatus());
+
+    (*donor)->tryForget();
+    ASSERT_OK((*donor)->completionFuture().getNoThrow());
+    ASSERT_TRUE((*donor)->isGarbageCollectable());
 }
 
 class ShardSplitPersistenceTest : public ShardSplitDonorServiceTest {
@@ -598,54 +693,6 @@ protected:
     std::unique_ptr<FailPointEnableBlock> _pauseBeforeRecipientCleanupFp;
     FailPoint::EntryCountT _initialTimesEntered;
 };
-
-TEST_F(ShardSplitDonorServiceTest, ResumeAfterStepdownTest) {
-    auto opCtx = makeOperationContext();
-    test::shard_split::ScopedTenantAccessBlocker scopedTenants(_tenantIds, opCtx.get());
-    test::shard_split::reconfigToAddRecipientNodes(
-        getServiceContext(), _recipientTagName, _replSet.getHosts(), _recipientSet.getHosts());
-
-    auto initialFuture = [&]() {
-        FailPointEnableBlock fp("pauseShardSplitAfterBlocking");
-        auto initialTimesEntered = fp.initialTimesEntered();
-
-        std::shared_ptr<ShardSplitDonorService::DonorStateMachine> serviceInstance =
-            ShardSplitDonorService::DonorStateMachine::getOrCreate(
-                opCtx.get(), _service, defaultStateDocument().toBSON());
-        ASSERT(serviceInstance.get());
-
-        fp->waitForTimesEntered(initialTimesEntered + 1);
-        stepDown();
-
-        return serviceInstance->decisionFuture();
-    }();
-
-    auto result = initialFuture.getNoThrow();
-    ASSERT_FALSE(result.isOK());
-    ASSERT_EQ(ErrorCodes::InterruptedDueToReplStateChange, result.getStatus().code());
-
-    ASSERT_OK(serverless::getStateDocument(opCtx.get(), _uuid).getStatus());
-
-    auto fp = std::make_unique<FailPointEnableBlock>("pauseShardSplitAfterBlocking");
-    auto initialTimesEntered = fp->initialTimesEntered();
-
-    stepUp(opCtx.get());
-
-    fp->failPoint()->waitForTimesEntered(initialTimesEntered + 1);
-
-    std::shared_ptr<ShardSplitDonorService::DonorStateMachine> serviceInstance =
-        ShardSplitDonorService::DonorStateMachine::getOrCreate(
-            opCtx.get(), _service, defaultStateDocument().toBSON());
-    ASSERT(serviceInstance.get());
-
-    ASSERT_OK(serverless::getStateDocument(opCtx.get(), _uuid).getStatus());
-
-    fp.reset();
-
-    ASSERT_OK(serviceInstance->decisionFuture().getNoThrow().getStatus());
-
-    serviceInstance->tryForget();
-}
 
 class ShardSplitRecipientCleanupTest : public ShardSplitPersistenceTest {
 public:

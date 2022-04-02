@@ -124,22 +124,5 @@ void PrimaryOnlyServiceMongoDTest::stepDown() {
     _registry->onStepDown();
 }
 
-std::shared_ptr<executor::TaskExecutor> makeTestExecutor() {
-    ThreadPool::Options threadPoolOptions;
-    threadPoolOptions.threadNamePrefix = "PrimaryOnlyServiceTest-";
-    threadPoolOptions.poolName = "PrimaryOnlyServiceTestThreadPool";
-    threadPoolOptions.onCreateThread = [](const std::string& threadName) {
-        Client::initThread(threadName.c_str());
-    };
-
-    auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
-    auto executor = std::make_shared<executor::ThreadPoolTaskExecutor>(
-        std::make_unique<ThreadPool>(threadPoolOptions),
-        executor::makeNetworkInterface(
-            "PrimaryOnlyServiceTestNetwork", nullptr, std::move(hookList)));
-    executor->startup();
-    return executor;
-}
-
 }  // namespace repl
 }  // namespace mongo

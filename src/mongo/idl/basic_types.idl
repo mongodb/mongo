@@ -225,6 +225,13 @@ types:
         serializer: mongo::NamespaceString::toString
         deserializer: mongo::NamespaceString
 
+    connection_string:
+        bson_serialization_type: string
+        description: "A MongoDB ConnectionString"
+        cpp_type: "mongo::ConnectionString"
+        serializer: mongo::ConnectionString::toString
+        deserializer: mongo::ConnectionString::deserialize
+
     fcv_string:
         bson_serialization_type: string
         description: >-

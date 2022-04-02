@@ -33,14 +33,6 @@ global:
 imports:
     - "mongo/idl/basic_types.idl"
 
-types:
-    connectionstring:
-        bson_serialization_type: string
-        description: "A MongoDB ConnectionString"
-        cpp_type: "mongo::ConnectionString"
-        serializer: mongo::ConnectionString::toString
-        deserializer: mongo::ConnectionString::deserialize
-
 structs:
     ShardIdentity:
         description: "Contains all the information needed to identify a shard and lookup the shard identity document from storage"
@@ -53,7 +45,7 @@ structs:
                 type: objectid
             configsvrConnectionString:
                 description: "Connection string to the config server"
-                type: connectionstring
+                type: connection_string
 
 commands:
     _addShard:
