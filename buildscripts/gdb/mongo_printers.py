@@ -37,22 +37,34 @@ def get_unique_ptr(obj):
 class StatusPrinter(object):
     """Pretty-printer for mongo::Status."""
 
+    @staticmethod
+    def extract_error(val):
+        """Extract the error object (if any) from a Status/StatusWith."""
+        error = val['_error']
+        if 'px' in error.type.iterkeys():
+            return error['px']
+        return error
+
+    @staticmethod
+    def generate_error_details(error):
+        """Generate a (code,reason) tuple from a Status/StatusWith error object."""
+        info = error.dereference()
+        code = info['code']
+        # Remove the mongo::ErrorCodes:: prefix. Does nothing if not a real ErrorCode.
+        code = str(code).split('::')[-1]
+
+        return (code, info['reason'])
+
     def __init__(self, val):
         """Initialize StatusPrinter."""
         self.val = val
 
     def to_string(self):
         """Return status for printing."""
-        if not self.val['_error']:
+        error = StatusPrinter.extract_error(self.val)
+        if not error:
             return 'Status::OK()'
-
-        code = self.val['_error']['code']
-        # Remove the mongo::ErrorCodes:: prefix. Does nothing if not a real ErrorCode.
-        code = str(code).split('::')[-1]
-
-        info = self.val['_error'].dereference()
-        reason = info['reason']
-        return 'Status(%s, %s)' % (code, reason)
+        return 'Status(%s, %s)' % StatusPrinter.generate_error_details(error)
 
 
 class StatusWithPrinter(object):
@@ -64,17 +76,10 @@ class StatusWithPrinter(object):
 
     def to_string(self):
         """Return status for printing."""
-        if not self.val['_status']['_error']:
+        error = StatusPrinter.extract_error(self.val['_status'])
+        if not error:
             return 'StatusWith(OK, %s)' % (self.val['_t'])
-
-        code = self.val['_status']['_error']['code']
-
-        # Remove the mongo::ErrorCodes:: prefix. Does nothing if not a real ErrorCode.
-        code = str(code).split('::')[-1]
-
-        info = self.val['_status']['_error'].dereference()
-        reason = info['reason']
-        return 'StatusWith(%s, %s)' % (code, reason)
+        return 'StatusWith(%s, %s)' % StatusPrinter.generate_error_details(error)
 
 
 class StringDataPrinter(object):
