@@ -56,10 +56,15 @@
 #set mvc_doc = yaml.safe_load(mvc_file)
 #set mvc_fcvs = mvc_doc['featureCompatibilityVersions']
 #set mvc_majors = mvc_doc['longTermSupportReleases']
+#set mvc_lower_bound_override = mvc_doc.get('generateFCVLowerBoundOverride')
 ##
 ## Transform strings to versions.
 #set global fcvs = list(map(Version, mvc_fcvs))
 #set majors = list(map(Version, mvc_majors))
+#set global lower_bound_override = None
+#if mvc_lower_bound_override is not None:
+  #set global lower_bound_override = Version(mvc_lower_bound_override)
+#end if
 
 #set global latest = Version(re.match(r'^[0-9]+\.[0-9]+', $mongo_version).group(0))
 ## Highest release less than latest.
@@ -84,6 +89,12 @@ namespace mongo::multiversion {
 fcvs = self.getVar('fcvs')
 last_lts, last_continuous, latest = self.getVar('last_lts'), self.getVar('last_continuous'), self.getVar('latest')
 generic_fcvs = self.getVar('generic_fcvs')
+lower_bound_override = self.getVar('lower_bound_override')
+
+# Will also generate an older set of constants if requested in releases.yml.
+lts_cutoff = last_lts
+if lower_bound_override is not None:
+    lts_cutoff = lower_bound_override
 
 # The 'latest' version must be one of the versions listed in releases.yml.
 assert(latest in fcvs)
@@ -100,7 +111,7 @@ fcv_list = []
 # A list of (FCV enum name, FCV string) tuples for all the transitioning FCV values.
 transition_fcvs = []
 
-for fcv_x in fcvs[bisect_left(fcvs, last_lts):bisect_right(fcvs, latest)]:
+for fcv_x in fcvs[bisect_left(fcvs, lts_cutoff):bisect_right(fcvs, latest)]:
     fcv_list.append((self.fcv_cpp_name(fcv_x), self.dotted(fcv_x)))
     if fcv_x in generic_fcvs.values():
         up_transitions = []

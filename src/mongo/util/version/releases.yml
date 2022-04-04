@@ -23,3 +23,10 @@ longTermSupportReleases:
   - "4.2"
   - "4.4"
   - "5.0"
+
+# Optional.
+# Using this special override extends FCV constant generation down to the previous value of
+# lastLTS. This is intended to ease the transition to a new lastLTS by extending the lifetime
+# of those older constants, so that they can be removed at a more convenient time.
+# For example, we can set this to "5.0" when releasing "6.0".
+# generateFCVLowerBoundOverride: "4.4"

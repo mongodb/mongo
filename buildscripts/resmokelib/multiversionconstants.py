@@ -111,6 +111,7 @@ def calculate_fcv_constants():
     fcvs = list(map(Version, fcvs))
     lts = releases_yml['longTermSupportReleases']
     lts = list(map(Version, lts))
+    lower_bound_override = releases_yml.get('generateFCVLowerBoundOverride')
 
     mongo_version_yml_file.close()
     releases_yml_file.close()
@@ -121,8 +122,13 @@ def calculate_fcv_constants():
     # Highest LTS release less than latest.
     last_lts = lts[bisect_left(lts, latest) - 1]
 
-    # All FCVs greater than last LTS, up to latest.
-    requires_fcv_tag_list = fcvs[bisect_right(fcvs, last_lts):bisect_right(fcvs, latest)]
+    # Normally, this list includes all FCVs greater than last LTS, up to latest.
+    # However, if we have 'generateFCVLowerBoundOverride' set in releases.yml, we will
+    # extend the lower bound to also include the prevous value of lastLTS.
+    lts_cutoff = last_lts
+    if lower_bound_override is not None:
+        lts_cutoff = Version(lower_bound_override)
+    requires_fcv_tag_list = fcvs[bisect_right(fcvs, lts_cutoff):bisect_right(fcvs, latest)]
 
     # All FCVs less than latest.
     fcvs_less_than_latest = fcvs[:bisect_left(fcvs, latest)]
@@ -165,7 +171,7 @@ LAST_LTS_MONGOS_BINARY = "mongos-" + LAST_LTS_BIN_VERSION
 
 REQUIRES_FCV_TAG_LATEST = tag_str(fcv_constants.latest)
 
-# Generate tags for all FCVS in (lastLTS, latest].
+# Generate tags for all FCVS in (lastLTS, latest], or (lowerBoundOverride, latest] if requested.
 # All multiversion tests should be run with these tags excluded.
 REQUIRES_FCV_TAG = ",".join([tag_str(fcv) for fcv in fcv_constants.requires_fcv_tag_list])
 
