@@ -635,6 +635,12 @@ private:
 
     void _enqueueRequest(WithLock, RequestData&& request);
 
+    /**
+     * Clears any persisted state and releases any distributed lock associated to the list of
+     * requests specified.
+     * This method must not be called while holding any mutex (this could cause deadlocks if a
+     * stepdown request is also being served).
+     */
     void _performDeferredCleanup(
         OperationContext* opCtx,
         const stdx::unordered_map<UUID, RequestData, UUID::Hash>& requestsHoldingResources);

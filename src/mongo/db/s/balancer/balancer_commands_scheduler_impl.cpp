@@ -561,15 +561,17 @@ void BalancerCommandsSchedulerImpl::_workerThread() {
         }
     }
     // Wait for each outstanding command to complete, clean out its resources and leave.
+    stdx::unordered_map<UUID, RequestData, UUID::Hash> requestsToClean;
     {
         stdx::unique_lock<Latch> ul(_mutex);
         _stateUpdatedCV.wait(
             ul, [this] { return (_requests.size() == _recentlyCompletedRequestIds.size()); });
-        auto opCtxHolder = cc().makeOperationContext();
-        _performDeferredCleanup(opCtxHolder.get(), _requests);
+        requestsToClean.swap(_requests);
         _requests.clear();
         _recentlyCompletedRequestIds.clear();
     }
+    auto opCtxHolder = cc().makeOperationContext();
+    _performDeferredCleanup(opCtxHolder.get(), requestsToClean);
 }
 
 
