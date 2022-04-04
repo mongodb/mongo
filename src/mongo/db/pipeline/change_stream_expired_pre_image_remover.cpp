@@ -346,8 +346,6 @@ void deleteExpiredChangeStreamPreImages(Client* client, Date_t currentTimeForTim
             ->getEarliestOplogTimestamp(opCtx.get());
 
     const bool isBatchedRemoval = gBatchedExpiredChangeStreamPreImageRemoval.load();
-    const bool isMultiDeletesFeatureFlagEnabled =
-        feature_flags::gBatchMultiDeletes.isEnabled(serverGlobalParams.featureCompatibility);
     size_t numberOfRemovals = 0;
 
     ChangeStreamExpiredPreImageIterator expiredPreImages(
@@ -367,7 +365,7 @@ void deleteExpiredChangeStreamPreImages(Client* client, Date_t currentTimeForTim
                 params->isMulti = true;
 
                 boost::optional<std::unique_ptr<BatchedDeleteStageBatchParams>> batchParams;
-                if (isMultiDeletesFeatureFlagEnabled && isBatchedRemoval) {
+                if (isBatchedRemoval) {
                     batchParams = std::make_unique<BatchedDeleteStageBatchParams>();
                 }
 
