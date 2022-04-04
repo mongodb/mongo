@@ -1289,17 +1289,20 @@ WiredTigerKVEngine::beginNonBlockingBackup(OperationContext* opCtx,
     invariant(_wtBackup.logFilePathsSeenByGetNextBatch.empty());
     invariant(_wtBackup.identToNamespaceAndUUIDMap.empty());
 
-    DurableCatalog* catalog = DurableCatalog::get(opCtx);
-    std::vector<DurableCatalog::Entry> catalogEntries = catalog->getAllCatalogEntries(opCtx);
-    for (const DurableCatalog::Entry& e : catalogEntries) {
-        // Populate the collection ident with its namespace and UUID.
-        UUID uuid = catalog->getMetaData(opCtx, e.catalogId)->options.uuid.get();
-        _wtBackup.identToNamespaceAndUUIDMap.emplace(e.ident, std::make_pair(e.nss, uuid));
+    {
+        Lock::GlobalLock lk(opCtx, MODE_IS);
+        DurableCatalog* catalog = DurableCatalog::get(opCtx);
+        std::vector<DurableCatalog::Entry> catalogEntries = catalog->getAllCatalogEntries(opCtx);
+        for (const DurableCatalog::Entry& e : catalogEntries) {
+            // Populate the collection ident with its namespace and UUID.
+            UUID uuid = catalog->getMetaData(opCtx, e.catalogId)->options.uuid.get();
+            _wtBackup.identToNamespaceAndUUIDMap.emplace(e.ident, std::make_pair(e.nss, uuid));
 
-        // Populate the collection's index idents with the collection's namespace and UUID.
-        std::vector<std::string> idxIdents = catalog->getIndexIdents(opCtx, e.catalogId);
-        for (const std::string& idxIdent : idxIdents) {
-            _wtBackup.identToNamespaceAndUUIDMap.emplace(idxIdent, std::make_pair(e.nss, uuid));
+            // Populate the collection's index idents with the collection's namespace and UUID.
+            std::vector<std::string> idxIdents = catalog->getIndexIdents(opCtx, e.catalogId);
+            for (const std::string& idxIdent : idxIdents) {
+                _wtBackup.identToNamespaceAndUUIDMap.emplace(idxIdent, std::make_pair(e.nss, uuid));
+            }
         }
     }
 
