@@ -78,12 +78,6 @@ const std::set<std::string> kApiVersions1 = {"1"};
 namespace {
 
 const char kWriteConcernField[] = "writeConcern";
-const WriteConcernOptions kMajorityWriteConcern(
-    WriteConcernOptions::kMajority,
-    // Note: Even though we're setting UNSET here, kMajority implies JOURNAL if journaling is
-    // supported by the mongod.
-    WriteConcernOptions::SyncMode::UNSET,
-    WriteConcernOptions::kWriteConcernTimeoutUserCommand);
 
 // Returns true if found to be authorized, false if undecided. Throws if unauthorized.
 bool checkAuthorizationImplPreParse(OperationContext* opCtx,
@@ -155,6 +149,13 @@ void CommandInvocationHooks::set(ServiceContext* serviceContext,
 
 //////////////////////////////////////////////////////////////
 // CommandHelpers
+
+const WriteConcernOptions CommandHelpers::kMajorityWriteConcern(
+    WriteConcernOptions::kMajority,
+    // Note: Even though we're setting UNSET here, kMajority implies JOURNAL if journaling is
+    // supported by the mongod.
+    WriteConcernOptions::SyncMode::UNSET,
+    WriteConcernOptions::kWriteConcernTimeoutUserCommand);
 
 BSONObj CommandHelpers::runCommandDirectly(OperationContext* opCtx, const OpMsgRequest& request) {
     auto command = globalCommandRegistry()->findCommand(request.getCommandName());

@@ -36,6 +36,7 @@
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/error_labels.h"
 #include "mongo/db/internal_session_pool.h"
@@ -131,17 +132,19 @@ std::string errorHandlingStepToString(Transaction::ErrorHandlingStep nextStep) {
     MONGO_UNREACHABLE;
 }
 
-std::string transactionStateToString(Transaction::TransactionState txnState) {
+std::string Transaction::_transactionStateToString(TransactionState txnState) const {
     switch (txnState) {
-        case Transaction::TransactionState::kInit:
+        case TransactionState::kInit:
             return "init";
-        case Transaction::TransactionState::kStarted:
+        case TransactionState::kStarted:
             return "started";
-        case Transaction::TransactionState::kStartedCommit:
+        case TransactionState::kStartedCommit:
             return "started commit";
-        case Transaction::TransactionState::kStartedAbort:
+        case TransactionState::kRetryingCommit:
+            return "retrying commit";
+        case TransactionState::kStartedAbort:
             return "started abort";
-        case Transaction::TransactionState::kDone:
+        case TransactionState::kDone:
             return "done";
     }
     MONGO_UNREACHABLE;
@@ -383,14 +386,20 @@ SemiFuture<BSONObj> Transaction::_commitOrAbort(StringData dbName, StringData cm
             return BSON("ok" << 1);
         }
         uassert(5875902,
-                "Internal transaction not in progress",
+                "Internal transaction not in progress, state: {}"_format(
+                    _transactionStateToString(_state)),
                 _state == TransactionState::kStarted ||
-                    // Allows the best effort abort to run.
-                    (_state == TransactionState::kStartedCommit &&
-                     cmdName == AbortTransaction::kCommandName));
+                    // Allows retrying commit and the best effort abort after failing to commit.
+                    (_isInCommit() &&
+                     (cmdName == AbortTransaction::kCommandName ||
+                      cmdName == CommitTransaction::kCommandName)));
 
         if (cmdName == CommitTransaction::kCommandName) {
-            _state = TransactionState::kStartedCommit;
+            if (!_isInCommit()) {
+                // Only transition if we aren't already retrying commit.
+                _state = TransactionState::kStartedCommit;
+            }
+
             if (_execContext == ExecutionContext::kClientTransaction) {
                 // Don't commit if we're nested in a client's transaction.
                 return SemiFuture<BSONObj>::makeReady(BSON("ok" << 1));
@@ -405,7 +414,15 @@ SemiFuture<BSONObj> Transaction::_commitOrAbort(StringData dbName, StringData cm
 
     BSONObjBuilder cmdBuilder;
     cmdBuilder.append(cmdName, 1);
-    cmdBuilder.append(WriteConcernOptions::kWriteConcernField, _writeConcern);
+    if (_state == TransactionState::kRetryingCommit) {
+        // Per the drivers transaction spec, retrying commitTransaction uses majority write concern
+        // to avoid double applying a transaction due to a transient NoSuchTransaction error
+        // response.
+        cmdBuilder.append(WriteConcernOptions::kWriteConcernField,
+                          CommandHelpers::kMajorityWriteConcern.toBSON());
+    } else {
+        cmdBuilder.append(WriteConcernOptions::kWriteConcernField, _writeConcern);
+    }
     auto cmdObj = cmdBuilder.obj();
 
     return ExecutorFuture<void>(_executor)
@@ -462,8 +479,6 @@ Transaction::ErrorHandlingStep Transaction::handleError(const StatusWith<CommitR
         return ErrorHandlingStep::kRetryTransaction;
     }
 
-    auto hasStartedCommit = _state == TransactionState::kStartedCommit;
-
     const auto& clientStatus = swResult.getStatus();
     if (!clientStatus.isOK()) {
         if (ErrorCodes::isNetworkError(clientStatus)) {
@@ -471,7 +486,7 @@ Transaction::ErrorHandlingStep Transaction::handleError(const StatusWith<CommitR
             // entire transaction. If there is a network error after a commit is sent, we can retry
             // the commit command to either recommit if the operation failed or get the result of
             // the successful commit.
-            if (hasStartedCommit) {
+            if (_isInCommit()) {
                 return ErrorHandlingStep::kRetryCommit;
             }
             return ErrorHandlingStep::kRetryTransaction;
@@ -479,7 +494,7 @@ Transaction::ErrorHandlingStep Transaction::handleError(const StatusWith<CommitR
         return ErrorHandlingStep::kAbortAndDoNotRetry;
     }
 
-    if (hasStartedCommit) {
+    if (_isInCommit()) {
         const auto& commitStatus = swResult.getValue().cmdStatus;
         const auto& commitWCStatus = swResult.getValue().wcError.toStatus();
 
@@ -579,9 +594,9 @@ void Transaction::primeForTransactionRetry() {
 
 void Transaction::primeForCommitRetry() {
     stdx::lock_guard<Latch> lg(_mutex);
-    invariant(_state == TransactionState::kStartedCommit);
+    invariant(_isInCommit());
     _latestResponseHasTransientTransactionErrorLabel = false;
-    _state = TransactionState::kStarted;
+    _state = TransactionState::kRetryingCommit;
 }
 
 BSONObj Transaction::reportStateForLog() const {
@@ -592,7 +607,7 @@ BSONObj Transaction::reportStateForLog() const {
 BSONObj Transaction::_reportStateForLog(WithLock) const {
     return BSON("execContext" << execContextToString(_execContext) << "sessionInfo"
                               << _sessionInfo.toBSON() << "state"
-                              << transactionStateToString(_state));
+                              << _transactionStateToString(_state));
 }
 
 void Transaction::_setSessionInfo(WithLock,
