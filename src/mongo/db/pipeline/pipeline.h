@@ -285,6 +285,13 @@ public:
     }
 
     /**
+     * Stitch together the source pointers by calling setSource() for each source in 'container'.
+     * This function must be called any time the order of stages within the container changes, e.g.
+     * in optimizeContainer().
+     */
+    static void stitch(SourceContainer* container);
+
+    /**
      * Removes and returns the first stage of the pipeline. Returns nullptr if the pipeline is
      * empty.
      */

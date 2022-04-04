@@ -96,6 +96,10 @@ private:
 
     SequentialDocumentCache* _cache;
 
+    // This flag is set to prevent the cache stage from immediately serving from the cache after it
+    // has exhausted input from its source for the first time.
+    bool _cacheIsEOF = false;
+
     bool _hasOptimizedPos = false;
 };
 

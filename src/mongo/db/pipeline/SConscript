@@ -516,6 +516,7 @@ env.CppUnitTest(
     target='pipeline_test',
     source=[
         'dependencies_test.cpp',
+        'document_source_sequential_document_cache_test.cpp',
         'pipeline_test.cpp',
     ],
     LIBDEPS=[

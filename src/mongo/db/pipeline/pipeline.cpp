@@ -476,6 +476,23 @@ void Pipeline::stitch() {
     }
 }
 
+void Pipeline::stitch(SourceContainer* container) {
+    if (container->empty()) {
+        return;
+    }
+
+    // Chain together all the stages.
+    DocumentSource* prevSource = container->front().get();
+    prevSource->setSource(nullptr);
+    for (Pipeline::SourceContainer::iterator iter(++container->begin()), listEnd(container->end());
+         iter != listEnd;
+         ++iter) {
+        intrusive_ptr<DocumentSource> pTemp(*iter);
+        pTemp->setSource(prevSource);
+        prevSource = pTemp.get();
+    }
+}
+
 boost::optional<Document> Pipeline::getNext() {
     invariant(!_sources.empty());
     auto nextResult = _sources.back()->getNext();

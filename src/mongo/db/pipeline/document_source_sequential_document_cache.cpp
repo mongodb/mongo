@@ -54,9 +54,17 @@ DocumentSource::GetNextResult DocumentSourceSequentialDocumentCache::getNext() {
 
     pExpCtx->checkForInterrupt();
 
+    if (_cacheIsEOF) {
+        return GetNextResult::makeEOF();
+    }
+
     if (_cache->isServing()) {
         auto nextDoc = _cache->getNext();
-        return (nextDoc ? std::move(*nextDoc) : GetNextResult::makeEOF());
+        if (nextDoc) {
+            return std::move(*nextDoc);
+        }
+        _cacheIsEOF = true;
+        return GetNextResult::makeEOF();
     }
 
     auto nextResult = pSource->getNext();
@@ -64,6 +72,7 @@ DocumentSource::GetNextResult DocumentSourceSequentialDocumentCache::getNext() {
     if (!_cache->isAbandoned()) {
         if (nextResult.isEOF()) {
             _cache->freeze();
+            _cacheIsEOF = true;
         } else {
             _cache->add(nextResult.getDocument());
         }
@@ -111,11 +120,14 @@ Pipeline::SourceContainer::iterator DocumentSourceSequentialDocumentCache::doOpt
     DepsTracker deps(DepsTracker::kAllMetadataAvailable);
 
     // Iterate through the pipeline stages until we find one which references an external variable.
+    DocumentSource* lastPtr = nullptr;
     for (; prefixSplit != container->end(); ++prefixSplit) {
         if (((*prefixSplit)->getDependencies(&deps) == DepsTracker::State::NOT_SUPPORTED) ||
             deps.hasVariableReferenceTo(varIDs)) {
             break;
         }
+
+        lastPtr = prefixSplit->get();
     }
 
     // The 'prefixSplit' iterator is now pointing to the first stage of the correlated suffix. If
@@ -128,6 +140,9 @@ Pipeline::SourceContainer::iterator DocumentSourceSequentialDocumentCache::doOpt
 
     // If the cache has been populated and is serving results, remove the non-correlated prefix.
     if (_cache->isServing()) {
+        // Need to dispose last stage to be removed.
+        Pipeline::stitch(container);
+        lastPtr->dispose();
         container->erase(container->begin(), prefixSplit);
     }
 
