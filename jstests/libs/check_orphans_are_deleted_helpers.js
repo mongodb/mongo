@@ -61,6 +61,22 @@ var CheckOrphansAreDeletedHelpers = (function() {
                     return rangeDeletions.length === 0;
                 },
                 () => {
+                    try {
+                        const adminDB = shardConn.getDB('admin');
+                        const idleCursors =
+                            adminDB
+                                .aggregate([
+                                    {$currentOp: {idleCursors: true, allUsers: true}},
+                                    {$match: {type: 'idleCursor', ns: ns}}
+                                ])
+                                .toArray();
+                        print("Idle cursors on " + ns + " @ " + shardId + ": " +
+                              tojson(idleCursors));
+                    } catch (e) {
+                        print("Failed to get idle cursors for " + ns + " @ " + shardId + ": " +
+                              tojson(e));
+                    }
+
                     return 'timed out waiting for rangeDeletions on ' + ns + ' to be empty @ ' +
                         shardId + ', last known contents: ' + tojson(rangeDeletions);
                 });
