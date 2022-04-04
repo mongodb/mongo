@@ -139,8 +139,8 @@ void upsertNullDocument(FLEQueryInterface* queryImpl,
     if (hasNullDoc) {
         // update the null doc with a replacement modification
         write_ops::UpdateOpEntry updateEntry;
-        updateEntry.setMulti("false");
-        updateEntry.setUpsert("false");
+        updateEntry.setMulti(false);
+        updateEntry.setUpsert(false);
         updateEntry.setQ(newNullDoc.getField("_id").wrap());
         updateEntry.setU(mongo::write_ops::UpdateModification(
             newNullDoc, write_ops::UpdateModification::ClassicTag(), true));
