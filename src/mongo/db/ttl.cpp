@@ -53,6 +53,7 @@
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
@@ -287,6 +288,8 @@ private:
 
         uassertStatusOK(userAllowedWriteNS(opCtx, nss));
 
+        // Attach IGNORED shard version to skip orphans (the range deleter will clear them up)
+        auto scopedRole = ScopedSetShardRole(opCtx, nss, ChunkVersion::IGNORED(), boost::none);
         AutoGetCollection coll(opCtx, nss, MODE_IX);
         // The collection with `uuid` might be renamed before the lock and the wrong namespace would
         // be locked and looked up so we double check here.
