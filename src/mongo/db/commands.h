@@ -126,6 +126,8 @@ public:
 // Would be a namespace, but want to keep it closed rather than open.
 // Some of these may move to the BasicCommand shim if they are only for legacy implementations.
 struct CommandHelpers {
+    static const WriteConcernOptions kMajorityWriteConcern;
+
     // The type of the first field in 'cmdObj' must be mongo::String. The first field is
     // interpreted as a collection name.
     static std::string parseNsFullyQualified(const BSONObj& cmdObj);

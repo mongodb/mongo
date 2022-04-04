@@ -301,14 +301,6 @@ public:
         kRetryCommit,
     };
 
-    enum class TransactionState {
-        kInit,
-        kStarted,
-        kStartedCommit,
-        kStartedAbort,
-        kDone,
-    };
-
     Transaction(const Transaction&) = delete;
     Transaction operator=(const Transaction&) = delete;
     ~Transaction();
@@ -406,6 +398,21 @@ public:
     LogicalTime getOperationTime() const;
 
 private:
+    enum class TransactionState {
+        kInit,
+        kStarted,
+        kStartedCommit,
+        kRetryingCommit,
+        kStartedAbort,
+        kDone,
+    };
+    std::string _transactionStateToString(TransactionState txnState) const;
+
+    bool _isInCommit() const {
+        return _state == TransactionState::kStartedCommit ||
+            _state == TransactionState::kRetryingCommit;
+    }
+
     std::unique_ptr<TxnMetadataHooks> _makeTxnMetadataHooks() {
         return std::make_unique<TxnMetadataHooks>(*this);
     }
