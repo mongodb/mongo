@@ -224,16 +224,11 @@ std::unique_ptr<Pipeline, PipelineDeleter> processPipeline(
     OperationContext* opCtx,
     NamespaceString nss,
     const EncryptionInformation& encryptInfo,
-    std::unique_ptr<Pipeline, PipelineDeleter> toRewrite) {
+    std::unique_ptr<Pipeline, PipelineDeleter> toRewrite,
+    GetTxnCallback txn) {
 
     auto sharedBlock = std::make_shared<PipelineRewrite>(nss, encryptInfo, std::move(toRewrite));
-    doFLERewriteInTxn(opCtx, sharedBlock, [](auto* opCtx) {
-        // TODO: SERVER-63312 pass in the right transaction callback for mongod.
-        return std::make_shared<txn_api::TransactionWithRetries>(
-            opCtx,
-            Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
-            TransactionRouterResourceYielder::makeForLocalHandoff());
-    });
+    doFLERewriteInTxn(opCtx, sharedBlock, txn);
 
     return sharedBlock->getPipeline();
 }

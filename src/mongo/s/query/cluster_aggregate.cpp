@@ -365,10 +365,10 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         // support querying against encrypted fields.
         if (shouldDoFLERewrite) {
             // After this rewriting, the encryption info does not need to be kept around.
-            pipeline = fle::processPipeline(opCtx,
-                                            namespaces.executionNss,
-                                            request.getEncryptionInformation().get(),
-                                            std::move(pipeline));
+            pipeline = processFLEPipelineS(opCtx,
+                                           namespaces.executionNss,
+                                           request.getEncryptionInformation().get(),
+                                           std::move(pipeline));
             request.setEncryptionInformation(boost::none);
         }
 

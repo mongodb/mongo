@@ -62,7 +62,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> processPipeline(
     OperationContext* opCtx,
     NamespaceString nss,
     const EncryptionInformation& encryptInfo,
-    std::unique_ptr<Pipeline, PipelineDeleter> toRewrite);
+    std::unique_ptr<Pipeline, PipelineDeleter> toRewrite,
+    GetTxnCallback txn);
 
 /**
  * Rewrite a filter MatchExpression with FLE Find Payloads into a disjunction over the tag array

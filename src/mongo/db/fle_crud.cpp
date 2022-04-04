@@ -1248,4 +1248,12 @@ void processFLEFindS(OperationContext* opCtx, FindCommandRequest* findCommand) {
     fle::processFindCommand(opCtx, findCommand, &getTransactionWithRetriesForMongoS);
 }
 
+std::unique_ptr<Pipeline, PipelineDeleter> processFLEPipelineS(
+    OperationContext* opCtx,
+    NamespaceString nss,
+    const EncryptionInformation& encryptInfo,
+    std::unique_ptr<Pipeline, PipelineDeleter> toRewrite) {
+    return fle::processPipeline(
+        opCtx, nss, encryptInfo, std::move(toRewrite), &getTransactionWithRetriesForMongoS);
+}
 }  // namespace mongo

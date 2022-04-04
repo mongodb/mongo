@@ -48,6 +48,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/fle_crud.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
@@ -644,7 +645,7 @@ std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createLegacyEx
 
 Status runAggregate(OperationContext* opCtx,
                     const NamespaceString& nss,
-                    const AggregateCommandRequest& request,
+                    AggregateCommandRequest& request,
                     const BSONObj& cmdObj,
                     const PrivilegeVector& privileges,
                     rpc::ReplyBuilderInterface* result) {
@@ -653,7 +654,7 @@ Status runAggregate(OperationContext* opCtx,
 
 Status runAggregate(OperationContext* opCtx,
                     const NamespaceString& origNss,
-                    const AggregateCommandRequest& request,
+                    AggregateCommandRequest& request,
                     const LiteParsedPipeline& liteParsedPipeline,
                     const BSONObj& cmdObj,
                     const PrivilegeVector& privileges,
@@ -913,6 +914,15 @@ Status runAggregate(OperationContext* opCtx,
             if (!pipelineCollationStatus.isOK()) {
                 return pipelineCollationStatus;
             }
+        }
+
+        // If the aggregate command supports encrypted collections, do rewrites of the pipeline to
+        // support querying against encrypted fields.
+        if (shouldDoFLERewrite(request)) {
+            // After this rewriting, the encryption info does not need to be kept around.
+            pipeline = processFLEPipelineD(
+                opCtx, nss, request.getEncryptionInformation().get(), std::move(pipeline));
+            request.setEncryptionInformation(boost::none);
         }
 
         pipeline->optimizePipeline();

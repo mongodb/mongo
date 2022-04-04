@@ -39,6 +39,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops_gen.h"
+#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/transaction_api.h"
 #include "mongo/s/write_ops/batch_write_exec.h"
 #include "mongo/s/write_ops/batched_command_response.h"
@@ -124,6 +125,24 @@ void processFLEFindS(OperationContext* opCtx, FindCommandRequest* findCommand);
  * Process a find command from a replica set.
  */
 void processFLEFindD(OperationContext* opCtx, FindCommandRequest* findCommand);
+
+/**
+ * Process a pipeline from mongos.
+ */
+std::unique_ptr<Pipeline, PipelineDeleter> processFLEPipelineS(
+    OperationContext* opCtx,
+    NamespaceString nss,
+    const EncryptionInformation& encryptInfo,
+    std::unique_ptr<Pipeline, PipelineDeleter> toRewrite);
+
+/**
+ * Process a pipeline from a replica set.
+ */
+std::unique_ptr<Pipeline, PipelineDeleter> processFLEPipelineD(
+    OperationContext* opCtx,
+    NamespaceString nss,
+    const EncryptionInformation& encryptInfo,
+    std::unique_ptr<Pipeline, PipelineDeleter> toRewrite);
 
 /**
  * Helper function to determine if an IDL object with encryption information should be rewritten.

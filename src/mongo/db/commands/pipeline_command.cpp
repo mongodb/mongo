@@ -101,7 +101,7 @@ public:
     public:
         Invocation(Command* cmd,
                    const OpMsgRequest& request,
-                   const AggregateCommandRequest aggregationRequest,
+                   AggregateCommandRequest aggregationRequest,
                    PrivilegeVector privileges)
             : CommandInvocation(cmd),
               _request(request),
@@ -182,7 +182,7 @@ public:
 
         const OpMsgRequest& _request;
         const std::string _dbName;
-        const AggregateCommandRequest _aggregationRequest;
+        AggregateCommandRequest _aggregationRequest;
         const LiteParsedPipeline _liteParsedPipeline;
         const PrivilegeVector _privileges;
     };

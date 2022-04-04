@@ -39,6 +39,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/crypto/fle_crypto.h"
+#include "mongo/db/fle_crud.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/ops/write_ops_parsers.h"
@@ -236,4 +237,12 @@ void processFLEFindD(OperationContext* opCtx, FindCommandRequest* findCommand) {
     fle::processFindCommand(opCtx, findCommand, &getTransactionWithRetriesForMongoD);
 }
 
+std::unique_ptr<Pipeline, PipelineDeleter> processFLEPipelineD(
+    OperationContext* opCtx,
+    NamespaceString nss,
+    const EncryptionInformation& encryptInfo,
+    std::unique_ptr<Pipeline, PipelineDeleter> toRewrite) {
+    return fle::processPipeline(
+        opCtx, nss, encryptInfo, std::move(toRewrite), &getTransactionWithRetriesForMongoD);
+}
 }  // namespace mongo

@@ -869,6 +869,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/crypto/encrypted_field_config',
         '$BUILD_DIR/mongo/db/ops/write_ops_parsers',
+        '$BUILD_DIR/mongo/db/pipeline/pipeline',
         'transaction_api',
     ],
     LIBDEPS_PRIVATE=[
