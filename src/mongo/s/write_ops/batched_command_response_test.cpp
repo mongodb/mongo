@@ -78,8 +78,8 @@ TEST(BatchedCommandResponseTest, StaleErrorAsStaleShardVersionCompatibility) {
     staleInfo.serialize(&builder);
 
     BSONArray writeErrorsArray(
-        BSON_ARRAY(BSON("index" << 0 << "code" << ErrorCodes::StaleShardVersion << "errmsg"
-                                << "StaleShardVersion error"
+        BSON_ARRAY(BSON("index" << 0 << "code" << ErrorCodes::OBSOLETE_StaleShardVersion << "errmsg"
+                                << "OBSOLETE_StaleShardVersion error"
                                 << "errInfo" << builder.obj())
                    << BSON("index" << 1 << "code" << ErrorCodes::InvalidNamespace << "errmsg"
                                    << "index 1 failed too")));

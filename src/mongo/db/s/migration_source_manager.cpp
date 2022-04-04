@@ -273,7 +273,7 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
                           << ChunkRange(_args.getMinKey(), _args.getMaxKey()).toString()
                           << " . The closest owned chunk is "
                           << ChunkRange(existingChunk.getMin(), existingChunk.getMax()).toString(),
-            collectionMetadata.checkRangeIsValid(_args.getMinKey(), _args.getMaxKey()).isOK());
+            existingChunk.getRange().covers(ChunkRange(_args.getMinKey(), _args.getMaxKey())));
 
     _collectionEpoch = collectionVersion.epoch();
     _collectionUUID = collectionUUID;

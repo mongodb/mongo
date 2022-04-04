@@ -50,8 +50,6 @@ const Status kShardNotFoundStatus{ErrorCodes::ShardNotFound, "dummy"};
 const Status kError1Status{ErrorCodes::HostUnreachable, "dummy"};
 const Status kError2Status{ErrorCodes::HostUnreachable, "dummy"};
 
-const Status kStaleConfigErrorStatus{ErrorCodes::StaleShardVersion, "dummy"};
-
 const Status kWriteConcernError1Status{ErrorCodes::WriteConcernFailed, "dummy"};
 const Status kWriteConcernError2Status{ErrorCodes::UnsatisfiableWriteConcern, "dummy"};
 
@@ -194,6 +192,17 @@ protected:
     const ShardId kShard5{"s5"};
 
     const std::vector<ShardId> kShardIdList{kShard1, kShard2, kShard3, kShard4, kShard5};
+
+    const Status kStaleConfigErrorStatus{[] {
+                                             OID epoch{OID::gen()};
+                                             Timestamp timestamp{1, 0};
+                                             return StaleConfigInfo(
+                                                 NamespaceString("Foo.Bar"),
+                                                 ChunkVersion(1, 0, epoch, timestamp),
+                                                 boost::none,
+                                                 ShardId{"dummy"});
+                                         }(),
+                                         "dummy"};
 
 private:
     static void _assertShardIdsMatch(const std::set<ShardId>& expectedShardIds,

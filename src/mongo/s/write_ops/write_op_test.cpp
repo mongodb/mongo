@@ -226,7 +226,12 @@ TEST_F(WriteOpTest, TargetMultiAllShardsAndErrorSingleChildOp) {
 
     // Simulate retryable error.
     write_ops::WriteError retryableError(
-        0, {ErrorCodes::StaleShardVersion, "simulate ssv error for test"});
+        0,
+        {StaleConfigInfo(kNss,
+                         ChunkVersion(10, 0, OID(), Timestamp(1, 1)),
+                         ChunkVersion(11, 0, OID(), Timestamp(1, 1)),
+                         ShardId("shardA")),
+         "simulate ssv error for test"});
     writeOp.noteWriteError(*targeted[0], retryableError);
 
     // State should not change until we have result from all nodes.
@@ -322,7 +327,10 @@ TEST_F(WriteOpTest, RetrySingleOp) {
     assertEndpointsEqual(targeted.front()->endpoint, endpoint);
 
     // Stale exception
-    write_ops::WriteError error(0, {ErrorCodes::StaleShardVersion, "some message"});
+    write_ops::WriteError error(
+        0,
+        {StaleConfigInfo(kNss, ChunkVersion::IGNORED(), boost::none, ShardId("shard")),
+         "some message"});
     writeOp.noteWriteError(*targeted.front(), error);
 
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Ready);
@@ -412,7 +420,12 @@ TEST_F(WriteOpTransactionTest, TargetMultiAllShardsAndErrorSingleChildOp) {
 
     // Simulate retryable error.
     write_ops::WriteError retryableError(
-        0, {ErrorCodes::StaleShardVersion, "simulate ssv error for test"});
+        0,
+        {StaleConfigInfo(kNss,
+                         ChunkVersion(10, 0, OID(), Timestamp(1, 1)),
+                         ChunkVersion(11, 0, OID(), Timestamp(1, 1)),
+                         ShardId("shardA")),
+         "simulate ssv error for test"});
     writeOp.noteWriteError(*targeted[0], retryableError);
 
     // State should change to error right away even with retryable error when in a transaction.

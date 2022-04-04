@@ -72,44 +72,9 @@ public:
         return _criticalSectionSignal;
     }
 
-    void serialize(BSONObjBuilder* bob) const {
-        bob->append("ns", _nss.ns());
-        _received.appendLegacyWithField(bob, "vReceived");
-        if (_wanted) {
-            _wanted->appendLegacyWithField(bob, "vWanted");
-        }
-
-        invariant(_shardId != "");
-        bob->append("shardId", _shardId.toString());
-    }
-
-    static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj& obj) {
-        return std::make_shared<StaleConfigInfo>(parseFromCommandError(obj));
-    }
-
-    static StaleConfigInfo parseFromCommandError(const BSONObj& obj) {
-        const auto shardId = obj["shardId"].String();
-        invariant(shardId != "");
-
-        auto extractOptionalChunkVersion =
-            [&obj](StringData field) -> boost::optional<ChunkVersion> {
-            try {
-                return boost::make_optional<ChunkVersion>(
-                    ChunkVersion::fromBSONLegacyOrNewerFormat(obj, field));
-            } catch (const DBException& ex) {
-                auto status = ex.toStatus();
-                if (status != ErrorCodes::NoSuchKey) {
-                    throw;
-                }
-            }
-            return boost::none;
-        };
-
-        return StaleConfigInfo(NamespaceString(obj["ns"].String()),
-                               ChunkVersion::fromBSONLegacyOrNewerFormat(obj, "vReceived"),
-                               extractOptionalChunkVersion("vWanted"),
-                               ShardId(shardId));
-    }
+    void serialize(BSONObjBuilder* bob) const;
+    static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj& obj);
+    static StaleConfigInfo parseFromCommandError(const BSONObj& obj);
 
 protected:
     NamespaceString _nss;

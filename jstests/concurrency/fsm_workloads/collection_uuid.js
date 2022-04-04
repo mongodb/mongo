@@ -51,7 +51,7 @@ const runCommandInLoop = function(
         ErrorCodes.ConflictingOperationInProgress,
         ErrorCodes.BackgroundOperationInProgressForNamespace,
         ErrorCodes.ReshardCollectionInProgress,
-        ErrorCodes.StaleShardVersion,
+        ErrorCodes.OBSOLETE_StaleShardVersion,
         ErrorCodes.QueryPlanKilled,
     ];
 

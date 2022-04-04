@@ -79,7 +79,7 @@ var $config = extendWorkload($config, function($config, $super) {
         // filter out those errors.
         let skippableErrors = [
             ErrorCodes.StaleConfig,
-            ErrorCodes.StaleShardVersion,
+            ErrorCodes.OBSOLETE_StaleShardVersion,
             ErrorCodes.WriteConflict,
             ErrorCodes.LockTimeout,
             ErrorCodes.PreparedTransactionInProgress,

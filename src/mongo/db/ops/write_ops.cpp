@@ -302,7 +302,7 @@ WriteError WriteError::parse(const BSONObj& obj) {
         //
         // TODO (SERVER-63327): This special parsing should be removed in the stable version
         // following the resolution of this ticket.
-        if (code == ErrorCodes::StaleShardVersion) {
+        if (code == ErrorCodes::OBSOLETE_StaleShardVersion) {
             return Status(ErrorCodes::StaleConfig,
                           std::move(errmsg),
                           obj[WriteError::kErrInfoFieldName].Obj());
@@ -327,7 +327,8 @@ BSONObj WriteError::serialize() const {
     // TODO (SERVER-63327): This special serialisation should be removed in the stable version
     // following the resolution of this ticket.
     if (_status == ErrorCodes::StaleConfig) {
-        errBuilder.append(WriteError::kCodeFieldName, int32_t(ErrorCodes::StaleShardVersion));
+        errBuilder.append(WriteError::kCodeFieldName,
+                          int32_t(ErrorCodes::OBSOLETE_StaleShardVersion));
         errBuilder.append(WriteError::kErrmsgFieldName, _status.reason());
         auto extraInfo = _status.extraInfo();
         invariant(extraInfo);

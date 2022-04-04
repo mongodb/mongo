@@ -96,7 +96,10 @@ error_codes:
     - {code: 60,name: OBSOLETE_DatabaseNotFound}
     - {code: 61,name: ShardKeyNotFound}
     - {code: 62,name: OplogOperationUnsupported}
-    - {code: 63,name: StaleShardVersion,categories: [StaleShardVersionError,NeedRetargettingError]}
+    # This error code is obsolete as of version 6.0 and no new places where it is thrown should be
+    # added. Use StaleConfig.
+    # TODO (SERVER-63327): Retire this code once 6.0 becomes LTS
+    - {code: 63,name: OBSOLETE_StaleShardVersion,categories: [StaleShardVersionError,NeedRetargettingError]}
     - {code: 64,name: WriteConcernFailed,categories: [WriteConcernError]}
     - {code: 65,name: MultipleErrorsOccurred, extra: MultipleErrorsOccurredInfo}
     - {code: 66,name: ImmutableField}
@@ -187,6 +190,8 @@ error_codes:
     - {code: 147,name: ZLibError}
     - {code: 148,name: ReadConcernMajorityNotEnabled,categories: [VoteAbortError]}
     - {code: 149,name: NoConfigPrimary}
+    # This error code is obsolete as of version 6.0 and no new places where it is thrown should be
+    # added. Use StaleConfig.
     - {code: 150,name: StaleEpoch,
                  categories: [StaleShardVersionError,NeedRetargettingError],
                  extra: StaleEpochInfo,

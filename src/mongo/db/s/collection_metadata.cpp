@@ -181,28 +181,6 @@ bool CollectionMetadata::getNextChunk(const BSONObj& lookupKey, ChunkType* chunk
     return true;
 }
 
-Status CollectionMetadata::checkRangeIsValid(const BSONObj& min, const BSONObj& max) const {
-    invariant(isSharded());
-
-    ChunkType existingChunk;
-
-    if (!getNextChunk(min, &existingChunk)) {
-        return {ErrorCodes::StaleShardVersion,
-                str::stream() << "Chunk with bounds " << ChunkRange(min, max).toString()
-                              << " is not owned by this shard."};
-    }
-
-    const ChunkRange receivedRange(min, max);
-    const auto owningRange = existingChunk.getRange();
-
-    uassert(ErrorCodes::InvalidOptions,
-            str::stream() << "Rejecting moveRange because the provided range is spanning "
-                             "across more than one chunk",
-            owningRange.covers(receivedRange));
-
-    return Status::OK();
-}
-
 bool CollectionMetadata::currentShardHasAnyChunks() const {
     invariant(isSharded());
     std::set<ShardId> shards;

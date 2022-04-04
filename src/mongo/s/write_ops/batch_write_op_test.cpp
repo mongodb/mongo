@@ -284,7 +284,15 @@ TEST_F(BatchWriteOpTest, SingleStaleError) {
 
     BatchedCommandResponse response;
     buildResponse(0, &response);
-    addError(ErrorCodes::StaleShardVersion, "mock stale error", 0, &response);
+    OID epoch{OID::gen()};
+    Timestamp timestamp{1, 0};
+    response.addToErrDetails(
+        write_ops::WriteError(0,
+                              Status{StaleConfigInfo(nss,
+                                                     ChunkVersion(101, 200, epoch, timestamp),
+                                                     ChunkVersion(105, 200, epoch, timestamp),
+                                                     ShardId("shard")),
+                                     "mock stale error"}));
 
     // First stale response comes back, we should retry
     batchOp.noteBatchResponse(*targeted.begin()->second, response, nullptr);

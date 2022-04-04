@@ -161,8 +161,12 @@ TEST_F(ShardedUnionTest, RetriesSubPipelineOnStaleConfigError) {
     // Mock out one error response, then expect a refresh of the sharding catalog for that
     // namespace, then mock out a successful response.
     onCommand([&](const executor::RemoteCommandRequest& request) {
-        return createErrorCursorResponse(
-            Status{ErrorCodes::StaleShardVersion, "Mock error: shard version mismatch"});
+        OID epoch{OID::gen()};
+        Timestamp timestamp{1, 0};
+        return createErrorCursorResponse(Status{
+            StaleConfigInfo(
+                kTestAggregateNss, ChunkVersion(1, 0, epoch, timestamp), boost::none, ShardId{"0"}),
+            "Mock error: shard version mismatch"});
     });
 
     // Mock the expected config server queries.
@@ -239,8 +243,13 @@ TEST_F(ShardedUnionTest, CorrectlySplitsSubPipelineIfRefreshedDistributionRequir
     // sharding catalog for that namespace.
     onCommand([&](const executor::RemoteCommandRequest& request) {
         ASSERT_EQ(request.target, HostAndPort(shards[1].getHost()));
-        return createErrorCursorResponse(
-            Status{ErrorCodes::StaleShardVersion, "Mock error: shard version mismatch"});
+
+        OID epoch{OID::gen()};
+        Timestamp timestamp{1, 0};
+        return createErrorCursorResponse(Status{
+            StaleConfigInfo(
+                kTestAggregateNss, ChunkVersion(1, 0, epoch, timestamp), boost::none, ShardId{"0"}),
+            "Mock error: shard version mismatch"});
     });
 
     // Mock the expected config server queries. Update the distribution as if a chunk [0, 10] was
@@ -324,20 +333,25 @@ TEST_F(ShardedUnionTest, AvoidsSplittingSubPipelineIfRefreshedDistributionDoesNo
 
     // Mock out an error response from both shards, then expect a refresh of the sharding catalog
     // for that namespace, then mock out a successful response.
+    OID epoch{OID::gen()};
+    Timestamp timestamp{1, 1};
+
     onCommand([&](const executor::RemoteCommandRequest& request) {
-        return createErrorCursorResponse(
-            Status{ErrorCodes::StaleShardVersion, "Mock error: shard version mismatch"});
+        return createErrorCursorResponse(Status{
+            StaleConfigInfo(
+                kTestAggregateNss, ChunkVersion(1, 0, epoch, timestamp), boost::none, ShardId{"0"}),
+            "Mock error: shard version mismatch"});
     });
     onCommand([&](const executor::RemoteCommandRequest& request) {
-        return createErrorCursorResponse(
-            Status{ErrorCodes::StaleShardVersion, "Mock error: shard version mismatch"});
+        return createErrorCursorResponse(Status{
+            StaleConfigInfo(
+                kTestAggregateNss, ChunkVersion(1, 0, epoch, timestamp), boost::none, ShardId{"0"}),
+            "Mock error: shard version mismatch"});
     });
 
     // Mock the expected config server queries. Update the distribution so that all chunks are on
     // the same shard.
-    const OID epoch = OID::gen();
     const UUID uuid = UUID::gen();
-    const Timestamp timestamp(1, 1);
     const ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
     ChunkVersion version(1, 0, epoch, timestamp);
     ChunkType chunk1(

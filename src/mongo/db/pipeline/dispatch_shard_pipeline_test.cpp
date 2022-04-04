@@ -167,13 +167,18 @@ TEST_F(DispatchShardPipelineTest, DispatchShardPipelineDoesNotRetryOnStaleConfig
         ASSERT_THROWS_CODE(sharded_agg_helpers::dispatchShardPipeline(
                                serializedCommand, hasChangeStream, std::move(pipeline)),
                            AssertionException,
-                           ErrorCodes::StaleShardVersion);
+                           ErrorCodes::StaleConfig);
     });
 
     // Mock out an error response.
     onCommand([&](const executor::RemoteCommandRequest& request) {
-        return createErrorCursorResponse(
-            {Status{ErrorCodes::StaleShardVersion, "Mock error: shard version mismatch"}});
+        OID epoch{OID::gen()};
+        Timestamp timestamp{1, 0};
+        return createErrorCursorResponse({StaleConfigInfo(kTestAggregateNss,
+                                                          ChunkVersion(1, 0, epoch, timestamp),
+                                                          boost::none,
+                                                          ShardId{"0"}),
+                                          "Mock error: shard version mismatch"});
     });
     future.default_timed_get();
 }
@@ -205,20 +210,24 @@ TEST_F(DispatchShardPipelineTest, WrappedDispatchDoesRetryOnStaleConfigError) {
         ASSERT(!bool(results.splitPipeline));
     });
 
+    const OID epoch{OID::gen()};
+    const Timestamp timestamp{1, 0};
+    const UUID uuid{UUID::gen()};
+
     // Mock out one error response, then expect a refresh of the sharding catalog for that
     // namespace, then mock out a successful response.
     onCommand([&](const executor::RemoteCommandRequest& request) {
-        return createErrorCursorResponse(
-            {ErrorCodes::StaleShardVersion, "Mock error: shard version mismatch"});
+        return createErrorCursorResponse({StaleConfigInfo(kTestAggregateNss,
+                                                          ChunkVersion(2, 0, epoch, timestamp),
+                                                          boost::none,
+                                                          ShardId{"0"}),
+                                          "Mock error: shard version mismatch"});
     });
 
     // Mock the expected config server queries.
-    const OID epoch = OID::gen();
-    const UUID uuid = UUID::gen();
-    const Timestamp timestamp(1);
     const ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
 
-    ChunkVersion version(1, 0, epoch, timestamp);
+    ChunkVersion version(2, 0, epoch, timestamp);
 
     ChunkType chunk1(
         uuid, {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << 0)}, version, {"0"});
@@ -229,6 +238,7 @@ TEST_F(DispatchShardPipelineTest, WrappedDispatchDoesRetryOnStaleConfigError) {
         uuid, {BSON("_id" << 0), shardKeyPattern.getKeyPattern().globalMax()}, version, {"1"});
     chunk2.setName(OID::gen());
     version.incMinor();
+
     expectCollectionAndChunksAggregation(
         kTestAggregateNss, epoch, timestamp, uuid, shardKeyPattern, {chunk1, chunk2});
 

@@ -36,8 +36,8 @@ namespace mongo {
 namespace {
 
 bool isRetryErrCode(int errCode) {
-    return errCode == ErrorCodes::StaleShardVersion || errCode == ErrorCodes::StaleConfig ||
-        errCode == ErrorCodes::StaleDbVersion ||
+    return errCode == ErrorCodes::OBSOLETE_StaleShardVersion ||
+        errCode == ErrorCodes::StaleConfig || errCode == ErrorCodes::StaleDbVersion ||
         errCode == ErrorCodes::ShardCannotRefreshDueToLocksHeld ||
         errCode == ErrorCodes::TenantMigrationAborted;
 }
