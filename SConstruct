@@ -635,6 +635,12 @@ add_option('visibility-support',
     type='choice',
 )
 
+# TODO Remove this flag once SERVER-64999 is complete
+add_option("force-icecc-sanitizers",
+    help="Force the use of icecream with sanitizer builds, ignoring denylist issues from SERVER-59243.",
+    nargs=0,
+)
+
 try:
     with open("version.json", "r") as version_fp:
         version_data = json.load(version_fp)
@@ -3538,6 +3544,20 @@ def doConfigure(myenv):
             # Unconditionally using the full path can affect SCons cached builds, so we only do
             # this in cases where we know it's going to matter.
             if 'ICECC' in env and env['ICECC']:
+                # We impose some guard rails to make sure users are aware of the issues around
+                # using icecream and sanitizers in networks which may have older iceccd remotes
+                # part of the network. Refer to SERVER-59243 for related issues.
+                # TODO Remove this flag once SERVER-64999 is complete
+                if not has_option("force-icecc-sanitizers"):
+                    env.FatalError(textwrap.dedent("""
+                        ERROR: Using icecream with sanitizers that use denylist files has known issues
+                        which cause the denylist to fail to be correctly applied. This will occur
+                        if the network you are building in contains remote icecream hosts which
+                        are older than icecc version 1.3. This will cause failures during
+                        exectution of the code. If you are aware of the risks, you can force
+                        icecream sanitizer builds with the '--force-icecc-sanitizers' option.
+                        """))
+
                 # Make these files available to remote icecream builds if requested.
                 # These paths *must* be absolute to match the paths in the remote
                 # toolchain archive.
