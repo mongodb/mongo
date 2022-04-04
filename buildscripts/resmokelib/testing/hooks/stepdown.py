@@ -14,7 +14,6 @@ from buildscripts.resmokelib.testing.fixtures import interface as fixture_interf
 from buildscripts.resmokelib.testing.fixtures import replicaset
 from buildscripts.resmokelib.testing.fixtures import shardedcluster
 from buildscripts.resmokelib.testing.fixtures import tenant_migration
-from buildscripts.resmokelib.testing.fixtures import cluster_to_cluster
 from buildscripts.resmokelib.testing.hooks import interface
 
 
@@ -25,6 +24,9 @@ class ContinuousStepdown(interface.Hook):  # pylint: disable=too-many-instance-a
                    " intervals)")
 
     IS_BACKGROUND = True
+
+    # The hook stops the fixture partially during its execution.
+    STOPS_FIXTURE = True
 
     def __init__(  # pylint: disable=too-many-arguments
             self, hook_logger, fixture, config_stepdown=True, shard_stepdown=True,
@@ -138,8 +140,8 @@ class ContinuousStepdown(interface.Hook):  # pylint: disable=too-many-instance-a
 
             for rs_fixture in fixture.get_replsets():
                 self._rs_fixtures.append(rs_fixture)
-        elif isinstance(fixture, cluster_to_cluster.ClusterToClusterFixture):
-            # Recursively call _add_fixture on the source and destination clusters.
+        elif isinstance(fixture, fixture_interface.MultiClusterFixture):
+            # Recursively call _add_fixture on all the independent clusters.
             for cluster_fixture in fixture.get_independent_clusters():
                 self._add_fixture(cluster_fixture)
 

@@ -8,8 +8,6 @@ from buildscripts.resmokelib import config
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib.testing import testcases
 from buildscripts.resmokelib.testing.fixtures.interface import create_fixture_table
-from buildscripts.resmokelib.testing.hooks import stepdown
-from buildscripts.resmokelib.testing.hooks import cluster_to_cluster_kill_replicator
 from buildscripts.resmokelib.testing.testcases import fixture as _fixture
 from buildscripts.resmokelib.utils import queue as _queue
 
@@ -35,9 +33,7 @@ class Job(object):  # pylint: disable=too-many-instance-attributes
         # expected, there is a race where fixture.is_running() could fail if called after the
         # primary was killed but before it was restarted.
         self._check_if_fixture_running = not any(
-            isinstance(hook, (stepdown.ContinuousStepdown,
-                              cluster_to_cluster_kill_replicator.KillReplicator))
-            for hook in self.hooks)
+            hasattr(hook, "STOPS_FIXTURE") and hook.STOPS_FIXTURE for hook in self.hooks)
 
     @property
     def job_num(self):
