@@ -49,3 +49,7 @@ feature_flags:
         description: "Optional config server for small clusters"
         cpp_varname: gFeatureFlagOptionalCfgSvr
         default: false
+    featureFlagConnHealthMetrics:
+        description: "Enable newly added cluster connection health metrics"
+        cpp_varname: gFeatureFlagConnHealthMetrics
+        default: false
