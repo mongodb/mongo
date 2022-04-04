@@ -26,12 +26,13 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger, wttest
+import sys, wiredtiger, wttest
+from helper_tiered import TieredConfigMixin, tiered_storage_sources
 from wtscenario import make_scenarios
 
 # test_alter02.py
 #    Smoke-test the session alter operations.
-class test_alter02(wttest.WiredTigerTestCase):
+class test_alter02(TieredConfigMixin, wttest.WiredTigerTestCase):
     entries = 500
     # Binary values.
     value = u'\u0001\u0002abcd\u0003\u0004'
@@ -63,7 +64,7 @@ class test_alter02(wttest.WiredTigerTestCase):
         ('no-reopen', dict(reopen=False)),
         ('reopen', dict(reopen=True)),
     ]
-    scenarios = make_scenarios(conn_log, types, tables, reopen)
+    scenarios = make_scenarios(tiered_storage_sources, conn_log, types, tables, reopen)
 
     # This test varies the log setting.  Override the standard methods.
     def setUpConnectionOpen(self, dir):
@@ -72,8 +73,15 @@ class test_alter02(wttest.WiredTigerTestCase):
         return None
     def ConnectionOpen(self):
         self.home = '.'
+        
+        tiered_config = self.conn_config()
+        tiered_config += self.extensionsConfig()
+        # In case the open starts additional threads, flush first to avoid confusion.
+        sys.stdout.flush()
 
         conn_params = 'create,log=(file_max=100K,remove=false,%s)' % self.uselog
+        if tiered_config != '':
+            conn_params += ',' + tiered_config
 
         try:
             self.conn = wiredtiger.wiredtiger_open(self.home, conn_params)
@@ -129,6 +137,9 @@ class test_alter02(wttest.WiredTigerTestCase):
 
     # Alter: Change the log setting after creation
     def test_alter02_log(self):
+        if self.is_tiered_scenario() and (self.uri == 'lsm:' or self.uri == 'file:'):
+            self.skipTest('Tiered storage does not support LSM or file URIs.')
+        
         uri = self.uri + self.name
         create_params = 'key_format=i,value_format=S,'
         complex_params = ''
@@ -208,9 +219,9 @@ class test_alter02(wttest.WiredTigerTestCase):
             self.conn.close()
             self.ConnectionOpen()
 
-        self.session.alter(uri, alter_param)
+        self.alter(uri, alter_param)
         if special:
-            self.session.alter(suburi, alter_param)
+            self.alter(suburi, alter_param)
         self.verify_metadata(log_str)
         # Put some more data in table.
         c = self.session.open_cursor(uri, None)

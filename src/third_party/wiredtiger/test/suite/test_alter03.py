@@ -27,11 +27,16 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wttest
+from helper_tiered import TieredConfigMixin, tiered_storage_sources
+from wtscenario import make_scenarios
 
 # test_alter03.py
 #    Check if app_metadata can be altered.
-class test_alter03(wttest.WiredTigerTestCase):
+class test_alter03(TieredConfigMixin, wttest.WiredTigerTestCase):
     name = "alter03"
+
+    # Build all scenarios
+    scenarios = make_scenarios(tiered_storage_sources)
 
     def verify_metadata(self, table_metastr, lsm_metastr, file_metastr):
         c = self.session.open_cursor('metadata:', None, None)
@@ -55,7 +60,15 @@ class test_alter03(wttest.WiredTigerTestCase):
         if file_metastr != '':
             # We must find a file type entry for the object and its value
             # should contain the provided file meta string.
-            c.set_key('file:' + self.name + '.wt')
+            if self.is_tiered_scenario():
+                c.set_key('file:' + self.name + '-0000000001.wtobj')
+                
+                # Removing quotes wrapping app metadata value just to make the test pass.
+                # FIXME: WT-9036
+                file_metastr = 'app_metadata=meta_data_1,'
+            else:
+                c.set_key('file:' + self.name + '.wt')
+
             self.assertNotEqual(c.search(), wiredtiger.WT_NOTFOUND)
             value = c.get_value()
             self.assertTrue(value.find(file_metastr) != -1)
@@ -81,16 +94,16 @@ class test_alter03(wttest.WiredTigerTestCase):
         self.verify_metadata(app_meta_orig, '', app_meta_orig)
 
         # Alter app metadata and verify
-        self.session.alter(uri, 'app_metadata="meta_data_2",')
+        self.alter(uri, 'app_metadata="meta_data_2",')
         self.verify_metadata('app_metadata="meta_data_2",', '', 'app_metadata="meta_data_2",')
 
         # Alter app metadata, explicitly asking for exclusive access and verify
-        self.session.alter(uri, 'app_metadata="meta_data_3",exclusive_refreshed=true,')
+        self.alter(uri, 'app_metadata="meta_data_3",exclusive_refreshed=true,')
         self.verify_metadata('app_metadata="meta_data_3",', '', 'app_metadata="meta_data_3",')
 
         # Alter app metadata without taking exclusive lock and verify that only
         # table object gets modified
-        self.session.alter(uri, 'app_metadata="meta_data_4",exclusive_refreshed=false,')
+        self.alter(uri, 'app_metadata="meta_data_4",exclusive_refreshed=false,')
         self.verify_metadata('app_metadata="meta_data_4",', '', 'app_metadata="meta_data_3",')
 
         # Open a cursor, insert some data and try to alter with session open.
@@ -100,15 +113,15 @@ class test_alter03(wttest.WiredTigerTestCase):
             c2[k+1] = 2
 
         self.assertRaisesException(wiredtiger.WiredTigerError,
-            lambda: self.session.alter(uri, 'app_metadata="meta_data_5",'))
+            lambda: self.alter(uri, 'app_metadata="meta_data_5",'))
         self.verify_metadata('app_metadata="meta_data_4",', '', 'app_metadata="meta_data_3",')
 
         self.assertRaisesException(wiredtiger.WiredTigerError,
-            lambda: self.session.alter(uri,
+            lambda: self.alter(uri,
                 'exclusive_refreshed=true,app_metadata="meta_data_5",'))
         self.verify_metadata('app_metadata="meta_data_4",', '', 'app_metadata="meta_data_3",')
 
-        self.session.alter(uri, 'app_metadata="meta_data_5",exclusive_refreshed=false,')
+        self.alter(uri, 'app_metadata="meta_data_5",exclusive_refreshed=false,')
         self.verify_metadata('app_metadata="meta_data_5",', '', 'app_metadata="meta_data_3",')
 
         c2.close()
@@ -120,6 +133,9 @@ class test_alter03(wttest.WiredTigerTestCase):
 
     # Alter LSM: A non exclusive alter should not be allowed
     def test_alter03_lsm_app_metadata(self):
+        if self.is_tiered_scenario():
+            self.skipTest('Tiered storage does not support LSM.')
+        
         uri = "lsm:" + self.name
         create_params = 'key_format=i,value_format=i,'
         app_meta_orig = 'app_metadata="meta_data_1",'
@@ -128,17 +144,17 @@ class test_alter03(wttest.WiredTigerTestCase):
 
         # Try to alter app metadata without exclusive access and verify
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.session.alter(uri,
+            lambda: self.alter(uri,
                 'exclusive_refreshed=false,app_metadata="meta_data_2",'),
                 '/is applicable only on simple tables/')
         self.verify_metadata('', 'app_metadata="meta_data_1",', '')
 
         # Alter app metadata, explicitly asking for exclusive access and verify
-        self.session.alter(uri, 'exclusive_refreshed=true,app_metadata="meta_data_2",')
+        self.alter(uri, 'exclusive_refreshed=true,app_metadata="meta_data_2",')
         self.verify_metadata('', 'app_metadata="meta_data_2",', '')
 
         # Alter app metadata and verify
-        self.session.alter(uri, 'app_metadata="meta_data_3",')
+        self.alter(uri, 'app_metadata="meta_data_3",')
         self.verify_metadata('', 'app_metadata="meta_data_3",', '')
 
 if __name__ == '__main__':

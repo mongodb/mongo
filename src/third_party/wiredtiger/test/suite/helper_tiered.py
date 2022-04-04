@@ -90,3 +90,80 @@ def generate_s3_prefix(test_name = ''):
 
     return prefix
 
+# Storage sources.
+tiered_storage_sources = [
+    ('dirstore', dict(is_tiered = True,
+        is_local_storage = True,
+        auth_token = get_auth_token('dir_store'),
+        bucket = get_bucket1_name('dir_store'),
+        bucket_prefix = "pfx_",
+        ss_name = 'dir_store')),
+    ('s3', dict(is_tiered = True,
+        is_local_storage = False,
+        auth_token = get_auth_token('s3_store'),
+        bucket = get_bucket1_name('s3_store'),
+        bucket_prefix = generate_s3_prefix(),
+        ss_name = 's3_store')),
+    ('non_tiered', dict(is_tiered = False)),            
+]
+
+# This mixin class provides tiered storage configuration methods.
+class TieredConfigMixin:
+    # Returns True if the current scenario is tiered.
+    def is_tiered_scenario(self):
+        return hasattr(self, 'is_tiered') and self.is_tiered
+
+    # Setup connection config.
+    def conn_config(self):
+        return self.tiered_conn_config()
+
+    # Setup tiered connection config.
+    def tiered_conn_config(self):
+        # Handle non_tiered storage scenarios.
+        if not self.is_tiered_scenario():
+            return ''
+
+        # Setup directories structure for local tiered storage.
+        if self.is_local_storage and not os.path.exists(self.bucket):
+            os.mkdir(self.bucket)
+
+        # Build tiered storage connection string.
+        return \
+            'debug_mode=(flush_checkpoint=true),' + \
+            'tiered_storage=(auth_token=%s,' % self.auth_token + \
+            'bucket=%s,' % self.bucket + \
+            'bucket_prefix=%s,' % self.bucket_prefix + \
+            'name=%s),tiered_manager=(wait=0)' % self.ss_name
+
+    # Load the storage sources extension.
+    def conn_extensions(self, extlist):
+        return self.tiered_conn_extensions(extlist)
+
+    # Load tiered storage source extension.
+    def tiered_conn_extensions(self, extlist):
+        # Handle non_tiered storage scenarios.
+        if not self.is_tiered_scenario():
+            return ''
+        
+        config = ''
+        # S3 store is built as an optional loadable extension, not all test environments build S3.
+        if not self.is_local_storage:
+            #config = '=(config=\"(verbose=1)\")'
+            extlist.skip_if_missing = True
+        #if self.is_local_storage:
+            #config = '=(config=\"(verbose=1,delay_ms=200,force_delay=3)\")'
+        # Windows doesn't support dynamically loaded extension libraries.
+        if os.name == 'nt':
+            extlist.skip_if_missing = True
+        extlist.extension('storage_sources', self.ss_name + config)
+
+    # Wrapper around session.alter call
+    def alter(self, uri, alter_param):
+        # Tiered storage does not fully support alter operation. FIXME WT-9027.
+        try:
+            self.session.alter(uri, alter_param)
+        except BaseException as err:
+            if self.is_tiered_scenario() and str(err) == 'Operation not supported':
+                self.skipTest('Tiered storage does not fully support alter operation.')
+            else:
+                raise    

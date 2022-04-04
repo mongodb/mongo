@@ -27,12 +27,13 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wttest
+from helper_tiered import TieredConfigMixin, tiered_storage_sources
 from wtscenario import make_scenarios
 
 # test_alter04.py
 #    Smoke-test the session alter operations.
 #    This test confirms os_cache_dirty_max and os_cache_max.
-class test_alter04(wttest.WiredTigerTestCase):
+class test_alter04(TieredConfigMixin, wttest.WiredTigerTestCase):
     name = "alter04"
     entries = 100
     cache_alter=('1M', '100K')
@@ -57,7 +58,7 @@ class test_alter04(wttest.WiredTigerTestCase):
         ('cache', dict(setting='os_cache_max')),
         ('cache_dirty', dict(setting='os_cache_dirty_max')),
     ]
-    scenarios = make_scenarios(types, sizes, reopen, settings)
+    scenarios = make_scenarios(tiered_storage_sources, types, sizes, reopen, settings)
 
     def verify_metadata(self, metastr):
         if metastr == '':
@@ -84,6 +85,9 @@ class test_alter04(wttest.WiredTigerTestCase):
 
     # Alter: Change the setting after creation
     def test_alter04_cache(self):
+        if self.is_tiered_scenario() and (self.uri == 'lsm:' or self.uri == 'file:'):
+            self.skipTest('Tiered storage does not support LSM or file URIs.')
+        
         uri = self.uri + self.name
         create_params = 'key_format=i,value_format=i,'
         complex_params = ''
@@ -129,14 +133,14 @@ class test_alter04(wttest.WiredTigerTestCase):
         # for all allowed settings.
         for a in self.cache_alter:
             alter_param = '%s=%s' % (self.setting, a)
-            self.session.alter(uri, alter_param)
+            self.alter(uri, alter_param)
             if self.reopen:
                 self.reopen_conn()
             special = self.use_cg or self.use_index
             if not special:
                 self.verify_metadata(alter_param)
             else:
-                self.session.alter(suburi, alter_param)
+                self.alter(suburi, alter_param)
                 self.verify_metadata(alter_param)
 
 if __name__ == '__main__':
