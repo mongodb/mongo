@@ -3,7 +3,7 @@
 MongoDB depends on third party libraries to implement some
 functionality. This document describes which libraries are depended
 upon, and how. It is maintained by and for humans, and so while it is a
-best effort attempt to describe the server’s dependencies, it is subject
+best effort attempt to describe the server's dependencies, it is subject
 to change as libraries are added or removed.
 
 ## Server Vendored Libraries
@@ -93,7 +93,7 @@ a notice will be included in
 ## WiredTiger Vendored Test Libraries
 
 The following Python libraries are transitively included by WiredTiger,
-and are used by that component for testing. They don’t appear in
+and are used by that component for testing. They don't appear in
 released binary artifacts.
 
 | Name            |
@@ -119,7 +119,7 @@ the Operating System may be loaded.
 
 For Windows Enterprise, we may ship precompiled DLLs containing some of
 these libraries. Releases prepared in this fashion will include a copy
-of these libraries’ license in a file named
+of these libraries' license in a file named
 `THIRD-PARTY-NOTICES.windows`.
 
 | Name       | Enterprise Only | Has Windows DLLs |
@@ -144,4 +144,4 @@ of these libraries’ license in a file named
 
 3. <a id="note_ssl" href="#ref_ssl">^</a>
     OpenSSL is only shipped as a dependency of the MongoDB tools written in Go. The MongoDB
-    shell and server binaries use Windows’ cryptography APIs.
+    shell and server binaries use Windows' cryptography APIs.
