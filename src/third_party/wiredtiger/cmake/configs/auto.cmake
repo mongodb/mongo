@@ -218,6 +218,13 @@ config_func(
 )
 
 config_lib(
+    HAVE_LIBMEMKIND
+    "memkind library exists."
+    LIB "memkind"
+    HEADER "memkind.h"
+)
+
+config_lib(
     HAVE_LIBPTHREAD
     "Pthread library exists."
     LIB "pthread"

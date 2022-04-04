@@ -63,6 +63,9 @@
 /* Define to 1 if you have the `lz4' library (-llz4). */
 #cmakedefine HAVE_LIBLZ4 1
 
+/* Define to 1 if you have the `memkind' library (-lmemkind). */
+#cmakedefine HAVE_LIBMEMKIND 1
+
 /* Define to 1 if you have the `pthread' library (-lpthread). */
 #cmakedefine HAVE_LIBPTHREAD 1
 
