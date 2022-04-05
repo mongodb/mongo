@@ -433,9 +433,8 @@ TEST(SpecializedServerParameter, withValidate) {
 void SpecializedClusterServerParameter::append(OperationContext*,
                                                BSONObjBuilder& builder,
                                                const std::string& name) {
-    BSONObjBuilder subObjBuilder = builder.subobjStart(name);
-    _data.serialize(&subObjBuilder);
-    subObjBuilder.done();
+    builder.append("_id"_sd, name);
+    builder.appendElementsUnique(_data.toBSON());
 }
 
 Status SpecializedClusterServerParameter::set(const BSONElement& newValueElement) {
@@ -488,6 +487,7 @@ TEST(SpecializedServerParameter, clusterServerParameter) {
     data.setClusterParameterTime(updateTime);
     data.setIntData(50);
     data.setStrData("hello");
+    data.setId(kSpecializedCSPName);
     data.serialize(&builder);
     ASSERT_OK(specializedCsp->set(builder.asTempObj()));
 
@@ -500,8 +500,9 @@ TEST(SpecializedServerParameter, clusterServerParameter) {
     // Assert that the parameter can be appended to a builder.
     builder.resetToEmpty();
     specializedCsp->append(nullptr, builder, kSpecializedCSPName.toString());
-    auto obj = builder.asTempObj()["specializedCluster"_sd].Obj();
-    ASSERT_EQ(obj.nFields(), 3);
+    auto obj = builder.asTempObj();
+    ASSERT_EQ(obj.nFields(), 4);
+    ASSERT_EQ(obj["_id"_sd].String(), kSpecializedCSPName);
     ASSERT_EQ(obj["clusterParameterTime"_sd].timestamp(), updateTime.asTimestamp());
     ASSERT_EQ(obj["strData"_sd].String(), "hello");
     ASSERT_EQ(obj["intData"_sd].Int(), 50);
@@ -520,8 +521,9 @@ TEST(SpecializedServerParameter, clusterServerParameter) {
     builder.resetToEmpty();
     ASSERT_OK(specializedCsp->reset());
     specializedCsp->append(nullptr, builder, kSpecializedCSPName.toString());
-    obj = builder.asTempObj()["specializedCluster"_sd].Obj();
-    ASSERT_EQ(obj.nFields(), 3);
+    obj = builder.asTempObj();
+    ASSERT_EQ(obj.nFields(), 4);
+    ASSERT_EQ(obj["_id"_sd].String(), kSpecializedCSPName);
     ASSERT_EQ(obj["clusterParameterTime"_sd].timestamp(), LogicalTime().asTimestamp());
     ASSERT_EQ(obj["strData"_sd].String(), "default");
     ASSERT_EQ(obj["intData"_sd].Int(), 30);

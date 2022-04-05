@@ -52,7 +52,7 @@ public:
                                                    BSONObj query,
                                                    BSONObj update,
                                                    const WriteConcernOptions&) = 0;
-    virtual LogicalTime getUpdateClusterTime(OperationContext*) = 0;
+    virtual Timestamp getUpdateClusterTime(OperationContext*) = 0;
     virtual ~DBClientService() = default;
 };
 
@@ -63,7 +63,7 @@ public:
                                            BSONObj query,
                                            BSONObj update,
                                            const WriteConcernOptions&) override;
-    LogicalTime getUpdateClusterTime(OperationContext*) override;
+    Timestamp getUpdateClusterTime(OperationContext*) override;
 
 private:
     DBDirectClient& _dbClient;

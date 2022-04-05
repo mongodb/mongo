@@ -350,7 +350,8 @@ public:
         if (isRedact()) {
             b.append(name, "###");
         } else if constexpr (paramType == SPT::kClusterWide) {
-            getValue().serialize(&b);
+            b.append("_id"_sd, name);
+            b.appendElementsUnique(getValue().toBSON());
         } else {
             b.append(name, getValue());
         }

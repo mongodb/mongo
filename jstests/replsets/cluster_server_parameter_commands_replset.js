@@ -1,5 +1,5 @@
 /**
- * Checks that getClusterParameter runs as expected on replica set nodes.
+ * Checks that set/getClusterParameter runs as expected on replica set nodes.
  *
  * @tags: [
  *   # Requires all nodes to be running the latest binary.
@@ -13,27 +13,22 @@
 
 load('jstests/libs/cluster_server_parameter_utils.js');
 
-// Tests that getClusterParameter works on a non-sharded replica set.
-function runReplSetTest() {
-    const rst = new ReplSetTest({
-        nodes: 3,
-    });
-    rst.startSet();
-    rst.initiate();
+// Tests that set/getClusterParameter works on a non-sharded replica set.
+const rst = new ReplSetTest({
+    nodes: 3,
+});
+rst.startSet();
+rst.initiate();
 
-    // Setup the necessary logging level for the test.
-    setupReplicaSet(rst);
+// Setup the necessary logging level for the test.
+setupReplicaSet(rst);
 
-    // First, ensure that nonexistent parameters and unauthorized users are rejected with the
-    // appropriate error codes.
-    testInvalidParameters(rst);
+// First, ensure that incorrect usages of set/getClusterParameter fail appropriately.
+testInvalidClusterParameterCommands(rst);
 
-    // Then, ensure that getClusterParameter returns the expected values for all valid invocations
-    // of getClusterParameter.
-    testValidParameters(rst);
+// Then, ensure that set/getClusterParameter set and retrieve the expected values on the
+// majority of the nodes in the replica set.
+testValidClusterParameterCommands(rst);
 
-    rst.stopSet();
-}
-
-runReplSetTest();
+rst.stopSet();
 })();

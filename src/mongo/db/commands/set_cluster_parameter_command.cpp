@@ -35,6 +35,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/cluster_server_parameter_cmds_gen.h"
 #include "mongo/db/commands/set_cluster_parameter_invocation.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/idl/cluster_server_parameter_gen.h"
 #include "mongo/logv2/log.h"
 
@@ -67,10 +68,20 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-
             uassert(ErrorCodes::IllegalOperation,
                     "Cannot set cluster parameter, gFeatureFlagClusterWideConfig is not enabled",
                     gFeatureFlagClusterWideConfig.isEnabledAndIgnoreFCV());
+
+            uassert(ErrorCodes::ErrorCodes::NotImplemented,
+                    "setClusterParameter can only run on mongos in sharded clusters",
+                    (serverGlobalParams.clusterRole == ClusterRole::None));
+
+            // TODO SERVER-65249: This will eventually be made specific to the parameter being set
+            // so that some parameters will be able to use setClusterParameter even on standalones.
+            uassert(ErrorCodes::IllegalOperation,
+                    str::stream() << Request::kCommandName << " cannot be run on standalones",
+                    repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() !=
+                        repl::ReplicationCoordinator::modeNone);
 
             std::unique_ptr<ServerParameterService> parameterService =
                 std::make_unique<ClusterParameterService>();

@@ -104,9 +104,9 @@ public:
         return updateParameterOnDiskMockImpl(cmd, info);
     }
 
-    LogicalTime getUpdateClusterTime(OperationContext*) override {
+    Timestamp getUpdateClusterTime(OperationContext*) override {
         LogicalTime lt;
-        return lt;
+        return lt.asTimestamp();
     }
 
 private:

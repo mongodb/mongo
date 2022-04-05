@@ -15,12 +15,10 @@ const clusterParameterNames = ["testStrClusterParameter", "testIntClusterParamet
 const clusterParametersDefault = [
     {
         _id: "testStrClusterParameter",
-        clusterParameterTime: Timestamp(0, 0),
         strData: "off",
     },
     {
         _id: "testIntClusterParameter",
-        clusterParameterTime: Timestamp(0, 0),
         intData: 16,
     }
 ];
@@ -28,12 +26,10 @@ const clusterParametersDefault = [
 const clusterParametersInsert = [
     {
         _id: "testStrClusterParameter",
-        clusterParameterTime: Timestamp(10, 2),
         strData: "on",
     },
     {
         _id: "testIntClusterParameter",
-        clusterParameterTime: Timestamp(10, 2),
         intData: 17,
     }
 ];
@@ -41,12 +37,10 @@ const clusterParametersInsert = [
 const clusterParametersUpdate = [
     {
         _id: "testStrClusterParameter",
-        clusterParameterTime: Timestamp(20, 4),
         strData: "sleep",
     },
     {
         _id: "testIntClusterParameter",
-        clusterParameterTime: Timestamp(20, 4),
         intData: 18,
     }
 ];
@@ -74,27 +68,22 @@ function setupSharded(st) {
     });
 }
 
-// TO-DO SERVER-65128: replace this function with a call to setClusterParameter.
-// Upserts config.clusterParameters document with w:majority.
-function simulateSetClusterParameterReplicaSet(rst, query, update) {
-    const clusterParametersNS = rst.getPrimary().getDB('config').clusterParameters;
-    assert.commandWorked(
-        clusterParametersNS.update(query, update, {upsert: true, writeConcern: {w: "majority"}}));
-}
+// Upserts config.clusterParameters document with w:majority via setClusterParameter.
+function runSetClusterParameter(conn, update) {
+    const paramName = update._id;
+    let updateCopy = Object.assign({}, update);
+    delete updateCopy._id;
+    delete updateCopy.clusterParameterTime;
+    const setClusterParameterDoc = {
+        [paramName]: updateCopy,
+    };
 
-// TO-DO SERVER-65128: replace this function with a call to setClusterParameter.
-// Upserts config.clusterParameters document with w:majority into configsvr and all shards.
-function simulateSetClusterParameterSharded(st, query, update) {
-    simulateSetClusterParameterReplicaSet(st.configRS, query, update);
-
-    const shards = [st.rs0, st.rs1, st.rs2];
-    shards.forEach(function(shard) {
-        simulateSetClusterParameterReplicaSet(shard, query, update);
-    });
+    const adminDB = conn.getDB('admin');
+    assert.commandWorked(adminDB.runCommand({setClusterParameter: setClusterParameterDoc}));
 }
 
 // Runs getClusterParameter on a specific mongod or mongos node and returns true/false depending
-// on whether .
+// on whether the expected values were returned.
 function runGetClusterParameterNode(conn, getClusterParameterArgs, expectedClusterParameters) {
     const adminDB = conn.getDB('admin');
     const actualClusterParameters =
@@ -117,10 +106,15 @@ function runGetClusterParameterNode(conn, getClusterParameterArgs, expectedClust
             }, {});
         const sortedActualClusterParameter =
             Object.keys(actualClusterParameter).sort().reduce(function(sorted, key) {
-                sorted[key] = actualClusterParameter[key];
+                if (key !== 'clusterParameterTime') {
+                    sorted[key] = actualClusterParameter[key];
+                }
                 return sorted;
             }, {});
+
         if (bsonWoCompare(sortedExpectedClusterParameter, sortedActualClusterParameter) !== 0) {
+            print('expected: ' + tojson(sortedExpectedClusterParameter) +
+                  '\nactual: ' + tojson(sortedActualClusterParameter));
             return false;
         }
     }
@@ -148,10 +142,13 @@ function runGetClusterParameterReplicaSet(rst, getClusterParameterArgs, expected
     assert((numMatches / numTotalNodes) > 0.5);
 }
 
-// Runs getClusterParameter on mongos and each mongod in each shard replica set.
+// Runs getClusterParameter on mongos, each mongod in each shard replica set, and each mongod in
+// the config server replica set.
 function runGetClusterParameterSharded(st, getClusterParameterArgs, expectedClusterParameters) {
     runGetClusterParameterNode(st.s0, getClusterParameterArgs, expectedClusterParameters);
 
+    runGetClusterParameterReplicaSet(
+        st.configRS, getClusterParameterArgs, expectedClusterParameters);
     const shards = [st.rs0, st.rs1, st.rs2];
     shards.forEach(function(shard) {
         runGetClusterParameterReplicaSet(shard, getClusterParameterArgs, expectedClusterParameters);
@@ -159,26 +156,24 @@ function runGetClusterParameterSharded(st, getClusterParameterArgs, expectedClus
 }
 
 // Tests valid usages of getClusterParameter and verifies that the expected values are returned.
-function testValidParameters(conn) {
+function testValidClusterParameterCommands(conn) {
     if (conn instanceof ReplSetTest) {
         // Run getClusterParameter in list format and '*' and ensure it returns all default values
         // on all nodes in the replica set.
         runGetClusterParameterReplicaSet(conn, clusterParameterNames, clusterParametersDefault);
         runGetClusterParameterReplicaSet(conn, '*', clusterParametersDefault);
 
-        // For each parameter, simulate setClusterParameter and verify that getClusterParameter
+        // For each parameter, run setClusterParameter and verify that getClusterParameter
         // returns the updated value on all nodes in the replica set.
         for (let i = 0; i < clusterParameterNames.length; i++) {
-            query = {_id: clusterParameterNames[i]};
-            simulateSetClusterParameterReplicaSet(conn, query, clusterParametersInsert[i]);
+            runSetClusterParameter(conn.getPrimary(), clusterParametersInsert[i]);
             runGetClusterParameterReplicaSet(
                 conn, clusterParameterNames[i], [clusterParametersInsert[i]]);
         }
 
         // Do the above again to verify that document updates are also handled properly.
         for (let i = 0; i < clusterParameterNames.length; i++) {
-            query = {_id: clusterParameterNames[i]};
-            simulateSetClusterParameterReplicaSet(conn, query, clusterParametersUpdate[i]);
+            runSetClusterParameter(conn.getPrimary(), clusterParametersUpdate[i]);
             runGetClusterParameterReplicaSet(
                 conn, clusterParameterNames[i], [clusterParametersUpdate[i]]);
         }
@@ -196,16 +191,14 @@ function testValidParameters(conn) {
         // For each parameter, simulate setClusterParameter and verify that getClusterParameter
         // returns the updated value on all nodes in the sharded cluster.
         for (let i = 0; i < clusterParameterNames.length; i++) {
-            query = {_id: clusterParameterNames[i]};
-            simulateSetClusterParameterSharded(conn, query, clusterParametersInsert[i]);
+            runSetClusterParameter(conn.s0, clusterParametersInsert[i]);
             runGetClusterParameterSharded(
                 conn, clusterParameterNames[i], [clusterParametersInsert[i]]);
         }
 
         // Do the above again to verify that document updates are also handled properly.
         for (let i = 0; i < clusterParameterNames.length; i++) {
-            query = {_id: clusterParameterNames[i]};
-            simulateSetClusterParameterSharded(conn, query, clusterParametersUpdate[i]);
+            runSetClusterParameter(conn.s0, clusterParametersUpdate[i]);
             runGetClusterParameterSharded(
                 conn, clusterParameterNames[i], [clusterParametersUpdate[i]]);
         }
@@ -217,8 +210,8 @@ function testValidParameters(conn) {
     }
 }
 
-// Tests that invalid uses of getClusterParameter fails
-function testInvalidParametersNode(conn) {
+// Tests that invalid uses of getClusterParameter fails on a given node.
+function testInvalidGetClusterParameter(conn) {
     const adminDB = conn.getDB('admin');
     // Assert that specifying a nonexistent parameter returns an error.
     assert.commandFailedWithCode(adminDB.runCommand({getClusterParameter: "nonexistentParam"}),
@@ -230,20 +223,90 @@ function testInvalidParametersNode(conn) {
         ErrorCodes.NoSuchKey);
 }
 
-// Tests that invalid uses of getClusterParameter fail with the appropriate errors.
-function testInvalidParameters(conn) {
+// Tests that invalid uses of set/getClusterParameter fail with the appropriate errors.
+function testInvalidClusterParameterCommands(conn) {
     if (conn instanceof ReplSetTest) {
-        testInvalidParametersNode(conn.getPrimary());
+        const adminDB = conn.getPrimary().getDB('admin');
+
+        // Assert that invalid uses of getClusterParameter fail on the primary.
+        testInvalidGetClusterParameter(conn.getPrimary());
+
+        // Assert that setting a nonexistent parameter on the primary returns an error.
+        assert.commandFailedWithCode(
+            adminDB.runCommand({setClusterParameter: {nonexistentParam: {intData: 5}}}),
+            ErrorCodes.IllegalOperation);
+
+        // Assert that running setClusterParameter with a scalar value fails.
+        assert.commandFailedWithCode(
+            adminDB.runCommand({setClusterParameter: {testIntClusterParameter: 5}}),
+            ErrorCodes.IllegalOperation);
+
         conn.getSecondaries().forEach(function(secondary) {
-            testInvalidParametersNode(secondary);
+            // Assert that setClusterParameter cannot be run on a secondary.
+            const secondaryAdminDB = secondary.getDB('admin');
+            assert.commandFailedWithCode(
+                secondaryAdminDB.runCommand(
+                    {setClusterParameter: {testIntClusterParameter: {intData: 5}}}),
+                ErrorCodes.NotWritablePrimary);
+            // Assert that invalid uses of getClusterParameter fail on secondaries.
+            testInvalidGetClusterParameter(secondary);
         });
     } else {
-        testInvalidParametersNode(conn.s0);
+        const adminDB = conn.s0.getDB('admin');
+
+        // Assert that invalid uses of getClusterParameter fail on mongos.
+        testInvalidGetClusterParameter(conn.s0);
+
+        // Assert that setting a nonexistent parameter on the mongos returns an error.
+        assert.commandFailedWithCode(
+            adminDB.runCommand({setClusterParameter: {nonexistentParam: {intData: 5}}}),
+            ErrorCodes.IllegalOperation);
+
+        // Assert that running setClusterParameter with a scalar value fails.
+        assert.commandFailedWithCode(
+            adminDB.runCommand({setClusterParameter: {testIntClusterParameter: 5}}),
+            ErrorCodes.IllegalOperation);
+
         const shards = [conn.rs0, conn.rs1, conn.rs2];
         shards.forEach(function(shard) {
+            // Assert that setClusterParameter cannot be run directly on a shard primary.
+            const shardPrimaryAdmin = shard.getPrimary().getDB('admin');
+            assert.commandFailedWithCode(
+                shardPrimaryAdmin.runCommand(
+                    {setClusterParameter: {testIntClusterParameter: {intData: 5}}}),
+                ErrorCodes.NotImplemented);
+            // Assert that invalid forms of getClusterParameter fail on the shard primary.
+            testInvalidGetClusterParameter(shard.getPrimary());
             shard.getSecondaries().forEach(function(secondary) {
-                testInvalidParametersNode(secondary);
+                // Assert that setClusterParameter cannot be run on a shard secondary.
+                const shardSecondaryAdmin = secondary.getDB('admin');
+                assert.commandFailedWithCode(
+                    shardSecondaryAdmin.runCommand(
+                        {setClusterParameter: {testIntClusterParameter: {intData: 5}}}),
+                    ErrorCodes.NotWritablePrimary);
+                // Assert that invalid forms of getClusterParameter fail on shard secondaries.
+                testInvalidGetClusterParameter(secondary);
             });
+        });
+
+        // Assert that setClusterParameter cannot be run directly on the configsvr primary.
+        const configRS = conn.configRS;
+        const configPrimaryAdmin = configRS.getPrimary().getDB('admin');
+        assert.commandFailedWithCode(
+            configPrimaryAdmin.runCommand(
+                {setClusterParameter: {testIntClusterParameter: {intData: 5}}}),
+            ErrorCodes.NotImplemented);
+        // Assert that invalid forms of getClusterParameter fail on the configsvr primary.
+        testInvalidGetClusterParameter(configRS.getPrimary());
+        configRS.getSecondaries().forEach(function(secondary) {
+            // Assert that setClusterParameter cannot be run on a configsvr secondary.
+            const configSecondaryAdmin = secondary.getDB('admin');
+            assert.commandFailedWithCode(
+                configSecondaryAdmin.runCommand(
+                    {setClusterParameter: {testIntClusterParameter: {intData: 5}}}),
+                ErrorCodes.NotWritablePrimary);
+            // Assert that invalid forms of getClusterParameter fail on configsvr secondaries.
+            testInvalidGetClusterParameter(secondary);
         });
     }
 }

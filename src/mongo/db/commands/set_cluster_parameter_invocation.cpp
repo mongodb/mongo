@@ -61,11 +61,10 @@ bool SetClusterParameterInvocation::invoke(OperationContext* opCtx,
             "Cluster parameter value must be an object",
             BSONType::Object == commandElement.type());
 
-    LogicalTime clusterTime =
-        paramTime ? LogicalTime(*paramTime) : _dbService.getUpdateClusterTime(opCtx);
+    Timestamp clusterTime = paramTime ? *paramTime : _dbService.getUpdateClusterTime(opCtx);
 
     BSONObjBuilder updateBuilder;
-    updateBuilder << "_id" << parameterName << "clusterParameterTime" << clusterTime.toBSON();
+    updateBuilder << "_id" << parameterName << "clusterParameterTime" << clusterTime;
     updateBuilder.appendElements(commandElement.Obj());
 
     BSONObj query = BSON("_id" << parameterName);
@@ -78,9 +77,9 @@ bool SetClusterParameterInvocation::invoke(OperationContext* opCtx,
     return uassertStatusOK(_dbService.updateParameterOnDisk(opCtx, query, update, writeConcern));
 }
 
-LogicalTime ClusterParameterDBClientService::getUpdateClusterTime(OperationContext* opCtx) {
+Timestamp ClusterParameterDBClientService::getUpdateClusterTime(OperationContext* opCtx) {
     VectorClock::VectorTime vt = VectorClock::get(opCtx)->getTime();
-    return vt.clusterTime();
+    return vt.clusterTime().asTimestamp();
 }
 
 StatusWith<bool> ClusterParameterDBClientService::updateParameterOnDisk(
@@ -93,6 +92,9 @@ StatusWith<bool> ClusterParameterDBClientService::updateParameterOnDisk(
     BSONObjBuilder set;
     set.append("$set", update);
     set.doneFast();
+
+    const auto writeConcernObj =
+        BSON(WriteConcernOptions::kWriteConcernField << writeConcern.toBSON());
 
     try {
         _dbClient.runCommand(
@@ -109,7 +111,7 @@ StatusWith<bool> ClusterParameterDBClientService::updateParameterOnDisk(
                     return entry;
                 }()});
 
-                return updateOp.toBSON(writeConcern.toBSON());
+                return updateOp.toBSON(writeConcernObj);
             }(),
             res);
     } catch (const DBException& ex) {

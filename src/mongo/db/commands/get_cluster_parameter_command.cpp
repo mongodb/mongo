@@ -34,6 +34,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/cluster_server_parameter_cmds_gen.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/idl/cluster_server_parameter_gen.h"
 #include "mongo/logv2/log.h"
 
@@ -69,6 +70,13 @@ public:
                 "featureFlagClusterWideConfig not enabled",
                 gFeatureFlagClusterWideConfig.isEnabled(serverGlobalParams.featureCompatibility));
 
+            // TODO SERVER-65249: This will eventually be made specific to the parameter being set
+            // so that some parameters will be able to use getClusterParameter even on standalones.
+            uassert(ErrorCodes::IllegalOperation,
+                    str::stream() << Request::kCommandName << " cannot be run on standalones",
+                    repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() !=
+                        repl::ReplicationCoordinator::modeNone);
+
             const stdx::variant<std::string, std::vector<std::string>>& cmdBody =
                 request().getCommandParameter();
             ServerParameterSet* clusterParameters = ServerParameterSet::getClusterParameterSet();
@@ -78,7 +86,6 @@ public:
             // For each parameter, generate a BSON representation of it and retrieve its name.
             auto makeBSON = [&](ServerParameter* requestedParameter) {
                 BSONObjBuilder bob;
-                bob.append("_id"_sd, requestedParameter->name());
                 requestedParameter->append(opCtx, bob, requestedParameter->name());
                 parameterValues.push_back(bob.obj());
                 parameterNames.push_back(requestedParameter->name());
