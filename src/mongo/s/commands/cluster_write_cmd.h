@@ -124,7 +124,6 @@ private:
         return static_cast<const ClusterWriteCmd*>(definition());
     }
 
-    bool _bypass;
     const OpMsgRequest* _request;
     BatchedCommandRequest _batchedRequest;
 
