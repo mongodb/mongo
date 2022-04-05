@@ -5,9 +5,9 @@ import unittest
 import inject
 
 import buildscripts.task_generation.task_types.fuzzer_tasks as under_test
+from buildscripts.task_generation.resmoke_proxy import ResmokeProxyService
 
 # pylint: disable=missing-docstring,invalid-name,unused-argument,no-self-use,protected-access
-from buildscripts.task_generation.resmoke_proxy import ResmokeProxyService
 
 
 def build_mock_fuzzer_params(jstestfuzz_vars="vars for jstestfuzz", npm_command="jstestfuzz"):
@@ -28,6 +28,7 @@ def build_mock_fuzzer_params(jstestfuzz_vars="vars for jstestfuzz", npm_command=
         use_large_distro=None,
         large_distro_name="large distro",
         config_location="config_location",
+        dependencies={"archive_dist_test_debug"},
     )
 
 

@@ -2,13 +2,13 @@
 import unittest
 
 import inject
-from mock import MagicMock
 
 import buildscripts.task_generation.task_types.resmoke_tasks as under_test
-from buildscripts.ciconfig.evergreen import EvergreenProjectConfig, Variant
+from buildscripts.ciconfig.evergreen import EvergreenProjectConfig
 from buildscripts.task_generation.resmoke_proxy import ResmokeProxyService
 from buildscripts.task_generation.suite_split import GeneratedSuite, SubSuite
-from buildscripts.task_generation.task_types.gentask_options import GenTaskOptions
+from buildscripts.task_generation.task_types.gentask_options import \
+    GenTaskOptions
 from buildscripts.util.teststats import TestRuntime
 
 # pylint: disable=missing-docstring,invalid-name,unused-argument,no-self-use,protected-access
@@ -47,6 +47,7 @@ def build_mock_gen_params(repeat_suites=1, resmoke_args="resmoke args"):
         resmoke_jobs_max=None,
         large_distro_name=None,
         config_location="generated_config",
+        dependencies={"archive_dist_test_debug"},
     )
 
 

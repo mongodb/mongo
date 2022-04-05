@@ -89,7 +89,7 @@ variables:
   name: gen_task_template
   depends_on:
   - name: build_variant_gen
-  - name: archive_dist_test
+  - name: archive_dist_test_debug
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -154,7 +154,7 @@ variables:
   exec_timeout_secs: 14400 # Time out the task if it runs for more than 4 hours.
   depends_on:
   - build_variant_gen
-  - archive_dist_test
+  - archive_dist_test_debug
   commands:
   - func: "generate resmoke tasks"
 

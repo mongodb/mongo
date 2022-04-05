@@ -41,6 +41,8 @@ class FuzzerGenTaskParams(NamedTuple):
     timeout_secs: Timeout before test execution is considered hung.
     require_multiversion_setup: Requires downloading Multiversion binaries.
     use_large_distro: Should tests be generated on a large distro.
+    config_location: S3 path to the generated config tarball. None if no generated config files.
+    dependencies: Set of dependencies generated tasks should depend on.
     """
 
     task_name: str
@@ -59,6 +61,7 @@ class FuzzerGenTaskParams(NamedTuple):
     use_large_distro: Optional[bool]
     large_distro_name: Optional[str]
     config_location: str
+    dependencies: Set[str]
 
     def jstestfuzz_params(self) -> Dict[str, str]:
         """Build a dictionary of parameters to pass to jstestfuzz."""
@@ -141,4 +144,6 @@ class FuzzerGenTaskService:
             FunctionCall(RUN_GENERATED_TESTS, run_tests_vars)
         ]
 
-        return Task(sub_task_name, commands, {TaskDependency(ARCHIVE_DIST_TEST_DEBUG_TASK)})
+        dependencies = {TaskDependency(dependency) for dependency in params.dependencies}
+
+        return Task(sub_task_name, commands, dependencies)
