@@ -875,6 +875,7 @@ conn_dsrc_stats = [
     # Checkpoint cleanup statistics
     ##########################################
     CheckpointCleanupStat('cc_pages_evict', 'pages added for eviction'),
+    CheckpointCleanupStat('cc_pages_read', 'obsolete pages read in for cleanup'),
     CheckpointCleanupStat('cc_pages_removed', 'pages removed'),
     CheckpointCleanupStat('cc_pages_visited', 'pages visited'),
     CheckpointCleanupStat('cc_pages_walk_skipped', 'pages skipped during tree walk'),

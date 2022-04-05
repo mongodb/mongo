@@ -115,6 +115,22 @@ __sync_dup_walk(WT_SESSION_IMPL *session, WT_REF *walk, uint32_t flags, WT_REF *
 }
 
 /*
+ * __sync_should_read_obsolete_page --
+ *     Check if we should read in an obsolete page with overflow items in order to re-reconcile it
+ *     and discard it all.
+ */
+static int
+__sync_should_read_obsolete_page(WT_SESSION_IMPL *session)
+{
+    /* If the cache is under stress, don't make it worse. */
+    if (__wt_cache_aggressive(session) || __wt_cache_full(session) || __wt_cache_stuck(session) ||
+      __wt_eviction_needed(session, false, false, NULL))
+        return (false);
+
+    return (true);
+}
+
+/*
  * __sync_ref_obsolete_check --
  *     Check whether the ref is obsolete according to the newest stop time point and handle the
  *     obsolete page.
@@ -168,11 +184,10 @@ __sync_ref_obsolete_check(WT_SESSION_IMPL *session, WT_REF *ref)
     ovfl_items = false;
     if (previous_state == WT_REF_DISK) {
         /*
-         * There should be an address, but simply skip any page where we don't find one. Also skip
-         * the pages that have overflow keys as part of fast delete flow. These overflow keys pages
-         * are handled as an in-memory obsolete page flow.
+         * There should be an address, but simply skip any page where we don't find one.
          */
-        if (__wt_ref_addr_copy(session, ref, &addr) && addr.type == WT_ADDR_LEAF_NO) {
+        if (__wt_ref_addr_copy(session, ref, &addr) &&
+          (addr.type == WT_ADDR_LEAF_NO || addr.type == WT_ADDR_LEAF)) {
             /*
              * Max stop timestamp is possible only when the prepared update is written to the data
              * store.
@@ -184,11 +199,30 @@ __sync_ref_obsolete_check(WT_SESSION_IMPL *session, WT_REF *ref)
             obsolete = __wt_txn_visible_all(session, newest_stop_txn, newest_stop_durable_ts);
         }
 
-        if (obsolete) {
+        if (obsolete && addr.type == WT_ADDR_LEAF_NO) {
             WT_REF_UNLOCK(ref, WT_REF_DELETED);
             WT_STAT_CONN_DATA_INCR(session, cc_pages_removed);
 
             WT_RET(__wt_page_parent_modify_set(session, ref, true));
+        } else if (obsolete && __sync_should_read_obsolete_page(session)) {
+            /*
+             * This page has overflow items, so we can't just drop it. Instead, read it into memory
+             * and mark it dirty (and ready to evict) so that the next reconciliation will clean it
+             * up.
+             *
+             * Set READ_SKIP_DELETED so that if someone else deletes the page when we unlock it, we
+             * don't then bother to reinstantiate it.
+             */
+            WT_REF_UNLOCK(ref, previous_state);
+            ret = __wt_page_in(session, ref, WT_READ_WONT_NEED | WT_READ_SKIP_DELETED);
+            WT_RET_NOTFOUND_OK(ret);
+            if (ret == 0) {
+                /* Mark the page dirty and count what we did in the stats. */
+                WT_RET(__wt_page_modify_init(session, ref->page));
+                __wt_page_modify_set(session, ref->page);
+                WT_RET(__wt_page_release(session, ref, 0));
+                WT_STAT_CONN_DATA_INCR(session, cc_pages_read);
+            }
         } else
             WT_REF_UNLOCK(ref, previous_state);
 
