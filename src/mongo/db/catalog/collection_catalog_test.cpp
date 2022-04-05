@@ -69,7 +69,7 @@ public:
         opCtx = makeOperationContext();
 
         std::shared_ptr<Collection> collection =
-            std::make_shared<CollectionMock>(TenantNamespace(boost::none, nss));
+            std::make_shared<CollectionMock>(colUUID, TenantNamespace(boost::none, nss));
         col = CollectionPtr(collection.get(), CollectionPtr::NoYieldTag{});
         // Register dummy collection in catalog.
         catalog.registerCollection(opCtx.get(), colUUID, std::move(collection));
@@ -451,7 +451,7 @@ TEST_F(CollectionCatalogTest, RenameCollection) {
     auto uuid = UUID::gen();
     NamespaceString oldNss(nss.db(), "oldcol");
     std::shared_ptr<Collection> collShared =
-        std::make_shared<CollectionMock>(TenantNamespace(boost::none, oldNss));
+        std::make_shared<CollectionMock>(uuid, TenantNamespace(boost::none, oldNss));
     auto collection = collShared.get();
     catalog.registerCollection(opCtx.get(), uuid, std::move(collShared));
     ASSERT_EQUALS(catalog.lookupCollectionByUUID(opCtx.get(), uuid), collection);
