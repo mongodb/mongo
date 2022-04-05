@@ -240,10 +240,11 @@ SemiFuture<void> MigrationCoordinator::_commitMigrationOnDonorAndRecipient(
                 "Retrieving number of orphan documents from recipient",
                 "migrationId"_attr = _migrationInfo.getId());
 
-    auto numOrphans = migrationutil::retrieveNumOrphansFromRecipient(opCtx, _migrationInfo);
+    const auto numOrphans = migrationutil::retrieveNumOrphansFromRecipient(opCtx, _migrationInfo);
 
     if (numOrphans > 0) {
-        migrationutil::persistUpdatedNumOrphans(opCtx, _migrationInfo.getId(), numOrphans);
+        migrationutil::persistUpdatedNumOrphans(
+            opCtx, _migrationInfo.getId(), _migrationInfo.getCollectionUuid(), numOrphans);
     }
 
     LOGV2_DEBUG(23896,

@@ -341,17 +341,17 @@ TEST_F(MigrationUtilsTest, TestInvalidUUID) {
 
 TEST_F(MigrationUtilsTest, TestUpdateNumberOfOrphans) {
     auto opCtx = operationContext();
-    const auto uuid = UUID::gen();
+    const auto collectionUuid = UUID::gen();
     PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
-    auto rangeDeletionDoc = createDeletionTask(opCtx, kTestNss, uuid, 0, 10);
+    auto rangeDeletionDoc = createDeletionTask(opCtx, kTestNss, collectionUuid, 0, 10);
     rangeDeletionDoc.setNumOrphanDocs(0);
     store.add(opCtx, rangeDeletionDoc);
 
-    migrationutil::persistUpdatedNumOrphans(opCtx, rangeDeletionDoc.getId(), 5);
+    migrationutil::persistUpdatedNumOrphans(opCtx, rangeDeletionDoc.getId(), collectionUuid, 5);
     rangeDeletionDoc.setNumOrphanDocs(5);
     ASSERT_EQ(store.count(opCtx, rangeDeletionDoc.toBSON().removeField("timestamp")), 1);
 
-    migrationutil::persistUpdatedNumOrphans(opCtx, rangeDeletionDoc.getId(), -5);
+    migrationutil::persistUpdatedNumOrphans(opCtx, rangeDeletionDoc.getId(), collectionUuid, -5);
     rangeDeletionDoc.setNumOrphanDocs(0);
     ASSERT_EQ(store.count(opCtx, rangeDeletionDoc.toBSON().removeField("timestamp")), 1);
 }

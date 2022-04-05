@@ -269,6 +269,7 @@ private:
     stdx::thread _migrateThreadHandle;
 
     boost::optional<UUID> _migrationId;
+    boost::optional<UUID> _collectionUuid;
     LogicalSessionId _lsid;
     TxnNumber _txnNumber{kUninitializedTxnNumber};
     NamespaceString _nss;

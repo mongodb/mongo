@@ -74,6 +74,7 @@ let testColl = testDB.foo;
         collectionUuid: collectionUuid,
         donorShardId: "unused",
         pending: true,
+        numOrphanDocs: orphanCount,
         range: {min: {x: 70}, max: {x: 90}},
         whenToClean: "now"
     };

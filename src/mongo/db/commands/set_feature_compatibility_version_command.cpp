@@ -394,9 +394,9 @@ public:
 
             if (request.getPhase() == SetFCVPhaseEnum::kStart) {
                 invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
-                // TODO SERVER-64162 Destroy the BalancerStatsRegistry
                 if (actualVersion > requestedVersion &&
                     !feature_flags::gOrphanTracking.isEnabledOnVersion(requestedVersion)) {
+                    BalancerStatsRegistry::get(opCtx)->terminate();
                     ScopedRangeDeleterLock rangeDeleterLock(opCtx);
                     clearOrphanCountersFromRangeDeletionTasks(opCtx);
                 }
@@ -466,9 +466,11 @@ public:
                 migrationutil::drainMigrationsPendingRecovery(opCtx);
 
                 if (orphanTrackingCondition) {
-                    // TODO SERVER-64162 Initialize the BalancerStatsRegistry
-                    ScopedRangeDeleterLock rangeDeleterLock(opCtx);
-                    setOrphanCountersOnRangeDeletionTasks(opCtx);
+                    {
+                        ScopedRangeDeleterLock rangeDeleterLock(opCtx);
+                        setOrphanCountersOnRangeDeletionTasks(opCtx);
+                    }
+                    BalancerStatsRegistry::get(opCtx)->initializeAsync(opCtx);
                 }
             }
 

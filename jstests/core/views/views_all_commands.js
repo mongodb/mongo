@@ -153,6 +153,7 @@ let viewsCommandTests = {
     _shardsvrCreateCollectionParticipant: {skip: isAnInternalCommand},
     _shardsvrDropDatabase: {skip: isAnInternalCommand},
     _shardsvrDropDatabaseParticipant: {skip: isAnInternalCommand},
+    _shardsvrGetStatsForBalancing: {skip: isAnInternalCommand},
     _shardsvrMovePrimary: {skip: isAnInternalCommand},
     _shardsvrMoveRange: {
         command: {_shardsvrMoveRange: "test.view"},

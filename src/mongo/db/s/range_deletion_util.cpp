@@ -325,7 +325,8 @@ ExecutorFuture<void> deleteRangeInBatches(const std::shared_ptr<executor::TaskEx
                                                                          keyPattern,
                                                                          range,
                                                                          numDocsToRemovePerBatch));
-                       migrationutil::persistUpdatedNumOrphans(opCtx, migrationId, -numDeleted);
+                       migrationutil::persistUpdatedNumOrphans(
+                           opCtx, migrationId, collectionUuid, -numDeleted);
 
                        if (MONGO_unlikely(hangAfterDoingDeletion.shouldFail())) {
                            hangAfterDoingDeletion.pauseWhileSet(opCtx);

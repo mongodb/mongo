@@ -1133,6 +1133,8 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
             return {uuid, indexes, idIndex, collOptions};
         }();
 
+        _collectionUuid = donorCollectionOptionsAndIndexes.uuid;
+
         auto fromShard = uassertStatusOK(
             Grid::get(outerOpCtx)->shardRegistry()->getShard(outerOpCtx, _fromShard));
 
@@ -1327,7 +1329,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
                     }
 
                     migrationutil::persistUpdatedNumOrphans(
-                        opCtx, _migrationId.get(), batchNumCloned);
+                        opCtx, _migrationId.get(), *_collectionUuid, batchNumCloned);
 
                     {
                         stdx::lock_guard<Latch> statsLock(_mutex);
@@ -1752,7 +1754,8 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx, const
     }
 
     if (changeInOrphans != 0) {
-        migrationutil::persistUpdatedNumOrphans(opCtx, _migrationId.get(), changeInOrphans);
+        migrationutil::persistUpdatedNumOrphans(
+            opCtx, _migrationId.get(), *_collectionUuid, changeInOrphans);
     }
     return didAnything;
 }

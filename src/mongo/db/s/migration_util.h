@@ -31,6 +31,7 @@
 
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/s/balancer_stats_registry.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/migration_coordinator_document_gen.h"
 #include "mongo/db/s/migration_recipient_recovery_document_gen.h"
@@ -149,6 +150,7 @@ void persistRangeDeletionTaskLocally(OperationContext* opCtx,
  */
 void persistUpdatedNumOrphans(OperationContext* opCtx,
                               const UUID& migrationId,
+                              const UUID& collectionUuid,
                               long long changeInOrphans);
 
 /**

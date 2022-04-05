@@ -672,6 +672,7 @@ void persistRangeDeletionTaskLocally(OperationContext* opCtx,
 
 void persistUpdatedNumOrphans(OperationContext* opCtx,
                               const UUID& migrationId,
+                              const UUID& collectionUuid,
                               long long changeInOrphans) {
     // TODO (SERVER-63819) Remove numOrphanDocsFieldName field from the query
     // Add $exists to the query to ensure that on upgrade and downgrade, the numOrphanDocs field
@@ -690,6 +691,7 @@ void persistUpdatedNumOrphans(OperationContext* opCtx,
                                                  << changeInOrphans)),
                              WriteConcerns::kLocalWriteConcern);
             });
+        BalancerStatsRegistry::get(opCtx)->updateOrphansCount(collectionUuid, changeInOrphans);
     } catch (const ExceptionFor<ErrorCodes::NoMatchingDocument>&) {
         // When upgrading or downgrading, there may be no documents with the orphan count field.
     }

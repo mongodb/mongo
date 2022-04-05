@@ -739,6 +739,9 @@ public:
 
     virtual long long numRecords(OperationContext* opCtx) const = 0;
 
+    /**
+     * Return uncompressed collection data size in bytes
+     */
     virtual long long dataSize(OperationContext* opCtx) const = 0;
 
 
@@ -747,6 +750,9 @@ public:
      */
     virtual bool isEmpty(OperationContext* opCtx) const = 0;
 
+    /**
+     * Return the average object size in bytes
+     */
     virtual int averageObjectSize(OperationContext* opCtx) const = 0;
 
     virtual uint64_t getIndexSize(OperationContext* opCtx,

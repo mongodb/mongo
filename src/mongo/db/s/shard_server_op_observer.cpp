@@ -36,6 +36,7 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/op_observer_impl.h"
+#include "mongo/db/s/balancer_stats_registry.h"
 #include "mongo/db/s/chunk_split_state_driver.h"
 #include "mongo/db/s/chunk_splitter.h"
 #include "mongo/db/s/collection_critical_section_document_gen.h"
@@ -57,6 +58,7 @@
 #include "mongo/s/cannot_implicitly_create_collection_info.h"
 #include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 
 namespace mongo {
 namespace {
@@ -268,6 +270,10 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
                 opCtx->recoveryUnit()->registerChange(
                     std::make_unique<SubmitRangeDeletionHandler>(opCtx, deletionTask));
             }
+
+            const auto numOrphanDocs = deletionTask.getNumOrphanDocs().value_or(0);
+            BalancerStatsRegistry::get(opCtx)->onRangeDeletionTaskInsertion(
+                deletionTask.getCollectionUuid(), numOrphanDocs);
         }
 
         if (nss == NamespaceString::kCollectionCriticalSectionsNamespace &&
@@ -446,7 +452,8 @@ void ShardServerOpObserver::aboutToDelete(OperationContext* opCtx,
                                           const UUID& uuid,
                                           BSONObj const& doc) {
 
-    if (nss == NamespaceString::kCollectionCriticalSectionsNamespace) {
+    if (nss == NamespaceString::kCollectionCriticalSectionsNamespace ||
+        nss == NamespaceString::kRangeDeletionNamespace) {
         documentIdDecoration(opCtx) = doc;
     } else {
         // Extract the _id field from the document. If it does not have an _id, use the
@@ -526,6 +533,33 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
                 auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr);
                 csr->exitCriticalSection(csrLock, reason);
             });
+    }
+
+    if (nss == NamespaceString::kRangeDeletionNamespace) {
+        if (!feature_flags::gOrphanTracking.isEnabled(serverGlobalParams.featureCompatibility)) {
+            return;
+        }
+
+        const auto& deletedDoc = documentId;
+
+        const auto numOrphanDocs = [&] {
+            auto numOrphanDocsElem = update_oplog_entry::extractNewValueForField(
+                deletedDoc, RangeDeletionTask::kNumOrphanDocsFieldName);
+            return numOrphanDocsElem ? numOrphanDocsElem.exactNumberLong() : 0;
+        }();
+
+        auto collUuid = [&] {
+            BSONElement collUuidElem;
+            uassertStatusOK(bsonExtractField(
+                documentId, RangeDeletionTask::kCollectionUuidFieldName, &collUuidElem));
+            return uassertStatusOK(UUID::parse(std::move(collUuidElem)));
+        }();
+
+        opCtx->recoveryUnit()->onCommit([opCtx = opCtx,
+                                         collUuid = std::move(collUuid),
+                                         numOrphanDocs](boost::optional<Timestamp>) {
+            BalancerStatsRegistry::get(opCtx)->onRangeDeletionTaskDeletion(collUuid, numOrphanDocs);
+        });
     }
 }
 

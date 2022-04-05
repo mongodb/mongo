@@ -1,0 +1,72 @@
+# Copyright (C) 2022-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+global:
+    cpp_namespace: "mongo"
+
+imports:
+    - "mongo/idl/basic_types.idl"
+
+structs:
+    CollStatsForBalancing:
+        description: 'Collection stats for a specific collection'
+        strict: false
+        fields:
+            namespace:
+                description: 'Namespace of the collection'
+                type: namespacestring
+                cpp_name: ns
+            collSize:
+                description: 'size of data currently owned by this shard for this collection'
+                type: safeInt64
+
+    ShardsvrGetStatsForBalancingReply:
+        description: 'Response for ShardsvrGetStatsForBalancing command'
+        strict: false
+        fields:
+            stats:
+                description: 'List of stats for each of the requested collection'
+                type: array<CollStatsForBalancing>
+
+commands:
+    _shardsvrGetStatsForBalancing:
+        command_name: _shardsvrGetStatsForBalancing
+        cpp_name: ShardsvrGetStatsForBalancing
+        description: 'Internal command used by the balancer to retrieve stats for balancing.'
+        namespace: ignored
+        api_version: ''
+        strict: false
+        reply_type: ShardsvrGetStatsForBalancingReply
+        fields:
+            collections:
+                description: 'List of namespaces to retrieve statistic for'
+                type: array<namespacestring>
+            scaleFactor:
+                description: 'Scale factor for data size units. If omitted 1048576 (MiB) will be used'
+                type: exactInt64
+                optional: true
