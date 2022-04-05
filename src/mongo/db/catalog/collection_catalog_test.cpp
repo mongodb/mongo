@@ -26,6 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+
 #include "mongo/db/catalog/collection_catalog.h"
 
 #include <algorithm>
@@ -80,7 +81,8 @@ public:
     }
 
 protected:
-    CollectionCatalog catalog;
+    std::shared_ptr<CollectionCatalog> sharedCatalog = std::make_shared<CollectionCatalog>();
+    CollectionCatalog& catalog = *sharedCatalog;
     ServiceContext::UniqueOperationContext opCtx;
     NamespaceString nss;
     CollectionPtr col;
@@ -443,9 +445,36 @@ TEST_F(CollectionCatalogTest, InsertAfterLookup) {
 }
 
 TEST_F(CollectionCatalogTest, OnDropCollection) {
+    auto yieldableColl = catalog.lookupCollectionByUUID(opCtx.get(), colUUID);
+    ASSERT(yieldableColl);
+    ASSERT_EQUALS(yieldableColl, col);
+
+    // Yielding resets a CollectionPtr's internal state to be restored later, provided
+    // the collection has not been dropped or renamed.
+    ASSERT_EQ(yieldableColl->uuid(), colUUID);  // Correct collection UUID is required for restore.
+    yieldableColl.yield();
+    ASSERT_FALSE(yieldableColl);
+
+    // The global catalog is used to refresh the CollectionPtr's internal state, so we temporarily
+    // replace the global instance initialized in the service context test fixture with our own.
+    CollectionCatalogStasher catalogStasher(opCtx.get(), sharedCatalog);
+
+    // Before dropping collection, confirm that the CollectionPtr can be restored successfully.
+    yieldableColl.restore();
+    ASSERT(yieldableColl);
+    ASSERT_EQUALS(yieldableColl, col);
+
+    // Reset CollectionPtr for post-drop restore test.
+    yieldableColl.yield();
+    ASSERT_FALSE(yieldableColl);
+
     catalog.deregisterCollection(opCtx.get(), colUUID);
     // Ensure the lookup returns a null pointer upon removing the colUUID entry.
     ASSERT(catalog.lookupCollectionByUUID(opCtx.get(), colUUID) == nullptr);
+
+    // After dropping the collection, we should fail to restore the CollectionPtr.
+    yieldableColl.restore();
+    ASSERT_FALSE(yieldableColl);
 }
 
 TEST_F(CollectionCatalogTest, RenameCollection) {
@@ -454,12 +483,38 @@ TEST_F(CollectionCatalogTest, RenameCollection) {
     std::shared_ptr<Collection> collShared = std::make_shared<CollectionMock>(uuid, oldNss);
     auto collection = collShared.get();
     catalog.registerCollection(opCtx.get(), uuid, std::move(collShared));
-    ASSERT_EQUALS(catalog.lookupCollectionByUUID(opCtx.get(), uuid), collection);
+    auto yieldableColl = catalog.lookupCollectionByUUID(opCtx.get(), uuid);
+    ASSERT(yieldableColl);
+    ASSERT_EQUALS(yieldableColl, collection);
+
+    // Yielding resets a CollectionPtr's internal state to be restored later, provided
+    // the collection has not been dropped or renamed.
+    ASSERT_EQ(yieldableColl->uuid(), uuid);  // Correct collection UUID is required for restore.
+    yieldableColl.yield();
+    ASSERT_FALSE(yieldableColl);
+
+    // The global catalog is used to refresh the CollectionPtr's internal state, so we temporarily
+    // replace the global instance initialized in the service context test fixture with our own.
+    CollectionCatalogStasher catalogStasher(opCtx.get(), sharedCatalog);
+
+    // Before renaming collection, confirm that the CollectionPtr can be restored successfully.
+    yieldableColl.restore();
+    ASSERT(yieldableColl);
+    ASSERT_EQUALS(yieldableColl, collection);
+
+    // Reset CollectionPtr for post-rename restore test.
+    yieldableColl.yield();
+    ASSERT_FALSE(yieldableColl);
 
     NamespaceString newNss(NamespaceString(nss.db(), "newcol"));
     ASSERT_OK(collection->rename(opCtx.get(), newNss, false));
     ASSERT_EQ(collection->ns(), newNss);
     ASSERT_EQUALS(catalog.lookupCollectionByUUID(opCtx.get(), uuid), collection);
+
+    // After renaming the collection, we should fail to restore the CollectionPtr.
+    yieldableColl.restore();
+    ASSERT(yieldableColl);
+    ASSERT_EQUALS(yieldableColl, collection);
 }
 
 TEST_F(CollectionCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsOldNSSIfDropped) {
