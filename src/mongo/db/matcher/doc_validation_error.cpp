@@ -1986,6 +1986,7 @@ public:
             {"dependencies", {"failingDependencies", ""}},
             {"required", {"missingProperties", ""}},
             {"_property", {"details", ""}},
+            {"implicitFLESchema", {"schemaRulesNotSatisfied", "schemaRulesSatisfied"}},
             {"", {"details", ""}}};
         auto detailsStringPair = detailsStringMap.find(tag);
         invariant(detailsStringPair != detailsStringMap.end());

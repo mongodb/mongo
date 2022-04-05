@@ -175,7 +175,7 @@ std::unique_ptr<MatchExpression> treeToMatchExpression(
     // if top-level, wrap the "and" expression with an outer "and" annotated with $and.
     if (toplevel) {
         auto outerAndExpr = std::make_unique<AndMatchExpression>(
-            doc_validation_error::createAnnotation(expCtx, "$and", BSONObj()));
+            doc_validation_error::createAnnotation(expCtx, "implicitFLESchema", BSONObj()));
         outerAndExpr->add(std::move(subschema));
         return outerAndExpr;
     }
