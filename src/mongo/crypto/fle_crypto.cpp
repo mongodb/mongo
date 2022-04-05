@@ -636,7 +636,7 @@ public:
     static FLE2InsertUpdatePayload serializeInsertUpdatePayload(FLEIndexKeyAndId indexKey,
                                                                 FLEUserKeyAndId userKey,
                                                                 BSONElement element,
-                                                                uint64_t maxContentionFactor);
+                                                                uint64_t contentionFactor);
 };
 
 
@@ -644,12 +644,10 @@ FLE2InsertUpdatePayload EDCClientPayload::parseInsertUpdatePayload(ConstDataRang
     return parseFromCDR<FLE2InsertUpdatePayload>(cdr);
 }
 
-
-FLE2InsertUpdatePayload EDCClientPayload::serializeInsertUpdatePayload(
-    FLEIndexKeyAndId indexKey,
-    FLEUserKeyAndId userKey,
-    BSONElement element,
-    uint64_t maxContentionFactor) {
+FLE2InsertUpdatePayload EDCClientPayload::serializeInsertUpdatePayload(FLEIndexKeyAndId indexKey,
+                                                                       FLEUserKeyAndId userKey,
+                                                                       BSONElement element,
+                                                                       uint64_t contentionFactor) {
     auto value = ConstDataRange(element.value(), element.value() + element.valuesize());
 
     auto collectionToken = FLELevel1TokenGenerator::generateCollectionsLevel1Token(indexKey.key);
@@ -666,12 +664,6 @@ FLE2InsertUpdatePayload EDCClientPayload::serializeInsertUpdatePayload(
         FLEDerivedFromDataTokenGenerator::generateESCDerivedFromDataToken(escToken, value);
     ECCDerivedFromDataToken eccDatakey =
         FLEDerivedFromDataTokenGenerator::generateECCDerivedFromDataToken(eccToken, value);
-
-    uint64_t contentionFactor = 0;
-    if (maxContentionFactor > 0) {
-        // Generate a number between [1,maxContentionFactor]
-        contentionFactor = SecureRandom().nextInt64(maxContentionFactor) + 1;
-    }
 
     EDCDerivedFromDataTokenAndContentionFactorToken edcDataCounterkey =
         FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
@@ -888,7 +880,8 @@ void visitEncryptedBSON(const BSONObj& object,
 void convertToFLE2Payload(FLEKeyVault* keyVault,
                           ConstDataRange cdr,
                           BSONObjBuilder* builder,
-                          StringData fieldNameToSerialize) {
+                          StringData fieldNameToSerialize,
+                          const ContentionFactorFn& contentionFactor) {
     auto [encryptedType, subCdr] = fromEncryptedConstDataRange(cdr);
 
     if (encryptedType == EncryptedBinDataType::kFLE2Placeholder) {
@@ -908,7 +901,7 @@ void convertToFLE2Payload(FLEKeyVault* keyVault,
 
             if (ep.getType() == Fle2PlaceholderType::kInsert) {
                 auto iupayload = EDCClientPayload::serializeInsertUpdatePayload(
-                    indexKey, userKey, el, ep.getMaxContentionCounter());
+                    indexKey, userKey, el, contentionFactor(ep));
 
                 toEncryptedBinData(fieldNameToSerialize,
                                    EncryptedBinDataType::kFLE2InsertUpdatePayload,
@@ -1146,6 +1139,10 @@ stdx::unordered_map<std::string, EncryptedField> toFieldMap(const EncryptedField
     return fields;
 }
 
+uint64_t generateRandomContention(uint64_t cm) {
+    return cm > 0 ? SecureRandom().nextInt64(cm) + 1 : 0;
+}
+
 }  // namespace
 
 
@@ -1265,18 +1262,25 @@ std::vector<uint8_t> FLEClientCrypto::encrypt(BSONElement element,
                                               FLEIndexKeyAndId indexKey,
                                               FLEUserKeyAndId userKey,
                                               FLECounter counter) {
-
-    auto iupayload =
-        EDCClientPayload::serializeInsertUpdatePayload(indexKey, userKey, element, counter);
-
-    return toEncryptedVector(EncryptedBinDataType::kFLE2InsertUpdatePayload, iupayload);
+    return toEncryptedVector(EncryptedBinDataType::kFLE2InsertUpdatePayload,
+                             EDCClientPayload::serializeInsertUpdatePayload(
+                                 indexKey, userKey, element, generateRandomContention(counter)));
 }
 
 
 BSONObj FLEClientCrypto::transformPlaceholders(const BSONObj& obj, FLEKeyVault* keyVault) {
+    return transformPlaceholders(obj, keyVault, [](const FLE2EncryptionPlaceholder& ep) {
+        // Generate a number between [1,maxContentionFactor]
+        return generateRandomContention(ep.getMaxContentionCounter());
+    });
+}
+
+BSONObj FLEClientCrypto::transformPlaceholders(const BSONObj& obj,
+                                               FLEKeyVault* keyVault,
+                                               const ContentionFactorFn& cf) {
     auto ret = transformBSON(
-        obj, [keyVault](ConstDataRange cdr, BSONObjBuilder* builder, StringData field) {
-            convertToFLE2Payload(keyVault, cdr, builder, field);
+        obj, [keyVault, cf](ConstDataRange cdr, BSONObjBuilder* builder, StringData field) {
+            convertToFLE2Payload(keyVault, cdr, builder, field, cf);
         });
 
     return ret;

@@ -721,6 +721,7 @@ private:
     }
 };
 
+using ContentionFactorFn = std::function<uint64_t(const FLE2EncryptionPlaceholder&)>;
 
 class FLEClientCrypto {
 public:
@@ -771,6 +772,14 @@ public:
      * }
      */
     static BSONObj transformPlaceholders(const BSONObj& obj, FLEKeyVault* keyVault);
+
+    /**
+     * Generates a client-side payload that is sent to the server. Contention factor is given
+     * explicitly as a lambda expression.
+     */
+    static BSONObj transformPlaceholders(const BSONObj& obj,
+                                         FLEKeyVault* keyVault,
+                                         const ContentionFactorFn& contentionFactor);
 
 
     /**

@@ -70,82 +70,93 @@ using TwiceDerived = FLETwiceDerivedTokenGenerator;
 //          }
 //          pos++
 //      return [EDC::encrypt(i) | i in tags]
-//
-// Note, a positive contention factor (cm) means we must repeat the above process (cm) times.
+void readTagsWithContention(const FLEStateCollectionReader& esc,
+                            const FLEStateCollectionReader& ecc,
+                            ESCDerivedFromDataToken s,
+                            ECCDerivedFromDataToken c,
+                            EDCDerivedFromDataToken d,
+                            uint64_t cf,
+                            std::vector<PrfBlock>& binaryTags) {
+
+    auto escTok = DerivedToken::generateESCDerivedFromDataTokenAndContentionFactorToken(s, cf);
+    auto escTag = TwiceDerived::generateESCTwiceDerivedTagToken(escTok);
+    auto escVal = TwiceDerived::generateESCTwiceDerivedValueToken(escTok);
+
+    auto eccTok = DerivedToken::generateECCDerivedFromDataTokenAndContentionFactorToken(c, cf);
+    auto eccTag = TwiceDerived::generateECCTwiceDerivedTagToken(eccTok);
+    auto eccVal = TwiceDerived::generateECCTwiceDerivedValueToken(eccTok);
+
+    auto edcTok = DerivedToken::generateEDCDerivedFromDataTokenAndContentionFactorToken(d, cf);
+    auto edcTag = TwiceDerived::generateEDCTwiceDerivedToken(edcTok);
+
+    // (1) Query ESC for the counter value after the most recent insert.
+    //     0 => 0 inserts for this field value pair.
+    //     n => n inserts for this field value pair.
+    //     none => compaction => query ESC for null document to find # of inserts.
+    auto insertCounter = ESCCollection::emuBinary(esc, escTag, escVal);
+    if (insertCounter && insertCounter.get() == 0) {
+        return;
+    }
+
+    stdx::unordered_set<int64_t> tags;
+
+    auto numInserts = insertCounter
+        ? uassertStatusOK(
+              ESCCollection::decryptDocument(
+                  escVal, esc.getById(ESCCollection::generateId(escTag, insertCounter))))
+              .count
+        : uassertStatusOK(ESCCollection::decryptNullDocument(
+                              escVal, esc.getById(ESCCollection::generateId(escTag, boost::none))))
+              .count;
+
+    // (2) Set the initial set of tags to 1..n inclusive - a superset of the true tag set.
+    for (uint64_t i = 1; i <= numInserts; i++) {
+        tags.insert(i);
+    }
+
+    // (3) Query ECC for a null document.
+    auto eccNullDoc = ecc.getById(ECCCollection::generateId(eccTag, boost::none));
+    auto pos = eccNullDoc.isEmpty()
+        ? 1
+        : uassertStatusOK(ECCCollection::decryptNullDocument(eccVal, eccNullDoc)).position + 2;
+
+    // (3) Search ECC for deleted tag(counter) values.
+    while (true) {
+        auto eccObj = ecc.getById(ECCCollection::generateId(eccTag, pos));
+        if (eccObj.isEmpty()) {
+            break;
+        }
+        auto eccDoc = uassertStatusOK(ECCCollection::decryptDocument(eccVal, eccObj));
+        // Compaction placeholders only present for positive contention factors (cm).
+        if (eccDoc.valueType == ECCValueType::kCompactionPlaceholder) {
+            break;
+        }
+        for (uint64_t i = eccDoc.start; i <= eccDoc.end; i++) {
+            tags.erase(i);
+        }
+        pos++;
+    }
+
+    for (auto counter : tags) {
+        // (4) Derive binary tag values (encrypted) from the set of counter values (tags).
+        binaryTags.emplace_back(EDCServerCollection::generateTag(edcTag, counter));
+    }
+}
+
+// A positive contention factor (cm) means we must run the above algorithm (cm) times.
 std::vector<PrfBlock> readTags(const FLEStateCollectionReader& esc,
                                const FLEStateCollectionReader& ecc,
                                ESCDerivedFromDataToken s,
                                ECCDerivedFromDataToken c,
                                EDCDerivedFromDataToken d,
                                boost::optional<int64_t> cm) {
-
     std::vector<PrfBlock> binaryTags;
-
-    for (auto i = 0; cm && i <= cm.get(); i++) {
-        auto escTok = DerivedToken::generateESCDerivedFromDataTokenAndContentionFactorToken(s, i);
-        auto escTag = TwiceDerived::generateESCTwiceDerivedTagToken(escTok);
-        auto escVal = TwiceDerived::generateESCTwiceDerivedValueToken(escTok);
-
-        auto eccTok = DerivedToken::generateECCDerivedFromDataTokenAndContentionFactorToken(c, i);
-        auto eccTag = TwiceDerived::generateECCTwiceDerivedTagToken(eccTok);
-        auto eccVal = TwiceDerived::generateECCTwiceDerivedValueToken(eccTok);
-
-        auto edcTok = DerivedToken::generateEDCDerivedFromDataTokenAndContentionFactorToken(d, i);
-        auto edcTag = TwiceDerived::generateEDCTwiceDerivedToken(edcTok);
-
-        // (1) Query ESC for the counter value after the most recent insert.
-        //     0 => 0 inserts for this field value pair.
-        //     n => n inserts for this field value pair.
-        //     none => compaction => query ESC for null document to find # of inserts.
-        auto insertCounter = ESCCollection::emuBinary(esc, escTag, escVal);
-        if (insertCounter && insertCounter.get() == 0) {
-            continue;
-        }
-
-        stdx::unordered_set<int64_t> tags;
-
-        auto numInserts = insertCounter
-            ? uassertStatusOK(
-                  ESCCollection::decryptDocument(
-                      escVal, esc.getById(ESCCollection::generateId(escTag, insertCounter))))
-                  .count
-            : uassertStatusOK(
-                  ESCCollection::decryptNullDocument(
-                      escVal, esc.getById(ESCCollection::generateId(escTag, boost::none))))
-                  .count;
-
-        // (2) Set the initial set of tags to 1..n inclusive - a superset of the true tag set.
-        for (uint64_t i = 1; i <= numInserts; i++) {
-            tags.insert(i);
-        }
-
-        // (3) Query ECC for a null document.
-        auto eccNullDoc = ecc.getById(ECCCollection::generateId(eccTag, boost::none));
-        auto pos = eccNullDoc.isEmpty()
-            ? 1
-            : uassertStatusOK(ECCCollection::decryptNullDocument(eccVal, eccNullDoc)).position + 2;
-
-        // (3) Search ECC for deleted tag(counter) values.
-        while (true) {
-            auto eccObj = ecc.getById(ECCCollection::generateId(eccTag, pos));
-            if (eccObj.isEmpty()) {
-                break;
-            }
-            auto eccDoc = uassertStatusOK(ECCCollection::decryptDocument(eccVal, eccObj));
-            // Compaction placeholders only present for positive contention factors (cm).
-            if (eccDoc.valueType == ECCValueType::kCompactionPlaceholder) {
-                break;
-            }
-            for (uint64_t i = eccDoc.start; i <= eccDoc.end; i++) {
-                tags.erase(i);
-            }
-            pos++;
-        }
-
-        for (auto counter : tags) {
-            // (4) Derive binary tag values (encrypted) from the set of counter values (tags).
-            binaryTags.emplace_back(EDCServerCollection::generateTag(edcTag, counter));
-        }
+    if (!cm || cm.get() == 0) {
+        readTagsWithContention(esc, ecc, s, c, d, 0, binaryTags);
+        return binaryTags;
+    }
+    for (auto i = 1; i <= cm.get(); i++) {
+        readTagsWithContention(esc, ecc, s, c, d, i, binaryTags);
     }
     return binaryTags;
 }

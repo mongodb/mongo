@@ -151,6 +151,11 @@ protected:
     void doSingleInsert(int id, BSONElement element);
     void doSingleInsert(int id, BSONObj obj);
 
+    void doSingleInsertWithContention(
+        int id, BSONElement element, int64_t cm, uint64_t cf, EncryptedFieldConfig efc);
+    void doSingleInsertWithContention(
+        int id, BSONObj obj, int64_t cm, uint64_t cf, EncryptedFieldConfig efc);
+
     void doSingleDelete(int id);
 
     void doSingleUpdate(int id, BSONElement element);
@@ -422,7 +427,7 @@ void FleCrudTest::validateDocument(int id, boost::optional<BSONObj> doc) {
 }
 
 // Use different keys for index and user
-std::vector<char> generateSinglePlaceholder(BSONElement value) {
+std::vector<char> generateSinglePlaceholder(BSONElement value, int64_t cm = 0) {
     FLE2EncryptionPlaceholder ep;
 
     ep.setAlgorithm(mongo::Fle2AlgorithmInt::kEquality);
@@ -430,7 +435,7 @@ std::vector<char> generateSinglePlaceholder(BSONElement value) {
     ep.setIndexKeyId(indexKeyId);
     ep.setValue(value);
     ep.setType(mongo::Fle2PlaceholderType::kInsert);
-    ep.setMaxContentionCounter(0);
+    ep.setMaxContentionCounter(cm);
 
     BSONObj obj = ep.toBSON();
 
@@ -462,6 +467,30 @@ void FleCrudTest::doSingleInsert(int id, BSONElement element) {
 
 void FleCrudTest::doSingleInsert(int id, BSONObj obj) {
     doSingleInsert(id, obj.firstElement());
+}
+
+void FleCrudTest::doSingleInsertWithContention(
+    int id, BSONElement element, int64_t cm, uint64_t cf, EncryptedFieldConfig efc) {
+    auto buf = generateSinglePlaceholder(element, cm);
+    BSONObjBuilder builder;
+    builder.append("_id", id);
+    builder.append("counter", 1);
+    builder.append("plainText", "sample");
+    builder.appendBinData("encrypted", buf.size(), BinDataType::Encrypt, buf.data());
+
+    auto clientDoc = builder.obj();
+
+    auto result = FLEClientCrypto::transformPlaceholders(
+        clientDoc, &_keyVault, [cf](const FLE2EncryptionPlaceholder&) { return cf; });
+
+    auto serverPayload = EDCServerCollection::getEncryptedFieldInfo(result);
+
+    uassertStatusOK(processInsert(_queryImpl.get(), _edcNs, serverPayload, efc, 0, result));
+}
+
+void FleCrudTest::doSingleInsertWithContention(
+    int id, BSONObj obj, int64_t cm, uint64_t cf, EncryptedFieldConfig efc) {
+    doSingleInsertWithContention(id, obj.firstElement(), cm, cf, efc);
 }
 
 void FleCrudTest::doSingleUpdate(int id, BSONObj obj) {
@@ -583,13 +612,23 @@ protected:
     void tearDown() {
         FleCrudTest::tearDown();
     }
-    std::vector<PrfBlock> readTags(BSONObj obj) {
+    std::vector<PrfBlock> readTagsWithContention(BSONObj obj, uint64_t contention = 0) {
         auto s = getTestESCDataToken(obj);
         auto c = getTestECCDataToken(obj);
         auto d = getTestEDCDataToken(obj);
         auto esc = CollectionReader("test.esc", *_queryImpl);
         auto ecc = CollectionReader("test.ecc", *_queryImpl);
-        return mongo::fle::readTags(esc, ecc, s, c, d, 0);
+        std::vector<PrfBlock> binaryTags;
+        mongo::fle::readTagsWithContention(esc, ecc, s, c, d, contention, binaryTags);
+        return binaryTags;
+    }
+    std::vector<PrfBlock> readTags(BSONObj obj, uint64_t cm = 0) {
+        auto s = getTestESCDataToken(obj);
+        auto c = getTestECCDataToken(obj);
+        auto d = getTestEDCDataToken(obj);
+        auto esc = CollectionReader("test.esc", *_queryImpl);
+        auto ecc = CollectionReader("test.ecc", *_queryImpl);
+        return mongo::fle::readTags(esc, ecc, s, c, d, cm);
     }
 };
 
@@ -1096,6 +1135,45 @@ TEST_F(FleTagsTest, InsertAndUpdate) {
 
     ASSERT_EQ(0, readTags(doc1).size());
     ASSERT_EQ(1, readTags(doc2).size());
+}
+
+TEST_F(FleTagsTest, ContentionFactor) {
+    auto efc = EncryptedFieldConfig::parse(IDLParserErrorContext("root"), fromjson(R"({
+        "escCollection": "esc",
+        "eccCollection": "ecc",
+        "ecocCollection": "ecoc",
+        "fields": [{
+            "keyId": { "$uuid": "12345678-1234-9876-1234-123456789012"},
+            "path": "encrypted",
+            "bsonType": "string",
+            "queries": {"queryType": "equality", "contention": NumberLong(4)}
+        }]
+    })"));
+
+    auto doc1 = BSON("encrypted"
+                     << "a");
+    auto doc2 = BSON("encrypted"
+                     << "b");
+
+    // Insert doc1 twice with a contention factor of 1 and once with a contention factor or 4.
+    doSingleInsertWithContention(1, doc1, 4, 1, efc);
+    doSingleInsertWithContention(4, doc1, 4, 4, efc);
+    doSingleInsertWithContention(5, doc1, 4, 1, efc);
+
+    // Insert doc2 once with a contention factor of 3 and once with a contention factor of 4.
+    doSingleInsertWithContention(7, doc2, 4, 3, efc);
+    doSingleInsertWithContention(8, doc2, 4, 4, efc);
+
+    ASSERT_EQ(2, readTagsWithContention(doc1, 1).size());
+    ASSERT_EQ(0, readTagsWithContention(doc2, 1).size());
+    ASSERT_EQ(0, readTagsWithContention(doc1, 2).size());
+    ASSERT_EQ(0, readTagsWithContention(doc2, 2).size());
+    ASSERT_EQ(0, readTagsWithContention(doc1, 3).size());
+    ASSERT_EQ(1, readTagsWithContention(doc2, 3).size());
+    ASSERT_EQ(1, readTagsWithContention(doc1, 4).size());
+    ASSERT_EQ(1, readTagsWithContention(doc2, 4).size());
+    ASSERT_EQ(3, readTags(doc1, 4).size());
+    ASSERT_EQ(2, readTags(doc2, 4).size());
 }
 }  // namespace
 }  // namespace mongo
