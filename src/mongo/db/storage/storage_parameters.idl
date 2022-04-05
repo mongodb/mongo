@@ -162,4 +162,5 @@ feature_flags:
     featureFlagTimeseriesBucketCompressionWithArrays:
         description: "Enable array compression support for time-series bucket compression"
         cpp_varname: feature_flags::gTimeseriesBucketCompressionWithArrays
-        default: false
+        default: true
+        version: 6.0
