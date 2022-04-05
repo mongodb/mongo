@@ -50,6 +50,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/config.h"
+#include "mongo/crypto/symmetric_crypto.h"
 #include "mongo/db/matcher/schema/encrypt_schema_gen.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/platform/decimal128.h"
@@ -1510,6 +1511,61 @@ TEST(EDC, NonMatchingSchema) {
     builder.appendBinData("not-encrypted", buf.size(), BinDataType::Encrypt, buf.data());
 
     ASSERT_THROWS_CODE(encryptDocument(builder.obj(), &keyVault, &efc), DBException, 6373601);
+}
+
+TEST(EDC, EncryptAlreadyEncryptedData) {
+    constexpr StringData testVectors[] = {
+        "07b347ede7329f41729dd4004b9d950ff102de64b1925159d2100d58c8d1d0a77bf23a52d30e8861d659e85de2ff96bf8326b3a57134efe5938f439936721dbfa22b02df9df0f63c6453fb2e30ee21b8bab39d4dfb3566926c650fe6995e6caeec025dac818c5a472653876b4a30711c141187236ab5d3dce403aa917d50e432a0ed6f8a685be18af3e2cd21f6b1aeee0e835de13b33fa76eace42527207db517b9e3dce5d0a0d9e25853f612e198a34b37adfce8cfeb673ef779c81c80412a96460e53fb65b0504651d55a4f329a8dc72aaeee93d1b62bf0b9564a71a"_sd,
+        "07"_sd,
+        "00"_sd,
+        "676172626167650a"_sd,    // "garbage"
+        "07676172626167650a"_sd,  // "\x07garbage"
+        "06676172626167650a"_sd,  // "\x06garbage"
+    };
+
+    EncryptedFieldConfig efc = getTestEncryptedFieldConfig();
+    TestKeyVault keyVault;
+
+    for (const auto& s : testVectors) {
+        BSONObjBuilder builder;
+        builder.append("plainText", "sample");
+
+        BSONObjBuilder builder1;
+        auto data = hexblob::decode(s);
+        builder1.appendBinData("a", data.length(), BinDataType::Encrypt, data.data());
+        auto doc = builder1.obj();
+
+        auto element = doc.firstElement();
+        auto buf = generatePlaceholder(element, Operation::kInsert);
+        builder.appendBinData("encrypted", buf.size(), BinDataType::Encrypt, buf.data());
+
+        ASSERT_THROWS_CODE(encryptDocument(builder.obj(), &keyVault, &efc), DBException, 6409401);
+    }
+}
+
+TEST(FLE1, EncryptAlreadyEncryptedDataLegacy) {
+    BSONObjBuilder builder;
+    builder.append("plainText", "sample");
+
+    BSONObjBuilder builder1;
+    auto data = hexblob::decode("676172626167650a"_sd);
+    builder1.appendBinData("a", data.length(), BinDataType::Encrypt, data.data());
+    auto doc = builder1.obj();
+
+    auto valueElem = doc.firstElement();
+    BSONType bsonType = valueElem.type();
+    ConstDataRange plaintext(valueElem.value(), valueElem.valuesize());
+    UUID uuid = UUID::gen();
+    auto symmKey =
+        std::make_shared<SymmetricKey>(crypto::aesGenerate(crypto::sym256KeySize, "testID"));
+    size_t cipherLength = crypto::aeadCipherOutputLength(plaintext.length());
+    ASSERT_THROWS_CODE(
+        [&] {
+            FLEEncryptionFrame dataFrame(
+                symmKey, FleAlgorithmInt::kDeterministic, uuid, bsonType, plaintext, cipherLength);
+        }(),
+        DBException,
+        6409402);
 }
 
 BSONObj encryptUpdateDocument(BSONObj obj, FLEKeyVault* keyVault) {

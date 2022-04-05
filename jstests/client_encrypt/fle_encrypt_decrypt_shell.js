@@ -59,7 +59,6 @@ const passTestCases = [
     BinData(3, "OEJTfmD8twzaj/LPKLIVkA=="),
     BinData(4, "OEJTfmD8twzaj/LPKLIVkA=="),
     BinData(5, '1234'),
-    BinData(6, '1234'),
     new Timestamp(1, 2),
     new ObjectId(),
     new DBPointer("mongo", new ObjectId()),
@@ -82,7 +81,8 @@ const failTestCases = [
     MinKey(),
     MaxKey(),
     DBRef("test", "test", "test"),
-    BinData(2, "BAAAADEyMzQ=")
+    BinData(2, "BAAAADEyMzQ="),
+    BinData(6, '1234'),
 ];
 
 const shell = Mongo(conn.host, clientSideFLEOptions);

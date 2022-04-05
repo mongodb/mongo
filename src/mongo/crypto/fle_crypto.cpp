@@ -889,6 +889,9 @@ void convertToFLE2Payload(FLEKeyVault* keyVault,
         auto ep = parseFromCDR<FLE2EncryptionPlaceholder>(subCdr);
 
         auto el = ep.getValue().getElement();
+        uassert(6409401,
+                "Encrypting already encrypted data prohibited",
+                !el.isBinData(BinDataType::Encrypt));
 
         FLEIndexKeyAndId indexKey = keyVault->getIndexKeyById(ep.getIndexKeyId());
         FLEUserKeyAndId userKey = keyVault->getUserKeyById(ep.getUserKeyId());

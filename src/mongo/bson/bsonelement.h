@@ -632,6 +632,13 @@ public:
         }
     }
 
+    static BinDataType binDataType(const char* raw, size_t length) {
+        // BinData: <int len> <byte subtype> <byte[len] data>
+        verify(length >= 5);
+        unsigned char c = raw[4];
+        return static_cast<BinDataType>(c);
+    }
+
     BinDataType binDataType() const {
         // BinData: <int len> <byte subtype> <byte[len] data>
         verify(type() == BinData);

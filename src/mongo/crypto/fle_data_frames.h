@@ -94,6 +94,13 @@ public:
         //      - either a 1 or a 2 depending on whether the iv is provided.
         // associatedData[1-16] = the uuid in bytes
         // associatedData[17] = the bson type
+        if (BSONType::BinData == type) {
+            BinDataType subType = BSONElement::binDataType(plaintext.data(), plaintext.length());
+            uassert(6409402,
+                    "Encrypting already encrypted data prohibited",
+                    BinDataType::Encrypt != subType);
+        }
+
         _data.resize(kAssociatedDataLength + cipherLength);
         _data[0] = FleAlgorithmInt_serializer(algorithm);
         auto uuidCDR = uuid.toCDR();
