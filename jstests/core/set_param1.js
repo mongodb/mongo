@@ -6,16 +6,23 @@
 // Tests for accessing logLevel server parameter using getParameter/setParameter commands
 // and shell helpers.
 
-old = db.adminCommand({"getParameter": "*"});
+function scrub(obj) {
+    delete obj["operationTime"];
+    delete obj["$clusterTime"];
+    // There are Failpoint manipulations in concurrent tasks in the jstest
+    // environment. So scrub the volatile "failpoint." parameters.
+    for (let key in obj)
+        if (key.startsWith("failpoint."))
+            delete obj[key];
+    return obj;
+}
+
+old = scrub(assert.commandWorked(db.adminCommand({"getParameter": "*"})));
 // the first time getParameter sends a request to with a shardingTaskExecutor and this sets an
 // operationTime. The following commands do not use shardingTaskExecutor.
-delete old["operationTime"];
-delete old["$clusterTime"];
-tmp1 = db.adminCommand({"setParameter": 1, "logLevel": 5});
-tmp2 = db.adminCommand({"setParameter": 1, "logLevel": old.logLevel});
-now = db.adminCommand({"getParameter": "*"});
-delete now["operationTime"];
-delete now["$clusterTime"];
+tmp1 = assert.commandWorked(db.adminCommand({"setParameter": 1, "logLevel": 5}));
+tmp2 = assert.commandWorked(db.adminCommand({"setParameter": 1, "logLevel": old.logLevel}));
+now = scrub(assert.commandWorked(db.adminCommand({"getParameter": "*"})));
 
 assert.eq(old, now, "A");
 assert.eq(old.logLevel, tmp1.was, "B");
