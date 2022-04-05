@@ -1256,8 +1256,16 @@ std::vector<BSONObj> FLEQueryInterfaceImpl::findDocuments(const NamespaceString&
     return _txnClient.exhaustiveFind(find).get();
 }
 
-void processFLEFindS(OperationContext* opCtx, FindCommandRequest* findCommand) {
-    fle::processFindCommand(opCtx, findCommand, &getTransactionWithRetriesForMongoS);
+void processFLEFindS(OperationContext* opCtx,
+                     const NamespaceString& nss,
+                     FindCommandRequest* findCommand) {
+    fle::processFindCommand(opCtx, nss, findCommand, &getTransactionWithRetriesForMongoS);
+}
+
+void processFLECountS(OperationContext* opCtx,
+                      const NamespaceString& nss,
+                      CountCommandRequest* countCommand) {
+    fle::processCountCommand(opCtx, nss, countCommand, &getTransactionWithRetriesForMongoS);
 }
 
 std::unique_ptr<Pipeline, PipelineDeleter> processFLEPipelineS(

@@ -289,7 +289,9 @@ public:
                     findCommand->getNtoreturn() == boost::none);
 
             if (shouldDoFLERewrite(findCommand)) {
-                processFLEFindS(opCtx, findCommand.get());
+                invariant(findCommand->getNamespaceOrUUID().nss());
+                processFLEFindS(
+                    opCtx, findCommand->getNamespaceOrUUID().nss().get(), findCommand.get());
             }
 
             return findCommand;

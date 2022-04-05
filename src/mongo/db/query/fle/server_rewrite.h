@@ -39,6 +39,7 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/count_command_gen.h"
 #include "mongo/db/transaction_api.h"
 
 namespace mongo {
@@ -50,13 +51,24 @@ namespace fle {
  * that any query on an encrypted field will properly query the underlying tags array.
  */
 void processFindCommand(OperationContext* opCtx,
+                        const NamespaceString& nss,
                         FindCommandRequest* findCommand,
                         GetTxnCallback txn);
 
 /**
+ * Process a count command with encryptionInformation in-place, rewriting the filter condition so
+ * that any query on an encrypted field will properly query the underlying tags array.
+ */
+void processCountCommand(OperationContext* opCtx,
+                         const NamespaceString& nss,
+                         CountCommandRequest* countCommand,
+                         GetTxnCallback getTxn);
+
+/**
  * Process a pipeline with encryptionInformation by rewriting the pipeline to query against the
- * underlying tags array, where appropriate. After this rewriting is complete, there is no more FLE
- * work to be done. The encryption info does not need to be kept around (e.g. on a command object).
+ * underlying tags array, where appropriate. After this rewriting is complete, there is no more
+ * FLE work to be done. The encryption info does not need to be kept around (e.g. on a command
+ * object).
  */
 std::unique_ptr<Pipeline, PipelineDeleter> processPipeline(
     OperationContext* opCtx,

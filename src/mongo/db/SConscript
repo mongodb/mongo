@@ -870,6 +870,7 @@ env.Library(
         '$BUILD_DIR/mongo/crypto/encrypted_field_config',
         '$BUILD_DIR/mongo/db/ops/write_ops_parsers',
         '$BUILD_DIR/mongo/db/pipeline/pipeline',
+        '$BUILD_DIR/mongo/db/query/command_request_response',
         'transaction_api',
     ],
     LIBDEPS_PRIVATE=[

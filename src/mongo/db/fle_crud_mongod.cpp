@@ -233,8 +233,16 @@ write_ops::UpdateCommandReply processFLEUpdate(
     return updateReply;
 }
 
-void processFLEFindD(OperationContext* opCtx, FindCommandRequest* findCommand) {
-    fle::processFindCommand(opCtx, findCommand, &getTransactionWithRetriesForMongoD);
+void processFLEFindD(OperationContext* opCtx,
+                     const NamespaceString& nss,
+                     FindCommandRequest* findCommand) {
+    fle::processFindCommand(opCtx, nss, findCommand, &getTransactionWithRetriesForMongoD);
+}
+
+void processFLECountD(OperationContext* opCtx,
+                      const NamespaceString& nss,
+                      CountCommandRequest* countCommand) {
+    fle::processCountCommand(opCtx, nss, countCommand, &getTransactionWithRetriesForMongoD);
 }
 
 std::unique_ptr<Pipeline, PipelineDeleter> processFLEPipelineD(

@@ -2,7 +2,9 @@ test_kind: js_test
 selector:
   roots:
   - jstests/fle2/**/*.js
-  - src/mongo/db/modules/*/jstests/fle2/**/*.js
+  - src/mongo/db/modules/*/jstests/fle2/*.js
+  - src/mongo/db/modules/*/jstests/fle2/query/*.js
+
 executor:
   archive:
     hooks:

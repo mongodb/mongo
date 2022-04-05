@@ -40,6 +40,7 @@
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/count.h"
+#include "mongo/db/fle_crud.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/count_command_as_aggregation_command.h"
@@ -158,6 +159,10 @@ public:
             return exceptionToStatus();
         }
 
+        if (shouldDoFLERewrite(request)) {
+            processFLECountD(opCtx, nss, &request);
+        }
+
         if (ctx->getView()) {
             // Relinquish locks. The aggregation command will re-acquire them.
             ctx.reset();
@@ -231,6 +236,9 @@ public:
             &hangBeforeCollectionCount, opCtx, "hangBeforeCollectionCount", []() {}, nss);
 
         auto request = CountCommandRequest::parse(IDLParserErrorContext("count"), cmdObj);
+        if (shouldDoFLERewrite(request)) {
+            processFLECountD(opCtx, nss, &request);
+        }
 
         if (ctx->getView()) {
             auto viewAggregation = countCommandAsAggregationCommand(request, nss);

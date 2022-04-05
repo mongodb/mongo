@@ -122,7 +122,8 @@ std::unique_ptr<FindCommandRequest> parseCmdObjectToFindCommandRequest(Operation
 
     // Rewrite any FLE find payloads that exist in the query if this is a FLE 2 query.
     if (shouldDoFLERewrite(findCommand)) {
-        processFLEFindD(opCtx, findCommand.get());
+        invariant(findCommand->getNamespaceOrUUID().nss());
+        processFLEFindD(opCtx, findCommand->getNamespaceOrUUID().nss().get(), findCommand.get());
     }
 
     return translateNtoReturnToLimitOrBatchSize(std::move(findCommand));

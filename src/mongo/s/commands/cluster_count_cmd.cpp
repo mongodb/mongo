@@ -33,6 +33,7 @@
 
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/fle_crud.h"
 #include "mongo/db/query/count_command_as_aggregation_command.h"
 #include "mongo/db/query/count_command_gen.h"
 #include "mongo/db/query/view_response_formatter.h"
@@ -100,6 +101,9 @@ public:
         std::vector<AsyncRequestsSender::Response> shardResponses;
         try {
             auto countRequest = CountCommandRequest::parse(IDLParserErrorContext("count"), cmdObj);
+            if (shouldDoFLERewrite(countRequest)) {
+                processFLECountS(opCtx, nss, &countRequest);
+            }
 
             // We only need to factor in the skip value when sending to the shards if we
             // have a value for limit, otherwise, we apply it only once we have collected all
@@ -192,29 +196,28 @@ public:
                    rpc::ReplyBuilderInterface* result) const override {
         std::string dbname = request.getDatabase().toString();
         const BSONObj& cmdObj = request.body;
+
+        CountCommandRequest countRequest(NamespaceStringOrUUID(NamespaceString{}));
+        try {
+            countRequest = CountCommandRequest::parse(IDLParserErrorContext("count"), request);
+        } catch (...) {
+            return exceptionToStatus();
+        }
+
         const NamespaceString nss(parseNs(dbname, cmdObj));
         uassert(ErrorCodes::InvalidNamespace,
                 str::stream() << "Invalid namespace specified '" << nss.ns() << "'",
                 nss.isValid());
 
-        // Extract the targeting query.
-        BSONObj targetingQuery;
-        if (Object == cmdObj["query"].type()) {
-            targetingQuery = cmdObj["query"].Obj();
+        // If the command has encryptionInformation, rewrite the query as necessary.
+        if (shouldDoFLERewrite(countRequest)) {
+            processFLECountS(opCtx, nss, &countRequest);
         }
 
-        // Extract the targeting collation.
-        BSONObj targetingCollation;
-        BSONElement targetingCollationElement;
-        auto status = bsonExtractTypedField(
-            cmdObj, "collation", BSONType::Object, &targetingCollationElement);
-        if (status.isOK()) {
-            targetingCollation = targetingCollationElement.Obj();
-        } else if (status != ErrorCodes::NoSuchKey) {
-            return status;
-        }
+        BSONObj targetingQuery = countRequest.getQuery();
+        BSONObj targetingCollation = countRequest.getCollation().value_or(BSONObj());
 
-        const auto explainCmd = ClusterExplain::wrapAsExplain(cmdObj, verbosity);
+        const auto explainCmd = ClusterExplain::wrapAsExplain(countRequest.toBSON({}), verbosity);
 
         // We will time how long it takes to run the commands on the shards
         Timer timer;
