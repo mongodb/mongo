@@ -169,5 +169,5 @@ buildvariants:
     - rhel80-small
   - name: .publish
     distros:
-    - rhels80-small
+    - rhel80-small
   - name: generate_buildid_to_debug_symbols_mapping
