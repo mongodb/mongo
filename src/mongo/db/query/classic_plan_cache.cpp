@@ -149,7 +149,13 @@ bool shouldCacheQuery(const CanonicalQuery& query) {
     // We don't read or write from the plan cache for explain. This ensures that explain queries
     // don't affect cache state, and it also makes sure that we can always generate information
     // regarding rejected plans and/or trial period execution of candidate plans.
-    if (query.getExplain()) {
+    //
+    // In order to be able to correctly measure 'executionTimeMillis' stats we should only skip
+    // caching top-level plans. Otherwise, if we were to skip caching inner pipelines for $lookup
+    // queries, we could run through the multi-planner for each document coming from the outer side,
+    // completely skewing the 'executionTimeMillis' stats.
+    tassert(6497600, "expCtx is null", query.getExpCtxRaw());
+    if (query.getExplain() && query.getExpCtxRaw()->subPipelineDepth == 0) {
         return false;
     }
 
