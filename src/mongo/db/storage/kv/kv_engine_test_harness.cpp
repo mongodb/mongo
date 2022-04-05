@@ -946,12 +946,12 @@ TEST_F(KVEngineTestHarness, PinningOldestTimestampWithReadConflict) {
  */
 DEATH_TEST_REGEX_F(KVEngineTestHarness,
                    PinningOldestTimestampWithWriteConflict,
-                   ".*commit timestamp.*is less than the oldest timestamp.*") {
+                   "Fatal assertion.*39001") {
     std::unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create(getServiceContext()));
     KVEngine* engine = helper->getEngine();
     // TODO SERVER-48314: Remove after implementing correct behavior on biggie.
     if (engine->isEphemeral())
-        invariant(false, "commit timestamp is less than the oldest timestamp");
+        invariant(false, "Fatal assertion: 39001");
 
     std::string ns = "a.b";
     std::unique_ptr<RecordStore> rs;
@@ -1069,14 +1069,12 @@ TEST_F(KVEngineTestHarness, RollingBackToLastStable) {
  * | Write A 1                       |                            |
  * | Timestamp :commit 1  (ROLLBACK) |                            |
  */
-DEATH_TEST_REGEX_F(KVEngineTestHarness,
-                   CommitBehindStable,
-                   ".*commit timestamp.*(is less than|must be after) the stable timestamp.*") {
+DEATH_TEST_REGEX_F(KVEngineTestHarness, CommitBehindStable, "Fatal assertion.*39001") {
     std::unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create(getServiceContext()));
     KVEngine* engine = helper->getEngine();
     // TODO SERVER-48314: Remove after implementing correct behavior on biggie.
     if (engine->isEphemeral())
-        invariant(false, "commit timestamp is less than the stable timestamp");
+        invariant(false, "Fatal assertion: 39001");
 
     // The initial data timestamp has to be set to take stable checkpoints.
     engine->setInitialDataTimestamp(Timestamp(1, 1));
