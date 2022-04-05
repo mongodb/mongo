@@ -37,5 +37,5 @@ function runTest(downgradeVersion) {
     st.stop();
 }
 
-runTest(lastLTSFCV);
+runTest(lastContinuousFCV);
 })();
