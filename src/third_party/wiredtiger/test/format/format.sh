@@ -547,8 +547,8 @@ format()
 		args+=" format.abort=1"
 	fi
 	if [[ $stress_split_test -ne 0 ]]; then
-		for k in {1..8}; do
-			args+=" stress_split_$k=$(($RANDOM%2))"
+		for k in {1..7}; do
+			args+=" stress.split_$k=$(($RANDOM%2))"
 		done
 	fi
 	args+=" $format_args"
