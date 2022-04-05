@@ -26,7 +26,7 @@
 # it in the license file.
 #
 
-# clearJumboFlag IDL File
+# refineCollectionShardKey IDL file
 
 global:
     cpp_namespace: "mongo"
@@ -35,42 +35,25 @@ imports:
     - "mongo/idl/basic_types.idl"
 
 commands:
-    clearJumboFlag:
-        description: "clearJumboFlag command for mongos"
-        command_name: clearJumboFlag
+    refineCollectionShardKey:
+        description: "The public refineCollectionShardKey command on mongos"
+        command_name: refineCollectionShardKey
+        strict: false
         namespace: type
         api_version: ""
         type: namespacestring
-        strict: false
         fields:
-            bounds:
-                type: array<object>
-                description: "The exact boundaries for a single chunk."
-                optional: true
-
-            find:
+            key:
                 type: object
-                description: "The shard key value that is within a chunk's boundaries.
-                              Cannot be used on collections with hashed shard keys."
-                optional: true
-
-    _configsvrClearJumboFlag:
-        command_name: _configsvrClearJumboFlag
-        cpp_name: ConfigsvrClearJumboFlag
-        description: "internal clearJumboFlag command for config server"
-        namespace: type
-        api_version: ""
-        type: namespacestring
-        strict: false
-        fields:
-            epoch:
-                type: objectid
-                description: "The expected epoch of the namespace provided to
-                              clearJumboFlag."
+                description: "The index specification document to use as the new shard key."
                 optional: false
-            minKey:
-                type: object
-                description: "The lower bound key value of the chunk."
-            maxKey:
-                type: object
-                description: "The upper bound key value of the chunk."
+            collectionUUID:
+                type: uuid
+                description: "The expected UUID of the collection."
+                optional: true
+            enforceUniquenessCheck:
+                description: >-
+                    Controls whether this command verifies that any unique indexes are prefixed by
+                    the shard key pattern if unique is true. If true then it will verify and if
+                    false then it won't.
+                type: optionalBool

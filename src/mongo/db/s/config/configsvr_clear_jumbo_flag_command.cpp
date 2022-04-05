@@ -38,7 +38,7 @@
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/dist_lock_manager.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/request_types/clear_jumbo_flag_gen.h"
+#include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 
 namespace mongo {
 namespace {

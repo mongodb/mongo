@@ -40,7 +40,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/request_types/refine_collection_shard_key_gen.h"
+#include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 
 namespace mongo {
 

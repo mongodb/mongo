@@ -26,6 +26,8 @@
 # it in the license file.
 #
 
+# Contains internal DDL commands which are exchanged between Router and Shard/ConfigServer role and are linked both on MongoD and MongoS
+
 global:
     cpp_namespace: "mongo"
     cpp_includes:
@@ -245,24 +247,6 @@ structs:
 
 commands:
 
-    clusterCreateDatabase:
-        description: "The public enableSharding command on mongos."
-        command_name: enableSharding
-        command_alias: enablesharding
-        cpp_name: ClusterCreateDatabase
-        strict: false
-        namespace: type
-        type: string
-        api_version: ""
-        reply_type: OkReply
-        fields:
-            primaryShard:
-                type: shard_id
-                description: "If set, indicates to the system which shard should be used as the
-                              primary for the database (if not already created). Otherwise, the
-                              system will use the balancer in order to select a primary."
-                optional: true
-    
     _shardsvrCreateCollection:
         command_name: _shardsvrCreateCollection
         cpp_name: ShardsvrCreateCollection
@@ -388,6 +372,29 @@ commands:
         chained_structs: 
             RefineCollectionShardKeyRequest: RefineCollectionShardKeyRequest
 
+    _configsvrRefineCollectionShardKey:
+        command_name: _configsvrRefineCollectionShardKey
+        cpp_name: ConfigsvrRefineCollectionShardKey
+        description: "The internal refineCollectionShardKey command on the config server"
+        strict: false
+        namespace: type
+        api_version: ""
+        type: namespacestring
+        fields:
+            key:
+                type: object
+                description: "The index specification document to use as the new shard key."
+                optional: false
+            epoch:
+                type: objectid
+                description: "The expected epoch of the namespace provided to
+                              refineCollectionShardKey."
+                optional: false
+            enforceUniquenessCheck:
+                description: >-
+                    Verifies that the shard key index has the same unique setting as the command.
+                type: optionalBool
+
     _configsvrCreateDatabase:
         description: "The internal createDatabase command on the config server"
         api_version: ""
@@ -456,3 +463,24 @@ commands:
         type: object_owned
         api_version: ""
         strict: false
+
+    _configsvrClearJumboFlag:
+        command_name: _configsvrClearJumboFlag
+        cpp_name: ConfigsvrClearJumboFlag
+        description: "internal clearJumboFlag command for config server"
+        namespace: type
+        api_version: ""
+        type: namespacestring
+        strict: false
+        fields:
+            epoch:
+                type: objectid
+                description: "The expected epoch of the namespace provided to
+                              clearJumboFlag."
+                optional: false
+            minKey:
+                type: object
+                description: "The lower bound key value of the chunk."
+            maxKey:
+                type: object
+                description: "The upper bound key value of the chunk."

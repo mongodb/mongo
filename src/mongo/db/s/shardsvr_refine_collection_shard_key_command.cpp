@@ -35,7 +35,6 @@
 #include "mongo/db/s/refine_collection_shard_key_coordinator.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/s/refine_collection_shard_key_coordinator_feature_flags_gen.h"
-#include "mongo/s/request_types/refine_collection_shard_key_gen.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 
 namespace mongo {
@@ -104,7 +103,8 @@ public:
             return request().getNamespace();
         }
     };
-} shardsvrDropDatabaseCommand;
+
+} shardsvrRefineCollectionShardKeyCommand;
 
 }  // namespace
 }  // namespace mongo

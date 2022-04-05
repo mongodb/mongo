@@ -31,6 +31,7 @@ global:
 
 imports:
   - "mongo/idl/basic_types.idl"
+  - "mongo/s/sharding_types.idl"
 
 server_parameters:
     KillSessionsMaxConcurrency:
@@ -50,6 +51,7 @@ server_parameters:
         default: 60000
 
 structs:
+
   ClusterMulticast:
     description: "A struct representing the 'multicast' command's arguments"
     strict: false
@@ -64,3 +66,44 @@ structs:
       timeout:
         type: int
         optional: true
+
+commands:
+
+    createDatabase:
+        description: "The public enableSharding command on mongos."
+        command_name: enableSharding
+        command_alias: enablesharding
+        cpp_name: ClusterCreateDatabase
+        strict: false
+        namespace: type
+        type: string
+        api_version: ""
+        reply_type: OkReply
+        fields:
+            primaryShard:
+                type: shard_id
+                description: "If set, indicates to the system which shard should be used as the
+                              primary for the database (if not already created). Otherwise, the
+                              system will use the balancer in order to select a primary."
+                optional: true
+
+    clearJumboFlag:
+        description: "The public clearJumboFlag command on mongos."
+        command_name: clearJumboFlag
+        cpp_name: ClusterClearJumboFlag
+        strict: false
+        namespace: type
+        api_version: ""
+        type: namespacestring
+        reply_type: OkReply
+        fields:
+            bounds:
+                type: array<object>
+                description: "The exact boundaries for a single chunk."
+                optional: true
+
+            find:
+                type: object
+                description: "The shard key value that is within a chunk's boundaries.
+                              Cannot be used on collections with hashed shard keys."
+                optional: true

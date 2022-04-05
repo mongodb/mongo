@@ -29,8 +29,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/s/sharding_ddl_util.h"
 
 #include "mongo/db/catalog/collection_catalog.h"
@@ -39,6 +37,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
+#include "mongo/db/s/remove_tags_gen.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_util.h"
@@ -51,14 +50,11 @@
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/request_types/remove_tags_gen.h"
 #include "mongo/s/request_types/set_allow_migrations_gen.h"
 #include "mongo/s/write_ops/batch_write_exec.h"
 
 namespace mongo {
-
 namespace sharding_ddl_util {
-
 namespace {
 
 void updateTags(OperationContext* opCtx,

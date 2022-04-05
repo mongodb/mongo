@@ -39,17 +39,16 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/s/catalog_cache.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/cluster_commands_helpers.h"
+#include "mongo/s/commands/cluster_commands_gen.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/request_types/clear_jumbo_flag_gen.h"
+#include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 
 namespace mongo {
 namespace {
 
 class ClearJumboFlagCommand final : public TypedCommand<ClearJumboFlagCommand> {
 public:
-    using Request = ClearJumboFlag;
+    using Request = ClusterClearJumboFlag;
 
     class Invocation : public MinimalInvocationBase {
     public:

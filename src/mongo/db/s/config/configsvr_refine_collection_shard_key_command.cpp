@@ -37,7 +37,7 @@
 #include "mongo/db/s/shard_key_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/request_types/refine_collection_shard_key_gen.h"
+#include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/s/stale_shard_version_helpers.h"
 
 namespace mongo {
@@ -176,6 +176,7 @@ public:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
+
 } configsvrRefineCollectionShardKeyCmd;
 
 }  // namespace

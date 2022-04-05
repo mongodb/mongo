@@ -29,15 +29,13 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/cluster_commands_helpers.h"
+#include "mongo/s/commands/refine_collection_shard_key_gen.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/request_types/refine_collection_shard_key_gen.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/util/fail_point.h"
 
