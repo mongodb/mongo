@@ -144,6 +144,9 @@ public:
                    const BSONObj& jsobj,
                    std::string& errmsg,
                    BSONObjBuilder& result) {
+        LOGV2_WARNING(6508600,
+                      "The reIndex command is deprecated. For more information, see "
+                      "https://mongodb.com/docs/manual/reference/command/reIndex/");
 
         const NamespaceString toReIndexNss =
             CommandHelpers::parseNsCollectionRequired(dbname, jsobj);
