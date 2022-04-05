@@ -116,6 +116,8 @@ public:
                                                    ShardingDataTransformMetrics::Role::kRecipient,
                                                    serviceContext->getFastClockSource()->now(),
                                                    serviceContext);
+            _applierMetrics =
+                std::make_unique<ReshardingOplogApplierMetrics>(_metricsNew.get(), boost::none);
             _crudApplication = std::make_unique<ReshardingOplogApplicationRules>(
                 _outputNss,
                 std::vector<NamespaceString>{_myStashNss, _otherStashNss},
@@ -123,7 +125,7 @@ public:
                 _myDonorId,
                 makeChunkManagerForSourceCollection(),
                 _metrics.get(),
-                _metricsNew.get());
+                _applierMetrics.get());
 
             _sessionApplication =
                 std::make_unique<ReshardingOplogSessionApplication>(_myOplogBufferNss);
@@ -361,6 +363,7 @@ private:
 
     std::unique_ptr<ReshardingMetrics> _metrics;
     std::unique_ptr<ReshardingMetricsNew> _metricsNew;
+    std::unique_ptr<ReshardingOplogApplierMetrics> _applierMetrics;
 
     std::unique_ptr<ReshardingOplogApplicationRules> _crudApplication;
     std::unique_ptr<ReshardingOplogSessionApplication> _sessionApplication;

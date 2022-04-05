@@ -137,4 +137,12 @@ StringData ReshardingMetricsNew::getStateString() const noexcept {
         _state.load());
 }
 
+void ReshardingMetricsNew::accumulateFrom(const ReshardingOplogApplierProgress& progressDoc) {
+    invariant(_role == Role::kRecipient);
+
+    accumulateValues(progressDoc.getInsertsApplied(),
+                     progressDoc.getUpdatesApplied(),
+                     progressDoc.getDeletesApplied());
+}
+
 }  // namespace mongo

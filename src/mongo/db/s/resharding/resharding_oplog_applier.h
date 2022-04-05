@@ -67,8 +67,10 @@ class ReshardingOplogApplier {
 public:
     class Env {
     public:
-        Env(ServiceContext* service, ReshardingMetrics* metrics, ReshardingMetricsNew* metricsNew)
-            : _service(service), _metrics(metrics), _metricsNew(metricsNew) {}
+        Env(ServiceContext* service,
+            ReshardingMetrics* metrics,
+            ReshardingOplogApplierMetrics* applierMetrics)
+            : _service(service), _metrics(metrics), _applierMetrics(applierMetrics) {}
 
         ServiceContext* service() const {
             return _service;
@@ -77,14 +79,14 @@ public:
             return _metrics;
         }
 
-        ReshardingMetricsNew* metricsNew() const {
-            return _metricsNew;
+        ReshardingOplogApplierMetrics* applierMetrics() {
+            return _applierMetrics;
         }
 
     private:
         ServiceContext* _service;
         ReshardingMetrics* _metrics;
-        ReshardingMetricsNew* _metricsNew;
+        ReshardingOplogApplierMetrics* _applierMetrics;
     };
 
     ReshardingOplogApplier(std::unique_ptr<Env> env,

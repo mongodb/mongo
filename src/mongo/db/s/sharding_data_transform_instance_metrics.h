@@ -80,6 +80,9 @@ public:
 protected:
     virtual std::string createOperationDescription() const noexcept;
     virtual StringData getStateString() const noexcept;
+
+    void accumulateValues(int64_t insertsApplied, int64_t updatesApplied, int64_t deletesApplied);
+
     const UUID _instanceId;
     const BSONObj _originalCommand;
     const NamespaceString _sourceNs;

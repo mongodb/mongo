@@ -69,7 +69,7 @@ ReshardingOplogApplier::ReshardingOplogApplier(
                        _sourceId.getShardId(),
                        std::move(sourceChunkMgr),
                        _env->metrics(),
-                       _env->metricsNew()},
+                       _env->applierMetrics()},
       _sessionApplication{std::move(oplogBufferNss)},
       _batchApplier{_crudApplication, _sessionApplication},
       _oplogIter(std::move(oplogIterator)) {}
@@ -233,13 +233,25 @@ void ReshardingOplogApplier::_clearAppliedOpsAndStoreProgress(OperationContext* 
                    BSON(ReshardingOplogApplierProgress::kNumEntriesAppliedFieldName
                         << static_cast<long long>(_currentBatchToApply.size())));
 
+    if (ShardingDataTransformMetrics::isEnabled()) {
+        builder.append("$set",
+                       BSON(ReshardingOplogApplierProgress::kInsertsAppliedFieldName
+                            << _env->applierMetrics()->getInsertsApplied()));
+        builder.append("$set",
+                       BSON(ReshardingOplogApplierProgress::kUpdatesAppliedFieldName
+                            << _env->applierMetrics()->getUpdatesApplied()));
+        builder.append("$set",
+                       BSON(ReshardingOplogApplierProgress::kDeletesAppliedFieldName
+                            << _env->applierMetrics()->getDeletesApplied()));
+    }
+
     store.upsert(
         opCtx,
         BSON(ReshardingOplogApplierProgress::kOplogSourceIdFieldName << _sourceId.toBSON()),
         builder.obj());
     _env->metrics()->onOplogEntriesApplied(_currentBatchToApply.size());
     if (ShardingDataTransformMetrics::isEnabled()) {
-        _env->metricsNew()->onOplogEntriesApplied(_currentBatchToApply.size());
+        _env->applierMetrics()->onOplogEntriesApplied(_currentBatchToApply.size());
     }
 
     _currentBatchToApply.clear();

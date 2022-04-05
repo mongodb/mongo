@@ -162,6 +162,8 @@ public:
                                                ReshardingMetricsNew::Role::kRecipient,
                                                getServiceContext()->getFastClockSource()->now(),
                                                getServiceContext());
+        _applierMetrics =
+            std::make_unique<ReshardingOplogApplierMetrics>(_metricsNew.get(), boost::none);
         _metrics->onStart(ReshardingMetrics::Role::kRecipient,
                           getServiceContext()->getFastClockSource()->now());
         _metrics->setRecipientState(RecipientStateEnum::kApplying);
@@ -309,7 +311,7 @@ public:
 protected:
     auto makeApplierEnv() {
         return std::make_unique<ReshardingOplogApplier::Env>(
-            getServiceContext(), _metrics.get(), _metricsNew.get());
+            getServiceContext(), _metrics.get(), _applierMetrics.get());
     }
 
     std::shared_ptr<executor::ThreadPoolTaskExecutor> makeTaskExecutorForApplier() {
@@ -367,6 +369,7 @@ protected:
     const ReshardingSourceId _sourceId{UUID::gen(), kMyShardId};
     std::unique_ptr<ReshardingMetrics> _metrics;
     std::unique_ptr<ReshardingMetricsNew> _metricsNew;
+    std::unique_ptr<ReshardingOplogApplierMetrics> _applierMetrics;
 
     std::shared_ptr<executor::ThreadPoolTaskExecutor> _executor;
     std::shared_ptr<ThreadPool> _cancelableOpCtxExecutor;

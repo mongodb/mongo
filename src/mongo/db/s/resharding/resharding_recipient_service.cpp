@@ -547,9 +547,18 @@ ReshardingRecipientService::RecipientStateMachine::_makeDataReplication(Operatio
     auto sourceChunkMgr =
         _externalState->getShardedCollectionRoutingInfo(opCtx, _metadata.getSourceNss());
 
+    // The metrics map can already be pre-populated if it was recovered from disk.
+    if (_applierMetricsMap.empty()) {
+        for (const auto& donor : _donorShards) {
+            _applierMetricsMap.emplace(
+                donor.getShardId(),
+                std::make_unique<ReshardingOplogApplierMetrics>(_metricsNew.get(), boost::none));
+        }
+    }
+
     return _dataReplicationFactory(opCtx,
                                    _metrics(),
-                                   _metricsNew.get(),
+                                   &_applierMetricsMap,
                                    _metadata,
                                    _donorShards,
                                    *_cloneTimestamp,
@@ -1096,6 +1105,7 @@ void ReshardingRecipientService::RecipientStateMachine::_restoreMetrics(
     reshardingOpCtxKilledWhileRestoringMetrics.execute(
         [&opCtx](const BSONObj& data) { opCtx->markKilled(); });
 
+    std::vector<std::pair<ShardId, ReshardingOplogApplierProgress>> progressDocList;
     for (const auto& donor : _donorShards) {
         {
             AutoGetCollection oplogBufferColl(
@@ -1121,12 +1131,29 @@ void ReshardingRecipientService::RecipientStateMachine::_restoreMetrics(
                     result);
 
                 if (!result.isEmpty()) {
-                    oplogEntriesApplied +=
-                        result.getField(ReshardingOplogApplierProgress::kNumEntriesAppliedFieldName)
-                            .Long();
+                    auto progressDoc = ReshardingOplogApplierProgress::parse(
+                        IDLParserErrorContext("resharding-recipient-service-progress-doc"), result);
+                    oplogEntriesApplied += progressDoc.getNumEntriesApplied();
+
+                    if (ShardingDataTransformMetrics::isEnabled()) {
+                        progressDocList.emplace_back(donor.getShardId(), progressDoc);
+                    }
                 }
             }
         }
+    }
+
+    // Restore stats here where interrupts will never occur, this is to ensure we will only update
+    // the metrics only once.
+    for (const auto& shardIdDocPair : progressDocList) {
+        const auto& shardId = shardIdDocPair.first;
+        const auto& progressDoc = shardIdDocPair.second;
+
+        _metricsNew->accumulateFrom(progressDoc);
+
+        auto applierMetrics =
+            std::make_unique<ReshardingOplogApplierMetrics>(_metricsNew.get(), progressDoc);
+        _applierMetricsMap.emplace(shardId, std::move(applierMetrics));
     }
 
     _metrics()->restoreForCurrentOp(

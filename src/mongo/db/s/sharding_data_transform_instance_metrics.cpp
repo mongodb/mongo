@@ -223,4 +223,12 @@ void ShardingDataTransformInstanceMetrics::onReadDuringCriticalSection() {
     _readsDuringCriticalSection.fetchAndAdd(1);
 }
 
+void ShardingDataTransformInstanceMetrics::accumulateValues(int64_t insertsApplied,
+                                                            int64_t updatesApplied,
+                                                            int64_t deletesApplied) {
+    _insertsApplied.fetchAndAdd(insertsApplied);
+    _updatesApplied.fetchAndAdd(updatesApplied);
+    _deletesApplied.fetchAndAdd(deletesApplied);
+}
+
 }  // namespace mongo

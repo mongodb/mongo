@@ -164,7 +164,7 @@ std::shared_ptr<executor::TaskExecutor> ReshardingDataReplication::_makeOplogFet
 std::vector<std::unique_ptr<ReshardingOplogApplier>> ReshardingDataReplication::_makeOplogAppliers(
     OperationContext* opCtx,
     ReshardingMetrics* metrics,
-    ReshardingMetricsNew* metricsNew,
+    ReshardingApplierMetricsMap* applierMetricsMap,
     const CommonReshardingMetadata& metadata,
     const std::vector<DonorShardFetchTimestamp>& donorShards,
     Timestamp cloneTimestamp,
@@ -175,18 +175,19 @@ std::vector<std::unique_ptr<ReshardingOplogApplier>> ReshardingDataReplication::
     oplogAppliers.reserve(donorShards.size());
 
     for (size_t i = 0; i < donorShards.size(); ++i) {
-        auto sourceId =
-            ReshardingSourceId{metadata.getReshardingUUID(), donorShards[i].getShardId()};
+        const auto donorShardId = donorShards[i].getShardId();
+        auto sourceId = ReshardingSourceId{metadata.getReshardingUUID(), donorShardId};
         auto minFetchTimestamp = *donorShards[i].getMinFetchTimestamp();
         auto idToResumeFrom = getOplogApplierResumeId(opCtx, sourceId, minFetchTimestamp);
         invariant((idToResumeFrom >= ReshardingDonorOplogId{minFetchTimestamp, minFetchTimestamp}));
 
         const auto& oplogBufferNss =
-            getLocalOplogBufferNamespace(metadata.getSourceUUID(), donorShards[i].getShardId());
+            getLocalOplogBufferNamespace(metadata.getSourceUUID(), donorShardId);
 
+        auto applierMetrics = (*applierMetricsMap)[donorShardId].get();
         oplogAppliers.emplace_back(std::make_unique<ReshardingOplogApplier>(
             std::make_unique<ReshardingOplogApplier::Env>(
-                opCtx->getServiceContext(), metrics, metricsNew),
+                opCtx->getServiceContext(), metrics, applierMetrics),
             std::move(sourceId),
             oplogBufferNss,
             metadata.getTempReshardingNss(),
@@ -206,7 +207,7 @@ std::vector<std::unique_ptr<ReshardingOplogApplier>> ReshardingDataReplication::
 std::unique_ptr<ReshardingDataReplicationInterface> ReshardingDataReplication::make(
     OperationContext* opCtx,
     ReshardingMetrics* metrics,
-    ReshardingMetricsNew* metricsNew,
+    ReshardingApplierMetricsMap* applierMetricsMap,
     CommonReshardingMetadata metadata,
     const std::vector<DonorShardFetchTimestamp>& donorShards,
     Timestamp cloneTimestamp,
@@ -228,7 +229,7 @@ std::unique_ptr<ReshardingDataReplicationInterface> ReshardingDataReplication::m
     auto stashCollections = ensureStashCollectionsExist(opCtx, sourceChunkMgr, donorShards);
     auto oplogAppliers = _makeOplogAppliers(opCtx,
                                             metrics,
-                                            metricsNew,
+                                            applierMetricsMap,
                                             metadata,
                                             donorShards,
                                             cloneTimestamp,

@@ -775,19 +775,18 @@ TEST_F(ReshardingRecipientServiceTest, RestoreMetricsAfterStepUp) {
             unsigned int i = 0;
             for (const auto& donor : donorShards) {
                 // Setup oplogBuffer collection.
+                ReshardingDonorOplogId donorOplogId{{20, i}, {19, 0}};
                 insertFn(getLocalOplogBufferNamespace(doc.getSourceUUID(), donor.getShardId()),
-                         InsertStatement{
-                             BSON("_id" << (ReshardingDonorOplogId{{20, i}, {19, 0}}).toBSON())});
+                         InsertStatement{BSON("_id" << donorOplogId.toBSON())});
                 ++i;
 
                 // Setup reshardingApplierProgress collection.
-                auto progressDoc = BSON(
-                    ReshardingOplogApplierProgress::kOplogSourceIdFieldName
-                    << (ReshardingSourceId{doc.getReshardingUUID(), donor.getShardId()}).toBSON()
-                    << ReshardingOplogApplierProgress::kNumEntriesAppliedFieldName
-                    << oplogEntriesAppliedOnEachDonor);
+                ReshardingOplogApplierProgress progressDoc(
+                    {doc.getReshardingUUID(), donor.getShardId()},
+                    donorOplogId,
+                    oplogEntriesAppliedOnEachDonor);
                 insertFn(NamespaceString::kReshardingApplierProgressNamespace,
-                         InsertStatement{progressDoc});
+                         InsertStatement{progressDoc.toBSON()});
             }
         }
 

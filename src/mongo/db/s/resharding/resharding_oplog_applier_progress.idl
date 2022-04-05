@@ -59,3 +59,21 @@ structs:
                 description: >-
                     The total number of oplog entries that have been applied by this
                     ReshardingOplogApplier.
+            insertsApplied:
+                type: safeInt64
+                default: 0
+                description: >-
+                    The total number of insert type oplog entries that have been applied by this
+                    ReshardingOplogApplier.
+            updatesApplied:
+                type: safeInt64
+                default: 0
+                description: >-
+                    The total number of update type oplog entries that have been applied by this
+                    ReshardingOplogApplier.
+            deletesApplied:
+                type: safeInt64
+                default: 0
+                description: >-
+                    The total number of delete type oplog entries that have been applied by this
+                    ReshardingOplogApplier.

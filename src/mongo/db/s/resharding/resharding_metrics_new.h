@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/resharding/resharding_metrics_helpers.h"
+#include "mongo/db/s/resharding/resharding_oplog_applier_progress_gen.h"
 #include "mongo/db/s/sharding_data_transform_instance_metrics.h"
 #include "mongo/util/uuid.h"
 
@@ -87,6 +88,8 @@ public:
         static_assert(std::is_assignable_v<State, T>);
         _state.store(state);
     }
+
+    void accumulateFrom(const ReshardingOplogApplierProgress& progressDoc);
 
 protected:
     virtual StringData getStateString() const noexcept override;

@@ -34,6 +34,7 @@
 #include "mongo/db/s/resharding/resharding_data_replication.h"
 #include "mongo/db/s/resharding/resharding_future_util.h"
 #include "mongo/db/s/resharding/resharding_metrics_new.h"
+#include "mongo/db/s/resharding/resharding_oplog_applier_metrics.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/util/concurrency/thread_pool.h"
@@ -277,6 +278,7 @@ private:
     const ReshardingRecipientService* const _recipientService;
 
     std::unique_ptr<ReshardingMetricsNew> _metricsNew;
+    ReshardingApplierMetricsMap _applierMetricsMap;
 
     // The in-memory representation of the immutable portion of the document in
     // config.localReshardingOperations.recipient.
