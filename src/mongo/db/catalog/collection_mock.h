@@ -40,10 +40,16 @@ namespace mongo {
  */
 class CollectionMock : public Collection {
 public:
-    CollectionMock(const NamespaceString& ns)
+    explicit CollectionMock(const NamespaceString& ns)
         : CollectionMock(ns, std::unique_ptr<IndexCatalog>()) {}
+    CollectionMock(const UUID& uuid, const NamespaceString& ns)
+        : CollectionMock(uuid, ns, std::unique_ptr<IndexCatalog>()) {}
     CollectionMock(const NamespaceString& ns, std::unique_ptr<IndexCatalog> indexCatalog)
-        : _ns(ns), _indexCatalog(std::move(indexCatalog)) {}
+        : CollectionMock(UUID::gen(), ns, std::unique_ptr<IndexCatalog>()) {}
+    CollectionMock(const UUID& uuid,
+                   const NamespaceString& ns,
+                   std::unique_ptr<IndexCatalog> indexCatalog)
+        : _uuid(uuid), _ns(ns), _indexCatalog(std::move(indexCatalog)) {}
     CollectionMock(const NamespaceString& ns, RecordId catalogId)
         : _ns(ns), _catalogId(catalogId) {}
     ~CollectionMock() = default;

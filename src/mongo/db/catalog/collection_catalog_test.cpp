@@ -68,7 +68,7 @@ public:
         ServiceContextMongoDTest::setUp();
         opCtx = makeOperationContext();
 
-        std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
+        std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(colUUID, nss);
         col = CollectionPtr(collection.get(), CollectionPtr::NoYieldTag{});
         // Register dummy collection in catalog.
         catalog.registerCollection(opCtx.get(), colUUID, std::move(collection));
@@ -438,7 +438,7 @@ TEST_F(CollectionCatalogTest, OnDropCollection) {
 TEST_F(CollectionCatalogTest, RenameCollection) {
     auto uuid = CollectionUUID::gen();
     NamespaceString oldNss(nss.db(), "oldcol");
-    std::shared_ptr<Collection> collShared = std::make_shared<CollectionMock>(oldNss);
+    std::shared_ptr<Collection> collShared = std::make_shared<CollectionMock>(uuid, oldNss);
     auto collection = collShared.get();
     catalog.registerCollection(opCtx.get(), uuid, std::move(collShared));
     ASSERT_EQUALS(catalog.lookupCollectionByUUID(opCtx.get(), uuid), collection);
