@@ -56,6 +56,10 @@ public:
 
     virtual bool hasSameOptions(const BSONObj&) const = 0;
 
+    ConfigsvrCoordinatorTypeEnum coordinatorType() const {
+        return _coordId.getCoordinatorType();
+    }
+
 protected:
     const ConfigsvrCoordinatorId _coordId;
 

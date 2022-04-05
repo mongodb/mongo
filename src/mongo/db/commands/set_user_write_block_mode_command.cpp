@@ -33,15 +33,17 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/set_user_write_block_mode_gen.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/user_writes_recoverable_critical_section_service.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/logv2/log.h"
-
 
 namespace mongo {
 namespace {
+
 class SetUserWriteBlockModeCommand final : public TypedCommand<SetUserWriteBlockModeCommand> {
 public:
     using Request = SetUserWriteBlockMode;
@@ -73,6 +75,13 @@ public:
                         repl::ReplicationCoordinator::modeNone);
 
             {
+                // TODO SERVER-65010 Remove FCV guard once 6.0 has branched out
+                FixedFCVRegion fixedFcvRegion(opCtx);
+                uassert(ErrorCodes::IllegalOperation,
+                        "featureFlagUserWriteBlocking not enabled",
+                        gFeatureFlagUserWriteBlocking.isEnabled(
+                            serverGlobalParams.featureCompatibility));
+
                 if (request().getGlobal()) {
                     UserWritesRecoverableCriticalSectionService::get(opCtx)
                         ->acquireRecoverableCriticalSectionBlockingUserWrites(
@@ -86,17 +95,17 @@ public:
                             UserWritesRecoverableCriticalSectionService::
                                 kGlobalUserWritesNamespace);
                 }
-
-                // Wait for the writes to the UserWritesRecoverableCriticalSection collection to be
-                // majority commited.
-                auto& replClient = repl::ReplClientInfo::forClient(opCtx->getClient());
-                WriteConcernResult writeConcernResult;
-                WriteConcernOptions majority(WriteConcernOptions::kMajority,
-                                             WriteConcernOptions::SyncMode::UNSET,
-                                             WriteConcernOptions::kWriteConcernTimeoutUserCommand);
-                uassertStatusOK(waitForWriteConcern(
-                    opCtx, replClient.getLastOp(), majority, &writeConcernResult));
             }
+
+            // Wait for the writes to the UserWritesRecoverableCriticalSection collection to be
+            // majority commited.
+            auto& replClient = repl::ReplClientInfo::forClient(opCtx->getClient());
+            WriteConcernResult writeConcernResult;
+            WriteConcernOptions majority(WriteConcernOptions::kMajority,
+                                         WriteConcernOptions::SyncMode::UNSET,
+                                         WriteConcernOptions::kWriteConcernTimeoutUserCommand);
+            uassertStatusOK(
+                waitForWriteConcern(opCtx, replClient.getLastOp(), majority, &writeConcernResult));
         }
 
     private:

@@ -64,6 +64,7 @@
 #include "mongo/db/repl/tenant_migration_donor_service.h"
 #include "mongo/db/repl/tenant_migration_recipient_service.h"
 #include "mongo/db/s/active_migrations_registry.h"
+#include "mongo/db/s/config/configsvr_coordinator_service.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/migration_coordinator_document_gen.h"
 #include "mongo/db/s/migration_util.h"
@@ -74,6 +75,7 @@
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/db/s/sharding_util.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/session_catalog.h"
 #include "mongo/db/session_txn_record_gen.h"
@@ -381,6 +383,28 @@ public:
                                        "processes before downgrading.",
                                 !isDefragmenting);
                     }
+                }
+
+                if (!gFeatureFlagUserWriteBlocking.isEnabledOnVersion(requestedVersion)) {
+                    // TODO SERVER-65010 Remove this scope once 6.0 has branched out
+
+                    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+                        uassert(
+                            ErrorCodes::CannotDowngrade,
+                            "Cannot downgrade while user write blocking is being changed",
+                            ConfigsvrCoordinatorService::getService(opCtx)
+                                ->isAnyCoordinatorOfGivenTypeRunning(
+                                    opCtx, ConfigsvrCoordinatorTypeEnum::kSetUserWriteBlockMode));
+                    }
+
+                    DBDirectClient client(opCtx);
+
+                    const bool isBlockingUserWrites =
+                        client.count(NamespaceString::kUserWritesCriticalSectionsNamespace) != 0;
+
+                    uassert(ErrorCodes::CannotDowngrade,
+                            "Cannot downgrade while user write blocking is enabled.",
+                            !isBlockingUserWrites);
                 }
 
                 FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(

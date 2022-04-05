@@ -33,6 +33,7 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/s/config/configsvr_coordinator_service.h"
 #include "mongo/db/s/config/set_user_write_block_mode_coordinator.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -58,22 +59,29 @@ public:
                     serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
             CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
                                                           opCtx->getWriteConcern());
-            uassert(
-                ErrorCodes::IllegalOperation,
-                "featureFlagUserWriteBlocking not enabled",
-                gFeatureFlagUserWriteBlocking.isEnabled(serverGlobalParams.featureCompatibility));
 
             const auto startBlocking = request().getGlobal();
 
-            SetUserWriteBlockModeCoordinatorDocument coordinatorDoc{startBlocking};
-            coordinatorDoc.setConfigsvrCoordinatorMetadata(
-                {ConfigsvrCoordinatorTypeEnum::kSetUserWriteBlockMode});
-            const auto coordinatorDocBSON = coordinatorDoc.toBSON();
+            const auto coordinatorCompletionFuture = [&]() -> SharedSemiFuture<void> {
+                // TODO SERVER-65010 Remove FCV guard once 6.0 has branched out
+                FixedFCVRegion fixedFcvRegion(opCtx);
+                uassert(ErrorCodes::IllegalOperation,
+                        "featureFlagUserWriteBlocking not enabled",
+                        gFeatureFlagUserWriteBlocking.isEnabled(
+                            serverGlobalParams.featureCompatibility));
 
-            const auto service = ConfigsvrCoordinatorService::getService(opCtx);
-            const auto instance = service->getOrCreateService(opCtx, coordinatorDoc.toBSON());
+                SetUserWriteBlockModeCoordinatorDocument coordinatorDoc{startBlocking};
+                coordinatorDoc.setConfigsvrCoordinatorMetadata(
+                    {ConfigsvrCoordinatorTypeEnum::kSetUserWriteBlockMode});
+                const auto coordinatorDocBSON = coordinatorDoc.toBSON();
 
-            instance->getCompletionFuture().get(opCtx);
+                const auto service = ConfigsvrCoordinatorService::getService(opCtx);
+                const auto instance = service->getOrCreateService(opCtx, coordinatorDoc.toBSON());
+
+                return instance->getCompletionFuture();
+            }();
+
+            coordinatorCompletionFuture.get(opCtx);
         }
 
     private:

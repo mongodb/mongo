@@ -93,4 +93,20 @@ ConfigsvrCoordinatorService::constructInstance(BSONObj initialState) {
     }
 }
 
+bool ConfigsvrCoordinatorService::isAnyCoordinatorOfGivenTypeRunning(
+    OperationContext* opCtx, ConfigsvrCoordinatorTypeEnum coordinatorType) {
+
+    const auto instances = getAllInstances(opCtx);
+    for (const auto& instance : instances) {
+        auto typedInstance = checked_pointer_cast<ConfigsvrCoordinator>(instance);
+        if (typedInstance->coordinatorType() == coordinatorType) {
+            if (!typedInstance->getCompletionFuture().isReady()) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
 }  // namespace mongo
