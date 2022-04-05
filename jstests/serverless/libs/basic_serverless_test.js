@@ -15,13 +15,23 @@ class BasicServerlessTest {
         this.recipientNodes = [];
     }
 
-    stop() {
+    /*
+     * Removes and stops the recipient nodes and then stops the donor nodes.
+     * @param {shouldRestart} indicates whether stop() is being called with the intent to call
+     * start() with restart=true for the same node(s) n.
+     */
+    stop({shouldRestart = false} = {}) {
         this.removeAndStopRecipientNodes();
         // If we validate, it will try to list all collections and the migrated collections will
         // return a TenantMigrationCommitted error.
-        this.donor.stopSet(undefined /* signal */, false /* forRestart */, {skipValidation: 1});
+        this.donor.stopSet(
+            undefined /* signal */, shouldRestart /* forRestart */, {skipValidation: 1});
     }
 
+    /*
+     * Add recipient nodes to the current donor set.
+     * @param {numNodes} indicates the number of recipient nodes to be added.
+     */
     addRecipientNodes(numNodes) {
         numNodes = numNodes || 3;  // default to three nodes
 
@@ -60,9 +70,13 @@ class BasicServerlessTest {
         this.recipientNodes.forEach(node => donor.waitForState(node, ReplSetTest.State.SECONDARY));
     }
 
+    /*
+     * Remove and stops the recipient nodes from the donor set.
+     */
     removeAndStopRecipientNodes() {
         print("Removing and stopping recipient nodes");
-        this.recipientNodes.forEach(node => {
+        const recipientNodes = this.recipientNodes.splice(0);
+        recipientNodes.forEach(node => {
             if (this.donor.nodes.includes(node)) {
                 this.donor.remove(node);
             } else {
@@ -78,6 +92,11 @@ class BasicServerlessTest {
         return `${tenantId}_${dbName}`;
     }
 
+    /*
+     * Lookup and return the tenant migration access blocker on a node for the given tenant.
+     * @param {donorNode} donor node on which the request will be sent.
+     * @param {tenantId} tenant id to lookup for tenant access blockers.
+     */
     getTenantMigrationAccessBlocker({donorNode, tenantId}) {
         const res = donorNode.adminCommand({serverStatus: 1});
         assert.commandWorked(res);
@@ -143,6 +162,39 @@ class BasicServerlessTest {
         this.donor.nodes = this.donor.nodes.filter(node => !this.recipientNodes.includes(node));
         this.donor.ports =
             this.donor.ports.filter(port => !this.recipientNodes.some(node => node.port === port));
+    }
+
+    /*
+     * Look up tenant access blockers for the given tenant ids and will check, based upon the
+     * expected state the access blockers are expected to be, that the different fields are
+     * properly set such as `blockTimestamp`, `abortOpTime` or `commitOpTime`.
+     * @param {migrationId} the current shard split id.
+     * @param {tenantIds} tenant ids of the shard split.
+     * @param {expectedState} expected state the tenant access blocker to be in.
+     */
+    validateTenantAccessBlockers(migrationId, tenantIds, expectedState) {
+        let donorPrimary = this.donor.getPrimary();
+        const stateDoc = findMigration(donorPrimary, migrationId);
+        assert.soon(() => tenantIds.every(tenantId => {
+            const donorMtab =
+                this.getTenantMigrationAccessBlocker({donorNode: donorPrimary, tenantId}).donor;
+            const tenantAccessBlockersBlockRW = donorMtab.state == expectedState;
+
+            const tenantAccessBlockersBlockTimestamp =
+                bsonWoCompare(donorMtab.blockTimestamp, stateDoc.blockTimestamp) == 0;
+
+            let tenantAccessBlockersAbortTimestamp = true;
+            if (donorMtab.state > TenantMigrationTest.DonorAccessState.kBlockWritesAndReads) {
+                let donorAbortOrCommitOpTime =
+                    donorMtab.state == TenantMigrationTest.DonorAccessState.kAborted
+                    ? donorMtab.abortOpTime
+                    : donorMtab.commitOpTime;
+                tenantAccessBlockersAbortTimestamp =
+                    bsonWoCompare(donorAbortOrCommitOpTime, stateDoc.commitOrAbortOpTime) == 0;
+            }
+            return tenantAccessBlockersBlockRW && tenantAccessBlockersBlockTimestamp &&
+                tenantAccessBlockersAbortTimestamp;
+        }));
     }
 }
 

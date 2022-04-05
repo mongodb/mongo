@@ -55,8 +55,8 @@ namespace mongo {
 
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(pauseShardSplitBeforeBlocking);
 MONGO_FAIL_POINT_DEFINE(pauseShardSplitAfterBlocking);
+MONGO_FAIL_POINT_DEFINE(pauseShardSplitAfterDecision);
 MONGO_FAIL_POINT_DEFINE(skipShardSplitWaitForSplitAcceptance);
 MONGO_FAIL_POINT_DEFINE(pauseShardSplitBeforeRecipientCleanup);
 
@@ -424,6 +424,8 @@ SemiFuture<void> ShardSplitDonorService::DonorStateMachine::run(
             .ignoreValue()
             .thenRunOn(**executor)
             .then([this, anchor = shared_from_this(), executor, primaryToken] {
+                auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+                pauseShardSplitAfterDecision.pauseWhileSetAndNotCanceled(opCtx.get(), primaryToken);
                 return _waitForForgetCmdThenMarkGarbageCollectible(executor, primaryToken);
             })
             .unsafeToInlineFuture());
@@ -579,6 +581,8 @@ ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_enterBlockingOr
             BSONObjBuilder bob;
             _abortReason->serializeErrorToBSON(&bob);
             _stateDoc.setAbortReason(bob.obj());
+            _stateDoc.setExpireAt(_serviceContext->getFastClockSource()->now() +
+                                  Milliseconds{repl::shardSplitGarbageCollectionDelayMS.load()});
             nextState = ShardSplitDonorStateEnum::kAborted;
         } else {
             auto recipientTagName = _stateDoc.getRecipientTagName();
@@ -846,7 +850,7 @@ ShardSplitDonorService::DonorStateMachine::_waitForForgetCmdThenMarkGarbageColle
         return ExecutorFuture(**executor);
     }
 
-    return std::move(_forgetShardSplitReceivedPromise.getFuture())
+    return future_util::withCancellation(_forgetShardSplitReceivedPromise.getFuture(), token)
         .thenRunOn(**executor)
         .then([this, self = shared_from_this(), executor, token] {
             LOGV2(6236606,

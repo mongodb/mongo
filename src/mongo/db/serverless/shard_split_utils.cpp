@@ -243,7 +243,7 @@ bool shouldRemoveStateDocumentOnRecipient(OperationContext* opCtx,
 
 Status validateRecipientNodesForShardSplit(const ShardSplitDonorDocument& stateDocument,
                                            const repl::ReplSetConfig& localConfig) {
-    if (stateDocument.getState() == ShardSplitDonorStateEnum::kAborted) {
+    if (stateDocument.getState() > ShardSplitDonorStateEnum::kUninitialized) {
         return Status::OK();
     }
 

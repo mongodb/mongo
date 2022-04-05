@@ -40,6 +40,9 @@
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
 #include "mongo/db/repl/tenant_migration_conflict_info.h"
+#include "mongo/db/repl/tenant_migration_state_machine_gen.h"
+#include "mongo/db/serverless/shard_split_state_machine_gen.h"
+#include "mongo/db/serverless/shard_split_utils.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/logv2/log.h"
 #include "mongo/transport/service_executor.h"
@@ -426,6 +429,61 @@ void recoverTenantMigrationAccessBlockers(OperationContext* opCtx) {
                 break;
             case TenantMigrationRecipientStateEnum::kUninitialized:
                 MONGO_UNREACHABLE;
+        }
+        return true;
+    });
+
+    // Recover TenantMigrationDonorAccessBlockers for ShardSplit.
+    PersistentTaskStore<ShardSplitDonorDocument> shardSplitDonorStore(
+        NamespaceString::kTenantSplitDonorsNamespace);
+
+    shardSplitDonorStore.forEach(opCtx, {}, [&](const ShardSplitDonorDocument& doc) {
+        // Skip creating a TenantMigrationDonorAccessBlocker for terminal shard split that have been
+        // marked as garbage collected.
+        if (doc.getExpireAt() &&
+            (doc.getState() == ShardSplitDonorStateEnum::kCommitted ||
+             doc.getState() == ShardSplitDonorStateEnum::kAborted)) {
+            return true;
+        }
+
+        // TODO(SERVER-64619) No longer use a dummy connectiong string when it is no longer a
+        // required parameter.
+        std::string dummmyRecipientConnectionString = "mongodb://FAKE_URI/?replSet=INVALID";
+
+        auto optionalTenants = doc.getTenantIds();
+        invariant(optionalTenants);
+        for (const auto& tenantId : optionalTenants.get()) {
+            auto mtab = std::make_shared<TenantMigrationDonorAccessBlocker>(
+                opCtx->getServiceContext(),
+                doc.getId(),
+                tenantId.toString(),
+                MigrationProtocolEnum::kMultitenantMigrations,
+                dummmyRecipientConnectionString);
+            TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
+                .add(tenantId.toString(), mtab);
+
+            switch (doc.getState()) {
+                case ShardSplitDonorStateEnum::kBlocking:
+                    invariant(doc.getBlockTimestamp());
+                    mtab->startBlockingWrites();
+                    mtab->startBlockingReadsAfter(doc.getBlockTimestamp().get());
+                    break;
+                case ShardSplitDonorStateEnum::kCommitted:
+                    invariant(doc.getBlockTimestamp());
+                    mtab->startBlockingWrites();
+                    mtab->startBlockingReadsAfter(doc.getBlockTimestamp().get());
+                    mtab->setCommitOpTime(opCtx, doc.getCommitOrAbortOpTime().get());
+                    break;
+                case ShardSplitDonorStateEnum::kAborted:
+                    if (doc.getBlockTimestamp()) {
+                        mtab->startBlockingWrites();
+                        mtab->startBlockingReadsAfter(doc.getBlockTimestamp().get());
+                    }
+                    mtab->setAbortOpTime(opCtx, doc.getCommitOrAbortOpTime().get());
+                    break;
+                case ShardSplitDonorStateEnum::kUninitialized:
+                    MONGO_UNREACHABLE;
+            }
         }
         return true;
     });

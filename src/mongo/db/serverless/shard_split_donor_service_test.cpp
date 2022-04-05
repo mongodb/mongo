@@ -46,6 +46,7 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
+#include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/repl/tenant_migration_donor_access_blocker.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/serverless/shard_split_donor_op_observer.h"
@@ -178,6 +179,14 @@ void fastForwardCommittedSnapshotOpTime(
     replCoord->setCurrentCommittedSnapshotOpTime(*foundStateDoc.getCommitOrAbortOpTime());
     serviceContext->getOpObserver()->onMajorityCommitPointUpdate(
         serviceContext, *foundStateDoc.getCommitOrAbortOpTime());
+}
+
+bool hasActiveSplitForTenants(OperationContext* opCtx,
+                              const std::vector<std::string>& tenantNames) {
+    return std::all_of(tenantNames.begin(), tenantNames.end(), [&](const auto& tenantName) {
+        return tenant_migration_access_blocker::hasActiveTenantMigration(
+            opCtx, StringData(tenantName + "_db"));
+    });
 }
 
 class ShardSplitDonorServiceTest : public repl::PrimaryOnlyServiceMongoDTest {
@@ -317,6 +326,8 @@ TEST_F(ShardSplitDonorServiceTest, BasicShardSplitDonorServiceInstanceCreation) 
 
     auto decisionFuture = serviceInstance->decisionFuture();
     decisionFuture.wait();
+
+    ASSERT_TRUE(hasActiveSplitForTenants(opCtx.get(), _tenantIds));
 
     auto result = decisionFuture.get();
     ASSERT(!result.abortReason);
@@ -526,7 +537,7 @@ TEST_F(ShardSplitDonorServiceTest, AbortDueToRecipientNodesValidation) {
     ASSERT_EQ(result.state, mongo::ShardSplitDonorStateEnum::kCommitted);
 
     ASSERT_OK(serviceInstance->completionFuture().getNoThrow());
-    ASSERT_TRUE(!serviceInstance->isGarbageCollectable());
+    ASSERT_FALSE(serviceInstance->isGarbageCollectable());
 }
 
 TEST(RecipientAcceptSplitListenerTest, FutureReady) {
@@ -723,14 +734,20 @@ TEST_F(ShardSplitRecipientCleanupTest, ShardSplitRecipientCleanup) {
 
     ASSERT_OK(serverless::getStateDocument(opCtx.get(), _uuid).getStatus());
 
+    ASSERT_FALSE(hasActiveSplitForTenants(opCtx.get(), _tenantIds));
+
     auto decisionFuture = [&]() {
         ASSERT(_pauseBeforeRecipientCleanupFp);
         (*(_pauseBeforeRecipientCleanupFp.get()))->waitForTimesEntered(_initialTimesEntered + 1);
+
+        tenant_migration_access_blocker::recoverTenantMigrationAccessBlockers(opCtx.get());
 
         auto splitService = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
                                 ->lookupServiceByName(ShardSplitDonorService::kServiceName);
         auto optionalDonor = ShardSplitDonorService::DonorStateMachine::lookup(
             opCtx.get(), splitService, BSON("_id" << _uuid));
+
+        ASSERT_TRUE(hasActiveSplitForTenants(opCtx.get(), _tenantIds));
 
         ASSERT_TRUE(optionalDonor);
         auto serviceInstance = optionalDonor.get();
@@ -785,6 +802,10 @@ TEST_F(ShardSplitStepUpWithCommitted, StepUpWithkCommitted) {
     auto foundStateDoc = uassertStatusOK(serverless::getStateDocument(opCtx.get(), _uuid));
     invariant(foundStateDoc.getExpireAt());
     ASSERT_EQ(*foundStateDoc.getExpireAt(), *_expireAt);
+
+    tenant_migration_access_blocker::recoverTenantMigrationAccessBlockers(opCtx.get());
+    // for kCommitted with expireAt field we skip the access blocker recovery.
+    ASSERT_FALSE(hasActiveSplitForTenants(opCtx.get(), _tenantIds));
 
     ASSERT(_pauseBeforeRecipientCleanupFp);
     _pauseBeforeRecipientCleanupFp.get()->failPoint()->waitForTimesEntered(_initialTimesEntered +
