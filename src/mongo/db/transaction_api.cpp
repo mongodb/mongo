@@ -368,7 +368,7 @@ SemiFuture<BSONObj> Transaction::_commitOrAbort(StringData dbName, StringData cm
         if (_state == TransactionState::kInit) {
             LOGV2_DEBUG(
                 5875903,
-                0,  // TODO SERVER-61781: Raise verbosity.
+                3,
                 "Internal transaction skipping commit or abort because no commands were run",
                 "cmdName"_attr = cmdName,
                 "txnInfo"_attr = _reportStateForLog(lg));
@@ -425,7 +425,7 @@ Transaction::ErrorHandlingStep Transaction::handleError(
     stdx::lock_guard<Latch> lg(_mutex);
 
     LOGV2_DEBUG(5875905,
-                0,  // TODO SERVER-61781: Raise verbosity.
+                3,
                 "Internal transaction handling error",
                 "error"_attr = swResult.isOK() ? swResult.getValue().getEffectiveStatus()
                                                : swResult.getStatus(),
@@ -638,7 +638,7 @@ void Transaction::_primeTransaction(OperationContext* opCtx) {
         ReadWriteConcernProvenanceBase::kSourceFieldName);
 
     LOGV2_DEBUG(5875901,
-                0,  // TODO SERVER-61781: Raise verbosity.
+                3,
                 "Started internal transaction",
                 "sessionInfo"_attr = _sessionInfo,
                 "readConcern"_attr = _readConcern,
