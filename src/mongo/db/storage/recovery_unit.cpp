@@ -32,6 +32,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
@@ -157,7 +158,9 @@ void RecoveryUnit::_executeRollbackHandlers() {
 }
 
 void RecoveryUnit::validateInUnitOfWork() const {
-    invariant(_inUnitOfWork(), toString(_getState()));
+    invariant(_inUnitOfWork() || storageGlobalParams.readOnly,
+              fmt::format(
+                  "state: {}, readOnly: {}", toString(_getState()), storageGlobalParams.readOnly));
 }
 
 }  // namespace mongo

@@ -43,7 +43,18 @@ const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
 
 static const NamespaceString _nss("unittests.indexcatalog");
 
-class IndexIteratorTests {
+class IndexCatalogTestBase {
+protected:
+    // Helper to refetch the IndexCatalog from the catalog in order to see any changes made to the
+    // collection
+    const IndexCatalog* indexCatalog(OperationContext* opCtx) const {
+        return CollectionCatalog::get(opCtx)
+            ->lookupCollectionByNamespace(opCtx, _nss)
+            ->getIndexCatalog();
+    }
+};
+
+class IndexIteratorTests : IndexCatalogTestBase {
 public:
     IndexIteratorTests() {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
@@ -52,9 +63,7 @@ public:
         OldClientContext ctx(&opCtx, _nss.ns());
         WriteUnitOfWork wuow(&opCtx);
 
-        _db = ctx.db();
-        _coll = _db->createCollection(&opCtx, _nss);
-        _catalog = _coll->getIndexCatalog();
+        ctx.db()->createCollection(&opCtx, _nss);
         wuow.commit();
     }
 
@@ -65,7 +74,7 @@ public:
         OldClientContext ctx(&opCtx, _nss.ns());
         WriteUnitOfWork wuow(&opCtx);
 
-        _db->dropCollection(&opCtx, _nss).transitional_ignore();
+        ctx.db()->dropCollection(&opCtx, _nss).transitional_ignore();
         wuow.commit();
     }
 
@@ -74,14 +83,15 @@ public:
         OperationContext& opCtx = *opCtxPtr;
         dbtests::WriteContextForTests ctx(&opCtx, _nss.ns());
 
-        int numFinishedIndexesStart = _catalog->numIndexesReady(&opCtx);
+        int numFinishedIndexesStart = indexCatalog(&opCtx)->numIndexesReady(&opCtx);
 
         dbtests::createIndex(&opCtx, _nss.ns(), BSON("x" << 1)).transitional_ignore();
         dbtests::createIndex(&opCtx, _nss.ns(), BSON("y" << 1)).transitional_ignore();
 
-        ASSERT_TRUE(_catalog->numIndexesReady(&opCtx) == numFinishedIndexesStart + 2);
+        ASSERT_TRUE(indexCatalog(&opCtx)->numIndexesReady(&opCtx) == numFinishedIndexesStart + 2);
 
-        std::unique_ptr<IndexCatalog::IndexIterator> ii = _catalog->getIndexIterator(&opCtx, false);
+        std::unique_ptr<IndexCatalog::IndexIterator> ii =
+            indexCatalog(&opCtx)->getIndexIterator(&opCtx, false);
         int indexesIterated = 0;
         bool foundIndex = false;
         while (ii->more()) {
@@ -97,17 +107,12 @@ public:
             }
         }
 
-        ASSERT_TRUE(indexesIterated == _catalog->numIndexesReady(&opCtx));
+        ASSERT_TRUE(indexesIterated == indexCatalog(&opCtx)->numIndexesReady(&opCtx));
         ASSERT_TRUE(foundIndex);
     }
-
-private:
-    IndexCatalog* _catalog;
-    Collection* _coll;
-    Database* _db;
 };
 
-class IndexCatalogEntryDroppedTest {
+class IndexCatalogEntryDroppedTest : IndexCatalogTestBase {
 public:
     IndexCatalogEntryDroppedTest() {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
@@ -116,9 +121,7 @@ public:
         OldClientContext ctx(&opCtx, _nss.ns());
         WriteUnitOfWork wuow(&opCtx);
 
-        _db = ctx.db();
-        _coll = _db->createCollection(&opCtx, _nss);
-        _catalog = _coll->getIndexCatalog();
+        ctx.db()->createCollection(&opCtx, _nss);
         wuow.commit();
     }
 
@@ -127,39 +130,35 @@ public:
         OperationContext& opCtx = *opCtxPtr;
         dbtests::WriteContextForTests ctx(&opCtx, _nss.ns());
 
-        const IndexDescriptor* idDesc = _catalog->findIdIndex(&opCtx);
-        std::shared_ptr<const IndexCatalogEntry> entry = _catalog->getEntryShared(idDesc);
+        const IndexDescriptor* idDesc = indexCatalog(&opCtx)->findIdIndex(&opCtx);
+        std::shared_ptr<const IndexCatalogEntry> entry =
+            indexCatalog(&opCtx)->getEntryShared(idDesc);
 
         ASSERT_FALSE(entry->isDropped());
 
         {
-            Lock::CollectionLock lk(&opCtx, _nss, MODE_X);
+            AutoGetCollection autoColl(&opCtx, _nss, MODE_X);
             WriteUnitOfWork wuow(&opCtx);
-            ASSERT_OK(_db->dropCollection(&opCtx, _nss));
+            ASSERT_OK(autoColl.getDb()->dropCollection(&opCtx, _nss));
             ASSERT_FALSE(entry->isDropped());
         }
 
         ASSERT_FALSE(entry->isDropped());
 
         {
-            Lock::CollectionLock lk(&opCtx, _nss, MODE_X);
+            AutoGetCollection autoColl(&opCtx, _nss, MODE_X);
             WriteUnitOfWork wuow(&opCtx);
-            ASSERT_OK(_db->dropCollection(&opCtx, _nss));
+            ASSERT_OK(autoColl.getDb()->dropCollection(&opCtx, _nss));
             wuow.commit();
             ASSERT_TRUE(entry->isDropped());
         }
     }
-
-private:
-    IndexCatalog* _catalog;
-    Collection* _coll;
-    Database* _db;
 };
 
 /**
  * Test for IndexCatalog::refreshEntry().
  */
-class RefreshEntry {
+class RefreshEntry : IndexCatalogTestBase {
 public:
     RefreshEntry() {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
@@ -168,9 +167,7 @@ public:
         OldClientContext ctx(&opCtx, _nss.ns());
         WriteUnitOfWork wuow(&opCtx);
 
-        _db = ctx.db();
-        _coll = _db->createCollection(&opCtx, _nss);
-        _catalog = _coll->getIndexCatalog();
+        ctx.db()->createCollection(&opCtx, _nss);
         wuow.commit();
     }
 
@@ -181,7 +178,7 @@ public:
         OldClientContext ctx(&opCtx, _nss.ns());
         WriteUnitOfWork wuow(&opCtx);
 
-        _db->dropCollection(&opCtx, _nss).transitional_ignore();
+        ctx.db()->dropCollection(&opCtx, _nss).transitional_ignore();
         wuow.commit();
     }
 
@@ -197,37 +194,39 @@ public:
                                                            << "v" << static_cast<int>(kIndexVersion)
                                                            << "expireAfterSeconds" << 5)));
 
-        const IndexDescriptor* desc = _catalog->findIndexByName(&opCtx, indexName);
+        const IndexDescriptor* desc = indexCatalog(&opCtx)->findIndexByName(&opCtx, indexName);
         ASSERT(desc);
         ASSERT_EQUALS(5, desc->infoObj()["expireAfterSeconds"].numberLong());
 
         // Change value of "expireAfterSeconds" on disk. This will update the metadata for the
         // Collection but not propagate the change to the IndexCatalog
         {
+            AutoGetCollection autoColl(&opCtx, _nss, MODE_X);
+            CollectionWriter coll(&opCtx, autoColl);
+
             WriteUnitOfWork wuow(&opCtx);
-            _coll->updateTTLSetting(&opCtx, "x_1", 10);
+            coll.getWritableCollection()->updateTTLSetting(&opCtx, "x_1", 10);
             wuow.commit();
         }
 
         // Confirm that the index catalog does not yet know of the change.
-        desc = _catalog->findIndexByName(&opCtx, indexName);
+        desc = indexCatalog(&opCtx)->findIndexByName(&opCtx, indexName);
         ASSERT_EQUALS(5, desc->infoObj()["expireAfterSeconds"].numberLong());
 
         {
+            AutoGetCollection autoColl(&opCtx, _nss, MODE_X);
+            CollectionWriter coll(&opCtx, autoColl);
+
             // Notify the catalog of the change.
             WriteUnitOfWork wuow(&opCtx);
-            desc = _catalog->refreshEntry(&opCtx, _coll, desc, CreateIndexEntryFlags::kIsReady);
+            desc = coll.getWritableCollection()->getIndexCatalog()->refreshEntry(
+                &opCtx, coll.getWritableCollection(), desc, CreateIndexEntryFlags::kIsReady);
             wuow.commit();
         }
 
         // Test that the catalog reflects the change.
         ASSERT_EQUALS(10, desc->infoObj()["expireAfterSeconds"].numberLong());
     }
-
-private:
-    IndexCatalog* _catalog;
-    Collection* _coll;
-    Database* _db;
 };
 
 class IndexCatalogTests : public OldStyleSuiteSpecification {

@@ -44,6 +44,11 @@ class OperationContext;
  * A WriteUnitOfWork can be nested with others, but only the top level WriteUnitOfWork will commit
  * the unit of work on the RecoveryUnit. If a low level WriteUnitOfWork aborts, any parents will
  * also abort.
+ *
+ * The WriteUnitOfWork may be used in read only mode, where it allows callbacks to be registered
+ * with the RecoveryUnit and executes them on commit/abort without opening any unit of work on the
+ * RecoveryUnit. This can be used to unify code that performs in-memory writes using the callback
+ * functionality of the RecoveryUnit.
  */
 class WriteUnitOfWork {
     WriteUnitOfWork(const WriteUnitOfWork&) = delete;

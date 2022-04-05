@@ -826,7 +826,7 @@ public:
      * Called by catalog::openCatalog() to re-establish the oplog collection pointer while holding
      * onto the global lock in exclusive mode.
      */
-    virtual void establishOplogCollectionForLogging(OperationContext* opCtx) = 0;
+    virtual void establishOplogCollectionForLogging(OperationContext* opCtx) const = 0;
 
     /**
      * Called when this Collection is deregistered from the catalog

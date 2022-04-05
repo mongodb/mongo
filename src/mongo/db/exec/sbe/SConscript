@@ -80,6 +80,7 @@ sbeEnv.Library(
         '$BUILD_DIR/mongo/db/stats/resource_consumption_metrics',
         '$BUILD_DIR/mongo/db/storage/encryption_hooks',
         '$BUILD_DIR/mongo/db/storage/index_entry_comparison',
+        '$BUILD_DIR/mongo/db/storage/record_store_base',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
         '$BUILD_DIR/third_party/shim_snappy',
         'query_sbe_plan_stats',

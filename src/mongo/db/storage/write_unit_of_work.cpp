@@ -48,11 +48,8 @@ MONGO_FAIL_POINT_DEFINE(sleepBeforeCommit);
 WriteUnitOfWork::WriteUnitOfWork(OperationContext* opCtx, bool groupOplogEntries)
     : _opCtx(opCtx),
       _toplevel(opCtx->_ruState == RecoveryUnitState::kNotInUnitOfWork),
-      _groupOplogEntries(groupOplogEntries) {
-    uassert(ErrorCodes::IllegalOperation,
-            "Cannot execute a write operation in read-only mode",
-            !storageGlobalParams.readOnly);
-    // Grouping oplog entries doesn't support WUOW nesting (e.g. multi-doc transactions).
+      _groupOplogEntries(groupOplogEntries) {  // Grouping oplog entries doesn't support WUOW
+                                               // nesting (e.g. multi-doc transactions).
     invariant(_toplevel || !_groupOplogEntries);
 
     if (_groupOplogEntries) {
@@ -62,7 +59,9 @@ WriteUnitOfWork::WriteUnitOfWork(OperationContext* opCtx, bool groupOplogEntries
 
     _opCtx->lockState()->beginWriteUnitOfWork();
     if (_toplevel) {
-        _opCtx->recoveryUnit()->beginUnitOfWork(_opCtx);
+        if (!storageGlobalParams.readOnly) {
+            _opCtx->recoveryUnit()->beginUnitOfWork(_opCtx);
+        }
         _opCtx->_ruState = RecoveryUnitState::kActiveUnitOfWork;
     }
     // Make sure we don't silently proceed after a previous WriteUnitOfWork under the same parent
@@ -71,14 +70,19 @@ WriteUnitOfWork::WriteUnitOfWork(OperationContext* opCtx, bool groupOplogEntries
 }
 
 WriteUnitOfWork::~WriteUnitOfWork() {
-    dassert(!storageGlobalParams.readOnly);
     if (!_released && !_committed) {
         invariant(_opCtx->_ruState != RecoveryUnitState::kNotInUnitOfWork);
-        if (_toplevel) {
-            _opCtx->recoveryUnit()->abortUnitOfWork();
-            _opCtx->_ruState = RecoveryUnitState::kNotInUnitOfWork;
+        if (!storageGlobalParams.readOnly) {
+            if (_toplevel) {
+                // Abort unit of work and execute rollback handlers
+                _opCtx->recoveryUnit()->abortUnitOfWork();
+                _opCtx->_ruState = RecoveryUnitState::kNotInUnitOfWork;
+            } else {
+                _opCtx->_ruState = RecoveryUnitState::kFailedUnitOfWork;
+            }
         } else {
-            _opCtx->_ruState = RecoveryUnitState::kFailedUnitOfWork;
+            // Just execute rollback handlers in readOnly mode
+            _opCtx->recoveryUnit()->abortRegisteredChanges();
         }
         _opCtx->lockState()->endWriteUnitOfWork();
     }
@@ -136,8 +140,18 @@ void WriteUnitOfWork::commit() {
             sleepFor(Milliseconds(100));
         }
 
+        // Execute preCommit hooks before committing the transaction. This is an opportunity to
+        // throw or do any last changes before committing.
         _opCtx->recoveryUnit()->runPreCommitHooks(_opCtx);
-        _opCtx->recoveryUnit()->commitUnitOfWork();
+        if (!storageGlobalParams.readOnly) {
+            // Just execute commit handlers in readOnly mode
+            _opCtx->recoveryUnit()->commitUnitOfWork();
+        } else {
+            // Commit unit of work and execute commit or rollback handlers depending on whether the
+            // commit was successful.
+            _opCtx->recoveryUnit()->commitRegisteredChanges(boost::none);
+        }
+
         _opCtx->_ruState = RecoveryUnitState::kNotInUnitOfWork;
     }
     _opCtx->lockState()->endWriteUnitOfWork();

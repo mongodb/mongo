@@ -1128,7 +1128,7 @@ bool WiredTigerRecordStore::findRecord(OperationContext* opCtx,
     return true;
 }
 
-void WiredTigerRecordStore::deleteRecord(OperationContext* opCtx, const RecordId& id) {
+void WiredTigerRecordStore::doDeleteRecord(OperationContext* opCtx, const RecordId& id) {
     // Only check if a write lock is held for regular (non-temporary) record stores.
     dassert(ns() == "" || opCtx->lockState()->isWriteLocked());
     invariant(opCtx->lockState()->inAWriteUnitOfWork() || opCtx->lockState()->isNoop());
@@ -1316,9 +1316,9 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx, Timestamp mayT
           "duration"_attr = Milliseconds(elapsedMillis));
 }
 
-Status WiredTigerRecordStore::insertRecords(OperationContext* opCtx,
-                                            std::vector<Record>* records,
-                                            const std::vector<Timestamp>& timestamps) {
+Status WiredTigerRecordStore::doInsertRecords(OperationContext* opCtx,
+                                              std::vector<Record>* records,
+                                              const std::vector<Timestamp>& timestamps) {
     return _insertRecords(opCtx, records->data(), timestamps.data(), records->size());
 }
 
@@ -1511,10 +1511,10 @@ StatusWith<Timestamp> WiredTigerRecordStore::getEarliestOplogTimestamp(Operation
     return {Timestamp(static_cast<unsigned long long>(_oplogFirstRecord.getLong()))};
 }
 
-Status WiredTigerRecordStore::updateRecord(OperationContext* opCtx,
-                                           const RecordId& id,
-                                           const char* data,
-                                           int len) {
+Status WiredTigerRecordStore::doUpdateRecord(OperationContext* opCtx,
+                                             const RecordId& id,
+                                             const char* data,
+                                             int len) {
     // Only check if a write lock is held for regular (non-temporary) record stores.
     dassert(ns() == "" || opCtx->lockState()->isWriteLocked());
     invariant(opCtx->lockState()->inAWriteUnitOfWork() || opCtx->lockState()->isNoop());
@@ -1613,7 +1613,7 @@ bool WiredTigerRecordStore::updateWithDamagesSupported() const {
     return true;
 }
 
-StatusWith<RecordData> WiredTigerRecordStore::updateWithDamages(
+StatusWith<RecordData> WiredTigerRecordStore::doUpdateWithDamages(
     OperationContext* opCtx,
     const RecordId& id,
     const RecordData& oldRec,
@@ -1733,7 +1733,7 @@ std::unique_ptr<RecordCursor> WiredTigerRecordStore::getRandomCursor(
     return std::make_unique<RandomCursor>(opCtx, *this, "");
 }
 
-Status WiredTigerRecordStore::truncate(OperationContext* opCtx) {
+Status WiredTigerRecordStore::doTruncate(OperationContext* opCtx) {
     WiredTigerCursor startWrap(_uri, _tableId, true, opCtx);
     WT_CURSOR* start = startWrap.get();
     int ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return start->next(start); });
@@ -1756,7 +1756,7 @@ Status WiredTigerRecordStore::truncate(OperationContext* opCtx) {
     return Status::OK();
 }
 
-Status WiredTigerRecordStore::compact(OperationContext* opCtx) {
+Status WiredTigerRecordStore::doCompact(OperationContext* opCtx) {
     dassert(opCtx->lockState()->isWriteLocked());
 
     WiredTigerSessionCache* cache = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache();
@@ -2041,9 +2041,9 @@ void WiredTigerRecordStore::setDataSize(long long dataSize) {
     _sizeStorer->flush(syncToDisk);
 }
 
-void WiredTigerRecordStore::cappedTruncateAfter(OperationContext* opCtx,
-                                                RecordId end,
-                                                bool inclusive) {
+void WiredTigerRecordStore::doCappedTruncateAfter(OperationContext* opCtx,
+                                                  RecordId end,
+                                                  bool inclusive) {
     std::unique_ptr<SeekableRecordCursor> cursor = getCursor(opCtx, true);
 
     auto record = cursor->seekExact(end);

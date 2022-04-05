@@ -194,14 +194,9 @@ public:
      * function as well as getCollection(). Any previous Collection pointers that were returned may
      * be invalidated.
      *
-     * CollectionCatalog::LifetimeMode::kManagedInWriteUnitOfWork will register an onCommit()
-     * handler to reset the pointers and an onRollback() handler that will reset getCollection() to
-     * the original Collection pointer.
+     * Must be in an active WriteUnitOfWork
      */
-    Collection* getWritableCollection(
-        OperationContext* opCtx,
-        CollectionCatalog::LifetimeMode mode =
-            CollectionCatalog::LifetimeMode::kManagedInWriteUnitOfWork);
+    Collection* getWritableCollection(OperationContext* opCtx);
 
 protected:
     // Ordering matters, the _collLocks should destruct before the _autoGetDb releases the
@@ -355,21 +350,14 @@ private:
 class CollectionWriter final {
 public:
     // Gets the collection from the catalog for the provided uuid
-    CollectionWriter(OperationContext* opCtx,
-                     const UUID& uuid,
-                     CollectionCatalog::LifetimeMode mode =
-                         CollectionCatalog::LifetimeMode::kManagedInWriteUnitOfWork);
+    CollectionWriter(OperationContext* opCtx, const UUID& uuid);
     // Gets the collection from the catalog for the provided namespace string
-    CollectionWriter(OperationContext* opCtx,
-                     const NamespaceString& nss,
-                     CollectionCatalog::LifetimeMode mode =
-                         CollectionCatalog::LifetimeMode::kManagedInWriteUnitOfWork);
+    CollectionWriter(OperationContext* opCtx, const NamespaceString& nss);
     // Acts as an adaptor for AutoGetCollection
-    CollectionWriter(OperationContext* opCtx,
-                     AutoGetCollection& autoCollection,
-                     CollectionCatalog::LifetimeMode mode =
-                         CollectionCatalog::LifetimeMode::kManagedInWriteUnitOfWork);
-    // Acts as an adaptor for a writable Collection that has been retrieved elsewhere
+    CollectionWriter(OperationContext* opCtx, AutoGetCollection& autoCollection);
+    // Acts as an adaptor for a writable Collection that has been retrieved elsewhere. This
+    // 'CollectionWriter' will become 'unmanaged' where the Collection will not be updated on
+    // commit/rollback.
     CollectionWriter(Collection* writableCollection);
 
     ~CollectionWriter();
@@ -410,7 +398,9 @@ private:
     CollectionPtr _storedCollection;
     Collection* _writableCollection = nullptr;
     OperationContext* _opCtx = nullptr;
-    CollectionCatalog::LifetimeMode _mode;
+
+    // Indicates if this instance is managing Collection pointers through commit and rollback.
+    bool _managed;
 
     struct SharedImpl;
     std::shared_ptr<SharedImpl> _sharedImpl;

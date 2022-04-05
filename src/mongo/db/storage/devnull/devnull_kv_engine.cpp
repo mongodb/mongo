@@ -102,11 +102,11 @@ public:
         return false;
     }
 
-    virtual void deleteRecord(OperationContext* opCtx, const RecordId& dl) {}
+    void doDeleteRecord(OperationContext* opCtx, const RecordId& dl) override {}
 
-    virtual Status insertRecords(OperationContext* opCtx,
-                                 std::vector<Record>* inOutRecords,
-                                 const std::vector<Timestamp>& timestamps) {
+    Status doInsertRecords(OperationContext* opCtx,
+                           std::vector<Record>* inOutRecords,
+                           const std::vector<Timestamp>& timestamps) override {
         _numInserts += inOutRecords->size();
         for (auto& record : *inOutRecords) {
             record.id = RecordId(6, 4);
@@ -114,10 +114,10 @@ public:
         return Status::OK();
     }
 
-    virtual Status updateRecord(OperationContext* opCtx,
-                                const RecordId& oldLocation,
-                                const char* data,
-                                int len) {
+    Status doUpdateRecord(OperationContext* opCtx,
+                          const RecordId& oldLocation,
+                          const char* data,
+                          int len) override {
         return Status::OK();
     }
 
@@ -125,11 +125,11 @@ public:
         return false;
     }
 
-    virtual StatusWith<RecordData> updateWithDamages(OperationContext* opCtx,
-                                                     const RecordId& loc,
-                                                     const RecordData& oldRec,
-                                                     const char* damageSource,
-                                                     const mutablebson::DamageVector& damages) {
+    StatusWith<RecordData> doUpdateWithDamages(OperationContext* opCtx,
+                                               const RecordId& loc,
+                                               const RecordData& oldRec,
+                                               const char* damageSource,
+                                               const mutablebson::DamageVector& damages) override {
         MONGO_UNREACHABLE;
     }
 
@@ -142,11 +142,11 @@ public:
         return std::make_unique<EmptyRecordCursor>();
     }
 
-    virtual Status truncate(OperationContext* opCtx) {
+    Status doTruncate(OperationContext* opCtx) override {
         return Status::OK();
     }
 
-    virtual void cappedTruncateAfter(OperationContext* opCtx, RecordId end, bool inclusive) {}
+    void doCappedTruncateAfter(OperationContext* opCtx, RecordId end, bool inclusive) override {}
 
     virtual void appendNumericCustomStats(OperationContext* opCtx,
                                           BSONObjBuilder* result,

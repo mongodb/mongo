@@ -69,34 +69,34 @@ public:
 
     virtual bool findRecord(OperationContext* opCtx, const RecordId& loc, RecordData* rd) const;
 
-    virtual void deleteRecord(OperationContext* opCtx, const RecordId& dl);
+    void doDeleteRecord(OperationContext* opCtx, const RecordId& dl) final;
 
-    virtual Status insertRecords(OperationContext* opCtx,
-                                 std::vector<Record>* inOutRecords,
-                                 const std::vector<Timestamp>& timestamps);
+    Status doInsertRecords(OperationContext* opCtx,
+                           std::vector<Record>* inOutRecords,
+                           const std::vector<Timestamp>& timestamps) final;
 
-    virtual Status updateRecord(OperationContext* opCtx,
-                                const RecordId& oldLocation,
-                                const char* data,
-                                int len);
+    Status doUpdateRecord(OperationContext* opCtx,
+                          const RecordId& oldLocation,
+                          const char* data,
+                          int len) final;
 
     virtual bool updateWithDamagesSupported() const;
 
-    virtual StatusWith<RecordData> updateWithDamages(OperationContext* opCtx,
-                                                     const RecordId& loc,
-                                                     const RecordData& oldRec,
-                                                     const char* damageSource,
-                                                     const mutablebson::DamageVector& damages);
+    StatusWith<RecordData> doUpdateWithDamages(OperationContext* opCtx,
+                                               const RecordId& loc,
+                                               const RecordData& oldRec,
+                                               const char* damageSource,
+                                               const mutablebson::DamageVector& damages) final;
 
     virtual void printRecordMetadata(OperationContext* opCtx, const RecordId& recordId) const {}
 
     std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext* opCtx,
                                                     bool forward) const final;
 
-    virtual Status truncate(OperationContext* opCtx);
+    Status doTruncate(OperationContext* opCtx) final;
     StatusWith<int64_t> truncateWithoutUpdatingCount(RecoveryUnit* ru);
 
-    virtual void cappedTruncateAfter(OperationContext* opCtx, RecordId end, bool inclusive);
+    void doCappedTruncateAfter(OperationContext* opCtx, RecordId end, bool inclusive) final;
 
     virtual void appendNumericCustomStats(OperationContext* opCtx,
                                           BSONObjBuilder* result,

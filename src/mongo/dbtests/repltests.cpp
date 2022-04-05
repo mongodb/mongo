@@ -267,7 +267,7 @@ protected:
             Database* db = ctx.db();
             Collection* coll =
                 CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespaceForMetadataWrite(
-                    &_opCtx, CollectionCatalog::LifetimeMode::kInplace, nss);
+                    &_opCtx, nss);
             if (!coll) {
                 coll = db->createCollection(&_opCtx, nss);
             }

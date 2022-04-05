@@ -121,6 +121,11 @@ public:
         getGlobalServiceContext()->unsetKillAllOperations();
     }
 
+    // Helper to refetch the Collection from the catalog in order to see any changes made to it
+    CollectionPtr coll() const {
+        return CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, _nss);
+    }
+
 protected:
     ValidateResults runValidate() {
         // Callers continue to do operations after running validate, so we must reset the read
@@ -222,18 +227,18 @@ public:
 
         // Create a new collection, insert records {_id: 1} and {_id: 2} and check it's valid.
         lockDb(MODE_X);
-        CollectionPtr coll;
+
         RecordId id1;
         {
             OpDebug* const nullOpDebug = nullptr;
             WriteUnitOfWork wunit(&_opCtx);
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
-            coll = _db->createCollection(&_opCtx, _nss);
+            _db->createCollection(&_opCtx, _nss);
 
-            ASSERT_OK(coll->insertDocument(
+            ASSERT_OK(coll()->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 1)), nullOpDebug, true));
-            id1 = coll->getCursor(&_opCtx)->next()->id;
-            ASSERT_OK(coll->insertDocument(
+            id1 = coll()->getCursor(&_opCtx)->next()->id;
+            ASSERT_OK(coll()->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 2)), nullOpDebug, true));
             wunit.commit();
         }
@@ -241,7 +246,7 @@ public:
         ensureValidateWorked();
 
         lockDb(MODE_X);
-        RecordStore* rs = coll->getRecordStore();
+        RecordStore* rs = coll()->getRecordStore();
 
         // Remove {_id: 1} from the record store, so we get more _id entries than records.
         {
@@ -280,23 +285,22 @@ public:
 
         // Create a new collection, insert two documents.
         lockDb(MODE_X);
-        CollectionPtr coll;
         RecordId id1;
         {
             OpDebug* const nullOpDebug = nullptr;
             WriteUnitOfWork wunit(&_opCtx);
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
-            coll = _db->createCollection(&_opCtx, _nss);
-            ASSERT_OK(coll->insertDocument(
+            _db->createCollection(&_opCtx, _nss);
+            ASSERT_OK(coll()->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
-            id1 = coll->getCursor(&_opCtx)->next()->id;
-            ASSERT_OK(coll->insertDocument(
+            id1 = coll()->getCursor(&_opCtx)->next()->id;
+            ASSERT_OK(coll()->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 2 << "a" << 2)), nullOpDebug, true));
             wunit.commit();
         }
 
         auto status = dbtests::createIndexFromSpec(&_opCtx,
-                                                   coll->ns().ns(),
+                                                   coll()->ns().ns(),
                                                    BSON("name"
                                                         << "a"
                                                         << "key" << BSON("a" << 1) << "v"
@@ -308,7 +312,7 @@ public:
         ensureValidateWorked();
 
         lockDb(MODE_X);
-        RecordStore* rs = coll->getRecordStore();
+        RecordStore* rs = coll()->getRecordStore();
 
         // Remove a record, so we get more _id entries than records, and verify validate fails.
         {
@@ -348,24 +352,23 @@ public:
         // Create a new collection, insert three records.
         lockDb(MODE_X);
         OpDebug* const nullOpDebug = nullptr;
-        CollectionPtr coll;
         RecordId id1;
         {
             WriteUnitOfWork wunit(&_opCtx);
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
-            coll = _db->createCollection(&_opCtx, _nss);
-            ASSERT_OK(coll->insertDocument(
+            _db->createCollection(&_opCtx, _nss);
+            ASSERT_OK(coll()->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
-            id1 = coll->getCursor(&_opCtx)->next()->id;
-            ASSERT_OK(coll->insertDocument(
+            id1 = coll()->getCursor(&_opCtx)->next()->id;
+            ASSERT_OK(coll()->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 2 << "a" << 2)), nullOpDebug, true));
-            ASSERT_OK(coll->insertDocument(
+            ASSERT_OK(coll()->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 3 << "b" << 3)), nullOpDebug, true));
             wunit.commit();
         }
 
         auto status = dbtests::createIndexFromSpec(&_opCtx,
-                                                   coll->ns().ns(),
+                                                   coll()->ns().ns(),
                                                    BSON("name"
                                                         << "a"
                                                         << "key" << BSON("a" << 1) << "v"
@@ -377,7 +380,7 @@ public:
         ensureValidateWorked();
 
         lockDb(MODE_X);
-        RecordStore* rs = coll->getRecordStore();
+        RecordStore* rs = coll()->getRecordStore();
 
         // Update {a: 1} to {a: 9} without updating the index, so we get inconsistent values
         // between the index and the document. Verify validate fails.
@@ -407,17 +410,16 @@ public:
         // Create a new collection, insert records {_id: 1} and {_id: 2} and check it's valid.
         lockDb(MODE_X);
         OpDebug* const nullOpDebug = nullptr;
-        CollectionPtr coll;
         RecordId id1;
         {
             WriteUnitOfWork wunit(&_opCtx);
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
-            coll = _db->createCollection(&_opCtx, _nss);
+            _db->createCollection(&_opCtx, _nss);
 
-            ASSERT_OK(coll->insertDocument(
+            ASSERT_OK(coll()->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 1)), nullOpDebug, true));
-            id1 = coll->getCursor(&_opCtx)->next()->id;
-            ASSERT_OK(coll->insertDocument(
+            id1 = coll()->getCursor(&_opCtx)->next()->id;
+            ASSERT_OK(coll()->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 2)), nullOpDebug, true));
             wunit.commit();
         }
@@ -425,7 +427,7 @@ public:
         ensureValidateWorked();
 
         lockDb(MODE_X);
-        RecordStore* rs = coll->getRecordStore();
+        RecordStore* rs = coll()->getRecordStore();
 
         // Update {_id: 1} to {_id: 9} without updating the index, so we get inconsistent values
         // between the index and the document. Verify validate fails.
@@ -483,7 +485,6 @@ public:
         // Create a new collection, insert three records and check it's valid.
         lockDb(MODE_X);
         OpDebug* const nullOpDebug = nullptr;
-        CollectionPtr coll;
         RecordId id1;
         // {a: [b: 1, c: 2]}, {a: [b: 2, c: 2]}, {a: [b: 1, c: 1]}
         auto doc1 = BSON("_id" << 1 << "a" << BSON_ARRAY(BSON("b" << 1) << BSON("c" << 2)));
@@ -497,13 +498,13 @@ public:
         {
             WriteUnitOfWork wunit(&_opCtx);
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
-            coll = _db->createCollection(&_opCtx, _nss);
+            _db->createCollection(&_opCtx, _nss);
 
 
-            ASSERT_OK(coll->insertDocument(&_opCtx, InsertStatement(doc1), nullOpDebug, true));
-            id1 = coll->getCursor(&_opCtx)->next()->id;
-            ASSERT_OK(coll->insertDocument(&_opCtx, InsertStatement(doc2), nullOpDebug, true));
-            ASSERT_OK(coll->insertDocument(&_opCtx, InsertStatement(doc3), nullOpDebug, true));
+            ASSERT_OK(coll()->insertDocument(&_opCtx, InsertStatement(doc1), nullOpDebug, true));
+            id1 = coll()->getCursor(&_opCtx)->next()->id;
+            ASSERT_OK(coll()->insertDocument(&_opCtx, InsertStatement(doc2), nullOpDebug, true));
+            ASSERT_OK(coll()->insertDocument(&_opCtx, InsertStatement(doc3), nullOpDebug, true));
             wunit.commit();
         }
         releaseDb();
@@ -513,7 +514,7 @@ public:
 
         // Create multi-key index.
         auto status = dbtests::createIndexFromSpec(&_opCtx,
-                                                   coll->ns().ns(),
+                                                   coll()->ns().ns(),
                                                    BSON("name"
                                                         << "multikey_index"
                                                         << "key" << BSON("a.b" << 1) << "v"
@@ -525,7 +526,7 @@ public:
         ensureValidateWorked();
 
         lockDb(MODE_X);
-        RecordStore* rs = coll->getRecordStore();
+        RecordStore* rs = coll()->getRecordStore();
 
         // Update a document's indexed field without updating the index.
         {
@@ -565,19 +566,18 @@ public:
         // Create a new collection, insert three records and check it's valid.
         lockDb(MODE_X);
         OpDebug* const nullOpDebug = nullptr;
-        CollectionPtr coll;
         RecordId id1;
         {
             WriteUnitOfWork wunit(&_opCtx);
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
-            coll = _db->createCollection(&_opCtx, _nss);
+            _db->createCollection(&_opCtx, _nss);
 
-            ASSERT_OK(coll->insertDocument(
+            ASSERT_OK(coll()->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
-            id1 = coll->getCursor(&_opCtx)->next()->id;
-            ASSERT_OK(coll->insertDocument(
+            id1 = coll()->getCursor(&_opCtx)->next()->id;
+            ASSERT_OK(coll()->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 2 << "a" << 2)), nullOpDebug, true));
-            ASSERT_OK(coll->insertDocument(
+            ASSERT_OK(coll()->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 3 << "b" << 1)), nullOpDebug, true));
             wunit.commit();
         }
@@ -585,7 +585,7 @@ public:
         // Create a sparse index.
         auto status =
             dbtests::createIndexFromSpec(&_opCtx,
-                                         coll->ns().ns(),
+                                         coll()->ns().ns(),
                                          BSON("name"
                                               << "sparse_index"
                                               << "key" << BSON("a" << 1) << "v"
@@ -597,7 +597,7 @@ public:
         ensureValidateWorked();
 
         lockDb(MODE_X);
-        RecordStore* rs = coll->getRecordStore();
+        RecordStore* rs = coll()->getRecordStore();
 
         // Update a document's indexed field without updating the index.
         {
@@ -625,21 +625,20 @@ public:
         // Create a new collection, insert three records and check it's valid.
         lockDb(MODE_X);
         OpDebug* const nullOpDebug = nullptr;
-        CollectionPtr coll;
         RecordId id1;
         {
             WriteUnitOfWork wunit(&_opCtx);
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
-            coll = _db->createCollection(&_opCtx, _nss);
+            _db->createCollection(&_opCtx, _nss);
 
-            ASSERT_OK(coll->insertDocument(
+            ASSERT_OK(coll()->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
-            id1 = coll->getCursor(&_opCtx)->next()->id;
-            ASSERT_OK(coll->insertDocument(
+            id1 = coll()->getCursor(&_opCtx)->next()->id;
+            ASSERT_OK(coll()->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 2 << "a" << 2)), nullOpDebug, true));
             // Explicitly test that multi-key partial indexes containing documents that
             // don't match the filter expression are handled correctly.
-            ASSERT_OK(coll->insertDocument(
+            ASSERT_OK(coll()->insertDocument(
                 &_opCtx,
                 InsertStatement(BSON("_id" << 3 << "a" << BSON_ARRAY(-1 << -2 << -3))),
                 nullOpDebug,
@@ -650,7 +649,7 @@ public:
         // Create a partial index.
         auto status =
             dbtests::createIndexFromSpec(&_opCtx,
-                                         coll->ns().ns(),
+                                         coll()->ns().ns(),
                                          BSON("name"
                                               << "partial_index"
                                               << "key" << BSON("a" << 1) << "v"
@@ -663,7 +662,7 @@ public:
         ensureValidateWorked();
 
         lockDb(MODE_X);
-        RecordStore* rs = coll->getRecordStore();
+        RecordStore* rs = coll()->getRecordStore();
 
         // Update an unindexed document without updating the index.
         {
@@ -692,24 +691,24 @@ public:
         // field.
         lockDb(MODE_X);
         OpDebug* const nullOpDebug = nullptr;
-        CollectionPtr coll;
+
         RecordId id1;
         {
             WriteUnitOfWork wunit(&_opCtx);
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
-            coll = _db->createCollection(&_opCtx, _nss);
+            _db->createCollection(&_opCtx, _nss);
             ASSERT_OK(
-                coll->insertDocument(&_opCtx,
-                                     InsertStatement(BSON("_id" << 1 << "x" << 1 << "a" << 2)),
-                                     nullOpDebug,
-                                     true));
+                coll()->insertDocument(&_opCtx,
+                                       InsertStatement(BSON("_id" << 1 << "x" << 1 << "a" << 2)),
+                                       nullOpDebug,
+                                       true));
             wunit.commit();
         }
 
         // Create a partial geo index that indexes the document. This should return an error.
         ASSERT_NOT_OK(
             dbtests::createIndexFromSpec(&_opCtx,
-                                         coll->ns().ns(),
+                                         coll()->ns().ns(),
                                          BSON("name"
                                               << "partial_index"
                                               << "key"
@@ -722,7 +721,7 @@ public:
         // Create a partial geo index that does not index the document.
         auto status =
             dbtests::createIndexFromSpec(&_opCtx,
-                                         coll->ns().ns(),
+                                         coll()->ns().ns(),
                                          BSON("name"
                                               << "partial_index"
                                               << "key"
@@ -750,29 +749,29 @@ public:
         // Create a new collection, insert five records and check it's valid.
         lockDb(MODE_X);
         OpDebug* const nullOpDebug = nullptr;
-        CollectionPtr coll;
+
         RecordId id1;
         {
             WriteUnitOfWork wunit(&_opCtx);
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
-            coll = _db->createCollection(&_opCtx, _nss);
+            _db->createCollection(&_opCtx, _nss);
 
             ASSERT_OK(
-                coll->insertDocument(&_opCtx,
-                                     InsertStatement(BSON("_id" << 1 << "a" << 1 << "b" << 4)),
-                                     nullOpDebug,
-                                     true));
-            id1 = coll->getCursor(&_opCtx)->next()->id;
+                coll()->insertDocument(&_opCtx,
+                                       InsertStatement(BSON("_id" << 1 << "a" << 1 << "b" << 4)),
+                                       nullOpDebug,
+                                       true));
+            id1 = coll()->getCursor(&_opCtx)->next()->id;
             ASSERT_OK(
-                coll->insertDocument(&_opCtx,
-                                     InsertStatement(BSON("_id" << 2 << "a" << 2 << "b" << 5)),
-                                     nullOpDebug,
-                                     true));
-            ASSERT_OK(coll->insertDocument(
+                coll()->insertDocument(&_opCtx,
+                                       InsertStatement(BSON("_id" << 2 << "a" << 2 << "b" << 5)),
+                                       nullOpDebug,
+                                       true));
+            ASSERT_OK(coll()->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 3 << "a" << 3)), nullOpDebug, true));
-            ASSERT_OK(coll->insertDocument(
+            ASSERT_OK(coll()->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 4 << "b" << 6)), nullOpDebug, true));
-            ASSERT_OK(coll->insertDocument(
+            ASSERT_OK(coll()->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 5 << "c" << 7)), nullOpDebug, true));
             wunit.commit();
         }
@@ -780,7 +779,7 @@ public:
         // Create two compound indexes, one forward and one reverse, to test
         // validate()'s index direction parsing.
         auto status = dbtests::createIndexFromSpec(&_opCtx,
-                                                   coll->ns().ns(),
+                                                   coll()->ns().ns(),
                                                    BSON("name"
                                                         << "compound_index_1"
                                                         << "key" << BSON("a" << 1 << "b" << -1)
@@ -789,7 +788,7 @@ public:
         ASSERT_OK(status);
 
         status = dbtests::createIndexFromSpec(&_opCtx,
-                                              coll->ns().ns(),
+                                              coll()->ns().ns(),
                                               BSON("name"
                                                    << "compound_index_2"
                                                    << "key" << BSON("a" << -1 << "b" << 1) << "v"
@@ -801,7 +800,7 @@ public:
         ensureValidateWorked();
 
         lockDb(MODE_X);
-        RecordStore* rs = coll->getRecordStore();
+        RecordStore* rs = coll()->getRecordStore();
 
         // Update a document's indexed field without updating the index.
         {
@@ -832,19 +831,19 @@ public:
         // Create a new collection, insert three records and check it's valid.
         lockDb(MODE_X);
         OpDebug* const nullOpDebug = nullptr;
-        CollectionPtr coll;
+
         RecordId id1;
         {
             WriteUnitOfWork wunit(&_opCtx);
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
-            coll = _db->createCollection(&_opCtx, _nss);
+            _db->createCollection(&_opCtx, _nss);
 
-            ASSERT_OK(coll->insertDocument(
+            ASSERT_OK(coll()->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
-            id1 = coll->getCursor(&_opCtx)->next()->id;
-            ASSERT_OK(coll->insertDocument(
+            id1 = coll()->getCursor(&_opCtx)->next()->id;
+            ASSERT_OK(coll()->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 2 << "a" << 2)), nullOpDebug, true));
-            ASSERT_OK(coll->insertDocument(
+            ASSERT_OK(coll()->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 3 << "b" << 1)), nullOpDebug, true));
             wunit.commit();
         }
@@ -852,7 +851,7 @@ public:
         const std::string indexName = "bad_index";
         auto status = dbtests::createIndexFromSpec(
             &_opCtx,
-            coll->ns().ns(),
+            coll()->ns().ns(),
             BSON("name" << indexName << "key" << BSON("a" << 1) << "v"
                         << static_cast<int>(kIndexVersion) << "background" << false));
 
@@ -863,7 +862,7 @@ public:
         lockDb(MODE_X);
 
         // Replace a correct index entry with a bad one and check it's invalid.
-        const IndexCatalog* indexCatalog = coll->getIndexCatalog();
+        const IndexCatalog* indexCatalog = coll()->getIndexCatalog();
         auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
         auto iam = indexCatalog->getEntry(descriptor)->accessMethod()->asSortedData();
 
@@ -880,7 +879,7 @@ public:
             KeyStringSet keys;
             iam->getKeys(
                 &_opCtx,
-                coll,
+                coll(),
                 pooledBuilder,
                 actualKey,
                 InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered,
@@ -892,8 +891,12 @@ public:
 
             auto removeStatus =
                 iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, options, &numDeleted);
-            auto insertStatus = iam->insert(
-                &_opCtx, pooledBuilder, coll, {{id1, Timestamp(), &badKey}}, options, &numInserted);
+            auto insertStatus = iam->insert(&_opCtx,
+                                            pooledBuilder,
+                                            coll(),
+                                            {{id1, Timestamp(), &badKey}},
+                                            options,
+                                            &numInserted);
 
             ASSERT_OK(removeStatus);
             ASSERT_OK(insertStatus);
@@ -918,11 +921,11 @@ public:
 
         // Create a new collection.
         lockDb(MODE_X);
-        CollectionPtr coll;
+
         {
             WriteUnitOfWork wunit(&_opCtx);
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
-            coll = _db->createCollection(&_opCtx, _nss);
+            _db->createCollection(&_opCtx, _nss);
             wunit.commit();
         }
 
@@ -931,7 +934,7 @@ public:
         const auto indexKey = BSON("$**" << 1);
         auto status = dbtests::createIndexFromSpec(
             &_opCtx,
-            coll->ns().ns(),
+            coll()->ns().ns(),
             BSON("name" << indexName << "key" << indexKey << "v" << static_cast<int>(kIndexVersion)
                         << "background" << false));
         ASSERT_OK(status);
@@ -942,15 +945,15 @@ public:
         {
             WriteUnitOfWork wunit(&_opCtx);
             ASSERT_OK(
-                coll->insertDocument(&_opCtx,
-                                     InsertStatement(BSON("_id" << 1 << "a" << 1 << "b" << 1)),
-                                     nullOpDebug,
-                                     true));
+                coll()->insertDocument(&_opCtx,
+                                       InsertStatement(BSON("_id" << 1 << "a" << 1 << "b" << 1)),
+                                       nullOpDebug,
+                                       true));
             ASSERT_OK(
-                coll->insertDocument(&_opCtx,
-                                     InsertStatement(BSON("_id" << 2 << "b" << BSON("0" << 1))),
-                                     nullOpDebug,
-                                     true));
+                coll()->insertDocument(&_opCtx,
+                                       InsertStatement(BSON("_id" << 2 << "b" << BSON("0" << 1))),
+                                       nullOpDebug,
+                                       true));
             wunit.commit();
         }
         releaseDb();
@@ -960,12 +963,12 @@ public:
         lockDb(MODE_X);
         {
             WriteUnitOfWork wunit(&_opCtx);
-            ASSERT_OK(coll->insertDocument(
+            ASSERT_OK(coll()->insertDocument(
                 &_opCtx,
                 InsertStatement(BSON("_id" << 3 << "mk_1" << BSON_ARRAY(1 << 2 << 3))),
                 nullOpDebug,
                 true));
-            ASSERT_OK(coll->insertDocument(
+            ASSERT_OK(coll()->insertDocument(
                 &_opCtx,
                 InsertStatement(BSON("_id" << 4 << "mk_2" << BSON_ARRAY(BSON("e" << 1)))),
                 nullOpDebug,
@@ -979,7 +982,7 @@ public:
         lockDb(MODE_X);
         const RecordId recordId(record_id_helpers::reservedIdFor(
             record_id_helpers::ReservationId::kWildcardMultikeyMetadataId, KeyFormat::Long));
-        const IndexCatalog* indexCatalog = coll->getIndexCatalog();
+        const IndexCatalog* indexCatalog = coll()->getIndexCatalog();
         auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
         auto accessMethod = indexCatalog->getEntry(descriptor)->accessMethod()->asSortedData();
         auto sortedDataInterface = accessMethod->getSortedDataInterface();
@@ -1038,11 +1041,11 @@ public:
 
         // Create a new collection.
         lockDb(MODE_X);
-        CollectionPtr coll;
+
         {
             WriteUnitOfWork wunit(&_opCtx);
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
-            coll = _db->createCollection(&_opCtx, _nss);
+            _db->createCollection(&_opCtx, _nss);
             wunit.commit();
         }
 
@@ -1051,7 +1054,7 @@ public:
         const auto indexKey = BSON("a.$**" << 1);
         auto status = dbtests::createIndexFromSpec(
             &_opCtx,
-            coll->ns().ns(),
+            coll()->ns().ns(),
             BSON("name" << indexName << "key" << indexKey << "v" << static_cast<int>(kIndexVersion)
                         << "background" << false));
         ASSERT_OK(status);
@@ -1062,28 +1065,28 @@ public:
         {
             WriteUnitOfWork wunit(&_opCtx);
             ASSERT_OK(
-                coll->insertDocument(&_opCtx,
-                                     InsertStatement(BSON("_id" << 1 << "a" << 1 << "b" << 1)),
-                                     nullOpDebug,
-                                     true));
+                coll()->insertDocument(&_opCtx,
+                                       InsertStatement(BSON("_id" << 1 << "a" << 1 << "b" << 1)),
+                                       nullOpDebug,
+                                       true));
             ASSERT_OK(
-                coll->insertDocument(&_opCtx,
-                                     InsertStatement(BSON("_id" << 2 << "a" << BSON("w" << 1))),
-                                     nullOpDebug,
-                                     true));
-            ASSERT_OK(coll->insertDocument(
+                coll()->insertDocument(&_opCtx,
+                                       InsertStatement(BSON("_id" << 2 << "a" << BSON("w" << 1))),
+                                       nullOpDebug,
+                                       true));
+            ASSERT_OK(coll()->insertDocument(
                 &_opCtx,
                 InsertStatement(BSON("_id" << 3 << "a" << BSON_ARRAY("x" << 1))),
                 nullOpDebug,
                 true));
-            ASSERT_OK(coll->insertDocument(
+            ASSERT_OK(coll()->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 4 << "b" << 2)), nullOpDebug, true));
             ASSERT_OK(
-                coll->insertDocument(&_opCtx,
-                                     InsertStatement(BSON("_id" << 5 << "b" << BSON("y" << 1))),
-                                     nullOpDebug,
-                                     true));
-            ASSERT_OK(coll->insertDocument(
+                coll()->insertDocument(&_opCtx,
+                                       InsertStatement(BSON("_id" << 5 << "b" << BSON("y" << 1))),
+                                       nullOpDebug,
+                                       true));
+            ASSERT_OK(coll()->insertDocument(
                 &_opCtx,
                 InsertStatement(BSON("_id" << 6 << "b" << BSON_ARRAY("z" << 1))),
                 nullOpDebug,
@@ -1094,7 +1097,7 @@ public:
         ensureValidateWorked();
 
         lockDb(MODE_X);
-        const IndexCatalog* indexCatalog = coll->getIndexCatalog();
+        const IndexCatalog* indexCatalog = coll()->getIndexCatalog();
         auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
         auto accessMethod = indexCatalog->getEntry(descriptor)->accessMethod()->asSortedData();
         auto sortedDataInterface = accessMethod->getSortedDataInterface();
@@ -1133,11 +1136,11 @@ public:
 
         // Create a new collection.
         lockDb(MODE_X);
-        CollectionPtr coll;
+
         {
             WriteUnitOfWork wunit(&_opCtx);
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
-            coll = _db->createCollection(&_opCtx, _nss);
+            _db->createCollection(&_opCtx, _nss);
             wunit.commit();
         }
 
@@ -1146,7 +1149,7 @@ public:
         const auto indexKey = BSON("a" << 1);
         auto status = dbtests::createIndexFromSpec(
             &_opCtx,
-            coll->ns().ns(),
+            coll()->ns().ns(),
             BSON("name" << indexName << "key" << indexKey << "v" << static_cast<int>(kIndexVersion)
                         << "background" << false));
         ASSERT_OK(status);
@@ -1157,19 +1160,19 @@ public:
         lockDb(MODE_X);
         {
             WriteUnitOfWork wunit(&_opCtx);
-            ASSERT_OK(coll->insertDocument(
+            ASSERT_OK(coll()->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
-            ASSERT_OK(coll->insertDocument(
+            ASSERT_OK(coll()->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 2 << "a" << 2)), nullOpDebug, true));
-            ASSERT_OK(coll->insertDocument(
+            ASSERT_OK(coll()->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 3 << "a" << 3)), nullOpDebug, true));
-            rid = coll->getCursor(&_opCtx)->next()->id;
+            rid = coll()->getCursor(&_opCtx)->next()->id;
             wunit.commit();
         }
         releaseDb();
         ensureValidateWorked();
 
-        RecordStore* rs = coll->getRecordStore();
+        RecordStore* rs = coll()->getRecordStore();
 
         // Updating a document without updating the index entry should cause us to have a missing
         // index entry and an extra index entry.
@@ -1198,7 +1201,7 @@ public:
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
-                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
             ASSERT_EQ(false, results.valid);
@@ -1227,11 +1230,11 @@ public:
 
         // Create a new collection.
         lockDb(MODE_X);
-        CollectionPtr coll;
+
         {
             WriteUnitOfWork wunit(&_opCtx);
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
-            coll = _db->createCollection(&_opCtx, _nss);
+            _db->createCollection(&_opCtx, _nss);
             wunit.commit();
         }
 
@@ -1240,7 +1243,7 @@ public:
         const auto indexKey = BSON("a" << 1);
         auto status = dbtests::createIndexFromSpec(
             &_opCtx,
-            coll->ns().ns(),
+            coll()->ns().ns(),
             BSON("name" << indexName << "key" << indexKey << "v" << static_cast<int>(kIndexVersion)
                         << "background" << false));
         ASSERT_OK(status);
@@ -1251,13 +1254,13 @@ public:
         lockDb(MODE_X);
         {
             WriteUnitOfWork wunit(&_opCtx);
-            ASSERT_OK(coll->insertDocument(
+            ASSERT_OK(coll()->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
-            ASSERT_OK(coll->insertDocument(
+            ASSERT_OK(coll()->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 2 << "a" << 2)), nullOpDebug, true));
-            ASSERT_OK(coll->insertDocument(
+            ASSERT_OK(coll()->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 3 << "a" << 3)), nullOpDebug, true));
-            rid = coll->getCursor(&_opCtx)->next()->id;
+            rid = coll()->getCursor(&_opCtx)->next()->id;
             wunit.commit();
         }
         releaseDb();
@@ -1268,7 +1271,7 @@ public:
         {
             lockDb(MODE_X);
 
-            const IndexCatalog* indexCatalog = coll->getIndexCatalog();
+            const IndexCatalog* indexCatalog = coll()->getIndexCatalog();
             auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
             auto iam = indexCatalog->getEntry(descriptor)->accessMethod()->asSortedData();
 
@@ -1282,7 +1285,7 @@ public:
             KeyStringSet keys;
             iam->getKeys(
                 &_opCtx,
-                coll,
+                coll(),
                 pooledBuilder,
                 actualKey,
                 InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered,
@@ -1316,7 +1319,7 @@ public:
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
-                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
             ASSERT_EQ(false, results.valid);
@@ -1342,11 +1345,11 @@ public:
 
         // Create a new collection.
         lockDb(MODE_X);
-        CollectionPtr coll;
+
         {
             WriteUnitOfWork wunit(&_opCtx);
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
-            coll = _db->createCollection(&_opCtx, _nss);
+            _db->createCollection(&_opCtx, _nss);
             wunit.commit();
         }
 
@@ -1355,7 +1358,7 @@ public:
         const auto indexKey = BSON("a" << 1);
         auto status = dbtests::createIndexFromSpec(
             &_opCtx,
-            coll->ns().ns(),
+            coll()->ns().ns(),
             BSON("name" << indexName << "key" << indexKey << "v" << static_cast<int>(kIndexVersion)
                         << "background" << false));
         ASSERT_OK(status);
@@ -1366,13 +1369,13 @@ public:
         lockDb(MODE_X);
         {
             WriteUnitOfWork wunit(&_opCtx);
-            ASSERT_OK(coll->insertDocument(
+            ASSERT_OK(coll()->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
-            ASSERT_OK(coll->insertDocument(
+            ASSERT_OK(coll()->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 2 << "a" << 2)), nullOpDebug, true));
-            ASSERT_OK(coll->insertDocument(
+            ASSERT_OK(coll()->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 3 << "a" << 3)), nullOpDebug, true));
-            rid = coll->getCursor(&_opCtx)->next()->id;
+            rid = coll()->getCursor(&_opCtx)->next()->id;
             wunit.commit();
         }
         releaseDb();
@@ -1382,7 +1385,7 @@ public:
         // index entries.
         {
             lockDb(MODE_X);
-            RecordStore* rs = coll->getRecordStore();
+            RecordStore* rs = coll()->getRecordStore();
 
             WriteUnitOfWork wunit(&_opCtx);
             rs->deleteRecord(&_opCtx, rid);
@@ -1405,7 +1408,7 @@ public:
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
-                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
             ASSERT_EQ(false, results.valid);
@@ -1429,11 +1432,11 @@ public:
     void run() {
         // Create a new collection.
         lockDb(MODE_X);
-        CollectionPtr coll;
+
         {
             WriteUnitOfWork wunit(&_opCtx);
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
-            coll = _db->createCollection(&_opCtx, _nss);
+            _db->createCollection(&_opCtx, _nss);
             wunit.commit();
         }
 
@@ -1442,7 +1445,7 @@ public:
         const auto indexKeyA = BSON("a" << 1);
         ASSERT_OK(
             dbtests::createIndexFromSpec(&_opCtx,
-                                         coll->ns().ns(),
+                                         coll()->ns().ns(),
                                          BSON("name" << indexNameA << "key" << indexKeyA << "v"
                                                      << static_cast<int>(kIndexVersion))));
 
@@ -1451,7 +1454,7 @@ public:
         const auto indexKeyB = BSON("b" << 1);
         ASSERT_OK(
             dbtests::createIndexFromSpec(&_opCtx,
-                                         coll->ns().ns(),
+                                         coll()->ns().ns(),
                                          BSON("name" << indexNameB << "key" << indexKeyB << "v"
                                                      << static_cast<int>(kIndexVersion))));
 
@@ -1462,26 +1465,26 @@ public:
         {
             WriteUnitOfWork wunit(&_opCtx);
             ASSERT_OK(
-                coll->insertDocument(&_opCtx,
-                                     InsertStatement(BSON("_id" << 1 << "a" << 1 << "b" << 1)),
-                                     nullOpDebug,
-                                     true));
+                coll()->insertDocument(&_opCtx,
+                                       InsertStatement(BSON("_id" << 1 << "a" << 1 << "b" << 1)),
+                                       nullOpDebug,
+                                       true));
             ASSERT_OK(
-                coll->insertDocument(&_opCtx,
-                                     InsertStatement(BSON("_id" << 2 << "a" << 3 << "b" << 3)),
-                                     nullOpDebug,
-                                     true));
+                coll()->insertDocument(&_opCtx,
+                                       InsertStatement(BSON("_id" << 2 << "a" << 3 << "b" << 3)),
+                                       nullOpDebug,
+                                       true));
             ASSERT_OK(
-                coll->insertDocument(&_opCtx,
-                                     InsertStatement(BSON("_id" << 3 << "a" << 6 << "b" << 6)),
-                                     nullOpDebug,
-                                     true));
+                coll()->insertDocument(&_opCtx,
+                                       InsertStatement(BSON("_id" << 3 << "a" << 6 << "b" << 6)),
+                                       nullOpDebug,
+                                       true));
             wunit.commit();
         }
         releaseDb();
         ensureValidateWorked();
 
-        RecordStore* rs = coll->getRecordStore();
+        RecordStore* rs = coll()->getRecordStore();
 
         // Updating documents without updating the index entries should cause us to have missing and
         // extra index entries.
@@ -1490,7 +1493,7 @@ public:
             WriteUnitOfWork wunit(&_opCtx);
             auto doc1 = BSON("_id" << 1 << "a" << 8 << "b" << 8);
             auto doc2 = BSON("_id" << 2 << "a" << 3 << "b" << 7);
-            std::unique_ptr<SeekableRecordCursor> cursor = coll->getCursor(&_opCtx);
+            std::unique_ptr<SeekableRecordCursor> cursor = coll()->getCursor(&_opCtx);
             auto record = cursor->next();
             RecordId rid = record->id;
             ASSERT_OK(rs->updateRecord(&_opCtx, rid, doc1.objdata(), doc1.objsize()));
@@ -1517,7 +1520,7 @@ public:
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
-                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
             ASSERT_EQ(false, results.valid);
@@ -1546,7 +1549,7 @@ public:
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
-                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
 
@@ -1582,7 +1585,7 @@ public:
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
-                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
             ASSERT_EQ(true, results.valid);
@@ -1611,11 +1614,11 @@ public:
 
         // Create a new collection.
         lockDb(MODE_X);
-        CollectionPtr coll;
+
         {
             WriteUnitOfWork wunit(&_opCtx);
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
-            coll = _db->createCollection(&_opCtx, _nss);
+            _db->createCollection(&_opCtx, _nss);
             wunit.commit();
         }
 
@@ -1624,7 +1627,7 @@ public:
         const auto indexKey = BSON("a" << 1);
         auto status =
             dbtests::createIndexFromSpec(&_opCtx,
-                                         coll->ns().ns(),
+                                         coll()->ns().ns(),
                                          BSON("name" << indexName << "key" << indexKey << "v"
                                                      << static_cast<int>(kIndexVersion)));
         ASSERT_OK(status);
@@ -1635,13 +1638,13 @@ public:
         lockDb(MODE_X);
         {
             WriteUnitOfWork wunit(&_opCtx);
-            ASSERT_OK(coll->insertDocument(
+            ASSERT_OK(coll()->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
-            ASSERT_OK(coll->insertDocument(
+            ASSERT_OK(coll()->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 2 << "a" << 2)), nullOpDebug, true));
-            ASSERT_OK(coll->insertDocument(
+            ASSERT_OK(coll()->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 3 << "a" << 3)), nullOpDebug, true));
-            rid = coll->getCursor(&_opCtx)->next()->id;
+            rid = coll()->getCursor(&_opCtx)->next()->id;
             wunit.commit();
         }
         releaseDb();
@@ -1652,7 +1655,7 @@ public:
         {
             lockDb(MODE_X);
 
-            const IndexCatalog* indexCatalog = coll->getIndexCatalog();
+            const IndexCatalog* indexCatalog = coll()->getIndexCatalog();
             auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
             auto iam = indexCatalog->getEntry(descriptor)->accessMethod()->asSortedData();
 
@@ -1666,7 +1669,7 @@ public:
             KeyStringSet keys;
             iam->getKeys(
                 &_opCtx,
-                coll,
+                coll(),
                 pooledBuilder,
                 actualKey,
                 InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered,
@@ -1701,7 +1704,7 @@ public:
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
-                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
             ASSERT_EQ(false, results.valid);
@@ -1732,7 +1735,7 @@ public:
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
-                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
             ASSERT_EQ(true, results.valid);
@@ -1764,7 +1767,7 @@ public:
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
-                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
             ASSERT_EQ(true, results.valid);
@@ -1790,11 +1793,11 @@ public:
     void run() {
         // Create a new collection.
         lockDb(MODE_X);
-        CollectionPtr coll;
+
         {
             WriteUnitOfWork wunit(&_opCtx);
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
-            coll = _db->createCollection(&_opCtx, _nss);
+            _db->createCollection(&_opCtx, _nss);
             wunit.commit();
         }
 
@@ -1803,7 +1806,7 @@ public:
         const auto indexKey = BSON("a" << 1);
         auto status =
             dbtests::createIndexFromSpec(&_opCtx,
-                                         coll->ns().ns(),
+                                         coll()->ns().ns(),
                                          BSON("name" << indexName << "key" << indexKey << "v"
                                                      << static_cast<int>(kIndexVersion)));
         ASSERT_OK(status);
@@ -1814,13 +1817,13 @@ public:
         lockDb(MODE_X);
         {
             WriteUnitOfWork wunit(&_opCtx);
-            ASSERT_OK(coll->insertDocument(
+            ASSERT_OK(coll()->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
-            ASSERT_OK(coll->insertDocument(
+            ASSERT_OK(coll()->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 2 << "a" << 2)), nullOpDebug, true));
-            ASSERT_OK(coll->insertDocument(
+            ASSERT_OK(coll()->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 3 << "a" << 3)), nullOpDebug, true));
-            rid = coll->getCursor(&_opCtx)->next()->id;
+            rid = coll()->getCursor(&_opCtx)->next()->id;
             wunit.commit();
         }
         releaseDb();
@@ -1830,7 +1833,7 @@ public:
         // index entries.
         {
             lockDb(MODE_X);
-            RecordStore* rs = coll->getRecordStore();
+            RecordStore* rs = coll()->getRecordStore();
 
             WriteUnitOfWork wunit(&_opCtx);
             rs->deleteRecord(&_opCtx, rid);
@@ -1854,7 +1857,7 @@ public:
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
-                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
             ASSERT_EQ(false, results.valid);
@@ -1885,7 +1888,7 @@ public:
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
-                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
             ASSERT_EQ(true, results.valid);
@@ -1916,7 +1919,7 @@ public:
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
-                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
             ASSERT_EQ(true, results.valid);
@@ -1946,13 +1949,13 @@ public:
 
         // Create a new collection and insert a document.
         lockDb(MODE_X);
-        CollectionPtr coll;
+
         OpDebug* const nullOpDebug = nullptr;
         {
             WriteUnitOfWork wunit(&_opCtx);
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
-            coll = _db->createCollection(&_opCtx, _nss);
-            ASSERT_OK(coll->insertDocument(
+            _db->createCollection(&_opCtx, _nss);
+            ASSERT_OK(coll()->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
             wunit.commit();
         }
@@ -1963,7 +1966,7 @@ public:
             const auto indexKey = BSON("a" << 1);
             auto status = dbtests::createIndexFromSpec(
                 &_opCtx,
-                coll->ns().ns(),
+                coll()->ns().ns(),
                 BSON("name" << indexName << "key" << indexKey << "v"
                             << static_cast<int>(kIndexVersion) << "unique" << true));
             ASSERT_OK(status);
@@ -1975,7 +1978,7 @@ public:
         {
             WriteUnitOfWork wunit(&_opCtx);
             ASSERT_NOT_OK(
-                coll->insertDocument(&_opCtx, InsertStatement(dupObj), nullOpDebug, true));
+                coll()->insertDocument(&_opCtx, InsertStatement(dupObj), nullOpDebug, true));
         }
         releaseDb();
         ensureValidateWorked();
@@ -1985,7 +1988,7 @@ public:
         {
             lockDb(MODE_X);
 
-            const IndexCatalog* indexCatalog = coll->getIndexCatalog();
+            const IndexCatalog* indexCatalog = coll()->getIndexCatalog();
 
             InsertDeleteOptions options;
             options.logIfError = true;
@@ -1997,7 +2000,7 @@ public:
             // checking. Inserting a record and its keys ensures that validation fails
             // because there are duplicate keys, and not just because there are keys without
             // corresponding records.
-            auto swRecordId = coll->getRecordStore()->insertRecord(
+            auto swRecordId = coll()->getRecordStore()->insertRecord(
                 &_opCtx, dupObj.objdata(), dupObj.objsize(), Timestamp());
             ASSERT_OK(swRecordId);
             rid = swRecordId.getValue();
@@ -2013,7 +2016,7 @@ public:
 
                 KeyStringSet keys;
                 iam->getKeys(&_opCtx,
-                             coll,
+                             coll(),
                              pooledBuilder,
                              dupObj,
                              InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraints,
@@ -2030,7 +2033,7 @@ public:
                     int64_t numInserted;
                     auto insertStatus = iam->insertKeysAndUpdateMultikeyPaths(
                         &_opCtx,
-                        coll,
+                        coll(),
                         {keys.begin(), keys.end()},
                         {},
                         MultikeyPaths{},
@@ -2068,7 +2071,7 @@ public:
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
-                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
             ASSERT_EQ(false, results.valid);
@@ -2098,7 +2101,7 @@ public:
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
-                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
             ASSERT_EQ(true, results.valid);
@@ -2133,7 +2136,7 @@ public:
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
-                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
             ASSERT_EQ(true, results.valid);
@@ -2166,17 +2169,17 @@ public:
 
         // Create a new collection and insert a document.
         lockDb(MODE_X);
-        CollectionPtr coll;
+
         OpDebug* const nullOpDebug = nullptr;
         {
             WriteUnitOfWork wunit(&_opCtx);
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
-            coll = _db->createCollection(&_opCtx, _nss);
+            _db->createCollection(&_opCtx, _nss);
             ASSERT_OK(
-                coll->insertDocument(&_opCtx,
-                                     InsertStatement(BSON("_id" << 1 << "a" << 1 << "b" << 1)),
-                                     nullOpDebug,
-                                     true));
+                coll()->insertDocument(&_opCtx,
+                                       InsertStatement(BSON("_id" << 1 << "a" << 1 << "b" << 1)),
+                                       nullOpDebug,
+                                       true));
             wunit.commit();
         }
 
@@ -2186,7 +2189,7 @@ public:
             const auto indexKeyA = BSON("a" << 1);
             auto status = dbtests::createIndexFromSpec(
                 &_opCtx,
-                coll->ns().ns(),
+                coll()->ns().ns(),
                 BSON("name" << indexNameA << "key" << indexKeyA << "v"
                             << static_cast<int>(kIndexVersion) << "unique" << true));
             ASSERT_OK(status);
@@ -2197,7 +2200,7 @@ public:
             const auto indexKeyB = BSON("b" << 1);
             auto status = dbtests::createIndexFromSpec(
                 &_opCtx,
-                coll->ns().ns(),
+                coll()->ns().ns(),
                 BSON("name" << indexNameB << "key" << indexKeyB << "v"
                             << static_cast<int>(kIndexVersion) << "unique" << true));
             ASSERT_OK(status);
@@ -2210,7 +2213,7 @@ public:
         {
             WriteUnitOfWork wunit(&_opCtx);
             ASSERT_NOT_OK(
-                coll->insertDocument(&_opCtx, InsertStatement(dupObj), nullOpDebug, true));
+                coll()->insertDocument(&_opCtx, InsertStatement(dupObj), nullOpDebug, true));
         }
         releaseDb();
         ensureValidateWorked();
@@ -2222,7 +2225,7 @@ public:
         {
             lockDb(MODE_X);
 
-            const IndexCatalog* indexCatalog = coll->getIndexCatalog();
+            const IndexCatalog* indexCatalog = coll()->getIndexCatalog();
 
             InsertDeleteOptions options;
             options.logIfError = true;
@@ -2233,7 +2236,7 @@ public:
             // Insert a record and its keys separately. We do this to bypass duplicate constraint
             // checking. Inserting a record without inserting keys results in the duplicate record
             // to be missing from both unique indexes.
-            auto swRecordId = coll->getRecordStore()->insertRecord(
+            auto swRecordId = coll()->getRecordStore()->insertRecord(
                 &_opCtx, dupObj.objdata(), dupObj.objsize(), Timestamp());
             ASSERT_OK(swRecordId);
             rid = swRecordId.getValue();
@@ -2249,7 +2252,7 @@ public:
 
                 KeyStringSet keys;
                 iam->getKeys(&_opCtx,
-                             coll,
+                             coll(),
                              pooledBuilder,
                              dupObj,
                              InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraints,
@@ -2266,7 +2269,7 @@ public:
                     int64_t numInserted;
                     auto insertStatus = iam->insertKeysAndUpdateMultikeyPaths(
                         &_opCtx,
-                        coll,
+                        coll(),
                         {keys.begin(), keys.end()},
                         {},
                         MultikeyPaths{},
@@ -2304,7 +2307,7 @@ public:
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
-                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
             ASSERT_EQ(false, results.valid);
@@ -2334,7 +2337,7 @@ public:
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
-                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
             ASSERT_EQ(true, results.valid);
@@ -2370,7 +2373,7 @@ public:
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
-                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
             ASSERT_EQ(true, results.valid);
@@ -2405,19 +2408,19 @@ public:
 
         // Create a new collection and insert a document.
         lockDb(MODE_X);
-        CollectionPtr coll;
+
         OpDebug* const nullOpDebug = nullptr;
         RecordId rid1 = RecordId::minLong();
         {
             WriteUnitOfWork wunit(&_opCtx);
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
-            coll = _db->createCollection(&_opCtx, _nss);
+            _db->createCollection(&_opCtx, _nss);
             ASSERT_OK(
-                coll->insertDocument(&_opCtx,
-                                     InsertStatement(BSON("_id" << 1 << "a" << 1 << "b" << 1)),
-                                     nullOpDebug,
-                                     true));
-            rid1 = coll->getCursor(&_opCtx)->next()->id;
+                coll()->insertDocument(&_opCtx,
+                                       InsertStatement(BSON("_id" << 1 << "a" << 1 << "b" << 1)),
+                                       nullOpDebug,
+                                       true));
+            rid1 = coll()->getCursor(&_opCtx)->next()->id;
             wunit.commit();
         }
 
@@ -2427,7 +2430,7 @@ public:
             const auto indexKeyA = BSON("a" << 1);
             auto status = dbtests::createIndexFromSpec(
                 &_opCtx,
-                coll->ns().ns(),
+                coll()->ns().ns(),
                 BSON("name" << indexNameA << "key" << indexKeyA << "v"
                             << static_cast<int>(kIndexVersion) << "unique" << true));
             ASSERT_OK(status);
@@ -2438,7 +2441,7 @@ public:
             const auto indexKeyB = BSON("b" << 1);
             auto status = dbtests::createIndexFromSpec(
                 &_opCtx,
-                coll->ns().ns(),
+                coll()->ns().ns(),
                 BSON("name" << indexNameB << "key" << indexKeyB << "v"
                             << static_cast<int>(kIndexVersion) << "unique" << true));
             ASSERT_OK(status);
@@ -2451,7 +2454,7 @@ public:
         {
             WriteUnitOfWork wunit(&_opCtx);
             ASSERT_NOT_OK(
-                coll->insertDocument(&_opCtx, InsertStatement(dupObj), nullOpDebug, true));
+                coll()->insertDocument(&_opCtx, InsertStatement(dupObj), nullOpDebug, true));
         }
         releaseDb();
         ensureValidateWorked();
@@ -2460,7 +2463,7 @@ public:
         {
             lockDb(MODE_X);
 
-            const IndexCatalog* indexCatalog = coll->getIndexCatalog();
+            const IndexCatalog* indexCatalog = coll()->getIndexCatalog();
 
             InsertDeleteOptions options;
             options.logIfError = true;
@@ -2477,7 +2480,7 @@ public:
                 KeyStringSet keys;
                 iam->getKeys(
                     &_opCtx,
-                    coll,
+                    coll(),
                     pooledBuilder,
                     actualKey,
                     InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered,
@@ -2502,7 +2505,7 @@ public:
         {
             lockDb(MODE_X);
 
-            const IndexCatalog* indexCatalog = coll->getIndexCatalog();
+            const IndexCatalog* indexCatalog = coll()->getIndexCatalog();
 
             InsertDeleteOptions options;
             options.logIfError = true;
@@ -2514,7 +2517,7 @@ public:
             // checking. Inserting a record and all of its keys ensures that validation fails
             // because there are duplicate keys, and not just because there are keys without
             // corresponding records.
-            auto swRecordId = coll->getRecordStore()->insertRecord(
+            auto swRecordId = coll()->getRecordStore()->insertRecord(
                 &_opCtx, dupObj.objdata(), dupObj.objsize(), Timestamp());
             ASSERT_OK(swRecordId);
             rid2 = swRecordId.getValue();
@@ -2530,7 +2533,7 @@ public:
 
                 KeyStringSet keys;
                 iam->getKeys(&_opCtx,
-                             coll,
+                             coll(),
                              pooledBuilder,
                              dupObj,
                              InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraints,
@@ -2547,7 +2550,7 @@ public:
                     int64_t numInserted;
                     auto insertStatus = iam->insertKeysAndUpdateMultikeyPaths(
                         &_opCtx,
-                        coll,
+                        coll(),
                         {keys.begin(), keys.end()},
                         {},
                         MultikeyPaths{},
@@ -2575,7 +2578,7 @@ public:
 
                 KeyStringSet keys;
                 iam->getKeys(&_opCtx,
-                             coll,
+                             coll(),
                              pooledBuilder,
                              dupObj,
                              InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraints,
@@ -2592,7 +2595,7 @@ public:
                     int64_t numInserted;
                     auto insertStatus = iam->insertKeysAndUpdateMultikeyPaths(
                         &_opCtx,
-                        coll,
+                        coll(),
                         {keys.begin(), keys.end()},
                         {},
                         MultikeyPaths{},
@@ -2630,7 +2633,7 @@ public:
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
-                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
             ASSERT_EQ(false, results.valid);
@@ -2663,7 +2666,7 @@ public:
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
-                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
             ASSERT_EQ(false, results.valid);
@@ -2699,7 +2702,7 @@ public:
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
-                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
             ASSERT_EQ(true, results.valid);
@@ -2734,17 +2737,17 @@ public:
 
         // Create a new collection and insert non-multikey document.
         lockDb(MODE_X);
-        CollectionPtr coll;
+
         RecordId id1;
         BSONObj doc = BSON("_id" << 1 << "a" << 1);
         {
             OpDebug* const nullOpDebug = nullptr;
             WriteUnitOfWork wunit(&_opCtx);
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
-            coll = _db->createCollection(&_opCtx, _nss);
+            _db->createCollection(&_opCtx, _nss);
 
-            ASSERT_OK(coll->insertDocument(&_opCtx, InsertStatement(doc), nullOpDebug, true));
-            id1 = coll->getCursor(&_opCtx)->next()->id;
+            ASSERT_OK(coll()->insertDocument(&_opCtx, InsertStatement(doc), nullOpDebug, true));
+            id1 = coll()->getCursor(&_opCtx)->next()->id;
             wunit.commit();
         }
 
@@ -2752,7 +2755,7 @@ public:
         const auto indexName = "non_mk_index";
         auto status =
             dbtests::createIndexFromSpec(&_opCtx,
-                                         coll->ns().ns(),
+                                         coll()->ns().ns(),
                                          BSON("name" << indexName << "key" << BSON("a" << 1) << "v"
                                                      << static_cast<int>(kIndexVersion)));
         ASSERT_OK(status);
@@ -2763,7 +2766,7 @@ public:
         // Set up a non-multikey index with multikey document.
         {
             lockDb(MODE_X);
-            const IndexCatalog* indexCatalog = coll->getIndexCatalog();
+            const IndexCatalog* indexCatalog = coll()->getIndexCatalog();
             auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
             auto iam = indexCatalog->getEntry(descriptor)->accessMethod()->asSortedData();
             InsertDeleteOptions options;
@@ -2776,7 +2779,7 @@ public:
                 KeyStringSet keys;
                 iam->getKeys(
                     &_opCtx,
-                    coll,
+                    coll(),
                     pooledBuilder,
                     doc,
                     InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered,
@@ -2799,7 +2802,7 @@ public:
             BSONObj mkDoc = BSON("_id" << 1 << "a" << BSON_ARRAY(2 << 3));
             {
                 WriteUnitOfWork wunit(&_opCtx);
-                auto updateStatus = coll->getRecordStore()->updateRecord(
+                auto updateStatus = coll()->getRecordStore()->updateRecord(
                     &_opCtx, id1, mkDoc.objdata(), mkDoc.objsize());
                 ASSERT_OK(updateStatus);
                 wunit.commit();
@@ -2824,7 +2827,7 @@ public:
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
-                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
             ASSERT_EQ(false, results.valid);
@@ -2855,7 +2858,7 @@ public:
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
-                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
             ASSERT_EQ(true, results.valid);
@@ -2887,7 +2890,7 @@ public:
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
-                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
             StorageDebugUtil::printValidateResults(results);
             ASSERT_EQ(true, results.valid);
@@ -2914,11 +2917,11 @@ public:
 
         // Create a new collection.
         lockDb(MODE_X);
-        CollectionPtr coll;
+
         {
             WriteUnitOfWork wunit(&_opCtx);
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
-            coll = _db->createCollection(&_opCtx, _nss);
+            _db->createCollection(&_opCtx, _nss);
             wunit.commit();
         }
 
@@ -2928,7 +2931,7 @@ public:
             const auto indexKey = BSON("a" << 1);
             auto status = dbtests::createIndexFromSpec(
                 &_opCtx,
-                coll->ns().ns(),
+                coll()->ns().ns(),
                 BSON("name" << indexName << "key" << indexKey << "v"
                             << static_cast<int>(kIndexVersion) << "background" << false));
             ASSERT_OK(status);
@@ -2939,7 +2942,7 @@ public:
             const auto indexKey = BSON("b" << 1);
             auto status = dbtests::createIndexFromSpec(
                 &_opCtx,
-                coll->ns().ns(),
+                coll()->ns().ns(),
                 BSON("name" << indexName << "key" << indexKey << "v"
                             << static_cast<int>(kIndexVersion) << "background" << false));
             ASSERT_OK(status);
@@ -2952,11 +2955,11 @@ public:
         {
             WriteUnitOfWork wunit(&_opCtx);
             ASSERT_OK(
-                coll->insertDocument(&_opCtx,
-                                     InsertStatement(BSON("_id" << 1 << "a" << 1 << "b" << 1)),
-                                     nullOpDebug,
-                                     true));
-            rid = coll->getCursor(&_opCtx)->next()->id;
+                coll()->insertDocument(&_opCtx,
+                                       InsertStatement(BSON("_id" << 1 << "a" << 1 << "b" << 1)),
+                                       nullOpDebug,
+                                       true));
+            rid = coll()->getCursor(&_opCtx)->next()->id;
             wunit.commit();
         }
         releaseDb();
@@ -2966,7 +2969,7 @@ public:
         {
             lockDb(MODE_X);
 
-            const IndexCatalog* indexCatalog = coll->getIndexCatalog();
+            const IndexCatalog* indexCatalog = coll()->getIndexCatalog();
             const std::string indexName = "a";
             auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
             auto iam = indexCatalog->getEntry(descriptor)->accessMethod()->asSortedData();
@@ -2981,7 +2984,7 @@ public:
             KeyStringSet keys;
             iam->getKeys(
                 &_opCtx,
-                coll,
+                coll(),
                 pooledBuilder,
                 actualKey,
                 InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered,
@@ -3004,7 +3007,7 @@ public:
         {
             lockDb(MODE_X);
 
-            const IndexCatalog* indexCatalog = coll->getIndexCatalog();
+            const IndexCatalog* indexCatalog = coll()->getIndexCatalog();
             const std::string indexName = "b";
             auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
             auto iam = indexCatalog->getEntry(descriptor)->accessMethod()->asSortedData();
@@ -3019,7 +3022,7 @@ public:
             KeyStringSet keys;
             iam->getKeys(
                 &_opCtx,
-                coll,
+                coll(),
                 pooledBuilder,
                 actualKey,
                 InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered,
@@ -3061,11 +3064,11 @@ public:
 
         // Create a new collection.
         lockDb(MODE_X);
-        CollectionPtr coll;
+
         {
             WriteUnitOfWork wunit(&_opCtx);
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
-            coll = _db->createCollection(&_opCtx, _nss);
+            _db->createCollection(&_opCtx, _nss);
             wunit.commit();
         }
 
@@ -3075,7 +3078,7 @@ public:
             const auto indexKey = BSON("a" << 1);
             auto status = dbtests::createIndexFromSpec(
                 &_opCtx,
-                coll->ns().ns(),
+                coll()->ns().ns(),
                 BSON("name" << indexName << "key" << indexKey << "v"
                             << static_cast<int>(kIndexVersion) << "background" << false << "unique"
                             << true));
@@ -3087,7 +3090,7 @@ public:
         lockDb(MODE_X);
         {
             WriteUnitOfWork wunit(&_opCtx);
-            ASSERT_OK(coll->insertDocument(
+            ASSERT_OK(coll()->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
             wunit.commit();
         }
@@ -3098,7 +3101,7 @@ public:
         {
             WriteUnitOfWork wunit(&_opCtx);
             ASSERT_NOT_OK(
-                coll->insertDocument(&_opCtx, InsertStatement(dupObj), nullOpDebug, true));
+                coll()->insertDocument(&_opCtx, InsertStatement(dupObj), nullOpDebug, true));
         }
         releaseDb();
         ensureValidateWorked();
@@ -3107,7 +3110,7 @@ public:
         {
             lockDb(MODE_X);
 
-            const IndexCatalog* indexCatalog = coll->getIndexCatalog();
+            const IndexCatalog* indexCatalog = coll()->getIndexCatalog();
 
             InsertDeleteOptions options;
             options.logIfError = true;
@@ -3119,7 +3122,7 @@ public:
             // checking. Inserting a record and all of its keys ensures that validation fails
             // because there are duplicate keys, and not just because there are keys without
             // corresponding records.
-            auto swRecordId = coll->getRecordStore()->insertRecord(
+            auto swRecordId = coll()->getRecordStore()->insertRecord(
                 &_opCtx, dupObj.objdata(), dupObj.objsize(), Timestamp());
             ASSERT_OK(swRecordId);
 
@@ -3134,7 +3137,7 @@ public:
 
                 KeyStringSet keys;
                 iam->getKeys(&_opCtx,
-                             coll,
+                             coll(),
                              pooledBuilder,
                              dupObj,
                              InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraints,
@@ -3151,7 +3154,7 @@ public:
                     int64_t numInserted;
                     auto insertStatus = iam->insertKeysAndUpdateMultikeyPaths(
                         &_opCtx,
-                        coll,
+                        coll(),
                         {keys.begin(), keys.end()},
                         {},
                         MultikeyPaths{},
@@ -3179,7 +3182,7 @@ public:
 
                 KeyStringSet keys;
                 iam->getKeys(&_opCtx,
-                             coll,
+                             coll(),
                              pooledBuilder,
                              dupObj,
                              InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraints,
@@ -3196,7 +3199,7 @@ public:
                     int64_t numInserted;
                     auto insertStatus = iam->insertKeysAndUpdateMultikeyPaths(
                         &_opCtx,
-                        coll,
+                        coll(),
                         {keys.begin(), keys.end()},
                         {},
                         MultikeyPaths{},
@@ -3222,7 +3225,7 @@ public:
 
         ScopeGuard dumpOnErrorGuard([&] {
             StorageDebugUtil::printValidateResults(results);
-            StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+            StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
         });
 
         ASSERT_FALSE(results.valid) << "Validation worked when it should have failed.";
@@ -3247,11 +3250,11 @@ public:
 
         // Create a new collection.
         lockDb(MODE_X);
-        CollectionPtr coll;
+
         {
             WriteUnitOfWork wunit(&_opCtx);
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
-            coll = _db->createCollection(&_opCtx, _nss);
+            _db->createCollection(&_opCtx, _nss);
             wunit.commit();
         }
 
@@ -3259,7 +3262,7 @@ public:
         const char* buffer = "\x0c\x00\x00\x00\x90\x41\x00\x10\x00\x00\x00\x00";
         BSONObj obj(buffer);
         lockDb(MODE_X);
-        RecordStore* rs = coll->getRecordStore();
+        RecordStore* rs = coll()->getRecordStore();
         RecordId rid;
         {
             WriteUnitOfWork wunit(&_opCtx);
@@ -3287,7 +3290,7 @@ public:
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
-                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
             ASSERT_EQ(false, results.valid);
@@ -3311,11 +3314,11 @@ public:
     void run() {
         // Create a new collection.
         lockDb(MODE_X);
-        CollectionPtr coll;
+
         {
             WriteUnitOfWork wunit(&_opCtx);
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
-            coll = _db->createCollection(&_opCtx, _nss);
+            _db->createCollection(&_opCtx, _nss);
             wunit.commit();
         }
 
@@ -3328,7 +3331,7 @@ public:
         BSONObj obj2(buf2);
         BSONObj obj3(buf3);
         lockDb(MODE_X);
-        RecordStore* rs = coll->getRecordStore();
+        RecordStore* rs = coll()->getRecordStore();
         {
             WriteUnitOfWork wunit(&_opCtx);
             ASSERT_OK(rs->insertRecord(&_opCtx, obj1.objdata(), 12ULL, Timestamp()));
@@ -3355,7 +3358,7 @@ public:
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
-                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
             ASSERT_EQ(false, results.valid);
@@ -3386,7 +3389,7 @@ public:
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
-                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
             ASSERT_EQ(true, results.valid);
@@ -3421,7 +3424,7 @@ public:
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
-                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
             ASSERT_EQ(true, results.valid);
@@ -3452,7 +3455,7 @@ public:
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
-                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
             ASSERT_EQ(true, results.valid);
@@ -3481,17 +3484,17 @@ public:
 
         // Create a new collection and insert non-multikey document.
         lockDb(MODE_X);
-        CollectionPtr coll;
+
         RecordId id1;
         BSONObj doc = BSON("_id" << 1 << "a" << 1);
         {
             OpDebug* const nullOpDebug = nullptr;
             WriteUnitOfWork wunit(&_opCtx);
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
-            coll = _db->createCollection(&_opCtx, _nss);
+            _db->createCollection(&_opCtx, _nss);
 
-            ASSERT_OK(coll->insertDocument(&_opCtx, InsertStatement(doc), nullOpDebug, true));
-            id1 = coll->getCursor(&_opCtx)->next()->id;
+            ASSERT_OK(coll()->insertDocument(&_opCtx, InsertStatement(doc), nullOpDebug, true));
+            id1 = coll()->getCursor(&_opCtx)->next()->id;
             wunit.commit();
         }
 
@@ -3499,7 +3502,7 @@ public:
         const auto indexName = "non_mk_index";
         auto status =
             dbtests::createIndexFromSpec(&_opCtx,
-                                         coll->ns().ns(),
+                                         coll()->ns().ns(),
                                          BSON("name" << indexName << "key" << BSON("a" << 1) << "v"
                                                      << static_cast<int>(kIndexVersion)));
         ASSERT_OK(status);
@@ -3510,7 +3513,7 @@ public:
         // Set up a non-multikey index with multikey document.
         {
             lockDb(MODE_X);
-            const IndexCatalog* indexCatalog = coll->getIndexCatalog();
+            const IndexCatalog* indexCatalog = coll()->getIndexCatalog();
             auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
             auto iam = indexCatalog->getEntry(descriptor)->accessMethod()->asSortedData();
             InsertDeleteOptions options;
@@ -3523,7 +3526,7 @@ public:
                 KeyStringSet keys;
                 iam->getKeys(
                     &_opCtx,
-                    coll,
+                    coll(),
                     pooledBuilder,
                     doc,
                     InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered,
@@ -3546,7 +3549,7 @@ public:
             BSONObj mkDoc = BSON("_id" << 1 << "a" << BSON_ARRAY(2 << 3));
             {
                 WriteUnitOfWork wunit(&_opCtx);
-                auto updateStatus = coll->getRecordStore()->updateRecord(
+                auto updateStatus = coll()->getRecordStore()->updateRecord(
                     &_opCtx, id1, mkDoc.objdata(), mkDoc.objsize());
                 ASSERT_OK(updateStatus);
                 wunit.commit();
@@ -3559,7 +3562,7 @@ public:
                 MultikeyPaths multikeyPaths;
                 iam->getKeys(
                     &_opCtx,
-                    coll,
+                    coll(),
                     pooledBuilder,
                     mkDoc,
                     InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered,
@@ -3576,7 +3579,7 @@ public:
                 int64_t numInserted;
                 auto keysIterator = keys.begin();
                 auto insertStatus = iam->insertKeysAndUpdateMultikeyPaths(&_opCtx,
-                                                                          coll,
+                                                                          coll(),
                                                                           {*keysIterator},
                                                                           {},
                                                                           MultikeyPaths{},
@@ -3589,7 +3592,7 @@ public:
                 keysIterator++;
                 numInserted = 0;
                 insertStatus = iam->insertKeysAndUpdateMultikeyPaths(&_opCtx,
-                                                                     coll,
+                                                                     coll(),
                                                                      {*keysIterator},
                                                                      {},
                                                                      MultikeyPaths{},
@@ -3618,7 +3621,7 @@ public:
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
-                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
             ASSERT_EQ(false, results.valid);
@@ -3647,7 +3650,7 @@ public:
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
-                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
             ASSERT_EQ(true, results.valid);
@@ -3677,7 +3680,7 @@ public:
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
-                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
             ASSERT_EQ(true, results.valid);
@@ -3704,7 +3707,7 @@ public:
 
         // Create a new collection and insert multikey document.
         lockDb(MODE_X);
-        CollectionPtr coll;
+
         RecordId id1;
         BSONObj doc1 = BSON("_id" << 1 << "a" << BSON_ARRAY(1 << 2) << "b" << 1);
         {
@@ -3712,17 +3715,17 @@ public:
 
             WriteUnitOfWork wunit(&_opCtx);
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
-            coll = _db->createCollection(&_opCtx, _nss);
+            _db->createCollection(&_opCtx, _nss);
 
-            ASSERT_OK(coll->insertDocument(&_opCtx, InsertStatement(doc1), nullOpDebug, true));
-            id1 = coll->getCursor(&_opCtx)->next()->id;
+            ASSERT_OK(coll()->insertDocument(&_opCtx, InsertStatement(doc1), nullOpDebug, true));
+            id1 = coll()->getCursor(&_opCtx)->next()->id;
             wunit.commit();
         }
 
         // Create a multikey index.
         const auto indexName = "mk_index";
         auto status = dbtests::createIndexFromSpec(&_opCtx,
-                                                   coll->ns().ns(),
+                                                   coll()->ns().ns(),
                                                    BSON("name" << indexName << "key"
                                                                << BSON("a" << 1 << "b" << 1) << "v"
                                                                << static_cast<int>(kIndexVersion)));
@@ -3735,7 +3738,7 @@ public:
         {
             lockDb(MODE_X);
 
-            const IndexCatalog* indexCatalog = coll->getIndexCatalog();
+            const IndexCatalog* indexCatalog = coll()->getIndexCatalog();
             auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
             auto iam = indexCatalog->getEntry(descriptor)->accessMethod()->asSortedData();
             InsertDeleteOptions options;
@@ -3749,7 +3752,7 @@ public:
                 KeyStringSet keys;
                 iam->getKeys(
                     &_opCtx,
-                    coll,
+                    coll(),
                     pooledBuilder,
                     doc1,
                     InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered,
@@ -3773,7 +3776,7 @@ public:
             BSONObj doc2 = BSON("_id" << 1 << "a" << 1 << "b" << BSON_ARRAY(4 << 5));
             {
                 WriteUnitOfWork wunit(&_opCtx);
-                auto updateStatus = coll->getRecordStore()->updateRecord(
+                auto updateStatus = coll()->getRecordStore()->updateRecord(
                     &_opCtx, id1, doc2.objdata(), doc2.objsize());
                 ASSERT_OK(updateStatus);
                 wunit.commit();
@@ -3786,7 +3789,7 @@ public:
                 KeyStringSet keys;
                 iam->getKeys(
                     &_opCtx,
-                    coll,
+                    coll(),
                     pooledBuilder,
                     doc2,
                     InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered,
@@ -3799,7 +3802,7 @@ public:
 
                 int64_t numInserted;
                 auto insertStatus = iam->insertKeysAndUpdateMultikeyPaths(
-                    &_opCtx, coll, keys, {}, oldMultikeyPaths, options, nullptr, &numInserted);
+                    &_opCtx, coll(), keys, {}, oldMultikeyPaths, options, nullptr, &numInserted);
 
                 ASSERT_EQUALS(numInserted, 2);
                 ASSERT_OK(insertStatus);
@@ -3824,7 +3827,7 @@ public:
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
-                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
             ASSERT_EQ(false, results.valid);
@@ -3853,7 +3856,7 @@ public:
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
-                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
             ASSERT_EQ(true, results.valid);
@@ -3882,7 +3885,7 @@ public:
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
-                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
             ASSERT_EQ(true, results.valid);
@@ -3908,18 +3911,18 @@ public:
 
         // Create a new collection and create an index.
         lockDb(MODE_X);
-        CollectionPtr coll;
+
         {
             WriteUnitOfWork wunit(&_opCtx);
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
-            coll = _db->createCollection(&_opCtx, _nss);
+            _db->createCollection(&_opCtx, _nss);
             wunit.commit();
         }
-        auto writableCollection = const_cast<Collection*>(coll.get());
+        CollectionWriter writer(&_opCtx, coll()->ns());
 
         const auto indexName = "mk_index";
         auto status = dbtests::createIndexFromSpec(&_opCtx,
-                                                   coll->ns().ns(),
+                                                   coll()->ns().ns(),
                                                    BSON("name" << indexName << "key"
                                                                << BSON("a" << 1 << "b" << 1) << "v"
                                                                << static_cast<int>(kIndexVersion)));
@@ -3930,25 +3933,25 @@ public:
         {
             WriteUnitOfWork wunit(&_opCtx);
             auto collMetadata =
-                DurableCatalog::get(&_opCtx)->getMetaData(&_opCtx, coll->getCatalogId());
+                DurableCatalog::get(&_opCtx)->getMetaData(&_opCtx, coll()->getCatalogId());
             int offset = collMetadata->findIndexOffset(indexName);
             ASSERT_GTE(offset, 0);
 
             auto& indexMetadata = collMetadata->indexes[offset];
             indexMetadata.multikeyPaths = {};
-            auto writableCollection = const_cast<Collection*>(coll.get());
-            writableCollection->replaceMetadata(&_opCtx, std::move(collMetadata));
+            writer.getWritableCollection()->replaceMetadata(&_opCtx, std::move(collMetadata));
             wunit.commit();
         }
 
         // Reload the index from the modified catalog.
-        auto indexCatalog = coll->getIndexCatalog();
-        auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
+        auto descriptor = coll()->getIndexCatalog()->findIndexByName(&_opCtx, indexName);
         {
             WriteUnitOfWork wunit(&_opCtx);
-            auto writableCatalog = const_cast<IndexCatalog*>(indexCatalog);
-            descriptor = writableCatalog->refreshEntry(
-                &_opCtx, writableCollection, descriptor, CreateIndexEntryFlags::kIsReady);
+            auto writableCatalog = writer.getWritableCollection()->getIndexCatalog();
+            descriptor = writableCatalog->refreshEntry(&_opCtx,
+                                                       writer.getWritableCollection(),
+                                                       descriptor,
+                                                       CreateIndexEntryFlags::kIsReady);
             wunit.commit();
         }
 
@@ -3959,15 +3962,15 @@ public:
         OpDebug* const nullOpDebug = nullptr;
         {
             WriteUnitOfWork wunit(&_opCtx);
-            ASSERT_OK(coll->insertDocument(&_opCtx, InsertStatement(doc1), nullOpDebug, true));
-            id1 = coll->getCursor(&_opCtx)->next()->id;
+            ASSERT_OK(coll()->insertDocument(&_opCtx, InsertStatement(doc1), nullOpDebug, true));
+            id1 = coll()->getCursor(&_opCtx)->next()->id;
             wunit.commit();
         }
 
-        auto catalogEntry = indexCatalog->getEntry(descriptor);
+        auto catalogEntry = coll()->getIndexCatalog()->getEntry(descriptor);
         auto expectedPathsBefore = MultikeyPaths{};
-        ASSERT(catalogEntry->isMultikey(&_opCtx, coll));
-        ASSERT(catalogEntry->getMultikeyPaths(&_opCtx, coll) == expectedPathsBefore);
+        ASSERT(catalogEntry->isMultikey(&_opCtx, coll()));
+        ASSERT(catalogEntry->getMultikeyPaths(&_opCtx, coll()) == expectedPathsBefore);
 
         releaseDb();
         ensureValidateWorked();
@@ -3988,7 +3991,7 @@ public:
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
-                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
             ASSERT_EQ(true, results.valid);
@@ -4002,8 +4005,8 @@ public:
         }
 
         auto expectedPathsAfter = MultikeyPaths{{0}, {}};
-        ASSERT(catalogEntry->isMultikey(&_opCtx, coll));
-        ASSERT(catalogEntry->getMultikeyPaths(&_opCtx, coll) == expectedPathsAfter);
+        ASSERT(catalogEntry->isMultikey(&_opCtx, coll()));
+        ASSERT(catalogEntry->getMultikeyPaths(&_opCtx, coll()) == expectedPathsAfter);
 
         // Confirm validate does not make changes when run a second time.
         {
@@ -4021,7 +4024,7 @@ public:
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
-                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
             ASSERT_EQ(true, results.valid);
@@ -4034,8 +4037,8 @@ public:
             dumpOnErrorGuard.dismiss();
         }
 
-        ASSERT(catalogEntry->isMultikey(&_opCtx, coll));
-        ASSERT(catalogEntry->getMultikeyPaths(&_opCtx, coll) == expectedPathsAfter);
+        ASSERT(catalogEntry->isMultikey(&_opCtx, coll()));
+        ASSERT(catalogEntry->getMultikeyPaths(&_opCtx, coll()) == expectedPathsAfter);
     }
 };
 
@@ -4051,15 +4054,13 @@ public:
         }
 
         lockDb(MODE_X);
-        CollectionPtr coll =
-            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, _nss);
-        ASSERT(coll);
+        ASSERT(coll());
 
         // Encode an invalid BSON Object with an invalid type, x90 and insert record
         const char* buffer = "\x0c\x00\x00\x00\x90\x41\x00\x10\x00\x00\x00\x00";
         BSONObj obj(buffer);
 
-        RecordStore* rs = coll->getRecordStore();
+        RecordStore* rs = coll()->getRecordStore();
         RecordId rid(OID::gen().view().view(), OID::kOIDSize);
         {
             WriteUnitOfWork wunit(&_opCtx);
@@ -4085,7 +4086,7 @@ public:
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
-                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
             ASSERT_EQ(false, results.valid);
@@ -4113,16 +4114,14 @@ public:
         }
 
         lockDb(MODE_X);
-        CollectionPtr coll =
-            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, _nss);
-        ASSERT(coll);
+        ASSERT(coll());
 
         // Create an index.
         const auto indexName = "a";
         const auto indexKey = BSON("a" << 1);
         auto status = dbtests::createIndexFromSpec(
             &_opCtx,
-            coll->ns().ns(),
+            coll()->ns().ns(),
             BSON("name" << indexName << "key" << indexKey << "v" << static_cast<int>(kIndexVersion)
                         << "background" << false));
         ASSERT_OK(status);
@@ -4136,26 +4135,26 @@ public:
         {
             WriteUnitOfWork wunit(&_opCtx);
             ASSERT_OK(
-                coll->insertDocument(&_opCtx,
-                                     InsertStatement(BSON("_id" << firstRecordId << "a" << 1)),
-                                     nullOpDebug,
-                                     true));
-            ASSERT_OK(coll->insertDocument(&_opCtx,
-                                           InsertStatement(BSON("_id" << OID::gen() << "a" << 2)),
-                                           nullOpDebug,
-                                           true));
-            ASSERT_OK(coll->insertDocument(&_opCtx,
-                                           InsertStatement(BSON("_id" << OID::gen() << "a" << 3)),
-                                           nullOpDebug,
-                                           true));
-            rid = coll->getCursor(&_opCtx)->next()->id;
+                coll()->insertDocument(&_opCtx,
+                                       InsertStatement(BSON("_id" << firstRecordId << "a" << 1)),
+                                       nullOpDebug,
+                                       true));
+            ASSERT_OK(coll()->insertDocument(&_opCtx,
+                                             InsertStatement(BSON("_id" << OID::gen() << "a" << 2)),
+                                             nullOpDebug,
+                                             true));
+            ASSERT_OK(coll()->insertDocument(&_opCtx,
+                                             InsertStatement(BSON("_id" << OID::gen() << "a" << 3)),
+                                             nullOpDebug,
+                                             true));
+            rid = coll()->getCursor(&_opCtx)->next()->id;
             wunit.commit();
         }
         releaseDb();
         ensureValidateWorked();
         lockDb(MODE_X);
 
-        RecordStore* rs = coll->getRecordStore();
+        RecordStore* rs = coll()->getRecordStore();
 
         // Updating a document without updating the index entry will cause validation to detect a
         // missing index entry and an extra index entry.
@@ -4185,7 +4184,7 @@ public:
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
-                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
             ASSERT_EQ(false, results.valid);
@@ -4210,16 +4209,14 @@ public:
         }
 
         lockDb(MODE_X);
-        CollectionPtr coll =
-            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, _nss);
-        ASSERT(coll);
+        ASSERT(coll());
 
         // Create an index.
         const auto indexName = "a";
         const auto indexKey = BSON("a" << 1);
         auto status = dbtests::createIndexFromSpec(
             &_opCtx,
-            coll->ns().ns(),
+            coll()->ns().ns(),
             BSON("name" << indexName << "key" << indexKey << "v" << static_cast<int>(kIndexVersion)
                         << "background" << false));
         ASSERT_OK(status);
@@ -4233,26 +4230,26 @@ public:
         {
             WriteUnitOfWork wunit(&_opCtx);
             ASSERT_OK(
-                coll->insertDocument(&_opCtx,
-                                     InsertStatement(BSON("_id" << firstRecordId << "a" << 1)),
-                                     nullOpDebug,
-                                     true));
-            ASSERT_OK(coll->insertDocument(&_opCtx,
-                                           InsertStatement(BSON("_id" << OID::gen() << "a" << 2)),
-                                           nullOpDebug,
-                                           true));
-            ASSERT_OK(coll->insertDocument(&_opCtx,
-                                           InsertStatement(BSON("_id" << OID::gen() << "a" << 3)),
-                                           nullOpDebug,
-                                           true));
-            rid = coll->getCursor(&_opCtx)->next()->id;
+                coll()->insertDocument(&_opCtx,
+                                       InsertStatement(BSON("_id" << firstRecordId << "a" << 1)),
+                                       nullOpDebug,
+                                       true));
+            ASSERT_OK(coll()->insertDocument(&_opCtx,
+                                             InsertStatement(BSON("_id" << OID::gen() << "a" << 2)),
+                                             nullOpDebug,
+                                             true));
+            ASSERT_OK(coll()->insertDocument(&_opCtx,
+                                             InsertStatement(BSON("_id" << OID::gen() << "a" << 3)),
+                                             nullOpDebug,
+                                             true));
+            rid = coll()->getCursor(&_opCtx)->next()->id;
             wunit.commit();
         }
         releaseDb();
         ensureValidateWorked();
         lockDb(MODE_X);
 
-        RecordStore* rs = coll->getRecordStore();
+        RecordStore* rs = coll()->getRecordStore();
 
         // Updating a document without updating the index entry will cause validation to detect a
         // missing index entry and an extra index entry.
@@ -4282,7 +4279,7 @@ public:
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
-                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
             ASSERT_EQ(false, results.valid);
@@ -4313,7 +4310,7 @@ public:
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
-                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
 
@@ -4349,9 +4346,7 @@ public:
         }
 
         lockDb(MODE_X);
-        CollectionPtr coll =
-            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, _nss);
-        ASSERT(coll);
+        ASSERT(coll());
 
         if (_withSecondaryIndex) {
             // Create index on {a: 1}
@@ -4359,7 +4354,7 @@ public:
             const auto indexKey = BSON("a" << 1);
             auto status = dbtests::createIndexFromSpec(
                 &_opCtx,
-                coll->ns().ns(),
+                coll()->ns().ns(),
                 BSON("name" << indexName << "key" << indexKey << "v"
                             << static_cast<int>(kIndexVersion) << "background" << false));
             ASSERT_OK(status);
@@ -4373,18 +4368,18 @@ public:
         {
             WriteUnitOfWork wunit(&_opCtx);
             ASSERT_OK(
-                coll->insertDocument(&_opCtx,
-                                     InsertStatement(BSON("_id" << firstRecordId << "a" << 1)),
-                                     nullOpDebug,
-                                     true));
-            ASSERT_OK(coll->insertDocument(&_opCtx,
-                                           InsertStatement(BSON("_id" << OID::gen() << "a" << 2)),
-                                           nullOpDebug,
-                                           true));
-            ASSERT_OK(coll->insertDocument(&_opCtx,
-                                           InsertStatement(BSON("_id" << OID::gen() << "a" << 3)),
-                                           nullOpDebug,
-                                           true));
+                coll()->insertDocument(&_opCtx,
+                                       InsertStatement(BSON("_id" << firstRecordId << "a" << 1)),
+                                       nullOpDebug,
+                                       true));
+            ASSERT_OK(coll()->insertDocument(&_opCtx,
+                                             InsertStatement(BSON("_id" << OID::gen() << "a" << 2)),
+                                             nullOpDebug,
+                                             true));
+            ASSERT_OK(coll()->insertDocument(&_opCtx,
+                                             InsertStatement(BSON("_id" << OID::gen() << "a" << 3)),
+                                             nullOpDebug,
+                                             true));
             wunit.commit();
         }
         releaseDb();
@@ -4395,8 +4390,8 @@ public:
         // Corrupt the second record in the RecordStore by having the RecordId not match the _id
         // field. Leave the third record untocuhed.
 
-        RecordStore* rs = coll->getRecordStore();
-        auto cursor = coll->getCursor(&_opCtx);
+        RecordStore* rs = coll()->getRecordStore();
+        auto cursor = coll()->getCursor(&_opCtx);
         const auto ridMissingId = cursor->next()->id;
         {
             WriteUnitOfWork wunit(&_opCtx);
@@ -4435,7 +4430,7 @@ public:
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
-                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
             ASSERT_EQ(false, results.valid);

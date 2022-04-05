@@ -517,7 +517,7 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::rebuildIndex
         return status;
     }
 
-    CollectionWriter collection(opCtx, nss, CollectionCatalog::LifetimeMode::kInplace);
+    CollectionWriter collection(opCtx, nss);
 
     // Complete the index build.
     return _runIndexRebuildForRecovery(opCtx, collection, buildUUID, repair);
@@ -542,7 +542,7 @@ Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opC
         indexNames.push_back(name);
     }
 
-    CollectionWriter collection(opCtx, nss, CollectionCatalog::LifetimeMode::kInplace);
+    CollectionWriter collection(opCtx, nss);
     {
         // These steps are combined into a single WUOW to ensure there are no commits without
         // the indexes.
@@ -654,8 +654,7 @@ Status IndexBuildsCoordinator::_setUpResumeIndexBuild(OperationContext* opCtx,
     Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
     Lock::CollectionLock collLock(opCtx, nssOrUuid, MODE_X);
 
-    CollectionWriter collection(
-        opCtx, resumeInfo.getCollectionUUID(), CollectionCatalog::LifetimeMode::kInplace);
+    CollectionWriter collection(opCtx, resumeInfo.getCollectionUUID());
     invariant(collection);
     auto durableCatalog = DurableCatalog::get(opCtx);
 
@@ -693,7 +692,9 @@ Status IndexBuildsCoordinator::_setUpResumeIndexBuild(OperationContext* opCtx,
     }
 
     if (!collection->isInitialized()) {
+        WriteUnitOfWork wuow(opCtx);
         collection.getWritableCollection()->init(opCtx);
+        wuow.commit();
     }
 
     auto protocol = IndexBuildProtocol::kTwoPhase;

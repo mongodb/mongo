@@ -149,12 +149,10 @@ class QueryStageMergeSortPrefixIndex : public QueryStageMergeSortTestBase {
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        Database* db = ctx.db();
-        CollectionPtr coll =
-            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss());
-        if (!coll) {
+
+        if (!ctx.getCollection()) {
             WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, nss());
+            ctx.db()->createCollection(&_opCtx, nss());
             wuow.commit();
         }
 
@@ -170,6 +168,7 @@ public:
 
         addIndex(firstIndex);
         addIndex(secondIndex);
+        CollectionPtr coll = ctx.getCollection();
 
         unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
         // Sort by c:1
@@ -220,12 +219,9 @@ class QueryStageMergeSortDups : public QueryStageMergeSortTestBase {
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        Database* db = ctx.db();
-        CollectionPtr coll =
-            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss());
-        if (!coll) {
+        if (!ctx.getCollection()) {
             WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, nss());
+            ctx.db()->createCollection(&_opCtx, nss());
             wuow.commit();
         }
 
@@ -241,6 +237,7 @@ public:
 
         addIndex(firstIndex);
         addIndex(secondIndex);
+        auto coll = ctx.getCollection();
 
         unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
         // Sort by c:1
@@ -290,12 +287,9 @@ class QueryStageMergeSortDupsNoDedup : public QueryStageMergeSortTestBase {
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        Database* db = ctx.db();
-        CollectionPtr coll =
-            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss());
-        if (!coll) {
+        if (!ctx.getCollection()) {
             WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, nss());
+            ctx.db()->createCollection(&_opCtx, nss());
             wuow.commit();
         }
 
@@ -310,6 +304,7 @@ public:
 
         addIndex(firstIndex);
         addIndex(secondIndex);
+        auto coll = ctx.getCollection();
 
         unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
         // Sort by c:1
@@ -361,12 +356,9 @@ class QueryStageMergeSortPrefixIndexReverse : public QueryStageMergeSortTestBase
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        Database* db = ctx.db();
-        CollectionPtr coll =
-            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss());
-        if (!coll) {
+        if (!ctx.getCollection()) {
             WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, nss());
+            ctx.db()->createCollection(&_opCtx, nss());
             wuow.commit();
         }
 
@@ -383,6 +375,7 @@ public:
 
         addIndex(firstIndex);
         addIndex(secondIndex);
+        auto coll = ctx.getCollection();
 
         unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
         // Sort by c:-1
@@ -436,12 +429,9 @@ class QueryStageMergeSortOneStageEOF : public QueryStageMergeSortTestBase {
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        Database* db = ctx.db();
-        CollectionPtr coll =
-            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss());
-        if (!coll) {
+        if (!ctx.getCollection()) {
             WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, nss());
+            ctx.db()->createCollection(&_opCtx, nss());
             wuow.commit();
         }
 
@@ -457,6 +447,7 @@ public:
 
         addIndex(firstIndex);
         addIndex(secondIndex);
+        auto coll = ctx.getCollection();
 
         unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
         // Sort by c:1
@@ -505,12 +496,9 @@ class QueryStageMergeSortManyShort : public QueryStageMergeSortTestBase {
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        Database* db = ctx.db();
-        CollectionPtr coll =
-            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss());
-        if (!coll) {
+        if (!ctx.getCollection()) {
             WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, nss());
+            ctx.db()->createCollection(&_opCtx, nss());
             wuow.commit();
         }
 
@@ -528,10 +516,12 @@ public:
 
             BSONObj indexSpec = BSON(index << 1 << "foo" << 1);
             addIndex(indexSpec);
-            auto params = makeIndexScanParams(&_opCtx, coll, getIndex(indexSpec, coll));
-            ms->addChild(
-                std::make_unique<IndexScan>(_expCtx.get(), coll, params, ws.get(), nullptr));
+            auto params = makeIndexScanParams(
+                &_opCtx, ctx.getCollection(), getIndex(indexSpec, ctx.getCollection()));
+            ms->addChild(std::make_unique<IndexScan>(
+                _expCtx.get(), ctx.getCollection(), params, ws.get(), nullptr));
         }
+        auto coll = ctx.getCollection();
         unique_ptr<FetchStage> fetchStage =
             make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ms), nullptr, coll);
 
@@ -564,12 +554,9 @@ class QueryStageMergeSortDeletedDocument : public QueryStageMergeSortTestBase {
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        Database* db = ctx.db();
-        CollectionPtr coll =
-            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss());
-        if (!coll) {
+        if (!ctx.getCollection()) {
             WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, nss());
+            ctx.db()->createCollection(&_opCtx, nss());
             wuow.commit();
         }
 
@@ -589,12 +576,14 @@ public:
 
             BSONObj indexSpec = BSON(index << 1 << "foo" << 1);
             addIndex(indexSpec);
-            auto params = makeIndexScanParams(&_opCtx, coll, getIndex(indexSpec, coll));
-            ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, &ws, nullptr));
+            auto params = makeIndexScanParams(
+                &_opCtx, ctx.getCollection(), getIndex(indexSpec, ctx.getCollection()));
+            ms->addChild(std::make_unique<IndexScan>(
+                _expCtx.get(), ctx.getCollection(), params, &ws, nullptr));
         }
 
         set<RecordId> recordIds;
-        getRecordIds(&recordIds, coll);
+        getRecordIds(&recordIds, ctx.getCollection());
 
         set<RecordId>::iterator it = recordIds.begin();
 
@@ -623,6 +612,7 @@ public:
         // stage, and therefore should still be returned.
         ms->saveState();
         remove(BSON(std::string(1u, 'a' + count) << 1));
+        auto coll = ctx.getCollection();
         ms->restoreState(&coll);
 
         // Make sure recordIds[11] is returned as expected. We expect the corresponding working set
@@ -684,12 +674,9 @@ class QueryStageMergeSortConcurrentUpdateDedup : public QueryStageMergeSortTestB
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        Database* db = ctx.db();
-        CollectionPtr coll =
-            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss());
-        if (!coll) {
+        if (!ctx.getCollection()) {
             WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, nss());
+            ctx.db()->createCollection(&_opCtx, nss());
             wuow.commit();
         }
 
@@ -699,6 +686,7 @@ public:
         insert(BSON("_id" << 6 << "a" << 6));
 
         addIndex(BSON("a" << 1));
+        auto coll = ctx.getCollection();
 
         std::set<RecordId> rids;
         getRecordIds(&rids, coll);
@@ -787,12 +775,9 @@ class QueryStageMergeSortStringsWithNullCollation : public QueryStageMergeSortTe
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        Database* db = ctx.db();
-        CollectionPtr coll =
-            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss());
-        if (!coll) {
+        if (!ctx.getCollection()) {
             WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, nss());
+            ctx.db()->createCollection(&_opCtx, nss());
             wuow.commit();
         }
 
@@ -810,6 +795,7 @@ public:
 
         addIndex(firstIndex);
         addIndex(secondIndex);
+        auto coll = ctx.getCollection();
 
         unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
         // Sort by c:1, d:1
@@ -860,12 +846,9 @@ class QueryStageMergeSortStringsRespectsCollation : public QueryStageMergeSortTe
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        Database* db = ctx.db();
-        CollectionPtr coll =
-            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss());
-        if (!coll) {
+        if (!ctx.getCollection()) {
             WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, nss());
+            ctx.db()->createCollection(&_opCtx, nss());
             wuow.commit();
         }
 
@@ -883,6 +866,7 @@ public:
 
         addIndex(firstIndex);
         addIndex(secondIndex);
+        auto coll = ctx.getCollection();
 
         unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
         // Sort by c:1, d:1

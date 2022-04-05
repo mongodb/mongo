@@ -214,7 +214,7 @@ Status ensureCollectionProperties(OperationContext* opCtx,
                                   EnsureIndexPolicy ensureIndexPolicy) {
     auto catalog = CollectionCatalog::get(opCtx);
     for (auto collIt = catalog->begin(opCtx, db->name()); collIt != catalog->end(opCtx); ++collIt) {
-        auto coll = collIt.getWritableCollection(opCtx, CollectionCatalog::LifetimeMode::kInplace);
+        auto coll = *collIt;
         if (!coll) {
             break;
         }
@@ -231,14 +231,14 @@ Status ensureCollectionProperties(OperationContext* opCtx,
             LOGV2(21001,
                   "collection {coll_ns} is missing an _id index",
                   "Collection is missing an _id index",
-                  logAttrs(*coll));
+                  logAttrs(*coll.get()));
             if (EnsureIndexPolicy::kBuildMissing == ensureIndexPolicy) {
-                auto status = buildMissingIdIndex(opCtx, coll);
+                auto status = buildMissingIdIndex(opCtx, collIt.getWritableCollection(opCtx));
                 if (!status.isOK()) {
                     LOGV2_ERROR(21021,
                                 "could not build an _id index on collection {coll_ns}: {error}",
                                 "Could not build an _id index on collection",
-                                logAttrs(*coll),
+                                logAttrs(*coll.get()),
                                 "error"_attr = status);
                     return downgradeError;
                 }
@@ -468,7 +468,13 @@ void startupRepair(OperationContext* opCtx, StorageEngine* storageEngine) {
     // order to allow downgrading to older binary versions.
     ScopeGuard abortRepairOnFCVErrors(
         [&] { StorageRepairObserver::get(opCtx->getServiceContext())->onRepairDone(opCtx); });
-    if (auto fcvColl = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
+
+    // Use the BatchedCollectionCatalogWriter so all Collection writes to the in-memory catalog are
+    // done in a single copy-on-write of the catalog. This avoids quadratic behavior where we
+    // iterate over every collection and perform writes where the catalog would be copied every
+    // time.
+    BatchedCollectionCatalogWriter catalog(opCtx);
+    if (auto fcvColl = catalog->lookupCollectionByNamespace(
             opCtx, NamespaceString::kServerConfigurationNamespace)) {
         auto databaseHolder = DatabaseHolder::get(opCtx);
 

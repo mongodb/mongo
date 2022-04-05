@@ -148,24 +148,24 @@ public:
 
     virtual bool findRecord(OperationContext* opCtx, const RecordId& id, RecordData* out) const;
 
-    virtual void deleteRecord(OperationContext* opCtx, const RecordId& id);
+    void doDeleteRecord(OperationContext* opCtx, const RecordId& id) final;
 
-    virtual Status insertRecords(OperationContext* opCtx,
-                                 std::vector<Record>* records,
-                                 const std::vector<Timestamp>& timestamps);
+    Status doInsertRecords(OperationContext* opCtx,
+                           std::vector<Record>* records,
+                           const std::vector<Timestamp>& timestamps) final;
 
-    virtual Status updateRecord(OperationContext* opCtx,
-                                const RecordId& recordId,
-                                const char* data,
-                                int len);
+    Status doUpdateRecord(OperationContext* opCtx,
+                          const RecordId& recordId,
+                          const char* data,
+                          int len) final;
 
     virtual bool updateWithDamagesSupported() const;
 
-    virtual StatusWith<RecordData> updateWithDamages(OperationContext* opCtx,
-                                                     const RecordId& id,
-                                                     const RecordData& oldRec,
-                                                     const char* damageSource,
-                                                     const mutablebson::DamageVector& damages);
+    StatusWith<RecordData> doUpdateWithDamages(OperationContext* opCtx,
+                                               const RecordId& id,
+                                               const RecordData& oldRec,
+                                               const char* damageSource,
+                                               const mutablebson::DamageVector& damages) final;
 
     virtual void printRecordMetadata(OperationContext* opCtx, const RecordId& recordId) const;
 
@@ -174,7 +174,7 @@ public:
 
     std::unique_ptr<RecordCursor> getRandomCursor(OperationContext* opCtx) const final;
 
-    virtual Status truncate(OperationContext* opCtx);
+    Status doTruncate(OperationContext* opCtx) final;
 
     virtual bool compactSupported() const {
         return !_isEphemeral;
@@ -185,7 +185,7 @@ public:
 
     virtual Timestamp getPinnedOplog() const final;
 
-    virtual Status compact(OperationContext* opCtx) final;
+    Status doCompact(OperationContext* opCtx) final;
 
     virtual void validate(OperationContext* opCtx,
                           ValidateResults* results,
@@ -199,7 +199,7 @@ public:
                                       BSONObjBuilder* result,
                                       double scale) const;
 
-    virtual void cappedTruncateAfter(OperationContext* opCtx, RecordId end, bool inclusive);
+    void doCappedTruncateAfter(OperationContext* opCtx, RecordId end, bool inclusive) final;
 
     virtual void updateStatsAfterRepair(OperationContext* opCtx,
                                         long long numRecords,

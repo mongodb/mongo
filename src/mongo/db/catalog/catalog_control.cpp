@@ -51,14 +51,19 @@ namespace catalog {
 namespace {
 void reopenAllDatabasesAndReloadCollectionCatalog(
     OperationContext* opCtx,
-    std::shared_ptr<const CollectionCatalog> catalog,
     StorageEngine* storageEngine,
     const MinVisibleTimestampMap& minVisibleTimestampMap,
     Timestamp stableTimestamp) {
+
     // Open all databases and repopulate the CollectionCatalog.
     LOGV2(20276, "openCatalog: reopening all databases");
-    boost::optional<BatchedCollectionCatalogWriter> catalogBatchWriter;
-    catalogBatchWriter.emplace(opCtx);
+
+    // Applies all Collection writes to the in-memory catalog in a single copy-on-write to the
+    // catalog. This avoids quadratic behavior where we iterate over every collection and perform
+    // writes where the catalog would be copied every time. boost::optional is used to be able to
+    // finish the write batch when encountering the oplog as other systems except immediate
+    // visibility for the oplog.
+    boost::optional<BatchedCollectionCatalogWriter> catalogWriter(opCtx);
 
     auto databaseHolder = DatabaseHolder::get(opCtx);
     std::vector<TenantDatabaseName> databasesToOpen = storageEngine->listDatabases();
@@ -67,10 +72,10 @@ void reopenAllDatabasesAndReloadCollectionCatalog(
             23992, 1, "openCatalog: dbholder reopening database", "db"_attr = tenantDbName);
         auto db = databaseHolder->openDb(opCtx, tenantDbName);
         invariant(db, str::stream() << "failed to reopen database " << tenantDbName.toString());
-        for (auto&& collNss : catalog->getAllCollectionNamesFromDb(opCtx, tenantDbName)) {
+        for (auto&& collNss :
+             catalogWriter.get()->getAllCollectionNamesFromDb(opCtx, tenantDbName)) {
             // Note that the collection name already includes the database component.
-            auto collection = catalog->lookupCollectionByNamespaceForMetadataWrite(
-                opCtx, CollectionCatalog::LifetimeMode::kInplace, collNss);
+            auto collection = catalogWriter.get()->lookupCollectionByNamespace(opCtx, collNss);
             invariant(collection,
                       str::stream()
                           << "failed to get valid collection pointer for namespace " << collNss);
@@ -87,7 +92,10 @@ void reopenAllDatabasesAndReloadCollectionCatalog(
                 // cost/effort.
                 auto minVisible = std::min(stableTimestamp,
                                            minVisibleTimestampMap.find(collection->uuid())->second);
-                collection->setMinimumVisibleSnapshot(minVisible);
+                auto writableCollection =
+                    catalogWriter.get()->lookupCollectionByUUIDForMetadataWrite(opCtx,
+                                                                                collection->uuid());
+                writableCollection->setMinimumVisibleSnapshot(minVisible);
             }
 
             // If this is the oplog collection, re-establish the replication system's cached pointer
@@ -97,9 +105,9 @@ void reopenAllDatabasesAndReloadCollectionCatalog(
 
                 // The oplog collection must be visible when establishing for repl. Finish our
                 // batched catalog write and continue on a new batch afterwards.
-                catalogBatchWriter.reset();
+                catalogWriter.reset();
                 collection->establishOplogCollectionForLogging(opCtx);
-                catalogBatchWriter.emplace(opCtx);
+                catalogWriter.emplace(opCtx);
             }
         }
     }
@@ -246,15 +254,14 @@ void openCatalog(OperationContext* opCtx,
         opCtx, reconcileResult.indexBuildsToRestart, reconcileResult.indexBuildsToResume);
 
     reopenAllDatabasesAndReloadCollectionCatalog(
-        opCtx, catalog, storageEngine, minVisibleTimestampMap, stableTimestamp);
+        opCtx, storageEngine, minVisibleTimestampMap, stableTimestamp);
 }
 
 
 void openCatalogAfterStorageChange(OperationContext* opCtx) {
     invariant(opCtx->lockState()->isW());
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    auto catalog = CollectionCatalog::get(opCtx);
-    reopenAllDatabasesAndReloadCollectionCatalog(opCtx, catalog, storageEngine, {}, {});
+    reopenAllDatabasesAndReloadCollectionCatalog(opCtx, storageEngine, {}, {});
 }
 
 }  // namespace catalog

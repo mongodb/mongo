@@ -31,8 +31,61 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/storage_options.h"
 
 namespace mongo {
+namespace {
+void validateWriteAllowed() {
+    uassert(ErrorCodes::IllegalOperation,
+            "Cannot execute a write operation in read-only mode",
+            !storageGlobalParams.readOnly);
+}
+}  // namespace
+
+void RecordStore::deleteRecord(OperationContext* opCtx, const RecordId& dl) {
+    validateWriteAllowed();
+    doDeleteRecord(opCtx, dl);
+}
+
+Status RecordStore::insertRecords(OperationContext* opCtx,
+                                  std::vector<Record>* inOutRecords,
+                                  const std::vector<Timestamp>& timestamps) {
+    validateWriteAllowed();
+    return doInsertRecords(opCtx, inOutRecords, timestamps);
+}
+
+Status RecordStore::updateRecord(OperationContext* opCtx,
+                                 const RecordId& recordId,
+                                 const char* data,
+                                 int len) {
+    validateWriteAllowed();
+    return doUpdateRecord(opCtx, recordId, data, len);
+}
+
+StatusWith<RecordData> RecordStore::updateWithDamages(OperationContext* opCtx,
+                                                      const RecordId& loc,
+                                                      const RecordData& oldRec,
+                                                      const char* damageSource,
+                                                      const mutablebson::DamageVector& damages) {
+    validateWriteAllowed();
+    return doUpdateWithDamages(opCtx, loc, oldRec, damageSource, damages);
+}
+
+Status RecordStore::truncate(OperationContext* opCtx) {
+    validateWriteAllowed();
+    return doTruncate(opCtx);
+}
+
+void RecordStore::cappedTruncateAfter(OperationContext* opCtx, RecordId end, bool inclusive) {
+    validateWriteAllowed();
+    doCappedTruncateAfter(opCtx, end, inclusive);
+}
+
+Status RecordStore::compact(OperationContext* opCtx) {
+    validateWriteAllowed();
+    return doCompact(opCtx);
+}
+
 
 Status RecordStore::oplogDiskLocRegister(OperationContext* opCtx,
                                          const Timestamp& opTime,

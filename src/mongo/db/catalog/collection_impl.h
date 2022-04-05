@@ -428,7 +428,7 @@ public:
 
     void indexBuildSuccess(OperationContext* opCtx, IndexCatalogEntry* index) final;
 
-    void establishOplogCollectionForLogging(OperationContext* opCtx) final;
+    void establishOplogCollectionForLogging(OperationContext* opCtx) const final;
     void onDeregisterFromCatalog(OperationContext* opCtx) final;
 
     StatusWith<int> checkMetaDataForIndex(const std::string& indexName,

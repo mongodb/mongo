@@ -178,8 +178,8 @@ public:
         BSONObj spec = builder.append("name", key).append("v", 2).done();
 
         Collection* collection =
-            CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForMetadataWrite(
-                opCtx, CollectionCatalog::LifetimeMode::kInplace, collNs);
+            CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForMetadataWrite(opCtx,
+                                                                                       collNs);
         auto descriptor = std::make_unique<IndexDescriptor>(IndexNames::findPluginName(spec), spec);
 
         auto ret = collection->prepareForIndexBuild(
@@ -189,8 +189,8 @@ public:
 
     void indexBuildSuccess(OperationContext* opCtx, NamespaceString collNs, std::string key) {
         Collection* collection =
-            CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForMetadataWrite(
-                opCtx, CollectionCatalog::LifetimeMode::kInplace, collNs);
+            CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForMetadataWrite(opCtx,
+                                                                                       collNs);
         auto descriptor = collection->getIndexCatalog()->findIndexByName(opCtx, key, true);
         collection->indexBuildSuccess(opCtx, descriptor->getEntry());
     }

@@ -374,7 +374,7 @@ public:
         std::abort();
     }
 
-    void establishOplogCollectionForLogging(OperationContext* opCtx) {
+    void establishOplogCollectionForLogging(OperationContext* opCtx) const {
         std::abort();
     }
 

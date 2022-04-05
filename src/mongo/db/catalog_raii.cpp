@@ -318,31 +318,26 @@ AutoGetCollection::AutoGetCollection(
     }
 }
 
-Collection* AutoGetCollection::getWritableCollection(OperationContext* opCtx,
-                                                     CollectionCatalog::LifetimeMode mode) {
+Collection* AutoGetCollection::getWritableCollection(OperationContext* opCtx) {
     invariant(_collLocks.size() == 1);
 
     // Acquire writable instance if not already available
     if (!_writableColl) {
 
         auto catalog = CollectionCatalog::get(opCtx);
-        _writableColl =
-            catalog->lookupCollectionByNamespaceForMetadataWrite(opCtx, mode, _resolvedNss);
-        if (mode != CollectionCatalog::LifetimeMode::kInplace) {
-            // Makes the internal CollectionPtr Yieldable and resets the writable Collection when
-            // the write unit of work finishes so we re-fetches and re-clones the Collection if a
-            // new write unit of work is opened.
-            opCtx->recoveryUnit()->registerChange(
-                [this, opCtx](boost::optional<Timestamp> commitTime) {
-                    _coll = CollectionPtr(opCtx, _coll.get(), LookupCollectionForYieldRestore());
-                    _writableColl = nullptr;
-                },
-                [this, originalCollection = _coll.get(), opCtx]() {
-                    _coll =
-                        CollectionPtr(opCtx, originalCollection, LookupCollectionForYieldRestore());
-                    _writableColl = nullptr;
-                });
-        }
+        _writableColl = catalog->lookupCollectionByNamespaceForMetadataWrite(opCtx, _resolvedNss);
+        // Makes the internal CollectionPtr Yieldable and resets the writable Collection when
+        // the write unit of work finishes so we re-fetches and re-clones the Collection if a
+        // new write unit of work is opened.
+        opCtx->recoveryUnit()->registerChange(
+            [this, opCtx](boost::optional<Timestamp> commitTime) {
+                _coll = CollectionPtr(opCtx, _coll.get(), LookupCollectionForYieldRestore());
+                _writableColl = nullptr;
+            },
+            [this, originalCollection = _coll.get(), opCtx]() {
+                _coll = CollectionPtr(opCtx, originalCollection, LookupCollectionForYieldRestore());
+                _writableColl = nullptr;
+            });
 
         // Set to writable collection. We are no longer yieldable.
         _coll = _writableColl;
@@ -449,50 +444,40 @@ struct CollectionWriter::SharedImpl {
     SharedImpl(CollectionWriter* parent) : _parent(parent) {}
 
     CollectionWriter* _parent;
-    std::function<Collection*(CollectionCatalog::LifetimeMode)> _writableCollectionInitializer;
+    std::function<Collection*()> _writableCollectionInitializer;
 };
 
-CollectionWriter::CollectionWriter(OperationContext* opCtx,
-                                   const UUID& uuid,
-                                   CollectionCatalog::LifetimeMode mode)
+CollectionWriter::CollectionWriter(OperationContext* opCtx, const UUID& uuid)
     : _collection(&_storedCollection),
       _opCtx(opCtx),
-      _mode(mode),
+      _managed(true),
       _sharedImpl(std::make_shared<SharedImpl>(this)) {
 
     _storedCollection = CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, uuid);
-    _sharedImpl->_writableCollectionInitializer = [opCtx,
-                                                   uuid](CollectionCatalog::LifetimeMode mode) {
-        return CollectionCatalog::get(opCtx)->lookupCollectionByUUIDForMetadataWrite(
-            opCtx, mode, uuid);
+    _sharedImpl->_writableCollectionInitializer = [opCtx, uuid]() {
+        return CollectionCatalog::get(opCtx)->lookupCollectionByUUIDForMetadataWrite(opCtx, uuid);
     };
 }
 
-CollectionWriter::CollectionWriter(OperationContext* opCtx,
-                                   const NamespaceString& nss,
-                                   CollectionCatalog::LifetimeMode mode)
+CollectionWriter::CollectionWriter(OperationContext* opCtx, const NamespaceString& nss)
     : _collection(&_storedCollection),
       _opCtx(opCtx),
-      _mode(mode),
+      _managed(true),
       _sharedImpl(std::make_shared<SharedImpl>(this)) {
     _storedCollection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
-    _sharedImpl->_writableCollectionInitializer = [opCtx,
-                                                   nss](CollectionCatalog::LifetimeMode mode) {
-        return CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForMetadataWrite(
-            opCtx, mode, nss);
+    _sharedImpl->_writableCollectionInitializer = [opCtx, nss]() {
+        return CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForMetadataWrite(opCtx,
+                                                                                          nss);
     };
 }
 
-CollectionWriter::CollectionWriter(OperationContext* opCtx,
-                                   AutoGetCollection& autoCollection,
-                                   CollectionCatalog::LifetimeMode mode)
+CollectionWriter::CollectionWriter(OperationContext* opCtx, AutoGetCollection& autoCollection)
     : _collection(&autoCollection.getCollection()),
       _opCtx(opCtx),
-      _mode(mode),
+      _managed(true),
       _sharedImpl(std::make_shared<SharedImpl>(this)) {
-    _sharedImpl->_writableCollectionInitializer = [&autoCollection,
-                                                   opCtx](CollectionCatalog::LifetimeMode mode) {
-        return autoCollection.getWritableCollection(opCtx, mode);
+    _sharedImpl->_writableCollectionInitializer = [&autoCollection, opCtx]() {
+        return autoCollection.getWritableCollection(opCtx);
     };
 }
 
@@ -500,7 +485,7 @@ CollectionWriter::CollectionWriter(Collection* writableCollection)
     : _collection(&_storedCollection),
       _storedCollection(writableCollection),
       _writableCollection(writableCollection),
-      _mode(CollectionCatalog::LifetimeMode::kInplace) {}
+      _managed(false) {}
 
 CollectionWriter::~CollectionWriter() {
     // Notify shared state that this instance is destroyed
@@ -512,11 +497,11 @@ CollectionWriter::~CollectionWriter() {
 Collection* CollectionWriter::getWritableCollection() {
     // Acquire writable instance lazily if not already available
     if (!_writableCollection) {
-        _writableCollection = _sharedImpl->_writableCollectionInitializer(_mode);
+        _writableCollection = _sharedImpl->_writableCollectionInitializer();
 
         // If we are using our stored Collection then we are not managed by an AutoGetCollection and
         // we need to manage lifetime here.
-        if (_mode != CollectionCatalog::LifetimeMode::kInplace) {
+        if (_managed) {
             bool usingStoredCollection = *_collection == _storedCollection;
             auto rollbackCollection =
                 usingStoredCollection ? std::move(_storedCollection) : CollectionPtr();

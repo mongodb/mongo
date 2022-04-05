@@ -71,7 +71,12 @@ public:
         std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
         col = CollectionPtr(collection.get(), CollectionPtr::NoYieldTag{});
         // Register dummy collection in catalog.
-        catalog.registerCollection(opCtx.get(), colUUID, std::move(collection));
+        catalog.registerCollection(opCtx.get(), colUUID, collection);
+
+        // Validate that kNumCollectionReferencesStored is correct, add one reference for the one we
+        // hold in this function.
+        ASSERT_EQUALS(collection.use_count(),
+                      CollectionCatalog::kNumCollectionReferencesStored + 1);
     }
 
 protected:
@@ -99,6 +104,7 @@ public:
 
             dbMap["foo"].insert(std::make_pair(fooUuid, fooColl.get()));
             dbMap["bar"].insert(std::make_pair(barUuid, barColl.get()));
+
             catalog.registerCollection(&opCtx, fooUuid, fooColl);
             catalog.registerCollection(&opCtx, barUuid, barColl);
         }
@@ -620,9 +626,10 @@ TEST_F(CollectionCatalogTest, GetAllCollectionNamesAndGetAllDbNamesWithUncommitt
         catalog.registerCollection(opCtx.get(), uuid, std::move(newColl));
     }
 
-    // One dbName with only an invisible collection does not appear in dbNames.
-    auto invisibleCollA = catalog.lookupCollectionByNamespaceForMetadataWrite(
-        opCtx.get(), CollectionCatalog::LifetimeMode::kInplace, aColl);
+    // One dbName with only an invisible collection does not appear in dbNames. Use const_cast to
+    // modify the collection in the catalog inplace, this bypasses copy-on-write behavior.
+    auto invisibleCollA =
+        const_cast<Collection*>(catalog.lookupCollectionByNamespace(opCtx.get(), aColl).get());
     invisibleCollA->setCommitted(false);
 
     Lock::DBLock dbLock(opCtx.get(), "dbA", MODE_S);
@@ -644,8 +651,10 @@ TEST_F(CollectionCatalogTest, GetAllCollectionNamesAndGetAllDbNamesWithUncommitt
         std::vector<NamespaceString> dCollList = dbDNss;
         dCollList.erase(std::find(dCollList.begin(), dCollList.end(), nss));
 
-        auto invisibleCollD = catalog.lookupCollectionByNamespaceForMetadataWrite(
-            opCtx.get(), CollectionCatalog::LifetimeMode::kInplace, nss);
+        // Use const_cast to modify the collection in the catalog inplace, this bypasses
+        // copy-on-write behavior.
+        auto invisibleCollD =
+            const_cast<Collection*>(catalog.lookupCollectionByNamespace(opCtx.get(), nss).get());
         invisibleCollD->setCommitted(false);
 
         Lock::DBLock dbLock(opCtx.get(), "dbD", MODE_S);
@@ -662,8 +671,10 @@ TEST_F(CollectionCatalogTest, GetAllCollectionNamesAndGetAllDbNamesWithUncommitt
 
     // If all dbNames consist only of invisible collections, none of these dbs is visible.
     for (auto& nss : nsss) {
-        auto invisibleColl = catalog.lookupCollectionByNamespaceForMetadataWrite(
-            opCtx.get(), CollectionCatalog::LifetimeMode::kInplace, nss);
+        // Use const_cast to modify the collection in the catalog inplace, this bypasses
+        // copy-on-write behavior.
+        auto invisibleColl =
+            const_cast<Collection*>(catalog.lookupCollectionByNamespace(opCtx.get(), nss).get());
         invisibleColl->setCommitted(false);
     }
 

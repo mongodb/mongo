@@ -169,15 +169,13 @@ Status DatabaseImpl::init(OperationContext* const opCtx) {
 
     auto catalog = CollectionCatalog::get(opCtx);
     for (const auto& uuid : catalog->getAllCollectionUUIDsFromDb(_name)) {
-        CollectionWriter collection(
-            opCtx,
-            uuid,
-            opCtx->lockState()->isW() ? CollectionCatalog::LifetimeMode::kInplace
-                                      : CollectionCatalog::LifetimeMode::kManagedInWriteUnitOfWork);
+        CollectionWriter collection(opCtx, uuid);
         invariant(collection);
         // If this is called from the repair path, the collection is already initialized.
         if (!collection->isInitialized()) {
+            WriteUnitOfWork wuow(opCtx);
             collection.getWritableCollection()->init(opCtx);
+            wuow.commit();
         }
     }
 

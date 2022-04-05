@@ -349,6 +349,16 @@ class CollectionCatalog::PublishCatalogUpdates final : public RecoveryUnit::Chan
 public:
     static constexpr size_t kNumStaticActions = 2;
 
+    static void setCollectionInCatalog(CollectionCatalog& catalog,
+                                       std::shared_ptr<Collection> collection) {
+        catalog._collections[collection->ns()] = collection;
+        catalog._catalog[collection->uuid()] = collection;
+        // TODO SERVER-64608 Use tenantID from ns
+        auto dbIdPair = std::make_pair(TenantDatabaseName(boost::none, collection->ns().db()),
+                                       collection->uuid());
+        catalog._orderedCollections[dbIdPair] = collection;
+    }
+
     PublishCatalogUpdates(OperationContext* opCtx,
                           UncommittedCatalogUpdates& uncommittedCatalogUpdates)
         : _opCtx(opCtx), _uncommittedCatalogUpdates(uncommittedCatalogUpdates) {}
@@ -371,16 +381,10 @@ public:
         for (auto&& entry : entries) {
             switch (entry.action) {
                 case UncommittedCatalogUpdates::Entry::Action::kWritableCollection:
-                    writeJobs.push_back([collection = std::move(entry.collection)](
-                                            CollectionCatalog& catalog) {
-                        catalog._collections[collection->ns()] = collection;
-                        catalog._catalog[collection->uuid()] = collection;
-                        // TODO SERVER-64608 Use tenantID from ns
-                        auto dbIdPair =
-                            std::make_pair(TenantDatabaseName(boost::none, collection->ns().db()),
-                                           collection->uuid());
-                        catalog._orderedCollections[dbIdPair] = collection;
-                    });
+                    writeJobs.push_back(
+                        [collection = std::move(entry.collection)](CollectionCatalog& catalog) {
+                            setCollectionInCatalog(catalog, std::move(collection));
+                        });
                     break;
                 case UncommittedCatalogUpdates::Entry::Action::kRenamedCollection:
                     writeJobs.push_back(
@@ -484,10 +488,9 @@ CollectionCatalog::iterator::value_type CollectionCatalog::iterator::operator*()
     return {_opCtx, _mapIter->second.get(), LookupCollectionForYieldRestore()};
 }
 
-Collection* CollectionCatalog::iterator::getWritableCollection(OperationContext* opCtx,
-                                                               LifetimeMode mode) {
+Collection* CollectionCatalog::iterator::getWritableCollection(OperationContext* opCtx) {
     return CollectionCatalog::get(opCtx)->lookupCollectionByUUIDForMetadataWrite(
-        opCtx, mode, operator*()->uuid());
+        opCtx, operator*()->uuid());
 }
 
 boost::optional<UUID> CollectionCatalog::iterator::uuid() {
@@ -936,12 +939,7 @@ std::shared_ptr<const Collection> CollectionCatalog::lookupCollectionByUUIDForRe
 }
 
 Collection* CollectionCatalog::lookupCollectionByUUIDForMetadataWrite(OperationContext* opCtx,
-                                                                      LifetimeMode mode,
                                                                       const UUID& uuid) const {
-    if (mode == LifetimeMode::kInplace) {
-        return const_cast<Collection*>(lookupCollectionByUUID(opCtx, uuid).get());
-    }
-
     auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
     auto [found, uncommittedPtr] = uncommittedCatalogUpdates.lookupCollection(uuid);
     // If UUID is managed by uncommittedCatalogUpdates return the pointer which will be nullptr in
@@ -965,8 +963,25 @@ Collection* CollectionCatalog::lookupCollectionByUUIDForMetadataWrite(OperationC
         return coll.get();
 
     invariant(opCtx->lockState()->isCollectionLockedForMode(coll->ns(), MODE_X));
+
+    // Skip cloning and return directly if allowed.
+    if (_alreadyClonedForBatchedWriter(coll)) {
+        return coll.get();
+    }
+
     auto cloned = coll->clone();
     auto ptr = cloned.get();
+
+    // If we are in a batch write, set this Collection instance in the batched catalog write
+    // instance. We don't want to store as uncommitted in this case as we need to observe the write
+    // on the thread doing the batch write and it would trigger the regular path where we do a
+    // copy-on-write on the catalog when committing.
+    if (_isCatalogBatchWriter()) {
+        PublishCatalogUpdates::setCollectionInCatalog(*batchedCatalogWriteInstance,
+                                                      std::move(cloned));
+        return ptr;
+    }
+
     uncommittedCatalogUpdates.writableCollection(std::move(cloned));
 
     PublishCatalogUpdates::ensureRegisteredWithRecoveryUnit(opCtx, uncommittedCatalogUpdates);
@@ -1032,8 +1047,10 @@ std::shared_ptr<const Collection> CollectionCatalog::lookupCollectionByNamespace
 }
 
 Collection* CollectionCatalog::lookupCollectionByNamespaceForMetadataWrite(
-    OperationContext* opCtx, LifetimeMode mode, const NamespaceString& nss) const {
-    if (mode == LifetimeMode::kInplace || nss.isOplog()) {
+    OperationContext* opCtx, const NamespaceString& nss) const {
+    // Oplog is special and can only be modified in a few contexts. It is modified inplace and care
+    // need to be taken for concurrency.
+    if (nss.isOplog()) {
         return const_cast<Collection*>(lookupCollectionByNamespace(opCtx, nss).get());
     }
 
@@ -1064,8 +1081,25 @@ Collection* CollectionCatalog::lookupCollectionByNamespaceForMetadataWrite(
         return nullptr;
 
     invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X));
+
+    // Skip cloning and return directly if allowed.
+    if (_alreadyClonedForBatchedWriter(coll)) {
+        return coll.get();
+    }
+
     auto cloned = coll->clone();
     auto ptr = cloned.get();
+
+    // If we are in a batch write, set this Collection instance in the batched catalog write
+    // instance. We don't want to store as uncommitted in this case as we need to observe the write
+    // on the thread doing the batch write and it would trigger the regular path where we do a
+    // copy-on-write on the catalog when committing.
+    if (_isCatalogBatchWriter()) {
+        PublishCatalogUpdates::setCollectionInCatalog(*batchedCatalogWriteInstance,
+                                                      std::move(cloned));
+        return ptr;
+    }
+
     uncommittedCatalogUpdates.writableCollection(std::move(cloned));
 
     PublishCatalogUpdates::ensureRegisteredWithRecoveryUnit(opCtx, uncommittedCatalogUpdates);
@@ -1669,6 +1703,25 @@ Status CollectionCatalog::_createOrUpdateView(
     return res;
 }
 
+
+bool CollectionCatalog::_isCatalogBatchWriter() const {
+    return batchedCatalogWriteInstance.get() == this;
+}
+
+bool CollectionCatalog::_alreadyClonedForBatchedWriter(
+    const std::shared_ptr<Collection>& collection) const {
+    // We may skip cloning the Collection instance if and only if we are currently in a batched
+    // catalog write and all references to this Collection is owned by the cloned CollectionCatalog
+    // instance owned by the batch writer. i.e. the Collection is uniquely owned by the batch
+    // writer. When the batch writer initially clones the catalog, all collections will have a
+    // 'use_count' of at least kNumCollectionReferencesStored*2 (because there are at least 2
+    // catalog instances). To check for uniquely owned we need to check that the reference count is
+    // exactly kNumCollectionReferencesStored (owned by a single catalog) while also account for the
+    // instance that is extracted from the catalog and provided as a parameter to this function, we
+    // therefore need to add 1.
+    return _isCatalogBatchWriter() && collection.use_count() == kNumCollectionReferencesStored + 1;
+}
+
 CollectionCatalogStasher::CollectionCatalogStasher(OperationContext* opCtx)
     : _opCtx(opCtx), _stashed(false) {}
 
@@ -1736,9 +1789,11 @@ BatchedCollectionCatalogWriter::BatchedCollectionCatalogWriter(OperationContext*
     // copy the collection catalog, this could be expensive, store it for future writes during this
     // batcher
     batchedCatalogWriteInstance = std::make_shared<CollectionCatalog>(*_base);
+    _batchedInstance = batchedCatalogWriteInstance.get();
 }
 BatchedCollectionCatalogWriter::~BatchedCollectionCatalogWriter() {
     invariant(_opCtx->lockState()->isW());
+    invariant(_batchedInstance == batchedCatalogWriteInstance.get());
 
     // Publish out batched instance, validate that no other writers have been able to write during
     // the batcher.
@@ -1747,6 +1802,7 @@ BatchedCollectionCatalogWriter::~BatchedCollectionCatalogWriter() {
         atomic_compare_exchange_strong(&storage.catalog, &_base, batchedCatalogWriteInstance));
 
     // Clear out batched pointer so no more attempts of batching are made
+    _batchedInstance = nullptr;
     batchedCatalogWriteInstance = nullptr;
 }
 

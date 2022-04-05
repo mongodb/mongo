@@ -246,7 +246,7 @@ TEST_F(StorageEngineTimestampMonitorTest, TemporaryRecordStoreKeep) {
 TEST_F(StorageEngineTest, ReconcileUnfinishedIndex) {
     auto opCtx = cc().makeOperationContext();
 
-    Lock::GlobalLock lk(&*opCtx, MODE_IX);
+    Lock::GlobalLock lk(&*opCtx, MODE_X);
 
     const NamespaceString ns("db.coll1");
     const std::string indexName("a_1");
@@ -297,6 +297,9 @@ TEST_F(StorageEngineTest, ReconcileUnfinishedBackgroundSecondaryIndex) {
     const bool isBackgroundSecondaryBuild = true;
     const boost::optional<UUID> buildUUID = boost::none;
     {
+        Lock::DBLock dbLk(opCtx.get(), ns.db(), MODE_IX);
+        Lock::CollectionLock collLk(opCtx.get(), ns, MODE_X);
+
         WriteUnitOfWork wuow(opCtx.get());
         ASSERT_OK(
             startIndexBuild(opCtx.get(), ns, indexName, isBackgroundSecondaryBuild, buildUUID));
@@ -344,14 +347,20 @@ TEST_F(StorageEngineTest, ReconcileTwoPhaseIndexBuilds) {
     // Start two indexes with the same buildUUID to simulate building multiple indexes within the
     // same build.
     {
-        WriteUnitOfWork wuow(opCtx.get());
-        ASSERT_OK(startIndexBuild(opCtx.get(), ns, indexA, isBackgroundSecondaryBuild, buildUUID));
-        wuow.commit();
-    }
-    {
-        WriteUnitOfWork wuow(opCtx.get());
-        ASSERT_OK(startIndexBuild(opCtx.get(), ns, indexB, isBackgroundSecondaryBuild, buildUUID));
-        wuow.commit();
+        Lock::DBLock dbLk(opCtx.get(), ns.db(), MODE_IX);
+        Lock::CollectionLock collLk(opCtx.get(), ns, MODE_X);
+        {
+            WriteUnitOfWork wuow(opCtx.get());
+            ASSERT_OK(
+                startIndexBuild(opCtx.get(), ns, indexA, isBackgroundSecondaryBuild, buildUUID));
+            wuow.commit();
+        }
+        {
+            WriteUnitOfWork wuow(opCtx.get());
+            ASSERT_OK(
+                startIndexBuild(opCtx.get(), ns, indexB, isBackgroundSecondaryBuild, buildUUID));
+            wuow.commit();
+        }
     }
 
     const auto indexIdentA = _storageEngine->getCatalog()->getIndexIdent(

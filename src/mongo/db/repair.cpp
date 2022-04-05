@@ -190,8 +190,8 @@ Status repairCollection(OperationContext* opCtx,
 
     // Need to lookup from catalog again because the old collection object was invalidated by
     // repairRecordStore.
-    auto collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForMetadataWrite(
-        opCtx, CollectionCatalog::LifetimeMode::kInplace, nss);
+    auto collection =
+        CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForMetadataWrite(opCtx, nss);
 
     // If data was modified during repairRecordStore, we know to rebuild indexes without needing
     // to run an expensive collection validation.

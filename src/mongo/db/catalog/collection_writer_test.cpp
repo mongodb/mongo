@@ -88,20 +88,6 @@ protected:
     const NamespaceString kNss{"testdb", "testcol"};
 };
 
-TEST_F(CollectionWriterTest, Inplace) {
-    CollectionWriter writer(operationContext(), kNss, CollectionCatalog::LifetimeMode::kInplace);
-
-    // CollectionWriter in Inplace mode should operate directly on the Collection instance stored in
-    // the catalog. So no Collection copy should be made.
-    ASSERT_EQ(writer.get(), lookupCollectionFromCatalog());
-    ASSERT_EQ(lookupCollectionFromCatalog().get(), lookupCollectionFromCatalogForRead());
-
-
-    auto writable = writer.getWritableCollection();
-    ASSERT_EQ(writable, lookupCollectionFromCatalog().get());
-    ASSERT_EQ(lookupCollectionFromCatalog().get(), lookupCollectionFromCatalogForRead());
-}
-
 TEST_F(CollectionWriterTest, Commit) {
     CollectionWriter writer(operationContext(), kNss);
 
@@ -304,6 +290,38 @@ TEST_F(CatalogReadCopyUpdateTest, ConcurrentCatalogWriteBatchingMayThrow) {
     for (auto&& thread : threads) {
         thread.join();
     }
+}
+
+class BatchedCollectionCatalogWriterTest : public CollectionWriterTest {
+public:
+    Collection* lookupCollectionFromCatalogForMetadataWrite() {
+        return CollectionCatalog::get(operationContext())
+            ->lookupCollectionByNamespaceForMetadataWrite(operationContext(), kNss);
+    }
+};
+
+TEST_F(BatchedCollectionCatalogWriterTest, BatchedTest) {
+
+    const Collection* before = lookupCollectionFromCatalogForRead();
+    const Collection* after = nullptr;
+    {
+        Lock::GlobalWrite lock(operationContext());
+        BatchedCollectionCatalogWriter batched(operationContext());
+
+        // We should get a unique clone the first time we request a writable collection
+        Collection* firstWritable = lookupCollectionFromCatalogForMetadataWrite();
+        ASSERT_NE(firstWritable, before);
+
+        // Subsequent requests should return the same instance.
+        Collection* secondWritable = lookupCollectionFromCatalogForMetadataWrite();
+        ASSERT_EQ(secondWritable, firstWritable);
+
+        after = firstWritable;
+    }
+
+    // When the batched writer commits our collection instance should be replaced.
+    ASSERT_NE(lookupCollectionFromCatalogForRead(), before);
+    ASSERT_EQ(lookupCollectionFromCatalogForRead(), after);
 }
 
 }  // namespace

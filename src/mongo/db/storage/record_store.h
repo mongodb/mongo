@@ -85,6 +85,8 @@ struct Record {
  * Implementations may override any default implementation if they can provide a more
  * efficient implementation.
  *
+ * Any interface that performs writes must validate that we are not in 'readOnly' mode.
+ *
  * Storage engines only need to implement the derived SeekableRecordCursor, but may choose
  * to implement this simpler interface for cursors used for repair or random traversal.
  *
@@ -343,15 +345,15 @@ public:
         return true;
     }
 
-    virtual void deleteRecord(OperationContext* opCtx, const RecordId& dl) = 0;
+    void deleteRecord(OperationContext* opCtx, const RecordId& dl);
 
     /**
      * Inserts the specified records into this RecordStore by copying the passed-in record data and
      * updates 'inOutRecords' to contain the ids of the inserted records.
      */
-    virtual Status insertRecords(OperationContext* opCtx,
-                                 std::vector<Record>* inOutRecords,
-                                 const std::vector<Timestamp>& timestamps) = 0;
+    Status insertRecords(OperationContext* opCtx,
+                         std::vector<Record>* inOutRecords,
+                         const std::vector<Timestamp>& timestamps);
 
     /**
      * A thin wrapper around insertRecords() to simplify handling of single document inserts.
@@ -383,10 +385,10 @@ public:
      * Updates the record with id 'recordId', replacing its contents with those described by
      * 'data' and 'len'.
      */
-    virtual Status updateRecord(OperationContext* opCtx,
-                                const RecordId& recordId,
-                                const char* data,
-                                int len) = 0;
+    Status updateRecord(OperationContext* opCtx,
+                        const RecordId& recordId,
+                        const char* data,
+                        int len);
 
     /**
      * @return Returns 'false' if this record store does not implement
@@ -405,11 +407,11 @@ public:
      * @return the updated version of the record. If unowned data is returned, then it is valid
      * until the next modification of this Record or the lock on the collection has been released.
      */
-    virtual StatusWith<RecordData> updateWithDamages(OperationContext* opCtx,
-                                                     const RecordId& loc,
-                                                     const RecordData& oldRec,
-                                                     const char* damageSource,
-                                                     const mutablebson::DamageVector& damages) = 0;
+    StatusWith<RecordData> updateWithDamages(OperationContext* opCtx,
+                                             const RecordId& loc,
+                                             const RecordData& oldRec,
+                                             const char* damageSource,
+                                             const mutablebson::DamageVector& damages);
 
     /**
      * Prints any storage engine provided metadata for the record with 'recordId'.
@@ -448,7 +450,7 @@ public:
     /**
      * removes all Records
      */
-    virtual Status truncate(OperationContext* opCtx) = 0;
+    Status truncate(OperationContext* opCtx);
 
     /**
      * Truncate documents newer than the document at 'end' from the capped
@@ -456,7 +458,7 @@ public:
      * function.  An assertion will be thrown if that is attempted.
      * @param inclusive - Truncate 'end' as well iff true
      */
-    virtual void cappedTruncateAfter(OperationContext* opCtx, RecordId end, bool inclusive) = 0;
+    void cappedTruncateAfter(OperationContext* opCtx, RecordId end, bool inclusive);
 
     /**
      * does this RecordStore support the compact operation?
@@ -481,9 +483,7 @@ public:
      *
      * Only called if compactSupported() returns true.
      */
-    virtual Status compact(OperationContext* opCtx) {
-        MONGO_UNREACHABLE;
-    }
+    Status compact(OperationContext* opCtx);
 
     /**
      * Performs record store specific validation to ensure consistency of underlying data
@@ -606,6 +606,29 @@ public:
     }
 
 protected:
+    // Functions derived classes need to override to implement this interface. Any write needs to be
+    // first checked so we are not in read only mode in this base class and then redirected to the
+    // derived class if allowed to perform the write.
+    virtual void doDeleteRecord(OperationContext* opCtx, const RecordId& dl) = 0;
+    virtual Status doInsertRecords(OperationContext* opCtx,
+                                   std::vector<Record>* inOutRecords,
+                                   const std::vector<Timestamp>& timestamps) = 0;
+    virtual Status doUpdateRecord(OperationContext* opCtx,
+                                  const RecordId& recordId,
+                                  const char* data,
+                                  int len) = 0;
+    virtual StatusWith<RecordData> doUpdateWithDamages(
+        OperationContext* opCtx,
+        const RecordId& loc,
+        const RecordData& oldRec,
+        const char* damageSource,
+        const mutablebson::DamageVector& damages) = 0;
+    virtual Status doTruncate(OperationContext* opCtx) = 0;
+    virtual void doCappedTruncateAfter(OperationContext* opCtx, RecordId end, bool inclusive) = 0;
+    virtual Status doCompact(OperationContext* opCtx) {
+        MONGO_UNREACHABLE;
+    }
+
     virtual Status oplogDiskLocRegisterImpl(OperationContext* opCtx,
                                             const Timestamp& opTime,
                                             bool orderedCommit) {

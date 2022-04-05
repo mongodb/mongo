@@ -105,12 +105,17 @@ Status createIndexFromSpec(OperationContext* opCtx,
                            VectorClockMutable* clock,
                            StringData ns,
                            const BSONObj& spec) {
+    NamespaceString nss(ns);
+
+    // Make sure we haven't already locked this namespace. An AutoGetCollection already instantiated
+    // on this namespace would have a dangling Collection pointer after this function has run.
+    invariant(!opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX));
+
     AutoGetDb autoDb(opCtx, nsToDatabaseSubstring(ns), MODE_X);
-    Collection* coll;
     {
         WriteUnitOfWork wunit(opCtx);
-        coll = CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForMetadataWrite(
-            opCtx, CollectionCatalog::LifetimeMode::kInplace, NamespaceString(ns));
+        auto coll =
+            CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForMetadataWrite(opCtx, nss);
         if (!coll) {
             auto db = autoDb.ensureDbExists(opCtx);
             invariant(db);
@@ -120,7 +125,7 @@ Status createIndexFromSpec(OperationContext* opCtx,
         wunit.commit();
     }
     MultiIndexBlock indexer;
-    CollectionWriter collection(coll);
+    CollectionWriter collection(opCtx, nss);
     ScopeGuard abortOnExit(
         [&] { indexer.abortIndexBuild(opCtx, collection, MultiIndexBlock::kNoopOnCleanUpFn); });
     Status status = indexer
@@ -141,21 +146,23 @@ Status createIndexFromSpec(OperationContext* opCtx,
     if (!status.isOK()) {
         return status;
     }
-    status = indexer.insertAllDocumentsInCollection(opCtx, coll);
+    status = indexer.insertAllDocumentsInCollection(opCtx, collection.get());
     if (!status.isOK()) {
         return status;
     }
-    status = indexer.retrySkippedRecords(opCtx, coll);
+    status = indexer.retrySkippedRecords(opCtx, collection.get());
     if (!status.isOK()) {
         return status;
     }
-    status = indexer.checkConstraints(opCtx, coll);
+    status = indexer.checkConstraints(opCtx, collection.get());
     if (!status.isOK()) {
         return status;
     }
     WriteUnitOfWork wunit(opCtx);
-    ASSERT_OK(indexer.commit(
-        opCtx, coll, MultiIndexBlock::kNoopOnCreateEachFn, MultiIndexBlock::kNoopOnCommitFn));
+    ASSERT_OK(indexer.commit(opCtx,
+                             collection.getWritableCollection(),
+                             MultiIndexBlock::kNoopOnCreateEachFn,
+                             MultiIndexBlock::kNoopOnCommitFn));
     LogicalTime indexTs = clock->tickClusterTime(1);
     ASSERT_OK(opCtx->recoveryUnit()->setTimestamp(indexTs.asTimestamp()));
     wunit.commit();
@@ -1615,7 +1622,6 @@ TEST_F(StorageTimestampTest, PrimarySetIndexMultikeyOnInsert) {
     NamespaceString nss("unittests.PrimarySetIndexMultikeyOnInsert");
     create(nss);
 
-    AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
     auto indexName = "a_1";
     auto indexSpec = BSON("name" << indexName << "key" << BSON("a" << 1) << "v"
                                  << static_cast<int>(kIndexVersion));
@@ -1624,6 +1630,7 @@ TEST_F(StorageTimestampTest, PrimarySetIndexMultikeyOnInsert) {
     const LogicalTime pastTime = _clock->tickClusterTime(1);
     const LogicalTime insertTime = pastTime.addTicks(1);
 
+    AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
     BSONObj doc = BSON("_id" << 1 << "a" << BSON_ARRAY(1 << 2));
     WriteUnitOfWork wunit(_opCtx);
     insertDocument(autoColl.getCollection(), InsertStatement(doc));
@@ -1640,7 +1647,6 @@ TEST_F(StorageTimestampTest, PrimarySetIndexMultikeyOnInsertUnreplicated) {
     NamespaceString nss("unittests.system.profile");
     create(nss);
 
-    AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
     auto indexName = "a_1";
     auto indexSpec = BSON("name" << indexName << "key" << BSON("a" << 1) << "v"
                                  << static_cast<int>(kIndexVersion));
@@ -1649,6 +1655,7 @@ TEST_F(StorageTimestampTest, PrimarySetIndexMultikeyOnInsertUnreplicated) {
     const LogicalTime pastTime = _clock->tickClusterTime(1);
     const LogicalTime insertTime = pastTime.addTicks(1);
 
+    AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
     BSONObj doc = BSON("_id" << 1 << "a" << BSON_ARRAY(1 << 2));
     WriteUnitOfWork wunit(_opCtx);
     insertDocument(autoColl.getCollection(), InsertStatement(doc));
@@ -1674,10 +1681,7 @@ TEST_F(StorageTimestampTest, PrimarySetsMultikeyInsideMultiDocumentTransaction) 
                                  << static_cast<int>(kIndexVersion));
     auto doc = BSON("_id" << 1 << "a" << BSON_ARRAY(1 << 2));
 
-    {
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
-        ASSERT_OK(createIndexFromSpec(_opCtx, _clock, nss.ns(), indexSpec));
-    }
+    ASSERT_OK(createIndexFromSpec(_opCtx, _clock, nss.ns(), indexSpec));
 
     const auto currentTime = _clock->getTime();
     const auto presentTs = currentTime.clusterTime().asTimestamp();

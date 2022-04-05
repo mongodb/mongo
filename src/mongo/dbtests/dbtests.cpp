@@ -102,12 +102,11 @@ Status createIndex(OperationContext* opCtx, StringData ns, const BSONObj& keys, 
 Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj& spec) {
     NamespaceString nss(ns);
     AutoGetDb autoDb(opCtx, nsToDatabaseSubstring(ns), MODE_IX);
-    Collection* coll;
     {
         Lock::CollectionLock collLock(opCtx, nss, MODE_X);
         WriteUnitOfWork wunit(opCtx);
-        coll = CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForMetadataWrite(
-            opCtx, CollectionCatalog::LifetimeMode::kInplace, NamespaceString(ns));
+        auto coll =
+            CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForMetadataWrite(opCtx, nss);
         if (!coll) {
             auto db = autoDb.ensureDbExists(opCtx);
             invariant(db);
@@ -117,10 +116,12 @@ Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj
         wunit.commit();
     }
     MultiIndexBlock indexer;
-    CollectionWriter collection(coll);
+    CollectionWriter collection(opCtx, nss);
     ScopeGuard abortOnExit([&] {
         Lock::CollectionLock collLock(opCtx, nss, MODE_X);
+        WriteUnitOfWork wunit(opCtx);
         indexer.abortIndexBuild(opCtx, collection, MultiIndexBlock::kNoopOnCleanUpFn);
+        wunit.commit();
     });
     auto status = Status::OK();
     {
@@ -145,25 +146,27 @@ Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj
     }
     {
         Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
-        status = indexer.insertAllDocumentsInCollection(opCtx, coll);
+        status = indexer.insertAllDocumentsInCollection(opCtx, collection.get());
         if (!status.isOK()) {
             return status;
         }
     }
     {
         Lock::CollectionLock collLock(opCtx, nss, MODE_X);
-        status = indexer.retrySkippedRecords(opCtx, coll);
+        status = indexer.retrySkippedRecords(opCtx, collection.get());
         if (!status.isOK()) {
             return status;
         }
 
-        status = indexer.checkConstraints(opCtx, coll);
+        status = indexer.checkConstraints(opCtx, collection.get());
         if (!status.isOK()) {
             return status;
         }
         WriteUnitOfWork wunit(opCtx);
-        ASSERT_OK(indexer.commit(
-            opCtx, coll, MultiIndexBlock::kNoopOnCreateEachFn, MultiIndexBlock::kNoopOnCommitFn));
+        ASSERT_OK(indexer.commit(opCtx,
+                                 collection.getWritableCollection(),
+                                 MultiIndexBlock::kNoopOnCreateEachFn,
+                                 MultiIndexBlock::kNoopOnCommitFn));
         ASSERT_OK(opCtx->recoveryUnit()->setTimestamp(Timestamp(1, 1)));
         wunit.commit();
     }

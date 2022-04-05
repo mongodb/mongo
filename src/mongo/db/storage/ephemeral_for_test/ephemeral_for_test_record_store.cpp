@@ -133,7 +133,7 @@ bool RecordStore::findRecord(OperationContext* opCtx, const RecordId& loc, Recor
     return true;
 }
 
-void RecordStore::deleteRecord(OperationContext* opCtx, const RecordId& dl) {
+void RecordStore::doDeleteRecord(OperationContext* opCtx, const RecordId& dl) {
     if (KeyFormat::Long == _keyFormat) {
         _initHighestIdIfNeeded(opCtx);
     }
@@ -144,9 +144,9 @@ void RecordStore::deleteRecord(OperationContext* opCtx, const RecordId& dl) {
     ru->makeDirty();
 }
 
-Status RecordStore::insertRecords(OperationContext* opCtx,
-                                  std::vector<Record>* inOutRecords,
-                                  const std::vector<Timestamp>& timestamps) {
+Status RecordStore::doInsertRecords(OperationContext* opCtx,
+                                    std::vector<Record>* inOutRecords,
+                                    const std::vector<Timestamp>& timestamps) {
     auto ru = RecoveryUnit::get(opCtx);
     StringStore* workingCopy(ru->getHead());
     {
@@ -189,10 +189,10 @@ Status RecordStore::insertRecords(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status RecordStore::updateRecord(OperationContext* opCtx,
-                                 const RecordId& oldLocation,
-                                 const char* data,
-                                 int len) {
+Status RecordStore::doUpdateRecord(OperationContext* opCtx,
+                                   const RecordId& oldLocation,
+                                   const char* data,
+                                   int len) {
     StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
     SizeAdjuster adjuster(opCtx, this);
     {
@@ -211,11 +211,11 @@ bool RecordStore::updateWithDamagesSupported() const {
     return false;
 }
 
-StatusWith<RecordData> RecordStore::updateWithDamages(OperationContext* opCtx,
-                                                      const RecordId& loc,
-                                                      const RecordData& oldRec,
-                                                      const char* damageSource,
-                                                      const mutablebson::DamageVector& damages) {
+StatusWith<RecordData> RecordStore::doUpdateWithDamages(OperationContext* opCtx,
+                                                        const RecordId& loc,
+                                                        const RecordData& oldRec,
+                                                        const char* damageSource,
+                                                        const mutablebson::DamageVector& damages) {
     return RecordData();
 }
 
@@ -226,7 +226,7 @@ std::unique_ptr<SeekableRecordCursor> RecordStore::getCursor(OperationContext* o
     return std::make_unique<ReverseCursor>(opCtx, *this, _visibilityManager);
 }
 
-Status RecordStore::truncate(OperationContext* opCtx) {
+Status RecordStore::doTruncate(OperationContext* opCtx) {
     SizeAdjuster adjuster(opCtx, this);
     StatusWith<int64_t> s = truncateWithoutUpdatingCount(
         checked_cast<ephemeral_for_test::RecoveryUnit*>(opCtx->recoveryUnit()));
@@ -257,7 +257,7 @@ StatusWith<int64_t> RecordStore::truncateWithoutUpdatingCount(mongo::RecoveryUni
     return static_cast<int64_t>(toDelete.size());
 }
 
-void RecordStore::cappedTruncateAfter(OperationContext* opCtx, RecordId end, bool inclusive) {
+void RecordStore::doCappedTruncateAfter(OperationContext* opCtx, RecordId end, bool inclusive) {
     auto ru = RecoveryUnit::get(opCtx);
     StringStore* workingCopy(ru->getHead());
     WriteUnitOfWork wuow(opCtx);

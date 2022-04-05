@@ -83,8 +83,7 @@ public:
     }
 
     CollectionWriter getCollectionWriter() {
-        return CollectionWriter(
-            operationContext(), *_collectionUUID, CollectionCatalog::LifetimeMode::kInplace);
+        return CollectionWriter(operationContext(), *_collectionUUID);
     }
 
     UUID createCollection(const NamespaceString& nss, CollectionOptions options) {
@@ -472,6 +471,9 @@ TEST_F(DurableCatalogTest, SinglePhaseIndexBuild) {
     ASSERT_FALSE(collection->getIndexBuildUUID(indexEntry->descriptor()->indexName()));
 
     {
+        Lock::DBLock dbLk(operationContext(), collection->ns().db(), MODE_IX);
+        Lock::CollectionLock collLk(operationContext(), collection->ns(), MODE_X);
+
         WriteUnitOfWork wuow(operationContext());
         getCollectionWriter().getWritableCollection()->indexBuildSuccess(operationContext(),
                                                                          indexEntry);
@@ -492,6 +494,9 @@ TEST_F(DurableCatalogTest, TwoPhaseIndexBuild) {
     ASSERT_TRUE(collection->getIndexBuildUUID(indexEntry->descriptor()->indexName()));
 
     {
+        Lock::DBLock dbLk(operationContext(), collection->ns().db(), MODE_IX);
+        Lock::CollectionLock collLk(operationContext(), collection->ns(), MODE_X);
+
         WriteUnitOfWork wuow(operationContext());
         getCollectionWriter().getWritableCollection()->indexBuildSuccess(operationContext(),
                                                                          indexEntry);

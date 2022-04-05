@@ -65,6 +65,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/util/fail_point',
+        'storage_options',
     ],
 )
 
@@ -78,6 +79,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/service_context',
+        'storage_options',
     ],
 )
 
@@ -294,6 +296,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/unittest/unittest',
+        'record_store_base',
     ],
 )
 
@@ -548,7 +551,8 @@ env.Library(
         '$BUILD_DIR/mongo/db/multitenancy',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         '$BUILD_DIR/mongo/db/server_options_core',
-        '$BUILD_DIR/mongo/db/storage/storage_options'
+        '$BUILD_DIR/mongo/db/storage/storage_options',
+        'record_store_base',
     ],
 )
 

@@ -749,7 +749,7 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
             WriteUnitOfWork wuow(opCtx);
             auto collection =
                 CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForMetadataWrite(
-                    opCtx, CollectionCatalog::LifetimeMode::kInplace, entry.nss);
+                    opCtx, entry.nss);
             invariant(collection->getCatalogId() == entry.catalogId);
             collection->replaceMetadata(opCtx, std::move(metaData));
             wuow.commit();
@@ -880,8 +880,7 @@ Status StorageEngineImpl::_dropCollectionsNoTimestamp(OperationContext* opCtx,
     WriteUnitOfWork untimestampedDropWuow(opCtx);
     auto collectionCatalog = CollectionCatalog::get(opCtx);
     for (auto& uuid : toDrop) {
-        auto coll = collectionCatalog->lookupCollectionByUUIDForMetadataWrite(
-            opCtx, CollectionCatalog::LifetimeMode::kManagedInWriteUnitOfWork, uuid);
+        auto coll = collectionCatalog->lookupCollectionByUUIDForMetadataWrite(opCtx, uuid);
 
         // No need to remove the indexes from the IndexCatalog because eliminating the Collection
         // will have the same effect.
