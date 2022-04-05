@@ -196,6 +196,8 @@ last-continuous:
       test_file: jstests/replsets/buildindexes_false_commit_quorum.js
     - ticket: SERVER-64780
       test_file: jstests/sharding/resharding_change_stream_namespace_filtering.js
+    - ticket: SERVER-65261
+      test_file: jstests/replsets/capped_deletes.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -509,6 +511,8 @@ last-lts:
       test_file: jstests/sharding/update_with_dollar_fields.js
     - ticket: SERVER-64142
       test_file: jstests/sharding/refine_collection_shard_key_basic.js
+    - ticket: SERVER-65261
+      test_file: jstests/replsets/capped_deletes.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:

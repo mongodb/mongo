@@ -216,11 +216,14 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
     auto expCtx = make_intrusive<ExpressionContext>(
         opCtx, std::unique_ptr<CollatorInterface>(nullptr), collection->ns());
 
+    if (collection->isCapped()) {
+        expCtx->setIsCappedDelete();
+    }
+
     auto collScanParams = createCollectionScanParams(
         expCtx, ws.get(), coll, direction, boost::none /* resumeAfterId */, minRecord, maxRecord);
 
-    auto root = _collectionScan(
-        expCtx, ws.get(), &collection, collScanParams, true /* relaxCappedConstraints */);
+    auto root = _collectionScan(expCtx, ws.get(), &collection, collScanParams);
 
     if (batchParams) {
         root = std::make_unique<BatchedDeleteStage>(expCtx.get(),
@@ -435,14 +438,12 @@ std::unique_ptr<PlanStage> InternalPlanner::_collectionScan(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     WorkingSet* ws,
     const CollectionPtr* coll,
-    const CollectionScanParams& params,
-    bool relaxCappedConstraints) {
+    const CollectionScanParams& params) {
 
     const auto& collection = *coll;
     invariant(collection);
 
-    return std::make_unique<CollectionScan>(
-        expCtx.get(), collection, params, ws, nullptr, relaxCappedConstraints);
+    return std::make_unique<CollectionScan>(expCtx.get(), collection, params, ws, nullptr);
 }
 
 std::unique_ptr<PlanStage> InternalPlanner::_indexScan(

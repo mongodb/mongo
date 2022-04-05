@@ -1280,6 +1280,15 @@ void CollectionImpl::deleteDocument(OperationContext* opCtx,
                   "Cannot remove from a capped collection in a multi-document transaction");
     }
 
+    if (_shared->_needCappedLock) {
+        // X-lock the metadata resource for this capped collection until the end of the WUOW. This
+        // prevents the primary from executing with more concurrency than secondaries and protects
+        // '_cappedFirstRecord'.
+        // See SERVER-21646.
+        Lock::ResourceLock heldUntilEndOfWUOW{
+            opCtx->lockState(), ResourceId(RESOURCE_METADATA, _ns.ns()), MODE_X};
+    }
+
     std::vector<OplogSlot> oplogSlots;
     auto retryableFindAndModifyLocation = RetryableFindAndModifyLocation::kNone;
     if (storeDeletedDoc == Collection::StoreDeletedDoc::On && !getRecordPreImages() &&

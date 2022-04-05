@@ -1526,6 +1526,10 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
         }
     }
 
+    if (collection && collection->isCapped()) {
+        expCtx->setIsCappedDelete();
+    }
+
     if (collection && collection->isCapped() && opCtx->inMultiDocumentTransaction()) {
         // This check is duplicated from CollectionImpl::deleteDocument() for two reasons:
         // - Performing a remove on an empty capped collection would not call

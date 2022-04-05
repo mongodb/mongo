@@ -317,6 +317,14 @@ public:
         }
     }
 
+    void setIsCappedDelete() {
+        _isCappedDelete = true;
+    }
+
+    bool getIsCappedDelete() const {
+        return _isCappedDelete;
+    }
+
     /**
      * Retrieves the Javascript Scope for the current thread or creates a new one if it has not been
      * created yet. Initializes the Scope with the 'jsScope' variables from the runtimeConstants.
@@ -490,6 +498,8 @@ protected:
     StringMap<ResolvedNamespace> _resolvedNamespaces;
 
     int _interruptCounter = kInterruptCheckPeriod;
+
+    bool _isCappedDelete = false;
 
 private:
     boost::optional<ExpressionCounters> _expressionCounters = boost::none;
