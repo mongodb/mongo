@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <boost/functional/hash.hpp>
 #include <string>
 
 #include "mongo/base/status_with.h"
@@ -60,8 +61,8 @@ constexpr Minutes kLogicalSessionDefaultTimeout =
     Minutes(kLocalLogicalSessionTimeoutMinutesDefault);
 
 inline bool operator==(const LogicalSessionId& lhs, const LogicalSessionId& rhs) {
-    return (lhs.getId() == rhs.getId()) && (lhs.getUid() == rhs.getUid()) &&
-        (lhs.getTxnNumber() == rhs.getTxnNumber()) && (lhs.getTxnUUID() == rhs.getTxnUUID());
+    return (lhs.getId() == rhs.getId()) && (lhs.getTxnNumber() == rhs.getTxnNumber()) &&
+        (lhs.getTxnUUID() == rhs.getTxnUUID()) && (lhs.getUid() == rhs.getUid());
 }
 
 inline bool operator!=(const LogicalSessionId& lhs, const LogicalSessionId& rhs) {
@@ -89,6 +90,15 @@ LogicalSessionRecord makeLogicalSessionRecordForTest();
 
 struct LogicalSessionIdHash {
     std::size_t operator()(const LogicalSessionId& lsid) const {
+        // Due to internal sessions having the same _id, we want to hash by its txnUUID and
+        // txnNumber to discourage hash key collision.
+        if (auto txnUUID = lsid.getTxnUUID()) {
+            auto hash = _hasher(*txnUUID);
+            if (lsid.getTxnNumber()) {
+                boost::hash_combine(hash, *lsid.getTxnNumber());
+            }
+            return hash;
+        }
         return _hasher(lsid.getId());
     }
 
@@ -98,7 +108,7 @@ private:
 
 struct LogicalSessionRecordHash {
     std::size_t operator()(const LogicalSessionRecord& lsid) const {
-        return _hasher(lsid.getId().getId());
+        return LogicalSessionIdHash{}(lsid.getId());
     }
 
 private:
