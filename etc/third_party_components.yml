@@ -241,6 +241,13 @@ components:
     team_owner: "Query"
     upgrade_suppression: TODO SERVER-47278
 
+  PCRE2:
+    homepage_url: https://www.pcre.org/
+    open_hub_url: https://www.openhub.net/p/pcre2
+    release_monitoring_id: 5832
+    local_directory_path: src/third_party/pcre2
+    team_owner: "Query"
+
   python-testscenarios:
     homepage_url: https://launchpad.net/testscenarios
     open_hub_url: https://www.openhub.net/p/testscenarios

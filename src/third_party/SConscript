@@ -81,6 +81,11 @@ if not use_system_version_of_library('pcre'):
         'CPPPATH' : ['#/src/third_party/pcre' + pcreSuffix],
     }
 
+if not use_system_version_of_library('pcre2'):
+    thirdPartyEnvironmentModifications['pcre2'] = {
+        'CPPPATH' : ['#/src/third_party/pcre2'],
+    }
+
 if not use_system_version_of_library('boost'):
 
 
@@ -340,6 +345,22 @@ else:
 
 pcreEnv.ShimLibrary(name="pcrecpp")
 
+pcre2Env = env.Clone()
+if use_system_version_of_library("pcre2"):
+    pcre2Env = pcre2Env.Clone(
+        SYSLIBDEPS=[
+            env['LIBDEPS_PCRE2_SYSLIBDEP'],
+        ])
+else:
+    pcre2Env = pcre2Env.Clone()
+    pcre2Env.InjectThirdParty(libraries=['pcre2'])
+    pcre2Env.SConscript('pcre2' + '/SConscript', exports={ 'env' : pcre2Env })
+    pcre2Env = pcre2Env.Clone(
+        LIBDEPS_INTERFACE=[
+            'pcre2/pcre2',
+        ])
+
+pcre2Env.ShimLibrary(name="pcre2")
 
 boostEnv = env.Clone()
 if use_system_version_of_library("boost"):

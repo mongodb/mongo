@@ -377,6 +377,7 @@ for pack in [
     ('intel_decimal128', 'intel decimal128'),
     ('kms-message',),
     ('pcre',),
+    ('pcre2',),
     ('snappy',),
     ('stemmer',),
     ('tcmalloc',),
@@ -4240,6 +4241,11 @@ def doConfigure(myenv):
         conf.FindSysLibDep("pcrecpp", ["pcrecpp"])
     else:
         conf.env.Prepend(CPPDEFINES=['PCRE_STATIC'])
+
+    if use_system_version_of_library("pcre2"):
+        conf.FindSysLibDep("pcre2", ["pcre2-8"])
+    else:
+        conf.env.Prepend(CPPDEFINES=['PCRE2_STATIC'])
 
     if use_system_version_of_library("snappy"):
         conf.FindSysLibDep("snappy", ["snappy"])
