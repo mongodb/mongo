@@ -44,6 +44,10 @@
 namespace mongo {
 namespace {
 
+const WriteConcernOptions kMajorityWriteConcern{WriteConcernOptions::kMajority,
+                                                WriteConcernOptions::SyncMode::UNSET,
+                                                WriteConcernOptions::kNoTimeout};
+
 // Mocks
 class MockParameterService : public ServerParameterService {
 public:
@@ -89,11 +93,14 @@ private:
 
 class DBClientMock : public DBClientService {
 public:
-    DBClientMock(std::function<Status(BSONObj, BSONObj)> updateParameterOnDiskMock) {
+    DBClientMock(std::function<StatusWith<bool>(BSONObj, BSONObj)> updateParameterOnDiskMock) {
         this->updateParameterOnDiskMockImpl = updateParameterOnDiskMock;
     }
 
-    Status updateParameterOnDisk(BSONObj cmd, BSONObj info) override {
+    StatusWith<bool> updateParameterOnDisk(OperationContext* opCtx,
+                                           BSONObj cmd,
+                                           BSONObj info,
+                                           const WriteConcernOptions&) override {
         return updateParameterOnDiskMockImpl(cmd, info);
     }
 
@@ -103,7 +110,7 @@ public:
     }
 
 private:
-    std::function<Status(BSONObj, BSONObj)> updateParameterOnDiskMockImpl;
+    std::function<StatusWith<bool>(BSONObj, BSONObj)> updateParameterOnDiskMockImpl;
 };
 
 MockServerParameter alwaysValidatingServerParameter(StringData name) {
@@ -123,7 +130,7 @@ MockServerParameter alwaysInvalidatingServerParameter(StringData name) {
 }
 
 DBClientMock alwaysSucceedingDbClient() {
-    DBClientMock dbServiceMock([&](BSONObj cmd, BSONObj info) { return Status::OK(); });
+    DBClientMock dbServiceMock([&](BSONObj cmd, BSONObj info) { return true; });
 
     return dbServiceMock;
 }
@@ -164,7 +171,7 @@ TEST(SetClusterParameterCommand, SucceedsWithObjectParameter) {
                                                                         << "majority")));
     SetClusterParameter testCmd(obj);
 
-    fixture.invoke(&spyCtx, testCmd);
+    fixture.invoke(&spyCtx, testCmd, boost::none, kMajorityWriteConcern);
 }
 
 TEST(SetClusterParameterCommand, ThrowsWithNonObjectParameter) {
@@ -189,7 +196,9 @@ TEST(SetClusterParameterCommand, ThrowsWithNonObjectParameter) {
     OperationContext spyCtx(clientPtr, 1234);
     SetClusterParameter testCmd(obj);
 
-    ASSERT_THROWS_CODE(fixture.invoke(&spyCtx, testCmd), DBException, 6432602);
+    ASSERT_THROWS_CODE(fixture.invoke(&spyCtx, testCmd, boost::none, kMajorityWriteConcern),
+                       DBException,
+                       ErrorCodes::IllegalOperation);
 }
 
 TEST(SetClusterParameterCommand, ThrowsWhenServerParameterValidationFails) {
@@ -217,10 +226,11 @@ TEST(SetClusterParameterCommand, ThrowsWhenServerParameterValidationFails) {
     OperationContext spyCtx(clientPtr, 1234);
     SetClusterParameter testCmd(obj);
 
-    ASSERT_THROWS_CODE_AND_WHAT(fixture.invoke(&spyCtx, testCmd),
-                                DBException,
-                                ErrorCodes::BadValue,
-                                "Parameter Validation Failed"_sd);
+    ASSERT_THROWS_CODE_AND_WHAT(
+        fixture.invoke(&spyCtx, testCmd, boost::none, kMajorityWriteConcern),
+        DBException,
+        ErrorCodes::BadValue,
+        "Parameter Validation Failed"_sd);
 }
 
 TEST(SetClusterParameterCommand, ThrowsWhenDBUpdateFails) {
@@ -248,7 +258,9 @@ TEST(SetClusterParameterCommand, ThrowsWhenDBUpdateFails) {
 
     SetClusterParameter testCmd(obj);
 
-    ASSERT_THROWS_WHAT(fixture.invoke(&spyCtx, testCmd), DBException, "DB Client Update Failed"_sd);
+    ASSERT_THROWS_WHAT(fixture.invoke(&spyCtx, testCmd, boost::none, kMajorityWriteConcern),
+                       DBException,
+                       "DB Client Update Failed"_sd);
 }
 
 TEST(SetClusterParameterCommand, ThrowsWhenParameterNotPresent) {
@@ -275,7 +287,9 @@ TEST(SetClusterParameterCommand, ThrowsWhenParameterNotPresent) {
 
     SetClusterParameter testCmd(obj);
 
-    ASSERT_THROWS_CODE(fixture.invoke(&spyCtx, testCmd), DBException, 6432601);
+    ASSERT_THROWS_CODE(fixture.invoke(&spyCtx, testCmd, boost::none, kMajorityWriteConcern),
+                       DBException,
+                       ErrorCodes::IllegalOperation);
 }
 }  // namespace
 }  // namespace mongo

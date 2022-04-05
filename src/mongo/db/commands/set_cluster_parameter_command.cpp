@@ -42,6 +42,10 @@ namespace mongo {
 
 namespace {
 
+const WriteConcernOptions kMajorityWriteConcern{WriteConcernOptions::kMajority,
+                                                WriteConcernOptions::SyncMode::UNSET,
+                                                WriteConcernOptions::kNoTimeout};
+
 class SetClusterParameterCommand final : public TypedCommand<SetClusterParameterCommand> {
 public:
     using Request = SetClusterParameter;
@@ -76,7 +80,7 @@ public:
 
             SetClusterParameterInvocation invocation{std::move(parameterService), dbService};
 
-            invocation.invoke(opCtx, request());
+            invocation.invoke(opCtx, request(), boost::none, kMajorityWriteConcern);
         }
 
     private:

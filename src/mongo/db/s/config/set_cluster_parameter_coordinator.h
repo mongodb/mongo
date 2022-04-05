@@ -57,6 +57,24 @@ private:
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
 
+    /*
+     * Performs a local write with majority write concern to set the parameter.
+     */
+    void _commit(OperationContext* opCtx);
+
+    /*
+     * Checks if the cluster parameter was already set to the provided value.
+     */
+    bool _isClusterParameterSetAtTimestamp(OperationContext* opCtx);
+
+    /*
+     * Sends setClusterParameter to every shard in the cluster with the appropiate session.
+     */
+    void _sendSetClusterParameterToAllShards(
+        OperationContext* opCtx,
+        const OperationSessionInfo& opInfo,
+        std::shared_ptr<executor::ScopedTaskExecutor> executor);
+
     const ConfigsvrCoordinatorMetadata& metadata() const override;
 
     template <typename Func>

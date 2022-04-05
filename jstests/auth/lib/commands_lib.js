@@ -4178,7 +4178,11 @@ var authCommandsLib = {
         {
           testname: "getClusterParameter",
           command: {getClusterParameter: "testIntClusterParameter"},
-          skipTest: (conn) => !TestData.setParameters.featureFlagClusterWideConfig,
+          skipTest: (conn) => {
+              const hello = assert.commandWorked(conn.getDB("admin").runCommand({hello: 1}));
+              const isStandalone = hello.msg !== "isdbgrid" && !hello.hasOwnProperty('setName');
+              return !TestData.setParameters.featureFlagClusterWideConfig || isStandalone;
+          },
           testcases: [
             {
               runOnDb: adminDbName,
@@ -5666,7 +5670,7 @@ var authCommandsLib = {
         },
         { 
           testname: "setClusterParameter",
-          command: {setClusterParameter: {testIntClusterParameterParam: {intData: 17}}},
+          command: {setClusterParameter: {testIntClusterParameter: {intData: 17}}},
           skipTest: (conn) => {
               const hello = assert.commandWorked(conn.getDB("admin").runCommand({hello: 1}));
               const isStandalone = hello.msg !== "isdbgrid" && !hello.hasOwnProperty('setName');

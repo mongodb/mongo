@@ -41,9 +41,6 @@ namespace mongo {
 namespace {
 constexpr auto kIdField = "_id"_sd;
 constexpr auto kCPTField = "clusterParameterTime"_sd;
-constexpr auto kConfigDB = "config"_sd;
-constexpr auto kClusterParametersColl = "clusterParameters"_sd;
-const NamespaceString kClusterParametersNS(kConfigDB, kClusterParametersColl);
 
 /**
  * Per-operation scratch space indicating the document being deleted.
@@ -53,7 +50,7 @@ const NamespaceString kClusterParametersNS(kConfigDB, kClusterParametersColl);
 const auto aboutToDeleteDoc = OperationContext::declareDecoration<std::string>();
 
 bool isConfigNamespace(const NamespaceString& nss) {
-    return nss == kClusterParametersNS;
+    return nss == NamespaceString::kClusterParametersNamespace;
 }
 
 constexpr auto kOplog = "oplog"_sd;
@@ -127,7 +124,7 @@ void doLoadAllParametersFromDisk(OperationContext* opCtx, StringData mode, OnEnt
     std::vector<Status> failures;
 
     DBDirectClient client(opCtx);
-    FindCommandRequest findRequest{kClusterParametersNS};
+    FindCommandRequest findRequest{NamespaceString::kClusterParametersNamespace};
     client.find(std::move(findRequest), ReadPreferenceSetting{}, [&](BSONObj doc) {
         try {
             onEntry(doc, mode);
@@ -242,7 +239,7 @@ void ClusterServerParameterOpObserver::onDelete(OperationContext* opCtx,
 
 void ClusterServerParameterOpObserver::onDropDatabase(OperationContext* opCtx,
                                                       const std::string& dbName) {
-    if (dbName == kConfigDB) {
+    if (dbName == NamespaceString::kConfigDb) {
         // Entire config DB deleted, reset to default state.
         clearAllParameters();
     }
@@ -303,7 +300,7 @@ void ClusterServerParameterOpObserver::onImportCollection(OperationContext* opCt
 
 void ClusterServerParameterOpObserver::_onReplicationRollback(OperationContext* opCtx,
                                                               const RollbackObserverInfo& rbInfo) {
-    if (rbInfo.rollbackNamespaces.count(kClusterParametersNS)) {
+    if (rbInfo.rollbackNamespaces.count(NamespaceString::kClusterParametersNamespace)) {
         // Some kind of rollback happend in the settings collection.
         // Just reload from disk to be safe.
         resynchronizeAllParametersFromDisk(opCtx);

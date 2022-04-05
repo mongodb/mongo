@@ -46,7 +46,7 @@ commands:
         api_version: ""
         namespace: type
         type: object
-        strict: true
+        strict: false
     
     getClusterParameter:
         description: "Retrieves the in-memory value of the specified cluster server parameter(s)"

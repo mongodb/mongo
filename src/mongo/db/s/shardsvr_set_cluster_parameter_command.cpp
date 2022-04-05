@@ -32,11 +32,12 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/set_cluster_parameter_invocation.h"
-#include "mongo/db/s/config/configsvr_coordinator_service.h"
-#include "mongo/db/s/config/set_cluster_parameter_coordinator.h"
-#include "mongo/idl/cluster_server_parameter_gen.h"
+#include "mongo/db/commands/user_management_commands_gen.h"
+#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
@@ -44,10 +45,13 @@
 namespace mongo {
 namespace {
 
-class ConfigsvrSetClusterParameterCommand final
-    : public TypedCommand<ConfigsvrSetClusterParameterCommand> {
+const WriteConcernOptions kLocalWriteConcern{
+    1, WriteConcernOptions::SyncMode::UNSET, WriteConcernOptions::kNoTimeout};
+
+class ShardsvrSetClusterParameterCommand final
+    : public TypedCommand<ShardsvrSetClusterParameterCommand> {
 public:
-    using Request = ConfigsvrSetClusterParameter;
+    using Request = ShardsvrSetClusterParameter;
 
     class Invocation final : public InvocationBase {
     public:
@@ -55,58 +59,45 @@ public:
 
         void typedRun(OperationContext* opCtx) {
             uassert(ErrorCodes::IllegalOperation,
-                    str::stream() << Request::kCommandName << " can only be run on config servers",
-                    serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+                    str::stream() << Request::kCommandName << " can only be run on shard servers",
+                    serverGlobalParams.clusterRole == ClusterRole::ShardServer);
+            CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
+                                                          opCtx->getWriteConcern());
 
-            uassert(
-                ErrorCodes::IllegalOperation,
-                "featureFlagClusterWideConfig not enabled",
-                gFeatureFlagClusterWideConfig.isEnabled(serverGlobalParams.featureCompatibility));
-
-            // Validate parameter before creating coordinator.
-            {
-                BSONObj cmdParamObj = request().getCommandParameter();
-                BSONElement commandElement = cmdParamObj.firstElement();
-                StringData parameterName = commandElement.fieldName();
-                std::unique_ptr<ServerParameterService> sps =
-                    std::make_unique<ClusterParameterService>();
-                const ServerParameter* serverParameter = sps->getIfExists(parameterName);
-
-                uassert(ErrorCodes::IllegalOperation,
-                        str::stream() << "Unknown Cluster Parameter " << parameterName,
-                        serverParameter != nullptr);
-
-                uassert(ErrorCodes::IllegalOperation,
-                        "Cluster parameter value must be an object",
-                        BSONType::Object == commandElement.type());
-
-                BSONObjBuilder clusterParamBuilder;
-                clusterParamBuilder << "_id" << parameterName;
-                clusterParamBuilder.appendElements(commandElement.Obj());
-
-                BSONObj clusterParam = clusterParamBuilder.obj();
-
-                uassertStatusOK(serverParameter->validate(clusterParam));
+            SetClusterParameter setClusterParameterRequest(request().getCommandParameter());
+            setClusterParameterRequest.setDbName(NamespaceString::kAdminDb);
+            std::unique_ptr<ServerParameterService> parameterService =
+                std::make_unique<ClusterParameterService>();
+            DBDirectClient client(opCtx);
+            ClusterParameterDBClientService dbService(client);
+            SetClusterParameterInvocation invocation{std::move(parameterService), dbService};
+            // Use local write concern for setClusterParameter, the idea is that the command is
+            // being called with majority write concern, so, we'll wait for majority after checking
+            // out the session.
+            bool writePerformed = invocation.invoke(opCtx,
+                                                    setClusterParameterRequest,
+                                                    request().getClusterParameterTime(),
+                                                    kLocalWriteConcern);
+            if (!writePerformed) {
+                // Since no write happened on this txnNumber, we need to make a dummy write so
+                // that secondaries can be aware of this txn.
+                DBDirectClient client(opCtx);
+                client.update(NamespaceString::kServerConfigurationNamespace.ns(),
+                              BSON("_id"
+                                   << "SetClusterParameterStats"),
+                              BSON("$inc" << BSON("count" << 1)),
+                              true /* upsert */,
+                              false /* multi */);
             }
-
-            SetClusterParameterCoordinatorDocument coordinatorDoc;
-            coordinatorDoc.setConfigsvrCoordinatorMetadata(
-                {ConfigsvrCoordinatorTypeEnum::kSetClusterParameter});
-            coordinatorDoc.setParameter(request().getCommandParameter());
-
-            const auto service = ConfigsvrCoordinatorService::getService(opCtx);
-            const auto instance = service->getOrCreateService(opCtx, coordinatorDoc.toBSON());
-
-            instance->getCompletionFuture().get(opCtx);
         }
 
     private:
         NamespaceString ns() const override {
-            return NamespaceString(request().getDbName());
+            return NamespaceString();
         }
 
         bool supportsWriteConcern() const override {
-            return false;
+            return true;
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const override {
@@ -119,8 +110,8 @@ public:
     };
 
     std::string help() const override {
-        return "Internal command, which is exported by the config servers. Do not call "
-               "directly. Sets a parameter in the cluster.";
+        return "Internal command, which is exported by the shard servers. Do not call "
+               "directly. Set's the cluster parameter in the node.";
     }
 
     bool adminOnly() const override {
@@ -130,7 +121,7 @@ public:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
-} configsvrSetClusterParameterCmd;
+} shardsvrSetClusterParameterCmd;
 
 }  // namespace
 }  // namespace mongo

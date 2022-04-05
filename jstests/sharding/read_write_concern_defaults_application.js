@@ -168,6 +168,7 @@ let testCases = {
     _shardsvrReshardCollection: {skip: "internal command"},
     _shardsvrReshardingOperationTime: {skip: "internal command"},
     _shardsvrSetAllowMigrations: {skip: "internal command"},
+    _shardsvrSetClusterParameter: {skip: "internal command"},
     _shardsvrSetUserWriteBlockMode: {skip: "internal command"},
     _shardsvrCollMod: {skip: "internal command"},
     _shardsvrCollModParticipant: {skip: "internal command"},

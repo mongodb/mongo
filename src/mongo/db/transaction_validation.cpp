@@ -65,6 +65,7 @@ const StringMap<int> retryableWriteCommands = {{"clusterDelete", 1},
                                                {"_shardsvrParticipantBlock", 1},
                                                {"_configsvrCollMod", 1},
                                                {"_shardsvrCollModParticipant", 1},
+                                               {"_shardsvrSetClusterParameter", 1},
                                                {"_shardsvrSetUserWriteBlockMode", 1}};
 
 // TODO SERVER-65101: Replace this with a property on each command.

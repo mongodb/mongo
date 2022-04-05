@@ -42,8 +42,10 @@
 
 namespace mongo {
 
-void SetClusterParameterInvocation::invoke(OperationContext* opCtx,
-                                           const SetClusterParameter& cmd) {
+bool SetClusterParameterInvocation::invoke(OperationContext* opCtx,
+                                           const SetClusterParameter& cmd,
+                                           boost::optional<Timestamp> paramTime,
+                                           const WriteConcernOptions& writeConcern) {
 
     BSONObj cmdParamObj = cmd.getCommandParameter();
     BSONElement commandElement = cmdParamObj.firstElement();
@@ -51,14 +53,16 @@ void SetClusterParameterInvocation::invoke(OperationContext* opCtx,
 
     const ServerParameter* serverParameter = _sps->getIfExists(parameterName);
 
-    uassert(6432601,
+    uassert(ErrorCodes::IllegalOperation,
             str::stream() << "Unknown Cluster Parameter " << parameterName,
             serverParameter != nullptr);
-    uassert(6432602,
+
+    uassert(ErrorCodes::IllegalOperation,
             "Cluster parameter value must be an object",
             BSONType::Object == commandElement.type());
 
-    LogicalTime clusterTime = _dbService.getUpdateClusterTime(opCtx);
+    LogicalTime clusterTime =
+        paramTime ? LogicalTime(*paramTime) : _dbService.getUpdateClusterTime(opCtx);
 
     BSONObjBuilder updateBuilder;
     updateBuilder << "_id" << parameterName << "clusterParameterTime" << clusterTime.toBSON();
@@ -67,11 +71,11 @@ void SetClusterParameterInvocation::invoke(OperationContext* opCtx,
     BSONObj query = BSON("_id" << parameterName);
     BSONObj update = updateBuilder.obj();
 
-    LOGV2(6432603, "Updating cluster parameter on-disk", "clusterParameter"_attr = parameterName);
+    LOGV2_DEBUG(
+        6432603, 2, "Updating cluster parameter on-disk", "clusterParameter"_attr = parameterName);
     uassertStatusOK(serverParameter->validate(update));
 
-    Status updateResult = _dbService.updateParameterOnDisk(query, update);
-    uassertStatusOK(updateResult);
+    return uassertStatusOK(_dbService.updateParameterOnDisk(opCtx, query, update, writeConcern));
 }
 
 LogicalTime ClusterParameterDBClientService::getUpdateClusterTime(OperationContext* opCtx) {
@@ -79,23 +83,23 @@ LogicalTime ClusterParameterDBClientService::getUpdateClusterTime(OperationConte
     return vt.clusterTime();
 }
 
-Status ClusterParameterDBClientService::updateParameterOnDisk(BSONObj query, BSONObj update) {
+StatusWith<bool> ClusterParameterDBClientService::updateParameterOnDisk(
+    OperationContext* opCtx,
+    BSONObj query,
+    BSONObj update,
+    const WriteConcernOptions& writeConcern) {
     BSONObj res;
 
     BSONObjBuilder set;
     set.append("$set", update);
     set.doneFast();
 
-    const std::string configDb = "config";
-    const auto kMajorityWriteConcern = BSON("writeConcern" << BSON("w"
-                                                                   << "majority"));
-    const NamespaceString kClusterParametersNamespace(configDb, "clusterParameters");
-
     try {
         _dbClient.runCommand(
-            configDb,
+            NamespaceString::kConfigDb.toString(),
             [&] {
-                write_ops::UpdateCommandRequest updateOp(kClusterParametersNamespace);
+                write_ops::UpdateCommandRequest updateOp(
+                    NamespaceString::kClusterParametersNamespace);
                 updateOp.setUpdates({[&] {
                     write_ops::UpdateOpEntry entry;
                     entry.setQ(query);
@@ -105,7 +109,7 @@ Status ClusterParameterDBClientService::updateParameterOnDisk(BSONObj query, BSO
                     return entry;
                 }()});
 
-                return updateOp.toBSON(kMajorityWriteConcern);
+                return updateOp.toBSON(writeConcern.toBSON());
             }(),
             res);
     } catch (const DBException& ex) {
@@ -119,7 +123,7 @@ Status ClusterParameterDBClientService::updateParameterOnDisk(BSONObj query, BSO
         return Status(ErrorCodes::FailedToParse, errmsg);
     }
 
-    return Status::OK();
+    return response.getNModified() > 0 || response.getN() > 0;
 }
 
 const ServerParameter* ClusterParameterService::getIfExists(StringData name) {
