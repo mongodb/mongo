@@ -336,6 +336,13 @@ assert.commandFailedWithCode(
         {clusteredIndex: {key: {_id: 1}, unique: true}, expireAfterSeconds: -10}),
     ErrorCodes.InvalidOptions);
 
+// Check using clustered : false, which is disallowed, fails for implicit collection creation
+assert.commandFailedWithCode(db.runCommand({
+    createIndexes: "some_collection",
+    indexes: [{"key": {"somedata": 1}, "name": "s2", "clustered": false, "unique": true}]
+}),
+                             6492800);
+
 // Validate that it's possible to create secondary indexes, regardless of whether they
 // include the cluster key as one of the fields.
 validateCompoundSecondaryIndexes(replicatedDB, replicatedColl, {_id: 1});

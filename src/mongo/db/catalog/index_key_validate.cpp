@@ -288,7 +288,7 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& in
     bool hasCollationField = false;
     bool hasWeightsField = false;
     bool hasOriginalSpecField = false;
-    bool hasClusteredField = indexSpec.hasField("clustered");
+    auto clusteredField = indexSpec["clustered"];
     bool apiStrict = opCtx && APIParameters::get(opCtx).getAPIStrict().value_or(false);
 
     auto fieldNamesValidStatus = validateIndexSpecFieldNames(indexSpec);
@@ -545,13 +545,19 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& in
                               << "' field is a required property of an index specification"};
     }
 
-    if (hasClusteredField &&
-        (!indexSpec.hasField(IndexDescriptor::kUniqueFieldName) ||
-         indexSpec.getBoolField(IndexDescriptor::kUniqueFieldName) == false)) {
-        // Only require 'unique' if clustered is specified.
-        return {ErrorCodes::CannotCreateIndex,
-                str::stream() << "The '" << IndexDescriptor::kUniqueFieldName
-                              << "' field is required when 'clustered' is specified"};
+    if (clusteredField) {
+        if (!clusteredField.trueValue()) {
+            // Disallow 'clustered' from taking value 'false'
+            return {ErrorCodes::Error(6492800), "Value 'false' for field 'clustered' is invalid"};
+        }
+
+        if (!indexSpec.hasField(IndexDescriptor::kUniqueFieldName) ||
+            indexSpec.getBoolField(IndexDescriptor::kUniqueFieldName) == false) {
+            // Only require 'unique' if clustered is specified.
+            return {ErrorCodes::CannotCreateIndex,
+                    str::stream() << "The '" << IndexDescriptor::kUniqueFieldName
+                                  << "' field is required when 'clustered' is specified"};
+        }
     }
 
     if (hasCollationField && *resolvedIndexVersion < IndexVersion::kV2) {

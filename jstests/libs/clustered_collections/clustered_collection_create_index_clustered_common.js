@@ -29,6 +29,13 @@ const CreateIndexesClusteredTest = (function() {
         assert.commandFailedWithCode(testColl.createIndex({a: 1}, {clustered: true, unique: true}),
                                      6243700);
 
+        // Check using clustered : false, which is disallowed, fails in an empty collection
+        assert.commandFailedWithCode(testDB.runCommand({
+            createIndexes: collName,
+            "indexes": [{key: {"_id": 1}, name: "anyName", clustered: false, unique: true}],
+        }),
+                                     6492800);
+
         // Insert some docs. Sometimes empty collections are treated as special when it comes to
         // index builds.
         const batchSize = 100;
@@ -50,6 +57,10 @@ const CreateIndexesClusteredTest = (function() {
 
         assert.commandFailedWithCode(testColl.createIndex({a: 1}, {clustered: true, unique: true}),
                                      6243700);
+
+        // Check using clustered : false, which is disallowed, fails in non empty collection
+        assert.commandFailedWithCode(
+            testColl.createIndex({_id: 1}, {clustered: false, unique: true}), 6492800);
     };
 
     /**
@@ -97,6 +108,13 @@ const CreateIndexesClusteredTest = (function() {
         assert.commandFailedWithCode(
             testColl.createIndex({notMyIndex: 1}, {clustered: true, unique: true}), 6243700);
 
+        // Check using clustered : false, which is disallowed, fails in empty collection
+        assert.commandFailedWithCode(testDB.runCommand({
+            createIndexes: collName,
+            "indexes": [{key: {"newKey": 1}, name: "anyName", clustered: false, unique: true}],
+        }),
+                                     6492800);
+
         // Insert some docs. Empty collections are treated as special (single phase) when
         // it comes to index builds.
         const batchSize = 100;
@@ -136,6 +154,10 @@ const CreateIndexesClusteredTest = (function() {
         // Only in implicit collection creation on a non-existent collection can createIndex create
         // a clusteredIndex with a custom name.
         assert.commandWorked(testColl.createIndex({_id: 1}, {name: "notTheClusterKeyName"}));
+
+        // Check using clustered : false, which is disallowed, fails non empty collection
+        assert.commandFailedWithCode(
+            testColl.createIndex({_id: 1}, {clustered: false, unique: true}), 6492800);
 
         ClusteredCollectionUtil.validateListIndexes(testDB, collName, fullCreateOptions);
     };
