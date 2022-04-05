@@ -9,7 +9,7 @@ set -o verbose
 setup_db_contrib_tool_venv
 activate_db_contrib_tool_venv
 
-rm -rf /data/install dist-test/bin
+rm -rf /data/install /data/multiversion
 
 edition="${multiversion_edition}"
 platform="${multiversion_platform}"
@@ -35,12 +35,18 @@ if [ ! -z "${multiversion_architecture_44_or_later}" ]; then
   architecture="${multiversion_architecture_44_or_later}"
 fi
 
+version=${project#mongodb-mongo-}
+version=${version#v}
+
 # This is primarily for tests for infrastructure which don't always need the latest
 # binaries.
 db-contrib-tool setup-repro-env \
   --installDir /data/install \
-  --linkDir dist-test/bin \
+  --linkDir /data/multiversion \
   --edition $edition \
   --platform $platform \
   --architecture $architecture \
-  master
+  $version
+
+version_dir=$(find /data/install -type d -iname "*$version*")
+mv $version_dir/dist-test $(pwd)
