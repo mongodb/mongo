@@ -570,7 +570,6 @@ let viewsCommandTests = {
         expectFailure: true,
         isAdminCommand: true,
     },
-    renameDatabaseForRestore: {skip: isUnrelated},
     revokePrivilegesFromRole: {
         command: {
             revokePrivilegesFromRole: "testrole",
