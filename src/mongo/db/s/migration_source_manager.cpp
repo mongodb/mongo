@@ -606,6 +606,11 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
 
     _stats.totalCriticalSectionCommitTimeMillis.addAndFetch(t.millis());
 
+    LOGV2(4817403,
+          "Exiting commit critical section",
+          "migrationId"_attr = _coordinator->getMigrationId(),
+          "durationMillis"_attr = t.millis());
+
     // Exit the critical section and ensure that all the necessary state is fully persisted before
     // scheduling orphan cleanup.
     _cleanup(true);
@@ -723,11 +728,10 @@ void MigrationSourceManager::_cleanup(bool completeMigration) noexcept {
     }();
 
     if (_state == kCriticalSection || _state == kCloneCompleted || _state == kCommittingOnConfig) {
-        LOGV2_DEBUG_OPTIONS(4817403,
-                            2,
-                            {logv2::LogComponent::kShardMigrationPerf},
-                            "Finished critical section",
-                            "migrationId"_attr = _coordinator->getMigrationId());
+        LOGV2(6107802,
+              "Finished critical section",
+              "migrationId"_attr = _coordinator->getMigrationId(),
+              "durationMillis"_attr = _cloneAndCommitTimer.millis());
     }
 
     // The cleanup operations below are potentially blocking or acquire other locks, so perform them
