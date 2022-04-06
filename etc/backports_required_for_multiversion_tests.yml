@@ -152,6 +152,26 @@ last-continuous:
       test_file: jstests/core/exhaust.js
     - ticket: SERVER-63141
       test_file: jstests/aggregation/lookup_let_optimization.js
+    - ticket: SERVER-63122
+      test_file: jstests/replsets/tenant_migration_cloning_uses_read_concern_majority.js
+    - ticket: SERVER-63122
+      test_file: jstests/replsets/tenant_migration_collection_ttl.js
+    - ticket: SERVER-63122
+      test_file: jstests/replsets/tenant_migration_concurrent_reads_on_recipient.js
+    - ticket: SERVER-63122
+      test_file: jstests/replsets/tenant_migration_concurrent_writes_on_recipient.js
+    - ticket: SERVER-63122
+      test_file: jstests/replsets/tenant_migration_fetch_committed_transactions_retry.js
+    - ticket: SERVER-63122
+      test_file: jstests/replsets/tenant_migration_recipient_current_op.js
+    - ticket: SERVER-63122
+      test_file: jstests/replsets/tenant_migration_retry_session_migration.js
+    - ticket: SERVER-63122
+      test_file: jstests/replsets/tenant_migration_retryable_write_retry_on_recipient.js
+    - ticket: SERVER-63122
+      test_file: jstests/replsets/tenant_migration_timeseries_retryable_write_retry_on_recipient.js
+    - ticket: SERVER-63122
+      test_file: jstests/replsets/tenant_migration_recipient_initial_sync_recovery.js
     - ticket: SERVER-63129
       test_file: jstests/replsets/tenant_migration_resume_collection_cloner_after_recipient_failover_with_dropped_views.js
     - ticket: SERVER-61864

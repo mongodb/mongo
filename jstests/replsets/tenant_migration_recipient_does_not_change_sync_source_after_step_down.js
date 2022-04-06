@@ -2,9 +2,13 @@
  * Test that in tenant migration, the recipient does not change sync source
  * even after its current sync source steps down as primary.
  *
+ * TODO SERVER-63517: incompatible_with_shard_merge because this relies on
+ * logical cloning behavior.
+ *
  * @tags: [
  *   incompatible_with_eft,
  *   incompatible_with_macos,
+ *   incompatible_with_shard_merge,
  *   incompatible_with_windows_tls,
  *   requires_majority_read_concern,
  *   requires_persistence,

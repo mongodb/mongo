@@ -1582,7 +1582,7 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientStartOplogFe
 }
 
 TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientStartsCloner) {
-    stopFailPointEnableBlock fp("fpAfterCollectionClonerDone");
+    stopFailPointEnableBlock fp("fpBeforeFetchingCommittedTransactions");
 
     auto taskFp = globalFailPointRegistry().find("hangBeforeTaskCompletion");
     ScopeGuard taskFpGuard([&taskFp] { taskFp->setMode(FailPoint::off); });
@@ -2610,7 +2610,7 @@ TEST_F(TenantMigrationRecipientServiceTest, StoppingApplierAllowsCompletion) {
 }
 
 TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientAddResumeTokenNoopsToBuffer) {
-    stopFailPointEnableBlock fp("fpAfterCollectionClonerDone");
+    stopFailPointEnableBlock fp("fpBeforeFetchingCommittedTransactions");
     const UUID migrationUUID = UUID::gen();
     const OpTime topOfOplogOpTime(Timestamp(5, 1), 1);
 
@@ -3026,7 +3026,7 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_AfterFail) 
     auto autoForgetFp = globalFailPointRegistry().find("autoRecipientForgetMigration");
     autoForgetFp->setMode(FailPoint::off);
 
-    stopFailPointEnableBlock fp("fpAfterCollectionClonerDone");
+    stopFailPointEnableBlock fp("fpBeforeFetchingCommittedTransactions");
     const UUID migrationUUID = UUID::gen();
     const OpTime topOfOplogOpTime(Timestamp(5, 1), 1);
 
@@ -3376,7 +3376,7 @@ TEST_F(TenantMigrationRecipientServiceTest, WaitUntilMigrationReachesReturnAfter
 }
 
 TEST_F(TenantMigrationRecipientServiceTest, RecipientReceivesRetriableFetcherError) {
-    stopFailPointEnableBlock stopFp("fpAfterCollectionClonerDone");
+    stopFailPointEnableBlock stopFp("fpBeforeFetchingCommittedTransactions");
     auto fp =
         globalFailPointRegistry().find("fpAfterStartingOplogFetcherMigrationRecipientInstance");
     auto initialTimesEntered = fp->setMode(FailPoint::alwaysOn,
@@ -3632,7 +3632,7 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientWillNotRetryOnReceivingForg
 }
 
 TEST_F(TenantMigrationRecipientServiceTest, RecipientReceivesRetriableClonerError) {
-    stopFailPointEnableBlock stopFp("fpAfterCollectionClonerDone");
+    stopFailPointEnableBlock stopFp("fpBeforeFetchingCommittedTransactions");
     auto fp =
         globalFailPointRegistry().find("fpAfterStartingOplogFetcherMigrationRecipientInstance");
     auto initialTimesEntered = fp->setMode(FailPoint::alwaysOn,
@@ -3705,7 +3705,7 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientReceivesRetriableClonerErro
 }
 
 TEST_F(TenantMigrationRecipientServiceTest, RecipientReceivesNonRetriableClonerError) {
-    stopFailPointEnableBlock stopFp("fpAfterCollectionClonerDone");
+    stopFailPointEnableBlock stopFp("fpBeforeFetchingCommittedTransactions");
     auto fp =
         globalFailPointRegistry().find("fpAfterStartingOplogFetcherMigrationRecipientInstance");
     auto initialTimesEntered = fp->setMode(FailPoint::alwaysOn,

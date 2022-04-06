@@ -33,7 +33,7 @@ let recipientPrimary = tenantMigrationTest.getRecipientPrimary();
 // Force the migration to pause after entering a randomly selected state.
 Random.setRandomSeed();
 const kMigrationFpNames = [
-    "fpAfterCollectionClonerDone",
+    "fpBeforeFetchingCommittedTransactions",
     "fpAfterWaitForRejectReadsBeforeTimestamp",
 ];
 const index = Random.randInt(kMigrationFpNames.length + 1);

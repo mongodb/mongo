@@ -284,7 +284,7 @@ switch (caseNum) {
     case 11:
         jsTestLog("[11] Testing rollback after finishing cloning.");
         runTest({
-            failPointName: "fpAfterCollectionClonerDone",
+            failPointName: "fpBeforeFetchingCommittedTransactions",
             failPointData: {
                 action: "hang",
             },

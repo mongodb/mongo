@@ -38,7 +38,8 @@ const migrationOpts = {
     tenantId,
 };
 
-TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(migrationOpts));
+TenantMigrationTest.assertCommitted(
+    tenantMigrationTest.runMigration(migrationOpts, {enableDonorStartMigrationFsync: true}));
 
 for (const db of [...tenantDBs, ...nonTenantDBs]) {
     for (const coll of collNames) {

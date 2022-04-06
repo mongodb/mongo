@@ -49,8 +49,8 @@ const kTenantId = "testTenantId";
         configureFailPoint(recipientPrimary,
                            "fpAfterStartingOplogFetcherMigrationRecipientInstance",
                            {action: "hang"});
-    let clonerDoneFp =
-        configureFailPoint(recipientPrimary, "fpAfterCollectionClonerDone", {action: "hang"});
+    let beforeFetchingTransactionsFp = configureFailPoint(
+        recipientPrimary, "fpBeforeFetchingCommittedTransactions", {action: "hang"});
     let waitForRejectReadsBeforeTsFp = configureFailPoint(
         recipientPrimary, "fpAfterWaitForRejectReadsBeforeTimestamp", {action: "hang"});
 
@@ -67,12 +67,12 @@ const kTenantId = "testTenantId";
     }
 
     startOplogFetcherFp.off();
-    clonerDoneFp.wait();
+    beforeFetchingTransactionsFp.wait();
 
     // Write after cloning is done should fail with SnapshotTooOld since no read is allowed.
     assert.commandFailedWithCode(tenantCollOnRecipient.remove({_id: 1}), ErrorCodes.SnapshotTooOld);
 
-    clonerDoneFp.off();
+    beforeFetchingTransactionsFp.off();
     waitForRejectReadsBeforeTsFp.wait();
 
     // Write after the recipient applied data past the rejectReadsBeforeTimestamp.

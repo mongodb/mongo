@@ -122,7 +122,8 @@ const migrationOpts2 = {
     migrationIdString: extractUUIDFromObject(migrationId2),
     tenantId: kTenantId,
 };
-TenantMigrationTest.assertCommitted(tenantMigrationTest2.runMigration(migrationOpts2));
+TenantMigrationTest.assertCommitted(
+    tenantMigrationTest2.runMigration(migrationOpts2, {enableDonorStartMigrationFsync: true}));
 const recipientPrimary2 = tenantMigrationTest2.getRecipientPrimary();
 const recipientTxnEntries2 = recipientPrimary2.getDB("config")["transactions"].find().toArray();
 jsTestLog(`Recipient2 config.transactions: ${tojson(recipientTxnEntries2)}`);

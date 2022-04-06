@@ -124,7 +124,8 @@ const migrationOpts = {
 const pauseAfterRetrievingLastTxnMigrationRecipientInstance =
     configureFailPoint(recipientPrimary, "pauseAfterRetrievingLastTxnMigrationRecipientInstance");
 
-assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
+assert.commandWorked(
+    tenantMigrationTest.startMigration(migrationOpts, {enableDonorStartMigrationFsync: true}));
 
 pauseAfterRetrievingLastTxnMigrationRecipientInstance.wait();
 

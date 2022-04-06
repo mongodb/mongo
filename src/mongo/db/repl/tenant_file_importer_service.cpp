@@ -107,12 +107,15 @@ void importCopiedFiles(OperationContext* opCtx,
                                                  donorConnectionString);
     }
 
-    // TODO SERVER-63122: Remove the try-catch block once logical cloning is removed for
-    // shard merge protocol.
-    try {
-        wiredTigerImportFromBackupCursor(opCtx, metadatas, tempWTDirectory.string());
-    } catch (const ExceptionFor<ErrorCodes::NamespaceExists>& ex) {
-        LOGV2_WARNING(6113314, "Temporarily ignoring the error", "error"_attr = ex.toStatus());
+    wiredTigerImportFromBackupCursor(opCtx, metadatas, tempWTDirectory.string());
+
+    auto catalog = CollectionCatalog::get(opCtx);
+    for (auto&& m : metadatas) {
+        Lock::CollectionLock systemViewsLock(
+            opCtx,
+            NamespaceString(m.ns.db(), NamespaceString::kSystemDotViewsCollectionName),
+            MODE_X);
+        uassertStatusOK(catalog->reloadViews(opCtx, m.ns.db()));
     }
 }
 }  // namespace

@@ -63,7 +63,7 @@ using namespace fmt::literals;
 void moveFile(const std::string& src, const std::string& dst) {
     LOGV2_DEBUG(6114304, 1, "Moving file", "src"_attr = src, "dst"_attr = dst);
 
-    tassert(6114401,
+    uassert(6114401,
             "Destination file '{}' already exists"_format(dst),
             !boost::filesystem::exists(dst));
 

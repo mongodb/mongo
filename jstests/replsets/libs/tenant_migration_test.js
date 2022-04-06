@@ -477,8 +477,10 @@ function TenantMigrationTest({
      */
     this.verifyRecipientDB = function(
         tenantId, dbName, collName, migrationCommitted = true, data = loadDummyData()) {
-        const shouldMigrate =
-            migrationCommitted && TenantMigrationUtil.isNamespaceForTenant(tenantId, dbName);
+        // We should migrate all data regardless of tenant id for shard merge.
+        const shouldMigrate = migrationCommitted &&
+            (TenantMigrationUtil.isShardMergeEnabled(this.getRecipientPrimary().getDB("admin")) ||
+             TenantMigrationUtil.isNamespaceForTenant(tenantId, dbName));
 
         jsTestLog(`Verifying that data in collection ${collName} of DB ${dbName} was ${
             (shouldMigrate ? "" : "not")} migrated to the recipient`);

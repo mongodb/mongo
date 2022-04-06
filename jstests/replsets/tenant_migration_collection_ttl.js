@@ -103,6 +103,12 @@ function assertTTLDeleteExpiredDocs(dbName, node) {
 // 1. At the recipient, the TTL deletions are suspended during the cloning phase.
 // 2. At the donor, TTL deletions are not suspended before blocking state.
 (() => {
+    if (TenantMigrationUtil.isShardMergeEnabled(donorPrimary.getDB("admin"))) {
+        jsTestLog(
+            "Skip: featureFlagShardMerge enabled, but shard merge does not use logical cloning");
+        return;
+    }
+
     jsTest.log("Test that the TTL does not delete documents on recipient during cloning");
 
     const tenantId = "testTenantId-duringCloning";
@@ -122,11 +128,11 @@ function assertTTLDeleteExpiredDocs(dbName, node) {
     prepareDb(dbName, 3);
 
     const recipientDb = recipientPrimary.getDB(dbName);
-    const hangAfterCollectionClone =
-        configureFailPoint(recipientDb, "fpAfterCollectionClonerDone", {action: "hang"});
+    const hangBeforeFetchingCommittedTransactions =
+        configureFailPoint(recipientDb, "fpBeforeFetchingCommittedTransactions", {action: "hang"});
     assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
 
-    hangAfterCollectionClone.wait();
+    hangBeforeFetchingCommittedTransactions.wait();
 
     // On a very slow machine, there is a chance that a TTL cycle happened at the donor before the
     // recipient cloned the documents. Therefore, these checks are only valid when we are sure the
@@ -140,7 +146,7 @@ function assertTTLDeleteExpiredDocs(dbName, node) {
         assertTTLNotDeleteExpiredDocs(dbName, recipientPrimary);
     }
 
-    hangAfterCollectionClone.off();
+    hangBeforeFetchingCommittedTransactions.off();
 
     TenantMigrationTest.assertCommitted(
         tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
@@ -155,12 +161,12 @@ function assertTTLDeleteExpiredDocs(dbName, node) {
 })();
 
 // Tests that:
-// 1. At the recipient, the TTL deletions are suspended after the cloning phase until migration is
-//    forgotten.
+// 1. At the recipient, the TTL deletions are suspended until migration is forgotten.
 // 2. At the donor, TTL deletions are suspended during blocking state. This verifies that
 //    the TTL mechanism respects the same MTAB mechanism as normal updates.
 (() => {
-    jsTest.log("Test that the TTL does not delete documents on recipient after cloning");
+    jsTest.log(
+        "Test that the TTL does not delete documents on recipient before migration is forgotten");
 
     const tenantId = "testTenantId-afterCloning";
     const dbName = tenantMigrationTest.tenantDB(tenantId, "testDB");
@@ -182,7 +188,8 @@ function assertTTLDeleteExpiredDocs(dbName, node) {
     let blockFp =
         configureFailPoint(donorPrimary, "pauseTenantMigrationBeforeLeavingBlockingState");
 
-    assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
+    assert.commandWorked(
+        tenantMigrationTest.startMigration(migrationOpts, {enableDonorStartMigrationFsync: true}));
     blockFp.wait();
 
     // At a very slow machine, there is a chance that a TTL cycle happened at the donor

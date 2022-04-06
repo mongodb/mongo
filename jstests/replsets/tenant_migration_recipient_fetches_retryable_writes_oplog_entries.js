@@ -2,10 +2,15 @@
  * Tests that the tenant migration recipient correctly fetches retryable writes oplog entries
  * and adds them to its oplog buffer.
  *
+ * TODO SERVER-63517: incompatible_with_shard_merge, this tests specific implementation
+ * details related to MT Migrations. Retryable write behavior is tested in various other
+ * tests for shard merge.
+ *
  * @tags: [
  *   incompatible_with_eft,
  *   incompatible_with_macos,
  *   incompatible_with_windows_tls,
+ *   incompatible_with_shard_merge,
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   serverless,
@@ -39,7 +44,7 @@ const kParams = {
     internalInsertMaxBatchSize: kMaxBatchSize,
 };
 
-function runTest(storeImagesInSideCollection) {
+function runTest({storeFindAndModifyImagesInSideCollection = false}) {
     const tenantMigrationTest = new TenantMigrationTest(
         {name: jsTestName(), sharedOptions: {nodes: 1, setParameter: kParams}});
 
@@ -53,7 +58,7 @@ function runTest(storeImagesInSideCollection) {
     const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
     const setParam = {
         setParameter: 1,
-        storeFindAndModifyImagesInSideCollection: storeImagesInSideCollection
+        storeFindAndModifyImagesInSideCollection,
     };
     donorPrimary.adminCommand(setParam);
     recipientPrimary.adminCommand(setParam);
@@ -99,10 +104,10 @@ function runTest(storeImagesInSideCollection) {
     // `startFetchingDonorOpTime`.
     const writeFp = configureFailPoint(donorPrimary, "hangDuringBatchInsert", {}, {skip: 1});
 
-    var batchInsertWorker = new Thread((host, dbName, collName, numToInsert) => {
+    const batchInsertWorker = new Thread((host, dbName, collName, numToInsert) => {
         // Insert elements [{_id: bulkRetryableWrite0}, {_id: bulkRetryableWrite1}].
         const docsToInsert =
-            [...Array(numToInsert).keys()].map(i => ({_id: "bulkRetryableWrite" + i}));
+            [...Array(numToInsert).keys()].map(i => ({_id: `bulkRetryableWrite${i}`}));
 
         donorConn = new Mongo(host);
         const tenantSession4 = donorConn.startSession({retryWrites: true});
@@ -164,7 +169,7 @@ function runTest(storeImagesInSideCollection) {
     fpAfterRetrievingStartOpTime.off();
     fpAfterRetrievingRetryableWrites.wait();
 
-    const kOplogBufferNS = "repl.migration.oplog_" + migrationOpts.migrationIdString;
+    const kOplogBufferNS = `repl.migration.oplog_${migrationOpts.migrationIdString}`;
     const recipientOplogBuffer = recipientPrimary.getDB("config")[kOplogBufferNS];
     jsTestLog({"oplog buffer ns": kOplogBufferNS});
 
@@ -195,8 +200,6 @@ function runTest(storeImagesInSideCollection) {
     tenantMigrationTest.stop();
 }
 
-// Run test with `storeFindAndModifyImagesInSideCollection`=false.
-runTest(false);
-// Run test with `storeFindAndModifyImagesInSideCollection`=true.
-runTest(true);
+runTest({storeFindAndModifyImagesInSideCollection: false});
+runTest({storeFindAndModifyImagesInSideCollection: true});
 })();

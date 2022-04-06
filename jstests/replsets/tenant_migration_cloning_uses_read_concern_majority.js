@@ -1,9 +1,14 @@
 /**
  * Tests that in a tenant migration, the recipient primary will use majority read concern when
  * cloning documents from the donor.
+ *
+ * TODO (SERVER-63517): Remove this test, it requires failover, and the ability to write to the
+ * donor during migration, and it tests a cloning method superseded by Shard Merge.
+ *
  * @tags: [
  *   incompatible_with_eft,
  *   incompatible_with_macos,
+ *   incompatible_with_shard_merge,
  *   incompatible_with_windows_tls,
  *   requires_majority_read_concern,
  *   requires_persistence,
@@ -31,14 +36,6 @@ const donorPrimary = tenantMigrationTest.getDonorPrimary();
 const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
 const donorRst = tenantMigrationTest.getDonorRst();
 const donorTestColl = donorPrimary.getDB(dbName).getCollection(collName);
-
-// TODO (SERVER-63517): Remove this test, it requires failover, and the ability to write to the
-// donor during migration, and it tests a cloning method superseded by Shard Merge.
-if (TenantMigrationUtil.isShardMergeEnabled(donorRst.getPrimary().getDB("adminDB"))) {
-    jsTestLog("Skip: featureFlagShardMerge enabled, but shard merge does not survive failover");
-    tenantMigrationTest.stop();
-    return;
-}
 
 // The default WC is majority and stopReplicationOnSecondaries will prevent satisfying any majority
 assert.commandWorked(recipientPrimary.adminCommand(
@@ -84,13 +81,13 @@ assert.eq(4, donorTestColl.find().itcount());
 assert.eq(2, donorTestColl.find().readConcern("majority").itcount());
 
 // Let the cloner finish.
-const waitAfterCloning =
-    configureFailPoint(recipientDb, "fpAfterCollectionClonerDone", {action: "hang"});
+const waitBeforeFetchingTransactions =
+    configureFailPoint(recipientDb, "fpBeforeFetchingCommittedTransactions", {action: "hang"});
 waitBeforeCloning.off();
 
 // Wait for the cloning phase to finish. Check that the recipient has only cloned documents that are
 // majority committed on the donor replica set.
-waitAfterCloning.wait();
+waitBeforeFetchingTransactions.wait();
 // Tenant migration recipient rejects all reads until it has applied data past the blockTimestamp
 // (returnAfterReachingTimestamp). Use this failpoint to allow the find command below to succeed.
 const notRejectReadsFp =
@@ -101,7 +98,7 @@ notRejectReadsFp.off();
 
 // Restart secondary replication in the donor replica set and complete the migration.
 restartReplicationOnSecondaries(donorRst);
-waitAfterCloning.off();
+waitBeforeFetchingTransactions.off();
 TenantMigrationTest.assertCommitted(migrationThread.returnData());
 tenantMigrationTest.stop();
 })();

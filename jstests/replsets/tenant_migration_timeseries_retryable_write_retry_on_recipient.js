@@ -41,9 +41,8 @@ function testRetryOnRecipient(ordered) {
     const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
     const recipientDb = recipientPrimary.getDB(kDbName);
 
-    jsTestLog("Run a migration to the end of cloning");
-    const waitAfterCloning =
-        configureFailPoint(recipientPrimary, "fpAfterCollectionClonerDone", {action: "hang"});
+    const waitBeforeFetchingTransactions = configureFailPoint(
+        recipientPrimary, "fpBeforeFetchingCommittedTransactions", {action: "hang"});
 
     const migrationId = UUID();
     const migrationOpts = {
@@ -96,14 +95,15 @@ function testRetryOnRecipient(ordered) {
     const migrationThread =
         new Thread(TenantMigrationUtil.runMigrationAsync, migrationOpts, donorRstArgs);
     migrationThread.start();
-    waitAfterCloning.wait();
+
+    waitBeforeFetchingTransactions.wait();
 
     jsTestLog("Run retryable writes during the migration");
     assert.commandWorked(donorDb.runCommand(duringWrites.retryableInsertCommand));
 
     // Wait for the migration to complete.
     jsTest.log("Waiting for migration to complete");
-    waitAfterCloning.off();
+    waitBeforeFetchingTransactions.off();
     TenantMigrationTest.assertCommitted(migrationThread.returnData());
 
     // Print the no-op oplog entries for debugging purposes.
@@ -124,6 +124,7 @@ function testRetryOnRecipient(ordered) {
     jsTestLog("Run retryable write on primary after the migration");
     testRecipientRetryableWrites(recipientDb, beforeWrites);
     testRecipientRetryableWrites(recipientDb, duringWrites);
+
     jsTestLog("Step up secondary");
     const recipientRst = tenantMigrationTest.getRecipientRst();
     recipientRst.awaitReplication();

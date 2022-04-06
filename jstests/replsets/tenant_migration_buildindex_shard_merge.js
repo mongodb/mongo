@@ -27,6 +27,14 @@ load("jstests/replsets/libs/tenant_migration_util.js");
 // Index builds should be blocked by the tenant access blocker, not maxNumActiveUserIndexBuilds.
 const tenantMigrationTest = new TenantMigrationTest(
     {name: jsTestName(), sharedOptions: {setParameter: {maxNumActiveUserIndexBuilds: 100}}});
+
+if (TenantMigrationUtil.isShardMergeEnabled(tenantMigrationTest.getDonorPrimary().getDB("admin"))) {
+    // TODO (SERVER-65084): Re-enable this test.
+    jsTestLog("Skip: Temporarily skipping test, see SERVER-65084.");
+    tenantMigrationTest.stop();
+    return;
+}
+
 const donorPrimary = tenantMigrationTest.getDonorPrimary();
 const kTenant1Id = "testTenantId1";
 const kTenant2Id = "testTenantId2";
@@ -146,7 +154,6 @@ TenantMigrationTest.assertCommitted(migrationThread.returnData());
 
 // The index creation threads should be done.
 racyIndexThread1.join();
-// TODO: remove, search everywhere
 racyIndexThread2.join();
 tenant1IndexThread.join();
 tenant2IndexThread.join();

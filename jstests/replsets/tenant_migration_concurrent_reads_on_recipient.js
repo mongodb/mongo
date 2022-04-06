@@ -67,14 +67,14 @@ function testRejectAllReadsAfterCloningDone({testCase, dbName, collName, tenantM
     const recipientRst = tenantMigrationTest.getRecipientRst();
     const recipientPrimary = recipientRst.getPrimary();
 
-    let clonerDoneFp =
-        configureFailPoint(recipientPrimary, "fpAfterCollectionClonerDone", {action: "hang"});
+    let beforeFetchingTransactionsFp = configureFailPoint(
+        recipientPrimary, "fpBeforeFetchingCommittedTransactions", {action: "hang"});
 
     const donorRstArgs = TenantMigrationUtil.createRstArgs(donorRst);
     const runMigrationThread =
         new Thread(TenantMigrationUtil.runMigrationAsync, migrationOpts, donorRstArgs);
     runMigrationThread.start();
-    clonerDoneFp.wait();
+    beforeFetchingTransactionsFp.wait();
 
     // Wait for the write to mark cloning as done to be replicated to all nodes.
     recipientRst.awaitReplication();
@@ -88,7 +88,7 @@ function testRejectAllReadsAfterCloningDone({testCase, dbName, collName, tenantM
         runCommand(db, command, ErrorCodes.SnapshotTooOld);
     });
 
-    clonerDoneFp.off();
+    beforeFetchingTransactionsFp.off();
     TenantMigrationTest.assertCommitted(runMigrationThread.returnData());
     assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 }

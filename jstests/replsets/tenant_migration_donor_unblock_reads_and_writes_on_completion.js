@@ -46,28 +46,36 @@ function startWriteThread(node, dbName, collName) {
     return writeThread;
 }
 
-const donorRst = new ReplSetTest({
-    nodes: 3,
-    name: "donorRst",
-    nodeOptions: Object.assign(TenantMigrationUtil.makeX509OptionsForTest().donor, {
-        setParameter: {
-            tenantMigrationGarbageCollectionDelayMS: 1,
-            ttlMonitorSleepSecs: 1,
+function setup() {
+    const donorRst = new ReplSetTest({
+        nodes: 3,
+        name: "donorRst",
+        nodeOptions: Object.assign(TenantMigrationUtil.makeX509OptionsForTest().donor, {
+            setParameter: {
+                tenantMigrationGarbageCollectionDelayMS: 1,
+                ttlMonitorSleepSecs: 1,
+            }
+        }),
+        // Disallow chaining to force both secondaries to sync from the primary. One of the test
+        // cases below disables replication on one of the secondaries, with chaining it would
+        // effectively disable replication on both secondaries, causing the migration to hang since
+        // majority write concern is unsatsifiable.
+        settings: {chainingAllowed: false}
+    });
+    donorRst.startSet();
+    donorRst.initiate();
+
+    const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), donorRst});
+
+    return {
+        donorRst,
+        tenantMigrationTest,
+        teardown: () => {
+            donorRst.stopSet();
+            tenantMigrationTest.stop();
         }
-    }),
-    // Disallow chaining to force both secondaries to sync from the primary. One of the test cases
-    // below disables replication on one of the secondaries, with chaining it would effectively
-    // disable replication on both secondaries, causing the migration to hang since majority
-    // write concern is unsatsifiable.
-    settings: {chainingAllowed: false}
-});
-donorRst.startSet();
-donorRst.initiate();
-
-const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), donorRst});
-
-const donorPrimary = tenantMigrationTest.getDonorPrimary();
-const donorsColl = donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS);
+    };
+}
 
 const kTenantIdPrefix = "testTenantId";
 const kDbName = "testDb";
@@ -76,6 +84,9 @@ const kCollName = "testColl";
 (() => {
     jsTest.log(
         "Test that a lagged donor secondary correctly unblocks blocked reads after the migration aborts");
+    const {tenantMigrationTest, donorRst, teardown} = setup();
+    const donorPrimary = tenantMigrationTest.getDonorPrimary();
+    const donorsColl = donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS);
     const tenantId = kTenantIdPrefix + "LaggedSecondaryMigrationAborted";
     const dbName = tenantId + "_" + kDbName;
     assert.commandWorked(
@@ -116,11 +127,16 @@ const kCollName = "testColl";
     assert.commandWorked(readThread.returnData());
     abortFp.off();
     snapshotFp.off();
+
+    teardown();
 })();
 
 (() => {
     jsTest.log(
         "Test that a lagged donor secondary correctly unblocks blocked reads after the migration commits");
+    const {tenantMigrationTest, donorRst, teardown} = setup();
+    const donorPrimary = tenantMigrationTest.getDonorPrimary();
+    const donorsColl = donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS);
     const tenantId = kTenantIdPrefix + "LaggedSecondaryMigrationCommitted";
     const dbName = tenantId + "_" + kDbName;
     assert.commandWorked(
@@ -158,11 +174,16 @@ const kCollName = "testColl";
 
     assert.commandFailedWithCode(readThread.returnData(), ErrorCodes.TenantMigrationCommitted);
     snapshotFp.off();
+
+    teardown();
 })();
 
 (() => {
     jsTest.log(
         "Test that blocked writes and reads are interrupted when the donor's state doc collection is dropped");
+    const {tenantMigrationTest, donorRst, teardown} = setup();
+    const donorPrimary = tenantMigrationTest.getDonorPrimary();
+    const donorsColl = donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS);
     const tenantId = kTenantIdPrefix + "DropStateDocCollection";
     const dbName = tenantId + "_" + kDbName;
     assert.commandWorked(
@@ -201,8 +222,7 @@ const kCollName = "testColl";
     assert.commandFailedWithCode(readThread.returnData(), ErrorCodes.Interrupted);
     assert.commandFailedWithCode(writeThread.returnData(), ErrorCodes.Interrupted);
     blockingFp.off();
-})();
 
-donorRst.stopSet();
-tenantMigrationTest.stop();
+    teardown();
+})();
 })();

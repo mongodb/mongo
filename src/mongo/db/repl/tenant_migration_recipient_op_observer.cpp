@@ -58,7 +58,7 @@ const auto migrationIdToDeleteDecoration =
  * Initializes the TenantMigrationRecipientAccessBlocker for the tenant migration denoted by the
  * given state doc.
  *
- * TODO (SERVER-63122): Skip for protocol kShardMerge.
+ * TODO (SERVER-64616): Skip for protocol kShardMerge.
  */
 void createAccessBlockerIfNeeded(OperationContext* opCtx,
                                  const TenantMigrationRecipientDocument& recipientStateDoc) {

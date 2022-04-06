@@ -1353,7 +1353,8 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_handleErrorOrEnterA
         LOGV2(6104912,
               "Entering 'aborted' state.",
               "migrationId"_attr = _migrationUuid,
-              "tenantId"_attr = _tenantId);
+              "tenantId"_attr = _tenantId,
+              "status"_attr = status);
         // Enter "abort" state.
         _abortReason.emplace(status);
         return _updateStateDoc(executor, TenantMigrationDonorStateEnum::kAborted, token)

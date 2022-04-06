@@ -2,9 +2,13 @@
  * Tests that TenantCollectionCloner completes without error when a collection is dropped during
  * cloning as part of a tenant migration.
  *
+ * TODO SERVER-61231: relies on various failpoints and such in TenantCollectionCloner, which is
+ * not used for by Shard Merge, but we should likely test similar behavior, adapt for Shard Merge
+ *
  * @tags: [
  *   incompatible_with_eft,
  *   incompatible_with_macos,
+ *   incompatible_with_shard_merge,
  *   incompatible_with_windows_tls,
  *   requires_majority_read_concern,
  *   requires_persistence,

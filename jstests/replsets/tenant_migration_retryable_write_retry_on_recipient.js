@@ -44,8 +44,8 @@ if (TenantMigrationUtil.isShardMergeEnabled(donorPrimary.getDB("adminDB"))) {
 }
 
 jsTestLog("Run a migration to the end of cloning");
-const waitAfterCloning =
-    configureFailPoint(recipientPrimary, "fpAfterCollectionClonerDone", {action: "hang"});
+const waitBeforeFetchingTransactions =
+    configureFailPoint(recipientPrimary, "fpBeforeFetchingCommittedTransactions", {action: "hang"});
 
 const migrationId = UUID();
 const migrationOpts = {
@@ -169,7 +169,7 @@ const donorRstArgs = TenantMigrationUtil.createRstArgs(tenantMigrationTest.getDo
 const migrationThread =
     new Thread(TenantMigrationUtil.runMigrationAsync, migrationOpts, donorRstArgs);
 migrationThread.start();
-waitAfterCloning.wait();
+waitBeforeFetchingTransactions.wait();
 
 jsTestLog("Run retryable writes during the migration");
 
@@ -184,7 +184,7 @@ assert.commandWorked(
 
 // Wait for the migration to complete.
 jsTest.log("Waiting for migration to complete");
-waitAfterCloning.off();
+waitBeforeFetchingTransactions.off();
 TenantMigrationTest.assertCommitted(migrationThread.returnData());
 
 // Print the no-op oplog entries for debugging purposes.

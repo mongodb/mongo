@@ -2,10 +2,14 @@
  * Tests tenant migration cloner stats such as 'approxTotalDataSize', 'approxTotalBytesCopied'
  * across multiple databases and collections in the absence of failovers.
  *
+ * TODO SERVER-63517: incompatible_with_shard_merge because this specifically tests logical
+ * cloning behavior.
+ *
  * @tags: [
  *   incompatible_with_eft,
  *   incompatible_with_macos,
  *   incompatible_with_windows_tls,
+ *   incompatible_with_shard_merge,
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   serverless,

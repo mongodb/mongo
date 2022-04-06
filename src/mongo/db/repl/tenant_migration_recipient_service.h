@@ -448,8 +448,7 @@ public:
          * should resume from. The oplog applier should resume applying entries that have a greater
          * optime than the returned value.
          */
-        OpTime _getOplogResumeApplyingDonorOptime(OpTime startApplyingDonorOpTime,
-                                                  OpTime cloneFinishedRecipientOpTime) const;
+        OpTime _getOplogResumeApplyingDonorOptime() const;
 
         /*
          * Starts the tenant cloner.
