@@ -105,16 +105,6 @@
 #include "mongo/util/testing_proctor.h"
 #include "mongo/util/time_support.h"
 
-#if !defined(__has_feature)
-#define __has_feature(x) 0
-#endif
-
-#if __has_feature(address_sanitizer)
-const bool kAddressSanitizerEnabled = true;
-#else
-const bool kAddressSanitizerEnabled = false;
-#endif
-
 using namespace fmt::literals;
 
 namespace mongo {
@@ -129,6 +119,22 @@ MONGO_FAIL_POINT_DEFINE(WTWriteConflictExceptionForImportIndex);
 MONGO_FAIL_POINT_DEFINE(WTRollbackToStableReturnOnEBUSY);
 
 const std::string kPinOldestTimestampAtStartupName = "_wt_startup";
+
+#if !defined(__has_feature)
+#define __has_feature(x) 0
+#endif
+
+#if __has_feature(address_sanitizer)
+constexpr bool kAddressSanitizerEnabled = true;
+#else
+constexpr bool kAddressSanitizerEnabled = false;
+#endif
+
+#if __has_feature(thread_sanitizer)
+constexpr bool kThreadSanitizerEnabled = true;
+#else
+constexpr bool kThreadSanitizerEnabled = false;
+#endif
 
 boost::filesystem::path getOngoingBackupPath() {
     return boost::filesystem::path(storageGlobalParams.dbpath) /
@@ -381,7 +387,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
         }
         ss << "),";
     }
-    if (kAddressSanitizerEnabled) {
+    if (kAddressSanitizerEnabled || kThreadSanitizerEnabled) {
         // For applications using WT, advancing a cursor invalidates the data/memory that cursor was
         // pointing to. WT performs the optimization of managing its own memory. The unit of memory
         // allocation is a page. Walking a cursor from one key/value to the next often lands on the
@@ -395,6 +401,11 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
         // free/malloc for roughly the same allocation size can often return the same memory
         // address. This is a scenario where the address sanitizer is not able to detect a
         // use-after-free error.
+        //
+        // Additionally, WT does not use the standard C thread model and thus TSAN can report false
+        // data races when touching memory that was allocated within WT. The cursor_copy mode
+        // alleviates this by copying all returned data to its own buffer before leaving the storage
+        // engine.
         ss << "debug_mode=(cursor_copy=true),";
     }
     if (TestingProctor::instance().isEnabled()) {
