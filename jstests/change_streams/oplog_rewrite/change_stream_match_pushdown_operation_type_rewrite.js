@@ -40,26 +40,32 @@ const coll = createShardedCollection(st, "_id" /* shardKey */, dbName, collName,
 // explain used to verify the oplog-level rewrites to fail.
 function verifyNonInvalidatingOps(
     resumeAfterToken, userMatchExpr, expectedOps, expectedOplogRetDocsForEachShard) {
-    const cursor =
-        coll.aggregate([{$changeStream: {resumeAfter: resumeAfterToken}}, userMatchExpr]);
+    const cursor = coll.aggregate([
+        {$changeStream: {resumeAfter: resumeAfterToken, showExpandedEvents: true}},
+        userMatchExpr
+    ]);
 
     // For shard1, document id is '1' and for shard2, document id is '2'.
     const docIds = [1, 2];
 
     for (const op of expectedOps) {
         docIds.forEach(docId => {
-            assert.soon(() => cursor.hasNext());
+            assert.soon(() => cursor.hasNext(), op);
             const event = cursor.next();
             assert.eq(event.operationType, op, event);
-            assert.eq(event.documentKey._id, docId, event);
+            if (op == "insert" || op == "replace" || op == "update" || op == "delete") {
+                assert.eq(event.documentKey._id, docId, event);
+            }
         });
     }
 
-    assert(!cursor.hasNext());
+    assert(!cursor.hasNext(), () => tojson(cursor.next()));
 
     // An 'executionStats' could only be captured for a non-invalidating stream.
-    const stats = coll.explain("executionStats")
-                      .aggregate([{$changeStream: {resumeAfter: resumeAfterToken}}, userMatchExpr]);
+    const stats = coll.explain("executionStats").aggregate([
+        {$changeStream: {resumeAfter: resumeAfterToken, showExpandedEvents: true}},
+        userMatchExpr
+    ]);
 
     assertNumChangeStreamDocsReturnedFromShard(stats, st.rs0.name, expectedOps.length);
     assertNumChangeStreamDocsReturnedFromShard(stats, st.rs1.name, expectedOps.length);
@@ -82,6 +88,11 @@ assert.commandWorked(coll.replaceOne({_id: 1}, {_id: 1, foo: "baz"}));
 assert.commandWorked(coll.replaceOne({_id: 2}, {_id: 2, foo: "baz"}));
 assert.commandWorked(coll.deleteOne({_id: 1}));
 assert.commandWorked(coll.deleteOne({_id: 2}));
+
+assert.commandWorked(coll.createIndex({a: 1}));
+assert.commandWorked(
+    coll.runCommand({collMod: coll.getName(), index: {keyPattern: {a: 1}, hidden: true}}));
+assert.commandWorked(coll.dropIndex({a: 1}));
 
 // Ensure that the '$match' on the 'insert' operation type is rewritten correctly.
 verifyNonInvalidatingOps(resumeAfterToken,
@@ -126,11 +137,11 @@ verifyNonInvalidatingOps(resumeAfterToken,
                          0 /* expectedOplogRetDocsForEachShard */);
 
 // Ensure that the '$match' on operation type with inequality operator cannot be rewritten to the
-// oplog format. The oplog cursor should return '4' documents for each shard.
+// oplog format. The oplog cursor should return all documents for each shard.
 verifyNonInvalidatingOps(resumeAfterToken,
                          {$match: {operationType: {$gt: "insert"}}},
-                         ["update", "replace"],
-                         4 /* expectedOplogRetDocsForEachShard */);
+                         ["update", "replace", "modify"],
+                         7 /* expectedOplogRetDocsForEachShard */);
 
 // Ensure that the '$match' on operation type sub-field can be rewritten to the oplog format. The
 // oplog cursor should return '0' documents for each shard.
@@ -143,8 +154,16 @@ verifyNonInvalidatingOps(resumeAfterToken,
 // oplog cursor should return all documents for each shard.
 verifyNonInvalidatingOps(resumeAfterToken,
                          {$match: {"operationType.subField": {$eq: null}}},
-                         ["insert", "update", "replace", "delete"] /* expectedOps */,
-                         4 /* expectedOplogRetDocsForEachShard */);
+                         [
+                             "insert",
+                             "update",
+                             "replace",
+                             "delete",
+                             "createIndexes",
+                             "modify",
+                             "dropIndexes"
+                         ] /* expectedOps */,
+                         7 /* expectedOplogRetDocsForEachShard */);
 
 // Ensure that the '$match' on the operation type with '$in' is rewritten correctly.
 verifyNonInvalidatingOps(resumeAfterToken,
@@ -175,25 +194,26 @@ verifyNonInvalidatingOps(resumeAfterToken,
 verifyNonInvalidatingOps(resumeAfterToken,
                          {$match: {operationType: {$in: [/^insert$/, "update"]}}},
                          ["insert", "update"] /* expectedOps */,
-                         4 /* expectedOplogRetDocsForEachShard */);
+                         7 /* expectedOplogRetDocsForEachShard */);
 
 // Ensure that the '$match' on the operation type with '$nin' is rewritten correctly.
 verifyNonInvalidatingOps(resumeAfterToken,
                          {$match: {operationType: {$nin: ["insert"]}}},
-                         ["update", "replace", "delete"],
-                         3 /* expectedOplogRetDocsForEachShard */);
+                         ["update", "replace", "delete", "createIndexes", "modify", "dropIndexes"],
+                         6 /* expectedOplogRetDocsForEachShard */);
 
 // Ensure that for the '$nin' with one valid and one invalid operation type is rewritten correctly.
 verifyNonInvalidatingOps(resumeAfterToken,
                          {$match: {operationType: {$nin: ["insert", "unknown"]}}},
-                         ["update", "replace", "delete"],
-                         3 /* expectedOplogRetDocsForEachShard */);
+                         ["update", "replace", "delete", "createIndexes", "modify", "dropIndexes"],
+                         6 /* expectedOplogRetDocsForEachShard */);
 
 // Ensure that the '$match' with '$nin' with operation type as number is rewritten correctly.
-verifyNonInvalidatingOps(resumeAfterToken,
-                         {$match: {operationType: {$nin: [1]}}},
-                         ["insert", "update", "replace", "delete"],
-                         4 /* expectedOplogRetDocsForEachShard */);
+verifyNonInvalidatingOps(
+    resumeAfterToken,
+    {$match: {operationType: {$nin: [1]}}},
+    ["insert", "update", "replace", "delete", "createIndexes", "modify", "dropIndexes"],
+    7 /* expectedOplogRetDocsForEachShard */);
 
 // Ensure that the '$match' using '$expr' to match only 'insert' operations is rewritten correctly.
 verifyNonInvalidatingOps(resumeAfterToken,
@@ -253,15 +273,15 @@ verifyNonInvalidatingOps(resumeAfterToken,
                                  }
                              }
                          },
-                         ["update", "replace", "delete"],
-                         3 /* expectedOplogRetDocsForEachShard */);
+                         ["update", "replace", "delete", "createIndexes"],
+                         4 /* expectedOplogRetDocsForEachShard */);
 
 // Ensure that the '$match' using '$expr' is rewritten correctly when '$not' is in the expression.
 verifyNonInvalidatingOps(
     resumeAfterToken,
     {$match: {$expr: {$not: {$regexMatch: {input: "$operationType", regex: /e$/}}}}},
-    ["insert"],
-    1 /* expectedOplogRetDocsForEachShard */);
+    ["insert", "createIndexes", "modify", "dropIndexes"],
+    4 /* expectedOplogRetDocsForEachShard */);
 
 // Ensure that the '$match' using '$expr' is rewritten correctly when nor ({$not: {$or: [...]}}) is
 // in the expression.
@@ -278,8 +298,8 @@ verifyNonInvalidatingOps(resumeAfterToken,
                                  }
                              }
                          },
-                         ["update", "replace"],
-                         2 /* expectedOplogRetDocsForEachShard */);
+                         ["update", "replace", "createIndexes", "modify", "dropIndexes"],
+                         5 /* expectedOplogRetDocsForEachShard */);
 
 st.stop();
 })();
