@@ -331,11 +331,14 @@ Collection* AutoGetCollection::getWritableCollection(OperationContext* opCtx) {
         // new write unit of work is opened.
         opCtx->recoveryUnit()->registerChange(
             [this, opCtx](boost::optional<Timestamp> commitTime) {
-                _coll = CollectionPtr(opCtx, _coll.get(), LookupCollectionForYieldRestore());
+                _coll =
+                    CollectionPtr(opCtx, _coll.get(), LookupCollectionForYieldRestore(_coll->ns()));
                 _writableColl = nullptr;
             },
             [this, originalCollection = _coll.get(), opCtx]() {
-                _coll = CollectionPtr(opCtx, originalCollection, LookupCollectionForYieldRestore());
+                _coll = CollectionPtr(opCtx,
+                                      originalCollection,
+                                      LookupCollectionForYieldRestore(originalCollection->ns()));
                 _writableColl = nullptr;
             });
 

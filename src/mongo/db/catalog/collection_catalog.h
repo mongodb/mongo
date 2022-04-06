@@ -663,7 +663,11 @@ private:
  * restore implementation for CollectionPtr when acquired from the catalog.
  */
 struct LookupCollectionForYieldRestore {
+    explicit LookupCollectionForYieldRestore(const NamespaceString& nss) : _nss(nss) {}
     const Collection* operator()(OperationContext* opCtx, const UUID& uuid) const;
+
+private:
+    const NamespaceString _nss;
 };
 
 /**
