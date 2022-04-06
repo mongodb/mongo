@@ -190,7 +190,7 @@ struct BaseCandidatePlan {
     // non-OK status.
     Status status{Status::OK()};
     // Any results produced during the plan's execution prior to scoring are retained here.
-    std::queue<ResultType> results;
+    std::deque<ResultType> results;
 };
 
 using CandidatePlan = BaseCandidatePlan<PlanStage*, WorkingSetID, WorkingSet*>;

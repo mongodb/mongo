@@ -74,7 +74,7 @@ FetchDocStatus fetchNextDocument(
 
         invariant(state == PlanState::ADVANCED);
         invariant(obj.isOwned());
-        candidate->results.push({obj, {recordIdSlot != nullptr, recordId}});
+        candidate->results.push_back({obj, {recordIdSlot != nullptr, recordId}});
     } catch (const ExceptionFor<ErrorCodes::QueryTrialRunCompleted>&) {
         return FetchDocStatus::exitedEarly;
     } catch (const ExceptionFor<ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed>& ex) {

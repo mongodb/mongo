@@ -238,7 +238,7 @@ bool handleCursorCommand(OperationContext* opCtx,
         // for later.
 
         if (!FindCommon::haveSpaceForNext(nextDoc, objCount, responseBuilder.bytesUsed())) {
-            exec->enqueue(nextDoc);
+            exec->stashResult(nextDoc);
             stashedResult = true;
             break;
         }

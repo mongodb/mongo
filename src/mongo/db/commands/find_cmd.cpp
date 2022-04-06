@@ -619,7 +619,7 @@ public:
                     // If we can't fit this result inside the current batch, then we stash it for
                     // later.
                     if (!FindCommon::haveSpaceForNext(obj, numResults, firstBatch.bytesUsed())) {
-                        exec->enqueue(obj);
+                        exec->stashResult(obj);
                         stashedResult = true;
                         break;
                     }

@@ -101,7 +101,7 @@ public:
 
     void dispose(OperationContext* opCtx);
 
-    void enqueue(const BSONObj& obj);
+    void stashResult(const BSONObj& obj);
 
     bool isMarkedAsKilled() const override {
         return !_killStatus.isOK();
@@ -163,7 +163,7 @@ private:
 
     boost::optional<sbe::value::SlotId> _resumeRecordIdSlot;
 
-    std::queue<std::pair<BSONObj, boost::optional<RecordId>>> _stash;
+    std::deque<std::pair<BSONObj, boost::optional<RecordId>>> _stash;
     // If we are returning owned result (i.e. value is moved out of the result accessor) then its
     // lifetime must extend up to the next getNext (or saveState).
     BSONObj _lastGetNext;

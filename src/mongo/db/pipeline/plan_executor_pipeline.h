@@ -106,7 +106,7 @@ public:
         _pipeline->dispose(opCtx);
     }
 
-    void enqueue(const BSONObj& obj) override {
+    void stashResult(const BSONObj& obj) override {
         _stash.push(obj.getOwned());
     }
 
