@@ -68,55 +68,57 @@ class test_hs14(wttest.WiredTigerTestCase):
             value4 = 'd' * 500
             value5 = 'e' * 500
 
+        # FIXME-WT-9063 revisit the use of self.retry() throughout this file.
+
         for i in range(1, nrows):
-            self.session.begin_transaction()
-            cursor[self.create_key(i)] = value1
-            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
-            self.session.begin_transaction()
-            cursor[self.create_key(i)] = value2
-            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
-            self.session.begin_transaction()
-            cursor[self.create_key(i)] = value3
-            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(3))
-            self.session.begin_transaction()
-            cursor[self.create_key(i)] = value4
-            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(4))
+            for retry in self.retry():
+                with retry.transaction(commit_timestamp = 2):
+                    cursor[self.create_key(i)] = value1
+            for retry in self.retry():
+                with retry.transaction(commit_timestamp = 2):
+                    cursor[self.create_key(i)] = value2
+            for retry in self.retry():
+                with retry.transaction(commit_timestamp = 3):
+                    cursor[self.create_key(i)] = value3
+            for retry in self.retry():
+                with retry.transaction(commit_timestamp = 4):
+                    cursor[self.create_key(i)] = value4
 
         # A checkpoint will ensure that older values are written to the history store.
         self.session.checkpoint()
 
         start = time.time()
-        self.session.begin_transaction('read_timestamp=' + self.timestamp_str(3))
-        for i in range(1, nrows):
-            self.assertEqual(cursor[self.create_key(i)], value3)
-        self.session.rollback_transaction()
+        for retry in self.retry():
+            with retry.transaction(read_timestamp = 3, rollback = True):
+                for i in range(1, nrows):
+                    self.assertEqual(cursor[self.create_key(i)], value3)
         end = time.time()
 
         # The time spent when all history store keys are visible to us.
         visible_hs_latency = (end - start)
 
         for i in range(1, nrows):
-            self.session.begin_transaction()
-            cursor.set_key(self.create_key(i))
-            cursor.remove()
-            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(5))
-            self.session.begin_transaction()
-            cursor[self.create_key(i)] = value5
-            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(10))
+            for retry in self.retry():
+                with retry.transaction(commit_timestamp = 5):
+                    cursor.set_key(self.create_key(i))
+                    cursor.remove()
+            for retry in self.retry():
+                with retry.transaction(commit_timestamp = 10):
+                    cursor[self.create_key(i)] = value5
 
         # A checkpoint will ensure that older values are written to the history store.
         self.session.checkpoint()
 
         start = time.time()
-        self.session.begin_transaction('read_timestamp=' + self.timestamp_str(9))
-        for i in range(1, nrows):
-            cursor.set_key(self.create_key(i))
-            if self.value_format == '8t':
-                self.assertEqual(cursor.search(), 0)
-                self.assertEqual(cursor.get_value(), 0)
-            else:
-                self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
-        self.session.rollback_transaction()
+        for retry in self.retry():
+            with retry.transaction(read_timestamp = 9, rollback = True):
+                for i in range(1, nrows):
+                    cursor.set_key(self.create_key(i))
+                    if self.value_format == '8t':
+                        self.assertEqual(cursor.search(), 0)
+                        self.assertEqual(cursor.get_value(), 0)
+                    else:
+                        self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
         end = time.time()
 
         # The time spent when all history store keys are invisible to us.

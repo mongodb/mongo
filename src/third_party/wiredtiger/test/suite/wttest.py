@@ -411,6 +411,63 @@ class WiredTigerTestCase(unittest.TestCase):
         self.close_conn()
         self.open_conn(directory, config)
 
+    def retry(self, limit=10):
+        # A retryable object is iterable, and returns Iteration objects each
+        # time until done, or until the limit is reached.
+        class Retryable:
+            def __init__(self, testcase, limit):
+                self.testcase = testcase
+                self.limit = limit
+                self.n = 0
+                self.done = False
+            def __iter__(self):
+                return self
+            def __next__(self):
+                return self.next()
+            def next(self):
+                if self.done or self.n >= self.limit:
+                    raise StopIteration
+                return Iteration(self)
+
+        # A single object returned by a Retryable interation.  It can only
+        # be used to start a transaction.
+        class Iteration:
+            def __init__(self, retryable):
+                self.retryable = retryable
+            @contextmanager
+            def transaction(self, session=None, begin_config=None, commit_config=None,
+                            commit_timestamp=None, read_timestamp=None, rollback=False):
+                testcase = self.retryable.testcase
+                if session == None:
+                    session = testcase.session
+                if commit_timestamp != None:
+                    if commit_config != None:
+                        raise Exception('transaction: commit_timestamp and commit_config cannot both be set')
+                    commit_config = 'commit_timestamp=' + testcase.timestamp_str(commit_timestamp)
+                if read_timestamp != None:
+                    if begin_config != None or commit_config != None:
+                        raise Exception('transaction: read_timestamp cannot be set with either ' +
+                            'begin_config, commit_config, commit_timestamp')
+                    begin_config = 'read_timestamp=' + testcase.timestamp_str(read_timestamp)
+
+                session.begin_transaction(begin_config)
+                try:
+                    yield
+                    if rollback:
+                        session.rollback_transaction()
+                    else:
+                        session.commit_transaction(commit_config)
+                    self.retryable.done = True
+                except Exception as ex:
+                    session.rollback_transaction()
+                    testcase.pr('Transaction failed: {}, {}/{} times'.format(
+                        ex, self.retryable.n, self.retryable.limit))
+                    self.retryable.n += 1
+                    if self.retryable.n >= self.retryable.limit:
+                        raise ex
+
+        return Retryable(self, limit)
+
     def setUp(self):
         if not hasattr(self.__class__, 'wt_ntests'):
             self.__class__.wt_ntests = 0

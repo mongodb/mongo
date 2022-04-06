@@ -70,14 +70,16 @@ class test_hs11(wttest.WiredTigerTestCase):
             value1 = 'a' * 500
             value2 = 'b' * 500
 
+        # FIXME-WT-9063 revisit the use of self.retry() throughout this file.
+
         # Apply a series of updates from timestamps 1-4.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
         cursor = self.session.open_cursor(uri)
         for ts in range(1, 5):
             for i in range(1, self.nrows):
-                self.session.begin_transaction()
-                cursor[self.create_key(i)] = value1
-                self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(ts))
+                for retry in self.retry():
+                    with retry.transaction(commit_timestamp = ts):
+                        cursor[self.create_key(i)] = value1
 
         # Reconcile and flush versions 1-3 to the history store.
         self.session.checkpoint()
@@ -96,27 +98,27 @@ class test_hs11(wttest.WiredTigerTestCase):
 
         # Now apply an update at timestamp 10.
         for i in range(1, self.nrows):
-            self.session.begin_transaction()
-            cursor[self.create_key(i)] = value2
-            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(10))
+            for retry in self.retry():
+                with retry.transaction(commit_timestamp = 10):
+                    cursor[self.create_key(i)] = value2
 
         # Ensure that we blew away history store content.
         for ts in range(1, 5):
-            self.session.begin_transaction('read_timestamp=' + self.timestamp_str(ts))
-            for i in range(1, self.nrows):
-                if i % 2 == 0:
-                    if self.update_type == 'deletion':
-                        cursor.set_key(self.create_key(i))
-                        if self.value_format == '8t':
-                            self.assertEqual(cursor.search(), 0)
-                            self.assertEqual(cursor.get_value(), 0)
+            for retry in self.retry():
+                with retry.transaction(read_timestamp = ts, rollback = True):
+                    for i in range(1, self.nrows):
+                        if i % 2 == 0:
+                            if self.update_type == 'deletion':
+                                cursor.set_key(self.create_key(i))
+                                if self.value_format == '8t':
+                                    self.assertEqual(cursor.search(), 0)
+                                    self.assertEqual(cursor.get_value(), 0)
+                                else:
+                                    self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
+                            else:
+                                self.assertEqual(cursor[self.create_key(i)], value2)
                         else:
-                            self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
-                    else:
-                        self.assertEqual(cursor[self.create_key(i)], value2)
-                else:
-                    self.assertEqual(cursor[self.create_key(i)], value1)
-            self.session.rollback_transaction()
+                            self.assertEqual(cursor[self.create_key(i)], value1)
 
         if self.update_type == 'deletion':
             hs_truncate = self.get_stat(stat.conn.cache_hs_key_truncate_onpage_removal)
@@ -139,9 +141,9 @@ class test_hs11(wttest.WiredTigerTestCase):
         cursor = self.session.open_cursor(uri)
         for ts in range(1, 5):
             for i in range(1, self.nrows):
-                self.session.begin_transaction()
-                cursor[self.create_key(i)] = value1
-                self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(ts))
+                for retry in self.retry():
+                    with retry.transaction(commit_timestamp = ts):
+                        cursor[self.create_key(i)] = value1
 
         # Reconcile and flush versions 1-3 to the history store.
         self.session.checkpoint()
@@ -149,10 +151,10 @@ class test_hs11(wttest.WiredTigerTestCase):
         # Remove the key with timestamp 10.
         for i in range(1, self.nrows):
             if i % 2 == 0:
-                self.session.begin_transaction()
-                cursor.set_key(self.create_key(i))
-                cursor.remove()
-                self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(10))
+                for retry in self.retry():
+                    with retry.transaction(commit_timestamp = 10):
+                        cursor.set_key(self.create_key(i))
+                        cursor.remove()
 
         # Reconcile and remove the obsolete entries.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10))
@@ -160,23 +162,23 @@ class test_hs11(wttest.WiredTigerTestCase):
 
         # Now apply an update at timestamp 20.
         for i in range(1, self.nrows):
-            self.session.begin_transaction()
-            cursor[self.create_key(i)] = value2
-            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(20))
+                for retry in self.retry():
+                    with retry.transaction(commit_timestamp = 20):
+                        cursor[self.create_key(i)] = value2
 
         # Ensure that we didn't select old history store content even if it is not blew away.
-        self.session.begin_transaction('read_timestamp=' + self.timestamp_str(10))
-        for i in range(1, self.nrows):
-            if i % 2 == 0:
-                cursor.set_key(self.create_key(i))
-                if self.value_format == '8t':
-                    self.assertEqual(cursor.search(), 0)
-                    self.assertEqual(cursor.get_value(), 0)
-                else:
-                    self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
-            else:
-                self.assertEqual(cursor[self.create_key(i)], value1)
-        self.session.rollback_transaction()
+        for retry in self.retry():
+            with retry.transaction(read_timestamp = 10, rollback = True):
+                for i in range(1, self.nrows):
+                    if i % 2 == 0:
+                        cursor.set_key(self.create_key(i))
+                        if self.value_format == '8t':
+                            self.assertEqual(cursor.search(), 0)
+                            self.assertEqual(cursor.get_value(), 0)
+                        else:
+                            self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
+                    else:
+                        self.assertEqual(cursor[self.create_key(i)], value1)
 
         hs_truncate = self.get_stat(stat.conn.cache_hs_key_truncate_onpage_removal)
         self.assertEqual(hs_truncate, 0)
