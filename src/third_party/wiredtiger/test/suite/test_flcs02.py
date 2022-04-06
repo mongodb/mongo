@@ -89,6 +89,17 @@ class test_flcs02(wttest.WiredTigerTestCase):
         cursor.reset()
         self.check_next(cursor, k, 0)
         self.check_prev(cursor, k, 0)
+        # Delete it again for good measure.
+        cursor.set_key(k)
+        self.assertEqual(cursor.search(), 0)
+        self.assertEqual(cursor.get_value(), 0)
+        self.assertEqual(cursor.remove(), 0)
+        cursor.reset()
+        v = cursor[k]
+        self.assertEqual(v, 0)
+        cursor.reset()
+        self.check_next(cursor, k, 0)
+        self.check_prev(cursor, k, 0)
         self.session.rollback_transaction()
         self.session.begin_transaction('read_timestamp=' + self.timestamp_str(readts - 5))
         v = cursor[k]
@@ -109,6 +120,9 @@ class test_flcs02(wttest.WiredTigerTestCase):
     # Delete a value and read it back from a different transaction.
     def delete_readback_commit(self, cursor, k, readts, committs):
         self.session.begin_transaction('read_timestamp=' + self.timestamp_str(readts))
+        cursor.set_key(k)
+        self.assertEqual(cursor.remove(), 0)
+        # Remove it again. For FLCS, this should succeed; deleted values are 0, not "deleted".
         cursor.set_key(k)
         self.assertEqual(cursor.remove(), 0)
         cursor.reset()
