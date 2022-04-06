@@ -524,7 +524,7 @@ void TransactionRouter::Router::processParticipantResponse(OperationContext* opC
                         3,
                         "{sessionId}:{txnNumber} Marking {shardId} as read-only",
                         "Marking shard as read-only participant",
-                        "sessionId"_attr = _sessionId().getId(),
+                        "sessionId"_attr = _sessionId(),
                         "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
                         "txnRetryCounter"_attr = o().txnNumberAndRetryCounter.getTxnRetryCounter(),
                         "shardId"_attr = shardId);
@@ -547,7 +547,7 @@ void TransactionRouter::Router::processParticipantResponse(OperationContext* opC
                     3,
                     "{sessionId}:{txnNumber} Marking {shardId} as having done a write",
                     "Marking shard has having done a write",
-                    "sessionId"_attr = _sessionId().getId(),
+                    "sessionId"_attr = _sessionId(),
                     "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
                     "txnRetryCounter"_attr = o().txnNumberAndRetryCounter.getTxnRetryCounter(),
                     "shardId"_attr = shardId);
@@ -559,7 +559,7 @@ void TransactionRouter::Router::processParticipantResponse(OperationContext* opC
                         3,
                         "{sessionId}:{txnNumber} Choosing {shardId} as recovery shard",
                         "Choosing shard as recovery shard",
-                        "sessionId"_attr = _sessionId().getId(),
+                        "sessionId"_attr = _sessionId(),
                         "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
                         "txnRetryCounter"_attr = o().txnNumberAndRetryCounter.getTxnRetryCounter(),
                         "shardId"_attr = shardId);
@@ -615,7 +615,7 @@ BSONObj TransactionRouter::Router::attachTxnFieldsIfNeeded(OperationContext* opC
             4,
             "{sessionId}:{txnNumber} Sending transaction fields to existing participant: {shardId}",
             "Attaching transaction fields to request for existing participant shard",
-            "sessionId"_attr = _sessionId().getId(),
+            "sessionId"_attr = _sessionId(),
             "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
             "txnRetryCounter"_attr = o().txnNumberAndRetryCounter.getTxnRetryCounter(),
             "shardId"_attr = shardId,
@@ -628,7 +628,7 @@ BSONObj TransactionRouter::Router::attachTxnFieldsIfNeeded(OperationContext* opC
                 4,
                 "{sessionId}:{txnNumber} Sending transaction fields to new participant: {shardId}",
                 "Attaching transaction fields to request for new participant shard",
-                "sessionId"_attr = _sessionId().getId(),
+                "sessionId"_attr = _sessionId(),
                 "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
                 "txnRetryCounter"_attr = o().txnNumberAndRetryCounter.getTxnRetryCounter(),
                 "shardId"_attr = shardId,
@@ -830,7 +830,7 @@ void TransactionRouter::Router::onStaleShardOrDbError(OperationContext* opCtx,
         3,
         "{sessionId}:{txnNumber} Clearing pending participants after stale version error: {error}",
         "Clearing pending participants after stale version error",
-        "sessionId"_attr = _sessionId().getId(),
+        "sessionId"_attr = _sessionId(),
         "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
         "txnRetryCounter"_attr = o().txnNumberAndRetryCounter.getTxnRetryCounter(),
         "error"_attr = redact(status));
@@ -850,7 +850,7 @@ void TransactionRouter::Router::onViewResolutionError(OperationContext* opCtx,
         "{sessionId}:{txnNumber} Clearing pending participants after view resolution error on "
         "namespace: {namespace}",
         "Clearing pending participants after view resolution error",
-        "sessionId"_attr = _sessionId().getId(),
+        "sessionId"_attr = _sessionId(),
         "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
         "txnRetryCounter"_attr = o().txnNumberAndRetryCounter.getTxnRetryCounter(),
         "namespace"_attr = nss);
@@ -880,7 +880,7 @@ void TransactionRouter::Router::onSnapshotError(OperationContext* opCtx, const S
         "{previousGlobalSnapshotTimestamp}",
         "Clearing pending participants and resetting global snapshot timestamp after "
         "snapshot error",
-        "sessionId"_attr = _sessionId().getId(),
+        "sessionId"_attr = _sessionId(),
         "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
         "txnRetryCounter"_attr = o().txnNumberAndRetryCounter.getTxnRetryCounter(),
         "error"_attr = redact(status),
@@ -928,7 +928,7 @@ void TransactionRouter::Router::_setAtClusterTime(
                 "{sessionId}:{txnNumber} Setting global snapshot timestamp to "
                 "{globalSnapshotTimestamp} on statement {latestStmtId}",
                 "Setting global snapshot timestamp for transaction",
-                "sessionId"_attr = _sessionId().getId(),
+                "sessionId"_attr = _sessionId(),
                 "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
                 "txnRetryCounter"_attr = o().txnNumberAndRetryCounter.getTxnRetryCounter(),
                 "globalSnapshotTimestamp"_attr = candidateTime,
@@ -999,7 +999,7 @@ void TransactionRouter::Router::_beginTxn(OperationContext* opCtx,
                         3,
                         "{sessionId}:{txnNumber} Commit recovery started",
                         "Commit recovery started",
-                        "sessionId"_attr = _sessionId().getId(),
+                        "sessionId"_attr = _sessionId(),
                         "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
                         "txnRetryCounter"_attr = o().txnNumberAndRetryCounter.getTxnRetryCounter());
 
@@ -1106,7 +1106,7 @@ BSONObj TransactionRouter::Router::_handOffCommitToCoordinator(OperationContext*
                 "{sessionId}:{txnNumber} Committing using two-phase commit, coordinator: "
                 "{coordinatorShardId}",
                 "Committing using two-phase commit",
-                "sessionId"_attr = _sessionId().getId(),
+                "sessionId"_attr = _sessionId(),
                 "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
                 "txnRetryCounter"_attr = o().txnNumberAndRetryCounter.getTxnRetryCounter(),
                 "coordinatorShardId"_attr = *o().coordinatorId);
@@ -1215,7 +1215,7 @@ BSONObj TransactionRouter::Router::_commitTransaction(
                     "{sessionId}:{txnNumber} Committing single-shard transaction, single "
                     "participant: {shardId}",
                     "Committing single-shard transaction",
-                    "sessionId"_attr = _sessionId().getId(),
+                    "sessionId"_attr = _sessionId(),
                     "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
                     "txnRetryCounter"_attr = o().txnNumberAndRetryCounter.getTxnRetryCounter(),
                     "shardId"_attr = shardId);
@@ -1236,7 +1236,7 @@ BSONObj TransactionRouter::Router::_commitTransaction(
                     "{sessionId}:{txnNumber} Committing read-only transaction on "
                     "{numParticipantShards} shards",
                     "Committing read-only transaction",
-                    "sessionId"_attr = _sessionId().getId(),
+                    "sessionId"_attr = _sessionId(),
                     "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
                     "txnRetryCounter"_attr = o().txnNumberAndRetryCounter.getTxnRetryCounter(),
                     "numParticipantShards"_attr = readOnlyShards.size());
@@ -1412,8 +1412,7 @@ void TransactionRouter::Router::implicitlyAbortTransaction(OperationContext* opC
 }
 
 std::string TransactionRouter::Router::txnIdToString() const {
-    return str::stream() << _sessionId().getId() << ":"
-                         << o().txnNumberAndRetryCounter.getTxnNumber();
+    return str::stream() << _sessionId() << ":" << o().txnNumberAndRetryCounter.getTxnNumber();
 }
 
 void TransactionRouter::Router::appendRecoveryToken(BSONObjBuilder* builder) const {
@@ -1491,7 +1490,7 @@ void TransactionRouter::Router::_resetRouterStateForStartTransaction(
                 3,
                 "{sessionId}:{txnNumber} New transaction started",
                 "New transaction started",
-                "sessionId"_attr = _sessionId().getId(),
+                "sessionId"_attr = _sessionId(),
                 "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
                 "txnRetryCounter"_attr = txnNumberAndRetryCounter.getTxnRetryCounter());
 };

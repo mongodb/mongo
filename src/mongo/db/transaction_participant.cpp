@@ -2657,7 +2657,7 @@ void TransactionParticipant::Participant::_setNewTxnNumberAndRetryCounter(
         "{lsid}",
         "New transaction started",
         "txnNumberAndRetryCounter"_attr = txnNumberAndRetryCounter,
-        "lsid"_attr = _sessionId().getId(),
+        "lsid"_attr = _sessionId(),
         "apiParameters"_attr = APIParameters::get(opCtx).toBSON());
 
     // Abort the existing transaction if it's not prepared, committed, or aborted.
