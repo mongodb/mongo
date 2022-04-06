@@ -33,6 +33,9 @@
 
 #include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/commands/fle2_compact_gen.h"
+#include "mongo/db/commands/server_status.h"
+#include "mongo/platform/mutex.h"
 
 namespace mongo {
 namespace {
@@ -348,6 +351,70 @@ ECCPreCompactState prepareECCForCompaction(FLEQueryInterface* queryImpl,
     return state;
 }
 
+void accumulateStats(ECStats& left, const ECStats& right) {
+    left.setRead(left.getRead() + right.getRead());
+    left.setInserted(left.getInserted() + right.getInserted());
+    left.setUpdated(left.getUpdated() + right.getUpdated());
+    left.setDeleted(left.getDeleted() + right.getDeleted());
+}
+
+void accumulateStats(ECOCStats& left, const ECOCStats& right) {
+    left.setRead(left.getRead() + right.getRead());
+    left.setDeleted(left.getDeleted() + right.getDeleted());
+}
+
+/**
+ * Server status section to track an aggregate of global compact statistics.
+ */
+class FLECompactStatsStatusSection : public ServerStatusSection {
+public:
+    FLECompactStatsStatusSection() : ServerStatusSection("fle") {
+        ECStats zeroStats;
+        ECOCStats zeroECOC;
+
+        _stats.setEcc(zeroStats);
+        _stats.setEsc(zeroStats);
+        _stats.setEcoc(zeroECOC);
+    }
+
+    bool includeByDefault() const final {
+        return _hasStats;
+    }
+
+    BSONObj generateSection(OperationContext* opCtx, const BSONElement& configElement) const final {
+
+        CompactStats temp;
+        {
+            stdx::lock_guard<Mutex> lock(_mutex);
+            temp = _stats;
+        }
+
+        BSONObjBuilder builder;
+        {
+            auto sub = BSONObjBuilder(builder.subobjStart("compactStats"));
+            temp.serialize(&sub);
+        }
+
+        return builder.obj();
+    }
+
+    void updateStats(const CompactStats& stats) {
+        stdx::lock_guard<Mutex> lock(_mutex);
+
+        _hasStats = true;
+        accumulateStats(_stats.getEsc(), stats.getEsc());
+        accumulateStats(_stats.getEcc(), stats.getEcc());
+        accumulateStats(_stats.getEcoc(), stats.getEcoc());
+    }
+
+private:
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("FLECompactStats::_mutex");
+    CompactStats _stats;
+    bool _hasStats{false};
+};
+
+FLECompactStatsStatusSection _fleCompactStatsStatusSection;
+
 }  // namespace
 
 
@@ -576,7 +643,10 @@ CompactStats processFLECompact(OperationContext* opCtx,
         uassertStatusOK(swResult.getValue().getEffectiveStatus());
     }
 
-    return CompactStats(ecocStats, eccStats, escStats);
+    CompactStats stats(ecocStats, eccStats, escStats);
+    _fleCompactStatsStatusSection.updateStats(stats);
+
+    return stats;
 }
 
 }  // namespace mongo
