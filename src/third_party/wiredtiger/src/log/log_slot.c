@@ -405,10 +405,16 @@ __wt_log_slot_switch(
     do {
         WT_WITH_SLOT_LOCK(
           session, log, ret = __log_slot_switch_internal(session, myslot, forced, did_work));
+        /*
+         * If we get an unexpected error, we need to panic. If we cannot switch the slot because of
+         * a real error, such as running out of space, there's nothing we can do.
+         */
         if (ret == EBUSY) {
             WT_STAT_CONN_INCR(session, log_slot_switch_busy);
             __wt_yield();
-        }
+        } else if (ret != 0)
+            WT_TRET(__wt_panic(session, ret, "log slot switch fatal error"));
+
         WT_RET(WT_SESSION_CHECK_PANIC(session));
         if (F_ISSET(S2C(session), WT_CONN_CLOSING))
             break;
