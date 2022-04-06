@@ -134,10 +134,17 @@ let view = db[viewName];
             [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
             JoinAlgorithm.NLJ /* expectedJoinAlgorithm */);
 
-    // $lookup against a non-existent foreign collection should always pick NLJ.
+    // $lookup against a non-existent foreign collection should pick NLJ.
     runTest(coll,
             [{$lookup: {from: "nonexistent", localField: "a", foreignField: "b", as: "out"}}],
             JoinAlgorithm.NLJ /* expectedJoinAlgorithm */);
+
+    // $lookup against a non-existent foreign collection should pick NLJ even when HJ is eligible.
+    runTest(coll,
+            [{$lookup: {from: "nonexistent", localField: "a", foreignField: "b", as: "out"}}],
+            JoinAlgorithm.NLJ /* expectedJoinAlgorithm */,
+            null /* indexKeyPattern */,
+            {allowDiskUse: true});
 
     // Self join $lookup, no views.
     runTest(coll,

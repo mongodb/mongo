@@ -616,7 +616,7 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::removeProjectSimpleBelowGro
 // Checks if the foreign collection is eligible for the hash join algorithm. We conservatively
 // choose the hash join algorithm for cases when the hash table is unlikely to spill data.
 bool isEligibleForHashJoin(const SecondaryCollectionInfo& foreignCollInfo) {
-    return !internalQueryDisableLookupExecutionUsingHashJoin.load() &&
+    return !internalQueryDisableLookupExecutionUsingHashJoin.load() && foreignCollInfo.exists &&
         foreignCollInfo.noOfRecords <=
         internalQueryCollectionMaxNoOfDocumentsToChooseHashJoin.load() &&
         foreignCollInfo.approximateDataSizeBytes <=
