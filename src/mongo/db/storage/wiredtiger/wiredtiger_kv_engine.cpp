@@ -1290,6 +1290,10 @@ WiredTigerKVEngine::beginNonBlockingBackup(OperationContext* opCtx,
     invariant(_wtBackup.logFilePathsSeenByGetNextBatch.empty());
     invariant(_wtBackup.identToNamespaceAndUUIDMap.empty());
 
+    // Fetching the catalog entries requires reading from the storage engine. During cache pressure,
+    // this read could be rolled back. In that case, we need to clear the map.
+    ScopeGuard clearGuard([&] { _wtBackup.identToNamespaceAndUUIDMap.clear(); });
+
     {
         Lock::GlobalLock lk(opCtx, MODE_IS);
         DurableCatalog* catalog = DurableCatalog::get(opCtx);
@@ -1310,6 +1314,7 @@ WiredTigerKVEngine::beginNonBlockingBackup(OperationContext* opCtx,
     auto streamingCursor = std::make_unique<StreamingCursorImpl>(
         session, _path, checkpointTimestamp, options, &_wtBackup);
 
+    clearGuard.dismiss();
     pinOplogGuard.dismiss();
     _backupSession = std::move(sessionRaii);
     _wtBackup.cursor = cursor;
