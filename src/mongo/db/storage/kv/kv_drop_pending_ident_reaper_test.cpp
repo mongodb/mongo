@@ -57,20 +57,21 @@ public:
         return nullptr;
     }
     std::unique_ptr<RecordStore> getRecordStore(OperationContext* opCtx,
-                                                StringData ns,
+                                                const NamespaceString& nss,
                                                 StringData ident,
                                                 const CollectionOptions& options) override {
         return {};
     }
     std::unique_ptr<SortedDataInterface> getSortedDataInterface(
         OperationContext* opCtx,
+        const NamespaceString& nss,
         const CollectionOptions& collOptions,
         StringData ident,
         const IndexDescriptor* desc) override {
         return nullptr;
     }
     Status createRecordStore(OperationContext* opCtx,
-                             StringData ns,
+                             const NamespaceString& nss,
                              StringData ident,
                              const CollectionOptions& options,
                              KeyFormat keyFormat) override {
@@ -82,6 +83,7 @@ public:
         return {};
     }
     Status createSortedDataInterface(OperationContext* opCtx,
+                                     const NamespaceString& nss,
                                      const CollectionOptions& collOptions,
                                      StringData ident,
                                      const IndexDescriptor* desc) override {

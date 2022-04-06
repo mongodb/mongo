@@ -138,48 +138,6 @@ std::string escapeDbName(StringData dbname) {
 bool indexTypeSupportsPathLevelMultikeyTracking(StringData accessMethod) {
     return accessMethod == IndexNames::BTREE || accessMethod == IndexNames::GEO_2DSPHERE;
 }
-
-/**
- * Returns true if writes to the catalog entry for the input namespace require being timestamped.
- */
-bool requiresTimestampForCatalogWrite(OperationContext* opCtx, const NamespaceString& nss) {
-    if (!nss.isReplicated() || nss.coll().startsWith("tmp.mr.") || nss.isDropPendingNamespace()) {
-        return false;
-    }
-
-    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    if (!replCoord->isReplEnabled()) {
-        return false;
-    }
-
-    if (!opCtx->writesAreReplicated()) {
-        return false;
-    }
-
-    // If there is a timestamp already assigned, there's no need to explicitly assign a timestamp.
-    if (opCtx->recoveryUnit()->isTimestamped()) {
-        return false;
-    }
-
-    // Nodes in `startup` do not need to timestamp writes.
-    // Nodes in the oplog application phase of initial sync (`startup2`) must not timestamp writes
-    // before the `initialDataTimestamp`.  Nodes in initial sync may also be in the `removed` state
-    // due to DNS resolution errors; they may continue writing during that time.
-    const auto memberState = replCoord->getMemberState();
-    if (memberState.startup() || memberState.startup2() || memberState.removed()) {
-        return false;
-    }
-
-    // When rollback completes, index builds may be restarted, which requires untimestamped catalog
-    // writes. Additionally, it's illegal to timestamp a write later than the timestamp associated
-    // with the node exiting the rollback state.
-    if (memberState.rollback()) {
-        return false;
-    }
-
-    return true;
-}
-
 }  // namespace
 
 class DurableCatalogImpl::AddIdentChange : public RecoveryUnit::Change {
@@ -482,10 +440,6 @@ void DurableCatalogImpl::putMetaData(OperationContext* opCtx,
         obj = b.obj();
     }
 
-    if (requiresTimestampForCatalogWrite(opCtx, nss)) {
-        opCtx->recoveryUnit()->setMustBeTimestamped();
-    }
-
     LOGV2_DEBUG(22211, 3, "recording new metadata: {obj}", "obj"_attr = obj);
     Status status = _rs->updateRecord(opCtx, catalogId, obj.objdata(), obj.objsize());
     fassert(28521, status);
@@ -521,10 +475,6 @@ Status DurableCatalogImpl::_replaceEntry(OperationContext* opCtx,
         invariant(it != _catalogIdToEntryMap.end());
         it->second.nss = fromName;
     });
-
-    if (requiresTimestampForCatalogWrite(opCtx, fromName)) {
-        opCtx->recoveryUnit()->setMustBeTimestamped();
-    }
 
     return Status::OK();
 }
@@ -672,7 +622,7 @@ StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> DurableCatalogImpl
         return KeyFormat::Long;
     }();
     Status status =
-        _engine->getEngine()->createRecordStore(opCtx, nss.ns(), entry.ident, options, keyFormat);
+        _engine->getEngine()->createRecordStore(opCtx, nss, entry.ident, options, keyFormat);
     if (!status.isOK())
         return status;
 
@@ -682,7 +632,7 @@ StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> DurableCatalogImpl
         catalog->_engine->getEngine()->dropIdent(ru, ident).ignore();
     });
 
-    auto rs = _engine->getEngine()->getRecordStore(opCtx, nss.ns(), entry.ident, options);
+    auto rs = _engine->getEngine()->getRecordStore(opCtx, nss, entry.ident, options);
     invariant(rs);
 
     return std::pair<RecordId, std::unique_ptr<RecordStore>>(entry.catalogId, std::move(rs));
@@ -690,12 +640,13 @@ StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> DurableCatalogImpl
 
 Status DurableCatalogImpl::createIndex(OperationContext* opCtx,
                                        RecordId catalogId,
+                                       const NamespaceString& nss,
                                        const CollectionOptions& collOptions,
                                        const IndexDescriptor* spec) {
     std::string ident = getIndexIdent(opCtx, catalogId, spec->indexName());
 
     auto kvEngine = _engine->getEngine();
-    const Status status = kvEngine->createSortedDataInterface(opCtx, collOptions, ident, spec);
+    const Status status = kvEngine->createSortedDataInterface(opCtx, nss, collOptions, ident, spec);
     if (status.isOK()) {
         opCtx->recoveryUnit()->onRollback([this, ident, recoveryUnit = opCtx->recoveryUnit()]() {
             // Intentionally ignoring failure.
@@ -800,7 +751,7 @@ StatusWith<DurableCatalog::ImportResult> DurableCatalogImpl::importCollection(
         }
     }
 
-    auto rs = _engine->getEngine()->getRecordStore(opCtx, nss.ns(), entry.ident, md.options);
+    auto rs = _engine->getEngine()->getRecordStore(opCtx, nss, entry.ident, md.options);
     invariant(rs);
 
     return DurableCatalog::ImportResult(entry.catalogId, std::move(rs), md.options.uuid.get());
@@ -833,6 +784,7 @@ Status DurableCatalogImpl::dropCollection(OperationContext* opCtx, RecordId cata
 }
 
 Status DurableCatalogImpl::dropAndRecreateIndexIdentForResume(OperationContext* opCtx,
+                                                              const NamespaceString& nss,
                                                               const CollectionOptions& collOptions,
                                                               const IndexDescriptor* spec,
                                                               StringData ident) {
@@ -840,7 +792,7 @@ Status DurableCatalogImpl::dropAndRecreateIndexIdentForResume(OperationContext* 
     if (!status.isOK())
         return status;
 
-    status = _engine->getEngine()->createSortedDataInterface(opCtx, collOptions, ident, spec);
+    status = _engine->getEngine()->createSortedDataInterface(opCtx, nss, collOptions, ident, spec);
 
     return status;
 }

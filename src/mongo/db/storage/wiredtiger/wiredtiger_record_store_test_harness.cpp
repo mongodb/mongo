@@ -34,16 +34,24 @@
 
 namespace mongo {
 
+namespace {
+std::string _testLoggingSettings(std::string extraStrings) {
+    // Use a small journal for testing to account for the unlikely event that the underlying
+    // filesystem does not support fast allocation of a file of zeros.
+    return extraStrings + ",log=(file_max=1m,prealloc=false)";
+}
+}  // namespace
+
 WiredTigerHarnessHelper::WiredTigerHarnessHelper(StringData extraStrings)
     : _dbpath("wt_test"),
       _lockerNoopClientObserverRegisterer(getServiceContext()),
       _engine(kWiredTigerEngineName,
               _dbpath.path(),
               &_cs,
-              extraStrings.toString(),
+              _testLoggingSettings(extraStrings.toString()),
               1,
               0,
-              false,
+              true,
               false,
               false,
               false) {
@@ -59,9 +67,16 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newRecordStore(
     OperationContextNoop opCtx(ru);
     std::string uri = WiredTigerKVEngine::kTableUriPrefix + ns;
     StringData ident = ns;
+    NamespaceString nss(ns);
 
     StatusWith<std::string> result = WiredTigerRecordStore::generateCreateString(
-        kWiredTigerEngineName, ns, ident, collOptions, "", keyFormat);
+        kWiredTigerEngineName,
+        NamespaceString(ns),
+        ident,
+        collOptions,
+        "",
+        keyFormat,
+        WiredTigerUtil::useTableLogging(NamespaceString(ns)));
     ASSERT_TRUE(result.isOK());
     std::string config = result.getValue();
 
@@ -73,13 +88,14 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newRecordStore(
     }
 
     WiredTigerRecordStore::Params params;
-    params.ns = ns;
+    params.nss = nss;
     params.ident = ident.toString();
     params.engineName = kWiredTigerEngineName;
     params.isCapped = collOptions.capped ? true : false;
     params.keyFormat = collOptions.clusteredIndex ? KeyFormat::String : KeyFormat::Long;
     params.overwrite = collOptions.clusteredIndex ? false : true;
     params.isEphemeral = false;
+    params.isLogged = WiredTigerUtil::useTableLogging(nss);
     params.cappedCallback = nullptr;
     params.sizeStorer = nullptr;
     params.isReadOnly = false;
@@ -108,9 +124,15 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStoreNoInit(
     CollectionOptions options;
     options.capped = true;
 
-    const std::string ns = NamespaceString::kRsOplogNamespace.toString();
-    StatusWith<std::string> result = WiredTigerRecordStore::generateCreateString(
-        kWiredTigerEngineName, ns, ident, options, "", KeyFormat::Long);
+    const NamespaceString oplogNss = NamespaceString::kRsOplogNamespace;
+    StatusWith<std::string> result =
+        WiredTigerRecordStore::generateCreateString(kWiredTigerEngineName,
+                                                    oplogNss,
+                                                    ident,
+                                                    options,
+                                                    "",
+                                                    KeyFormat::Long,
+                                                    WiredTigerUtil::useTableLogging(oplogNss));
     ASSERT_TRUE(result.isOK());
     std::string config = result.getValue();
 
@@ -122,7 +144,7 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStoreNoInit(
     }
 
     WiredTigerRecordStore::Params params;
-    params.ns = ns;
+    params.nss = oplogNss;
     params.ident = ident;
     params.engineName = kWiredTigerEngineName;
     params.isCapped = true;

@@ -147,7 +147,8 @@ StatusWith<std::string> WiredTigerIndex::generateCreateString(
     const std::string& sysIndexConfig,
     const std::string& collIndexConfig,
     const NamespaceString& collectionNamespace,
-    const IndexDescriptor& desc) {
+    const IndexDescriptor& desc,
+    bool isLogged) {
     str::stream ss;
 
     // Separate out a prefix and suffix in the default string. User configuration will override
@@ -202,10 +203,7 @@ StatusWith<std::string> WiredTigerIndex::generateCreateString(
 
     // Index metadata
     ss << generateAppMetadataString(desc);
-
-    bool replicatedWrites = getGlobalReplSettings().usingReplSets() ||
-        repl::ReplSettings::shouldRecoverFromOplogAsStandalone();
-    if (WiredTigerUtil::useTableLogging(collectionNamespace, replicatedWrites)) {
+    if (isLogged) {
         ss << "log=(enabled=true)";
     } else {
         ss << "log=(enabled=false)";
@@ -238,9 +236,10 @@ WiredTigerIndex::WiredTigerIndex(OperationContext* ctx,
                                  StringData ident,
                                  KeyFormat rsKeyFormat,
                                  const IndexDescriptor* desc,
+                                 bool isLogged,
                                  bool isReadOnly)
     : SortedDataInterface(ident,
-                          _handleVersionInfo(ctx, uri, desc, isReadOnly),
+                          _handleVersionInfo(ctx, uri, desc, isLogged, isReadOnly),
                           Ordering::make(desc->keyPattern()),
                           rsKeyFormat),
       _uri(uri),
@@ -248,7 +247,8 @@ WiredTigerIndex::WiredTigerIndex(OperationContext* ctx,
       _desc(desc),
       _indexName(desc->indexName()),
       _keyPattern(desc->keyPattern()),
-      _collation(desc->collation()) {}
+      _collation(desc->collation()),
+      _isLogged(isLogged) {}
 
 NamespaceString WiredTigerIndex::getCollectionNamespace(OperationContext* opCtx) const {
     return _desc->getEntry()->getNSSFromCatalog(opCtx);
@@ -636,6 +636,7 @@ StatusWith<bool> WiredTigerIndex::_checkDups(OperationContext* opCtx,
 KeyString::Version WiredTigerIndex::_handleVersionInfo(OperationContext* ctx,
                                                        const std::string& uri,
                                                        const IndexDescriptor* desc,
+                                                       bool isLogged,
                                                        bool isReadOnly) {
     auto version = WiredTigerUtil::checkApplicationMetadataFormatVersion(
         ctx, uri, kMinimumIndexVersion, kMaximumIndexVersion);
@@ -664,12 +665,7 @@ KeyString::Version WiredTigerIndex::_handleVersionInfo(OperationContext* ctx,
     }
 
     if (!isReadOnly) {
-        bool replicatedWrites = getGlobalReplSettings().usingReplSets() ||
-            repl::ReplSettings::shouldRecoverFromOplogAsStandalone();
-        bool useTableLogging = !replicatedWrites ||
-            WiredTigerUtil::useTableLogging(desc->getEntry()->getNSSFromCatalog(ctx),
-                                            replicatedWrites);
-        uassertStatusOK(WiredTigerUtil::setTableLogging(ctx, uri, useTableLogging));
+        uassertStatusOK(WiredTigerUtil::setTableLogging(ctx, uri, isLogged));
     }
 
     /*
@@ -1491,8 +1487,10 @@ WiredTigerIndexUnique::WiredTigerIndexUnique(OperationContext* ctx,
                                              StringData ident,
                                              KeyFormat rsKeyFormat,
                                              const IndexDescriptor* desc,
+                                             bool isLogged,
                                              bool isReadOnly)
-    : WiredTigerIndex(ctx, uri, ident, rsKeyFormat, desc, isReadOnly), _partial(desc->isPartial()) {
+    : WiredTigerIndex(ctx, uri, ident, rsKeyFormat, desc, isLogged, isReadOnly),
+      _partial(desc->isPartial()) {
     // _id indexes must use WiredTigerIdIndex
     invariant(!isIdIndex());
     // All unique indexes should be in the timestamp-safe format version as of version 4.2.
@@ -1578,8 +1576,9 @@ WiredTigerIdIndex::WiredTigerIdIndex(OperationContext* ctx,
                                      const std::string& uri,
                                      StringData ident,
                                      const IndexDescriptor* desc,
+                                     bool isLogged,
                                      bool isReadOnly)
-    : WiredTigerIndex(ctx, uri, ident, KeyFormat::Long, desc, isReadOnly) {
+    : WiredTigerIndex(ctx, uri, ident, KeyFormat::Long, desc, isLogged, isReadOnly) {
     invariant(isIdIndex());
 }
 
@@ -1809,8 +1808,9 @@ WiredTigerIndexStandard::WiredTigerIndexStandard(OperationContext* ctx,
                                                  StringData ident,
                                                  KeyFormat rsKeyFormat,
                                                  const IndexDescriptor* desc,
+                                                 bool isLogged,
                                                  bool isReadOnly)
-    : WiredTigerIndex(ctx, uri, ident, rsKeyFormat, desc, isReadOnly) {}
+    : WiredTigerIndex(ctx, uri, ident, rsKeyFormat, desc, isLogged, isReadOnly) {}
 
 std::unique_ptr<SortedDataInterface::Cursor> WiredTigerIndexStandard::newCursor(
     OperationContext* opCtx, bool forward) const {

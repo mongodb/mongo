@@ -1082,9 +1082,16 @@ TEST(WiredTigerRecordStoreTest, ClusteredRecordStore) {
 
     ASSERT(opCtx.get());
     const std::string ns = "testRecordStore";
+    const NamespaceString nss(ns);
     const std::string uri = WiredTigerKVEngine::kTableUriPrefix + ns;
-    const StatusWith<std::string> result = WiredTigerRecordStore::generateCreateString(
-        kWiredTigerEngineName, ns, "", CollectionOptions(), "", KeyFormat::String);
+    const StatusWith<std::string> result =
+        WiredTigerRecordStore::generateCreateString(kWiredTigerEngineName,
+                                                    nss,
+                                                    "",
+                                                    CollectionOptions(),
+                                                    "",
+                                                    KeyFormat::String,
+                                                    WiredTigerUtil::useTableLogging(nss));
     ASSERT_TRUE(result.isOK());
     const std::string config = result.getValue();
 
@@ -1098,13 +1105,14 @@ TEST(WiredTigerRecordStoreTest, ClusteredRecordStore) {
     }
 
     WiredTigerRecordStore::Params params;
-    params.ns = ns;
+    params.nss = nss;
     params.ident = ns;
     params.engineName = kWiredTigerEngineName;
     params.isCapped = false;
     params.keyFormat = KeyFormat::String;
     params.overwrite = false;
     params.isEphemeral = false;
+    params.isLogged = WiredTigerUtil::useTableLogging(nss);
     params.cappedCallback = nullptr;
     params.sizeStorer = nullptr;
     params.tracksSizeAdjustments = true;

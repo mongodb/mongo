@@ -732,10 +732,6 @@ public:
         return _getState();
     }
 
-    void setMustBeTimestamped() {
-        _mustBeTimestamped = true;
-    }
-
     void setNoEvictionAfterRollback() {
         _noEvictionAfterRollback = true;
     }
@@ -798,8 +794,6 @@ protected:
      * Executes all registered rollback handlers and clears all registered changes
      */
     void _executeRollbackHandlers();
-
-    bool _mustBeTimestamped = false;
 
     bool _noEvictionAfterRollback = false;
 

@@ -42,6 +42,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/concurrency/temporarily_unavailable_exception.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/global_settings.h"
 #include "mongo/db/server_options_general_gen.h"
 #include "mongo/db/snapshot_window_options_gen.h"
 #include "mongo/db/storage/storage_file_util.h"
@@ -839,19 +840,26 @@ void WiredTigerUtil::resetTableLoggingInfo() {
     _tableLoggingInfo = TableLoggingInfo();
 }
 
-bool WiredTigerUtil::useTableLogging(NamespaceString ns, bool replEnabled) {
-    if (!replEnabled) {
-        // All tables on standalones are logged.
+bool WiredTigerUtil::useTableLogging(const NamespaceString& nss) {
+    // We only turn off logging in the case of:
+    // 1) Replication is enabled (the typical deployment), or
+    // 2) We're running as a standalone with recoverFromOplogAsStandalone=true
+    const bool journalWritesBecauseStandalone = !getGlobalReplSettings().usingReplSets() &&
+        !repl::ReplSettings::shouldRecoverFromOplogAsStandalone();
+    if (journalWritesBecauseStandalone) {
         return true;
     }
 
+    // Don't make assumptions if there is no namespace string.
+    invariant(nss.size() > 0);
+
     // Of the replica set configurations:
-    if (ns.db() != "local") {
+    if (!nss.isLocal()) {
         // All replicated collections are not logged.
         return false;
     }
 
-    if (ns.coll() == "replset.minvalid") {
+    if (nss.coll() == "replset.minvalid") {
         // Of local collections, this is derived from the state of the data and therefore
         // not logged.
         return false;
@@ -977,8 +985,6 @@ Status WiredTigerUtil::setTableLogging(OperationContext* opCtx, const std::strin
 Status WiredTigerUtil::_setTableLogging(WiredTigerSessionCache* sessionCache,
                                         const std::string& uri,
                                         bool on) {
-    auto engine = sessionCache->getKVEngine();
-
     const std::string setting = on ? "log=(enabled=true)" : "log=(enabled=false)";
 
     // This method does some "weak" parsing to see if the table is in the expected logging
@@ -1008,7 +1014,9 @@ Status WiredTigerUtil::_setTableLogging(WiredTigerSessionCache* sessionCache,
 
     LOGV2_DEBUG(
         22432, 1, "Changing table logging settings", "uri"_attr = uri, "loggingEnabled"_attr = on);
-    auto status = engine->alterMetadata(uri, setting);
+    // Only alter the metadata once we're sure that we need to change the table settings, since
+    // WT_SESSION::alter may return EBUSY and require taking a checkpoint to make progress.
+    auto status = sessionCache->getKVEngine()->alterMetadata(uri, setting);
     if (!status.isOK()) {
         LOGV2_FATAL(50756,
                     "Failed to update log setting",
