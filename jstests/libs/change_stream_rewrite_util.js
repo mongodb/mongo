@@ -141,3 +141,66 @@ function createShardedCollection(shardingTest, shardKey, dbName, collName, split
         true);
     return coll;
 }
+
+// A helper that opens a change stream on the whole cluster with the user supplied match expression
+// 'userMatchExpr' and 'changeStreamSpec'. The helper validates that:
+// 1. for each shard, the events are seen in that order as specified in 'expectedResult'.
+// 2. There are no additional events being returned other than the ones in the 'expectedResult'.
+// 3. the filtering is been done at oplog level, and each of the shard read only the
+// 'expectedOplogNReturnedPerShard' documents.
+function verifyChangeStreamOnWholeCluster(
+    {st, changeStreamSpec, userMatchExpr, expectedResult, expectedOplogNReturnedPerShard}) {
+    changeStreamSpec["allChangesForCluster"] = true;
+    const adminDB = st.s.getDB("admin");
+    const cursor = adminDB.aggregate([{$changeStream: changeStreamSpec}, userMatchExpr]);
+
+    for (const [collOrDb, opDict] of Object.entries(expectedResult)) {
+        for (const [op, eventIdentifierList] of Object.entries(opDict)) {
+            eventIdentifierList.forEach(eventIdentifier => {
+                assert.soon(() => cursor.hasNext(), {op: op, eventIdentifier: eventIdentifier});
+                const event = cursor.next();
+                assert.eq(event.operationType, op, event);
+
+                if (op == "dropDatabase") {
+                    assert.eq(event.ns.db, eventIdentifier, event);
+                } else if (op == "insert") {
+                    assert.eq(event.documentKey._id, eventIdentifier, event);
+                } else if (op == "rename") {
+                    assert.eq(event.to.coll, eventIdentifier, event);
+                } else if (op == "drop") {
+                    assert.eq(event.ns.coll, eventIdentifier);
+                } else if (op == "create") {
+                    assert.eq(event.ns.coll, eventIdentifier);
+                } else if (op == "createIndexes") {
+                    assert.eq(event.ns.coll, eventIdentifier);
+                } else if (op == "dropIndexes") {
+                    assert.eq(event.ns.coll, eventIdentifier);
+                } else if (op == "shardCollection") {
+                    assert.eq(event.ns.coll, eventIdentifier);
+                } else if (op == "modify") {
+                    assert.eq(event.ns.coll, eventIdentifier);
+                } else {
+                    assert(false, event);
+                }
+
+                if (op != "dropDatabase") {
+                    assert.eq(event.ns.coll, collOrDb);
+                }
+            });
+        }
+    }
+
+    assert(!cursor.hasNext(), () => tojson(cursor.next()));
+
+    const stats = adminDB.runCommand({
+        explain: {
+            aggregate: 1,
+            pipeline: [{$changeStream: changeStreamSpec}, userMatchExpr],
+            cursor: {batchSize: 0}
+        },
+        verbosity: "executionStats"
+    });
+
+    assertNumMatchingOplogEventsForShard(stats, st.rs0.name, expectedOplogNReturnedPerShard[0]);
+    assertNumMatchingOplogEventsForShard(stats, st.rs1.name, expectedOplogNReturnedPerShard[1]);
+}

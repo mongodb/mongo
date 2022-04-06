@@ -42,53 +42,14 @@ const otherColl =
 // 2. the filtering is been done at oplog level
 function verifyOnWholeCluster(
     resumeAfterToken, userMatchExpr, expectedResult, expectedOplogRetDocsForEachShard) {
-    const cursor = db.getSiblingDB("admin").aggregate([
-        {$changeStream: {resumeAfter: resumeAfterToken, allChangesForCluster: true}},
-        userMatchExpr
-    ]);
-
-    for (const [collOrDb, opDict] of Object.entries(expectedResult)) {
-        for (const [op, eventIdentifierList] of Object.entries(opDict)) {
-            eventIdentifierList.forEach(eventIdentifier => {
-                assert.soon(() => cursor.hasNext());
-                const event = cursor.next();
-                assert.eq(event.operationType, op, event);
-
-                if (op == "dropDatabase") {
-                    assert.eq(event.ns.db, eventIdentifier, event);
-                } else if (op == "insert") {
-                    assert.eq(event.documentKey._id, eventIdentifier, event);
-                } else if (op == "rename") {
-                    assert.eq(event.to.coll, eventIdentifier, event);
-                } else if (op == "drop") {
-                    assert.eq(event.ns.coll, eventIdentifier);
-                } else {
-                    assert(false, event);
-                }
-
-                if (op != "dropDatabase") {
-                    assert.eq(event.ns.coll, collOrDb);
-                }
-            });
-        }
-    }
-
-    assert(!cursor.hasNext());
-
-    const stats = db.getSiblingDB("admin").runCommand({
-        explain: {
-            aggregate: 1,
-            pipeline: [
-                {$changeStream: {resumeAfter: resumeAfterToken, allChangesForCluster: true}},
-                userMatchExpr
-            ],
-            cursor: {batchSize: 0}
-        },
-        verbosity: "executionStats"
+    verifyChangeStreamOnWholeCluster({
+        st: st,
+        changeStreamSpec: {resumeAfter: resumeAfterToken},
+        userMatchExpr: userMatchExpr,
+        expectedResult: expectedResult,
+        expectedOplogNReturnedPerShard:
+            [expectedOplogRetDocsForEachShard, expectedOplogRetDocsForEachShard]
     });
-
-    assertNumMatchingOplogEventsForShard(stats, st.rs0.name, expectedOplogRetDocsForEachShard);
-    assertNumMatchingOplogEventsForShard(stats, st.rs1.name, expectedOplogRetDocsForEachShard);
 }
 
 // Enable a failpoint that will prevent $expr match expressions from generating $_internalExprEq
