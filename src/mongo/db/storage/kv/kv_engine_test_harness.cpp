@@ -700,61 +700,6 @@ TEST_F(KVEngineTestHarness, BasicTimestampMultiple) {
 }
 
 /*
- * Concurrent operations under snapshot isolation blocks visibility
- * | Session 1         | Session 2                            |
- * |-------------------+--------------------------------------|
- * | Begin             |                                      |
- * |                   | Begin :readAt 20 :isolation snapshot |
- * | Write A 1         |                                      |
- * | Commit :commit 10 |                                      |
- * |                   | Read A (NOT_FOUND)                   |
- * |                   | Abandon Snapshot                     |
- * |                   | Read A (1)                           |
- */
-TEST_F(KVEngineTestHarness, SingleReadWithConflict) {
-    std::unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create(getServiceContext()));
-    KVEngine* engine = helper->getEngine();
-    // TODO SERVER-48314: Remove after implementing correct behavior on biggie.
-    if (engine->isEphemeral())
-        return;
-
-    std::string ns = "a.b";
-    std::unique_ptr<RecordStore> rs;
-    {
-        auto opCtx = _makeOperationContext(engine);
-        ASSERT_OK(engine->createRecordStore(opCtx.get(), ns, ns, CollectionOptions()));
-        rs = engine->getRecordStore(opCtx.get(), ns, ns, CollectionOptions());
-        ASSERT(rs);
-    }
-
-    auto opCtxs = _makeOperationContexts(engine, 2);
-
-    auto opCtx2 = opCtxs[1].second.get();
-    opCtx2->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
-                                                   Timestamp(20, 20));
-
-    auto opCtx1 = opCtxs[0].second.get();
-    WriteUnitOfWork uow1(opCtx1);
-    StatusWith<RecordId> res = rs->insertRecord(opCtx1, "abc", 4, Timestamp(10, 10));
-    ASSERT_OK(res);
-    RecordId loc = res.getValue();
-
-    // Cannot find record before commit.
-    RecordData rd;
-    ASSERT(!rs->findRecord(opCtx2, loc, &rd));
-
-    // Cannot find record after commit due to snapshot isolation.
-    uow1.commit();
-    ASSERT(!rs->findRecord(opCtx2, loc, &rd));
-
-    // Abandon snapshot for visibility.
-    opCtx2->recoveryUnit()->abandonSnapshot();
-
-    ASSERT(rs->findRecord(opCtx2, loc, &rd));
-    ASSERT_EQUALS(std::string("abc"), rs->dataFor(opCtx2, loc).data());
-}
-
-/*
  * Item Not Found - Read timestamp hides visibility
  * | Session              |
  * |----------------------|
