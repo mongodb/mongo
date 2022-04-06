@@ -21,14 +21,15 @@ load('jstests/multiVersion/libs/multi_cluster.js');  // For upgradeCluster()
     });
 
     let db = st.getDB(jsTestName());
-    let dbAtShard0 = st.shard0.getDB(jsTestName());
-    let dbAtShard1 = st.shard1.getDB(jsTestName());
 
     // Makes sure that the test db is sharded.
     assert.commandWorked(st.s0.adminCommand({enableSharding: db.getName()}));
 
     let verifyShardedAccumulatorResultsOnBothEngine =
         (isGreaterLastContinous, coll, pipeline, verifyThis) => {
+            const dbAtShard0 = st.shard0.getDB(jsTestName());
+            const dbAtShard1 = st.shard1.getDB(jsTestName());
+
             // In the last-lts, we don't have the 'internalQueryForceClassicEngine' query knob.
             if (isGreaterLastContinous) {
                 // Turns to the classic engine at the shards.
@@ -68,7 +69,6 @@ load('jstests/multiVersion/libs/multi_cluster.js');  // For upgradeCluster()
     };
 
     let hashShardedColl = shardCollectionByHashing(db.partial_sum);
-    let unshardedColl = db.partial_sum2;
 
     for (let i = 0; i < 10; ++i) {
         const docs = [
@@ -78,32 +78,33 @@ load('jstests/multiVersion/libs/multi_cluster.js');  // For upgradeCluster()
             {k: i, n: -1e+34}
         ];
         assert.commandWorked(hashShardedColl.insert(docs));
-        assert.commandWorked(unshardedColl.insert(docs));
     }
 
     const pipelineWithSum = [{$group: {_id: "$k", s: {$sum: "$n"}}}, {$group: {_id: "$s"}}];
     const pipelineWithAvg = [{$group: {_id: "$k", s: {$avg: "$n"}}}, {$group: {_id: "$s"}}];
 
     // The results on an unsharded collection is the expected results.
-    let expectedRes = unshardedColl.aggregate(pipelineWithSum).toArray();
+    const expectedResSum = [{"_id": NumberDecimal("0.11")}];
     verifyShardedAccumulatorResultsOnBothEngine(
         false /* isGreaterLastContinous */,
         hashShardedColl,
         pipelineWithSum,
         (actualRes) => assert.neq(
             actualRes,
-            expectedRes,
-            `Sharded sum for mixed data by which only decimal sum survive on ${version}`));
+            expectedResSum,
+            `Sharded sum for mixed data by which only decimal sum survive on ${version}: \n` +
+                `${tojson(actualRes)} == ${tojson(expectedResSum)}`));
 
-    expectedRes = unshardedColl.aggregate(pipelineWithAvg).toArray();
+    const expectedResAvg = [{"_id": NumberDecimal("0.0275")}];
     verifyShardedAccumulatorResultsOnBothEngine(
         false /* isGreaterLastContinous */,
         hashShardedColl,
         pipelineWithAvg,
         (actualRes) => assert.neq(
             actualRes,
-            expectedRes,
-            `Sharded avg for mixed data by which only decimal sum survive on ${version}`));
+            expectedResAvg,
+            `Sharded avg for mixed data by which only decimal sum survive on ${version}: \n` +
+                `${tojson(actualRes)} == ${tojson(expectedResAvg)}`));
 
     // Upgrade the cluster to the latest.
     st.upgradeCluster(
@@ -112,46 +113,43 @@ load('jstests/multiVersion/libs/multi_cluster.js');  // For upgradeCluster()
 
     db = st.getDB(jsTestName());
     checkFCV(st.rs0.getPrimary().getDB("admin"), lastLTSFCV);
-    dbAtShard0 = st.shard0.getDB(jsTestName());
-    dbAtShard1 = st.shard1.getDB(jsTestName());
 
     hashShardedColl = db.partial_sum;
-    unshardedColl = db.partial_sum2;
 
     // $sum fix is FCV-gated. So, it's not applied after binary upgrade.
-    expectedRes = unshardedColl.aggregate(pipelineWithSum).toArray();
     verifyShardedAccumulatorResultsOnBothEngine(
         true /* isGreaterLastContinuous */,
         hashShardedColl,
         pipelineWithSum,
         (actualRes) => assert.neq(
             actualRes,
-            expectedRes,
-            "Sharded sum for mixed data by which only decimal sum survive on latest after binary upgrade"));
+            expectedResSum,
+            "Sharded sum for mixed data by which only decimal sum survive on latest after binary upgrade: \n" +
+                `${tojson(actualRes)} == ${tojson(expectedResSum)}`));
 
     // On the other hand, $avg fix is not FCV-gated. So, it's applied after binary upgrade.
-    expectedRes = unshardedColl.aggregate(pipelineWithAvg).toArray();
     verifyShardedAccumulatorResultsOnBothEngine(
         true /* isGreaterLastContinuous */,
         hashShardedColl,
         pipelineWithAvg,
         (actualRes) => assert.eq(
             actualRes,
-            expectedRes,
-            "Sharded avg for mixed data by which only decimal sum survive on latest after binary upgrade"));
+            expectedResAvg,
+            "Sharded avg for mixed data by which only decimal sum survive on latest after binary upgrade: \n" +
+                `${tojson(actualRes)} != ${tojson(expectedResAvg)}`));
 
     assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
 
     // The FCV is upgraded to the 'latestFCV' and $sum fix must be applied now.
-    expectedRes = unshardedColl.aggregate(pipelineWithSum).toArray();
     verifyShardedAccumulatorResultsOnBothEngine(
         true /* isGreaterLastContinuous */,
         hashShardedColl,
         pipelineWithSum,
         (actualRes) => assert.eq(
             actualRes,
-            expectedRes,
-            "Sharded sum for mixed data by which only decimal sum survive on latest after FCV upgrade"));
+            expectedResSum,
+            "Sharded sum for mixed data by which only decimal sum survive on latest after FCV upgrade: \n" +
+                `${tojson(actualRes)} != ${tojson(expectedResSum)}`));
 
     st.stop();
 }());
