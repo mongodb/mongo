@@ -388,7 +388,7 @@ public:
                     // If adding this object will cause us to exceed the message size limit, then we
                     // stash it for later.
                     if (!FindCommon::haveSpaceForNext(obj, *numResults, nextBatch->bytesUsed())) {
-                        exec->enqueue(obj);
+                        exec->stashResult(obj);
                         break;
                     }
 

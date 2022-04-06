@@ -650,7 +650,7 @@ void MigrationChunkClonerSourceLegacy::_nextCloneBatchFromIndexScan(OperationCon
             // that we take into consideration the overhead of BSONArray indices.
             if (arrBuilder->arrSize() &&
                 (arrBuilder->len() + obj.objsize() + 1024) > BSONObjMaxUserSize) {
-                _jumboChunkCloneState->clonerExec->enqueue(obj);
+                _jumboChunkCloneState->clonerExec->stashResult(obj);
                 break;
             }
 

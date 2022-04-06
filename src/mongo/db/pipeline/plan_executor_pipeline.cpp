@@ -93,8 +93,8 @@ PlanExecutor::ExecState PlanExecutorPipeline::getNextDocument(Document* docOut,
     invariant(!recordIdOut);
     invariant(docOut);
 
-    // Callers which use 'enqueue()' are not allowed to use 'getNextDocument()', and must instead
-    // use 'getNext()'.
+    // Callers which use 'stashResult()' are not allowed to use 'getNextDocument()', and must
+    // instead use 'getNext()'.
     invariant(_stash.empty());
 
     if (auto next = _getNext()) {

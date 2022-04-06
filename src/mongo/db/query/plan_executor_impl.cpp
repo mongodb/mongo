@@ -337,7 +337,7 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* ob
     if (!_stash.empty()) {
         invariant(objOut && !dlOut);
         *objOut = {SnapshotId(), _stash.front()};
-        _stash.pop();
+        _stash.pop_front();
         return PlanExecutor::ADVANCED;
     }
 
@@ -580,8 +580,8 @@ long long PlanExecutorImpl::executeDelete() {
     }
 }
 
-void PlanExecutorImpl::enqueue(const BSONObj& obj) {
-    _stash.push(Document{obj.getOwned()});
+void PlanExecutorImpl::stashResult(const BSONObj& obj) {
+    _stash.push_front(Document{obj.getOwned()});
 }
 
 bool PlanExecutorImpl::isMarkedAsKilled() const {

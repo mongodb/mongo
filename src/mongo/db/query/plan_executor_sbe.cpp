@@ -186,10 +186,10 @@ void PlanExecutorSBE::dispose(OperationContext* opCtx) {
     _isDisposed = true;
 }
 
-void PlanExecutorSBE::enqueue(const BSONObj& obj) {
+void PlanExecutorSBE::stashResult(const BSONObj& obj) {
     invariant(_state == State::kOpened);
     invariant(!_isDisposed);
-    _stash.push({obj.getOwned(), boost::none});
+    _stash.push_front({obj.getOwned(), boost::none});
 }
 
 PlanExecutor::ExecState PlanExecutorSBE::getNextDocument(Document* objOut, RecordId* dlOut) {
@@ -216,7 +216,7 @@ PlanExecutor::ExecState PlanExecutorSBE::getNext(BSONObj* out, RecordId* dlOut) 
         if (dlOut && recordId) {
             *dlOut = *recordId;
         }
-        _stash.pop();
+        _stash.pop_front();
         return PlanExecutor::ExecState::ADVANCED;
     } else if (_root->getCommonStats()->isEOF) {
         // If we had stashed elements and consumed them all, but the PlanStage has also

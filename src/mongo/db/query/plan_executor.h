@@ -313,16 +313,16 @@ public:
     virtual void dispose(OperationContext* opCtx) = 0;
 
     /**
-     * Stash the BSONObj so that it gets returned from the PlanExecutor on a later call to
-     * getNext(). Implementations should NOT support returning queued BSON objects using
-     * 'getNextDocument()'. Only 'getNext()' should return the queued BSON objects.
+     * Stash the BSONObj so that it gets returned from the PlanExecutor a subsequent call to
+     * getNext(). Implementations should NOT support returning stashed BSON objects using
+     * 'getNextDocument()'. Only 'getNext()' should return the stashed BSON objects.
      *
-     * Enqueued documents are returned in FIFO order. The queued results are exhausted before
+     * Enqueued documents are returned in LIFO order. The stashed results are exhausted before
      * generating further results from the underlying query plan.
      *
      * Subsequent calls to getNext() must request the BSONObj and *not* the RecordId.
      */
-    virtual void enqueue(const BSONObj& obj) = 0;
+    virtual void stashResult(const BSONObj& obj) = 0;
 
     virtual bool isMarkedAsKilled() const = 0;
     virtual Status getKillStatus() = 0;

@@ -513,7 +513,7 @@ public:
                     // If we can't fit this result inside the current batch, then we stash it for
                     // later.
                     if (!FindCommon::haveSpaceForNext(nextDoc, objCount, bytesBuffered)) {
-                        exec->enqueue(nextDoc);
+                        exec->stashResult(nextDoc);
                         break;
                     }
 

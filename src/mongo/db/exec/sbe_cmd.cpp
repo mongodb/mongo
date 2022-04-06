@@ -141,7 +141,7 @@ public:
 
             // If we can't fit this result inside the current batch, then we stash it for later.
             if (!FindCommon::haveSpaceForNext(next, objCount, firstBatch.len())) {
-                exec->enqueue(next);
+                exec->stashResult(next);
                 break;
             }
 

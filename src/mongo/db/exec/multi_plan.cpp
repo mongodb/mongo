@@ -111,7 +111,7 @@ PlanStage::StageState MultiPlanStage::doWork(WorkingSetID* out) {
     // Look for an already produced result that provides the data the caller wants.
     if (!bestPlan.results.empty()) {
         *out = bestPlan.results.front();
-        bestPlan.results.pop();
+        bestPlan.results.pop_front();
         return PlanStage::ADVANCED;
     }
 
@@ -265,7 +265,7 @@ bool MultiPlanStage::workAllPlans(size_t numResults, PlanYieldPolicy* yieldPolic
             // Ensure that the BSONObj underlying the WorkingSetMember is owned in case we choose to
             // return the results from the 'candidate' plan.
             member->makeObjOwnedIfNeeded();
-            candidate.results.push(id);
+            candidate.results.push_back(id);
 
             // Once a plan returns enough results, stop working.
             if (candidate.results.size() >= numResults) {
