@@ -577,7 +577,7 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
             const InternalBucketGeoWithinMatchExpression* ibgwme =
                 static_cast<InternalBucketGeoWithinMatchExpression*>(node);
             auto gc = ibgwme->getGeoContainer();
-            return gc->hasS2Region();
+            return gc.hasS2Region();
         }
         return false;
     } else if (IndexNames::GEO_2D == indexedFieldType) {

@@ -31,6 +31,7 @@
 
 #include <string>
 
+#include "mongo/base/clonable_ptr.h"
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/geo/shapes.h"
 #include "third_party/s2/s2regionunion.h"
@@ -38,14 +39,14 @@
 namespace mongo {
 
 class GeometryContainer {
-    GeometryContainer(const GeometryContainer&) = delete;
-    GeometryContainer& operator=(const GeometryContainer&) = delete;
-
 public:
     /**
      * Creates an empty geometry container which may then be loaded from BSON or directly.
      */
     GeometryContainer() = default;
+
+    GeometryContainer(const GeometryContainer&);
+    GeometryContainer& operator=(const GeometryContainer&);
 
     /**
      * Loads an empty GeometryContainer from query.
@@ -154,18 +155,18 @@ private:
     bool contains(const S2Polyline& otherLine) const;
     bool contains(const S2Polygon& otherPolygon) const;
 
-    // Only one of these shared_ptrs should be non-NULL.  S2Region is a
+    // Only one of these clonable_ptrs should be non-NULL.  S2Region is a
     // superclass but it only supports testing against S2Cells.  We need
     // the most specific class we can get.
-    std::unique_ptr<PointWithCRS> _point;
-    std::unique_ptr<LineWithCRS> _line;
-    std::unique_ptr<BoxWithCRS> _box;
-    std::unique_ptr<PolygonWithCRS> _polygon;
-    std::unique_ptr<CapWithCRS> _cap;
-    std::unique_ptr<MultiPointWithCRS> _multiPoint;
-    std::unique_ptr<MultiLineWithCRS> _multiLine;
-    std::unique_ptr<MultiPolygonWithCRS> _multiPolygon;
-    std::unique_ptr<GeometryCollection> _geometryCollection;
+    clonable_ptr<PointWithCRS> _point;
+    clonable_ptr<LineWithCRS> _line;
+    clonable_ptr<BoxWithCRS> _box;
+    clonable_ptr<PolygonWithCRS> _polygon;
+    clonable_ptr<CapWithCRS> _cap;
+    clonable_ptr<MultiPointWithCRS> _multiPoint;
+    clonable_ptr<MultiLineWithCRS> _multiLine;
+    clonable_ptr<MultiPolygonWithCRS> _multiPolygon;
+    clonable_ptr<GeometryCollection> _geometryCollection;
 
     // Cached for use during covering calculations
     // TODO: _s2Region is currently generated immediately - don't necessarily need to do this

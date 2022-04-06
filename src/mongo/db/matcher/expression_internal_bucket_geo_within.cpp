@@ -72,7 +72,7 @@ bool InternalBucketGeoWithinMatchExpression::equivalent(const MatchExpression* e
 
     return SimpleBSONObjComparator::kInstance.evaluate(
                _geoContainer->getGeoElement().Obj() ==
-               other->getGeoContainer()->getGeoElement().Obj()) &&
+               other->getGeoContainer().getGeoElement().Obj()) &&
         _field == other->getField();
 }
 

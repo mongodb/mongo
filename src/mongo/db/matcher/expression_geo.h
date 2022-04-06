@@ -97,8 +97,12 @@ public:
                          const GeoExpression::Predicate& queryPredicate,
                          bool skipValidation,
                          const BSONElement& e,
-                         MatchDetails* details);
+                         MatchDetails*);
+    static bool contains(const GeometryContainer& queryGeom,
+                         const GeoExpression::Predicate& queryPredicate,
+                         GeometryContainer* geometry);
     bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
+    bool matchesGeoContainer(const GeometryContainer&) const;
 
     virtual void debugString(StringBuilder& debug, int indentationLevel = 0) const;
 

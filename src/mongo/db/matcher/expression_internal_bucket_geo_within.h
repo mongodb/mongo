@@ -118,8 +118,8 @@ public:
         return _field;
     }
 
-    const std::shared_ptr<GeometryContainer> getGeoContainer() const {
-        return _geoContainer;
+    const GeometryContainer& getGeoContainer() const {
+        return *_geoContainer;
     }
 
     const StringData path() const final {

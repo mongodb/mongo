@@ -33,6 +33,7 @@
 #include <string>
 #include <vector>
 
+#include "mongo/base/clonable_ptr.h"
 #include "mongo/db/geo/big_polygon.h"
 #include "mongo/db/geo/s2.h"
 #include "mongo/db/jsobj.h"
@@ -260,6 +261,7 @@ enum CRS {
 
 struct PointWithCRS {
     PointWithCRS() : crs(UNSET) {}
+    std::unique_ptr<PointWithCRS> clone() const;
 
     S2Point point;
     S2Cell cell;
@@ -269,6 +271,7 @@ struct PointWithCRS {
 
 struct LineWithCRS {
     LineWithCRS() : crs(UNSET) {}
+    std::unique_ptr<LineWithCRS> clone() const;
 
     S2Polyline line;
     CRS crs;
@@ -276,6 +279,7 @@ struct LineWithCRS {
 
 struct CapWithCRS {
     CapWithCRS() : crs(UNSET) {}
+    std::unique_ptr<CapWithCRS> clone() const;
 
     S2Cap cap;
     Circle circle;
@@ -284,6 +288,7 @@ struct CapWithCRS {
 
 struct BoxWithCRS {
     BoxWithCRS() : crs(UNSET) {}
+    std::unique_ptr<BoxWithCRS> clone() const;
 
     Box box;
     CRS crs;
@@ -291,6 +296,7 @@ struct BoxWithCRS {
 
 struct PolygonWithCRS {
     PolygonWithCRS() : crs(UNSET) {}
+    std::unique_ptr<PolygonWithCRS> clone() const;
 
     std::unique_ptr<S2Polygon> s2Polygon;
     // Simple polygons with strict winding order may be bigger or smaller than a hemisphere.
@@ -303,6 +309,7 @@ struct PolygonWithCRS {
 
 struct MultiPointWithCRS {
     MultiPointWithCRS() : crs(UNSET) {}
+    std::unique_ptr<MultiPointWithCRS> clone() const;
 
     std::vector<S2Point> points;
     std::vector<S2Cell> cells;
@@ -311,6 +318,7 @@ struct MultiPointWithCRS {
 
 struct MultiLineWithCRS {
     MultiLineWithCRS() : crs(UNSET) {}
+    std::unique_ptr<MultiLineWithCRS> clone() const;
 
     std::vector<std::unique_ptr<S2Polyline>> lines;
     CRS crs;
@@ -318,20 +326,23 @@ struct MultiLineWithCRS {
 
 struct MultiPolygonWithCRS {
     MultiPolygonWithCRS() : crs(UNSET) {}
+    std::unique_ptr<MultiPolygonWithCRS> clone() const;
 
     std::vector<std::unique_ptr<S2Polygon>> polygons;
     CRS crs;
 };
 
 struct GeometryCollection {
+    std::unique_ptr<GeometryCollection> clone() const;
+
     std::vector<PointWithCRS> points;
 
-    // The amount of indirection here is painful but we can't operator= unique_ptr.
-    std::vector<std::unique_ptr<LineWithCRS>> lines;
-    std::vector<std::unique_ptr<PolygonWithCRS>> polygons;
-    std::vector<std::unique_ptr<MultiPointWithCRS>> multiPoints;
-    std::vector<std::unique_ptr<MultiLineWithCRS>> multiLines;
-    std::vector<std::unique_ptr<MultiPolygonWithCRS>> multiPolygons;
+    // The amount of indirection here is painful but we can't assign these geometric types.
+    std::vector<clonable_ptr<LineWithCRS>> lines;
+    std::vector<clonable_ptr<PolygonWithCRS>> polygons;
+    std::vector<clonable_ptr<MultiPointWithCRS>> multiPoints;
+    std::vector<clonable_ptr<MultiLineWithCRS>> multiLines;
+    std::vector<clonable_ptr<MultiPolygonWithCRS>> multiPolygons;
 
     bool supportsContains() {
         // Only polygons (and multiPolygons) support containment.

@@ -368,7 +368,7 @@ bool GeoMatchExpression::contains(const GeometryContainer& queryGeom,
                                   const GeoExpression::Predicate& queryPredicate,
                                   bool skipValidation,
                                   const BSONElement& e,
-                                  MatchDetails* details) {
+                                  MatchDetails*) {
     if (!e.isABSONObj())
         return false;
 
@@ -389,14 +389,37 @@ bool GeoMatchExpression::contains(const GeometryContainer& queryGeom,
     if (!geometry.supportsProject(queryGeom.getNativeCRS()))
         return false;
 
-    geometry.projectInto(queryGeom.getNativeCRS());
+    return contains(queryGeom, queryPredicate, &geometry);
+}
 
+bool GeoMatchExpression::contains(const GeometryContainer& queryGeom,
+                                  const GeoExpression::Predicate& queryPredicate,
+                                  GeometryContainer* geometry) {
+    geometry->projectInto(queryGeom.getNativeCRS());
     if (GeoExpression::WITHIN == queryPredicate) {
-        return queryGeom.contains(geometry);
+        return queryGeom.contains(*geometry);
     } else {
         verify(GeoExpression::INTERSECT == queryPredicate);
-        return queryGeom.intersects(geometry);
+        return queryGeom.intersects(*geometry);
     }
+}
+
+bool GeoMatchExpression::matchesGeoContainer(const GeometryContainer& input) const {
+    // Never match big polygon
+    if (input.getNativeCRS() == STRICT_SPHERE)
+        return false;
+
+    // Project this geometry into the CRS of the larger geometry.
+
+    // In the case of index validation, we are projecting the geometry of the query
+    // into the CRS of the index to confirm that the index region convers/includes
+    // the region described by the predicate.
+
+    if (!input.supportsProject(_query->getGeometry().getNativeCRS()))
+        return false;
+
+    GeometryContainer geometry{input};
+    return contains(_query->getGeometry(), _query->getPred(), &geometry);
 }
 
 void GeoMatchExpression::debugString(StringBuilder& debug, int indentationLevel) const {

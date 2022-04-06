@@ -698,38 +698,19 @@ bool isSubsetOf(const MatchExpression* lhs, const MatchExpression* rhs) {
 
     if (lhs->matchType() == MatchExpression::INTERNAL_BUCKET_GEO_WITHIN &&
         rhs->matchType() == MatchExpression::INTERNAL_BUCKET_GEO_WITHIN) {
-        auto indexMatchExpression = static_cast<const InternalBucketGeoWithinMatchExpression*>(rhs);
+        const auto* queryMatchExpression =
+            static_cast<const InternalBucketGeoWithinMatchExpression*>(lhs);
+        const auto* indexMatchExpression =
+            static_cast<const InternalBucketGeoWithinMatchExpression*>(rhs);
 
-        // {$_internalBucketGeoWithin: {$withinRegion: {$geometry: ...}, field: 'loc' }}
-        auto queryInternalBucketGeoWithinObj = lhs->serialize();
-        // '$_internalBucketGeoWithin: {$withinRegion: ... , field: 'loc' }'
-        auto queryInternalBucketGeoWithinElement = queryInternalBucketGeoWithinObj.firstElement();
         // Confirm that the "field" arguments match before continuing.
-        if (queryInternalBucketGeoWithinElement["field"].type() != mongo::String ||
-            queryInternalBucketGeoWithinElement["field"].valueStringData() !=
-                indexMatchExpression->getField()) {
+        if (queryMatchExpression->getField() != indexMatchExpression->getField()) {
             return false;
         }
-        // {$withinRegion: {$geometry: {type: "Polygon", coords:[...]}}
-        auto queryWithinRegionObj = queryInternalBucketGeoWithinElement.Obj();
-        // '$withinRegion: {$geometry: {type: "Polygon", coords:[...]}'
-        auto queryWithinRegionElement = queryWithinRegionObj.firstElement();
-        // {$geometry: {type: "Polygon", coordinates: [...]}}
-        auto queryGeometryObj = queryWithinRegionElement.Obj();
 
-        // We only handle $_internalBucketGeoWithin queries that use the $geometry operator.
-        if (!queryGeometryObj.hasField("$geometry"))
-            return false;
-
-        // geometryElement is '$geometry: {type: ... }'
-        auto queryGeometryElement = queryGeometryObj.firstElement();
-        MatchDetails* details = nullptr;
-
-        if (GeoMatchExpression::contains(*indexMatchExpression->getGeoContainer(),
-                                         GeoExpression::WITHIN,
-                                         false,
-                                         queryGeometryElement,
-                                         details)) {
+        GeometryContainer geometry = queryMatchExpression->getGeoContainer();
+        if (GeoMatchExpression::contains(
+                indexMatchExpression->getGeoContainer(), GeoExpression::WITHIN, &geometry)) {
             // The region described by query is within the region captured by the index.
             // For example, a query over the $geometry for the city of Houston is covered by an
             // index over the $geometry for the entire state of texas. Therefore this index can be
@@ -745,26 +726,15 @@ bool isSubsetOf(const MatchExpression* lhs, const MatchExpression* rhs) {
         // [...]}}' geometryObj is  {$geometry: {type: "Polygon", coordinates: [...]}}
         // geometryElement '$geometry: {type: "Polygon", coordinates: [...]}'
 
-        const GeoMatchExpression* queryMatchExpression =
-            static_cast<const GeoMatchExpression*>(lhs);
+        const auto* queryMatchExpression = static_cast<const GeoMatchExpression*>(lhs);
         // We only handle geoWithin queries
         if (queryMatchExpression->getGeoExpression().getPred() != GeoExpression::WITHIN) {
             return false;
         }
-        const GeoMatchExpression* indexMatchExpression =
-            static_cast<const GeoMatchExpression*>(rhs);
-        auto geoWithinObj = queryMatchExpression->getSerializedRightHandSide();
-        auto geoWithinElement = geoWithinObj.firstElement();
-        auto geometryObj = geoWithinElement.Obj();
+        const auto* indexMatchExpression = static_cast<const GeoMatchExpression*>(rhs);
 
-        // More specifically, we only handle geoWithin queries that use the $geometry operator.
-        if (!geometryObj.hasField("$geometry")) {
-            return false;
-        }
-        auto geometryElement = geometryObj.firstElement();
-        MatchDetails* details = nullptr;
-
-        if (indexMatchExpression->matchesSingleElement(geometryElement, details)) {
+        auto geometryContainer = queryMatchExpression->getGeoExpression().getGeometry();
+        if (indexMatchExpression->matchesGeoContainer(geometryContainer)) {
             // The region described by query is within the region captured by the index.
             // Therefore this index can be used in a potential solution for this query.
             return true;

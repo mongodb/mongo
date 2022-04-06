@@ -440,6 +440,101 @@ string R2Annulus::toString() const {
                          << " outer: " << _outer;
 }
 
+std::unique_ptr<PointWithCRS> PointWithCRS::clone() const {
+    auto cloned = std::make_unique<PointWithCRS>();
+    cloned->crs = crs;
+
+    cloned->point = point;
+    cloned->cell = cell;
+    cloned->oldPoint = oldPoint;
+
+    return cloned;
+}
+
+std::unique_ptr<LineWithCRS> LineWithCRS::clone() const {
+    auto cloned = std::make_unique<LineWithCRS>();
+    cloned->crs = crs;
+
+    std::vector<S2Point> vertices;
+    for (int i = 0; i < line.num_vertices(); ++i) {
+        vertices.emplace_back(line.vertex(i));
+    }
+    cloned->line.Init(vertices);
+
+    return cloned;
+}
+
+std::unique_ptr<CapWithCRS> CapWithCRS::clone() const {
+    auto cloned = std::make_unique<CapWithCRS>();
+    cloned->crs = crs;
+
+    cloned->cap = cap;
+
+    return cloned;
+}
+
+std::unique_ptr<BoxWithCRS> BoxWithCRS::clone() const {
+    auto cloned = std::make_unique<BoxWithCRS>();
+    cloned->crs = crs;
+
+    cloned->box = box;
+
+    return cloned;
+}
+
+std::unique_ptr<PolygonWithCRS> PolygonWithCRS::clone() const {
+    auto cloned = std::make_unique<PolygonWithCRS>();
+    cloned->crs = crs;
+
+    if (s2Polygon) {
+        cloned->s2Polygon.reset(s2Polygon->Clone());
+    }
+    if (bigPolygon) {
+        cloned->bigPolygon.reset(bigPolygon->Clone());
+    }
+    cloned->oldPolygon.init(oldPolygon);
+
+    return cloned;
+}
+
+std::unique_ptr<MultiPointWithCRS> MultiPointWithCRS::clone() const {
+    auto cloned = std::make_unique<MultiPointWithCRS>();
+    cloned->crs = crs;
+
+    cloned->points = points;
+    cloned->cells = cells;
+
+    return cloned;
+}
+
+std::unique_ptr<MultiLineWithCRS> MultiLineWithCRS::clone() const {
+    auto cloned = std::make_unique<MultiLineWithCRS>();
+    cloned->crs = crs;
+
+    for (const auto& line : lines) {
+        invariant(line);
+        cloned->lines.emplace_back(line->Clone());
+    }
+
+    return cloned;
+}
+
+std::unique_ptr<MultiPolygonWithCRS> MultiPolygonWithCRS::clone() const {
+    auto cloned = std::make_unique<MultiPolygonWithCRS>();
+    cloned->crs = crs;
+
+    for (const auto& polygon : polygons) {
+        invariant(polygon);
+        cloned->polygons.emplace_back(polygon->Clone());
+    }
+
+    return cloned;
+}
+
+std::unique_ptr<GeometryCollection> GeometryCollection::clone() const {
+    return std::make_unique<GeometryCollection>(*this);
+}
+
 /////// Other methods
 
 double S2Distance::distanceRad(const S2Point& pointA, const S2Point& pointB) {

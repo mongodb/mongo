@@ -1155,8 +1155,8 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
         if ("2dsphere_bucket"_sd == elt.valueStringDataSafe()) {
             tassert(5837101,
                     "A geo query on a sphere must have an S2 region",
-                    ibgwme->getGeoContainer()->hasS2Region());
-            const S2Region& region = ibgwme->getGeoContainer()->getS2Region();
+                    ibgwme->getGeoContainer().hasS2Region());
+            const S2Region& region = ibgwme->getGeoContainer().getS2Region();
             S2IndexingParams indexParams;
             ExpressionParams::initialize2dsphereParams(index.infoObj, index.collator, &indexParams);
             ExpressionMapping::cover2dsphere(region, indexParams, oilOut);
