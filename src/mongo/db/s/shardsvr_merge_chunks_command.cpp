@@ -29,8 +29,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
@@ -53,26 +51,6 @@
 
 namespace mongo {
 namespace {
-
-bool checkMetadataForSuccess(OperationContext* opCtx,
-                             const NamespaceString& nss,
-                             const OID& epoch,
-                             const ChunkRange& chunkRange) {
-    AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-    const auto metadataAfterMerge =
-        CollectionShardingRuntime::get(opCtx, nss)->getCurrentMetadataIfKnown();
-
-    uassert(ErrorCodes::StaleEpoch,
-            str::stream() << "Collection " << nss.ns() << " changed since merge start",
-            metadataAfterMerge && metadataAfterMerge->getShardVersion().epoch() == epoch);
-
-    ChunkType chunk;
-    if (!metadataAfterMerge->getNextChunk(chunkRange.getMin(), &chunk))
-        return false;
-
-    return chunk.getMin().woCompare(chunkRange.getMin()) == 0 &&
-        chunk.getMax().woCompare(chunkRange.getMax()) == 0;
-}
 
 Shard::CommandResponse commitMergeOnConfigServer(OperationContext* opCtx,
                                                  const NamespaceString& nss,
@@ -100,7 +78,8 @@ void mergeChunks(OperationContext* opCtx,
                  const NamespaceString& nss,
                  const BSONObj& minKey,
                  const BSONObj& maxKey,
-                 const OID& expectedEpoch) {
+                 const OID& expectedEpoch,
+                 const boost::optional<Timestamp>& expectedTimestamp) {
     auto scopedSplitOrMergeChunk(
         uassertStatusOK(ActiveMigrationsRegistry::get(opCtx).registerSplitOrMergeChunk(
             opCtx, nss, ChunkRange(minKey, maxKey))));
@@ -113,68 +92,65 @@ void mergeChunks(OperationContext* opCtx,
     const auto metadataBeforeMerge = [&] {
         AutoGetCollection autoColl(opCtx, nss, MODE_IS);
         auto csr = CollectionShardingRuntime::get(opCtx, nss);
+
         // If there is a version attached to the OperationContext, validate it
         if (oss.getShardVersion(nss)) {
             csr->checkShardVersionOrThrow(opCtx);
+        } else {
+            auto optMetadata = csr->getCurrentMetadataIfKnown();
+
+            ShardId shardId = ShardingState::get(opCtx)->shardId();
+
+            uassert(StaleConfigInfo(nss,
+                                    ChunkVersion::IGNORED() /* receivedVersion */,
+                                    boost::none /* wantedVersion */,
+                                    shardId),
+                    str::stream() << "Collection " << nss.ns() << " needs to be recovered",
+                    optMetadata);
+            uassert(StaleConfigInfo(nss,
+                                    ChunkVersion::IGNORED() /* receivedVersion */,
+                                    ChunkVersion::UNSHARDED() /* wantedVersion */,
+                                    shardId),
+                    str::stream() << "Collection " << nss.ns() << " is not sharded",
+                    optMetadata->isSharded());
+            const auto epoch = optMetadata->getShardVersion().epoch();
+            uassert(StaleConfigInfo(nss,
+                                    ChunkVersion::IGNORED() /* receivedVersion */,
+                                    optMetadata->getShardVersion() /* wantedVersion */,
+                                    shardId),
+                    str::stream() << "Could not merge chunks because collection " << nss.ns()
+                                  << " has changed since merge was sent (sent epoch: "
+                                  << expectedEpoch << ", current epoch: " << epoch << ")",
+                    epoch == expectedEpoch &&
+                        (!expectedTimestamp ||
+                         optMetadata->getShardVersion().getTimestamp() == expectedTimestamp));
         }
-        return csr->getCurrentMetadataIfKnown();
+
+        return *csr->getCurrentMetadataIfKnown();
     }();
-
-    uassert(ErrorCodes::StaleEpoch,
-            str::stream() << "Collection " << nss.ns() << " is not sharded",
-            metadataBeforeMerge && metadataBeforeMerge->isSharded());
-
-    const auto epoch = metadataBeforeMerge->getShardVersion().epoch();
-    uassert(ErrorCodes::StaleEpoch,
-            str::stream() << "could not merge chunks, collection " << nss.ns()
-                          << " has changed since merge was sent (sent epoch: " << expectedEpoch
-                          << ", current epoch: " << epoch << ")",
-            expectedEpoch == epoch);
 
     ChunkRange chunkRange(minKey, maxKey);
 
     uassert(ErrorCodes::IllegalOperation,
-            str::stream() << "could not merge chunks, the range " << redact(chunkRange.toString())
-                          << " is not valid"
-                          << " for collection " << nss.ns() << " with key pattern "
-                          << metadataBeforeMerge->getKeyPattern().toString(),
-            metadataBeforeMerge->isValidKey(minKey) && metadataBeforeMerge->isValidKey(maxKey));
+            str::stream() << "could not merge chunks, the range " << chunkRange.toString()
+                          << " is not valid for collection " << nss.ns() << " with key pattern "
+                          << metadataBeforeMerge.getKeyPattern().toString(),
+            metadataBeforeMerge.isValidKey(minKey) && metadataBeforeMerge.isValidKey(maxKey));
 
-    auto cmdResponse = commitMergeOnConfigServer(opCtx, nss, chunkRange, metadataBeforeMerge.get());
+    auto cmdResponse = commitMergeOnConfigServer(opCtx, nss, chunkRange, metadataBeforeMerge);
 
-    boost::optional<ChunkVersion> shardVersionReceived = [&]() -> boost::optional<ChunkVersion> {
-        // old versions might not have the shardVersion field
+    uassertStatusOKWithContext(cmdResponse.commandStatus, "Failed to commit chunk merge");
+    uassertStatusOKWithContext(cmdResponse.writeConcernStatus, "Failed to commit chunk merge");
+
+    auto shardVersionReceived = [&]() -> boost::optional<ChunkVersion> {
+        // Old versions might not have the shardVersion field
         if (cmdResponse.response[ChunkVersion::kShardVersionField]) {
             return ChunkVersion::fromBSONPositionalOrNewerFormat(
                 cmdResponse.response[ChunkVersion::kShardVersionField]);
         }
         return boost::none;
     }();
-
-    // Refresh metadata to pick up new chunk definitions (regardless of the results returned from
-    // running _configsvrCommitChunksMerge).
     onShardVersionMismatch(opCtx, nss, std::move(shardVersionReceived));
-
-    // If _configsvrCommitChunksMerge returned an error, look at this shard's metadata to determine
-    // if the merge actually did happen. This can happen if there's a network error getting the
-    // response from the first call to _configsvrCommitChunksMerge, but it actually succeeds, thus
-    // the automatic retry fails with a precondition violation, for example.
-    auto commandStatus = std::move(cmdResponse.commandStatus);
-    auto writeConcernStatus = std::move(cmdResponse.writeConcernStatus);
-
-    if ((!commandStatus.isOK() || !writeConcernStatus.isOK()) &&
-        checkMetadataForSuccess(opCtx, nss, epoch, chunkRange)) {
-        LOGV2_DEBUG(21983,
-                    1,
-                    "mergeChunk interval [{minKey},{maxKey}) has already been committed",
-                    "mergeChunk interval has already been committed",
-                    "minKey"_attr = redact(minKey),
-                    "maxKey"_attr = redact(maxKey));
-        return;
-    }
-
-    uassertStatusOKWithContext(commandStatus, "Failed to commit chunk merge");
-    uassertStatusOKWithContext(writeConcernStatus, "Failed to commit chunk merge");
 }
 
 class MergeChunksCommand : public ErrmsgCommandDeprecated {
@@ -212,12 +188,10 @@ public:
         return false;
     }
 
-    // Required
     static BSONField<std::string> nsField;
     static BSONField<std::vector<BSONObj>> boundsField;
-
-    // Optional, if the merge is only valid for a particular epoch
     static BSONField<OID> epochField;
+    static BSONField<Timestamp> timestampField;
 
     bool errmsgRun(OperationContext* opCtx,
                    const std::string& dbname,
@@ -256,13 +230,20 @@ public:
             return false;
         }
 
-        // Epoch is optional, and if not set indicates we should use the latest epoch
         OID epoch;
         if (!FieldParser::extract(cmdObj, epochField, &epoch, &errmsg)) {
             return false;
         }
 
-        mergeChunks(opCtx, nss, minKey, maxKey, epoch);
+        boost::optional<Timestamp> timestamp;
+        if (cmdObj[timestampField()]) {
+            timestamp.emplace();
+            if (!FieldParser::extract(cmdObj, timestampField, timestamp.get_ptr(), &errmsg)) {
+                return false;
+            }
+        }
+
+        mergeChunks(opCtx, nss, minKey, maxKey, epoch, timestamp);
         return true;
     }
 
@@ -271,6 +252,7 @@ public:
 BSONField<std::string> MergeChunksCommand::nsField("mergeChunks");
 BSONField<std::vector<BSONObj>> MergeChunksCommand::boundsField("bounds");
 BSONField<OID> MergeChunksCommand::epochField("epoch");
+BSONField<Timestamp> MergeChunksCommand::timestampField("timestamp");
 
 }  // namespace
 }  // namespace mongo
