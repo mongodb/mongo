@@ -610,6 +610,59 @@ TEST_F(HashAggStageTest, HashAggBasicCountSpillDouble) {
     stage->close();
 }
 
+TEST_F(HashAggStageTest, HashAggBasicCountNoSpillWithNoGroupByDouble) {
+    auto defaultInternalQuerySBEAggApproxMemoryUseInBytesBeforeSpill =
+        internalQuerySBEAggApproxMemoryUseInBytesBeforeSpill.load();
+    internalQuerySBEAggApproxMemoryUseInBytesBeforeSpill.store(1);
+    ON_BLOCK_EXIT([&] {
+        internalQuerySBEAggApproxMemoryUseInBytesBeforeSpill.store(
+            defaultInternalQuerySBEAggApproxMemoryUseInBytesBeforeSpill);
+    });
+
+    auto ctx = makeCompileCtx();
+
+    auto [inputTag, inputVal] =
+        stage_builder::makeValue(BSON_ARRAY(1.0 << 2.0 << 3.0 << 4.0 << 5.0));
+    auto [scanSlot, scanStage] = generateVirtualScan(inputTag, inputVal);
+
+    // Build a HashAggStage, with an empty group by slot and compute a simple count.
+    auto countsSlot = generateSlotId();
+    auto stage = makeS<HashAggStage>(
+        std::move(scanStage),
+        makeSV(),
+        makeEM(countsSlot,
+               stage_builder::makeFunction(
+                   "sum",
+                   makeE<EConstant>(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(1)))),
+        makeSV(),  // Seek slot
+        true,
+        boost::none,
+        true /* allowDiskUse */,
+        kEmptyPlanNodeId);
+
+    // Prepare the tree and get the 'SlotAccessor' for the output slot.
+    auto resultAccessor = prepareTree(ctx.get(), stage.get(), countsSlot);
+
+    // Read in all of the results.
+    std::set<int64_t> results;
+    while (stage->getNext() == PlanState::ADVANCED) {
+        auto [resTag, resVal] = resultAccessor->getViewOfValue();
+        ASSERT_EQ(value::TypeTags::NumberInt64, resTag);
+        ASSERT_TRUE(results.insert(value::bitcastFrom<int64_t>(resVal)).second);
+    }
+
+    // Check that the results match the expected.
+    ASSERT_EQ(1, results.size());
+    ASSERT_EQ(1, results.count(5));
+
+    // Check that the spilling behavior matches the expected.
+    auto stats = static_cast<const HashAggStats*>(stage->getSpecificStats());
+    ASSERT_FALSE(stats->usedDisk);
+    ASSERT_EQ(0, stats->spilledRecords);
+
+    stage->close();
+}
+
 TEST_F(HashAggStageTest, HashAggMultipleAccSpill) {
     // We estimate the size of result row like {double, int64} at 59B. Set the memory threshold to
     // 128B so that two rows fit in memory.

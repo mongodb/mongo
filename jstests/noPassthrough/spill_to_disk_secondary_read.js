@@ -13,7 +13,8 @@ const replTest = new ReplSetTest({
 replTest.startSet();
 replTest.initiate();
 
-// Test that spilling '$group' pipeline on a secondary works with a writeConcern greater than w:1.
+// Test that spilling '$group' and '$lookup' pipeline on a secondary works with a writeConcern
+// greater than w:1.
 let primary = replTest.getPrimary();
 const insertColl = primary.getDB("test").foo;
 for (let i = 0; i < 500; ++i) {
@@ -24,11 +25,26 @@ let secondary = replTest.getSecondary();
 assert.commandWorked(secondary.adminCommand(
     {setParameter: 1, internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill: 1}));
 
+assert.commandWorked(secondary.adminCommand({
+    setParameter: 1,
+    internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill: 1
+}));
+
 const readColl = secondary.getDB("test").foo;
 
 let pipeline = [{$group: {_id: '$a', s: {$addToSet: '$string'}, p: {$push: '$a'}}}];
 
 let res =
+    readColl
+        .aggregate(
+            pipeline,
+            {allowDiskUse: true, readConcern: {level: "majority"}, writeConcern: {"w": "majority"}})
+        .toArray();
+
+pipeline =
+    [{$lookup: {from: readColl.getName(), localField: "a", foreignField: "a", as: "results"}}];
+
+res =
     readColl
         .aggregate(
             pipeline,

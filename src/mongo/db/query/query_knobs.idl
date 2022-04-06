@@ -632,6 +632,17 @@ server_parameters:
     validator:
         gt: 0
 
+  internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill:
+    description: "The max size in bytes that the hash table in a HashLookup stage can be estimated to
+    be before we spill to disk."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQuerySBELookupApproxMemoryUseInBytesBeforeSpill"
+    cpp_vartype: AtomicWord<long long>
+    default:
+      expr: 100 * 1024 * 1024
+    validator:
+        gt: 0
+
   internalQueryForceClassicEngine:
     description: "If true, the system will use the classic execution engine for all queries,
     otherwise eligible queries will execute using the SBE execution engine."

@@ -158,4 +158,13 @@ template <class BufferAllocator>
 size_t estimate(const BasicBufBuilder<BufferAllocator>& ba) {
     return static_cast<size_t>(ba.capacity());
 }
+
+inline size_t estimate(const value::MaterializedRow& row) {
+    size_t size = 0;
+    for (size_t idx = 0; idx < row.size(); ++idx) {
+        auto [tag, val] = row.getViewOfValue(idx);
+        size += estimate(tag, val);
+    }
+    return size;
+}
 }  // namespace mongo::sbe::size_estimator

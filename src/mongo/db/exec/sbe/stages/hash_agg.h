@@ -100,8 +100,6 @@ protected:
         TrialRunTracker* tracker, TrialRunTrackerAttachResultMask childrenAttachResult) override;
 
 private:
-    boost::optional<value::MaterializedRow> getFromRecordStore(const RecordId& rid);
-
     using TableType = stdx::unordered_map<value::MaterializedRow,
                                           value::MaterializedRow,
                                           value::MaterializedRowHasher,
@@ -175,8 +173,8 @@ private:
     value::SlotAccessorMap _outAccessors;
     std::vector<value::SlotAccessor*> _inKeyAccessors;
 
-    // Accesors for the key stored in '_ht', a SwitchAccessor is used so we can produce the key from
-    // either the '_ht' or the '_recordStore'.
+    // Accessors for the key stored in '_ht', a SwitchAccessor is used so we can produce the key
+    // from either the '_ht' or the '_recordStore'.
     std::vector<std::unique_ptr<HashKeyAccessor>> _outHashKeyAccessors;
     std::vector<std::unique_ptr<value::SwitchAccessor>> _outKeyAccessors;
 

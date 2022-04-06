@@ -34,6 +34,7 @@
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
+#include "mongo/db/query/query_knobs_gen.h"
 
 namespace mongo::sbe {
 /**
@@ -112,10 +113,60 @@ private:
     using BufferAccessor = value::MaterializedRowAccessor<BufferType>;
 
     void reset();
-    void addHashTableEntry(value::SlotAccessor* keyAccessor, size_t valueIndex);
-
     template <typename C>
     void accumulateFromValueIndices(const C& projectIndices);
+
+    // Spilling helpers.
+    void addHashTableEntry(value::SlotAccessor* keyAccessor, size_t valueIndex);
+    void spillBufferedValueToDisk(OperationContext* opCtx,
+                                  RecordStore* rs,
+                                  size_t bufferIdx,
+                                  const value::MaterializedRow&);
+    size_t bufferValueOrSpill(value::MaterializedRow& value);
+    void setInnerProjectSwitchAccessor(int idx);
+
+    boost::optional<std::vector<size_t>> readIndicesFromRecordStore(RecordStore* rs,
+                                                                    value::TypeTags tagKey,
+                                                                    value::Value valKey);
+
+    void writeIndicesToRecordStore(RecordStore* rs,
+                                   value::TypeTags tagKey,
+                                   value::Value valKey,
+                                   const std::vector<size_t>& value,
+                                   bool update);
+
+    void spillIndicesToRecordStore(RecordStore* rs,
+                                   value::TypeTags tagKey,
+                                   value::Value valKey,
+                                   const std::vector<size_t>& value);
+    /**
+     * Constructs a RecordId for a value index. It must be shifted by 1 since a valid RecordId
+     * with the value 0 is invalid.
+     */
+    RecordId getValueRecordId(size_t index) {
+        return RecordId(static_cast<int64_t>(index) + 1);
+    }
+
+    bool hasSpilledHtToDisk() {
+        return _recordStoreHt != nullptr;
+    }
+
+    bool hasSpilledBufToDisk() {
+        return _recordStoreBuf != nullptr;
+    }
+
+    void makeTemporaryRecordStore();
+
+    std::pair<RecordId, KeyString::TypeBits> serializeKeyForRecordStore(
+        const value::MaterializedRow& key) const;
+
+    /**
+     * Normalizes a string if _collatorSlot is pouplated and returns a third parameter to let the
+     * caller know if it should own the tag and value.
+     */
+    std::tuple<bool, value::TypeTags, value::Value> normalizeStringIfCollator(value::TypeTags tag,
+                                                                              value::Value val);
+
 
     PlanStage* outerChild() const {
         return _children[0].get();
@@ -129,6 +180,7 @@ private:
     const value::SlotVector _innerProjects;
     const value::SlotMap<std::unique_ptr<EExpression>> _innerAggs;
     const boost::optional<value::SlotId> _collatorSlot;
+    CollatorInterface* _collator;
 
     value::SlotAccessorMap _outAccessorMap;
     value::SlotAccessorMap _outInnerProjectAccessorMap;
@@ -137,9 +189,18 @@ private:
 
     value::SlotAccessor* _inInnerMatchAccessor;
     std::vector<value::SlotAccessor*> _inInnerProjectAccessors;
-    std::vector<BufferAccessor> _outInnerProjectAccessors;
+    std::vector<value::SwitchAccessor> _outInnerProjectAccessors;
     std::vector<value::MaterializedSingleRowAccessor> _outResultAggAccessors;
     std::vector<std::unique_ptr<vm::CodeFragment>> _aggCodes;
+
+    // The accessor for the '_ht' agg value.
+    std::vector<value::MaterializedSingleRowAccessor> _outAggAccessors;
+
+    // Accessor for the buffered value stored in the '_recordStore' when data is spilled to
+    // disk.
+    value::MaterializedRow _bufValueRecordStore{0};
+    std::vector<value::MaterializedSingleRowAccessor> _outInnerBufValueRecordStoreAccessors;
+    std::vector<BufferAccessor> _outInnerBufferProjectAccessors;
 
     // Accessor for collator. Only set if collatorSlot provided during construction.
     value::SlotAccessor* _collatorAccessor = nullptr;
@@ -152,10 +213,23 @@ private:
 
     BufferType _buffer;
     size_t _bufferIt{0};
+    long long _valueId{0};
     boost::optional<HashTableType> _ht;
 
     vm::ByteCode _bytecode;
 
     bool _compileInnerAgg{false};
+
+    // Memory tracking and spilling to disk.
+    const long long _memoryUseInBytesBeforeSpill =
+        internalQuerySBELookupApproxMemoryUseInBytesBeforeSpill.load();
+    int _currentSwitchIdx = 0;
+
+    // This counter tracks an exact size for the '_ht' and an approximate size for the buffered
+    // rows in '_buffer'.
+    long long _computedTotalMemUsage = 0;
+
+    std::unique_ptr<TemporaryRecordStore> _recordStoreHt;
+    std::unique_ptr<TemporaryRecordStore> _recordStoreBuf;
 };
 }  // namespace mongo::sbe

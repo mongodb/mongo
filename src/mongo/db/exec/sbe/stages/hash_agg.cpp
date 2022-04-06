@@ -32,6 +32,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/exec/sbe/stages/hash_agg.h"
+#include "mongo/db/exec/sbe/util/spilling.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/util/str.h"
@@ -173,7 +174,7 @@ void HashAggStage::prepare(CompileCtx& ctx) {
 
         // A SwitchAccessor is used to toggle the '_outAggAccessors' between the '_ht' and the
         // '_recordStore' when updating the agg state via the bytecode. By compiling the agg
-        // EExpressions with a SwitchAccessor we can load the agg value into the of memory
+        // EExpressions with a SwitchAccessor we can load the agg value into the memory of
         // '_aggValueRecordStore' if the value comes from the '_recordStore' or we can use the
         // agg value referenced through '_htIt' and run the bytecode to mutate the value through the
         // SwitchAccessor.
@@ -205,32 +206,6 @@ value::SlotAccessor* HashAggStage::getAccessor(CompileCtx& ctx, value::SlotId sl
     return ctx.getAccessor(slot);
 }
 
-namespace {
-// Proactively assert that this operation can safely write before hitting an assertion in the
-// storage engine. We can safely write if we are enforcing prepare conflicts by blocking or if we
-// are ignoring prepare conflicts and explicitly allowing writes. Ignoring prepare conflicts
-// without allowing writes will cause this operation to fail in the storage engine.
-void assertIgnorePrepareConflictsBehavior(OperationContext* opCtx) {
-    tassert(5907502,
-            "The operation must be ignoring conflicts and allowing writes or enforcing prepare "
-            "conflicts entirely",
-            opCtx->recoveryUnit()->getPrepareConflictBehavior() !=
-                PrepareConflictBehavior::kIgnoreConflicts);
-}
-
-/**
- * This helper takes the 'rid' RecordId (the group-by key) and rehydrates it into a KeyString::Value
- * from the typeBits.
- */
-KeyString::Value rehydrateKey(const RecordId& rid, KeyString::TypeBits typeBits) {
-    auto rawKey = rid.getStr();
-    KeyString::Builder kb{KeyString::Version::kLatestVersion};
-    kb.resetFromBuffer(rawKey.rawData(), rawKey.size());
-    kb.setTypeBits(typeBits);
-    return kb.getValueCopy();
-}
-}  // namespace
-
 void HashAggStage::makeTemporaryRecordStore() {
     tassert(
         5907500,
@@ -253,7 +228,8 @@ void HashAggStage::spillRowToDisk(const value::MaterializedRow& key,
     auto typeBits = kb.getTypeBits();
 
     auto rid = RecordId(kb.getBuffer(), kb.getSize());
-    auto valFromRs = getFromRecordStore(rid);
+    boost::optional<value::MaterializedRow> valFromRs =
+        readFromRecordStore(_opCtx, _recordStore->rs(), rid);
     tassert(6031100, "Spilling a row doesn't support updating it in the store.", !valFromRs);
 
     spillValueToDisk(rid, val, typeBits, false /*update*/);
@@ -263,44 +239,11 @@ void HashAggStage::spillValueToDisk(const RecordId& key,
                                     const value::MaterializedRow& val,
                                     const KeyString::TypeBits& typeBits,
                                     bool update) {
-    BufBuilder bufValue;
-    val.serializeForSorter(bufValue);
-
-    // Append the 'typeBits' to the end of the val's buffer so the 'key' can be reconstructed when
-    // draining HashAgg.
-    bufValue.appendBuf(typeBits.getBuffer(), typeBits.getSize());
-
-    assertIgnorePrepareConflictsBehavior(_opCtx);
-
-    WriteUnitOfWork wuow(_opCtx);
-
-    auto result = mongo::Status::OK();
-    if (update) {
-        result = _recordStore->rs()->updateRecord(_opCtx, key, bufValue.buf(), bufValue.len());
-    } else {
-        auto status = _recordStore->rs()->insertRecord(
-            _opCtx, key, bufValue.buf(), bufValue.len(), Timestamp{});
-        result = status.getStatus();
-    }
-    wuow.commit();
-    tassert(5843600,
-            str::stream() << "Failed to write to disk because " << result.reason(),
-            result.isOK());
-
+    auto nBytes = upsertToRecordStore(_opCtx, _recordStore->rs(), key, val, typeBits, update);
     if (!update) {
         _specificStats.spilledRecords++;
     }
-    _specificStats.lastSpilledRecordSize = bufValue.len();
-}
-
-boost::optional<value::MaterializedRow> HashAggStage::getFromRecordStore(const RecordId& rid) {
-    RecordData record;
-    if (_recordStore->rs()->findRecord(_opCtx, rid, &record)) {
-        auto valueReader = BufReader(record.data(), record.size());
-        return value::MaterializedRow::deserializeForSorter(valueReader, {});
-    } else {
-        return boost::none;
-    }
+    _specificStats.lastSpilledRecordSize = nBytes;
 }
 
 // Checks memory usage. Ideally, we'd want to know the exact size of already accumulated data, but
@@ -313,6 +256,12 @@ void HashAggStage::checkMemoryUsageAndSpillIfNecessary(MemoryCheckData& mcd) {
     // meet the memory constraint during a previous check -- we don't need to keep checking memory
     // usage in this case because the table will never get new rows.
     if (_ht->empty()) {
+        return;
+    }
+
+    // If the group-by key is empty we will only ever aggregate into a single row so no sense in
+    // spilling since we will just be moving a single row back and forth from disk to main memory.
+    if (_inKeyAccessors.size() == 0) {
         return;
     }
 
@@ -445,7 +394,8 @@ void HashAggStage::open(bool reOpen) {
 
                 auto rid = RecordId(kb.getBuffer(), kb.getSize());
 
-                auto valFromRs = getFromRecordStore(rid);
+                boost::optional<value::MaterializedRow> valFromRs =
+                    readFromRecordStore(_opCtx, _recordStore->rs(), rid);
                 if (!valFromRs) {
                     _aggValueRecordStore = defaultVal;
                 } else {
@@ -553,7 +503,7 @@ PlanState HashAggStage::getNext() {
 
             BufBuilder buf;
             _aggKeyRecordStore = value::MaterializedRow::deserializeFromKeyString(
-                rehydrateKey(nextRecord->id, typeBits), &buf);
+                decodeKeyString(nextRecord->id, typeBits), &buf);
             return trackPlanState(PlanState::ADVANCED);
         } else {
             _rsCursor.reset();

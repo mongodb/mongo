@@ -59,6 +59,7 @@ sbeEnv.Library(
         'stages/unique.cpp',
         'stages/unwind.cpp',
         'util/debug_print.cpp',
+        'util/spilling.cpp',
         'util/stage_results_printer.cpp',
         'values/sbe_pattern_value_cmp.cpp',
         'values/slot.cpp',

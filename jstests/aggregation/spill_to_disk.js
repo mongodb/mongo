@@ -14,6 +14,7 @@
 (function() {
 'use strict';
 
+load("jstests/aggregation/extras/utils.js");
 load('jstests/libs/fixture_helpers.js');            // For 'FixtureHelpers'
 load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
 
@@ -188,4 +189,150 @@ for (const op of ['$firstN', '$lastN', '$minN', '$maxN', '$topN', '$bottomN']) {
 }
 // don't leave large collection laying around
 assert(coll.drop());
+
+// Test spill to disk for $lookup
+const localColl = db.lookup_spill_local_hj;
+const foreignColl = db.lookup_spill_foreign_hj;
+
+function setupCollections(localRecords, foreignRecords, foreignField) {
+    localColl.drop();
+    assert.commandWorked(localColl.insert(localRecords));
+    foreignColl.drop();
+    assert.commandWorked(foreignColl.insert(foreignRecords));
+}
+
+function setHashLookupParameters(memoryLimit) {
+    const oldMemoryLimit =
+        assert
+            .commandWorked(db.adminCommand({
+                setParameter: 1,
+                internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill:
+                    memoryLimit
+            }))
+            .was;
+
+    return oldMemoryLimit;
+}
+
+/**
+ * Executes $lookup with multiple records in the local/foreign collections and checks that the "as"
+ * field for it contains documents with ids from `idsExpectedToMatch`.
+ */
+function runTest_MultipleLocalForeignRecords(
+    {testDescription, localRecords, localField, foreignRecords, foreignField, idsExpectedToMatch}) {
+    setupCollections(localRecords, foreignRecords, foreignField);
+    const pipeline = [{
+                  $lookup: {
+                                from: foreignColl.getName(),
+                                localField: localField,
+                                foreignField: foreignField,
+                                as: "matched"
+                            }}];
+    const results = localColl.aggregate(pipeline, {allowDiskUse: true}).toArray();
+    const explain = localColl.explain().aggregate(pipeline, {allowDiskUse: true});
+
+    assert.eq(localRecords.length, results.length);
+
+    // Extract matched foreign ids from the "matched" field.
+    for (let i = 0; i < results.length; i++) {
+        const matchedIds = results[i].matched.map(x => (x._id));
+        // Order of the elements within the arrays is not significant for 'assertArrayEq'.
+        assertArrayEq({
+            actual: matchedIds,
+            expected: idsExpectedToMatch[i],
+            extraErrorMsg: " **TEST** " + testDescription + " " + tojson(explain)
+        });
+    }
+}
+
+function runHashLookupSpill(memoryLimit) {
+    const oldSettings = setHashLookupParameters(memoryLimit);
+
+    (function testMultipleMatchesOnSingleLocal() {
+        const docs = [
+            {_id: 0, no_a: 1},
+            {_id: 1, a: 1},
+            {_id: 2, a: [1]},
+            {_id: 3, a: [[1]]},
+            {_id: 4, a: 1},
+        ];
+
+        runTest_MultipleLocalForeignRecords({
+            testDescription: "Single Local matches multiple foreign docs",
+            localRecords: [{_id: 0, b: 1}],
+            localField: "b",
+            foreignRecords: docs,
+            foreignField: "a",
+            idsExpectedToMatch: [[1, 2, 4]]
+        });
+    })();
+
+    (function testMultipleMatchesOnManyLocal() {
+        const localDocs = [
+            {_id: 0, a: -1},
+            {_id: 1, a: 1},
+            {_id: 2, a: 2},
+            {_id: 3, a: 3},
+            {_id: 4, a: 3},
+            {_id: 5, a: 7},
+        ];
+
+        const foreignDocs = [
+            {_id: 7, b: 0},
+            {_id: 8, b: 1},
+            {_id: 9, b: 2},
+            {_id: 10, b: 2},
+            {_id: 11, b: 3},
+            {_id: 12, b: 3},
+            {_id: 13, b: 3},
+            {_id: 14, b: 6},
+        ];
+
+        runTest_MultipleLocalForeignRecords({
+            testDescription: "Multiple local matches on multiple foreign docs",
+            localRecords: localDocs,
+            localField: "a",
+            foreignRecords: foreignDocs,
+            foreignField: "b",
+            idsExpectedToMatch: [[], [8], [9, 10], [11, 12, 13], [11, 12, 13], []]
+        });
+    })();
+
+    return oldSettings;
+}
+
+const oldMemSettings =
+    assert
+        .commandWorked(db.adminCommand({
+            getParameter: 1,
+            internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill: 1
+        }))
+        .internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill;
+
+(function runAllDiskTest() {
+    try {
+        // Spill at one byte.
+        runHashLookupSpill(1);
+    } finally {
+        setHashLookupParameters(oldMemSettings);
+    }
+})();
+
+(function runMixedInMemoryAndDiskTest() {
+    try {
+        // Spill at 128 bytes.
+        runHashLookupSpill(128);
+    } finally {
+        setHashLookupParameters(oldMemSettings);
+    }
+})();
+
+(function runMixedAllInMemory() {
+    try {
+        // Spill at 100 mb.
+        runHashLookupSpill(100 * 1024 * 1024);
+    } finally {
+        setHashLookupParameters(oldMemSettings);
+    }
+})();
 })();
