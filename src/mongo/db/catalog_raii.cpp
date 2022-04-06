@@ -192,15 +192,17 @@ Collection* AutoGetCollection::getWritableCollection(CollectionCatalog::Lifetime
                                     const Collection* originalCollection)
                 : _autoColl(autoColl), _originalCollection(originalCollection) {}
             void commit(boost::optional<Timestamp> commitTime) final {
-                _autoColl._coll = CollectionPtr(_autoColl.getOperationContext(),
-                                                _autoColl._coll.get(),
-                                                LookupCollectionForYieldRestore());
+                _autoColl._coll =
+                    CollectionPtr(_autoColl.getOperationContext(),
+                                  _autoColl._coll.get(),
+                                  LookupCollectionForYieldRestore(_autoColl._coll->ns()));
                 _autoColl._writableColl = nullptr;
             }
             void rollback() final {
-                _autoColl._coll = CollectionPtr(_autoColl.getOperationContext(),
-                                                _originalCollection,
-                                                LookupCollectionForYieldRestore());
+                _autoColl._coll =
+                    CollectionPtr(_autoColl.getOperationContext(),
+                                  _originalCollection,
+                                  LookupCollectionForYieldRestore(_originalCollection->ns()));
                 _autoColl._writableColl = nullptr;
             }
 

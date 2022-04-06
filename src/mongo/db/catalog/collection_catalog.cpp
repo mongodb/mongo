@@ -339,7 +339,8 @@ CollectionCatalog::iterator::value_type CollectionCatalog::iterator::operator*()
         return CollectionPtr();
     }
 
-    return {_opCtx, _mapIter->second.get(), LookupCollectionForYieldRestore()};
+    return {
+        _opCtx, _mapIter->second.get(), LookupCollectionForYieldRestore(_mapIter->second->ns())};
 }
 
 Collection* CollectionCatalog::iterator::getWritableCollection(OperationContext* opCtx,
@@ -665,12 +666,12 @@ CollectionPtr CollectionCatalog::lookupCollectionByUUID(OperationContext* opCtx,
     }
 
     if (auto coll = UncommittedCollections::getForTxn(opCtx, uuid)) {
-        return {opCtx, coll.get(), LookupCollectionForYieldRestore()};
+        return {opCtx, coll.get(), LookupCollectionForYieldRestore(coll->ns())};
     }
 
     auto coll = _lookupCollectionByUUID(uuid);
     return (coll && coll->isCommitted())
-        ? CollectionPtr(opCtx, coll.get(), LookupCollectionForYieldRestore())
+        ? CollectionPtr(opCtx, coll.get(), LookupCollectionForYieldRestore(coll->ns()))
         : CollectionPtr();
 }
 
@@ -750,7 +751,7 @@ CollectionPtr CollectionCatalog::lookupCollectionByNamespace(OperationContext* o
     // If found=true above but we don't have a Collection pointer it is a drop or rename. But first
     // check UncommittedCollections in case we find a new collection there.
     if (auto coll = UncommittedCollections::getForTxn(opCtx, nss)) {
-        return {opCtx, coll.get(), LookupCollectionForYieldRestore()};
+        return {opCtx, coll.get(), LookupCollectionForYieldRestore(coll->ns())};
     }
 
     // Report the drop or rename as nothing new was created.
@@ -761,7 +762,7 @@ CollectionPtr CollectionCatalog::lookupCollectionByNamespace(OperationContext* o
     auto it = _collections.find(nss);
     auto coll = (it == _collections.end() ? nullptr : it->second);
     return (coll && coll->isCommitted())
-        ? CollectionPtr(opCtx, coll.get(), LookupCollectionForYieldRestore())
+        ? CollectionPtr(opCtx, coll.get(), LookupCollectionForYieldRestore(coll->ns()))
         : nullptr;
 }
 
