@@ -29,8 +29,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
-#include "mongo/platform/basic.h"
-
 #include <string>
 #include <vector>
 
@@ -53,7 +51,7 @@ namespace {
 
 class SplitChunkCommand : public ErrmsgCommandDeprecated {
 public:
-    SplitChunkCommand() : ErrmsgCommandDeprecated("splitChunk") {}
+    SplitChunkCommand() : ErrmsgCommandDeprecated("splitChunk", "_shardsvrSplitChunk") {}
 
     std::string help() const override {
         return "internal command usage only\n"

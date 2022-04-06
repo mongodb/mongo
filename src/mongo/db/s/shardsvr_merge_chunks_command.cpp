@@ -144,9 +144,6 @@ void mergeChunks(OperationContext* opCtx,
     auto cmdResponse = commitMergeOnConfigServer(
         opCtx, nss, expectedEpoch, expectedTimestamp, chunkRange, metadataBeforeMerge);
 
-    uassertStatusOKWithContext(cmdResponse.commandStatus, "Failed to commit chunk merge");
-    uassertStatusOKWithContext(cmdResponse.writeConcernStatus, "Failed to commit chunk merge");
-
     auto shardVersionReceived = [&]() -> boost::optional<ChunkVersion> {
         // Old versions might not have the shardVersion field
         if (cmdResponse.response[ChunkVersion::kShardVersionField]) {
@@ -156,11 +153,14 @@ void mergeChunks(OperationContext* opCtx,
         return boost::none;
     }();
     onShardVersionMismatch(opCtx, nss, std::move(shardVersionReceived));
+
+    uassertStatusOKWithContext(cmdResponse.commandStatus, "Failed to commit chunk merge");
+    uassertStatusOKWithContext(cmdResponse.writeConcernStatus, "Failed to commit chunk merge");
 }
 
 class MergeChunksCommand : public ErrmsgCommandDeprecated {
 public:
-    MergeChunksCommand() : ErrmsgCommandDeprecated("mergeChunks") {}
+    MergeChunksCommand() : ErrmsgCommandDeprecated("mergeChunks", "_shardsvrMergeChunks") {}
 
     std::string help() const override {
         return "Internal command to merge a contiguous range of chunks.\n"
