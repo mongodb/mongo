@@ -271,6 +271,7 @@ variables:
   - enterprise-amazon2-arm64
   - enterprise-debian92-64
   - enterprise-debian10-64
+  - enterprise-debian11-64
   - enterprise-linux-64-amazon-ami
   - enterprise-macos
   - enterprise-rhel-70-64-bit
@@ -324,7 +325,9 @@ variables:
   - enterprise-amazon2
   - enterprise-amazon2-arm64
   - debian10
+  - debian11
   - enterprise-debian10-64
+  - enterprise-debian11-64
   - debian92
   - enterprise-debian92-64
   - rhel70

@@ -210,6 +210,16 @@ evergreen_buildvariants:
     platform: debian10
     architecture: x86_64
 
+  - name: debian11
+    edition: targeted
+    platform: debian11
+    architecture: x86_64
+
+  - name: enterprise-debian11-64
+    edition: enterprise
+    platform: debian11
+    architecture: x86_64
+
   - name: windows
     edition: base
     platform: windows

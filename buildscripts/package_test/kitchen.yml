@@ -63,6 +63,11 @@ platforms:
       image_id: ami-0dedf6a6502877301
     transport:
       username: admin
+  - name: debian11-x86-64
+    driver:
+      image_id: ami-06a80441f25333895
+    transport:
+      username: admin
   - name: rhel70-x86-64
     driver:
       image_id: ami-2051294a
