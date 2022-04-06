@@ -134,7 +134,8 @@ public:
     static void determineLookupStrategy(
         EqLookupNode* eqLookupNode,
         const std::map<NamespaceString, SecondaryCollectionInfo>& collectionsInfo,
-        bool allowDiskUse);
+        bool allowDiskUse,
+        const CollatorInterface* collator);
 };
 
 }  // namespace mongo

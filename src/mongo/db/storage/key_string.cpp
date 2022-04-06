@@ -366,9 +366,9 @@ void BuilderBase<BufferT>::appendBool(bool val) {
 }
 
 template <class BufferT>
-void BuilderBase<BufferT>::appendString(StringData val) {
+void BuilderBase<BufferT>::appendString(StringData val, const StringTransformFn& f) {
     _verifyAppendingState();
-    _appendString(val, _shouldInvertOnAppend(), nullptr);
+    _appendString(val, _shouldInvertOnAppend(), f);
     _elemCount++;
 }
 

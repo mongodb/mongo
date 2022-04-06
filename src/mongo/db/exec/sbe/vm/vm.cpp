@@ -1638,11 +1638,8 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinKeyStringToStri
     return {true, tagStr, valStr};
 }
 
-std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinNewKeyString(ArityType arity) {
-    tassert(6333000,
-            str::stream() << "Unsupported number of arguments passed to ks(): " << arity,
-            arity >= 3 && arity <= Ordering::kMaxCompoundIndexKeys + 3);
-
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::genericNewKeyString(
+    ArityType arity, CollatorInterface* collator) {
     auto [_, tagVersion, valVersion] = getFromStack(0);
     auto [__, tagOrdering, valOrdering] = getFromStack(1);
     auto [___, tagDiscriminator, valDiscriminator] = getFromStack(arity - 1u);
@@ -1667,6 +1664,10 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinNewKeyString(Ar
     }
 
     KeyString::HeapBuilder kb{ksVersion, Ordering::make(bb.done())};
+
+    const auto stringTransformFn = [&](StringData stringData) {
+        return collator->getComparisonString(stringData);
+    };
 
     for (size_t idx = 2; idx < arity - 1u; ++idx) {
         auto [_, tag, val] = getFromStack(idx);
@@ -1693,7 +1694,11 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinNewKeyString(Ar
             case value::TypeTags::StringSmall:
             case value::TypeTags::StringBig:
             case value::TypeTags::bsonString:
-                kb.appendString(value::getStringView(tag, val));
+                if (collator) {
+                    kb.appendString(value::getStringView(tag, val), stringTransformFn);
+                } else {
+                    kb.appendString(value::getStringView(tag, val));
+                }
                 break;
             case value::TypeTags::Null:
                 kb.appendNull();
@@ -1719,18 +1724,22 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinNewKeyString(Ar
             case value::TypeTags::MinKey: {
                 BSONObjBuilder bob;
                 bob.appendMinKey("");
-                kb.appendBSONElement(bob.obj().firstElement(), nullptr);
+                kb.appendBSONElement(bob.obj().firstElement());
                 break;
             }
             case value::TypeTags::MaxKey: {
                 BSONObjBuilder bob;
                 bob.appendMaxKey("");
-                kb.appendBSONElement(bob.obj().firstElement(), nullptr);
+                kb.appendBSONElement(bob.obj().firstElement());
                 break;
             }
             case value::TypeTags::bsonArray: {
                 BSONObj bson{value::getRawPointerView(val)};
-                kb.appendArray(BSONArray(BSONObj(bson)));
+                if (collator) {
+                    kb.appendArray(BSONArray(BSONObj(bson)), stringTransformFn);
+                } else {
+                    kb.appendArray(BSONArray(BSONObj(bson)));
+                }
                 break;
             }
             case value::TypeTags::Array:
@@ -1738,18 +1747,30 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinNewKeyString(Ar
                 value::ArrayEnumerator enumerator{tag, val};
                 BSONArrayBuilder arrayBuilder;
                 bson::convertToBsonObj(arrayBuilder, enumerator);
-                kb.appendArray(arrayBuilder.arr());
+                if (collator) {
+                    kb.appendArray(arrayBuilder.arr(), stringTransformFn);
+                } else {
+                    kb.appendArray(arrayBuilder.arr());
+                }
                 break;
             }
             case value::TypeTags::bsonObject: {
                 BSONObj bson{value::getRawPointerView(val)};
-                kb.appendObject(bson);
+                if (collator) {
+                    kb.appendObject(bson, stringTransformFn);
+                } else {
+                    kb.appendObject(bson);
+                }
                 break;
             }
             case value::TypeTags::Object: {
                 BSONObjBuilder objBuilder;
                 bson::convertToBsonObj(objBuilder, value::getObjectView(val));
-                kb.appendObject(objBuilder.obj());
+                if (collator) {
+                    kb.appendObject(objBuilder.obj(), stringTransformFn);
+                } else {
+                    kb.appendObject(objBuilder.obj());
+                }
                 break;
             }
             case value::TypeTags::ObjectId: {
@@ -1803,6 +1824,26 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinNewKeyString(Ar
     return {true,
             value::TypeTags::ksValue,
             value::bitcastFrom<KeyString::Value*>(new KeyString::Value(kb.release()))};
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinNewKeyString(ArityType arity) {
+    tassert(6333000,
+            str::stream() << "Unsupported number of arguments passed to ks(): " << arity,
+            arity >= 3 && arity <= Ordering::kMaxCompoundIndexKeys + 3);
+    return genericNewKeyString(arity);
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollNewKeyString(ArityType arity) {
+    tassert(6511500,
+            str::stream() << "Unsupported number of arguments passed to collKs(): " << arity,
+            arity >= 4 && arity <= Ordering::kMaxCompoundIndexKeys + 4);
+
+    auto [_, tagCollator, valCollator] = getFromStack(arity - 1u);
+    if (tagCollator != value::TypeTags::collator) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+    auto collator = value::getCollatorView(valCollator);
+    return genericNewKeyString(arity - 1u, collator);
 }
 
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinAbs(ArityType arity) {
@@ -4110,6 +4151,8 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builti
             return builtinKeyStringToString(arity);
         case Builtin::newKs:
             return builtinNewKeyString(arity);
+        case Builtin::collNewKs:
+            return builtinCollNewKeyString(arity);
         case Builtin::abs:
             return builtinAbs(arity);
         case Builtin::ceil:

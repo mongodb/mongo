@@ -489,6 +489,7 @@ enum class Builtin : uint8_t {
     newObj,
     ksToString,  // KeyString to string
     newKs,       // new KeyString
+    collNewKs,   // new KeyString (with collation)
     abs,         // absolute value
     ceil,
     floor,
@@ -1045,6 +1046,8 @@ private:
                                                                      value::Value dateValue,
                                                                      value::TypeTags timezoneTag,
                                                                      value::Value timezoneValue);
+    std::tuple<bool, value::TypeTags, value::Value> genericNewKeyString(
+        ArityType arity, CollatorInterface* collator = nullptr);
 
     std::tuple<bool, value::TypeTags, value::Value> builtinSplit(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinDate(ArityType arity);
@@ -1064,6 +1067,7 @@ private:
     std::tuple<bool, value::TypeTags, value::Value> builtinNewObj(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinKeyStringToString(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinNewKeyString(ArityType arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinCollNewKeyString(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinAbs(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinCeil(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinFloor(ArityType arity);

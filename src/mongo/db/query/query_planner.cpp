@@ -1306,8 +1306,10 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
                                                lookupStage->getLocalField()->fullPath(),
                                                lookupStage->getForeignField()->fullPath(),
                                                lookupStage->getAsField().fullPath());
-            QueryPlannerAnalysis::determineLookupStrategy(
-                eqLookupNode.get(), secondaryCollInfos, query.getExpCtx()->allowDiskUse);
+            QueryPlannerAnalysis::determineLookupStrategy(eqLookupNode.get(),
+                                                          secondaryCollInfos,
+                                                          query.getExpCtx()->allowDiskUse,
+                                                          query.getCollator());
             solnForAgg = std::move(eqLookupNode);
             continue;
         }

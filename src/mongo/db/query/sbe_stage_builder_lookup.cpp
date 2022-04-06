@@ -688,28 +688,33 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
     auto indexKeyPatternSlot = slotIdGenerator.generate();
     auto [_, indexKeyPatternValue] =
         copyValue(TypeTags::bsonObject, bitcastFrom<const char*>(index.keyPattern.objdata()));
-    auto indexBoundKeyStage = makeProjectStage(
-        std::move(valueGeneratorStage),
-        nodeId,
-        lowKeySlot,
-        makeFunction(
-            "ks"_sd,
-            makeConstant(value::TypeTags::NumberInt64, static_cast<int64_t>(indexVersion)),
-            makeConstant(value::TypeTags::NumberInt32, indexOrdering.getBits()),
-            makeVariable(valueForIndexBounds),
-            makeConstant(value::TypeTags::NumberInt64,
-                         static_cast<int64_t>(KeyString::Discriminator::kExclusiveBefore))),
-        highKeySlot,
-        makeFunction("ks"_sd,
-                     makeConstant(value::TypeTags::NumberInt64, static_cast<int64_t>(indexVersion)),
-                     makeConstant(value::TypeTags::NumberInt32, indexOrdering.getBits()),
-                     makeVariable(valueForIndexBounds),
-                     makeConstant(value::TypeTags::NumberInt64,
-                                  static_cast<int64_t>(KeyString::Discriminator::kExclusiveAfter))),
-        indexIdSlot,
-        makeConstant(indexName),
-        indexKeyPatternSlot,
-        makeConstant(value::TypeTags::bsonObject, indexKeyPatternValue));
+
+    auto makeNewKeyStringCall = [&](KeyString::Discriminator discriminator) {
+        StringData functionName = "ks";
+        EExpression::Vector args;
+        args.emplace_back(
+            makeConstant(value::TypeTags::NumberInt64, static_cast<int64_t>(indexVersion)));
+        args.emplace_back(makeConstant(value::TypeTags::NumberInt32, indexOrdering.getBits()));
+        args.emplace_back(makeVariable(valueForIndexBounds));
+        args.emplace_back(
+            makeConstant(value::TypeTags::NumberInt64, static_cast<int64_t>(discriminator)));
+        if (collatorSlot) {
+            functionName = "collKs";
+            args.emplace_back(makeVariable(*collatorSlot));
+        }
+        return makeE<EFunction>(functionName, std::move(args));
+    };
+    auto indexBoundKeyStage =
+        makeProjectStage(std::move(valueGeneratorStage),
+                         nodeId,
+                         lowKeySlot,
+                         makeNewKeyStringCall(KeyString::Discriminator::kExclusiveBefore),
+                         highKeySlot,
+                         makeNewKeyStringCall(KeyString::Discriminator::kExclusiveAfter),
+                         indexIdSlot,
+                         makeConstant(indexName),
+                         indexKeyPatternSlot,
+                         makeConstant(value::TypeTags::bsonObject, indexKeyPatternValue));
 
     // To ensure that we compute index bounds for all local values, introduce loop join, where
     // unwinding of local values happens on the right side and index generation happens on the left
@@ -789,10 +794,16 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
         buildForeignKeysStream(foreignRecordSlot, foreignFieldName, nodeId, slotIdGenerator);
 
     // Check if local keys set contains the value from the foreign document.
-    auto foreignValueFilterStage = makeS<FilterStage<false>>(
-        std::move(foreignValueStage),
-        makeFunction("isMember", makeVariable(foreignValueSlot), makeVariable(localKeysSetSlot)),
-        nodeId);
+    auto foreignValueFilterStage =
+        makeS<FilterStage<false>>(std::move(foreignValueStage),
+                                  collatorSlot ? makeFunction("collIsMember",
+                                                              makeVariable(*collatorSlot),
+                                                              makeVariable(foreignValueSlot),
+                                                              makeVariable(localKeysSetSlot))
+                                               : makeFunction("isMember",
+                                                              makeVariable(foreignValueSlot),
+                                                              makeVariable(localKeysSetSlot)),
+                                  nodeId);
 
     // Path traversal of the foreign document may produce multiple values. To ensure that the
     // foreign document is added only once to the resulting array, we put whole path traversal into

@@ -629,7 +629,8 @@ bool isEligibleForHashJoin(const SecondaryCollectionInfo& foreignCollInfo) {
 void QueryPlannerAnalysis::determineLookupStrategy(
     EqLookupNode* eqLookupNode,
     const std::map<NamespaceString, SecondaryCollectionInfo>& collectionsInfo,
-    bool allowDiskUse) {
+    bool allowDiskUse,
+    const CollatorInterface* collator) {
     const auto& foreignCollName = eqLookupNode->foreignCollection;
     auto foreignCollItr = collectionsInfo.find(NamespaceString(foreignCollName));
     tassert(5842600,
@@ -660,7 +661,8 @@ void QueryPlannerAnalysis::determineLookupStrategy(
         for (const auto& index : indexes) {
             if ((index.type == INDEX_BTREE || index.type == INDEX_HASHED) &&
                 index.keyPattern.firstElement().fieldName() ==
-                    eqLookupNode->joinFieldForeign.fullPath()) {
+                    eqLookupNode->joinFieldForeign.fullPath() &&
+                CollatorInterface::collatorsMatch(collator, index.collator)) {
                 return index;
             }
         }

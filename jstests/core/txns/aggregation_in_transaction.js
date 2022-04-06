@@ -73,6 +73,8 @@ withTxnAndAutoRetryOnMongos(session, () => {
     // Perform aggregations that look at other collections.
     // TODO: SERVER-39162 Sharded $lookup is not supported in transactions.
     if (!isForeignSharded) {
+        jsTestLog("Testing $lookup within a transaction.");
+
         const lookupDoc = Object.merge(testDoc, {lookup: [foreignDoc]});
         cursor = coll.aggregate({
                 $lookup: {
@@ -84,6 +86,8 @@ withTxnAndAutoRetryOnMongos(session, () => {
             });
         assert.docEq(cursor.next(), lookupDoc);
         assert(!cursor.hasNext());
+
+        jsTestLog("Testing $graphLookup within a transaction.");
 
         cursor = coll.aggregate({
                 $graphLookup: {

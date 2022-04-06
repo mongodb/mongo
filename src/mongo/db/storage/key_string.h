@@ -561,7 +561,7 @@ public:
     void appendBSONElement(const BSONElement& elem, const StringTransformFn& f = nullptr);
 
     void appendBool(bool val);
-    void appendString(StringData val);
+    void appendString(StringData val, const StringTransformFn& f = nullptr);
     void appendSymbol(StringData val);
     void appendNumberDouble(double num);
     void appendNumberLong(long long num);

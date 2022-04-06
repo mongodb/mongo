@@ -14,6 +14,7 @@
  */
 load("jstests/aggregation/extras/utils.js");  // For anyEq.
 load("jstests/libs/sbe_util.js");             // For checkSBEEnabled.
+load("jstests/libs/analyze_plan.js");         // For getAggPlanStages, getWinningPlan.
 
 (function() {
 
@@ -55,7 +56,10 @@ const records = [{_id: 0, key: "a"}, {_id: 1, key: "A"}];
 assert.commandWorked(collAa.insert(records));
 assert.commandWorked(collAA.insert(records));
 assert.commandWorked(collAa_indexed.insert(records));
+// Create two indexes to check the one with a matching collation will be chosen even if it has a
+// longer key pattern.
 assert.commandWorked(collAa_indexed.createIndex({key: 1}));
+assert.commandWorked(collAa_indexed.createIndex({key: 1, x: 1}, {collation: caseInsensitive}));
 
 const lookupWithPipeline = (foreignColl) => {
     return {
@@ -83,6 +87,7 @@ const resultCaseInsensitive = [
     {_id: 1, key: "A", matched: [{_id: 0, key: "a"}, {_id: 1, key: "A"}]},
 ];
 let results = [];
+let explain;
 
 // Collation on the foreign collection should be ignored.
 (function testLocalCollationPrecedence() {
@@ -159,10 +164,24 @@ let results = [];
 // In presense of indexes lookup might choose a different strategy for the join, that relies on the
 // index (INLJ). It should respect the effective collation of $lookup.
 (function testCollationWithIndexes() {
-    // TODO SERVER-65115: integration of collation with INLJ NYI.
-    if (checkSBEEnabled(testDB, ["featureFlagSBELookupPushdown"])) {
-        jsTestLog("Skipping test because of SERVER-65115.");
-        return;
+    function assertIndexJoinStrategy(explain) {
+        // Check join strategy when $lookup is pushed down.
+        if (getAggPlanStages(explain, "$cursor").length === 0) {
+            const winningPlan = getWinningPlan(explain.queryPlanner);
+            assert.eq("EQ_LOOKUP", winningPlan.stage, explain);
+            assert.eq("IndexedLoopJoin", winningPlan.strategy, explain);
+            // Will choose the index with the matching collation.
+            assert.eq("key_1_x_1", winningPlan.indexName, explain);
+        }
+    }
+
+    function assertNestedLoopJoinStrategy(explain) {
+        // Check join strategy when $lookup is pushed down.
+        if (getAggPlanStages(explain, "$cursor").length === 0) {
+            const winningPlan = getWinningPlan(explain.queryPlanner);
+            assert.eq("EQ_LOOKUP", winningPlan.stage, explain);
+            assert.eq("NestedLoopJoin", winningPlan.strategy, explain);
+        }
     }
 
     for (let lookupInto of [lookupWithPipeline, lookupNoPipeline]) {
@@ -174,6 +193,8 @@ let results = [];
             extraErrorMsg: " Case-insensitive collation on local, foreign is indexed, running: " +
                 tojson(lookupInto)
         });
+        explain = collAA.explain().aggregate([lookupInto(collAa_indexed)]);
+        assertIndexJoinStrategy(explain);
 
         // Command-level collation overrides collection-level collation.
         results =
@@ -184,6 +205,15 @@ let results = [];
             extraErrorMsg: " Case-insensitive collation on command, foreign is indexed, running: " +
                 tojson(lookupInto)
         });
+        explain =
+            collAa.explain().aggregate([lookupInto(collAa_indexed)], {collation: caseInsensitive});
+        assertIndexJoinStrategy(explain);
+
+        // If no index is compatible with the requested collation, nested loop join will be chosen
+        // instead.
+        explain =
+            collAa.explain().aggregate([lookupInto(collAa_indexed)], {collation: {locale: "fr"}});
+        assertNestedLoopJoinStrategy(explain);
 
         // Stage-level collation overrides collection-level and command-level collations.
         let lookupStage = lookupInto(collAa_indexed);
@@ -195,6 +225,8 @@ let results = [];
             extraErrorMsg: " Case-insensitive collation on stage, foreign is indexed, running: " +
                 tojson(lookupInto)
         });
+        explain = collAa.explain().aggregate([lookupStage], {collation: caseSensitive});
+        assertIndexJoinStrategy(explain);
     }
 })();
 })();
