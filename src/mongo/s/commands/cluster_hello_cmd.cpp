@@ -120,6 +120,11 @@ public:
         const bool apiStrict = APIParameters::get(opCtx).getAPIStrict().value_or(false);
         auto cmd = HelloCommand::parse({"hello", apiStrict}, cmdObj);
 
+        LOGV2(6524600,
+              "Fail point blocks Hello response until removed",
+              "cmd"_attr = cmdObj,
+              "client"_attr = opCtx->getClient()->clientAddress(true),
+              "desc"_attr = opCtx->getClient()->desc());
         waitInHello.pauseWhileSet(opCtx);
 
         // "hello" is exempt from error code rewrites.

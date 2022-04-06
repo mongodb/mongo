@@ -3,14 +3,16 @@
 (function() {
 "use strict";
 load("jstests/libs/fail_point_util.js");
+load("jstests/libs/logv2_helpers.js");
 
 function runTest(conn) {
     function runHelloCommand() {
-        const now = new Date();
         assert.commandWorked(db.runCommand({hello: 1}));
-        const helloDuration = new Date() - now;
-        assert.gte(helloDuration, 100);
     }
+
+    // Clear ramlog so checkLog can't find log messages from previous times this fail point was
+    // enabled.
+    assert.commandWorked(conn.adminCommand({clearLog: 'global'}));
 
     // Do a find to make sure that the shell has finished running hello while establishing its
     // initial connection.
@@ -20,7 +22,9 @@ function runTest(conn) {
     const helloFailpoint = configureFailPoint(conn, "waitInHello", {}, {skip: 1});
     const awaitHello = startParallelShell(runHelloCommand, conn.port);
     helloFailpoint.wait();
-    sleep(100);
+
+    checkLog.contains(conn, "Fail point blocks Hello response until removed");
+
     helloFailpoint.off();
     awaitHello();
 }
