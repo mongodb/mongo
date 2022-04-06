@@ -107,7 +107,7 @@ private:
     boost::optional<Callback> _runOnMockingNextResponse;
 
     ShardingDataTransformCumulativeMetrics _cumulativeMetrics{"dummyForTest"};
-    std::unique_ptr<ReshardingMetricsNew> _metrics;
+    std::shared_ptr<ReshardingMetricsNew> _metrics;
 };
 
 auto makeExecutor() {
@@ -153,7 +153,7 @@ void CoordinatorCommitMonitorTest::setUp() {
 
     _cancellationSource = std::make_unique<CancellationSource>();
 
-    _metrics = std::make_unique<ReshardingMetricsNew>(
+    _metrics = std::make_shared<ReshardingMetricsNew>(
         UUID::gen(),
         BSON("y" << 1),
         _ns,
@@ -162,11 +162,11 @@ void CoordinatorCommitMonitorTest::setUp() {
         clockSource,
         &_cumulativeMetrics);
 
-    _commitMonitor = std::make_shared<CoordinatorCommitMonitor>(_ns,
+    _commitMonitor = std::make_shared<CoordinatorCommitMonitor>(_metrics,
+                                                                _ns,
                                                                 _recipientShards,
                                                                 _futureExecutor,
                                                                 _cancellationSource->token(),
-                                                                _metrics.get(),
                                                                 Milliseconds(0));
     _commitMonitor->setNetworkExecutorForTest(executor());
 }

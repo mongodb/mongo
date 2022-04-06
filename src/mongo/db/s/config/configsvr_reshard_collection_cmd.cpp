@@ -60,22 +60,15 @@ boost::optional<std::shared_ptr<ReshardingCoordinatorService::ReshardingCoordina
 getExistingInstanceToJoin(OperationContext* opCtx,
                           const NamespaceString& nss,
                           const BSONObj& newShardKey) {
-    auto reshardingCoordinatorService = checked_cast<ReshardingCoordinatorService*>(
-        repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
-            ->lookupServiceByName(ReshardingCoordinatorService::kServiceName));
-    auto instances = reshardingCoordinatorService->getAllReshardingInstances(opCtx);
-    for (auto& instance : instances) {
-        auto reshardingCoordinator =
-            checked_pointer_cast<ReshardingCoordinatorService::ReshardingCoordinator>(instance);
-
-        auto instanceMetadata = reshardingCoordinator->getMetadata();
+    auto instances =
+        getReshardingStateMachines<ReshardingCoordinatorService,
+                                   ReshardingCoordinatorService::ReshardingCoordinator>(opCtx, nss);
+    for (const auto& instance : instances) {
         if (SimpleBSONObjComparator::kInstance.evaluate(
-                instanceMetadata.getReshardingKey().toBSON() == newShardKey) &&
-            instanceMetadata.getSourceNss() == nss) {
-            return reshardingCoordinator;
-        };
+                instance->getMetadata().getReshardingKey().toBSON() == newShardKey)) {
+            return instance;
+        }
     }
-
     return boost::none;
 }
 

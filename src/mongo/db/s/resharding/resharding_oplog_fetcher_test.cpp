@@ -47,6 +47,7 @@
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
+#include "mongo/db/s/resharding/resharding_metrics_new.h"
 #include "mongo/db/s/resharding/resharding_oplog_fetcher.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
@@ -101,6 +102,13 @@ public:
         _metrics->onStart(ReshardingMetrics::Role::kRecipient,
                           _svcCtx->getFastClockSource()->now());
         _metrics->setRecipientState(RecipientStateEnum::kCloning);
+        _metricsNew =
+            ReshardingMetricsNew::makeInstance(_reshardingUUID,
+                                               BSON("y" << 1),
+                                               NamespaceString{""},
+                                               ReshardingMetricsNew::Role::kRecipient,
+                                               getServiceContext()->getFastClockSource()->now(),
+                                               getServiceContext());
 
         for (const auto& shardId : kTwoShardIdList) {
             auto shardTargeter = RemoteCommandTargeterMock::get(
@@ -128,7 +136,8 @@ public:
     }
 
     auto makeFetcherEnv() {
-        return std::make_unique<ReshardingOplogFetcher::Env>(_svcCtx, &*_metrics);
+        return std::make_unique<ReshardingOplogFetcher::Env>(
+            _svcCtx, _metrics.get(), _metricsNew.get());
     }
 
     /**
@@ -341,6 +350,7 @@ protected:
     ShardId _donorShard;
     ShardId _destinationShard;
     std::unique_ptr<ReshardingMetrics> _metrics;
+    std::unique_ptr<ReshardingMetricsNew> _metricsNew;
 
 private:
     static HostAndPort makeHostAndPort(const ShardId& shardId) {

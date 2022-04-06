@@ -46,6 +46,7 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
+#include "mongo/db/s/resharding/resharding_metrics_new.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/executor/task_executor.h"
@@ -342,6 +343,9 @@ bool ReshardingOplogFetcher::consume(Client* client,
                 ++_numOplogEntriesCopied;
 
                 _env->metrics()->onOplogEntriesFetched(1);
+                if (ShardingDataTransformMetrics::isEnabled()) {
+                    _env->metricsNew()->onOplogEntriesFetched(1);
+                }
 
                 auto [p, f] = makePromiseFuture<void>();
                 {
@@ -385,6 +389,9 @@ bool ReshardingOplogFetcher::consume(Client* client,
                     wuow.commit();
 
                     _env->metrics()->onOplogEntriesFetched(1);
+                    if (ShardingDataTransformMetrics::isEnabled()) {
+                        _env->metricsNew()->onOplogEntriesFetched(1);
+                    }
 
                     auto [p, f] = makePromiseFuture<void>();
                     {

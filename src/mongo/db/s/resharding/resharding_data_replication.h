@@ -211,6 +211,7 @@ private:
     static std::vector<std::unique_ptr<ReshardingOplogFetcher>> _makeOplogFetchers(
         OperationContext* opCtx,
         ReshardingMetrics* metrics,
+        ReshardingMetricsNew* metricsNew,
         const CommonReshardingMetadata& metadata,
         const std::vector<DonorShardFetchTimestamp>& donorShards,
         const ShardId& myShardId);

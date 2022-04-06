@@ -49,6 +49,8 @@
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/resharding/document_source_resharding_add_resume_id.h"
 #include "mongo/db/s/resharding/document_source_resharding_iterate_transaction.h"
+#include "mongo/db/s/resharding/resharding_metrics.h"
+#include "mongo/db/s/resharding/resharding_metrics_new.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log.h"
@@ -60,6 +62,23 @@
 #include "mongo/s/shard_key_pattern.h"
 
 namespace mongo {
+
+namespace {
+/**
+ * Given a constant rate of time per unit of work:
+ *    totalTime / totalWork == elapsedTime / elapsedWork
+ * Solve for remaining time.
+ *    remainingTime := totalTime - elapsedTime
+ *                  == (totalWork * (elapsedTime / elapsedWork)) - elapsedTime
+ *                  == elapsedTime * (totalWork / elapsedWork - 1)
+ */
+Milliseconds estimateRemainingTime(Milliseconds elapsedTime, double elapsedWork, double totalWork) {
+    elapsedWork = std::min(elapsedWork, totalWork);
+    double remainingMsec = 1.0 * elapsedTime.count() * (totalWork / elapsedWork - 1);
+    return Milliseconds(Milliseconds::rep(std::round(remainingMsec)));
+}
+}  // namespace
+
 using namespace fmt::literals;
 
 BSONObj serializeAndTruncateReshardingErrorIfNeeded(Status originalError) {
@@ -370,6 +389,28 @@ void doNoopWrite(OperationContext* opCtx, StringData opStr, const NamespaceStrin
             boost::none);
         wuow.commit();
     });
+}
+
+boost::optional<Milliseconds> estimateRemainingRecipientTime(bool applyingBegan,
+                                                             int64_t bytesCopied,
+                                                             int64_t bytesToCopy,
+                                                             Milliseconds timeSpentCopying,
+                                                             int64_t oplogEntriesApplied,
+                                                             int64_t oplogEntriesFetched,
+                                                             Milliseconds timeSpentApplying) {
+    if (applyingBegan && oplogEntriesFetched == 0) {
+        return Milliseconds(0);
+    }
+    if (oplogEntriesApplied > 0 && oplogEntriesFetched > 0) {
+        // All fetched oplogEntries must be applied. Some of them already have been.
+        return estimateRemainingTime(timeSpentApplying, oplogEntriesApplied, oplogEntriesFetched);
+    }
+    if (bytesCopied > 0 && bytesToCopy > 0) {
+        // Until the time to apply batches of oplog entries is measured, we assume that applying all
+        // of them will take as long as copying did.
+        return estimateRemainingTime(timeSpentCopying, bytesCopied, 2 * bytesToCopy);
+    }
+    return {};
 }
 
 }  // namespace mongo

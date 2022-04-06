@@ -1651,6 +1651,7 @@ ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllRecipientsFinished
                                                               coordinatorDocChangedOnDisk);
             if (ShardingDataTransformMetrics::isEnabled()) {
                 _metricsNew->onCopyingEnd();
+                _metricsNew->onApplyingBegin();
             }
         })
         .then([this] { return _waitForMajority(_ctHolder->getAbortToken()); });
@@ -1663,11 +1664,11 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_startCommitMonitor(
     }
 
     _commitMonitor = std::make_shared<resharding::CoordinatorCommitMonitor>(
+        _metricsNew,
         _coordinatorDoc.getSourceNss(),
         extractShardIdsFromParticipantEntries(_coordinatorDoc.getRecipientShards()),
         **executor,
-        _ctHolder->getCommitMonitorToken(),
-        _metricsNew.get());
+        _ctHolder->getCommitMonitorToken());
 
     _commitMonitorQuiesced = _commitMonitor->waitUntilRecipientsAreWithinCommitThreshold()
                                  .thenRunOn(**executor)
@@ -1711,6 +1712,7 @@ ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllRecipientsFinished
             this->_updateCoordinatorDocStateAndCatalogEntries(CoordinatorStateEnum::kBlockingWrites,
                                                               _coordinatorDoc);
             if (ShardingDataTransformMetrics::isEnabled()) {
+                _metricsNew->onApplyingEnd();
                 _metricsNew->onCriticalSectionBegin();
             }
         })

@@ -36,11 +36,11 @@ ShardingDataTransformMetricsObserver::ShardingDataTransformMetricsObserver(
     : _metrics(metrics) {}
 
 int64_t ShardingDataTransformMetricsObserver::getHighEstimateRemainingTimeMillis() const {
-    return _metrics->getHighEstimateRemainingTimeMillis();
+    return _metrics->getHighEstimateRemainingTimeMillis().count();
 }
 
 int64_t ShardingDataTransformMetricsObserver::getLowEstimateRemainingTimeMillis() const {
-    return _metrics->getLowEstimateRemainingTimeMillis();
+    return _metrics->getLowEstimateRemainingTimeMillis().count();
 }
 
 Date_t ShardingDataTransformMetricsObserver::getStartTimestamp() const {

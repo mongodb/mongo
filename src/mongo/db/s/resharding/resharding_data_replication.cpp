@@ -113,6 +113,7 @@ std::vector<std::unique_ptr<ReshardingTxnCloner>> ReshardingDataReplication::_ma
 std::vector<std::unique_ptr<ReshardingOplogFetcher>> ReshardingDataReplication::_makeOplogFetchers(
     OperationContext* opCtx,
     ReshardingMetrics* metrics,
+    ReshardingMetricsNew* metricsNew,
     const CommonReshardingMetadata& metadata,
     const std::vector<DonorShardFetchTimestamp>& donorShards,
     const ShardId& myShardId) {
@@ -128,7 +129,8 @@ std::vector<std::unique_ptr<ReshardingOplogFetcher>> ReshardingDataReplication::
         invariant((idToResumeFrom >= ReshardingDonorOplogId{minFetchTimestamp, minFetchTimestamp}));
 
         oplogFetchers.emplace_back(std::make_unique<ReshardingOplogFetcher>(
-            std::make_unique<ReshardingOplogFetcher::Env>(opCtx->getServiceContext(), metrics),
+            std::make_unique<ReshardingOplogFetcher::Env>(
+                opCtx->getServiceContext(), metrics, metricsNew),
             metadata.getReshardingUUID(),
             metadata.getSourceUUID(),
             // The recipient fetches oplog entries from the donor starting from the largest _id
@@ -225,7 +227,8 @@ std::unique_ptr<ReshardingDataReplicationInterface> ReshardingDataReplication::m
         txnCloners = _makeTxnCloners(metadata, donorShards);
     }
 
-    auto oplogFetchers = _makeOplogFetchers(opCtx, metrics, metadata, donorShards, myShardId);
+    auto oplogFetchers =
+        _makeOplogFetchers(opCtx, metrics, metricsNew, metadata, donorShards, myShardId);
 
     auto oplogFetcherExecutor = _makeOplogFetcherExecutor(donorShards.size());
 

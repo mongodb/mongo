@@ -249,6 +249,17 @@ TEST_F(ShardingDataTransformInstanceMetricsTest, DonorIncrementReadsDuringCritic
     ASSERT_EQ(report.getIntField("countReadsDuringCriticalSection"), 1);
 }
 
+TEST_F(ShardingDataTransformInstanceMetricsTest, RecipientIncrementFetchedOplogEntries) {
+    auto metrics = createInstanceMetrics(UUID::gen(), Role::kRecipient);
+
+    auto report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("oplogEntriesFetched"), 0);
+    metrics->onOplogEntriesFetched(50);
+
+    report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("oplogEntriesFetched"), 50);
+}
+
 TEST_F(ShardingDataTransformInstanceMetricsTest, CurrentOpReportsCriticalSectionTime) {
     runTimeReportTest(
         "CurrentOpReportsCriticalSectionTime",
@@ -289,6 +300,59 @@ TEST_F(ShardingDataTransformInstanceMetricsTest, RecipientIncrementsDocumentsAnd
     ASSERT_EQ(report.getIntField("bytesCopied"), 1000);
 }
 
+TEST_F(ShardingDataTransformInstanceMetricsTest, RecipientReportsRemainingTime) {
+    auto metrics = createInstanceMetrics(UUID::gen(), Role::kRecipient);
+    const auto& clock = getClockSource();
+    constexpr auto kIncrement = Milliseconds(5000);
+    constexpr auto kOpsPerIncrement = 25;
+    const auto kIncrementSecs = durationCount<Seconds>(kIncrement);
+    const auto kExpectedTotal = kIncrementSecs * 8;
+    metrics->setDocumentsToCopyCounts(0, kOpsPerIncrement * 4);
+    metrics->onOplogEntriesFetched(kOpsPerIncrement * 4);
+
+    // Before cloning.
+    auto report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("remainingOperationTimeEstimatedSecs"), 0);
+
+    // During cloning.
+    metrics->onCopyingBegin();
+    metrics->onDocumentsCopied(0, kOpsPerIncrement);
+    clock->advance(kIncrement);
+    report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("remainingOperationTimeEstimatedSecs"),
+              kExpectedTotal - kIncrementSecs);
+
+    metrics->onDocumentsCopied(0, kOpsPerIncrement * 2);
+    clock->advance(kIncrement * 2);
+    report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("remainingOperationTimeEstimatedSecs"),
+              kExpectedTotal - (kIncrementSecs * 3));
+
+    // During applying.
+    metrics->onDocumentsCopied(0, kOpsPerIncrement);
+    clock->advance(kIncrement);
+    metrics->onCopyingEnd();
+    metrics->onApplyingBegin();
+    metrics->onOplogEntriesApplied(kOpsPerIncrement);
+    clock->advance(kIncrement);
+    report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("remainingOperationTimeEstimatedSecs"),
+              kExpectedTotal - (kIncrementSecs * 5));
+
+    metrics->onOplogEntriesApplied(kOpsPerIncrement * 2);
+    clock->advance(kIncrement * 2);
+    report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("remainingOperationTimeEstimatedSecs"),
+              kExpectedTotal - (kIncrementSecs * 7));
+
+    // Done.
+    metrics->onOplogEntriesApplied(kOpsPerIncrement);
+    clock->advance(kIncrement);
+    metrics->onApplyingEnd();
+    report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("remainingOperationTimeEstimatedSecs"), 0);
+}
+
 TEST_F(ShardingDataTransformInstanceMetricsTest, CurrentOpReportsCopyingTime) {
     runTimeReportTest(
         "CurrentOpReportsCopyingTime",
@@ -296,6 +360,15 @@ TEST_F(ShardingDataTransformInstanceMetricsTest, CurrentOpReportsCopyingTime) {
         "totalCopyTimeElapsedSecs",
         [](ShardingDataTransformInstanceMetrics* metrics) { metrics->onCopyingBegin(); },
         [](ShardingDataTransformInstanceMetrics* metrics) { metrics->onCopyingEnd(); });
+}
+
+TEST_F(ShardingDataTransformInstanceMetricsTest, CurrentOpReportsApplyingTime) {
+    runTimeReportTest(
+        "CurrentOpReportsApplyingTime",
+        {Role::kRecipient, Role::kCoordinator},
+        "totalApplyTimeElapsedSecs",
+        [](ShardingDataTransformInstanceMetrics* metrics) { metrics->onApplyingBegin(); },
+        [](ShardingDataTransformInstanceMetrics* metrics) { metrics->onApplyingEnd(); });
 }
 
 TEST_F(ShardingDataTransformInstanceMetricsTest, CurrentOpReportsRunningTime) {
@@ -331,7 +404,7 @@ TEST_F(ShardingDataTransformInstanceMetricsTest,
 
     auto report = metrics->reportForCurrentOp();
     ASSERT_EQ(report.getIntField("allShardsLowestRemainingOperationTimeEstimatedSecs"), 0);
-    metrics->setLowestEstimatedRemainingOperationTime(Milliseconds(2000));
+    metrics->setCoordinatorLowEstimateRemainingTimeMillis(Milliseconds(2000));
 
     report = metrics->reportForCurrentOp();
     ASSERT_EQ(report.getIntField("allShardsLowestRemainingOperationTimeEstimatedSecs"), 2);
@@ -343,7 +416,7 @@ TEST_F(ShardingDataTransformInstanceMetricsTest,
 
     auto report = metrics->reportForCurrentOp();
     ASSERT_EQ(report.getIntField("allShardsHighestRemainingOperationTimeEstimatedSecs"), 0);
-    metrics->setHighestEstimatedRemainingOperationTime(Milliseconds(12000));
+    metrics->setCoordinatorHighEstimateRemainingTimeMillis(Milliseconds(12000));
 
     report = metrics->reportForCurrentOp();
     ASSERT_EQ(report.getIntField("allShardsHighestRemainingOperationTimeEstimatedSecs"), 12);

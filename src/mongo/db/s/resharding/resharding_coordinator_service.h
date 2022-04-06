@@ -507,7 +507,7 @@ private:
     // The primary-only service instance corresponding to the coordinator instance. Not owned.
     const ReshardingCoordinatorService* const _coordinatorService;
 
-    std::unique_ptr<ReshardingMetricsNew> _metricsNew;
+    std::shared_ptr<ReshardingMetricsNew> _metricsNew;
 
     // The in-memory representation of the immutable portion of the document in
     // config.reshardingOperations.

@@ -69,11 +69,11 @@ public:
         Milliseconds max;
     };
 
-    CoordinatorCommitMonitor(NamespaceString ns,
+    CoordinatorCommitMonitor(std::shared_ptr<ReshardingMetricsNew> metricsNew,
+                             NamespaceString ns,
                              std::vector<ShardId> recipientShards,
                              TaskExecutorPtr executor,
                              CancellationToken cancelToken,
-                             ReshardingMetricsNew* metrics,
                              Milliseconds maxDelayBetweenQueries = kMaxDelayBetweenQueries);
 
     SemiFuture<void> waitUntilRecipientsAreWithinCommitThreshold() const;
@@ -95,12 +95,11 @@ private:
     static constexpr auto kDiagnosticLogLevel = 0;
     static constexpr auto kMaxDelayBetweenQueries = Seconds(30);
 
+    std::shared_ptr<ReshardingMetricsNew> _metricsNew;
     const NamespaceString _ns;
     const std::vector<ShardId> _recipientShards;
     const TaskExecutorPtr _executor;
     const CancellationToken _cancelToken;
-
-    ReshardingMetricsNew* _metrics;
 
     const Milliseconds _threshold;
     const Milliseconds _maxDelayBetweenQueries;

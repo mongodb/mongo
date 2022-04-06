@@ -829,6 +829,7 @@ void ReshardingRecipientService::RecipientStateMachine::_transitionToApplying(
     _metrics()->startApplyingOplogEntries(currentTime);
     if (ShardingDataTransformMetrics::isEnabled()) {
         _metricsNew->onCopyingEnd();
+        _metricsNew->onApplyingBegin();
     }
 }
 
@@ -839,6 +840,9 @@ void ReshardingRecipientService::RecipientStateMachine::_transitionToStrictConsi
     _transitionState(std::move(newRecipientCtx), boost::none, boost::none, factory);
     auto currentTime = getCurrentTime();
     _metrics()->endApplyingOplogEntries(currentTime);
+    if (ShardingDataTransformMetrics::isEnabled()) {
+        _metricsNew->onApplyingEnd();
+    }
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_transitionToError(

@@ -33,6 +33,7 @@
 #include <memory>
 
 #include "mongo/db/s/resharding/resharding_metrics.h"
+#include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/aligned.h"
@@ -81,20 +82,6 @@ const auto getMetrics = ServiceContext::declareDecoration<MetricsPtr>();
 const auto reshardingMetricsRegisterer = ServiceContext::ConstructorActionRegisterer{
     "ReshardingMetrics",
     [](ServiceContext* ctx) { getMetrics(ctx) = std::make_unique<ReshardingMetrics>(ctx); }};
-
-/**
- * Given a constant rate of time per unit of work:
- *    totalTime / totalWork == elapsedTime / elapsedWork
- * Solve for remaining time.
- *    remainingTime := totalTime - elapsedTime
- *                  == (totalWork * (elapsedTime / elapsedWork)) - elapsedTime
- *                  == elapsedTime * (totalWork / elapsedWork - 1)
- */
-Milliseconds remainingTime(Milliseconds elapsedTime, double elapsedWork, double totalWork) {
-    elapsedWork = std::min(elapsedWork, totalWork);
-    double remainingMsec = 1.0 * elapsedTime.count() * (totalWork / elapsedWork - 1);
-    return Milliseconds(Milliseconds::rep(remainingMsec));
-}
 
 static StringData serializeState(boost::optional<RecipientStateEnum> e) {
     return RecipientState_serializer(*e);
@@ -255,21 +242,13 @@ void ReshardingMetrics::OperationMetrics::gotDelete() noexcept {
 
 boost::optional<Milliseconds> ReshardingMetrics::OperationMetrics::remainingOperationTime(
     Date_t now) const {
-    if (recipientState > RecipientStateEnum::kCloning && oplogEntriesFetched == 0) {
-        return Milliseconds(0);
-    }
-
-    if (oplogEntriesApplied > 0 && oplogEntriesFetched > 0) {
-        // All fetched oplogEntries must be applied. Some of them already have been.
-        return remainingTime(
-            applyingOplogEntries.duration(now), oplogEntriesApplied, oplogEntriesFetched);
-    }
-    if (bytesCopied > 0 && bytesToCopy > 0) {
-        // Until the time to apply batches of oplog entries is measured, we assume that applying all
-        // of them will take as long as copying did.
-        return remainingTime(copyingDocuments.duration(now), bytesCopied, 2 * bytesToCopy);
-    }
-    return {};
+    return estimateRemainingRecipientTime(recipientState > RecipientStateEnum::kCloning,
+                                          bytesCopied,
+                                          bytesToCopy,
+                                          copyingDocuments.duration(now),
+                                          oplogEntriesApplied,
+                                          oplogEntriesFetched,
+                                          applyingOplogEntries.duration(now));
 }
 
 void ReshardingMetrics::OperationMetrics::appendCurrentOpMetrics(BSONObjBuilder* bob,

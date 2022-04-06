@@ -51,23 +51,28 @@
 namespace mongo {
 
 class ReshardingMetrics;
+class ReshardingMetricsNew;
 
 class ReshardingOplogFetcher : public resharding::OnInsertAwaitable {
 public:
     class Env {
     public:
-        Env(ServiceContext* service, ReshardingMetrics* metrics)
-            : _service(service), _metrics(metrics) {}
+        Env(ServiceContext* service, ReshardingMetrics* metrics, ReshardingMetricsNew* metricsNew)
+            : _service(service), _metrics(metrics), _metricsNew(metricsNew) {}
         ServiceContext* service() const {
             return _service;
         }
         ReshardingMetrics* metrics() const {
             return _metrics;
         }
+        ReshardingMetricsNew* metricsNew() const {
+            return _metricsNew;
+        }
 
     private:
         ServiceContext* _service;
         ReshardingMetrics* _metrics;
+        ReshardingMetricsNew* _metricsNew;
     };
 
     // Special value to use for startAt to indicate there are no more oplog entries needing to be

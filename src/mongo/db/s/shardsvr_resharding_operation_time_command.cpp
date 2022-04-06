@@ -34,7 +34,10 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
+#include "mongo/db/s/resharding/resharding_recipient_service.h"
+#include "mongo/db/s/sharding_data_transform_metrics.h"
 #include "mongo/db/service_context.h"
 #include "mongo/s/request_types/resharding_operation_time_gen.h"
 #include "mongo/util/duration.h"
@@ -47,18 +50,21 @@ class ShardsvrReshardingOperationTimeCmd final
 public:
     class OperationTime {
     public:
-        explicit OperationTime(ReshardingMetrics* metrics) : _metrics(metrics) {}
+        explicit OperationTime(boost::optional<Milliseconds> elapsedMillis,
+                               boost::optional<Milliseconds> remainingMillis)
+            : _elapsedMillis{elapsedMillis}, _remainingMillis{remainingMillis} {}
         void serialize(BSONObjBuilder* bob) const {
-            if (const auto elapsedTime = _metrics->getOperationElapsedTime()) {
-                bob->append("elapsedMillis", durationCount<Milliseconds>(elapsedTime.get()));
+            if (_elapsedMillis) {
+                bob->append("elapsedMillis", _elapsedMillis->count());
             }
-            if (const auto remainingTime = _metrics->getOperationRemainingTime()) {
-                bob->append("remainingMillis", durationCount<Milliseconds>(remainingTime.get()));
+            if (_remainingMillis) {
+                bob->append("remainingMillis", _remainingMillis->count());
             }
         }
 
     private:
-        ReshardingMetrics* const _metrics;
+        boost::optional<Milliseconds> _elapsedMillis;
+        boost::optional<Milliseconds> _remainingMillis;
     };
 
     using Request = _shardsvrReshardingOperationTime;
@@ -103,10 +109,23 @@ public:
         }
 
         Response typedRun(OperationContext* opCtx) {
-            // Once multiple concurrent resharding operations are allowed, the following could use
-            // `ns()` to choose the instance of `ReshardingMetrics` that is associated with the
-            // provided namespace string.
-            return Response(ReshardingMetrics::get(opCtx->getServiceContext()));
+            if (ShardingDataTransformMetrics::isEnabled()) {
+                auto instances =
+                    getReshardingStateMachines<ReshardingRecipientService,
+                                               ReshardingRecipientService::RecipientStateMachine>(
+                        opCtx, ns());
+                if (instances.empty()) {
+                    return Response{boost::none, boost::none};
+                }
+                invariant(instances.size() == 1);
+                const auto& metrics = instances[0]->getMetrics();
+                return Response{duration_cast<Milliseconds>(metrics.getOperationRunningTimeSecs()),
+                                metrics.getHighEstimateRemainingTimeMillis()};
+            } else {
+                auto metrics = ReshardingMetrics::get(opCtx->getServiceContext());
+                return Response{metrics->getOperationElapsedTime(),
+                                metrics->getOperationRemainingTime()};
+            }
         }
     };
 } _shardsvrReshardingOperationTime;
