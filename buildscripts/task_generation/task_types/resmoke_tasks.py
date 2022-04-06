@@ -1,21 +1,19 @@
 """Task generation for split resmoke tasks."""
-from typing import Any, Dict, List, NamedTuple, Optional, Set
+from typing import Set, Any, Dict, NamedTuple, Optional, List
 
 import inject
 import structlog
-from shrub.v2 import FunctionCall, Task, TaskDependency
+from shrub.v2 import Task, TaskDependency, FunctionCall
 
 from buildscripts.ciconfig.evergreen import EvergreenProjectConfig
 from buildscripts.resmokelib.multiversionconstants import REQUIRES_FCV_TAG
-from buildscripts.task_generation.constants import (
-    BACKPORT_REQUIRED_TAG, CONFIGURE_EVG_CREDENTIALS, EXCLUDES_TAGS_FILE_PATH, RUN_GENERATED_TESTS)
+from buildscripts.task_generation.constants import ARCHIVE_DIST_TEST_DEBUG_TASK, EXCLUDES_TAGS_FILE_PATH, \
+    BACKPORT_REQUIRED_TAG, CONFIGURE_EVG_CREDENTIALS, RUN_GENERATED_TESTS
 from buildscripts.task_generation.suite_split import GeneratedSuite
-from buildscripts.task_generation.task_types.gentask_options import \
-    GenTaskOptions
-from buildscripts.task_generation.task_types.models.resmoke_task_model import \
-    ResmokeTask
-from buildscripts.task_generation.task_types.multiversion_decorator import (
-    MultiversionDecoratorParams, MultiversionGenTaskDecorator)
+from buildscripts.task_generation.task_types.gentask_options import GenTaskOptions
+from buildscripts.task_generation.task_types.models.resmoke_task_model import ResmokeTask
+from buildscripts.task_generation.task_types.multiversion_decorator import MultiversionGenTaskDecorator, \
+    MultiversionDecoratorParams
 from buildscripts.timeouts.timeout import TimeoutEstimate
 
 LOGGER = structlog.getLogger(__name__)
@@ -46,7 +44,6 @@ class ResmokeGenTaskParams(NamedTuple):
     resmoke_jobs_max: Max number of jobs that resmoke should execute in parallel.
     depends_on: List of tasks this task depends on.
     config_location: S3 path to the generated config tarball. None if no generated config files.
-    dependencies: Set of dependencies generated tasks should depend on.
     """
 
     use_large_distro: bool
@@ -57,7 +54,6 @@ class ResmokeGenTaskParams(NamedTuple):
     resmoke_args: str
     resmoke_jobs_max: Optional[int]
     config_location: str
-    dependencies: Set[str]
 
 
 class ResmokeGenTaskService:
@@ -161,8 +157,7 @@ class ResmokeGenTaskService:
             FunctionCall(RUN_GENERATED_TESTS, run_tests_vars),
         ]
 
-        shrub_task = Task(sub_task_name, [cmd for cmd in commands if cmd],
-                          self._get_dependencies(params))
+        shrub_task = Task(sub_task_name, [cmd for cmd in commands if cmd], self._get_dependencies())
         return ResmokeTask(shrub_task=shrub_task, resmoke_suite_name=suite.suite_name,
                            execution_task_suite_yaml_path=sub_suite_file_path,
                            execution_task_suite_yaml_name=sub_suite_file, test_list=sub_suite_roots,
@@ -233,7 +228,7 @@ class ResmokeGenTaskService:
         return variables
 
     @staticmethod
-    def _get_dependencies(params: ResmokeGenTaskParams) -> Set[TaskDependency]:
+    def _get_dependencies() -> Set[TaskDependency]:
         """Get the set of dependency tasks for these suites."""
-        dependencies = {TaskDependency(dependency) for dependency in params.dependencies}
+        dependencies = {TaskDependency(ARCHIVE_DIST_TEST_DEBUG_TASK)}
         return dependencies

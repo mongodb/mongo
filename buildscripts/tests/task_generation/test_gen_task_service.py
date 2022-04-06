@@ -6,11 +6,9 @@ from unittest.mock import MagicMock
 import inject
 from shrub.v2 import BuildVariant
 
-from buildscripts.task_generation.resmoke_proxy import ResmokeProxyService
-from buildscripts.task_generation.task_types.fuzzer_tasks import \
-    FuzzerGenTaskService
-
 import buildscripts.task_generation.gen_task_service as under_test
+from buildscripts.task_generation.resmoke_proxy import ResmokeProxyService
+from buildscripts.task_generation.task_types.fuzzer_tasks import FuzzerGenTaskService
 
 # pylint: disable=missing-docstring,invalid-name,unused-argument,no-self-use,protected-access
 
@@ -33,7 +31,6 @@ def build_mock_fuzzer_params(multi_version=False, use_large_distro=None, large_d
         use_large_distro=use_large_distro,
         large_distro_name=large_distro_name,
         config_location="config location",
-        dependencies={"archive_dist_test_debug"},
     )
 
 

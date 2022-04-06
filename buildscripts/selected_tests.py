@@ -417,8 +417,6 @@ class SelectedTestsOrchestrator:
                 resmoke_args=task_config.get("resmoke_args", ""),
                 resmoke_jobs_max=task_config.get("resmoke_jobs_max"),
                 config_location=self.evg_expansions.get_config_location(),
-                dependencies={depends_on["name"]
-                              for depends_on in task_def.depends_on},
             )
             builder.generate_suite(split_params, gen_params)
 
