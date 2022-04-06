@@ -311,20 +311,22 @@ std::unique_ptr<MatchExpression> buildInternalOpFilter(
     }
 
     // Also filter for shardCollection events, which are recorded as {op: 'n'} in the oplog.
-    auto nsRegex = DocumentSourceChangeStream::getNsRegexForChangeStream(expCtx);
-    internalOpTypeOrBuilder.append(BSON("o2.shardCollection" << BSONRegEx(nsRegex)));
+    internalOpTypeOrBuilder.append(BSON("o2.shardCollection" << BSON("$exists" << true)));
 
     // Only return the 'migrateLastChunkFromShard' event if 'showSystemEvents' is set.
     if (expCtx->changeStreamSpec->getShowSystemEvents()) {
-        internalOpTypeOrBuilder.append(BSON("o2.migrateLastChunkFromShard" << BSONRegEx(nsRegex)));
+        internalOpTypeOrBuilder.append(
+            BSON("o2.migrateLastChunkFromShard" << BSON("$exists" << true)));
     }
 
     // Finalize the array of $or filter predicates.
     internalOpTypeOrBuilder.done();
 
+    auto nsRegex = DocumentSourceChangeStream::getNsRegexForChangeStream(expCtx);
     return MatchExpressionParser::parseAndNormalize(BSON("op"
                                                          << "n"
-                                                         << "$or" << internalOpTypeOrBuilder.arr()),
+                                                         << "ns" << BSONRegEx(nsRegex) << "$or"
+                                                         << internalOpTypeOrBuilder.arr()),
                                                     expCtx);
 }
 
