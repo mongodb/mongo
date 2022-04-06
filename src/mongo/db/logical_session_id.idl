@@ -64,10 +64,15 @@ types:
     deserializer: "mongo::BSONElement::_numberInt"
 
 structs:
-  InternalSessionFields:
-    description: "Internal session id fields"
+  LogicalSessionId:
+    description: "A struct representing a LogicalSessionId"
     strict: true
     fields:
+      id: uuid
+      uid: sha256Block
+      # The "txnNumber" field must come after the "id" and "uid" fields and before "txnUUID" field
+      # to enable find commands with session id as the sort field to return results that correspond
+      # to the same session id sorted by the "txnNumber" field.
       txnNumber:
         description: "Used for internal sessions only."
         type: TxnNumber
@@ -78,15 +83,6 @@ structs:
         type: uuid
         optional: true
         unstable: false
-
-  LogicalSessionId:
-    description: "A struct representing a LogicalSessionId"
-    strict: true
-    chained_structs:
-      InternalSessionFields: InternalSessionFields
-    fields:
-      id: uuid
-      uid: sha256Block
 
   LogicalSessionIdToClient:
     description: "A struct representing a LogicalSessionId to external clients"
@@ -116,14 +112,22 @@ structs:
   LogicalSessionFromClient:
     description: "A struct representing a LogicalSessionId from external clients"
     strict: true
-    chained_structs:
-      InternalSessionFields: InternalSessionFields
     fields:
-      id: 
+      id:
         type: uuid
         unstable: false
       uid:
         type: sha256Block
+        optional: true
+        unstable: false
+      txnNumber:
+        description: "Used for internal sessions only."
+        type: TxnNumber
+        optional: true
+        unstable: false
+      txnUUID:
+        description: "Used for internal sessions only."
+        type: uuid
         optional: true
         unstable: false
 

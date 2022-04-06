@@ -61,6 +61,11 @@ namespace {
 
 PseudoRandom hashGenerator(SecureRandom().nextInt64());
 
+struct LastTxnSession {
+    LogicalSessionId sessionId;
+    TxnNumber txnNumber;
+};
+
 boost::optional<repl::OplogEntry> forgeNoopEntryFromImageCollection(
     OperationContext* opCtx, const repl::OplogEntry retryableFindAndModifyOplogEntry) {
     invariant(retryableFindAndModifyOplogEntry.getNeedsRetryImage());
@@ -217,8 +222,7 @@ SessionCatalogMigrationSource::SessionCatalogMigrationSource(OperationContext* o
       _rollbackIdAtInit(repl::ReplicationProcess::get(opCtx)->getRollbackID()),
       _chunkRange(std::move(chunk)),
       _keyPattern(shardKey) {
-    // Sort is not needed for correctness. This is just for making it easier to write deterministic
-    // tests.
+
     DBDirectClient client(opCtx);
     FindCommandRequest findRequest{NamespaceString::kSessionTransactionsTableNamespace};
     // Skip internal sessions for retryable writes with aborted or in progress transactions since
@@ -226,25 +230,41 @@ SessionCatalogMigrationSource::SessionCatalogMigrationSource(OperationContext* o
     // non-retryable writes since they only support transactions and those transactions are not
     // retryable so there is no need to transfer their write history to the recipient.
     findRequest.setFilter(BSON(
-        "$or" << BSON_ARRAY(BSON((SessionTxnRecord::kSessionIdFieldName + "." +
-                                  InternalSessionFields::kTxnUUIDFieldName)
-                                 << BSON("$exists" << false))
-                            << BSON("$and" << BSON_ARRAY(BSON(
-                                        (SessionTxnRecord::kSessionIdFieldName + "." +
-                                         InternalSessionFields::kTxnNumberFieldName)
-                                        << BSON("$exists" << true)
-                                        << SessionTxnRecord::kStateFieldName << "committed"))))));
-    findRequest.setSort(BSON(SessionTxnRecord::kSessionIdFieldName << 1));
+        "$or" << BSON_ARRAY(
+            BSON((SessionTxnRecord::kSessionIdFieldName + "." + LogicalSessionId::kTxnUUIDFieldName)
+                 << BSON("$exists" << false))
+            << BSON("$and" << BSON_ARRAY(BSON((SessionTxnRecord::kSessionIdFieldName + "." +
+                                               LogicalSessionId::kTxnNumberFieldName)
+                                              << BSON("$exists" << true)
+                                              << SessionTxnRecord::kStateFieldName
+                                              << "committed"))))));
+    // Sort the records in descending of the session id (_id) field so that the records for internal
+    // sessions with highest txnNumber are returned first. This enables us to avoid migrating
+    // internal sessions for retryable writes with txnNumber lower than the highest txnNumber.
+    findRequest.setSort(BSON(SessionTxnRecord::kSessionIdFieldName << -1));
     auto cursor = client.find(std::move(findRequest));
 
+    boost::optional<LastTxnSession> lastTxnSession;
     while (cursor->more()) {
-        auto nextSession = SessionTxnRecord::parse(
+        const auto txnRecord = SessionTxnRecord::parse(
             IDLParserErrorContext("Session migration cloning"), cursor->next());
-        const auto sessionId = nextSession.getSessionId();
 
-        if (!nextSession.getLastWriteOpTime().isNull()) {
+        const auto sessionId = txnRecord.getSessionId();
+        const auto parentSessionId = castToParentSessionId(sessionId);
+        const auto parentTxnNumber =
+            sessionId.getTxnNumber() ? *sessionId.getTxnNumber() : txnRecord.getTxnNum();
+
+        if (lastTxnSession && (lastTxnSession->sessionId == parentSessionId) &&
+            (lastTxnSession->txnNumber > parentTxnNumber)) {
+            // Skip internal sessions for retryable writes with txnNumber lower than the higest
+            // txnNumber.
+            continue;
+        }
+        lastTxnSession = LastTxnSession{parentSessionId, parentTxnNumber};
+
+        if (!txnRecord.getLastWriteOpTime().isNull()) {
             _sessionOplogIterators.push_back(
-                std::make_unique<SessionOplogIterator>(std::move(nextSession), _rollbackIdAtInit));
+                std::make_unique<SessionOplogIterator>(std::move(txnRecord), _rollbackIdAtInit));
         }
     }
 

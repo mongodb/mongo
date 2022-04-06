@@ -104,14 +104,14 @@ bool isInternalSessionForNonRetryableWrite(const LogicalSessionId& sessionId) {
 LogicalSessionId makeLogicalSessionIdWithTxnNumberAndUUID(const LogicalSessionId& parentLsid,
                                                           TxnNumber txnNumber) {
     auto lsid = LogicalSessionId(parentLsid.getId(), parentLsid.getUid());
-    lsid.getInternalSessionFields().setTxnNumber(txnNumber);
-    lsid.getInternalSessionFields().setTxnUUID(UUID::gen());
+    lsid.setTxnNumber(txnNumber);
+    lsid.setTxnUUID(UUID::gen());
     return lsid;
 }
 
 LogicalSessionId makeLogicalSessionIdWithTxnUUID(const LogicalSessionId& parentLsid) {
     auto lsid = LogicalSessionId(parentLsid.getId(), parentLsid.getUid());
-    lsid.getInternalSessionFields().setTxnUUID(UUID::gen());
+    lsid.setTxnUUID(UUID::gen());
     return lsid;
 }
 
@@ -125,8 +125,8 @@ LogicalSessionId makeLogicalSessionId(const LogicalSessionFromClient& fromClient
     LogicalSessionId lsid;
 
     lsid.setId(fromClient.getId());
-    lsid.getInternalSessionFields().setTxnNumber(fromClient.getTxnNumber());
-    lsid.getInternalSessionFields().setTxnUUID(fromClient.getTxnUUID());
+    lsid.setTxnNumber(fromClient.getTxnNumber());
+    lsid.setTxnUUID(fromClient.getTxnUUID());
 
     if (fromClient.getUid()) {
         auto authSession = AuthorizationSession::get(opCtx->getClient());

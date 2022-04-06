@@ -150,7 +150,7 @@ TEST_F(LogicalSessionIdTest, ConstructorFromClientWithTxnUUID) {
 
     LogicalSessionFromClient req;
     req.setId(id);
-    req.getInternalSessionFields().setTxnUUID(txnUUID);
+    req.setTxnUUID(txnUUID);
 
     LogicalSessionId lsid = makeLogicalSessionId(req, _opCtx.get());
     ASSERT_EQ(lsid.getId(), id);
@@ -165,7 +165,7 @@ TEST_F(LogicalSessionIdTest, ConstructorFromClientWithTxnNumberWithoutTxnUUID) {
 
     LogicalSessionFromClient req;
     req.setId(id);
-    req.getInternalSessionFields().setTxnNumber(txnNumber);
+    req.setTxnNumber(txnNumber);
 
     ASSERT_THROWS_CODE(
         makeLogicalSessionId(req, _opCtx.get()), DBException, ErrorCodes::InvalidOptions);
@@ -179,8 +179,8 @@ TEST_F(LogicalSessionIdTest, ConstructorFromClientWithTxnNumberAndTxnUUID) {
 
     LogicalSessionFromClient req;
     req.setId(id);
-    req.getInternalSessionFields().setTxnNumber(txnNumber);
-    req.getInternalSessionFields().setTxnUUID(txnUUID);
+    req.setTxnNumber(txnNumber);
+    req.setTxnUUID(txnUUID);
 
     LogicalSessionId lsid = makeLogicalSessionId(req, _opCtx.get());
     ASSERT_EQ(lsid.getId(), id);

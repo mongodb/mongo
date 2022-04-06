@@ -145,7 +145,7 @@ InternalSessionPool::Session InternalSessionPool::acquireChildSession(
             return session;
         } else {
             auto lsid = LogicalSessionId{parentLsid.getId(), parentLsid.getUid()};
-            lsid.getInternalSessionFields().setTxnUUID(UUID::gen());
+            lsid.setTxnUUID(UUID::gen());
             auto session = InternalSessionPool::Session(lsid, TxnNumber(0));
             return session;
         }

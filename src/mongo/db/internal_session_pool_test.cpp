@@ -108,8 +108,8 @@ TEST_F(InternalSessionPoolTest, AcquireWithParentSessionFromPoolWithParentEntry)
     LogicalSessionId parentLsid2 = makeLogicalSessionIdForTest();
 
     // Set txnUUID for parentLsids.
-    parentLsid1.getInternalSessionFields().setTxnUUID(UUID::gen());
-    parentLsid2.getInternalSessionFields().setTxnUUID(UUID::gen());
+    parentLsid1.setTxnUUID(UUID::gen());
+    parentLsid2.setTxnUUID(UUID::gen());
 
     auto parentSession1 = InternalSessionPool::Session(parentLsid1, TxnNumber(1));
     _pool->release(parentSession1);
