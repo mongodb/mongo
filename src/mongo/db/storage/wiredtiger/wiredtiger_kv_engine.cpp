@@ -89,6 +89,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/background.h"
@@ -1744,12 +1745,25 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::makeTemporaryRecordStore(Operat
 
 void WiredTigerKVEngine::alterIdentMetadata(OperationContext* opCtx,
                                             StringData ident,
-                                            const IndexDescriptor* desc) {
+                                            const IndexDescriptor* desc,
+                                            bool isForceUpdateMetadata) {
+    std::string uri = _uri(ident);
+    if (!isForceUpdateMetadata) {
+        // Explicitly disallows metadata change, specifically index data format change, on indexes
+        // of version 11 and 12. This is extra defensive and can be reconsidered if we expand the
+        // use of 'alterIdentMetadata()' to also modify non-data-format properties.
+        invariant(!WiredTigerUtil::checkApplicationMetadataFormatVersion(
+                       opCtx,
+                       uri,
+                       kDataFormatV3KeyStringV0UniqueIndexVersionV1,
+                       kDataFormatV4KeyStringV1UniqueIndexVersionV2)
+                       .isOK());
+    }
+
     // Make the alter call to update metadata without taking exclusive lock to avoid conflicts with
     // concurrent operations.
     std::string alterString =
         WiredTigerIndex::generateAppMetadataString(*desc) + "exclusive_refreshed=false,";
-    std::string uri = _uri(ident);
     auto status = alterMetadata(uri, alterString);
     invariantStatusOK(status);
 }

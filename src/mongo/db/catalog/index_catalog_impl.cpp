@@ -530,7 +530,8 @@ IndexCatalogEntry* IndexCatalogImpl::createIndexEntry(OperationContext* opCtx,
     // index to be unique.
     bool isUpdateMetadata = CreateIndexEntryFlags::kUpdateMetadata & flags;
     if (isUpdateMetadata) {
-        engine->getEngine()->alterIdentMetadata(opCtx, ident, desc);
+        bool isForceUpdateMetadata = CreateIndexEntryFlags::kForceUpdateMetadata & flags;
+        engine->getEngine()->alterIdentMetadata(opCtx, ident, desc, isForceUpdateMetadata);
     }
 
     const auto& collOptions = collection->getCollectionOptions();

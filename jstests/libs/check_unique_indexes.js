@@ -35,15 +35,13 @@ function checkUniqueIndexFormatVersion(adminDB) {
                                   .storageStats.indexDetails[index.name]
                                   .metadata.formatVersion;
                     if (index.v === 2) {
-                        assert.eq(
-                            ifv,
-                            12,
-                            "Expected index format version 12 for unique index: " + tojson(index));
+                        assert(ifv == 12 || ifv == 14,
+                               "Expected index format version 12 or 14 for unique index: " +
+                                   tojson(index));
                     } else {
-                        assert.eq(
-                            ifv,
-                            11,
-                            "Expected index format version 11 for unique index: " + tojson(index));
+                        assert(ifv == 11 || ifv == 13,
+                               "Expected index format version 11 or 13 for unique index: " +
+                                   tojson(index));
                     }
                 }
             });

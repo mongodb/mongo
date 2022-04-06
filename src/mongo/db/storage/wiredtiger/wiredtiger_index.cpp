@@ -87,17 +87,6 @@ MONGO_FAIL_POINT_DEFINE(WTIndexPauseAfterSearchNear);
 static const WiredTigerItem emptyItem(nullptr, 0);
 }  // namespace
 
-
-// Keystring format 7 was used in 3.3.6 - 3.3.8 development releases. 4.2 onwards, unique indexes
-// can be either format version 11 or 12. On upgrading to 4.2, an existing format 6 unique index
-// will upgrade to format 11 and an existing format 8 unique index will upgrade to format 12.
-const int kDataFormatV1KeyStringV0IndexVersionV1 = 6;
-const int kDataFormatV2KeyStringV1IndexVersionV2 = 8;
-const int kDataFormatV3KeyStringV0UniqueIndexVersionV1 = 11;
-const int kDataFormatV4KeyStringV1UniqueIndexVersionV2 = 12;
-const int kMinimumIndexVersion = kDataFormatV1KeyStringV0IndexVersionV1;
-const int kMaximumIndexVersion = kDataFormatV4KeyStringV1UniqueIndexVersionV2;
-
 void WiredTigerIndex::setKey(WT_CURSOR* cursor, const WT_ITEM* item) {
     cursor->set_key(cursor, item);
 }
@@ -137,8 +126,8 @@ std::string WiredTigerIndex::generateAppMetadataString(const IndexDescriptor& de
 
     if (desc.unique() && !desc.isIdIndex()) {
         keyStringVersion = desc.version() >= IndexDescriptor::IndexVersion::kV2
-            ? kDataFormatV4KeyStringV1UniqueIndexVersionV2
-            : kDataFormatV3KeyStringV0UniqueIndexVersionV1;
+            ? kDataFormatV6KeyStringV1UniqueIndexVersionV2
+            : kDataFormatV5KeyStringV0UniqueIndexVersionV1;
     } else {
         keyStringVersion = desc.version() >= IndexDescriptor::IndexVersion::kV2
             ? kDataFormatV2KeyStringV1IndexVersionV2
@@ -663,8 +652,8 @@ KeyString::Version WiredTigerIndex::_handleVersionInfo(OperationContext* ctx,
     _dataFormatVersion = version.getValue();
 
     if (!desc->isIdIndex() && desc->unique() &&
-        _dataFormatVersion != kDataFormatV3KeyStringV0UniqueIndexVersionV1 &&
-        _dataFormatVersion != kDataFormatV4KeyStringV1UniqueIndexVersionV2) {
+        (_dataFormatVersion < kDataFormatV3KeyStringV0UniqueIndexVersionV1 ||
+         _dataFormatVersion > kDataFormatV6KeyStringV1UniqueIndexVersionV2)) {
         auto collectionNamespace = desc->getEntry()->getNSSFromCatalog(ctx);
         Status versionStatus(ErrorCodes::UnsupportedFormat,
                              str::stream()
@@ -684,11 +673,12 @@ KeyString::Version WiredTigerIndex::_handleVersionInfo(OperationContext* ctx,
     }
 
     /*
-     * Index data format 6 and 11 correspond to KeyString version V0 and data format 8 and 12
-     * correspond to KeyString version V1.
+     * Index data format 6, 11, and 13 correspond to KeyString version V0 and data format 8, 12, and
+     * 14 correspond to KeyString version V1.
      */
     return (_dataFormatVersion == kDataFormatV2KeyStringV1IndexVersionV2 ||
-            _dataFormatVersion == kDataFormatV4KeyStringV1UniqueIndexVersionV2)
+            _dataFormatVersion == kDataFormatV4KeyStringV1UniqueIndexVersionV2 ||
+            _dataFormatVersion == kDataFormatV6KeyStringV1UniqueIndexVersionV2)
         ? KeyString::Version::V1
         : KeyString::Version::V0;
 }

@@ -40,6 +40,32 @@
 
 namespace mongo {
 
+/**
+ * Table of WiredTiger index types<->KeyString format<->Data format version:
+ *
+ * | Index Type                   | Key                             | Data Format Version        |
+ * | ---------------------------- | ------------------------------- | -------------------------- |
+ * | _id index                    | KeyString without RecordId      | index V1: 6, index V2: 8   |
+ * | non-unique index             | KeyString with RecordId         | index V1: 6, index V2: 8   |
+ * | unique secondary index (new) | KeyString with RecordId         | index V1: 13, index V2: 14 |
+ * | unique secondary index (old) | KeyString with/without RecordId | index V1: 11, index V2: 12 |
+ *
+ * Starting in 4.2, unique indexes can be in format version 11 or 12. On upgrade to 4.2, an existing
+ * format 6 unique index will upgrade to format 11 and an existing format 8 unique index will
+ * upgrade to format 12.
+ *
+ * Starting in 6.0, any new unique index will be in format 13 or 14, which guarantees that all keys
+ * are in the new format.
+ */
+const int kDataFormatV1KeyStringV0IndexVersionV1 = 6;
+const int kDataFormatV2KeyStringV1IndexVersionV2 = 8;
+const int kDataFormatV3KeyStringV0UniqueIndexVersionV1 = 11;
+const int kDataFormatV4KeyStringV1UniqueIndexVersionV2 = 12;
+const int kDataFormatV5KeyStringV0UniqueIndexVersionV1 = 13;
+const int kDataFormatV6KeyStringV1UniqueIndexVersionV2 = 14;
+const int kMinimumIndexVersion = kDataFormatV1KeyStringV0IndexVersionV1;
+const int kMaximumIndexVersion = kDataFormatV6KeyStringV1UniqueIndexVersionV2;
+
 class IndexCatalogEntry;
 class IndexDescriptor;
 struct WiredTigerItem;

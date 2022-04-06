@@ -261,6 +261,9 @@ void processCollModIndexRequest(OperationContext* opCtx,
     // Update data format version in storage engine metadata for index.
     if (indexUnique || indexForceNonUnique) {
         flags = CreateIndexEntryFlags::kIsReady | CreateIndexEntryFlags::kUpdateMetadata;
+        if (indexForceNonUnique) {
+            flags = flags | CreateIndexEntryFlags::kForceUpdateMetadata;
+        }
     }
 
     // Notify the index catalog that the definition of this index changed. This will invalidate the

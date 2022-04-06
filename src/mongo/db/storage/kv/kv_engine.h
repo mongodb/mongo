@@ -182,7 +182,8 @@ public:
 
     virtual void alterIdentMetadata(OperationContext* opCtx,
                                     StringData ident,
-                                    const IndexDescriptor* desc) {}
+                                    const IndexDescriptor* desc,
+                                    bool isForceUpdateMetadata) {}
 
     /**
      * See StorageEngine::flushAllFiles for details

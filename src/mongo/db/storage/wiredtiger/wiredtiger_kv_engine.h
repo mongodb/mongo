@@ -185,7 +185,8 @@ public:
 
     void alterIdentMetadata(OperationContext* opCtx,
                             StringData ident,
-                            const IndexDescriptor* desc) override;
+                            const IndexDescriptor* desc,
+                            bool isForceUpdateMetadata) override;
 
     Status alterMetadata(StringData uri, StringData config);
 

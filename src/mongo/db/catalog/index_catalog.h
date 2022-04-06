@@ -105,9 +105,16 @@ enum class CreateIndexEntryFlags : int {
     /**
      * kUpdateMetadata indicates that the index metadata in the storage engine should be updated
      * based on changes to the IndexDescriptor.
-     * This is used when making an index unique through the collMod command.
+     * This is used when converting a regular index to a unique index through the collMod command.
      */
-    kUpdateMetadata = 0x8
+    kUpdateMetadata = 0x8,
+    /**
+     * kForceUpdateMetadata indicates bypassing the checks when updating the index metadata in the
+     * storage engine.
+     * This is used when forcing the conversion of a unique index to a non-unique index through the
+     * collMod command.
+     */
+    kForceUpdateMetadata = 0x10,
 };
 
 inline bool operator&(CreateIndexEntryFlags lhs, CreateIndexEntryFlags rhs) {
