@@ -159,10 +159,6 @@ feature_flags:
         cpp_varname: feature_flags::gDocumentSourceListCatalog
         default: true
         version: 6.0
-    featureFlagDatabaseRenameDuringRestore:
-        description: "When enabled, allow renaming databases during restore"
-        cpp_varname: feature_flags::gDatabaseRenameDuringRestore
-        default: false
     featureFlagTimeseriesBucketCompressionWithArrays:
         description: "Enable array compression support for time-series bucket compression"
         cpp_varname: feature_flags::gTimeseriesBucketCompressionWithArrays
