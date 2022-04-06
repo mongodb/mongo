@@ -513,8 +513,7 @@ TEST_F(CollectionCatalogTest, RenameCollection) {
 
     // After renaming the collection, we should fail to restore the CollectionPtr.
     yieldableColl.restore();
-    ASSERT(yieldableColl);
-    ASSERT_EQUALS(yieldableColl, collection);
+    ASSERT_FALSE(yieldableColl);
 }
 
 TEST_F(CollectionCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsOldNSSIfDropped) {

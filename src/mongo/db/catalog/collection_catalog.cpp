@@ -1762,9 +1762,19 @@ void CollectionCatalogStasher::reset() {
 
 const Collection* LookupCollectionForYieldRestore::operator()(OperationContext* opCtx,
                                                               const UUID& uuid) const {
-    auto collection = CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, uuid).get();
-    if (!collection)
+    auto collection = CollectionCatalog::get(opCtx)->lookupCollectionByUUIDForRead(opCtx, uuid);
+
+    // Collection dropped during yielding.
+    if (!collection) {
         return nullptr;
+    }
+
+    // Collection renamed during yielding.
+    // This check ensures that we are locked on the same namespace and that it is safe to return
+    // the C-style pointer to the Collection.
+    if (collection->ns() != _nss) {
+        return nullptr;
+    }
 
     // After yielding and reacquiring locks, the preconditions that were used to select our
     // ReadSource initially need to be checked again. We select a ReadSource based on replication
@@ -1776,7 +1786,7 @@ const Collection* LookupCollectionForYieldRestore::operator()(OperationContext* 
         opCtx->recoveryUnit()->setTimestampReadSource(*newReadSource);
     }
 
-    return collection;
+    return collection.get();
 }
 
 BatchedCollectionCatalogWriter::BatchedCollectionCatalogWriter(OperationContext* opCtx)
