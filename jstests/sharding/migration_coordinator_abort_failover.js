@@ -42,7 +42,7 @@ runMoveChunkMakeDonorStepDownAfterFailpoint(
     dbName,
     "hangInEnsureChunkVersionIsGreaterThanThenSimulateErrorUninterruptible",
     true /* shouldMakeMigrationFailToCommitOnConfig */,
-    ErrorCodes.StaleEpoch);
+    [ErrorCodes.OperationFailed, ErrorCodes.StaleEpoch]);
 
 runMoveChunkMakeDonorStepDownAfterFailpoint(
     st,
