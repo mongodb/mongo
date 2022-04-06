@@ -438,6 +438,7 @@ public:
     // Serialize the bound for explain output
     virtual Document serializeBound() const = 0;
 
+    virtual size_t totalDataSizeBytes() const = 0;
     virtual size_t numSpills() const = 0;
 
     // By default, uassert that the input meets our assumptions of being almost-sorted.
@@ -518,6 +519,10 @@ public:
     Document serializeBound() const {
         return {makeBound.serialize()};
     };
+
+    size_t totalDataSizeBytes() const {
+        return _totalDataSizeSorted;
+    }
 
     size_t numSpills() const {
         return _numSpills;

@@ -29,8 +29,6 @@ const buckets = testDB['system.buckets.' + coll.getName()];
 coll.drop();
 assert.commandWorked(
     testDB.createCollection(coll.getName(), {timeseries: {timeField: 't', metaField: 'm'}}));
-const bucketMaxSpanSeconds =
-    testDB.getCollectionInfos({name: coll.getName()})[0].options.timeseries.bucketMaxSpanSeconds;
 
 // Insert some data.
 {
@@ -108,23 +106,39 @@ function assertSorted(result) {
                       .toArray();
     assertSorted(naive);
 
-    const opt = buckets
-                    .aggregate(
-                        [
-                            {$sort: {'control.min.t': 1}},
-                            unpackStage,
-                            {
-                                $_internalBoundedSort: {
-                                    sortKey: {t: 1},
-                                    bound: {base: "min"},
-                                }
-                            },
-                        ],
-                        {allowDiskUse: true})
-                    .toArray();
+    const pipeline = [
+        {$sort: {'control.min.t': 1}},
+        unpackStage,
+        {
+            $_internalBoundedSort: {
+                sortKey: {t: 1},
+                bound: {base: "min"},
+            }
+        },
+    ];
+    const opt = buckets.aggregate(pipeline, {allowDiskUse: true}).toArray();
     assertSorted(opt);
 
     assert.eq(naive, opt);
+
+    // Let's make sure the execution stats make sense.
+    const stats =
+        getAggPlanStage(buckets.explain("executionStats").aggregate(pipeline, {allowDiskUse: true}),
+                        '$_internalBoundedSort');
+    assert.eq(stats.usedDisk, true);
+
+    // We know each doc should have at least 8 bytes for time in both key and document.
+    const docSize = stats.totalDataSizeSortedBytesEstimate / stats.nReturned;
+    assert.gte(docSize, 16);
+    const docsToTriggerSpill = Math.ceil(kSmallMemoryLimit / docSize);
+
+    // We know we'll spill if we can't store all the docs from a single bucket within the memory
+    // limit, so let's ensure that the total spills are at least what we'd expect if none of the
+    // buckets overlap.
+    const docsPerBucket = Math.floor(stats.nReturned / buckets.count());
+    const spillsPerBucket = Math.floor(docsPerBucket / docsToTriggerSpill);
+    assert.gt(spillsPerBucket, 0);
+    assert.gte(stats.spills, buckets.count() * spillsPerBucket);
 }
 
 // Test $sort + $limit.

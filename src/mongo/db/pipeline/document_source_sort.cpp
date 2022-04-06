@@ -283,18 +283,26 @@ void DocumentSourceSort::serializeToArray(
                 "$_internalBoundedSort should not absorb a $limit",
                 !_sortExecutor->hasLimit());
 
-        // TODO SERVER-63637 Implement execution stats.
-
         // {$_internalBoundedSort: {sortKey, bound}}
         auto sortKey = _sortExecutor->sortPattern().serialize(
             SortPattern::SortKeySerialization::kForPipelineSerialization);
-        array.push_back(Value{Document{{
+
+        MutableDocument mutDoc{Document{{
             {"$_internalBoundedSort"_sd,
              Document{{
                  {"sortKey"_sd, std::move(sortKey)},
                  {"bound"_sd, _timeSorter->serializeBound()},
              }}},
-        }}});
+        }}};
+
+        if (explain >= ExplainOptions::Verbosity::kExecStats) {
+            mutDoc["totalDataSizeSortedBytesEstimate"] =
+                Value(static_cast<long long>(_timeSorter->totalDataSizeBytes()));
+            mutDoc["usedDisk"] = Value(_timeSorter->numSpills() > 0);
+            mutDoc["spills"] = Value(static_cast<long long>(_timeSorter->numSpills()));
+        }
+
+        array.push_back(Value{mutDoc.freeze()});
         return;
     }
     uint64_t limit = _sortExecutor->getLimit();
