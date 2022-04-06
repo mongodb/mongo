@@ -336,7 +336,7 @@ public:
 
         int binDataLen;
         auto binData = elem.binData(binDataLen);
-        if (!binDataLen)
+        if (static_cast<size_t>(binDataLen) < sizeof(FleBlobHeader))
             return false;
 
         auto fleBlobSubType =
