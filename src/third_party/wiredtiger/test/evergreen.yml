@@ -334,6 +334,15 @@ functions:
         set -o verbose
         ${test_env_vars|} ./run -t ${test_name} -C '${test_config}' -f ${test_config_filename} -l 2
 
+  "wt2853_perf test":
+    command: shell.exec
+    params:
+      working_dir: "wiredtiger/cmake_build/bench/wt2853_perf"
+      script: |
+        set -o errexit
+        set -o verbose
+        ${test_env_vars|} ./test_wt2853_perf ${wt2853_perf_args}
+
   "csuite test":
     command: shell.exec
     params:
@@ -596,10 +605,10 @@ functions:
         set -o verbose
         ${test_env_vars|} test/csuite/${test_binary}/smoke.sh ${test_args|} 2>&1
 
-  "upload cpp test stats":
+  "upload test stats":
     - command: perf.send
       params:
-        file: ./wiredtiger/cmake_build/test/cppsuite/${test_name}.json
+        file: ./wiredtiger/cmake_build/${test_path}.json
 
   "upload-perf-test-stats":
     - command: shell.exec
@@ -994,9 +1003,9 @@ tasks:
           test_config: debug_mode=(cursor_copy=true)
           test_config_filename: configs/base_test_default.txt
           test_name: base_test
-      - func: "upload cpp test stats"
+      - func: "upload test stats"
         vars:
-          test_name: base_test
+          test_path: test/cppsuite/base_test
 
   - name: cppsuite-hs-cleanup-default
     tags: ["pull_request"]
@@ -1009,9 +1018,9 @@ tasks:
           test_config: debug_mode=(cursor_copy=true)
           test_config_filename: configs/hs_cleanup_default.txt
           test_name: hs_cleanup
-      - func: "upload cpp test stats"
+      - func: "upload test stats"
         vars:
-          test_name: hs_cleanup
+          test_path: test/cppsuite/hs_cleanup
 
   - name: cppsuite-search-near-01-default
     tags: ["pull_request"]
@@ -1023,9 +1032,9 @@ tasks:
         vars:
           test_config_filename: configs/search_near_01_default.txt
           test_name: search_near_01
-      - func: "upload cpp test stats"
+      - func: "upload test stats"
         vars:
-          test_name: search_near_01
+          test_path: test/cppsuite/search_near_01
 
   - name: cppsuite-search-near-02-default
     tags: ["pull_request"]
@@ -1037,9 +1046,9 @@ tasks:
         vars:
           test_config_filename: configs/search_near_02_default.txt
           test_name: search_near_02
-      - func: "upload cpp test stats"
+      - func: "upload test stats"
         vars:
-          test_name: search_near_02
+          test_path: test/cppsuite/search_near_02
 
   - name: cppsuite-search-near-03-default
     tags: ["pull_request"]
@@ -1051,9 +1060,9 @@ tasks:
         vars:
           test_config_filename: configs/search_near_03_default.txt
           test_name: search_near_03
-      - func: "upload cpp test stats"
+      - func: "upload test stats"
         vars:
-          test_name: search_near_03
+          test_path: test/cppsuite/search_near_03
 
   - name: cppsuite-base-test-stress
     depends_on:
@@ -1064,9 +1073,9 @@ tasks:
         vars:
           test_config_filename: configs/base_test_stress.txt
           test_name: base_test
-      - func: "upload cpp test stats"
+      - func: "upload test stats"
         vars:
-          test_name: base_test
+          test_path: test/cppsuite/base_test
 
   - name: cppsuite-hs-cleanup-stress
     depends_on:
@@ -1077,9 +1086,9 @@ tasks:
         vars:
           test_config_filename: configs/hs_cleanup_stress.txt
           test_name: hs_cleanup
-      - func: "upload cpp test stats"
+      - func: "upload test stats"
         vars:
-          test_name: hs_cleanup
+          test_path: test/cppsuite/hs_cleanup
 
   - name: cppsuite-search-near-01-stress
     depends_on:
@@ -1090,9 +1099,9 @@ tasks:
         vars:
           test_config_filename: configs/search_near_01_stress.txt
           test_name: search_near_01
-      - func: "upload cpp test stats"
+      - func: "upload test stats"
         vars:
-          test_name: search_near_01
+          test_path: test/cppsuite/search_near_01
 
   - name: cppsuite-search-near-02-stress
     depends_on:
@@ -1103,9 +1112,9 @@ tasks:
         vars:
           test_config_filename: configs/search_near_02_stress.txt
           test_name: search_near_02
-      - func: "upload cpp test stats"
+      - func: "upload test stats"
         vars:
-          test_name: search_near_02
+          test_path: test/cppsuite/search_near_02
 
   - name: cppsuite-search-near-03-stress
     depends_on:
@@ -1116,9 +1125,9 @@ tasks:
         vars:
           test_config_filename: configs/search_near_03_stress.txt
           test_name: search_near_03
-      - func: "upload cpp test stats"
+      - func: "upload test stats"
         vars:
-          test_name: search_near_03
+          test_path: test/cppsuite/search_near_03
 
   # End of cppsuite test tasks.
   # Start of csuite test tasks
@@ -1459,16 +1468,6 @@ tasks:
       - func: "csuite test"
         vars:
           test_name: wt2834_join_bloom_fix
-
-  - name: csuite-wt2853-perf-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "csuite test"
-        vars:
-          test_name: wt2853_perf
 
   - name: csuite-wt2909-checkpoint-integrity-test
     tags: ["pull_request"]
@@ -3635,6 +3634,32 @@ tasks:
           comparison_op: "lt"
           expected-stats: '{"Warning Idle (drop)": 50, "Latency drop(in sec.) Max1": 500, "Latency warnings (read, insert, update)": 500}'
 
+  - name: bench-wt2853-perf-test-row
+    tags: ["wt2853-perf"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "wt2853_perf test"
+        vars:
+          wt2853_perf_args: "-t r"
+      - func: "upload test stats"
+        vars:
+          test_path: bench/wt2853_perf/wt2853_perf
+
+  - name: bench-wt2853-perf-test-col
+    tags: ["wt2853-perf"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "wt2853_perf test"
+        vars:
+          wt2853_perf_args: "-t c"
+      - func: "upload test stats"
+        vars:
+          test_path: bench/wt2853_perf/wt2853_perf
+
 #######################################
 #            Buildvariants            #
 #######################################
@@ -3940,6 +3965,7 @@ buildvariants:
     - name: ".log-perf"
     - name: ".long-perf"
     - name: many-dhandle-stress
+    - name: ".wt2853-perf"
   display_tasks:
     - name: Wiredtiger-perf-btree-jobs
       execution_tasks:
@@ -3963,6 +3989,9 @@ buildvariants:
     - name: Wiredtiger-perf-long-jobs
       execution_tasks:
       - ".long-perf"
+    - name: WiredTiger-wt2853-perf
+      execution_tasks:
+      - ".wt2853-perf"
 
 - name: large-scale-tests
   display_name: "Large scale tests"

@@ -42,20 +42,16 @@
 
 static void *thread_insert(void *);
 static void *thread_get(void *);
+static void create_perf_json(bool, int, int);
 
 #define BLOOM false
-#define GAP_DISPLAY 3 /* Threshold for seconds of gap to be displayed */
-#define GAP_ERROR 20  /* Threshold for seconds of gap to be treated as error */
+#define GAP_WARNINGS 3 /* Threshold for seconds of gap to be displayed */
 #define N_RECORDS 10000
 #define N_INSERT 1000000
 #define N_INSERT_THREAD 1
 #define N_GET_THREAD 1
 #define S64 "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789::"
 #define S1024 (S64 S64 S64 S64 S64 S64 S64 S64 S64 S64 S64 S64 S64 S64 S64 S64)
-
-#if GAP_ERROR < GAP_DISPLAY
-#error "GAP_ERROR must be >= GAP_DISPLAY"
-#endif
 
 typedef struct {
     char posturi[256];
@@ -72,12 +68,13 @@ typedef struct {
     int nthread;
     int done;
     int njoins;
-    int nfail;
+    int nwarnings;
 } THREAD_ARGS;
 
 /*
  * main --
- *     TODO: Add a comment describing this function.
+ *     Setup the creation of tables and indices. Run the insert and read operation threads and check
+ *     for any performance discrepancies.
  */
 int
 main(int argc, char *argv[])
@@ -88,7 +85,7 @@ main(int argc, char *argv[])
     WT_CURSOR *maincur;
     WT_SESSION *session;
     pthread_t get_tid[N_GET_THREAD], insert_tid[N_INSERT_THREAD];
-    int i, key, nfail;
+    int i, key, njoins, nwarnings;
     char tableconf[128];
     const char *tablename;
 
@@ -99,7 +96,7 @@ main(int argc, char *argv[])
     memset(sharedopts, 0, sizeof(*sharedopts));
     memset(insert_args, 0, sizeof(insert_args));
     memset(get_args, 0, sizeof(get_args));
-    nfail = 0;
+    njoins = nwarnings = 0;
 
     sharedopts->bloom = BLOOM;
     testutil_check(testutil_parse_opts(argc, argv, opts));
@@ -193,31 +190,34 @@ main(int argc, char *argv[])
     fprintf(stderr, "\n");
     for (i = 0; i < N_GET_THREAD; ++i) {
         fprintf(stderr, "  thread %d did %d joins (%d fails)\n", i, get_args[i].njoins,
-          get_args[i].nfail);
-        nfail += get_args[i].nfail;
+          get_args[i].nwarnings);
+        nwarnings += get_args[i].nwarnings;
+        njoins += get_args[i].njoins;
     }
 
     /*
      * Note that slow machines can be skipped for this test. See the bypass code earlier.
      */
-    if (nfail != 0)
+    if (nwarnings != 0)
         fprintf(stderr,
-          "ERROR: %d failures when a single commit took more than %d seconds.\n"
+          "WARNING: %d warnings when a single commit took more than %d seconds.\n"
           "This may indicate a real problem or a particularly slow machine.\n",
-          nfail, GAP_ERROR);
-    testutil_assert(nfail == 0);
+          nwarnings, GAP_WARNINGS);
+    fprintf(stderr, "All read threads executed %d cursor joins.\n", njoins);
     testutil_progress(opts, "cleanup starting");
+    create_perf_json(sharedopts->usecolumns, njoins, nwarnings);
     testutil_cleanup(opts);
     return (0);
 }
 
 /*
  * thread_insert --
- *     TODO: Add a comment describing this function.
+ *     Insert records to stress the WiredTiger's indices.
  */
 static void *
 thread_insert(void *arg)
 {
+    WT_DECL_RET;
     SHARED_OPTS *sharedopts;
     TEST_OPTS *opts;
     THREAD_ARGS *threadargs;
@@ -262,7 +262,12 @@ thread_insert(void *arg)
             flag = 0;
         }
         maincur->set_value(maincur, post, bal, extra, flag, key);
-        testutil_check(maincur->insert(maincur));
+        ret = maincur->insert(maincur);
+        if (ret == WT_ROLLBACK) {
+            testutil_check(session->rollback_transaction(session, NULL));
+            continue;
+        }
+        testutil_assert(ret == 0);
         testutil_check(maincur->reset(maincur));
         testutil_check(session->commit_transaction(session, NULL));
         if (i % 1000 == 0 && i != 0) {
@@ -272,15 +277,14 @@ thread_insert(void *arg)
                 fprintf(stderr, ".");
             __wt_seconds((WT_SESSION_IMPL *)session, &curtime);
             elapsed = curtime - prevtime;
-            if (elapsed > GAP_DISPLAY) {
+            if (elapsed > GAP_WARNINGS) {
                 testutil_progress(opts, "insert time gap");
                 fprintf(stderr,
                   "\n"
                   "GAP: %" PRIu64 " secs after %d inserts\n",
                   elapsed, i);
+                threadargs->nwarnings++;
             }
-            if (elapsed > GAP_ERROR)
-                threadargs->nfail++;
             prevtime = curtime;
         }
     }
@@ -292,7 +296,8 @@ thread_insert(void *arg)
 
 /*
  * thread_get --
- *     TODO: Add a comment describing this function.
+ *     Continuously perform reads and loop through the indices with same key. Record the time taken
+ *     to finish the read on table and the indices.
  */
 static void *
 thread_get(void *arg)
@@ -347,15 +352,14 @@ thread_get(void *arg)
 
         __wt_seconds((WT_SESSION_IMPL *)session, &curtime);
         elapsed = curtime - prevtime;
-        if (elapsed > GAP_DISPLAY) {
+        if (elapsed > GAP_WARNINGS) {
             testutil_progress(opts, "get time gap");
             fprintf(stderr,
               "\n"
               "GAP: %" PRIu64 " secs after %d gets\n",
               elapsed, threadargs->njoins);
+            threadargs->nwarnings++;
         }
-        if (elapsed > GAP_ERROR)
-            threadargs->nfail++;
         prevtime = curtime;
     }
     testutil_progress(opts, "get end");
@@ -363,4 +367,27 @@ thread_get(void *arg)
     testutil_check(maincur->close(maincur));
     testutil_check(session->close(session, NULL));
     return (NULL);
+}
+
+/*
+ * create_perf_json --
+ *     Construct the performance json which is used to generate the performance charts.
+ */
+static void
+create_perf_json(bool usecolumns, int njoins, int nwarnings)
+{
+    FILE *fp;
+    char testname[50];
+
+    fp = NULL;
+
+    testutil_check(
+      __wt_snprintf(testname, sizeof(testname), "wt2853_perf_%s", usecolumns ? "col" : "row"));
+    testutil_assert_errno((fp = fopen("wt2853_perf.json", "w")) != NULL);
+    testutil_assert(fprintf(fp,
+                      "[{\"info\":{\"test_name\": \"%s\"},"
+                      "\"metrics\": [{\"name\":\"Cursor Joins\",\"value\":%d}, {\"name\":\"GAP"
+                      " Warnings\",\"value\":%d}]}]",
+                      testname, njoins, nwarnings) > 0);
+    testutil_assert(fclose(fp) == 0);
 }
