@@ -611,6 +611,12 @@ SlotBasedStageBuilder::SlotBasedStageBuilder(OperationContext* opCtx,
             break;
         }
     }
+
+    const auto [groupNode, groupCount] = getFirstNodeByType(solution.root(), STAGE_GROUP);
+    if (groupCount) {
+        // TODO: SERVER-63604 optimize _shouldProduceRecordIdSlot maintenance
+        _shouldProduceRecordIdSlot = false;
+    }
 }
 
 std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::build(const QuerySolutionNode* root) {

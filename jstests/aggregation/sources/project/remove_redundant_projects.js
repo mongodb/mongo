@@ -129,11 +129,6 @@ assertResultsMatch({
     expectProjectToCoalesce: true,
     pipelineOptimizedAway: true
 });
-assertResultsMatch({
-    pipeline: [{$sort: {a: 1}}, {$group: {_id: "$_id", a: {$sum: "$a"}}}, {$project: {arr: 1}}],
-    expectProjectToCoalesce:
-        !groupPushdownEnabled,  // lowering $group into SBE prevents coalesing of projects
-});
 
 // Test that projections with computed fields are removed from the pipeline.
 assertResultsMatch({
