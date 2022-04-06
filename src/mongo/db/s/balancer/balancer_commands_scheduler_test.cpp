@@ -188,7 +188,7 @@ TEST_F(BalancerCommandsSchedulerTest, SuccessfulMoveRangeCommand) {
             [&](const executor::RemoteCommandRequest& request) { return BSON("ok" << true); });
     });
     auto futureResponse = _scheduler.requestMoveRange(
-        operationContext(), shardsvrRequest, false /* issuedByRemoteUser */);
+        operationContext(), shardsvrRequest, WriteConcernOptions(), false /* issuedByRemoteUser */);
     ASSERT_OK(futureResponse.getNoThrow());
     networkResponseFuture.default_timed_get();
     deferredCleanupCompletedCheckpoint->waitForTimesEntered(timesEnteredFailPoint + 1);

@@ -43,8 +43,11 @@ public:
     using Request = ClusterMoveRange;
 
     std::string help() const override {
-        // TODO SERVER-64486 document this command with an inline example.
-        return "Move the range delimited by the the given key(s) to the destination shard.";
+        return "Example: move range starting from {num : 7} to shard001 (max bound automatically "
+               "chosen)\n  { moveRange : 'test.foo' , min : { num : 7 } , to : 'shard0001' }\n"
+               "Example: move range with lower bound 0 and upper bound 10 to shard001\n"
+               "  { moveRange : 'test.foo' , min : { num : 0 } , max: { num : 10 } "
+               " , to : 'shard001' }\n";
     }
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {

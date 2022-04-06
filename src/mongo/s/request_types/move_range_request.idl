@@ -30,6 +30,7 @@ global:
     cpp_namespace: "mongo"
     cpp_includes:
         - "mongo/s/catalog/types_validators.h"
+        - "mongo/s/request_types/migration_secondary_throttle_options.h"
 
 imports:
     - "mongo/idl/basic_types.idl"
@@ -43,6 +44,14 @@ enums:
             kDoNotForce: 0    # do not attempt to migrate a large chunk
             kForceManual: 1   # manual moveChunk command specified `forceJumbo: true`
             kForceBalancer: 2 # balancer specified `forceJumbo: true`
+
+types:
+    MigrationSecondaryThrottle:
+        bson_serialization_type: object
+        description: "Secondary throttle policy to adopt during the migration"
+        cpp_type: "mongo::MigrationSecondaryThrottleOptions"
+        serializer: mongo::MigrationSecondaryThrottleOptions::toBSON
+        deserializer: mongo::MigrationSecondaryThrottleOptions::parseFromBSON
 
 structs:
     MoveRangeRequest:
@@ -70,10 +79,6 @@ structs:
                 type: ForceJumbo
                 description: "Specifies the policy to use for jumbo chunks"
                 default: kDoNotForce
-            secondaryThrottle:
-                type: bool
-                description: "Secondary throttle policy to adopt during the migration"
-                default: false
 
 commands:
     clusterMoveRange:
@@ -86,6 +91,10 @@ commands:
         strict: false
         chained_structs:
             MoveRangeRequest: MoveRangeRequest
+        fields:
+            secondaryThrottle:
+                type: optionalBool
+                description: "Secondary throttle policy to adopt during the migration"
 
     _configsvrMoveRange:
         command_name: _configsvrMoveRange
@@ -97,6 +106,11 @@ commands:
         strict: false
         chained_structs:
             MoveRangeRequest: MoveRangeRequest
+        fields:
+            secondaryThrottle:
+                type: MigrationSecondaryThrottle
+                description: "Secondary throttle policy to adopt during the migration"
+                optional: true
 
     _shardsvrMoveRange:
         command_name: _shardsvrMoveRange
@@ -123,3 +137,6 @@ commands:
                 type: safeInt64
                 description: "Max size of data to move"
                 optional: true
+            secondaryThrottle:
+                type: optionalBool
+                description: "Secondary throttle policy to adopt during the migration"

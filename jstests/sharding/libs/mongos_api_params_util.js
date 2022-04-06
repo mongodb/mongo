@@ -925,8 +925,8 @@ let MongosAPIParametersUtil = (function() {
             commandName: "moveChunk",
             run: {
                 inAPIVersion1: false,
-                shardCommandName: "moveChunk",
-                configServerCommandName: "_configsvrMoveChunk",
+                shardCommandName: "_shardsvrMoveRange",
+                configServerCommandName: "_configsvrMoveRange",
                 runsAgainstAdminDb: true,
                 permittedInTxn: false,
                 requiresShardedCollection: true,

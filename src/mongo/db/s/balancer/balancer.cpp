@@ -381,35 +381,46 @@ Status Balancer::moveSingleChunk(OperationContext* opCtx,
 
 Status Balancer::moveRange(OperationContext* opCtx,
                            const NamespaceString& nss,
-                           const MoveRangeRequest& request,
+                           const ConfigsvrMoveRange& request,
                            bool issuedByRemoteUser) {
     auto coll = Grid::get(opCtx)->catalogClient()->getCollection(
         opCtx, nss, repl::ReadConcernLevel::kMajorityReadConcern);
     const auto maxChunkSize = getMaxChunkSizeBytes(opCtx, coll);
 
-    const auto chunk = [&]() {
+    const auto [fromShardId, min] = [&]() {
         const auto cm = uassertStatusOK(
             Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx,
                                                                                          nss));
         // TODO SERVER-64926 do not assume min always present
-        return cm.findIntersectingChunkWithSimpleCollation(*request.getMin());
+        const auto& chunk = cm.findIntersectingChunkWithSimpleCollation(*request.getMin());
+        return std::tuple<ShardId, BSONObj>{chunk.getShardId(), chunk.getMin()};
     }();
 
-    if (chunk.getShardId() == request.getToShard()) {
+
+    if (fromShardId == request.getToShard()) {
         return Status::OK();
     }
 
     ShardsvrMoveRange shardSvrRequest(nss);
     shardSvrRequest.setDbName(NamespaceString::kAdminDb);
-    shardSvrRequest.setMoveRangeRequest(request);
+    shardSvrRequest.setMoveRangeRequest(request.getMoveRangeRequest());
     shardSvrRequest.setMaxChunkSizeBytes(maxChunkSize);
-    shardSvrRequest.setFromShard(chunk.getShardId());
+    shardSvrRequest.setFromShard(fromShardId);
     shardSvrRequest.setEpoch(coll.getEpoch());
+    const auto wc = [&]() {
+        const auto& secondaryThrottle = request.getSecondaryThrottle();
+        if (secondaryThrottle) {
+            shardSvrRequest.setSecondaryThrottle(true);
+            return secondaryThrottle->getWriteConcern();
+        }
+        return WriteConcernOptions();
+    }();
 
-    auto response = _commandScheduler->requestMoveRange(opCtx, shardSvrRequest, issuedByRemoteUser)
-                        .getNoThrow();
+    auto response =
+        _commandScheduler->requestMoveRange(opCtx, shardSvrRequest, wc, issuedByRemoteUser)
+            .getNoThrow();
     return processManualMigrationOutcome(
-        opCtx, chunk.getMin(), nss, shardSvrRequest.getToShard(), std::move(response));
+        opCtx, min, nss, shardSvrRequest.getToShard(), std::move(response));
 }
 
 void Balancer::report(OperationContext* opCtx, BSONObjBuilder* builder) {

@@ -552,7 +552,8 @@ public:
                                       bool issuedByRemoteUser) override;
 
     SemiFuture<void> requestMoveRange(OperationContext* opCtx,
-                                      ShardsvrMoveRange& request,
+                                      const ShardsvrMoveRange& request,
+                                      const WriteConcernOptions& secondaryThrottleWC,
                                       bool issuedByRemoteUser) override;
 
     SemiFuture<void> requestMergeChunks(OperationContext* opCtx,

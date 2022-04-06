@@ -151,7 +151,8 @@ public:
                                                          bool estimatedValue) = 0;
 
     virtual SemiFuture<void> requestMoveRange(OperationContext* opCtx,
-                                              ShardsvrMoveRange& request,
+                                              const ShardsvrMoveRange& request,
+                                              const WriteConcernOptions& secondaryThrottleWC,
                                               bool issuedByRemoteUser) = 0;
 };
 

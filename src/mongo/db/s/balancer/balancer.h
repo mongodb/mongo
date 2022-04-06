@@ -149,7 +149,7 @@ public:
      */
     Status moveRange(OperationContext* opCtx,
                      const NamespaceString& nss,
-                     const MoveRangeRequest& request,
+                     const ConfigsvrMoveRange& request,
                      bool issuedByRemoteUser);
 
     /**

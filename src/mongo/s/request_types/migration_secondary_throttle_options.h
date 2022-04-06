@@ -87,6 +87,14 @@ public:
      */
     static StatusWith<MigrationSecondaryThrottleOptions> createFromCommand(const BSONObj& obj);
 
+    /*
+     * Same as `createFromCommand`, but throwing in case of parsing exception
+     */
+    static MigrationSecondaryThrottleOptions parseFromBSON(const BSONObj& obj) {
+        return uassertStatusOK(createFromCommand(obj));
+    }
+
+
     /**
      * Extracts the secondary throttle settings from a balancer configuration document, which can
      * have the following format:

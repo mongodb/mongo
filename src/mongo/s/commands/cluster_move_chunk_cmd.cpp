@@ -46,6 +46,7 @@
 #include "mongo/s/config_server_client.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/migration_secondary_throttle_options.h"
+#include "mongo/s/request_types/move_range_request_gen.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
@@ -175,21 +176,32 @@ public:
         const auto secondaryThrottle =
             uassertStatusOK(MigrationSecondaryThrottleOptions::createFromCommand(cmdObj));
 
-        ChunkType chunkType;
-        chunkType.setCollectionUUID(cm.getUUID());
-        chunkType.setMin(chunk->getMin());
-        chunkType.setMax(chunk->getMax());
-        chunkType.setShard(chunk->getShardId());
-        chunkType.setVersion(cm.getVersion());
+        const bool waitForDelete =
+            cmdObj["_waitForDelete"].trueValue() || cmdObj["waitForDelete"].trueValue();
 
-        uassertStatusOK(configsvr_client::moveChunk(opCtx,
-                                                    nss,
-                                                    chunkType,
-                                                    to->getId(),
-                                                    secondaryThrottle,
-                                                    cmdObj["_waitForDelete"].trueValue() ||
-                                                        cmdObj["waitForDelete"].trueValue(),
-                                                    forceJumbo));
+        MoveRangeRequest moveRangeReq;
+        moveRangeReq.setToShard(to->getId());
+        moveRangeReq.setMin(chunk->getMin());
+        moveRangeReq.setMax(chunk->getMax());
+        moveRangeReq.setWaitForDelete(waitForDelete);
+
+        moveRangeReq.setForceJumbo(forceJumbo ? ForceJumbo::kForceManual : ForceJumbo::kDoNotForce);
+
+        ConfigsvrMoveRange configsvrRequest(nss);
+        configsvrRequest.setDbName(NamespaceString::kAdminDb);
+        configsvrRequest.setMoveRangeRequest(moveRangeReq);
+        if (secondaryThrottle.getSecondaryThrottle() == MigrationSecondaryThrottleOptions::kOn) {
+            configsvrRequest.setSecondaryThrottle(secondaryThrottle);
+        }
+
+        auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+        auto commandResponse = configShard->runCommandWithFixedRetryAttempts(
+            opCtx,
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            NamespaceString::kAdminDb.toString(),
+            CommandHelpers::appendMajorityWriteConcern(configsvrRequest.toBSON({})),
+            Shard::RetryPolicy::kIdempotent);
+        uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(std::move(commandResponse)));
 
         Grid::get(opCtx)
             ->catalogCache()

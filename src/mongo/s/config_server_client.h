@@ -45,17 +45,6 @@ class Status;
 namespace configsvr_client {
 
 /**
- * Requests the balancer to move the specified chunk off of its current shard to the new shard.
- */
-Status moveChunk(OperationContext* opCtx,
-                 const NamespaceString& nss,
-                 const ChunkType& chunk,
-                 const ShardId& newShardId,
-                 const MigrationSecondaryThrottleOptions& secondaryThrottle,
-                 bool waitForDelete,
-                 bool forceJumbo);
-
-/**
  * Requests the balancer to move the specified chunk off of its current shard to a shard, considered
  * more appropriate under the balancing policy which is currently in effect.
  */

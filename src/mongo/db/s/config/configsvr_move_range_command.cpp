@@ -62,10 +62,6 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            uassert(ErrorCodes::CommandFailed,
-                    "Can't run moveRange because the feature is disabled in the current FCV mode",
-                    feature_flags::gNoMoreAutoSplitter.isEnabled(
-                        serverGlobalParams.featureCompatibility));
             uassert(ErrorCodes::IllegalOperation,
                     str::stream() << Request::kCommandName
                                   << " can only be run on the config server",
@@ -85,8 +81,8 @@ public:
                 Grid::get(opCtx)->shardRegistry()->getShard(opCtx, req.getToShard()),
                 "Could not find destination shard");
 
-            uassertStatusOK(Balancer::get(opCtx)->moveRange(
-                opCtx, nss, req.getMoveRangeRequest(), true /* issuedByRemoteUser */));
+            uassertStatusOK(
+                Balancer::get(opCtx)->moveRange(opCtx, nss, req, true /* issuedByRemoteUser */));
         }
 
     private:
