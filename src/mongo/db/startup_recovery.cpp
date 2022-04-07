@@ -630,6 +630,12 @@ void repairAndRecoverDatabases(OperationContext* opCtx,
     auto const storageEngine = opCtx->getServiceContext()->getStorageEngine();
     Lock::GlobalWrite lk(opCtx);
 
+    // Use the BatchedCollectionCatalogWriter so all Collection writes to the in-memory catalog are
+    // done in a single copy-on-write of the catalog. This avoids quadratic behavior where we
+    // iterate over every collection and perform writes where the catalog would be copied every
+    // time.
+    BatchedCollectionCatalogWriter catalog(opCtx);
+
     // Create the FCV document for the first time, if necessary. Replica set nodes only initialize
     // the FCV when the replica set is first initiated or by data replication.
     const auto& replSettings = repl::ReplicationCoordinator::get(opCtx)->getSettings();
