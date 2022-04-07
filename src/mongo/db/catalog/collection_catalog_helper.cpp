@@ -67,10 +67,10 @@ void forEachCollectionFromDb(OperationContext* opCtx,
 
     auto catalogForIteration = CollectionCatalog::get(opCtx);
     for (auto collectionIt = catalogForIteration->begin(opCtx, tenantDbName);
-         collectionIt != catalogForIteration->end(opCtx);
-         ++collectionIt) {
+         collectionIt != catalogForIteration->end(opCtx);) {
         auto uuid = collectionIt.uuid().get();
         if (predicate && !catalogForIteration->checkIfCollectionSatisfiable(uuid, predicate)) {
+            ++collectionIt;
             continue;
         }
 
@@ -93,6 +93,10 @@ void forEachCollectionFromDb(OperationContext* opCtx,
             // Failed: collection got renamed before locking it, so unlock and try again.
             clk.reset();
         }
+
+        // Increment iterator before calling callback. This allows for collection deletion inside
+        // this callback even if we are in batched inplace mode.
+        ++collectionIt;
 
         // The NamespaceString couldn't be resolved from the uuid, so the collection was dropped.
         if (!collection)

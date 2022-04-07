@@ -227,6 +227,12 @@ Status DatabaseImpl::init(OperationContext* const opCtx) {
         // Refresh our copy of the catalog, since we may have modified it above.
         catalog = CollectionCatalog::get(opCtx);
         try {
+            struct ViewToDrop {
+                NamespaceString name;
+                NamespaceString viewOn;
+                NamespaceString resolvedNs;
+            };
+            std::vector<ViewToDrop> viewsToDrop;
             catalog->iterateViews(opCtx, _name.dbName(), [&](const ViewDefinition& view) {
                 auto swResolvedView =
                     view_catalog_helpers::resolveView(opCtx, catalog, view.name(), boost::none);
@@ -247,27 +253,35 @@ Status DatabaseImpl::init(OperationContext* const opCtx) {
                     return true;
                 }
 
-                LOGV2(6260803,
-                      "Removing view on collection not restored",
-                      "view"_attr = view.name(),
-                      "viewOn"_attr = view.viewOn(),
-                      "resolvedNs"_attr = resolvedNs);
-
-                WriteUnitOfWork wuow(opCtx);
-                Status status = catalog->dropView(opCtx, view.name());
-                if (!status.isOK()) {
-                    LOGV2_WARNING(6260804,
-                                  "Failed to remove view on unrestored collection",
-                                  "view"_attr = view.name(),
-                                  "viewOn"_attr = view.viewOn(),
-                                  "resolvedNs"_attr = resolvedNs,
-                                  "reason"_attr = status.reason());
-                    return true;
-                }
-                wuow.commit();
+                // Defer the view to drop so we don't do it while iterating. In case we're updating
+                // the catalog inplace, we cannot modify the same data structure as we're iterating
+                // on.
+                viewsToDrop.push_back({view.name(), view.viewOn(), resolvedNs});
 
                 return true;
             });
+
+            // Drop all collected views from above.
+            for (const auto& view : viewsToDrop) {
+                LOGV2(6260803,
+                      "Removing view on collection not restored",
+                      "view"_attr = view.name,
+                      "viewOn"_attr = view.viewOn,
+                      "resolvedNs"_attr = view.resolvedNs);
+
+                WriteUnitOfWork wuow(opCtx);
+                Status status = catalog->dropView(opCtx, view.name);
+                if (!status.isOK()) {
+                    LOGV2_WARNING(6260804,
+                                  "Failed to remove view on unrestored collection",
+                                  "view"_attr = view.name,
+                                  "viewOn"_attr = view.viewOn,
+                                  "resolvedNs"_attr = view.resolvedNs,
+                                  "reason"_attr = status.reason());
+                    continue;
+                }
+                wuow.commit();
+            }
         } catch (const ExceptionFor<ErrorCodes::InvalidViewDefinition>& e) {
             LOGV2_WARNING(6260805,
                           "Failed to access the view catalog during restore",

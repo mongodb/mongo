@@ -469,11 +469,7 @@ void startupRepair(OperationContext* opCtx, StorageEngine* storageEngine) {
     ScopeGuard abortRepairOnFCVErrors(
         [&] { StorageRepairObserver::get(opCtx->getServiceContext())->onRepairDone(opCtx); });
 
-    // Use the BatchedCollectionCatalogWriter so all Collection writes to the in-memory catalog are
-    // done in a single copy-on-write of the catalog. This avoids quadratic behavior where we
-    // iterate over every collection and perform writes where the catalog would be copied every
-    // time.
-    BatchedCollectionCatalogWriter catalog(opCtx);
+    auto catalog = CollectionCatalog::get(opCtx);
     if (auto fcvColl = catalog->lookupCollectionByNamespace(
             opCtx, NamespaceString::kServerConfigurationNamespace)) {
         auto databaseHolder = DatabaseHolder::get(opCtx);
@@ -618,6 +614,12 @@ void repairAndRecoverDatabases(OperationContext* opCtx,
                                StorageEngine::LastShutdownState lastShutdownState) {
     auto const storageEngine = opCtx->getServiceContext()->getStorageEngine();
     Lock::GlobalWrite lk(opCtx);
+
+    // Use the BatchedCollectionCatalogWriter so all Collection writes to the in-memory catalog are
+    // done in a single copy-on-write of the catalog. This avoids quadratic behavior where we
+    // iterate over every collection and perform writes where the catalog would be copied every
+    // time.
+    BatchedCollectionCatalogWriter catalog(opCtx);
 
     // Create the FCV document for the first time, if necessary. Replica set nodes only initialize
     // the FCV when the replica set is first initiated or by data replication.
