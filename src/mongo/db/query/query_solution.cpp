@@ -41,6 +41,7 @@
 #include "mongo/db/field_ref.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/keypattern.h"
+#include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/index_bounds_builder.h"
@@ -1072,15 +1073,31 @@ bool IndexScanNode::operator==(const IndexScanNode& other) const {
 //
 // ColumnIndexScanNode
 //
-ColumnIndexScanNode::ColumnIndexScanNode(ColumnIndexEntry indexEntry)
-    : indexEntry(std::move(indexEntry)) {}
+ColumnIndexScanNode::ColumnIndexScanNode(ColumnIndexEntry indexEntry,
+                                         std::set<std::string> outputFieldsIn,
+                                         std::set<std::string> matchFieldsIn,
+                                         StringMap<std::unique_ptr<MatchExpression>> filtersByPath,
+                                         std::unique_ptr<MatchExpression> postAssemblyFilter)
+    : indexEntry(std::move(indexEntry)),
+      outputFields(std::move(outputFieldsIn)),
+      matchFields(std::move(matchFieldsIn)),
+      filtersByPath(std::move(filtersByPath)),
+      postAssemblyFilter(std::move(postAssemblyFilter)) {
+    allFields = outputFields;
+    allFields.insert(matchFields.begin(), matchFields.end());
+}
 
 void ColumnIndexScanNode::appendToString(str::stream* ss, int indent) const {
     addIndent(ss, indent);
     *ss << "COLUMN_IX_SCAN\n";
     addIndent(ss, indent + 1);
-    *ss << "fields = [" << boost::algorithm::join(fields, ", ");
-    *ss << "]\n";
+    *ss << "outputFields = [" << boost::algorithm::join(outputFields, ", ") << "]\n";
+    addIndent(ss, indent + 1);
+    *ss << "matchFields = [" << boost::algorithm::join(matchFields, ", ") << "]\n";
+    addIndent(ss, indent + 1);
+    *ss << "filtersByPath = [" << expression::filterMapToString(filtersByPath) << "]\n";
+    addIndent(ss, indent + 1);
+    *ss << "postAssemblyFilter = [" << postAssemblyFilter->toString() << "]\n";
     addCommon(ss, indent);
 }
 

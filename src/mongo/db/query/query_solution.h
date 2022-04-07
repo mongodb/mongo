@@ -498,7 +498,11 @@ struct CollectionScanNode : public QuerySolutionNodeWithSortSet {
 };
 
 struct ColumnIndexScanNode : public QuerySolutionNode {
-    ColumnIndexScanNode(ColumnIndexEntry);
+    ColumnIndexScanNode(ColumnIndexEntry,
+                        std::set<std::string> outputFields,
+                        std::set<std::string> matchFields,
+                        StringMap<std::unique_ptr<MatchExpression>> filtersByPath,
+                        std::unique_ptr<MatchExpression> postAssemblyFilter);
 
     virtual StageType getType() const {
         return STAGE_COLUMN_IXSCAN;
@@ -510,12 +514,8 @@ struct ColumnIndexScanNode : public QuerySolutionNode {
         return false;
     }
     FieldAvailability getFieldAvailability(const std::string& field) const {
-        for (const auto& availableField : fields) {
-            if (field == availableField) {
-                return FieldAvailability::kFullyProvided;
-            }
-        }
-        return FieldAvailability::kNotProvided;
+        return allFields.find(field) != allFields.end() ? FieldAvailability::kFullyProvided
+                                                        : FieldAvailability::kNotProvided;
     }
     bool sortedByDiskLoc() const {
         return true;
@@ -526,13 +526,40 @@ struct ColumnIndexScanNode : public QuerySolutionNode {
     }
 
     QuerySolutionNode* clone() const {
-        return new ColumnIndexScanNode(indexEntry);
+        StringMap<std::unique_ptr<MatchExpression>> clonedFiltersByPath;
+        for (auto&& [path, filter] : filtersByPath) {
+            clonedFiltersByPath[path] = filter->shallowClone();
+        }
+        return new ColumnIndexScanNode(indexEntry,
+                                       outputFields,
+                                       matchFields,
+                                       std::move(clonedFiltersByPath),
+                                       postAssemblyFilter->shallowClone());
     }
 
     ColumnIndexEntry indexEntry;
 
+    // The fields we need to output. Dot separated path names.
+    std::set<std::string> outputFields;
+
+    // The fields which are referenced by any and all filters - either in 'filtersByPath' or
+    // 'postAssemblyFilter'.
+    std::set<std::string> matchFields;
+
+    // A column scan can apply a filter to the columns directly while scanning, or to a document
+    // assembled from the scanned columns.
+
+    // Filters to apply to a column directly while scanning. Maps the path to the filter for that
+    // column. Empty if there are none.
     StringMap<std::unique_ptr<MatchExpression>> filtersByPath;
-    std::vector<std::string> fields;
+
+    // An optional filter to apply after assembling a document from all scanned columns. For
+    // example: {$or: [{a: 2}, {b: 2}]}.
+    std::unique_ptr<MatchExpression> postAssemblyFilter;
+
+    // A cached copy of the union of the above two field sets which we expect to be frequently asked
+    // for.
+    std::set<std::string> allFields;
 };
 
 /**

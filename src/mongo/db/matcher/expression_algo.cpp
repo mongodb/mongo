@@ -437,9 +437,18 @@ std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitMatchEx
     }
 }
 
+bool pathDependenciesAreExact(StringData key, const MatchExpression* expr) {
+    DepsTracker columnDeps;
+    expr->addDependencies(&columnDeps);
+    return !columnDeps.needWholeDocument && columnDeps.fields == std::set{key.toString()};
+}
+
 bool tryAddExprHelper(StringData path,
                       std::unique_ptr<MatchExpression> me,
                       StringMap<std::unique_ptr<MatchExpression>>& out) {
+    // In order for this to be correct, the dependencies of the filter by column must be exactly
+    // this column.
+    dassert(pathDependenciesAreExact(path, me.get()));
     auto& entryForPath = out[path];
     if (!entryForPath) {
         // First predicate for this path, just put it in directly.

@@ -53,6 +53,8 @@ const expectedParamDefaults = {
     internalQueryCollectionMaxNoOfDocumentsToChooseHashJoin: 10 * 1000,
     internalQueryCollectionMaxDataSizeBytesToChooseHashJoin: 100 * 1024 * 1024,
     internalQueryCollectionMaxStorageSizeBytesToChooseHashJoin: 100 * 1024 * 1024,
+    internalQueryMaxNumberOfFieldsToChooseUnfilteredColumnScan: 5,
+    internalQueryMaxNumberOfFieldsToChooseFilteredColumnScan: 12,
     internalQueryDisableLookupExecutionUsingHashJoin: false,
 };
 
@@ -227,6 +229,14 @@ assertSetParameterFails("internalQueryCollectionMaxStorageSizeBytesToChooseHashJ
 
 assertSetParameterSucceeds("internalQueryDisableLookupExecutionUsingHashJoin", true);
 assertSetParameterSucceeds("internalQueryDisableLookupExecutionUsingHashJoin", false);
+
+assertSetParameterSucceeds("internalQueryMaxNumberOfFieldsToChooseUnfilteredColumnScan", 100);
+assertSetParameterSucceeds("internalQueryMaxNumberOfFieldsToChooseUnfilteredColumnScan", 0);
+assertSetParameterFails("internalQueryMaxNumberOfFieldsToChooseUnfilteredColumnScan", -1);
+
+assertSetParameterSucceeds("internalQueryMaxNumberOfFieldsToChooseFilteredColumnScan", 100);
+assertSetParameterSucceeds("internalQueryMaxNumberOfFieldsToChooseFilteredColumnScan", 0);
+assertSetParameterFails("internalQueryMaxNumberOfFieldsToChooseFilteredColumnScan", -1);
 
 MongoRunner.stopMongod(conn);
 })();

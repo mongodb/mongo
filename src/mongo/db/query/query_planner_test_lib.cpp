@@ -152,6 +152,31 @@ Status columnIxScanFiltersByPathMatch(
     return Status::OK();
 }
 
+template <typename Iterable>
+Status stringSetsMatch(BSONElement expectedStringArrElem,
+                       Iterable actualStrings,
+                       std::string contextMsg) {
+
+    stdx::unordered_set<std::string> expectedFields;
+    for (auto& field : expectedStringArrElem.Array()) {
+        expectedFields.insert(field.String());
+    }
+    if (expectedFields.size() != expectedStringArrElem.Array().size()) {
+        return Status{ErrorCodes::Error{6430500}, "expected string set had duplicate elements"}
+            .withContext(contextMsg);
+    }
+
+    stdx::unordered_set<std::string> actualStringsSet(actualStrings.begin(), actualStrings.end());
+    if (actualStringsSet.size() != actualStrings.size()) {
+        return Status{ErrorCodes::Error{6430501}, "actual string set had duplicate elements"}
+            .withContext(contextMsg);
+    }
+    if (expectedFields != actualStringsSet) {
+        return {ErrorCodes::Error{5842491}, contextMsg};
+    }
+    return Status::OK();
+}
+
 void appendIntervalBound(BSONObjBuilder& bob, BSONElement& el) {
     if (el.type() == String) {
         std::string data = el.String();
@@ -1274,16 +1299,23 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
         }
         auto obj = expectedElem.Obj();
 
-        if (!obj["fields"].eoo()) {
-            std::set<std::string> expectedFields;
-            for (auto& field : obj["fields"].Obj()) {
-                expectedFields.insert(field.fieldName());
+        if (auto outputFields = obj["outputFields"]) {
+            if (auto outputStatus =
+                    stringSetsMatch(outputFields,
+                                    actualColumnIxScanNode->outputFields,
+                                    "mismatching output fields within 'column_ixscan'");
+                !outputStatus.isOK()) {
+                return outputStatus;
             }
+        }
 
-            std::set<std::string> actualFields(actualColumnIxScanNode->fields.begin(),
-                                               actualColumnIxScanNode->fields.end());
-            if (expectedFields != std::set<std::string>(actualFields.begin(), actualFields.end())) {
-                return {ErrorCodes::Error{5842491}, str::stream() << "fields mismatch."};
+        if (auto matchFields = obj["matchFields"]) {
+            if (auto matchStatus =
+                    stringSetsMatch(matchFields,
+                                    actualColumnIxScanNode->matchFields,
+                                    "mismatching match fields within 'column_ixscan'");
+                !matchStatus.isOK()) {
+                return matchStatus;
             }
         }
 
@@ -1321,6 +1353,26 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
                 !filtersMatchStatus.isOK()) {
                 return filtersMatchStatus.withContext(
                     "mismatching filters in 'column_ixscan' stage");
+            }
+        }
+
+        if (auto postAssemblyFilter = obj["postAssemblyFilter"]) {
+            if (postAssemblyFilter.type() != BSONType::Object) {
+                return {ErrorCodes::Error{6412408},
+                        str::stream()
+                            << "invalid 'postAssemblyFilter' specified to 'column_ixscan' "
+                               "stage. Please specify an object. Found: "
+                            << postAssemblyFilter};
+            }
+
+            const auto expectedPostAssemblyFilter = postAssemblyFilter.Obj();
+            if (auto filtersMatchStatus =
+                    filterMatches(expectedPostAssemblyFilter,
+                                  actualColumnIxScanNode->postAssemblyFilter.get(),
+                                  nullptr);
+                !filtersMatchStatus.isOK()) {
+                return filtersMatchStatus.withContext(
+                    "mismatching 'postAssemblyFilter' in 'column_ixscan' stage");
             }
         }
 

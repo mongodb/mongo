@@ -57,6 +57,7 @@
 #include "mongo/db/query/planner_analysis.h"
 #include "mongo/db/query/planner_ixselect.h"
 #include "mongo/db/query/projection_parser.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/logv2/log.h"
@@ -166,6 +167,89 @@ bool hintMatchesClusterKey(const boost::optional<ClusteredCollectionInfo>& clust
     return hintObj.woCompare(clusteredIndexSpec.getKey()) == 0;
 }
 
+/**
+ * Returns the dependencies for the CanoncialQuery, split by those needed to answer the filter, and
+ * those needed for "everything else" which is the project and sort.
+ */
+std::pair<DepsTracker, DepsTracker> computeDeps(const CanonicalQuery& query) {
+    DepsTracker filterDeps;
+    query.root()->addDependencies(&filterDeps);
+    DepsTracker outputDeps;
+    if (!query.getProj() || query.getProj()->requiresDocument()) {
+        outputDeps.needWholeDocument = true;
+        return {std::move(filterDeps), std::move(outputDeps)};
+    }
+    auto projectionFields = query.getProj()->getRequiredFields();
+    outputDeps.fields.insert(projectionFields.begin(), projectionFields.end());
+    if (auto sortPattern = query.getSortPattern()) {
+        sortPattern->addDependencies(&outputDeps);
+    }
+    // There's no known way a sort would depend on the whole document, and we already verified that
+    // the projection doesn't depend on the whole document.
+    tassert(6430503, "Unexpectedly required entire object", !outputDeps.needWholeDocument);
+    return {std::move(filterDeps), std::move(outputDeps)};
+}
+
+void tryToAddColumnScan(const QueryPlannerParams& params,
+                        const CanonicalQuery& query,
+                        std::vector<std::unique_ptr<QuerySolution>>& out) {
+    if (params.columnarIndexes.empty()) {
+        return;
+    }
+    invariant(params.columnarIndexes.size() == 1);
+
+    auto [filterDeps, outputDeps] = computeDeps(query);
+    if (filterDeps.needWholeDocument || outputDeps.needWholeDocument) {
+        // We only want to use the columnar index if we can avoid fetching the whole document.
+        return;
+    }
+    if (!query.isSbeCompatible() || query.getForceClassicEngine()) {
+        // We only support column scans in SBE.
+        return;
+    }
+    if (!query.pipeline().empty()) {
+        LOGV2_DEBUG(
+            6430502, 3, "Not yet prepared to handle and test CQ pipeline with a columnstore index");
+        return;
+    }
+    // TODO SERVER-63123: Check if the columnar index actually provides the fields we need.
+    auto fieldsNeededForFilter = std::move(filterDeps.fields);
+    auto filterSplitByColumn = expression::splitMatchExpressionForColumns(query.root());
+    auto canPushFilters = bool(filterSplitByColumn) && !query.getQueryObj().isEmpty();
+    if (canPushFilters) {
+        fieldsNeededForFilter.clear();
+        for (auto&& [key, expr] : *filterSplitByColumn) {
+            fieldsNeededForFilter.emplace(key);
+        }
+    }
+
+    // TODO SERVER-64306 support splitting into 'can push down' and 'cannot push down' rather
+    // than all or nothing.
+    auto columnScan = std::make_unique<ColumnIndexScanNode>(
+        params.columnarIndexes.front(),
+        std::move(outputDeps.fields),
+        std::move(fieldsNeededForFilter),
+        filterSplitByColumn ? std::move(*filterSplitByColumn)
+                            : StringMap<std::unique_ptr<MatchExpression>>{},
+        query.root()->shallowClone());
+
+    const int nReferencedFields = static_cast<int>(columnScan->allFields.size());
+    const int maxNumFields = canPushFilters
+        ? internalQueryMaxNumberOfFieldsToChooseFilteredColumnScan.load()
+        : internalQueryMaxNumberOfFieldsToChooseUnfilteredColumnScan.load();
+    if (nReferencedFields > maxNumFields) {
+        LOGV2_DEBUG(6430508,
+                    5,
+                    "Opting out of column scan plan due to too many referenced fields",
+                    "nReferencedFields"_attr = nReferencedFields,
+                    "maxNumFields"_attr = maxNumFields,
+                    "canPushFilters"_attr = canPushFilters);
+        return;
+    }
+    // We have few enough dependencies that we suspect a column scan is still better than a
+    // collection scan. Add that solution.
+    out.push_back(QueryPlannerAnalysis::analyzeDataAccess(query, params, std::move(columnScan)));
+}
 }  // namespace
 
 using std::numeric_limits;
@@ -1198,17 +1282,8 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
 
     // Check whether we're eligible to use the columnar index, assuming no other indexes can be
     // used.
-    if (out.empty() && !params.columnarIndexes.empty() && query.getProj() &&
-        !query.getProj()->requiresDocument() && query.isSbeCompatible() &&
-        !query.getForceClassicEngine()) {
-        // TODO SERVER-63123: Check if the columnar index actually provides the fields we need.
-        auto columnScan = std::make_unique<ColumnIndexScanNode>(params.columnarIndexes.front());
-        columnScan->fields = query.getProj()->getRequiredFields();
-        if (auto filterSplitByColumn = expression::splitMatchExpressionForColumns(query.root())) {
-            columnScan->filtersByPath = std::move(*filterSplitByColumn);
-            out.push_back(
-                QueryPlannerAnalysis::analyzeDataAccess(query, params, std::move(columnScan)));
-        }
+    if (out.empty()) {
+        tryToAddColumnScan(params, query, out);
     }
 
     // The caller can explicitly ask for a collscan.

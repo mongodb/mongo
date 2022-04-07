@@ -846,8 +846,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     auto csn = static_cast<const ColumnIndexScanNode*>(root);
     tassert(6312405,
-            "Unexpected filter provided for column scan stage. Expected 'filtersByPath' to be used "
-            "instead.",
+            "Unexpected filter provided for column scan stage. Expected 'filtersByPath' or "
+            "'postAssemblyFilter' to be used instead.",
             !csn->filter);
 
     PlanStageSlots outputs;
@@ -862,17 +862,17 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         outputs.set(kRecordId, *ridSlot);
     }
 
-    auto fieldSlotIds = _slotIdGenerator.generateMultiple(csn->fields.size());
+    auto fieldSlotIds = _slotIdGenerator.generateMultiple(csn->allFields.size());
     auto rowStoreSlot = _slotIdGenerator.generate();
     auto emptyExpr = sbe::makeE<sbe::EFunction>("newObj", sbe::EExpression::Vector{});
     std::vector<std::unique_ptr<sbe::EExpression>> pathExprs;
-    for (size_t idx = 0; idx < csn->fields.size(); ++idx) {
+    for (size_t remaining = csn->allFields.size(); remaining > 0; remaining--) {
         pathExprs.emplace_back(emptyExpr->clone());
     }
 
     std::string rootStr = "rowStoreRoot";
     optimizer::FieldMapBuilder builder(rootStr, true);
-    for (const std::string& field : csn->fields) {
+    for (const std::string& field : csn->allFields) {
         builder.integrateFieldPath(FieldPath(field),
                                    [](const bool isLastElement, optimizer::FieldMapEntry& entry) {
                                        entry._hasLeadingObj = true;
@@ -886,17 +886,18 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     slotMap[rootStr] = rowStoreSlot;
     auto abt = builder.generateABT();
     auto exprOut = abt ? abtToExpr(*abt, slotMap) : emptyExpr->clone();
-    auto stage = std::make_unique<sbe::ColumnScanStage>(getCurrentCollection(reqs)->uuid(),
-                                                        csn->indexEntry.catalogName,
-                                                        fieldSlotIds,
-                                                        csn->fields,
-                                                        recordSlot,
-                                                        ridSlot,
-                                                        std::move(exprOut),
-                                                        std::move(pathExprs),
-                                                        rowStoreSlot,
-                                                        _yieldPolicy,
-                                                        csn->nodeId());
+    auto stage = std::make_unique<sbe::ColumnScanStage>(
+        getCurrentCollection(reqs)->uuid(),
+        csn->indexEntry.catalogName,
+        fieldSlotIds,
+        std::vector<std::string>{csn->allFields.begin(), csn->allFields.end()},
+        recordSlot,
+        ridSlot,
+        std::move(exprOut),
+        std::move(pathExprs),
+        rowStoreSlot,
+        _yieldPolicy,
+        csn->nodeId());
 
     return {std::move(stage), std::move(outputs)};
 }

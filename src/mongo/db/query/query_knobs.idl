@@ -496,8 +496,7 @@ server_parameters:
     set_at: [ startup, runtime ]
     cpp_varname: "internalQueryJavaScriptHeapSizeLimitMB"
     cpp_vartype: AtomicWord<int>
-    default:
-      expr: 100
+    default: 100
 
   internalQueryJavaScriptFnTimeoutMillis:
     description: "Limits the maximum allowed time a user-defined javascript function can run in a
@@ -542,8 +541,7 @@ server_parameters:
     set_at: [ startup, runtime ]
     cpp_varname: "internalQuerySlotBasedExecutionMaxStaticIndexScanIntervals"
     cpp_vartype: AtomicWord<int>
-    default:
-      expr: 1000
+    default: 1000
     validator:
         gt: 0
     on_update: plan_cache_util::clearSbeCacheOnParameterChange
@@ -561,8 +559,7 @@ server_parameters:
     set_at: [ startup, runtime ]
     cpp_varname: "internalQueryMaxDocValidationErrorConsideredValues"
     cpp_vartype: AtomicWord<int>
-    default:
-        expr: 10
+    default: 10
     validator:
         gt: 0
 
@@ -587,8 +584,7 @@ server_parameters:
     set_at: [ startup, runtime ]
     cpp_varname: "internalQuerySBEAggMemoryUseCheckMargin"
     cpp_vartype: AtomicDouble
-    default:
-      expr: 0.7
+    default: 0.7
     validator:
         gt: 0.0
         lte: 1.0
@@ -601,8 +597,7 @@ server_parameters:
     set_at: [ startup, runtime ]
     cpp_varname: "internalQuerySBEAggMemoryCheckPerAdvanceAtMost"
     cpp_vartype: AtomicWord<long long>
-    default:
-      expr: 2
+    default: 2
     validator:
         gt: 0
 
@@ -616,8 +611,7 @@ server_parameters:
     set_at: [ startup, runtime ]
     cpp_varname: "internalQuerySBEAggMemoryCheckPerAdvanceAtLeast"
     cpp_vartype: AtomicWord<long long>
-    default:
-      expr: 1024
+    default: 1024
     validator:
         gt: 0
 
@@ -813,6 +807,32 @@ server_parameters:
     cpp_varname: "internalQueryDisableLookupExecutionUsingHashJoin"
     cpp_vartype: AtomicWord<bool>
     default: false
+    on_update: plan_cache_util::clearSbeCacheOnParameterChange
+
+  internalQueryMaxNumberOfFieldsToChooseUnfilteredColumnScan:
+    description: "Up to what number of fields do we choose to use the column store index when there
+    are no other indexed alternatives and no query predicates that can be applied during the column
+    store index scan? Set to 0 to never use the column store, even if there is only one referenced
+    field."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryMaxNumberOfFieldsToChooseUnfilteredColumnScan"
+    cpp_vartype: AtomicWord<int>
+    default: 5
+    validator:
+        gte: 0
+    on_update: plan_cache_util::clearSbeCacheOnParameterChange
+
+  internalQueryMaxNumberOfFieldsToChooseFilteredColumnScan:
+    description: "Up to what number of fields do we choose to use the column store index when there
+    are no other indexed alternatives but at least one query predicate that can be applied during
+    the column store index scan? Set to 0 to never use the column store, even if there is only one
+    referenced field."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryMaxNumberOfFieldsToChooseFilteredColumnScan"
+    cpp_vartype: AtomicWord<int>
+    default: 12
+    validator:
+        gte: 0
     on_update: plan_cache_util::clearSbeCacheOnParameterChange
 
 # Note for adding additional query knobs:
