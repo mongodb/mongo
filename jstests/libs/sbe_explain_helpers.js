@@ -34,3 +34,24 @@ function engineSpecificAssertion(classicAssert, sbeAssert, theDB, msg) {
         assert(classicAssert, msg);
     }
 }
+
+/**
+ * Gets the query info object at either the top level or the first stage from a v2
+ * explainOutput. If a query is a find query or some prefix stage(s) of a pipeline is pushed down to
+ * SBE, then plan information will be in the 'queryPlanner' object. Currently, this supports find
+ * query or pushed-down prefix pipeline stages.
+ */
+function getQueryInfoAtTopLevelOrFirstStage(explainOutputV2) {
+    if (explainOutputV2.hasOwnProperty("queryPlanner")) {
+        return explainOutputV2;
+    }
+
+    if (explainOutputV2.hasOwnProperty("stages") && Array.isArray(explainOutputV2.stages) &&
+        explainOutputV2.stages.length > 0 && explainOutputV2.stages[0].hasOwnProperty("$cursor") &&
+        explainOutputV2.stages[0].$cursor.hasOwnProperty("queryPlanner")) {
+        return explainOutputV2.stages[0].$cursor;
+    }
+
+    assert(false, `expected version 2 explain output but got ${explainOutputV2}`);
+    return undefined;
+}
