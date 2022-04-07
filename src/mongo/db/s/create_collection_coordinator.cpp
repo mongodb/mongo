@@ -447,17 +447,13 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                     // Perform a noop write on the participants in order to advance the txnNumber
                     // for this coordinator's lsid so that requests with older txnNumbers can no
                     // longer execute.
+                    //
+                    // Additionally we want to perform a majority write on the CSRS to ensure that
+                    // all the subsequent reads will see all the writes performed from a previous
+                    // execution of this coordinator.
                     _performNoopRetryableWriteOnParticipants(opCtx, **executor);
                 }
 
-                if (_recoveredFromDisk) {
-                    // If a stedown happened it could've ocurred while waiting for majority when
-                    // writing config.collections. If the refresh happens before this write is
-                    // majority committed, we will only see the data on config.chunks but not on
-                    // config.collections, so we need to serialize the refresh with the collection
-                    // creation.
-                    sharding_ddl_util::linearizeCSRSReads(opCtx);
-                }
                 // Log the start of the event only if we're not recovering.
                 _logStartCreateCollection(opCtx);
 
@@ -490,7 +486,7 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                     ->acquireRecoverableCriticalSectionBlockWrites(
                         opCtx, nss(), _critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
 
-                if (_recoveredFromDisk) {
+                if (!_firstExecution) {
                     auto uuid = sharding_ddl_util::getCollectionUUID(opCtx, nss());
                     // If the collection can be found locally, then we clean up the config.chunks
                     // collection.
