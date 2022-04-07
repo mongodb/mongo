@@ -27,8 +27,11 @@
  *    it in the license file.
  */
 
+#include <boost/optional.hpp>
+
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/unittest/unittest.h"
@@ -277,7 +280,8 @@ TEST(NamespaceStringTest, NamespaceStringParse5) {
 }
 
 TEST(NamespaceStringTest, makeListCollectionsNSIsCorrect) {
-    NamespaceString ns = NamespaceString::makeListCollectionsNSS("DB");
+    NamespaceString ns =
+        NamespaceString::makeListCollectionsNSS(TenantDatabaseName(boost::none, "DB"));
     ASSERT_EQUALS("DB", ns.db());
     ASSERT_EQUALS("$cmd.listCollections", ns.coll());
     ASSERT(ns.isValid());
@@ -294,6 +298,84 @@ TEST(NamespaceStringTest, EmptyNSStringReturnsEmptyDb) {
     NamespaceString nss{};
     ASSERT_TRUE(nss.isEmpty());
     ASSERT_EQ(nss.db(), StringData{});
+}
+
+TEST(NamespaceStringTest, NSSWithTenantId) {
+    TenantId tenantId(OID::gen());
+    std::string tenantNsStr = str::stream() << tenantId.toString() << "_foo.bar";
+
+    NamespaceString nss("foo.bar", tenantId);
+    ASSERT_EQ(nss.ns(), tenantNsStr);
+    ASSERT_EQ(nss.toString(), tenantNsStr);
+    ASSERT(nss.tenantId());
+    ASSERT_EQ(*nss.tenantId(), tenantId);
+
+    TenantDatabaseName dbName(tenantId, "foo");
+    NamespaceString nss2(dbName, "bar");
+    ASSERT_EQ(nss2.ns(), tenantNsStr);
+    ASSERT_EQ(nss2.toString(), tenantNsStr);
+    ASSERT(nss2.tenantId());
+    ASSERT_EQ(*nss2.tenantId(), tenantId);
+
+    NamespaceString nss3("foo", "bar", tenantId);
+    ASSERT_EQ(nss3.ns(), tenantNsStr);
+    ASSERT_EQ(nss3.toString(), tenantNsStr);
+    ASSERT(nss3.tenantId());
+    ASSERT_EQ(*nss3.tenantId(), tenantId);
+}
+
+TEST(NamespaceStringTest, NSSNoCollectionWithTenantId) {
+    TenantId tenantId(OID::gen());
+    std::string tenantNsStr = str::stream() << tenantId.toString() << "_foo";
+
+    NamespaceString nss("foo", tenantId);
+    ASSERT_EQ(nss.ns(), tenantNsStr);
+    ASSERT_EQ(nss.toString(), tenantNsStr);
+    ASSERT(nss.tenantId());
+    ASSERT_EQ(*nss.tenantId(), tenantId);
+
+    TenantDatabaseName dbName(tenantId, "foo");
+    NamespaceString nss2(dbName, "");
+    ASSERT(nss2.tenantId());
+    ASSERT_EQ(*nss2.tenantId(), tenantId);
+
+    NamespaceString nss3("foo", "", tenantId);
+    ASSERT(nss3.tenantId());
+    ASSERT_EQ(*nss3.tenantId(), tenantId);
+}
+
+TEST(NamespaceStringTest, ParseNSSWithTenantId) {
+    gMultitenancySupport = true;
+
+    TenantId tenantId(OID::gen());
+    std::string tenantNsStr = str::stream() << tenantId.toString() << "_foo.bar";
+
+    NamespaceString nss =
+        NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(tenantNsStr);
+    ASSERT_EQ(nss.ns(), tenantNsStr);
+    ASSERT(nss.tenantId());
+    ASSERT_EQ(*nss.tenantId(), tenantId);
+}
+
+TEST(NamespaceStringTest, CompareNSSWithTenantId) {
+    TenantId tenantIdMin(OID("000000000000000000000000"));
+    TenantId tenantIdMax(OID::max());
+
+    ASSERT(NamespaceString(tenantIdMin, "foo.bar") == NamespaceString(tenantIdMin, "foo.bar"));
+
+    ASSERT(NamespaceString(tenantIdMin, "foo.bar") != NamespaceString(tenantIdMax, "foo.bar"));
+    ASSERT(NamespaceString(tenantIdMin, "foo.bar") != NamespaceString(tenantIdMin, "zoo.bar"));
+
+    ASSERT(NamespaceString(tenantIdMin, "foo.bar") < NamespaceString(tenantIdMax, "foo.bar"));
+    ASSERT(NamespaceString(tenantIdMin, "foo.bar") < NamespaceString(tenantIdMin, "zoo.bar"));
+    ASSERT(NamespaceString(tenantIdMin, "zoo.bar") < NamespaceString(tenantIdMax, "foo.bar"));
+
+    ASSERT(NamespaceString(tenantIdMax, "foo.bar") > NamespaceString(tenantIdMin, "foo.bar"));
+    ASSERT(NamespaceString(tenantIdMin, "zoo.bar") > NamespaceString(tenantIdMin, "foo.bar"));
+    ASSERT(NamespaceString(tenantIdMax, "foo.bar") > NamespaceString(tenantIdMin, "zoo.bar"));
+
+    ASSERT(NamespaceString(tenantIdMin, "foo.bar") <= NamespaceString(tenantIdMin, "foo.bar"));
+    ASSERT(NamespaceString(tenantIdMin, "foo.bar") >= NamespaceString(tenantIdMin, "foo.bar"));
 }
 
 }  // namespace

@@ -2811,7 +2811,8 @@ TEST_F(ChangeStreamStageTest, UsesResumeTokenAsSortKeyIfNeedsMergeIsFalse) {
 class ChangeStreamStageDBTest : public ChangeStreamStageTest {
 public:
     ChangeStreamStageDBTest()
-        : ChangeStreamStageTest(NamespaceString::makeCollectionlessAggregateNSS(nss.db())) {}
+        : ChangeStreamStageTest(NamespaceString::makeCollectionlessAggregateNSS(
+              TenantDatabaseName(boost::none, nss.db()))) {}
 };
 
 TEST_F(ChangeStreamStageDBTest, TransformInsert) {
@@ -4468,7 +4469,8 @@ TEST_F(MultiTokenFormatVersionTest, CanResumeFromV2HighWaterMark) {
     ResumeTokenData resumeToken = ResumeToken::makeHighWaterMarkToken(resumeTs, 2).getData();
     resumeToken.version = 2;
     auto expCtx = getExpCtxRaw();
-    expCtx->ns = NamespaceString::makeCollectionlessAggregateNSS("unittests");
+    expCtx->ns = NamespaceString::makeCollectionlessAggregateNSS(
+        TenantDatabaseName(boost::none, "unittests"));
 
     // Create a change stream spec that resumes after 'resumeToken'.
     const auto spec =

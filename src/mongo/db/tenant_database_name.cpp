@@ -29,29 +29,10 @@
 
 #include "mongo/db/tenant_database_name.h"
 
-#include "mongo/db/multitenancy_gen.h"
-#include "mongo/db/server_feature_flags_gen.h"
-
 namespace mongo {
 
-TenantDatabaseName::TenantDatabaseName(boost::optional<TenantId> tenantId, StringData dbName) {
-    // TODO SERVER-62114 Check instead if gMultitenancySupport is enabled.
-    if (gFeatureFlagRequireTenantID.isEnabledAndIgnoreFCV())
-        invariant(tenantId);
-
-    _tenantId = tenantId;
-    _dbName = dbName.toString();
-
-    _tenantDbName =
-        _tenantId ? boost::make_optional(_tenantId->toString() + "_" + _dbName) : boost::none;
-}
-
 TenantDatabaseName TenantDatabaseName::createSystemTenantDbName(StringData dbName) {
-    // TODO SERVER-62114 Check instead if gMultitenancySupport is enabled.
-    if (gFeatureFlagRequireTenantID.isEnabledAndIgnoreFCV()) {
-        return TenantDatabaseName(TenantId::kSystemTenantId, dbName);
-    }
-
+    // TODO SERVER-62491 Use kSystemTenantId
     return TenantDatabaseName(boost::none, dbName);
 }
 

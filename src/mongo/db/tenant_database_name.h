@@ -55,10 +55,21 @@ public:
      * Constructs a TenantDatabaseName from the given tenantId and database name.
      * "dbName" is expected only consist of a db name. It is the caller's responsibility to ensure
      * the dbName is a valid db name.
-     *
-     * If featureFlagRequireTenantID is set, tenantId is required.
      */
-    TenantDatabaseName(boost::optional<TenantId> tenantId, StringData dbName);
+    TenantDatabaseName(boost::optional<TenantId> tenantId, StringData dbName) {
+        _tenantId = tenantId;
+        _dbName = dbName.toString();
+
+        _tenantDbName =
+            _tenantId ? boost::make_optional(_tenantId->toString() + "_" + _dbName) : boost::none;
+    }
+
+    /**
+     * Prefer to use the constructor above.
+     * TODO SERVER-65456 Remove this constructor.
+     */
+    TenantDatabaseName(StringData dbName, boost::optional<TenantId> tenantId = boost::none)
+        : TenantDatabaseName(tenantId, dbName) {}
 
     static TenantDatabaseName createSystemTenantDbName(StringData dbName);
 

@@ -123,9 +123,10 @@ TEST(ChangeStreamEventTransformTest, TestCreateViewTransform) {
          Document{{"db", viewNss.db()}, {"coll", viewNss.coll()}}},
         {DocumentSourceChangeStream::kOperationDescriptionField, opDescription}};
 
-    ASSERT_DOCUMENT_EQ(
-        applyTransformation(oplogEntry, NamespaceString::makeCollectionlessAggregateNSS("viewDB")),
-        expectedDoc);
+    ASSERT_DOCUMENT_EQ(applyTransformation(oplogEntry,
+                                           NamespaceString::makeCollectionlessAggregateNSS(
+                                               TenantDatabaseName(boost::none, "viewDB"))),
+                       expectedDoc);
 }
 
 TEST(ChangeStreamEventTransformTest, TestCreateViewOnSingleCollection) {

@@ -84,7 +84,6 @@ env.Library(
     target='multitenancy',
     source=[
         'multitenancy.cpp',
-        'tenant_database_name.cpp',
     ],
     LIBDEPS=[
         'multitenancy_params',
@@ -94,7 +93,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/auth/auth',
         '$BUILD_DIR/mongo/db/auth/security_token',
         '$BUILD_DIR/mongo/idl/feature_flag',
-        'namespace_string',
         'server_feature_flags',
     ]
 )
@@ -247,10 +245,12 @@ env.Library(
     target='namespace_string',
     source=[
         'namespace_string.cpp',
+        'tenant_database_name.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/repl/optime',
+        'multitenancy_params',
     ],
     LIBDEPS_PRIVATE=[
         'server_options_core',

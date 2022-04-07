@@ -127,7 +127,8 @@ NamespaceString parseNs(const std::string& dbname, const BSONObj& cmdObj) {
                               << firstElement.fieldNameStringData()
                               << "' field must specify a collection name or 1",
                 firstElement.number() == 1);
-        return NamespaceString::makeCollectionlessAggregateNSS(dbname);
+        return NamespaceString::makeCollectionlessAggregateNSS(
+            TenantDatabaseName(boost::none, dbname));
     } else {
         uassert(ErrorCodes::TypeMismatch,
                 str::stream() << "collection name has invalid type: "

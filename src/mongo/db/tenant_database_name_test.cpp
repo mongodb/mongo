@@ -68,10 +68,11 @@ TEST(TenantDatabaseNameTest, MultitenancySupportEnabledTenantIDNotRequired) {
     ASSERT_EQUALS(std::string(tenantId.toString() + "_a"), tdnWithTenant.fullName());
 }
 
+/*
+// TODO SERVER-65457 Re-enable these tests
+
 DEATH_TEST(TenantDatabaseNameTest, TenantIDRequiredNoTenantIdAssigned, "invariant") {
     RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
-    // TODO SERVER-62114 Remove enabling this feature flag.
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
 
     TenantDatabaseName tdnWithoutTenant(boost::none, "a");
 }
@@ -88,6 +89,7 @@ TEST(TenantDatabaseNameTest, TenantIDRequiredBasic) {
     ASSERT_EQUALS(std::string("a"), tdn.dbName());
     ASSERT_EQUALS(std::string(tenantId.toString() + "_a"), tdn.fullName());
 }
+*/
 
 TEST(TenantDatabaseNameTest, VerifyEqualsOperator) {
     TenantId tenantId(OID::gen());

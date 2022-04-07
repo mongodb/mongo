@@ -462,9 +462,11 @@ void createCollection(OperationContext* opCtx,
     writeConflictRetry(opCtx, "createCollection", nss.ns(), [&] {
         Lock::DBLock dbLk(opCtx, nss.db(), MODE_IX);
         Lock::CollectionLock collLk(opCtx, nss, MODE_X);
+
         OldClientContext ctx(opCtx, nss.ns());
         auto db = ctx.db();
         ASSERT_TRUE(db);
+
         mongo::WriteUnitOfWork wuow(opCtx);
         auto coll = db->createCollection(opCtx, nss, options);
         ASSERT_TRUE(coll);

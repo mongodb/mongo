@@ -35,6 +35,7 @@
 
 #include "mongo/base/parse_number.h"
 #include "mongo/base/status.h"
+#include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/util/str.h"
 
@@ -165,6 +166,23 @@ const NamespaceString NamespaceString::kCompactStructuredEncryptionCoordinatorNa
 const NamespaceString NamespaceString::kClusterParametersNamespace(NamespaceString::kConfigDb,
                                                                    "clusterParameters");
 
+NamespaceString NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(StringData ns) {
+    if (!gMultitenancySupport) {
+        return NamespaceString(ns, boost::none);
+    }
+
+    auto tenantDelim = ns.find('_');
+    auto collDelim = ns.find('.');
+    // If the first '_' is after the '.' that separates the db and coll names, the '_' is part
+    // of the coll name and is not a db prefix.
+    if (tenantDelim == std::string::npos || collDelim < tenantDelim) {
+        return NamespaceString(ns, boost::none);
+    }
+
+    const TenantId tenantId(OID(ns.substr(0, tenantDelim)));
+    return NamespaceString(ns.substr(tenantDelim + 1, ns.size() - 1 - tenantDelim), tenantId);
+}
+
 bool NamespaceString::isListCollectionsCursorNS() const {
     return coll() == listCollectionsCursorCol;
 }
@@ -242,15 +260,15 @@ bool NamespaceString::mustBeAppliedInOwnOplogBatch() const {
         _ns == kTenantMigrationRecipientsNamespace.ns();
 }
 
-NamespaceString NamespaceString::makeListCollectionsNSS(StringData dbName) {
+NamespaceString NamespaceString::makeListCollectionsNSS(const TenantDatabaseName& dbName) {
     NamespaceString nss(dbName, listCollectionsCursorCol);
     dassert(nss.isValid());
     dassert(nss.isListCollectionsCursorNS());
     return nss;
 }
 
-NamespaceString NamespaceString::makeCollectionlessAggregateNSS(StringData dbname) {
-    NamespaceString nss(dbname, collectionlessAggregateCursorCol);
+NamespaceString NamespaceString::makeCollectionlessAggregateNSS(const TenantDatabaseName& dbName) {
+    NamespaceString nss(dbName, collectionlessAggregateCursorCol);
     dassert(nss.isValid());
     dassert(nss.isCollectionlessAggregateNS());
     return nss;

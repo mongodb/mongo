@@ -876,6 +876,7 @@ AutoGetCollectionForReadCommandLockFree::AutoGetCollectionForReadCommandLockFree
 
 OldClientContext::OldClientContext(OperationContext* opCtx, const std::string& ns, bool doVersion)
     : _opCtx(opCtx) {
+    // TODO SERVER-65488 Grab the TenantDatabaseName from the NamespaceString passed in
     const auto dbName = nsToDatabaseSubstring(ns);
     const TenantDatabaseName tenantDbName(boost::none, dbName);
     _db = DatabaseHolder::get(opCtx)->getDb(opCtx, tenantDbName);

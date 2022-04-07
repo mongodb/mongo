@@ -4206,7 +4206,7 @@ TEST_F(PipelineValidateTest, AggregateOneNSNotValidForEmptyPipeline) {
     const std::vector<BSONObj> rawPipeline = {};
     auto ctx = getExpCtx();
 
-    ctx->ns = NamespaceString::makeCollectionlessAggregateNSS("a");
+    ctx->ns = NamespaceString::makeCollectionlessAggregateNSS(TenantDatabaseName(boost::none, "a"));
 
     ASSERT_THROWS_CODE(
         Pipeline::parse(rawPipeline, ctx), AssertionException, ErrorCodes::InvalidNamespace);
@@ -4216,7 +4216,7 @@ TEST_F(PipelineValidateTest, AggregateOneNSNotValidIfInitialStageRequiresCollect
     const std::vector<BSONObj> rawPipeline = {fromjson("{$match: {}}")};
     auto ctx = getExpCtx();
 
-    ctx->ns = NamespaceString::makeCollectionlessAggregateNSS("a");
+    ctx->ns = NamespaceString::makeCollectionlessAggregateNSS(TenantDatabaseName(boost::none, "a"));
 
     ASSERT_THROWS_CODE(
         Pipeline::parse(rawPipeline, ctx), AssertionException, ErrorCodes::InvalidNamespace);
@@ -4226,7 +4226,7 @@ TEST_F(PipelineValidateTest, AggregateOneNSValidIfInitialStageIsCollectionless) 
     auto ctx = getExpCtx();
     auto collectionlessSource = DocumentSourceCollectionlessMock::create(ctx);
 
-    ctx->ns = NamespaceString::makeCollectionlessAggregateNSS("a");
+    ctx->ns = NamespaceString::makeCollectionlessAggregateNSS(TenantDatabaseName(boost::none, "a"));
 
     Pipeline::create({collectionlessSource}, ctx);
 }
@@ -4247,7 +4247,8 @@ TEST_F(PipelineValidateTest, AggregateOneNSValidForFacetPipelineRegardlessOfInit
     const std::vector<BSONObj> rawPipeline = {fromjson("{$facet: {subPipe: [{$match: {}}]}}")};
     auto ctx = getExpCtx();
 
-    ctx->ns = NamespaceString::makeCollectionlessAggregateNSS("unittests");
+    ctx->ns = NamespaceString::makeCollectionlessAggregateNSS(
+        TenantDatabaseName(boost::none, "unittests"));
 
     ASSERT_THROWS_CODE(
         Pipeline::parse(rawPipeline, ctx), AssertionException, ErrorCodes::InvalidNamespace);

@@ -239,7 +239,8 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest,
        ShouldErrorIfDatabaseMismatchOnCollectionlessNss) {
     auto expCtx = getExpCtx();
 
-    expCtx->ns = NamespaceString::makeCollectionlessAggregateNSS("test");
+    expCtx->ns =
+        NamespaceString::makeCollectionlessAggregateNSS(TenantDatabaseName(boost::none, "test"));
 
     // Set up the lookup change post image stage.
     auto lookupChangeStage = DocumentSourceChangeStreamAddPostImage::create(expCtx, getSpec());
@@ -264,7 +265,8 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest,
 TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldPassIfDatabaseMatchesOnCollectionlessNss) {
     auto expCtx = getExpCtx();
 
-    expCtx->ns = NamespaceString::makeCollectionlessAggregateNSS("test");
+    expCtx->ns =
+        NamespaceString::makeCollectionlessAggregateNSS(TenantDatabaseName(boost::none, "test"));
 
     // Set up the lookup change post image stage.
     auto lookupChangeStage = DocumentSourceChangeStreamAddPostImage::create(expCtx, getSpec());

@@ -39,6 +39,8 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/tenant_database_name.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
@@ -222,37 +224,48 @@ public:
     /**
      * Constructs an empty NamespaceString.
      */
-    NamespaceString() : _ns(), _dotIndex(std::string::npos) {}
+    NamespaceString() : _ns(), _dotIndex(std::string::npos), _dbName() {}
 
     /**
-     * Constructs a NamespaceString from the fully qualified namespace named in "ns".
+     * Constructs a NamespaceString from the fully qualified namespace named in "ns" and the
+     * tenantId. "ns" is NOT expected to contain the tenantId.
      */
-    explicit NamespaceString(StringData ns) {
-        _ns = ns.toString();  // copy to our buffer
+    explicit NamespaceString(boost::optional<TenantId> tenantId, StringData ns) {
+        _ns = tenantId ? tenantId->toString() + "_" + ns.toString()
+                       : ns.toString();  // copy to our buffer
         _dotIndex = _ns.find('.');
         uassert(ErrorCodes::InvalidNamespace,
                 "namespaces cannot have embedded null characters",
                 _ns.find('\0') == std::string::npos);
+
+        auto db = _dotIndex == std::string::npos ? ns : ns.substr(0, _dotIndex);
+        _dbName = TenantDatabaseName(tenantId, db);
     }
+
+    // TODO SERVER-65920 Remove this constructor once all constructor call sites have been updated
+    // to pass tenantId explicitly
+    explicit NamespaceString(StringData ns, boost::optional<TenantId> tenantId = boost::none)
+        : NamespaceString(tenantId, ns) {}
 
     /**
      * Constructs a NamespaceString for the given database and collection names.
      * "dbName" must not contain a ".", and "collectionName" must not start with one.
      */
-    NamespaceString(StringData dbName, StringData collectionName)
-        : _ns(dbName.size() + collectionName.size() + 1, '\0') {
+    NamespaceString(TenantDatabaseName dbName, StringData collectionName)
+        : _ns(dbName.fullName().size() + collectionName.size() + 1, '\0') {
         uassert(ErrorCodes::InvalidNamespace,
-                "'.' is an invalid character in the database name: " + dbName,
-                dbName.find('.') == std::string::npos);
+                "'.' is an invalid character in the database name: " + dbName.dbName(),
+                dbName.dbName().find('.') == std::string::npos);
         uassert(ErrorCodes::InvalidNamespace,
                 "Collection names cannot start with '.': " + collectionName,
                 collectionName.empty() || collectionName[0] != '.');
 
-        std::string::iterator it = std::copy(dbName.begin(), dbName.end(), _ns.begin());
+        auto db = dbName.fullName();
+        std::string::iterator it = std::copy(db.begin(), db.end(), _ns.begin());
         *it = '.';
         ++it;
         it = std::copy(collectionName.begin(), collectionName.end(), it);
-        _dotIndex = dbName.size();
+        _dotIndex = db.size();
 
         dassert(it == _ns.end());
         dassert(_ns[_dotIndex] == '.');
@@ -260,19 +273,42 @@ public:
         uassert(ErrorCodes::InvalidNamespace,
                 "namespaces cannot have embedded null characters",
                 _ns.find('\0') == std::string::npos);
+
+        _dbName = std::move(dbName);
     }
+
+    /**
+     * Constructs a NamespaceString for the given db name, collection name, and tenantId.
+     * "db" must not contain a ".", and "collectionName" must not start with one. "dbName" is
+     * NOT expected to contain a tenantId.
+     */
+    NamespaceString(boost::optional<TenantId> tenantId, StringData db, StringData collectionName)
+        : NamespaceString(TenantDatabaseName(tenantId, db), collectionName) {}
+
+    // TODO SERVER-65920 Remove this constructor once all constructor call sites have been updated
+    // to pass tenantId explicitly
+    NamespaceString(StringData db,
+                    StringData collectionName,
+                    boost::optional<TenantId> tenantId = boost::none)
+        : NamespaceString(TenantDatabaseName(tenantId, db), collectionName) {}
+
+    /**
+     * Constructs a NamespaceString from the string 'ns'. Should only be used when reading a
+     * namespace from disk. 'ns' is expected to contain a tenantId when running in Serverless mode.
+     */
+    static NamespaceString parseFromStringExpectTenantIdInMultitenancyMode(StringData ns);
 
     /**
      * Constructs the namespace '<dbName>.$cmd.aggregate', which we use as the namespace for
      * aggregation commands with the format {aggregate: 1}.
      */
-    static NamespaceString makeCollectionlessAggregateNSS(StringData dbName);
+    static NamespaceString makeCollectionlessAggregateNSS(const TenantDatabaseName& dbName);
 
     /**
      * Constructs a NamespaceString representing a listCollections namespace. The format for this
      * namespace is "<dbName>.$cmd.listCollections".
      */
-    static NamespaceString makeListCollectionsNSS(StringData dbName);
+    static NamespaceString makeListCollectionsNSS(const TenantDatabaseName& dbName);
 
     /**
      * NOTE: DollarInDbNameBehavior::allow is deprecated.
@@ -285,8 +321,17 @@ public:
         Allow,  // Deprecated
     };
 
+    boost::optional<TenantId> tenantId() const {
+        return _dbName.tenantId();
+    }
+
     StringData db() const {
-        return _dotIndex == std::string::npos ? _ns : StringData(_ns.data(), _dotIndex);
+        // TODO SERVER-65456 Remove this function.
+        return StringData(_dbName.fullName());
+    }
+
+    TenantDatabaseName dbName() const {
+        return _dbName;
     }
 
     StringData coll() const {
@@ -541,7 +586,7 @@ public:
      *                                 contain a $ should be checked explicitly.
      * @return if db is an allowed database name
      */
-    static bool validDBName(StringData db,
+    static bool validDBName(StringData dbString,
                             DollarInDbNameBehavior behavior = DollarInDbNameBehavior::Disallow);
 
     /**
@@ -603,6 +648,7 @@ public:
 private:
     std::string _ns;
     size_t _dotIndex = 0;
+    TenantDatabaseName _dbName;
 };
 
 /**
@@ -612,8 +658,15 @@ private:
 class NamespaceStringOrUUID {
 public:
     NamespaceStringOrUUID(NamespaceString nss) : _nss(std::move(nss)) {}
-    NamespaceStringOrUUID(std::string dbname, UUID uuid)
+    NamespaceStringOrUUID(TenantDatabaseName dbname, UUID uuid)
         : _uuid(std::move(uuid)), _dbname(std::move(dbname)) {}
+    NamespaceStringOrUUID(boost::optional<TenantId> tenantId, std::string db, UUID uuid)
+        : _uuid(std::move(uuid)), _dbname(TenantDatabaseName(std::move(tenantId), std::move(db))) {}
+    // TODO SERVER-65920 Remove once all call sites have been changed to take tenantId explicitly
+    NamespaceStringOrUUID(std::string db,
+                          UUID uuid,
+                          boost::optional<TenantId> tenantId = boost::none)
+        : _uuid(std::move(uuid)), _dbname(TenantDatabaseName(std::move(tenantId), std::move(db))) {}
 
     const boost::optional<NamespaceString>& nss() const {
         return _nss;
@@ -630,7 +683,11 @@ public:
     /**
      * Returns database name if this object was initialized with a UUID.
      */
-    const std::string& dbname() const {
+    std::string dbname() const {
+        return _dbname ? _dbname->dbName() : "";
+    }
+
+    const boost::optional<TenantDatabaseName>& dbnameWithTenant() const {
         return _dbname;
     }
 
@@ -642,7 +699,7 @@ public:
      * Returns database name derived from either '_nss' or '_dbname'.
      */
     StringData db() const {
-        return _nss ? _nss->db() : StringData(_dbname);
+        return _nss ? _nss->db() : StringData(_dbname->dbName());
     }
 
     /**
@@ -663,10 +720,10 @@ private:
     // When seralizing, if both '_nss' and '_uuid' are present, use '_nss'.
     bool _preferNssForSerialization = false;
 
-    // Empty string when '_nss' is non-none, and contains the database name when '_uuid' is
+    // Empty when '_nss' is non-none, and contains the database name when '_uuid' is
     // non-none. Although the UUID specifies a collection uniquely, we must later verify that the
     // collection belongs to the database named here.
-    std::string _dbname;
+    boost::optional<TenantDatabaseName> _dbname;
 };
 
 std::ostream& operator<<(std::ostream& stream, const NamespaceString& nss);

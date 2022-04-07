@@ -50,6 +50,7 @@
 #include "mongo/db/repl/tenant_oplog_batcher.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/log_test.h"
@@ -113,8 +114,6 @@ private:
     mutable Mutex _mutex = MONGO_MAKE_LATCH("TenantOplogApplierTestOpObserver::_mutex");
     std::vector<MutableOplogEntry> _entries;
 };
-
-constexpr auto dbName = "tenant_test"_sd;
 
 class TenantOplogApplierTest : public ServiceContextMongoDTest {
 public:
@@ -185,7 +184,8 @@ protected:
     OplogBufferMock _oplogBuffer;
     executor::NetworkInterfaceMock* _net;
     std::shared_ptr<executor::ThreadPoolTaskExecutor> _executor;
-    std::string _tenantId = "tenant";
+    std::string _tenantId = OID::gen().toString();
+    TenantDatabaseName _dbName = TenantDatabaseName(TenantId(OID(_tenantId)), "test");
     UUID _migrationUuid = UUID::gen();
     ServiceContext::UniqueOperationContext _opCtx;
     TenantOplogApplierTestOpObserver* _opObserver;  // Owned by service context opObserverRegistry
@@ -199,8 +199,8 @@ private:
 
 TEST_F(TenantOplogApplierTest, NoOpsForSingleBatch) {
     std::vector<OplogEntry> srcOps;
-    srcOps.push_back(makeInsertOplogEntry(1, NamespaceString(dbName, "foo"), UUID::gen()));
-    srcOps.push_back(makeInsertOplogEntry(2, NamespaceString(dbName, "bar"), UUID::gen()));
+    srcOps.push_back(makeInsertOplogEntry(1, NamespaceString(_dbName, "foo"), UUID::gen()));
+    srcOps.push_back(makeInsertOplogEntry(2, NamespaceString(_dbName, "bar"), UUID::gen()));
     pushOps(srcOps);
 
     auto writerPool = makeTenantMigrationWriterPool();
@@ -225,7 +225,7 @@ TEST_F(TenantOplogApplierTest, NoOpsForLargeBatch) {
     std::vector<OplogEntry> srcOps;
     // This should be big enough to use several threads to do the writing
     for (int i = 0; i < 64; i++) {
-        srcOps.push_back(makeInsertOplogEntry(i + 1, NamespaceString(dbName, "foo"), UUID::gen()));
+        srcOps.push_back(makeInsertOplogEntry(i + 1, NamespaceString(_dbName, "foo"), UUID::gen()));
     }
     pushOps(srcOps);
 
@@ -250,10 +250,10 @@ TEST_F(TenantOplogApplierTest, NoOpsForLargeBatch) {
 
 TEST_F(TenantOplogApplierTest, NoOpsForMultipleBatches) {
     std::vector<OplogEntry> srcOps;
-    srcOps.push_back(makeInsertOplogEntry(1, NamespaceString(dbName, "foo"), UUID::gen()));
-    srcOps.push_back(makeInsertOplogEntry(2, NamespaceString(dbName, "bar"), UUID::gen()));
-    srcOps.push_back(makeInsertOplogEntry(3, NamespaceString(dbName, "baz"), UUID::gen()));
-    srcOps.push_back(makeInsertOplogEntry(4, NamespaceString(dbName, "bif"), UUID::gen()));
+    srcOps.push_back(makeInsertOplogEntry(1, NamespaceString(_dbName, "foo"), UUID::gen()));
+    srcOps.push_back(makeInsertOplogEntry(2, NamespaceString(_dbName, "bar"), UUID::gen()));
+    srcOps.push_back(makeInsertOplogEntry(3, NamespaceString(_dbName, "baz"), UUID::gen()));
+    srcOps.push_back(makeInsertOplogEntry(4, NamespaceString(_dbName, "bif"), UUID::gen()));
 
     auto writerPool = makeTenantMigrationWriterPool();
 
@@ -283,18 +283,18 @@ TEST_F(TenantOplogApplierTest, NoOpsForMultipleBatches) {
 
 TEST_F(TenantOplogApplierTest, NoOpsForLargeTransaction) {
     std::vector<OplogEntry> innerOps1;
-    innerOps1.push_back(makeInsertOplogEntry(11, NamespaceString(dbName, "bar"), UUID::gen()));
-    innerOps1.push_back(makeInsertOplogEntry(12, NamespaceString(dbName, "bar"), UUID::gen()));
+    innerOps1.push_back(makeInsertOplogEntry(11, NamespaceString(_dbName, "bar"), UUID::gen()));
+    innerOps1.push_back(makeInsertOplogEntry(12, NamespaceString(_dbName, "bar"), UUID::gen()));
     std::vector<OplogEntry> innerOps2;
-    innerOps2.push_back(makeInsertOplogEntry(21, NamespaceString(dbName, "bar"), UUID::gen()));
-    innerOps2.push_back(makeInsertOplogEntry(22, NamespaceString(dbName, "bar"), UUID::gen()));
+    innerOps2.push_back(makeInsertOplogEntry(21, NamespaceString(_dbName, "bar"), UUID::gen()));
+    innerOps2.push_back(makeInsertOplogEntry(22, NamespaceString(_dbName, "bar"), UUID::gen()));
     std::vector<OplogEntry> innerOps3;
-    innerOps3.push_back(makeInsertOplogEntry(31, NamespaceString(dbName, "bar"), UUID::gen()));
-    innerOps3.push_back(makeInsertOplogEntry(32, NamespaceString(dbName, "bar"), UUID::gen()));
+    innerOps3.push_back(makeInsertOplogEntry(31, NamespaceString(_dbName, "bar"), UUID::gen()));
+    innerOps3.push_back(makeInsertOplogEntry(32, NamespaceString(_dbName, "bar"), UUID::gen()));
 
     // Makes entries with ts from range [2, 5).
     std::vector<OplogEntry> srcOps = makeMultiEntryTransactionOplogEntries(
-        2, dbName, /* prepared */ false, {innerOps1, innerOps2, innerOps3});
+        2, _dbName.dbName(), /* prepared */ false, {innerOps1, innerOps2, innerOps3});
     pushOps(srcOps);
 
     auto writerPool = makeTenantMigrationWriterPool();
@@ -320,7 +320,7 @@ TEST_F(TenantOplogApplierTest, NoOpsForLargeTransaction) {
 
 TEST_F(TenantOplogApplierTest, CommitUnpreparedTransaction_DataPartiallyApplied) {
     createCollectionWithUuid(_opCtx.get(), NamespaceString::kSessionTransactionsTableNamespace);
-    NamespaceString nss(dbName, "bar");
+    NamespaceString nss(_dbName, "bar");
     auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
     auto lsid = makeLogicalSessionId(_opCtx.get());
     TxnNumber txnNum(0);
@@ -372,7 +372,7 @@ TEST_F(TenantOplogApplierTest, CommitUnpreparedTransaction_DataPartiallyApplied)
 }
 
 TEST_F(TenantOplogApplierTest, ApplyInsert_DatabaseMissing) {
-    auto entry = makeInsertOplogEntry(1, NamespaceString(dbName, "bar"), UUID::gen());
+    auto entry = makeInsertOplogEntry(1, NamespaceString(_dbName, "bar"), UUID::gen());
     bool onInsertsCalled = false;
     _opObserver->onInsertsFn = [&](OperationContext* opCtx,
                                    const NamespaceString&,
@@ -393,8 +393,8 @@ TEST_F(TenantOplogApplierTest, ApplyInsert_DatabaseMissing) {
 }
 
 TEST_F(TenantOplogApplierTest, ApplyInsert_CollectionMissing) {
-    createDatabase(_opCtx.get(), dbName);
-    auto entry = makeInsertOplogEntry(1, NamespaceString(dbName, "bar"), UUID::gen());
+    createDatabase(_opCtx.get(), _dbName.fullName());
+    auto entry = makeInsertOplogEntry(1, NamespaceString(_dbName, "bar"), UUID::gen());
     bool onInsertsCalled = false;
     _opObserver->onInsertsFn = [&](OperationContext* opCtx,
                                    const NamespaceString&,
@@ -415,7 +415,7 @@ TEST_F(TenantOplogApplierTest, ApplyInsert_CollectionMissing) {
 }
 
 TEST_F(TenantOplogApplierTest, ApplyInsert_InsertExisting) {
-    NamespaceString nss(dbName, "bar");
+    NamespaceString nss(_dbName, "bar");
     auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
     ASSERT_OK(getStorageInterface()->insertDocument(_opCtx.get(),
                                                     nss,
@@ -433,7 +433,6 @@ TEST_F(TenantOplogApplierTest, ApplyInsert_InsertExisting) {
     };
     pushOps({entry});
     auto writerPool = makeTenantMigrationWriterPool();
-
     auto applier = std::make_shared<TenantOplogApplier>(
         _migrationUuid, _tenantId, OpTime(), &_oplogBuffer, _executor, writerPool.get());
     ASSERT_OK(applier->startup());
@@ -448,7 +447,7 @@ TEST_F(TenantOplogApplierTest, ApplyInsert_InsertExisting) {
 }
 
 TEST_F(TenantOplogApplierTest, ApplyInsert_UniqueKey_InsertExisting) {
-    NamespaceString nss(dbName, "bar");
+    NamespaceString nss(_dbName, "bar");
     auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
 
     // Create unique key index on the collection.
@@ -483,7 +482,7 @@ TEST_F(TenantOplogApplierTest, ApplyInsert_UniqueKey_InsertExisting) {
 }
 
 TEST_F(TenantOplogApplierTest, ApplyInsert_Success) {
-    NamespaceString nss(dbName, "bar");
+    NamespaceString nss(_dbName, "bar");
     auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
     auto entry = makeInsertOplogEntry(1, nss, uuid);
     bool onInsertsCalled = false;
@@ -491,7 +490,7 @@ TEST_F(TenantOplogApplierTest, ApplyInsert_Success) {
         [&](OperationContext* opCtx, const NamespaceString& nss, const std::vector<BSONObj>& docs) {
             ASSERT_FALSE(onInsertsCalled);
             onInsertsCalled = true;
-            ASSERT_EQUALS(nss.db(), dbName);
+            ASSERT_EQUALS(nss.db(), _dbName.fullName());
             ASSERT_EQUALS(nss.coll(), "bar");
             ASSERT_EQUALS(1, docs.size());
             ASSERT_BSONOBJ_EQ(docs[0], entry.getObject());
@@ -513,9 +512,9 @@ TEST_F(TenantOplogApplierTest, ApplyInsert_Success) {
 TEST_F(TenantOplogApplierTest, ApplyInserts_Grouped) {
     // TODO(SERVER-50256): remove nss_workaround, which is used to work around a bug where
     // the first operation assigned to a worker cannot be grouped.
-    NamespaceString nss_workaround(dbName, "a");
-    NamespaceString nss1(dbName, "bar");
-    NamespaceString nss2(dbName, "baz");
+    NamespaceString nss_workaround(_dbName, "a");
+    NamespaceString nss1(_dbName, "bar");
+    NamespaceString nss2(_dbName, "baz");
     auto uuid1 = createCollectionWithUuid(_opCtx.get(), nss1);
     auto uuid2 = createCollectionWithUuid(_opCtx.get(), nss2);
     std::vector<OplogEntry> entries;
@@ -567,7 +566,7 @@ TEST_F(TenantOplogApplierTest, ApplyInserts_Grouped) {
 }
 
 TEST_F(TenantOplogApplierTest, ApplyUpdate_MissingDocument) {
-    NamespaceString nss(dbName, "bar");
+    NamespaceString nss(_dbName, "bar");
     auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
     auto entry = makeOplogEntry(
         repl::OpTypeEnum::kUpdate, nss, uuid, BSON("$set" << BSON("a" << 1)), BSON("_id" << 0));
@@ -596,7 +595,7 @@ TEST_F(TenantOplogApplierTest, ApplyUpdate_MissingDocument) {
 }
 
 TEST_F(TenantOplogApplierTest, ApplyUpdate_Success) {
-    NamespaceString nss(dbName, "bar");
+    NamespaceString nss(_dbName, "bar");
     auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
     ASSERT_OK(getStorageInterface()->insertDocument(_opCtx.get(), nss, {BSON("_id" << 0)}, 0));
     auto entry = makeOplogEntry(
@@ -622,7 +621,7 @@ TEST_F(TenantOplogApplierTest, ApplyUpdate_Success) {
 }
 
 TEST_F(TenantOplogApplierTest, ApplyDelete_DatabaseMissing) {
-    auto entry = makeOplogEntry(OpTypeEnum::kDelete, NamespaceString(dbName, "bar"), UUID::gen());
+    auto entry = makeOplogEntry(OpTypeEnum::kDelete, NamespaceString(_dbName, "bar"), UUID::gen());
     bool onDeleteCalled = false;
     _opObserver->onDeleteFn = [&](OperationContext* opCtx,
                                   const NamespaceString&,
@@ -645,8 +644,8 @@ TEST_F(TenantOplogApplierTest, ApplyDelete_DatabaseMissing) {
 }
 
 TEST_F(TenantOplogApplierTest, ApplyDelete_CollectionMissing) {
-    createDatabase(_opCtx.get(), dbName);
-    auto entry = makeOplogEntry(OpTypeEnum::kDelete, NamespaceString(dbName, "bar"), UUID::gen());
+    createDatabase(_opCtx.get(), _dbName.fullName());
+    auto entry = makeOplogEntry(OpTypeEnum::kDelete, NamespaceString(_dbName, "bar"), UUID::gen());
     bool onDeleteCalled = false;
     _opObserver->onDeleteFn = [&](OperationContext* opCtx,
                                   const NamespaceString&,
@@ -669,7 +668,7 @@ TEST_F(TenantOplogApplierTest, ApplyDelete_CollectionMissing) {
 }
 
 TEST_F(TenantOplogApplierTest, ApplyDelete_DocumentMissing) {
-    NamespaceString nss(dbName, "bar");
+    NamespaceString nss(_dbName, "bar");
     auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
     auto entry = makeOplogEntry(OpTypeEnum::kDelete, nss, uuid, BSON("_id" << 0));
     bool onDeleteCalled = false;
@@ -694,7 +693,7 @@ TEST_F(TenantOplogApplierTest, ApplyDelete_DocumentMissing) {
 }
 
 TEST_F(TenantOplogApplierTest, ApplyDelete_Success) {
-    NamespaceString nss(dbName, "bar");
+    NamespaceString nss(_dbName, "bar");
     auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
     ASSERT_OK(getStorageInterface()->insertDocument(_opCtx.get(), nss, {BSON("_id" << 0)}, 0));
     auto entry = makeOplogEntry(OpTypeEnum::kDelete, nss, uuid, BSON("_id" << 0));
@@ -710,7 +709,7 @@ TEST_F(TenantOplogApplierTest, ApplyDelete_Success) {
         ASSERT_TRUE(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX));
         ASSERT_TRUE(opCtx->writesAreReplicated());
         ASSERT_FALSE(args.fromMigrate);
-        ASSERT_EQUALS(nss.db(), dbName);
+        ASSERT_EQUALS(nss.db(), _dbName.fullName());
         ASSERT_EQUALS(nss.coll(), "bar");
         ASSERT_EQUALS(uuid, observer_uuid);
     };
@@ -729,7 +728,7 @@ TEST_F(TenantOplogApplierTest, ApplyDelete_Success) {
 }
 
 TEST_F(TenantOplogApplierTest, ApplyCreateCollCommand_CollExisting) {
-    NamespaceString nss(dbName, "bar");
+    NamespaceString nss(_dbName, "bar");
     auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
     auto op = BSON("op"
                    << "c"
@@ -758,8 +757,8 @@ TEST_F(TenantOplogApplierTest, ApplyCreateCollCommand_CollExisting) {
 }
 
 TEST_F(TenantOplogApplierTest, ApplyRenameCollCommand_CollExisting) {
-    NamespaceString nss1(dbName, "foo");
-    NamespaceString nss2(dbName, "bar");
+    NamespaceString nss1(_dbName, "foo");
+    NamespaceString nss2(_dbName, "bar");
     auto uuid = createCollectionWithUuid(_opCtx.get(), nss2);
     auto op =
         BSON("op"
@@ -792,7 +791,7 @@ TEST_F(TenantOplogApplierTest, ApplyRenameCollCommand_CollExisting) {
 }
 
 TEST_F(TenantOplogApplierTest, ApplyCreateCollCommand_Success) {
-    NamespaceString nss(dbName, "t");
+    NamespaceString nss(_dbName, "t");
     auto op =
         BSON("op"
              << "c"
@@ -826,7 +825,7 @@ TEST_F(TenantOplogApplierTest, ApplyCreateCollCommand_Success) {
 }
 
 TEST_F(TenantOplogApplierTest, ApplyCreateIndexesCommand_Success) {
-    NamespaceString nss(dbName, "t");
+    NamespaceString nss(_dbName, "t");
     auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
     auto op =
         BSON("op"
@@ -867,7 +866,7 @@ TEST_F(TenantOplogApplierTest, ApplyCreateIndexesCommand_Success) {
 }
 
 TEST_F(TenantOplogApplierTest, ApplyStartIndexBuildCommand_Failure) {
-    NamespaceString nss(dbName, "t");
+    NamespaceString nss(_dbName, "t");
     auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
     auto op = BSON("op"
                    << "c"
@@ -920,7 +919,7 @@ TEST_F(TenantOplogApplierTest, ApplyCreateCollCommand_WrongNSS) {
 }
 
 TEST_F(TenantOplogApplierTest, ApplyDropIndexesCommand_IndexNotFound) {
-    NamespaceString nss(dbName, "bar");
+    NamespaceString nss(_dbName, "bar");
     auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
     auto op = BSON("op"
                    << "c"
@@ -952,7 +951,7 @@ TEST_F(TenantOplogApplierTest, ApplyDropIndexesCommand_IndexNotFound) {
 }
 
 TEST_F(TenantOplogApplierTest, ApplyCollModCommand_IndexNotFound) {
-    NamespaceString nss(dbName, "bar");
+    NamespaceString nss(_dbName, "bar");
     auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
     auto op = BSON("op"
                    << "c"
@@ -989,8 +988,8 @@ TEST_F(TenantOplogApplierTest, ApplyCollModCommand_IndexNotFound) {
 }
 
 TEST_F(TenantOplogApplierTest, ApplyCollModCommand_CollectionMissing) {
-    createDatabase(_opCtx.get(), dbName);
-    NamespaceString nss(dbName, "bar");
+    createDatabase(_opCtx.get(), _dbName.fullName());
+    NamespaceString nss(_dbName, "bar");
     UUID uuid(UUID::gen());
     auto op = BSON("op"
                    << "c"
@@ -1053,7 +1052,7 @@ TEST_F(TenantOplogApplierTest, ApplyCRUD_WrongUUID) {
     // Should not be able to apply a CRUD operation to a namespace not belonging to us, even if
     // we claim it does in the nss field.
     NamespaceString nss("notmytenant", "bar");
-    NamespaceString nss_to_apply(dbName, "bar");
+    NamespaceString nss_to_apply(_dbName, "bar");
     auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
     auto entry = makeInsertOplogEntry(1, nss_to_apply, uuid);
     bool onInsertsCalled = false;
@@ -1124,7 +1123,7 @@ TEST_F(TenantOplogApplierTest, ApplyResumeTokenNoop_Success) {
 
 TEST_F(TenantOplogApplierTest, ApplyInsertThenResumeTokenNoopInDifferentBatch_Success) {
     std::vector<OplogEntry> srcOps;
-    srcOps.push_back(makeInsertOplogEntry(1, NamespaceString(dbName, "foo"), UUID::gen()));
+    srcOps.push_back(makeInsertOplogEntry(1, NamespaceString(_dbName, "foo"), UUID::gen()));
     srcOps.push_back(makeNoopOplogEntry(2, TenantMigrationRecipientService::kNoopMsg));
     pushOps(srcOps);
     auto writerPool = makeTenantMigrationWriterPool();
@@ -1155,7 +1154,7 @@ TEST_F(TenantOplogApplierTest, ApplyInsertThenResumeTokenNoopInDifferentBatch_Su
 TEST_F(TenantOplogApplierTest, ApplyResumeTokenNoopThenInsertInSameBatch_Success) {
     std::vector<OplogEntry> srcOps;
     srcOps.push_back(makeNoopOplogEntry(1, TenantMigrationRecipientService::kNoopMsg));
-    srcOps.push_back(makeInsertOplogEntry(2, NamespaceString(dbName, "foo"), UUID::gen()));
+    srcOps.push_back(makeInsertOplogEntry(2, NamespaceString(_dbName, "foo"), UUID::gen()));
     pushOps(srcOps);
     auto writerPool = makeTenantMigrationWriterPool();
 
@@ -1180,7 +1179,7 @@ TEST_F(TenantOplogApplierTest, ApplyResumeTokenNoopThenInsertInSameBatch_Success
 
 TEST_F(TenantOplogApplierTest, ApplyResumeTokenInsertThenNoopSameTimestamp_Success) {
     std::vector<OplogEntry> srcOps;
-    srcOps.push_back(makeInsertOplogEntry(1, NamespaceString(dbName, "foo"), UUID::gen()));
+    srcOps.push_back(makeInsertOplogEntry(1, NamespaceString(_dbName, "foo"), UUID::gen()));
     srcOps.push_back(makeNoopOplogEntry(1, TenantMigrationRecipientService::kNoopMsg));
     pushOps(srcOps);
     ASSERT_EQ(srcOps[0].getOpTime(), srcOps[1].getOpTime());
@@ -1207,7 +1206,7 @@ TEST_F(TenantOplogApplierTest, ApplyResumeTokenInsertThenNoopSameTimestamp_Succe
 
 TEST_F(TenantOplogApplierTest, ApplyResumeTokenInsertThenNoop_Success) {
     std::vector<OplogEntry> srcOps;
-    srcOps.push_back(makeInsertOplogEntry(1, NamespaceString(dbName, "foo"), UUID::gen()));
+    srcOps.push_back(makeInsertOplogEntry(1, NamespaceString(_dbName, "foo"), UUID::gen()));
     srcOps.push_back(makeNoopOplogEntry(2, TenantMigrationRecipientService::kNoopMsg));
     pushOps(srcOps);
     auto writerPool = makeTenantMigrationWriterPool();
@@ -1233,8 +1232,8 @@ TEST_F(TenantOplogApplierTest, ApplyResumeTokenInsertThenNoop_Success) {
 
 TEST_F(TenantOplogApplierTest, ApplyInsert_MultiKeyIndex) {
     createCollectionWithUuid(_opCtx.get(), NamespaceString::kSessionTransactionsTableNamespace);
-    NamespaceString indexedNss(dbName, "indexedColl");
-    NamespaceString nonIndexedNss(dbName, "nonIndexedColl");
+    NamespaceString indexedNss(_dbName, "indexedColl");
+    NamespaceString nonIndexedNss(_dbName, "nonIndexedColl");
     auto indexedCollUUID = createCollectionWithUuid(_opCtx.get(), indexedNss);
     createCollection(_opCtx.get(), nonIndexedNss, CollectionOptions());
 
