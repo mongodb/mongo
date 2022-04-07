@@ -135,6 +135,7 @@ struct CachedSbePlan {
 
     std::unique_ptr<sbe::PlanStage> root;
     stage_builder::PlanStageData planStageData;
+    bool indexFilterApplied = false;
 };
 
 using PlanCacheEntry = PlanCacheEntryBase<CachedSbePlan, plan_cache_debug_info::DebugInfoSBE>;

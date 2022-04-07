@@ -196,11 +196,11 @@ public:
      * Remove all the entries for keys for which the predicate returns true. Returns the number of
      * removed entries.
      */
-    template <typename UnaryPredicate>
-    size_t removeIf(UnaryPredicate predicate) {
+    template <typename KeyValuePredicate>
+    size_t removeIf(KeyValuePredicate predicate) {
         size_t removed = 0;
         for (auto it = _kvList.begin(); it != _kvList.end();) {
-            if (predicate(it->first)) {
+            if (predicate(it->first, *it->second)) {
                 std::unique_ptr<V> entryToRemove{it->second};
                 _budgetTracker.onRemove(*entryToRemove);
                 _kvMap.erase(it->first);

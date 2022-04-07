@@ -1073,7 +1073,7 @@ std::string encodeSBE(const CanonicalQuery& cq) {
     return base64::encode(StringData(bufBuilder.buf(), bufBuilder.len()));
 }
 
-CanonicalQuery::QueryShapeString encodeForIndexFilters(const CanonicalQuery& cq) {
+CanonicalQuery::IndexFilterKey encodeForIndexFilters(const CanonicalQuery& cq) {
     StringBuilder keyBuilder;
     encodeKeyForMatch(cq.root(), &keyBuilder);
     encodeKeyForSort(cq.getFindCommandRequest().getSort(), &keyBuilder);

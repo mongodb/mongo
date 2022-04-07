@@ -32,6 +32,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/query/classic_plan_cache.h"
 #include "mongo/db/query/query_settings.h"
+#include "mongo/db/query/sbe_plan_cache.h"
 
 namespace mongo {
 
@@ -67,9 +68,9 @@ public:
     bool run(OperationContext* opCtx,
              const std::string& dbname,
              const BSONObj& cmdObj,
-             BSONObjBuilder& result);
+             BSONObjBuilder& result) override;
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override;
+    bool supportsWriteConcern(const BSONObj& cmd) const override;
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override;
 
@@ -79,18 +80,12 @@ public:
      * One action type defined for index filter commands:
      * - planCacheIndexFilter
      */
-    virtual Status checkAuthForCommand(Client* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) const;
+    Status checkAuthForCommand(Client* client,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj) const override;
 
-    /**
-     * Subset of command arguments used by index filter commands
-     * Override to provide command functionality.
-     * Should contain just enough logic to invoke run*Command() function
-     * in query_settings.h
-     */
     virtual Status runIndexFilterCommand(OperationContext* opCtx,
-                                         const std::string& ns,
+                                         const CollectionPtr& collection,
                                          const BSONObj& cmdObj,
                                          BSONObjBuilder* bob) = 0;
 
@@ -108,10 +103,10 @@ class ListFilters : public IndexFilterCommand {
 public:
     ListFilters();
 
-    virtual Status runIndexFilterCommand(OperationContext* opCtx,
-                                         const std::string& ns,
-                                         const BSONObj& cmdObj,
-                                         BSONObjBuilder* bob);
+    Status runIndexFilterCommand(OperationContext* opCtx,
+                                 const CollectionPtr& collection,
+                                 const BSONObj& cmdObj,
+                                 BSONObjBuilder* bob) override;
 
     /**
      * Looks up index filters from collection's query settings.
@@ -130,22 +125,21 @@ class ClearFilters : public IndexFilterCommand {
 public:
     ClearFilters();
 
-    virtual Status runIndexFilterCommand(OperationContext* opCtx,
-                                         const std::string& ns,
-                                         const BSONObj& cmdObj,
-                                         BSONObjBuilder* bob);
+    Status runIndexFilterCommand(OperationContext* opCtx,
+                                 const CollectionPtr& collection,
+                                 const BSONObj& cmdObj,
+                                 BSONObjBuilder* bob) override;
 
     /**
-     * If query shape is provided, clears index filter for a query.
-     * Otherwise, clears collection's filters.
-     * Namespace argument ns is ignored if we are clearing the entire cache.
-     * Removes corresponding entries from plan cache.
+     * Removes corresponding entries from plan caches. If query shape is provided, clears index
+     * filter for the query. Otherwise, clears collection's filters.
      */
     static Status clear(OperationContext* opCtx,
                         const CollectionPtr& collection,
+                        const BSONObj& cmdObj,
                         QuerySettings* querySettings,
-                        PlanCache* planCache,
-                        const BSONObj& cmdObj);
+                        PlanCache* planCacheClassic,
+                        sbe::PlanCache* planCacheSBE);
 };
 
 /**
@@ -164,20 +158,20 @@ class SetFilter : public IndexFilterCommand {
 public:
     SetFilter();
 
-    virtual Status runIndexFilterCommand(OperationContext* opCtx,
-                                         const std::string& ns,
-                                         const BSONObj& cmdObj,
-                                         BSONObjBuilder* bob);
+    Status runIndexFilterCommand(OperationContext* opCtx,
+                                 const CollectionPtr& collection,
+                                 const BSONObj& cmdObj,
+                                 BSONObjBuilder* bob) override;
 
     /**
-     * Sets index filter for a query shape.
-     * Removes entry for query shape from plan cache.
+     * Sets index filter for a query shape. Removes entries for the query shape from plan cache.
      */
     static Status set(OperationContext* opCtx,
                       const CollectionPtr& collection,
+                      const BSONObj& cmdObj,
                       QuerySettings* querySettings,
-                      PlanCache* planCache,
-                      const BSONObj& cmdObj);
+                      PlanCache* planCacheClassic,
+                      sbe::PlanCache* planCacheSBE);
 };
 
 }  // namespace mongo

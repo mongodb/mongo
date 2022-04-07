@@ -279,12 +279,16 @@ TEST(LRUKeyValueTest, RemoveIfTest) {
 
     size_t sizeBefore = cache.size();
 
-    // Remove all even keys.
-    size_t nRemoved = cache.removeIf([](int key) { return key % 2 == 0; });
-    ASSERT_EQ(5, nRemoved);
+    // Remove all even keys and "key: 5"
+    size_t nRemoved = cache.removeIf([](int key, int entry) { return key % 2 == 0 || entry == 5; });
+    ASSERT_EQ(6, nRemoved);
 
-    // Assert that all odd keys are in store.
+    // Assert that all odd keys are in store execept for "key: 5".
     for (int i = 1; i < 10; i += 2) {
+        if (i == 5) {
+            assertNotInKVStore(cache, i);
+            continue;
+        }
         assertInKVStore(cache, i, i);
     }
 

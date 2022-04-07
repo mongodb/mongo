@@ -217,9 +217,7 @@ CandidatePlans CachedSolutionPlanner::replan(bool shouldCache, std::string reaso
     // the best, update the cache, and so on.
     std::vector<std::pair<std::unique_ptr<PlanStage>, stage_builder::PlanStageData>> roots;
     for (auto&& solution : solutions) {
-        if (solution->cacheData.get()) {
-            solution->cacheData->indexFilterApplied = plannerParams.indexFiltersApplied;
-        }
+        solution->indexFilterApplied = plannerParams.indexFiltersApplied;
 
         roots.push_back(buildExecutableTree(*solution));
     }

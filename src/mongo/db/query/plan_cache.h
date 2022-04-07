@@ -95,6 +95,7 @@ public:
     static std::unique_ptr<Entry> create(std::unique_ptr<CachedPlanType> cachedPlan,
                                          uint32_t queryHash,
                                          uint32_t planCacheKey,
+                                         uint32_t indexFilterKey,
                                          Date_t timeOfCreation,
                                          bool isActive,
                                          size_t works,
@@ -122,6 +123,7 @@ public:
                                                 timeOfCreation,
                                                 queryHash,
                                                 planCacheKey,
+                                                indexFilterKey,
                                                 isActive,
                                                 works,
                                                 std::move(debugInfoOpt)));
@@ -135,6 +137,7 @@ public:
     static std::unique_ptr<Entry> createPinned(std::unique_ptr<CachedPlanType> cachedPlan,
                                                uint32_t queryHash,
                                                uint32_t planCacheKey,
+                                               uint32_t indexFilterKey,
                                                Date_t timeOfCreation,
                                                DebugInfoType debugInfo) {
         return std::unique_ptr<Entry>(
@@ -142,6 +145,7 @@ public:
                       timeOfCreation,
                       queryHash,
                       planCacheKey,
+                      indexFilterKey,
                       true,         // isActive
                       boost::none,  // decisionWorks
                       std::make_shared<const DebugInfoType>(std::move(debugInfo))));
@@ -168,6 +172,7 @@ public:
                                                 timeOfCreation,
                                                 queryHash,
                                                 planCacheKey,
+                                                indexFilterKey,
                                                 isActive,
                                                 works,
                                                 debugInfo));
@@ -196,6 +201,10 @@ public:
 
     // Hash of the "stable" cache key, which is the same regardless of what indexes are around.
     const uint32_t planCacheKey;
+
+    // Hash of the index filter key, which is used to match the query against index filters. This
+    // type of key is encoded by filter, sort, projection and user-defined collation.
+    const uint32_t indexFilterKey;
 
     // Whether or not the cache entry is active. Inactive cache entries should not be used for
     // planning.
@@ -227,6 +236,7 @@ private:
                        Date_t timeOfCreation,
                        uint32_t queryHash,
                        uint32_t planCacheKey,
+                       uint32_t indexFilterKey,
                        bool isActive,
                        boost::optional<size_t> works,
                        std::shared_ptr<const DebugInfoType> debugInfo)
@@ -234,6 +244,7 @@ private:
           timeOfCreation(timeOfCreation),
           queryHash(queryHash),
           planCacheKey(planCacheKey),
+          indexFilterKey(indexFilterKey),
           isActive(isActive),
           works(works),
           debugInfo(std::move(debugInfo)),
@@ -406,6 +417,7 @@ public:
         auto newEntry(Entry::create(std::move(cachedPlan),
                                     queryHash,
                                     planCacheKey,
+                                    callbacks->getIndexFilterKeyHash(),
                                     now,
                                     isNewEntryActive,
                                     newWorks,
@@ -420,12 +432,17 @@ public:
      * is always created and always active in this scenario.
      */
     void setPinned(const KeyType& key,
+                   const uint32_t indexFilterKey,
                    std::unique_ptr<CachedPlanType> plan,
                    Date_t now,
                    DebugInfoType debugInfo) {
         invariant(plan);
-        auto entry = Entry::createPinned(
-            std::move(plan), key.queryHash(), key.planCacheKeyHash(), now, std::move(debugInfo));
+        auto entry = Entry::createPinned(std::move(plan),
+                                         key.queryHash(),
+                                         key.planCacheKeyHash(),
+                                         indexFilterKey,
+                                         now,
+                                         std::move(debugInfo));
         auto partition = _partitionedCache->lockOnePartition(key);
         // We're not interested in the number of evicted entries if the cache store exceeds the
         // budget after add(), so we just ignore the return value.

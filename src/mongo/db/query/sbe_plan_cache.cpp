@@ -154,11 +154,13 @@ void clearPlanCacheEntriesWith(ServiceContext* serviceCtx,
                                UUID collectionUuid,
                                size_t collectionVersion) {
     if (feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
-        auto removed = sbe::getPlanCache(serviceCtx)
-                           .removeIf([&collectionUuid, collectionVersion](const PlanCacheKey& key) {
-                               return key.getCollectionVersion() == collectionVersion &&
-                                   key.getCollectionUuid() == collectionUuid;
-                           });
+        auto removed =
+            sbe::getPlanCache(serviceCtx)
+                .removeIf([&collectionUuid, collectionVersion](const PlanCacheKey& key,
+                                                               const sbe::PlanCacheEntry& entry) {
+                    return key.getCollectionVersion() == collectionVersion &&
+                        key.getCollectionUuid() == collectionUuid;
+                });
 
         LOGV2_DEBUG(6006600,
                     1,

@@ -33,6 +33,7 @@
 
 #include "mongo/db/exec/plan_cache_util.h"
 
+#include "mongo/db/query/canonical_query_encoder.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
@@ -83,8 +84,11 @@ void updatePlanCache(OperationContext* opCtx,
         feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
         auto key = plan_cache_key_factory::make<sbe::PlanCacheKey>(query, collection);
         auto plan = std::make_unique<sbe::CachedSbePlan>(root.clone(), data);
+        plan->indexFilterApplied = solution.indexFilterApplied;
         sbe::getPlanCache(opCtx).setPinned(
             std::move(key),
+            canonical_query_encoder::computeHash(
+                canonical_query_encoder::encodeForIndexFilters(query)),
             std::move(plan),
             opCtx->getServiceContext()->getPreciseClockSource()->now(),
             buildDebugInfo(&solution));

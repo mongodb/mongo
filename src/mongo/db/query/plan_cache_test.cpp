@@ -1037,6 +1037,7 @@ protected:
             PlanCacheEntry::create(qs.cacheData->clone(),
                                    queryHash,
                                    planCacheKey,
+                                   0, /* indexFilterKey */
                                    Date_t(),
                                    false /* isActive  */,
                                    0 /* works */,

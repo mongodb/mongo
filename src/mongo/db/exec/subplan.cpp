@@ -139,9 +139,7 @@ Status SubplanStage::choosePlanWholeQuery(PlanYieldPolicy* yieldPolicy) {
         MultiPlanStage* multiPlanStage = static_cast<MultiPlanStage*>(child().get());
 
         for (size_t ix = 0; ix < solutions.size(); ++ix) {
-            if (solutions[ix]->cacheData.get()) {
-                solutions[ix]->cacheData->indexFilterApplied = _plannerParams.indexFiltersApplied;
-            }
+            solutions[ix]->indexFilterApplied = _plannerParams.indexFiltersApplied;
 
             auto&& nextPlanRoot = stage_builder::buildClassicExecutableTree(
                 expCtx()->opCtx, collection(), *_query, *solutions[ix], _ws);

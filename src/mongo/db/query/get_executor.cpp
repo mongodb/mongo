@@ -692,6 +692,7 @@ public:
             // Only one possible plan. Build the stages from the solution.
             auto result = makeResult();
             auto root = buildExecutableTree(*solutions[0]);
+            solutions[0]->indexFilterApplied = _plannerParams.indexFiltersApplied;
             result->emplace(std::move(root), std::move(solutions[0]));
 
             LOGV2_DEBUG(20926,
@@ -944,9 +945,7 @@ protected:
             std::make_unique<MultiPlanStage>(_cq->getExpCtxRaw(), _collection, _cq);
 
         for (size_t ix = 0; ix < solutions.size(); ++ix) {
-            if (solutions[ix]->cacheData.get()) {
-                solutions[ix]->cacheData->indexFilterApplied = _plannerParams.indexFiltersApplied;
-            }
+            solutions[ix]->indexFilterApplied = _plannerParams.indexFiltersApplied;
 
             auto&& nextPlanRoot = buildExecutableTree(*solutions[ix]);
 
@@ -1173,9 +1172,7 @@ protected:
         std::vector<std::unique_ptr<QuerySolution>> solutions) final {
         auto result = makeResult();
         for (size_t ix = 0; ix < solutions.size(); ++ix) {
-            if (solutions[ix]->cacheData.get()) {
-                solutions[ix]->cacheData->indexFilterApplied = _plannerParams.indexFiltersApplied;
-            }
+            solutions[ix]->indexFilterApplied = _plannerParams.indexFiltersApplied;
 
             auto execTree = buildExecutableTree(*solutions[ix]);
             result->emplace(std::move(execTree), std::move(solutions[ix]));

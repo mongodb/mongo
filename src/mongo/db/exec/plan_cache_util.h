@@ -181,6 +181,8 @@ void updatePlanCache(
                                    SolutionCacheData,
                                    plan_cache_debug_info::DebugInfo>
                 callbacks{query, buildDebugInfoFn};
+            winningPlan.solution->cacheData->indexFilterApplied =
+                winningPlan.solution->indexFilterApplied;
             uassertStatusOK(CollectionQueryInfo::get(collection)
                                 .getPlanCache()
                                 ->set(plan_cache_key_factory::make<PlanCacheKey>(query, collection),
@@ -204,6 +206,8 @@ void updatePlanCache(
                     auto cachedPlan = std::make_unique<sbe::CachedSbePlan>(
                         std::move(winningPlan.clonedPlan->first),
                         std::move(winningPlan.clonedPlan->second));
+                    cachedPlan->indexFilterApplied = winningPlan.solution->indexFilterApplied;
+
                     auto buildDebugInfoFn = [soln = winningPlan.solution.get()]()
                         -> plan_cache_debug_info::DebugInfoSBE { return buildDebugInfo(soln); };
                     PlanCacheCallbacksImpl<sbe::PlanCacheKey,

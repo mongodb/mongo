@@ -104,17 +104,16 @@ void generatePlannerInfo(PlanExecutor* exec,
                 *exec->getCanonicalQuery(), collection);
             planCacheKeyHash = planCacheKeyInfo.planCacheKeyHash();
             queryHash = planCacheKeyInfo.queryHash();
-            // TODO SERVER-59695: Set the correct value of "indexFilterSet".
         } else {
             const auto planCacheKeyInfo =
                 plan_cache_key_factory::make<PlanCacheKey>(*exec->getCanonicalQuery(), collection);
             planCacheKeyHash = planCacheKeyInfo.planCacheKeyHash();
             queryHash = planCacheKeyInfo.queryHash();
-            if (auto allowedIndicesFilter = querySettings->getAllowedIndicesFilter(
-                    exec->getCanonicalQuery()->encodeKeyForIndexFilters())) {
-                // Found an index filter set on the query shape.
-                indexFilterSet = true;
-            }
+        }
+        if (auto allowedIndicesFilter = querySettings->getAllowedIndicesFilter(
+                exec->getCanonicalQuery()->encodeKeyForIndexFilters())) {
+            // Found an index filter set on the query shape.
+            indexFilterSet = true;
         }
     }
     plannerBob.append("indexFilterSet", indexFilterSet);
@@ -475,6 +474,8 @@ void Explain::planCacheEntryToBSON(const sbe::PlanCacheEntry& entry, BSONObjBuil
     out->append("cachedPlan",
                 BSON("slots" << entry.cachedPlan->planStageData.debugString() << "stages"
                              << sbe::DebugPrinter().print(*entry.cachedPlan->root)));
+
+    out->append("indexFilterSet", entry.cachedPlan->indexFilterApplied);
     out->append("isPinned", entry.isPinned());
     out->append("estimatedSizeBytes", static_cast<long long>(entry.estimatedEntrySizeBytes));
 }

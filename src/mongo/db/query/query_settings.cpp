@@ -77,7 +77,7 @@ AllowedIndexEntry::AllowedIndexEntry(const BSONObj& query,
 //
 
 boost::optional<AllowedIndicesFilter> QuerySettings::getAllowedIndicesFilter(
-    const CanonicalQuery::QueryShapeString& key) const {
+    const CanonicalQuery::IndexFilterKey& key) const {
     stdx::lock_guard<Latch> cacheLock(_mutex);
     AllowedIndexEntryMap::const_iterator cacheIter = _allowedIndexEntryMap.find(key);
 
@@ -117,7 +117,7 @@ void QuerySettings::setAllowedIndices(const CanonicalQuery& canonicalQuery,
         std::forward_as_tuple(query, sort, projection, collation, indexKeyPatterns, indexNames));
 }
 
-void QuerySettings::removeAllowedIndices(const CanonicalQuery::QueryShapeString& key) {
+void QuerySettings::removeAllowedIndices(const CanonicalQuery::IndexFilterKey& key) {
     stdx::lock_guard<Latch> cacheLock(_mutex);
     AllowedIndexEntryMap::iterator i = _allowedIndexEntryMap.find(key);
 

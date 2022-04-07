@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/query/canonical_query_encoder.h"
 #include "mongo/db/query/plan_cache_debug_info.h"
 
 namespace mongo {
@@ -99,6 +100,7 @@ public:
         const PlanCacheEntryBase<CachedPlanType, DebugInfoType>* oldEntry,
         size_t newWorks) const = 0;
     virtual DebugInfoType buildDebugInfo() const = 0;
+    virtual uint32_t getIndexFilterKeyHash() const = 0;
 };
 
 /**
@@ -177,6 +179,11 @@ public:
     DebugInfoType buildDebugInfo() const final {
         tassert(6407401, "_buildDebugInfoCallBack should be callable", _buildDebugInfoCallBack);
         return _buildDebugInfoCallBack();
+    }
+
+    uint32_t getIndexFilterKeyHash() const final {
+        return canonical_query_encoder::computeHash(
+            canonical_query_encoder::encodeForIndexFilters(_cq));
     }
 
 private:

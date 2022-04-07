@@ -38,12 +38,7 @@ load("jstests/libs/analyze_plan.js");
 load("jstests/libs/clustered_collections/clustered_collection_util.js");
 load("jstests/libs/fixture_helpers.js");  // For 'FixtureHelpers'.
 load("jstests/libs/sbe_explain_helpers.js");
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 
-if (checkSBEEnabled(db, ["featureFlagSbePlanCache"])) {
-    jsTest.log("Skipping test because SBE and SBE plan cache are both enabled.");
-    return;
-}
 const coll = db.jstests_index_filter_commands;
 
 coll.drop();
@@ -109,7 +104,9 @@ function clearFilters(collection, queryShape) {
 // Returns the plan cache entry for the given value of 'createdFromQuery', or null if no such plan
 // cache entry exists.
 function planCacheEntryForQuery(createdFromQuery) {
-    const res = coll.getPlanCache().list([{$match: {createdFromQuery: createdFromQuery}}]);
+    const options = Object.assign({collection: coll, db: db}, createdFromQuery);
+    const planCacheKey = getPlanCacheKeyFromShape(options);
+    const res = coll.getPlanCache().list([{$match: {planCacheKey: planCacheKey}}]);
     if (res.length === 0) {
         return null;
     }
