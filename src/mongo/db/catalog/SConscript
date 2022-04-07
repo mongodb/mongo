@@ -277,7 +277,7 @@ env.Library(
     target='collection_catalog',
     source=[
         'collection_catalog.cpp',
-        'uncommitted_collections.cpp',
+        'uncommitted_catalog_updates.cpp',
         'uncommitted_multikey.cpp',
         'views_for_database.cpp',
     ],

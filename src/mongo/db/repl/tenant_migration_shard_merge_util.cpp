@@ -39,7 +39,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/create_collection.h"
-#include "mongo/db/catalog/uncommitted_collections.h"
+#include "mongo/db/catalog/uncommitted_catalog_updates.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/cursor_server_params_gen.h"
@@ -215,7 +215,7 @@ void wiredTigerImportFromBackupCursor(OperationContext* opCtx,
             opCtx->recoveryUnit()->registerChange(
                 makeCountsChange(ownedCollection->getRecordStore(), collectionMetadata));
 
-            UncommittedCollections::addToTxn(opCtx, std::move(ownedCollection));
+            CollectionCatalog::get(opCtx)->onCreateCollection(opCtx, std::move(ownedCollection));
             // TODO SERVER-63789 Uncomment wunit.commit() call below when we
             // make file copy/import async.
             // wunit.commit();

@@ -46,7 +46,7 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/catalog/multi_index_block.h"
-#include "mongo/db/catalog/uncommitted_collections.h"
+#include "mongo/db/catalog/uncommitted_catalog_updates.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -406,8 +406,7 @@ CreateIndexesReply runCreateIndexesOnNewCollection(
     // collection implicitly as part of createIndexes or because the collection was created earlier
     // in the same multi-document transaction.
     CollectionWriter collection(opCtx, ns);
-    UncommittedCollections::get(opCtx).invariantHasExclusiveAccessToCollection(opCtx,
-                                                                               collection->ns());
+    CollectionCatalog::get(opCtx)->invariantHasExclusiveAccessToCollection(opCtx, collection->ns());
     invariant(opCtx->inMultiDocumentTransaction() || createCollImplicitly);
 
     uassert(ErrorCodes::OperationNotSupportedInTransaction,
@@ -504,7 +503,7 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
             }
 
             if (collection &&
-                !UncommittedCollections::get(opCtx).isUncommittedCollection(opCtx, ns)) {
+                !UncommittedCatalogUpdates::get(opCtx).isCreatedCollection(opCtx, ns)) {
                 // The collection exists and was not created in the same multi-document transaction
                 // as the createIndexes.
                 collectionUUID = collection->uuid();

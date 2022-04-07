@@ -44,7 +44,7 @@
 #include "mongo/db/catalog/index_build_block.h"
 #include "mongo/db/catalog/index_catalog_entry_impl.h"
 #include "mongo/db/catalog/index_key_validate.h"
-#include "mongo/db/catalog/uncommitted_collections.h"
+#include "mongo/db/catalog/uncommitted_catalog_updates.h"
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -552,7 +552,7 @@ IndexCatalogEntry* IndexCatalogImpl::createIndexEntry(OperationContext* opCtx,
     }
 
     bool initFromDisk = CreateIndexEntryFlags::kInitFromDisk & flags;
-    if (!initFromDisk && UncommittedCollections::getForTxn(opCtx, collection->ns()) == nullptr) {
+    if (!initFromDisk && !UncommittedCatalogUpdates::isCreatedCollection(opCtx, collection->ns())) {
         const std::string indexName = descriptorPtr->indexName();
         opCtx->recoveryUnit()->onRollback(
             [collectionDecorations = collection->getSharedDecorations(),
@@ -569,8 +569,7 @@ StatusWith<BSONObj> IndexCatalogImpl::createIndexOnEmptyCollection(OperationCont
                                                                    Collection* collection,
                                                                    BSONObj spec) {
     invariant(collection->uuid() == collection->uuid());
-    UncommittedCollections::get(opCtx).invariantHasExclusiveAccessToCollection(opCtx,
-                                                                               collection->ns());
+    CollectionCatalog::get(opCtx)->invariantHasExclusiveAccessToCollection(opCtx, collection->ns());
     invariant(collection->isEmpty(opCtx),
               str::stream() << "Collection must be empty. Collection: " << collection->ns()
                             << " UUID: " << collection->uuid()

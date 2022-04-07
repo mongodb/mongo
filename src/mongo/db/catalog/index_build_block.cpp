@@ -37,7 +37,6 @@
 
 #include "mongo/db/audit.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/uncommitted_collections.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -215,8 +214,7 @@ void IndexBuildBlock::success(OperationContext* opCtx, Collection* collection) {
     // Being in a WUOW means all timestamping responsibility can be pushed up to the caller.
     invariant(opCtx->lockState()->inAWriteUnitOfWork());
 
-    UncommittedCollections::get(opCtx).invariantHasExclusiveAccessToCollection(opCtx,
-                                                                               collection->ns());
+    CollectionCatalog::get(opCtx)->invariantHasExclusiveAccessToCollection(opCtx, collection->ns());
 
     if (_indexBuildInterceptor) {
         // Skipped records are only checked when we complete an index build as primary.

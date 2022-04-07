@@ -46,7 +46,6 @@ namespace mongo {
 
 class CollectionCatalog;
 class Database;
-class UncommittedCatalogUpdates;
 
 class CollectionCatalog {
     friend class iterator;
@@ -193,6 +192,13 @@ public:
      * Requires an IS lock on the 'system.views' collection'.
      */
     Status reloadViews(OperationContext* opCtx, StringData dbName) const;
+
+    /**
+     * Handles committing a collection to the catalog within a WriteUnitOfWork.
+     *
+     * Must be called within a WriteUnitOfWork.
+     */
+    void onCreateCollection(OperationContext* opCtx, std::shared_ptr<Collection> coll) const;
 
     /**
      * This function is responsible for safely tracking a Collection rename within a
@@ -508,6 +514,12 @@ public:
      */
     void addResource(const ResourceId& rid, const std::string& entry);
 
+    /**
+     * Ensures we have a MODE_X lock on a collection or MODE_IX lock for newly created collections.
+     */
+    static void invariantHasExclusiveAccessToCollection(OperationContext* opCtx,
+                                                        const NamespaceString& nss);
+
 private:
     friend class CollectionCatalog::iterator;
     class PublishCatalogUpdates;
@@ -552,21 +564,17 @@ private:
 
     /**
      * Throws 'WriteConflictException' if given namespace is already registered with the catalog, as
-     * either a view or collection. In the case of an collection drop (by the calling thread) that
-     * has not been committed yet, it will not throw, but it will return
-     * 'NonExistenceType::kDropPending' to distinguish from the case that the namespace is simply
-     * not registered with the catalog at all. The results will include namespaces which have been
-     * registered by preCommitHooks on other threads, but which have not truly been committed yet.
+     * either a view or collection. The results will include namespaces which have been registered
+     * by preCommitHooks on other threads, but which have not truly been committed yet.
      *
      * If 'type' is set to 'NamespaceType::kCollection', we will only check for collisions with
      * collections. If set to 'NamespaceType::kAll', we will check against both collections and
      * views.
      */
-    enum class NonExistenceType { kDropPending, kNormal };
     enum class NamespaceType { kAll, kCollection };
-    NonExistenceType _ensureNamespaceDoesNotExist(OperationContext* opCtx,
-                                                  const NamespaceString& nss,
-                                                  NamespaceType type) const;
+    void _ensureNamespaceDoesNotExist(OperationContext* opCtx,
+                                      const NamespaceString& nss,
+                                      NamespaceType type) const;
 
     /**
      * When present, indicates that the catalog is in closed state, and contains a map from UUID

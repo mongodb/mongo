@@ -37,7 +37,6 @@
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_repair.h"
-#include "mongo/db/catalog/uncommitted_collections.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/namespace_string.h"
@@ -342,7 +341,7 @@ bool IndexBuildsManager::abortIndexBuild(OperationContext* opCtx,
     // Since abortIndexBuild is special in that it can be called by threads other than the index
     // builder, ensure the caller has an exclusive lock.
     auto nss = collection->ns();
-    UncommittedCollections::get(opCtx).invariantHasExclusiveAccessToCollection(opCtx, nss);
+    CollectionCatalog::invariantHasExclusiveAccessToCollection(opCtx, nss);
 
     builder.getValue()->abortIndexBuild(opCtx, collection, onCleanUpFn);
     return true;

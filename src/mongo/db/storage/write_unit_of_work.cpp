@@ -34,7 +34,6 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 
 #include "mongo/db/batched_write_context.h"
-#include "mongo/db/catalog/uncommitted_collections.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/logv2/log.h"

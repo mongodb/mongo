@@ -49,7 +49,7 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/drop_indexes.h"
 #include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/catalog/uncommitted_collections.h"
+#include "mongo/db/catalog/uncommitted_catalog_updates.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands/feature_compatibility_version_parser.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -440,7 +440,7 @@ Status DatabaseImpl::dropCollection(OperationContext* opCtx,
                                     NamespaceString nss,
                                     repl::OpTime dropOpTime) const {
     // Cannot drop uncommitted collections.
-    invariant(!UncommittedCollections::getForTxn(opCtx, nss));
+    invariant(!UncommittedCatalogUpdates::isCreatedCollection(opCtx, nss));
 
     auto catalog = CollectionCatalog::get(opCtx);
 
@@ -875,7 +875,8 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
     auto collection = ownedCollection.get();
     ownedCollection->init(opCtx);
     ownedCollection->setCommitted(false);
-    UncommittedCollections::addToTxn(opCtx, std::move(ownedCollection));
+
+    CollectionCatalog::get(opCtx)->onCreateCollection(opCtx, std::move(ownedCollection));
     openCreateCollectionWindowFp.executeIf([&](const BSONObj& data) { sleepsecs(3); },
                                            [&](const BSONObj& data) {
                                                const auto collElem = data["collectionNS"];

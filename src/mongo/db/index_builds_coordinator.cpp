@@ -38,7 +38,6 @@
 #include "mongo/db/catalog/commit_quorum_options.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_build_entry_gen.h"
-#include "mongo/db/catalog/uncommitted_collections.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
@@ -114,7 +113,7 @@ constexpr StringData kUniqueFieldName = "unique"_sd;
 void checkShardKeyRestrictions(OperationContext* opCtx,
                                const NamespaceString& nss,
                                const BSONObj& newIdxKey) {
-    UncommittedCollections::get(opCtx).invariantHasExclusiveAccessToCollection(opCtx, nss);
+    CollectionCatalog::get(opCtx)->invariantHasExclusiveAccessToCollection(opCtx, nss);
 
     const auto collDesc = CollectionShardingState::get(opCtx, nss)->getCollectionDescription(opCtx);
     if (!collDesc.isSharded())
@@ -1686,8 +1685,7 @@ void IndexBuildsCoordinator::createIndexesOnEmptyCollection(OperationContext* op
     invariant(!specs.empty(), str::stream() << collectionUUID);
 
     auto nss = collection->ns();
-    UncommittedCollections::get(opCtx).invariantHasExclusiveAccessToCollection(opCtx,
-                                                                               collection->ns());
+    CollectionCatalog::get(opCtx)->invariantHasExclusiveAccessToCollection(opCtx, collection->ns());
 
     auto opObserver = opCtx->getServiceContext()->getOpObserver();
 
@@ -2838,8 +2836,7 @@ std::vector<BSONObj> IndexBuildsCoordinator::prepareSpecListForCreate(
     const CollectionPtr& collection,
     const NamespaceString& nss,
     const std::vector<BSONObj>& indexSpecs) {
-    UncommittedCollections::get(opCtx).invariantHasExclusiveAccessToCollection(opCtx,
-                                                                               collection->ns());
+    CollectionCatalog::get(opCtx)->invariantHasExclusiveAccessToCollection(opCtx, collection->ns());
     invariant(collection);
 
     // During secondary oplog application, the index specs have already been normalized in the

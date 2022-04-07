@@ -32,6 +32,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/catalog/uncommitted_catalog_updates.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/commands/txn_two_phase_commit_cmds_gen.h"
@@ -119,7 +120,7 @@ public:
             // TODO(SERVER-46105) remove
             uassert(ErrorCodes::OperationNotSupportedInTransaction,
                     "Cannot create new collections inside distributed transactions",
-                    UncommittedCollections::get(opCtx).isEmpty());
+                    UncommittedCatalogUpdates::get(opCtx).isEmpty());
 
             uassert(ErrorCodes::NoSuchTransaction,
                     "Transaction isn't in progress",

@@ -32,7 +32,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/catalog/uncommitted_collections.h"
+#include "mongo/db/catalog/uncommitted_catalog_updates.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -82,8 +82,14 @@ public:
 
                 ASSERT_TRUE(collectionExists(op1.get(), competingNss));
                 ASSERT_TRUE(collectionExists(op2.get(), competingNss));
-                ASSERT_NOT_EQUALS(UncommittedCollections::getForTxn(op1.get(), competingNss),
-                                  UncommittedCollections::getForTxn(op2.get(), competingNss));
+
+                auto [found1, collection1, newColl1] =
+                    UncommittedCatalogUpdates::lookupCollection(op1.get(), competingNss);
+                auto [found2, collection2, newColl2] =
+                    UncommittedCatalogUpdates::lookupCollection(op2.get(), competingNss);
+                ASSERT_EQUALS(found1, found2);
+                ASSERT_EQUALS(newColl1, newColl2);
+                ASSERT_NOT_EQUALS(collection1, collection2);
                 wuow2.commit();
             }
             ASSERT_THROWS(wuow1.commit(), WriteConflictException);

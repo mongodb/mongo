@@ -40,7 +40,6 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/multi_index_block_gen.h"
-#include "mongo/db/catalog/uncommitted_collections.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/index/multikey_paths.h"
@@ -128,7 +127,7 @@ void MultiIndexBlock::abortIndexBuild(OperationContext* opCtx,
     }
 
     auto nss = collection->ns();
-    UncommittedCollections::get(opCtx).invariantHasExclusiveAccessToCollection(opCtx, nss);
+    CollectionCatalog::get(opCtx)->invariantHasExclusiveAccessToCollection(opCtx, nss);
 
     while (true) {
         try {

@@ -33,7 +33,7 @@
 #include "collection_catalog.h"
 
 #include "mongo/db/catalog/database.h"
-#include "mongo/db/catalog/uncommitted_collections.h"
+#include "mongo/db/catalog/uncommitted_catalog_updates.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/server_options.h"
@@ -57,266 +57,6 @@ const OperationContext::Decoration<std::shared_ptr<const CollectionCatalog>> sta
     OperationContext::declareDecoration<std::shared_ptr<const CollectionCatalog>>();
 
 }  // namespace
-
-/**
- * Decoration on RecoveryUnit to store cloned Collections until they are committed or rolled
- * back TODO SERVER-51236: This should be merged with UncommittedCollections
- */
-class UncommittedCatalogUpdates {
-public:
-    struct Entry {
-        enum class Action {
-            // Writable clone
-            kWritableCollection,
-            // Marker to indicate that the namespace has been renamed
-            kRenamedCollection,
-            // Dropped collection instance
-            kDroppedCollection,
-            // Recreated collection after drop
-            kRecreatedCollection,
-            // Replaced views for a particular database
-            kReplacedViewsForDatabase,
-            // Add a view resource
-            kAddViewResource,
-            // Remove a view resource
-            kRemoveViewResource,
-        };
-
-        boost::optional<UUID> uuid() const {
-            if (action == Action::kWritableCollection || action == Action::kRenamedCollection)
-                return collection->uuid();
-            return externalUUID;
-        }
-
-        // Type of action this entry has stored. Members below may or may not be set depending on
-        // this member.
-        Action action;
-
-        // Storage for the actual collection.
-        // Set for actions kWritableCollection, kRecreatedCollection. nullptr otherwise.
-        std::shared_ptr<Collection> collection;
-
-        // Store namespace separately to handle rename and drop without making writable first
-        // Set for all actions
-        NamespaceString nss;
-
-        // External uuid when not accessible via collection
-        // Set for actions kDroppedCollection, kRecreatedCollection. boost::none otherwise.
-        boost::optional<UUID> externalUUID;
-
-        // New namespace this collection has been renamed to
-        // Set for action kRenamedCollection. Default constructed otherwise.
-        NamespaceString renameTo;
-
-        // New set of view information for a database.
-        // Set for action kReplacedViewsForDatabase, boost::none otherwise.
-        boost::optional<ViewsForDatabase> viewsForDb;
-    };
-
-    /**
-     * Determine if an entry is associated with a collection action (as opposed to a view action).
-     */
-    static bool isCollectionEntry(const Entry& entry) {
-        return (entry.action == Entry::Action::kWritableCollection ||
-                entry.action == Entry::Action::kRenamedCollection ||
-                entry.action == Entry::Action::kDroppedCollection ||
-                entry.action == Entry::Action::kRecreatedCollection);
-    }
-
-    /**
-     * Lookup of Collection by UUID. The boolean indicates if this namespace is managed.
-     * A managed Collection pointer may be returned as nullptr, which indicates a drop.
-     * If the returned boolean is false then the Collection will always be nullptr.
-     */
-    std::pair<bool, std::shared_ptr<Collection>> lookupCollection(UUID uuid) const {
-        // Doing reverse search so we find most recent entry affecting this uuid
-        auto it = std::find_if(_entries.rbegin(), _entries.rend(), [uuid](auto&& entry) {
-            // Rename actions don't have UUID
-            if (entry.action == Entry::Action::kRenamedCollection)
-                return false;
-
-            return entry.uuid() == uuid;
-        });
-        if (it == _entries.rend())
-            return {false, nullptr};
-        return {true, it->collection};
-    }
-
-    /**
-     * Lookup of Collection by NamespaceString. The boolean indicates if this namespace is managed.
-     * A managed Collection pointer may be returned as nullptr, which indicates drop or rename.
-     * If the returned boolean is false then the Collection will always be nullptr.
-     */
-    std::pair<bool, std::shared_ptr<Collection>> lookupCollection(
-        const NamespaceString& nss) const {
-        // Doing reverse search so we find most recent entry affecting this namespace
-        auto it = std::find_if(_entries.rbegin(), _entries.rend(), [&nss](auto&& entry) {
-            return entry.nss == nss && isCollectionEntry(entry);
-        });
-        if (it == _entries.rend())
-            return {false, nullptr};
-        return {true, it->collection};
-    }
-
-    boost::optional<const ViewsForDatabase&> getViewsForDatabase(StringData dbName) const {
-        // Doing reverse search so we find most recent entry affecting this namespace
-        auto it = std::find_if(_entries.rbegin(), _entries.rend(), [&](auto&& entry) {
-            return entry.nss.db() == dbName && entry.viewsForDb;
-        });
-        if (it == _entries.rend())
-            return boost::none;
-        return {*it->viewsForDb};
-    }
-
-    /**
-     * Manage the lifetime of uncommitted writable collection
-     */
-    void writableCollection(std::shared_ptr<Collection> collection) {
-        const auto& ns = collection->ns();
-        _entries.push_back({Entry::Action::kWritableCollection, std::move(collection), ns});
-    }
-
-    /**
-     * Manage an uncommitted rename, pointer must have made writable first and should exist in entry
-     * list
-     */
-    void renameCollection(const Collection* collection, const NamespaceString& from) {
-        auto it = std::find_if(_entries.rbegin(), _entries.rend(), [collection](auto&& entry) {
-            return entry.collection.get() == collection;
-        });
-        invariant(it != _entries.rend());
-        it->nss = collection->ns();
-        _entries.push_back(
-            {Entry::Action::kRenamedCollection, nullptr, from, boost::none, it->nss});
-    }
-
-    /**
-     * Manage an uncommitted collection drop
-     */
-    void dropCollection(const Collection* collection) {
-        auto it = std::find_if(
-            _entries.rbegin(), _entries.rend(), [uuid = collection->uuid()](auto&& entry) {
-                return entry.uuid() == uuid;
-            });
-        if (it == _entries.rend()) {
-            // Entry with this uuid was not found, add new
-            _entries.push_back(
-                {Entry::Action::kDroppedCollection, nullptr, collection->ns(), collection->uuid()});
-            return;
-        }
-
-        // If we have been recreated after drop we can simply just erase this entry so lookup will
-        // then find previous drop
-        if (it->action == Entry::Action::kRecreatedCollection) {
-            _entries.erase(it.base());
-            return;
-        }
-
-        // Entry is already without Collection pointer, nothing to do
-        if (!it->collection)
-            return;
-
-        // Transform found entry into dropped.
-        invariant(it->collection.get() == collection);
-        it->action = Entry::Action::kDroppedCollection;
-        it->externalUUID = it->collection->uuid();
-        it->collection = nullptr;
-    }
-
-    /**
-     * Re-creates a collection that has previously been dropped
-     */
-    void createCollectionAfterDrop(UUID uuid, std::shared_ptr<Collection> collection) {
-        const auto& ns = collection->ns();
-        _entries.push_back({Entry::Action::kRecreatedCollection, std::move(collection), ns, uuid});
-    }
-
-    /**
-     * Replace the ViewsForDatabase instance assocated with database `dbName` with `vfdb`. This is
-     * the primary low-level write method to alter any information about the views associated with a
-     * given database.
-     */
-    void replaceViewsForDatabase(StringData dbName, ViewsForDatabase&& vfdb) {
-        _entries.push_back({Entry::Action::kReplacedViewsForDatabase,
-                            nullptr,
-                            NamespaceString{dbName},
-                            boost::none,
-                            {},
-                            std::move(vfdb)});
-    }
-
-    /**
-     * Adds a ResourceID associated with a view namespace, and registers a preCommitHook to do
-     * conflict-checking on the view namespace.
-     */
-    void addView(OperationContext* opCtx, const NamespaceString nss) {
-        opCtx->recoveryUnit()->registerPreCommitHook([nss](OperationContext* opCtx) {
-            CollectionCatalog::write(opCtx, [opCtx, nss](CollectionCatalog& catalog) {
-                catalog.registerUncommittedView(opCtx, nss);
-            });
-        });
-        opCtx->recoveryUnit()->onRollback([opCtx, nss]() {
-            CollectionCatalog::write(
-                opCtx, [&](CollectionCatalog& catalog) { catalog.deregisterUncommittedView(nss); });
-        });
-        _entries.push_back({Entry::Action::kAddViewResource, nullptr, nss});
-    }
-
-    /**
-     * Removes the ResourceID associated with a view namespace.
-     */
-    void removeView(const NamespaceString nss) {
-        _entries.push_back({Entry::Action::kRemoveViewResource, nullptr, nss});
-    }
-
-    /**
-     * Releases all entries, needs to be done when WriteUnitOfWork commits or rolls back.
-     */
-    std::vector<Entry> releaseEntries() {
-        std::vector<Entry> ret;
-        std::swap(ret, _entries);
-        return ret;
-    }
-
-    /**
-     * The catalog needs to ignore external view changes for its own modifications. This method
-     * should be used by DDL operations to prevent op observers from triggering additional catalog
-     * operations.
-     */
-    void setIgnoreExternalViewChanges(StringData dbName, bool value) {
-        if (value) {
-            _ignoreExternalViewChanges.emplace(dbName);
-        } else {
-            _ignoreExternalViewChanges.erase(dbName);
-        }
-    }
-
-    /**
-     * The catalog needs to ignore external view changes for its own modifications. This method can
-     * be used by methods called by op observers (e.g. 'CollectionCatalog::reload()') to distinguish
-     * between an external write to 'system.views' and one initiated through the proper view DDL
-     * operations.
-     */
-    bool shouldIgnoreExternalViewChanges(StringData dbName) const {
-        return _ignoreExternalViewChanges.contains(dbName);
-    }
-
-    static UncommittedCatalogUpdates& get(OperationContext* opCtx);
-
-private:
-    // Store entries in vector, we will do linear search to find what we're looking for but it will
-    // be very few entries so it should be fine.
-    std::vector<Entry> _entries;
-
-    StringSet _ignoreExternalViewChanges;
-};
-
-const RecoveryUnit::Decoration<UncommittedCatalogUpdates> getUncommittedCatalogUpdates =
-    RecoveryUnit::declareDecoration<UncommittedCatalogUpdates>();
-
-UncommittedCatalogUpdates& UncommittedCatalogUpdates::get(OperationContext* opCtx) {
-    return getUncommittedCatalogUpdates(opCtx->recoveryUnit());
-}
 
 class IgnoreExternalViewChangesForDatabase {
 public:
@@ -380,13 +120,14 @@ public:
         auto entries = _uncommittedCatalogUpdates.releaseEntries();
         for (auto&& entry : entries) {
             switch (entry.action) {
-                case UncommittedCatalogUpdates::Entry::Action::kWritableCollection:
+                case UncommittedCatalogUpdates::Entry::Action::kWritableCollection: {
                     writeJobs.push_back(
                         [collection = std::move(entry.collection)](CollectionCatalog& catalog) {
                             setCollectionInCatalog(catalog, std::move(collection));
                         });
                     break;
-                case UncommittedCatalogUpdates::Entry::Action::kRenamedCollection:
+                }
+                case UncommittedCatalogUpdates::Entry::Action::kRenamedCollection: {
                     writeJobs.push_back(
                         [& from = entry.nss, &to = entry.renameTo](CollectionCatalog& catalog) {
                             catalog._collections.erase(from);
@@ -401,39 +142,63 @@ public:
                             catalog.addResource(newRid, toStr);
                         });
                     break;
-                case UncommittedCatalogUpdates::Entry::Action::kDroppedCollection:
+                }
+                case UncommittedCatalogUpdates::Entry::Action::kDroppedCollection: {
                     writeJobs.push_back(
                         [opCtx = _opCtx, uuid = *entry.uuid()](CollectionCatalog& catalog) {
                             catalog.deregisterCollection(opCtx, uuid);
                         });
                     break;
-                case UncommittedCatalogUpdates::Entry::Action::kRecreatedCollection:
+                }
+                case UncommittedCatalogUpdates::Entry::Action::kRecreatedCollection: {
                     writeJobs.push_back([opCtx = _opCtx,
-                                         collection = std::move(entry.collection),
+                                         collection = entry.collection,
                                          uuid = *entry.externalUUID](CollectionCatalog& catalog) {
                         catalog.registerCollection(opCtx, uuid, std::move(collection));
                     });
+                    // Fallthrough to the createCollection case to finish committing the collection.
+                }
+                case UncommittedCatalogUpdates::Entry::Action::kCreatedCollection: {
+                    auto collPtr = entry.collection.get();
+
+                    // By this point, we may or may not have reserved an oplog slot for the
+                    // collection creation.
+                    // For example, multi-document transactions will only reserve the oplog slot at
+                    // commit time. As a result, we may or may not have a reliable value to use to
+                    // set the new collection's minimum visible snapshot until commit time.
+                    // Pre-commit hooks do not presently have awareness of the commit timestamp, so
+                    // we must update the minVisibleTimestamp with the appropriate value. This is
+                    // fine because the collection should not be visible in the catalog until we
+                    // call setCommitted(true).
+                    if (commitTime) {
+                        collPtr->setMinimumVisibleSnapshot(commitTime.get());
+                    }
+                    collPtr->setCommitted(true);
                     break;
-                case UncommittedCatalogUpdates::Entry::Action::kReplacedViewsForDatabase:
+                }
+                case UncommittedCatalogUpdates::Entry::Action::kReplacedViewsForDatabase: {
                     writeJobs.push_back(
                         [dbName = entry.nss.db(),
                          &viewsForDb = entry.viewsForDb.get()](CollectionCatalog& catalog) {
                             catalog._replaceViewsForDatabase(dbName, std::move(viewsForDb));
                         });
                     break;
-                case UncommittedCatalogUpdates::Entry::Action::kAddViewResource:
+                }
+                case UncommittedCatalogUpdates::Entry::Action::kAddViewResource: {
                     writeJobs.push_back([& viewName = entry.nss](CollectionCatalog& catalog) {
                         auto viewRid = ResourceId(RESOURCE_COLLECTION, viewName.ns());
                         catalog.addResource(viewRid, viewName.ns());
                         catalog.deregisterUncommittedView(viewName);
                     });
                     break;
-                case UncommittedCatalogUpdates::Entry::Action::kRemoveViewResource:
+                }
+                case UncommittedCatalogUpdates::Entry::Action::kRemoveViewResource: {
                     writeJobs.push_back([& viewName = entry.nss](CollectionCatalog& catalog) {
                         auto viewRid = ResourceId(RESOURCE_COLLECTION, viewName.ns());
                         catalog.removeResource(viewRid, viewName.ns());
                     });
                     break;
+                }
             };
         }
 
@@ -861,6 +626,30 @@ Status CollectionCatalog::reloadViews(OperationContext* opCtx, StringData dbName
     return status;
 }
 
+void CollectionCatalog::onCreateCollection(OperationContext* opCtx,
+                                           std::shared_ptr<Collection> coll) const {
+    invariant(coll);
+
+    auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
+    auto [found, existingColl, newColl] =
+        UncommittedCatalogUpdates::lookupCollection(opCtx, coll->ns());
+    uassert(31370,
+            str::stream() << "collection already exists. ns: " << coll->ns(),
+            existingColl == nullptr);
+
+    // When we already have a drop and recreate the collection, we want to seamlessly swap out the
+    // collection in the catalog under a single critical section. So we register the recreated
+    // collection in the same commit handler that we unregister the dropped collection (as opposed
+    // to registering the new collection inside of a preCommitHook).
+    if (found) {
+        uncommittedCatalogUpdates.recreateCollection(opCtx, std::move(coll));
+    } else {
+        uncommittedCatalogUpdates.createCollection(opCtx, std::move(coll));
+    }
+
+    PublishCatalogUpdates::ensureRegisteredWithRecoveryUnit(opCtx, uncommittedCatalogUpdates);
+}
+
 void CollectionCatalog::onCollectionRename(OperationContext* opCtx,
                                            Collection* coll,
                                            const NamespaceString& fromCollection) const {
@@ -921,18 +710,10 @@ uint64_t CollectionCatalog::getEpoch() const {
 
 std::shared_ptr<const Collection> CollectionCatalog::lookupCollectionByUUIDForRead(
     OperationContext* opCtx, const UUID& uuid) const {
-
-    auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
-    auto [found, uncommittedPtr] = uncommittedCatalogUpdates.lookupCollection(uuid);
-    // If UUID is managed by uncommittedCatalogUpdates return the pointer which will be nullptr in
-    // case of a drop. We don't need to check UncommittedCollections as we will never share UUID for
-    // a new Collection.
-    if (found) {
-        return uncommittedPtr;
-    }
-
-    if (auto coll = UncommittedCollections::getForTxn(opCtx, uuid)) {
-        return coll;
+    auto [found, uncommittedColl, newColl] =
+        UncommittedCatalogUpdates::lookupCollection(opCtx, uuid);
+    if (uncommittedColl) {
+        return uncommittedColl;
     }
 
     auto coll = _lookupCollectionByUUID(uuid);
@@ -942,17 +723,19 @@ std::shared_ptr<const Collection> CollectionCatalog::lookupCollectionByUUIDForRe
 Collection* CollectionCatalog::lookupCollectionByUUIDForMetadataWrite(OperationContext* opCtx,
                                                                       const UUID& uuid) const {
     auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
-    auto [found, uncommittedPtr] = uncommittedCatalogUpdates.lookupCollection(uuid);
-    // If UUID is managed by uncommittedCatalogUpdates return the pointer which will be nullptr in
-    // case of a drop. We don't need to check UncommittedCollections as we will never share UUID for
-    // a new Collection.
+    auto [found, uncommittedPtr, newColl] =
+        UncommittedCatalogUpdates::lookupCollection(opCtx, uuid);
     if (found) {
-        return uncommittedPtr.get();
-    }
+        // The uncommittedPtr will be nullptr in the case of drop.
+        if (!uncommittedPtr.get()) {
+            return nullptr;
+        }
 
-    if (auto coll = UncommittedCollections::getForTxn(opCtx, uuid)) {
-        invariant(opCtx->lockState()->isCollectionLockedForMode(coll->ns(), MODE_IX));
-        return coll.get();
+        auto nss = uncommittedPtr->ns();
+        // If the collection is newly created, invariant on the collection being locked in MODE_IX.
+        invariant(!newColl || opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX),
+                  nss.toString());
+        return uncommittedPtr.get();
     }
 
     std::shared_ptr<Collection> coll = _lookupCollectionByUUID(uuid);
@@ -991,17 +774,12 @@ Collection* CollectionCatalog::lookupCollectionByUUIDForMetadataWrite(OperationC
 }
 
 CollectionPtr CollectionCatalog::lookupCollectionByUUID(OperationContext* opCtx, UUID uuid) const {
-    auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
-    auto [found, uncommittedPtr] = uncommittedCatalogUpdates.lookupCollection(uuid);
-    // If UUID is managed by uncommittedCatalogUpdates return the pointer which will be nullptr in
-    // case of a drop. We don't need to check UncommittedCollections as we will never share UUID for
-    // a new Collection.
+    // If UUID is managed by UncommittedCatalogUpdates (but not newly created) return the pointer
+    // which will be nullptr in case of a drop.
+    auto [found, uncommittedPtr, newColl] =
+        UncommittedCatalogUpdates::lookupCollection(opCtx, uuid);
     if (found) {
         return uncommittedPtr.get();
-    }
-
-    if (auto coll = UncommittedCollections::getForTxn(opCtx, uuid)) {
-        return {opCtx, coll.get(), LookupCollectionForYieldRestore(coll->ns())};
     }
 
     auto coll = _lookupCollectionByUUID(uuid);
@@ -1023,18 +801,10 @@ std::shared_ptr<Collection> CollectionCatalog::_lookupCollectionByUUID(UUID uuid
 std::shared_ptr<const Collection> CollectionCatalog::lookupCollectionByNamespaceForRead(
     OperationContext* opCtx, const NamespaceString& nss) const {
 
-    auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
-    auto [found, uncommittedPtr] = uncommittedCatalogUpdates.lookupCollection(nss);
-    // If uncommittedPtr is valid, found is always true. Return the pointer as the collection still
-    // exists.
-    if (uncommittedPtr) {
-        return uncommittedPtr;
-    }
-
-    // If found=true above but we don't have a Collection pointer it is a drop or rename. But first
-    // check UncommittedCollections in case we find a new collection there.
-    if (auto coll = UncommittedCollections::getForTxn(opCtx, nss)) {
-        return coll;
+    auto [found, uncommittedColl, newColl] =
+        UncommittedCatalogUpdates::lookupCollection(opCtx, nss);
+    if (uncommittedColl) {
+        return uncommittedColl;
     }
 
     // Report the drop or rename as nothing new was created.
@@ -1056,18 +826,16 @@ Collection* CollectionCatalog::lookupCollectionByNamespaceForMetadataWrite(
     }
 
     auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
-    auto [found, uncommittedPtr] = uncommittedCatalogUpdates.lookupCollection(nss);
+    auto [found, uncommittedPtr, newColl] = UncommittedCatalogUpdates::lookupCollection(opCtx, nss);
+
+
     // If uncommittedPtr is valid, found is always true. Return the pointer as the collection still
     // exists.
     if (uncommittedPtr) {
+        // If the collection is newly created, invariant on the collection being locked in MODE_IX.
+        invariant(!newColl || opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX),
+                  nss.toString());
         return uncommittedPtr.get();
-    }
-
-    // If found=true above but we don't have a Collection pointer it is a drop or rename. But first
-    // check UncommittedCollections in case we find a new collection there.
-    if (auto coll = UncommittedCollections::getForTxn(opCtx, nss)) {
-        invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX));
-        return coll.get();
     }
 
     // Report the drop or rename as nothing new was created.
@@ -1110,18 +878,11 @@ Collection* CollectionCatalog::lookupCollectionByNamespaceForMetadataWrite(
 
 CollectionPtr CollectionCatalog::lookupCollectionByNamespace(OperationContext* opCtx,
                                                              const NamespaceString& nss) const {
-    auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
-    auto [found, uncommittedPtr] = uncommittedCatalogUpdates.lookupCollection(nss);
     // If uncommittedPtr is valid, found is always true. Return the pointer as the collection still
     // exists.
+    auto [found, uncommittedPtr, newColl] = UncommittedCatalogUpdates::lookupCollection(opCtx, nss);
     if (uncommittedPtr) {
         return uncommittedPtr.get();
-    }
-
-    // If found=true above but we don't have a Collection pointer it is a drop or rename. But first
-    // check UncommittedCollections in case we find a new collection there.
-    if (auto coll = UncommittedCollections::getForTxn(opCtx, nss)) {
-        return {opCtx, coll.get(), LookupCollectionForYieldRestore(coll->ns())};
     }
 
     // Report the drop or rename as nothing new was created.
@@ -1138,19 +899,14 @@ CollectionPtr CollectionCatalog::lookupCollectionByNamespace(OperationContext* o
 
 boost::optional<NamespaceString> CollectionCatalog::lookupNSSByUUID(OperationContext* opCtx,
                                                                     const UUID& uuid) const {
-    auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
-    auto [found, uncommittedPtr] = uncommittedCatalogUpdates.lookupCollection(uuid);
+    auto [found, uncommittedPtr, newColl] =
+        UncommittedCatalogUpdates::lookupCollection(opCtx, uuid);
     // If UUID is managed by uncommittedCatalogUpdates return its corresponding namespace if the
     // Collection exists, boost::none otherwise.
     if (found) {
         if (uncommittedPtr)
             return uncommittedPtr->ns();
-        else
-            return boost::none;
-    }
-
-    if (auto coll = UncommittedCollections::getForTxn(opCtx, uuid)) {
-        return coll->ns();
+        return boost::none;
     }
 
     auto foundIt = _catalog.find(uuid);
@@ -1173,14 +929,9 @@ boost::optional<NamespaceString> CollectionCatalog::lookupNSSByUUID(OperationCon
 
 boost::optional<UUID> CollectionCatalog::lookupUUIDByNSS(OperationContext* opCtx,
                                                          const NamespaceString& nss) const {
-    auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
-    auto [found, uncommittedPtr] = uncommittedCatalogUpdates.lookupCollection(nss);
+    auto [found, uncommittedPtr, newColl] = UncommittedCatalogUpdates::lookupCollection(opCtx, nss);
     if (uncommittedPtr) {
         return uncommittedPtr->uuid();
-    }
-
-    if (auto coll = UncommittedCollections::getForTxn(opCtx, nss)) {
-        return coll->uuid();
     }
 
     if (found) {
@@ -1384,14 +1135,7 @@ void CollectionCatalog::registerCollection(OperationContext* opCtx,
     auto nss = coll->ns();
     // TODO SERVER-64608 Use tenantId from nss
     auto tenantDbName = TenantDatabaseName(boost::none, nss.db());
-    if (NonExistenceType::kDropPending ==
-        _ensureNamespaceDoesNotExist(opCtx, nss, NamespaceType::kAll)) {
-        // If we have an uncommitted drop of this collection we can defer the creation, the register
-        // will happen in the same catalog write as the drop.
-        auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
-        uncommittedCatalogUpdates.createCollectionAfterDrop(uuid, std::move(coll));
-        return;
-    }
+    _ensureNamespaceDoesNotExist(opCtx, nss, NamespaceType::kAll);
 
     LOGV2_DEBUG(20280,
                 1,
@@ -1481,10 +1225,7 @@ void CollectionCatalog::registerUncommittedView(OperationContext* opCtx,
 
     // Since writing to system.views requires an X lock, we only need to cross-check collection
     // namespaces here.
-    if (NonExistenceType::kDropPending ==
-        _ensureNamespaceDoesNotExist(opCtx, nss, NamespaceType::kCollection)) {
-        throw WriteConflictException();
-    }
+    _ensureNamespaceDoesNotExist(opCtx, nss, NamespaceType::kCollection);
 
     _uncommittedViews.emplace(nss);
 }
@@ -1493,15 +1234,11 @@ void CollectionCatalog::deregisterUncommittedView(const NamespaceString& nss) {
     _uncommittedViews.erase(nss);
 }
 
-CollectionCatalog::NonExistenceType CollectionCatalog::_ensureNamespaceDoesNotExist(
-    OperationContext* opCtx, const NamespaceString& nss, NamespaceType type) const {
-    if (_collections.find(nss) != _collections.end()) {
-        auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
-        auto [found, uncommittedPtr] = uncommittedCatalogUpdates.lookupCollection(nss);
-        if (found && !uncommittedPtr) {
-            return NonExistenceType::kDropPending;
-        }
-
+void CollectionCatalog::_ensureNamespaceDoesNotExist(OperationContext* opCtx,
+                                                     const NamespaceString& nss,
+                                                     NamespaceType type) const {
+    auto existingCollection = _collections.find(nss);
+    if (existingCollection != _collections.end()) {
         LOGV2(5725001,
               "Conflicted registering namespace, already have a collection with the same namespace",
               "nss"_attr = nss);
@@ -1526,8 +1263,6 @@ CollectionCatalog::NonExistenceType CollectionCatalog::_ensureNamespaceDoesNotEx
             }
         }
     }
-
-    return NonExistenceType::kNormal;
 }
 
 void CollectionCatalog::deregisterAllCollectionsAndViews() {
@@ -1629,6 +1364,15 @@ void CollectionCatalog::addResource(const ResourceId& rid, const std::string& en
     }
 
     namespaces.insert(entry);
+}
+
+void CollectionCatalog::invariantHasExclusiveAccessToCollection(OperationContext* opCtx,
+                                                                const NamespaceString& nss) {
+    auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
+    invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X) ||
+                  (uncommittedCatalogUpdates.isCreatedCollection(opCtx, nss) &&
+                   opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX)),
+              nss.toString());
 }
 
 boost::optional<const ViewsForDatabase&> CollectionCatalog::_getViewsForDatabase(

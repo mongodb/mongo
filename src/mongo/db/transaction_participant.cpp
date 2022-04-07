@@ -41,6 +41,7 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/local_oplog_info.h"
+#include "mongo/db/catalog/uncommitted_catalog_updates.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -2180,7 +2181,7 @@ void TransactionParticipant::Participant::_cleanUpTxnResourceOnOpCtx(
                            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
 
     opCtx->lockState()->unsetMaxLockTimeout();
-    invariant(UncommittedCollections::get(opCtx).isEmpty());
+    invariant(UncommittedCatalogUpdates::get(opCtx).isEmpty());
 }
 
 void TransactionParticipant::Participant::_checkIsCommandValidWithTxnState(

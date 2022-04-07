@@ -34,7 +34,6 @@
 #include <map>
 
 #include "mongo/db/api_parameters.h"
-#include "mongo/db/catalog/uncommitted_collections.h"
 #include "mongo/db/catalog/uncommitted_multikey.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/concurrency/d_concurrency.h"
