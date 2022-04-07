@@ -814,6 +814,34 @@ TEST_F(TxnParticipantTest, KillOpBeforeAbortingPreparedTransaction) {
     runFunctionFromDifferentOpCtx(commitPreparedFunc);
     ASSERT_TRUE(txnParticipant.transactionIsCommitted());
 }
+TEST_F(TxnParticipantTest, StashedRollbackDoesntHoldClientLock) {
+    auto sessionCheckout = checkOutSession();
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    txnParticipant.unstashTransactionResources(opCtx(), "prepareTransaction");
+
+    txnParticipant.prepareTransaction(opCtx(), {});
+
+    unittest::Barrier startedRollback(2);
+    unittest::Barrier finishRollback(2);
+
+    // Rollback changes are executed in reverse order.
+    opCtx()->recoveryUnit()->onRollback([&] { finishRollback.countDownAndWait(); });
+    opCtx()->recoveryUnit()->onRollback([&] { startedRollback.countDownAndWait(); });
+
+    auto future = stdx::async(stdx::launch::async, [&] {
+        startedRollback.countDownAndWait();
+
+        // Verify we can take the Client lock during the rollback of the stashed transaction.
+        stdx::lock_guard<Client> lk(*opCtx()->getClient());
+
+        finishRollback.countDownAndWait();
+    });
+
+    txnParticipant.stashTransactionResources(opCtx());
+    txnParticipant.abortTransaction(opCtx());
+
+    future.get();
+}
 
 TEST_F(TxnParticipantTest, ThrowDuringOnTransactionPrepareAbortsTransaction) {
     auto sessionCheckout = checkOutSession();

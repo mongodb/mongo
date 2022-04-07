@@ -1661,11 +1661,11 @@ void TransactionParticipant::Participant::_abortTransactionOnSession(OperationCo
     const auto nextState = o().txnState.isPrepared() ? TransactionState::kAbortedWithPrepare
                                                      : TransactionState::kAbortedWithoutPrepare;
 
-    stdx::lock_guard<Client> lk(*opCtx->getClient());
+    stdx::unique_lock<Client> lk(*opCtx->getClient());
     if (o().txnResourceStash && opCtx->recoveryUnit()->getNoEvictionAfterRollback()) {
         o(lk).txnResourceStash->setNoEvictionAfterRollback();
     }
-    _resetTransactionState(lk, nextState);
+    _resetTransactionStateAndUnlock(&lk, nextState);
 }
 
 void TransactionParticipant::Participant::_cleanUpTxnResourceOnOpCtx(
@@ -1990,18 +1990,18 @@ void TransactionParticipant::Participant::_setNewTxnNumber(OperationContext* opC
         _abortTransactionOnSession(opCtx);
     }
 
-    stdx::lock_guard<Client> lk(*opCtx->getClient());
+    stdx::unique_lock<Client> lk(*opCtx->getClient());
     o(lk).activeTxnNumber = txnNumber;
     o(lk).lastWriteOpTime = repl::OpTime();
 
     // Reset the retryable writes state
     _resetRetryableWriteState();
 
-    // Reset the transactional state
-    _resetTransactionState(lk, TransactionState::kNone);
-
     // Reset the transactions metrics
     o(lk).transactionMetricsObserver.resetSingleTransactionStats(txnNumber);
+
+    // Reset the transactional state
+    _resetTransactionStateAndUnlock(&lk, TransactionState::kNone);
 }
 
 void TransactionParticipant::Participant::refreshFromStorageIfNeeded(OperationContext* opCtx) {
@@ -2108,32 +2108,42 @@ void TransactionParticipant::Participant::_resetRetryableWriteState() {
     p().hasIncompleteHistory = false;
 }
 
-void TransactionParticipant::Participant::_resetTransactionState(
-    WithLock wl, TransactionState::StateFlag state) {
+void TransactionParticipant::Participant::_resetTransactionStateAndUnlock(
+    stdx::unique_lock<Client>* lk, TransactionState::StateFlag state) {
+    invariant(lk && lk->owns_lock());
+
     // If we are transitioning to kNone, we are either starting a new transaction or aborting a
     // prepared transaction for rollback. In the latter case, we will need to relax the invariant
     // that prevents transitioning from kPrepared to kNone.
     if (o().txnState.isPrepared() && state == TransactionState::kNone) {
-        o(wl).txnState.transitionTo(
+        o(*lk).txnState.transitionTo(
             state, TransactionState::TransitionValidation::kRelaxTransitionValidation);
     } else {
-        o(wl).txnState.transitionTo(state);
+        o(*lk).txnState.transitionTo(state);
     }
 
     p().transactionOperationBytes = 0;
     p().transactionOperations.clear();
-    o(wl).prepareOpTime = repl::OpTime();
-    o(wl).recoveryPrepareOpTime = repl::OpTime();
+    o(*lk).prepareOpTime = repl::OpTime();
+    o(*lk).recoveryPrepareOpTime = repl::OpTime();
     p().multikeyPathInfo.clear();
     p().autoCommit = boost::none;
     p().needToWriteAbortEntry = false;
 
-    // Release any locks held by this participant and abort the storage transaction.
-    o(wl).txnResourceStash = boost::none;
+    // Swap out txnResourceStash while holding the Client lock, then release any locks held by this
+    // participant and abort the storage transaction after releasing the lock. The transaction
+    // rollback can block indefinitely if the storage engine recruits it for eviction. In that case
+    // we should not be holding the Client lock, as that would block tasks like the periodic
+    // transaction killer from making progress.
+    using std::swap;
+    boost::optional<TxnResources> temporary;
+    swap(o(*lk).txnResourceStash, temporary);
+    lk->unlock();
+    temporary = boost::none;
 }
 
 void TransactionParticipant::Participant::invalidate(OperationContext* opCtx) {
-    stdx::lock_guard<Client> lg(*opCtx->getClient());
+    stdx::unique_lock<Client> lk(*opCtx->getClient());
 
     uassert(ErrorCodes::PreparedTransactionInProgress,
             "Cannot invalidate prepared transaction",
@@ -2141,9 +2151,9 @@ void TransactionParticipant::Participant::invalidate(OperationContext* opCtx) {
 
     // Invalidate the session and clear both the retryable writes and transactional states on
     // this participant.
-    _invalidate(lg);
+    _invalidate(lk);
     _resetRetryableWriteState();
-    _resetTransactionState(lg, TransactionState::kNone);
+    _resetTransactionStateAndUnlock(&lk, TransactionState::kNone);
 }
 
 boost::optional<repl::OplogEntry> TransactionParticipant::Participant::checkStatementExecuted(

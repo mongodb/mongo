@@ -735,8 +735,10 @@ public:
         void _resetRetryableWriteState();
 
         // Helper that resets the transactional state. This is used when aborting a transaction,
-        // invalidating a transaction, or starting a new transaction.
-        void _resetTransactionState(WithLock wl, TransactionState::StateFlag state);
+        // invalidating a transaction, or starting a new transaction. It releases the Client lock
+        // before releasing this participant's locks and aborting its storage transaction.
+        void _resetTransactionStateAndUnlock(stdx::unique_lock<Client>* lk,
+                                             TransactionState::StateFlag state);
 
         /* Releases the resources held in *o().txnResources to the operation context.
          * o().txnResources must be engaged prior to calling this.
