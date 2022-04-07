@@ -23,16 +23,6 @@ const shard0 = st.rs0;
 const freshMongos = st.s0.getDB(jsTestName());
 const staleMongos = st.s1.getDB(jsTestName());
 
-// TODO SERVER-64714 Reenable this test after SERVER-64714 is fixed.
-const res = shard0.getPrimary().getDB("admin").adminCommand(
-    {getParameter: 1, featureFlagSBELookupPushdown: 1});
-if (!res.ok ||
-    res.hasOwnProperty("featureFlagSBELookupPushdown") && res.featureFlagSBELookupPushdown.value) {
-    jsTestLog("Skipping test because SBE and SBE $lookup features are both enabled.");
-    st.stop();
-    return;
-}
-
 const sourceCollection = freshMongos.source;
 const foreignCollection = freshMongos.foreign;
 
@@ -124,12 +114,36 @@ const getShardedLookupParam = st.s.adminCommand({getParameter: 1, featureFlagSha
 const isShardedLookupEnabled = getShardedLookupParam.hasOwnProperty("featureFlagShardedLookup") &&
     getShardedLookupParam.featureFlagShardedLookup.value;
 
+let res = shard0.getPrimary().getDB("admin").adminCommand(
+    {getParameter: 1, featureFlagSBELookupPushdown: 1});
+let isSBELookupEnabled = res.ok && res.hasOwnProperty("featureFlagSBELookupPushdown") &&
+    res.featureFlagSBELookupPushdown.value;
+
 // Now run a getMore for each of the test cases. The collection has become sharded mid-iteration, so
 // we should observe the error code associated with the test case.
 // TODO SERVER-60018: When the feature flag is removed, assert that the command works and has
 // expected results.
 if (!isShardedLookupEnabled) {
     for (let testCase of testCases) {
+        // In the classic lookup, when we compile an internal $match stage for $lookup local
+        // document match against the foreign collection, we try to get a lock on the foreign
+        // collection as the MAIN collection and in the SBE lookup, we try to get a lock on both the
+        // local (MAIN) and foreign (secondary) collection. The thing is we go through different
+        // checks for the main collection and secondary namespaces. For the main collection, we
+        // check the shard version explicitly. For the secondary namespaces, we check sharding
+        // changes based on the snapshot. So, we don't get the error and the SBE lookup succeeds at
+        // getMore request. This is a similar situation as SERVER-64128 though it's not exactly
+        // same. Until SERVER-64128 is resolved, the expected behavior is not exactly clear and we
+        // need to revisit this scenario after SERVER-64128 is resolved. Until then, just checks
+        // whether this scenario succeeds when the SBE lookup feature is enabled.
+        if (isSBELookupEnabled && testCase.aggCmd.pipeline[0].hasOwnProperty("$lookup")) {
+            assert.commandWorked(
+                freshMongos.runCommand(
+                    {getMore: testCase.aggCmdRes.cursor.id, collection: testCase.aggCmd.aggregate}),
+                `Expected getMore to succeed. Original command: ${tojson(testCase.aggCmd)}`);
+            continue;
+        }
+
         assert.commandFailedWithCode(
             freshMongos.runCommand(
                 {getMore: testCase.aggCmdRes.cursor.id, collection: testCase.aggCmd.aggregate}),
@@ -180,12 +194,22 @@ assert.commandWorked(shard0.getPrimary().adminCommand({fsync: 1}));
 // both the source and foreign collections.
 shard0.restart(shard0.getPrimary());
 
+// Refreshes the SBE lookup feature availability just in case that a different version of mongod
+// is running after restart.
+res = shard0.getPrimary().getDB("admin").adminCommand(
+    {getParameter: 1, featureFlagSBELookupPushdown: 1});
+isSBELookupEnabled = res.ok && res.hasOwnProperty("featureFlagSBELookupPushdown") &&
+    res.featureFlagSBELookupPushdown.value;
+
 // Enable profiling on shard0 to capture stale shard version exceptions.
 const primaryDB = shard0.getPrimary().getDB(jsTestName());
 assert.commandWorked(primaryDB.setProfilingLevel(2));
 
 // Wait until both mongos have refreshed their view of the new Primary.
 st.waitUntilStable();
+
+const prevStaleConfigErrorCount = assert.commandWorked(primaryDB.runCommand({serverStatus: 1}))
+                                      .shardingStatistics.countStaleConfigErrors;
 
 // Verify that the 'aggregate' command works and produces (batchSize) results, indicating that the
 // $lookup or $graphLookup succeeded on the unsharded foreign collection.
@@ -194,20 +218,34 @@ for (let testCase of testCases) {
     assert.eq(aggCmdRes.cursor.firstBatch.length, batchSize);
 }
 
+const newStaleConfigErrorCount = assert.commandWorked(primaryDB.runCommand({serverStatus: 1}))
+                                     .shardingStatistics.countStaleConfigErrors;
+
 // ... and a single StaleConfig exception for the foreign namespace. Note that the 'ns' field of the
 // profiler entry is the source collection in both cases, because the $lookup's parent aggregation
 // produces the profiler entry, and it is always running on the source collection.
 // TODO SERVER-60018: When the feature flag is removed, remove the check and ensure the results are
 // expected.
 if (!isShardedLookupEnabled) {
-    profilerHasSingleMatchingEntryOrThrow({
-        profileDB: primaryDB,
-        filter: {
-            ns: sourceCollection.getFullName(),
-            errCode: ErrorCodes.StaleConfig,
-            errMsg: {$regex: `${foreignCollection.getFullName()} is not currently available`}
-        }
-    });
+    // Both in the classic lookup and the SBE lookup, 'StaleConfig' error happens. In the classic
+    // lookup, profiling can properly report the 'StaleConfig' of the foreign collection.
+    //
+    // On the other hand, in the SBE lookup, profiling fails to report the error because the
+    // profiling level is not set up properly according to the configured profiling level in case of
+    // lock acquisition exception. So, we check statusStatus' StaleConfig error count instead.
+    assert.gt(newStaleConfigErrorCount,
+              prevStaleConfigErrorCount,
+              "StaleConfig errors must have happened");
+    if (!isSBELookupEnabled) {
+        profilerHasSingleMatchingEntryOrThrow({
+            profileDB: primaryDB,
+            filter: {
+                ns: sourceCollection.getFullName(),
+                errCode: ErrorCodes.StaleConfig,
+                errMsg: {$regex: `${foreignCollection.getFullName()} is not currently available`}
+            }
+        });
+    }
 }
 
 st.stop();
