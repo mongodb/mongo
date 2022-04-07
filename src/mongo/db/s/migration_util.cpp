@@ -151,9 +151,11 @@ void retryIdempotentWorkAsPrimaryUntilSuccessOrStepdown(
     const auto initialTerm = repl::ReplicationCoordinator::get(opCtx)->getTerm();
 
     for (int attempt = 1;; attempt++) {
-        // If the server is already doing a clean shutdown, join the shutdown.
+        // Since we can't differenciate if a shutdown exception is coming from a remote node or
+        // locally we need to directly inspect the the global shutdown state to correctly interrupt
+        // this task in case this node is shutting down.
         if (globalInShutdownDeprecated()) {
-            shutdown(waitForShutdown());
+            uasserted(ErrorCodes::ShutdownInProgress, "Shutdown in progress");
         }
 
         // If the node is no longer primary, stop retrying.
