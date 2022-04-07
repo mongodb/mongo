@@ -33,6 +33,7 @@
 
 #include <fmt/format.h>
 
+#include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
@@ -511,6 +512,11 @@ void Transaction::prepareRequest(BSONObjBuilder* cmdBuilder) {
         cmdBuilder->append(repl::ReadConcernArgs::kReadConcernFieldName, _readConcern);
     }
 
+    // If the transaction API caller had API parameters, we should forward them in all requests.
+    if (_apiParameters.getParamsPassed()) {
+        _apiParameters.appendInfo(cmdBuilder);
+    }
+
     _latestResponseHasTransientTransactionErrorLabel = false;
 }
 
@@ -636,6 +642,7 @@ void Transaction::_primeTransaction(OperationContext* opCtx) {
         ReadWriteConcernProvenanceBase::kSourceFieldName);
     _writeConcern = opCtx->getWriteConcern().toBSON().removeField(
         ReadWriteConcernProvenanceBase::kSourceFieldName);
+    _apiParameters = APIParameters::get(opCtx);
 
     LOGV2_DEBUG(5875901,
                 3,
@@ -643,6 +650,7 @@ void Transaction::_primeTransaction(OperationContext* opCtx) {
                 "sessionInfo"_attr = _sessionInfo,
                 "readConcern"_attr = _readConcern,
                 "writeConcern"_attr = _writeConcern,
+                "APIParameters"_attr = _apiParameters,
                 "execContext"_attr = execContextToString(_execContext));
 }
 

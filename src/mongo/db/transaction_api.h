@@ -426,6 +426,7 @@ private:
 
     BSONObj _writeConcern;
     BSONObj _readConcern;
+    APIParameters _apiParameters;
     ExecutionContext _execContext;
 
     // Protects the members below that are accessed by the TxnMetadataHooks, which are called by the
