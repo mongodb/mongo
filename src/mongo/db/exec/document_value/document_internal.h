@@ -330,7 +330,6 @@ struct FieldNameHasher {
 
     std::size_t operator()(StringData sd) const {
         // TODO consider FNV-1a once we have a better benchmark corpus
-        // Keep in sync with 'hashName' in BSONColumn implementation.
         unsigned out;
         MurmurHash3_x86_32(sd.rawData(), sd.size(), 0, &out);
         return out;

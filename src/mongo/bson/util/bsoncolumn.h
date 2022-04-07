@@ -263,15 +263,6 @@ public:
         return _name;
     }
 
-    /**
-     * Field name that this BSONColumn represents.
-     *
-     * O(1) time complexity
-     */
-    std::pair<StringData, std::size_t> nameHashed() const {
-        return {_name, _nameHash};
-    }
-
 private:
     /**
      * BSONElement storage, owns materialised BSONElement returned by BSONColumn.
@@ -414,6 +405,5 @@ private:
     bool _fullyDecompressed = false;
 
     std::string _name;
-    std::size_t _nameHash;
 };
 }  // namespace mongo

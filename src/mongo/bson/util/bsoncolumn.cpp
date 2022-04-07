@@ -30,7 +30,6 @@
 #include "mongo/bson/util/bsoncolumn.h"
 
 #include <algorithm>
-#include <third_party/murmurhash3/MurmurHash3.h>
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/util/bsoncolumn_util.h"
@@ -128,13 +127,6 @@ private:
     bool _recurseIntoArrays;
     BSONType _rootType;
 };
-
-std::size_t hashName(StringData sd) {
-    // Keep in sync with DocumentStorageHasher
-    unsigned out;
-    MurmurHash3_x86_32(sd.rawData(), sd.size(), 0, &out);
-    return out;
-}
 
 }  // namespace
 
@@ -820,7 +812,6 @@ BSONColumn::BSONColumn(BSONElement bin) {
 
     _binary = bin.binData(_size);
     _name = bin.fieldNameStringData().toString();
-    _nameHash = hashName(_name);
     _init();
 }
 
@@ -829,7 +820,6 @@ BSONColumn::BSONColumn(BSONBinData bin, StringData name) {
     _binary = static_cast<const char*>(bin.data);
     _size = bin.length;
     _name = name.toString();
-    _nameHash = hashName(_name);
     _init();
 }
 
