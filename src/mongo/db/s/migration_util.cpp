@@ -496,10 +496,32 @@ void submitPendingDeletions(OperationContext* opCtx) {
     });
 }
 
-void resubmitRangeDeletionsOnStepUp(ServiceContext* serviceContext) {
+SemiFuture<void> resubmitRangeDeletionsOnStepUp(ServiceContext* serviceContext) {
     LOGV2(22028, "Starting pending deletion submission thread.");
 
-    ExecutorFuture<void>(getMigrationUtilExecutor(serviceContext))
+    return ExecutorFuture<void>(getMigrationUtilExecutor(serviceContext))
+        .then([serviceContext] {
+            ThreadClient tc("ResubmitRangeDeletions", serviceContext);
+            {
+                stdx::lock_guard<Client> lk(*tc.get());
+                tc->setSystemOperationKillableByStepdown(lk);
+            }
+
+            auto opCtx = tc->makeOperationContext();
+
+            DBDirectClient client(opCtx.get());
+            FindCommandRequest findCommand(NamespaceString::kRangeDeletionNamespace);
+            findCommand.setFilter(BSON(RangeDeletionTask::kProcessingFieldName << true));
+            auto cursor = client.find(std::move(findCommand));
+            if (cursor->more()) {
+                return migrationutil::submitRangeDeletionTask(
+                    opCtx.get(),
+                    RangeDeletionTask::parse(IDLParserErrorContext("rangeDeletionRecovery"),
+                                             cursor->next()));
+            } else {
+                return ExecutorFuture<void>(getMigrationUtilExecutor(serviceContext));
+            }
+        })
         .then([serviceContext] {
             ThreadClient tc("ResubmitRangeDeletions", serviceContext);
             {
@@ -511,13 +533,7 @@ void resubmitRangeDeletionsOnStepUp(ServiceContext* serviceContext) {
 
             submitPendingDeletions(opCtx.get());
         })
-        .getAsync([](const Status& status) {
-            if (!status.isOK()) {
-                LOGV2(45739,
-                      "Error while submitting pending range deletions",
-                      "error"_attr = redact(status));
-            }
-        });
+        .semi();
 }
 
 void dropRangeDeletionsCollection(OperationContext* opCtx) {
@@ -1009,42 +1025,57 @@ void ensureChunkVersionIsGreaterThan(OperationContext* opCtx,
     }
 }
 
-void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx) {
+void resumeMigrationCoordinationsOnStepUp(ServiceContext* serviceContext,
+                                          SemiFuture<void> rangeDeletionRecovery) {
     LOGV2_DEBUG(4798510, 2, "Starting migration coordinator step-up recovery");
 
-    unsigned long long unfinishedMigrationsCount = 0;
+    return std::move(rangeDeletionRecovery)
+        .thenRunOn(getMigrationUtilExecutor(serviceContext))
+        .then([serviceContext] {
+            ThreadClient tc("MigrationCoordinatorRecovery", serviceContext);
+            {
+                stdx::lock_guard<Client> lk(*tc.get());
+                tc->setSystemOperationKillableByStepdown(lk);
+            }
+            auto uniqueOpCtx = tc->makeOperationContext();
+            auto opCtx = uniqueOpCtx.get();
 
-    PersistentTaskStore<MigrationCoordinatorDocument> store(
-        NamespaceString::kMigrationCoordinatorsNamespace);
-    store.forEach(opCtx,
-                  BSONObj{},
-                  [&opCtx, &unfinishedMigrationsCount](const MigrationCoordinatorDocument& doc) {
-                      unfinishedMigrationsCount++;
-                      LOGV2_DEBUG(4798511,
-                                  3,
-                                  "Found unfinished migration on step-up",
-                                  "migrationCoordinatorDoc"_attr = redact(doc.toBSON()),
-                                  "unfinishedMigrationsCount"_attr = unfinishedMigrationsCount);
+            unsigned long long unfinishedMigrationsCount = 0;
 
-                      const auto& nss = doc.getNss();
+            PersistentTaskStore<MigrationCoordinatorDocument> store(
+                NamespaceString::kMigrationCoordinatorsNamespace);
+            store.forEach(
+                opCtx,
+                BSONObj{},
+                [&opCtx, &unfinishedMigrationsCount](const MigrationCoordinatorDocument& doc) {
+                    unfinishedMigrationsCount++;
+                    LOGV2_DEBUG(4798511,
+                                3,
+                                "Found unfinished migration on step-up",
+                                "migrationCoordinatorDoc"_attr = redact(doc.toBSON()),
+                                "unfinishedMigrationsCount"_attr = unfinishedMigrationsCount);
 
-                      {
-                          AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-                          CollectionShardingRuntime::get(opCtx, nss)->clearFilteringMetadata(opCtx);
-                      }
+                    const auto& nss = doc.getNss();
 
-                      asyncRecoverMigrationUntilSuccessOrStepDown(opCtx, nss);
+                    {
+                        AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+                        CollectionShardingRuntime::get(opCtx, nss)->clearFilteringMetadata(opCtx);
+                    }
 
-                      return true;
-                  });
+                    asyncRecoverMigrationUntilSuccessOrStepDown(opCtx, nss);
 
-    ShardingStatistics::get(opCtx).unfinishedMigrationFromPreviousPrimary.store(
-        unfinishedMigrationsCount);
+                    return true;
+                });
 
-    LOGV2_DEBUG(4798513,
-                2,
-                "Finished migration coordinator step-up recovery",
-                "unfinishedMigrationsCount"_attr = unfinishedMigrationsCount);
+            ShardingStatistics::get(opCtx).unfinishedMigrationFromPreviousPrimary.store(
+                unfinishedMigrationsCount);
+
+            LOGV2_DEBUG(4798513,
+                        2,
+                        "Finished migration coordinator step-up recovery",
+                        "unfinishedMigrationsCount"_attr = unfinishedMigrationsCount);
+        })
+        .getAsync([](auto) {});
 }
 
 void recoverMigrationCoordinations(OperationContext* opCtx,

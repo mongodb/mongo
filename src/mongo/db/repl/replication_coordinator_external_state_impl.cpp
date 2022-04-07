@@ -944,8 +944,9 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
         // Note, these must be done after the configOpTime is recovered via
         // ShardingStateRecovery::recover above, because they may trigger filtering metadata
         // refreshes which should use the recovered configOpTime.
-        migrationutil::resubmitRangeDeletionsOnStepUp(_service);
-        migrationutil::resumeMigrationCoordinationsOnStepUp(opCtx);
+        auto rangeDeletionRecoveries = migrationutil::resubmitRangeDeletionsOnStepUp(_service);
+        migrationutil::resumeMigrationCoordinationsOnStepUp(_service,
+                                                            std::move(rangeDeletionRecoveries));
         migrationutil::resumeMigrationRecipientsOnStepUp(opCtx);
 
         const bool scheduleAsyncRefresh = true;

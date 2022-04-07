@@ -118,9 +118,11 @@ ExecutorFuture<void> submitRangeDeletionTask(OperationContext* oppCtx,
 void submitPendingDeletions(OperationContext* opCtx);
 
 /**
- * Asynchronously calls submitPendingDeletions using the fixed executor pool.
+ * Asynchronously calls submitPendingDeletions using the fixed executor pool. The returned future
+ * is set when any range deletion with the processing flag set to true has been submitted and
+ * executed and when all other range deletions have been submitted.
  */
-void resubmitRangeDeletionsOnStepUp(ServiceContext* serviceContext);
+SemiFuture<void> resubmitRangeDeletionsOnStepUp(ServiceContext* serviceContext);
 
 void dropRangeDeletionsCollection(OperationContext* opCtx);
 
@@ -232,9 +234,10 @@ void ensureChunkVersionIsGreaterThan(OperationContext* opCtx,
 
 /**
  * Submits an asynchronous task to scan config.migrationCoordinators and drive each unfinished
- * migration coordination to completion.
+ * migration coordination to completion after waiting for the passed in SemiFuture to become ready.
  */
-void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx);
+void resumeMigrationCoordinationsOnStepUp(ServiceContext* serviceContext,
+                                          SemiFuture<void> rangeDeletionRecovery);
 
 /**
  * Drive each unfished migration coordination in the given namespace to completion.
