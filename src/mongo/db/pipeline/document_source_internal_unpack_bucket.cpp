@@ -49,10 +49,8 @@
 #include "mongo/db/pipeline/document_source_add_fields.h"
 #include "mongo/db/pipeline/document_source_geo_near.h"
 #include "mongo/db/pipeline/document_source_group.h"
-#include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_project.h"
-#include "mongo/db/pipeline/document_source_replace_root.h"
 #include "mongo/db/pipeline/document_source_sample.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/document_source_sort.h"
@@ -109,16 +107,6 @@ auto getIncludeExcludeProjectAndType(DocumentSource* src) {
                              TransformerInterface::TransformerType::kInclusionProjection};
     }
     return std::pair{BSONObj{}, false};
-}
-
-auto isLastpointSortTimeAscending(const SortPattern& sortPattern, const std::string& timeField) {
-    for (auto entry : sortPattern) {
-        if (entry.fieldPath->fullPath() == timeField) {
-            return entry.isAscending;
-        }
-    }
-    // A lastpoint query will always have the time field as part of the sort pattern.
-    MONGO_UNREACHABLE;
 }
 
 /**
@@ -217,14 +205,24 @@ boost::intrusive_ptr<DocumentSourceSort> createMetadataSortForReorder(
         sort.getContext(), SortPattern{updatedPattern}, 0, maxMemoryUsageBytes);
 }
 
-boost::intrusive_ptr<DocumentSourceGroup> createGroupForReorder(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx, FieldPath& fieldPath) {
-    auto bucket = BSON("bucket" << BSON(AccumulatorFirst::kName << "$_id"));
-    auto newAccum = AccumulationStatement::parseAccumulationStatement(
-        expCtx.get(), bucket.firstElement(), expCtx->variablesParseState);
+/**
+ * Returns a new DocumentSourceGroup to add before current unpack bucket document.
+ */
+boost::intrusive_ptr<DocumentSourceGroup> createBucketGroupForReorder(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const std::vector<std::string>& fieldsToInclude,
+    const std::string& fieldPath) {
     auto groupByExpr = ExpressionFieldPath::createPathFromString(
-        expCtx.get(), fieldPath.fullPath(), expCtx->variablesParseState);
-    return DocumentSourceGroup::create(expCtx, groupByExpr, {newAccum});
+        expCtx.get(), fieldPath, expCtx->variablesParseState);
+
+    std::vector<AccumulationStatement> accumulators;
+    for (const auto& fieldName : fieldsToInclude) {
+        auto field = BSON(fieldName << BSON(AccumulatorFirst::kName << "$" + fieldName));
+        accumulators.emplace_back(AccumulationStatement::parseAccumulationStatement(
+            expCtx.get(), field.firstElement(), expCtx->variablesParseState));
+    };
+
+    return DocumentSourceGroup::create(expCtx, groupByExpr, accumulators);
 }
 
 // Optimize the section of the pipeline before the $_internalUnpackBucket stage.
@@ -739,58 +737,6 @@ bool DocumentSourceInternalUnpackBucket::haveComputedMetaField() const {
             _bucketUnpacker.bucketSpec().metaField().get());
 }
 
-void addStagesToRetrieveEventLevelFields(Pipeline::SourceContainer& sources,
-                                         const Pipeline::SourceContainer::const_iterator unpackIt,
-                                         boost::intrusive_ptr<ExpressionContext> expCtx,
-                                         boost::intrusive_ptr<DocumentSourceGroup> group,
-                                         const boost::optional<std::string&> lastpointTimeField,
-                                         bool timeAscending) {
-    mongo::stdx::unordered_set<mongo::NamespaceString> nss;
-    auto&& ns = expCtx->ns;
-    nss.emplace(ns);
-    expCtx->addResolvedNamespaces(nss);
-
-    FieldPath metrics("metrics");
-    auto lookup = DocumentSourceLookUp::createFromBson(
-        BSON(DocumentSourceLookUp::kStageName << BSON(
-                 DocumentSourceLookUp::kFromField
-                 << ns.coll() << DocumentSourceLookUp::kLocalField << "bucket"
-                 << DocumentSourceLookUp::kForeignField << "_id" << DocumentSourceLookUp::kAsField
-                 << metrics.fullPath() << DocumentSourceLookUp::kPipelineField
-                 << BSON_ARRAY(unpackIt->get()->serializeToBSONForDebug()
-                               << BSON(DocumentSourceSort::kStageName << BSON(
-                                           lastpointTimeField.get() << (timeAscending ? 1 : -1)))
-                               << BSON(DocumentSourceLimit::kStageName << 1))))
-            .firstElement(),
-        expCtx);
-    sources.insert(unpackIt, lookup);
-
-    auto unwind = DocumentSourceUnwind::createFromBson(
-        BSON(DocumentSourceUnwind::kStageName << metrics.fullPathWithPrefix()).firstElement(),
-        expCtx);
-    sources.insert(unpackIt, unwind);
-
-    BSONObjBuilder fields;
-    fields << "_id"
-           << "$_id";
-    for (auto&& accumulator : group->getAccumulatedFields()) {
-        auto&& v = accumulator.expr.argument;
-        if (auto expr = dynamic_cast<ExpressionFieldPath*>(v.get())) {
-            auto&& newPath = metrics.concat(expr->getFieldPath().tail());
-            // This is necessary to preserve $first, $last null-check semantics for handling
-            // nullish fields, e.g. returning missing field paths as null.
-            auto ifNullCheck = BSON(
-                "$ifNull" << BSONArray(BSON("0" << ("$" + newPath.fullPath()) << "1" << BSONNULL)));
-            fields << StringData{accumulator.fieldName} << ifNullCheck;
-        }
-    }
-
-    auto replaceWithBson = BSON(DocumentSourceReplaceRoot::kAliasNameReplaceWith << fields.obj());
-    auto replaceWith =
-        DocumentSourceReplaceRoot::createFromBson(replaceWithBson.firstElement(), expCtx);
-    sources.insert(unpackIt, replaceWith);
-}
-
 bool DocumentSourceInternalUnpackBucket::optimizeLastpoint(Pipeline::SourceContainer::iterator itr,
                                                            Pipeline::SourceContainer* container) {
     // A lastpoint-type aggregation must contain both a $sort and a $group stage, in that order.
@@ -837,24 +783,13 @@ bool DocumentSourceInternalUnpackBucket::optimizeLastpoint(Pipeline::SourceConta
         return false;
     }
 
-    auto newFieldPath = FieldPath(timeseries::kBucketMetaFieldName);
+    auto rewrittenFieldPath = FieldPath(timeseries::kBucketMetaFieldName);
     if (fieldPath.tail().getPathLength() > 1) {
-        newFieldPath = newFieldPath.concat(fieldPath.tail().tail());
+        rewrittenFieldPath = rewrittenFieldPath.concat(fieldPath.tail().tail());
     }
+    auto newFieldPath = rewrittenFieldPath.fullPath();
 
-    auto groupByExpr = ExpressionFieldPath::createPathFromString(
-        pExpCtx.get(), newFieldPath.fullPath(), pExpCtx->variablesParseState);
-
-    // Insert bucket-level $sort and $group stages before we unpack any buckets.
-    boost::intrusive_ptr<DocumentSourceSort> newSort;
-    auto insertBucketLevelSortAndGroup = [&](bool flipSort) {
-        newSort =
-            createMetadataSortForReorder(*sortStage, timeField, newFieldPath.fullPath(), flipSort);
-        auto newGroup = createGroupForReorder(pExpCtx, newFieldPath);
-        container->insert(itr, newSort);
-        container->insert(itr, newGroup);
-    };
-
+    // Check to see if $group uses only the specified accumulator.
     auto accumulators = groupStage->getAccumulatedFields();
     auto groupOnlyUsesTargetAccum = [&](AccumulatorDocumentsNeeded targetAccum) {
         return std::all_of(accumulators.begin(), accumulators.end(), [&](auto&& accum) {
@@ -862,43 +797,47 @@ bool DocumentSourceInternalUnpackBucket::optimizeLastpoint(Pipeline::SourceConta
         });
     };
 
-    std::string newTimeField;
-    if (groupOnlyUsesTargetAccum(AccumulatorDocumentsNeeded::kFirstDocument)) {
-        insertBucketLevelSortAndGroup(false);
-        newTimeField = timeseries::kControlMinFieldNamePrefix + timeField;
-    } else if (groupOnlyUsesTargetAccum(AccumulatorDocumentsNeeded::kLastDocument)) {
-        insertBucketLevelSortAndGroup(true);
-        newTimeField = timeseries::kControlMaxFieldNamePrefix + timeField;
-    } else {
-        return false;
-    }
+    // We disallow firstpoint queries from participating in this rewrite due to the fact that we
+    // round down control.min.time for buckets, which means that if we are given two buckets with
+    // the same min time, we won't know which bucket contains the earliest time until we unpack
+    // them and sort their measurements. Hence, this rewrite could give us an incorrect firstpoint.
+    auto isFirstPointQuery = [&](AccumulatorDocumentsNeeded targetAccum) {
+        bool firstpointTimeIsAscending =
+            (targetAccum == AccumulatorDocumentsNeeded::kFirstDocument);
+        for (auto entry : sortStage->getSortKeyPattern()) {
+            if (entry.fieldPath->fullPath() == timeField) {
+                return entry.isAscending == firstpointTimeIsAscending;
+            }
+        }
+        // We can never reach this because we checked 'checkMetadataSortReorder()' earlier.
+        MONGO_UNREACHABLE_TASSERT(6500500);
+    };
 
-    // Add $lookup, $unwind and $replaceWith stages.
-    addStagesToRetrieveEventLevelFields(
-        *container,
-        itr,
-        pExpCtx,
-        groupStage,
-        timeField,
-        isLastpointSortTimeAscending(newSort->getSortKeyPattern(), newTimeField));
+    // Try to insert bucket-level $sort and $group stages before we unpack any buckets. We ensure
+    // that the generated $group preserves all bucket fields, so that the $_internalUnpackBucket
+    // stage and the original $group stage can read them.
+    std::vector<std::string> fieldsToInclude{timeseries::kBucketMetaFieldName.toString(),
+                                             timeseries::kBucketControlFieldName.toString(),
+                                             timeseries::kBucketDataFieldName.toString()};
+    const auto& computedMetaProjFields = _bucketUnpacker.bucketSpec().computedMetaProjFields();
+    std::copy(computedMetaProjFields.begin(),
+              computedMetaProjFields.end(),
+              std::back_inserter(fieldsToInclude));
 
-    // Remove the $sort, $group and $_internalUnpackBucket stages.
-    tassert(6165401,
-            "unexpected stage in lastpoint aggregate, expected $_internalUnpackBucket",
-            itr->get()->getSourceName() == kStageNameInternal);
-    itr = container->erase(itr);
+    auto tryInsertBucketLevelSortAndGroup = [&](AccumulatorDocumentsNeeded accum) {
+        if (!groupOnlyUsesTargetAccum(accum) || isFirstPointQuery(accum)) {
+            return false;
+        }
+        bool flipSort = (accum == AccumulatorDocumentsNeeded::kLastDocument);
+        auto newSort = createMetadataSortForReorder(*sortStage, timeField, newFieldPath, flipSort);
+        auto newGroup = createBucketGroupForReorder(pExpCtx, fieldsToInclude, newFieldPath);
+        container->insert(itr, newSort);
+        container->insert(itr, newGroup);
+        return true;
+    };
 
-    tassert(6165402,
-            "unexpected stage in lastpoint aggregate, expected $sort",
-            itr->get()->getSourceName() == DocumentSourceSort::kStageName);
-    itr = container->erase(itr);
-
-    tassert(6165403,
-            "unexpected stage in lastpoint aggregate, expected $group",
-            itr->get()->getSourceName() == DocumentSourceGroup::kStageName);
-    container->erase(itr);
-
-    return true;
+    return tryInsertBucketLevelSortAndGroup(AccumulatorDocumentsNeeded::kFirstDocument) ||
+        tryInsertBucketLevelSortAndGroup(AccumulatorDocumentsNeeded::kLastDocument);
 }
 
 Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimizeAt(
@@ -1038,7 +977,8 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
     // Attempt to optimize last-point type queries.
     if (feature_flags::gfeatureFlagLastPointQuery.isEnabled(
             serverGlobalParams.featureCompatibility) &&
-        optimizeLastpoint(itr, container)) {
+        !_triedLastpointRewrite && optimizeLastpoint(itr, container)) {
+        _triedLastpointRewrite = true;
         // If we are able to rewrite the aggregation, give the resulting pipeline a chance to
         // perform further optimizations.
         return container->begin();

@@ -39,253 +39,208 @@ namespace {
 
 using InternalUnpackBucketOptimizeLastpointTest = AggregationContextFixture;
 
+void assertExpectedLastpointOpt(const boost::intrusive_ptr<ExpressionContext> expCtx,
+                                const std::vector<std::string>& inputPipelineStrs,
+                                const std::vector<std::string>& expectedPipelineStrs,
+                                const bool expectedSuccess = true) {
+    std::vector<BSONObj> inputPipelineBson;
+    for (auto stageStr : inputPipelineStrs) {
+        inputPipelineBson.emplace_back(fromjson(stageStr));
+    }
+
+    auto pipeline = Pipeline::parse(inputPipelineBson, expCtx);
+    auto& container = pipeline->getSources();
+    ASSERT_EQ(container.size(), inputPipelineBson.size());
+
+    // Assert that the lastpoint optimization succeeds/fails as expected.
+    auto success = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
+                       ->optimizeLastpoint(container.begin(), &container);
+    ASSERT_EQ(success, expectedSuccess);
+
+    auto serialized = pipeline->serializeToBson();
+    ASSERT_EQ(serialized.size(), expectedPipelineStrs.size());
+
+    // Assert the pipeline is unchanged.
+    auto serializedItr = serialized.begin();
+    for (auto stageStr : expectedPipelineStrs) {
+        auto expectedStageBson = fromjson(stageStr);
+        ASSERT_BSONOBJ_EQ(*serializedItr, expectedStageBson);
+        ++serializedItr;
+    }
+}
+
 TEST_F(InternalUnpackBucketOptimizeLastpointTest, NonLastpointDoesNotParticipateInOptimization) {
     RAIIServerParameterControllerForTest controller("featureFlagLastPointQuery", true);
-    {
-        // $sort must contain a time field.
-        auto unpackSpec = fromjson(
-            "{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: 'tags', "
-            "bucketMaxSpanSeconds: 3600}}");
-        auto sortSpec = fromjson("{$sort: {'tags.a': 1}}");
-        auto groupSpec =
-            fromjson("{$group: {_id: '$tags.a', b: {$first: '$b'}, c: {$first: '$c'}}}");
-        auto pipeline = Pipeline::parse(makeVector(unpackSpec, sortSpec, groupSpec), getExpCtx());
-        auto& container = pipeline->getSources();
+    auto assertPipelineUnoptimized = [&](const std::string& unpackStr,
+                                         const std::string& sortStr,
+                                         const std::string& groupStr) {
+        std::vector stageStrs{unpackStr, sortStr, groupStr};
+        assertExpectedLastpointOpt(getExpCtx(), stageStrs, stageStrs, /* expectedSuccess */ false);
+    };
 
-        ASSERT_EQ(container.size(), 3U);
+    // $sort must contain a time field.
+    assertPipelineUnoptimized(
+        "{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: 'm', "
+        "bucketMaxSpanSeconds: 60}}",
+        "{$sort: {'m.a': 1}}",
+        "{$group: {_id: '$m.a', b: {$first: '$b'}, c: {$first: '$c'}}}");
 
-        auto success = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
-                           ->optimizeLastpoint(container.begin(), &container);
-        ASSERT_FALSE(success);
+    // $sort must have the time field as the last field in the sort key pattern.
+    assertPipelineUnoptimized(
+        "{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: 'm', "
+        "bucketMaxSpanSeconds: 60}}",
+        "{$sort: {t: -1, 'm.a': 1}}",
+        "{$group: {_id: '$m.a', b: {$first: '$b'}, c: {$first: '$c'}}}");
 
-        // The pipeline is unchanged.
-        auto serialized = pipeline->serializeToBson();
-        ASSERT_EQ(serialized.size(), 3u);
-        ASSERT_BSONOBJ_EQ(serialized[0], unpackSpec);
-        ASSERT_BSONOBJ_EQ(serialized[1], sortSpec);
-        ASSERT_BSONOBJ_EQ(serialized[2], groupSpec);
-    }
-    {
-        // $sort must have the time field as the last field in the sort key pattern.
-        auto unpackSpec = fromjson(
-            "{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: 'tags', "
-            "bucketMaxSpanSeconds: 3600}}");
-        auto sortSpec = fromjson("{$sort: {t: -1, 'tags.a': 1}}");
-        auto groupSpec =
-            fromjson("{$group: {_id: '$tags.a', b: {$first: '$b'}, c: {$first: '$c'}}}");
-        auto pipeline = Pipeline::parse(makeVector(unpackSpec, sortSpec, groupSpec), getExpCtx());
-        auto& container = pipeline->getSources();
+    // $group's _id must be a meta field.
+    assertPipelineUnoptimized(
+        "{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: 'm', "
+        "bucketMaxSpanSeconds: 60}}",
+        "{$sort: {'m.a': 1, t: -1}}",
+        "{$group: {_id: '$nonMeta', b: {$first: '$b'}, c: {$first: '$c'}}}");
 
-        ASSERT_EQ(container.size(), 3U);
+    // $group can only contain $first or $last accumulators.
+    assertPipelineUnoptimized(
+        "{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: 'm', "
+        "bucketMaxSpanSeconds: 60}}",
+        "{$sort: {'m.a': 1, t: -1}}",
+        "{$group: {_id: '$m.a', b: {$first: '$b'}, c: {$last: '$c'}}}");
 
-        auto success = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
-                           ->optimizeLastpoint(container.begin(), &container);
-        ASSERT_FALSE(success);
+    // We disallow the rewrite for firstpoint queries due to rounding behaviour on control.min.time.
+    assertPipelineUnoptimized(
+        "{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
+        "'m', bucketMaxSpanSeconds: 60}}",
+        "{$sort: {'m.a': -1, t: 1}}",
+        "{$group: {_id: '$m.a', b: {$first: '$b'}, c: {$first: '$c'}}}");
 
-        // The pipeline is unchanged.
-        auto serialized = pipeline->serializeToBson();
-        ASSERT_EQ(serialized.size(), 3u);
-        ASSERT_BSONOBJ_EQ(serialized[0], unpackSpec);
-        ASSERT_BSONOBJ_EQ(serialized[1], sortSpec);
-        ASSERT_BSONOBJ_EQ(serialized[2], groupSpec);
-    }
-    {
-        // $group's _id must be a meta field.
-        auto unpackSpec = fromjson(
-            "{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: 'tags', "
-            "bucketMaxSpanSeconds: 3600}}");
-        auto sortSpec = fromjson("{$sort: {'tags.a': 1, t: -1}}");
-        auto groupSpec =
-            fromjson("{$group: {_id: '$nonMeta', b: {$first: '$b'}, c: {$first: '$c'}}}");
-        auto pipeline = Pipeline::parse(makeVector(unpackSpec, sortSpec, groupSpec), getExpCtx());
-        auto& container = pipeline->getSources();
+    assertPipelineUnoptimized(
+        "{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
+        "'m', bucketMaxSpanSeconds: 60}}",
+        "{$sort: {'m.a': -1, t: -1}}",
+        "{$group: {_id: '$m.a', b: {$last: '$b'}, c: {$last: '$c'}}}");
 
-        ASSERT_EQ(container.size(), 3U);
-
-        auto success = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
-                           ->optimizeLastpoint(container.begin(), &container);
-        ASSERT_FALSE(success);
-
-        // The pipeline is unchanged.
-        auto serialized = pipeline->serializeToBson();
-        ASSERT_EQ(serialized.size(), 3u);
-        ASSERT_BSONOBJ_EQ(serialized[0], unpackSpec);
-        ASSERT_BSONOBJ_EQ(serialized[1], sortSpec);
-        ASSERT_BSONOBJ_EQ(serialized[2], groupSpec);
-    }
-    {
-        // For now, $group can only contain $first accumulators.
-        auto unpackSpec = fromjson(
-            "{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: 'tags', "
-            "bucketMaxSpanSeconds: 3600}}");
-        auto sortSpec = fromjson("{$sort: {'tags.a': 1, t: -1}}");
-        auto groupSpec =
-            fromjson("{$group: {_id: '$tags.a', b: {$first: '$b'}, c: {$last: '$c'}}}");
-        auto pipeline = Pipeline::parse(makeVector(unpackSpec, sortSpec, groupSpec), getExpCtx());
-        auto& container = pipeline->getSources();
-
-        ASSERT_EQ(container.size(), 3U);
-
-        auto success = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
-                           ->optimizeLastpoint(container.begin(), &container);
-        ASSERT_FALSE(success);
-
-        // The pipeline is unchanged.
-        auto serialized = pipeline->serializeToBson();
-        ASSERT_EQ(serialized.size(), 3u);
-        ASSERT_BSONOBJ_EQ(serialized[0], unpackSpec);
-        ASSERT_BSONOBJ_EQ(serialized[1], sortSpec);
-        ASSERT_BSONOBJ_EQ(serialized[2], groupSpec);
-    }
+    // The _id field in $group's must match the meta field in $sort.
+    assertPipelineUnoptimized(
+        "{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
+        "'m', bucketMaxSpanSeconds: 60}}",
+        "{$sort: {'m.a': -1, t: -1}}",
+        "{$group: {_id: '$m.z', b: {$last: '$b'}, c: {$last: '$c'}}}");
 }
 
 TEST_F(InternalUnpackBucketOptimizeLastpointTest,
        LastpointWithMetaSubfieldAscendingTimeDescending) {
     RAIIServerParameterControllerForTest controller("featureFlagLastPointQuery", true);
-    auto pipeline = Pipeline::parse(
-        makeVector(fromjson("{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
-                            "'tags', bucketMaxSpanSeconds: 3600}}"),
-                   fromjson("{$sort: {'tags.a': 1, t: -1}}"),
-                   fromjson("{$group: {_id: '$tags.a', b: {$first: '$b'}, c: {$first: '$c'}}}")),
-        getExpCtx());
-    auto& container = pipeline->getSources();
-
-    ASSERT_EQ(container.size(), 3U);
-
-    auto success = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
-                       ->optimizeLastpoint(container.begin(), &container);
-    ASSERT_TRUE(success);
-
-    auto serialized = pipeline->serializeToBson();
-
-    ASSERT_EQ(serialized.size(), 5u);
-    ASSERT_BSONOBJ_EQ(serialized[0],
-                      fromjson("{$sort: {'meta.a': 1, 'control.max.t': -1, 'control.min.t': -1}}"));
-    ASSERT_BSONOBJ_EQ(serialized[1],
-                      fromjson("{$group: {_id: '$meta.a', bucket: {$first: '$_id'}}}"));
-    ASSERT_BSONOBJ_EQ(
-        serialized[2],
-        fromjson(
-            "{$lookup: {from: 'pipeline_test', as: 'metrics', localField: 'bucket', foreignField: "
-            "'_id', let: {}, pipeline: [{$_internalUnpackBucket: {exclude: [], timeField: 't', "
-            "metaField: 'tags', bucketMaxSpanSeconds: 3600}}, {$sort: {t: -1}}, {$limit: 1}]}}"));
-    ASSERT_BSONOBJ_EQ(serialized[3], fromjson("{$unwind: {path: '$metrics'}}"));
-    ASSERT_BSONOBJ_EQ(
-        serialized[4],
-        fromjson("{$replaceRoot: {newRoot: {_id: '$_id', b: {$ifNull: ['$metrics.b', {$const: "
-                 "null}]}, c: {$ifNull: ['$metrics.c', {$const: null}]}}}}"));
+    assertExpectedLastpointOpt(getExpCtx(),
+                               /* inputPipelineStrs */
+                               {"{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
+                                "'m', bucketMaxSpanSeconds: 60}}",
+                                "{$sort: {'m.a': 1, t: -1}}",
+                                "{$group: {_id: '$m.a', b: {$first: '$b'}, c: {$first: '$c'}}}"},
+                               /* expectedPipelineStrs */
+                               {"{$sort: {'meta.a': 1, 'control.max.t': -1, 'control.min.t': -1}}",
+                                "{$group: {_id: '$meta.a', meta: {$first: '$meta'}, control: "
+                                "{$first: '$control'}, data: {$first: '$data'}}}",
+                                "{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
+                                "'m', bucketMaxSpanSeconds: 60}}",
+                                "{$sort: {'m.a': 1, t: -1}}",
+                                "{$group: {_id: '$m.a', b: {$first: '$b'}, c: {$first: '$c'}}}"});
 }
 
 TEST_F(InternalUnpackBucketOptimizeLastpointTest,
        LastpointWithMetaSubfieldDescendingTimeDescending) {
     RAIIServerParameterControllerForTest controller("featureFlagLastPointQuery", true);
-    auto pipeline = Pipeline::parse(
-        makeVector(fromjson("{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
-                            "'tags', bucketMaxSpanSeconds: 3600}}"),
-                   fromjson("{$sort: {'tags.a': -1, t: -1}}"),
-                   fromjson("{$group: {_id: '$tags.a', b: {$first: '$b'}, c: {$first: '$c'}}}")),
-        getExpCtx());
-    auto& container = pipeline->getSources();
-
-    ASSERT_EQ(container.size(), 3U);
-
-    auto success = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
-                       ->optimizeLastpoint(container.begin(), &container);
-    ASSERT_TRUE(success);
-
-    auto serialized = pipeline->serializeToBson();
-
-    ASSERT_EQ(serialized.size(), 5u);
-    ASSERT_BSONOBJ_EQ(
-        serialized[0],
-        fromjson("{$sort: {'meta.a': -1, 'control.max.t': -1, 'control.min.t': -1}}"));
-    ASSERT_BSONOBJ_EQ(serialized[1],
-                      fromjson("{$group: {_id: '$meta.a', bucket: {$first: '$_id'}}}"));
-    ASSERT_BSONOBJ_EQ(
-        serialized[2],
-        fromjson(
-            "{$lookup: {from: 'pipeline_test', as: 'metrics', localField: 'bucket', foreignField: "
-            "'_id', let: {}, pipeline: [{$_internalUnpackBucket: {exclude: [], timeField: 't', "
-            "metaField: 'tags', bucketMaxSpanSeconds: 3600}}, {$sort: {t: -1}}, {$limit: 1}]}}"));
-    ASSERT_BSONOBJ_EQ(serialized[3], fromjson("{$unwind: {path: '$metrics'}}"));
-    ASSERT_BSONOBJ_EQ(
-        serialized[4],
-        fromjson("{$replaceRoot: {newRoot: {_id: '$_id', b: {$ifNull: ['$metrics.b', {$const: "
-                 "null}]}, c: {$ifNull: ['$metrics.c', {$const: null}]}}}}"));
+    assertExpectedLastpointOpt(getExpCtx(),
+                               /* inputPipelineStrs */
+                               {"{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
+                                "'m', bucketMaxSpanSeconds: 60}}",
+                                "{$sort: {'m.a': -1, t: -1}}",
+                                "{$group: {_id: '$m.a', b: {$first: '$b'}, c: {$first: '$c'}}}"},
+                               /* expectedPipelineStrs */
+                               {"{$sort: {'meta.a': -1, 'control.max.t': -1, 'control.min.t': -1}}",
+                                "{$group: {_id: '$meta.a', meta: {$first: '$meta'}, control: "
+                                "{$first: '$control'}, data: {$first: '$data'}}}",
+                                "{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
+                                "'m', bucketMaxSpanSeconds: 60}}",
+                                "{$sort: {'m.a': -1, t: -1}}",
+                                "{$group: {_id: '$m.a', b: {$first: '$b'}, c: {$first: '$c'}}}"});
 }
 
 TEST_F(InternalUnpackBucketOptimizeLastpointTest, LastpointWithMetaSubfieldAscendingTimeAscending) {
     RAIIServerParameterControllerForTest controller("featureFlagLastPointQuery", true);
-    auto pipeline = Pipeline::parse(
-        makeVector(fromjson("{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
-                            "'tags', bucketMaxSpanSeconds: 3600}}"),
-                   fromjson("{$sort: {'tags.a': 1, t: 1}}"),
-                   fromjson("{$group: {_id: '$tags.a', b: {$last: '$b'}, c: {$last: '$c'}}}")),
-        getExpCtx());
-    auto& container = pipeline->getSources();
-
-    ASSERT_EQ(container.size(), 3U);
-
-    auto success = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
-                       ->optimizeLastpoint(container.begin(), &container);
-    ASSERT_TRUE(success);
-
-    auto serialized = pipeline->serializeToBson();
-
-    ASSERT_EQ(serialized.size(), 5u);
-    ASSERT_BSONOBJ_EQ(
-        serialized[0],
-        fromjson("{$sort: {'meta.a': -1, 'control.max.t': -1, 'control.min.t': -1}}"));
-    ASSERT_BSONOBJ_EQ(serialized[1],
-                      fromjson("{$group: {_id: '$meta.a', bucket: {$first: '$_id'}}}"));
-    ASSERT_BSONOBJ_EQ(
-        serialized[2],
-        fromjson(
-            "{$lookup: {from: 'pipeline_test', as: 'metrics', localField: 'bucket', foreignField: "
-            "'_id', let: {}, pipeline: [{$_internalUnpackBucket: {exclude: [], timeField: 't', "
-            "metaField: 'tags', bucketMaxSpanSeconds: 3600}}, {$sort: {t: -1}}, {$limit: 1}]}}"));
-    ASSERT_BSONOBJ_EQ(serialized[3], fromjson("{$unwind: {path: '$metrics'}}"));
-    ASSERT_BSONOBJ_EQ(
-        serialized[4],
-        fromjson("{$replaceRoot: {newRoot: {_id: '$_id', b: {$ifNull: ['$metrics.b', {$const: "
-                 "null}]}, c: {$ifNull: ['$metrics.c', {$const: null}]}}}}"));
+    assertExpectedLastpointOpt(getExpCtx(),
+                               /* inputPipelineStrs */
+                               {"{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
+                                "'m', bucketMaxSpanSeconds: 60}}",
+                                "{$sort: {'m.a': 1, t: 1}}",
+                                "{$group: {_id: '$m.a', b: {$last: '$b'}, c: {$last: '$c'}}}"},
+                               /* expectedPipelineStrs */
+                               {"{$sort: {'meta.a': -1, 'control.max.t': -1, 'control.min.t': -1}}",
+                                "{$group: {_id: '$meta.a', meta: {$first: '$meta'}, control: "
+                                "{$first: '$control'}, data: {$first: '$data'}}}",
+                                "{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
+                                "'m', bucketMaxSpanSeconds: 60}}",
+                                "{$sort: {'m.a': 1, t: 1}}",
+                                "{$group: {_id: '$m.a', b: {$last: '$b'}, c: {$last: '$c'}}}"});
 }
 
 TEST_F(InternalUnpackBucketOptimizeLastpointTest,
        LastpointWithMetaSubfieldDescendingTimeAscending) {
     RAIIServerParameterControllerForTest controller("featureFlagLastPointQuery", true);
-    auto pipeline = Pipeline::parse(
-        makeVector(fromjson("{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
-                            "'tags', bucketMaxSpanSeconds: 3600}}"),
-                   fromjson("{$sort: {'tags.a': -1, t: 1}}"),
-                   fromjson("{$group: {_id: '$tags.a', b: {$last: '$b'}, c: {$last: '$c'}}}")),
-        getExpCtx());
-    auto& container = pipeline->getSources();
+    assertExpectedLastpointOpt(getExpCtx(),
+                               /* inputPipelineStrs */
+                               {"{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
+                                "'m', bucketMaxSpanSeconds: 60}}",
+                                "{$sort: {'m.a': -1, t: 1}}",
+                                "{$group: {_id: '$m.a', b: {$last: '$b'}, c: {$last: '$c'}}}"},
+                               /* expectedPipelineStrs */
+                               {"{$sort: {'meta.a': 1, 'control.max.t': -1, 'control.min.t': -1}}",
+                                "{$group: {_id: '$meta.a', meta: {$first: '$meta'}, control: "
+                                "{$first: '$control'}, data: {$first: '$data'}}}",
+                                "{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
+                                "'m', bucketMaxSpanSeconds: 60}}",
+                                "{$sort: {'m.a': -1, t: 1}}",
+                                "{$group: {_id: '$m.a', b: {$last: '$b'}, c: {$last: '$c'}}}"});
+}
 
-    ASSERT_EQ(container.size(), 3U);
+TEST_F(InternalUnpackBucketOptimizeLastpointTest, LastpointWithComputedMetaProjectionFields) {
+    RAIIServerParameterControllerForTest controller("featureFlagLastPointQuery", true);
+    // We might get such a case if $_internalUnpackBucket swaps with a $project. Verify that the
+    // lastpoint optimization does not break in this scenario. Note that in the full pipeline we
+    // would expect $_internalUnpackBucket to be preceded by a stage like $addFields. However,
+    // optimizeLastpoint() only gets an interator to the $_internalUnpackBucket stage itself.
+    assertExpectedLastpointOpt(
+        getExpCtx(),
+        /* inputPipelineStrs */
+        {"{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: 'm', "
+         "bucketMaxSpanSeconds: 60, computedMetaProjFields: ['abc', 'def']}}",
+         "{$sort: {'m.a': -1, t: 1}}",
+         "{$group: {_id: '$m.a', b: {$last: '$b'}, c: {$last: '$c'}}}"},
+        /* expectedPipelineStrs */
+        {"{$sort: {'meta.a': 1, 'control.max.t': -1, 'control.min.t': -1}}",
+         "{$group: {_id: '$meta.a', meta: {$first: '$meta'}, control: {$first: '$control'}, data: "
+         "{$first: '$data'}, abc: {$first: '$abc'}, def: {$first: '$def'}}}",
+         "{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: 'm', "
+         "bucketMaxSpanSeconds: 60, computedMetaProjFields: ['abc', 'def']}}",
+         "{$sort: {'m.a': -1, t: 1}}",
+         "{$group: {_id: '$m.a', b: {$last: '$b'}, c: {$last: '$c'}}}"});
 
-    auto success = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
-                       ->optimizeLastpoint(container.begin(), &container);
-    ASSERT_TRUE(success);
-
-    auto serialized = pipeline->serializeToBson();
-
-    ASSERT_EQ(serialized.size(), 5u);
-    ASSERT_BSONOBJ_EQ(serialized[0],
-                      fromjson("{$sort: {'meta.a': 1, 'control.max.t': -1, 'control.min.t': -1}}"));
-    ASSERT_BSONOBJ_EQ(serialized[1],
-                      fromjson("{$group: {_id: '$meta.a', bucket: {$first: '$_id'}}}"));
-    ASSERT_BSONOBJ_EQ(
-        serialized[2],
-        fromjson(
-            "{$lookup: {from: 'pipeline_test', as: 'metrics', localField: 'bucket', foreignField: "
-            "'_id', let: {}, pipeline: [{$_internalUnpackBucket: {exclude: [], timeField: 't', "
-            "metaField: 'tags', bucketMaxSpanSeconds: 3600}}, {$sort: {t: -1}}, {$limit: 1}]}}"));
-    ASSERT_BSONOBJ_EQ(serialized[3], fromjson("{$unwind: {path: '$metrics'}}"));
-    ASSERT_BSONOBJ_EQ(
-        serialized[4],
-        fromjson("{$replaceRoot: {newRoot: {_id: '$_id', b: {$ifNull: ['$metrics.b', {$const: "
-                 "null}]}, c: {$ifNull: ['$metrics.c', {$const: null}]}}}}"));
+    // Furthermore, validate that we can use the lastpoint optimization in the case where we have a
+    // projection included in the final $group.
+    assertExpectedLastpointOpt(
+        getExpCtx(),
+        /* inputPipelineStrs */
+        {"{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: 'm', "
+         "bucketMaxSpanSeconds: 60, computedMetaProjFields: ['abc', 'def']}}",
+         "{$sort: {'m.a': -1, t: 1}}",
+         "{$group: {_id: '$m.a', b: {$last: '$b'}, c: {$last: '$c'}, def: {$last: '$def'}}}"},
+        /* expectedPipelineStrs */
+        {"{$sort: {'meta.a': 1, 'control.max.t': -1, 'control.min.t': -1}}",
+         "{$group: {_id: '$meta.a', meta: {$first: '$meta'}, control: {$first: '$control'}, data: "
+         "{$first: '$data'}, abc: {$first: '$abc'}, def: {$first: '$def'}}}",
+         "{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: 'm', "
+         "bucketMaxSpanSeconds: 60, computedMetaProjFields: ['abc', 'def']}}",
+         "{$sort: {'m.a': -1, t: 1}}",
+         "{$group: {_id: '$m.a', b: {$last: '$b'}, c: {$last: '$c'}, def: {$last: '$def'}}}"});
 }
 
 }  // namespace

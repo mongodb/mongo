@@ -203,16 +203,14 @@ public:
      *  {$group: {_id: "$myMeta.a", otherFields: {$first: {$otherFields}}}}]
      *
      * will be rewritten into:
-     * [{$sort: {meta.a: 1, time: -1}},
-     *  {$group: {_id: "$meta.a": 1, bucket: {$first: "$_id"}}},
-     *  {$lookup: {
-     *      from: <bucketColl>,
-     *      as: "metrics",
-     *      localField: "bucket",
-     *      foreignField: "_id"
-     *      pipeline: [{$_internalUnpackBucket: {...}}, {$sort: {myTime: -1}}, {$limit: 1}]}},
-     *  {$unwind: "$metrics"},
-     *  {$replaceWith: {_id: "$_id", otherFields: {$metrics.otherFields}}}]
+     * [{$sort: {meta.a: 1, 'control.max.myTime': -1, 'control.min.myTime': -1}},
+     *  {$group: {_id: "$meta.a": 1, control: {$first: "$control"}, meta: {$first: "$meta"},
+     *    data: {$first: "$data"}}},
+     *  {$_internalUnpackBucket: {...}},
+     *  {$sort: {myMeta.a: 1, myTime: -1}},
+     *  {$group: {_id: "$myMeta.a", otherFields: {$first: {$otherFields}}}}]
+     *
+     * Note that the first $group includes all fields so we can avoid fetching the bucket twice.
      */
     bool optimizeLastpoint(Pipeline::SourceContainer::iterator itr,
                            Pipeline::SourceContainer* container);
@@ -238,5 +236,6 @@ private:
     bool _triedBucketLevelFieldsPredicatesPushdown = false;
     bool _optimizedEndOfPipeline = false;
     bool _triedInternalizeProject = false;
+    bool _triedLastpointRewrite = false;
 };
 }  // namespace mongo
