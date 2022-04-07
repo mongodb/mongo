@@ -44,12 +44,8 @@ const NamespaceString kTestNss("TestDB", "TestColl");
 
 void setCollectionFilteringMetadata(OperationContext* opCtx, CollectionMetadata metadata) {
     AutoGetCollection autoColl(opCtx, kTestNss, MODE_X);
-    const auto shardVersion = metadata.getShardVersion();
     CollectionShardingRuntime::get(opCtx, kTestNss)
         ->setFilteringMetadata(opCtx, std::move(metadata));
-
-    OperationShardingState::setShardRole(
-        opCtx, kTestNss, shardVersion, boost::none /* databaseVersion */);
 }
 
 class DocumentKeyStateTest : public ShardServerTestFixture {
@@ -106,10 +102,14 @@ TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateUnsharded) {
 
 TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithoutIdInShardKey) {
     // Push a CollectionMetadata with a shard key not including "_id"...
-    setCollectionFilteringMetadata(operationContext(),
-                                   makeAMetadata(BSON("key" << 1 << "key3" << 1)));
+    const auto metadata{makeAMetadata(BSON("key" << 1 << "key3" << 1))};
+    setCollectionFilteringMetadata(operationContext(), metadata);
 
     AutoGetCollection autoColl(operationContext(), kTestNss, MODE_IX);
+    ScopedSetShardRole scopedSetShardRole{operationContext(),
+                                          kTestNss,
+                                          metadata.getShardVersion() /* shardVersion */,
+                                          boost::none /* databaseVersion */};
 
     // The order of fields in `doc` deliberately does not match the shard key
     auto doc = BSON("key3"
@@ -129,10 +129,14 @@ TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithoutIdInShardKey) {
 
 TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithIdInShardKey) {
     // Push a CollectionMetadata with a shard key that does have "_id" in the middle...
-    setCollectionFilteringMetadata(operationContext(),
-                                   makeAMetadata(BSON("key" << 1 << "_id" << 1 << "key2" << 1)));
+    const auto metadata{makeAMetadata(BSON("key" << 1 << "_id" << 1 << "key2" << 1))};
+    setCollectionFilteringMetadata(operationContext(), metadata);
 
     AutoGetCollection autoColl(operationContext(), kTestNss, MODE_IX);
+    ScopedSetShardRole scopedSetShardRole{operationContext(),
+                                          kTestNss,
+                                          metadata.getShardVersion() /* shardVersion */,
+                                          boost::none /* databaseVersion */};
 
     // The order of fields in `doc` deliberately does not match the shard key
     auto doc = BSON("key2" << true << "key3"
@@ -151,11 +155,15 @@ TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithIdInShardKey) {
 
 TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithIdHashInShardKey) {
     // Push a CollectionMetadata with a shard key "_id", hashed.
-    setCollectionFilteringMetadata(operationContext(),
-                                   makeAMetadata(BSON("_id"
-                                                      << "hashed")));
+    const auto metadata{makeAMetadata(BSON("_id"
+                                           << "hashed"))};
+    setCollectionFilteringMetadata(operationContext(), metadata);
 
     AutoGetCollection autoColl(operationContext(), kTestNss, MODE_IX);
+    ScopedSetShardRole scopedSetShardRole{operationContext(),
+                                          kTestNss,
+                                          metadata.getShardVersion() /* shardVersion */,
+                                          boost::none /* databaseVersion */};
 
     auto doc = BSON("key2" << true << "_id"
                            << "hello"
