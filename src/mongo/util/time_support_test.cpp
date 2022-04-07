@@ -413,7 +413,7 @@ TEST(TimeParsing, InvalidDates) {
         "1970-01-01T00:00:00.x00Z",
     };
 
-    for (const std::string& s : badDates) {
+    for (const char* s : badDates) {
         ASSERT_NOT_OK(dateFromISOString(s)) << s;
     }
 }
