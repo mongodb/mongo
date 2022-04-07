@@ -151,6 +151,9 @@ enum class TypeTags : uint8_t {
 
     // Pointer to a SortSpec object.
     sortSpec,
+
+    // Pointer to a IndexBounds object.
+    indexBounds,
 };
 
 inline constexpr bool isNumber(TypeTags tag) noexcept {
@@ -1238,6 +1241,10 @@ inline SortSpec* getSortSpecView(Value val) noexcept {
     return reinterpret_cast<SortSpec*>(val);
 }
 
+inline IndexBounds* getIndexBoundsView(Value val) noexcept {
+    return reinterpret_cast<IndexBounds*>(val);
+}
+
 /**
  * Pattern and flags of Regex are stored in BSON as two C strings written one after another.
  *
@@ -1358,6 +1365,8 @@ std::pair<TypeTags, Value> makeCopySortSpec(const SortSpec&);
 
 std::pair<TypeTags, Value> makeCopyCollator(const CollatorInterface& collator);
 
+std::pair<TypeTags, Value> makeCopyIndexBounds(const IndexBounds& collator);
+
 /**
  * Releases memory allocated for the value. If the value does not have any memory allocated for it,
  * does nothing.
@@ -1435,6 +1444,8 @@ inline std::pair<TypeTags, Value> copyValue(TypeTags tag, Value val) {
             return makeCopySortSpec(*getSortSpecView(val));
         case TypeTags::collator:
             return makeCopyCollator(*getCollatorView(val));
+        case TypeTags::indexBounds:
+            return makeCopyIndexBounds(*getIndexBoundsView(val));
         default:
             break;
     }

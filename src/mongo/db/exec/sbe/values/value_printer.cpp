@@ -153,6 +153,9 @@ void ValuePrinter<T>::writeTagToStream(TypeTags tag) {
         case TypeTags::sortSpec:
             stream << "sortSpec";
             break;
+        case TypeTags::indexBounds:
+            stream << "indexBounds";
+            break;
         default:
             stream << "unknown tag";
             break;
@@ -459,6 +462,15 @@ void ValuePrinter<T>::writeValueToStream(TypeTags tag, Value val, size_t depth) 
             stream << ", ";
             writeCollatorToStream(getSortSpecView(val)->getCollator());
             stream << ')';
+            break;
+        case TypeTags::indexBounds:
+            // When calling toString() we don't know if the index has a non-simple collation or
+            // not. Passing false could produce invalid UTF-8, which is not acceptable when we are
+            // going to put the resulting string into a BSON object and return it across the wire.
+            // While passing true may be misleading in cases when the index has no collation, it is
+            // safer to do so.
+            stream << "IndexBounds("
+                   << getIndexBoundsView(val)->toString(true /* hasNonSimpleCollation */) << ")";
             break;
         default:
             MONGO_UNREACHABLE;

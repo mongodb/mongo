@@ -113,8 +113,12 @@ TEST_F(PlanSizeTest, BsonScan) {
 }
 
 TEST_F(PlanSizeTest, CheckBounds) {
-    CheckBoundsParams params{
-        IndexBounds{}, BSONObj{}, int{}, KeyString::Version{}, Ordering::allAscending()};
+    const auto [indexBoundsTag, indexBoundsValue] = sbe::value::makeCopyIndexBounds(IndexBounds());
+    CheckBoundsParams params{makeE<EConstant>(indexBoundsTag, indexBoundsValue),
+                             BSONObj{},
+                             int{},
+                             KeyString::Version{},
+                             Ordering::allAscending()};
     auto stage = makeS<CheckBoundsStage>(
         mockS(), params, generateSlotId(), generateSlotId(), generateSlotId(), kEmptyPlanNodeId);
     assertPlanSize(*stage);

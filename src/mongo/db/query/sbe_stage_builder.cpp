@@ -773,13 +773,15 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         iamMap = nullptr;
     }
 
-    auto [stage, outputs] = generateIndexScan(_state,
-                                              getCurrentCollection(reqs),
-                                              ixn,
-                                              indexKeyBitset,
-                                              _yieldPolicy,
-                                              iamMap,
-                                              reqs.has(kIndexKeyPattern));
+    const auto generateIndexScanFunc =
+        ixn->iets.empty() ? generateIndexScan : generateIndexScanWithDynamicBounds;
+    auto&& [stage, outputs] = generateIndexScanFunc(_state,
+                                                    getCurrentCollection(reqs),
+                                                    ixn,
+                                                    indexKeyBitset,
+                                                    _yieldPolicy,
+                                                    iamMap,
+                                                    reqs.has(kIndexKeyPattern));
 
     if (reqs.has(PlanStageSlots::kReturnKey)) {
         sbe::EExpression::Vector mkObjArgs;

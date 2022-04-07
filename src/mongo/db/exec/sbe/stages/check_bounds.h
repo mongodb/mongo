@@ -29,16 +29,50 @@
 
 #pragma once
 
+#include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/query/index_bounds.h"
 
 namespace mongo::sbe {
 struct CheckBoundsParams {
-    const IndexBounds bounds;
-    const BSONObj keyPattern;
-    const int direction;
-    const KeyString::Version version;
-    const Ordering ord;
+    CheckBoundsParams(std::unique_ptr<EExpression> boundsExpression,
+                      const BSONObj& keyPattern,
+                      const int direction,
+                      const KeyString::Version version,
+                      const Ordering ord)
+        : indexBoundsExpression(std::move(boundsExpression)),
+          keyPattern(keyPattern),
+          direction(direction),
+          version(version),
+          ord(ord) {}
+
+    CheckBoundsParams(const CheckBoundsParams& params)
+        : indexBoundsExpression(params.indexBoundsExpression->clone()),
+          keyPattern(params.keyPattern),
+          direction(params.direction),
+          version(params.version),
+          ord(params.ord) {}
+
+    CheckBoundsParams& operator=(const CheckBoundsParams& other) {
+        if (this != &other) {
+            indexBoundsExpression = other.indexBoundsExpression->clone();
+            keyPattern = other.keyPattern;
+            direction = other.direction;
+            version = other.version;
+            ord = other.ord;
+        }
+
+        return *this;
+    };
+    ~CheckBoundsParams() = default;
+    CheckBoundsParams(CheckBoundsParams&& other) = default;
+    CheckBoundsParams& operator=(CheckBoundsParams&& other) = default;
+
+    std::unique_ptr<EExpression> indexBoundsExpression;
+    BSONObj keyPattern;
+    int direction;
+    KeyString::Version version;
+    Ordering ord;
 };
 
 /**
@@ -66,7 +100,7 @@ struct CheckBoundsParams {
 class CheckBoundsStage final : public PlanStage {
 public:
     CheckBoundsStage(std::unique_ptr<PlanStage> input,
-                     const CheckBoundsParams& params,
+                     CheckBoundsParams params,
                      value::SlotId inKeySlot,
                      value::SlotId inRecordIdSlot,
                      value::SlotId outSlot,
@@ -90,7 +124,9 @@ protected:
 
 private:
     const CheckBoundsParams _params;
-    IndexBoundsChecker _checker;
+    vm::CodeFragment _indexBoundsCode;
+    boost::optional<IndexBoundsChecker> _checker;
+    boost::optional<IndexBounds> _indexBounds;
 
     const value::SlotId _inKeySlot;
     const value::SlotId _inRecordIdSlot;

@@ -65,6 +65,25 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
 class PlanStageReqs;
 
 /**
+ * The ParameterizedIndexScanSlots struct is used by SlotBasedStageBuilder while building the index
+ * scan stage to return the slots that are registered in the runtime environment and will be
+ * populated based on the index bounds.
+ */
+struct ParameterizedIndexScanSlots {
+    // Holds the value whether the generic or optimized index scan should be used.
+    sbe::value::SlotId isGenericScan;
+
+    // Holds the value of the initial 'startKey' for the generic index scan algorithm.
+    sbe::value::SlotId initialStartKey;
+
+    // Holds the value of the IndexBounds used for the generic index scan algorithm.
+    sbe::value::SlotId indexBounds;
+
+    // Holds the value of an array of low and high keys for each interval.
+    sbe::value::SlotId lowHighKeyIntervals;
+};
+
+/**
  * The PlanStageSlots class is used by SlotBasedStageBuilder to return the output slots produced
  * after building a stage.
  */

@@ -35,14 +35,13 @@
 
 namespace mongo::sbe {
 CheckBoundsStage::CheckBoundsStage(std::unique_ptr<PlanStage> input,
-                                   const CheckBoundsParams& params,
+                                   CheckBoundsParams params,
                                    value::SlotId inKeySlot,
                                    value::SlotId inRecordIdSlot,
                                    value::SlotId outSlot,
                                    PlanNodeId planNodeId)
     : PlanStage{"chkbounds"_sd, planNodeId},
-      _params{params},
-      _checker{&_params.bounds, _params.keyPattern, _params.direction},
+      _params{std::move(params)},
       _inKeySlot{inKeySlot},
       _inRecordIdSlot{inRecordIdSlot},
       _outSlot{outSlot} {
@@ -59,6 +58,7 @@ void CheckBoundsStage::prepare(CompileCtx& ctx) {
 
     _inKeyAccessor = _children[0]->getAccessor(ctx, _inKeySlot);
     _inRecordIdAccessor = _children[0]->getAccessor(ctx, _inRecordIdSlot);
+    _indexBoundsCode = _params.indexBoundsExpression->compileDirect(ctx);
 }
 
 value::SlotAccessor* CheckBoundsStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
@@ -74,6 +74,18 @@ void CheckBoundsStage::open(bool reOpen) {
 
     _commonStats.opens++;
     _children[0]->open(reOpen);
+
+    // Set up the IndexBounds and IndexBoundsChecker by evaluating the '_compiledBoundsExpression'.
+    auto [owned, tag, val] = vm::ByteCode().run(&_indexBoundsCode);
+    tassert(6335100,
+            "The index bounds expression must be of type 'indexBounds'",
+            tag == value::TypeTags::indexBounds);
+    _indexBounds.emplace(*value::getIndexBoundsView(val));
+    _checker.emplace(_indexBounds.get_ptr(), _params.keyPattern, _params.direction);
+    if (owned) {
+        releaseValue(tag, val);
+    }
+
     _isEOF = false;
 }
 
@@ -104,7 +116,7 @@ PlanState CheckBoundsStage::getNext() {
             key->getBuffer(), key->getSize(), _params.ord, key->getTypeBits(), keyBuilder);
         auto bsonKey = keyBuilder.done();
 
-        switch (_checker.checkKey(bsonKey, &_seekPoint)) {
+        switch (_checker->checkKey(bsonKey, &_seekPoint)) {
             case IndexBoundsChecker::VALID: {
                 auto [tag, val] = _inRecordIdAccessor->getViewOfValue();
                 _outAccessor.reset(false, tag, val);
@@ -181,9 +193,13 @@ size_t CheckBoundsStage::estimateCompileTimeSize() const {
     size += size_estimator::estimate(_children);
     size += size_estimator::estimate(_specificStats);
     size += size_estimator::estimate(_params.keyPattern);
-    size += size_estimator::estimate(_params.bounds);
+    if (_indexBounds) {
+        size += size_estimator::estimate(*_indexBounds);
+    }
     size += size_estimator::estimate(_seekPoint);
-    size += size_estimator::estimate(_checker);
+    if (_checker) {
+        size += size_estimator::estimate(*_checker);
+    }
     size += size_estimator::estimate(_keyBuffer);
     return size;
 }

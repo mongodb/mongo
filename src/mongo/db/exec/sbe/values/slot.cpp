@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/exec/js_function.h"
+#include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/sort_spec.h"
 #include "mongo/db/exec/sbe/values/value_builder.h"
@@ -703,6 +704,9 @@ int getApproximateSize(TypeTags tag, Value val) {
             break;
         case TypeTags::sortSpec:
             result += getSortSpecView(val)->getApproximateSize();
+            break;
+        case TypeTags::indexBounds:
+            result += size_estimator::estimate(*getIndexBoundsView(val));
             break;
         default:
             MONGO_UNREACHABLE;

@@ -96,4 +96,50 @@ std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateSingleInt
     PlanYieldPolicy* yieldPolicy,
     PlanNodeId nodeId);
 
+
+/**
+ * Constructs a generic multi-interval index scan. Depending on the intervals will either execute
+ * the optimized or the generic index scan subplan. The generated subtree will have
+ * the following form:
+ *
+ * branch {isGenericScanSlot} [recordIdSlot, resultSlot, ...]
+ * then
+ *    filter {isRecordId(resultSlot)}
+ *    lspool sp1 [resultSlot] {!isRecordId(resultSlot)}
+ *    union [resultSlot]
+             project [startKeySlot = anchorSlot, unusedVarSlot0 = Nothing, ...]
+ *           limit 1
+ *           coscan
+ *       [checkBoundsSlot]
+ *           nlj [] [seekKeySlot]
+ *               left
+ *                   sspool sp1 [seekKeySlot]
+ *               right
+ *                  chkbounds resultSlot recordIdSlot checkBoundsSlot
+ *                  nlj [] [lowKeySlot]
+ *                      left
+ *                          project [lowKeySlot = seekKeySlot]
+ *                          limit 1
+ *                          coscan
+ *                   right
+ *                      ixseek lowKeySlot resultSlot recordIdSlot [] @coll @index
+ * else
+ *     nlj [] [lowKeySlot, highKeySlot]
+ *     left
+ *         project [lowKeySlot = getField (unwindSlot, "l"),
+ *                  highKeySlot = getField (unwindSlot, "h")]
+ *         unwind unwindSlot indexSlot boundsSlot false
+ *         limit 1
+ *         coscan
+ *     right
+ *         ixseek lowKeySlot highKeySlot recordIdSlot [] @coll @index
+ */
+std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWithDynamicBounds(
+    StageBuilderState& state,
+    const CollectionPtr& collection,
+    const IndexScanNode* ixn,
+    const sbe::IndexKeysInclusionSet& indexKeyBitset,
+    PlanYieldPolicy* yieldPolicy,
+    StringMap<const IndexAccessMethod*>* iamMap,
+    bool needsCorruptionCheck);
 }  // namespace mongo::stage_builder

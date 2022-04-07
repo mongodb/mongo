@@ -264,6 +264,11 @@ std::pair<TypeTags, Value> makeCopyRecordId(const RecordId& rid) {
     return {TypeTags::RecordId, copy};
 }
 
+std::pair<TypeTags, Value> makeCopyIndexBounds(const IndexBounds& bounds) {
+    auto boundsCopy = bitcastFrom<IndexBounds*>(new IndexBounds(bounds));
+    return {TypeTags::indexBounds, boundsCopy};
+}
+
 
 void releaseValue(TypeTags tag, Value val) noexcept {
     switch (tag) {
@@ -319,6 +324,9 @@ void releaseValue(TypeTags tag, Value val) noexcept {
             break;
         case TypeTags::collator:
             delete getCollatorView(val);
+            break;
+        case TypeTags::indexBounds:
+            delete getIndexBoundsView(val);
             break;
         default:
             break;
