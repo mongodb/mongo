@@ -105,7 +105,7 @@ public:
     Status createCollTable(OperationContext* opCtx, NamespaceString collName) {
         const std::string identName = "collection-" + collName.ns();
         return _storageEngine->getEngine()->createRecordStore(
-            opCtx, collName.ns(), identName, CollectionOptions());
+            opCtx, collName, identName, CollectionOptions());
     }
 
     Status dropIndexTable(OperationContext* opCtx, NamespaceString nss, std::string indexName) {

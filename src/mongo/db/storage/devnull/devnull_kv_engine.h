@@ -53,7 +53,7 @@ public:
     }
 
     virtual Status createRecordStore(OperationContext* opCtx,
-                                     StringData ns,
+                                     const NamespaceString& nss,
                                      StringData ident,
                                      const CollectionOptions& options,
                                      KeyFormat keyFormat = KeyFormat::Long) {
@@ -61,7 +61,7 @@ public:
     }
 
     virtual std::unique_ptr<RecordStore> getRecordStore(OperationContext* opCtx,
-                                                        StringData ns,
+                                                        const NamespaceString& nss,
                                                         StringData ident,
                                                         const CollectionOptions& options);
 
@@ -70,6 +70,7 @@ public:
                                                                   KeyFormat keyFormat) override;
 
     virtual Status createSortedDataInterface(OperationContext* opCtx,
+                                             const NamespaceString& nss,
                                              const CollectionOptions& collOptions,
                                              StringData ident,
                                              const IndexDescriptor* desc) {
@@ -82,6 +83,7 @@ public:
 
     virtual std::unique_ptr<SortedDataInterface> getSortedDataInterface(
         OperationContext* opCtx,
+        const NamespaceString& nss,
         const CollectionOptions& collOptions,
         StringData ident,
         const IndexDescriptor* desc);

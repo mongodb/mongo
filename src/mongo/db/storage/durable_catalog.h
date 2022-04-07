@@ -153,6 +153,7 @@ public:
 
     virtual Status createIndex(OperationContext* opCtx,
                                RecordId catalogId,
+                               const NamespaceString& nss,
                                const CollectionOptions& collOptions,
                                const IndexDescriptor* spec) = 0;
 
@@ -202,6 +203,7 @@ public:
      * Drops the provided ident and recreates it as empty for use in resuming an index build.
      */
     virtual Status dropAndRecreateIndexIdentForResume(OperationContext* opCtx,
+                                                      const NamespaceString& nss,
                                                       const CollectionOptions& collOptions,
                                                       const IndexDescriptor* spec,
                                                       StringData ident) = 0;

@@ -106,13 +106,14 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         WiredTigerRecordStore::Params params;
-        params.ns = "a.b"_sd;
+        params.nss = NamespaceString("a.b");
         params.ident = ident;
         params.engineName = kWiredTigerEngineName;
         params.isCapped = false;
         params.keyFormat = KeyFormat::Long;
         params.overwrite = true;
         params.isEphemeral = false;
+        params.isLogged = false;
         params.cappedCallback = nullptr;
         params.sizeStorer = &ss;
         params.isReadOnly = false;

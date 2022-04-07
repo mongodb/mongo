@@ -64,7 +64,8 @@ public:
         IndexDescriptor desc("", spec);
         invariant(desc.isIdIndex());
 
-        return _kvEngine.getSortedDataInterface(&opCtx, CollectionOptions(), "ident"_sd, &desc);
+        return _kvEngine.getSortedDataInterface(
+            &opCtx, NamespaceString(ns), CollectionOptions(), "ident"_sd, &desc);
     }
 
     std::unique_ptr<mongo::SortedDataInterface> newSortedDataInterface(bool unique,
@@ -86,7 +87,8 @@ public:
 
         auto collection = std::make_unique<CollectionMock>(NamespaceString(ns));
         _descs.emplace_back("", spec);
-        return _kvEngine.getSortedDataInterface(&opCtx, keyFormat, "ident"_sd, &_descs.back());
+        return _kvEngine.getSortedDataInterface(
+            &opCtx, NamespaceString(ns), keyFormat, "ident"_sd, &_descs.back());
     }
 
     std::unique_ptr<mongo::RecoveryUnit> newRecoveryUnit() final {

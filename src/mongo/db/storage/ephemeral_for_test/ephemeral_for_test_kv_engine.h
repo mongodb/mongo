@@ -55,7 +55,7 @@ public:
     virtual mongo::RecoveryUnit* newRecoveryUnit();
 
     virtual Status createRecordStore(OperationContext* opCtx,
-                                     StringData ns,
+                                     const NamespaceString& nss,
                                      StringData ident,
                                      const CollectionOptions& options,
                                      KeyFormat keyFormat = KeyFormat::Long);
@@ -66,7 +66,7 @@ public:
                                      const ImportOptions& importOptions) final;
 
     virtual std::unique_ptr<mongo::RecordStore> getRecordStore(OperationContext* opCtx,
-                                                               StringData ns,
+                                                               const NamespaceString& nss,
                                                                StringData ident,
                                                                const CollectionOptions& options);
 
@@ -74,6 +74,7 @@ public:
         OperationContext* opCtx, StringData ident, KeyFormat keyFormat) override;
 
     virtual Status createSortedDataInterface(OperationContext* opCtx,
+                                             const NamespaceString& nss,
                                              const CollectionOptions& collOptions,
                                              StringData ident,
                                              const IndexDescriptor* desc);
@@ -89,12 +90,14 @@ public:
 
     virtual std::unique_ptr<mongo::SortedDataInterface> getSortedDataInterface(
         OperationContext* opCtx,
+        const NamespaceString& nss,
         KeyFormat rsKeyFormat,
         StringData ident,
         const IndexDescriptor* desc);
 
     virtual std::unique_ptr<mongo::SortedDataInterface> getSortedDataInterface(
         OperationContext* opCtx,
+        const NamespaceString& nss,
         const CollectionOptions& collOptions,
         StringData ident,
         const IndexDescriptor* desc);
