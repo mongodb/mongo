@@ -1,6 +1,9 @@
 /**
  * Tests that a unique index built or converted to in the latest version are in the new data
  * formats. Unique indexes built on older versions will stay the same data formats.
+ * @tags: [
+ *   future_git_tag_incompatible,
+ * ]
  */
 
 (function() {
