@@ -1812,6 +1812,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::genericNewKeyString(
                 auto dbPointer = value::getBsonDBPointerView(val);
                 BSONDBRef dbRef{dbPointer.ns, OID::from(dbPointer.id)};
                 kb.appendDBRef(dbRef);
+                break;
             }
             default:
                 uasserted(4822802, str::stream() << "Unsuppored key string type: " << tagCopy);
