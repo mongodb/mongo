@@ -4811,6 +4811,8 @@ if get_option('ninja') != 'disabled':
     )
     env.NinjaRegisterFunctionHandler("test_list_builder_action", ninja_test_list_builder)
 
+    env['NINJA_GENERATED_SOURCE_ALIAS_NAME'] = 'generated-sources'
+
 
 if get_option('separate-debug') == "on" or env.TargetOSIs("windows"):
 

@@ -660,27 +660,56 @@ class NinjaState:
                 kwargs['pool'] = 'local_pool'
             ninja.rule(rule, **kwargs)
 
-        # TODO SERVER-64664
-        generated_source_files = sorted({
-            output
-            # First find builds which have header files in their outputs.
-            for build in self.builds.values()
-            if self.has_generated_sources(build["outputs"])
-            for output in build["outputs"]
-            # Collect only the header files from the builds with them
-            # in their output. We do this because is_generated_source
-            # returns True if it finds a header in any of the outputs,
-            # here we need to filter so we only have the headers and
-            # not the other outputs.
-            if self.is_generated_source(output)
-        })
+        # If the user supplied an alias to determine generated sources, use that, otherwise
+        # determine what the generated sources are dynamically.
+        generated_sources_alias = self.env.get('NINJA_GENERATED_SOURCE_ALIAS_NAME')
+        generated_sources_build = None
 
-        if generated_source_files:
-            ninja.build(
-                outputs="_generated_sources",
-                rule="phony",
-                implicit=generated_source_files
+        if generated_sources_alias:
+            generated_sources_build = self.builds.get(generated_sources_alias)
+            if generated_sources_build is None or generated_sources_build["rule"] != 'phony':
+                raise Exception(
+                    "ERROR: 'NINJA_GENERATED_SOURCE_ALIAS_NAME' set, but no matching Alias object found."
+                )
+
+        if generated_sources_alias and generated_sources_build:
+            generated_source_files = sorted(
+                [] if not generated_sources_build else generated_sources_build['implicit']
             )
+            def check_generated_source_deps(build):
+                return (
+                    build != generated_sources_build
+                    and set(build["outputs"]).isdisjoint(generated_source_files)
+                )
+        else:
+            generated_sources_build = None
+            generated_source_files = sorted({
+                output
+                # First find builds which have header files in their outputs.
+                for build in self.builds.values()
+                if self.has_generated_sources(build["outputs"])
+                for output in build["outputs"]
+                # Collect only the header files from the builds with them
+                # in their output. We do this because is_generated_source
+                # returns True if it finds a header in any of the outputs,
+                # here we need to filter so we only have the headers and
+                # not the other outputs.
+                if self.is_generated_source(output)
+            })
+
+            if generated_source_files:
+                generated_sources_alias = "_ninja_generated_sources"
+                ninja.build(
+                    outputs=generated_sources_alias,
+                    rule="phony",
+                    implicit=generated_source_files
+                )
+                def check_generated_source_deps(build):
+                    return (
+                        not build["rule"] == "INSTALL"
+                        and set(build["outputs"]).isdisjoint(generated_source_files)
+                        and set(build.get("implicit", [])).isdisjoint(generated_source_files)
+                    )
 
         template_builders = []
 
@@ -699,9 +728,7 @@ class NinjaState:
             # cycle.
             if (
                 generated_source_files
-                and not build["rule"] == "INSTALL"
-                and set(build["outputs"]).isdisjoint(generated_source_files)
-                and set(build.get("implicit", [])).isdisjoint(generated_source_files)
+                and check_generated_source_deps(build)
             ):
 
                 # Make all non-generated source targets depend on
@@ -711,7 +738,7 @@ class NinjaState:
                 # sure that all of these sources are generated before
                 # other builds.
                 order_only = build.get("order_only", [])
-                order_only.append("_generated_sources")
+                order_only.append(generated_sources_alias)
                 build["order_only"] = order_only
             if "order_only" in build:
                 build["order_only"].sort()
