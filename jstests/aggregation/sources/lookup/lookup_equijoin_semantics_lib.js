@@ -278,18 +278,14 @@ function runTests() {
                 idsExpectedToMatch: [0, 1]
             });
 
-            // SERVER-65202: matching of "undefined" isn't consistent
-            const S65202 =
-                ([JoinAlgorithm.INLJ_Asc, JoinAlgorithm.INLJ_Dec].includes(currentJoinAlgorithm))
-                ? [2]
-                : [];
             runTest_SingleLocalRecord({
                 testDescription: "Undefined in local, top-level field in foreign",
                 localRecord: {_id: 0, b: undefined},
                 localField: "b",
                 foreignRecords: docs,
                 foreignField: "a",
-                idsExpectedToMatch: [].concat(S65202)
+                // TODO SERVER-65202: matching of "undefined" isn't consistent
+                idsExpectedToMatch: (currentJoinAlgorithm != JoinAlgorithm.HJ) ? [2] : []
             });
         } else {
             // Due to legacy reasons, in the classic engine "undefined" either matches to null or

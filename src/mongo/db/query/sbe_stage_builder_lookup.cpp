@@ -397,6 +397,56 @@ std::pair<SlotId /* resultSlot */, std::unique_ptr<sbe::PlanStage>> buildForeign
         std::move(makeLimitSkip(std::move(unionStage), nodeId, 1 /* limit */).stage));
 }
 
+// Creates stages that extract key values from the given foreign record, compares them to the local
+// key values and groups the matching records into an array.
+std::pair<SlotId /* matched docs */, std::unique_ptr<sbe::PlanStage>> buildForeignMatches(
+    SlotId localKeysSetSlot,
+    std::unique_ptr<sbe::PlanStage> foreignStage,
+    SlotId foreignRecordSlot,
+    const FieldPath& foreignFieldName,
+    boost::optional<SlotId> collatorSlot,
+    const PlanNodeId nodeId,
+    SlotIdGenerator& slotIdGenerator,
+    bool allowDiskUse) {
+    // 'buildForeignKeysStream()' does not take a child stage. To connect the extraction of key
+    // values it does to the 'foreignStage' we'll use an 'nlj', inner branch of which will do the
+    // key value extraction and filtering. It's possible that the same foreign record contains
+    // multiple matching values and to avoid duplication of the record we must limit the inner
+    // branch to '1'.
+    auto [foreignValueSlot, currentRootStage] =
+        buildForeignKeysStream(foreignRecordSlot, foreignFieldName, nodeId, slotIdGenerator);
+
+    currentRootStage = makeLimitTree(
+        makeS<FilterStage<false>>(std::move(currentRootStage),
+                                  collatorSlot ? makeFunction("collIsMember",
+                                                              makeVariable(*collatorSlot),
+                                                              makeVariable(foreignValueSlot),
+                                                              makeVariable(localKeysSetSlot))
+                                               : makeFunction("isMember",
+                                                              makeVariable(foreignValueSlot),
+                                                              makeVariable(localKeysSetSlot)),
+                                  nodeId),
+        nodeId,
+        1 /* take the foreign record once, even if multiple key values match */);
+
+    currentRootStage = makeS<LoopJoinStage>(std::move(foreignStage) /* outer */,
+                                            std::move(currentRootStage) /* inner */,
+                                            makeSV(foreignRecordSlot) /* outerProjects */,
+                                            makeSV(foreignRecordSlot) /* outerCorrelated */,
+                                            nullptr,
+                                            nodeId);
+
+    // Group the matched foreign documents into a list.
+    // It creates a union stage internally so that when there's no matching foreign records, an
+    // empty array will be returned.
+    return buildForeignMatchedArray(
+        EvalStage{std::move(currentRootStage), makeSV(foreignRecordSlot)},
+        foreignRecordSlot,
+        nodeId,
+        slotIdGenerator,
+        allowDiskUse);
+}
+
 std::pair<SlotId /* matched docs */, std::unique_ptr<sbe::PlanStage>> buildNljLookupStage(
     std::unique_ptr<sbe::PlanStage> localStage,
     SlotId localRecordSlot,
@@ -417,42 +467,21 @@ std::pair<SlotId /* matched docs */, std::unique_ptr<sbe::PlanStage>> buildNljLo
                                                       slotIdGenerator,
                                                       allowDiskUse);
 
-    // Build the inner branch that produces the set of foreign key values.
-    auto [foreignKeySlot, foreignKeyStage] = buildKeySet(JoinSide::Foreign,
-                                                         std::move(foreignStage),
-                                                         foreignRecordSlot,
-                                                         foreignFieldName,
-                                                         nodeId,
-                                                         slotIdGenerator,
-                                                         allowDiskUse);
-
-    // Add a filter that only lets through foreign records with non-empty intersection of local and
-    // foreign keys.
-    std::unique_ptr<EExpression> setIntersectionExpr = (collatorSlot)
-        ? makeFunction("collSetIntersection",
-                       makeVariable(*collatorSlot),
-                       makeVariable(localKeySlot),
-                       makeVariable(foreignKeySlot))
-        : makeFunction("setIntersection", makeVariable(localKeySlot), makeVariable(foreignKeySlot));
-    std::unique_ptr<EExpression> haveMatchingKeysExpr =
-        makeBinaryOp(EPrimBinary::greater,
-                     makeFunction("getArraySize", std::move(setIntersectionExpr)),
-                     makeConstant(TypeTags::NumberInt32, 0));
-
-    EvalStage innerBranch = makeFilter<false /* IsConst */, false /* IsEof */>(
-        EvalStage{std::move(foreignKeyStage), SlotVector{}},
-        std::move(haveMatchingKeysExpr),
-        nodeId);
-
-    // Group the matched foreign documents into a list, stored in the 'innerResultSlot'.
-    // It creates a union stage internally so that when there's no matching foreign records, an
-    // empty array will be returned.
-    auto [innerResultSlot, innerRootStage] = buildForeignMatchedArray(
-        std::move(innerBranch), foreignRecordSlot, nodeId, slotIdGenerator, allowDiskUse);
+    // Build the inner branch that will get the foreign key values, compare them to the local key
+    // values and accumulate all matching foreign records into an array that is placed into
+    // 'matchedRecordsSlot'.
+    auto [matchedRecordsSlot, innerRootStage] = buildForeignMatches(localKeySlot,
+                                                                    std::move(foreignStage),
+                                                                    foreignRecordSlot,
+                                                                    foreignFieldName,
+                                                                    collatorSlot,
+                                                                    nodeId,
+                                                                    slotIdGenerator,
+                                                                    allowDiskUse);
 
     // Connect the two branches with a nested loop join. For each outer record with a corresponding
     // value in the 'localKeySlot', the inner branch will be executed and will place the result into
-    // 'innerResultSlot'.
+    // 'matchedRecordsSlot'.
     std::unique_ptr<sbe::PlanStage> nlj =
         makeS<LoopJoinStage>(std::move(outerRootStage),
                              std::move(innerRootStage),
@@ -461,49 +490,7 @@ std::pair<SlotId /* matched docs */, std::unique_ptr<sbe::PlanStage>> buildNljLo
                              nullptr /* predicate */,
                              nodeId);
 
-    return {innerResultSlot, std::move(nlj)};
-}
-
-std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildLookupResultObject(
-    std::unique_ptr<sbe::PlanStage> stage,
-    SlotId localDocumentSlot,
-    SlotId resultArraySlot,
-    const FieldPath& fieldPath,
-    const PlanNodeId nodeId,
-    SlotIdGenerator& slotIdGenerator) {
-    const int32_t pathLength = fieldPath.getPathLength();
-
-    // Extract values of all fields along the path except the last one.
-    auto fieldSlots = slotIdGenerator.generateMultiple(pathLength - 1);
-    for (int32_t i = 0; i < pathLength - 1; i++) {
-        const auto fieldName = fieldPath.getFieldName(i);
-        const auto inputSlot = i == 0 ? localDocumentSlot : fieldSlots[i - 1];
-        stage = makeProjectStage(
-            std::move(stage),
-            nodeId,
-            fieldSlots[i],
-            makeFunction("getField"_sd, makeVariable(inputSlot), makeConstant(fieldName)));
-    }
-
-    // Construct new objects for each path level.
-    auto objectSlots = slotIdGenerator.generateMultiple(pathLength);
-    for (int32_t i = pathLength - 1; i >= 0; i--) {
-        const auto rootObjectSlot = i == 0 ? localDocumentSlot : fieldSlots[i - 1];
-        const auto fieldName = fieldPath.getFieldName(i).toString();
-        const auto valueSlot = i == pathLength - 1 ? resultArraySlot : objectSlots[i + 1];
-        stage = makeS<MakeBsonObjStage>(std::move(stage),
-                                        objectSlots[i],                        /* objSlot */
-                                        rootObjectSlot,                        /* rootSlot */
-                                        MakeBsonObjStage::FieldBehavior::drop, /* fieldBehaviour */
-                                        std::vector<std::string>{},            /* fields */
-                                        std::vector<std::string>{fieldName},   /* projectFields */
-                                        SlotVector{valueSlot},                 /* projectVars */
-                                        true,                                  /* forceNewObject */
-                                        false,                                 /* returnOldObject */
-                                        nodeId);
-    }
-
-    return {objectSlots.front(), std::move(stage)};
+    return {matchedRecordsSlot, std::move(nlj)};
 }
 
 /*
@@ -791,48 +778,18 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
                                                                       makeSV() /* slotsToForward */,
                                                                       slotIdGenerator);
 
-    // Some values are encoded with the same value in BTree index, such undefined, null and empty
-    // array. In hashed indexes, hash collisions are possible. We need to double check that the
-    // results returned from the index scan are what we expect. To do that, we traverse the path in
-    // 'foreignFieldName' and check if the set in 'localKeysSetSlot' contains any of the values
-    // returned.
-    auto [foreignValueSlot, foreignValueStage] =
-        buildForeignKeysStream(foreignRecordSlot, foreignFieldName, nodeId, slotIdGenerator);
-
-    // Check if local keys set contains the value from the foreign document.
-    auto foreignValueFilterStage =
-        makeS<FilterStage<false>>(std::move(foreignValueStage),
-                                  collatorSlot ? makeFunction("collIsMember",
-                                                              makeVariable(*collatorSlot),
-                                                              makeVariable(foreignValueSlot),
-                                                              makeVariable(localKeysSetSlot))
-                                               : makeFunction("isMember",
-                                                              makeVariable(foreignValueSlot),
-                                                              makeVariable(localKeysSetSlot)),
-                                  nodeId);
-
-    // Path traversal of the foreign document may produce multiple values. To ensure that the
-    // foreign document is added only once to the resulting array, we put whole path traversal into
-    // the right branch of loop join and add 'limit 1' stage on top.
-    auto foreignValueMatchesStage = makeLimitTree(std::move(foreignValueFilterStage), nodeId, 1);
-
-    auto filteredForeignRecordsStage =
-        makeS<LoopJoinStage>(std::move(scanNljStage) /* outer */,
-                             std::move(foreignValueMatchesStage) /* inner */,
-                             makeSV(foreignRecordSlot) /* outerProjects */,
-                             makeSV(foreignRecordSlot) /* outerCorrelated */,
-                             nullptr,
-                             nodeId);
-
-    // Group the matched foreign documents into a list, stored in the 'foreignGroupSlot'.
-    // It creates a union stage internally so that when there's no matching foreign records, an
-    // empty array will be returned.
-    auto [foreignGroupSlot, foreignGroupStage] = buildForeignMatchedArray(
-        EvalStage{std::move(filteredForeignRecordsStage), makeSV(foreignRecordSlot)},
-        foreignRecordSlot,
-        nodeId,
-        slotIdGenerator,
-        state.allowDiskUse);
+    // 'buildForeignMatches()' filters the foreign records, returned by the index scan, to match
+    // those in 'localKeysSetSlot'. This is necessary because some values are encoded with the same
+    // value in BTree index, such as undefined, null and empty array. In hashed indexes, hash
+    // collisions are possible.
+    auto [foreignGroupSlot, foreignGroupStage] = buildForeignMatches(localKeysSetSlot,
+                                                                     std::move(scanNljStage),
+                                                                     foreignRecordSlot,
+                                                                     foreignFieldName,
+                                                                     collatorSlot,
+                                                                     nodeId,
+                                                                     slotIdGenerator,
+                                                                     state.allowDiskUse);
 
     // The top level loop join stage that joins each local field with the matched foreign
     // documents.
@@ -955,6 +912,48 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildNonExistentForeignCollLo
                              nodeId,
                              emptyArraySlot,
                              makeConstant(emptyArrayTag, emptyArrayVal))};
+}
+
+std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildLookupResultObject(
+    std::unique_ptr<sbe::PlanStage> stage,
+    SlotId localDocumentSlot,
+    SlotId resultArraySlot,
+    const FieldPath& fieldPath,
+    const PlanNodeId nodeId,
+    SlotIdGenerator& slotIdGenerator) {
+    const int32_t pathLength = fieldPath.getPathLength();
+
+    // Extract values of all fields along the path except the last one.
+    auto fieldSlots = slotIdGenerator.generateMultiple(pathLength - 1);
+    for (int32_t i = 0; i < pathLength - 1; i++) {
+        const auto fieldName = fieldPath.getFieldName(i);
+        const auto inputSlot = i == 0 ? localDocumentSlot : fieldSlots[i - 1];
+        stage = makeProjectStage(
+            std::move(stage),
+            nodeId,
+            fieldSlots[i],
+            makeFunction("getField"_sd, makeVariable(inputSlot), makeConstant(fieldName)));
+    }
+
+    // Construct new objects for each path level.
+    auto objectSlots = slotIdGenerator.generateMultiple(pathLength);
+    for (int32_t i = pathLength - 1; i >= 0; i--) {
+        const auto rootObjectSlot = i == 0 ? localDocumentSlot : fieldSlots[i - 1];
+        const auto fieldName = fieldPath.getFieldName(i).toString();
+        const auto valueSlot = i == pathLength - 1 ? resultArraySlot : objectSlots[i + 1];
+        stage = makeS<MakeBsonObjStage>(std::move(stage),
+                                        objectSlots[i],                        /* objSlot */
+                                        rootObjectSlot,                        /* rootSlot */
+                                        MakeBsonObjStage::FieldBehavior::drop, /* fieldBehaviour */
+                                        std::vector<std::string>{},            /* fields */
+                                        std::vector<std::string>{fieldName},   /* projectFields */
+                                        SlotVector{valueSlot},                 /* projectVars */
+                                        true,                                  /* forceNewObject */
+                                        false,                                 /* returnOldObject */
+                                        nodeId);
+    }
+
+    return {objectSlots.front(), std::move(stage)};
 }
 }  // namespace
 
