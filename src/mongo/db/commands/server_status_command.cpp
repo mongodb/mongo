@@ -133,11 +133,17 @@ public:
 
         // --- counters
         bool includeMetricTree = MetricTree::theMetricTree != nullptr;
-        if (cmdObj["metrics"].type() && !cmdObj["metrics"].trueValue())
+        auto metricsEl = cmdObj["metrics"_sd];
+        if (metricsEl.type() && !metricsEl.trueValue())
             includeMetricTree = false;
 
         if (includeMetricTree) {
-            MetricTree::theMetricTree->appendTo(result);
+            if (metricsEl.type() == BSONType::Object) {
+                MetricTree::theMetricTree->appendTo(BSON("metrics" << metricsEl.embeddedObject()),
+                                                    result);
+            } else {
+                MetricTree::theMetricTree->appendTo(result);
+            }
         }
 
         // --- some hard coded global things hard to pull out

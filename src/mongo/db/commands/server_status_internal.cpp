@@ -31,6 +31,7 @@
 
 #include <iostream>
 
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/util/str.h"
 
@@ -79,16 +80,53 @@ void MetricTree::_add(const string& path, ServerStatusMetric* metric) {
 }
 
 void MetricTree::appendTo(BSONObjBuilder& b) const {
-    for (map<string, ServerStatusMetric*>::const_iterator i = _metrics.begin(); i != _metrics.end();
-         ++i) {
-        i->second->appendAtLeaf(b);
+    for (const auto& i : _metrics) {
+        i.second->appendAtLeaf(b);
     }
 
-    for (map<string, MetricTree*>::const_iterator i = _subtrees.begin(); i != _subtrees.end();
-         ++i) {
-        BSONObjBuilder bb(b.subobjStart(i->first));
-        i->second->appendTo(bb);
+    for (const auto& i : _subtrees) {
+        BSONObjBuilder bb(b.subobjStart(i.first));
+        i.second->appendTo(bb);
         bb.done();
     }
 }
+
+void MetricTree::appendTo(const BSONObj& excludePaths, BSONObjBuilder& b) const {
+    auto fieldNamesInExclude = excludePaths.getFieldNames<stdx::unordered_set<std::string>>();
+    for (const auto& i : _metrics) {
+        auto key = i.first;
+        auto el = fieldNamesInExclude.contains(key) ? excludePaths.getField(key) : BSONElement();
+        if (el) {
+            uassert(ErrorCodes::InvalidBSONType,
+                    "Exclusion value for a leaf must be a boolean.",
+                    el.type() == Bool);
+            if (el.boolean() == false) {
+                continue;
+            }
+        }
+        i.second->appendAtLeaf(b);
+    }
+
+    for (const auto& i : _subtrees) {
+        auto key = i.first;
+        auto el = fieldNamesInExclude.contains(key) ? excludePaths.getField(key) : BSONElement();
+        if (el) {
+            uassert(ErrorCodes::InvalidBSONType,
+                    "Exclusion value must be a boolean or a nested object.",
+                    el.type() == Bool || el.type() == Object);
+            if (el.isBoolean() && el.boolean() == false) {
+                continue;
+            }
+        }
+
+        BSONObjBuilder bb(b.subobjStart(key));
+        if (el.type() == Object) {
+            i.second->appendTo(el.embeddedObject(), bb);
+        } else {
+            i.second->appendTo(bb);
+        }
+        bb.done();
+    }
+}
+
 }  // namespace mongo
