@@ -135,11 +135,6 @@ private:
     void _commit(OperationContext* opCtx);
 
     /**
-     * Refresh all participant shards and log creation.
-     */
-    void _finalize(OperationContext* opCtx);
-
-    /**
      * Helper function to audit and log the shard collection event.
      */
     void _logStartCreateCollection(OperationContext* opCtx);
@@ -161,15 +156,22 @@ private:
 
     const BSONObj _critSecReason;
 
-    // Objects generated on each execution.
+    // The shard key of the collection, static for the duration of the coordinator and reflects the
+    // original command
     boost::optional<ShardKeyPattern> _shardKeyPattern;
+
+    // Set on successful completion of the coordinator
+    boost::optional<CreateCollectionResponse> _result;
+
+    // The fields below are only populated if the coordinator enters in the branch where the
+    // collection is not already sharded (i.e., they will not be present on early return)
+
     boost::optional<BSONObj> _collationBSON;
     boost::optional<UUID> _collectionUUID;
+
     std::unique_ptr<InitialSplitPolicy> _splitPolicy;
-    InitialSplitPolicy::ShardCollectionConfig _initialChunks;
-    boost::optional<CreateCollectionResponse> _result;
+    boost::optional<InitialSplitPolicy::ShardCollectionConfig> _initialChunks;
     boost::optional<bool> _collectionEmpty;
-    boost::optional<size_t> _numChunks;
 };
 
 class CreateCollectionCoordinatorDocumentPre60Compatible final
