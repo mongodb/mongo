@@ -852,7 +852,13 @@ void TransactionParticipant::Participant::_beginMultiDocumentTransaction(
         getRetryableWriteTransactionParticipantCatalog(opCtx);
     if (_isInternalSessionForRetryableWrite()) {
         retryableWriteTxnParticipantCatalog.addParticipant(*this);
-    } else {
+    } else if (!_isInternalSessionForNonRetryableWrite()) {
+        // Don't reset the RetryableWriteTransactionParticipantCatalog upon starting an internal
+        // transaction for a non-retryable write since the transaction is unrelated to the
+        // retryable write or transaction in the original session that the write runs in. In
+        // addition, it is incorrect to clear the transaction history in the original session since
+        // the history should be kept until there is a retryable write or transaction with a higher
+        // txnNumber.
         retryableWriteTxnParticipantCatalog.reset();
     }
 
@@ -2731,8 +2737,10 @@ void TransactionParticipant::Participant::_refreshFromStorageIfNeeded(OperationC
                                                                       bool fetchOplogEntries) {
     _refreshSelfFromStorageIfNeeded(opCtx, fetchOplogEntries);
     if (!_isInternalSessionForNonRetryableWrite()) {
-        // Internal sessions for writes without a txnNumber runs independently of the original
-        // session that those write run in, so there is no need to do a cross-session refresh.
+        // Internal sessions for non-retryable writes only support transactions and those
+        // transactions are not retryable or related to the retryable write or transaction the
+        // original sessions that those writes run in, so there is no need to do a cross-session
+        // refresh.
         _refreshActiveTransactionParticipantsFromStorageIfNeeded(opCtx, fetchOplogEntries);
     }
 }
@@ -2993,8 +3001,9 @@ void TransactionParticipant::Participant::invalidate(OperationContext* opCtx) {
     auto& retryableWriteTxnParticipantCatalog =
         getRetryableWriteTransactionParticipantCatalog(_session());
     if (!_isInternalSessionForNonRetryableWrite()) {
-        // Internal sessions for writes without a txnNumber runs independently of the original
-        // session that those write run in.
+        // Don't invalidate the RetryableWriteTransactionParticipantCatalog upon invalidating an
+        // internal transaction for a non-retryable write since the transaction is unrelated to
+        // the retryable write or transaction in the original session that the write runs in.
         retryableWriteTxnParticipantCatalog.invalidate();
     }
 
