@@ -102,6 +102,7 @@ public:
     void onReshardingFieldsChanges(OperationContext* opCtx,
                                    const TypeCollectionReshardingFields& reshardingFields);
 
+    void onReadDuringCriticalSection();
     void onWriteDuringCriticalSection();
 
     SharedSemiFuture<void> awaitCriticalSectionAcquired();

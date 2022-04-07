@@ -525,6 +525,13 @@ void ReshardingDonorService::DonorStateMachine::onWriteDuringCriticalSection() {
     _metricsNew->onWriteDuringCriticalSection();
 }
 
+void ReshardingDonorService::DonorStateMachine::onReadDuringCriticalSection() {
+    if (!ShardingDataTransformMetrics::isEnabled()) {
+        return;
+    }
+    _metricsNew->onReadDuringCriticalSection();
+}
+
 SharedSemiFuture<void> ReshardingDonorService::DonorStateMachine::awaitCriticalSectionAcquired() {
     return _critSecWasAcquired.getFuture();
 }

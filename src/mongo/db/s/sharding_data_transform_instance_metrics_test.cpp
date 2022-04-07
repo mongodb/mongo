@@ -201,6 +201,17 @@ TEST_F(ShardingDataTransformInstanceMetricsTest, DonorIncrementWritesDuringCriti
     ASSERT_EQ(report.getIntField("countWritesDuringCriticalSection"), 1);
 }
 
+TEST_F(ShardingDataTransformInstanceMetricsTest, DonorIncrementReadsDuringCriticalSection) {
+    auto metrics = createInstanceMetrics(UUID::gen(), Role::kDonor);
+
+    auto report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("countReadsDuringCriticalSection"), 0);
+    metrics->onReadDuringCriticalSection();
+
+    report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("countReadsDuringCriticalSection"), 1);
+}
+
 TEST_F(ShardingDataTransformInstanceMetricsTest, CurrentOpReportsCriticalSectionTime) {
     const auto roles = {Role::kDonor, Role::kCoordinator};
     for (const auto& role : roles) {
@@ -247,6 +258,17 @@ TEST_F(ShardingDataTransformInstanceMetricsTest, CurrentOpReportsRunningTime) {
                                                                           &_cumulativeMetrics);
     auto report = metrics->reportForCurrentOp();
     ASSERT_EQ(report.getIntField("totalOperationTimeElapsedSecs"), kTimeElapsed);
+}
+
+TEST_F(ShardingDataTransformInstanceMetricsTest, OnWriteToStasheddShouldIncrementCurOpFields) {
+    auto metrics = createInstanceMetrics(UUID::gen(), Role::kRecipient);
+
+    auto report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("countWritesToStashCollections"), 0);
+    metrics->onWriteToStashedCollections();
+
+    report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("countWritesToStashCollections"), 1);
 }
 
 }  // namespace

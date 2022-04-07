@@ -68,9 +68,13 @@ public:
     void onUpdateApplied();
     void onDeleteApplied();
     void onOplogEntriesApplied(int64_t numEntries);
+    void onWriteToStashedCollections();
+
+    void onReadDuringCriticalSection();
     void onWriteDuringCriticalSection();
     void onCriticalSectionBegin();
     void onCriticalSectionEnd();
+
     Role getRole() const;
 
 protected:
@@ -125,9 +129,11 @@ private:
     AtomicWord<int64_t> _updatesApplied;
     AtomicWord<int64_t> _deletesApplied;
     AtomicWord<int64_t> _oplogEntriesApplied;
+    AtomicWord<int64_t> _writesToStashCollections;
 
     AtomicWord<Date_t> _criticalSectionStartTime;
     AtomicWord<Date_t> _criticalSectionEndTime;
+    AtomicWord<int64_t> _readsDuringCriticalSection;
     AtomicWord<int64_t> _writesDuringCriticalSection;
 };
 

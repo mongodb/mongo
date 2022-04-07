@@ -271,6 +271,10 @@ void ReshardingOplogApplicationRules::_applyInsert_inlock(OperationContext* opCt
         UpdateResult ur = update(opCtx, db, request);
         invariant(ur.numMatched != 0);
 
+        if (ShardingDataTransformMetrics::isEnabled()) {
+            _metricsNew->onWriteToStashedCollections();
+        }
+
         return;
     }
 
@@ -311,6 +315,10 @@ void ReshardingOplogApplicationRules::_applyInsert_inlock(OperationContext* opCt
     // and insert the contents of 'op' to the stash collection.
     uassertStatusOK(stashColl->insertDocument(
         opCtx, InsertStatement(oField), nullptr /* nullOpDebug */, false /* fromMigrate */));
+
+    if (ShardingDataTransformMetrics::isEnabled()) {
+        _metricsNew->onWriteToStashedCollections();
+    }
 }
 
 void ReshardingOplogApplicationRules::_applyUpdate_inlock(OperationContext* opCtx,
@@ -363,6 +371,10 @@ void ReshardingOplogApplicationRules::_applyUpdate_inlock(OperationContext* opCt
         UpdateResult ur = update(opCtx, db, request);
 
         invariant(ur.numMatched != 0);
+
+        if (ShardingDataTransformMetrics::isEnabled()) {
+            _metricsNew->onWriteToStashedCollections();
+        }
 
         return;
     }
@@ -437,6 +449,11 @@ void ReshardingOplogApplicationRules::_applyDelete_inlock(OperationContext* opCt
     if (!stashCollDoc.isEmpty()) {
         auto nDeleted = deleteObjects(opCtx, stashColl, _myStashNss, idQuery, true /* justOne */);
         invariant(nDeleted != 0);
+
+        if (ShardingDataTransformMetrics::isEnabled()) {
+            _metricsNew->onWriteToStashedCollections();
+        }
+
         return;
     }
 
@@ -520,6 +537,11 @@ void ReshardingOplogApplicationRules::_applyDelete_inlock(OperationContext* opCt
                                                           boost::none /* verbosity */));
             BSONObj res;
             auto state = exec->getNext(&res, nullptr);
+
+            if (ShardingDataTransformMetrics::isEnabled()) {
+                _metricsNew->onWriteToStashedCollections();
+            }
+
             if (PlanExecutor::ADVANCED == state) {
                 // We matched a document and deleted it, so break.
                 doc = std::move(res);

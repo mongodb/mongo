@@ -146,7 +146,7 @@ BSONObj ShardingDataTransformInstanceMetrics::reportForCurrentOp() const noexcep
             builder.append(kDonorState, getStateString());
             builder.append(kCriticalSectionTimeElapsed, getCriticalSectionElapsedTimeSecs());
             builder.append(kCountWritesDuringCriticalSection, _writesDuringCriticalSection.load());
-            builder.append(kCountReadsDuringCriticalSection, TEMP_VALUE);
+            builder.append(kCountReadsDuringCriticalSection, _readsDuringCriticalSection.load());
             break;
         case Role::kRecipient:
             builder.append(kRecipientState, getStateString());
@@ -156,7 +156,7 @@ BSONObj ShardingDataTransformInstanceMetrics::reportForCurrentOp() const noexcep
             builder.append(kApproxDocumentsToCopy, TEMP_VALUE);
             builder.append(kApproxBytesToCopy, TEMP_VALUE);
             builder.append(kBytesCopied, TEMP_VALUE);
-            builder.append(kCountWritesToStashCollections, TEMP_VALUE);
+            builder.append(kCountWritesToStashCollections, _writesToStashCollections.load());
             builder.append(kInsertsApplied, _insertsApplied.load());
             builder.append(kUpdatesApplied, _updatesApplied.load());
             builder.append(kDeletesApplied, _deletesApplied.load());
@@ -213,6 +213,14 @@ int64_t ShardingDataTransformInstanceMetrics::getCriticalSectionElapsedTimeSecs(
         end = _clockSource->now();
     }
     return durationCount<Seconds>(end - start);
+}
+
+void ShardingDataTransformInstanceMetrics::onWriteToStashedCollections() {
+    _writesToStashCollections.fetchAndAdd(1);
+}
+
+void ShardingDataTransformInstanceMetrics::onReadDuringCriticalSection() {
+    _readsDuringCriticalSection.fetchAndAdd(1);
 }
 
 }  // namespace mongo

@@ -70,6 +70,7 @@ void onCriticalSectionErrorThrows(OperationContext* opCtx, const StaleConfigInfo
             (*stateMachine)->onWriteDuringCriticalSection();
             return;
         case StaleConfigInfo::OperationType::kRead:
+            (*stateMachine)->onReadDuringCriticalSection();
             return;
     }
 }
