@@ -79,9 +79,6 @@ void MultiIndexBlockTest::setUp() {
 }
 
 void MultiIndexBlockTest::tearDown() {
-    auto service = getServiceContext();
-    repl::ReplicationCoordinator::set(service, {});
-
     _indexer = {};
 
     CatalogTestFixture::tearDown();

@@ -3360,8 +3360,14 @@ std::string buildTransactionInfoString(OperationContext* opCtx,
                             << singleTransactionStatsInfo.str()
                             << " terminationCause:" << terminationCause
                             << timeActiveAndInactiveInfo.str() << " numYields:" << 0
-                            << " locks:" << locks.done().toString()
-                            << " wasPrepared:" << wasPrepared;
+                            << " locks:" << locks.done().toString();
+
+    if (auto& storageStats = CurOp::get(opCtx)->debug().storageStats) {
+        expectedTransactionInfo << " storage:" << storageStats->toBSON();
+    }
+
+    expectedTransactionInfo << " wasPrepared:" << wasPrepared;
+
     if (wasPrepared) {
         StringBuilder totalPreparedDuration;
         buildPreparedDurationString(

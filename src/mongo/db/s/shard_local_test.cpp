@@ -39,6 +39,7 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/s/shard_local.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/client/shard_registry.h"
 
@@ -90,6 +91,14 @@ void ShardLocalTest::setUp() {
             new repl::ReplicationCoordinatorMock(_opCtx->getServiceContext(), replSettings)));
     ASSERT_OK(repl::ReplicationCoordinator::get(getGlobalServiceContext())
                   ->setFollowerMode(repl::MemberState::RS_PRIMARY));
+
+    repl::createOplog(_opCtx.get());
+
+    // Set a committed snapshot so that we can perform majority reads.
+    WriteUnitOfWork wuow{_opCtx.get()};
+    _opCtx->getServiceContext()->getStorageEngine()->getSnapshotManager()->setCommittedSnapshot(
+        repl::getNextOpTime(_opCtx.get()).getTimestamp());
+    wuow.commit();
 }
 
 void ShardLocalTest::tearDown() {

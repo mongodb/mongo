@@ -34,6 +34,6 @@
 namespace mongo {
 
 ServiceContextDevnullTestFixture::ServiceContextDevnullTestFixture()
-    : ServiceContextMongoDTest("devnull") {}
+    : ServiceContextMongoDTest(Options{}.engine("devnull")) {}
 
 }  // namespace mongo

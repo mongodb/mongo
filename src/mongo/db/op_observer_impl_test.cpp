@@ -192,6 +192,8 @@ public:
     }
 
 protected:
+    explicit OpObserverTest(Options options = {}) : ServiceContextMongoDTest(std::move(options)) {}
+
     // Assert that the oplog has the expected number of entries, and return them
     std::vector<BSONObj> getNOplogEntries(OperationContext* opCtx, int numExpected) {
         std::vector<BSONObj> allOplogEntries;
@@ -847,6 +849,9 @@ public:
     }
 
 protected:
+    // TODO (SERVER-65219): Use wiredTiger.
+    OpObserverTxnParticipantTest() : OpObserverTest(Options{}.engine("ephemeralForTest")) {}
+
     Session* session() {
         return OperationContextSession::get(opCtx());
     }

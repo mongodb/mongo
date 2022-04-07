@@ -56,6 +56,9 @@ using namespace mongo;
 
 class CollectionTest : public CatalogTestFixture {
 protected:
+    // TODO (SERVER-65194): Use wiredTiger.
+    CollectionTest() : CatalogTestFixture(Options{}.engine("ephemeralForTest")) {}
+
     void makeCapped(NamespaceString nss, long long cappedSize = 8192);
     void makeTimeseries(NamespaceString nss);
     void makeCollectionForMultikey(NamespaceString nss, StringData indexName);
@@ -639,6 +642,7 @@ TEST_F(CatalogTestFixture, CappedVisibilityEmptyInitialState) {
     RecordStore* rs = coll->getRecordStore();
 
     auto doInsert = [&](OperationContext* opCtx) -> RecordId {
+        Lock::GlobalLock globalLock{opCtx, MODE_IX};
         std::string data = "data";
         return uassertStatusOK(rs->insertRecord(opCtx, data.c_str(), data.size(), Timestamp()));
     };
@@ -699,6 +703,7 @@ TEST_F(CatalogTestFixture, CappedVisibilityNonEmptyInitialState) {
     RecordStore* rs = coll->getRecordStore();
 
     auto doInsert = [&](OperationContext* opCtx) -> RecordId {
+        Lock::GlobalLock globalLock{opCtx, MODE_IX};
         std::string data = "data";
         return uassertStatusOK(rs->insertRecord(opCtx, data.c_str(), data.size(), Timestamp()));
     };
@@ -768,7 +773,7 @@ TEST_F(CatalogTestFixture, CappedVisibilityNonEmptyInitialState) {
     ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get())->seekExact(otherId), otherId);
 }
 
-TEST_F(CatalogTestFixture, CappedCursorRollover) {
+TEST_F(CollectionTest, CappedCursorRollover) {
     NamespaceString nss("test.t");
     CollectionOptions options;
     options.capped = true;

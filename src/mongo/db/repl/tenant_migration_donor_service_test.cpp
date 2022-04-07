@@ -60,11 +60,6 @@ class TenantMigrationDonorServiceTest : public ServiceContextMongoDTest {
         ServiceContextMongoDTest::setUp();
         auto serviceContext = getServiceContext();
 
-        // Set up clocks.
-        serviceContext->setFastClockSource(std::make_unique<SharedClockSourceAdapter>(_clkSource));
-        serviceContext->setPreciseClockSource(
-            std::make_unique<SharedClockSourceAdapter>(_clkSource));
-
         WaitForMajorityService::get(getServiceContext()).startup(getServiceContext());
 
         {
@@ -130,9 +125,11 @@ class TenantMigrationDonorServiceTest : public ServiceContextMongoDTest {
     }
 
 protected:
+    TenantMigrationDonorServiceTest() : ServiceContextMongoDTest(Options{}.useMockClock(true)) {}
+
     PrimaryOnlyServiceRegistry* _registry;
     PrimaryOnlyService* _service;
-    std::shared_ptr<ClockSourceMock> _clkSource = std::make_shared<ClockSourceMock>();
+    ClockSourceMock _clkSource;
     long long _term = 0;
 
     const TenantMigrationPEMPayload kDonorPEMPayload = [&] {
@@ -170,7 +167,7 @@ protected:
 
 TEST_F(TenantMigrationDonorServiceTest, CheckSettingMigrationStartDate) {
     // Advance the clock by some arbitrary amount of time so we are not starting at 0 seconds.
-    _clkSource->advance(Milliseconds(10000));
+    _clkSource.advance(Milliseconds(10000));
 
     auto taskFp =
         globalFailPointRegistry().find("pauseTenantMigrationAfterPersistingInitialDonorStateDoc");

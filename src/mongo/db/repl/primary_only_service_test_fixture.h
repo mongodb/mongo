@@ -54,6 +54,9 @@ public:
     void tearDown() override;
 
 protected:
+    explicit PrimaryOnlyServiceMongoDTest(Options options = {})
+        : ServiceContextMongoDTest(std::move(options)) {}
+
     void startup(OperationContext* opCtx);
     void shutdown();
 

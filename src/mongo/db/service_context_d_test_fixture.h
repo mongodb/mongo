@@ -46,17 +46,43 @@ public:
 protected:
     enum class RepairAction { kNoRepair, kRepair };
 
-    ServiceContextMongoDTest();
+    class Options {
+    public:
+        Options(){};
 
-    /**
-     * Build a ServiceContextMongoDTest, using the named storage engine.
-     */
-    explicit ServiceContextMongoDTest(std::string engine);
-    ServiceContextMongoDTest(std::string engine,
-                             RepairAction repair,
-                             StorageEngineInitFlags initFlags = kDefaultStorageEngineInitFlags,
-                             bool useReplSettings = false,
-                             bool useMockClock = false);
+        Options& engine(std::string engine) {
+            _engine = std::move(engine);
+            return *this;
+        }
+        Options& repair(RepairAction repair) {
+            _repair = repair;
+            return *this;
+        }
+        Options& initFlags(StorageEngineInitFlags initFlags) {
+            _initFlags = initFlags;
+            return *this;
+        }
+        Options& useReplSettings(bool useReplSettings) {
+            _useReplSettings = useReplSettings;
+            return *this;
+        }
+        Options& useMockClock(bool useMockClock) {
+            _useMockClock = useMockClock;
+            return *this;
+        }
+
+    private:
+        std::string _engine = "wiredTiger";
+        RepairAction _repair = RepairAction::kNoRepair;
+        StorageEngineInitFlags _initFlags = kDefaultStorageEngineInitFlags;
+        bool _useReplSettings = false;
+        bool _useMockClock = false;
+
+        friend class ServiceContextMongoDTest;
+    };
+
+    explicit ServiceContextMongoDTest(Options options = {});
+
     virtual ~ServiceContextMongoDTest();
 
     void tearDown() override;

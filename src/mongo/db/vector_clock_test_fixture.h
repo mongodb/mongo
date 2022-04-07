@@ -45,11 +45,10 @@ class VectorClockMutable;
  * ShardingMongodTestFixture.
  */
 class VectorClockTestFixture : public ShardingMongodTestFixture {
-public:
+protected:
     VectorClockTestFixture();
     ~VectorClockTestFixture();
 
-protected:
     /**
      * Sets up this fixture as the primary node in a shard server replica set with a VectorClock
      * (with a TimeProofService), storage engine, DBClient, OpObserver, and a mocked clock source.
@@ -66,20 +65,19 @@ protected:
 
     LogicalTime getClusterTime() const;
 
-    ClockSourceMock* getMockClockSource() const;
+    ClockSourceMock* getMockClockSource();
 
-    void setMockClockSourceTime(Date_t time) const;
+    void setMockClockSourceTime(Date_t time);
 
-    Date_t getMockClockSourceTime() const;
+    Date_t getMockClockSourceTime();
 
     DBDirectClient* getDBClient() const;
 
-protected:
     void setupOpObservers() override;
 
 private:
     VectorClock* _clock;
-    std::shared_ptr<ClockSourceMock> _mockClockSource = std::make_shared<ClockSourceMock>();
+    ClockSourceMock _mockClockSource;
     std::unique_ptr<DBDirectClient> _dbDirectClient;
 };
 

@@ -314,6 +314,9 @@ private:
     void tearDown() override;
 
 protected:
+    explicit RenameCollectionTest(Options options = {})
+        : ServiceContextMongoDTest(std::move(options)) {}
+
     ServiceContext::UniqueOperationContext _opCtx;
     repl::ReplicationCoordinatorMock* _replCoord = nullptr;
     OpObserverMock* _opObserver = nullptr;
@@ -765,31 +768,6 @@ TEST_F(RenameCollectionTest,
                   renameCollection(_opCtx.get(), _sourceNss, _targetNss, options));
 }
 
-TEST_F(RenameCollectionTest, RenameCollectionMakesTargetCollectionDropPendingIfDropTargetIsTrue) {
-    _createCollectionWithUUID(_opCtx.get(), _sourceNss);
-    auto targetUUID = _createCollectionWithUUID(_opCtx.get(), _targetNss);
-    RenameCollectionOptions options;
-    options.dropTarget = true;
-    ASSERT_OK(renameCollection(_opCtx.get(), _sourceNss, _targetNss, options));
-    ASSERT_FALSE(_collectionExists(_opCtx.get(), _sourceNss))
-        << "source collection " << _sourceNss << " still exists after successful rename";
-    ASSERT_TRUE(_collectionExists(_opCtx.get(), _targetNss))
-        << "target collection " << _targetNss << " missing after successful rename";
-
-    ASSERT_TRUE(_opObserver->onRenameCollectionCalled);
-    ASSERT(_opObserver->onRenameCollectionDropTarget);
-    ASSERT_EQUALS(targetUUID, *_opObserver->onRenameCollectionDropTarget);
-
-    auto renameOpTime = _opObserver->renameOpTime;
-    ASSERT_GREATER_THAN(renameOpTime, repl::OpTime());
-
-    // Confirm that the target collection has been renamed to a drop-pending collection.
-    auto dpns = _targetNss.makeDropPendingNamespace(renameOpTime);
-    ASSERT_TRUE(_collectionExists(_opCtx.get(), dpns))
-        << "target collection " << _targetNss
-        << " not renamed to drop-pending collection after successful rename";
-}
-
 TEST_F(RenameCollectionTest,
        RenameCollectionOverridesDropTargetIfTargetCollectionIsMissingAndDropTargetIsTrue) {
     _createCollectionWithUUID(_opCtx.get(), _sourceNss);
@@ -815,30 +793,6 @@ TEST_F(RenameCollectionTest, RenameCollectionForApplyOpsRejectsRenameOpTimeIfWri
     ASSERT_EQUALS(
         ErrorCodes::BadValue,
         renameCollectionForApplyOps(_opCtx.get(), dbName, boost::none, cmd, renameOpTime));
-}
-
-TEST_F(RenameCollectionTest,
-       RenameCollectionForApplyOpsMakesTargetCollectionDropPendingIfDropTargetIsTrue) {
-    repl::UnreplicatedWritesBlock uwb(_opCtx.get());
-    ASSERT_FALSE(_opCtx->writesAreReplicated());
-
-    // OpObserver::preRenameCollection() must return a null OpTime when writes are not replicated.
-    _opObserver->renameOpTime = {};
-
-    _createCollection(_opCtx.get(), _sourceNss);
-    auto dropTargetUUID = _createCollectionWithUUID(_opCtx.get(), _targetNss);
-    auto dbName = _sourceNss.db().toString();
-    auto cmd = BSON("renameCollection" << _sourceNss.ns() << "to" << _targetNss.ns() << "dropTarget"
-                                       << dropTargetUUID);
-
-    repl::OpTime renameOpTime = {Timestamp(Seconds(200), 1U), 1LL};
-    ASSERT_OK(renameCollectionForApplyOps(_opCtx.get(), dbName, boost::none, cmd, renameOpTime));
-
-    // Confirm that the target collection has been renamed to a drop-pending collection.
-    auto dpns = _targetNss.makeDropPendingNamespace(renameOpTime);
-    ASSERT_TRUE(_collectionExists(_opCtx.get(), dpns))
-        << "target collection " << _targetNss
-        << " not renamed to drop-pending collection after successful rename for applyOps";
 }
 
 DEATH_TEST_F(RenameCollectionTest,
@@ -892,69 +846,6 @@ TEST_F(RenameCollectionTest, RenameCollectionForApplyOpsDropTargetByUUIDEvenIfSo
         renameCollectionForApplyOps(_opCtx.get(), missingSourceNss.db().toString(), uuid, cmd, {}));
     ASSERT_TRUE(_collectionExists(_opCtx.get(), _targetNss));
     ASSERT_FALSE(_collectionExists(_opCtx.get(), dropTargetNss));
-}
-
-TEST_F(RenameCollectionTest, RenameCollectionForApplyOpsDropTargetEvenIfSourceIsDropPending) {
-    repl::OpTime dropOpTime(Timestamp(Seconds(100), 0), 1LL);
-    auto dropPendingNss = _sourceNss.makeDropPendingNamespace(dropOpTime);
-
-    auto dropTargetUUID = _createCollectionWithUUID(_opCtx.get(), _targetNss);
-    auto uuid = _createCollectionWithUUID(_opCtx.get(), dropPendingNss);
-    auto cmd =
-        BSON("renameCollection" << dropPendingNss.ns() << "to" << _targetNss.ns() << "dropTarget"
-                                << "true");
-
-    repl::UnreplicatedWritesBlock uwb(_opCtx.get());
-    repl::OpTime renameOpTime = {Timestamp(Seconds(200), 1U), 1LL};
-    ASSERT_OK(renameCollectionForApplyOps(
-        _opCtx.get(), dropPendingNss.db().toString(), uuid, cmd, renameOpTime));
-
-    // Source collections stays in drop-pending state.
-    ASSERT_TRUE(_collectionExists(_opCtx.get(), dropPendingNss));
-    ASSERT_FALSE(_collectionExists(_opCtx.get(), _targetNss));
-    ASSERT_EQUALS(_targetNss.makeDropPendingNamespace(renameOpTime),
-                  _getCollectionNssFromUUID(_opCtx.get(), dropTargetUUID));
-}
-
-TEST_F(RenameCollectionTest, RenameCollectionForApplyOpsDropTargetByUUIDEvenIfSourceIsDropPending) {
-    repl::OpTime dropOpTime(Timestamp(Seconds(100), 0), 1LL);
-    auto dropPendingNss = _sourceNss.makeDropPendingNamespace(dropOpTime);
-    auto dropTargetNss = NamespaceString("test.bar2");
-
-    _createCollectionWithUUID(_opCtx.get(), _targetNss);
-
-    auto dropTargetUUID = _createCollectionWithUUID(_opCtx.get(), dropTargetNss);
-    auto uuid = _createCollectionWithUUID(_opCtx.get(), dropPendingNss);
-    auto cmd = BSON("renameCollection" << dropPendingNss.ns() << "to" << _targetNss.ns()
-                                       << "dropTarget" << dropTargetUUID);
-
-    repl::UnreplicatedWritesBlock uwb(_opCtx.get());
-    repl::OpTime renameOpTime = {Timestamp(Seconds(200), 1U), 1LL};
-    ASSERT_OK(renameCollectionForApplyOps(
-        _opCtx.get(), dropPendingNss.db().toString(), uuid, cmd, renameOpTime));
-
-    // Source collections stays in drop-pending state.
-    ASSERT_TRUE(_collectionExists(_opCtx.get(), dropPendingNss));
-    ASSERT_FALSE(_collectionExists(_opCtx.get(), dropTargetNss));
-    ASSERT_EQUALS(dropTargetNss.makeDropPendingNamespace(renameOpTime),
-                  _getCollectionNssFromUUID(_opCtx.get(), dropTargetUUID));
-    ASSERT_TRUE(_collectionExists(_opCtx.get(), _targetNss));
-}
-
-TEST_F(RenameCollectionTest, RenameCollectionForApplyOpsDropTargetByUUIDEvenIfSourceEqualsTarget) {
-    auto dropTargetUUID = _createCollectionWithUUID(_opCtx.get(), _targetNss);
-    auto uuid = _createCollectionWithUUID(_opCtx.get(), _sourceNss);
-    auto cmd = BSON("renameCollection" << _sourceNss.ns() << "to" << _sourceNss.ns() << "dropTarget"
-                                       << dropTargetUUID);
-    repl::UnreplicatedWritesBlock uwb(_opCtx.get());
-    repl::OpTime renameOpTime = {Timestamp(Seconds(200), 1U), 1LL};
-    auto dpns = _targetNss.makeDropPendingNamespace(renameOpTime);
-    ASSERT_OK(renameCollectionForApplyOps(
-        _opCtx.get(), _sourceNss.db().toString(), uuid, cmd, renameOpTime));
-
-    ASSERT_TRUE(_collectionExists(_opCtx.get(), _sourceNss));
-    ASSERT_TRUE(_collectionExists(_opCtx.get(), dpns));
-    ASSERT_FALSE(_collectionExists(_opCtx.get(), _targetNss));
 }
 
 void _testRenameCollectionStayTemp(OperationContext* opCtx,

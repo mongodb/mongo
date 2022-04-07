@@ -81,6 +81,9 @@ void assertBSONObjsSame(const std::vector<BSONObj>& expectedBSON,
 
 class ConfigInitializationTest : public ConfigServerTestFixture {
 protected:
+    // TODO (SERVER-65308): Use wiredTiger.
+    ConfigInitializationTest() : ConfigServerTestFixture(Options{}.engine("ephemeralForTest")) {}
+
     /*
      * Initializes the sharding state and locks both the config db and rstl.
      */

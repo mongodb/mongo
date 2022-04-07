@@ -51,15 +51,11 @@ public:
     }
 
 protected:
+    KeysManagerShardedTest() : ConfigServerTestFixture(Options{}.useMockClock(true)) {}
+
     void setUp() override {
         ConfigServerTestFixture::setUp();
 
-        auto clockSource = std::make_unique<ClockSourceMock>();
-        // Timestamps of "0 seconds" are not allowed, so we must advance our clock mock to the first
-        // real second.
-        clockSource->advance(Seconds(1));
-
-        operationContext()->getServiceContext()->setFastClockSource(std::move(clockSource));
         auto catalogClient = std::make_unique<KeysCollectionClientSharded>(
             Grid::get(operationContext())->catalogClient());
         _keyManager =
@@ -77,12 +73,26 @@ private:
 };
 
 TEST_F(KeysManagerShardedTest, GetKeyForValidationTimesOutIfRefresherIsNotRunning) {
-    operationContext()->setDeadlineAfterNowBy(Microseconds(250 * 1000),
-                                              ErrorCodes::ExceededTimeLimit);
+    Milliseconds maxTime{25};
+    operationContext()->setDeadlineAfterNowBy(maxTime, ErrorCodes::ExceededTimeLimit);
 
-    ASSERT_THROWS(
-        keyManager()->getKeysForValidation(operationContext(), 1, LogicalTime(Timestamp(100, 0))),
-        DBException);
+    AtomicWord<bool> done{false};
+    stdx::thread t{[&] {
+        ASSERT_THROWS(keyManager()->getKeysForValidation(
+                          operationContext(), 1, LogicalTime(Timestamp(100, 0))),
+                      DBException);
+        done.store(true);
+    }};
+
+    int numTimesAdvanced = 0;
+    while (!done.load()) {
+        ClockSourceMock clock;
+        clock.advance(maxTime);
+        ++numTimesAdvanced;
+    }
+    t.join();
+
+    ASSERT_GT(numTimesAdvanced, 0);
 }
 
 TEST_F(KeysManagerShardedTest, GetKeyForValidationErrorsIfKeyDoesntExist) {
@@ -371,6 +381,8 @@ TEST_F(KeysManagerShardedTest, HasSeenKeysIsFalseUntilKeysAreFound) {
 
 class KeysManagerDirectTest : public ConfigServerTestFixture {
 protected:
+    KeysManagerDirectTest() : ConfigServerTestFixture(Options{}.useMockClock(true)) {}
+
     const UUID kMigrationId1 = UUID::gen();
     const UUID kMigrationId2 = UUID::gen();
 
@@ -381,12 +393,6 @@ protected:
     void setUp() override {
         ConfigServerTestFixture::setUp();
 
-        auto clockSource = std::make_unique<ClockSourceMock>();
-        // Timestamps of "0 seconds" are not allowed, so we must advance our clock mock to the first
-        // real second.
-        clockSource->advance(Seconds(1));
-
-        operationContext()->getServiceContext()->setFastClockSource(std::move(clockSource));
         _keyManager = std::make_unique<KeysCollectionManager>(
             "dummy", std::make_unique<KeysCollectionClientDirect>(), Seconds(1));
     }

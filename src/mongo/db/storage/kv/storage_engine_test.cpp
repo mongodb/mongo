@@ -130,7 +130,6 @@ TEST_F(StorageEngineTest, TemporaryRecordStoreClustered) {
     WriteUnitOfWork wuow(opCtx.get());
     StatusWith<RecordId> s = rs->insertRecord(opCtx.get(), rid, data, strlen(data), Timestamp());
     ASSERT_TRUE(s.isOK());
-    ASSERT_EQUALS(1, rs->numRecords(opCtx.get()));
     wuow.commit();
 
     // Read the record back.
@@ -175,13 +174,7 @@ TEST_F(StorageEngineTest, ReconcileKeepsTemporary) {
     ASSERT_EQUALS(0UL, reconcileResult.indexesToRebuild.size());
     ASSERT_EQUALS(0UL, reconcileResult.indexBuildsToRestart.size());
 
-    if (_storageEngine->supportsResumableIndexBuilds()) {
-        // The storage engine does not drop its temporary idents outside of starting up after an
-        // unclean shutdown.
-        ASSERT(identExists(opCtx.get(), ident));
-    } else {
-        ASSERT_FALSE(identExists(opCtx.get(), ident));
-    }
+    ASSERT_FALSE(identExists(opCtx.get(), ident));
 }
 
 class StorageEngineTimestampMonitorTest : public StorageEngineTest {
@@ -685,7 +678,7 @@ TEST_F(TimestampKVEngineTest, TimestampAdvancesOnNotification) {
     _storageEngine->getTimestampMonitor()->clearListeners();
 }
 
-TEST_F(StorageEngineDurableTest, UseAlternateStorageLocation) {
+TEST_F(StorageEngineTest, UseAlternateStorageLocation) {
     auto opCtx = cc().makeOperationContext();
 
     const NamespaceString coll1Ns("db.coll1");

@@ -53,8 +53,7 @@ const static NamespaceString kNss("db.dummy");
 
 class QueuedDataStageTest : public ServiceContextMongoDTest {
 public:
-    QueuedDataStageTest() {
-        getServiceContext()->setFastClockSource(std::make_unique<ClockSourceMock>());
+    QueuedDataStageTest() : ServiceContextMongoDTest(Options{}.useMockClock(true)) {
         _opCtx = makeOperationContext();
     }
 

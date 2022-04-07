@@ -54,11 +54,11 @@ public:
     }
 
 protected:
+    LogicalTimeValidatorTest() : ConfigServerTestFixture(Options{}.useMockClock(true)) {}
+
     void setUp() override {
         ConfigServerTestFixture::setUp();
 
-        auto clockSource = std::make_unique<ClockSourceMock>();
-        operationContext()->getServiceContext()->setFastClockSource(std::move(clockSource));
         auto catalogClient = std::make_unique<KeysCollectionClientSharded>(
             Grid::get(operationContext())->catalogClient());
 

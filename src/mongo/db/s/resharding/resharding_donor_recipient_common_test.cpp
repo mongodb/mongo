@@ -32,6 +32,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/persistent_task_store.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/operation_sharding_state.h"
@@ -315,8 +316,11 @@ public:
 
         ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
         ASSERT_OK(replCoord->updateTerm(operationContext(), _term));
-        replCoord->setMyLastAppliedOpTimeAndWallTime(
-            repl::OpTimeAndWallTime(repl::OpTime(Timestamp(1, 1), _term), Date_t()));
+
+        WriteUnitOfWork wuow{operationContext()};
+        replCoord->setMyLastAppliedOpTimeAndWallTime(repl::OpTimeAndWallTime(
+            repl::OpTime(repl::getNextOpTime(operationContext()).getTimestamp(), _term), Date_t()));
+        wuow.commit();
 
         _primaryOnlyServiceRegistry->onStepUpComplete(operationContext(), _term);
     }

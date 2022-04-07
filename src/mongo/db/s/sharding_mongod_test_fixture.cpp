@@ -56,6 +56,7 @@
 #include "mongo/db/s/op_observer_sharding_impl.h"
 #include "mongo/db/s/shard_local.h"
 #include "mongo/db/s/shard_server_op_observer.h"
+#include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
@@ -85,7 +86,8 @@ using repl::ReplicationCoordinatorMock;
 using repl::ReplSettings;
 using unittest::assertGet;
 
-ShardingMongodTestFixture::ShardingMongodTestFixture() {}
+ShardingMongodTestFixture::ShardingMongodTestFixture(Options options, bool setUpMajorityReads)
+    : ServiceContextMongoDTest(std::move(options)), _setUpMajorityReads(setUpMajorityReads) {}
 
 ShardingMongodTestFixture::~ShardingMongodTestFixture() = default;
 
@@ -281,6 +283,13 @@ void ShardingMongodTestFixture::setUp() {
     // testing this release's code, not backwards compatibility code.
     // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
     serverGlobalParams.mutableFeatureCompatibility.setVersion(multiversion::GenericFCV::kLatest);
+
+    if (_setUpMajorityReads && service->getStorageEngine()->getSnapshotManager()) {
+        WriteUnitOfWork wuow{operationContext()};
+        service->getStorageEngine()->getSnapshotManager()->setCommittedSnapshot(
+            repl::getNextOpTime(operationContext()).getTimestamp());
+        wuow.commit();
+    }
 }
 
 void ShardingMongodTestFixture::tearDown() {

@@ -81,7 +81,7 @@ BSONObj ReplCoordTest::addProtocolVersion(const BSONObj& configDoc, int protocol
     return builder.obj();
 }
 
-ReplCoordTest::ReplCoordTest() {
+ReplCoordTest::ReplCoordTest(Options options) : ServiceContextMongoDTest(std::move(options)) {
     _settings.setReplSetString("mySet/node1:12345,node2:54321");
 }
 
@@ -167,8 +167,6 @@ void ReplCoordTest::init() {
                                                          replicationProcess,
                                                          _storageInterface,
                                                          seed);
-    service->setFastClockSource(std::make_unique<ClockSourceMock>());
-    service->setPreciseClockSource(std::make_unique<ClockSourceMock>());
 }
 
 void ReplCoordTest::init(const ReplSettings& settings) {

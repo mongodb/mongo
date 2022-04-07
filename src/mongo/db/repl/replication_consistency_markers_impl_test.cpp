@@ -203,7 +203,7 @@ TEST_F(ReplicationConsistencyMarkersTest, ReplicationConsistencyMarkers) {
     OpTime startOpTime({Seconds(123), 0}, 1LL);
     OpTime endOpTime({Seconds(456), 0}, 1LL);
     consistencyMarkers.setAppliedThrough(opCtx, startOpTime);
-    consistencyMarkers.setMinValid(opCtx, endOpTime);
+    consistencyMarkers.setMinValid(opCtx, endOpTime, true /* alwaysAllowUntimestampedWrite */);
     consistencyMarkers.setOplogTruncateAfterPoint(opCtx, endOpTime.getTimestamp());
 
     ASSERT_EQ(consistencyMarkers.getAppliedThrough(opCtx), startOpTime);

@@ -52,6 +52,7 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/unittest.h"
@@ -383,12 +384,6 @@ TEST_F(StorageInterfaceImplTest, GetRollbackIDReturnsBadStatusIfRollbackIDIsNotI
                            Timestamp::min()}};
     ASSERT_OK(storage.insertDocuments(opCtx, nss, transformInserts(badDoc)));
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, storage.getRollbackID(opCtx).getStatus());
-}
-
-TEST_F(StorageInterfaceImplTest, SnapshotSupported) {
-    auto opCtx = getOperationContext();
-    Status status = opCtx->recoveryUnit()->majorityCommittedSnapshotAvailable();
-    ASSERT(status.isOK());
 }
 
 TEST_F(StorageInterfaceImplTest, InsertDocumentsReturnsOKWhenNoOperationsAreGiven) {

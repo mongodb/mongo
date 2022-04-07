@@ -150,6 +150,9 @@ class ReshardingTxnClonerTest : public ShardServerTestFixture {
     }
 
 protected:
+    // TODO (SERVER-65303): Use wiredTiger.
+    ReshardingTxnClonerTest() : ShardServerTestFixture(Options{}.engine("ephemeralForTest")) {}
+
     const UUID kDefaultReshardingId = UUID::gen();
     const std::vector<ShardId> kTwoShardIdList{_myShardName, {"otherShardName"}};
     const std::vector<ReshardingSourceId> kTwoSourceIdList = {

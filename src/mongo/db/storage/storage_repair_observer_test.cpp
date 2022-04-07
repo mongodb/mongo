@@ -53,8 +53,7 @@ using boost::filesystem::path;
 
 class StorageRepairObserverTest : public ServiceContextMongoDTest {
 public:
-    StorageRepairObserverTest() : ServiceContextMongoDTest("ephemeralForTest") {
-
+    StorageRepairObserverTest() {
         repl::ReplicationCoordinator::set(
             getServiceContext(),
             std::make_unique<repl::ReplicationCoordinatorMock>(getServiceContext()));

@@ -52,7 +52,7 @@ namespace mongo {
 class ShardingMongodTestFixture : public ShardingTestFixtureCommon,
                                   public ServiceContextMongoDTest {
 protected:
-    ShardingMongodTestFixture();
+    ShardingMongodTestFixture(Options options = {}, bool allowMajorityReads = true);
     ~ShardingMongodTestFixture();
 
     void setUp() override;
@@ -143,6 +143,10 @@ private:
 
     // Records if a component has been shut down, so that it is only shut down once.
     bool _executorPoolShutDown = false;
+
+    // Whether the test fixture should set a committed snapshot during setup so that tests can
+    // perform majority reads without doing any writes.
+    bool _setUpMajorityReads;
 };
 
 }  // namespace mongo

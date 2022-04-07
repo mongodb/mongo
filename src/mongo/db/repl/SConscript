@@ -1643,7 +1643,6 @@ if wiredtiger:
             'roll_back_local_operations_test.cpp',
             'rollback_checker_test.cpp',
             'rollback_impl_test.cpp',
-            'rs_rollback_test.cpp',
             'scatter_gather_test.cpp',
             'speculative_majority_read_info_test.cpp',
             'split_horizon_test.cpp',

@@ -40,7 +40,7 @@ namespace mongo {
  */
 class ShardServerTestFixture : public ShardingMongodTestFixture {
 protected:
-    ShardServerTestFixture();
+    ShardServerTestFixture(Options options = {}, bool setUpMajorityReads = true);
     ~ShardServerTestFixture();
 
     void setUp() override;

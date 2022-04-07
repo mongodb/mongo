@@ -45,8 +45,6 @@ namespace {
 
 class AutoGetCollectionMultiTest : public CatalogTestFixture {
 public:
-    AutoGetCollectionMultiTest() : CatalogTestFixture("wiredTiger") {}
-
     typedef std::pair<ServiceContext::UniqueClient, ServiceContext::UniqueOperationContext>
         ClientAndCtx;
 

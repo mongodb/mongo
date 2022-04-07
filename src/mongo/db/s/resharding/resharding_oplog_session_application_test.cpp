@@ -310,6 +310,11 @@ public:
         return _oplogBufferNss;
     }
 
+protected:
+    // TODO (SERVER-65306): Use wiredTiger.
+    ReshardingOplogSessionApplicationTest()
+        : ServiceContextMongoDTest(Options{}.engine("ephemeralForTest")) {}
+
 private:
     // Used for pre/post image oplog entry lookup.
     const ShardId _donorShardId{"donor-0"};

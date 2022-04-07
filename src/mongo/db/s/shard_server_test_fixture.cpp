@@ -44,7 +44,8 @@ namespace mongo {
 
 const HostAndPort ShardServerTestFixture::kConfigHostAndPort("dummy", 123);
 
-ShardServerTestFixture::ShardServerTestFixture() = default;
+ShardServerTestFixture::ShardServerTestFixture(Options options, bool setUpMajorityReads)
+    : ShardingMongodTestFixture(std::move(options), setUpMajorityReads) {}
 
 ShardServerTestFixture::~ShardServerTestFixture() = default;
 

@@ -46,6 +46,9 @@ namespace mongo {
 
 class MigrationTestFixture : public ConfigServerTestFixture {
 protected:
+    explicit MigrationTestFixture(Options options = {})
+        : ConfigServerTestFixture(std::move(options)) {}
+
     void setUp() override;
 
     /**

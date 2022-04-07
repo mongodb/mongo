@@ -42,6 +42,8 @@ namespace {
 
 class MongoDSessionCatalogTest : public ServiceContextMongoDTest {
 protected:
+    MongoDSessionCatalogTest() : ServiceContextMongoDTest(Options{}.useMockClock(true)) {}
+
     void setUp() override {
         ServiceContextMongoDTest::setUp();
         const auto service = getServiceContext();
@@ -50,8 +52,6 @@ protected:
 
         repl::ReplicationCoordinator::set(service, std::move(replCoord));
         repl::createOplog(_opCtx);
-
-        service->setFastClockSource(std::make_unique<ClockSourceMock>());
     }
 
     ClockSourceMock* clock() {

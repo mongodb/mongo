@@ -44,11 +44,11 @@ namespace {
 
 class VectorClockShardServerTest : public ShardServerTestFixture {
 protected:
+    VectorClockShardServerTest()
+        : ShardServerTestFixture(Options{}.useMockClock(true), false /* setUpMajorityReads */) {}
+
     void setUp() override {
         ShardServerTestFixture::setUp();
-
-        auto clockSource = std::make_unique<ClockSourceMock>();
-        getServiceContext()->setFastClockSource(std::move(clockSource));
 
         auto keysCollectionClient = std::make_unique<KeysCollectionClientDirect>();
 

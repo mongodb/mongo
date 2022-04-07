@@ -47,7 +47,8 @@
 
 namespace mongo {
 
-VectorClockTestFixture::VectorClockTestFixture() = default;
+VectorClockTestFixture::VectorClockTestFixture()
+    : ShardingMongodTestFixture(Options{}.useMockClock(true), false /* setUpMajorityReads */) {}
 
 VectorClockTestFixture::~VectorClockTestFixture() = default;
 
@@ -57,9 +58,6 @@ void VectorClockTestFixture::setUp() {
     auto service = getServiceContext();
 
     _clock = VectorClock::get(service);
-
-    service->setFastClockSource(std::make_unique<SharedClockSourceAdapter>(_mockClockSource));
-    service->setPreciseClockSource(std::make_unique<SharedClockSourceAdapter>(_mockClockSource));
 
     _dbDirectClient = std::make_unique<DBDirectClient>(operationContext());
 
@@ -90,16 +88,16 @@ LogicalTime VectorClockTestFixture::getClusterTime() const {
     return now.clusterTime();
 }
 
-ClockSourceMock* VectorClockTestFixture::getMockClockSource() const {
-    return _mockClockSource.get();
+ClockSourceMock* VectorClockTestFixture::getMockClockSource() {
+    return &_mockClockSource;
 }
 
-void VectorClockTestFixture::setMockClockSourceTime(Date_t time) const {
-    _mockClockSource->reset(time);
+void VectorClockTestFixture::setMockClockSourceTime(Date_t time) {
+    _mockClockSource.reset(time);
 }
 
-Date_t VectorClockTestFixture::getMockClockSourceTime() const {
-    return _mockClockSource->now();
+Date_t VectorClockTestFixture::getMockClockSourceTime() {
+    return _mockClockSource.now();
 }
 
 DBDirectClient* VectorClockTestFixture::getDBClient() const {

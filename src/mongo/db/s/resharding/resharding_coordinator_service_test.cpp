@@ -127,6 +127,10 @@ class ReshardingCoordinatorServiceTest : public ConfigServerTestFixture {
 public:
     using ReshardingCoordinator = ReshardingCoordinatorService::ReshardingCoordinator;
 
+    // TODO (SERVER-65302): Use wiredTiger.
+    ReshardingCoordinatorServiceTest()
+        : ConfigServerTestFixture(Options{}.engine("ephemeralForTest")) {}
+
     std::unique_ptr<repl::PrimaryOnlyService> makeService(ServiceContext* serviceContext) {
         return std::make_unique<ReshardingCoordinatorServiceForTest>(serviceContext);
     }

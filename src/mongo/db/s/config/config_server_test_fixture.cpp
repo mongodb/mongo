@@ -92,7 +92,8 @@ namespace {
 ReadPreferenceSetting kReadPref(ReadPreference::PrimaryOnly);
 }  // namespace
 
-ConfigServerTestFixture::ConfigServerTestFixture() = default;
+ConfigServerTestFixture::ConfigServerTestFixture(Options options, bool setUpMajorityReads)
+    : ShardingMongodTestFixture(std::move(options), setUpMajorityReads) {}
 
 ConfigServerTestFixture::~ConfigServerTestFixture() = default;
 

@@ -228,6 +228,10 @@ public:
     }
 
 protected:
+    // TODO (SERVER-65218): Use wiredTiger.
+    ShardSplitDonorServiceTest()
+        : repl::PrimaryOnlyServiceMongoDTest(Options{}.engine("ephemeralForTest")) {}
+
     std::unique_ptr<repl::PrimaryOnlyService> makeService(ServiceContext* serviceContext) override {
         return std::make_unique<ShardSplitDonorService>(serviceContext);
     }

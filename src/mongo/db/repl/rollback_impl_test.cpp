@@ -152,6 +152,9 @@ private:
     friend class RollbackImplTest::Listener;
 
 protected:
+    // TODO (SERVER-65305): Use wiredTiger.
+    RollbackImplTest() : RollbackTest(Options{}.engine("ephemeralForTest")) {}
+
     /**
      * Creates a new mock collection with name 'nss' via the StorageInterface and associates 'uuid'
      * with the new collection in the CollectionCatalog. There must not already exist a collection

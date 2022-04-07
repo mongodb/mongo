@@ -42,11 +42,11 @@ namespace {
 
 class VectorClockConfigServerTest : public ConfigServerTestFixture {
 protected:
+    VectorClockConfigServerTest()
+        : ConfigServerTestFixture(Options{}.useMockClock(true), false /* setUpMajorityReads */) {}
+
     void setUp() override {
         ConfigServerTestFixture::setUp();
-
-        auto clockSource = std::make_unique<ClockSourceMock>();
-        getServiceContext()->setFastClockSource(std::move(clockSource));
 
         auto keysCollectionClient = std::make_unique<KeysCollectionClientSharded>(
             Grid::get(operationContext())->catalogClient());

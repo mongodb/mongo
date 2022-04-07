@@ -150,8 +150,7 @@ bool WiredTigerFileVersion::shouldDowngrade(bool readOnly, bool hasRecoveryTimes
     }
 
     const auto replCoord = repl::ReplicationCoordinator::get(getGlobalServiceContext());
-    const auto memberState = replCoord->getMemberState();
-    if (memberState.arbiter()) {
+    if (replCoord && replCoord->getMemberState().arbiter()) {
         // SERVER-35361: Arbiters will no longer downgrade their data files. To downgrade
         // binaries, the user must delete the dbpath. It's not particularly expensive for a
         // replica set to re-initialize an arbiter that comes online.

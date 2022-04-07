@@ -48,22 +48,13 @@ namespace mongo {
 
 class StorageEngineTest : public ServiceContextMongoDTest {
 public:
-    StorageEngineTest(RepairAction repair,
-                      const std::string& storageEngine,
-                      StorageEngineInitFlags initFlags)
-        : ServiceContextMongoDTest(storageEngine, repair, initFlags),
-          _storageEngine(getServiceContext()->getStorageEngine()) {}
-
-    StorageEngineTest(const std::string& storageEngine, StorageEngineInitFlags initFlags)
-        : StorageEngineTest(RepairAction::kNoRepair, storageEngine, initFlags) {
-        auto serviceCtx = getServiceContext();
+    explicit StorageEngineTest(Options options = {})
+        : ServiceContextMongoDTest(std::move(options)),
+          _storageEngine(getServiceContext()->getStorageEngine()) {
         repl::ReplicationCoordinator::set(
-            serviceCtx, std::make_unique<repl::ReplicationCoordinatorMock>(serviceCtx));
+            getServiceContext(),
+            std::make_unique<repl::ReplicationCoordinatorMock>(getServiceContext()));
     }
-
-    StorageEngineTest()
-        : StorageEngineTest("ephemeralForTest",
-                            ServiceContextMongoDTest::kDefaultStorageEngineInitFlags) {}
 
     StatusWith<DurableCatalog::Entry> createCollection(OperationContext* opCtx,
                                                        NamespaceString ns) {
@@ -121,6 +112,7 @@ public:
     }
 
     StatusWith<StorageEngine::ReconcileResult> reconcile(OperationContext* opCtx) {
+        Lock::GlobalLock globalLock{opCtx, MODE_IX};
         return _storageEngine->reconcileCatalogAndIdents(opCtx,
                                                          StorageEngine::LastShutdownState::kClean);
     }
@@ -207,10 +199,9 @@ public:
 
 class StorageEngineRepairTest : public StorageEngineTest {
 public:
+    // TODO (SERVER-65191): Use wiredTiger.
     StorageEngineRepairTest()
-        : StorageEngineTest(RepairAction::kRepair,
-                            "ephemeralForTest",
-                            ServiceContextMongoDTest::kDefaultStorageEngineInitFlags) {}
+        : StorageEngineTest(Options{}.engine("ephemeralForTest").repair(RepairAction::kRepair)) {}
 
     void tearDown() {
         auto repairObserver = StorageRepairObserver::get(getGlobalServiceContext());
@@ -226,11 +217,6 @@ public:
                   logv2::seqLog(boost::make_transform_iterator(modifications.begin(), asString),
                                 boost::make_transform_iterator(modifications.end(), asString)));
     }
-};
-
-class StorageEngineDurableTest : public StorageEngineTest {
-public:
-    StorageEngineDurableTest() : StorageEngineTest("wiredTiger", StorageEngineInitFlags()) {}
 };
 
 }  // namespace mongo

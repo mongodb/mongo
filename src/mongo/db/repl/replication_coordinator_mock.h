@@ -420,6 +420,8 @@ public:
     virtual WriteConcernTagChanges* getWriteConcernTagChanges() override;
 
 private:
+    void _setMyLastAppliedOpTimeAndWallTime(const OpTimeAndWallTime& opTimeAndWallTime);
+
     ServiceContext* const _service;
     ReplSettings _settings;
     StorageInterface* _storage = nullptr;

@@ -251,12 +251,7 @@ public:
     repl::ReplicationConsistencyMarkers* _consistencyMarkers;
 
     StorageTimestampTest()
-        : ServiceContextMongoDTest("wiredTiger",
-                                   ServiceContextMongoDTest::RepairAction::kNoRepair,
-                                   kDefaultStorageEngineInitFlags,
-                                   true,  // useReplSettings
-                                   true   // useMockClock
-          ) {
+        : ServiceContextMongoDTest(Options{}.useReplSettings(true).useMockClock(true)) {
         // Set up mongod.
         ServiceContextMongoDTest::setUp();
 

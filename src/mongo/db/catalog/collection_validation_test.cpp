@@ -46,20 +46,7 @@ namespace {
 
 const NamespaceString kNss = NamespaceString("test.t");
 
-/**
- * Test fixture for collection validation with the ephemeralForTest storage engine.
- * Validation with {background:true} is not supported by the ephemeralForTest storage engine.
- */
 class CollectionValidationTest : public CatalogTestFixture {
-public:
-    CollectionValidationTest() : CollectionValidationTest("ephemeralForTest") {}
-
-protected:
-    /**
-     * Allow inheriting classes to select a storage engine with which to run unit tests.
-     */
-    explicit CollectionValidationTest(std::string engine) : CatalogTestFixture(std::move(engine)) {}
-
 private:
     void setUp() override {
         CatalogTestFixture::setUp();
@@ -69,24 +56,6 @@ private:
         ASSERT_OK(storageInterface()->createCollection(
             operationContext(), kNss, defaultCollectionOptions));
     };
-};
-
-/**
- * Test fixture for testing background collection validation on the wiredTiger engine, which is
- * currently the only storage engine that supports background collection validation.
- *
- * Collection kNss will be created for each unit test, courtesy of inheritance from
- * CollectionValidationTest.
- */
-class BackgroundCollectionValidationTest : public CollectionValidationTest {
-public:
-    /**
-     * Sets up the wiredTiger storage engine that supports data checkpointing.
-     *
-     * Background validation runs on a checkpoint, and therefore only on storage engines that
-     * support checkpoints.
-     */
-    BackgroundCollectionValidationTest() : CollectionValidationTest("wiredTiger") {}
 };
 
 /**
@@ -242,7 +211,7 @@ TEST_F(CollectionValidationTest, ValidateEmpty) {
                        /*numInvalidDocuments*/ 0,
                        /*numErrors*/ 0);
 }
-TEST_F(BackgroundCollectionValidationTest, BackgroundValidateEmpty) {
+TEST_F(CollectionValidationTest, BackgroundValidateEmpty) {
     // Running on the WT storage engine.
     backgroundValidate(operationContext(),
                        /*valid*/ true,
@@ -261,7 +230,7 @@ TEST_F(CollectionValidationTest, Validate) {
                        /*numInvalidDocuments*/ 0,
                        /*numErrors*/ 0);
 }
-TEST_F(BackgroundCollectionValidationTest, BackgroundValidate) {
+TEST_F(CollectionValidationTest, BackgroundValidate) {
     auto opCtx = operationContext();
     backgroundValidate(opCtx,
                        /*valid*/ true,
@@ -280,7 +249,7 @@ TEST_F(CollectionValidationTest, ValidateError) {
                        /*numInvalidDocuments*/ 1,
                        /*numErrors*/ 1);
 }
-TEST_F(BackgroundCollectionValidationTest, BackgroundValidateError) {
+TEST_F(CollectionValidationTest, BackgroundValidateError) {
     auto opCtx = operationContext();
     backgroundValidate(opCtx,
                        /*valid*/ false,
@@ -314,7 +283,7 @@ void waitUntilValidateFailpointHasBeenReached() {
     ASSERT(CollectionValidation::getIsValidationPausedForTest());
 }
 
-TEST_F(BackgroundCollectionValidationTest, BackgroundValidateRunsConcurrentlyWithWrites) {
+TEST_F(CollectionValidationTest, BackgroundValidateRunsConcurrentlyWithWrites) {
     auto opCtx = operationContext();
     auto serviceContext = opCtx->getServiceContext();
 
@@ -378,7 +347,7 @@ KeyString::Value makeKeyStringWithoutRecordId(const KeyString::Value& keyStringW
 }
 
 // Verify calling validate() on a collection with old (pre-4.2) keys in a WT unique index.
-TEST_F(BackgroundCollectionValidationTest, ValidateOldUniqueIndexKeyWarning) {
+TEST_F(CollectionValidationTest, ValidateOldUniqueIndexKeyWarning) {
     auto opCtx = operationContext();
 
     {

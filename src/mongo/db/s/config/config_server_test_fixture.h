@@ -48,7 +48,7 @@ class Shard;
  */
 class ConfigServerTestFixture : public ShardingMongodTestFixture {
 protected:
-    ConfigServerTestFixture();
+    explicit ConfigServerTestFixture(Options options = {}, bool setUpMajorityReads = true);
     ~ConfigServerTestFixture();
 
     void setUp() override;

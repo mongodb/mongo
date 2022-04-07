@@ -89,7 +89,7 @@ StringBuilder& operator<<(StringBuilder& sb, const CollectionState& state);
 
 class IdempotencyTest : public OplogApplierImplTest {
 public:
-    IdempotencyTest() : OplogApplierImplTest("wiredTiger") {
+    IdempotencyTest() {
         globalFailPointRegistry()
             .find("doUntimestampedWritesForIdempotencyTests")
             ->setMode(FailPoint::alwaysOn);

@@ -50,11 +50,11 @@ namespace {
  */
 class VectorClockMongoDTest : public ShardingMongodTestFixture {
 protected:
+    VectorClockMongoDTest()
+        : ShardingMongodTestFixture(Options{}.useMockClock(true), false /* setUpMajorityReads */) {}
+
     void setUp() override {
         ShardingMongodTestFixture::setUp();
-
-        auto clockSource = std::make_unique<ClockSourceMock>();
-        getServiceContext()->setFastClockSource(std::move(clockSource));
 
         auto keysCollectionClient = std::make_unique<KeysCollectionClientDirect>();
 

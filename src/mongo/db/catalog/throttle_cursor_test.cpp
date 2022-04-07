@@ -55,6 +55,10 @@ private:
     void setUp() override;
     void tearDown() override;
 
+protected:
+    // TODO (SERVER-65221): Use wiredTiger.
+    ThrottleCursorTest() : CatalogTestFixture(Options{}.engine("ephemeralForTest")) {}
+
 public:
     void setMaxMbPerSec(int maxMbPerSec);
 

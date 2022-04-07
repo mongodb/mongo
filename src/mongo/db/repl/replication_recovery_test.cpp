@@ -136,6 +136,9 @@ public:
 
 class ReplicationRecoveryTest : public ServiceContextMongoDTest {
 protected:
+    // TODO (SERVER-65304): Use wiredTiger.
+    ReplicationRecoveryTest() : ServiceContextMongoDTest(Options{}.engine("ephemeralForTest")) {}
+
     OperationContext* getOperationContext() {
         return _opCtx.get();
     }

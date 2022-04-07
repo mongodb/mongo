@@ -92,7 +92,7 @@ public:
     }
 
 protected:
-    ReplCoordTest();
+    explicit ReplCoordTest(Options options = Options{}.useMockClock(true));
     virtual ~ReplCoordTest();
 
     /**

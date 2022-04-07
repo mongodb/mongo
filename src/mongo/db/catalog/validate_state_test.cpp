@@ -52,8 +52,6 @@ const NamespaceString kNss = NamespaceString("fooDB.fooColl");
 
 class ValidateStateTest : public CatalogTestFixture {
 public:
-    ValidateStateTest() : CatalogTestFixture("wiredTiger") {}
-
     /**
      * Create collection 'nss'. It will possess a default _id index.
      */

@@ -47,6 +47,7 @@
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/storage/snapshot_manager.h"
 
 namespace mongo {
 
@@ -90,6 +91,14 @@ void MockReplCoordServerFixture::setUp() {
     repl::DropPendingCollectionReaper::set(
         service,
         std::make_unique<repl::DropPendingCollectionReaper>(repl::StorageInterface::get(service)));
+
+    // Set a committed snapshot so that we can perform majority reads.
+    WriteUnitOfWork wuow{_opCtx.get()};
+    if (auto snapshotManager =
+            _opCtx->getServiceContext()->getStorageEngine()->getSnapshotManager()) {
+        snapshotManager->setCommittedSnapshot(repl::getNextOpTime(_opCtx.get()).getTimestamp());
+    }
+    wuow.commit();
 }
 
 void MockReplCoordServerFixture::insertOplogEntry(const repl::OplogEntry& entry) {

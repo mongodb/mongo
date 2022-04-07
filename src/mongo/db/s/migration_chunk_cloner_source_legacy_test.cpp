@@ -67,6 +67,8 @@ const ConnectionString kRecipientConnStr =
 
 class MigrationChunkClonerSourceLegacyTest : public ShardServerTestFixture {
 protected:
+    MigrationChunkClonerSourceLegacyTest() : ShardServerTestFixture(Options{}.useMockClock(true)) {}
+
     void setUp() override {
         ShardServerTestFixture::setUp();
 
@@ -97,14 +99,6 @@ protected:
             RemoteCommandTargeterMock::get(recipientShard->getTargeter())
                 ->setFindHostReturnValue(kRecipientConnStr.getServers()[0]);
         }
-
-        auto clockSource = std::make_unique<ClockSourceMock>();
-
-        // Timestamps of "0 seconds" are not allowed, so we must advance our clock mock to the first
-        // real second.
-        clockSource->advance(Seconds(1));
-
-        operationContext()->getServiceContext()->setFastClockSource(std::move(clockSource));
 
         _lsid = makeLogicalSessionId(operationContext());
     }

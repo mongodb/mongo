@@ -49,11 +49,11 @@ namespace {
 
 class KeyGeneratorUpdateTest : public ConfigServerTestFixture {
 protected:
+    KeyGeneratorUpdateTest() : ConfigServerTestFixture(Options{}.useMockClock(true)) {}
+
     void setUp() override {
         ConfigServerTestFixture::setUp();
 
-        auto clockSource = std::make_unique<ClockSourceMock>();
-        operationContext()->getServiceContext()->setFastClockSource(std::move(clockSource));
         _catalogClient = std::make_unique<KeysCollectionClientSharded>(
             Grid::get(operationContext())->catalogClient());
     }

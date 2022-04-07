@@ -51,7 +51,6 @@ namespace {
 
 class DBRAIITestFixture : public CatalogTestFixture {
 public:
-    DBRAIITestFixture() : CatalogTestFixture("wiredTiger") {}
     typedef std::pair<ServiceContext::UniqueClient, ServiceContext::UniqueOperationContext>
         ClientAndCtx;
 

@@ -298,6 +298,11 @@ public:
             << sessionTxnRecord.toBSON() << ", " << foundOp;
     }
 
+protected:
+    // TODO (SERVER-65307): Use wiredTiger.
+    ReshardingOplogBatchApplierTest()
+        : ServiceContextMongoDTest(Options{}.engine("ephemeralForTest")) {}
+
 private:
     ChunkManager makeChunkManagerForSourceCollection() {
         const OID epoch = OID::gen();

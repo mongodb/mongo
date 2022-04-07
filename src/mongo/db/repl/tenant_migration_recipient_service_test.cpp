@@ -181,11 +181,6 @@ public:
 
         ConnectionString::setConnectionHook(mongo::MockConnRegistry::get()->getConnStrHook());
 
-        // Set up clocks.
-        serviceContext->setFastClockSource(std::make_unique<SharedClockSourceAdapter>(_clkSource));
-        serviceContext->setPreciseClockSource(
-            std::make_unique<SharedClockSourceAdapter>(_clkSource));
-
         WaitForMajorityService::get(serviceContext).startup(serviceContext);
 
         // Automatically mark the state doc garbage collectable after data sync completion.
@@ -256,10 +251,6 @@ public:
         auto fetchCommittedTransactionsFp =
             globalFailPointRegistry().find("skipFetchingCommittedTransactions");
         fetchCommittedTransactionsFp->setMode(FailPoint::alwaysOn);
-
-        // Timestamps of "0 seconds" are not allowed, so we must advance our clock mock to the first
-        // real second.
-        _clkSource->advance(Milliseconds(1000));
     }
 
     void tearDown() override {
@@ -305,6 +296,9 @@ public:
     }
 
 protected:
+    TenantMigrationRecipientServiceTest()
+        : ServiceContextMongoDTest(Options{}.useMockClock(true)) {}
+
     PrimaryOnlyServiceRegistry* _registry;
     PrimaryOnlyService* _service;
     long long _term = 0;
@@ -416,14 +410,14 @@ protected:
      * Advance the time by millis on both clock source mocks.
      */
     void advanceTime(Milliseconds millis) {
-        _clkSource->advance(millis);
+        _clkSource.advance(millis);
     }
 
     /**
      * Assumes that the times on both clock source mocks is the same.
      */
     Date_t now() {
-        return _clkSource->now();
+        return _clkSource.now();
     };
 
     /*
@@ -456,11 +450,11 @@ protected:
     }
 
     ClockSource* clock() {
-        return _clkSource.get();
+        return &_clkSource;
     }
 
 private:
-    std::shared_ptr<ClockSourceMock> _clkSource = std::make_shared<ClockSourceMock>();
+    ClockSourceMock _clkSource;
 
     unittest::MinimumLoggedSeverityGuard _replicationSeverityGuard{
         logv2::LogComponent::kReplication, logv2::LogSeverity::Debug(1)};

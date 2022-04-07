@@ -195,12 +195,11 @@ public:
 };
 
 class OplogApplierImplTest : public ServiceContextMongoDTest {
-public:
-    OplogApplierImplTest(){};
-    OplogApplierImplTest(std::string storageEngine)
-        : ServiceContextMongoDTest(std::move(storageEngine)){};
-
 protected:
+    // TODO (SERVER-65297): Use wiredTiger.
+    explicit OplogApplierImplTest()
+        : ServiceContextMongoDTest(Options{}.engine("ephemeralForTest")) {}
+
     void _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::Error expectedError,
                                                            const OplogEntry& op,
                                                            bool expectedApplyOpCalled);
