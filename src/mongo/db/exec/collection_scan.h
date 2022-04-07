@@ -91,6 +91,10 @@ public:
 
     const SpecificStats* getSpecificStats() const final;
 
+    CollectionScanParams::Direction getDirection() const {
+        return _params.direction;
+    }
+
 protected:
     void doSaveStateRequiresCollection() final;
 

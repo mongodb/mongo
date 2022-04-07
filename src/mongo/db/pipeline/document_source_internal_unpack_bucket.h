@@ -33,6 +33,9 @@
 #include <vector>
 
 #include "mongo/db/exec/bucket_unpacker.h"
+#include "mongo/db/exec/collection_scan.h"
+#include "mongo/db/exec/index_scan.h"
+#include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_match.h"
 
@@ -103,6 +106,18 @@ public:
         return DepsTracker::State::EXHAUSTIVE_ALL;
     }
 
+    int getBucketMaxSpanSeconds() const {
+        return _bucketMaxSpanSeconds;
+    }
+
+    std::string getMinTimeField() const {
+        return _bucketUnpacker.getMinField(_bucketUnpacker.getTimeField());
+    }
+
+    std::string getMaxTimeField() const {
+        return _bucketUnpacker.getMaxField(_bucketUnpacker.getTimeField());
+    }
+
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
         return boost::none;
     };
@@ -110,6 +125,20 @@ public:
     BucketUnpacker bucketUnpacker() const {
         return _bucketUnpacker.copy();
     }
+
+    typedef bool IndexSortOrderAgree;
+    typedef bool IndexOrderedByMinTime;
+
+    /*
+     * Takes a leaf plan stage and a sort pattern and returns a pair if they support the Bucket
+Unpacking with Sort Optimization.
+     * The pair includes whether the index order and sort order agree with each other as its first
+     * member and the order of the index as the second parameter.
+     *
+     * Note that the index scan order is different from the index order.
+     */
+    boost::optional<std::pair<IndexSortOrderAgree, IndexOrderedByMinTime>> supportsSort(
+        PlanStage* root, const SortPattern& sort) const;
 
     Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
                                                      Pipeline::SourceContainer* container) final;
@@ -162,6 +191,14 @@ public:
     void setSampleParameters(long long n, int bucketMaxCount) {
         _sampleSize = n;
         _bucketMaxCount = bucketMaxCount;
+    }
+
+    void setIncludeMinTimeAsMetadata() {
+        _bucketUnpacker.setIncludeMinTimeAsMetadata();
+    }
+
+    void setIncludeMaxTimeAsMetadata() {
+        _bucketUnpacker.setIncludeMaxTimeAsMetadata();
     }
 
     boost::optional<long long> sampleSize() const {
@@ -218,6 +255,68 @@ public:
     GetModPathsReturn getModifiedPaths() const final override;
 
 private:
+    /* This is a helper method for supportsSort. It takes the current iterator for the index
+     * keyPattern, the direction of the index scan, the timeField path we're sorting on, and the
+     * direction of the sort. It returns a pair if this data agrees and none if it doesn't.
+     *
+     * The pair contains whether the index order and the sort order agree with each other as the
+     * firstmember and the order of the index as the second parameter.
+     *
+     * Note that the index scan order may be different from the index order.
+     * N.B.: It ASSUMES that there are two members left in the keyPatternIter iterator, and that the
+     * timeSortFieldPath is in fact the path on time.
+     */
+    boost::optional<std::pair<IndexSortOrderAgree, IndexOrderedByMinTime>> checkTimeHelper(
+        BSONObj::iterator& keyPatternIter,
+        bool scanIsForward,
+        const FieldPath& timeSortFieldPath,
+        bool sortIsAscending) const {
+        bool wasMin = false;
+        bool wasMax = false;
+
+        // Check that the index isn't special.
+        if ((*keyPatternIter).isNumber() && abs((*keyPatternIter).numberInt()) == 1) {
+            bool direction = ((*keyPatternIter).numberInt() == 1);
+            direction = (scanIsForward) ? direction : !direction;
+
+            // Verify the direction and fieldNames match.
+            wasMin = ((*keyPatternIter).fieldName() ==
+                      _bucketUnpacker.getMinField(timeSortFieldPath.fullPath()));
+            wasMax = ((*keyPatternIter).fieldName() ==
+                      _bucketUnpacker.getMaxField(timeSortFieldPath.fullPath()));
+            // Terminate early if it wasn't max or min or if the directions don't match.
+            if ((wasMin || wasMax) && (sortIsAscending == direction))
+                return std::pair{wasMin ? sortIsAscending : !sortIsAscending, wasMin};
+        }
+
+        return boost::none;
+    }
+
+    bool sortAndKeyPatternPartAgreeAndOnMeta(const char* keyPatternFieldName,
+                                             const FieldPath& sortFieldPath) const {
+        FieldPath keyPatternFieldPath = FieldPath(keyPatternFieldName);
+
+        // If they don't have the same path length they cannot agree.
+        if (keyPatternFieldPath.getPathLength() != sortFieldPath.getPathLength())
+            return false;
+
+        // Check these paths are on the meta field.
+        if (keyPatternFieldPath.getSubpath(0) != mongo::timeseries::kBucketMetaFieldName)
+            return false;
+        if (!_bucketUnpacker.getMetaField() ||
+            sortFieldPath.getSubpath(0) != *_bucketUnpacker.getMetaField()) {
+            return false;
+        }
+
+        // If meta was the only path component then return true.
+        // Note: We already checked that the path lengths are equal.
+        if (keyPatternFieldPath.getPathLength() == 1)
+            return true;
+
+        // Otherwise return if the remaining path components are equal.
+        return (keyPatternFieldPath.tail() == sortFieldPath.tail());
+    }
+
     GetNextResult doGetNext() final;
     bool haveComputedMetaField() const;
 

@@ -131,6 +131,14 @@ public:
 
     static const char* kStageType;
 
+    const BSONObj& getKeyPattern() const {
+        return _keyPattern;
+    }
+
+    bool isForward() const {
+        return _forward;
+    }
+
 protected:
     void doSaveStateRequiresIndex() final;
 

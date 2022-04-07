@@ -1192,4 +1192,97 @@ DocumentSource::GetModPathsReturn DocumentSourceInternalUnpackBucket::getModifie
     return {GetModPathsReturn::Type::kAllPaths, std::set<std::string>{}, {}};
 }
 
+boost::optional<std::pair<DocumentSourceInternalUnpackBucket::IndexSortOrderAgree,
+                          DocumentSourceInternalUnpackBucket::IndexOrderedByMinTime>>
+DocumentSourceInternalUnpackBucket::supportsSort(PlanStage* root, const SortPattern& sort) const {
+    if (!root)
+        return boost::none;
+
+    switch (root->stageType()) {
+        case STAGE_COLLSCAN: {
+            const CollectionScan* scan = static_cast<CollectionScan*>(root);
+            if (sort.size() == 1) {
+                auto part = sort[0];
+                // Check the sort we're asking for is on time.
+                if (part.fieldPath && *part.fieldPath == _bucketUnpacker.getTimeField()) {
+                    // Check that the directions agree.
+                    if ((scan->getDirection() == CollectionScanParams::Direction::FORWARD) ==
+                        part.isAscending)
+                        return std::pair{part.isAscending, true};
+                }
+            }
+            return boost::none;
+        }
+        case STAGE_IXSCAN: {
+            const IndexScan* scan = static_cast<IndexScan*>(root);
+
+            const auto keyPattern = scan->getKeyPattern();
+            const bool forward = scan->isForward();
+
+            // Return none if the keyPattern cannot support the sort.
+            // Note We add one to sort size to account for the compounding on min/max for the time
+            // field.
+            if ((sort.size() + 1 > (unsigned int)keyPattern.nFields()) || (sort.size() < 1)) {
+                return boost::none;
+            }
+
+            if (sort.size() == 1) {
+                auto part = sort[0];
+
+                // TOOD SERVER-65050: implement here.
+
+                // Check the sort we're asking for is on time.
+                if (part.fieldPath && *part.fieldPath == _bucketUnpacker.getTimeField()) {
+                    auto keyPatternIter = keyPattern.begin();
+
+                    return checkTimeHelper(
+                        keyPatternIter, forward, *part.fieldPath, part.isAscending);
+                }
+            } else if (sort.size() >= 2) {
+                size_t i = 0;
+
+
+                for (auto keyPatternIter = keyPattern.begin();
+                     i < sort.size() && keyPatternIter != keyPattern.end();
+                     (++keyPatternIter)) {
+                    auto part = sort[i];
+                    if (!(part.fieldPath))
+                        return boost::none;
+
+                    if (i < sort.size() - 1) {
+                        // Check the meta field index isn't special.
+                        if (!(*keyPatternIter).isNumber() ||
+                            abs((*keyPatternIter).numberInt()) != 1) {
+                            return boost::none;
+                        }
+
+                        // True = ascending; false = descending.
+                        bool direction = ((*keyPatternIter).numberInt() == 1);
+                        direction = (forward) ? direction : !direction;
+
+                        // Return false if partOne and the first keyPattern part don't agree.
+                        if (!sortAndKeyPatternPartAgreeAndOnMeta((*keyPatternIter).fieldName(),
+                                                                 *part.fieldPath) ||
+                            part.isAscending != direction)
+                            return boost::none;
+                    } else {
+                        if (!part.fieldPath ||
+                            !(*part.fieldPath == _bucketUnpacker.getTimeField())) {
+                            return boost::none;
+                        }
+
+                        return checkTimeHelper(
+                            keyPatternIter, forward, *part.fieldPath, part.isAscending);
+                    }
+
+                    // Increment index
+                    ++i;
+                }
+            }
+            return boost::none;
+        }
+        default:
+            return boost::none;
+    }
+}
 }  // namespace mongo
