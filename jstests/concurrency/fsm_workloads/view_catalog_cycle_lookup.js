@@ -21,10 +21,6 @@ var $config = (function() {
     // Track if the test is not allowed to run on sharded collections.
     var isShardedAndShardedLookupDisabled = false;
 
-    // Test is not allowed yet when featureFlagSBELookPushdown is turned on.
-    // TODO SERVER-64665 Remove this variable after SERVER-64665 is fixed.
-    var isSBELookupEnabled = false;
-
     // Store the default value of the max sub pipeline view depth so it can be reset at the end of
     // the test.
     var oldMaxSubPipelineViewDepth;
@@ -176,13 +172,6 @@ var $config = (function() {
             jsTestLog(
                 "Skipping test because the sharded lookup feature flag is disabled and we have sharded collections");
             this.isShardedAndShardedLookupDisabled = true;
-            return;
-        }
-
-        // TODO SERVER-64665 Remove 'if' block after SERVER-64665 is fixed.
-        if (checkSBEEnabled(db, ["featureFlagSBELookupPushdown"])) {
-            jsTestLog("Skipping test because SBE and SBE $lookup features are both enabled.");
-            this.isSBELookupEnabled = true;
             return;
         }
 

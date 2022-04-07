@@ -175,21 +175,20 @@ public:
             // Check that the secondary collection is safe to use.
             uassertStatusOK(checkSecondaryCollection(opCtx, collection, readTimestamp));
 
+            if ((!collection && isSecondaryNssAView(opCtx, secondaryNss)) ||
+                isSecondaryNssSharded(opCtx, secondaryNss)) {
+                _haveAShardedOrViewSecondaryNss = true;
+                _consistencyCheckBypass = true;
+
+                // We early return once '_haveAShardedOrViewSecondaryNss' is set. We wish to avoid
+                // extra shardVersion checks that can throw stale shard version errors.
+                return;
+            }
+
+            // Create an entry for 'secondaryNss' if we have to perform the consistency check later.
             if (!_consistencyCheckBypass) {
-                _namespaces.emplace_back(secondaryNssOrUUID,
-                                         secondaryNss,
-                                         collection ? false
-                                                    : isSecondaryNssAView(opCtx, secondaryNss),
-                                         isSecondaryNssSharded(opCtx, secondaryNss));
-            } else {
-                // isSecondaryStateStillConsistent won't be called, so initialize
-                // _haveAShardedOrViewSecondaryNss on construction instead. No need to create the
-                // internal maps, either.
-                bool view = collection ? false : isSecondaryNssAView(opCtx, secondaryNss);
-                bool sharded = view ? false : isSecondaryNssSharded(opCtx, secondaryNss);
-                if ((view || sharded) && !_haveAShardedOrViewSecondaryNss) {
-                    _haveAShardedOrViewSecondaryNss = true;
-                }
+                _namespaces.emplace_back(
+                    secondaryNssOrUUID, secondaryNss, false /* pIsView */, false /* pIsSharded */);
             }
         }
     }
@@ -201,15 +200,24 @@ public:
      *
      * Returns false if the originally provided 'secondaryNssOrUUIDs' now resolve to different
      * NamespaceStrings or are found to now be a view or sharded when they previously where not.
-     *
-     * Cannot be called if 'consistencyCheckBypass' was set to true on object construction.
      */
     bool isSecondaryStateStillConsistent(OperationContext* opCtx,
                                          const CollectionCatalog* catalog) {
-        invariant(!_consistencyCheckBypass);
+        if (_consistencyCheckBypass) {
+            // If we're bypassing the consistency check, we consider the secondary state to be
+            // consistent.
+            return true;
+        }
 
         const auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
         for (const auto& namespaceIt : _namespaces) {
+            // Skip the consistency check if we've discovered that a secondary namespace is a view
+            // or is sharded. At this point, it is not safe to use this AutoGet object to access
+            // secondary namespaces.
+            if (_haveAShardedOrViewSecondaryNss) {
+                break;
+            }
+
             auto secondaryNss = catalog->resolveNamespaceStringOrUUID(opCtx, namespaceIt.nssOrUUID);
             if (secondaryNss != namespaceIt.nss) {
                 // A secondary collection UUID maps to a different namespace.

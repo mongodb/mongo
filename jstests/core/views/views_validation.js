@@ -139,19 +139,13 @@ makeView("v0", "ok", [makeGraphLookup("v1")], ErrorCodes.ViewDepthLimitExceeded)
 makeView("v0", "ok", [makeFacet("v1")], ErrorCodes.ViewDepthLimitExceeded);
 makeView("v0", "ok", [makeUnion("v1")], ErrorCodes.ViewDepthLimitExceeded);
 
-// Temporarily disable this test case.
-// TODO SERVER-64665 Remove 'if' condition after SERVER-64665 is fixed.
-if (!checkSBEEnabled(db, ["featureFlagSBELookupPushdown"])) {
-    // Test that querying a view that descends more than 20 views will fail.
-    assert.commandFailedWithCode(
-        viewsDb.runCommand({aggregate: "v10", pipeline: [makeUnion("v1")], cursor: {}}),
-        ErrorCodes.ViewDepthLimitExceeded);
-    assert.commandFailedWithCode(
-        viewsDb.runCommand({aggregate: "v10", pipeline: [makeLookup("v1")], cursor: {}}),
-        ErrorCodes.ViewDepthLimitExceeded);
-} else {
-    jsTestLog("Skipping test because SBE and SBE $lookup features are both enabled.");
-}
+// Test that querying a view that descends more than 20 views will fail.
+assert.commandFailedWithCode(
+    viewsDb.runCommand({aggregate: "v10", pipeline: [makeUnion("v1")], cursor: {}}),
+    ErrorCodes.ViewDepthLimitExceeded);
+assert.commandFailedWithCode(
+    viewsDb.runCommand({aggregate: "v10", pipeline: [makeLookup("v1")], cursor: {}}),
+    ErrorCodes.ViewDepthLimitExceeded);
 
 // But adding to the middle should be ok.
 makeView("vMid", "v10");

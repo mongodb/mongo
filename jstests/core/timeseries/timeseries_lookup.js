@@ -13,12 +13,6 @@
 load("jstests/core/timeseries/libs/timeseries.js");
 load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 
-// TODO SERVER-64465 Reenable this test after SERVER-64465 is fixed.
-if (checkSBEEnabled(db, ["featureFlagSBELookupPushdown"])) {
-    jsTestLog("Skipping test because SBE and SBE $lookup features are both enabled.");
-    return;
-}
-
 TimeseriesTest.run((insert) => {
     const testDB = db.getSiblingDB(jsTestName());
     assert.commandWorked(testDB.dropDatabase());
