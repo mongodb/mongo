@@ -6284,12 +6284,7 @@ tasks:
   depends_on:
   - name: compile_dist_test
   commands:
-  - command: manifest.load
-  - func: "git get project and add git tag"
   - *f_expansions_write
-  - *kill_processes
-  - *cleanup_environment
-  - *set_up_venv
   - func: "scons compile"
     vars:
       targets: >-
