@@ -149,10 +149,16 @@ FLEBatchResult processFLEFindAndModify(OperationContext* opCtx,
                                        const BSONObj& cmdObj,
                                        BSONObjBuilder& result);
 
+write_ops::FindAndModifyCommandRequest processFLEFindAndModifyExplainMongos(
+    OperationContext* opCtx, const write_ops::FindAndModifyCommandRequest& findAndModifyRequest);
+
 /**
  * Process a findAndModify request from a replica set.
  */
 write_ops::FindAndModifyCommandReply processFLEFindAndModify(
+    OperationContext* opCtx, const write_ops::FindAndModifyCommandRequest& findAndModifyRequest);
+
+write_ops::FindAndModifyCommandRequest processFLEFindAndModifyExplainMongod(
     OperationContext* opCtx, const write_ops::FindAndModifyCommandRequest& findAndModifyRequest);
 
 /**
@@ -418,6 +424,11 @@ write_ops::FindAndModifyCommandReply processFindAndModify(
     FLEQueryInterface* queryImpl,
     const write_ops::FindAndModifyCommandRequest& findAndModifyRequest);
 
+write_ops::FindAndModifyCommandRequest processFindAndModifyExplain(
+    boost::intrusive_ptr<ExpressionContext> expCtx,
+    FLEQueryInterface* queryImpl,
+    const write_ops::FindAndModifyCommandRequest& findAndModifyRequest);
+
 /**
  * Callback function to get a TransactionWithRetries with the appropiate Executor
  */
@@ -433,10 +444,18 @@ write_ops::DeleteCommandReply processDelete(OperationContext* opCtx,
                                             const write_ops::DeleteCommandRequest& deleteRequest,
                                             GetTxnCallback getTxns);
 
-StatusWith<write_ops::FindAndModifyCommandReply> processFindAndModifyRequest(
+template <typename ReplyType>
+using ProcessFindAndModifyCallback =
+    std::function<ReplyType(boost::intrusive_ptr<ExpressionContext> expCtx,
+                            FLEQueryInterface* queryImpl,
+                            const write_ops::FindAndModifyCommandRequest& findAndModifyRequest)>;
+
+template <typename ReplyType>
+StatusWith<ReplyType> processFindAndModifyRequest(
     OperationContext* opCtx,
     const write_ops::FindAndModifyCommandRequest& findAndModifyRequest,
-    GetTxnCallback getTxns);
+    GetTxnCallback getTxns,
+    ProcessFindAndModifyCallback<ReplyType> processCallback = processFindAndModify);
 
 
 write_ops::UpdateCommandReply processUpdate(OperationContext* opCtx,

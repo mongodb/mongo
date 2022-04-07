@@ -212,7 +212,7 @@ write_ops::FindAndModifyCommandReply processFLEFindAndModify(
             repl::ReplicationCoordinator::get(opCtx->getServiceContext())->getReplicationMode() ==
                 repl::ReplicationCoordinator::modeReplSet);
 
-    auto reply = processFindAndModifyRequest(
+    auto reply = processFindAndModifyRequest<write_ops::FindAndModifyCommandReply>(
         opCtx, findAndModifyRequest, &getTransactionWithRetriesForMongoD);
 
     return uassertStatusOK(reply);
@@ -265,4 +265,15 @@ BSONObj processFLEWriteExplainD(OperationContext* opCtx,
         opCtx, fle::collatorFromBSON(opCtx, collation), nss, runtimeConstants, letParameters);
     return fle::rewriteQuery(opCtx, expCtx, nss, info, query, &getTransactionWithRetriesForMongoD);
 }
+
+write_ops::FindAndModifyCommandRequest processFLEFindAndModifyExplainMongod(
+    OperationContext* opCtx, const write_ops::FindAndModifyCommandRequest& request) {
+    tassert(6513401,
+            "Missing encryptionInformation for findAndModify",
+            request.getEncryptionInformation().has_value());
+
+    return uassertStatusOK(processFindAndModifyRequest<write_ops::FindAndModifyCommandRequest>(
+        opCtx, request, &getTransactionWithRetriesForMongoD, processFindAndModifyExplain));
+}
+
 }  // namespace mongo

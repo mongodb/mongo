@@ -550,17 +550,26 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
     const BSONObj& cmdObj = this->request().toBSON(BSONObj() /* commandPassthroughFields */);
     validate(this->request());
 
-    const NamespaceString& nsString = this->request().getNamespace();
+    auto request = [&]() {
+        if (this->request().getEncryptionInformation().has_value() &&
+            !this->request().getEncryptionInformation()->getCrudProcessed().get_value_or(false)) {
+            return processFLEFindAndModifyExplainMongod(opCtx, this->request());
+        } else {
+            return this->request();
+        }
+    }();
+
+    const NamespaceString& nsString = request.getNamespace();
     uassertStatusOK(userAllowedWriteNS(opCtx, nsString));
     auto const curOp = CurOp::get(opCtx);
     OpDebug* const opDebug = &curOp->debug();
-    const std::string dbName = this->request().getDbName().toString();
+    const std::string dbName = request.getDbName().toString();
 
-    if (this->request().getRemove().value_or(false)) {
+    if (request.getRemove().value_or(false)) {
         auto deleteRequest = DeleteRequest{};
         deleteRequest.setNsString(nsString);
         const bool isExplain = true;
-        makeDeleteRequest(opCtx, this->request(), isExplain, &deleteRequest);
+        makeDeleteRequest(opCtx, request, isExplain, &deleteRequest);
 
         ParsedDelete parsedDelete(opCtx, &deleteRequest);
         uassertStatusOK(parsedDelete.parseRequest());
@@ -583,7 +592,7 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
     } else {
         auto updateRequest = UpdateRequest();
         updateRequest.setNamespaceString(nsString);
-        makeUpdateRequest(opCtx, this->request(), verbosity, &updateRequest);
+        makeUpdateRequest(opCtx, request, verbosity, &updateRequest);
 
         const ExtensionsCallbackReal extensionsCallback(opCtx, &updateRequest.getNamespaceString());
         ParsedUpdate parsedUpdate(opCtx, &updateRequest, extensionsCallback);

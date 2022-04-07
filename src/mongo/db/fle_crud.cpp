@@ -553,10 +553,12 @@ void processRemovedFields(FLEQueryInterface* queryImpl,
 
 }  // namespace
 
-StatusWith<write_ops::FindAndModifyCommandReply> processFindAndModifyRequest(
+template <typename ReplyType>
+StatusWith<ReplyType> processFindAndModifyRequest(
     OperationContext* opCtx,
     const write_ops::FindAndModifyCommandRequest& findAndModifyRequest,
-    GetTxnCallback getTxns) {
+    GetTxnCallback getTxns,
+    ProcessFindAndModifyCallback<ReplyType> processCallback) {
 
     // Is this a delete
     bool isDelete = findAndModifyRequest.getRemove().value_or(false);
@@ -588,20 +590,21 @@ StatusWith<write_ops::FindAndModifyCommandReply> processFindAndModifyRequest(
 
     // The function that handles the transaction may outlive this function so we need to use
     // shared_ptrs
-    write_ops::FindAndModifyCommandReply reply;
+    std::shared_ptr<ReplyType> reply;
     auto findAndModifyBlock = std::tie(findAndModifyRequest, reply, expCtx);
     auto sharedFindAndModifyBlock =
         std::make_shared<decltype(findAndModifyBlock)>(findAndModifyBlock);
 
     auto swResult = trun->runSyncNoThrow(
         opCtx,
-        [sharedFindAndModifyBlock](const txn_api::TransactionClient& txnClient,
-                                   ExecutorPtr txnExec) {
+        [sharedFindAndModifyBlock, processCallback](const txn_api::TransactionClient& txnClient,
+                                                    ExecutorPtr txnExec) {
             FLEQueryInterfaceImpl queryImpl(txnClient);
 
             auto [findAndModifyRequest2, reply2, expCtx] = *sharedFindAndModifyBlock.get();
 
-            reply2 = processFindAndModify(expCtx, &queryImpl, findAndModifyRequest2);
+            reply2 = std::make_shared<ReplyType>(
+                processCallback(expCtx, &queryImpl, findAndModifyRequest2));
 
             if (MONGO_unlikely(fleCrudHangFindAndModify.shouldFail())) {
                 LOGV2(6371900, "Hanging due to fleCrudHangFindAndModify fail point");
@@ -617,7 +620,7 @@ StatusWith<write_ops::FindAndModifyCommandReply> processFindAndModifyRequest(
         return swResult.getValue().getEffectiveStatus();
     }
 
-    return reply;
+    return *reply;
 }
 
 FLEQueryInterface::~FLEQueryInterface() {}
@@ -1025,6 +1028,24 @@ write_ops::FindAndModifyCommandReply processFindAndModify(
     return reply;
 }
 
+write_ops::FindAndModifyCommandRequest processFindAndModifyExplain(
+    boost::intrusive_ptr<ExpressionContext> expCtx,
+    FLEQueryInterface* queryImpl,
+    const write_ops::FindAndModifyCommandRequest& findAndModifyRequest) {
+
+    auto edcNss = findAndModifyRequest.getNamespace();
+    auto ei = findAndModifyRequest.getEncryptionInformation().get();
+
+    auto efc = EncryptionInformationHelpers::getAndValidateSchema(edcNss, ei);
+
+    auto newFindAndModifyRequest = findAndModifyRequest;
+    newFindAndModifyRequest.setQuery(fle::rewriteEncryptedFilterInsideTxn(
+        queryImpl, edcNss.db(), efc, expCtx, findAndModifyRequest.getQuery()));
+
+    newFindAndModifyRequest.setEncryptionInformation(boost::none);
+    return newFindAndModifyRequest;
+}
+
 FLEBatchResult processFLEFindAndModify(OperationContext* opCtx,
                                        const BSONObj& cmdObj,
                                        BSONObjBuilder& result) {
@@ -1048,13 +1069,24 @@ FLEBatchResult processFLEFindAndModify(OperationContext* opCtx,
         return FLEBatchResult::kNotProcessed;
     }
 
-    auto swReply = processFindAndModifyRequest(opCtx, request, &getTransactionWithRetriesForMongoS);
+    auto swReply = processFindAndModifyRequest<write_ops::FindAndModifyCommandReply>(
+        opCtx, request, &getTransactionWithRetriesForMongoS);
 
     auto reply = uassertStatusOK(swReply);
 
     reply.serialize(&result);
 
     return FLEBatchResult::kProcessed;
+}
+
+write_ops::FindAndModifyCommandRequest processFLEFindAndModifyExplainMongos(
+    OperationContext* opCtx, const write_ops::FindAndModifyCommandRequest& request) {
+    tassert(6513400,
+            "Missing encryptionInformation for findAndModify",
+            request.getEncryptionInformation().has_value());
+
+    return uassertStatusOK(processFindAndModifyRequest<write_ops::FindAndModifyCommandRequest>(
+        opCtx, request, &getTransactionWithRetriesForMongoS, processFindAndModifyExplain));
 }
 
 BSONObj FLEQueryInterfaceImpl::getById(const NamespaceString& nss, BSONElement element) {

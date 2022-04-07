@@ -1357,6 +1357,8 @@ std::pair<BSONType, std::vector<uint8_t>> FLEClientCrypto::decrypt(ConstDataRang
         // return the unencrypted body. The EOO BSONType signals to the caller that this should
         // maintain the encryption subtype.
         return {EOO, vectorFromCDR(pair.second)};
+    } else if (pair.first == EncryptedBinDataType::kFLE2InsertUpdatePayload) {
+        return {EOO, vectorFromCDR(pair.second)};
     } else {
         uasserted(6373507, "Not supported");
     }
