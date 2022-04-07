@@ -1130,6 +1130,7 @@ public:
             }
 
             curOp.debug().additiveMetrics.ninserted = baseReply.getN();
+            globalOpCounters.gotInserts(baseReply.getN());
         }
     };
 } cmdInsert;
