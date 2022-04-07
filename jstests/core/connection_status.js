@@ -2,6 +2,7 @@
 //   assumes_superuser_permissions,
 //   assumes_write_concern_unchanged,
 //   creates_and_authenticates_user,
+//   no_selinux,
 //   requires_auth,
 //   requires_non_retryable_commands,
 // ]
