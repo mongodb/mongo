@@ -31,6 +31,7 @@
 
 #include "mongo/db/exec/requires_collection_stage.h"
 #include "mongo/db/query/all_indices_required_checker.h"
+#include "mongo/db/query/multiple_collection_accessor.h"
 
 namespace mongo {
 
@@ -44,7 +45,8 @@ public:
     RequiresAllIndicesStage(const char* stageType,
                             ExpressionContext* expCtx,
                             const CollectionPtr& coll)
-        : RequiresCollectionStage(stageType, expCtx, coll), _allIndicesRequiredChecker(coll) {}
+        : RequiresCollectionStage(stageType, expCtx, coll),
+          _allIndicesRequiredChecker(MultipleCollectionAccessor(coll)) {}
 
     virtual ~RequiresAllIndicesStage() = default;
 

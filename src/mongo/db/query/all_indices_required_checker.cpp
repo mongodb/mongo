@@ -31,24 +31,36 @@
 
 namespace mongo {
 
-AllIndicesRequiredChecker::AllIndicesRequiredChecker(const CollectionPtr& collection) {
-    auto allEntriesShared = collection->getIndexCatalog()->getAllReadyEntriesShared();
-    _indexCatalogEntries.reserve(allEntriesShared.size());
-    _indexNames.reserve(allEntriesShared.size());
-    for (auto&& index : allEntriesShared) {
-        _indexCatalogEntries.emplace_back(index);
-        _indexNames.push_back(index->descriptor()->indexName());
+AllIndicesRequiredChecker::AllIndicesRequiredChecker(
+    const MultipleCollectionAccessor& collections) {
+    saveIndicesForCollection(collections.getMainCollection());
+    for (auto& [_, collection] : collections.getSecondaryCollections()) {
+        saveIndicesForCollection(collection);
+    }
+}
+
+void AllIndicesRequiredChecker::saveIndicesForCollection(const CollectionPtr& collection) {
+    if (collection) {
+        auto allEntriesShared = collection->getIndexCatalog()->getAllReadyEntriesShared();
+        auto& indexMap = _indexCatalogEntries[collection->ns()];
+        for (auto&& index : allEntriesShared) {
+            indexMap[index->descriptor()->indexName()] = index;
+        }
     }
 }
 
 void AllIndicesRequiredChecker::check() const {
-    size_t i = 0;
-    for (auto&& index : _indexCatalogEntries) {
-        auto indexCatalogEntry = index.lock();
-        uassert(ErrorCodes::QueryPlanKilled,
-                str::stream() << "query plan killed :: index '" << _indexNames[i] << "' dropped",
-                indexCatalogEntry && !indexCatalogEntry->isDropped());
-        ++i;
+    for (auto& [ns, indexMap] : _indexCatalogEntries) {
+        auto& nsCopy = ns;
+        for (auto& [name, index] : indexMap) {
+            // Create copies for 'ns' and 'name' to make them accessible to the uassert below.
+            auto& nameCopy = name;
+            auto indexCatalogEntry = index.lock();
+            uassert(ErrorCodes::QueryPlanKilled,
+                    str::stream() << "query plan killed :: index '" << nameCopy
+                                  << "' for collection '" << nsCopy << "' dropped",
+                    indexCatalogEntry && !indexCatalogEntry->isDropped());
+        }
     }
 }
 

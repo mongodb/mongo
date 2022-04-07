@@ -87,7 +87,7 @@ public:
           _cq(cq),
           _queryParams(queryParams),
           _yieldPolicy(yieldPolicy),
-          _indexExistenceChecker(collections.getMainCollection()) {
+          _indexExistenceChecker(collections) {
         invariant(_opCtx);
     }
 
@@ -138,9 +138,6 @@ protected:
     const CanonicalQuery& _cq;
     const QueryPlannerParams _queryParams;
     PlanYieldPolicySBE* const _yieldPolicy;
-
-    // TODO SERVER-62913: When support for indexed nested loop join is added, this member needs
-    //  to be extended to support checking for index existence on multiple collections.
     const AllIndicesRequiredChecker _indexExistenceChecker;
 };
 }  // namespace mongo::sbe
