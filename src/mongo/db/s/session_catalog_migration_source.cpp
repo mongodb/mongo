@@ -101,7 +101,7 @@ boost::optional<repl::OplogEntry> forgeNoopEntryFromImageCollection(
     repl::OpTimeBase opTimeBase(Timestamp::min());
     opTimeBase.setTerm(-1);
     forgedNoop.setOpTimeBase(opTimeBase);
-    forgedNoop.setStatementIds({0});
+    forgedNoop.setStatementIds(retryableFindAndModifyOplogEntry.getStatementIds());
     forgedNoop.setPrevWriteOpTimeInTransaction(repl::OpTime(Timestamp::min(), -1));
     return repl::OplogEntry::parse(forgedNoop.toBSON()).getValue();
 }

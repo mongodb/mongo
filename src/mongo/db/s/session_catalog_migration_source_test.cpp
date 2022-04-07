@@ -725,7 +725,10 @@ TEST_F(SessionCatalogMigrationSourceTest, ForgeImageEntriesWhenFetchingEntriesWi
     ASSERT_EQUALS(txnNumber, nextOplogResult.oplog->getTxnNumber().get());
     ASSERT_EQUALS(sessionId, nextOplogResult.oplog->getSessionId().get());
     ASSERT_EQUALS("n", repl::OpType_serializer(nextOplogResult.oplog->getOpType()));
-    ASSERT_EQUALS(0LL, nextOplogResult.oplog->getStatementIds().front());
+    ASSERT_EQ(entry.getStatementIds().size(), nextOplogResult.oplog->getStatementIds().size());
+    for (size_t i = 0; i < entry.getStatementIds().size(); i++) {
+        ASSERT_EQ(entry.getStatementIds()[i], nextOplogResult.oplog->getStatementIds()[i]);
+    }
 
     // The next oplog entry should be the original entry that generated the image entry.
     ASSERT_TRUE(migrationSource.hasMoreOplog());
@@ -1196,8 +1199,12 @@ TEST_F(SessionCatalogMigrationSourceTest,
 
         const auto expectedSessionId = *getParentSessionId(sessionId);
         const auto expectedTxnNumber = *sessionId.getTxnNumber();
-        const auto expectedImageOpForOp2 = makeDurableReplOp(
-            repl::OpTypeEnum::kNoop, kNs, imageEntryForOp2.getImage(), boost::none, {0});
+        const auto expectedImageOpForOp2 =
+            makeDurableReplOp(repl::OpTypeEnum::kNoop,
+                              kNs,
+                              imageEntryForOp2.getImage(),
+                              boost::none,
+                              repl::variant_util::toVector<StmtId>(op2.getStatementIds()));
         const std::vector<repl::DurableReplOperation> expectedOps{
             op3, expectedImageOpForOp2, op2, op1};
 
@@ -1926,8 +1933,12 @@ TEST_F(
 
             const auto expectedSessionId = *getParentSessionId(sessionId);
             const auto expectedTxnNumber = *sessionId.getTxnNumber();
-            const auto expectedImageOpForOp2 = makeDurableReplOp(
-                repl::OpTypeEnum::kNoop, kNs, imageEntryForOp2.getImage(), boost::none, {0});
+            const auto expectedImageOpForOp2 =
+                makeDurableReplOp(repl::OpTypeEnum::kNoop,
+                                  kNs,
+                                  imageEntryForOp2.getImage(),
+                                  boost::none,
+                                  repl::variant_util::toVector<StmtId>(op2.getStatementIds()));
             const std::vector<repl::DurableReplOperation> expectedOps{
                 op3, expectedImageOpForOp2, op2, op1};
 

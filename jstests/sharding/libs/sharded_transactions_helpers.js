@@ -213,12 +213,15 @@ function getOplogEntriesForTxn(rs, lsid, txnNumber) {
     return getOplogEntriesForTxnOnNode(rs.getPrimary(), lsid, txnNumber);
 }
 
-function getTxnEntriesForSession(rs, lsid) {
-    return rs.getPrimary()
-        .getCollection("config.transactions")
+function getTxnEntriesForSessionOnNode(node, lsid) {
+    return node.getCollection("config.transactions")
         .find(makeLsidFilter(lsid, "_id"))
         .sort({_id: 1})
         .toArray();
+}
+
+function getTxnEntriesForSession(rs, lsid) {
+    return getTxnEntriesForSessionOnNode(rs.getPrimary(), lsid);
 }
 
 function getImageEntriesForTxnOnNode(node, lsid, txnNumber) {
