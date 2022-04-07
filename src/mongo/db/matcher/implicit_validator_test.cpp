@@ -43,7 +43,8 @@ FleBlobHeader makeFleHeader(const EncryptedField& field, EncryptedBinDataType su
     FleBlobHeader blob;
     blob.fleBlobSubtype = static_cast<uint8_t>(subtype);
     memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
-    blob.originalBsonType = typeFromName(field.getBsonType());
+    ASSERT(field.getBsonType().has_value());
+    blob.originalBsonType = typeFromName(field.getBsonType().value());
     return blob;
 }
 
@@ -52,17 +53,8 @@ BSONBinData makeFleBinData(const FleBlobHeader& blob) {
         reinterpret_cast<const void*>(&blob), sizeof(FleBlobHeader), BinDataType::Encrypt);
 }
 
-const auto kTestKeyId = UUID::parse("deadbeef-0000-0000-0000-0000deadbeef").getValue();
-const EncryptedField kFieldAbc(kTestKeyId, "a.b.c", "string");
-const EncryptedField kFieldAbd(kTestKeyId, "a.b.d", "int");
-const EncryptedField kFieldC(kTestKeyId, "c", "array");
-const EncryptedField kFieldAxy(kTestKeyId, "a.x.y", "bool");
-const auto kValueAbc = makeFleHeader(kFieldAbc, EncryptedBinDataType::kFLE2EqualityIndexedValue);
-const auto kValueAbd = makeFleHeader(kFieldAbd, EncryptedBinDataType::kFLE2EqualityIndexedValue);
-const auto kValueC = makeFleHeader(kFieldC, EncryptedBinDataType::kFLE2EqualityIndexedValue);
-const auto kValueAxy = makeFleHeader(kFieldAxy, EncryptedBinDataType::kFLE2EqualityIndexedValue);
-const auto kValueFLE1 = makeFleHeader(kFieldAbc, EncryptedBinDataType::kDeterministic);
-const auto kEncryptedFields = std::vector<EncryptedField>{kFieldAbc, kFieldAbd, kFieldC, kFieldAxy};
+const UUID kTestKeyId = UUID::parse("deadbeef-0000-0000-0000-0000deadbeef").getValue();
+
 
 void replace_str(std::string& str, StringData search, StringData replace) {
     auto pos = str.find(search.rawData(), 0, search.size());
@@ -85,13 +77,21 @@ std::string expectedLeafExpr(const EncryptedField& field) {
             {"$or":[
                 {"<NAME>":{"$not":{"$exists":true}}},
                 {"$and":[
-                    {"<NAME>":{"$_internalSchemaBinDataFLE2EncryptedType":[{"$numberInt":"<TYPE>"}]}}
+                    {"<NAME>":{"$_internalSchemaBinDataFLE2EncryptedType":[<TYPE>]}}
                 ]}
             ]})";
     FieldRef ref(field.getPath());
     replace_all(tmpl, "<NAME>"_sd, ref.getPart(ref.numParts() - 1));
-    replace_all(
-        tmpl, "<TYPE>"_sd, std::to_string(static_cast<int>(typeFromName(field.getBsonType()))));
+    if (field.getBsonType().has_value()) {
+        // {"$numberInt":"<TYPE>"}
+        replace_all(tmpl,
+                    "<TYPE>"_sd,
+                    str::stream() << "{\"$numberInt\":\""
+                                  << static_cast<int>(typeFromName(field.getBsonType().value()))
+                                  << "\"}");
+    } else {
+        replace_all(tmpl, "<TYPE>"_sd, "");
+    }
     return tmpl;
 }
 
@@ -112,15 +112,54 @@ std::string expectedNonLeafExpr(StringData fieldName, StringData subschema) {
     return tmpl;
 }
 
-TEST(GenerateFLE2MatchExpression, EmptyInput) {
+class GenerateFLE2MatchExpression : public unittest::Test {
+public:
+    GenerateFLE2MatchExpression() {
+        kFieldAbc.setBsonType("string"_sd);
+        kFieldAbd.setBsonType("int"_sd);
+        kFieldC.setBsonType("array"_sd);
+        kFieldAxy.setBsonType("bool"_sd);
+
+        kValueAbc = makeFleHeader(kFieldAbc, EncryptedBinDataType::kFLE2EqualityIndexedValue);
+        kValueAbd = makeFleHeader(kFieldAbd, EncryptedBinDataType::kFLE2EqualityIndexedValue);
+        kValueC = makeFleHeader(kFieldC, EncryptedBinDataType::kFLE2EqualityIndexedValue);
+        kValueAxy = makeFleHeader(kFieldAxy, EncryptedBinDataType::kFLE2EqualityIndexedValue);
+        // Use the type information from kFieldAbc
+        kValueAxt = makeFleHeader(kFieldAbc, EncryptedBinDataType::kFLE2UnindexedEncryptedValue);
+        kValueFLE1 = makeFleHeader(kFieldAbc, EncryptedBinDataType::kDeterministic);
+
+        kEncryptedFields =
+            std::vector<EncryptedField>{kFieldAbc, kFieldAbd, kFieldC, kFieldAxy, kFieldAxt};
+    }
+
+    EncryptedField kFieldAbc{kTestKeyId, "a.b.c"};
+    EncryptedField kFieldAbd{kTestKeyId, "a.b.d"};
+    EncryptedField kFieldC{kTestKeyId, "c"};
+    EncryptedField kFieldAxy{kTestKeyId, "a.x.y"};
+    EncryptedField kFieldAxt{kTestKeyId, "a.x.t"};  // Untyped
+
+    FleBlobHeader kValueAbc;
+    FleBlobHeader kValueAbd;
+    FleBlobHeader kValueC;
+    FleBlobHeader kValueAxy;
+    FleBlobHeader kValueAxt;
+    FleBlobHeader kValueFLE1;
+
+    std::vector<EncryptedField> kEncryptedFields;
+};
+
+
+TEST_F(GenerateFLE2MatchExpression, EmptyInput) {
     auto swExpr = generateMatchExpressionFromEncryptedFields(new ExpressionContextForTest(), {});
     ASSERT(swExpr.isOK());
     ASSERT_BSONOBJ_EQ(mongo::fromjson("{$alwaysTrue: 1}"), swExpr.getValue()->serialize());
 }
 
-TEST(GenerateFLE2MatchExpression, SimpleInput) {
-    EncryptedField foo(UUID::gen(), "foo", "string");
-    EncryptedField bar(UUID::gen(), "bar", "string");
+TEST_F(GenerateFLE2MatchExpression, SimpleInput) {
+    EncryptedField foo(UUID::gen(), "foo");
+    foo.setBsonType("string"_sd);
+    EncryptedField bar(UUID::gen(), "bar");
+    bar.setBsonType("string"_sd);
 
     std::string expectedJSON = R"({"$and":[
         {"$and":[
@@ -141,7 +180,7 @@ TEST(GenerateFLE2MatchExpression, SimpleInput) {
     ASSERT_BSONOBJ_EQ(expectedBSON, outputBSON);
 }
 
-TEST(GenerateFLE2MatchExpression, NormalInputWithNestedFields) {
+TEST_F(GenerateFLE2MatchExpression, NormalInputWithNestedFields) {
     auto swExpr = generateMatchExpressionFromEncryptedFields(new ExpressionContextForTest(),
                                                              kEncryptedFields);
     ASSERT(swExpr.isOK());
@@ -151,7 +190,7 @@ TEST(GenerateFLE2MatchExpression, NormalInputWithNestedFields) {
     std::string rootSchema = R"({"$and":[{"$and":[<aNonLeafExpr>, <cLeafExpr>]}]})";
     std::string aSubschema = R"({"$and":[<abNonLeafExpr>, <axNonLeafExpr>]})";
     std::string abSubschema = R"({"$and":[<abcLeafExpr>, <abdLeafExpr>]})";
-    std::string axSubschema = R"({"$and":[<axyLeafExpr>]})";
+    std::string axSubschema = R"({"$and":[<axyLeafExpr>, <axtLeafExpr>]})";
 
     replace_str(rootSchema, "<cLeafExpr>", expectedLeafExpr(kFieldC));
     replace_str(rootSchema, "<aNonLeafExpr>", expectedNonLeafExpr("a", aSubschema));
@@ -160,15 +199,19 @@ TEST(GenerateFLE2MatchExpression, NormalInputWithNestedFields) {
     replace_all(rootSchema, "<abcLeafExpr>", expectedLeafExpr(kFieldAbc));
     replace_all(rootSchema, "<abdLeafExpr>", expectedLeafExpr(kFieldAbd));
     replace_all(rootSchema, "<axyLeafExpr>", expectedLeafExpr(kFieldAxy));
+    replace_all(rootSchema, "<axtLeafExpr>", expectedLeafExpr(kFieldAxt));
 
     auto expectedBSON = mongo::fromjson(rootSchema);
     ASSERT_BSONOBJ_EQ(expectedBSON, outputBSON);
 }
 
 DEATH_TEST(GenerateFLE2MatchExpression, EncryptedFieldsConflict, "tripwire assertions") {
-    EncryptedField a(UUID::gen(), "a", "string");
-    EncryptedField ab(UUID::gen(), "a.b", "int");
-    EncryptedField abc(UUID::gen(), "a.b.c", "int");
+    EncryptedField a(UUID::gen(), "a");
+    a.setBsonType("string"_sd);
+    EncryptedField ab(UUID::gen(), "a.b");
+    ab.setBsonType("int"_sd);
+    EncryptedField abc(UUID::gen(), "a.b.c");
+    abc.setBsonType("int"_sd);
 
     auto swExpr =
         generateMatchExpressionFromEncryptedFields(new ExpressionContextForTest(), {a, ab});
@@ -184,7 +227,7 @@ DEATH_TEST(GenerateFLE2MatchExpression, EncryptedFieldsConflict, "tripwire asser
     ASSERT(swExpr.getStatus().code() == 6364302);
 }
 
-class Fle2MatchTest : public unittest::Test {
+class Fle2MatchTest : public GenerateFLE2MatchExpression {
 public:
     Fle2MatchTest() {
         expr = uassertStatusOK(generateMatchExpressionFromEncryptedFields(
@@ -255,6 +298,16 @@ TEST_F(Fle2MatchTest, DoesNotMatchIfHasArrayInEncryptedFieldPath) {
 
     auto obj = BSON("a" << BSON_ARRAY(BSON("b" << BSON("c" << makeFleBinData(kValueAbc)))));
     ASSERT_FALSE(expr->matchesBSON(obj));
+}
+
+TEST_F(Fle2MatchTest, MatchOptionalType) {
+    // Match against indexed
+    auto obj = BSON("a" << BSON("x" << BSON("t" << makeFleBinData(kValueAxy))));
+    ASSERT_TRUE(expr->matchesBSON(obj));
+
+    // Match against unindexed
+    auto obj2 = BSON("a" << BSON("x" << BSON("t" << makeFleBinData(kValueAxt))));
+    ASSERT_TRUE(expr->matchesBSON(obj2));
 }
 
 }  // namespace

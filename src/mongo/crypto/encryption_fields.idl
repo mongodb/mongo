@@ -77,6 +77,7 @@ structs:
                 description: "BSON type of field to encrypt"
                 type: string
                 validator: { callback: "isValidBSONTypeName" }
+                optional: true
                 unstable: true
             queries:
                 description: "List of supported query types"

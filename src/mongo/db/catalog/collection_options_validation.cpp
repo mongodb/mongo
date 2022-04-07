@@ -73,8 +73,6 @@ EncryptedFieldConfig processAndValidateEncryptedFields(EncryptedFieldConfig conf
         uassert(6338401, "Duplicate key ids are not allowed", keys.count(keyId) == 0);
         keys.insert(keyId);
 
-        BSONType type = typeFromName(field.getBsonType());
-
         for (const auto& path : fieldPaths) {
             uassert(6338402, "Duplicate paths are not allowed", field.getPath() != path);
             // Cannot have indexes on "a" and "a.b"
@@ -98,15 +96,25 @@ EncryptedFieldConfig processAndValidateEncryptedFields(EncryptedFieldConfig conf
                         queries->size() == 1);
             }
 
+            uassert(6412601,
+                    "Bson type needs to be specified for equality indexed field",
+                    field.getBsonType().has_value());
+
+            BSONType type = typeFromName(field.getBsonType().value());
+
             uassert(6338405,
                     str::stream() << "Type '" << typeName(type)
                                   << "' is not a supported equality indexed type",
                     isFLE2EqualityIndexedSupportedType(type));
         } else {
-            uassert(6338406,
-                    str::stream() << "Type '" << typeName(type)
-                                  << "' is not a supported unindexed type",
-                    isFLE2UnindexedSupportedType(type));
+            if (field.getBsonType().has_value()) {
+                BSONType type = typeFromName(field.getBsonType().value());
+
+                uassert(6338406,
+                        str::stream()
+                            << "Type '" << typeName(type) << "' is not a supported unindexed type",
+                        isFLE2UnindexedSupportedType(type));
+            }
         }
     }
 

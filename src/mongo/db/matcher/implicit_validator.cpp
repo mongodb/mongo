@@ -29,6 +29,7 @@
 
 #include "mongo/db/matcher/implicit_validator.h"
 
+#include "mongo/db/query/stage_types.h"
 #include <algorithm>
 
 #include "mongo/bson/bsonobjbuilder.h"
@@ -46,7 +47,7 @@ namespace {
 
 struct Node {
     std::string name;
-    BSONType type;
+    boost::optional<BSONType> type;
     std::vector<Node> subobjs;
 };
 
@@ -76,10 +77,12 @@ std::unique_ptr<Node> buildTreeFromEncryptedFieldPaths(
                 // the rest of the path forms a new branch; append nodes until the last part
                 for (; i < fieldPath.numParts(); i++) {
                     level->subobjs.push_back(
-                        {fieldPath.getPart(i).toString(), BSONType::Object, std::vector<Node>()});
+                        {fieldPath.getPart(i).toString(), boost::none, std::vector<Node>()});
                     level = &(level->subobjs.back());
                 }
-                level->type = typeFromName(field.getBsonType());
+                if (field.getBsonType().has_value()) {
+                    level->type = typeFromName(field.getBsonType().value());
+                }
             } else {
                 // another field with the same prefix already exists in the tree.
                 // make sure that the nodes in common are not leaves
@@ -142,10 +145,12 @@ std::unique_ptr<MatchExpression> treeToMatchExpression(
         // ]}
         auto andExpr = std::make_unique<AndMatchExpression>(doc_validation_error::createAnnotation(
             expCtx, "_property", BSON("propertyName" << node.name)));
+
         andExpr->add(std::make_unique<InternalSchemaBinDataFLE2EncryptedTypeExpression>(
             node.name,
-            node.type,
+            node.type.has_value() ? MatcherTypeSet(node.type.value()) : MatcherTypeSet(),
             doc_validation_error::createAnnotation(expCtx, "fle2Encrypt", BSONObj())));
+
         return andExpr;
     }
 

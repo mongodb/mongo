@@ -331,7 +331,7 @@ EncryptedFieldConfig FleCompactTest::generateEncryptedFieldConfig(
         EncryptedField ef;
         ef.setKeyId(fieldNameToUUID(field));
         ef.setPath(field);
-        ef.setBsonType("string");
+        ef.setBsonType("string"_sd);
         QueryTypeConfig q(QueryTypeEnum::Equality);
         auto x = ef.getQueries();
         x = std::move(q);
