@@ -3157,18 +3157,17 @@ tasks:
   - func: "send benchmark results"
   - func: "analyze benchmark results"
 
-# Disabled under SERVER-64949.
-# - <<: *benchmark_template
-#   name: benchmarks_cst
-#   tags: ["benchmarks"]
-#   commands:
-#   - func: "do benchmark setup"
-#   - func: "run tests"
-#     vars:
-#       suite: benchmarks_cst
-#       resmoke_jobs_max: 1
-#   - func: "send benchmark results"
-#   - func: "analyze benchmark results"
+- <<: *benchmark_template
+  name: benchmarks_cst
+  tags: ["benchmarks"]
+  commands:
+  - func: "do benchmark setup"
+  - func: "run tests"
+    vars:
+      suite: benchmarks_cst
+      resmoke_jobs_max: 1
+  - func: "send benchmark results"
+  - func: "analyze benchmark results"
 
 - <<: *run_jepsen_template
   name: jepsen_register_findAndModify

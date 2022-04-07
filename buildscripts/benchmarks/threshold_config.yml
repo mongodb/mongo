@@ -27,5 +27,4 @@ overrides:
   benchmarks:
   benchmarks_sharding:
   benchmarks_bsoncolumn:
-  # Disabled under SERVER-64949.
-  # benchmarks_cst:
+  benchmarks_cst:
