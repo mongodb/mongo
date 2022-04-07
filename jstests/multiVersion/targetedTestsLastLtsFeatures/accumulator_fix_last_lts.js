@@ -27,16 +27,20 @@ load('jstests/multiVersion/libs/multi_cluster.js');  // For upgradeCluster()
 
     let verifyShardedAccumulatorResultsOnBothEngine =
         (isGreaterLastContinous, coll, pipeline, verifyThis) => {
-            const dbAtShard0 = st.shard0.getDB(jsTestName());
-            const dbAtShard1 = st.shard1.getDB(jsTestName());
+            const dbs = [
+                st.rs0.getPrimary().getDB(jsTestName()),
+                st.rs0.getSecondary().getDB(jsTestName()),
+                st.rs1.getPrimary().getDB(jsTestName()),
+                st.rs1.getSecondary().getDB(jsTestName())
+            ];
 
             // In the last-lts, we don't have the 'internalQueryForceClassicEngine' query knob.
             if (isGreaterLastContinous) {
                 // Turns to the classic engine at the shards.
-                assert.commandWorked(dbAtShard0.adminCommand(
-                    {setParameter: 1, internalQueryForceClassicEngine: true}));
-                assert.commandWorked(dbAtShard1.adminCommand(
-                    {setParameter: 1, internalQueryForceClassicEngine: true}));
+                dbs.forEach(
+                    (db) => assert.commandWorked(
+                        db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: false}),
+                        `at node ${db.getMongo().host}`));
             }
 
             // Verifies that the classic engine's results are same as the expected results.
@@ -47,10 +51,10 @@ load('jstests/multiVersion/libs/multi_cluster.js');  // For upgradeCluster()
             // nor the SBE $group pushdown feature.
             if (isGreaterLastContinous) {
                 // Turns to the SBE engine at the shards.
-                assert.commandWorked(dbAtShard0.adminCommand(
-                    {setParameter: 1, internalQueryForceClassicEngine: false}));
-                assert.commandWorked(dbAtShard1.adminCommand(
-                    {setParameter: 1, internalQueryForceClassicEngine: false}));
+                dbs.forEach(
+                    (db) => assert.commandWorked(
+                        db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: true}),
+                        `at node ${db.getMongo().host}`));
 
                 // Verifies that the SBE engine's results are same as the expected results.
                 const sbeRes = coll.aggregate(pipeline).toArray();
