@@ -317,7 +317,7 @@ public:
 
     static void resetTableLoggingInfo();
 
-    static bool useTableLogging(const NamespaceString& nss);
+    static bool useTableLogging(NamespaceString ns, bool replEnabled);
 
     static Status setTableLogging(OperationContext* opCtx, const std::string& uri, bool on);
 

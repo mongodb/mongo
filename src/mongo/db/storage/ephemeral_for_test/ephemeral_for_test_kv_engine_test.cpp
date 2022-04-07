@@ -99,8 +99,8 @@ TEST_F(EphemeralForTestKVEngineTest, AvailableHistoryUpdate) {
     std::unique_ptr<mongo::RecordStore> rs;
     {
         OperationContextFromKVEngine opCtx(_engine);
-        ASSERT_OK(_engine->createRecordStore(&opCtx, nss, ident, defaultCollectionOptions));
-        rs = _engine->getRecordStore(&opCtx, nss, ident, defaultCollectionOptions);
+        ASSERT_OK(_engine->createRecordStore(&opCtx, nss.ns(), ident, defaultCollectionOptions));
+        rs = _engine->getRecordStore(&opCtx, nss.ns(), ident, defaultCollectionOptions);
         ASSERT(rs);
     }
 
@@ -136,8 +136,8 @@ TEST_F(EphemeralForTestKVEngineTest, PinningOldestTimestampWithReadTransaction) 
     std::unique_ptr<mongo::RecordStore> rs;
     {
         OperationContextFromKVEngine opCtx(_engine);
-        ASSERT_OK(_engine->createRecordStore(&opCtx, nss, ident, defaultCollectionOptions));
-        rs = _engine->getRecordStore(&opCtx, nss, ident, defaultCollectionOptions);
+        ASSERT_OK(_engine->createRecordStore(&opCtx, nss.ns(), ident, defaultCollectionOptions));
+        rs = _engine->getRecordStore(&opCtx, nss.ns(), ident, defaultCollectionOptions);
         ASSERT(rs);
     }
 
@@ -182,8 +182,8 @@ TEST_F(EphemeralForTestKVEngineTest, SettingOldestTimestampClearsHistory) {
     std::unique_ptr<mongo::RecordStore> rs;
     {
         OperationContextFromKVEngine opCtx(_engine);
-        ASSERT_OK(_engine->createRecordStore(&opCtx, nss, ident, defaultCollectionOptions));
-        rs = _engine->getRecordStore(&opCtx, nss, ident, defaultCollectionOptions);
+        ASSERT_OK(_engine->createRecordStore(&opCtx, nss.ns(), ident, defaultCollectionOptions));
+        rs = _engine->getRecordStore(&opCtx, nss.ns(), ident, defaultCollectionOptions);
         ASSERT(rs);
     }
 
@@ -228,8 +228,8 @@ TEST_F(EphemeralForTestKVEngineTest, SettingOldestTimestampToMax) {
     std::unique_ptr<mongo::RecordStore> rs;
     {
         OperationContextFromKVEngine opCtx(_engine);
-        ASSERT_OK(_engine->createRecordStore(&opCtx, nss, ident, defaultCollectionOptions));
-        rs = _engine->getRecordStore(&opCtx, nss, ident, defaultCollectionOptions);
+        ASSERT_OK(_engine->createRecordStore(&opCtx, nss.ns(), ident, defaultCollectionOptions));
+        rs = _engine->getRecordStore(&opCtx, nss.ns(), ident, defaultCollectionOptions);
         ASSERT(rs);
     }
 
@@ -259,8 +259,8 @@ TEST_F(EphemeralForTestKVEngineTest, CleanHistoryWithOpenTransaction) {
     std::unique_ptr<mongo::RecordStore> rs;
     {
         OperationContextFromKVEngine opCtx(_engine);
-        ASSERT_OK(_engine->createRecordStore(&opCtx, nss, ident, defaultCollectionOptions));
-        rs = _engine->getRecordStore(&opCtx, nss, ident, defaultCollectionOptions);
+        ASSERT_OK(_engine->createRecordStore(&opCtx, nss.ns(), ident, defaultCollectionOptions));
+        rs = _engine->getRecordStore(&opCtx, nss.ns(), ident, defaultCollectionOptions);
         ASSERT(rs);
     }
 
@@ -322,8 +322,8 @@ TEST_F(EphemeralForTestKVEngineTest, ReadOlderSnapshotsSimple) {
     std::unique_ptr<mongo::RecordStore> rs;
     {
         OperationContextFromKVEngine opCtx(_engine);
-        ASSERT_OK(_engine->createRecordStore(&opCtx, nss, ident, defaultCollectionOptions));
-        rs = _engine->getRecordStore(&opCtx, nss, ident, defaultCollectionOptions);
+        ASSERT_OK(_engine->createRecordStore(&opCtx, nss.ns(), ident, defaultCollectionOptions));
+        rs = _engine->getRecordStore(&opCtx, nss.ns(), ident, defaultCollectionOptions);
         ASSERT(rs);
     }
 
@@ -370,8 +370,8 @@ TEST_F(EphemeralForTestKVEngineTest, ReadOutdatedSnapshot) {
     std::unique_ptr<mongo::RecordStore> rs;
     {
         OperationContextFromKVEngine opCtx(_engine);
-        ASSERT_OK(_engine->createRecordStore(&opCtx, nss, ident, defaultCollectionOptions));
-        rs = _engine->getRecordStore(&opCtx, nss, ident, defaultCollectionOptions);
+        ASSERT_OK(_engine->createRecordStore(&opCtx, nss.ns(), ident, defaultCollectionOptions));
+        rs = _engine->getRecordStore(&opCtx, nss.ns(), ident, defaultCollectionOptions);
         ASSERT(rs);
     }
 
@@ -418,8 +418,8 @@ TEST_F(EphemeralForTestKVEngineTest, SetReadTimestampBehindOldestTimestamp) {
     std::unique_ptr<mongo::RecordStore> rs;
     {
         OperationContextFromKVEngine opCtx(_engine);
-        ASSERT_OK(_engine->createRecordStore(&opCtx, nss, ident, defaultCollectionOptions));
-        rs = _engine->getRecordStore(&opCtx, nss, ident, defaultCollectionOptions);
+        ASSERT_OK(_engine->createRecordStore(&opCtx, nss.ns(), ident, defaultCollectionOptions));
+        rs = _engine->getRecordStore(&opCtx, nss.ns(), ident, defaultCollectionOptions);
         ASSERT(rs);
     }
 

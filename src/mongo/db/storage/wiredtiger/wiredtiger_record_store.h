@@ -95,22 +95,20 @@ public:
      * fail with the constructed configuration string.
      */
     static StatusWith<std::string> generateCreateString(const std::string& engineName,
-                                                        const NamespaceString& nss,
+                                                        StringData ns,
                                                         StringData ident,
                                                         const CollectionOptions& options,
                                                         StringData extraStrings,
-                                                        KeyFormat keyFormat,
-                                                        bool loggingEnabled);
+                                                        KeyFormat keyFormat);
 
     struct Params {
-        NamespaceString nss;
+        StringData ns;
         std::string ident;
         std::string engineName;
         bool isCapped;
         KeyFormat keyFormat;
         bool overwrite;
         bool isEphemeral;
-        bool isLogged;
         boost::optional<int64_t> oplogMaxSize;
         CappedCallback* cappedCallback;
         WiredTigerSizeStorer* sizeStorer;

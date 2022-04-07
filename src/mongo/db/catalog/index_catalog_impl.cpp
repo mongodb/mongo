@@ -535,8 +535,8 @@ IndexCatalogEntry* IndexCatalogImpl::createIndexEntry(OperationContext* opCtx,
     }
 
     const auto& collOptions = collection->getCollectionOptions();
-    std::unique_ptr<SortedDataInterface> sdi = engine->getEngine()->getSortedDataInterface(
-        opCtx, collection->ns(), collOptions, ident, desc);
+    std::unique_ptr<SortedDataInterface> sdi =
+        engine->getEngine()->getSortedDataInterface(opCtx, collOptions, ident, desc);
 
     std::unique_ptr<IndexAccessMethod> accessMethod =
         IndexAccessMethodFactory::get(opCtx)->make(entry.get(), std::move(sdi));

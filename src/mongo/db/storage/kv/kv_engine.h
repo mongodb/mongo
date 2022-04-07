@@ -79,13 +79,12 @@ public:
      * @param ident Will be created if it does not already exist.
      */
     virtual std::unique_ptr<RecordStore> getRecordStore(OperationContext* opCtx,
-                                                        const NamespaceString& nss,
+                                                        StringData ns,
                                                         StringData ident,
                                                         const CollectionOptions& options) = 0;
 
     virtual std::unique_ptr<SortedDataInterface> getSortedDataInterface(
         OperationContext* opCtx,
-        const NamespaceString& nss,
         const CollectionOptions& collOptions,
         StringData ident,
         const IndexDescriptor* desc) = 0;
@@ -98,7 +97,7 @@ public:
      * back and it is safe to immediately reclaim storage.
      */
     virtual Status createRecordStore(OperationContext* opCtx,
-                                     const NamespaceString& nss,
+                                     StringData ns,
                                      StringData ident,
                                      const CollectionOptions& options,
                                      KeyFormat keyFormat = KeyFormat::Long) = 0;
@@ -119,7 +118,6 @@ public:
     }
 
     virtual Status createSortedDataInterface(OperationContext* opCtx,
-                                             const NamespaceString& nss,
                                              const CollectionOptions& collOptions,
                                              StringData ident,
                                              const IndexDescriptor* desc) = 0;
@@ -175,7 +173,7 @@ public:
                                         const NamespaceString& nss,
                                         StringData ident,
                                         const CollectionOptions& options) {
-        auto status = createRecordStore(opCtx, nss, ident, options);
+        auto status = createRecordStore(opCtx, nss.ns(), ident, options);
         if (status.isOK()) {
             return {ErrorCodes::DataModifiedByRepair, "Orphan recovery created a new record store"};
         }

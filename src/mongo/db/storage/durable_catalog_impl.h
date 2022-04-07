@@ -113,7 +113,6 @@ public:
 
     Status createIndex(OperationContext* opCtx,
                        RecordId catalogId,
-                       const NamespaceString& nss,
                        const CollectionOptions& collOptions,
                        const IndexDescriptor* spec);
 
@@ -131,7 +130,6 @@ public:
     Status dropCollection(OperationContext* opCtx, RecordId catalogId);
 
     Status dropAndRecreateIndexIdentForResume(OperationContext* opCtx,
-                                              const NamespaceString& nss,
                                               const CollectionOptions& collOptions,
                                               const IndexDescriptor* spec,
                                               StringData ident);

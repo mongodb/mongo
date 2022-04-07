@@ -137,13 +137,13 @@ public:
     RecoveryUnit* newRecoveryUnit() override;
 
     Status createRecordStore(OperationContext* opCtx,
-                             const NamespaceString& ns,
+                             StringData ns,
                              StringData ident,
                              const CollectionOptions& options,
                              KeyFormat keyFormat = KeyFormat::Long) override;
 
     std::unique_ptr<RecordStore> getRecordStore(OperationContext* opCtx,
-                                                const NamespaceString& nss,
+                                                StringData ns,
                                                 StringData ident,
                                                 const CollectionOptions& options) override;
 
@@ -152,14 +152,12 @@ public:
                                                           KeyFormat keyFormat) override;
 
     Status createSortedDataInterface(OperationContext* opCtx,
-                                     const NamespaceString& ns,
                                      const CollectionOptions& collOptions,
                                      StringData ident,
                                      const IndexDescriptor* desc) override;
 
     std::unique_ptr<SortedDataInterface> getSortedDataInterface(
         OperationContext* opCtx,
-        const NamespaceString& nss,
         const CollectionOptions& collOptions,
         StringData ident,
         const IndexDescriptor* desc) override;

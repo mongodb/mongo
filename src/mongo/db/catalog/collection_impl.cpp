@@ -2170,7 +2170,7 @@ Status CollectionImpl::prepareForIndexBuild(OperationContext* opCtx,
                        md.insertIndex(std::move(indexMetaData));
                    });
 
-    return durableCatalog->createIndex(opCtx, getCatalogId(), ns(), getCollectionOptions(), spec);
+    return durableCatalog->createIndex(opCtx, getCatalogId(), getCollectionOptions(), spec);
 }
 
 boost::optional<UUID> CollectionImpl::getIndexBuildUUID(StringData indexName) const {

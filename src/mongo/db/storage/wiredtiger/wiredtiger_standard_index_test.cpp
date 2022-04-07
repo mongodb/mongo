@@ -79,7 +79,6 @@ public:
 
     std::unique_ptr<SortedDataInterface> newIdIndexSortedDataInterface() final {
         std::string ns = "test.wt";
-        NamespaceString nss(ns);
         OperationContextNoop opCtx(newRecoveryUnit().release());
 
         BSONObj spec = BSON("key" << BSON("_id" << 1) << "name"
@@ -87,26 +86,24 @@ public:
                                   << "v" << static_cast<int>(IndexDescriptor::kLatestIndexVersion)
                                   << "unique" << true);
 
-        auto collection = std::make_unique<CollectionMock>(nss);
+        auto collection = std::make_unique<CollectionMock>(NamespaceString(ns));
         IndexDescriptor desc("", spec);
         invariant(desc.isIdIndex());
 
-        const bool isLogged = false;
         StatusWith<std::string> result = WiredTigerIndex::generateCreateString(
-            kWiredTigerEngineName, "", "", nss, desc, isLogged);
+            kWiredTigerEngineName, "", "", NamespaceString(ns), desc);
         ASSERT_OK(result.getStatus());
 
         string uri = "table:" + ns;
         invariant(Status::OK() == WiredTigerIndex::Create(&opCtx, uri, result.getValue()));
 
-        return std::make_unique<WiredTigerIdIndex>(&opCtx, uri, "" /* ident */, &desc, isLogged);
+        return std::make_unique<WiredTigerIdIndex>(&opCtx, uri, "" /* ident */, &desc);
     }
 
     std::unique_ptr<mongo::SortedDataInterface> newSortedDataInterface(bool unique,
                                                                        bool partial,
                                                                        KeyFormat keyFormat) final {
         std::string ns = "test.wt";
-        NamespaceString nss(ns);
         OperationContextNoop opCtx(newRecoveryUnit().release());
 
         BSONObj spec = BSON("key" << BSON("a" << 1) << "name"
@@ -121,27 +118,23 @@ public:
             spec = spec.addField(partialBSON.firstElement());
         }
 
-        auto collection = std::make_unique<CollectionMock>(nss);
+        auto collection = std::make_unique<CollectionMock>(NamespaceString(ns));
 
         IndexDescriptor& desc = _descriptors.emplace_back("", spec);
 
         StatusWith<std::string> result = WiredTigerIndex::generateCreateString(
-            kWiredTigerEngineName, "", "", nss, desc, WiredTigerUtil::useTableLogging(nss));
+            kWiredTigerEngineName, "", "", NamespaceString(ns), desc);
         ASSERT_OK(result.getStatus());
 
         string uri = "table:" + ns;
         invariant(Status::OK() == WiredTigerIndex::Create(&opCtx, uri, result.getValue()));
 
         if (unique) {
-            return std::make_unique<WiredTigerIndexUnique>(&opCtx,
-                                                           uri,
-                                                           "" /* ident */,
-                                                           keyFormat,
-                                                           &desc,
-                                                           WiredTigerUtil::useTableLogging(nss));
+            return std::make_unique<WiredTigerIndexUnique>(
+                &opCtx, uri, "" /* ident */, keyFormat, &desc);
         }
         return std::make_unique<WiredTigerIndexStandard>(
-            &opCtx, uri, "" /* ident */, keyFormat, &desc, WiredTigerUtil::useTableLogging(nss));
+            &opCtx, uri, "" /* ident */, keyFormat, &desc);
     }
 
     std::unique_ptr<RecoveryUnit> newRecoveryUnit() final {

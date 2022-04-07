@@ -161,9 +161,8 @@ TEST_F(KVEngineTestHarness, SimpleRS1) {
     std::unique_ptr<RecordStore> rs;
     {
         auto opCtx = _makeOperationContext(engine);
-        ASSERT_OK(
-            engine->createRecordStore(opCtx.get(), NamespaceString(ns), ns, CollectionOptions()));
-        rs = engine->getRecordStore(opCtx.get(), NamespaceString(ns), ns, CollectionOptions());
+        ASSERT_OK(engine->createRecordStore(opCtx.get(), ns, ns, CollectionOptions()));
+        rs = engine->getRecordStore(opCtx.get(), ns, ns, CollectionOptions());
         ASSERT(rs);
     }
 
@@ -204,9 +203,8 @@ TEST_F(KVEngineTestHarness, Restart1) {
         std::unique_ptr<RecordStore> rs;
         {
             auto opCtx = _makeOperationContext(engine);
-            ASSERT_OK(engine->createRecordStore(
-                opCtx.get(), NamespaceString(ns), ns, CollectionOptions()));
-            rs = engine->getRecordStore(opCtx.get(), NamespaceString(ns), ns, CollectionOptions());
+            ASSERT_OK(engine->createRecordStore(opCtx.get(), ns, ns, CollectionOptions()));
+            rs = engine->getRecordStore(opCtx.get(), ns, ns, CollectionOptions());
             ASSERT(rs);
         }
 
@@ -230,7 +228,7 @@ TEST_F(KVEngineTestHarness, Restart1) {
     {
         std::unique_ptr<RecordStore> rs;
         auto opCtx = _makeOperationContext(engine);
-        rs = engine->getRecordStore(opCtx.get(), NamespaceString(ns), ns, CollectionOptions());
+        rs = engine->getRecordStore(opCtx.get(), ns, ns, CollectionOptions());
         ASSERT_EQUALS(std::string("abc"), rs->dataFor(opCtx.get(), loc).data());
     }
 }
@@ -242,7 +240,7 @@ TEST_F(KVEngineTestHarness, SimpleSorted1) {
     ASSERT(engine);
 
     std::string ident = "abc";
-    NamespaceString nss("mydb.mycoll");
+    auto nss = NamespaceString("mydb.mycoll");
 
     CollectionOptions options;
     options.uuid = UUID::gen();
@@ -251,10 +249,11 @@ TEST_F(KVEngineTestHarness, SimpleSorted1) {
     {
         auto opCtx = _makeOperationContext(engine);
         WriteUnitOfWork uow(opCtx.get());
-        ASSERT_OK(engine->createRecordStore(opCtx.get(), nss, "catalog", options));
-        rs = engine->getRecordStore(opCtx.get(), nss, "catalog", options);
+        ASSERT_OK(engine->createRecordStore(opCtx.get(), "catalog", "catalog", options));
+        rs = engine->getRecordStore(opCtx.get(), "catalog", "catalog", options);
         uow.commit();
     }
+
 
     std::unique_ptr<Collection> collection;
     {
@@ -271,8 +270,9 @@ TEST_F(KVEngineTestHarness, SimpleSorted1) {
     std::unique_ptr<SortedDataInterface> sorted;
     {
         auto opCtx = _makeOperationContext(engine);
-        ASSERT_OK(engine->createSortedDataInterface(opCtx.get(), nss, options, ident, &desc));
-        sorted = engine->getSortedDataInterface(opCtx.get(), nss, options, ident, &desc);
+        ASSERT_OK(
+            engine->createSortedDataInterface(opCtx.get(), CollectionOptions(), ident, &desc));
+        sorted = engine->getSortedDataInterface(opCtx.get(), CollectionOptions(), ident, &desc);
         ASSERT(sorted);
     }
 
@@ -345,8 +345,8 @@ TEST_F(KVEngineTestHarness, AllDurableTimestamp) {
         options.cappedMaxDocs = -1;
 
         NamespaceString oplogNss("local.oplog.rs");
-        ASSERT_OK(engine->createRecordStore(opCtx.get(), oplogNss, "ident", options));
-        rs = engine->getRecordStore(opCtx.get(), oplogNss, "ident", options);
+        ASSERT_OK(engine->createRecordStore(opCtx.get(), oplogNss.ns(), "ident", options));
+        rs = engine->getRecordStore(opCtx.get(), oplogNss.ns(), "ident", options);
         ASSERT(rs);
     }
     {
@@ -431,9 +431,8 @@ TEST_F(KVEngineTestHarness, PinningOldestWithAnotherSession) {
     std::unique_ptr<RecordStore> rs;
     {
         auto opCtx = _makeOperationContext(engine);
-        ASSERT_OK(
-            engine->createRecordStore(opCtx.get(), NamespaceString(ns), ns, CollectionOptions()));
-        rs = engine->getRecordStore(opCtx.get(), NamespaceString(ns), ns, CollectionOptions());
+        ASSERT_OK(engine->createRecordStore(opCtx.get(), ns, ns, CollectionOptions()));
+        rs = engine->getRecordStore(opCtx.get(), ns, ns, CollectionOptions());
         ASSERT(rs);
     }
 
@@ -500,9 +499,8 @@ TEST_F(KVEngineTestHarness, AllDurable) {
     std::unique_ptr<RecordStore> rs;
     {
         auto opCtx = _makeOperationContext(engine);
-        ASSERT_OK(
-            engine->createRecordStore(opCtx.get(), NamespaceString(ns), ns, CollectionOptions()));
-        rs = engine->getRecordStore(opCtx.get(), NamespaceString(ns), ns, CollectionOptions());
+        ASSERT_OK(engine->createRecordStore(opCtx.get(), ns, ns, CollectionOptions()));
+        rs = engine->getRecordStore(opCtx.get(), ns, ns, CollectionOptions());
         ASSERT(rs);
     }
 
@@ -593,9 +591,8 @@ TEST_F(KVEngineTestHarness, BasicTimestampSingle) {
     std::unique_ptr<RecordStore> rs;
     {
         auto opCtx = _makeOperationContext(engine);
-        ASSERT_OK(
-            engine->createRecordStore(opCtx.get(), NamespaceString(ns), ns, CollectionOptions()));
-        rs = engine->getRecordStore(opCtx.get(), NamespaceString(ns), ns, CollectionOptions());
+        ASSERT_OK(engine->createRecordStore(opCtx.get(), ns, ns, CollectionOptions()));
+        rs = engine->getRecordStore(opCtx.get(), ns, ns, CollectionOptions());
         ASSERT(rs);
     }
 
@@ -666,9 +663,8 @@ TEST_F(KVEngineTestHarness, BasicTimestampMultiple) {
     std::unique_ptr<RecordStore> rs;
     {
         auto opCtx = _makeOperationContext(engine);
-        ASSERT_OK(
-            engine->createRecordStore(opCtx.get(), NamespaceString(ns), ns, CollectionOptions()));
-        rs = engine->getRecordStore(opCtx.get(), NamespaceString(ns), ns, CollectionOptions());
+        ASSERT_OK(engine->createRecordStore(opCtx.get(), ns, ns, CollectionOptions()));
+        rs = engine->getRecordStore(opCtx.get(), ns, ns, CollectionOptions());
         ASSERT(rs);
     }
 
@@ -726,9 +722,8 @@ DEATH_TEST_REGEX_F(KVEngineTestHarness, SnapshotHidesVisibility, ".*item not fou
     std::unique_ptr<RecordStore> rs;
     {
         auto opCtx = _makeOperationContext(engine);
-        ASSERT_OK(
-            engine->createRecordStore(opCtx.get(), NamespaceString(ns), ns, CollectionOptions()));
-        rs = engine->getRecordStore(opCtx.get(), NamespaceString(ns), ns, CollectionOptions());
+        ASSERT_OK(engine->createRecordStore(opCtx.get(), ns, ns, CollectionOptions()));
+        rs = engine->getRecordStore(opCtx.get(), ns, ns, CollectionOptions());
         ASSERT(rs);
     }
 
@@ -785,10 +780,8 @@ TEST_F(KVEngineTestHarness, SingleReadWithConflictWithOplog) {
     std::unique_ptr<RecordStore> oplogRs;
     {
         auto opCtx = _makeOperationContext(engine);
-        ASSERT_OK(
-            engine->createRecordStore(opCtx.get(), NamespaceString(ns), ns, CollectionOptions()));
-        collectionRs =
-            engine->getRecordStore(opCtx.get(), NamespaceString(ns), ns, CollectionOptions());
+        ASSERT_OK(engine->createRecordStore(opCtx.get(), ns, ns, CollectionOptions()));
+        collectionRs = engine->getRecordStore(opCtx.get(), ns, ns, CollectionOptions());
         ASSERT(collectionRs);
 
         CollectionOptions options;
@@ -797,8 +790,8 @@ TEST_F(KVEngineTestHarness, SingleReadWithConflictWithOplog) {
         options.cappedMaxDocs = -1;
 
         NamespaceString oplogNss("local.oplog.rs");
-        ASSERT_OK(engine->createRecordStore(opCtx.get(), oplogNss, "ident", options));
-        oplogRs = engine->getRecordStore(opCtx.get(), oplogNss, "ident", options);
+        ASSERT_OK(engine->createRecordStore(opCtx.get(), oplogNss.ns(), "ident", options));
+        oplogRs = engine->getRecordStore(opCtx.get(), oplogNss.ns(), "ident", options);
         ASSERT(oplogRs);
     }
 
@@ -863,9 +856,8 @@ TEST_F(KVEngineTestHarness, PinningOldestTimestampWithReadConflict) {
     std::unique_ptr<RecordStore> rs;
     {
         auto opCtx = _makeOperationContext(engine);
-        ASSERT_OK(
-            engine->createRecordStore(opCtx.get(), NamespaceString(ns), ns, CollectionOptions()));
-        rs = engine->getRecordStore(opCtx.get(), NamespaceString(ns), ns, CollectionOptions());
+        ASSERT_OK(engine->createRecordStore(opCtx.get(), ns, ns, CollectionOptions()));
+        rs = engine->getRecordStore(opCtx.get(), ns, ns, CollectionOptions());
         ASSERT(rs);
     }
 
@@ -910,9 +902,8 @@ DEATH_TEST_REGEX_F(KVEngineTestHarness,
     std::unique_ptr<RecordStore> rs;
     {
         auto opCtx = _makeOperationContext(engine);
-        ASSERT_OK(
-            engine->createRecordStore(opCtx.get(), NamespaceString(ns), ns, CollectionOptions()));
-        rs = engine->getRecordStore(opCtx.get(), NamespaceString(ns), ns, CollectionOptions());
+        ASSERT_OK(engine->createRecordStore(opCtx.get(), ns, ns, CollectionOptions()));
+        rs = engine->getRecordStore(opCtx.get(), ns, ns, CollectionOptions());
         ASSERT(rs);
     }
 
@@ -954,9 +945,8 @@ TEST_F(KVEngineTestHarness, RollingBackToLastStable) {
     std::unique_ptr<RecordStore> rs;
     {
         auto opCtx = _makeOperationContext(engine);
-        ASSERT_OK(
-            engine->createRecordStore(opCtx.get(), NamespaceString(ns), ns, CollectionOptions()));
-        rs = engine->getRecordStore(opCtx.get(), NamespaceString(ns), ns, CollectionOptions());
+        ASSERT_OK(engine->createRecordStore(opCtx.get(), ns, ns, CollectionOptions()));
+        rs = engine->getRecordStore(opCtx.get(), ns, ns, CollectionOptions());
         ASSERT(rs);
     }
 
@@ -1037,9 +1027,8 @@ DEATH_TEST_REGEX_F(KVEngineTestHarness, CommitBehindStable, "Fatal assertion.*39
     std::unique_ptr<RecordStore> rs;
     {
         auto opCtx = _makeOperationContext(engine);
-        ASSERT_OK(
-            engine->createRecordStore(opCtx.get(), NamespaceString(ns), ns, CollectionOptions()));
-        rs = engine->getRecordStore(opCtx.get(), NamespaceString(ns), ns, CollectionOptions());
+        ASSERT_OK(engine->createRecordStore(opCtx.get(), ns, ns, CollectionOptions()));
+        rs = engine->getRecordStore(opCtx.get(), ns, ns, CollectionOptions());
         ASSERT(rs);
     }
 
@@ -1073,10 +1062,8 @@ TEST_F(DurableCatalogImplTest, Coll1) {
         auto clientAndCtx = makeClientAndCtx("opCtx");
         auto opCtx = clientAndCtx.opCtx();
         WriteUnitOfWork uow(opCtx);
-        ASSERT_OK(engine->createRecordStore(
-            opCtx, NamespaceString("catalog"), "catalog", CollectionOptions()));
-        rs = engine->getRecordStore(
-            opCtx, NamespaceString("catalog"), "catalog", CollectionOptions());
+        ASSERT_OK(engine->createRecordStore(opCtx, "catalog", "catalog", CollectionOptions()));
+        rs = engine->getRecordStore(opCtx, "catalog", "catalog", CollectionOptions());
         catalog = std::make_unique<DurableCatalogImpl>(rs.get(), false, false, nullptr);
         uow.commit();
     }
@@ -1127,10 +1114,8 @@ TEST_F(DurableCatalogImplTest, Idx1) {
         auto clientAndCtx = makeClientAndCtx("opCtx");
         auto opCtx = clientAndCtx.opCtx();
         WriteUnitOfWork uow(opCtx);
-        ASSERT_OK(engine->createRecordStore(
-            opCtx, NamespaceString("catalog"), "catalog", CollectionOptions()));
-        rs = engine->getRecordStore(
-            opCtx, NamespaceString("catalog"), "catalog", CollectionOptions());
+        ASSERT_OK(engine->createRecordStore(opCtx, "catalog", "catalog", CollectionOptions()));
+        rs = engine->getRecordStore(opCtx, "catalog", "catalog", CollectionOptions());
         catalog = std::make_unique<DurableCatalogImpl>(rs.get(), false, false, nullptr);
         uow.commit();
     }
@@ -1217,10 +1202,8 @@ TEST_F(DurableCatalogImplTest, DirectoryPerDb1) {
         auto clientAndCtx = makeClientAndCtx("opCtx");
         auto opCtx = clientAndCtx.opCtx();
         WriteUnitOfWork uow(opCtx);
-        ASSERT_OK(engine->createRecordStore(
-            opCtx, NamespaceString("catalog"), "catalog", CollectionOptions()));
-        rs = engine->getRecordStore(
-            opCtx, NamespaceString("catalog"), "catalog", CollectionOptions());
+        ASSERT_OK(engine->createRecordStore(opCtx, "catalog", "catalog", CollectionOptions()));
+        rs = engine->getRecordStore(opCtx, "catalog", "catalog", CollectionOptions());
         catalog = std::make_unique<DurableCatalogImpl>(rs.get(), true, false, nullptr);
         uow.commit();
     }
@@ -1269,10 +1252,8 @@ TEST_F(DurableCatalogImplTest, Split1) {
         auto clientAndCtx = makeClientAndCtx("opCtx");
         auto opCtx = clientAndCtx.opCtx();
         WriteUnitOfWork uow(opCtx);
-        ASSERT_OK(engine->createRecordStore(
-            opCtx, NamespaceString("catalog"), "catalog", CollectionOptions()));
-        rs = engine->getRecordStore(
-            opCtx, NamespaceString("catalog"), "catalog", CollectionOptions());
+        ASSERT_OK(engine->createRecordStore(opCtx, "catalog", "catalog", CollectionOptions()));
+        rs = engine->getRecordStore(opCtx, "catalog", "catalog", CollectionOptions());
         catalog = std::make_unique<DurableCatalogImpl>(rs.get(), false, true, nullptr);
         uow.commit();
     }
@@ -1321,10 +1302,8 @@ TEST_F(DurableCatalogImplTest, DirectoryPerAndSplit1) {
         auto clientAndCtx = makeClientAndCtx("opCtx");
         auto opCtx = clientAndCtx.opCtx();
         WriteUnitOfWork uow(opCtx);
-        ASSERT_OK(engine->createRecordStore(
-            opCtx, NamespaceString("catalog"), "catalog", CollectionOptions()));
-        rs = engine->getRecordStore(
-            opCtx, NamespaceString("catalog"), "catalog", CollectionOptions());
+        ASSERT_OK(engine->createRecordStore(opCtx, "catalog", "catalog", CollectionOptions()));
+        rs = engine->getRecordStore(opCtx, "catalog", "catalog", CollectionOptions());
         catalog = std::make_unique<DurableCatalogImpl>(rs.get(), true, true, nullptr);
         uow.commit();
     }
@@ -1383,7 +1362,7 @@ DEATH_TEST_REGEX_F(DurableCatalogImplTest,
     ASSERT(engine);
 
     std::string ident = "abc";
-    NamespaceString nss("mydb.mycoll");
+    auto nss = NamespaceString("mydb.mycoll");
 
     CollectionOptions options;
     options.uuid = UUID::gen();
@@ -1393,8 +1372,8 @@ DEATH_TEST_REGEX_F(DurableCatalogImplTest,
         auto clientAndCtx = makeClientAndCtx("opCtx");
         auto opCtx = clientAndCtx.opCtx();
         WriteUnitOfWork uow(opCtx);
-        ASSERT_OK(engine->createRecordStore(opCtx, NamespaceString("catalog"), "catalog", options));
-        rs = engine->getRecordStore(opCtx, NamespaceString("catalog"), "catalog", options);
+        ASSERT_OK(engine->createRecordStore(opCtx, "catalog", "catalog", options));
+        rs = engine->getRecordStore(opCtx, "catalog", "catalog", options);
         uow.commit();
     }
 
@@ -1416,8 +1395,8 @@ DEATH_TEST_REGEX_F(DurableCatalogImplTest,
     {
         auto clientAndCtx = makeClientAndCtx("opCtx");
         auto opCtx = clientAndCtx.opCtx();
-        ASSERT_OK(engine->createSortedDataInterface(opCtx, nss, CollectionOptions(), ident, &desc));
-        sorted = engine->getSortedDataInterface(opCtx, nss, CollectionOptions(), ident, &desc);
+        ASSERT_OK(engine->createSortedDataInterface(opCtx, CollectionOptions(), ident, &desc));
+        sorted = engine->getSortedDataInterface(opCtx, CollectionOptions(), ident, &desc);
         ASSERT(sorted);
     }
 }

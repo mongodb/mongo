@@ -773,12 +773,11 @@ private:
 // static
 StatusWith<std::string> WiredTigerRecordStore::generateCreateString(
     const std::string& engineName,
-    const NamespaceString& nss,
+    StringData ns,
     StringData ident,
     const CollectionOptions& options,
     StringData extraStrings,
-    KeyFormat keyFormat,
-    bool loggingEnabled) {
+    KeyFormat keyFormat) {
 
     // Separate out a prefix and suffix in the default string. User configuration will
     // override values in the prefix, but not values in the suffix.
@@ -792,7 +791,7 @@ StatusWith<std::string> WiredTigerRecordStore::generateCreateString(
     ss << "split_pct=90,";
     ss << "leaf_value_max=64MB,";
     if (TestingProctor::instance().isEnabled()) {
-        if (nss.isOplog()) {
+        if (NamespaceString(ns).isOplog()) {
             // For the above clauses we do not assert any particular `write_timestamp_usage`. In
             // particular for the oplog, WT removes all timestamp information. There's nothing in
             // MDB's control to assert against.
@@ -801,7 +800,8 @@ StatusWith<std::string> WiredTigerRecordStore::generateCreateString(
             ident.startsWith("internal-") ||
             // TODO (SERVER-60753): Remove special handling for index build during recovery. This
             // includes the following _mdb_catalog ident.
-            nss == NamespaceString::kIndexBuildEntryNamespace || ident.startsWith("_mdb_catalog")) {
+            ns == NamespaceString::kIndexBuildEntryNamespace.ns() ||
+            ident.startsWith("_mdb_catalog")) {
             ss << "write_timestamp_usage=mixed_mode,";
         } else {
             ss << "write_timestamp_usage=ordered,";
@@ -825,8 +825,7 @@ StatusWith<std::string> WiredTigerRecordStore::generateCreateString(
     }
     ss << ",";
 
-    ss << WiredTigerCustomizationHooks::get(getGlobalServiceContext())
-              ->getTableCreateConfig(nss.ns());
+    ss << WiredTigerCustomizationHooks::get(getGlobalServiceContext())->getTableCreateConfig(ns);
 
     ss << extraStrings << ",";
 
@@ -837,6 +836,7 @@ StatusWith<std::string> WiredTigerRecordStore::generateCreateString(
 
     ss << customOptions.getValue();
 
+    NamespaceString nss(ns);
     if (nss.isOplog()) {
         // force file for oplog
         ss << "type=file,";
@@ -865,12 +865,17 @@ StatusWith<std::string> WiredTigerRecordStore::generateCreateString(
 
     // Record store metadata
     ss << ",app_metadata=(formatVersion=" << kCurrentRecordStoreVersion;
-    if (nss.isOplog()) {
+    if (NamespaceString::oplog(ns)) {
         ss << ",oplogKeyExtractionVersion=1";
     }
     ss << ")";
 
-    if (loggingEnabled) {
+    bool replicatedWrites = getGlobalReplSettings().usingReplSets() ||
+        repl::ReplSettings::shouldRecoverFromOplogAsStandalone();
+
+    // Do not journal writes when 'ns' is an empty string, which is the case for internal-only
+    // temporary tables.
+    if (ns.size() && WiredTigerUtil::useTableLogging(NamespaceString(ns), replicatedWrites)) {
         ss << ",log=(enabled=true)";
     } else {
         ss << ",log=(enabled=false)";
@@ -882,7 +887,7 @@ StatusWith<std::string> WiredTigerRecordStore::generateCreateString(
 WiredTigerRecordStore::WiredTigerRecordStore(WiredTigerKVEngine* kvEngine,
                                              OperationContext* ctx,
                                              Params params)
-    : RecordStore(params.nss.ns(), params.ident),
+    : RecordStore(params.ns, params.ident),
       _uri(WiredTigerKVEngine::kTableUriPrefix + params.ident),
       _tableId(WiredTigerSession::genTableId()),
       _engineName(params.engineName),
@@ -890,8 +895,12 @@ WiredTigerRecordStore::WiredTigerRecordStore(WiredTigerKVEngine* kvEngine,
       _keyFormat(params.keyFormat),
       _overwrite(params.overwrite),
       _isEphemeral(params.isEphemeral),
-      _isLogged(params.isLogged),
-      _isOplog(params.nss.isOplog()),
+      _isLogged(!isTemp() &&
+                WiredTigerUtil::useTableLogging(
+                    NamespaceString(ns()),
+                    getGlobalReplSettings().usingReplSets() ||
+                        repl::ReplSettings::shouldRecoverFromOplogAsStandalone())),
+      _isOplog(NamespaceString::oplog(params.ns)),
       _forceUpdateWithFullDocument(params.forceUpdateWithFullDocument),
       _oplogMaxSize(params.oplogMaxSize),
       _cappedCallback(params.cappedCallback),
@@ -912,7 +921,7 @@ WiredTigerRecordStore::WiredTigerRecordStore(WiredTigerKVEngine* kvEngine,
     }
 
     if (_oplogMaxSize) {
-        invariant(_isOplog, str::stream() << "Namespace " << params.nss);
+        invariant(_isOplog, str::stream() << "Namespace " << params.ns);
     }
 
     Status versionStatus = WiredTigerUtil::checkApplicationMetadataFormatVersion(
@@ -1095,11 +1104,6 @@ RecordData WiredTigerRecordStore::_getData(const WiredTigerCursor& cursor) const
 bool WiredTigerRecordStore::findRecord(OperationContext* opCtx,
                                        const RecordId& id,
                                        RecordData* out) const {
-    if (_isOplog) {
-        // This optimized findRecord implementation does not apply oplog visibility rules. Use the
-        // base class implementation which uses a cursor that guarantees the proper semantics.
-        return RecordStore::findRecord(opCtx, id, out);
-    }
     dassert(opCtx->lockState()->isReadLocked());
 
     WiredTigerCursor curwrap(_uri, _tableId, true, opCtx);

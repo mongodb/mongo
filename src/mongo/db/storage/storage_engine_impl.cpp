@@ -72,7 +72,7 @@ MONGO_FAIL_POINT_DEFINE(pauseTimestampMonitor);
 MONGO_FAIL_POINT_DEFINE(setMinVisibleForAllCollectionsToOldestOnStartup);
 
 namespace {
-const std::string kCatalogInfo = "_mdb_catalog";
+const std::string catalogInfo = "_mdb_catalog";
 const auto kCatalogLogLevel = logv2::LogSeverity::Debug(2);
 }  // namespace
 
@@ -116,13 +116,13 @@ StorageEngineImpl::StorageEngineImpl(OperationContext* opCtx,
 }
 
 void StorageEngineImpl::loadCatalog(OperationContext* opCtx, LastShutdownState lastShutdownState) {
-    bool catalogExists = _engine->hasIdent(opCtx, kCatalogInfo);
+    bool catalogExists = _engine->hasIdent(opCtx, catalogInfo);
     if (_options.forRepair && catalogExists) {
         auto repairObserver = StorageRepairObserver::get(getGlobalServiceContext());
         invariant(repairObserver->isIncomplete());
 
         LOGV2(22246, "Repairing catalog metadata");
-        Status status = _engine->repairIdent(opCtx, kCatalogInfo);
+        Status status = _engine->repairIdent(opCtx, catalogInfo);
 
         if (status.code() == ErrorCodes::DataModifiedByRepair) {
             LOGV2_WARNING(22264, "Catalog data modified by repair", "error"_attr = status);
@@ -136,8 +136,8 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx, LastShutdownState l
     if (!catalogExists) {
         WriteUnitOfWork uow(opCtx);
 
-        auto status = _engine->createRecordStore(
-            opCtx, NamespaceString(kCatalogInfo), kCatalogInfo, CollectionOptions());
+        auto status =
+            _engine->createRecordStore(opCtx, catalogInfo, catalogInfo, CollectionOptions());
 
         // BadValue is usually caused by invalid configuration string.
         // We still fassert() but without a stack trace.
@@ -148,8 +148,8 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx, LastShutdownState l
         uow.commit();
     }
 
-    _catalogRecordStore = _engine->getRecordStore(
-        opCtx, NamespaceString(kCatalogInfo), kCatalogInfo, CollectionOptions());
+    _catalogRecordStore =
+        _engine->getRecordStore(opCtx, catalogInfo, catalogInfo, CollectionOptions());
     if (shouldLog(::mongo::logv2::LogComponent::kStorageRecovery, kCatalogLogLevel)) {
         LOGV2_FOR_RECOVERY(4615631, kCatalogLogLevel.toInt(), "loadCatalog:");
         _dumpCatalog(opCtx);
@@ -376,7 +376,7 @@ void StorageEngineImpl::_initCollection(OperationContext* opCtx,
         // repaired. This also ensures that if we try to use it, it will blow up.
         rs = nullptr;
     } else {
-        rs = _engine->getRecordStore(opCtx, nss, ident, md->options);
+        rs = _engine->getRecordStore(opCtx, nss.ns(), ident, md->options);
         invariant(rs);
     }
 
@@ -481,7 +481,7 @@ bool StorageEngineImpl::_handleInternalIdent(OperationContext* opCtx,
     // When starting up after a clean shutdown and resumable index builds are supported, find the
     // internal idents that contain the relevant information to resume each index build and recover
     // the state.
-    auto rs = _engine->getRecordStore(opCtx, NamespaceString(""), ident, CollectionOptions());
+    auto rs = _engine->getRecordStore(opCtx, "", ident, CollectionOptions());
 
     auto cursor = rs->getCursor(opCtx);
     auto record = cursor->next();
@@ -555,7 +555,7 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
     {
         std::vector<std::string> vec = _engine->getAllIdents(opCtx);
         engineIdents.insert(vec.begin(), vec.end());
-        engineIdents.erase(kCatalogInfo);
+        engineIdents.erase(catalogInfo);
     }
 
     LOGV2_FOR_RECOVERY(4615633, 2, "Reconciling collection and index idents.");
@@ -1014,7 +1014,7 @@ StorageEngineImpl::makeTemporaryRecordStoreForResumableIndexBuild(OperationConte
 
 std::unique_ptr<TemporaryRecordStore> StorageEngineImpl::makeTemporaryRecordStoreFromExistingIdent(
     OperationContext* opCtx, StringData ident) {
-    auto rs = _engine->getRecordStore(opCtx, NamespaceString(""), ident, CollectionOptions());
+    auto rs = _engine->getRecordStore(opCtx, "", ident, CollectionOptions());
     return std::make_unique<DeferredDropRecordStore>(std::move(rs), this);
 }
 

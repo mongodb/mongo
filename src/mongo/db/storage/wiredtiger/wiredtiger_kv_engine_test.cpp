@@ -38,14 +38,12 @@
 #include <memory>
 
 #include "mongo/base/init.h"
-#include "mongo/db/global_settings.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/checkpointer.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/logv2/log.h"
@@ -61,13 +59,9 @@ class WiredTigerKVHarnessHelper : public KVHarnessHelper {
 public:
     WiredTigerKVHarnessHelper(ServiceContext* svcCtx, bool forRepair = false)
         : _dbpath("wt-kv-harness"), _forRepair(forRepair), _engine(makeEngine()) {
-        // Faitfhully simulate being in replica set mode for timestamping tests which requires
-        // parity for journaling settings.
-        repl::ReplSettings replSettings;
-        replSettings.setReplSetString("i am a replica set");
-        setGlobalReplSettings(replSettings);
         repl::ReplicationCoordinator::set(
-            svcCtx, std::make_unique<repl::ReplicationCoordinatorMock>(svcCtx, replSettings));
+            svcCtx,
+            std::make_unique<repl::ReplicationCoordinatorMock>(svcCtx, repl::ReplSettings()));
         _engine->notifyStartupComplete();
     }
 
@@ -88,16 +82,13 @@ public:
 
 private:
     std::unique_ptr<WiredTigerKVEngine> makeEngine() {
-        // Use a small journal for testing to account for the unlikely event that the underlying
-        // filesystem does not support fast allocation of a file of zeros.
-        std::string extraStrings = "log=(file_max=1m,prealloc=false)";
         return std::make_unique<WiredTigerKVEngine>(kWiredTigerEngineName,
                                                     _dbpath.path(),
                                                     _cs.get(),
-                                                    extraStrings,
+                                                    "",
                                                     1,
                                                     0,
-                                                    true,
+                                                    false,
                                                     false,
                                                     _forRepair,
                                                     false);
@@ -142,8 +133,9 @@ TEST_F(WiredTigerKVEngineRepairTest, OrphanedDataFilesCanBeRecovered) {
     CollectionOptions defaultCollectionOptions;
 
     std::unique_ptr<RecordStore> rs;
-    ASSERT_OK(_engine->createRecordStore(opCtxPtr.get(), nss, ident, defaultCollectionOptions));
-    rs = _engine->getRecordStore(opCtxPtr.get(), nss, ident, defaultCollectionOptions);
+    ASSERT_OK(
+        _engine->createRecordStore(opCtxPtr.get(), nss.ns(), ident, defaultCollectionOptions));
+    rs = _engine->getRecordStore(opCtxPtr.get(), nss.ns(), ident, defaultCollectionOptions);
     ASSERT(rs);
 
     RecordId loc;
@@ -199,8 +191,9 @@ TEST_F(WiredTigerKVEngineRepairTest, UnrecoverableOrphanedDataFilesAreRebuilt) {
     CollectionOptions defaultCollectionOptions;
 
     std::unique_ptr<RecordStore> rs;
-    ASSERT_OK(_engine->createRecordStore(opCtxPtr.get(), nss, ident, defaultCollectionOptions));
-    rs = _engine->getRecordStore(opCtxPtr.get(), nss, ident, defaultCollectionOptions);
+    ASSERT_OK(
+        _engine->createRecordStore(opCtxPtr.get(), nss.ns(), ident, defaultCollectionOptions));
+    rs = _engine->getRecordStore(opCtxPtr.get(), nss.ns(), ident, defaultCollectionOptions);
     ASSERT(rs);
 
     RecordId loc;
@@ -248,7 +241,7 @@ TEST_F(WiredTigerKVEngineRepairTest, UnrecoverableOrphanedDataFilesAreRebuilt) {
     boost::filesystem::path corruptFile = (dataFilePath->string() + ".corrupt");
     ASSERT(boost::filesystem::exists(corruptFile));
 
-    rs = _engine->getRecordStore(opCtxPtr.get(), nss, ident, defaultCollectionOptions);
+    rs = _engine->getRecordStore(opCtxPtr.get(), nss.ns(), ident, defaultCollectionOptions);
     RecordData data;
     ASSERT_FALSE(rs->findRecord(opCtxPtr.get(), loc, &data));
 #endif
@@ -370,7 +363,8 @@ TEST_F(WiredTigerKVEngineTest, IdentDrop) {
     CollectionOptions defaultCollectionOptions;
 
     std::unique_ptr<RecordStore> rs;
-    ASSERT_OK(_engine->createRecordStore(opCtxPtr.get(), nss, ident, defaultCollectionOptions));
+    ASSERT_OK(
+        _engine->createRecordStore(opCtxPtr.get(), nss.ns(), ident, defaultCollectionOptions));
 
     const boost::optional<boost::filesystem::path> dataFilePath =
         _engine->getDataFilePathForIdent(ident);
@@ -382,7 +376,8 @@ TEST_F(WiredTigerKVEngineTest, IdentDrop) {
 
     // Because the underlying file was not removed, it will be renamed out of the way by WiredTiger
     // when creating a new table with the same ident.
-    ASSERT_OK(_engine->createRecordStore(opCtxPtr.get(), nss, ident, defaultCollectionOptions));
+    ASSERT_OK(
+        _engine->createRecordStore(opCtxPtr.get(), nss.ns(), ident, defaultCollectionOptions));
 
     const boost::filesystem::path renamedFilePath = dataFilePath->generic_string() + ".1";
     ASSERT(boost::filesystem::exists(*dataFilePath));

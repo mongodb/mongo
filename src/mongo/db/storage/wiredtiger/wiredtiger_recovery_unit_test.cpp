@@ -79,16 +79,9 @@ public:
     virtual std::unique_ptr<RecordStore> createRecordStore(OperationContext* opCtx,
                                                            const std::string& ns) final {
         std::string ident = ns;
-        NamespaceString nss(ns);
         std::string uri = WiredTigerKVEngine::kTableUriPrefix + ns;
-        StatusWith<std::string> result =
-            WiredTigerRecordStore::generateCreateString(kWiredTigerEngineName,
-                                                        nss,
-                                                        ident,
-                                                        CollectionOptions(),
-                                                        "",
-                                                        KeyFormat::Long,
-                                                        WiredTigerUtil::useTableLogging(nss));
+        StatusWith<std::string> result = WiredTigerRecordStore::generateCreateString(
+            kWiredTigerEngineName, ns, ident, CollectionOptions(), "", KeyFormat::Long);
         ASSERT_TRUE(result.isOK());
         std::string config = result.getValue();
 
@@ -102,14 +95,13 @@ public:
         }
 
         WiredTigerRecordStore::Params params;
-        params.nss = nss;
+        params.ns = ns;
         params.ident = ident;
         params.engineName = kWiredTigerEngineName;
         params.isCapped = false;
         params.keyFormat = KeyFormat::Long;
         params.overwrite = true;
         params.isEphemeral = false;
-        params.isLogged = WiredTigerUtil::useTableLogging(nss);
         params.cappedCallback = nullptr;
         params.sizeStorer = nullptr;
         params.tracksSizeAdjustments = true;

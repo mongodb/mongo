@@ -477,6 +477,10 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
                 end, FMT_STRING(durableTimestampFmtString), _durableTimestamp.asULL());
         }
 
+        if (_mustBeTimestamped) {
+            invariant(_isTimestamped);
+        }
+
         *end = '\0';
 
         wtRet = s->commit_transaction(s, conf.data());
@@ -531,6 +535,7 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
     _isOplogReader = false;
     _oplogVisibleTs = boost::none;
     _orderedCommit = true;  // Default value is true; we assume all writes are ordered.
+    _mustBeTimestamped = false;
 }
 
 Status WiredTigerRecoveryUnit::majorityCommittedSnapshotAvailable() const {

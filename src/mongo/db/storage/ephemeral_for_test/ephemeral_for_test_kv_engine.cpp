@@ -67,7 +67,7 @@ mongo::RecoveryUnit* KVEngine::newRecoveryUnit() {
 }
 
 Status KVEngine::createRecordStore(OperationContext* opCtx,
-                                   const NamespaceString& nss,
+                                   StringData ns,
                                    StringData ident,
                                    const CollectionOptions& options,
                                    KeyFormat keyFormat) {
@@ -97,20 +97,20 @@ std::unique_ptr<mongo::RecordStore> KVEngine::makeTemporaryRecordStore(Operation
 
 
 std::unique_ptr<mongo::RecordStore> KVEngine::getRecordStore(OperationContext* unused,
-                                                             const NamespaceString& nss,
+                                                             StringData ns,
                                                              StringData ident,
                                                              const CollectionOptions& options) {
     std::unique_ptr<mongo::RecordStore> recordStore;
     const auto keyFormat = options.clusteredIndex ? KeyFormat::String : KeyFormat::Long;
     if (options.capped) {
-        recordStore = std::make_unique<RecordStore>(nss.ns(),
+        recordStore = std::make_unique<RecordStore>(ns,
                                                     ident,
                                                     keyFormat,
                                                     options.capped,
                                                     /*cappedCallback*/ nullptr,
                                                     _visibilityManager.get());
     } else {
-        recordStore = std::make_unique<RecordStore>(nss.ns(), ident, keyFormat, options.capped);
+        recordStore = std::make_unique<RecordStore>(ns, ident, keyFormat, options.capped);
     }
     stdx::lock_guard lock(_identsLock);
     _idents[ident.toString()] = true;
@@ -133,7 +133,6 @@ bool KVEngine::trySwapMaster(StringStore& newMaster, uint64_t version) {
 
 
 Status KVEngine::createSortedDataInterface(OperationContext* opCtx,
-                                           const NamespaceString& nss,
                                            const CollectionOptions& collOptions,
                                            StringData ident,
                                            const IndexDescriptor* desc) {
@@ -153,20 +152,15 @@ Status KVEngine::importSortedDataInterface(OperationContext* opCtx,
 
 std::unique_ptr<mongo::SortedDataInterface> KVEngine::getSortedDataInterface(
     OperationContext* opCtx,
-    const NamespaceString& nss,
     const CollectionOptions& collOptions,
     StringData ident,
     const IndexDescriptor* desc) {
     auto rsKeyFormat = collOptions.clusteredIndex ? KeyFormat::String : KeyFormat::Long;
-    return getSortedDataInterface(opCtx, nss, rsKeyFormat, ident, desc);
+    return getSortedDataInterface(opCtx, rsKeyFormat, ident, desc);
 }
 
 std::unique_ptr<mongo::SortedDataInterface> KVEngine::getSortedDataInterface(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    KeyFormat rsKeyFormat,
-    StringData ident,
-    const IndexDescriptor* desc) {
+    OperationContext* opCtx, KeyFormat rsKeyFormat, StringData ident, const IndexDescriptor* desc) {
     {
         stdx::lock_guard lock(_identsLock);
         _idents[ident.toString()] = false;
@@ -189,7 +183,7 @@ Status KVEngine::dropIdent(mongo::RecoveryUnit* ru,
         lock.unlock();
         if (isRecordStore) {  // ident is RecordStore.
             CollectionOptions s;
-            auto rs = getRecordStore(/*opCtx=*/nullptr, NamespaceString(""), ident, s);
+            auto rs = getRecordStore(/*opCtx=*/nullptr, ""_sd, ident, s);
             dropStatus =
                 checked_cast<RecordStore*>(rs.get())->truncateWithoutUpdatingCount(ru).getStatus();
         } else {  // ident is SortedDataInterface.

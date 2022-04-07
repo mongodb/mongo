@@ -260,13 +260,13 @@ DevNullKVEngine::DevNullKVEngine() {
 }
 
 std::unique_ptr<RecordStore> DevNullKVEngine::getRecordStore(OperationContext* opCtx,
-                                                             const NamespaceString& nss,
+                                                             StringData ns,
                                                              StringData ident,
                                                              const CollectionOptions& options) {
     if (ident == "_mdb_catalog") {
-        return std::make_unique<EphemeralForTestRecordStore>(nss.ns(), ident, &_catalogInfo);
+        return std::make_unique<EphemeralForTestRecordStore>(ns, ident, &_catalogInfo);
     }
-    return std::make_unique<DevNullRecordStore>(nss.ns(), ident, options, KeyFormat::Long);
+    return std::make_unique<DevNullRecordStore>(ns, ident, options, KeyFormat::Long);
 }
 
 std::unique_ptr<RecordStore> DevNullKVEngine::makeTemporaryRecordStore(OperationContext* opCtx,
@@ -277,7 +277,6 @@ std::unique_ptr<RecordStore> DevNullKVEngine::makeTemporaryRecordStore(Operation
 
 std::unique_ptr<SortedDataInterface> DevNullKVEngine::getSortedDataInterface(
     OperationContext* opCtx,
-    const NamespaceString& nss,
     const CollectionOptions& collOptions,
     StringData ident,
     const IndexDescriptor* desc) {
