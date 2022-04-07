@@ -663,6 +663,18 @@ bool CommandHelpers::shouldActivateFailCommandFailPoint(const BSONObj& data,
         return false;
     }
 
+    if (data.hasField("failAllCommands")) {
+        LOGV2(6348500,
+              "Activating 'failCommand' failpoint for all commands",
+              "data"_attr = data,
+              "threadName"_attr = threadName,
+              "appName"_attr = appName,
+              "namespace"_attr = nss,
+              "isInternalClient"_attr = isInternalClient,
+              "command"_attr = cmd->getName());
+        return true;
+    }
+
     for (auto&& failCommand : data.getObjectField("failCommands")) {
         if (failCommand.type() == String && cmd->hasAlias(failCommand.valueStringData())) {
             LOGV2(4898500,

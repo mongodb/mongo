@@ -15,7 +15,7 @@ class BGJob(threading.Thread):
 
     def __init__(self, hook):
         """Initialize the background job."""
-        threading.Thread.__init__(self, name="BGJob")
+        threading.Thread.__init__(self, name=f"BGJob-{hook.__class__.__name__}")
         self.daemon = True
         self._hook = hook
         self.__is_alive = True
