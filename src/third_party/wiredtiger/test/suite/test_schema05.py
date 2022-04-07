@@ -27,11 +27,12 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wttest
+from helper_tiered import TieredConfigMixin, tiered_storage_sources
 from wtscenario import make_scenarios
 
 # test_schema05.py
 #    Test indices using a custom extractor.
-class test_schema05(wttest.WiredTigerTestCase):
+class test_schema05(TieredConfigMixin, wttest.WiredTigerTestCase):
     """
     Test indices with a custom extractor.
     This test is the same as test_schema04, except that rows
@@ -50,15 +51,18 @@ class test_schema05(wttest.WiredTigerTestCase):
     nentries = 1000
     nindices = 6
 
-    scenarios = make_scenarios([
+    index = [
         ('index-before', { 'create_index' : 0 }),
         ('index-during', { 'create_index' : 1 }),
         ('index-after', { 'create_index' : 2 }),
-    ])
+    ]
+
+    scenarios = make_scenarios(tiered_storage_sources, index)
 
     def conn_extensions(self, extlist):
         extlist.skip_if_missing = True
         extlist.extension('extractors', 'csv')
+        return self.tiered_conn_extensions(extlist)
 
     def create_indices(self):
         # Create self.nindices index files, each with a column from the CSV

@@ -33,6 +33,7 @@
 
 import os
 import suite_random
+from helper_tiered import TieredConfigMixin, tiered_storage_sources
 import wtscenario, wttest
 
 try:
@@ -195,7 +196,7 @@ class idxconfig:
             colpos += 1
         return keys
 
-class test_schema03(wttest.WiredTigerTestCase):
+class test_schema03(TieredConfigMixin, wttest.WiredTigerTestCase):
     """
     Test schemas - a 'predictably random' assortment of columns,
     column groups and indices are created within tables, and are
@@ -223,7 +224,7 @@ class test_schema03(wttest.WiredTigerTestCase):
     """
 
     # Boost cache size and number of sessions for this test
-    conn_config = 'cache_size=100m,session_max=1000'
+    conn_config_string = 'cache_size=100m,session_max=1000,'
 
     ################################################################
     # These three variables can be altered to help generate
@@ -276,9 +277,9 @@ class test_schema03(wttest.WiredTigerTestCase):
         ['', ',type=file', ',type=lsm'], [0.5, 0.3, 0.2])
 
     scenarios = wtscenario.make_scenarios(
-        restart_scenarios, ntable_scenarios, ncolgroup_scenarios,
-        nindex_scenarios, idx_args_scenarios, table_args_scenarios,
-        prune=30)
+        tiered_storage_sources, restart_scenarios, ntable_scenarios,
+        ncolgroup_scenarios, nindex_scenarios, idx_args_scenarios,
+        table_args_scenarios, prune=30)
 
     # Note: the set can be reduced here for debugging, e.g.
     # scenarios = scenarios[40:44]
@@ -301,6 +302,10 @@ class test_schema03(wttest.WiredTigerTestCase):
             self.skipTest('Require %d open files, only %d available' % newlimit)
         resource.setrlimit(resource.RLIMIT_NOFILE, newlimit)
         super(test_schema03, self).setUp()
+
+    # Set up connection config.
+    def conn_config(self):
+        return self.conn_config_string + self.tiered_conn_config()
 
     def tearDown(self):
         super(test_schema03, self).tearDown()
@@ -338,6 +343,10 @@ class test_schema03(wttest.WiredTigerTestCase):
             self.reopen_conn()
 
     def test_schema(self):
+        if self.is_tiered_scenario() and (self.s_index_args == ',type=lsm' or self.s_index_args == ',type=file' or
+            self.s_extra_table_args == ',type=lsm' or self.s_extra_table_args == ',type=file'):
+            self.skipTest('Tiered storage does not support LSM or file URIs.')
+
         rand = suite_random.suite_random()
         if self.SHOW_PYTHON:
             print('  ################################################')

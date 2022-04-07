@@ -27,20 +27,23 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wttest
+from helper_tiered import TieredConfigMixin, tiered_storage_sources
 from wtscenario import make_scenarios
 
 # test_schema06.py
 #    Repeatedly create and drop indices
-class test_schema06(wttest.WiredTigerTestCase):
+class test_schema06(TieredConfigMixin, wttest.WiredTigerTestCase):
     """
     Test basic operations
     """
     nentries = 1000
 
-    scenarios = make_scenarios([
-        ('normal', { 'idx_config' : '' }),
-        ('lsm', { 'idx_config' : ',type=lsm' }),
-    ])
+    types = [
+        ('normal', { 'type': 'normal', 'idx_config' : '' }),
+        ('lsm', { 'type': 'lsm', 'idx_config' : ',type=lsm' }),
+    ]
+
+    scenarios = make_scenarios(tiered_storage_sources, types)
 
     def flip(self, inum, val):
         """
@@ -67,6 +70,9 @@ class test_schema06(wttest.WiredTigerTestCase):
         self.dropUntilSuccess(self.session, "index:schema06:" + colname)
 
     def test_index_stress(self):
+        if self.is_tiered_scenario() and self.type == 'lsm':
+            self.skipTest('Tiered storage does not support LSM URIs.')
+
         self.session.create("table:schema06",
                             "key_format=S,value_format=SSSSSS," +
                             "columns=(key,s0,s1,s2,s3,s4,s5),colgroups=(c1,c2)")

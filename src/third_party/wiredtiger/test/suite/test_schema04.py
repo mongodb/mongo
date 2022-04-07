@@ -27,11 +27,12 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wttest
+from helper_tiered import TieredConfigMixin, tiered_storage_sources
 from wtscenario import make_scenarios
 
 # test_schema04.py
 #    Test indices with duplicates
-class test_schema04(wttest.WiredTigerTestCase):
+class test_schema04(TieredConfigMixin, wttest.WiredTigerTestCase):
     """
     Test indices with duplicates.
     Our set of rows looks like a multiplication table:
@@ -46,11 +47,13 @@ class test_schema04(wttest.WiredTigerTestCase):
     """
     nentries = 100
 
-    scenarios = make_scenarios([
+    index = [
         ('index-before', { 'create_index' : 0 }),
         ('index-during', { 'create_index' : 1 }),
         ('index-after', { 'create_index' : 2 }),
-    ])
+    ]
+
+    scenarios = make_scenarios(tiered_storage_sources, index)
 
     def create_indices(self):
         # Create 6 index files, each with a column from the main table
