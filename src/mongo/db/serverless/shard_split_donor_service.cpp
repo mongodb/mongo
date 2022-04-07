@@ -203,6 +203,28 @@ ThreadPool::Limits ShardSplitDonorService::getThreadPoolLimits() const {
     return ThreadPool::Limits();
 }
 
+void ShardSplitDonorService::checkIfConflictsWithOtherInstances(
+    OperationContext* opCtx,
+    BSONObj initialState,
+    const std::vector<const repl::PrimaryOnlyService::Instance*>& existingInstances) {
+    auto stateDoc =
+        ShardSplitDonorDocument::parse(IDLParserErrorContext("donorStateDoc"), initialState);
+
+    for (auto& instance : existingInstances) {
+        auto existingTypedInstance =
+            checked_cast<const ShardSplitDonorService::DonorStateMachine*>(instance);
+        bool isGarbageCollectable = existingTypedInstance->isGarbageCollectable();
+        bool existingIsAborted =
+            existingTypedInstance->getStateDocState() == ShardSplitDonorStateEnum::kAborted &&
+            isGarbageCollectable;
+
+        uassert(ErrorCodes::ConflictingOperationInProgress,
+                str::stream() << "Can't start a concurent shard split operation against"
+                              << " migrationId:" << existingTypedInstance->getId(),
+                existingIsAborted);
+    }
+}
+
 std::shared_ptr<repl::PrimaryOnlyService::Instance> ShardSplitDonorService::constructInstance(
     BSONObj initialState) {
     return std::make_shared<DonorStateMachine>(

@@ -66,7 +66,7 @@ protected:
     void checkIfConflictsWithOtherInstances(
         OperationContext* opCtx,
         BSONObj initialState,
-        const std::vector<const repl::PrimaryOnlyService::Instance*>& existingInstances) override{};
+        const std::vector<const repl::PrimaryOnlyService::Instance*>& existingInstances) override;
 
     std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(BSONObj initialState) override;
 
@@ -145,6 +145,11 @@ public:
      */
     static void setSplitAcceptanceTaskExecutor_forTest(TaskExecutorPtr taskExecutor) {
         _splitAcceptanceTaskExecutorForTest = taskExecutor;
+    }
+
+    ShardSplitDonorStateEnum getStateDocState() const {
+        stdx::lock_guard<Latch> lg(_mutex);
+        return _stateDoc.getState();
     }
 
 private:
