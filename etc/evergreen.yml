@@ -5997,12 +5997,7 @@ tasks:
   depends_on:
     - name: compile_dist_test
   commands:
-    - command: manifest.load
-    - *git_get_project
     - *f_expansions_write
-    - *kill_processes
-    - *cleanup_environment
-    - *set_up_venv
     - func: "scons compile"
       vars:
         targets: >-
