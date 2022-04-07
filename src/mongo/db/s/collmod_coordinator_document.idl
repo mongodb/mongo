@@ -51,28 +51,6 @@ enums:
             kUpdateShards: "UpdateShards"
 
 structs:
-    CollModCollectionInfo:
-        description: "Collection information that may affect collMod processing"
-        generate_comparison_operators: false
-        strict: false
-        fields:
-            timeSeriesOptions:
-                type: TimeseriesOptions
-                optional: true
-            nsForTargetting:
-                type: namespacestring
-                description: "The targeting namespace that may be different from the original namespace in some cases, like time-series collections"
-            isSharded:
-                type: bool
-            primaryShard:
-                type: shard_id
-                optional: true
-                description: "The primary shard for the collection, only set if the collection is sharded"
-            shardsOwningChunks:
-                type: array<shard_id>
-                optional: true
-                description: "The shards owning chunks for the collection, only set if the collection is sharded"
-
     CollModCoordinatorDocument:
         description: "Represents a collMod operation on the coordinator shard."
         generate_comparison_operators: false
@@ -89,8 +67,4 @@ structs:
             collUUID:
                 type: uuid
                 description: "Collection uuid."
-                optional: true
-            info:
-                type: CollModCollectionInfo
-                description: "Collection information that may affect collMod processing"
                 optional: true

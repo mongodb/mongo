@@ -71,29 +71,6 @@ bool hasTimeSeriesGranularityUpdate(const CollModRequest& request) {
     return request.getTimeseries() && request.getTimeseries()->getGranularity();
 }
 
-CollModCollectionInfo getCollModCollectionInfo(OperationContext* opCtx,
-                                               const NamespaceString& nss) {
-    CollModCollectionInfo info;
-    info.setTimeSeriesOptions(timeseries::getTimeseriesOptions(opCtx, nss, true));
-    info.setNsForTargetting(info.getTimeSeriesOptions() ? nss.makeTimeseriesBucketsNamespace()
-                                                        : nss);
-    info.setIsSharded(isShardedColl(opCtx, info.getNsForTargetting()));
-    if (info.getIsSharded()) {
-        const auto chunkManager =
-            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(
-                opCtx, info.getNsForTargetting()));
-        info.setPrimaryShard(chunkManager.dbPrimary());
-        tassert(8423352,
-                "Unexpected unsharded collection info found on local catalog cache during collMod",
-                chunkManager.isSharded());
-        std::set<ShardId> shardIdsSet;
-        chunkManager.getAllShardIds(&shardIdsSet);
-        std::vector<ShardId> shardIdsVec{shardIdsSet.begin(), shardIdsSet.end()};
-        info.setShardsOwningChunks(shardIdsVec);
-    }
-    return info;
-}
-
 }  // namespace
 
 CollModCoordinator::CollModCoordinator(ShardingDDLCoordinatorService* service,
@@ -169,6 +146,35 @@ void CollModCoordinator::_performNoopRetryableWriteOnParticipants(
         opCtx, shardsAndConfigsvr, getCurrentSession(_doc), executor);
 }
 
+void CollModCoordinator::_saveCollectionInfoOnCoordinatorIfNecessary(OperationContext* opCtx) {
+    if (!_collInfo) {
+        CollectionInfo info;
+        info.timeSeriesOptions = timeseries::getTimeseriesOptions(opCtx, nss(), true);
+        info.nsForTargeting =
+            info.timeSeriesOptions ? nss().makeTimeseriesBucketsNamespace() : nss();
+        info.isSharded = isShardedColl(opCtx, info.nsForTargeting);
+        _collInfo = std::move(info);
+    }
+}
+
+void CollModCoordinator::_saveShardingInfoOnCoordinatorIfNecessary(OperationContext* opCtx) {
+    tassert(
+        6522700, "Sharding information must be gathered after collection information", _collInfo);
+    if (!_shardingInfo && _collInfo->isSharded) {
+        ShardingInfo info;
+        const auto chunkManager =
+            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(
+                opCtx, _collInfo->nsForTargeting));
+
+        info.primaryShard = chunkManager.dbPrimary();
+        std::set<ShardId> shardIdsSet;
+        chunkManager.getAllShardIds(&shardIdsSet);
+        std::vector<ShardId> shardIdsVec{shardIdsSet.begin(), shardIdsSet.end()};
+        info.shardsOwningChunks = std::move(shardIdsVec);
+        _shardingInfo = std::move(info);
+    }
+}
+
 ExecutorFuture<void> CollModCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
@@ -181,6 +187,28 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
             if (_doc.getPhase() > Phase::kUnset) {
                 _performNoopRetryableWriteOnParticipants(opCtx, **executor);
             }
+
+            {
+                AutoGetCollection coll{
+                    opCtx, nss(), MODE_IS, AutoGetCollectionViewMode::kViewsPermitted};
+                checkCollectionUUIDMismatch(
+                    opCtx, nss(), *coll, _doc.getCollModRequest().getCollectionUUID());
+            }
+
+            _saveCollectionInfoOnCoordinatorIfNecessary(opCtx);
+
+            auto isGranularityUpdate = hasTimeSeriesGranularityUpdate(_doc.getCollModRequest());
+            uassert(6201808,
+                    "Cannot use time-series options for a non-timeseries collection",
+                    _collInfo->timeSeriesOptions || !isGranularityUpdate);
+            if (isGranularityUpdate) {
+                uassert(ErrorCodes::InvalidOptions,
+                        "Invalid transition for timeseries.granularity. Can only transition "
+                        "from 'seconds' to 'minutes' or 'minutes' to 'hours'.",
+                        timeseries::isValidTimeseriesGranularityTransition(
+                            _collInfo->timeSeriesOptions->getGranularity(),
+                            *_doc.getCollModRequest().getTimeseries()->getGranularity()));
+            }
         })
         .then(_executePhase(
             Phase::kBlockShards,
@@ -191,51 +219,23 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
 
                 _doc = _updateSession(opCtx, _doc);
 
-                {
-                    AutoGetCollection coll{
-                        opCtx, nss(), MODE_IS, AutoGetCollectionViewMode::kViewsPermitted};
-                    checkCollectionUUIDMismatch(
-                        opCtx, nss(), *coll, _doc.getCollModRequest().getCollectionUUID());
+                _saveCollectionInfoOnCoordinatorIfNecessary(opCtx);
+
+                if (_collInfo->isSharded) {
+                    _doc.setCollUUID(
+                        sharding_ddl_util::getCollectionUUID(opCtx, nss(), true /* allowViews */));
+                    sharding_ddl_util::stopMigrations(opCtx, nss(), _doc.getCollUUID());
                 }
 
-                if (!_doc.getInfo()) {
-                    _doc.setInfo(getCollModCollectionInfo(opCtx, nss()));
-                }
+                _saveShardingInfoOnCoordinatorIfNecessary(opCtx);
 
-
-                auto isGranularityUpdate = hasTimeSeriesGranularityUpdate(_doc.getCollModRequest());
-                uassert(6201808,
-                        "Cannot use time-series options for a non-timeseries collection",
-                        _doc.getInfo()->getTimeSeriesOptions() || !isGranularityUpdate);
-                if (isGranularityUpdate) {
-                    uassert(ErrorCodes::InvalidOptions,
-                            "Invalid transition for timeseries.granularity. Can only transition "
-                            "from 'seconds' to 'minutes' or 'minutes' to 'hours'.",
-                            timeseries::isValidTimeseriesGranularityTransition(
-                                _doc.getInfo()->getTimeSeriesOptions()->getGranularity(),
-                                *_doc.getCollModRequest().getTimeseries()->getGranularity()));
-
-                    if (_doc.getInfo()->getIsSharded()) {
-                        tassert(6201805,
-                                "shardsOwningChunks should be set on state document for sharded "
-                                "collection",
-                                _doc.getInfo()->getShardsOwningChunks());
-
-                        _doc.setCollUUID(sharding_ddl_util::getCollectionUUID(
-                            opCtx, nss(), true /* allowViews */));
-                        sharding_ddl_util::stopMigrations(opCtx, nss(), _doc.getCollUUID());
-
-                        ShardsvrParticipantBlock blockCRUDOperationsRequest(
-                            _doc.getInfo()->getNsForTargetting());
-                        const auto cmdObj = CommandHelpers::appendMajorityWriteConcern(
-                            blockCRUDOperationsRequest.toBSON({}));
-                        sharding_ddl_util::sendAuthenticatedCommandToShards(
-                            opCtx,
-                            nss().db(),
-                            cmdObj,
-                            *_doc.getInfo()->getShardsOwningChunks(),
-                            **executor);
-                    }
+                if (_collInfo->isSharded &&
+                    hasTimeSeriesGranularityUpdate(_doc.getCollModRequest())) {
+                    ShardsvrParticipantBlock blockCRUDOperationsRequest(_collInfo->nsForTargeting);
+                    const auto cmdObj = CommandHelpers::appendMajorityWriteConcern(
+                        blockCRUDOperationsRequest.toBSON({}));
+                    sharding_ddl_util::sendAuthenticatedCommandToShards(
+                        opCtx, nss().db(), cmdObj, _shardingInfo->shardsOwningChunks, **executor);
                 }
             }))
         .then(_executePhase(
@@ -248,12 +248,13 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                 getForwardableOpMetadata().setOn(opCtx);
 
                 _doc = _updateSession(opCtx, _doc);
-                tassert(6201803, "collMod collection information should be set", _doc.getInfo());
 
-                if (_doc.getInfo()->getIsSharded() && _doc.getInfo()->getTimeSeriesOptions() &&
+                _saveCollectionInfoOnCoordinatorIfNecessary(opCtx);
+                _saveShardingInfoOnCoordinatorIfNecessary(opCtx);
+
+                if (_collInfo->isSharded && _collInfo->timeSeriesOptions &&
                     hasTimeSeriesGranularityUpdate(_doc.getCollModRequest())) {
-                    ConfigsvrCollMod request(_doc.getInfo()->getNsForTargetting(),
-                                             _doc.getCollModRequest());
+                    ConfigsvrCollMod request(_collInfo->nsForTargeting, _doc.getCollModRequest());
                     const auto cmdObj =
                         CommandHelpers::appendMajorityWriteConcern(request.toBSON({}));
 
@@ -274,27 +275,21 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                 getForwardableOpMetadata().setOn(opCtx);
 
                 _doc = _updateSession(opCtx, _doc);
-                tassert(6201804, "collMod collection information should be set", _doc.getInfo());
 
-                if (_doc.getInfo()->getIsSharded()) {
-                    tassert(
-                        6201806,
-                        "shardsOwningChunks should be set on state document for sharded collection",
-                        _doc.getInfo()->getShardsOwningChunks());
-                    tassert(6201807,
-                            "primaryShard should be set on state document for sharded collection",
-                            _doc.getInfo()->getPrimaryShard());
+                _saveCollectionInfoOnCoordinatorIfNecessary(opCtx);
+                _saveShardingInfoOnCoordinatorIfNecessary(opCtx);
 
+                if (_collInfo->isSharded) {
                     ShardsvrCollModParticipant request(nss(), _doc.getCollModRequest());
-                    bool needsUnblock = _doc.getInfo()->getTimeSeriesOptions() &&
+                    bool needsUnblock = _collInfo->timeSeriesOptions &&
                         hasTimeSeriesGranularityUpdate(_doc.getCollModRequest());
                     request.setNeedsUnblock(needsUnblock);
 
                     std::vector<AsyncRequestsSender::Response> responses;
-                    auto shardsOwningChunks = *_doc.getInfo()->getShardsOwningChunks();
+                    auto shardsOwningChunks = _shardingInfo->shardsOwningChunks;
                     auto primaryShardOwningChunk = std::find(shardsOwningChunks.begin(),
                                                              shardsOwningChunks.end(),
-                                                             _doc.getInfo()->getPrimaryShard());
+                                                             _shardingInfo->primaryShard);
                     // A view definition will only be present on the primary shard. So we pass an
                     // addition 'performViewChange' flag only to the primary shard.
                     if (primaryShardOwningChunk != shardsOwningChunks.end()) {
@@ -304,7 +299,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                                 opCtx,
                                 nss().db(),
                                 CommandHelpers::appendMajorityWriteConcern(request.toBSON({})),
-                                {*_doc.getInfo()->getPrimaryShard()},
+                                {_shardingInfo->primaryShard},
                                 **executor);
                         responses.insert(
                             responses.end(), primaryResponse.begin(), primaryResponse.end());

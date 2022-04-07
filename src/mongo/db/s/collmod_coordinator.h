@@ -59,6 +59,21 @@ public:
     }
 
 private:
+    struct CollectionInfo {
+        bool isSharded;
+        boost::optional<TimeseriesOptions> timeSeriesOptions;
+        // The targeting namespace can be different from the original namespace in some cases, like
+        // time-series collections.
+        NamespaceString nsForTargeting;
+    };
+
+    struct ShardingInfo {
+        // The primary shard for the collection, only set if the collection is sharded.
+        ShardId primaryShard;
+        // The shards owning chunks for the collection, only set if the collection is sharded.
+        std::vector<ShardId> shardsOwningChunks;
+    };
+
     ShardingDDLCoordinatorMetadata const& metadata() const override {
         return _doc.getShardingDDLCoordinatorMetadata();
     }
@@ -88,9 +103,15 @@ private:
     void _performNoopRetryableWriteOnParticipants(
         OperationContext* opCtx, const std::shared_ptr<executor::TaskExecutor>& executor);
 
+    void _saveCollectionInfoOnCoordinatorIfNecessary(OperationContext* opCtx);
+
+    void _saveShardingInfoOnCoordinatorIfNecessary(OperationContext* opCtx);
+
     BSONObj _initialState;
     CollModCoordinatorDocument _doc;
     boost::optional<BSONObj> _result;
+    boost::optional<CollectionInfo> _collInfo;
+    boost::optional<ShardingInfo> _shardingInfo;
 };
 
 }  // namespace mongo

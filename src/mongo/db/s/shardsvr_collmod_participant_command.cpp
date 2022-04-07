@@ -32,6 +32,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/collmod_coordinator.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/recoverable_critical_section_service.h"
@@ -87,7 +88,16 @@ public:
                         "collMod unblocking should always be on a time-series collection",
                         timeseries::getTimeseriesOptions(opCtx, ns(), true));
                 auto bucketNs = ns().makeTimeseriesBucketsNamespace();
-                forceShardFilteringMetadataRefresh(opCtx, bucketNs);
+
+                try {
+                    forceShardFilteringMetadataRefresh(opCtx, bucketNs);
+                } catch (const DBException&) {
+                    // If the refresh fails, then set the shard version to UNKNOWN and let a future
+                    // operation to refresh the metadata.
+                    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+                    AutoGetCollection autoColl(opCtx, bucketNs, MODE_IX);
+                    CollectionShardingRuntime::get(opCtx, bucketNs)->clearFilteringMetadata(opCtx);
+                }
 
                 auto service = RecoverableCriticalSectionService::get(opCtx);
                 const auto reason = BSON("command"
