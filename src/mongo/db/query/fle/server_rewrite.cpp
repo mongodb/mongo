@@ -32,12 +32,15 @@
 
 #include <memory>
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/crypto/fle_crypto.h"
+#include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/crypto/fle_tags.h"
 #include "mongo/db/fle_crud.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/document_source_geo_near.h"
 #include "mongo/db/pipeline/document_source_graph_lookup.h"
 #include "mongo/db/pipeline/document_source_match.h"
@@ -47,6 +50,19 @@
 #include "mongo/util/assert_util.h"
 
 namespace mongo::fle {
+
+// TODO: This is a generally useful helper function that should probably go in some other namespace.
+std::unique_ptr<CollatorInterface> collatorFromBSON(OperationContext* opCtx,
+                                                    const BSONObj& collation) {
+    std::unique_ptr<CollatorInterface> collator;
+    if (!collation.isEmpty()) {
+        auto statusWithCollator =
+            CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(collation);
+        uassertStatusOK(statusWithCollator.getStatus());
+        collator = std::move(statusWithCollator.getValue());
+    }
+    return collator;
+}
 namespace {
 BSONObj rewriteEncryptedFilter(const FLEStateCollectionReader& escReader,
                                const FLEStateCollectionReader& eccReader,
@@ -54,55 +70,6 @@ BSONObj rewriteEncryptedFilter(const FLEStateCollectionReader& escReader,
                                BSONObj filter) {
     return MatchExpressionRewrite(expCtx, escReader, eccReader, filter).get();
 }
-
-/**
- * Make an expression context from a find command.
- */
-boost::intrusive_ptr<ExpressionContext> makeExpCtx(OperationContext* opCtx,
-                                                   const NamespaceString& nss,
-                                                   FindCommandRequest* findCommand) {
-
-    std::unique_ptr<CollatorInterface> collator;
-    if (!findCommand->getCollation().isEmpty()) {
-        auto statusWithCollator = CollatorFactoryInterface::get(opCtx->getServiceContext())
-                                      ->makeFromBSON(findCommand->getCollation());
-
-        uassertStatusOK(statusWithCollator.getStatus());
-        collator = std::move(statusWithCollator.getValue());
-    }
-    auto expCtx = make_intrusive<ExpressionContext>(opCtx,
-                                                    std::move(collator),
-                                                    nss,
-                                                    findCommand->getLegacyRuntimeConstants(),
-                                                    findCommand->getLet());
-    expCtx->stopExpressionCounters();
-    return expCtx;
-}
-
-boost::intrusive_ptr<ExpressionContext> makeExpCtx(OperationContext* opCtx,
-                                                   const NamespaceString& nss,
-                                                   CountCommandRequest* countCommand) {
-
-    std::unique_ptr<CollatorInterface> collator;
-    if (countCommand->getCollation()) {
-        auto statusWithCollator = CollatorFactoryInterface::get(opCtx->getServiceContext())
-                                      ->makeFromBSON(countCommand->getCollation().get());
-
-        uassertStatusOK(statusWithCollator.getStatus());
-        collator = std::move(statusWithCollator.getValue());
-    }
-    auto expCtx = make_intrusive<ExpressionContext>(
-        opCtx,
-        std::move(collator),
-        nss,
-        // Count command does not have legacy runtime constants, and does not support user variables
-        // defined in a let expression.
-        boost::none,
-        boost::none);
-    expCtx->stopExpressionCounters();
-    return expCtx;
-}
-
 
 class RewriteBase {
 public:
@@ -225,6 +192,17 @@ BSONObj rewriteEncryptedFilterInsideTxn(FLEQueryInterface* queryImpl,
     return rewriteEncryptedFilter(escReader, eccReader, expCtx, filter);
 }
 
+BSONObj rewriteQuery(OperationContext* opCtx,
+                     boost::intrusive_ptr<ExpressionContext> expCtx,
+                     const NamespaceString& nss,
+                     const EncryptionInformation& info,
+                     BSONObj filter,
+                     GetTxnCallback getTransaction) {
+    auto sharedBlock = std::make_shared<FilterRewrite>(expCtx, nss, info, filter);
+    doFLERewriteInTxn(opCtx, sharedBlock, getTransaction);
+    return sharedBlock->rewrittenFilter.getOwned();
+}
+
 
 void processFindCommand(OperationContext* opCtx,
                         const NamespaceString& nss,
@@ -232,15 +210,19 @@ void processFindCommand(OperationContext* opCtx,
                         GetTxnCallback getTransaction) {
     invariant(findCommand->getEncryptionInformation());
 
-    auto sharedBlock =
-        std::make_shared<FilterRewrite>(makeExpCtx(opCtx, nss, findCommand),
+    auto expCtx =
+        make_intrusive<ExpressionContext>(opCtx,
+                                          collatorFromBSON(opCtx, findCommand->getCollation()),
+                                          nss,
+                                          findCommand->getLegacyRuntimeConstants(),
+                                          findCommand->getLet());
+    expCtx->stopExpressionCounters();
+    findCommand->setFilter(rewriteQuery(opCtx,
+                                        expCtx,
                                         nss,
                                         findCommand->getEncryptionInformation().get(),
-                                        findCommand->getFilter().getOwned());
-    doFLERewriteInTxn(opCtx, sharedBlock, getTransaction);
-
-    auto rewrittenFilter = sharedBlock->rewrittenFilter.getOwned();
-    findCommand->setFilter(std::move(rewrittenFilter));
+                                        findCommand->getFilter().getOwned(),
+                                        getTransaction));
     // The presence of encryptionInformation is a signal that this is a FLE request that requires
     // special processing. Once we've rewritten the query, it's no longer a "special" FLE query, but
     // a normal query that can be executed by the query system like any other, so remove
@@ -253,16 +235,18 @@ void processCountCommand(OperationContext* opCtx,
                          CountCommandRequest* countCommand,
                          GetTxnCallback getTxn) {
     invariant(countCommand->getEncryptionInformation());
+    // Count command does not have legacy runtime constants, and does not support user variables
+    // defined in a let expression.
+    auto expCtx = make_intrusive<ExpressionContext>(
+        opCtx, collatorFromBSON(opCtx, countCommand->getCollation().value_or(BSONObj())), nss);
+    expCtx->stopExpressionCounters();
 
-    auto sharedBlock =
-        std::make_shared<FilterRewrite>(makeExpCtx(opCtx, nss, countCommand),
+    countCommand->setQuery(rewriteQuery(opCtx,
+                                        expCtx,
                                         nss,
                                         countCommand->getEncryptionInformation().get(),
-                                        countCommand->getQuery().getOwned());
-    doFLERewriteInTxn(opCtx, sharedBlock, getTxn);
-
-    auto rewrittenFilter = sharedBlock->rewrittenFilter.getOwned();
-    countCommand->setQuery(std::move(rewrittenFilter));
+                                        countCommand->getQuery().getOwned(),
+                                        getTxn));
     // The presence of encryptionInformation is a signal that this is a FLE request that requires
     // special processing. Once we've rewritten the query, it's no longer a "special" FLE query, but
     // a normal query that can be executed by the query system like any other, so remove

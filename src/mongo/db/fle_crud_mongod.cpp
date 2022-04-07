@@ -253,4 +253,16 @@ std::unique_ptr<Pipeline, PipelineDeleter> processFLEPipelineD(
     return fle::processPipeline(
         opCtx, nss, encryptInfo, std::move(toRewrite), &getTransactionWithRetriesForMongoD);
 }
+
+BSONObj processFLEWriteExplainD(OperationContext* opCtx,
+                                const BSONObj& collation,
+                                const NamespaceString& nss,
+                                const EncryptionInformation& info,
+                                const boost::optional<LegacyRuntimeConstants>& runtimeConstants,
+                                const boost::optional<BSONObj>& letParameters,
+                                const BSONObj& query) {
+    auto expCtx = make_intrusive<ExpressionContext>(
+        opCtx, fle::collatorFromBSON(opCtx, collation), nss, runtimeConstants, letParameters);
+    return fle::rewriteQuery(opCtx, expCtx, nss, info, query, &getTransactionWithRetriesForMongoD);
+}
 }  // namespace mongo

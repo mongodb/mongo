@@ -35,6 +35,7 @@
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/fle_crud.h"
 #include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/stats/counters.h"
@@ -644,22 +645,33 @@ void ClusterWriteCmd::InvocationBase::explain(OperationContext* opCtx,
             "explained write batches must be of size 1",
             _batchedRequest.sizeWriteOps() == 1U);
 
-    const auto explainCmd = ClusterExplain::wrapAsExplain(_request->body, verbosity);
+
+    std::unique_ptr<BatchedCommandRequest> req;
+    if (_batchedRequest.hasEncryptionInformation() &&
+        (_batchedRequest.getBatchType() == BatchedCommandRequest::BatchType_Delete ||
+         _batchedRequest.getBatchType() == BatchedCommandRequest::BatchType_Update)) {
+        req = processFLEBatchExplain(opCtx, _batchedRequest);
+    }
+
+    auto nss = req ? req->getNS() : _batchedRequest.getNS();
+    auto requestBSON = req ? req->toBSON() : _request->body;
+    auto requestPtr = req ? req.get() : &_batchedRequest;
+
+    const auto explainCmd = ClusterExplain::wrapAsExplain(requestBSON, verbosity);
 
     // We will time how long it takes to run the commands on the shards.
     Timer timer;
 
     // Target the command to the shards based on the singleton batch item.
-    BatchItemRef targetingBatchItem(&_batchedRequest, 0);
+    BatchItemRef targetingBatchItem(requestPtr, 0);
     std::vector<AsyncRequestsSender::Response> shardResponses;
-    _commandOpWrite(
-        opCtx, _batchedRequest.getNS(), explainCmd, targetingBatchItem, &shardResponses);
+    _commandOpWrite(opCtx, nss, explainCmd, targetingBatchItem, &shardResponses);
     auto bodyBuilder = result->getBodyBuilder();
     uassertStatusOK(ClusterExplain::buildExplainResult(opCtx,
                                                        shardResponses,
                                                        ClusterExplain::kWriteOnShards,
                                                        timer.millis(),
-                                                       _request->body,
+                                                       requestBSON,
                                                        &bodyBuilder));
 }
 

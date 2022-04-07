@@ -47,6 +47,24 @@ class FLEQueryInterface;
 namespace fle {
 
 /**
+ * Make a collator object from its BSON representation. Useful when creating ExpressionContext
+ * objects for parsing MatchExpressions as part of the server-side rewrite.
+ */
+std::unique_ptr<CollatorInterface> collatorFromBSON(OperationContext* opCtx,
+                                                    const BSONObj& collation);
+
+/**
+ * Return a rewritten version of the passed-in filter as a BSONObj. Generally used by other
+ * functions to process MatchExpressions in each command.
+ */
+BSONObj rewriteQuery(OperationContext* opCtx,
+                     boost::intrusive_ptr<ExpressionContext> expCtx,
+                     const NamespaceString& nss,
+                     const EncryptionInformation& info,
+                     BSONObj filter,
+                     GetTxnCallback getTransaction);
+
+/**
  * Process a find command with encryptionInformation in-place, rewriting the filter condition so
  * that any query on an encrypted field will properly query the underlying tags array.
  */

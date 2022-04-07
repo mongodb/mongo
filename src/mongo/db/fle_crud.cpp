@@ -855,6 +855,46 @@ FLEBatchResult processFLEBatch(OperationContext* opCtx,
     MONGO_UNREACHABLE;
 }
 
+std::unique_ptr<BatchedCommandRequest> processFLEBatchExplain(
+    OperationContext* opCtx, const BatchedCommandRequest& request) {
+    invariant(request.hasEncryptionInformation());
+    auto getExpCtx = [&](const auto& op) {
+        auto expCtx = make_intrusive<ExpressionContext>(
+            opCtx,
+            fle::collatorFromBSON(opCtx, op.getCollation().value_or(BSONObj())),
+            request.getNS(),
+            request.getLegacyRuntimeConstants(),
+            request.getLet());
+        expCtx->stopExpressionCounters();
+        return expCtx;
+    };
+
+    if (request.getBatchType() == BatchedCommandRequest::BatchType_Delete) {
+        auto deleteRequest = request.getDeleteRequest();
+        auto newDeleteOp = deleteRequest.getDeletes()[0];
+        newDeleteOp.setQ(fle::rewriteQuery(opCtx,
+                                           getExpCtx(newDeleteOp),
+                                           request.getNS(),
+                                           deleteRequest.getEncryptionInformation().get(),
+                                           newDeleteOp.getQ(),
+                                           &getTransactionWithRetriesForMongoS));
+        deleteRequest.setDeletes({newDeleteOp});
+        return std::make_unique<BatchedCommandRequest>(deleteRequest);
+    } else if (request.getBatchType() == BatchedCommandRequest::BatchType_Update) {
+        auto updateRequest = request.getUpdateRequest();
+        auto newUpdateOp = updateRequest.getUpdates()[0];
+        newUpdateOp.setQ(fle::rewriteQuery(opCtx,
+                                           getExpCtx(newUpdateOp),
+                                           request.getNS(),
+                                           updateRequest.getEncryptionInformation().get(),
+                                           newUpdateOp.getQ(),
+                                           &getTransactionWithRetriesForMongoS));
+        updateRequest.setUpdates({newUpdateOp});
+        return std::make_unique<BatchedCommandRequest>(updateRequest);
+    }
+    MONGO_UNREACHABLE;
+}
+
 // See processUpdate for algorithm overview
 write_ops::FindAndModifyCommandReply processFindAndModify(
     boost::intrusive_ptr<ExpressionContext> expCtx,

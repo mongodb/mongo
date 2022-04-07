@@ -172,6 +172,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/core',
+        '$BUILD_DIR/mongo/db/fle_crud',
         '$BUILD_DIR/mongo/db/initialize_api_parameters',
         '$BUILD_DIR/mongo/db/internal_transactions_feature_flag',
         '$BUILD_DIR/mongo/db/read_write_concern_defaults',

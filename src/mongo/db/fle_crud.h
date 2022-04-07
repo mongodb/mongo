@@ -29,8 +29,9 @@
 
 #pragma once
 
-#include "boost/smart_ptr/intrusive_ptr.hpp"
 #include <cstdint>
+
+#include "boost/smart_ptr/intrusive_ptr.hpp"
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
@@ -72,6 +73,12 @@ FLEBatchResult processFLEBatch(OperationContext* opCtx,
                                BatchedCommandResponse* response,
                                boost::optional<OID> targetEpoch);
 
+/**
+ * Rewrite a BatchedCommandRequest for explain commands.
+ */
+std::unique_ptr<BatchedCommandRequest> processFLEBatchExplain(OperationContext* opCtx,
+                                                              const BatchedCommandRequest& request);
+
 
 /**
  * Initialize the FLE CRUD subsystem on Mongod.
@@ -96,6 +103,38 @@ FLEBatchResult processFLEInsert(OperationContext* opCtx,
  */
 write_ops::DeleteCommandReply processFLEDelete(
     OperationContext* opCtx, const write_ops::DeleteCommandRequest& deleteRequest);
+
+/**
+ * Rewrite the query within a replica set explain command for delete and update.
+ * This concrete function is passed all the parameters directly.
+ */
+BSONObj processFLEWriteExplainD(OperationContext* opCtx,
+                                const BSONObj& collation,
+                                const NamespaceString& nss,
+                                const EncryptionInformation& info,
+                                const boost::optional<LegacyRuntimeConstants>& runtimeConstants,
+                                const boost::optional<BSONObj>& letParameters,
+                                const BSONObj& query);
+
+/**
+ * Rewrite the query within a replica set explain command for delete and update.
+ * This template is passed the request object from the command and delegates
+ * to the function above.
+ */
+template <typename T>
+BSONObj processFLEWriteExplainD(OperationContext* opCtx,
+                                const BSONObj& collation,
+                                const T& request,
+                                const BSONObj& query) {
+
+    return processFLEWriteExplainD(opCtx,
+                                   collation,
+                                   request.getNamespace(),
+                                   request.getEncryptionInformation().get(),
+                                   request.getLegacyRuntimeConstants(),
+                                   request.getLet(),
+                                   query);
+}
 
 /**
  * Process a replica set update.

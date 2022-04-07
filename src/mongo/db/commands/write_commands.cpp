@@ -1537,6 +1537,13 @@ public:
 
             UpdateRequest updateRequest(request().getUpdates()[0]);
             updateRequest.setNamespaceString(request().getNamespace());
+            if (shouldDoFLERewrite(request())) {
+                updateRequest.setQuery(
+                    processFLEWriteExplainD(opCtx,
+                                            write_ops::collationOf(request().getUpdates()[0]),
+                                            request(),
+                                            updateRequest.getQuery()));
+            }
             updateRequest.setLegacyRuntimeConstants(request().getLegacyRuntimeConstants().value_or(
                 Variables::generateRuntimeConstants(opCtx)));
             updateRequest.setLetParameters(request().getLet());
@@ -1677,7 +1684,14 @@ public:
             deleteRequest.setLegacyRuntimeConstants(request().getLegacyRuntimeConstants().value_or(
                 Variables::generateRuntimeConstants(opCtx)));
             deleteRequest.setLet(request().getLet());
-            deleteRequest.setQuery(request().getDeletes()[0].getQ());
+
+            BSONObj query = request().getDeletes()[0].getQ();
+            if (shouldDoFLERewrite(request())) {
+                query = processFLEWriteExplainD(
+                    opCtx, write_ops::collationOf(request().getDeletes()[0]), request(), query);
+            }
+            deleteRequest.setQuery(std::move(query));
+
             deleteRequest.setCollation(write_ops::collationOf(request().getDeletes()[0]));
             deleteRequest.setMulti(request().getDeletes()[0].getMulti());
             deleteRequest.setYieldPolicy(PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
