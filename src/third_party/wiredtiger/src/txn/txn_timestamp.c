@@ -563,18 +563,10 @@ __wt_txn_set_commit_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t commit_ts
               __wt_timestamp_to_string(commit_ts, ts_string[0]),
               __wt_timestamp_to_string(oldest_ts, ts_string[1]));
 
-#ifdef WT_STANDALONE_BUILD
         if (has_stable_ts && commit_ts <= stable_ts)
             WT_RET_MSG(session, EINVAL, "commit timestamp %s must be after the stable timestamp %s",
               __wt_timestamp_to_string(commit_ts, ts_string[0]),
               __wt_timestamp_to_string(stable_ts, ts_string[1]));
-#else
-        /* Don't change this error message, MongoDB servers check for it. */
-        if (has_stable_ts && commit_ts < stable_ts)
-            WT_RET_MSG(session, EINVAL, "commit timestamp %s is less than the stable timestamp %s",
-              __wt_timestamp_to_string(commit_ts, ts_string[0]),
-              __wt_timestamp_to_string(stable_ts, ts_string[1]));
-#endif
 
         /*
          * Compare against the commit timestamp of the current transaction. Return an error if the
@@ -673,17 +665,10 @@ __wt_txn_set_durable_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t durable_
           __wt_timestamp_to_string(durable_ts, ts_string[0]),
           __wt_timestamp_to_string(oldest_ts, ts_string[1]));
 
-#ifdef WT_STANDALONE_BUILD
     if (has_stable_ts && durable_ts <= stable_ts)
         WT_RET_MSG(session, EINVAL, "durable timestamp %s must be after the stable timestamp %s",
           __wt_timestamp_to_string(durable_ts, ts_string[0]),
           __wt_timestamp_to_string(stable_ts, ts_string[1]));
-#else
-    if (has_stable_ts && durable_ts < stable_ts)
-        WT_RET_MSG(session, EINVAL, "durable timestamp %s is less than the stable timestamp %s",
-          __wt_timestamp_to_string(durable_ts, ts_string[0]),
-          __wt_timestamp_to_string(stable_ts, ts_string[1]));
-#endif
 
     /* Check if the durable timestamp is less than the commit timestamp. */
     if (durable_ts < txn->commit_timestamp)
