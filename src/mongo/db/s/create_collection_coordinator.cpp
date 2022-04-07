@@ -313,52 +313,27 @@ void insertChunks(OperationContext* opCtx,
     }
 }
 
-void updateCatalogEntry(OperationContext* opCtx,
-                        const NamespaceString& nss,
-                        CollectionType& coll,
-                        const OperationSessionInfo& osi) {
+void insertCollectionEntry(OperationContext* opCtx,
+                           const NamespaceString& nss,
+                           CollectionType& coll,
+                           const OperationSessionInfo& osi) {
     const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
-    BatchedCommandRequest updateRequest([&]() {
-        write_ops::UpdateCommandRequest updateOp(CollectionType::ConfigNS);
-        updateOp.setUpdates({[&] {
-            write_ops::UpdateOpEntry entry;
-            entry.setQ(BSON(CollectionType::kNssFieldName << nss.ns()));
-            entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(coll.toBSON()));
-            entry.setUpsert(true);
-            entry.setMulti(false);
-            return entry;
-        }()});
-        return updateOp;
-    }());
+    BatchedCommandRequest insertRequest(
+        write_ops::InsertCommandRequest(CollectionType::ConfigNS, {coll.toBSON()}));
+    insertRequest.setWriteConcern(ShardingCatalogClient::kMajorityWriteConcern.toBSON());
 
-    updateRequest.setWriteConcern(ShardingCatalogClient::kMajorityWriteConcern.toBSON());
-    const BSONObj cmdObj = updateRequest.toBSON().addFields(osi.toBSON());
+    const BSONObj cmdObj = insertRequest.toBSON().addFields(osi.toBSON());
 
-    try {
-        BatchedCommandResponse batchResponse;
-        const auto response =
-            configShard->runCommand(opCtx,
-                                    ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                    CollectionType::ConfigNS.db().toString(),
-                                    cmdObj,
-                                    Shard::kDefaultConfigCommandTimeout,
-                                    Shard::RetryPolicy::kIdempotent);
-
-        const auto writeStatus =
-            Shard::CommandResponse::processBatchWriteResponse(response, &batchResponse);
-
-        uassertStatusOK(batchResponse.toStatus());
-        uassertStatusOK(writeStatus);
-    } catch (const DBException&) {
-        // If an error happens when contacting the config server, we don't know if the update
-        // succeeded or not, which might cause the local shard version to differ from the config
-        // server, so we clear the metadata to allow another operation to refresh it.
-        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-        AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-        CollectionShardingRuntime::get(opCtx, nss)->clearFilteringMetadata(opCtx);
-        throw;
-    }
+    BatchedCommandResponse unusedResponse;
+    uassertStatusOK(Shard::CommandResponse::processBatchWriteResponse(
+        configShard->runCommand(opCtx,
+                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                CollectionType::ConfigNS.db().toString(),
+                                cmdObj,
+                                Shard::kDefaultConfigCommandTimeout,
+                                Shard::RetryPolicy::kIdempotent),
+        &unusedResponse));
 }
 
 void broadcastDropCollection(OperationContext* opCtx,
@@ -466,15 +441,16 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                             _shardKeyPattern->getKeyPattern().toBSON(),
                             getCollation(opCtx, nss(), _doc.getCollation()).second,
                             _doc.getUnique().value_or(false))) {
-                    _result = createCollectionResponseOpt;
-                    // The collection was already created and commited but there was a
-                    // stepdown after the commit.
+                    // The collection was already created and commited but there was a stepdown
+                    // after the commit.
                     RecoverableCriticalSectionService::get(opCtx)
                         ->releaseRecoverableCriticalSection(
                             opCtx,
                             nss(),
                             _critSecReason,
                             ShardingCatalogClient::kMajorityWriteConcern);
+
+                    _result = createCollectionResponseOpt;
                     return;
                 }
 
@@ -515,10 +491,10 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
 
                 if (_splitPolicy->isOptimized()) {
                     _createChunks(opCtx);
-                    // Block reads/writes from here on if we need to create
-                    // the collection on other shards, this way we prevent
-                    // reads/writes that should be redirected to another
-                    // shard.
+
+                    // Block reads/writes from here on if we need to create the collection on other
+                    // shards, this way we prevent reads/writes that should be redirected to another
+                    // shard
                     RecoverableCriticalSectionService::get(opCtx)
                         ->promoteRecoverableCriticalSectionToBlockAlsoReads(
                             opCtx,
@@ -548,11 +524,8 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                 // collections.
                 if (!_splitPolicy->isOptimized()) {
                     _createChunks(opCtx);
-
                     _commit(opCtx);
                 }
-
-                _finalize(opCtx);
             }))
         .then([this] {
             auto opCtxHolder = cc().makeOperationContext();
@@ -754,9 +727,8 @@ void CreateCollectionCoordinator::_createChunks(OperationContext* opCtx) {
              ServerGlobalParams::FeatureCompatibility::Version::kVersion50)});
 
     // There must be at least one chunk.
-    invariant(!_initialChunks.chunks.empty());
-
-    _numChunks = _initialChunks.chunks.size();
+    invariant(_initialChunks);
+    invariant(!_initialChunks->chunks.empty());
 }
 
 void CreateCollectionCoordinator::_createCollectionOnNonPrimaryShards(
@@ -773,7 +745,7 @@ void CreateCollectionCoordinator::_createCollectionOnNonPrimaryShards(
     NamespaceStringOrUUID nssOrUUID{nss().db().toString(), *_collectionUUID};
     auto [collOptions, indexes, idIndex] = getCollectionOptionsAndIndexes(opCtx, nssOrUUID);
 
-    for (const auto& chunk : _initialChunks.chunks) {
+    for (const auto& chunk : _initialChunks->chunks) {
         const auto& chunkShardId = chunk.getShard();
         if (chunkShardId == dbPrimaryShardId ||
             initializedShards.find(chunkShardId) != initializedShards.end()) {
@@ -827,11 +799,11 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx) {
 
     // Upsert Chunks.
     _doc = _updateSession(opCtx, _doc);
-    insertChunks(opCtx, _initialChunks.chunks, getCurrentSession(_doc));
+    insertChunks(opCtx, _initialChunks->chunks, getCurrentSession(_doc));
 
     CollectionType coll(nss(),
-                        _initialChunks.collVersion().epoch(),
-                        _initialChunks.collVersion().getTimestamp(),
+                        _initialChunks->collVersion().epoch(),
+                        _initialChunks->collVersion().getTimestamp(),
                         Date_t::now(),
                         *_collectionUUID);
 
@@ -852,20 +824,26 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx) {
     }
 
     _doc = _updateSession(opCtx, _doc);
-    updateCatalogEntry(opCtx, nss(), coll, getCurrentSession(_doc));
-}
-
-void CreateCollectionCoordinator::_finalize(OperationContext* opCtx) {
-    LOGV2_DEBUG(5277907, 2, "Create collection _finalize", "namespace"_attr = nss());
 
     try {
+        insertCollectionEntry(opCtx, nss(), coll, getCurrentSession(_doc));
+
+        LOGV2_DEBUG(5277907, 2, "Collection successfully committed", "namespace"_attr = nss());
+
         forceShardFilteringMetadataRefresh(opCtx, nss());
-    } catch (const DBException&) {
+    } catch (const DBException& ex) {
+        LOGV2(5277908,
+              "Failed to obtain collection's shard version, so it will be recovered",
+              "namespace"_attr = nss(),
+              "error"_attr = redact(ex));
+
         // If the refresh fails, then set the shard version to UNKNOWN and let a future operation to
         // refresh the metadata.
         UninterruptibleLockGuard noInterrupt(opCtx->lockState());
         AutoGetCollection autoColl(opCtx, nss(), MODE_IX);
         CollectionShardingRuntime::get(opCtx, nss())->clearFilteringMetadata(opCtx);
+
+        throw;
     }
 
     // Best effort refresh to warm up cache of all involved shards so we can have a cluster ready to
@@ -874,8 +852,9 @@ void CreateCollectionCoordinator::_finalize(OperationContext* opCtx) {
     auto dbPrimaryShardId = ShardingState::get(opCtx)->shardId();
 
     std::set<ShardId> shardsRefreshed;
-    for (const auto& chunk : _initialChunks.chunks) {
+    for (const auto& chunk : _initialChunks->chunks) {
         const auto& chunkShardId = chunk.getShard();
+
         if (chunkShardId == dbPrimaryShardId ||
             shardsRefreshed.find(chunkShardId) != shardsRefreshed.end()) {
             continue;
@@ -893,11 +872,10 @@ void CreateCollectionCoordinator::_finalize(OperationContext* opCtx) {
     LOGV2(5277901,
           "Created initial chunk(s)",
           "namespace"_attr = nss(),
-          "numInitialChunks"_attr = _initialChunks.chunks.size(),
-          "initialCollectionVersion"_attr = _initialChunks.collVersion());
+          "numInitialChunks"_attr = _initialChunks->chunks.size(),
+          "initialCollectionVersion"_attr = _initialChunks->collVersion());
 
-    auto result = CreateCollectionResponse(
-        _initialChunks.chunks[_initialChunks.chunks.size() - 1].getVersion());
+    auto result = CreateCollectionResponse(_initialChunks->chunks.back().getVersion());
     result.setCollectionUUID(_collectionUUID);
     _result = std::move(result);
 
@@ -923,8 +901,9 @@ void CreateCollectionCoordinator::_logEndCreateCollection(OperationContext* opCt
     collectionDetail.append("version", _result->getCollectionVersion().toString());
     if (_collectionEmpty)
         collectionDetail.append("empty", *_collectionEmpty);
-    if (_numChunks)
-        collectionDetail.appendNumber("numChunks", static_cast<long long>(*_numChunks));
+    if (_initialChunks)
+        collectionDetail.appendNumber("numChunks",
+                                      static_cast<long long>(_initialChunks->chunks.size()));
     ShardingLogging::get(opCtx)->logChange(
         opCtx, "shardCollection.end", nss().ns(), collectionDetail.obj());
 }
