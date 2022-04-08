@@ -1491,7 +1491,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
         F_CLR(txn, WT_TXN_TS_ROUND_PREPARED);
 
     /* Set the commit and the durable timestamps. */
-    WT_ERR(__wt_txn_set_timestamp(session, cfg));
+    WT_ERR(__wt_txn_set_timestamp(session, cfg, true));
 
     if (prepare) {
         if (!F_ISSET(txn, WT_TXN_HAS_TS_COMMIT))
@@ -1786,7 +1786,7 @@ __wt_txn_prepare(WT_SESSION_IMPL *session, const char *cfg[])
         WT_RET_MSG(session, EINVAL, "a prepared transaction cannot include a logged table");
 
     /* Set the prepare timestamp. */
-    WT_RET(__wt_txn_set_timestamp(session, cfg));
+    WT_RET(__wt_txn_set_timestamp(session, cfg, false));
 
     if (!F_ISSET(txn, WT_TXN_HAS_TS_PREPARE))
         WT_RET_MSG(session, EINVAL, "prepare timestamp is not set");

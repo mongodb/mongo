@@ -1797,7 +1797,7 @@ __session_timestamp_transaction(WT_SESSION *wt_session, const char *config)
     cfg[1] = config;
 #endif
 
-    ret = __wt_txn_set_timestamp(session, cfg);
+    ret = __wt_txn_set_timestamp(session, cfg, false);
 err:
     API_END_RET(session, ret);
 }
@@ -1851,7 +1851,7 @@ __session_reset_snapshot(WT_SESSION *wt_session)
     session = (WT_SESSION_IMPL *)wt_session;
     txn = session->txn;
 
-    /* Return error if the isolation mode is read committed. */
+    /* Return error if the isolation mode is not snapshot. */
     if (txn->isolation != WT_ISO_SNAPSHOT)
         WT_RET_MSG(
           session, ENOTSUP, "not supported in read-committed or read-uncommitted transactions");

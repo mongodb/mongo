@@ -401,7 +401,6 @@ operations(u_int ops_seconds, bool lastrun)
 static void
 begin_transaction_ts(TINFO *tinfo)
 {
-    TINFO **tlp;
     WT_DECL_RET;
     WT_SESSION *session;
     uint64_t ts;
@@ -410,16 +409,13 @@ begin_transaction_ts(TINFO *tinfo)
     session = tinfo->session;
 
     /*
-     * Transaction reads are normally repeatable, but WiredTiger timestamps allow rewriting commits,
-     * that is, applications can specify at commit time the timestamp at which the commit happens.
-     * If that happens, our read might no longer be repeatable. Test in both modes: pick a read
-     * timestamp we know is repeatable (because it's at least as old as the oldest resolved commit
-     * timestamp in any thread), and pick a current timestamp, 50% of the time.
+     * Transaction timestamp reads are repeatable, but read timestamps must be before any possible
+     * commit timestamp. Without a read timestamp, reads are based on the transaction snapshot,
+     * which will include the latest values as of when the snapshot is taken. Test in both modes:
+     * 75% of the time, pick a read timestamp before any commit timestamp in any thread, 25% of
+     * the time don't set a timestamp at all.
      */
-    ts = 0;
-    if (mmrand(&tinfo->rnd, 1, 2) == 1)
-        for (ts = UINT64_MAX, tlp = tinfo_list; *tlp != NULL; ++tlp)
-            ts = WT_MIN(ts, (*tlp)->commit_ts);
+    ts = mmrand(&tinfo->rnd, 1, 4) == 1 ? 0 : maximum_read_ts();
     if (ts != 0) {
         wiredtiger_begin_transaction(session, NULL);
 
@@ -441,22 +437,6 @@ begin_transaction_ts(TINFO *tinfo)
     }
 
     wiredtiger_begin_transaction(session, NULL);
-
-    /*
-     * Otherwise, pick a current timestamp.
-     *
-     * Prepare returns an error if the prepare timestamp is less than any active read timestamp,
-     * single-thread transaction prepare and begin.
-     *
-     * Lock out the oldest timestamp update.
-     */
-    lock_writelock(session, &g.ts_lock);
-
-    ts = __wt_atomic_addv64(&g.timestamp, 1);
-    testutil_check(__wt_snprintf(buf, sizeof(buf), "read_timestamp=%" PRIx64, ts));
-    testutil_check(session->timestamp_transaction(session, buf));
-
-    lock_writeunlock(session, &g.ts_lock);
 
     snap_op_init(tinfo, ts, false);
     trace_op(tinfo, "begin snapshot read-ts=%" PRIu64 " (not repeatable)", ts);

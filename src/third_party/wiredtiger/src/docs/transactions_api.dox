@@ -136,14 +136,16 @@ well as any key and value that may have been set.
 
 @section snapshot_reset Resetting the session snapshot
 
-Snapshot-isolation transactions can pin a large amount of data into the database
+Snapshot-isolation transactions can pin large amounts of data into the database
 cache in order to be able to satisfy potential reads at the snapshot.
 WT_SESSION::reset_snapshot releases the current snapshot and gets a new (more
 recent) snapshot to avoid pinning content in the cache that is no longer needed.
-Applications may see different search results compared to earlier after updating
-the snapshot. It is an error to call WT_SESSION::reset_snapshot at any isolation
-level other than snapshot, or if the current transaction has performed any write
-operations.
+It is an error to call WT_SESSION::reset_snapshot at any isolation level other
+than snapshot, or if the current transaction has performed any write operations.
+
+\warning
+Applications not using read timestamps for search may see different results
+after the snapshot is updated.
 
 @snippet ex_all.c reset snapshot
 

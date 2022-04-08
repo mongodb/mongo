@@ -603,8 +603,11 @@ void
 snap_repeat_single(TINFO *tinfo)
 {
     SNAP_OPS *snap;
+    uint64_t ts;
     u_int v;
     int count;
+
+    ts = maximum_read_ts();
 
     /*
      * Start at a random spot in the list of operations and look for a read to retry. Stop when
@@ -616,7 +619,7 @@ snap_repeat_single(TINFO *tinfo)
         if (snap >= tinfo->snap_end)
             snap = tinfo->snap_list;
 
-        if (snap->repeatable)
+        if (snap->repeatable && snap->ts <= ts)
             break;
     }
 

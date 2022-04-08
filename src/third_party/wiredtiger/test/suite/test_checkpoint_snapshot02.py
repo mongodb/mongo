@@ -207,8 +207,8 @@ class test_checkpoint_snapshot02(wttest.WiredTigerTestCase):
             self.assertEqual(cursor1.insert(), 0)
         session1.timestamp_transaction('commit_timestamp=' + self.timestamp_str(30))
 
-        # Set stable timestamp to 40
-        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(40))
+        # Set stable timestamp to 25
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(25))
 
         # Create a checkpoint thread
         done = threading.Event()

@@ -61,15 +61,6 @@ will fail and drop core at the failing check.
 These are best-effort checks by WiredTiger, and there are cases where
 application misbehavior will not be detected.
 
-@section timestamp_misc_reset_snapshot Resetting the snapshot
-
-Transactions that have not set \c read_timestamp can use
-WT_SESSION::reset_snapshot with timestamped tables as with
-non-timestamped tables, to get a new snapshot of the database to read
-from. See @ref snapshot_reset.
-Transactions that have set \c read_timestamp can also call
-WT_SESSION::reset_snapshot, but it will have no effect.
-
 @section timestamps_misc_in_memory In-memory configurations and timestamps
 
 Timestamps are supported for in-memory databases, but must be configured as in

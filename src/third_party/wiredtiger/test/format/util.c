@@ -401,6 +401,27 @@ set_oldest_timestamp(void)
 }
 
 /*
+ * maximum_read_ts --
+ *     Return the largest safe read timestamp.
+ */
+uint64_t
+maximum_read_ts(void)
+{
+    TINFO **tlp;
+    uint64_t ts;
+
+    /*
+     *  We can't use a read timestamp that's ahead of a commit timestamp. Find the maximum safe read
+     * timestamp.
+     */
+    for (ts = g.timestamp, tlp = tinfo_list; *tlp != NULL; ++tlp)
+        ts = WT_MIN(ts, (*tlp)->commit_ts);
+    if (ts != 0)
+        --ts;
+    return (ts);
+}
+
+/*
  * lock_init --
  *     Initialize abstract lock that can use either pthread of wt reader-writer locks.
  */
