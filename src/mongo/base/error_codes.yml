@@ -448,6 +448,8 @@ error_codes:
 
     - {code: 357, name: InvalidBSONType}
 
+    - {code: 360, name: ShardVersionRefreshCanceled, categories: [InternalOnly]}
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)
