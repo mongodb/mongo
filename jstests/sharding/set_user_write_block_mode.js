@@ -64,7 +64,7 @@ newShard.initiate();
     assert.commandWorked(st.s.adminCommand({addShard: newShard.getURL(), name: newShardName}));
 
     // Check that we cannot write on the new shard.
-    assert.commandFailedWithCode(newShardCollMongos.insert({x: 2}), ErrorCodes.OperationFailed);
+    assert.commandFailedWithCode(newShardCollMongos.insert({x: 2}), ErrorCodes.UserWritesBlocked);
 
     // Now unblock and check we can write to the new shard.
     assert.commandWorked(st.s.adminCommand({setUserWriteBlockMode: 1, global: false}));

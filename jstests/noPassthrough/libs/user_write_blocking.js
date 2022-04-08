@@ -36,7 +36,14 @@ const UserWriteBlockHelpers = (function() {
                 assert.commandWorked(admin.runCommand({
                     createUser: noBypassUser,
                     pwd: password,
-                    roles: [{role: "readWriteAnyDatabase", db: "admin"}]
+                    roles: [
+                        // Need for CUD operations
+                        {role: "readWriteAnyDatabase", db: "admin"},
+                        // Need for DDL operations
+                        {role: "dbAdminAnyDatabase", db: "admin"},
+                        // Need for importCollection
+                        {role: "clusterAdmin", db: "admin"}
+                    ]
                 }));
                 this.haveCreatedUsers = true;
             }
@@ -60,6 +67,14 @@ const UserWriteBlockHelpers = (function() {
             const db = this.adminConn.getDB(jsTestName());
             const coll = db.test;
             return fun({conn: this.adminConn, db: db, admin: db.getSiblingDB("admin"), coll: coll});
+        }
+
+        runInParallelShell(asAdmin, funString) {
+            const userName = asAdmin ? bypassUser : noBypassUser;
+            return startParallelShell(`{
+                    db.getSiblingDB('admin').auth('${userName}', '${password}');
+                    (` + funString + `)({conn: db.getMongo()});
+            }`, this.conn.port);
         }
 
         enableWriteBlockMode() {
@@ -98,6 +113,10 @@ const UserWriteBlockHelpers = (function() {
             return {waiter: awaitShell, failpoint: hangWhileSetingUserWriteBlockModeFailPoint};
         }
 
+        setFailPoint(failpointName) {
+            throw "UNIMPLEMENTED";
+        }
+
         restart() {
             throw "UNIMPLEMENTED";
         }
@@ -109,8 +128,15 @@ const UserWriteBlockHelpers = (function() {
 
     class ReplicaFixture extends Fixture {
         constructor() {
-            const rst = new ReplSetTest(
-                {nodes: 3, nodeOptions: {auth: "", bind_ip_all: ""}, keyFile: keyfile});
+            const rst = new ReplSetTest({
+                nodes: 3,
+                nodeOptions: {auth: "", bind_ip_all: ""},
+                keyFile: keyfile,
+                setParameter: {
+                    // Set the history window to zero to explicitly control the oldest timestamp.
+                    minSnapshotHistoryWindowInSeconds: 0
+                }
+            });
             rst.startSet();
             rst.initiate();
 
@@ -165,6 +191,14 @@ const UserWriteBlockHelpers = (function() {
             return new LockHolder(this, parallelShell, opId);
         }
 
+        setFailPoint(failpointName) {
+            return configureFailPoint(this.adminConn, failpointName);
+        }
+
+        getAllDbPaths() {
+            return this.rst.nodes.map(node => this.rst.getDbPath(node));
+        }
+
         restart() {
             this.rst.stopSet(undefined, /* restart */ true);
             this.rst.startSet({}, /* restart */ true);
@@ -195,6 +229,12 @@ const UserWriteBlockHelpers = (function() {
 
         hangTransition() {
             return this._hangTransition(this.st.shard0, "hangInShardsvrSetUserWriteBlockMode");
+        }
+
+        setFailPoint(failpointName) {
+            const backend = this.st.rs0.getPrimary();
+            return authutil.asCluster(
+                backend, keyfile, () => configureFailPoint(backend, failpointName));
         }
 
         restart() {

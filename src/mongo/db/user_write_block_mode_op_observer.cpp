@@ -175,6 +175,113 @@ void UserWriteBlockModeOpObserver::_onReplicationRollback(OperationContext* opCt
     }
 }
 
+void UserWriteBlockModeOpObserver::onCreateIndex(OperationContext* opCtx,
+                                                 const NamespaceString& nss,
+                                                 const UUID& uuid,
+                                                 BSONObj indexDoc,
+                                                 bool fromMigrate) {
+    _checkWriteAllowed(opCtx, nss);
+}
+
+void UserWriteBlockModeOpObserver::onStartIndexBuild(OperationContext* opCtx,
+                                                     const NamespaceString& nss,
+                                                     const UUID& collUUID,
+                                                     const UUID& indexBuildUUID,
+                                                     const std::vector<BSONObj>& indexes,
+                                                     bool fromMigrate) {
+    _checkWriteAllowed(opCtx, nss);
+}
+
+void UserWriteBlockModeOpObserver::onCommitIndexBuild(OperationContext* opCtx,
+                                                      const NamespaceString& nss,
+                                                      const UUID& collUUID,
+                                                      const UUID& indexBuildUUID,
+                                                      const std::vector<BSONObj>& indexes,
+                                                      bool fromMigrate) {
+    _checkWriteAllowed(opCtx, nss);
+}
+
+void UserWriteBlockModeOpObserver::onStartIndexBuildSinglePhase(OperationContext* opCtx,
+                                                                const NamespaceString& nss) {
+    _checkWriteAllowed(opCtx, nss);
+}
+
+void UserWriteBlockModeOpObserver::onCreateCollection(OperationContext* opCtx,
+                                                      const CollectionPtr& coll,
+                                                      const NamespaceString& collectionName,
+                                                      const CollectionOptions& options,
+                                                      const BSONObj& idIndex,
+                                                      const OplogSlot& createOpTime,
+                                                      bool fromMigrate) {
+    _checkWriteAllowed(opCtx, collectionName);
+}
+
+void UserWriteBlockModeOpObserver::onCollMod(OperationContext* opCtx,
+                                             const NamespaceString& nss,
+                                             const UUID& uuid,
+                                             const BSONObj& collModCmd,
+                                             const CollectionOptions& oldCollOptions,
+                                             boost::optional<IndexCollModInfo> indexInfo) {
+    _checkWriteAllowed(opCtx, nss);
+}
+
+void UserWriteBlockModeOpObserver::onDropDatabase(OperationContext* opCtx,
+                                                  const std::string& dbName) {
+    _checkWriteAllowed(opCtx, NamespaceString(dbName));
+}
+
+repl::OpTime UserWriteBlockModeOpObserver::onDropCollection(OperationContext* opCtx,
+                                                            const NamespaceString& collectionName,
+                                                            const UUID& uuid,
+                                                            std::uint64_t numRecords,
+                                                            CollectionDropType dropType) {
+    _checkWriteAllowed(opCtx, collectionName);
+    return repl::OpTime();
+}
+
+void UserWriteBlockModeOpObserver::onDropIndex(OperationContext* opCtx,
+                                               const NamespaceString& nss,
+                                               const UUID& uuid,
+                                               const std::string& indexName,
+                                               const BSONObj& indexInfo) {
+    _checkWriteAllowed(opCtx, nss);
+}
+
+repl::OpTime UserWriteBlockModeOpObserver::preRenameCollection(
+    OperationContext* opCtx,
+    const NamespaceString& fromCollection,
+    const NamespaceString& toCollection,
+    const UUID& uuid,
+    const boost::optional<UUID>& dropTargetUUID,
+    std::uint64_t numRecords,
+    bool stayTemp) {
+    _checkWriteAllowed(opCtx, fromCollection);
+    _checkWriteAllowed(opCtx, toCollection);
+    return repl::OpTime();
+}
+
+void UserWriteBlockModeOpObserver::onRenameCollection(OperationContext* opCtx,
+                                                      const NamespaceString& fromCollection,
+                                                      const NamespaceString& toCollection,
+                                                      const UUID& uuid,
+                                                      const boost::optional<UUID>& dropTargetUUID,
+                                                      std::uint64_t numRecords,
+                                                      bool stayTemp) {
+    _checkWriteAllowed(opCtx, fromCollection);
+    _checkWriteAllowed(opCtx, toCollection);
+}
+
+void UserWriteBlockModeOpObserver::onImportCollection(OperationContext* opCtx,
+                                                      const UUID& importUUID,
+                                                      const NamespaceString& nss,
+                                                      long long numRecords,
+                                                      long long dataSize,
+                                                      const BSONObj& catalogEntry,
+                                                      const BSONObj& storageMetadata,
+                                                      bool isDryRun) {
+    _checkWriteAllowed(opCtx, nss);
+}
+
 void UserWriteBlockModeOpObserver::_checkWriteAllowed(OperationContext* opCtx,
                                                       const NamespaceString& nss) {
     // Evaluate write blocking only on replica set primaries.

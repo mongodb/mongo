@@ -482,6 +482,8 @@ error_codes:
     - {code: 369, name: FLETransactionAbort}
     - {code: 370, name: CannotDropShardKeyIndex}
 
+    - {code: 371, name: UserWritesBlocked}
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)

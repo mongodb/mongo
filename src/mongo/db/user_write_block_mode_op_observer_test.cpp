@@ -62,12 +62,12 @@ public:
     }
 
 protected:
-    // Ensure that inserts, updates, and deletes with the given opCtx on the given namespace will
-    // succeed or fail depending on the value of shouldSucceed.
+    // Ensure that CUD ops with the given opCtx on the given namespace will succeed or fail
+    // depending on the value of shouldSucceed.
     void runCUD(OperationContext* opCtx,
                 const NamespaceString& nss,
                 bool shouldSucceed,
-                bool fromMigrate = false) {
+                bool fromMigrate) {
         UserWriteBlockModeOpObserver opObserver;
         std::vector<InsertStatement> inserts;
         CollectionUpdateArgs collectionUpdateArgs;
@@ -78,7 +78,6 @@ protected:
         updateArgs.nss = nss;
         OplogDeleteEntryArgs deleteArgs;
         deleteArgs.fromMigrate = fromMigrate;
-
         if (shouldSucceed) {
             try {
                 opObserver.onInserts(opCtx, nss, uuid, inserts.begin(), inserts.end(), fromMigrate);
@@ -95,6 +94,83 @@ protected:
             ASSERT_THROWS(opObserver.onUpdate(opCtx, updateArgs), AssertionException);
             ASSERT_THROWS(opObserver.onDelete(opCtx, nss, uuid, StmtId(), deleteArgs),
                           AssertionException);
+        }
+    }
+
+    // Ensure that all checked ops with the given opCtx on the given namespace will
+    // succeed or fail depending on the value of shouldSucceed.
+    void runCheckedOps(OperationContext* opCtx,
+                       const NamespaceString& nss,
+                       bool shouldSucceed,
+                       bool fromMigrate = false) {
+        runCUD(opCtx, nss, shouldSucceed, fromMigrate);
+        UserWriteBlockModeOpObserver opObserver;
+        auto uuid = UUID::gen();
+        NamespaceString adminNss = NamespaceString("admin");
+
+        if (shouldSucceed) {
+            try {
+                opObserver.onCreateIndex(opCtx, nss, uuid, BSONObj(), false);
+                opObserver.onStartIndexBuild(opCtx, nss, uuid, uuid, {}, false);
+                opObserver.onStartIndexBuildSinglePhase(opCtx, nss);
+                opObserver.onCreateCollection(
+                    opCtx, nullptr, nss, {}, BSONObj(), OplogSlot(), false);
+                opObserver.onCollMod(opCtx, nss, uuid, BSONObj(), {}, boost::none);
+                opObserver.onDropDatabase(opCtx, std::string(nss.db()));
+                opObserver.onDropCollection(
+                    opCtx,
+                    nss,
+                    uuid,
+                    0,
+                    UserWriteBlockModeOpObserver::CollectionDropType::kOnePhase);
+                opObserver.onDropIndex(opCtx, nss, uuid, "", BSONObj());
+                // For renames, make sure we check both from and to for the given namespace
+                opObserver.preRenameCollection(opCtx, nss, adminNss, uuid, boost::none, 0, false);
+                opObserver.preRenameCollection(opCtx, adminNss, nss, uuid, boost::none, 0, false);
+                opObserver.onRenameCollection(opCtx, nss, adminNss, uuid, boost::none, 0, false);
+                opObserver.onRenameCollection(opCtx, adminNss, nss, uuid, boost::none, 0, false);
+                opObserver.onImportCollection(opCtx, uuid, nss, 0, 0, BSONObj(), BSONObj(), false);
+            } catch (...) {
+                // Make it easier to see that this is where we failed.
+                ASSERT_OK(exceptionToStatus());
+            }
+        } else {
+            ASSERT_THROWS(opObserver.onCreateIndex(opCtx, nss, uuid, BSONObj(), false),
+                          AssertionException);
+            ASSERT_THROWS(opObserver.onStartIndexBuild(opCtx, nss, uuid, uuid, {}, false),
+                          AssertionException);
+            ASSERT_THROWS(opObserver.onStartIndexBuildSinglePhase(opCtx, nss), AssertionException);
+            ASSERT_THROWS(opObserver.onCreateCollection(
+                              opCtx, nullptr, nss, {}, BSONObj(), OplogSlot(), false),
+                          AssertionException);
+            ASSERT_THROWS(opObserver.onCollMod(opCtx, nss, uuid, BSONObj(), {}, boost::none),
+                          AssertionException);
+            ASSERT_THROWS(opObserver.onDropDatabase(opCtx, std::string(nss.db())),
+                          AssertionException);
+            ASSERT_THROWS(opObserver.onDropCollection(
+                              opCtx,
+                              nss,
+                              uuid,
+                              0,
+                              UserWriteBlockModeOpObserver::CollectionDropType::kOnePhase),
+                          AssertionException);
+            ASSERT_THROWS(opObserver.onDropIndex(opCtx, nss, uuid, "", BSONObj()),
+                          AssertionException);
+            ASSERT_THROWS(
+                opObserver.preRenameCollection(opCtx, nss, adminNss, uuid, boost::none, 0, false),
+                AssertionException);
+            ASSERT_THROWS(
+                opObserver.preRenameCollection(opCtx, adminNss, nss, uuid, boost::none, 0, false),
+                AssertionException);
+            ASSERT_THROWS(
+                opObserver.onRenameCollection(opCtx, nss, adminNss, uuid, boost::none, 0, false),
+                AssertionException);
+            ASSERT_THROWS(
+                opObserver.onRenameCollection(opCtx, adminNss, nss, uuid, boost::none, 0, false),
+                AssertionException);
+            ASSERT_THROWS(
+                opObserver.onImportCollection(opCtx, uuid, nss, 0, 0, BSONObj(), BSONObj(), false),
+                AssertionException);
         }
     }
 
@@ -117,10 +193,10 @@ TEST_F(UserWriteBlockModeOpObserverTest, WriteBlockingDisabledNoBypass) {
     ASSERT(!WriteBlockBypass::get(opCtx.get()).isWriteBlockBypassEnabled());
 
     // Ensure writes succeed
-    runCUD(opCtx.get(), NamespaceString("a.b"), true);
-    runCUD(opCtx.get(), NamespaceString("admin"), true);
-    runCUD(opCtx.get(), NamespaceString("local"), true);
-    runCUD(opCtx.get(), NamespaceString("config"), true);
+    runCheckedOps(opCtx.get(), NamespaceString("a.b"), true);
+    runCheckedOps(opCtx.get(), NamespaceString("admin"), true);
+    runCheckedOps(opCtx.get(), NamespaceString("local"), true);
+    runCheckedOps(opCtx.get(), NamespaceString("config"), true);
 }
 
 TEST_F(UserWriteBlockModeOpObserverTest, WriteBlockingDisabledWithBypass) {
@@ -137,10 +213,10 @@ TEST_F(UserWriteBlockModeOpObserverTest, WriteBlockingDisabledWithBypass) {
     ASSERT(WriteBlockBypass::get(opCtx.get()).isWriteBlockBypassEnabled());
 
     // Ensure writes succeed
-    runCUD(opCtx.get(), NamespaceString("a.b"), true);
-    runCUD(opCtx.get(), NamespaceString("admin"), true);
-    runCUD(opCtx.get(), NamespaceString("local"), true);
-    runCUD(opCtx.get(), NamespaceString("config"), true);
+    runCheckedOps(opCtx.get(), NamespaceString("a.b"), true);
+    runCheckedOps(opCtx.get(), NamespaceString("admin"), true);
+    runCheckedOps(opCtx.get(), NamespaceString("local"), true);
+    runCheckedOps(opCtx.get(), NamespaceString("config"), true);
 }
 
 TEST_F(UserWriteBlockModeOpObserverTest, WriteBlockingEnabledNoBypass) {
@@ -152,12 +228,12 @@ TEST_F(UserWriteBlockModeOpObserverTest, WriteBlockingEnabledNoBypass) {
     ASSERT(!WriteBlockBypass::get(opCtx.get()).isWriteBlockBypassEnabled());
 
     // Ensure user writes now fail, while non-user writes still succeed
-    runCUD(opCtx.get(), NamespaceString("a.b"), false);
-    runCUD(opCtx.get(), NamespaceString("admin"), true);
-    runCUD(opCtx.get(), NamespaceString("local"), true);
-    runCUD(opCtx.get(), NamespaceString("config"), true);
+    runCheckedOps(opCtx.get(), NamespaceString("a.b"), false);
+    runCheckedOps(opCtx.get(), NamespaceString("admin"), true);
+    runCheckedOps(opCtx.get(), NamespaceString("local"), true);
+    runCheckedOps(opCtx.get(), NamespaceString("config"), true);
 
-    // Ensure that writes from migrations succeed
+    // Ensure that CUD ops from migrations succeed
     runCUD(opCtx.get(), NamespaceString("a.b"), true, true /* fromMigrate */);
 }
 
@@ -175,10 +251,11 @@ TEST_F(UserWriteBlockModeOpObserverTest, WriteBlockingEnabledWithBypass) {
     ASSERT(WriteBlockBypass::get(opCtx.get()).isWriteBlockBypassEnabled());
 
     // Ensure user writes succeed
-    runCUD(opCtx.get(), NamespaceString("a.b"), true);
-    runCUD(opCtx.get(), NamespaceString("admin"), true);
-    runCUD(opCtx.get(), NamespaceString("local"), true);
-    runCUD(opCtx.get(), NamespaceString("config"), true);
+
+    runCheckedOps(opCtx.get(), NamespaceString("a.b"), true);
+    runCheckedOps(opCtx.get(), NamespaceString("admin"), true);
+    runCheckedOps(opCtx.get(), NamespaceString("local"), true);
+    runCheckedOps(opCtx.get(), NamespaceString("config"), true);
 }
 
 }  // namespace

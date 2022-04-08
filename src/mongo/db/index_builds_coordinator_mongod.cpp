@@ -45,6 +45,7 @@
 #include "mongo/db/index_build_entry_helpers.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
+#include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
@@ -64,6 +65,7 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(hangAfterAcquiringIndexBuildSlot);
 MONGO_FAIL_POINT_DEFINE(hangBeforeInitializingIndexBuild);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildAfterSignalPrimaryForCommitReadiness);
+MONGO_FAIL_POINT_DEFINE(hangBeforeRunningIndexBuild);
 
 const StringData kMaxNumActiveUserIndexBuildsServerParameterName = "maxNumActiveUserIndexBuilds"_sd;
 
@@ -306,6 +308,7 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
     // Since index builds occur in a separate thread, client attributes that are audited must be
     // extracted from the client object and passed into the thread separately.
     audit::ImpersonatedClientAttrs impersonatedClientAttrs(opCtx->getClient());
+    ForwardableOperationMetadata forwardableOpMetadata(opCtx);
 
     // The thread pool task will be responsible for signalling the condition variable when the index
     // build thread is done running.
@@ -324,7 +327,8 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
         shardVersion = oss.getShardVersion(nss),
         dbVersion = oss.getDbVersion(dbName),
         resumeInfo,
-        impersonatedClientAttrs = std::move(impersonatedClientAttrs)
+        impersonatedClientAttrs = std::move(impersonatedClientAttrs),
+        forwardableOpMetadata = std::move(forwardableOpMetadata)
     ](auto status) mutable noexcept {
         ScopeGuard onScopeExitGuard([&] {
             stdx::unique_lock<Latch> lk(_throttlingMutex);
@@ -340,6 +344,10 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
         }
 
         auto opCtx = Client::getCurrent()->makeOperationContext();
+
+        // Forward the forwardable operation metadata from the external client to this thread's
+        // client.
+        forwardableOpMetadata.setOn(opCtx.get());
 
         // Load the external client's attributes into this thread's client for auditing.
         auto authSession = AuthorizationSession::get(opCtx->getClient());
@@ -384,6 +392,8 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
 
         // Signal that the index build started successfully.
         startPromise.setWith([] {});
+
+        hangBeforeRunningIndexBuild.pauseWhileSet(opCtx.get());
 
         // Runs the remainder of the index build. Sets the promise result and cleans up the index
         // build.
