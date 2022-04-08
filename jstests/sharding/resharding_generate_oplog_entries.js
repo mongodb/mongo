@@ -44,7 +44,6 @@ function simulateResharding() {
     let donorReshardingFields = {
         "uuid": uuid,
         "state": "preparing-to-donate",
-        "startTime": new Date(),
         "donorFields": {
             "tempNs": tempReshardingNss,
             "reshardingKey": {y: 1},

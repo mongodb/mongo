@@ -33,7 +33,6 @@
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/s/resharding/donor_document_gen.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
-#include "mongo/db/s/resharding/resharding_metrics_new.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 
 namespace mongo {
@@ -101,8 +100,6 @@ public:
 
     void onReshardingFieldsChanges(OperationContext* opCtx,
                                    const TypeCollectionReshardingFields& reshardingFields);
-
-    void onWriteDuringCriticalSection();
 
     SharedSemiFuture<void> awaitCriticalSectionAcquired();
 
@@ -223,8 +220,6 @@ private:
 
     // The primary-only service instance corresponding to the donor instance. Not owned.
     const ReshardingDonorService* const _donorService;
-
-    std::unique_ptr<ReshardingMetricsNew> _metricsNew;
 
     // The in-memory representation of the immutable portion of the document in
     // config.localReshardingOperations.donor.
