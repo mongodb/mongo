@@ -8,6 +8,9 @@
  *   requires_profiling,
  *   uses_parallel_shell,
  *   no_selinux,
+ *   # Tenant migrations passthrough suites automatically retry operations on TenantMigrationAborted
+ *   # errors.
+ *   tenant_migration_incompatible,
  * ]
  */
 

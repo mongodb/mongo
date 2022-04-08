@@ -5,6 +5,8 @@
  *   requires_replication,
  *   # applyOps is not supported on mongos
  *   assumes_against_mongod_not_mongos,
+ *   # Tenant migrations don't support applyOps.
+ *   tenant_migration_incompatible,
  * ]
  */
 

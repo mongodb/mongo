@@ -1,3 +1,9 @@
+// @tags: [
+//   # This test does not support tojson of command objects so the inject_tenant_prefix.js override
+//   # cannot deep copy the command objects correctly.
+//   tenant_migration_incompatible,
+// ]
+
 (function() {
 
 "use strict";

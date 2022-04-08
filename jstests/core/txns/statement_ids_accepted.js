@@ -1,6 +1,12 @@
 // Makes sure all commands which are supposed to take statement ids do.  This should test all
 // commands that are allowed in transactions.
-// @tags: [uses_transactions, uses_prepare_transaction]
+// @tags: [
+//    uses_transactions,
+//    uses_prepare_transaction,
+//    # Tenant migrations don't support applyOps.
+//    tenant_migration_incompatible
+// ]
+
 (function() {
 "use strict";
 

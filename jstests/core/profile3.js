@@ -3,6 +3,8 @@
 //   creates_and_authenticates_user,
 //   no_selinux,
 //   requires_profiling,
+//   # This test depends on hardcoded database name equality.
+//   tenant_migration_incompatible,
 // ]
 // special db so that it can be run in parallel tests
 var stddb = db;

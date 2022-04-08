@@ -17,6 +17,8 @@
  *   requires_non_retryable_commands,
  *   requires_non_retryable_writes,
  *   requires_replication,
+ *   # This test depends on hardcoded database name equality.
+ *   tenant_migration_incompatible,
  * ]
  */
 (function() {

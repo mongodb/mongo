@@ -1,4 +1,9 @@
-// @tags: [requires_getmore]
+// @tags: [
+//   requires_getmore,
+//   # This test uses exhaust which does not use runCommand (required by the inject_tenant_prefix.js
+//   # override).
+//   tenant_migration_incompatible,
+// ]
 
 (function() {
 'use strict';

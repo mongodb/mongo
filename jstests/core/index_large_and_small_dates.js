@@ -1,3 +1,8 @@
+// @tags: [
+//   # The tenant migration override cannot deep copy very large or small dates.
+//   tenant_migration_incompatible,
+// ]
+
 (function() {
 "use strict";
 const coll = db.index_dates;

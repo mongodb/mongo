@@ -3,6 +3,9 @@
 // @tags: [
 //   assumes_no_implicit_index_creation,
 //   uses_multiple_connections,
+//   # This test uses benchRun which does not use runCommand (required by the
+//   # inject_tenant_prefix.js override).
+//   tenant_migration_incompatible,
 // ]
 (function() {
 "use strict";

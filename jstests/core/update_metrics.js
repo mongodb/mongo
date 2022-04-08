@@ -7,6 +7,9 @@
  *   assumes_unsharded_collection,
  *   # The test relies on the precise number of executions of commands.
  *   requires_non_retryable_writes,
+ *   # This test contains assertions on the number of executed operations, and tenant migrations
+ *   # passthrough suites automatically retry operations on TenantMigrationAborted errors.
+ *   tenant_migration_incompatible,
  * ]
  */
 (function() {

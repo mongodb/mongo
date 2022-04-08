@@ -1,7 +1,10 @@
 // Test that commands other than retryable writes may not use txnNumber outside transactions.
 // @tags: [
 //   uses_map_reduce_with_temp_collections,
+//   # Tenant migrations don't support applyOps.
+//   tenant_migration_incompatible,
 // ]
+
 (function() {
 "use strict";
 

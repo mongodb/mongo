@@ -9,6 +9,9 @@
 //   assumes_read_preference_unchanged,
 //   incompatible_with_embedded,
 //   requires_collstats,
+//   # Tenant migrations passthrough suites automatically retry operations on TenantMigrationAborted
+//   # errors.
+//   tenant_migration_incompatible,
 // ]
 //
 

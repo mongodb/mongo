@@ -2,7 +2,10 @@
 // @tags: [
 //   uses_snapshot_read_concern,
 //   uses_transactions,
+//   # Tenant migrations don't support applyOps.
+//   tenant_migration_incompatible,
 // ]
+
 (function() {
 "use strict";
 

@@ -7,7 +7,8 @@
  *   assumes_against_mongod_not_mongos,
  *   # applyOps uses the oplog that require replication support
  *   requires_replication,
- *   # Uses $v: 2 update oplog entries, only available in 4.7+.
+ *   # Tenant migrations don't support applyOps.
+ *   tenant_migration_incompatible,
  * ]
  */
 

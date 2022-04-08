@@ -7,6 +7,8 @@
 //   requires_collstats,
 //   requires_non_retryable_commands,
 //   requires_profiling,
+//   # This test depends on hardcoded database name equality.
+//   tenant_migration_incompatible,
 // ]
 
 (function() {

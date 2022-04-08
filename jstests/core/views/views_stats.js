@@ -9,6 +9,8 @@
 //     assumes_unsharded_collection,
 //     # top command is not available on embedded
 //     incompatible_with_embedded,
+//     # This test depends on hardcoded database name equality.
+//     tenant_migration_incompatible,
 // ]
 
 (function() {

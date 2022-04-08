@@ -6,6 +6,8 @@
 //   requires_capped,
 //   requires_non_retryable_commands,
 //   requires_non_retryable_writes,
+//   # Tenant migrations don't support applyOps.
+//   tenant_migration_incompatible,
 // ]
 
 // Integration tests for the collation feature.

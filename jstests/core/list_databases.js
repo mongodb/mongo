@@ -1,5 +1,10 @@
 /**
  * Tests for the listDatabases command.
+ *
+ * @tags: [
+ *    # This test depends on hardcoded database name equality.
+ *    tenant_migration_incompatible,
+ * ]
  */
 (function() {
 "use strict";

@@ -9,6 +9,9 @@
 //   assumes_unsharded_collection,
 //   does_not_support_stepdowns,
 //   requires_non_retryable_writes,
+//   # Tenant migrations passthrough suites automatically retry operations on TenantMigrationAborted
+//   # errors.
+//   tenant_migration_incompatible,
 // ]
 
 (function() {

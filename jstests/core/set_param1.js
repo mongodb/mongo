@@ -1,6 +1,10 @@
 // @tags: [
 //   assumes_superuser_permissions,
 //   does_not_support_stepdowns,
+//   # This test attempts to compare the response from running the {getParameter: "*"}
+//   # command multiple times, which may observe the change to the failpoint enabled by the
+//   # migration hook.
+//   tenant_migration_incompatible,
 // ]
 
 // Tests for accessing logLevel server parameter using getParameter/setParameter commands

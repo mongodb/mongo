@@ -1,7 +1,12 @@
 /**
  * Tests that benchRun can understand pipeline-style updates and findAndModifys.
  *
- * @tags: [uses_multiple_connections]
+ * @tags: [
+ *     uses_multiple_connections,
+ *     # This test uses exhaust which does not use runCommand (required by the
+ *     # inject_tenant_prefix.js override).
+ *     tenant_migration_incompatible,
+ * ]
  */
 (function() {
 "use strict";
