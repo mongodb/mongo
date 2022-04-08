@@ -59,8 +59,10 @@ public:
     void setWritesAreBatched(bool batched);
 
     /**
-     * Adds a stored operation to the list of stored operations for the current WUOW. It is illegal
-     * to add operations outside of a WUOW.
+     * Adds a stored operation to the list of stored operations for the current WUOW.
+     * It is illegal to add operations outside of a WUOW.
+     * The stored operations must generate an applyOps entry that's within the max BSON size.
+     * Anything larger will throw a TransactionTooLarge exception at commit.
      */
     void addBatchedOperation(OperationContext* opCtx, const repl::ReplOperation& operation);
 

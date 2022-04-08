@@ -12,8 +12,6 @@
  *  requires_non_retryable_writes,
  *  # TODO (SERVER-63044): namespace for this test is hardcoded, tenant migrations rename it.
  *  tenant_migration_incompatible,
- *  # TODO (SERVER-65018): Investigate 'maxNumberOfTransactionOperationsInSingleOplogEntry': 2
- *  exclude_from_large_txns,
  * ]
  */
 

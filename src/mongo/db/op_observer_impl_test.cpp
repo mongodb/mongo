@@ -2354,6 +2354,8 @@ struct DeleteTestCase {
 
 class BatchedWriteOutputsTest : public OpObserverTest {
 protected:
+    // The maximum numbers of documents that can be deleted in a batch. Assumes _id of integer type.
+    static const int maxDocsInBatch = 203669;
     const NamespaceString _nss{"test", "coll"};
     const UUID _uuid = UUID::gen();
 };
@@ -2516,6 +2518,89 @@ TEST_F(BatchedWriteOutputsTest, testEmptyWUOW) {
     // The getNOplogEntries call below asserts that the oplog is empty.
     getNOplogEntries(opCtx, 0);
 }
+
+// Verifies a large WUOW that is within 16MB of oplog entry succeeds.
+TEST_F(BatchedWriteOutputsTest, testWUOWLarge) {
+    // Setup.
+    auto opCtxRaii = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxRaii.get();
+    reset(opCtx, NamespaceString::kRsOplogNamespace);
+    auto opObserverRegistry = std::make_unique<OpObserverRegistry>();
+    opObserverRegistry->addObserver(std::make_unique<OpObserverImpl>());
+    opCtx->getServiceContext()->setOpObserver(std::move(opObserverRegistry));
+
+    AutoGetCollection locks(opCtx, _nss, LockMode::MODE_IX);
+
+    WriteUnitOfWork wuow(opCtx, true /* groupOplogEntries */);
+
+    // Delete BatchedWriteOutputsTest::maxDocsInBatch documents in a single batch, which is the
+    // maximum number of docs that can be batched while staying within 16MB of applyOps.
+    for (int docId = 0; docId < BatchedWriteOutputsTest::maxDocsInBatch; docId++) {
+        // This test does not call `OpObserver::aboutToDelete`. That method has the side-effect
+        // of setting of `documentKey` on the delete for sharding purposes.
+        // `OpObserverImpl::onDelete` asserts its existence.
+        documentKeyDecoration(opCtx).emplace(BSON("_id" << docId), boost::none);
+        const OplogDeleteEntryArgs args;
+        opCtx->getServiceContext()->getOpObserver()->onDelete(
+            opCtx, _nss, _uuid, kUninitializedStmtId, args);
+    }
+    wuow.commit();
+
+    // Retrieve the oplog entries, implicitly asserting that there's exactly one entry in the whole
+    // oplog.
+    std::vector<BSONObj> oplogs = getNOplogEntries(opCtx, 1);
+    auto lastOplogEntry = oplogs.back();
+    auto lastOplogEntryParsed = assertGet(OplogEntry::parse(oplogs.back()));
+
+    // The batch consists of an applyOps, whose array contains all deletes issued within the
+    // WUOW.
+    ASSERT(lastOplogEntryParsed.getCommandType() == OplogEntry::CommandType::kApplyOps);
+    std::vector<repl::OplogEntry> innerEntries;
+    repl::ApplyOps::extractOperationsTo(
+        lastOplogEntryParsed, lastOplogEntryParsed.getEntry().toBSON(), &innerEntries);
+    ASSERT(innerEntries.size() == BatchedWriteOutputsTest::maxDocsInBatch);
+    for (int opIdx = 0; opIdx < BatchedWriteOutputsTest::maxDocsInBatch; opIdx++) {
+        BSONObj o = BSON("_id" << opIdx);
+        const auto innerEntry = innerEntries[opIdx];
+        ASSERT(innerEntry.getCommandType() == OplogEntry::CommandType::kNotCommand);
+        ASSERT(innerEntry.getOpType() == repl::OpTypeEnum::kDelete);
+        ASSERT(innerEntry.getNss() == NamespaceString("test.coll"));
+        ASSERT(0 == innerEntry.getObject().woCompare(o));
+    }
+}
+
+// Verifies a WUOW that would result in a an oplog entry >16MB fails with TransactionTooLarge.
+TEST_F(BatchedWriteOutputsTest, testWUOWTooLarge) {
+    // Setup.
+    auto opCtxRaii = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxRaii.get();
+    reset(opCtx, NamespaceString::kRsOplogNamespace);
+    auto opObserverRegistry = std::make_unique<OpObserverRegistry>();
+    opObserverRegistry->addObserver(std::make_unique<OpObserverImpl>());
+    opCtx->getServiceContext()->setOpObserver(std::move(opObserverRegistry));
+
+    AutoGetCollection locks(opCtx, _nss, LockMode::MODE_IX);
+
+    WriteUnitOfWork wuow(opCtx, true /* groupOplogEntries */);
+
+    // Attempt to delete more than BatchedWriteOutputsTest::maxDocsInBatch documents in a single
+    // batch, which fails as it can't generate an applyOps entry larger than 16MB.
+    for (int docId = 0; docId < BatchedWriteOutputsTest::maxDocsInBatch + 1; docId++) {
+        // This test does not call `OpObserver::aboutToDelete`. That method has the side-effect
+        // of setting of `documentKey` on the delete for sharding purposes.
+        // `OpObserverImpl::onDelete` asserts its existence.
+        documentKeyDecoration(opCtx).emplace(BSON("_id" << docId), boost::none);
+        const OplogDeleteEntryArgs args;
+        opCtx->getServiceContext()->getOpObserver()->onDelete(
+            opCtx, _nss, _uuid, kUninitializedStmtId, args);
+    }
+
+    ASSERT_THROWS_CODE(wuow.commit(), DBException, ErrorCodes::Error::TransactionTooLarge);
+
+    // The getNOplogEntries call below asserts that the oplog is empty.
+    getNOplogEntries(opCtx, 0);
+}
+
 class OnDeleteOutputsTest : public OpObserverTest {
 
 protected:

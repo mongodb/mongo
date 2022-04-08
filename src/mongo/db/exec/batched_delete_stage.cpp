@@ -55,6 +55,18 @@ MONGO_FAIL_POINT_DEFINE(throwWriteConflictExceptionInBatchedDeleteStage);
 MONGO_FAIL_POINT_DEFINE(batchedDeleteStageHangAfterNDocuments);
 
 namespace {
+
+/**
+ * Constants that (conservatively) estimate the size of the oplog entry that would result from
+ * committing a batch, so as to ensure that a batch fits within a 16MB oplog entry. These constants
+ * translate to a maximum of ~63k documents deleted per batch on non-clustered collections.
+ */
+// Size of an array member of an applyOps entry, excluding the RecordId. Accounts for the maximum
+// size of the internal fields.
+static size_t kApplyOpsNonArrayEntryPaddingBytes = 256;
+// Size of an applyOps entry, excluding its array.
+static size_t kApplyOpsArrayEntryPaddingBytes = 256;
+
 void incrementSSSMetricNoOverflow(AtomicWord<long long>& metric, long long value) {
     const int64_t MAX = 1ULL << 60;
 
@@ -173,9 +185,13 @@ PlanStage::StageState BatchedDeleteStage::_deleteBatch(WorkingSetID* out) {
     unsigned int docsDeleted = 0;
     unsigned int batchIdx = 0;
 
+    // Estimate the size of the oplog entry that would result from committing the batch,
+    // to ensure we emit an oplog entry that's within the 16MB BSON limit.
+    size_t applyOpsBytes = kApplyOpsNonArrayEntryPaddingBytes;
+
     try {
         // Start a WUOW with 'groupOplogEntries' which groups a delete batch into a single timestamp
-        // and oplog entry
+        // and oplog entry.
         WriteUnitOfWork wuow(opCtx(), true /* groupOplogEntries */);
         for (; batchIdx < _stagedDeletesBuffer.size(); ++batchIdx) {
             if (MONGO_unlikely(throwWriteConflictExceptionInBatchedDeleteStage.shouldFail())) {
@@ -192,6 +208,19 @@ PlanStage::StageState BatchedDeleteStage::_deleteBatch(WorkingSetID* out) {
                                                       stagedDocument.snapshotId,
                                                       _params->canonicalQuery);
             if (docStillMatches) {
+                applyOpsBytes += kApplyOpsArrayEntryPaddingBytes;
+                // TODO (SERVER-65157): get accurate _id size from the snapshotted document.
+                applyOpsBytes += (stagedDocument.rid.isLong() ? OID::kOIDSize
+                                                              : stagedDocument.rid.getStr().size());
+                if (applyOpsBytes > BSONObjMaxUserSize) {
+                    // There's no room to fit this deletion in the current batch, as doing so would
+                    // exceed 16MB of oplog entry: put this deletion back into the staging buffer
+                    // and commit the batch.
+                    invariant(batchIdx > 0);
+                    batchIdx--;
+                    break;
+                }
+
                 collection()->deleteDocument(opCtx(),
                                              _params->stmtId,
                                              stagedDocument.rid,
@@ -222,7 +251,8 @@ PlanStage::StageState BatchedDeleteStage::_deleteBatch(WorkingSetID* out) {
             const Milliseconds elapsedMillis(batchTimer.millis());
             if (_batchParams->targetBatchTimeMS != Milliseconds(0) &&
                 elapsedMillis >= _batchParams->targetBatchTimeMS) {
-                // Met targetBatchTimeMS after evaluating _ridSnapShotBuffer[batchIdx].
+                // Met targetBatchTimeMS after evaluating _ridSnapShotBuffer[batchIdx]: commit the
+                // batch.
                 break;
             }
         }

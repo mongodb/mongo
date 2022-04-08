@@ -50,18 +50,20 @@ function validateBatchedDeletesOplogDocsPerBatch(conn) {
     assert.eq(applyOpsEntriesFull + applyOpsEntriesLast, expectedApplyOpsEntries);
 }
 
-// Verifies that a large batch that would result in an applyOps entry beyond the 16MB BSON limit
-// generates more than one applyOps entry.
+// Verifies the batched deleter cuts batches that stay within the 16MB BSON limit of one applyOps
+// entry.
 function validateBatchedDeletesOplogBatchAbove16MB(conn) {
     const db = conn.getDB("__internalBatchedDeletesTesting");
     const coll = db.getCollection('Collection0');
 
-    // With _id's of ObjectId type, and applyOps entry reaches the 16MB BSON limit at ~140k entries.
-    // Create a collection >> 140k documents, make the docsPerBatch target high enough to hit the
-    // 16MB BSON limit with applyOps, and disable other batch tunables that could cut a batch
-    // earlier than expected.
+    // With non-clustered collections (_id of ObjectId type) the batched deleter's conservative
+    // applyOps estimation would cut a batch at ~63k documents. Create a collection >> 63k
+    // documents, make the docsPerBatch target high enough to hit the 16MB BSON limit with applyOps,
+    // and disable other batch tunables that could cut a batch earlier than expected.
     const docsPerBatch = 500000;
-    const collCount = 200000;
+    const collCount = 130000;
+    const expectedApplyOpsEntries =
+        Math.ceil(collCount / 63600 /* max docs per batch, see comment above. */);
     assert.commandWorked(
         db.adminCommand({setParameter: 1, internalBatchUserMultiDeletesForTest: 1}));
     // Disable time-based batching
@@ -79,7 +81,7 @@ function validateBatchedDeletesOplogBatchAbove16MB(conn) {
     assert.commandWorked(coll.deleteMany({_id: {$gte: 0}}));
     assert.eq(0, coll.find().itcount());
 
-    // The whole deletion replicates as two applyOps.
+    // The whole deletion breaks down the deletion into multiple batches/applyOps.
     const oplogEntriesApplyOps = db.getSiblingDB('local')
                                      .oplog.rs
                                      .aggregate([
@@ -93,24 +95,32 @@ function validateBatchedDeletesOplogBatchAbove16MB(conn) {
                                          {$project: {opsPerApplyOps: {$size: '$o.applyOps'}}}
                                      ])
                                      .toArray();
-    assert.eq(2, oplogEntriesApplyOps.length);
-    assert.eq(
-        collCount,
-        oplogEntriesApplyOps[0]['opsPerApplyOps'] + oplogEntriesApplyOps[1]['opsPerApplyOps']);
+    assert.eq(expectedApplyOpsEntries, oplogEntriesApplyOps.length);
+    let aggregateApplyOpsDeleteEntries = 0;
+    for (let i = 0; i < expectedApplyOpsEntries; i++) {
+        aggregateApplyOpsDeleteEntries += oplogEntriesApplyOps[i]['opsPerApplyOps'];
+    }
+    assert.eq(collCount, aggregateApplyOpsDeleteEntries);
 }
 
-function runTestInIsolation(testFunc) {
+function runTestInIsolation(testFunc, serverParam) {
+    const nodeOptions = serverParam ? serverParam : {};
     const rst = new ReplSetTest({
         name: "batched_multi_deletes_test",
-        nodes: 1,
+        nodes: 2,
+        nodeOptions,
     });
     rst.startSet();
     rst.initiate();
     rst.awaitNodesAgreeOnPrimary();
     testFunc(rst.getPrimary());
+    rst.awaitReplication();
+    rst.checkReplicatedDataHashes();
     rst.stopSet();
 }
 
+// Validates oplog content for batches that fit within 16MB worth of oplog.
 runTestInIsolation(validateBatchedDeletesOplogDocsPerBatch);
+// Validates oplog content for batches that would exceed 16MB worth of oplog.
 runTestInIsolation(validateBatchedDeletesOplogBatchAbove16MB);
 })();

@@ -1358,14 +1358,20 @@ void writeChangeStreamPreImagesForApplyOpsEntries(
 }
 
 /**
- * Returns transaction operations that can fit into an "applyOps" entry. The returned operations are
- * serialized to BSON. The transaction operations are given by range ['operationsBegin',
- * 'operationsEnd'). Constraints for fitting the operations: (1) the resulting "applyOps" entry
- * shouldn't exceed the 16MB limit, unless only one operation is allocated to it; (2) the number of
- * operations is not larger than the maximum number of transaction statements allowed in one entry
- * as defined by 'gMaxNumberOfTransactionOperationsInSingleOplogEntry'.
+ * Returns operations that can fit into an "applyOps" entry. The returned operations are
+ * serialized to BSON. The operations are given by range ['operationsBegin',
+ * 'operationsEnd').
+ * Multi-document transactions follow the following constraints for fitting the operations: (1) the
+ * resulting "applyOps" entry shouldn't exceed the 16MB limit, unless only one operation is
+ * allocated to it; (2) the number of operations is not larger than the maximum number of
+ * transaction statements allowed in one entry as defined by
+ * 'gMaxNumberOfTransactionOperationsInSingleOplogEntry'. Batched writes (WUOWs that pack writes
+ * into a single applyOps outside of a multi-doc transaction) are exempt from the constraints above.
+ * If the operations cannot be packed into a single applyOps that's within the BSON size limit
+ * (16MB), the batched write will fail with TransactionTooLarge.
  */
-std::vector<BSONObj> packTransactionOperationsIntoApplyOps(
+std::vector<BSONObj> packOperationsIntoApplyOps(
+    OperationContext* opCtx,
     std::vector<repl::ReplOperation>::const_iterator operationsBegin,
     std::vector<repl::ReplOperation>::const_iterator operationsEnd) {
     // Conservative BSON array element overhead assuming maximum 6 digit array index.
@@ -1378,18 +1384,26 @@ std::vector<BSONObj> packTransactionOperationsIntoApplyOps(
     for (auto operationIter = operationsBegin; operationIter != operationsEnd; ++operationIter) {
         const auto& operation = *operationIter;
 
-        // Stop packing when either number of transaction operations is reached, or when the next
-        // one would make the total size of operations larger than the maximum BSON Object User
-        // Size. We rely on the headroom between BSONObjMaxUserSize and BSONObjMaxInternalSize to
-        // cover the BSON overhead and the other "applyOps" entry fields. But if a single operation
-        // in the set exceeds BSONObjMaxUserSize, we still fit it, as a single max-length operation
-        // should be able to be packed into an "applyOps" entry.
-        if (operations.size() ==
-                static_cast<size_t>(gMaxNumberOfTransactionOperationsInSingleOplogEntry) ||
-            (operations.size() > 0 &&
-             (totalOperationsSize + DurableOplogEntry::getDurableReplOperationSize(operation) >
-              BSONObjMaxUserSize))) {
-            break;
+        if (TransactionParticipant::get(opCtx)) {
+            // Stop packing when either number of transaction operations is reached, or when the
+            // next one would make the total size of operations larger than the maximum BSON Object
+            // User Size. We rely on the headroom between BSONObjMaxUserSize and
+            // BSONObjMaxInternalSize to cover the BSON overhead and the other "applyOps" entry
+            // fields. But if a single operation in the set exceeds BSONObjMaxUserSize, we still fit
+            // it, as a single max-length operation should be able to be packed into an "applyOps"
+            // entry.
+            if (operations.size() ==
+                    static_cast<size_t>(gMaxNumberOfTransactionOperationsInSingleOplogEntry) ||
+                (operations.size() > 0 &&
+                 (totalOperationsSize + DurableOplogEntry::getDurableReplOperationSize(operation) >
+                  BSONObjMaxUserSize))) {
+                break;
+            }
+        } else {
+            // This a batched write, so we don't break the batch into multiple applyOps. It is the
+            // reponsibility of the caller to generate a batch that fits within a single applyOps.
+            // If the batch doesn't fit within an applyOps, we throw a TransactionTooLarge later
+            // on when serializing to BSON.
         }
         auto serializedOperation = operation.toBSON();
         totalOperationsSize += static_cast<size_t>(serializedOperation.objsize());
@@ -1464,8 +1478,7 @@ getApplyOpsOplogSlotAndOperationAssignmentForTransaction(
 
     // Assign operations to "applyOps" entries.
     for (auto operationIt = operations.begin(); operationIt != operations.end();) {
-        auto applyOpsOperations =
-            packTransactionOperationsIntoApplyOps(operationIt, operations.end());
+        auto applyOpsOperations = packOperationsIntoApplyOps(opCtx, operationIt, operations.end());
         const auto opCountWithNeedsRetryImage =
             std::count_if(operationIt, operationIt + applyOpsOperations.size(), hasNeedsRetryImage);
         if (opCountWithNeedsRetryImage > 0) {
@@ -1477,6 +1490,11 @@ getApplyOpsOplogSlotAndOperationAssignmentForTransaction(
             OpObserver::ApplyOpsOplogSlotAndOperationAssignment::ApplyOpsEntry{
                 getNextOplogSlot(), std::move(applyOpsOperations)});
     }
+
+    auto& batchedWriteContext = BatchedWriteContext::get(opCtx);
+    tassert(6501800,
+            "batched writes must generate a single applyOps entry",
+            !batchedWriteContext.writesAreBatched() || applyOpsEntries.size() == 1);
 
     // In the special case of writing the implicit 'prepare' oplog entry, we use the last reserved
     // oplog slot. This may mean we skipped over some reserved slots, but there's no harm in that.
