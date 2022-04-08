@@ -87,6 +87,24 @@ sum_ckpt_ops(WTPERF *wtperf)
 }
 
 /*
+ * Return total flush_tier operations.
+ */
+uint64_t
+sum_flush_ops(WTPERF *wtperf)
+{
+    CONFIG_OPTS *opts;
+    uint64_t total;
+
+    opts = wtperf->opts;
+
+    if (opts->tiered_flush_interval > 0)
+        total = wtperf->flushthreads->flush.ops;
+    else
+        total = 0;
+    return (total);
+}
+
+/*
  * Return total scan operations.
  */
 uint64_t
