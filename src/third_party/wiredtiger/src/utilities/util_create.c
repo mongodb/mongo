@@ -10,7 +10,7 @@
 
 /*
  * usage --
- *     TODO: Add a comment describing this function.
+ *     Display a usage message for the create command.
  */
 static int
 usage(void)
@@ -24,7 +24,7 @@ usage(void)
 
 /*
  * util_create --
- *     TODO: Add a comment describing this function.
+ *     The create command.
  */
 int
 util_create(WT_SESSION *session, int argc, char *argv[])

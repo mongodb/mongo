@@ -10,7 +10,7 @@
 
 /*
  * usage --
- *     TODO: Add a comment describing this function.
+ *     Display a usage message for the stat command.
  */
 static int
 usage(void)
@@ -24,7 +24,7 @@ usage(void)
 
 /*
  * util_stat --
- *     TODO: Add a comment describing this function.
+ *     The stat command.
  */
 int
 util_stat(WT_SESSION *session, int argc, char *argv[])

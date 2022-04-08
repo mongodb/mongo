@@ -10,7 +10,7 @@
 
 /*
  * usage --
- *     TODO: Add a comment describing this function.
+ *     Display a usage message for the salvage command.
  */
 static int
 usage(void)
@@ -25,7 +25,7 @@ usage(void)
 
 /*
  * util_salvage --
- *     TODO: Add a comment describing this function.
+ *     The salvage command.
  */
 int
 util_salvage(WT_SESSION *session, int argc, char *argv[])

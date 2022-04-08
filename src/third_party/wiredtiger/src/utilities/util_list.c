@@ -14,7 +14,7 @@ static int list_print_checkpoint(WT_SESSION *, const char *);
 
 /*
  * usage --
- *     TODO: Add a comment describing this function.
+ *     Display a usage message for the list command.
  */
 static int
 usage(void)
@@ -30,7 +30,7 @@ usage(void)
 
 /*
  * util_list --
- *     TODO: Add a comment describing this function.
+ *     The list command.
  */
 int
 util_list(WT_SESSION *session, int argc, char *argv[])

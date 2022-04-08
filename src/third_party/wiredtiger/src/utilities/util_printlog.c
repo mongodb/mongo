@@ -10,7 +10,7 @@
 
 /*
  * usage --
- *     TODO: Add a comment describing this function.
+ *     Display a usage message for the printlog command.
  */
 static int
 usage(void)
@@ -30,7 +30,7 @@ usage(void)
 
 /*
  * util_printlog --
- *     TODO: Add a comment describing this function.
+ *     The printlog command.
  */
 int
 util_printlog(WT_SESSION *session, int argc, char *argv[])

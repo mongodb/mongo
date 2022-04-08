@@ -10,7 +10,7 @@
 
 /*
  * usage --
- *     TODO: Add a comment describing this function.
+ *     Display a usage message for the alter command.
  */
 static int
 usage(void)
@@ -21,7 +21,7 @@ usage(void)
 
 /*
  * util_alter --
- *     TODO: Add a comment describing this function.
+ *     The alter command.
  */
 int
 util_alter(WT_SESSION *session, int argc, char *argv[])

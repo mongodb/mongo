@@ -10,7 +10,7 @@
 
 /*
  * usage --
- *     TODO: Add a comment describing this function.
+ *     Display a usage message for the write command.
  */
 static int
 usage(void)
@@ -24,7 +24,7 @@ usage(void)
 
 /*
  * util_write --
- *     TODO: Add a comment describing this function.
+ *     The write command.
  */
 int
 util_write(WT_SESSION *session, int argc, char *argv[])

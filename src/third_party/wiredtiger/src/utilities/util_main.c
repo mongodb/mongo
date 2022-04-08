@@ -39,7 +39,7 @@ wt_explicit_zero(void *ptr, size_t len)
 
 /*
  * usage --
- *     TODO: Add a comment describing this function.
+ *     Display a usage message for the wt utility.
  */
 static void
 usage(void)
@@ -70,7 +70,7 @@ usage(void)
 
 /*
  * main --
- *     TODO: Add a comment describing this function.
+ *     The wt utility.
  */
 int
 main(int argc, char *argv[])

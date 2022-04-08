@@ -10,12 +10,13 @@
 
 /*
  * util_copyright --
- *     TODO: Add a comment describing this function.
+ *     Display a copyright notice.
  */
 void
 util_copyright(void)
 {
-    printf("%s\n", "Copyright (c) 2008-present MongoDB, Inc.");
+    printf("%s\n", "Copyright (c) 2008-2014 WiredTiger, Inc.");
+    printf("%s\n", "Copyright (c) 2014-present MongoDB, Inc.");
     printf("%s\n\n", "All rights reserved.");
 
     printf("%s\n\n",
@@ -34,6 +35,5 @@ util_copyright(void)
     printf("%s\n",
       "For a license to use the WiredTiger software under conditions\n"
       "other than those described by the GNU General Public License,\n"
-      "or for technical support for this software, contact WiredTiger,\n"
-      "Inc. at info@wiredtiger.com.");
+      "or for technical support for this software, contact MongoDB, Inc.");
 }

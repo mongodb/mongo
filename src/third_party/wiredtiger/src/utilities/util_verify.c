@@ -10,7 +10,7 @@
 
 /*
  * usage --
- *     TODO: Add a comment describing this function.
+ *     Display a usage message for the verify command.
  */
 static int
 usage(void)
@@ -31,7 +31,7 @@ usage(void)
 
 /*
  * util_verify --
- *     TODO: Add a comment describing this function.
+ *     The verify command.
  */
 int
 util_verify(WT_SESSION *session, int argc, char *argv[])

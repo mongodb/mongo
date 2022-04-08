@@ -30,7 +30,7 @@ static int time_pair_to_timestamp(WT_SESSION_IMPL *, char *, WT_ITEM *);
 
 /*
  * usage --
- *     TODO: Add a comment describing this function.
+ *     Display a usage message for the dump command.
  */
 static int
 usage(void)
@@ -59,7 +59,7 @@ static FILE *fp;
 
 /*
  * util_dump --
- *     TODO: Add a comment describing this function.
+ *     The dump command.
  */
 int
 util_dump(WT_SESSION *session, int argc, char *argv[])

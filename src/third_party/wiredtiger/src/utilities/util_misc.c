@@ -10,7 +10,7 @@
 
 /*
  * util_cerr --
- *     TODO: Add a comment describing this function.
+ *     Report an error for a cursor operation.
  */
 int
 util_cerr(WT_CURSOR *cursor, const char *op, int ret)

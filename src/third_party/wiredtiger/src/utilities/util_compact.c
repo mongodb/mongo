@@ -10,7 +10,7 @@
 
 /*
  * usage --
- *     TODO: Add a comment describing this function.
+ *     Display a usage message for the compact command.
  */
 static int
 usage(void)
@@ -21,7 +21,7 @@ usage(void)
 
 /*
  * util_compact --
- *     TODO: Add a comment describing this function.
+ *     The compact command.
  */
 int
 util_compact(WT_SESSION *session, int argc, char *argv[])

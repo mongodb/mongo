@@ -13,7 +13,7 @@ static int text(WT_SESSION *, const char *);
 
 /*
  * usage --
- *     TODO: Add a comment describing this function.
+ *     Display a usage message for the loadtext command.
  */
 static int
 usage(void)
@@ -27,7 +27,7 @@ usage(void)
 
 /*
  * util_loadtext --
- *     TODO: Add a comment describing this function.
+ *     The loadtext command.
  */
 int
 util_loadtext(WT_SESSION *session, int argc, char *argv[])

@@ -10,7 +10,7 @@
 
 /*
  * usage --
- *     TODO: Add a comment describing this function.
+ *     Display a usage message for the truncate command.
  */
 static int
 usage(void)
@@ -21,7 +21,7 @@ usage(void)
 
 /*
  * util_truncate --
- *     TODO: Add a comment describing this function.
+ *     The truncate command.
  */
 int
 util_truncate(WT_SESSION *session, int argc, char *argv[])

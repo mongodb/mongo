@@ -23,7 +23,7 @@ static bool no_overwrite = false; /* -n don't overwrite existing data */
 
 /*
  * usage --
- *     TODO: Add a comment describing this function.
+ *     Display a usage message for the load command.
  */
 static int
 usage(void)
@@ -41,7 +41,7 @@ usage(void)
 
 /*
  * util_load --
- *     TODO: Add a comment describing this function.
+ *     The load command.
  */
 int
 util_load(WT_SESSION *session, int argc, char *argv[])

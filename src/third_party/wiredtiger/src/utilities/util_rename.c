@@ -10,7 +10,7 @@
 
 /*
  * usage --
- *     TODO: Add a comment describing this function.
+ *     Display a usage message for the rename command.
  */
 static int
 usage(void)
@@ -21,7 +21,7 @@ usage(void)
 
 /*
  * util_rename --
- *     TODO: Add a comment describing this function.
+ *     The rename command.
  */
 int
 util_rename(WT_SESSION *session, int argc, char *argv[])
