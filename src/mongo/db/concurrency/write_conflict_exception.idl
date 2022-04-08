@@ -36,6 +36,14 @@ server_parameters:
         set_at: [ startup, runtime ]
         cpp_varname: 'WriteConflictException::trace'
 
+    enableTemporarilyUnavailableExceptions:
+        description: 'Enables the use of TemporarilyUnavailableExceptions. When disabled, reverts to
+                      throwing WriteConflictException.'
+        set_at: [ startup, runtime ]
+        cpp_varname: 'gEnableTemporarilyUnavailableExceptions'
+        cpp_vartype: AtomicWord<bool>
+        default: false
+
     temporarilyUnavailableMaxRetries:
         description: 'The number of times to retry a TemporarilyUnavailable error internally'
         set_at: [ startup, runtime ]

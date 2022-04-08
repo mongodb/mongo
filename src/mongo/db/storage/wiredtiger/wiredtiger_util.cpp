@@ -42,6 +42,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/concurrency/temporarily_unavailable_exception.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/concurrency/write_conflict_exception_gen.h"
 #include "mongo/db/global_settings.h"
 #include "mongo/db/server_options_general_gen.h"
 #include "mongo/db/snapshot_window_options_gen.h"
@@ -162,24 +163,25 @@ Mutex WiredTigerUtil::_tableLoggingInfoMutex =
     MONGO_MAKE_LATCH("WiredTigerUtil::_tableLoggingInfoMutex");
 WiredTigerUtil::TableLoggingInfo WiredTigerUtil::_tableLoggingInfo;
 
+bool wasRollbackReasonCachePressure(WT_SESSION* session) {
+    if (session) {
+        const auto reason = session->get_rollback_reason(session);
+        if (reason) {
+            return strncmp(WT_TXN_ROLLBACK_REASON_CACHE,
+                           reason,
+                           sizeof(WT_TXN_ROLLBACK_REASON_CACHE)) == 0;
+        }
+    }
+    return false;
+}
+
 Status wtRCToStatus_slow(int retCode, WT_SESSION* session, StringData prefix) {
     if (retCode == 0)
         return Status::OK();
 
     if (retCode == WT_ROLLBACK) {
-        const auto reasonIsCachePressure = [&] {
-            if (session) {
-                const auto reason = session->get_rollback_reason(session);
-                if (reason) {
-                    return strncmp(WT_TXN_ROLLBACK_REASON_CACHE,
-                                   reason,
-                                   sizeof(WT_TXN_ROLLBACK_REASON_CACHE)) == 0;
-                }
-            }
-            return false;
-        }();
-
-        if (reasonIsCachePressure) {
+        if (gEnableTemporarilyUnavailableExceptions.load() &&
+            wasRollbackReasonCachePressure(session)) {
             str::stream s;
             if (!prefix.empty())
                 s << prefix << " ";

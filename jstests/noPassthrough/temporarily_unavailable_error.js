@@ -19,6 +19,7 @@ const replSet = new ReplSetTest({
         wiredTigerCacheSizeGB: 0.256,
         setParameter: {
             logComponentVerbosity: tojson({control: 1, write: 1}),
+            enableTemporarilyUnavailableExceptions: true,
             // Lower these values from the defaults to speed up the test.
             temporarilyUnavailableMaxRetries: 3,
             temporarilyUnavailableBackoffBaseMs: 10,
