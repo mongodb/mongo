@@ -637,6 +637,13 @@ server_parameters:
     validator:
         gt: 0
 
+  internalQuerySlotBasedExecutionDisableLookupPushdown:
+    description: "If true, the system will not push down $lookup to the SBE execution engine."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQuerySlotBasedExecutionDisableLookupPushdown"
+    cpp_vartype: AtomicWord<bool>
+    default: false
+
   internalQueryForceClassicEngine:
     description: "If true, the system will use the classic execution engine for all queries,
     otherwise eligible queries will execute using the SBE execution engine."

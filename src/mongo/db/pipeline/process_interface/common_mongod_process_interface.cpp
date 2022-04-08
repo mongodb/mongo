@@ -56,6 +56,7 @@
 #include "mongo/db/pipeline/pipeline_d.h"
 #include "mongo/db/query/collection_index_usage_tracker_decoration.h"
 #include "mongo/db/query/collection_query_info.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/sbe_plan_cache.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/s/sharding_state.h"
@@ -433,7 +434,8 @@ CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalRead(Pipeline*
     // Reparse 'pipeline' to discover whether there are secondary namespaces that we need to lock
     // when constructing our query executor.
     std::vector<NamespaceStringOrUUID> secondaryNamespaces = [&]() {
-        if (feature_flags::gFeatureFlagSBELookupPushdown.isEnabledAndIgnoreFCV()) {
+        if (feature_flags::gFeatureFlagSBELookupPushdown.isEnabledAndIgnoreFCV() &&
+            !internalQuerySlotBasedExecutionDisableLookupPushdown.load()) {
             auto lpp = LiteParsedPipeline(expCtx->ns, pipeline->serializeToBson());
             return lpp.getForeignExecutionNamespaces();
         } else {
