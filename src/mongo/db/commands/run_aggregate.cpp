@@ -673,7 +673,9 @@ Status runAggregate(OperationContext* opCtx,
     std::vector<NamespaceStringOrUUID> secondaryExecNssList;
 
     // Taking locks over multiple collections is not supported outside of $lookup pushdown.
-    if (feature_flags::gFeatureFlagSBELookupPushdown.isEnabledAndIgnoreFCV() &&
+    if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+        feature_flags::gFeatureFlagSBELookupPushdown.isEnabled(
+            serverGlobalParams.featureCompatibility) &&
         !internalQuerySlotBasedExecutionDisableLookupPushdown.load()) {
         secondaryExecNssList = liteParsedPipeline.getForeignExecutionNamespaces();
     }

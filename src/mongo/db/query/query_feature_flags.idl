@@ -132,7 +132,8 @@ feature_flags:
     featureFlagSBELookupPushdown:
       description: "Feature flag for allowing SBE $lookup pushdown"
       cpp_varname: gFeatureFlagSBELookupPushdown
-      default: false
+      default: true
+      version: 6.0
 
     featureFlagSearchShardedFacets:
       description: "Enable use of $$SEARCH_META on sharded collections"
