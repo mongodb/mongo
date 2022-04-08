@@ -392,7 +392,7 @@ private:
      */
     static void finishLeafNode(QuerySolutionNode* node,
                                const IndexEntry& index,
-                               const std::vector<interval_evaluation_tree::Builder>& ietBuilders);
+                               std::vector<interval_evaluation_tree::Builder> ietBuilders);
 
     /**
      * Fills in any missing bounds by calling finishLeafNode(...) for the scan contained in

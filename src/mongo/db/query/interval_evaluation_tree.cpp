@@ -157,8 +157,7 @@ public:
         auto expr = _inputParamIdMap[node.inputParamId()];
 
         OrderedIntervalList oil{};
-        IndexBoundsBuilder::BoundsTightness tightness;
-        IndexBoundsBuilder::translate(expr, _elt, _index, &oil, &tightness, nullptr);
+        IndexBoundsBuilder::translate(expr, _elt, _index, &oil);
         return oil;
     }
 

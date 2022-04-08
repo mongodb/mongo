@@ -116,6 +116,15 @@ public:
                           interval_evaluation_tree::Builder* ietBuilder);
 
     /**
+     * Turn the MatchExpression in 'expr' into a set of index bounds.  The field that 'expr' is
+     * concerned with is indexed according to the keypattern element 'elt' from index 'index'. This
+     * function is used to evaluate index bounds from cached Interval Evaluation Trees.
+     */
+    static void translate(const MatchExpression* expr,
+                          const BSONElement& elt,
+                          const IndexEntry& index,
+                          OrderedIntervalList* oilOut);
+    /**
      * Creates bounds for 'expr' (indexed according to 'elt').  Intersects those bounds
      * with the bounds in oilOut, which is an in/out parameter.
      *

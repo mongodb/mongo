@@ -33,6 +33,7 @@
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/index_entry.h"
+#include "mongo/db/query/interval_evaluation_tree.h"
 #include "mongo/db/query/query_solution.h"
 
 namespace mongo {
@@ -74,7 +75,8 @@ BoundsTightness translateWildcardIndexBoundsAndTightness(const IndexEntry& index
  * - Adds a new, empty entry to 'multikeyPaths' for '$_path'.
  * - Updates shouldDedup for index scan node.
  */
-void finalizeWildcardIndexScanConfiguration(IndexScanNode* scan);
+void finalizeWildcardIndexScanConfiguration(
+    IndexScanNode* scan, std::vector<interval_evaluation_tree::Builder>* ietBuilders);
 
 /**
  * Returns true if the given IndexScanNode is a $** scan whose bounds overlap the object type

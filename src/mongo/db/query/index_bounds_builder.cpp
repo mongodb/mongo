@@ -409,6 +409,14 @@ void IndexBoundsBuilder::translate(const MatchExpression* expr,
     }
 }
 
+void IndexBoundsBuilder::translate(const MatchExpression* expr,
+                                   const BSONElement& elt,
+                                   const IndexEntry& index,
+                                   OrderedIntervalList* oilOut) {
+    BoundsTightness tightnessOut;
+    _translatePredicate(expr, elt, index, oilOut, &tightnessOut, /*ietBuilder*/ nullptr);
+}
+
 namespace {
 IndexBoundsBuilder::BoundsTightness computeTightnessForTypeSet(const MatcherTypeSet& typeSet,
                                                                const IndexEntry& index) {

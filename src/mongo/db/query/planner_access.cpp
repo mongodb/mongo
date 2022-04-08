@@ -907,7 +907,7 @@ void QueryPlannerAccess::finishAndOutputLeaf(ScanBuildingState* scanState,
                                              vector<std::unique_ptr<QuerySolutionNode>>* out) {
     finishLeafNode(scanState->currentScan.get(),
                    scanState->indices[scanState->currentIndexNumber],
-                   scanState->ietBuilders);
+                   std::move(scanState->ietBuilders));
 
     if (MatchExpression::OR == scanState->root->matchType()) {
         if (orNeedsFetch(scanState)) {
@@ -941,7 +941,7 @@ void QueryPlannerAccess::finishAndOutputLeaf(ScanBuildingState* scanState,
 void QueryPlannerAccess::finishLeafNode(
     QuerySolutionNode* node,
     const IndexEntry& index,
-    const std::vector<interval_evaluation_tree::Builder>& ietBuilders) {
+    std::vector<interval_evaluation_tree::Builder> ietBuilders) {
     const StageType type = node->getType();
 
     if (STAGE_TEXT_MATCH == type) {
@@ -967,7 +967,7 @@ void QueryPlannerAccess::finishLeafNode(
 
         // If this is a $** index, update and populate the keyPattern, bounds, and multikeyPaths.
         if (index.type == IndexType::INDEX_WILDCARD) {
-            wcp::finalizeWildcardIndexScanConfiguration(scan);
+            wcp::finalizeWildcardIndexScanConfiguration(scan, &ietBuilders);
         }
     }
 
@@ -1357,9 +1357,9 @@ bool QueryPlannerAccess::processIndexScansElemMatch(
                 verify(IndexTag::kNoIndex == scanState->currentIndexNumber);
             }
 
-            scanState->currentIndexNumber = scanState->ixtag->index;
+            // Reset state before producing a new leaf.
+            scanState->resetForNextScan(scanState->ixtag, query.isParameterized());
 
-            scanState->tightness = IndexBoundsBuilder::INEXACT_FETCH;
             scanState->currentScan = makeLeafNode(query,
                                                   indices[scanState->currentIndexNumber],
                                                   scanState->ixtag->pos,
@@ -1668,7 +1668,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::_buildIndexedDataAccess(
 
             auto soln = makeLeafNode(query, index, tag->pos, root, &tightness, ietBuilder);
             verify(nullptr != soln);
-            finishLeafNode(soln.get(), index, ietBuilders);
+            finishLeafNode(soln.get(), index, std::move(ietBuilders));
 
             if (!ownedRoot) {
                 // We're performing access planning for the child of an array operator such as

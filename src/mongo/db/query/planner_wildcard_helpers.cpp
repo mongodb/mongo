@@ -449,7 +449,8 @@ BoundsTightness translateWildcardIndexBoundsAndTightness(const IndexEntry& index
     return (arrayIndicesTraversedByQuery.empty() ? tightnessIn : BoundsTightness::INEXACT_FETCH);
 }
 
-void finalizeWildcardIndexScanConfiguration(IndexScanNode* scan) {
+void finalizeWildcardIndexScanConfiguration(
+    IndexScanNode* scan, std::vector<interval_evaluation_tree::Builder>* ietBuilders) {
     IndexEntry* index = &scan->index;
     IndexBounds* bounds = &scan->bounds;
 
@@ -459,6 +460,9 @@ void finalizeWildcardIndexScanConfiguration(IndexScanNode* scan) {
     invariant(index->multikeyPaths.size() == 1);
     invariant(bounds && bounds->fields.size() == 1);
     invariant(bounds->fields.front().name == index->keyPattern.firstElementFieldName());
+    tassert(6536700,
+            "IET Builders list must be size of 1 or empty for wildcard indexes",
+            ietBuilders->empty() || ietBuilders->size() == 1);
 
     // For $** indexes, the IndexEntry key pattern is {'path.to.field': ±1} but the actual keys in
     // the index are of the form {'$_path': ±1, 'path.to.field': ±1}, where the value of the first
@@ -469,6 +473,9 @@ void finalizeWildcardIndexScanConfiguration(IndexScanNode* scan) {
     bounds->fields.insert(bounds->fields.begin(), {"$_path"});
     index->keyPattern =
         BSON("$_path" << index->keyPattern.firstElement() << index->keyPattern.firstElement());
+    if (!ietBuilders->empty()) {
+        ietBuilders->emplace(ietBuilders->begin());
+    }
 
     // Create a FieldRef to perform any necessary manipulations on the query path string.
     FieldRef queryPath{std::next(index->keyPattern.begin())->fieldNameStringData()};
