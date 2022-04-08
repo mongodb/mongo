@@ -58,6 +58,7 @@ constexpr StringData BUILTIN_ROLE_BACKUP = "backup"_sd;
 constexpr StringData BUILTIN_ROLE_RESTORE = "restore"_sd;
 constexpr StringData BUILTIN_ROLE_ENABLE_SHARDING = "enableSharding"_sd;
 constexpr StringData BUILTIN_ROLE_QUERYABLE_BACKUP = "__queryableBackup"_sd;
+constexpr StringData BUILTIN_ROLE_DIRECT_SHARD_OPERATIONS = "directShardOperations"_sd;
 
 /// Actions that the "read" role may perform on a normal resources of a specific database, and
 /// that the "readAnyDatabase" role may perform on normal resources of any database.
@@ -718,6 +719,10 @@ void addInternalRolePrivileges(PrivilegeVector* privileges) {
     auth::generateUniversalPrivileges(privileges);
 }
 
+// Placeholder role with no privileges for 6.0.0. From 7.0 onwards, this method will assign
+// the requisite privileges to write directly to shards.
+void addDirectShardOperationsPrivileges(PrivilegeVector* privileges) {}
+
 class BuiltinRoleDefinition {
 public:
     BuiltinRoleDefinition() = delete;
@@ -772,6 +777,7 @@ const std::map<StringData, BuiltinRoleDefinition> kBuiltinRoles({
     {BUILTIN_ROLE_RESTORE, {true, addRestorePrivileges}},
     {BUILTIN_ROLE_ROOT, {true, addRootRolePrivileges}},
     {BUILTIN_ROLE_INTERNAL, {true, addInternalRolePrivileges}},
+    {BUILTIN_ROLE_DIRECT_SHARD_OPERATIONS, {true, addDirectShardOperationsPrivileges}},
 });
 
 // $external is a virtual database used for X509, LDAP,

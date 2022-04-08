@@ -70,6 +70,7 @@ TEST(BuiltinRoles, BuiltinRolesOnlyOnAppropriateDatabases) {
     ASSERT(auth::isBuiltinRole(RoleName("clusterAdmin", "admin")));
     ASSERT(auth::isBuiltinRole(RoleName("root", "admin")));
     ASSERT(auth::isBuiltinRole(RoleName("__system", "admin")));
+    ASSERT(auth::isBuiltinRole(RoleName("directShardOperations", "admin")));
     ASSERT(!auth::isBuiltinRole(RoleName("MyRole", "admin")));
 }
 
