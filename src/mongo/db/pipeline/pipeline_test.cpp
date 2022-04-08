@@ -2650,7 +2650,6 @@ TEST(PipelineOptimizationTest, ChangeStreamLookupSwapsWithIndependentMatch) {
 
     // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
     // filters out newly added events.
-    RAIIServerParameterControllerForTest controller("featureFlagChangeStreamsVisibility", true);
     auto spec = BSON("$changeStream" << BSON(
                          "fullDocument"
                          << "updateLookup"
@@ -2682,7 +2681,6 @@ TEST(PipelineOptimizationTest, ChangeStreamLookupDoesNotSwapWithMatchOnPostImage
 
     // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
     // filters out newly added events.
-    RAIIServerParameterControllerForTest controller("featureFlagChangeStreamsVisibility", true);
     auto spec = BSON("$changeStream" << BSON(
                          "fullDocument"
                          << "updateLookup"
@@ -2712,7 +2710,6 @@ TEST(PipelineOptimizationTest, FullDocumentBeforeChangeLookupSwapsWithIndependen
 
     // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
     // filters out newly added events.
-    RAIIServerParameterControllerForTest controller("featureFlagChangeStreamsVisibility", true);
     auto spec = BSON("$changeStream" << BSON(
                          "fullDocumentBeforeChange"
                          << "required"
@@ -2744,7 +2741,6 @@ TEST(PipelineOptimizationTest, FullDocumentBeforeChangeDoesNotSwapWithMatchOnPre
 
     // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
     // filters out newly added events.
-    RAIIServerParameterControllerForTest controller("featureFlagChangeStreamsVisibility", true);
     auto spec = BSON("$changeStream" << BSON(
                          "fullDocumentBeforeChange"
                          << "required"

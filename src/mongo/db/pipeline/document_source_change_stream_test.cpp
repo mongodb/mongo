@@ -377,9 +377,6 @@ public:
         expCtx->ns = NamespaceString("a.collection");
         expCtx->inMongos = true;
 
-        // Always enable 'featureFlagChangeStreamsVisibility' since some tests rely on
-        // 'showExpandedEvents'.
-        RAIIServerParameterControllerForTest controller("featureFlagChangeStreamsVisibility", true);
         auto pipeline = Pipeline::parse(rawPipeline, expCtx);
         pipeline->optimizePipeline();
 
@@ -765,9 +762,6 @@ TEST_F(ChangeStreamStageTest, TransformUpdateFields) {
 }
 
 TEST_F(ChangeStreamStageTest, TransformUpdateFieldsShowExpandedEvents) {
-    // TODO SERVER-52254: Remove this feature flag.
-    RAIIServerParameterControllerForTest controller("featureFlagChangeStreamsVisibility", true);
-
     BSONObj o = BSON("$set" << BSON("y" << 1));
     BSONObj o2 = BSON("_id" << 1 << "x" << 2);
     auto updateField = makeOplogEntry(OpTypeEnum::kUpdate,  // op type
@@ -994,9 +988,6 @@ TEST_F(ChangeStreamStageTest, TransformReplace) {
 }
 
 TEST_F(ChangeStreamStageTest, TransformReplaceShowExpandedEvents) {
-    // TODO SERVER-52254: Remove this feature flag.
-    RAIIServerParameterControllerForTest controller("featureFlagChangeStreamsVisibility", true);
-
     BSONObj o = BSON("_id" << 1 << "x" << 2 << "y" << 1);
     BSONObj o2 = BSON("_id" << 1 << "x" << 2);
     auto replace = makeOplogEntry(OpTypeEnum::kUpdate,  // op type
@@ -1051,9 +1042,6 @@ TEST_F(ChangeStreamStageTest, TransformDelete) {
 }
 
 TEST_F(ChangeStreamStageTest, TransformDeleteShowExpandedEvents) {
-    // TODO SERVER-52254: Remove this feature flag.
-    RAIIServerParameterControllerForTest controller("featureFlagChangeStreamsVisibility", true);
-
     BSONObj o = BSON("_id" << 1 << "x" << 2);
     auto deleteEntry = makeOplogEntry(OpTypeEnum::kDelete,  // op type
                                       nss,                  // namespace
@@ -1140,9 +1128,6 @@ TEST_F(ChangeStreamStageTest, TransformDrop) {
 }
 
 TEST_F(ChangeStreamStageTest, TransformDropShowExpandedEvents) {
-    // TODO SERVER-52254: Remove this feature flag.
-    RAIIServerParameterControllerForTest controller("featureFlagChangeStreamsVisibility", true);
-
     OplogEntry dropColl = createCommand(BSON("drop" << nss.coll()), testUuid());
 
     Document expectedDrop{
@@ -1167,8 +1152,6 @@ TEST_F(ChangeStreamStageTest, TransformDropShowExpandedEvents) {
 }
 
 TEST_F(ChangeStreamStageTest, TransformCreate) {
-    RAIIServerParameterControllerForTest controller("featureFlagChangeStreamsVisibility", true);
-
     OplogEntry create =
         createCommand(BSON("create" << nss.coll() << "idIndex"
                                     << BSON("v" << 2 << "key" << BSON("id" << 1)) << "name"
@@ -1219,9 +1202,6 @@ TEST_F(ChangeStreamStageTest, TransformRename) {
 }
 
 TEST_F(ChangeStreamStageTest, TransformRenameShowExpandedEvents) {
-    // TODO SERVER-52254: Remove this feature flag.
-    RAIIServerParameterControllerForTest controller("featureFlagChangeStreamsVisibility", true);
-
     NamespaceString otherColl("test.bar");
     auto dropTarget = UUID::gen();
     OplogEntry rename = createCommand(BSON("renameCollection" << nss.ns() << "to" << otherColl.ns()
@@ -2217,8 +2197,6 @@ TEST_F(ChangeStreamStageTest, TransformApplyOps) {
 }
 
 TEST_F(ChangeStreamStageTest, TransformApplyOpsWithCreateOperation) {
-    RAIIServerParameterControllerForTest controller("featureFlagChangeStreamsVisibility", true);
-
     // Doesn't use the checkTransformation() pattern that other tests use since we expect multiple
     // documents to be returned from one applyOps.
 
@@ -2828,9 +2806,6 @@ TEST_F(ChangeStreamStageDBTest, TransformInsert) {
 }
 
 TEST_F(ChangeStreamStageDBTest, TransformInsertShowExpandedEvents) {
-    // TODO SERVER-52254: Remove this feature flag.
-    RAIIServerParameterControllerForTest controller("featureFlagChangeStreamsVisibility", true);
-
     auto insert = makeOplogEntry(OpTypeEnum::kInsert,
                                  nss,
                                  BSON("_id" << 1 << "x" << 2),
@@ -3109,9 +3084,6 @@ TEST_F(ChangeStreamStageDBTest, TransformDropDatabase) {
 }
 
 TEST_F(ChangeStreamStageDBTest, TransformDropDatabaseShowExpandedEvents) {
-    // TODO SERVER-52254: Remove this feature flag.
-    RAIIServerParameterControllerForTest controller("featureFlagChangeStreamsVisibility", true);
-
     OplogEntry dropDB = createCommand(BSON("dropDatabase" << 1), boost::none, false);
 
     // Drop database entry doesn't have a UUID.
