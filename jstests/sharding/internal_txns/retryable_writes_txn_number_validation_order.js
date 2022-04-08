@@ -8,7 +8,7 @@
  * for writes without a txnNumber (i.e. non-retryable writes) against the txnNumber in
  * the parent session and the txnNumber in the lsids for internal transactions for retryable writes.
  *
- * @tags: [requires_fcv_52, featureFlagInternalTransactions]
+ * @tags: [requires_fcv_60]
  */
 (function() {
 'use strict';

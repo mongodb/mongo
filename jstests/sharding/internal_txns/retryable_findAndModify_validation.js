@@ -2,7 +2,7 @@
  * Tests that it is invalid to commit a retryable internal transaction with multiple findAndModify
  * pre or post images.
  *
- * @tags: [requires_fcv_51, featureFlagInternalTransactions]
+ * @tags: [requires_fcv_60]
  */
 (function() {
 'use strict';

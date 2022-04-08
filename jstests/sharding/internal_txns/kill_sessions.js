@@ -1,7 +1,7 @@
 /*
  * Tests running killSessions to kill internal sessions on both mongos and mongod.
  *
- * @tags: [requires_fcv_51, featureFlagInternalTransactions]
+ * @tags: [requires_fcv_60]
  */
 (function() {
 'use strict';

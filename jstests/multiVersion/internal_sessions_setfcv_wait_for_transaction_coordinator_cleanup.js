@@ -1,7 +1,7 @@
 /*
  * Tests that setFCV waits for transaction coordinators for internal transactions to be removed.
  *
- * @tags: [requires_fcv_51, featureFlagInternalTransactions]
+ * @tags: [requires_fcv_60]
  */
 
 (function() {

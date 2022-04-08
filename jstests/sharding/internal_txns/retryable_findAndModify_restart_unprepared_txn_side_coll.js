@@ -2,7 +2,7 @@
  * Tests that unprepared retryable internal transactions for findAndModify on a shard with image
  * collection enabled are retryable across restart.
  *
- * @tags: [requires_fcv_53, featureFlagInternalTransactions]
+ * @tags: [requires_fcv_60]
  */
 (function() {
 'use strict';

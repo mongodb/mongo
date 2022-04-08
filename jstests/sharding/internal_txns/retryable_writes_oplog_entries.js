@@ -2,7 +2,7 @@
  * Tests that the stmtIds for write statements in an internal transaction for retryable writes
  * are stored in the individual operation entries in the applyOps oplog entry for the transaction.
  *
- * @tags: [requires_fcv_51, featureFlagInternalTransactions]
+ * @tags: [requires_fcv_60, uses_transactions]
  */
 (function() {
 'use strict';

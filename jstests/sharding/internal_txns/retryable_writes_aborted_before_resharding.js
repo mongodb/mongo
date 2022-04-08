@@ -3,7 +3,7 @@
  * transactions that start and abort on the donor(s) before resharding are not retryable on the
  * recipient after resharding.
  *
- * @tags: [requires_fcv_53, featureFlagInternalTransactions]
+ * @tags: [requires_fcv_60]
  */
 (function() {
 "use strict";

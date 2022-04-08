@@ -17,7 +17,6 @@ selector:
   exclude_with_any_tags:
   - assumes_standalone_mongod
   # TODO (SERVER-64506): make groupOplogEntries WUOW's nestable (e.g. inside multi-doc txns).
-  - featureFlagInternalTransactions
   - uses_multi_shard_transaction
   - uses_prepare_transaction
   - uses_transactions

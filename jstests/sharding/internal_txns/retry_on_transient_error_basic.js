@@ -3,7 +3,7 @@
  * can be retried on a replica set and that its txnRetryCounter is persisted correctly
  * on all nodes.
  *
- * @tags: [requires_fcv_51, featureFlagInternalTransactions]
+ * @tags: [requires_fcv_60]
  */
 (function() {
 'use strict';

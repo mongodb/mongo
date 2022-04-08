@@ -3,7 +3,7 @@
  * disabled inside internal transactions that start and commit on the donor during a chunk migration
  * are retryable on the recipient after the migration.
  *
- * @tags: [requires_fcv_53, featureFlagInternalTransactions]
+ * @tags: [requires_fcv_60]
  */
 (function() {
 "use strict";

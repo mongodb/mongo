@@ -4,8 +4,8 @@
  *
  * @tags: [
  * requires_fcv_60,
- * featureFlagInternalTransactions,
- * featureFlagChangeStreamPreAndPostImages
+ * featureFlagChangeStreamPreAndPostImages,
+ * uses_transactions,
  * ]
  */
 (function() {

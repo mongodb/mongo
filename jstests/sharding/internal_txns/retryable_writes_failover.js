@@ -2,7 +2,7 @@
  * Tests that retryable internal transactions for insert, update and delete are retryable across
  * failover.
  *
- * @tags: [requires_fcv_51, featureFlagInternalTransactions]
+ * @tags: [requires_fcv_60, uses_transactions]
  */
 (function() {
 'use strict';

@@ -38,7 +38,8 @@ feature_flags:
     featureFlagInternalTransactions:
         description: Feature flag for enabling internal transactions.
         cpp_varname: gFeatureFlagInternalTransactions
-        default: false
+        default: true
+        version: 6.0
 
     featureFlagUpdateDocumentShardKeyUsingTransactionApi:
         description: Feature flag to enable usage of the transaction api for update findAndModify and update commands that change a document's shard key.

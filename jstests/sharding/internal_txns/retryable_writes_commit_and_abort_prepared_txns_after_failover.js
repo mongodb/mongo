@@ -3,7 +3,7 @@
  * "cross-session" write statement execution works as expected after the transaction commits or
  * aborts.
  *
- * @tags: [requires_fcv_53, featureFlagInternalTransactions]
+ * @tags: [requires_fcv_60]
  */
 (function() {
 "use strict";

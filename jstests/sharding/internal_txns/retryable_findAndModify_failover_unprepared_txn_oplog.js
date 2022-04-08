@@ -2,7 +2,7 @@
  * Tests that unprepared retryable internal transactions for findAndModify on a shard with image
  * collection disabled are retryable across failover.
  *
- * @tags: [requires_fcv_53, featureFlagInternalTransactions]
+ * @tags: [requires_fcv_60]
  */
 (function() {
 'use strict';

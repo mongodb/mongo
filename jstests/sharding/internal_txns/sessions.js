@@ -1,7 +1,7 @@
 /*
  * Tests basic support for internal sessions.
  *
- * @tags: [requires_fcv_51, featureFlagInternalTransactions]
+ * @tags: [requires_fcv_60]
  */
 (function() {
 'use strict';

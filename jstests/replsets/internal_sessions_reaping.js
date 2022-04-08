@@ -3,7 +3,7 @@
  * child sessions is tied to the lifetime of the config.system.sessions entry for their parent
  * sessions.
  *
- * @tags: [requires_fcv_51, featureFlagInternalTransactions]
+ * @tags: [requires_fcv_60]
  */
 
 (function() {

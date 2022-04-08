@@ -8,6 +8,7 @@
  *  requires_sharding,
  *  assumes_balancer_off,
  *  uses_transactions,
+ *  featureFlagUpdateDocumentShardKeyUsingTransactionApi,
  * ]
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');
@@ -480,13 +481,15 @@ var $config = extendWorkload($config, function($config, $super) {
         }
         db.printShardingStatus();
 
-        const parameterRes = db.adminCommand({getParameter: 1, featureFlagInternalTransactions: 1});
+        const parameterRes = db.adminCommand(
+            {getParameter: 1, featureFlagUpdateDocumentShardKeyUsingTransactionApi: 1});
         if (!parameterRes.ok) {
             assert.eq(parameterRes.errmsg, "no option found to get", parameterRes);
             this.internalTransactionsEnabled = false;
         } else {
             assert.commandWorked(parameterRes);
-            this.internalTransactionsEnabled = parameterRes.featureFlagInternalTransactions.value;
+            this.internalTransactionsEnabled =
+                parameterRes.featureFlagUpdateDocumentShardKeyUsingTransactionApi.value;
         }
         print("Internal transactions enabled: " + this.internalTransactionsEnabled);
     };

@@ -9,6 +9,7 @@
  *  requires_sharding,
  *  assumes_balancer_off,
  *  uses_transactions,
+ *  featureFlagUpdateDocumentShardKeyUsingTransactionApi,
  * ]
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');

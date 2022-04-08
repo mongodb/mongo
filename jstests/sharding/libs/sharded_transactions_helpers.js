@@ -268,3 +268,12 @@ function areInternalTransactionsEnabled(conn) {
             .commandWorked(conn.adminCommand({getParameter: 1, featureFlagInternalTransactions: 1}))
             .featureFlagInternalTransactions.value;
 }
+
+function isUpdateDocumentShardKeyUsingTransactionApiEnabled(conn) {
+    return jsTestOptions().mongosBinVersion !== "last-lts" &&
+        jsTestOptions().mongosBinVersion !== "last-continuous" &&
+        assert
+            .commandWorked(conn.adminCommand(
+                {getParameter: 1, featureFlagUpdateDocumentShardKeyUsingTransactionApi: 1}))
+            .featureFlagUpdateDocumentShardKeyUsingTransactionApi.value;
+}

@@ -2,7 +2,7 @@
  * Test that prepared retryable internal transactions with a findAndModify statement can commit and
  * abort after failover.
  *
- * @tags: [requires_fcv_53, featureFlagInternalTransactions]
+ * @tags: [requires_fcv_60]
  */
 (function() {
 'use strict';

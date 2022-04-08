@@ -3,7 +3,7 @@
  * its shard key value during resharding is not retryable on the recipient after resharding
  * completes.
  *
- * @tags: [requires_fcv_53, featureFlagInternalTransactions]
+ * @tags: [requires_fcv_60, featureFlagUpdateDocumentShardKeyUsingTransactionApi]
  */
 (function() {
 

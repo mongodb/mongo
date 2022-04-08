@@ -3,6 +3,7 @@
 // insert, delete pair.
 // @tags: [
 //   uses_atclustertime,
+//   featureFlagUpdateDocumentShardKeyUsingTransactionApi,
 // ]
 //
 

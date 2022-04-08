@@ -6,7 +6,7 @@
  * This test verifies this behavior with internal transactions in sessions with
  * retryableWrite: {false, true}, distinguished through the specification of txnNumber in their
  * lsids. Variables named with 0 correlates to the former and 1 with the latter.
- * @tags: [featureFlagInternalTransactions]
+ * @tags: [requires_fcv_60]
  */
 (function() {
 'use strict';

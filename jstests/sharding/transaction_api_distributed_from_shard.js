@@ -1,7 +1,7 @@
 /**
  * Tests that the transaction API can be used for distributed transactions initiated from a shard.
  *
- * @tags: [requires_fcv_53, featureFlagInternalTransactions]
+ * @tags: [requires_fcv_60]
  */
 (function() {
 "use strict";

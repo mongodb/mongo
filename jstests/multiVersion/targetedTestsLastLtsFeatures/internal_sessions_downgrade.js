@@ -2,7 +2,7 @@
  * Test that internal sessions documents are properly removed from the config.transactions
  * collection.
  *
- * @tags: [featureFlagInternalTransactions]
+ * @tags: [requires_fcv_60]
  */
 (function() {
 'use strict';

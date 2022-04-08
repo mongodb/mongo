@@ -4,6 +4,7 @@
  * @tags: [
  *   uses_multi_shard_transaction,
  *   uses_transactions,
+ *   featureFlagUpdateDocumentShardKeyUsingTransactionApi,
  * ]
  */
 
@@ -19,19 +20,25 @@ const st = new ShardingTest({
     rsOptions:
         {setParameter: {maxTransactionLockRequestTimeoutMillis: ReplSetTest.kDefaultTimeoutMS}}
 });
-const internalTransactionsEnabled = areInternalTransactionsEnabled(st.s);
+
 const kDbName = 'db';
 const mongos = st.s0;
 const shard0 = st.shard0.shardName;
 const shard1 = st.shard1.shardName;
 const ns = kDbName + '.foo';
 
+const updateDocumentShardKeyUsingTransactionApiEnabled =
+    isUpdateDocumentShardKeyUsingTransactionApiEnabled(st.s);
+
 enableCoordinateCommitReturnImmediatelyAfterPersistingDecision(st);
 assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
 st.ensurePrimaryShard(kDbName, shard0);
 
-function changeShardKeyWhenFailpointsSet(
-    session, sessionDB, runInTxn, isFindAndModify, internalTransactionsEnabled) {
+function changeShardKeyWhenFailpointsSet(session,
+                                         sessionDB,
+                                         runInTxn,
+                                         isFindAndModify,
+                                         updateDocumentShardKeyUsingTransactionApiEnabled) {
     const docsToInsert = [{"x": 4, "a": 3}, {"x": 100}, {"x": 300, "a": 3}, {"x": 500, "a": 6}];
     const splitDoc = {x: 100};
     shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, splitDoc, {"x": 300});
@@ -47,7 +54,7 @@ function changeShardKeyWhenFailpointsSet(
         }
     }));
     if (isFindAndModify) {
-        if (!runInTxn && internalTransactionsEnabled) {
+        if (!runInTxn && updateDocumentShardKeyUsingTransactionApiEnabled) {
             // Internal transactions will retry internally with the transaction API.
             runFindAndModifyCmdSuccess(st,
                                        kDbName,
@@ -64,7 +71,7 @@ function changeShardKeyWhenFailpointsSet(
                 st, kDbName, session, sessionDB, runInTxn, {x: 300}, {$set: {x: 30}}, false);
         }
     } else {
-        if (!runInTxn && internalTransactionsEnabled) {
+        if (!runInTxn && updateDocumentShardKeyUsingTransactionApiEnabled) {
             // Internal transactions will retry internally with the transaction API.
             runUpdateCmdSuccess(st,
                                 kDbName,
@@ -241,8 +248,11 @@ changeShardKeyOptions.forEach(function(updateConfig) {
                 st, kDbName, ns, session, sessionDB, runInTxn, {"x": 300}, {"$set": {"x": 30}});
         }
 
-        changeShardKeyWhenFailpointsSet(
-            session, sessionDB, runInTxn, isFindAndModify, internalTransactionsEnabled);
+        changeShardKeyWhenFailpointsSet(session,
+                                        sessionDB,
+                                        runInTxn,
+                                        isFindAndModify,
+                                        updateDocumentShardKeyUsingTransactionApiEnabled);
     }
 });
 

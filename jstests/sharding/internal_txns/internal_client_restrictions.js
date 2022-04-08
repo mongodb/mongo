@@ -1,7 +1,7 @@
 /*
  * Tests internal client validation properties for txnRetryCounter.
  *
- * @tags: [requires_fcv_51, featureFlagInternalTransactions]
+ * @tags: [requires_fcv_60]
  */
 (function() {
 "use strict";

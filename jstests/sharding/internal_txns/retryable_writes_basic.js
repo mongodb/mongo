@@ -2,7 +2,7 @@
  * Tests that retryable internal transactions for insert, update and delete are retryable and
  * other kinds of transactions for insert, update and delete are not retryable.
  *
- * @tags: [requires_fcv_51, featureFlagInternalTransactions]
+ * @tags: [requires_fcv_60, uses_transactions]
  */
 (function() {
 'use strict';
