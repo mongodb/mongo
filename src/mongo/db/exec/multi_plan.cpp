@@ -50,14 +50,12 @@
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/query/plan_ranker_util.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/histogram.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
 
-using std::endl;
-using std::list;
 using std::unique_ptr;
-using std::vector;
 
 // static
 const char* MultiPlanStage::kStageType = "MULTI_PLAN";
@@ -69,6 +67,65 @@ void markShouldCollectTimingInfoOnSubtree(PlanStage* root) {
         markShouldCollectTimingInfoOnSubtree(child.get());
     }
 }
+
+Counter64 classicMicrosTotal;
+Counter64 classicWorksTotal;
+Counter64 classicCount;
+
+Histogram<uint64_t> classicMicrosHistogram{{0,
+                                            1024,
+                                            4096,
+                                            16384,
+                                            65536,
+                                            262144,
+                                            1048576,
+                                            4194304,
+                                            16777216,
+                                            67108864,
+                                            268435456,
+                                            1073741824}};
+Histogram<uint64_t> classicWorksHistogram{{0, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768}};
+Histogram<uint64_t> classicNumPlansHistogram{{0, 2, 4, 8, 16, 32}};
+
+/**
+ * Aggregation of the total number of microseconds spent (in the classic multiplanner).
+ */
+ServerStatusMetricField<Counter64> classicMicrosTotalDisplay("query.multiPlanner.classicMicros",
+                                                             &classicMicrosTotal);
+
+/**
+ * Aggregation of the total number of "works" performed (in the classic multiplanner).
+ */
+ServerStatusMetricField<Counter64> classicWorksTotalDisplay("query.multiPlanner.classicWorks",
+                                                            &classicWorksTotal);
+
+/**
+ * Aggregation of the total number of invocations (of the classic multiplanner).
+ */
+ServerStatusMetricField<Counter64> classicCountDisplay("query.multiPlanner.classicCount",
+                                                       &classicCount);
+
+/**
+ * An element in this histogram is the number of microseconds spent in an invocation (of the
+ * classic multiplanner).
+ */
+ServerStatusMetricField<Histogram<uint64_t>> classicMicrosHistogramDisplay(
+    "query.multiPlanner.histograms.classicMicros", classicMicrosHistogram);
+
+/**
+ * An element in this histogram is the number of "works" performed during an invocation (of the
+ * classic multiplanner).
+ */
+ServerStatusMetricField<Histogram<uint64_t>> classicWorksHistogramDisplay(
+    "query.multiPlanner.histograms.classicWorks", classicWorksHistogram);
+
+/**
+ * An element in this histogram is the number of plans in the candidate set of an invocation (of the
+ * classic multiplanner).
+ */
+ServerStatusMetricField<Histogram<uint64_t>> classicNumPlansHistogramDisplay(
+    "query.multiPlanner.histograms.classicNumPlans", classicNumPlansHistogram);
+
 }  // namespace
 
 MultiPlanStage::MultiPlanStage(ExpressionContext* expCtx,
@@ -163,6 +220,12 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
     // make sense.
     auto optTimer = getOptTimer();
 
+    auto tickSource = opCtx()->getServiceContext()->getTickSource();
+    auto startTicks = tickSource->getTicks();
+
+    classicNumPlansHistogram.increment(_candidates.size());
+    classicCount.increment();
+
     const size_t numWorks =
         trial_period::getTrialPeriodMaxWorks(opCtx(),
                                              collection(),
@@ -172,15 +235,24 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
 
     try {
         // Work the plans, stopping when a plan hits EOF or returns some fixed number of results.
-        for (size_t ix = 0; ix < numWorks; ++ix) {
+        size_t ix = 0;
+        for (; ix < numWorks; ++ix) {
             bool moreToDo = workAllPlans(numResults, yieldPolicy);
             if (!moreToDo) {
                 break;
             }
         }
+        auto totalWorks = ix * _candidates.size();
+        classicWorksHistogram.increment(totalWorks);
+        classicWorksTotal.increment(totalWorks);
     } catch (DBException& e) {
         return e.toStatus().withContext("error while multiplanner was selecting best plan");
     }
+
+    auto durationMicros = durationCount<Microseconds>(
+        tickSource->ticksTo<Microseconds>(tickSource->getTicks() - startTicks));
+    classicMicrosHistogram.increment(durationMicros);
+    classicMicrosTotal.increment(durationMicros);
 
     // After picking best plan, ranking will own plan stats from candidate solutions (winner and
     // losers).
