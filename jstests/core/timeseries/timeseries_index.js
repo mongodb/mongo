@@ -294,5 +294,13 @@ TimeseriesTest.run((insert) => {
 
     // Cannot directly create a "2dsphere_bucket" index.
     testCreateIndexFailed({"loc": "2dsphere_bucket"});
+
+    // {} is not a valid index spec.
+    testCreateIndexFailed({});
+
+    // Hints are not valid index specs.
+    testCreateIndexFailed({$natural: 1});
+    testCreateIndexFailed({$natural: -1});
+    testCreateIndexFailed({$hint: 'my_index_name'});
 });
 })();

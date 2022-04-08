@@ -68,16 +68,27 @@ std::pair<std::string, std::string> extractControlPrefixAndKey(const StringData&
     return {std::string(field.begin(), fieldIt + 1), std::string(fieldIt + 1, field.end())};
 }
 
+/**
+ * Converts an event-level index spec to a bucket-level index spec.
+ *
+ * If the input is not a valid index spec, this function must either:
+ *  - return an error Status
+ *  - return an invalid index spec
+ */
 StatusWith<BSONObj> createBucketsSpecFromTimeseriesSpec(const TimeseriesOptions& timeseriesOptions,
                                                         const BSONObj& timeseriesIndexSpecBSON,
                                                         bool isShardKeySpec) {
-    tassert(6390200, "Empty object is not a valid index spec", !timeseriesIndexSpecBSON.isEmpty());
-    tassert(6390201,
+    if (timeseriesIndexSpecBSON.isEmpty()) {
+        return {ErrorCodes::BadValue, "Empty object is not a valid index spec"_sd};
+    }
+    if (timeseriesIndexSpecBSON.firstElement().fieldNameStringData() == "$hint"_sd ||
+        timeseriesIndexSpecBSON.firstElement().fieldNameStringData() == "$natural"_sd) {
+        return {
+            ErrorCodes::BadValue,
             str::stream() << "Invalid index spec (perhaps it's a valid hint, that was incorrectly "
                           << "passed to createBucketsSpecFromTimeseriesSpec): "
-                          << timeseriesIndexSpecBSON,
-            timeseriesIndexSpecBSON.firstElement().fieldNameStringData() != "$hint"_sd &&
-                timeseriesIndexSpecBSON.firstElement().fieldNameStringData() != "$natural"_sd);
+                          << timeseriesIndexSpecBSON};
+    }
 
     auto timeField = timeseriesOptions.getTimeField();
     auto metaField = timeseriesOptions.getMetaField();
