@@ -80,11 +80,12 @@ const res = assert.commandWorked(initialSyncNode.adminCommand({replSetGetStatus:
 
 // The initial sync should have failed.
 assert.eq(res.initialSyncStatus.failedInitialSyncAttempts, 1);
-beforeFinishFailPoint.off();
-
-// Release the initial sync source and sync node oplog fetcher so the test completes.
+// Release the sync node oplog fetcher so the test completes.
 assert.commandWorked(initialSyncNodeDb.adminCommand(
     {configureFailPoint: "hangBeforeStartingOplogFetcher", mode: "off"}));
+beforeFinishFailPoint.off();
+
+// Release the initial sync source so the test completes.
 assert.commandWorked(initialSyncSource.getDB("admin").adminCommand(
     {configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}));
 
