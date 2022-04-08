@@ -325,6 +325,10 @@ struct StageConstraints {
     // Indicates that a stage is allowed within a pipeline-stlye update.
     bool isAllowedWithinUpdatePipeline = false;
 
+    // Indicates that a stage does not modify anything to do with a sort and can be done before a
+    // following merge sort.
+    bool preservesOrderAndMetadata = false;
+
     bool operator==(const StageConstraints& other) const {
         return requiredPosition == other.requiredPosition &&
             hostRequirement == other.hostRequirement && diskRequirement == other.diskRequirement &&
@@ -337,7 +341,8 @@ struct StageConstraints {
             canSwapWithMatch == other.canSwapWithMatch &&
             canSwapWithLimitAndSample == other.canSwapWithLimitAndSample &&
             isAllowedWithinUpdatePipeline == other.isAllowedWithinUpdatePipeline &&
-            unionRequirement == other.unionRequirement;
+            unionRequirement == other.unionRequirement &&
+            preservesOrderAndMetadata == other.preservesOrderAndMetadata;
     }
 };
 }  // namespace mongo

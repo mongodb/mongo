@@ -143,7 +143,7 @@ public:
         // Also add logic to the shards to ensure that each shard has enough oplog history to resume
         // the change stream.
         logic.shardsStage = DocumentSourceCheckResumability::create(pExpCtx, _tokenFromClient);
-        logic.inputSortPattern = change_stream_constants::kSortSpec;
+        logic.mergeSortPattern = change_stream_constants::kSortSpec;
         return logic;
     };
 
