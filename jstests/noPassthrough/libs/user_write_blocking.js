@@ -124,6 +124,10 @@ const UserWriteBlockHelpers = (function() {
         stop() {
             throw "UNIMPLEMENTED";
         }
+
+        setProfilingLevel(level) {
+            throw "UNIMPLEMENTED";
+        }
     }
 
     class ReplicaFixture extends Fixture {
@@ -210,6 +214,11 @@ const UserWriteBlockHelpers = (function() {
         stop() {
             this.rst.stopSet();
         }
+
+        setProfilingLevel(level) {
+            return assert.commandWorked(
+                this.adminConn.getDB(jsTestName()).setProfilingLevel(level));
+        }
     }
 
     class ShardingFixture extends Fixture {
@@ -244,6 +253,12 @@ const UserWriteBlockHelpers = (function() {
 
         stop() {
             this.st.stop();
+        }
+
+        setProfilingLevel(level) {
+            const backend = this.st.rs0.getPrimary();
+            return authutil.asCluster(
+                backend, keyfile, () => backend.getDB(jsTestName()).setProfilingLevel(level));
         }
     }
 

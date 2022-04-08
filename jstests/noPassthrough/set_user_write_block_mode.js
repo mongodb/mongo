@@ -134,6 +134,31 @@ function testCheckedOps(conn, shouldSucceed, expectedFailure) {
     assertState();
 }
 
+// Checks that an unprivileged user's operations can be logged on the profiling collection.
+function testProfiling(fixture) {
+    const collName = 'foo';
+    fixture.asAdmin(({db}) => {
+        assert.commandWorked(db[collName].insert({x: 1}));
+    });
+
+    // Enable profiling.
+    const prevProfilingLevel = fixture.setProfilingLevel(2).was;
+
+    // Perform a find() as an unprivileged user.
+    const comment = UUID();
+    fixture.asUser(({db}) => {
+        db[collName].find().comment(comment).itcount();
+    });
+
+    // Check that the find() was logged on the profiling collection.
+    fixture.asAdmin(({db}) => {
+        assert.eq(1, db.system.profile.find({'command.comment': comment}).itcount());
+    });
+
+    // Restore the original profiling level.
+    fixture.setProfilingLevel(prevProfilingLevel);
+}
+
 function runTest(fixture) {
     fixture.asAdmin(({conn}) => setupForTesting(conn));
 
@@ -158,6 +183,9 @@ function runTest(fixture) {
     // Now with setUserWriteBlockMode enabled, ensure that only the bypassUser can CUD
     fixture.asAdmin(({conn}) => testCheckedOps(conn, true));
     fixture.asUser(({conn}) => testCheckedOps(conn, false, ErrorCodes.UserWritesBlocked));
+
+    // Ensure that profiling works while user writes are blocked.
+    testProfiling(fixture);
 
     // Restarting the cluster has no impact, as write block state is durable
     fixture.restart();

@@ -235,6 +235,12 @@ TEST_F(UserWriteBlockModeOpObserverTest, WriteBlockingEnabledNoBypass) {
 
     // Ensure that CUD ops from migrations succeed
     runCUD(opCtx.get(), NamespaceString("a.b"), true, true /* fromMigrate */);
+
+    // Ensure that writes to the <db>.system.profile collections are always allowed
+    runCUD(opCtx.get(),
+           NamespaceString("a.system.profile"),
+           true /* shouldSucceed */,
+           false /* fromMigrate */);
 }
 
 TEST_F(UserWriteBlockModeOpObserverTest, WriteBlockingEnabledWithBypass) {

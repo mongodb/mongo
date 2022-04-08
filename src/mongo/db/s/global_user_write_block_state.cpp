@@ -62,7 +62,8 @@ void GlobalUserWriteBlockState::checkUserWritesAllowed(OperationContext* opCtx,
     uassert(ErrorCodes::UserWritesBlocked,
             "User writes blocked",
             !_globalUserWritesBlocked || WriteBlockBypass::get(opCtx).isWriteBlockBypassEnabled() ||
-                nss.isOnInternalDb() || nss.isTemporaryReshardingCollection());
+                nss.isOnInternalDb() || nss.isTemporaryReshardingCollection() ||
+                nss.isSystemDotProfile());
 }
 
 bool GlobalUserWriteBlockState::isUserWriteBlockingEnabled(OperationContext* opCtx) const {
