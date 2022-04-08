@@ -48,15 +48,41 @@ constexpr StringData ResumeToken::kTypeBitsFieldName;
 
 namespace {
 // Helper function for makeHighWaterMarkToken and isHighWaterMarkToken.
-ResumeTokenData makeHighWaterMarkResumeTokenData(Timestamp clusterTime,
-                                                 boost::optional<UUID> uuid) {
+ResumeTokenData makeHighWaterMarkResumeTokenData(Timestamp clusterTime, int version) {
     ResumeTokenData tokenData;
     tokenData.clusterTime = clusterTime;
     tokenData.tokenType = ResumeTokenData::kHighWaterMarkToken;
-    tokenData.uuid = uuid;
+    tokenData.version = version;
     return tokenData;
 }
 }  // namespace
+
+ResumeTokenData::ResumeTokenData(Timestamp clusterTimeIn,
+                                 int versionIn,
+                                 size_t txnOpIndexIn,
+                                 const boost::optional<UUID>& uuidIn,
+                                 StringData opType,
+                                 Value documentKey,
+                                 Value opDescription)
+    : clusterTime(clusterTimeIn), version(versionIn), txnOpIndex(txnOpIndexIn), uuid(uuidIn) {
+    tassert(6280100,
+            "both documentKey and operationDescription cannot be present for an event",
+            documentKey.missing() || opDescription.missing());
+
+    // For v1 classic change events, the eventIdentifier is always the documentKey, even if missing.
+    if (change_stream_legacy::kClassicOperationTypes.count(opType) && version <= 1) {
+        eventIdentifier = documentKey;
+        return;
+    }
+
+    // If we are here, then this is either a v2 classic event or an expanded event. In both cases,
+    // the resume token is the operationType plus the documentKey or operationDescription.
+    auto opDescOrDocKey = documentKey.missing()
+        ? std::make_pair("operationDescription"_sd, opDescription)
+        : std::make_pair("documentKey"_sd, documentKey);
+
+    eventIdentifier = Value(Document{{"operationType"_sd, opType}, std::move(opDescOrDocKey)});
+};
 
 bool ResumeTokenData::operator==(const ResumeTokenData& other) const {
     return clusterTime == other.clusterTime && version == other.version &&
@@ -110,14 +136,33 @@ ResumeToken::ResumeToken(const ResumeTokenData& data) {
     if (data.version >= 1) {
         builder.appendBool("", data.fromInvalidate);
     }
+
+    // High water mark tokens only populate the clusterTime, version, and tokenType fields.
+    uassert(6189505,
+            "Invalid high water mark token",
+            !(data.tokenType == ResumeTokenData::TokenType::kHighWaterMarkToken &&
+              (data.txnOpIndex > 0 || data.fromInvalidate || data.uuid ||
+               !data.eventIdentifier.missing())));
+
+    // From v2 onwards, tokens may have an eventIdentifier but no UUID.
     uassert(50788,
             "Unexpected resume token with a eventIdentifier but no UUID",
-            data.uuid || data.eventIdentifier.missing());
+            data.uuid || data.eventIdentifier.missing() || data.version >= 2);
 
+    // From v2 onwards, all non-high-water-mark tokens must have an eventIdentifier.
+    uassert(6189502,
+            "Expected an eventIdentifier for an event resume token",
+            !(data.tokenType == ResumeTokenData::TokenType::kEventToken &&
+              data.eventIdentifier.missing() && data.version >= 2));
+
+    // From v2 onwards, a missing UUID is encoded as explicitly null.
     if (data.uuid) {
         data.uuid->appendToBuilder(&builder, "");
+    } else if (data.version >= 2) {
+        builder.appendNull("");
     }
     data.eventIdentifier.addToBsonObj(&builder, "");
+
     auto keyObj = builder.obj();
     KeyString::Builder encodedToken(KeyString::Version::V1, keyObj, Ordering::make(BSONObj()));
     _hexKeyString = hexblob::encode(encodedToken.getBuffer(), encodedToken.getSize());
@@ -171,8 +216,8 @@ ResumeTokenData ResumeToken::getData() const {
             versionElt.type() == BSONType::NumberInt);
     result.version = versionElt.numberInt();
     uassert(50795,
-            "Invalid Resume Token: only supports version 0 or 1",
-            result.version == 0 || result.version == 1);
+            "Invalid Resume Token: only supports version 0, 1 and 2",
+            result.version == 0 || result.version == 1 || result.version == 2);
 
     if (result.version >= 1) {
         // The 'tokenType' field was added in version 1 and is not present in v0 tokens.
@@ -210,16 +255,35 @@ ResumeTokenData ResumeToken::getData() const {
         result.fromInvalidate = ResumeTokenData::FromInvalidate(fromInvalidate.boolean());
     }
 
-    // The UUID and eventIdentifier are not required.
+    // The UUID and eventIdentifier are not required for token versions <= 1.
     if (!i.more()) {
+        uassert(6189500, "Expected UUID or null", result.version <= 1);
         return result;
     }
 
-    // The UUID comes first, then the eventIdentifier.
-    result.uuid = uassertStatusOK(UUID::parse(i.next()));
-    if (i.more()) {
-        result.eventIdentifier = Value(i.next());
+    // The UUID comes first, then eventIdentifier. From v2 onwards, UUID may be explicitly null.
+    if (auto uuidElem = i.next(); uuidElem.type() != BSONType::jstNULL) {
+        result.uuid = uassertStatusOK(UUID::parse(uuidElem));
     }
+
+    // High water mark tokens never have an eventIdentifier.
+    uassert(6189504,
+            "Invalid high water mark token",
+            !(result.tokenType == ResumeTokenData::TokenType::kHighWaterMarkToken && i.more()));
+
+    // From v2 onwards, all non-high-water-mark tokens must have an eventIdentifier.
+    if (!i.more()) {
+        uassert(
+            6189501,
+            "Expected an eventIdentifier for an event resume token",
+            !(result.tokenType == ResumeTokenData::TokenType::kEventToken && result.version >= 2));
+        return result;
+    }
+
+    result.eventIdentifier = Value(i.next());
+    uassert(6189503,
+            "Resume Token eventIdentifier is not an object",
+            result.eventIdentifier.getType() == BSONType::Object);
 
     uassert(40646, "invalid oversized resume token", !i.more());
     return result;
@@ -234,26 +298,12 @@ ResumeToken ResumeToken::parse(const Document& resumeDoc) {
 }
 
 ResumeToken ResumeToken::makeHighWaterMarkToken(Timestamp clusterTime) {
-    return ResumeToken(makeHighWaterMarkResumeTokenData(clusterTime, boost::none));
+    return ResumeToken(
+        makeHighWaterMarkResumeTokenData(clusterTime, ResumeTokenData::kDefaultTokenVersion));
 }
 
 bool ResumeToken::isHighWaterMarkToken(const ResumeTokenData& tokenData) {
-    return tokenData == makeHighWaterMarkResumeTokenData(tokenData.clusterTime, tokenData.uuid);
-}
-
-Value ResumeToken::makeEventIdentifier(StringData opType, Value documentKey, Value opDescription) {
-    tassert(6280100,
-            "both documentKey and operationDescription cannot be present for an event",
-            documentKey.missing() || opDescription.missing());
-
-    // For classic change events, the eventIdentifier is always the documentKey, even if missing.
-    if (change_stream_legacy::kClassicOperationTypes.count(opType)) {
-        return documentKey;
-    }
-
-    // For an expanded event, the eventIdentifier is its operation type and description.
-    return Value(
-        Document{{"operationType"_sd, opType}, {"operationDescription"_sd, opDescription}});
+    return tokenData == makeHighWaterMarkResumeTokenData(tokenData.clusterTime, tokenData.version);
 }
 
 }  // namespace mongo

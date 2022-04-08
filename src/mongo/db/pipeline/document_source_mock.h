@@ -48,6 +48,8 @@ public:
 
     static boost::intrusive_ptr<DocumentSourceMock> createForTest(
         Document doc, const boost::intrusive_ptr<ExpressionContext>& expCtx);
+    static boost::intrusive_ptr<DocumentSourceMock> createForTest(
+        const std::vector<BSONObj>& docs, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     static boost::intrusive_ptr<DocumentSourceMock> createForTest(
         const GetNextResult& result, const boost::intrusive_ptr<ExpressionContext>& expCtx);

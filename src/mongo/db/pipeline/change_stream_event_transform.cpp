@@ -52,26 +52,6 @@ Document copyDocExceptFields(const Document& source, const std::set<StringData>&
     return doc.freeze();
 }
 
-ResumeTokenData makeResumeToken(Value ts,
-                                Value txnOpIndex,
-                                Value uuid,
-                                StringData operationType,
-                                Value documentKey,
-                                Value opDescription) {
-    ResumeTokenData resumeTokenData;
-    resumeTokenData.clusterTime = ts.getTimestamp();
-    if (!uuid.missing()) {
-        resumeTokenData.uuid = uuid.getUuid();
-    }
-    if (!txnOpIndex.missing()) {
-        resumeTokenData.txnOpIndex = txnOpIndex.getLong();
-    }
-    resumeTokenData.eventIdentifier =
-        ResumeToken::makeEventIdentifier(operationType, documentKey, opDescription);
-
-    return resumeTokenData;
-}
-
 repl::OpTypeEnum getOplogOpType(const Document& oplog) {
     auto opTypeField = oplog[repl::OplogEntry::kOpTypeFieldName];
     checkValueType(opTypeField, repl::OplogEntry::kOpTypeFieldName, BSONType::String);
@@ -97,6 +77,8 @@ void setResumeTokenForEvent(const ResumeTokenData& resumeTokenData, MutableDocum
 ChangeStreamEventTransformation::ChangeStreamEventTransformation(
     const DocumentSourceChangeStreamSpec& spec)
     : _changeStreamSpec(spec) {
+    _resumeToken = DocumentSourceChangeStream::resolveResumeTokenFromSpec(_changeStreamSpec);
+
     // Determine whether the user requested a point-in-time pre-image, which will affect this
     // stage's output.
     _preImageRequested =
@@ -109,13 +91,32 @@ ChangeStreamEventTransformation::ChangeStreamEventTransformation(
         _changeStreamSpec.getFullDocument() == FullDocumentModeEnum::kRequired;
 }
 
+ResumeTokenData ChangeStreamEventTransformation::makeResumeToken(Value tsVal,
+                                                                 Value txnOpIndexVal,
+                                                                 Value uuidVal,
+                                                                 StringData operationType,
+                                                                 Value documentKey,
+                                                                 Value opDescription) const {
+    // Resolve the potentially-absent Value arguments to the expected resume token types.
+    auto uuid = uuidVal.missing() ? boost::none : boost::optional<UUID>{uuidVal.getUuid()};
+    size_t txnOpIndex = txnOpIndexVal.missing() ? 0 : txnOpIndexVal.getLong();
+    auto clusterTime = tsVal.getTimestamp();
+
+    // If we have a resume token, we need to match the version with which it was generated until we
+    // have surpassed it, at which point we can begin generating tokens with our default version.
+    auto version = (clusterTime > _resumeToken.clusterTime) ? ResumeTokenData::kDefaultTokenVersion
+                                                            : _resumeToken.version;
+
+    // Construct and return the final resume token.
+    return {clusterTime, version, txnOpIndex, uuid, operationType, documentKey, opDescription};
+}
+
 ChangeStreamDefaultEventTransformation::ChangeStreamDefaultEventTransformation(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const DocumentSourceChangeStreamSpec& spec)
     : ChangeStreamEventTransformation(spec) {
-    // Extract the resume token and use it to construct the document key cache.
-    auto tokenData = DocumentSourceChangeStream::resolveResumeTokenFromSpec(_changeStreamSpec);
-    _documentKeyCache = std::make_unique<change_stream_legacy::DocumentKeyCache>(expCtx, tokenData);
+    _documentKeyCache =
+        std::make_unique<change_stream_legacy::DocumentKeyCache>(expCtx, _resumeToken);
 }
 
 std::set<std::string> ChangeStreamDefaultEventTransformation::getFieldNameDependencies() const {

@@ -55,7 +55,16 @@ public:
     virtual std::set<std::string> getFieldNameDependencies() const = 0;
 
 protected:
+    // Construct a resume token for the specified event.
+    ResumeTokenData makeResumeToken(Value tsVal,
+                                    Value txnOpIndexVal,
+                                    Value uuidVal,
+                                    StringData operationType,
+                                    Value documentKey,
+                                    Value opDescription) const;
+
     const DocumentSourceChangeStreamSpec _changeStreamSpec;
+    ResumeTokenData _resumeToken;
 
     // Set to true if the pre-image should be included in the output documents.
     bool _preImageRequested = false;

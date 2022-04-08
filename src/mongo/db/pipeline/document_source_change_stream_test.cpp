@@ -229,11 +229,25 @@ public:
     /**
      * Returns a list of stages expanded from a $changStream specification, starting with a
      * DocumentSourceMock which contains a single document representing 'entry'.
+     *
+     * Stages such as DSEnsureResumeTokenPresent which can swallow results are removed from the
+     * returned list.
      */
-    vector<intrusive_ptr<DocumentSource>> makeStages(const BSONObj& entry, const BSONObj& spec) {
-        list<intrusive_ptr<DocumentSource>> result =
+    std::vector<intrusive_ptr<DocumentSource>> makeStages(BSONObj entry, const BSONObj& spec) {
+        return makeStages({entry}, spec, true /* removeEnsureResumeTokenStage */);
+    }
+
+    /**
+     * Returns a list of the stages expanded from a $changStream specification, starting with a
+     * DocumentSourceMock which contains a list of document representing 'entries'.
+     */
+    std::vector<intrusive_ptr<DocumentSource>> makeStages(
+        std::vector<BSONObj> entries,
+        const BSONObj& spec,
+        bool removeEnsureResumeTokenStage = false) {
+        std::list<intrusive_ptr<DocumentSource>> result =
             DSChangeStream::createFromBson(spec.firstElement(), getExpCtx());
-        vector<intrusive_ptr<DocumentSource>> stages(std::begin(result), std::end(result));
+        std::vector<intrusive_ptr<DocumentSource>> stages(std::begin(result), std::end(result));
         getExpCtx()->mongoProcessInterface = std::make_unique<MockMongoInterface>();
 
         // This match stage is a DocumentSourceChangeStreamOplogMatch, which we explicitly disallow
@@ -254,14 +268,16 @@ public:
         ASSERT(dynamic_cast<DocumentSourceChangeStreamTransform*>(transform));
 
         // Create mock stage and insert at the front of the stages.
-        auto mock = DocumentSourceMock::createForTest(D(entry), getExpCtx());
+        auto mock = DocumentSourceMock::createForTest(entries, getExpCtx());
         stages.insert(stages.begin(), mock);
 
-        // Remove the DSEnsureResumeTokenPresent stage since it will swallow the result.
-        auto newEnd = std::remove_if(stages.begin(), stages.end(), [](auto& stage) {
-            return dynamic_cast<DocumentSourceChangeStreamEnsureResumeTokenPresent*>(stage.get());
-        });
-        stages.erase(newEnd, stages.end());
+        if (removeEnsureResumeTokenStage) {
+            auto newEnd = std::remove_if(stages.begin(), stages.end(), [](auto& stage) {
+                return dynamic_cast<DocumentSourceChangeStreamEnsureResumeTokenPresent*>(
+                    stage.get());
+            });
+            stages.erase(newEnd, stages.end());
+        }
 
         // Wire up the stages by setting the source stage.
         auto prevIt = stages.begin();
@@ -1162,10 +1178,11 @@ TEST_F(ChangeStreamStageTest, TransformCreate) {
     const auto expectedOpDescription = fromjson("{idIndex: {v: 2, key: {id: 1}}, name: '_id_'}");
     Document expectedCreate{
         {DSChangeStream::kIdField,
-         makeResumeToken(kDefaultTs,
-                         testUuid(),
-                         ResumeTokenData::makeEventIdentifierFromOpDescription(
-                             DSChangeStream::kCreateOpType, Value(expectedOpDescription)))},
+         makeResumeToken(
+             kDefaultTs,
+             testUuid(),
+             Value(Document{{"operationType", DocumentSourceChangeStream::kCreateOpType},
+                            {"operationDescription", expectedOpDescription}}))},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kCreateOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kCollectionUuidField, testUuid()},
@@ -4346,6 +4363,210 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithAllStagesAndResumeToken) {
                            "$replaceRoot",
                            "$_internalChangeStreamHandleTopologyChange",
                            "$_internalChangeStreamEnsureResumeTokenPresent"});
+}
+
+BSONObj makeAnOplogEntry(const Timestamp& ts, Document docKey) {
+    const auto uuid = testUuid();
+
+    auto updateField = change_stream_test_helper::makeOplogEntry(
+        repl::OpTypeEnum::kUpdate,                                 // op type
+        change_stream_test_helper::nss,                            // namespace
+        BSON("$v" << 2 << "diff" << BSON("u" << BSON("y" << 2))),  // o
+        uuid,                                                      // uuid
+        boost::none,                                               // fromMigrate
+        docKey.toBson(),                                           // o2
+        repl::OpTime(ts, 1));                                      // opTime
+    return updateField.getEntry().toBSON();
+}
+
+using MultiTokenFormatVersionTest = ChangeStreamStageTest;
+
+TEST_F(MultiTokenFormatVersionTest, CanResumeFromV2Token) {
+    const auto beforeResumeTs = Timestamp(100, 1);
+    const auto resumeTs = Timestamp(100, 2);
+    const auto afterResumeTs = Timestamp(100, 3);
+    const auto uuid = testUuid();
+
+    const auto lowerDocumentKey = Document{{"x", 1}, {"y", 0}};
+    const auto midDocumentKey = Document{{"x", 1}, {"y", 1}};
+    const auto higherDocumentKey = Document{{"x", 1}, {"y", 2}};
+
+    auto oplogBeforeResumeTime = makeAnOplogEntry(beforeResumeTs, midDocumentKey);
+    auto oplogAtResumeTimeLowerDocKey = makeAnOplogEntry(resumeTs, lowerDocumentKey);
+    auto oplogResumeTime = makeAnOplogEntry(resumeTs, midDocumentKey);
+    auto oplogAtResumeTimeHigherDocKey = makeAnOplogEntry(resumeTs, higherDocumentKey);
+    auto oplogAfterResumeTime = makeAnOplogEntry(afterResumeTs, midDocumentKey);
+
+    // Create a resume token matching the 'oplogResumeTime' above.
+    ResumeTokenData resumeToken{
+        resumeTs, 2 /* version */, 0, uuid, "update"_sd, Value(midDocumentKey), Value()};
+
+    // Create a change stream spec that resumes after 'resumeToken'.
+    const auto spec =
+        BSON("$changeStream" << BSON("resumeAfter" << ResumeToken(resumeToken).toBSON()));
+
+    // Make a pipeline from this spec and seed it with the oplog entries in order.
+    auto stages = makeStages({oplogBeforeResumeTime,
+                              oplogAtResumeTimeLowerDocKey,
+                              oplogResumeTime,
+                              oplogAtResumeTimeHigherDocKey,
+                              oplogAfterResumeTime},
+                             spec);
+    auto lastStage = stages.back();
+
+    // The stream will swallow everything up to and including the resume token. The first event we
+    // get back has the same clusterTime as the resume token, and should therefore use the client
+    // token's version, which is 2. Similarly, the eventIdentifier should use the v2 token format.
+    auto next = lastStage->getNext();
+    ASSERT(next.isAdvanced());
+    const auto sameTsResumeToken =
+        ResumeToken::parse(next.releaseDocument()["_id"].getDocument()).getData();
+    ASSERT_EQ(sameTsResumeToken.clusterTime, resumeTs);
+    ASSERT_EQ(sameTsResumeToken.version, 2);
+    ASSERT_VALUE_EQ(
+        sameTsResumeToken.eventIdentifier,
+        Value(Document{{"operationType", "update"_sd}, {"documentKey", higherDocumentKey}}));
+
+    // The next event has a clusterTime later than the resume point, and should therefore start
+    // using the default token version.
+    next = lastStage->getNext();
+    ASSERT(next.isAdvanced());
+    const auto afterResumeTsResumeToken =
+        ResumeToken::parse(next.releaseDocument()["_id"].getDocument()).getData();
+    ASSERT_EQ(afterResumeTsResumeToken.clusterTime, afterResumeTs);
+    ASSERT_EQ(afterResumeTsResumeToken.version, ResumeTokenData::kDefaultTokenVersion);
+    ASSERT_VALUE_EQ(afterResumeTsResumeToken.eventIdentifier, Value(midDocumentKey));
+
+    // Verify that no other events are returned.
+    next = lastStage->getNext();
+    ASSERT_FALSE(next.isAdvanced());
+}
+
+TEST_F(MultiTokenFormatVersionTest, CanResumeFromV1Token) {
+    const auto beforeResumeTs = Timestamp(100, 1);
+    const auto resumeTs = Timestamp(100, 2);
+    const auto afterResumeTs = Timestamp(100, 3);
+    const auto uuid = testUuid();
+
+    const auto lowerDocumentKey = Document{{"x", 1}, {"y", 0}};
+    const auto midDocumentKey = Document{{"x", 1}, {"y", 1}};
+    const auto higherDocumentKey = Document{{"x", 1}, {"y", 2}};
+
+    auto oplogBeforeResumeTime = makeAnOplogEntry(beforeResumeTs, midDocumentKey);
+    auto oplogAtResumeTimeLowerDocKey = makeAnOplogEntry(resumeTs, lowerDocumentKey);
+    auto oplogResumeTime = makeAnOplogEntry(resumeTs, midDocumentKey);
+    auto oplogAtResumeTimeHigherDocKey = makeAnOplogEntry(resumeTs, higherDocumentKey);
+    auto oplogAfterResumeTime = makeAnOplogEntry(afterResumeTs, midDocumentKey);
+
+    // Create a resume token matching the 'oplogResumeTime' above.
+    ResumeTokenData resumeToken{
+        resumeTs, 1 /* version */, 0, uuid, "update"_sd, Value(midDocumentKey), Value()};
+
+    // Create a change stream spec that resumes after 'resumeToken'.
+    const auto spec =
+        BSON("$changeStream" << BSON("resumeAfter" << ResumeToken(resumeToken).toBSON()));
+
+    // Make a pipeline from this spec and seed it with the oplog entries in order.
+    auto stages = makeStages({oplogBeforeResumeTime,
+                              oplogAtResumeTimeLowerDocKey,
+                              oplogResumeTime,
+                              oplogAtResumeTimeHigherDocKey,
+                              oplogAfterResumeTime},
+                             spec);
+    auto lastStage = stages.back();
+
+    // The stream will swallow everything up to and including the resume token. The first event we
+    // get back has the same clusterTime as the resume token, and should therefore use the client
+    // token's version, which is 1. Similarly, the eventIdentifier should use the v1 token format.
+    auto next = lastStage->getNext();
+    ASSERT(next.isAdvanced());
+    const auto sameTsResumeToken =
+        ResumeToken::parse(next.releaseDocument()["_id"].getDocument()).getData();
+    ASSERT_EQ(sameTsResumeToken.clusterTime, resumeTs);
+    ASSERT_EQ(sameTsResumeToken.version, 1);
+    ASSERT_VALUE_EQ(sameTsResumeToken.eventIdentifier, Value(higherDocumentKey));
+
+    // The next event has a clusterTime later than the resume point, and should therefore start
+    // using the default token version.
+    next = lastStage->getNext();
+    ASSERT(next.isAdvanced());
+    const auto afterResumeTsResumeToken =
+        ResumeToken::parse(next.releaseDocument()["_id"].getDocument()).getData();
+    ASSERT_EQ(afterResumeTsResumeToken.clusterTime, afterResumeTs);
+    ASSERT_EQ(afterResumeTsResumeToken.version, ResumeTokenData::kDefaultTokenVersion);
+    ASSERT_VALUE_EQ(afterResumeTsResumeToken.eventIdentifier, Value(midDocumentKey));
+
+    // Verify that no other events are returned.
+    next = lastStage->getNext();
+    ASSERT_FALSE(next.isAdvanced());
+}
+
+TEST_F(MultiTokenFormatVersionTest, CanResumeFromV2HighWaterMark) {
+    const auto beforeResumeTs = Timestamp(100, 1);
+    const auto resumeTs = Timestamp(100, 2);
+    const auto afterResumeTs = Timestamp(100, 3);
+
+    const auto documentKey = Document{{"x", 1}, {"y", 1}};
+    const auto higherDocumentKey = Document{{"x", 1}, {"y", 2}};
+
+    auto oplogBeforeResumeTime = makeAnOplogEntry(beforeResumeTs, documentKey);
+    auto firstOplogAtResumeTime = makeAnOplogEntry(resumeTs, documentKey);
+    auto secondOplogAtResumeTime = makeAnOplogEntry(resumeTs, higherDocumentKey);
+    auto oplogAfterResumeTime = makeAnOplogEntry(afterResumeTs, documentKey);
+
+    // Create a v2 high water mark token which sorts immediately before 'firstOplogAtResumeTime'.
+    ResumeTokenData resumeToken = ResumeToken::makeHighWaterMarkToken(resumeTs).getData();
+    resumeToken.version = 2;
+    auto expCtx = getExpCtxRaw();
+    expCtx->ns = NamespaceString::makeCollectionlessAggregateNSS("unittests");
+
+    // Create a change stream spec that resumes after 'resumeToken'.
+    const auto spec =
+        BSON("$changeStream" << BSON("resumeAfter" << ResumeToken(resumeToken).toBSON()));
+
+    // Make a pipeline from this spec and seed it with the oplog entries in order.
+    auto stages = makeStages({oplogBeforeResumeTime,
+                              firstOplogAtResumeTime,
+                              secondOplogAtResumeTime,
+                              oplogAfterResumeTime},
+                             spec);
+
+    // The high water mark token should be order ahead of every other entry with the same
+    // clusterTime. So we should see both entries that match the resumeToken's clusterTime, and both
+    // should have inherited the token version 2 from the high water mark.
+    auto lastStage = stages.back();
+    auto next = lastStage->getNext();
+    ASSERT(next.isAdvanced());
+    const auto sameTsResumeToken1 =
+        ResumeToken::parse(next.releaseDocument()["_id"].getDocument()).getData();
+    ASSERT_EQ(sameTsResumeToken1.clusterTime, resumeTs);
+    ASSERT_EQ(sameTsResumeToken1.version, 2);
+    ASSERT_VALUE_EQ(sameTsResumeToken1.eventIdentifier,
+                    Value(Document{{"operationType", "update"_sd}, {"documentKey", documentKey}}));
+
+    next = lastStage->getNext();
+    ASSERT(next.isAdvanced());
+    const auto sameTsResumeToken2 =
+        ResumeToken::parse(next.releaseDocument()["_id"].getDocument()).getData();
+    ASSERT_EQ(sameTsResumeToken2.clusterTime, resumeTs);
+    ASSERT_EQ(sameTsResumeToken2.version, 2);
+    ASSERT_VALUE_EQ(
+        sameTsResumeToken2.eventIdentifier,
+        Value(Document{{"operationType", "update"_sd}, {"documentKey", higherDocumentKey}}));
+
+    // The resumeToken after the current clusterTime should start using the default version, and
+    // corresponding 'eventIdentifier' format.
+    next = lastStage->getNext();
+    ASSERT(next.isAdvanced());
+    const auto afterResumeTsResumeToken =
+        ResumeToken::parse(next.releaseDocument()["_id"].getDocument()).getData();
+    ASSERT_EQ(afterResumeTsResumeToken.clusterTime, afterResumeTs);
+    ASSERT_EQ(afterResumeTsResumeToken.version, ResumeTokenData::kDefaultTokenVersion);
+    ASSERT_VALUE_EQ(afterResumeTsResumeToken.eventIdentifier, Value(documentKey));
+
+    // Verify that no other events are returned.
+    next = lastStage->getNext();
+    ASSERT_FALSE(next.isAdvanced());
 }
 }  // namespace
 }  // namespace mongo
