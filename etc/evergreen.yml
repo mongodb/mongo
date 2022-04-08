@@ -285,8 +285,10 @@ buildvariants:
   expansions:
     use_wt_develop: true
     resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
-    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enable-free-mon=on --enable-http-client=on
-    scons_cache_mode: nolinked
+    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enable-free-mon=on --enable-http-client=on --link-model=dynamic
+    scons_cache_mode: all
+    scons_cache_scope: shared
+    num_scons_link_jobs_available: 0.99
     test_flags: --excludeWithAnyTags=requires_http_client
 
 - name: linux-64-duroff
@@ -295,17 +297,25 @@ buildvariants:
   run_on:
   - rhel80-small
   expansions: &linux-64-required-duroff-expansions
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enable-free-mon=off --enable-http-client=off
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enable-free-mon=off --enable-http-client=off --link-model=dynamic
     multiversion_platform: rhel80
     multiversion_edition: targeted
     # Running WiredTiger with --nojournal in a replica set is no longer supported, so this variant
     # does not include replica set tests. Since transactions are only supported on replica sets, we
     # exclude those tests as well.
     test_flags: --nojournal --excludeWithAnyTags=requires_journaling,requires_replication,requires_sharding,uses_transactions,requires_http_client
+    scons_cache_mode: all
     scons_cache_scope: shared
+    num_scons_link_jobs_available: 0.99
     large_distro_name: rhel80-medium
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_parallel_core_stream_TG
+    distros:
+    - rhel80-xlarge
+  - name: compile_test_and_package_parallel_unittest_stream_TG
+    distros:
+    - rhel80-xlarge
+  - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel80-xlarge
   - name: build_variant_gen
@@ -342,7 +352,7 @@ buildvariants:
   - ubuntu1804-test
   stepback: false
   expansions:
-    compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
     repo_edition: enterprise
     has_packages: false
   tasks:
@@ -472,7 +482,7 @@ buildvariants:
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     test_flags: --excludeWithAnyTags=resource_intensive,incompatible_with_gcov
-    compile_flags: --dbg=on --gcov --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --dbg=on --gcov --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
     large_distro_name: rhel80-medium
     multiversion_platform: rhel80
     multiversion_edition: enterprise
@@ -487,8 +497,15 @@ buildvariants:
     timeout_secs: 18000 # 5 hour idle timeout
     use_scons_cache: false
     gcov_tool: /opt/mongodbtoolchain/v3/bin/gcov
+    num_scons_link_jobs_available: 0.99
   tasks: &enterprise-rhel-80-64-bit-coverage-tasks
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_parallel_core_stream_TG
+    distros:
+    - rhel80-large
+  - name: compile_test_and_package_parallel_unittest_stream_TG
+    distros:
+    - rhel80-large
+  - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel80-large
   - name: build_variant_gen
@@ -548,7 +565,7 @@ buildvariants:
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     test_flags: --excludeWithAnyTags=resource_intensive,incompatible_with_gcov
-    compile_flags: --dbg=on --gcov --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars
+    compile_flags: --dbg=on --gcov --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --link-model=dynamic
     large_distro_name: rhel80-medium
     multiversion_platform: rhel80
     multiversion_edition: enterprise
@@ -566,6 +583,7 @@ buildvariants:
     # gcov does. However, this version of clang still produces .gcda files that
     # the v3 gcov can read natively anyway, so we don't need it.
     gcov_tool: /opt/mongodbtoolchain/v3/bin/gcov
+    num_scons_link_jobs_available: 0.99
   tasks:
     *enterprise-rhel-80-64-bit-coverage-tasks
 
@@ -580,7 +598,7 @@ buildvariants:
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     test_flags: --excludeWithAnyTags=resource_intensive,incompatible_with_gcov
-    compile_flags: --dbg=on --gcov --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v4_gcc.vars
+    compile_flags: --dbg=on --gcov --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v4_gcc.vars --link-model=dynamic
     large_distro_name: rhel80-medium
     multiversion_platform: rhel80
     multiversion_edition: enterprise
@@ -595,6 +613,7 @@ buildvariants:
     timeout_secs: 18000 # 5 hour idle timeout
     use_scons_cache: false
     gcov_tool: /opt/mongodbtoolchain/v4/bin/gcov
+    num_scons_link_jobs_available: 0.99
   tasks:
     *enterprise-rhel-80-64-bit-coverage-tasks
 
@@ -609,7 +628,7 @@ buildvariants:
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     test_flags: --excludeWithAnyTags=resource_intensive,incompatible_with_gcov
-    compile_flags: --dbg=on --gcov --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v4_clang.vars
+    compile_flags: --dbg=on --gcov --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v4_clang.vars --link-model=dynamic
     large_distro_name: rhel80-medium
     multiversion_platform: rhel80
     multiversion_edition: enterprise
@@ -624,6 +643,7 @@ buildvariants:
     timeout_secs: 9000 # 2.5 hour idle timeout
     use_scons_cache: false
     gcov_tool: /opt/mongodbtoolchain/v4/bin/llvm-cov gcov
+    num_scons_link_jobs_available: 0.99
   tasks:
     *enterprise-rhel-80-64-bit-coverage-tasks
 
@@ -1121,6 +1141,10 @@ buildvariants:
     - windows-vsCurrent-large
   - name: audit
   # Do not add more tasks to this list.
+
+###########################################
+#         macos buildvariants             #
+###########################################
 
 - &macos-debug-template
   name: macos-debug-suggested
@@ -1742,16 +1766,25 @@ buildvariants:
       MONGO_DISTMOD=rhel80
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --link-model=dynamic
     multiversion_platform: rhel80
     multiversion_edition: enterprise
     repo_edition: enterprise
+    scons_cache_mode: all
     scons_cache_scope: shared
+    num_scons_link_jobs_available: 0.99
     large_distro_name: rhel80-medium
     test_flags: >-
       --mongodSetParameters="{maxNumberOfTransactionOperationsInSingleOplogEntry: 2}"
       --excludeWithAnyTags=exclude_from_large_txns
   tasks:
-  - name: compile_and_archive_dist_test_then_package_TG
+  - name: compile_test_and_package_parallel_core_stream_TG
+    distros:
+    - rhel80-large
+  - name: compile_test_and_package_parallel_unittest_stream_TG
+    distros:
+    - rhel80-large
+  - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel80-large
   - name: build_variant_gen
@@ -1816,16 +1849,25 @@ buildvariants:
       --ssl
       --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
       MONGO_DISTMOD=rhel80
+      --link-model=dynamic
     multiversion_platform: rhel80
     multiversion_edition: enterprise
     repo_edition: enterprise
     scons_cache_scope: shared
+    scons_cache_mode: all
+    num_scons_link_jobs_available: 0.99
     tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
     large_distro_name: rhel80-medium
     resmoke_jobs_factor: 0.25
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_parallel_core_stream_TG
+    distros:
+    - rhel80-xlarge
+  - name: compile_test_and_package_parallel_unittest_stream_TG
+    distros:
+    - rhel80-xlarge
+  - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel80-xlarge
   - name: build_variant_gen
@@ -1857,10 +1899,13 @@ buildvariants:
       --ssl
       --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
       MONGO_DISTMOD=rhel80
+      --link-model=dynamic
     multiversion_platform: rhel80
     multiversion_edition: enterprise
     repo_edition: enterprise
     scons_cache_scope: shared
+    scons_cache_mode: all
+    num_scons_link_jobs_available: 0.99
     tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
     large_distro_name: rhel80-medium
@@ -1869,7 +1914,13 @@ buildvariants:
     test_flags: >-
       --excludeWithAnyTags=future_git_tag_incompatible
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_parallel_core_stream_TG
+    distros:
+    - rhel80-xlarge
+  - name: compile_test_and_package_parallel_unittest_stream_TG
+    distros:
+    - rhel80-xlarge
+  - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel80-xlarge
   - name: build_variant_gen
@@ -1891,10 +1942,18 @@ buildvariants:
 #    multiversion_platform: rhel80
 #    multiversion_edition: enterprise
 #    scons_cache_scope: shared
+#    scons_cache_mode: all
+#    num_scons_link_jobs_available: 0.99
 #    build_mongoreplay: false
 #    large_distro_name: rhel80-medium
 #  tasks:
-#  - name: compile_test_and_package_serial_TG
+#  - name: compile_test_and_package_parallel_core_stream_TG
+#    distros:
+#    - rhel80-large
+#  - name: compile_test_and_package_parallel_unittest_stream_TG
+#    distros:
+#    - rhel80-large
+#  - name: compile_test_and_package_parallel_dbtest_stream_TG
 #    distros:
 #    - rhel80-large
 #  - name: jsCore
@@ -1978,10 +2037,15 @@ buildvariants:
   expansions:
     <<: *enterprise-rhel-70-64-bit-expansions-template
     additional_package_targets: ""
-    compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enterprise-features=hot_backups
+    compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enterprise-features=hot_backups --link-model=dynamic
     has_packages: false
+    scons_cache_mode: all
+    scons_cache_scope: shared
+    num_scons_link_jobs_available: 0.99
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_parallel_core_stream_TG
+  - name: compile_test_and_package_parallel_unittest_stream_TG
+  - name: compile_test_and_package_parallel_dbtest_stream_TG
   - name: build_variant_gen
   - name: jsCore
   - name: noPassthroughHotBackups_gen
@@ -1994,12 +2058,21 @@ buildvariants:
   - rhel70
   expansions:
     <<: *enterprise-rhel-70-64-bit-expansions-template
-    compile_flags: --ssl MONGO_DISTMOD=rhel70 --use-libunwind=off --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=rhel70 --use-libunwind=off --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
     has_packages: false
     additional_package_targets: ""
+    scons_cache_mode: all
+    scons_cache_scope: shared
+    num_scons_link_jobs_available: 0.99
   # Override list of tasks to exclude package testing and publishing
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_parallel_core_stream_TG
+    distros:
+    - rhel70
+  - name: compile_test_and_package_parallel_unittest_stream_TG
+    distros:
+    - rhel70
+  - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel70
   - name: build_variant_gen
@@ -2059,8 +2132,7 @@ buildvariants:
   stepback: false
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
-    release_buid: true
-    compile_flags: --ssl MONGO_DISTMOD=rhel72 -j3 --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=rhel72 -j3 --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
     resmoke_jobs_max: 2
     has_packages: true
     packager_script: packager_enterprise.py
@@ -2074,6 +2146,7 @@ buildvariants:
     multiversion_platform: rhel72
     multiversion_architecture: s390x
     multiversion_edition: enterprise
+    num_scons_link_jobs_available: 0.99
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
@@ -2172,12 +2245,16 @@ buildvariants:
       --storageEngine=ephemeralForTest
       --excludeWithAnyTags=requires_persistence,requires_fsync,requires_journaling,requires_wiredtiger,uses_transactions,uses_speculative_majority,requires_snapshot_read,requires_majority_read_concern,uses_change_streams,requires_sharding,incompatible_with_eft
       --mongodSetParameters="{oplogApplicationEnforcesSteadyStateConstraints: false}"
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --dbg=off --opt=on --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --dbg=off --opt=on --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
     multiversion_platform: rhel80
     multiversion_edition: targeted
+    scons_cache_mode: all
     scons_cache_scope: shared
+    num_scons_link_jobs_available: 0.99
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_parallel_core_stream_TG
+  - name: compile_test_and_package_parallel_unittest_stream_TG
+  - name: compile_test_and_package_parallel_dbtest_stream_TG
     # TODO (SERVER-58125): Re-enable the timeseries fuzzer for EFT
   - name: build_variant_gen
   #  - name: .aggfuzzer .common !.timeseries # Disabled for FCV 5.3
@@ -2609,9 +2686,18 @@ buildvariants:
   modules:
   - enterprise
   expansions:
-    compile_flags: MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --use-diagnostic-latches=off
+    compile_flags: MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --use-diagnostic-latches=off --link-model=dynamic
+    scons_cache_mode: all
+    scons_cache_scope: shared
+    num_scons_link_jobs_available: 0.99
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_parallel_core_stream_TG
+    distros:
+    - ubuntu1804-build
+  - name: compile_test_and_package_parallel_unittest_stream_TG
+    distros:
+    - ubuntu1804-build
+  - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - ubuntu1804-build
 
@@ -2622,9 +2708,17 @@ buildvariants:
   - enterprise
   expansions:
     compile_flags: MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --dbg=on --opt=off --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --detect-odr-violations
+    scons_cache_mode: all
     scons_cache_scope: shared
+    num_scons_link_jobs_available: 0.99
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_parallel_core_stream_TG
+    distros:
+    - ubuntu1804-build
+  - name: compile_test_and_package_parallel_unittest_stream_TG
+    distros:
+    - ubuntu1804-build
+  - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - ubuntu1804-build
 
@@ -2637,7 +2731,9 @@ buildvariants:
   - enterprise
   expansions:
     scons_cache_scope: shared
-    compile_flags: MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    scons_cache_mode: all
+    num_scons_link_jobs_available: 0.99
+    compile_flags: MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
     multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
     test_flags: >-
@@ -2645,7 +2741,13 @@ buildvariants:
       --mongodSetParameters="{initialServiceExecutorThreadingModel: borrowed}"
     large_distro_name: ubuntu1804-build
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_parallel_core_stream_TG
+    distros:
+    - ubuntu1804-build
+  - name: compile_test_and_package_parallel_unittest_stream_TG
+    distros:
+    - ubuntu1804-build
+  - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - ubuntu1804-build
   - name: build_variant_gen
@@ -2670,7 +2772,9 @@ buildvariants:
   - enterprise
   expansions:
     scons_cache_scope: shared
-    compile_flags: MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    scons_cache_mode: all
+    num_scons_link_jobs_available: 0.99
+    compile_flags: MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
     multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
     test_flags: >-
@@ -2679,7 +2783,13 @@ buildvariants:
       --excludeWithAnyTags=requires_streamable_rsm
     large_distro_name: ubuntu1804-build
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_parallel_core_stream_TG
+    distros:
+    - ubuntu1804-build
+  - name: compile_test_and_package_parallel_unittest_stream_TG
+    distros:
+    - ubuntu1804-build
+  - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - ubuntu1804-build
   - name: build_variant_gen
@@ -2702,14 +2812,22 @@ buildvariants:
   - enterprise
   expansions:
     scons_cache_scope: shared
-    compile_flags: MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    scons_cache_mode: all
+    num_scons_link_jobs_available: 0.99
+    compile_flags: MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
     multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
     test_flags: |- # Set the taskExecutorPoolSize for all tests
       --mongosSetParameters="taskExecutorPoolSize: 4"
     large_distro_name: ubuntu1804-build
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_parallel_core_stream_TG
+    distros:
+    - ubuntu1804-build
+  - name: compile_test_and_package_parallel_unittest_stream_TG
+    distros:
+    - ubuntu1804-build
+  - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - ubuntu1804-build
   - name: build_variant_gen
@@ -2732,7 +2850,9 @@ buildvariants:
   - enterprise
   expansions:
     scons_cache_scope: shared
-    compile_flags: MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    scons_cache_mode: all
+    num_scons_link_jobs_available: 0.99
+    compile_flags: MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
     multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
     test_flags: >-
@@ -2740,7 +2860,13 @@ buildvariants:
       --excludeWithAnyTags=sets_replica_set_matching_strategy
     large_distro_name: ubuntu1804-build
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_parallel_core_stream_TG
+    distros:
+    - ubuntu1804-build
+  - name: compile_test_and_package_parallel_unittest_stream_TG
+    distros:
+    - ubuntu1804-build
+  - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - ubuntu1804-build
   - name: build_variant_gen
@@ -2763,7 +2889,9 @@ buildvariants:
   - enterprise
   expansions:
     scons_cache_scope: shared
-    compile_flags: MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    scons_cache_mode: all
+    num_scons_link_jobs_available: 0.99
+    compile_flags: MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
     multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
     test_flags: >-
@@ -2771,7 +2899,13 @@ buildvariants:
       --excludeWithAnyTags=sets_replica_set_matching_strategy
     large_distro_name: ubuntu1804-build
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_parallel_core_stream_TG
+    distros:
+    - ubuntu1804-build
+  - name: compile_test_and_package_parallel_unittest_stream_TG
+    distros:
+    - ubuntu1804-build
+  - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - ubuntu1804-build
   - name: build_variant_gen
@@ -2794,7 +2928,9 @@ buildvariants:
   - enterprise
   expansions:
     scons_cache_scope: shared
-    compile_flags: MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    scons_cache_mode: all
+    num_scons_link_jobs_available: 0.99
+    compile_flags: MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
     multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
     test_flags: >-
@@ -2802,7 +2938,13 @@ buildvariants:
       --excludeWithAnyTags=sets_replica_set_matching_strategy
     large_distro_name: ubuntu1804-build
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_parallel_core_stream_TG
+    distros:
+    - ubuntu1804-build
+  - name: compile_test_and_package_parallel_unittest_stream_TG
+    distros:
+    - ubuntu1804-build
+  - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - ubuntu1804-build
   - name: build_variant_gen
@@ -2906,12 +3048,15 @@ buildvariants:
   display_name: "~ Shared Library Windows (visibility test)"
   cron: "0 12 * * *" # Every day starting at 12:00
   expansions:
+    # --link-model=dynamic is set by visiblity_test's task_compile_flags
+    # expansion
     compile_flags: CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --win-version-min=win10
     python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
     has_packages: false
     scons_cache_scope: shared
     scons_cache_mode: all
+    num_scons_link_jobs_available: 0.99
   tasks:
   - name: visibility_test_TG
     distros:
@@ -2957,6 +3102,8 @@ buildvariants:
   - ubuntu1804-large
   stepback: false
   expansions:
+    # Do not set link-model=dynamic on this build. The antithesis image builder
+    # scripts cannot handle the shared library build
     compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars CCFLAGS="-fsanitize-coverage=trace-pc-guard" LIBS="voidstar"
     multiversion_platform: ubuntu1804
     multiversion_edition: enterprise

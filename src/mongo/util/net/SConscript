@@ -202,6 +202,7 @@ if http_client == "off":
         ],
         LIBDEPS=[
             '$BUILD_DIR/mongo/base',
+            'http_client',
         ],
     )
 else:
