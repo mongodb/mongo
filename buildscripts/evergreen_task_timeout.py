@@ -8,6 +8,7 @@ import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional
+import shlex
 
 import inject
 import structlog
@@ -15,6 +16,7 @@ import yaml
 from pydantic import BaseModel
 from evergreen import EvergreenApi, RetryingEvergreenApi
 
+from buildscripts.task_generation.resmoke_proxy import ResmokeProxyService
 from buildscripts.ciconfig.evergreen import (EvergreenProjectConfig, parse_evergreen_file)
 from buildscripts.timeouts.timeout_service import (TimeoutParams, TimeoutService, TimeoutSettings)
 from buildscripts.util.cmdutils import enable_logging
@@ -319,6 +321,8 @@ def main():
     """Determine the timeout value a task should use in evergreen."""
     parser = argparse.ArgumentParser(description=main.__doc__)
 
+    parser.add_argument("--install-dir", dest="install_dir", required=True,
+                        help="Path to bin directory of testable installation")
     parser.add_argument("--task-name", dest="task", required=True, help="Task being executed.")
     parser.add_argument("--suite-name", dest="suite_name", required=True,
                         help="Resmoke suite being run against.")
@@ -363,6 +367,9 @@ def main():
         binder.bind(TimeoutOverrides, timeout_overrides)
         binder.bind(EvergreenProjectConfig,
                     parse_evergreen_file(os.path.expanduser(options.evg_project_config)))
+        binder.bind(
+            ResmokeProxyService,
+            ResmokeProxyService(run_options=f"--installDir={shlex.quote(options.install_dir)}"))
 
     inject.configure(dependencies)
 

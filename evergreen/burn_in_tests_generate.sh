@@ -9,4 +9,4 @@ set -o verbose
 activate_venv
 
 # Evergreen executable is in $HOME.
-PATH=$PATH:$HOME $python buildscripts/burn_in_tags.py --expansion-file ../expansions.yml
+PATH=$PATH:$HOME $python buildscripts/burn_in_tags.py --expansion-file ../expansions.yml --install-dir "${install_dir}"

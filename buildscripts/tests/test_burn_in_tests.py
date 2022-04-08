@@ -497,7 +497,7 @@ class TestCreateTestsByTask(unittest.TestCase):
         evg_conf_mock.get_variant.return_value = None
 
         with self.assertRaises(ValueError):
-            under_test.create_tests_by_task(variant, evg_conf_mock, set())
+            under_test.create_tests_by_task(variant, evg_conf_mock, set(), "install-dir/bin")
 
 
 class TestLocalFileChangeDetector(unittest.TestCase):

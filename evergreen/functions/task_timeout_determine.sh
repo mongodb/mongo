@@ -27,6 +27,7 @@ fi
 
 activate_venv
 PATH=$PATH:$HOME:/ $python buildscripts/evergreen_task_timeout.py $timeout_factor \
+  --install-dir "${install_dir}" \
   --task-name ${task_name} \
   --suite-name ${suite_name} \
   --build-variant $build_variant_for_timeout \

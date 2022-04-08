@@ -79,7 +79,7 @@ class TestAcceptance(unittest.TestCase):
         mock_evg_api = MagicMock()
 
         under_test.burn_in("task_id", variant, gen_config, repeat_config, mock_evg_api,
-                           mock_evg_conf, repos, "testfile.json")
+                           mock_evg_conf, repos, "testfile.json", "install-dir/bin")
 
         write_json_mock.assert_called_once()
         written_config = json.loads(write_json_mock.call_args[0][1])
@@ -110,7 +110,7 @@ class TestAcceptance(unittest.TestCase):
         mock_evg_api = MagicMock()
 
         under_test.burn_in("task_id", variant, gen_config, repeat_config, mock_evg_api,
-                           mock_evg_conf, repos, "testfile.json")
+                           mock_evg_conf, repos, "testfile.json", 'install-dir/bin')
 
         write_json_mock.assert_called_once()
         written_config = json.loads(write_json_mock.call_args[0][1])

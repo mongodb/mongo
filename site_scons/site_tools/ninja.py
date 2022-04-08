@@ -660,6 +660,7 @@ class NinjaState:
                 kwargs['pool'] = 'local_pool'
             ninja.rule(rule, **kwargs)
 
+        # TODO SERVER-64664
         generated_source_files = sorted({
             output
             # First find builds which have header files in their outputs.

@@ -17,4 +17,4 @@ if [ -n "${burn_in_tests_build_variant}" ]; then
 fi
 burn_in_args="$burn_in_args --repeat-tests-min=2 --repeat-tests-max=1000 --repeat-tests-secs=600"
 # Evergreen executable is in $HOME.
-PATH="$PATH:$HOME" eval $python buildscripts/evergreen_burn_in_tests.py --project=${project} $build_variant_opts --distro=${distro_id} --generate-tasks-file=burn_in_tests_gen.json --task_id ${task_id} $burn_in_args --verbose
+PATH="$PATH:$HOME" eval $python buildscripts/evergreen_burn_in_tests.py --project=${project} $build_variant_opts --distro=${distro_id} --generate-tasks-file=burn_in_tests_gen.json --task_id ${task_id} $burn_in_args --verbose --install-dir "${install_dir}"

@@ -352,7 +352,7 @@ def create_task_list_for_tests(changed_tests: Set[str], build_variant: str,
 
 
 def create_tests_by_task(build_variant: str, evg_conf: EvergreenProjectConfig,
-                         changed_tests: Set[str]) -> Dict[str, TaskInfo]:
+                         changed_tests: Set[str], install_dir: str) -> Dict[str, TaskInfo]:
     """
     Create a list of tests by task.
 
@@ -367,7 +367,7 @@ def create_tests_by_task(build_variant: str, evg_conf: EvergreenProjectConfig,
         exclude_tests.append(f"{ENTERPRISE_MODULE_PATH}/**/*")
     changed_tests = filter_tests(changed_tests, exclude_tests)
 
-    buildscripts.resmokelib.parser.set_run_options()
+    buildscripts.resmokelib.parser.set_run_options(f"--installDir={shlex.quote(install_dir)}")
     if changed_tests:
         return create_task_list_for_tests(changed_tests, build_variant, evg_conf, exclude_suites,
                                           exclude_tasks)
@@ -553,7 +553,7 @@ class BurnInOrchestrator:
         self.burn_in_executor = burn_in_executor
         self.evg_conf = evg_conf
 
-    def burn_in(self, repos: List[Repo], build_variant: str) -> None:
+    def burn_in(self, repos: List[Repo], build_variant: str, install_dir: str) -> None:
         """
         Execute burn in tests for the given git repositories.
 
@@ -563,12 +563,14 @@ class BurnInOrchestrator:
         changed_tests = self.change_detector.find_changed_tests(repos)
         LOGGER.info("Found changed tests", files=changed_tests)
 
-        tests_by_task = create_tests_by_task(build_variant, self.evg_conf, changed_tests)
+        tests_by_task = create_tests_by_task(build_variant, self.evg_conf, changed_tests,
+                                             install_dir)
         LOGGER.debug("tests and tasks found", tests_by_task=tests_by_task)
 
         self.burn_in_executor.execute(tests_by_task)
 
 
+# pylint: disable=too-many-function-args
 @click.command(context_settings=dict(ignore_unknown_options=True))
 @click.option("--no-exec", "no_exec", default=False, is_flag=True,
               help="Do not execute the found tests.")
@@ -586,12 +588,14 @@ class BurnInOrchestrator:
 @click.option(
     "--origin-rev", "origin_rev", default=None,
     help="The revision in the mongo repo that changes will be compared against if specified.")
+@click.option("--install-dir", "install_dir", required=True, type=str,
+              help="Path to bin directory of a testable installation")
 @click.argument("resmoke_args", nargs=-1, type=click.UNPROCESSED)
 # pylint: disable=too-many-arguments,too-many-locals
 def main(build_variant: str, no_exec: bool, repeat_tests_num: Optional[int],
          repeat_tests_min: Optional[int], repeat_tests_max: Optional[int],
          repeat_tests_secs: Optional[int], resmoke_args: str, verbose: bool,
-         origin_rev: Optional[str]) -> None:
+         origin_rev: Optional[str], install_dir: str) -> None:
     """
     Run new or changed tests in repeated mode to validate their stability.
 
@@ -639,7 +643,7 @@ def main(build_variant: str, no_exec: bool, repeat_tests_num: Optional[int],
         executor = NopBurnInExecutor()
 
     burn_in_orchestrator = BurnInOrchestrator(change_detector, executor, evg_conf)
-    burn_in_orchestrator.burn_in(repos, build_variant)
+    burn_in_orchestrator.burn_in(repos, build_variant, install_dir)
 
 
 if __name__ == "__main__":

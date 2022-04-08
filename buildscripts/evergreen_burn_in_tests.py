@@ -419,7 +419,7 @@ class GenerateBurnInExecutor(BurnInExecutor):
 # pylint: disable=too-many-arguments
 def burn_in(task_id: str, build_variant: str, generate_config: GenerateConfig,
             repeat_config: RepeatConfig, evg_api: EvergreenApi, evg_conf: EvergreenProjectConfig,
-            repos: List[Repo], generate_tasks_file: str) -> None:
+            repos: List[Repo], generate_tasks_file: str, install_dir: str) -> None:
     """
     Run burn_in_tests.
 
@@ -431,12 +431,13 @@ def burn_in(task_id: str, build_variant: str, generate_config: GenerateConfig,
     :param evg_conf: Evergreen project configuration.
     :param repos: Git repos containing changes.
     :param generate_tasks_file: File to write generate tasks configuration to.
+    :param install_dir: Path to bin directory of a testable installation
     """
     change_detector = EvergreenFileChangeDetector(task_id, evg_api, os.environ)
     executor = GenerateBurnInExecutor(generate_config, repeat_config, evg_api, generate_tasks_file)
 
     burn_in_orchestrator = BurnInOrchestrator(change_detector, executor, evg_conf)
-    burn_in_orchestrator.burn_in(repos, build_variant)
+    burn_in_orchestrator.burn_in(repos, build_variant, install_dir)
 
 
 @click.command()
@@ -463,11 +464,13 @@ def burn_in(task_id: str, build_variant: str, generate_config: GenerateConfig,
 @click.option("--verbose", "verbose", default=False, is_flag=True, help="Enable extra logging.")
 @click.option("--task_id", "task_id", required=True, metavar='TASK_ID',
               help="The evergreen task id.")
+@click.option("--install-dir", "install_dir", required=True,
+              help="Path to bin directory of a testable installation.")
 # pylint: disable=too-many-arguments,too-many-locals
 def main(build_variant: str, run_build_variant: str, distro: str, project: str,
          generate_tasks_file: str, repeat_tests_num: Optional[int], repeat_tests_min: Optional[int],
          repeat_tests_max: Optional[int], repeat_tests_secs: Optional[int], evg_api_config: str,
-         verbose: bool, task_id: str):
+         verbose: bool, task_id: str, install_dir: str):
     """
     Run new or changed tests in repeated mode to validate their stability.
 
@@ -500,6 +503,7 @@ def main(build_variant: str, run_build_variant: str, distro: str, project: str,
     :param evg_api_config: Location of configuration file to connect to evergreen.
     :param verbose: Log extra debug information.
     :param task_id: Id of evergreen task being run in.
+    :param install_dir: path to bin directory of a testable installation
     """
     _configure_logging(verbose)
 
@@ -520,7 +524,7 @@ def main(build_variant: str, run_build_variant: str, distro: str, project: str,
     generate_config.validate(evg_conf)
 
     burn_in(task_id, build_variant, generate_config, repeat_config, evg_api, evg_conf, repos,
-            generate_tasks_file)
+            generate_tasks_file, install_dir)
 
 
 if __name__ == "__main__":

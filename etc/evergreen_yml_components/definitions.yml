@@ -2425,6 +2425,7 @@ tasks:
   - func: "run tests"
     vars:
       suite: unittests
+      install_dir: build/install/bin
 
 ## run_unittests with UndoDB live-record ##
 #- name: run_unittests_with_recording
@@ -2452,6 +2453,7 @@ tasks:
 #        # Start fewer jobs since there's a constant amount of overhead of starting
 #        # live-record for each job.
 #        resmoke_jobs_factor: 0.3
+#        install_dir: build/install/bin
 
 
 ##compile_and_archive_libfuzzertests - build libfuzzertests ##
@@ -2492,6 +2494,7 @@ tasks:
     vars:
       targets: install-sdam-json-test
       compiling_for_test: true
+      install_dir: build/install/bin
   - func: "run tests"
     vars:
       suite: sdam_json_test
@@ -2503,6 +2506,7 @@ tasks:
     vars:
       targets: install-server-selection-json-test
       compiling_for_test: true
+      install_dir: build/install/bin
   - func: "run tests"
 
 ## compile_dbtest ##

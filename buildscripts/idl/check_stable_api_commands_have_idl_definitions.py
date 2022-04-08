@@ -167,14 +167,20 @@ def main():
     arg_parser = argparse.ArgumentParser(description=__doc__)
     arg_parser.add_argument("--include", type=str, action="append",
                             help="Directory to search for IDL import files")
-    arg_parser.add_argument("--installDir", dest="install_dir", metavar="INSTALL_DIR",
+    arg_parser.add_argument("--install-dir", dest="install_dir", required=True,
                             help="Directory to search for MongoDB binaries")
     arg_parser.add_argument("-v", "--verbose", action="count", help="Enable verbose logging")
     arg_parser.add_argument("api_version", metavar="API_VERSION", help="API Version to check")
     args = arg_parser.parse_args()
 
+    class FakeArgs:
+        """Fake argparse.Namespace-like class to pass arguments to _update_config_vars."""
+
+        def __init__(self):
+            self.INSTALL_DIR = args.install_dir  # pylint: disable=invalid-name
+
     # pylint: disable=protected-access
-    configure_resmoke._update_config_vars(object)
+    configure_resmoke._update_config_vars(FakeArgs())
     configure_resmoke._set_logging_config()
 
     # Configure Fixture logging.
