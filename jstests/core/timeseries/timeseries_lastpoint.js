@@ -31,10 +31,6 @@ if (!isLastpointEnabled) {
     return;
 }
 
-// Timeseries test parameters.
-const numHosts = 10;
-const numIterations = 20;
-
 function verifyLastpoint({tsColl, observerColl, pipeline, precedingFilter, expectStage}) {
     // Verify lastpoint optmization.
     const explain = tsColl.explain().aggregate(pipeline);
@@ -50,6 +46,8 @@ function createBoringCollections(includeIdleMeasurements = false) {
     // Prepare collections. Note: we usually test without idle measurements (all meta subfields are
     // non-null). If we allow the insertion of idle measurements, we will obtain multiple lastpoints
     // per bucket, and may have different results on the observer and timeseries collections.
+    const numHosts = 10;
+    const numIterations = 20;
     return TimeseriesAggTests.prepareInputCollections(
         numHosts, numIterations, includeIdleMeasurements);
 }
@@ -181,53 +179,6 @@ function createInterestingCollections() {
     return [tsColl, observerColl];
 }
 
-function verifyTsResults({pipeline, precedingFilter, expectStage, prepareTest}) {
-    const [tsColl, observerColl] = prepareTest();
-    verifyLastpoint({tsColl, observerColl, pipeline, precedingFilter, expectStage});
-
-    // Drop collections after test.
-    tsColl.drop();
-    observerColl.drop();
-}
-
-function verifyTsResultsWithAndWithoutIndex({
-    pipeline,
-    index,
-    bucketsIndex,
-    precedingFilter,
-    expectStage,
-    prepareCollections,
-    noSortInCursor
-}) {
-    // Test without indexes first.
-    const prepareTest = prepareCollections;
-    const expectNoIndexStage = ({explain, precedingFilter}) =>
-        expectCollScan({explain, precedingFilter, noSortInCursor});
-    verifyTsResults({pipeline, precedingFilter, expectStage: expectNoIndexStage, prepareTest});
-
-    // Test with indexes.
-    verifyTsResults({
-        pipeline,
-        precedingFilter,
-        expectStage,
-        prepareTest: () => {
-            const [tsColl, observerColl] = prepareCollections();
-
-            // Create index on the timeseries collection.
-            tsColl.createIndex(index);
-
-            // Create an additional secondary index directly on the buckets collection so that we
-            // can test the DISTINCT_SCAN optimization when time is sorted in ascending order.
-            if (bucketsIndex) {
-                const bucketsColl = testDB["system.buckets.in"];
-                bucketsColl.createIndex(bucketsIndex);
-            }
-
-            return [tsColl, observerColl];
-        }
-    });
-}
-
 function expectDistinctScan({explain}) {
     // The query can utilize DISTINCT_SCAN.
     assert.neq(getAggPlanStage(explain, "DISTINCT_SCAN"), null, explain);
@@ -281,125 +232,174 @@ function getGroupStage(accumulator, extraFields = []) {
      3. Lastpoint queries on indexes with ascending time and $last and an additional secondary
     index so that we can use the DISTINCT_SCAN optimization.
 */
-const testCases = [
-    {time: -1, useBucketsIndex: false},
-    {time: 1, useBucketsIndex: false},
-    {time: 1, useBucketsIndex: true}
-];
+function testAllTimeMetaDirections(tsColl, observerColl, getTestCases) {
+    const testCases = [
+        {time: -1, useBucketsIndex: false},
+        {time: 1, useBucketsIndex: false},
+        {time: 1, useBucketsIndex: true}
+    ];
 
-for (const {time, useBucketsIndex} of testCases) {
-    const isTimeDescending = time < 0;
-    const canUseDistinct = isTimeDescending || useBucketsIndex;
-    const accumulator = isTimeDescending ? "$first" : "$last";
-    const groupStage = getGroupStage(accumulator);
+    for (const {time, useBucketsIndex} of testCases) {
+        const isTimeDescending = time < 0;
+        const canUseDistinct = isTimeDescending || useBucketsIndex;
+        const accumulator = isTimeDescending ? "$first" : "$last";
+        const groupStage = getGroupStage(accumulator);
 
-    // Test both directions of the metaField sort for each direction of time.
-    for (const metaDir of [1, -1]) {
-        const index = {"tags.hostid": metaDir, time};
-        const bucketsIndex = useBucketsIndex
-            ? {"meta.hostid": metaDir, "control.max.time": 1, "control.min.time": 1}
-            : undefined;
-        const canSortOnTimeUseDistinct = (metaDir > 0) && (isTimeDescending || useBucketsIndex);
+        // Test both directions of the metaField sort for each direction of time.
+        for (const metaDir of [1, -1]) {
+            const index = {"tags.hostid": metaDir, time};
+            const bucketsIndex = useBucketsIndex
+                ? {"meta.hostid": metaDir, "control.max.time": 1, "control.min.time": 1}
+                : undefined;
 
-        // Test pipeline without a preceding $match stage with sort only on time.
-        verifyTsResultsWithAndWithoutIndex({
-            pipeline: [{$sort: {time}}, groupStage],
-            index,
-            bucketsIndex,
-            expectStage: (canSortOnTimeUseDistinct ? expectDistinctScan : expectCollScan),
-            prepareCollections: createBoringCollections,
-        });
+            const tests = getTestCases({
+                canUseDistinct,
+                canSortOnTimeUseDistinct: (metaDir > 0) && (isTimeDescending || useBucketsIndex),
+                accumulator,
+                groupStage,
+                time,
+                index,
+                bucketsIndex,
+            });
 
-        // Test pipeline without a preceding $match stage with a sort on the index.
-        verifyTsResultsWithAndWithoutIndex({
-            pipeline: [{$sort: index}, groupStage],
-            index,
-            bucketsIndex,
-            expectStage: (canUseDistinct ? expectDistinctScan : expectCollScan),
-            prepareCollections: createBoringCollections,
-        });
+            // Run all tests without an index.
+            for (const {pipeline, expectStageNoIndex, precedingFilter} of tests) {
+                // Normally we expect to see a COLLSCAN with a SORT pushed into the cursor, but some
+                // test-cases may override this.
+                const expectStage = expectStageNoIndex || expectCollScan;
+                verifyLastpoint({tsColl, observerColl, pipeline, precedingFilter, expectStage});
+            }
 
-        // Test pipeline without a projection to ensure that we correctly evaluate
-        // computedMetaProjFields in the rewrite. Note that we can't get a DISTINCT_SCAN here due to
-        // the projection.
-        {
-            const expectStage = ({explain}) => expectCollScan({explain, noSortInCursor: true});
-            verifyTsResultsWithAndWithoutIndex({
+            // Create index on the timeseries collection.
+            const ixName = "tsIndex_time_" + time + "_meta_" + metaDir;
+            tsColl.createIndex(index, {name: ixName});
+
+            // Create an additional secondary index directly on the buckets collection so that we
+            // can test the DISTINCT_SCAN optimization when time is sorted in ascending order.
+            const bucketsColl = testDB["system.buckets.in"];
+            const bucketsIxName = "bucketsIndex_time_" + time + "_meta_" + metaDir;
+            if (bucketsIndex) {
+                bucketsColl.createIndex(bucketsIndex, {name: bucketsIxName});
+            }
+
+            // Re-run all tests with an index.
+            for (const {pipeline, expectStageWithIndex, precedingFilter} of tests) {
+                verifyLastpoint({
+                    tsColl,
+                    observerColl,
+                    pipeline,
+                    precedingFilter,
+                    expectStage: expectStageWithIndex
+                });
+            }
+
+            // Drop indexes for next test.
+            tsColl.dropIndex(ixName);
+            if (bucketsIndex) {
+                bucketsColl.dropIndex(bucketsIxName);
+            }
+        }
+    }
+
+    // Drop collections at the end of the test.
+    tsColl.drop();
+    observerColl.drop();
+}
+
+{
+    const [tsColl, observerColl] = createBoringCollections();
+    testAllTimeMetaDirections(tsColl, observerColl, (t) => {
+        const {time, canUseDistinct, canSortOnTimeUseDistinct, accumulator, groupStage, index} = t;
+        const expectCollscanNoSort = ({explain}) => expectCollScan({explain, noSortInCursor: true});
+        const getTestWithMatch = (matchStage, precedingFilter) => {
+            return {
+                precedingFilter,
+                pipeline: [matchStage, {$sort: index}, groupStage],
+                expectStageWithIndex: (canUseDistinct ? expectDistinctScan : expectIxscan),
+            };
+        };
+        return [
+            // Test pipeline without a preceding $match stage with sort only on time.
+            {
+                pipeline: [{$sort: {time}}, groupStage],
+                expectStageWithIndex:
+                    (canSortOnTimeUseDistinct ? expectDistinctScan : expectCollScan),
+            },
+
+            // Test pipeline without a preceding $match stage with a sort on the index.
+            {
+                pipeline: [{$sort: index}, groupStage],
+                expectStageWithIndex: (canUseDistinct ? expectDistinctScan : expectCollScan),
+            },
+
+            // Test pipeline without a projection to ensure that we correctly evaluate
+            // computedMetaProjFields in the rewrite. Note that we can't get a DISTINCT_SCAN here
+            // due to the projection.
+            {
                 pipeline: [
                     {$set: {abc: {$add: [1, "$tags.hostid"]}}},
                     {$sort: index},
                     getGroupStage(accumulator, ["abc"]),
                 ],
-                index,
-                bucketsIndex,
-                noSortInCursor: true,
-                expectStage,
-                prepareCollections: createBoringCollections,
-            });
-        }
+                expectStageWithIndex: expectCollscanNoSort,
+                expectStageNoIndex: expectCollscanNoSort,
+            },
 
-        // Test pipeline without a preceding $match stage which has an extra idle measurement. This
-        // verifies that the query rewrite correctly returns missing fields.
-        verifyTsResultsWithAndWithoutIndex({
+            // Test pipeline with an equality $match stage.
+            getTestWithMatch({$match: {"tags.hostid": 0}}, {"meta.hostid": {$eq: 0}}),
+
+            // Test pipeline with an inequality $match stage.
+            getTestWithMatch({$match: {"tags.hostid": {$ne: 0}}},
+                             {"meta.hostid": {$not: {$eq: 0}}}),
+
+            // Test pipeline with a $match stage that uses a $gt query.
+            getTestWithMatch({$match: {"tags.hostid": {$gt: 5}}}, {"meta.hostid": {$gt: 5}}),
+
+            // Test pipeline with a $match stage that uses a $lt query.
+            getTestWithMatch({$match: {"tags.hostid": {$lt: 5}}}, {"meta.hostid": {$lt: 5}}),
+        ];
+    });
+}
+
+// Test pipeline without a preceding $match stage which has an extra idle measurement. This verifies
+// that the query rewrite correctly returns missing fields.
+{
+    const [tsColl, observerColl] = createBoringCollections(true /* includeIdleMeasurements */);
+    testAllTimeMetaDirections(
+        tsColl,
+        observerColl,
+        ({canUseDistinct, groupStage, index}) => [{
             pipeline: [{$sort: index}, groupStage],
-            index,
-            bucketsIndex,
-            expectStage: (canUseDistinct ? expectDistinctScan : expectCollScan),
-            prepareCollections: () => createBoringCollections(true /* includeIdleMeasurements */),
-        });
+            expectStageWithIndex: (canUseDistinct ? expectDistinctScan : expectCollScan),
+        }]);
+}
 
-        // Test interesting metaField values.
-        {
-            const expectIxscanNoSort = ({explain}) => expectIxscan({explain, noSortInCursor: true});
+// Test interesting metaField values.
+{
+    const [tsColl, observerColl] = createInterestingCollections();
+    const expectIxscanNoSort = ({explain}) => expectIxscan({explain, noSortInCursor: true});
 
-            // Verifies that the '_id' of each group matches one of the equivalent '_id' values.
-            const mapToEquivalentIdStage = getMapInterestingValuesToEquivalentsStage();
+    // Verifies that the '_id' of each group matches one of the equivalent '_id' values.
+    const mapToEquivalentIdStage = getMapInterestingValuesToEquivalentsStage();
 
+    testAllTimeMetaDirections(
+        tsColl,
+        observerColl,
+        ({canUseDistinct, canSortOnTimeUseDistinct, groupStage, time, index}) => [
             // Test pipeline with sort only on time and interesting metaField values.
-            verifyTsResultsWithAndWithoutIndex({
+            {
                 pipeline: [{$sort: {time}}, groupStage, mapToEquivalentIdStage],
-                index,
-                bucketsIndex,
                 // We get an index scan here because the index on interesting values is multikey.
-                expectStage: (canSortOnTimeUseDistinct ? expectIxscanNoSort : expectCollScan),
-                prepareCollections: createInterestingCollections,
-            });
-
+                expectStageWithIndex:
+                    (canSortOnTimeUseDistinct ? expectIxscanNoSort : expectCollScan),
+            },
             // Test pipeline without a preceding $match stage and interesting metaField values.
-            verifyTsResultsWithAndWithoutIndex({
+            {
                 pipeline: [{$sort: index}, groupStage, mapToEquivalentIdStage],
-                index,
-                bucketsIndex,
                 // We get an index scan here because the index on interesting values is multikey, so
                 // we cannot have a DISTINCT_SCAN.
-                expectStage: (canUseDistinct ? expectIxscanNoSort : expectCollScan),
-                prepareCollections: createInterestingCollections,
-            });
-        }
-
-        // Test pipeline with a preceding $match stage.
-        function testWithMatch(matchStage, precedingFilter) {
-            verifyTsResultsWithAndWithoutIndex({
-                pipeline: [matchStage, {$sort: index}, groupStage],
-                index,
-                bucketsIndex,
-                precedingFilter,
-                expectStage: canUseDistinct ? expectDistinctScan : expectIxscan,
-                prepareCollections: createBoringCollections,
-            });
-        }
-
-        // Test pipeline with an equality $match stage.
-        testWithMatch({$match: {"tags.hostid": 0}}, {"meta.hostid": {$eq: 0}});
-
-        // Test pipeline with an inequality $match stage.
-        testWithMatch({$match: {"tags.hostid": {$ne: 0}}}, {"meta.hostid": {$not: {$eq: 0}}});
-
-        // Test pipeline with a $match stage that uses a $gt query.
-        testWithMatch({$match: {"tags.hostid": {$gt: 5}}}, {"meta.hostid": {$gt: 5}});
-
-        // Test pipeline with a $match stage that uses a $lt query.
-        testWithMatch({$match: {"tags.hostid": {$lt: 5}}}, {"meta.hostid": {$lt: 5}});
-    }
+                expectStageWithIndex: (canUseDistinct ? expectIxscanNoSort : expectCollScan),
+            },
+    ]);
 }
 })();
