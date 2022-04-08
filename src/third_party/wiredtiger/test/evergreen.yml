@@ -2790,7 +2790,7 @@ tasks:
             virtualenv -p python3 venv
             source venv/bin/activate
             pip3 install "pymongo[srv]==3.12.2"
-            res_dir=`find ./ -type d -name "many-collection-[0-9]*" -print`
+            res_dir=`find ./ -type d -name "many-collection-artifacts" -print`
             ./upload-results-atlas.py ${atlas_wt_perf_test_user} ${atlas_wt_perf_pass} wt-perf-tests many-collection-test ${branch_name} $res_dir/results/results.json
 
   - name: cyclomatic-complexity
@@ -4014,8 +4014,8 @@ buildvariants:
       WT_TOPDIR=$(git rev-parse --show-toplevel)
       WT_BUILDDIR=$WT_TOPDIR/cmake_build
       LD_LIBRARY_PATH=$WT_BUILDDIR:$WT_TOPDIR/TCMALLOC_LIB/lib
-    upload_source_dir: mongo-tests/largescale/many-collection/dbpath/diagnostic.data
-    upload_filename: diagnostic.data.tgz
+    upload_source_dir: mongo-tests/largescale/many-collection-artifacts
+    upload_filename: many-collection.tgz
   tasks:
     - name: many-collection-test
       distros: ubuntu2004-wt-large
