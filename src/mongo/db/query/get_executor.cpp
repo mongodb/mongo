@@ -282,7 +282,7 @@ void fillOutIndexEntries(OperationContext* opCtx,
                          const CanonicalQuery* canonicalQuery,
                          const CollectionPtr& collection,
                          std::vector<IndexEntry>& entries) {
-    // TODO SERVER-63352: Eliminate this check once we support auto-parameterized index scan plans.
+    // TODO SERVER-65129: Eliminate this check once we support auto-parameterized index scan plans.
     if (feature_flags::gFeatureFlagAutoParameterization.isEnabledAndIgnoreFCV()) {
         // Indexed plans are not yet supported when auto-parameterization is enabled, so make it
         // look to the planner like there are no indexes.

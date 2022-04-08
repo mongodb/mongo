@@ -34,6 +34,7 @@
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/trial_period_utils.h"
+#include "mongo/db/query/interval_evaluation_tree.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
@@ -267,6 +268,20 @@ using InputParamToSlotMap = stdx::unordered_map<MatchExpression::InputParamId, s
 using VariableIdToSlotMap = stdx::unordered_map<Variables::Id, sbe::value::SlotId>;
 
 /**
+ * IndexBoundsEvaluationInfo struct contains Interval Evaluation Trees (IETs) and additional data
+ * structures required to restore index bounds from IETs and bind them to generic index scan
+ * algorithm.
+ */
+struct IndexBoundsEvaluationInfo {
+    IndexEntry index;
+    KeyString::Version keyStringVersion;
+    Ordering ordering;
+    int direction;
+    std::vector<interval_evaluation_tree::IET> iets;
+    ParameterizedIndexScanSlots slots;
+};
+
+/**
  * Some auxiliary data returned by a 'SlotBasedStageBuilder' along with a PlanStage tree root, which
  * is needed to execute the PlanStage tree.
  */
@@ -336,6 +351,10 @@ struct PlanStageData {
     // This Variable-to-SlotId map stores all the Variables that were translated into corresponding
     // SBE Slots. The slots are registered in the 'RuntimeEnvironment'.
     VariableIdToSlotMap variableIdToSlotMap;
+
+    // Stores auxiliary data to restore index bounds for a cached auto-parameterized SBE plan for
+    // every index used by the plan.
+    std::vector<IndexBoundsEvaluationInfo> indexBoundsEvaluationInfos;
 
 private:
     // This copy function copies data from 'other' but will not create a copy of its

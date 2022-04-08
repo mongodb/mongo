@@ -196,62 +196,6 @@ std::vector<std::pair<BSONObj, BSONObj>> decomposeIntoSingleIntervals(
 }
 
 /**
- * Constructs low/high key values from the given index 'bounds' if they can be represented either as
- * a single interval between the low and high keys, or multiple single intervals. If index bounds
- * for some interval cannot be expressed as valid low/high keys, then an empty vector is returned.
- */
-std::vector<std::pair<std::unique_ptr<KeyString::Value>, std::unique_ptr<KeyString::Value>>>
-makeIntervalsFromIndexBounds(const IndexBounds& bounds,
-                             bool forward,
-                             KeyString::Version version,
-                             Ordering ordering) {
-    auto lowKeyInclusive{IndexBounds::isStartIncludedInBound(bounds.boundInclusion)};
-    auto highKeyInclusive{IndexBounds::isEndIncludedInBound(bounds.boundInclusion)};
-    auto intervals = [&]() -> std::vector<std::pair<BSONObj, BSONObj>> {
-        auto lowKey = bounds.startKey;
-        auto highKey = bounds.endKey;
-        if (bounds.isSimpleRange ||
-            IndexBoundsBuilder::isSingleInterval(
-                bounds, &lowKey, &lowKeyInclusive, &highKey, &highKeyInclusive)) {
-            return {{lowKey, highKey}};
-        } else if (canBeDecomposedIntoSingleIntervals(
-                       bounds.fields, &lowKeyInclusive, &highKeyInclusive)) {
-            return decomposeIntoSingleIntervals(bounds.fields, lowKeyInclusive, highKeyInclusive);
-        } else {
-            // Index bounds cannot be represented as valid low/high keys.
-            return {};
-        }
-    }();
-
-    LOGV2_DEBUG(
-        4742905, 5, "Number of generated interval(s) for ixscan", "num"_attr = intervals.size());
-    std::vector<std::pair<std::unique_ptr<KeyString::Value>, std::unique_ptr<KeyString::Value>>>
-        result;
-    for (auto&& [lowKey, highKey] : intervals) {
-        LOGV2_DEBUG(4742906,
-                    5,
-                    "Generated interval [lowKey, highKey]",
-                    "lowKey"_attr = lowKey,
-                    "highKey"_attr = highKey);
-        // Note that 'makeKeyFromBSONKeyForSeek()' is intended to compute the "start" key for an
-        // index scan. The logic for computing a "discriminator" for an "end" key is reversed, which
-        // is why we use 'makeKeyStringFromBSONKey()' to manually specify the discriminator for the
-        // end key.
-        result.push_back(
-            {std::make_unique<KeyString::Value>(
-                 IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(
-                     lowKey, version, ordering, forward, lowKeyInclusive)),
-             std::make_unique<KeyString::Value>(IndexEntryComparison::makeKeyStringFromBSONKey(
-                 highKey,
-                 version,
-                 ordering,
-                 forward != highKeyInclusive ? KeyString::Discriminator::kExclusiveBefore
-                                             : KeyString::Discriminator::kExclusiveAfter))});
-    }
-    return result;
-}
-
-/**
  * Constructs an optimized version of an index scan for multi-interval index bounds for the case
  * when the bounds can be decomposed in a number of single-interval bounds. In this case, instead
  * of building a generic index scan to navigate through the index using the 'IndexBoundsChecker',
@@ -281,22 +225,20 @@ makeIntervalsFromIndexBounds(const IndexBounds& bounds,
  * environment and returned as a third element of the tuple.
  */
 std::tuple<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>, boost::optional<sbe::value::SlotId>>
-generateOptimizedMultiIntervalIndexScan(
-    StageBuilderState& state,
-    const CollectionPtr& collection,
-    const std::string& indexName,
-    const BSONObj& keyPattern,
-    bool forward,
-    boost::optional<std::vector<
-        std::pair<std::unique_ptr<KeyString::Value>, std::unique_ptr<KeyString::Value>>>> intervals,
-    sbe::IndexKeysInclusionSet indexKeysToInclude,
-    sbe::value::SlotVector indexKeySlots,
-    boost::optional<sbe::value::SlotId> snapshotIdSlot,
-    boost::optional<sbe::value::SlotId> indexIdSlot,
-    boost::optional<sbe::value::SlotId> recordSlot,
-    boost::optional<sbe::value::SlotId> indexKeyPatternSlot,
-    PlanYieldPolicy* yieldPolicy,
-    PlanNodeId planNodeId) {
+generateOptimizedMultiIntervalIndexScan(StageBuilderState& state,
+                                        const CollectionPtr& collection,
+                                        const std::string& indexName,
+                                        const BSONObj& keyPattern,
+                                        bool forward,
+                                        boost::optional<IndexIntervals> intervals,
+                                        sbe::IndexKeysInclusionSet indexKeysToInclude,
+                                        sbe::value::SlotVector indexKeySlots,
+                                        boost::optional<sbe::value::SlotId> snapshotIdSlot,
+                                        boost::optional<sbe::value::SlotId> indexIdSlot,
+                                        boost::optional<sbe::value::SlotId> recordSlot,
+                                        boost::optional<sbe::value::SlotId> indexKeyPatternSlot,
+                                        PlanYieldPolicy* yieldPolicy,
+                                        PlanNodeId planNodeId) {
     using namespace std::literals;
 
     auto slotIdGenerator = state.slotIdGenerator;
@@ -309,25 +251,7 @@ generateOptimizedMultiIntervalIndexScan(
     auto&& [boundsSlot, boundsStage] =
         [&]() -> std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> {
         if (intervals) {
-            // Construct an array containing objects with the low and high keys
-            // for each interval. E.g.,
-            //    [ {l: KS(...), h: KS(...)},
-            //      {l: KS(...), h: KS(...)}, ... ]
-            auto [boundsTag, boundsVal] = sbe::value::makeNewArray();
-            auto arr = sbe::value::getArrayView(boundsVal);
-            arr->reserve(intervals->size());
-            for (auto&& [lowKey, highKey] : *intervals) {
-                auto [tag, val] = sbe::value::makeNewObject();
-                auto obj = sbe::value::getObjectView(val);
-                obj->reserve(2);
-                obj->push_back("l"_sd,
-                               sbe::value::TypeTags::ksValue,
-                               sbe::value::bitcastFrom<KeyString::Value*>(lowKey.release()));
-                obj->push_back("h"_sd,
-                               sbe::value::TypeTags::ksValue,
-                               sbe::value::bitcastFrom<KeyString::Value*>(highKey.release()));
-                arr->push_back(tag, val);
-            }
+            auto [boundsTag, boundsVal] = packIndexIntervalsInSbeArray(std::move(*intervals));
             const auto boundsSlot = slotIdGenerator->generate();
             return {boundsSlot,
                     sbe::makeProjectStage(std::move(limitStage),
@@ -683,7 +607,7 @@ generateGenericMultiIntervalIndexScan(StageBuilderState& state,
     // Get the start seek key for our recursive scan. If there are no possible index entries that
     // match the bounds and we cannot generate a start seek key, inject an EOF sub-tree an exit
     // straight away - this index scan won't emit any results.
-    if (!didGetStartSeekPoint) {
+    if (!hasDynamicIndexBounds && !didGetStartSeekPoint) {
         sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> projects;
         projects.emplace(resultSlot, makeConstant(sbe::value::TypeTags::Nothing, 0));
 
@@ -1118,6 +1042,79 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
     return {std::move(stage), std::move(outputs)};
 }
 
+IndexIntervals makeIntervalsFromIndexBounds(const IndexBounds& bounds,
+                                            bool forward,
+                                            KeyString::Version version,
+                                            Ordering ordering) {
+    auto lowKeyInclusive{IndexBounds::isStartIncludedInBound(bounds.boundInclusion)};
+    auto highKeyInclusive{IndexBounds::isEndIncludedInBound(bounds.boundInclusion)};
+    auto intervals = [&]() -> std::vector<std::pair<BSONObj, BSONObj>> {
+        auto lowKey = bounds.startKey;
+        auto highKey = bounds.endKey;
+        if (bounds.isSimpleRange ||
+            IndexBoundsBuilder::isSingleInterval(
+                bounds, &lowKey, &lowKeyInclusive, &highKey, &highKeyInclusive)) {
+            return {{lowKey, highKey}};
+        } else if (canBeDecomposedIntoSingleIntervals(
+                       bounds.fields, &lowKeyInclusive, &highKeyInclusive)) {
+            return decomposeIntoSingleIntervals(bounds.fields, lowKeyInclusive, highKeyInclusive);
+        } else {
+            // Index bounds cannot be represented as valid low/high keys.
+            return {};
+        }
+    }();
+
+    LOGV2_DEBUG(
+        4742905, 5, "Number of generated interval(s) for ixscan", "num"_attr = intervals.size());
+    IndexIntervals result;
+    for (auto&& [lowKey, highKey] : intervals) {
+        LOGV2_DEBUG(4742906,
+                    5,
+                    "Generated interval [lowKey, highKey]",
+                    "lowKey"_attr = lowKey,
+                    "highKey"_attr = highKey);
+        // Note that 'makeKeyFromBSONKeyForSeek()' is intended to compute the "start" key for an
+        // index scan. The logic for computing a "discriminator" for an "end" key is reversed, which
+        // is why we use 'makeKeyStringFromBSONKey()' to manually specify the discriminator for the
+        // end key.
+        result.push_back(
+            {std::make_unique<KeyString::Value>(
+                 IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(
+                     lowKey, version, ordering, forward, lowKeyInclusive)),
+             std::make_unique<KeyString::Value>(IndexEntryComparison::makeKeyStringFromBSONKey(
+                 highKey,
+                 version,
+                 ordering,
+                 forward != highKeyInclusive ? KeyString::Discriminator::kExclusiveBefore
+                                             : KeyString::Discriminator::kExclusiveAfter))});
+    }
+    return result;
+}
+
+std::pair<sbe::value::TypeTags, sbe::value::Value> packIndexIntervalsInSbeArray(
+    IndexIntervals intervals) {
+    auto [boundsTag, boundsVal] = sbe::value::makeNewArray();
+    auto arr = sbe::value::getArrayView(boundsVal);
+    sbe::value::ValueGuard boundsGuard{boundsTag, boundsVal};
+    arr->reserve(intervals.size());
+    for (auto&& [lowKey, highKey] : intervals) {
+        auto [tag, val] = sbe::value::makeNewObject();
+        auto obj = sbe::value::getObjectView(val);
+        sbe::value::ValueGuard guard{tag, val};
+        obj->reserve(2);
+        obj->push_back("l"_sd,
+                       sbe::value::TypeTags::ksValue,
+                       sbe::value::bitcastFrom<KeyString::Value*>(lowKey.release()));
+        obj->push_back("h"_sd,
+                       sbe::value::TypeTags::ksValue,
+                       sbe::value::bitcastFrom<KeyString::Value*>(highKey.release()));
+        guard.reset();
+        arr->push_back(tag, val);
+    }
+    boundsGuard.reset();
+    return {boundsTag, boundsVal};
+}
+
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWithDynamicBounds(
     StageBuilderState& state,
     const CollectionPtr& collection,
@@ -1205,6 +1202,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWith
             state.slotIdGenerator,
             state.spoolIdGenerator,
             yieldPolicy);
+    tassert(6335203, "bounds slots for index scan are undefined", genericIndexScanBoundsSlots);
     genericIndexScanSlots.push_back(genericIndexScanRecordIdSlot);
 
     // If we were able to decompose multi-interval index bounds into a number of single-interval
@@ -1226,6 +1224,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWith
                                                 optimizedIndexKeyPatternSlot,
                                                 yieldPolicy,
                                                 ixn->nodeId());
+    tassert(6335204, "bounds slot for index scan is undefined", optimizedIndexScanBoundsSlot);
     optimizedIndexScanSlots.push_back(optimizedIndexScanRecordIdSlot);
 
     // Generate a branch stage that will either execute an optimized or a generic index scan
@@ -1268,11 +1267,19 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWith
     outputs.setIndexKeySlots(makeIndexKeyOutputSlotsMatchingParentReqs(
         ixn->index.keyPattern, originalIndexKeyBitset, indexKeyBitset, outputIndexKeySlots));
 
-    [[maybe_unused]] ParameterizedIndexScanSlots indexScanStageSlots{
-        isGenericScanSlot,
-        genericIndexScanBoundsSlots->first,
-        genericIndexScanBoundsSlots->second,
-        *optimizedIndexScanBoundsSlot};
+    ParameterizedIndexScanSlots indexScanStageSlots{isGenericScanSlot,
+                                                    genericIndexScanBoundsSlots->first,
+                                                    genericIndexScanBoundsSlots->second,
+                                                    *optimizedIndexScanBoundsSlot};
+
+    state.data->indexBoundsEvaluationInfos.emplace_back(
+        IndexBoundsEvaluationInfo{ixn->index,
+                                  accessMethod->getSortedDataInterface()->getKeyStringVersion(),
+                                  accessMethod->getSortedDataInterface()->getOrdering(),
+                                  ixn->direction,
+                                  std::move(ixn->iets),
+                                  std::move(indexScanStageSlots)});
+
     return {std::move(stage), std::move(outputs)};
 }
 }  // namespace mongo::stage_builder

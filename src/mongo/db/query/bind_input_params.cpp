@@ -278,13 +278,13 @@ private:
         // The encoding of the plan cache key should ensure that if we recover a cached plan from
         // the cached, the auto-parameterization of the query is consistent with the way that the
         // cached plan is parameterized.
-        tassert(6279500,
-                str::stream() << "expected value in 'inputParamsToSlotsMap' for param id: "
-                              << paramId,
-                it != _inputParamToSlotMap.end());
-        auto accessor = _runtimeEnvironment->getAccessor(it->second);
-
-        accessor->reset(owned, typeTag, value);
+        if (it != _inputParamToSlotMap.end()) {
+            auto accessor = _runtimeEnvironment->getAccessor(it->second);
+            accessor->reset(owned, typeTag, value);
+        } else {
+            // TODO SERVER-65361: add tassert here if the slotId is missing from
+            // _inputParamToSlotMap but not from IETs.
+        }
     }
 
     const stage_builder::InputParamToSlotMap& _inputParamToSlotMap;

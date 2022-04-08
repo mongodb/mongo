@@ -981,6 +981,32 @@ void QueryPlannerAccess::finishLeafNode(
         }
     }
 
+    // Process a case when some fields are not filled out with bounds.
+    if (firstEmptyField != bounds->fields.size()) {
+        // Skip ahead to the firstEmptyField-th element, where we begin filling in bounds.
+        BSONObjIterator it(nodeIndex->keyPattern);
+        for (size_t i = 0; i < firstEmptyField; ++i) {
+            verify(it.more());
+            it.next();
+        }
+
+        // For each field in the key...
+        while (it.more()) {
+            BSONElement kpElt = it.next();
+            // There may be filled-in fields to the right of the firstEmptyField; for instance, the
+            // index {loc:"2dsphere", x:1} with a predicate over x and a near search over loc.
+            if (bounds->fields[firstEmptyField].name.empty()) {
+                verify(bounds->fields[firstEmptyField].intervals.empty());
+                IndexBoundsBuilder::allValuesForField(kpElt, &bounds->fields[firstEmptyField]);
+            }
+            ++firstEmptyField;
+        }
+
+        // Make sure that the length of the key is the length of the bounds we started.
+        verify(firstEmptyField == bounds->fields.size());
+    }
+
+    // Build Interval Evaluation Trees used to restore index bounds from cached SBE Plans.
     if (node->getType() == STAGE_IXSCAN && !ietBuilders.empty()) {
         auto ixScan = static_cast<IndexScanNode*>(node);
         ixScan->iets.reserve(ietBuilders.size());
@@ -996,34 +1022,6 @@ void QueryPlannerAccess::finishLeafNode(
         }
         LOGV2_DEBUG(6334900, 5, "Build IETs", "iets"_attr = ietsToString(index, ixScan->iets));
     }
-
-    // All fields are filled out with bounds, nothing to do.
-    if (firstEmptyField == bounds->fields.size()) {
-        return IndexBoundsBuilder::alignBounds(
-            bounds, nodeIndex->keyPattern, nodeIndex->collator != nullptr);
-    }
-
-    // Skip ahead to the firstEmptyField-th element, where we begin filling in bounds.
-    BSONObjIterator it(nodeIndex->keyPattern);
-    for (size_t i = 0; i < firstEmptyField; ++i) {
-        verify(it.more());
-        it.next();
-    }
-
-    // For each field in the key...
-    while (it.more()) {
-        BSONElement kpElt = it.next();
-        // There may be filled-in fields to the right of the firstEmptyField; for instance, the
-        // index {loc:"2dsphere", x:1} with a predicate over x and a near search over loc.
-        if (bounds->fields[firstEmptyField].name.empty()) {
-            verify(bounds->fields[firstEmptyField].intervals.empty());
-            IndexBoundsBuilder::allValuesForField(kpElt, &bounds->fields[firstEmptyField]);
-        }
-        ++firstEmptyField;
-    }
-
-    // Make sure that the length of the key is the length of the bounds we started.
-    verify(firstEmptyField == bounds->fields.size());
 
     // We create bounds assuming a forward direction but can easily reverse bounds to align
     // according to our desired direction.
