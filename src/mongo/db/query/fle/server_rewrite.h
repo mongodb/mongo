@@ -112,39 +112,48 @@ BSONObj rewriteEncryptedFilterInsideTxn(FLEQueryInterface* queryImpl,
  * around as extra arguments to every function.
  *
  * Exposed in the header file for unit testing purposes. External callers should use the
- * rewriteEncryptedFilter() helper function defined below.
+ * rewriteEncryptedFilterInsideTxn() helper function defined above.
  */
-class MatchExpressionRewrite {
+class FLEQueryRewriter {
 public:
     /**
      * Takes in references to collection readers for the ESC and ECC that are used during tag
-     * computation, along with a BSONObj holding a MatchExpression to rewrite. The rewritten
-     * BSON is then retrieved by calling get() on the rewriter object.
+     * computation.
      */
-    MatchExpressionRewrite(boost::intrusive_ptr<ExpressionContext> expCtx,
-                           const FLEStateCollectionReader& escReader,
-                           const FLEStateCollectionReader& eccReader,
-                           BSONObj filter)
-        : _escReader(&escReader), _eccReader(&eccReader) {
+    FLEQueryRewriter(boost::intrusive_ptr<ExpressionContext> expCtx,
+                     const FLEStateCollectionReader& escReader,
+                     const FLEStateCollectionReader& eccReader)
+        : _expCtx(expCtx), _escReader(&escReader), _eccReader(&eccReader) {
         // This isn't the "real" query so we don't want to increment Expression
         // counters here.
-        expCtx->stopExpressionCounters();
-        auto expr = uassertStatusOK(MatchExpressionParser::parse(filter, expCtx));
-        _result = _rewriteMatchExpression(std::move(expr))->serialize();
+        _expCtx->stopExpressionCounters();
     }
 
     /**
-     * Get the rewritten MatchExpression from the object.
+     * Accepts a BSONObj holding a MatchExpression, and returns BSON representing the rewritten
+     * expression. Returns boost::none if no rewriting was done.
+     *
+     * Rewrites the match expression with FLE find payloads into a disjunction on the
+     * __safeContent__ array of tags.
+     *
+     * Will rewrite top-level $eq and $in expressions, as well as recursing through $and, $or, $not
+     * and $nor. Also handles similarly limited rewriting under $expr. All other MatchExpressions,
+     * notably $elemMatch, are ignored.
      */
-    BSONObj get() {
-        return _result.getOwned();
-    }
+    boost::optional<BSONObj> rewriteMatchExpression(const BSONObj& filter);
+
+    /**
+     * Accepts an expression to be re-written. Will rewrite top-level expressions including $eq and
+     * $in, as well as recursing through other expressions. Returns a new pointer if the top-level
+     * expression must be changed. A nullptr indicates that the modifications happened in-place.
+     */
+    std::unique_ptr<Expression> rewriteExpression(Expression* expression);
 
     /**
      * Determine whether a given BSONElement is in fact a FLE find payload.
      * Sub-type 6, sub-sub-type 0x05.
      */
-    virtual bool isFleFindPayload(const BSONElement& elt) {
+    virtual bool isFleFindPayload(const BSONElement& elt) const {
         if (!elt.isBinData(BinDataType::Encrypt)) {
             return false;
         }
@@ -154,19 +163,31 @@ public:
             data[0] == static_cast<uint8_t>(EncryptedBinDataType::kFLE2FindEqualityPayload);
     }
 
-protected:
     /**
-     * Rewrites a match expression with FLE find payloads into a disjunction on the __safeContent__
-     * array of tags.
-     *
-     * Will rewrite top-level $eq and $in expressions, as well as recursing through $and, $or, $not
-     * and $nor. All other MatchExpressions, notably $elemMatch, are ignored. This function is only
-     * used directly during unit testing.
+     * Determine whether a given Value is in fact a FLE find payload.
+     * Sub-type 6, sub-sub-type 0x05.
      */
-    std::unique_ptr<MatchExpression> _rewriteMatchExpression(std::unique_ptr<MatchExpression> expr);
+    bool isFleFindPayload(const Value& v) const {
+        if (v.getType() != BSONType::BinData) {
+            return false;
+        }
 
-    // The default constructor should only be used for mocks in testing.
-    MatchExpressionRewrite() : _escReader(nullptr), _eccReader(nullptr) {}
+        auto binData = v.getBinData();
+        return binData.type == BinDataType::Encrypt && binData.length >= 1 &&
+            static_cast<uint8_t>(EncryptedBinDataType::kFLE2FindEqualityPayload) ==
+            static_cast<const uint8_t*>(binData.data)[0];
+    }
+
+    std::vector<Value> rewritePayloadAsTags(Value fleFindPayload) const;
+
+    ExpressionContext* expCtx() {
+        return _expCtx.get();
+    }
+
+protected:
+    // This constructor should only be used for mocks in testing.
+    FLEQueryRewriter(boost::intrusive_ptr<ExpressionContext> expCtx)
+        : _expCtx(expCtx), _escReader(nullptr), _eccReader(nullptr) {}
 
 private:
     /**
@@ -174,15 +195,19 @@ private:
      */
     std::unique_ptr<MatchExpression> _rewrite(MatchExpression* me);
 
-    virtual BSONObj rewritePayloadAsTags(BSONElement fleFindPayload);
+    virtual BSONObj rewritePayloadAsTags(BSONElement fleFindPayload) const;
     std::unique_ptr<InMatchExpression> rewriteEq(const EqualityMatchExpression* expr);
     std::unique_ptr<InMatchExpression> rewriteIn(const InMatchExpression* expr);
+
+    boost::intrusive_ptr<ExpressionContext> _expCtx;
 
     // Holds a pointer so that these can be null for tests, even though the public constructor
     // takes a const reference.
     const FLEStateCollectionReader* _escReader;
     const FLEStateCollectionReader* _eccReader;
-    BSONObj _result;
+
+    // True if the last Expression or MatchExpression processed by this rewriter was rewritten.
+    bool _rewroteLastExpression;
 };
 
 

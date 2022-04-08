@@ -40,10 +40,12 @@
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/crypto/fle_tags.h"
 #include "mongo/db/fle_crud.h"
+#include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/document_source_geo_near.h"
 #include "mongo/db/pipeline/document_source_graph_lookup.h"
 #include "mongo/db/pipeline/document_source_match.h"
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/transaction_router_resource_yielder.h"
@@ -64,11 +66,158 @@ std::unique_ptr<CollatorInterface> collatorFromBSON(OperationContext* opCtx,
     return collator;
 }
 namespace {
+
+/**
+ * This section defines a mapping from DocumentSources to the dispatch function to appropriately
+ * handle FLE rewriting for that stage. This should be kept in line with code on the client-side
+ * that marks constants for encryption: we should handle all places where an implicitly-encrypted
+ * value may be for each stage, otherwise we may return non-sensical results.
+ */
+static stdx::unordered_map<std::type_index, std::function<void(FLEQueryRewriter*, DocumentSource*)>>
+    stageRewriterMap;
+
+#define REGISTER_DOCUMENT_SOURCE_FLE_REWRITER(className, rewriterFunc)                 \
+    MONGO_INITIALIZER(encryptedAnalyzerFor_##className)(InitializerContext*) {         \
+                                                                                       \
+        invariant(stageRewriterMap.find(typeid(className)) == stageRewriterMap.end()); \
+        stageRewriterMap[typeid(className)] = [&](auto* rewriter, auto* source) {      \
+            rewriterFunc(rewriter, static_cast<className*>(source));                   \
+        };                                                                             \
+    }
+
+void rewriteMatch(FLEQueryRewriter* rewriter, DocumentSourceMatch* source) {
+    if (auto rewritten = rewriter->rewriteMatchExpression(source->getQuery())) {
+        source->rebuild(rewritten.get());
+    }
+}
+
+void rewriteGeoNear(FLEQueryRewriter* rewriter, DocumentSourceGeoNear* source) {
+    if (auto rewritten = rewriter->rewriteMatchExpression(source->getQuery())) {
+        source->setQuery(rewritten.get());
+    }
+}
+
+void rewriteGraphLookUp(FLEQueryRewriter* rewriter, DocumentSourceGraphLookUp* source) {
+    if (auto filter = source->getAdditionalFilter()) {
+        if (auto rewritten = rewriter->rewriteMatchExpression(filter.get())) {
+            source->setAdditionalFilter(rewritten.get());
+        }
+    }
+
+    if (auto newExpr = rewriter->rewriteExpression(source->getStartWithField())) {
+        source->setStartWithField(newExpr.release());
+    }
+}
+
+REGISTER_DOCUMENT_SOURCE_FLE_REWRITER(DocumentSourceMatch, rewriteMatch);
+REGISTER_DOCUMENT_SOURCE_FLE_REWRITER(DocumentSourceGeoNear, rewriteGeoNear);
+REGISTER_DOCUMENT_SOURCE_FLE_REWRITER(DocumentSourceGraphLookUp, rewriteGraphLookUp);
+
+class FLEExpressionRewriter {
+public:
+    FLEExpressionRewriter(FLEQueryRewriter* queryRewriter) : queryRewriter(queryRewriter){};
+
+    /**
+     * Accepts a vector of expressions to be compared for equality to an encrypted field. For any
+     * expression representing a constant encrypted value, computes the tags for the expression and
+     * rewrites the comparison to a disjunction over __safeContent__. Returns an OR expression of
+     * these disjunctions. If no rewrites were done, returns nullptr. Either all of the expressions
+     * be constant FFPs or none of them should be.
+     *
+     * The final output will look like
+     * {$or: [{$in: [tag0, "$__safeContent__"]}, {$in: [tag1, "$__safeContent__"]}, ...]}.
+     */
+    std::unique_ptr<Expression> rewriteComparisonsToEncryptedField(
+        const std::vector<boost::intrusive_ptr<Expression>>& equalitiesList) {
+        size_t numFFPs = 0;
+        std::vector<boost::intrusive_ptr<Expression>> orListElems;
+
+        for (auto& equality : equalitiesList) {
+            // For each expression representing a FleFindPayload...
+            if (auto constChild = dynamic_cast<ExpressionConstant*>(equality.get())) {
+                if (!queryRewriter->isFleFindPayload(constChild->getValue())) {
+                    continue;
+                }
+
+                // ... rewrite the payload to a list of tags...
+                numFFPs++;
+                auto tags = queryRewriter->rewritePayloadAsTags(constChild->getValue());
+                for (auto&& tagElt : tags) {
+                    // ... and for each tag, construct expression {$in: [tag, "$__safeContent__"]}.
+                    std::vector<boost::intrusive_ptr<Expression>> inVec{
+                        ExpressionConstant::create(queryRewriter->expCtx(), tagElt),
+                        ExpressionFieldPath::createPathFromString(
+                            queryRewriter->expCtx(),
+                            kSafeContent,
+                            queryRewriter->expCtx()->variablesParseState)};
+                    orListElems.push_back(
+                        make_intrusive<ExpressionIn>(queryRewriter->expCtx(), std::move(inVec)));
+                }
+            }
+        }
+
+        // Finally, construct an $or of all of the $ins.
+        if (numFFPs == 0) {
+            return nullptr;
+        }
+        uassert(
+            6334102,
+            "If any elements in an comparison expression are encrypted, then all elements should "
+            "be encrypted.",
+            numFFPs == equalitiesList.size());
+
+        didRewrite = true;
+        return std::make_unique<ExpressionOr>(queryRewriter->expCtx(), std::move(orListElems));
+    }
+
+    std::unique_ptr<Expression> postVisit(Expression* exp) {
+        if (auto inExpr = dynamic_cast<ExpressionIn*>(exp)) {
+            // Rewrite an $in over an encrypted field to an $or. The first child of the $in can be
+            // ignored when rewrites are done; there is no extra information in that child that
+            // doesn't exist in the FFPs in the $in list.
+            if (auto inList = dynamic_cast<ExpressionArray*>(inExpr->getOperandList()[1].get())) {
+                return rewriteComparisonsToEncryptedField(inList->getChildren());
+            }
+        } else if (auto eqExpr = dynamic_cast<ExpressionCompare*>(exp); eqExpr &&
+                   (eqExpr->getOp() == ExpressionCompare::EQ ||
+                    eqExpr->getOp() == ExpressionCompare::NE)) {
+            // Rewrite an $eq comparing an encrypted field and an encrypted constant to an $or.
+            // Either child may be the constant, so try rewriting both.
+            auto or0 = rewriteComparisonsToEncryptedField({eqExpr->getChildren()[0]});
+            auto or1 = rewriteComparisonsToEncryptedField({eqExpr->getChildren()[1]});
+            uassert(6334100, "Cannot compare two encrypted constants to each other", !or0 || !or1);
+
+            // Neither child is an encrypted constant, and no rewriting needs to be done.
+            if (!or0 && !or1) {
+                return nullptr;
+            }
+
+            // Exactly one child was an encrypted constant. The other child can be ignored; there is
+            // no extra information in that child that doesn't exist in the FFP.
+            if (eqExpr->getOp() == ExpressionCompare::NE) {
+                std::vector<boost::intrusive_ptr<Expression>> notChild{(or0 ? or0 : or1).release()};
+                return std::make_unique<ExpressionNot>(queryRewriter->expCtx(),
+                                                       std::move(notChild));
+            }
+            return std::move(or0 ? or0 : or1);
+        }
+
+        return nullptr;
+    }
+
+    FLEQueryRewriter* queryRewriter;
+    bool didRewrite = false;
+};
+
 BSONObj rewriteEncryptedFilter(const FLEStateCollectionReader& escReader,
                                const FLEStateCollectionReader& eccReader,
                                boost::intrusive_ptr<ExpressionContext> expCtx,
                                BSONObj filter) {
-    return MatchExpressionRewrite(expCtx, escReader, eccReader, filter).get();
+    if (auto rewritten =
+            FLEQueryRewriter(expCtx, escReader, eccReader).rewriteMatchExpression(filter)) {
+        return rewritten.get();
+    }
+    return filter;
 }
 
 class RewriteBase {
@@ -101,17 +250,10 @@ public:
 
     ~PipelineRewrite(){};
     void doRewrite(FLEStateCollectionReader& escReader, FLEStateCollectionReader& eccReader) final {
+        auto rewriter = FLEQueryRewriter(expCtx, escReader, eccReader);
         for (auto&& source : pipeline->getSources()) {
-            if (auto match = dynamic_cast<DocumentSourceMatch*>(source.get())) {
-                match->rebuild(
-                    rewriteEncryptedFilter(escReader, eccReader, expCtx, match->getQuery()));
-            } else if (auto geoNear = dynamic_cast<DocumentSourceGeoNear*>(source.get())) {
-                geoNear->setQuery(
-                    rewriteEncryptedFilter(escReader, eccReader, expCtx, geoNear->getQuery()));
-            } else if (auto graphLookup = dynamic_cast<DocumentSourceGraphLookUp*>(source.get());
-                       graphLookup && graphLookup->getAdditionalFilter()) {
-                graphLookup->setAdditionalFilter(rewriteEncryptedFilter(
-                    escReader, eccReader, expCtx, graphLookup->getAdditionalFilter().get()));
+            if (stageRewriterMap.find(typeid(*source)) != stageRewriterMap.end()) {
+                stageRewriterMap[typeid(*source)](&rewriter, source.get());
             }
         }
     }
@@ -267,17 +409,33 @@ std::unique_ptr<Pipeline, PipelineDeleter> processPipeline(
     return sharedBlock->getPipeline();
 }
 
-std::unique_ptr<MatchExpression> MatchExpressionRewrite::_rewriteMatchExpression(
-    std::unique_ptr<MatchExpression> expr) {
-    if (auto result = _rewrite(expr.get())) {
-        return result;
-    } else {
-        return expr;
-    }
+std::unique_ptr<Expression> FLEQueryRewriter::rewriteExpression(Expression* expression) {
+    tassert(6334104, "Expected an expression to rewrite but found none", expression);
+
+    FLEExpressionRewriter expressionRewriter{this};
+    auto res = expression_walker::walk<Expression>(expression, &expressionRewriter);
+    _rewroteLastExpression = expressionRewriter.didRewrite;
+    return res;
 }
 
-// Rewrite the passed-in match expression in-place.
-std::unique_ptr<MatchExpression> MatchExpressionRewrite::_rewrite(MatchExpression* expr) {
+boost::optional<BSONObj> FLEQueryRewriter::rewriteMatchExpression(const BSONObj& filter) {
+    auto expr = uassertStatusOK(MatchExpressionParser::parse(filter, _expCtx));
+
+    _rewroteLastExpression = false;
+    if (auto res = _rewrite(expr.get())) {
+        // The rewrite resulted in top-level changes. Serialize the new expression.
+        return res->serialize().getOwned();
+    } else if (_rewroteLastExpression) {
+        // The rewrite had no top-level changes, but nested expressions were rewritten. Serialize
+        // the parsed expression, which has in-place changes.
+        return expr->serialize().getOwned();
+    }
+
+    // No rewrites were done.
+    return boost::none;
+}
+
+std::unique_ptr<MatchExpression> FLEQueryRewriter::_rewrite(MatchExpression* expr) {
     switch (expr->matchType()) {
         case MatchExpression::EQ:
             return rewriteEq(std::move(static_cast<const EqualityMatchExpression*>(expr)));
@@ -286,7 +444,7 @@ std::unique_ptr<MatchExpression> MatchExpressionRewrite::_rewrite(MatchExpressio
         case MatchExpression::AND:
         case MatchExpression::OR:
         case MatchExpression::NOT:
-        case MatchExpression::NOR:
+        case MatchExpression::NOR: {
             for (size_t i = 0; i < expr->numChildren(); i++) {
                 auto child = expr->getChild(i);
                 if (auto newChild = _rewrite(child)) {
@@ -294,12 +452,24 @@ std::unique_ptr<MatchExpression> MatchExpressionRewrite::_rewrite(MatchExpressio
                 }
             }
             return nullptr;
+        }
+        case MatchExpression::EXPRESSION: {
+            // Save the current value of _rewroteLastExpression, since rewriteExpression() may
+            // reset it to false and we may have already done a match expression rewrite.
+            auto didRewrite = _rewroteLastExpression;
+            auto rewritten =
+                rewriteExpression(static_cast<ExprMatchExpression*>(expr)->getExpression().get());
+            _rewroteLastExpression |= didRewrite;
+            if (rewritten) {
+                return std::make_unique<ExprMatchExpression>(rewritten.release(), expCtx());
+            }
+        }
         default:
             return nullptr;
     }
 }
 
-BSONObj MatchExpressionRewrite::rewritePayloadAsTags(BSONElement fleFindPayload) {
+BSONObj FLEQueryRewriter::rewritePayloadAsTags(BSONElement fleFindPayload) const {
     auto tokens = ParsedFindPayload(fleFindPayload);
     auto tags = readTags(*_escReader,
                          *_eccReader,
@@ -316,7 +486,23 @@ BSONObj MatchExpressionRewrite::rewritePayloadAsTags(BSONElement fleFindPayload)
     return bab.obj().getOwned();
 }
 
-std::unique_ptr<InMatchExpression> MatchExpressionRewrite::rewriteEq(
+std::vector<Value> FLEQueryRewriter::rewritePayloadAsTags(Value fleFindPayload) const {
+    auto tokens = ParsedFindPayload(fleFindPayload);
+    auto tags = readTags(*_escReader,
+                         *_eccReader,
+                         tokens.escToken,
+                         tokens.eccToken,
+                         tokens.edcToken,
+                         tokens.maxCounter);
+
+    std::vector<Value> tagVec;
+    for (auto tag : tags) {
+        tagVec.push_back(Value(BSONBinData(tag.data(), tag.size(), BinDataType::BinDataGeneral)));
+    }
+    return tagVec;
+}
+
+std::unique_ptr<InMatchExpression> FLEQueryRewriter::rewriteEq(
     const EqualityMatchExpression* expr) {
     auto ffp = expr->getData();
     if (!isFleFindPayload(ffp)) {
@@ -332,11 +518,12 @@ std::unique_ptr<InMatchExpression> MatchExpressionRewrite::rewriteEq(
     inExpr->setBackingBSON(std::move(obj));
     auto status = inExpr->setEqualities(std::move(tags));
     uassertStatusOK(status);
+
+    _rewroteLastExpression = true;
     return inExpr;
 }
 
-std::unique_ptr<InMatchExpression> MatchExpressionRewrite::rewriteIn(
-    const InMatchExpression* expr) {
+std::unique_ptr<InMatchExpression> FLEQueryRewriter::rewriteIn(const InMatchExpression* expr) {
     auto backingBSONBuilder = BSONArrayBuilder();
     size_t numFFPs = 0;
     for (auto& eq : expr->getEqualities()) {
@@ -366,6 +553,7 @@ std::unique_ptr<InMatchExpression> MatchExpressionRewrite::rewriteIn(
     auto status = inExpr->setEqualities(std::move(allTags));
     uassertStatusOK(status);
 
+    _rewroteLastExpression = true;
     return inExpr;
 }
 

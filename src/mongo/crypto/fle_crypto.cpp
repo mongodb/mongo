@@ -66,6 +66,7 @@
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/crypto/symmetric_key.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/idl/basic_types.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/platform/random.h"
@@ -208,6 +209,15 @@ ConstDataRange binDataToCDR(const BSONElement element) {
 
     int len;
     const char* data = element.binData(len);
+    return ConstDataRange(data, data + len);
+}
+
+ConstDataRange binDataToCDR(const Value& value) {
+    uassert(6334103, "Expected binData Value type", value.getType() == BinData);
+
+    auto binData = value.getBinData();
+    int len = binData.length;
+    const char* data = static_cast<const char*>(binData.data);
     return ConstDataRange(data, data + len);
 }
 
@@ -2336,8 +2346,14 @@ StringMap<FLEDeleteToken> EncryptionInformationHelpers::getDeleteTokens(
     return map;
 }
 
-ParsedFindPayload::ParsedFindPayload(BSONElement fleFindPayload) {
-    auto [encryptedTypeBinding, subCdr] = fromEncryptedConstDataRange(binDataToCDR(fleFindPayload));
+ParsedFindPayload::ParsedFindPayload(BSONElement fleFindPayload)
+    : ParsedFindPayload(binDataToCDR(fleFindPayload)){};
+
+ParsedFindPayload::ParsedFindPayload(const Value& fleFindPayload)
+    : ParsedFindPayload(binDataToCDR(fleFindPayload)){};
+
+ParsedFindPayload::ParsedFindPayload(ConstDataRange cdr) {
+    auto [encryptedTypeBinding, subCdr] = fromEncryptedConstDataRange(cdr);
     auto encryptedType = encryptedTypeBinding;
 
     uassert(6435600,

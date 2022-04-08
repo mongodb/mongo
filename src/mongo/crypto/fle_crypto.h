@@ -47,6 +47,7 @@
 #include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/crypto/symmetric_crypto.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/util/uuid.h"
 
@@ -1162,6 +1163,8 @@ struct ParsedFindPayload {
     boost::optional<std::int64_t> maxCounter;
 
     explicit ParsedFindPayload(BSONElement fleFindPayload);
+    explicit ParsedFindPayload(const Value& fleFindPayload);
+    explicit ParsedFindPayload(ConstDataRange cdr);
 };
 
 }  // namespace mongo

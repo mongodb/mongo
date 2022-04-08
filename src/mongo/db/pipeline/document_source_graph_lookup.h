@@ -82,6 +82,10 @@ public:
         return _startWith.get();
     }
 
+    void setStartWithField(boost::intrusive_ptr<Expression> startWith) {
+        _startWith.swap(startWith);
+    }
+
     boost::optional<BSONObj> getAdditionalFilter() const {
         return _additionalFilter;
     };
