@@ -70,10 +70,9 @@ bool SetClusterParameterInvocation::invoke(OperationContext* opCtx,
     BSONObj query = BSON("_id" << parameterName);
     BSONObj update = updateBuilder.obj();
 
-    uassertStatusOK(serverParameter->validate(update));
-
     LOGV2_DEBUG(
         6432603, 2, "Updating cluster parameter on-disk", "clusterParameter"_attr = parameterName);
+    uassertStatusOK(serverParameter->validate(update));
 
     return uassertStatusOK(_dbService.updateParameterOnDisk(opCtx, query, update, writeConcern));
 }

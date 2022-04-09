@@ -48,7 +48,6 @@
 #include "mongo/db/audit.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
-#include "mongo/db/commands/cluster_server_parameter_cmds_gen.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/feature_compatibility_version_parser.h"
 #include "mongo/db/commands/set_feature_compatibility_version_gen.h"
@@ -69,7 +68,6 @@
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/idl/cluster_server_parameter_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/config_server_version.h"
@@ -687,9 +685,6 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
     // Set the user-writes blocking state on the new shard.
     _setUserWriteBlockingStateOnNewShard(opCtx, targeter.get());
 
-    // Set the cluster parameters on the new shard.
-    _setClusterParametersOnNewShard(opCtx, targeter.get());
-
     {
         // Keep the FCV stable across checking the FCV, sending setFCV to the new shard and writing
         // the entry for the new shard to config.shards. This ensures the FCV doesn't change after
@@ -1117,55 +1112,6 @@ void ShardingCatalogManager::_setUserWriteBlockingStateOnNewShard(OperationConte
 
         return true;
     });
-}
-
-void ShardingCatalogManager::_setClusterParametersOnNewShard(OperationContext* opCtx,
-                                                             RemoteCommandTargeter* targeter) {
-    if (!gFeatureFlagClusterWideConfig.isEnabled(serverGlobalParams.featureCompatibility))
-        return;
-
-    LOGV2_DEBUG(6360600, 2, "Pushing cluster parameters into new shard");
-
-    // Remove possible leftovers config.clusterParameters documents from the new shard.
-    {
-        write_ops::DeleteCommandRequest deleteOp(NamespaceString::kClusterParametersNamespace);
-        write_ops::DeleteOpEntry query({}, true /*multi*/);
-        deleteOp.setDeletes({query});
-
-        const auto swCommandResponse =
-            _runCommandForAddShard(opCtx,
-                                   targeter,
-                                   NamespaceString::kClusterParametersNamespace.db(),
-                                   CommandHelpers::appendMajorityWriteConcern(deleteOp.toBSON({})));
-        uassertStatusOK(swCommandResponse.getStatus());
-        uassertStatusOK(getStatusFromWriteCommandReply(swCommandResponse.getValue().response));
-    }
-
-    // Push cluster parameters into the newly added shard.
-    auto clusterParameterDocs =
-        uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
-            opCtx,
-            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-            repl::ReadConcernLevel::kLocalReadConcern,
-            NamespaceString::kClusterParametersNamespace,
-            BSONObj(),
-            BSONObj(),
-            boost::none));
-
-    for (const auto parameter : clusterParameterDocs.docs) {
-        ShardsvrSetClusterParameter setClusterParamsCmd(
-            BSON(parameter["_id"].String() << parameter.filterFieldsUndotted(
-                     BSON("_id" << 1 << "clusterParameterTime" << 1), false)));
-        setClusterParamsCmd.setDbName(NamespaceString::kAdminDb);
-        setClusterParamsCmd.setClusterParameterTime(parameter["clusterParameterTime"].timestamp());
-
-        const auto cmdResponse = _runCommandForAddShard(
-            opCtx,
-            targeter,
-            NamespaceString::kAdminDb,
-            CommandHelpers::appendMajorityWriteConcern(setClusterParamsCmd.toBSON({})));
-        uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(cmdResponse));
-    }
 }
 
 }  // namespace mongo

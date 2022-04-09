@@ -11,8 +11,7 @@
  *
  */
 
-const clusterParameterNames =
-    ["testStrClusterParameter", "testIntClusterParameter", "testBoolClusterParameter"];
+const clusterParameterNames = ["testStrClusterParameter", "testIntClusterParameter"];
 const clusterParametersDefault = [
     {
         _id: "testStrClusterParameter",
@@ -21,10 +20,6 @@ const clusterParametersDefault = [
     {
         _id: "testIntClusterParameter",
         intData: 16,
-    },
-    {
-        _id: "testBoolClusterParameter",
-        boolData: false,
     }
 ];
 
@@ -36,10 +31,6 @@ const clusterParametersInsert = [
     {
         _id: "testIntClusterParameter",
         intData: 17,
-    },
-    {
-        _id: "testBoolClusterParameter",
-        boolData: true,
     }
 ];
 
@@ -51,10 +42,6 @@ const clusterParametersUpdate = [
     {
         _id: "testIntClusterParameter",
         intData: 18,
-    },
-    {
-        _id: "testBoolClusterParameter",
-        boolData: false,
     }
 ];
 
@@ -124,6 +111,7 @@ function runGetClusterParameterNode(conn, getClusterParameterArgs, expectedClust
                 }
                 return sorted;
             }, {});
+
         if (bsonWoCompare(sortedExpectedClusterParameter, sortedActualClusterParameter) !== 0) {
             print('expected: ' + tojson(sortedExpectedClusterParameter) +
                   '\nactual: ' + tojson(sortedActualClusterParameter));

@@ -45,7 +45,6 @@
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/type_shard_identity.h"
-#include "mongo/idl/cluster_server_parameter_gen.h"
 #include "mongo/s/catalog/config_server_version.h"
 #include "mongo/s/catalog/type_changelog.h"
 #include "mongo/s/catalog/type_config_version.h"
@@ -165,27 +164,6 @@ protected:
                               << BSON("w"
                                       << "majority"
                                       << "wtimeout" << 60000)));
-            ASSERT_BSONOBJ_EQ(rpc::makeEmptyMetadata(), request.metadata);
-
-            return BSON("ok" << 1);
-        });
-    }
-
-    void expectRemoveSetClusterParameterDocs(const HostAndPort& target) {
-        if (!gFeatureFlagClusterWideConfig.isEnabled(serverGlobalParams.featureCompatibility))
-            return;
-        onCommandForAddShard([&](const RemoteCommandRequest& request) {
-            ASSERT_EQ(request.target, target);
-            ASSERT_EQ(request.dbname, NamespaceString::kClusterParametersNamespace.db());
-            ASSERT_BSONOBJ_EQ(request.cmdObj,
-                              BSON("delete" << NamespaceString::kClusterParametersNamespace.coll()
-                                            << "bypassDocumentValidation" << false << "ordered"
-                                            << true << "deletes"
-                                            << BSON_ARRAY(BSON("q" << BSONObj() << "limit" << 0))
-                                            << "writeConcern"
-                                            << BSON("w"
-                                                    << "majority"
-                                                    << "wtimeout" << 60000)));
             ASSERT_BSONOBJ_EQ(rpc::makeEmptyMetadata(), request.metadata);
 
             return BSON("ok" << 1);
@@ -459,9 +437,6 @@ TEST_F(AddShardTest, StandaloneBasicSuccess) {
     // The shard receives the _addShard command
     expectAddShardCmdReturnSuccess(shardTarget, expectedShardName);
 
-    // The shard receives a delete op to clear any leftover clusterParameters doc.
-    expectRemoveSetClusterParameterDocs(shardTarget);
-
     // The shard receives a delete op to clear any leftover user_writes_critical_sections doc.
     expectRemoveUserWritesCriticalSectionsDocs(shardTarget);
 
@@ -544,9 +519,6 @@ TEST_F(AddShardTest, StandaloneGenerateName) {
 
     // The shard receives the _addShard command
     expectAddShardCmdReturnSuccess(shardTarget, expectedShardName);
-
-    // The shard receives a delete op to clear any leftover clusterParameters doc.
-    expectRemoveSetClusterParameterDocs(shardTarget);
 
     // The shard receives a delete op to clear any leftover user_writes_critical_sections doc.
     expectRemoveUserWritesCriticalSectionsDocs(shardTarget);
@@ -946,9 +918,6 @@ TEST_F(AddShardTest, SuccessfullyAddReplicaSet) {
     // The shard receives the _addShard command
     expectAddShardCmdReturnSuccess(shardTarget, expectedShardName);
 
-    // The shard receives a delete op to clear any leftover clusterParameters doc.
-    expectRemoveSetClusterParameterDocs(shardTarget);
-
     // The shard receives a delete op to clear any leftover user_writes_critical_sections doc.
     expectRemoveUserWritesCriticalSectionsDocs(shardTarget);
 
@@ -1016,9 +985,6 @@ TEST_F(AddShardTest, ReplicaSetExtraHostsDiscovered) {
 
     // The shard receives the _addShard command
     expectAddShardCmdReturnSuccess(shardTarget, expectedShardName);
-
-    // The shard receives a delete op to clear any leftover clusterParameters doc.
-    expectRemoveSetClusterParameterDocs(shardTarget);
 
     // The shard receives a delete op to clear any leftover user_writes_critical_sections doc.
     expectRemoveUserWritesCriticalSectionsDocs(shardTarget);
@@ -1100,9 +1066,6 @@ TEST_F(AddShardTest, AddShardSucceedsEvenIfAddingDBsFromNewShardFails) {
 
     // The shard receives the _addShard command
     expectAddShardCmdReturnSuccess(shardTarget, expectedShardName);
-
-    // The shard receives a delete op to clear any leftover clusterParameters doc.
-    expectRemoveSetClusterParameterDocs(shardTarget);
 
     // The shard receives a delete op to clear any leftover user_writes_critical_sections doc.
     expectRemoveUserWritesCriticalSectionsDocs(shardTarget);

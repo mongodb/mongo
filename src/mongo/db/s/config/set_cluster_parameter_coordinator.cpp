@@ -37,7 +37,6 @@
 #include "mongo/db/commands/cluster_server_parameter_cmds_gen.h"
 #include "mongo/db/commands/set_cluster_parameter_invocation.h"
 #include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_util.h"
 #include "mongo/db/vector_clock.h"
@@ -176,47 +175,38 @@ ExecutorFuture<void> SetClusterParameterCoordinator::_runImpl(
                 _doc.setClusterParameterTime(clusterParameterTime.asTimestamp());
             }
         })
-        .then(_executePhase(
-            Phase::kSetClusterParameter, [this, executor = executor, anchor = shared_from_this()] {
-                auto opCtxHolder = cc().makeOperationContext();
-                auto* opCtx = opCtxHolder.get();
+        .then(_executePhase(Phase::kSetClusterParameter,
+                            [this, executor = executor, anchor = shared_from_this()] {
+                                auto opCtxHolder = cc().makeOperationContext();
+                                auto* opCtx = opCtxHolder.get();
 
-                ShardingLogging::get(opCtx)->logChange(
-                    opCtx,
-                    "setClusterParameter.start",
-                    NamespaceString::kClusterParametersNamespace.toString(),
-                    _doc.getParameter(),
-                    kMajorityWriteConcern);
+                                ShardingLogging::get(opCtx)->logChange(
+                                    opCtx,
+                                    "setClusterParameter.start",
+                                    NamespaceString::kClusterParametersNamespace.toString(),
+                                    _doc.getParameter(),
+                                    kMajorityWriteConcern);
 
-                // If the parameter was already set on the config server, there is
-                // nothing else to do.
-                if (_isClusterParameterSetAtTimestamp(opCtx)) {
-                    return;
-                }
+                                // If the parameter was already set on the config server, there is
+                                // nothing else to do.
+                                if (_isClusterParameterSetAtTimestamp(opCtx)) {
+                                    return;
+                                }
 
-                _doc = _updateSession(opCtx, _doc);
-                const auto session = _getCurrentSession();
+                                _doc = _updateSession(opCtx, _doc);
+                                const auto session = _getCurrentSession();
 
-                {
-                    // Ensure the topology is stable so shards added concurrently will
-                    // not miss the cluster parameter. Keep it stable until we have
-                    // persisted the cluster parameter on the configsvr so that new
-                    // shards that get added will see the new cluster parameter.
-                    Lock::SharedLock stableTopologyRegion =
-                        ShardingCatalogManager::get(opCtx)->enterStableTopologyRegion(opCtx);
+                                _sendSetClusterParameterToAllShards(opCtx, session, executor);
 
-                    _sendSetClusterParameterToAllShards(opCtx, session, executor);
+                                _commit(opCtx);
 
-                    _commit(opCtx);
-                }
-
-                ShardingLogging::get(opCtx)->logChange(
-                    opCtx,
-                    "setClusterParameter.end",
-                    NamespaceString::kClusterParametersNamespace.toString(),
-                    _doc.getParameter(),
-                    kMajorityWriteConcern);
-            }));
+                                ShardingLogging::get(opCtx)->logChange(
+                                    opCtx,
+                                    "setClusterParameter.end",
+                                    NamespaceString::kClusterParametersNamespace.toString(),
+                                    _doc.getParameter(),
+                                    kMajorityWriteConcern);
+                            }));
 }
 
 }  // namespace mongo
