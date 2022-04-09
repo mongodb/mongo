@@ -58,10 +58,6 @@ Status validateStorageEngineOptions(const BSONObj& storageEngine) {
 
 EncryptedFieldConfig processAndValidateEncryptedFields(EncryptedFieldConfig config) {
 
-    if (!gFeatureFlagFLE2.isEnabledAndIgnoreFCV()) {
-        uasserted(6338408, "Feature flag FLE2 is not enabled");
-    }
-
     stdx::unordered_set<UUID, UUID::Hash> keys(config.getFields().size());
     std::vector<std::string> fieldPaths;
     fieldPaths.reserve(config.getFields().size());

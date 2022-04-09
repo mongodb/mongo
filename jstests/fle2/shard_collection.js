@@ -2,7 +2,7 @@
  * Verify valid and invalid scenarios for shard collection
  *
  * @tags: [
- *  featureFlagFLE2,
+ * requires_fcv_60
  * ]
  */
 load("jstests/fle2/libs/encrypted_client_util.js");

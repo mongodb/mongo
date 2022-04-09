@@ -820,6 +820,22 @@ private:
                         deletionStatus.isOK() ||
                             deletionStatus.code() == ErrorCodes::NamespaceNotFound);
             }
+
+            // Block downgrade for collections with encrypted fields
+            // TODO SERVER-65077: Remove once FCV 6.0 becomes last-lts.
+            for (const auto& tenantDbName : DatabaseHolder::get(opCtx)->getNames()) {
+                const auto& dbName = tenantDbName.dbName();
+                Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
+                catalog::forEachCollectionFromDb(
+                    opCtx, tenantDbName, MODE_X, [&](const CollectionPtr& collection) {
+                        uassert(
+                            ErrorCodes::CannotDowngrade,
+                            str::stream() << "Cannot downgrade the cluster as collection "
+                                          << collection->ns() << " has 'encryptedFields'",
+                            !collection->getCollectionOptions().encryptedFieldConfig.has_value());
+                        return true;
+                    });
+            }
         }
 
         {

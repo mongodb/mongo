@@ -2,18 +2,12 @@
 
 /**
  * @tags: [
- *  featureFlagFLE2,
+ * requires_fcv_60
  * ]
  */
 (function() {
 'use strict';
 load("jstests/libs/doc_validation_utils.js");  // for assertDocumentValidationFailure
-
-const isFLE2Enabled = TestData == undefined || TestData.setParameters.featureFlagFLE2;
-
-if (!isFLE2Enabled) {
-    return;
-}
 
 const dbTest = db.getSiblingDB('implicit_schema_validation_db');
 

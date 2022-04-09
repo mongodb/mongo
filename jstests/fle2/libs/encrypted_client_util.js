@@ -271,19 +271,10 @@ function runEncryptedTest(db, dbName, collName, encryptedFields, runTestsCallbac
     runTestsCallback(edb, client);
 }
 
-// TODO - remove this when the feature flag is removed
-function isFLE2Enabled() {
-    return TestData == undefined || TestData.setParameters.featureFlagFLE2;
-}
-
 /**
  * @returns Returns true if talking to a sharded cluster
  */
 function isFLE2ShardingEnabled() {
-    if (!isFLE2Enabled()) {
-        return false;
-    }
-
     return typeof (testingFLESharding) == "undefined" || testingFLESharding === true;
 }
 
@@ -291,10 +282,6 @@ function isFLE2ShardingEnabled() {
  * @returns Returns true if talking to a replica set
  */
 function isFLE2ReplicationEnabled() {
-    if (!isFLE2Enabled()) {
-        return false;
-    }
-
     return typeof (testingReplication) == "undefined" || testingReplication === true;
 }
 

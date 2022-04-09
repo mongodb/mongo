@@ -42,6 +42,7 @@
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/count_command_gen.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/transaction_api.h"
 #include "mongo/s/write_ops/batch_write_exec.h"
 #include "mongo/s/write_ops/batched_command_response.h"
@@ -213,12 +214,18 @@ std::unique_ptr<Pipeline, PipelineDeleter> processFLEPipelineD(
  */
 template <typename T>
 bool shouldDoFLERewrite(const std::unique_ptr<T>& cmd) {
-    return gFeatureFlagFLE2.isEnabledAndIgnoreFCV() && cmd->getEncryptionInformation();
+    // TODO (SERVER-65077): Remove FCV check once 6.0 is released
+    return (!serverGlobalParams.featureCompatibility.isVersionInitialized() ||
+            gFeatureFlagFLE2.isEnabled(serverGlobalParams.featureCompatibility)) &&
+        cmd->getEncryptionInformation();
 }
 
 template <typename T>
 bool shouldDoFLERewrite(const T& cmd) {
-    return gFeatureFlagFLE2.isEnabledAndIgnoreFCV() && cmd.getEncryptionInformation();
+    // TODO (SERVER-65077): Remove FCV check once 6.0 is released
+    return (!serverGlobalParams.featureCompatibility.isVersionInitialized() ||
+            gFeatureFlagFLE2.isEnabled(serverGlobalParams.featureCompatibility)) &&
+        cmd.getEncryptionInformation();
 }
 
 /**

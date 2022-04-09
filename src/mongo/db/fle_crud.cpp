@@ -803,9 +803,10 @@ FLEBatchResult processFLEBatch(OperationContext* opCtx,
                                BatchedCommandResponse* response,
                                boost::optional<OID> targetEpoch) {
 
-    if (!gFeatureFlagFLE2.isEnabledAndIgnoreFCV()) {
-        uasserted(6371209, "Feature flag FLE2 is not enabled");
-    }
+    // TODO (SERVER-65077): Remove FCV check once 6.0 is released
+    uassert(6371209,
+            "FLE 2 is only supported when FCV supports 6.0",
+            gFeatureFlagFLE2.isEnabled(serverGlobalParams.featureCompatibility));
 
     if (request.getBatchType() == BatchedCommandRequest::BatchType_Insert) {
         auto insertRequest = request.getInsertRequest();
@@ -1058,8 +1059,9 @@ FLEBatchResult processFLEFindAndModify(OperationContext* opCtx,
         return FLEBatchResult::kNotProcessed;
     }
 
-    if (!gFeatureFlagFLE2.isEnabledAndIgnoreFCV()) {
-        uasserted(6371405, "Feature flag FLE2 is not enabled");
+    // TODO (SERVER-65077): Remove FCV check once 6.0 is released
+    if (!gFeatureFlagFLE2.isEnabled(serverGlobalParams.featureCompatibility)) {
+        uasserted(6371405, "FLE 2 is only supported when FCV supports 6.0");
     }
 
     // FLE2 Mongos CRUD operations loopback through MongoS with EncryptionInformation as

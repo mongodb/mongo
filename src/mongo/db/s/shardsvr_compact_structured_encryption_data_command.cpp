@@ -74,9 +74,10 @@ public:
         using InvocationBase::InvocationBase;
 
         Reply typedRun(OperationContext* opCtx) {
+            // TODO (SERVER-65077): Remove FCV check once 6.0 is released
             uassert(6350499,
-                    "Feature flag FLE2 is not enabled",
-                    gFeatureFlagFLE2.isEnabledAndIgnoreFCV());
+                    "FLE 2 is only supported when FCV supports 6.0",
+                    gFeatureFlagFLE2.isEnabled(serverGlobalParams.featureCompatibility));
 
             auto compact = makeRequest(opCtx);
             if (!compact) {

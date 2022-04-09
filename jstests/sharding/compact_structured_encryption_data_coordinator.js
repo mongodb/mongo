@@ -6,11 +6,6 @@
 
 load('jstests/fle2/libs/encrypted_client_util.js');
 
-if (!TestData.setParameters.featureFlagFLE2) {
-    jsTest.log('Skipping test because feature flag is not enabled');
-    return;
-}
-
 const options = {
     mongos: 1,
     config: 1,

@@ -175,6 +175,10 @@ FLEBatchResult processFLEInsert(OperationContext* opCtx,
             repl::ReplicationCoordinator::get(opCtx->getServiceContext())->getReplicationMode() ==
                 repl::ReplicationCoordinator::modeReplSet);
 
+    uassert(5926101,
+            "FLE 2 is only supported when FCV supports 6.0",
+            gFeatureFlagFLE2.isEnabled(serverGlobalParams.featureCompatibility));
+
     auto [batchResult, insertReplyReturn] =
         processInsert(opCtx, insertRequest, &getTransactionWithRetriesForMongoD);
 
@@ -197,6 +201,10 @@ write_ops::DeleteCommandReply processFLEDelete(
             repl::ReplicationCoordinator::get(opCtx->getServiceContext())->getReplicationMode() ==
                 repl::ReplicationCoordinator::modeReplSet);
 
+    uassert(5926102,
+            "FLE 2 is only supported when FCV supports 6.0",
+            gFeatureFlagFLE2.isEnabled(serverGlobalParams.featureCompatibility));
+
     auto deleteReply = processDelete(opCtx, deleteRequest, &getTransactionWithRetriesForMongoD);
 
     setMongosFieldsInReply(opCtx, &deleteReply.getWriteCommandReplyBase());
@@ -212,6 +220,10 @@ write_ops::FindAndModifyCommandReply processFLEFindAndModify(
             repl::ReplicationCoordinator::get(opCtx->getServiceContext())->getReplicationMode() ==
                 repl::ReplicationCoordinator::modeReplSet);
 
+    uassert(5926103,
+            "FLE 2 is only supported when FCV supports 6.0",
+            gFeatureFlagFLE2.isEnabled(serverGlobalParams.featureCompatibility));
+
     auto reply = processFindAndModifyRequest<write_ops::FindAndModifyCommandReply>(
         opCtx, findAndModifyRequest, &getTransactionWithRetriesForMongoD);
 
@@ -225,6 +237,10 @@ write_ops::UpdateCommandReply processFLEUpdate(
             "Encrypted index operations are only supported on replica sets",
             repl::ReplicationCoordinator::get(opCtx->getServiceContext())->getReplicationMode() ==
                 repl::ReplicationCoordinator::modeReplSet);
+
+    uassert(5926104,
+            "FLE 2 is only supported when FCV supports 6.0",
+            gFeatureFlagFLE2.isEnabled(serverGlobalParams.featureCompatibility));
 
     auto updateReply = processUpdate(opCtx, updateRequest, &getTransactionWithRetriesForMongoD);
 

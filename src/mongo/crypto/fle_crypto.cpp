@@ -969,6 +969,7 @@ void parseAndVerifyInsertUpdatePayload(std::vector<EDCServerPayloadInfo>* pField
 
 void collectEDCServerInfo(std::vector<EDCServerPayloadInfo>* pFields,
                           ConstDataRange cdr,
+
                           StringData fieldPath) {
 
     // TODO - validate field is actually indexed in the schema?

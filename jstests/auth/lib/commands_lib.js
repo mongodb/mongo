@@ -2764,8 +2764,6 @@ var authCommandsLib = {
           command: {compactStructuredEncryptionData: "foo", compactionTokens : {}},
           skipSharded: true,
           skipUnlessReplicaSet: true,
-          skipTest:
-              (conn) => !TestData.setParameters.featureFlagFLE2,
           setup: function(db) {
               assert.commandWorked(db.createCollection("foo", {
                 encryptedFields: {

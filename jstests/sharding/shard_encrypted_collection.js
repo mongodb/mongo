@@ -2,7 +2,6 @@
 
 /**
  * @tags: [
- *  featureFlagFLE2,
  *  requires_fcv_60,
  * ]
  */

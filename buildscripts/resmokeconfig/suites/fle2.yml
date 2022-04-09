@@ -11,7 +11,6 @@ executor:
       - ValidateCollections
   config:
     shell_options:
-      setShellParameter: featureFlagFLE2=true
       eval: "testingReplication = true; testingFLESharding = false;"
   hooks:
   # We don't execute dbHash or oplog consistency checks since there is only a single replica set

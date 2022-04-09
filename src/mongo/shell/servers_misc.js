@@ -157,8 +157,6 @@ startParallelShell = function(jsCode, port, noConnect, ...optionArgs) {
     }
 
     args.push(...optionArgs);
-    args.push("--setShellParameter");
-    args.push("featureFlagFLE2=true");
     args.push("--eval", jsCode);
 
     var pid = startMongoProgramNoConnect.apply(null, args);

@@ -213,7 +213,8 @@ bool validateShardKeyIndexExistsOrCreateIfPossible(OperationContext* opCtx,
 void validateShardKeyIsNotEncrypted(OperationContext* opCtx,
                                     const NamespaceString& nss,
                                     const ShardKeyPattern& shardKeyPattern) {
-    if (!gFeatureFlagFLE2.isEnabledAndIgnoreFCV()) {
+    // TODO (SERVER-65077): Remove FCV check once 6.0 is released
+    if (!gFeatureFlagFLE2.isEnabled(serverGlobalParams.featureCompatibility)) {
         return;
     }
 

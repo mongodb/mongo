@@ -2,19 +2,13 @@
 
 /**
  * @tags: [
- *  featureFlagFLE2,
+ *  requires_fcv_60,
  *  assumes_against_mongod_not_mongos,
  *  no_selinux
  * ]
  */
 (function() {
 'use strict';
-
-const isFLE2Enabled = TestData == undefined || TestData.setParameters.featureFlagFLE2;
-
-if (!isFLE2Enabled) {
-    return;
-}
 
 let dbTest = db.getSiblingDB('create_encrypted_collection_db');
 
