@@ -62,7 +62,7 @@ long long adjustCappedMaxDocs(long long cappedMaxDocs) {
 
 void setEncryptedDefaultEncryptedCollectionNames(const NamespaceString& ns,
                                                  EncryptedFieldConfig* config) {
-    auto prefix = std::string("fle2.") + ns.coll();
+    auto prefix = std::string("enxcol_.") + ns.coll();
 
     if (!config->getEscCollection()) {
         config->setEscCollection(StringData(prefix + ".esc"));

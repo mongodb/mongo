@@ -88,7 +88,7 @@ if (kHaveAuditing) {
     jsTest.log('Audit Log: ' + tojson(audit));
 
     const renameEvents = audit.filter((ev) => (ev.atype === 'renameCollection') &&
-                                          (ev.param.old === 'test.fle2.encrypted.ecoc'));
+                                          (ev.param.old === 'test.enxcol_.encrypted.ecoc'));
     assert.eq(renameEvents.length, 1, 'Invalid number of rename events: ' + tojson(renameEvents));
     assert.eq(renameEvents[0].result, ErrorCodes.OK);
     const tempNSS = renameEvents[0].param.new;

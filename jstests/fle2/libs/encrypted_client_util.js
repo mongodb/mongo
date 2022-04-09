@@ -234,7 +234,7 @@ class EncryptedClient {
 
     assertStateCollectionsAfterCompact(collName) {
         const suffixes = ['esc', 'ecc', 'ecoc'];
-        const prefix = "fle2." + collName + ".";
+        const prefix = "enxcol_." + collName + ".";
 
         // assert the state collections still exist
         suffixes.forEach((suffix) => {

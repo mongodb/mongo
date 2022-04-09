@@ -45,7 +45,7 @@ constexpr auto listCollectionsCursorCol = "$cmd.listCollections"_sd;
 constexpr auto collectionlessAggregateCursorCol = "$cmd.aggregate"_sd;
 constexpr auto dropPendingNSPrefix = "system.drop."_sd;
 
-constexpr auto fle2Prefix = "fle2."_sd;
+constexpr auto fle2Prefix = "enxcol_."_sd;
 constexpr auto fle2EscSuffix = ".esc"_sd;
 constexpr auto fle2EccSuffix = ".ecc"_sd;
 constexpr auto fle2EcocSuffix = ".ecoc"_sd;

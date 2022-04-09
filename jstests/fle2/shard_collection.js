@@ -28,14 +28,14 @@ assert.commandWorked(client.createEncryptionCollection("basic", {
 const result = dbTest.getCollectionInfos({name: "basic"});
 print("result" + tojson(result));
 const ef = result[0].options.encryptedFields;
-assert.eq(ef.escCollection, "fle2.basic.esc");
-assert.eq(ef.eccCollection, "fle2.basic.ecc");
-assert.eq(ef.ecocCollection, "fle2.basic.ecoc");
+assert.eq(ef.escCollection, "enxcol_.basic.esc");
+assert.eq(ef.eccCollection, "enxcol_.basic.ecc");
+assert.eq(ef.ecocCollection, "enxcol_.basic.ecoc");
 
 assert.commandFailedWithCode(
-    db.adminCommand({shardCollection: 'shard_state.fle2.basic.esc', key: {_id: 1}}), 6464401);
+    db.adminCommand({shardCollection: 'shard_state.enxcol_.basic.esc', key: {_id: 1}}), 6464401);
 assert.commandFailedWithCode(
-    db.adminCommand({shardCollection: 'shard_state.fle2.basic.ecc', key: {_id: 1}}), 6464401);
+    db.adminCommand({shardCollection: 'shard_state.enxcol_.basic.ecc', key: {_id: 1}}), 6464401);
 assert.commandFailedWithCode(
-    db.adminCommand({shardCollection: 'shard_state.fle2.basic.ecoc', key: {_id: 1}}), 6464401);
+    db.adminCommand({shardCollection: 'shard_state.enxcol_.basic.ecoc', key: {_id: 1}}), 6464401);
 }());
