@@ -182,13 +182,10 @@ Status dispatchMergingPipeline(const boost::intrusive_ptr<ExpressionContext>& ex
         targetedShards.emplace_back(remoteCursor->getShardId().toString());
     }
 
-    sharded_agg_helpers::addMergeCursorsSource(
+    sharded_agg_helpers::partitionAndAddMergeCursorsSource(
         mergePipeline,
-        shardDispatchResults.commandForTargetedShards,
         std::move(shardDispatchResults.remoteCursors),
-        targetedShards,
-        shardDispatchResults.splitPipeline->shardCursorsSortSpec,
-        hasChangeStream);
+        shardDispatchResults.splitPipeline->shardCursorsSortSpec);
 
     // First, check whether we can merge on the mongoS. If the merge pipeline MUST run on mongoS,
     // then ignore the internalQueryProhibitMergingOnMongoS parameter.
@@ -401,13 +398,10 @@ DispatchShardPipelineResults dispatchExchangeConsumerPipeline(
         auto consumerPipeline = Pipeline::create(
             shardDispatchResults->splitPipeline->mergePipeline->getSources(), expCtx);
 
-        sharded_agg_helpers::addMergeCursorsSource(
+        sharded_agg_helpers::partitionAndAddMergeCursorsSource(
             consumerPipeline.get(),
-            BSONObj(),
             std::move(producers),
-            {},
-            shardDispatchResults->splitPipeline->shardCursorsSortSpec,
-            false);
+            shardDispatchResults->splitPipeline->shardCursorsSortSpec);
 
         consumerPipelines.emplace_back(std::move(consumerPipeline), nullptr, boost::none);
 

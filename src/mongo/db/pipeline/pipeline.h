@@ -126,6 +126,15 @@ public:
         PipelineValidatorCallback validator = nullptr);
 
     /**
+     * Like parse, but takes a BSONElement instead of a vector of objects. 'arrElem' must be an
+     * array of objects.
+     */
+    static std::unique_ptr<Pipeline, PipelineDeleter> parseFromArray(
+        BSONElement arrayElem,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        PipelineValidatorCallback validator = nullptr);
+
+    /**
      * Creates a Pipeline from an existing SourceContainer.
      *
      * Returns a non-OK status if any stage is in an invalid position. For example, if an $out stage
@@ -405,6 +414,16 @@ private:
     Pipeline(SourceContainer stages, const boost::intrusive_ptr<ExpressionContext>& pCtx);
 
     ~Pipeline();
+
+    /**
+     * Helper for public methods that parse pipelines from vectors of different types.
+     */
+    template <class T>
+    static std::unique_ptr<Pipeline, PipelineDeleter> parseCommon(
+        const std::vector<T>& rawPipeline,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        PipelineValidatorCallback validator,
+        std::function<BSONObj(T)> getElemFunc);
 
     /**
      * Stitch together the source pointers by calling setSource() for each source in '_sources'.

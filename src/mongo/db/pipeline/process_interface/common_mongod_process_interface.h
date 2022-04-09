@@ -81,6 +81,8 @@ public:
         Pipeline* pipeline) final;
     std::string getShardName(OperationContext* opCtx) const final;
 
+    bool inShardedEnvironment(OperationContext* opCtx) const final;
+
     std::vector<GenericCursor> getIdleCursors(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                               CurrentOpUserMode userMode) const final;
     BackupCursorState openBackupCursor(OperationContext* opCtx,

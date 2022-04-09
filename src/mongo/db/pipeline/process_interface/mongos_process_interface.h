@@ -179,6 +179,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    bool inShardedEnvironment(OperationContext* opCtx) const final {
+        return true;
+    }
+
     /**
      * The following methods only make sense for data-bearing nodes and should never be called on
      * a mongos.

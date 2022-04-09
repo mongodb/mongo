@@ -161,15 +161,17 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::clone() const {
     return create(clonedStages, getContext());
 }
 
-std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::parse(
-    const std::vector<BSONObj>& rawPipeline,
-    const intrusive_ptr<ExpressionContext>& expCtx,
-    PipelineValidatorCallback validator) {
+template <class T>
+std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::parseCommon(
+    const std::vector<T>& rawPipeline,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    PipelineValidatorCallback validator,
+    std::function<BSONObj(T)> getElemFunc) {
 
     SourceContainer stages;
 
-    for (auto&& stageObj : rawPipeline) {
-        auto parsedSources = DocumentSource::parse(expCtx, stageObj);
+    for (auto&& stageElem : rawPipeline) {
+        auto parsedSources = DocumentSource::parse(expCtx, getElemFunc(stageElem));
         stages.insert(stages.end(), parsedSources.begin(), parsedSources.end());
     }
 
@@ -190,6 +192,30 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::parse(
 
     pipeline->stitch();
     return pipeline;
+}
+
+std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::parseFromArray(
+    BSONElement rawPipelineElement,
+    const intrusive_ptr<ExpressionContext>& expCtx,
+    PipelineValidatorCallback validator) {
+
+    tassert(6253719,
+            "Expected array for Pipeline::parseFromArray",
+            rawPipelineElement.type() == BSONType::Array);
+    auto rawStages = rawPipelineElement.Array();
+
+    return parseCommon<BSONElement>(rawStages, expCtx, validator, [](BSONElement e) {
+        uassert(6253720, "Pipeline array element must be an object", e.type() == BSONType::Object);
+        return e.embeddedObject();
+    });
+}
+
+std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::parse(
+    const std::vector<BSONObj>& rawPipeline,
+    const intrusive_ptr<ExpressionContext>& expCtx,
+    PipelineValidatorCallback validator) {
+
+    return parseCommon<BSONObj>(rawPipeline, expCtx, validator, [](BSONObj o) { return o; });
 }
 
 std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::create(

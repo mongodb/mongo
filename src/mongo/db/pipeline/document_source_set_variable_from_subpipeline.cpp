@@ -46,44 +46,28 @@ using boost::intrusive_ptr;
 
 constexpr StringData DocumentSourceSetVariableFromSubPipeline::kStageName;
 
+REGISTER_INTERNAL_DOCUMENT_SOURCE(
+    setVariableFromSubPipeline,
+    LiteParsedDocumentSourceDefault::parse,
+    DocumentSourceSetVariableFromSubPipeline::createFromBson,
+    // This can only be generated in certain versions, and registering document sources is too early
+    // to check the FCV.
+    feature_flags::gFeatureFlagSearchShardedFacets.isEnabledAndIgnoreFCV());
+
 Value DocumentSourceSetVariableFromSubPipeline::serialize(
     boost::optional<ExplainOptions::Verbosity> explain) const {
     const auto var = "$$" + Variables::getBuiltinVariableName(_variableID);
     tassert(625298, "SubPipeline cannot be null during serialization", _subPipeline);
-    return Value(DOC(getSourceName()
-                     << DOC("setVariable" << var << "pipeline" << _subPipeline->serialize())));
+    MutableDocument mDoc;
+    mDoc.addField("setVariable", Value(StringData(var)));
+    mDoc.addField("pipeline", Value(_subPipeline->serialize()));
+    return Value(DOC(getSourceName() << mDoc.freezeToValue()));
 }
 
 DepsTracker::State DocumentSourceSetVariableFromSubPipeline::getDependencies(
     DepsTracker* deps) const {
     // TODO SERVER-63845: change to NOT_SUPPORTED.
     return DepsTracker::State::SEE_NEXT;
-}
-
-Pipeline::SourceContainer::iterator DocumentSourceSetVariableFromSubPipeline::doOptimizeAt(
-    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
-    tassert(625295, "Iterator mismatch during optimization", *itr == this);
-    auto nextStage = std::next(itr);
-    if (nextStage == container->end()) {
-        return container->end();
-    }
-    // SetVariableFromSubPipeline can be moved after any shard-only stage that does not
-    // reference the $$SEARCH_META variable.
-
-    // Confirm it is a shards only stage.
-    if (nextStage->get()->distributedPlanLogic()->shardsStage &&
-        !nextStage->get()->distributedPlanLogic()->mergingStage) {
-
-        DepsTracker depsTracker;
-        nextStage->get()->getDependencies(&depsTracker);
-        // Check if next stage uses $$SEARCH_META.
-        if (!depsTracker.hasVariableReferenceTo(std::set<Variables::Id>{_variableID})) {
-            std::swap(*itr, *nextStage);
-            return itr == container->begin() ? itr : std::prev(itr);
-        }
-    }
-
-    return nextStage;
 }
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceSetVariableFromSubPipeline::createFromBson(
@@ -126,7 +110,7 @@ DocumentSourceSetVariableFromSubPipeline::create(
 };
 
 DocumentSource::GetNextResult DocumentSourceSetVariableFromSubPipeline::doGetNext() {
-    if (_firstCallForInput) {
+    if (_firstCallForInput && !_subPipeline->peekFront()->constraints().requiresInputDocSource) {
         auto nextSubPipelineInput = _subPipeline->getNext();
         tassert(625296,
                 "No document returned from $SetVariableFromSubPipeline subpipeline ",
@@ -139,6 +123,11 @@ DocumentSource::GetNextResult DocumentSourceSetVariableFromSubPipeline::doGetNex
     }
     _firstCallForInput = false;
     return pSource->getNext();
+}
+
+void DocumentSourceSetVariableFromSubPipeline::addSubPipelineInitialSource(
+    boost::intrusive_ptr<DocumentSource> source) {
+    _subPipeline->addInitialSource(std::move(source));
 }
 
 }  // namespace mongo

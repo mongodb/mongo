@@ -188,6 +188,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    bool inShardedEnvironment(OperationContext* opCtx) const override {
+        MONGO_UNREACHABLE;
+    }
+
     std::string getHostAndPort(OperationContext* opCtx) const override {
         MONGO_UNREACHABLE;
     }

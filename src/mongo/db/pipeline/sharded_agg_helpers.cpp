@@ -44,12 +44,14 @@
 #include "mongo/db/pipeline/document_source_out.h"
 #include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/document_source_sequential_document_cache.h"
+#include "mongo/db/pipeline/document_source_set_variable_from_subpipeline.h"
 #include "mongo/db/pipeline/document_source_skip.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/search_helper.h"
 #include "mongo/db/pipeline/semantic_analysis.h"
+#include "mongo/db/query/cursor_response_gen.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -240,66 +242,121 @@ std::set<ShardId> getTargetedShards(boost::intrusive_ptr<ExpressionContext> expC
 }
 
 /**
+ * Helpers to check and move stages from a DistributedPlanLogic.
+ */
+void addMaybeNullStageToFront(Pipeline* pipe, boost::intrusive_ptr<DocumentSource> ds) {
+    if (ds) {
+        pipe->addInitialSource(std::move(ds));
+    }
+}
+void addMaybeNullStageToBack(Pipeline* pipe, boost::intrusive_ptr<DocumentSource> ds) {
+    if (ds) {
+        pipe->addFinalSource(std::move(ds));
+    }
+}
+
+boost::optional<BSONObj> getOwnedOrNone(boost::optional<BSONObj> obj) {
+    if (obj) {
+        return obj->getOwned();
+    }
+    return boost::none;
+}
+
+/**
+ * Helper for find split point that handles the split after a stage that must be on
+ * the merging half of the pipeline defers being added to the merging pipeline.
+ */
+std::pair<std::unique_ptr<Pipeline, PipelineDeleter>, boost::optional<BSONObj>>
+finishFindSplitPointAfterDeferral(
+    Pipeline* mergePipe,
+    std::unique_ptr<Pipeline, PipelineDeleter> shardPipe,
+    boost::intrusive_ptr<DocumentSource> deferredStage,
+    boost::optional<BSONObj> mergeSort,
+    DocumentSource::DistributedPlanLogic::movePastFunctionType moveCheckFunc) {
+    tassert(6253723, "Expected shard pipeline", shardPipe);
+    tassert(6253724, "Expected original pipeline", mergePipe);
+
+    while (!mergePipe->getSources().empty()) {
+        boost::intrusive_ptr<DocumentSource> current = mergePipe->popFront();
+        if (!moveCheckFunc(*current)) {
+            mergePipe->addInitialSource(std::move(current));
+            break;
+        }
+
+        // If this stage also would like to split, split here. Don't defer multiple stages.
+        if (auto distributedPlanLogic = current->distributedPlanLogic()) {
+            // A source may not simultaneously be present on both sides of the split.
+            invariant(distributedPlanLogic->shardsStage != distributedPlanLogic->mergingStage);
+            // This stage must be split, split it normally.
+            addMaybeNullStageToBack(shardPipe.get(), std::move(distributedPlanLogic->shardsStage));
+            addMaybeNullStageToFront(mergePipe, std::move(distributedPlanLogic->mergingStage));
+
+            // The sort that was earlier in the pipeline takes precedence.
+            if (!mergeSort) {
+                mergeSort = getOwnedOrNone(distributedPlanLogic->mergeSortPattern);
+            }
+            break;
+        }
+
+        // Move the source from the merger _sources to the shard _sources.
+        shardPipe->addFinalSource(current);
+    }
+
+    // We got to the end of the pipeline or found a split point.
+    addMaybeNullStageToFront(mergePipe, std::move(deferredStage));
+    return {std::move(shardPipe), getOwnedOrNone(mergeSort)};
+}
+
+/**
  * Moves everything before a splittable stage to the shards. If there are no splittable stages,
  * moves everything to the shards.
  *
  * It is not safe to call this optimization multiple times.
  *
- * Returns the sort specification if the input streams are sorted, and false otherwise.
+ * Returns {shardPipe, sortSpec}. The original passed in pipeline retains all stages after the split
+ * point and becomes the merge pipeline.
  */
-boost::optional<BSONObj> findSplitPoint(Pipeline::SourceContainer* shardPipe, Pipeline* mergePipe) {
-    // Stages can specify that a merge sort must be performed sometime during the pipeline. Keep
-    // track of it until we hit the actual split point.
-    boost::optional<BSONObj> mergeSort = boost::none;
+std::pair<std::unique_ptr<Pipeline, PipelineDeleter>, boost::optional<BSONObj>> findSplitPoint(
+    Pipeline* mergePipe) {
+    const auto& expCtx = mergePipe->getContext();
+    auto shardPipe = Pipeline::create({}, expCtx);
     while (!mergePipe->getSources().empty()) {
         boost::intrusive_ptr<DocumentSource> current = mergePipe->popFront();
-
-        // If we've deferred a sort, only push it past stages that don't change the sort order.
-        if (mergeSort && !current->constraints().preservesOrderAndMetadata) {
-            // This will break the merge sort, keep it in the merging half of the pipeline.
-            mergePipe->addInitialSource(std::move(current));
-            return mergeSort;
-        }
-        // Check if this source is splittable.
         auto distributedPlanLogic = current->distributedPlanLogic();
+
+        // Check if this source is splittable.
         if (!distributedPlanLogic) {
             // Move the source from the merger _sources to the shard _sources.
-            shardPipe->push_back(current);
+            shardPipe->addFinalSource(current);
             continue;
         }
 
-        // If we got a plan logic with a sort that doesn't require a split, save it and keep going.
-        if (distributedPlanLogic->mergeSortPattern && !distributedPlanLogic->needsSplit) {
-            tassert(6441000,
-                    "Cannot specify shardsStage or mergingStage and not require that the pipeline "
-                    "be split",
-                    !distributedPlanLogic->shardsStage && !distributedPlanLogic->mergingStage);
-            shardPipe->push_back(current);
-            mergeSort = distributedPlanLogic->mergeSortPattern;
-            continue;
+        // If we got a plan logic which doesn't require a split, save it and keep going.
+        if (!distributedPlanLogic->needsSplit) {
+            addMaybeNullStageToBack(shardPipe.get(), std::move(distributedPlanLogic->shardsStage));
+            tassert(6253721,
+                    "Must have deferral function if deferring pipeline split",
+                    distributedPlanLogic->canMovePast);
+            // We know these are all currently null/none, as if we had deferred something and
+            // 'current' did not need split we would have returned above.
+            return finishFindSplitPointAfterDeferral(
+                mergePipe,
+                std::move(shardPipe),
+                std::move(distributedPlanLogic->mergingStage),
+                getOwnedOrNone(distributedPlanLogic->mergeSortPattern),
+                distributedPlanLogic->canMovePast);
         }
 
         // A source may not simultaneously be present on both sides of the split.
         invariant(distributedPlanLogic->shardsStage != distributedPlanLogic->mergingStage);
 
-        tassert(
-            6441001,
-            "Cannot specify shardsStage or mergingStage and not require that the pipeline be split",
-            distributedPlanLogic->needsSplit);
+        addMaybeNullStageToBack(shardPipe.get(), std::move(distributedPlanLogic->shardsStage));
+        addMaybeNullStageToFront(mergePipe, std::move(distributedPlanLogic->mergingStage));
 
-
-        if (distributedPlanLogic->shardsStage)
-            shardPipe->push_back(std::move(distributedPlanLogic->shardsStage));
-
-        if (distributedPlanLogic->mergingStage)
-            mergePipe->addInitialSource(std::move(distributedPlanLogic->mergingStage));
-
-        /**
-         * The sort that was earlier in the pipeline takes precedence.
-         */
-        return mergeSort ? mergeSort : distributedPlanLogic->mergeSortPattern;
+        return {std::move(shardPipe), getOwnedOrNone(distributedPlanLogic->mergeSortPattern)};
     }
-    return mergeSort;
+
+    return {std::move(shardPipe), boost::none};
 }
 
 /**
@@ -709,13 +766,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
         mergePipeline = Pipeline::parse(std::vector<BSONObj>(), expCtx);
     }
 
-    addMergeCursorsSource(mergePipeline.get(),
-                          shardDispatchResults.commandForTargetedShards,
-                          std::move(shardDispatchResults.remoteCursors),
-                          targetedShards,
-                          shardCursorsSortSpec,
-                          hasChangeStream);
-
+    partitionAndAddMergeCursorsSource(
+        mergePipeline.get(), std::move(shardDispatchResults.remoteCursors), shardCursorsSortSpec);
     return mergePipeline;
 }
 
@@ -768,13 +820,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> runPipelineDirectlyOnSingleShard(
     // empty local pipeline which we will attach the merge cursors stage to.
     auto mergePipeline = Pipeline::parse(std::vector<BSONObj>{}, expCtx);
 
-    addMergeCursorsSource(mergePipeline.get(),
-                          std::move(versionedCmdObj),
-                          std::move(ownedCursors),
-                          {std::move(shardId)},
-                          boost::none /* shardCursorsSortSpec */,
-                          false /* hasChangeStream */);
-
+    partitionAndAddMergeCursorsSource(mergePipeline.get(), std::move(ownedCursors), boost::none);
     return mergePipeline;
 }
 
@@ -814,14 +860,11 @@ boost::optional<ShardedExchangePolicy> checkIfEligibleForExchange(OperationConte
 }
 
 SplitPipeline splitPipeline(std::unique_ptr<Pipeline, PipelineDeleter> pipeline) {
-    auto& expCtx = pipeline->getContext();
     // Re-brand 'pipeline' as the merging pipeline. We will move stages one by one from the merging
     // half to the shards, as possible.
     auto mergePipeline = std::move(pipeline);
 
-    Pipeline::SourceContainer shardStages;
-    boost::optional<BSONObj> inputsSort = findSplitPoint(&shardStages, mergePipeline.get());
-    auto shardsPipeline = Pipeline::create(std::move(shardStages), expCtx);
+    auto [shardsPipeline, inputsSort] = findSplitPoint(mergePipeline.get());
 
     // The order in which optimizations are applied can have significant impact on the efficiency of
     // the final pipeline. Be Careful!
@@ -996,14 +1039,12 @@ DispatchShardPipelineResults dispatchShardPipeline(
 
     // If set, the pipeline is not valid to be run if the collection is sharded. The given string
     // is the error message to print if the collection is sharded.
-    auto pipelinePtr = pipeline.get();
-    const auto failOnShardedCollection = [opCtx, pipelinePtr]() {
-        if (opCtx->getServiceContext() && pipelinePtr) {
-            return getSearchHelpers(opCtx->getServiceContext())
-                ->validatePipelineForShardedCollection(*pipelinePtr);
-        }
-        return boost::optional<std::string>{};
-    }();
+    boost::optional<std::string> errMsgOnShardedCollection = boost::none;
+    auto srvcCtxt = opCtx->getServiceContext();
+    if (srvcCtxt && pipeline) {
+        errMsgOnShardedCollection =
+            getSearchHelpers(srvcCtxt)->validatePipelineForShardedCollection(*pipeline.get());
+    }
 
     if (needsSplit) {
         LOGV2_DEBUG(20906,
@@ -1017,7 +1058,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
 
         // If the first stage of the pipeline is a $search stage, exchange optimization isn't
         // possible.
-        // TODO SERVER-62537 Investigate relaxing this restriction.
+        // TODO SERVER-65349 Investigate relaxing this restriction.
         if (!splitPipelines || !splitPipelines->shardsPipeline ||
             !splitPipelines->shardsPipeline->peekFront() ||
             splitPipelines->shardsPipeline->peekFront()->getSourceName() !=
@@ -1110,11 +1151,11 @@ DispatchShardPipelineResults dispatchShardPipeline(
             // else.
             auto staleInfo = e.extraInfo<StaleConfigInfo>();
             tassert(6441003, "StaleConfigInfo was null during sharded aggregation", staleInfo);
-            if (failOnShardedCollection && staleInfo->getVersionWanted() &&
+            if (errMsgOnShardedCollection && staleInfo->getVersionWanted() &&
                 staleInfo->getVersionWanted() != ChunkVersion::UNSHARDED()) {
                 // If we thought the collection was not sharded, we were wrong. Collection must be
                 // sharded.
-                uassert(5858100, *failOnShardedCollection, executionNsRoutingInfo->isSharded());
+                uassert(5858100, *errMsgOnShardedCollection, executionNsRoutingInfo->isSharded());
             }
             throw;
         } catch (const ExceptionFor<ErrorCodes::CollectionUUIDMismatch>& ex) {
@@ -1124,8 +1165,8 @@ DispatchShardPipelineResults dispatchShardPipeline(
         // If we thought the collection was sharded and the shard confirmed this, fail if the query
         // isn't valid on a sharded collection.
         uassert(6347900,
-                *failOnShardedCollection,
-                !failOnShardedCollection || !executionNsRoutingInfo->isSharded());
+                *errMsgOnShardedCollection,
+                !errMsgOnShardedCollection || !executionNsRoutingInfo->isSharded());
 
         invariant(cursors.size() % shardIds.size() == 0,
                   str::stream() << "Number of cursors (" << cursors.size()
@@ -1162,12 +1203,14 @@ DispatchShardPipelineResults dispatchShardPipeline(
                                         exchangeSpec};
 }
 
-
+/**
+ * Build the AsyncResultsMergerParams from the cursor set and sort spec.
+ */
 AsyncResultsMergerParams buildArmParams(boost::intrusive_ptr<ExpressionContext> expCtx,
-                                        std::vector<RemoteCursor> remoteCursors,
+                                        std::vector<OwnedRemoteCursor> ownedCursors,
                                         boost::optional<BSONObj> shardCursorsSortSpec) {
     AsyncResultsMergerParams armParams;
-    armParams.setSort(shardCursorsSortSpec);
+    armParams.setSort(std::move(shardCursorsSortSpec));
     armParams.setTailableMode(expCtx->tailableMode);
     armParams.setNss(expCtx->ns);
 
@@ -1189,17 +1232,6 @@ AsyncResultsMergerParams buildArmParams(boost::intrusive_ptr<ExpressionContext> 
 
     armParams.setOperationSessionInfo(sessionInfo);
 
-    armParams.setRemotes(std::move(remoteCursors));
-
-    return armParams;
-}
-
-void addMergeCursorsSource(Pipeline* mergePipeline,
-                           BSONObj cmdSentToShards,
-                           std::vector<OwnedRemoteCursor> ownedCursors,
-                           const std::vector<ShardId>& targetedShards,
-                           boost::optional<BSONObj> shardCursorsSortSpec,
-                           bool hasChangeStream) {
     // Convert owned cursors into a vector of remote cursors to be transferred to the merge
     // pipeline.
     std::vector<RemoteCursor> remoteCursors;
@@ -1207,13 +1239,106 @@ void addMergeCursorsSource(Pipeline* mergePipeline,
         // Transfer ownership of the remote cursor to the $mergeCursors stage.
         remoteCursors.emplace_back(cursor.releaseCursor());
     }
-    auto armParams = buildArmParams(
-        mergePipeline->getContext(), std::move(remoteCursors), std::move(shardCursorsSortSpec));
+    armParams.setRemotes(std::move(remoteCursors));
 
-    auto mergeCursorsStage =
-        DocumentSourceMergeCursors::create(mergePipeline->getContext(), std::move(armParams));
+    return armParams;
+}
 
-    mergePipeline->addInitialSource(std::move(mergeCursorsStage));
+// Anonnymous namespace for helpers of partitionCursorsAndAddMergeCursors.
+namespace {
+/**
+ * Given the owned cursors vector, partitions the cursors into either one or two vectors. If
+ * untyped cursors are present, returned pair will be {results, boost::none}. If results or meta are
+ * present, the returned pair will be {results, meta}.
+ */
+std::pair<std::vector<OwnedRemoteCursor>, boost::optional<std::vector<OwnedRemoteCursor>>>
+partitionCursors(std::vector<OwnedRemoteCursor> ownedCursors) {
+
+    // Partition cursor set based on type/label.
+    std::vector<OwnedRemoteCursor> resultsCursors;
+    std::vector<OwnedRemoteCursor> metaCursors;
+    std::vector<OwnedRemoteCursor> untypedCursors;
+    for (OwnedRemoteCursor& ownedCursor : ownedCursors) {
+        auto cursor = *ownedCursor;
+        auto maybeCursorType = cursor->getCursorResponse().getCursorType();
+        if (!maybeCursorType) {
+            untypedCursors.push_back(std::move(ownedCursor));
+        } else {
+            auto cursorType = CursorType_parse(IDLParserErrorContext("ShardedAggHelperCursorType"),
+                                               maybeCursorType.get());
+            if (cursorType == CursorTypeEnum::DocumentResult) {
+                resultsCursors.push_back(std::move(ownedCursor));
+            } else if (cursorType == CursorTypeEnum::SearchMetaResult) {
+                metaCursors.push_back(std::move(ownedCursor));
+            } else {
+                tasserted(625304, "Received unknown cursor type from mongot.");
+            }
+        }
+    }
+
+    // Verify we don't have illegal mix of types and untyped cursors from the shards.
+    bool haveTypedCursors = !resultsCursors.empty() || !metaCursors.empty();
+    if (haveTypedCursors) {
+        tassert(625305,
+                "Received unexpected mix of labelled and unlabelled cursors.",
+                untypedCursors.empty());
+    }
+
+    if (haveTypedCursors) {
+        return {std::move(resultsCursors), std::move(metaCursors)};
+    }
+    return {std::move(untypedCursors), boost::none};
+}
+
+
+/**
+ * Adds a merge cursors stage to the pipeline for metadata cursors. Should not be called if
+ * the query did not generate metadata cursors.
+ */
+void injectMetaCursor(Pipeline* mergePipeline, std::vector<OwnedRemoteCursor> metaCursors) {
+    // Provide the "meta" cursors to the $setVariableFromSubPipeline stage.
+    for (auto source : mergePipeline->getSources()) {
+        if (auto* setVarStage =
+                dynamic_cast<DocumentSourceSetVariableFromSubPipeline*>(source.get())) {
+
+            // If $setVar is present, we must have a non-empty set of "meta" cursors.
+            tassert(625307, "Missing meta cursor set.", !metaCursors.empty());
+
+            auto armParams = sharded_agg_helpers::buildArmParams(
+                mergePipeline->getContext(), std::move(metaCursors), {});
+
+            setVarStage->addSubPipelineInitialSource(DocumentSourceMergeCursors::create(
+                mergePipeline->getContext(), std::move(armParams)));
+            break;
+        }
+    }
+}
+
+/**
+ * Adds a mergeCursors stage to the front of the pipeline to handle merging cursors from each
+ * shard.
+ */
+void addMergeCursorsSource(Pipeline* mergePipeline,
+                           std::vector<OwnedRemoteCursor> cursorsToMerge,
+                           boost::optional<BSONObj> shardCursorsSortSpec) {
+
+    auto armParams = sharded_agg_helpers::buildArmParams(
+        mergePipeline->getContext(), std::move(cursorsToMerge), std::move(shardCursorsSortSpec));
+
+    mergePipeline->addInitialSource(
+        DocumentSourceMergeCursors::create(mergePipeline->getContext(), std::move(armParams)));
+}
+
+}  // namespace
+void partitionAndAddMergeCursorsSource(Pipeline* mergePipeline,
+                                       std::vector<OwnedRemoteCursor> cursors,
+                                       boost::optional<BSONObj> shardCursorsSortSpec) {
+    auto [resultsCursors, metaCursors] = partitionCursors(std::move(cursors));
+    // Whether or not cursors are typed/untyped, the first is always the results cursor.
+    addMergeCursorsSource(mergePipeline, std::move(resultsCursors), shardCursorsSortSpec);
+    if (metaCursors) {
+        injectMetaCursor(mergePipeline, std::move(*metaCursors));
+    }
 }
 
 Status appendExplainResults(DispatchShardPipelineResults&& dispatchResults,
@@ -1263,7 +1388,7 @@ Status appendExplainResults(DispatchShardPipelineResults&& dispatchResults,
             // Since no cursors are actually established for an explain, construct ARM params with
             // an empty vector and then remove it from the explain BSON.
             buildArmParams(dispatchResults.splitPipeline->mergePipeline->getContext(),
-                           std::vector<RemoteCursor>(),
+                           std::vector<OwnedRemoteCursor>(),
                            std::move(dispatchResults.splitPipeline->shardCursorsSortSpec))
                 .toBSON()
                 .removeField(AsyncResultsMergerParams::kRemotesFieldName);

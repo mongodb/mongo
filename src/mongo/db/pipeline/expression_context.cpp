@@ -210,6 +210,7 @@ intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
     expCtx->subPipelineDepth = subPipelineDepth;
     expCtx->tempDir = tempDir;
     expCtx->jsHeapLimitMB = jsHeapLimitMB;
+    expCtx->isParsingViewDefinition = isParsingViewDefinition;
 
     expCtx->variables = variables;
     expCtx->variablesParseState = variablesParseState.copyWith(expCtx->variables.useIdGenerator());

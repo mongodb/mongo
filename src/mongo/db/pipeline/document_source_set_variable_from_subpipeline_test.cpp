@@ -151,7 +151,8 @@ TEST_F(DocumentSourceSetVariableFromSubPipelineTest, testDoGetNext) {
         Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{filter}, getExpCtx()),
         Variables::kSearchMetaId);
 
-    filter->setSource(mockSourceForSubPipelineDocSource.get());
+    // filter->setSource(mockSourceForSubPipelineDocSource.get());
+    setVariableFromSubPipeline->addSubPipelineInitialSource(mockSourceForSubPipelineDocSource);
     setVariableFromSubPipeline->setSource(mockSourceForSetVarStage.get());
 
     auto comparator = DocumentComparator();
@@ -159,51 +160,9 @@ TEST_F(DocumentSourceSetVariableFromSubPipelineTest, testDoGetNext) {
     auto next = setVariableFromSubPipeline->getNext();
     ASSERT_TRUE(next.isAdvanced());
 
-    // Test that $$SEARCH_META is now set and is equal to the value we expect.
     ASSERT_TRUE(Value::compare(mockCtxOne->variables.getValue(Variables::kSearchMetaId),
                                Value((BSON("d" << 1))),
                                nullptr) == 0);
-}
-
-
-TEST_F(DocumentSourceSetVariableFromSubPipelineTest, testDoOptimizeAt) {
-    Pipeline::SourceContainer pipelineContainer;
-    auto testBson =
-        BSON("$setVariableFromSubPipeline"
-             << BSON("setVariable"
-                     << "$$SEARCH_META"
-                     << "pipeline"
-                     << BSON_ARRAY(BSON("$addFields" << BSON("a" << BSON("$const" << 3))))));
-    auto setVariable = DocumentSourceSetVariableFromSubPipeline::createFromBson(
-        testBson.firstElement(), getExpCtx());
-    pipelineContainer.push_back(setVariable);
-
-    // $geoNear is a shard-only stage, DocumentSourceSetVariableFromSubPipeline should optimize.
-    auto geoNearStageObj =
-        fromjson("{$geoNear: {distanceField: 'dist', near: [0, 0], key: 'a.b'}}");
-    auto geoNear =
-        DocumentSourceGeoNear::createFromBson(geoNearStageObj.firstElement(), getExpCtx());
-    pipelineContainer.push_back(geoNear);
-    pipelineContainer.front()->optimizeAt(pipelineContainer.begin(), &pipelineContainer);
-    ASSERT(typeid(**pipelineContainer.begin()) == typeid(DocumentSourceGeoNear));
-
-    // $lookUp is a merging stage, so DocumentSourceSetVariableFromSubPipeline shouldn't optimize.
-    pipelineContainer.pop_front();
-    ASSERT(typeid(**pipelineContainer.begin()) == typeid(DocumentSourceSetVariableFromSubPipeline));
-    auto expCtx = getExpCtx();
-    NamespaceString fromNs("test", "coll");
-    expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
-        {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
-    auto lookupStage = DocumentSourceLookUp::createFromBson(
-        BSON("$lookup" << BSON("from"
-                               << "coll"
-                               << "pipeline" << BSON_ARRAY(BSON("$match" << BSON("x" << 1))) << "as"
-                               << "as"))
-            .firstElement(),
-        expCtx);
-    pipelineContainer.push_back(lookupStage);
-    pipelineContainer.front()->optimizeAt(pipelineContainer.begin(), &pipelineContainer);
-    ASSERT(typeid(**pipelineContainer.begin()) == typeid(DocumentSourceSetVariableFromSubPipeline));
 }
 
 }  // namespace

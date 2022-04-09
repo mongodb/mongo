@@ -58,7 +58,9 @@ public:
     StageConstraints constraints(Pipeline::SplitState) const final {
         StageConstraints setVariableConstraints(StreamType::kStreaming,
                                                 PositionRequirement::kNone,
-                                                HostTypeRequirement::kAnyShard,
+                                                // Set variable can run anywhere as long as it is
+                                                // in the merging half of the pipeline.
+                                                HostTypeRequirement::kNone,
                                                 DiskUseRequirement::kNoDiskUse,
                                                 FacetRequirement::kNotAllowed,
                                                 TransactionRequirement::kNotAllowed,
@@ -68,25 +70,31 @@ public:
         // The constraints of the sub-pipeline determine the constraints of the
         // $setVariableFromSubPipeline. We want to forward the strictest requirements of the stages
         // in the sub-pipeline.
-        setVariableConstraints = StageConstraints::getStrictestConstraints(
-            _subPipeline->getSources(), setVariableConstraints);
+        if (_subPipeline) {
+            setVariableConstraints = StageConstraints::getStrictestConstraints(
+                _subPipeline->getSources(), setVariableConstraints);
+        }
+        // This stage doesn't modify documents.
+        setVariableConstraints.preservesOrderAndMetadata = true;
         return setVariableConstraints;
     }
 
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
 
-protected:
     /**
-     * Attempts to swap with a subsequent sharding only stage.
+     * Set the sub-pipeline's initial source. Similar to Pipeline's addInitialSource().
+     * Should be used to add a cursor/document generating stage to the pipeline.
      */
-    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                     Pipeline::SourceContainer* container) final;
+    void addSubPipelineInitialSource(boost::intrusive_ptr<DocumentSource> source);
+
+protected:
     DocumentSourceSetVariableFromSubPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                              std::unique_ptr<Pipeline, PipelineDeleter> subpipeline,
                                              Variables::Id varID)
         : DocumentSource(kStageName, expCtx),
           _subPipeline(std::move(subpipeline)),
           _variableID(varID) {}
+
 
 private:
     GetNextResult doGetNext() final;

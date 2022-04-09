@@ -337,6 +337,11 @@ public:
     virtual std::string getShardName(OperationContext* opCtx) const = 0;
 
     /**
+     * Returns whether or not this process is running as part of a sharded cluster.
+     */
+    virtual bool inShardedEnvironment(OperationContext* opCtx) const = 0;
+
+    /**
      * Returns the "host:port" string for this node.
      */
     virtual std::string getHostAndPort(OperationContext* opCtx) const = 0;

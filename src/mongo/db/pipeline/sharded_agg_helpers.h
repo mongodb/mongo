@@ -145,15 +145,12 @@ BSONObj createCommandForTargetedShards(const boost::intrusive_ptr<ExpressionCont
                                        boost::optional<BSONObj> readConcern = boost::none);
 
 /**
- * Creates a new DocumentSourceMergeCursors from the provided 'remoteCursors' and adds it to the
- * front of 'mergePipeline'.
+ * Convenience method for callers that want to do 'partitionCursors', 'injectMetaCursors', and
+ * 'addMergeCursorsSource' in order.
  */
-void addMergeCursorsSource(Pipeline* mergePipeline,
-                           BSONObj cmdSentToShards,
-                           std::vector<OwnedRemoteCursor> ownedCursors,
-                           const std::vector<ShardId>& targetedShards,
-                           boost::optional<BSONObj> shardCursorsSortSpec,
-                           bool hasChangeStream);
+void partitionAndAddMergeCursorsSource(Pipeline* pipeline,
+                                       std::vector<OwnedRemoteCursor> cursors,
+                                       boost::optional<BSONObj> shardCursorsSortSpec);
 
 /**
  * Targets the shards with an aggregation command built from `ownedPipeline` and explain set to

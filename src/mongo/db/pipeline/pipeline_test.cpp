@@ -4027,13 +4027,19 @@ public:
         return new DocumentSourceDeferredMergeSort(expCtx);
     }
 
+
+    static bool canMovePastDuringSplit(const DocumentSource& ds) {
+        return ds.constraints().preservesOrderAndMetadata;
+    }
+
     boost::optional<DistributedPlanLogic> distributedPlanLogic() override {
         DistributedPlanLogic logic;
 
         logic.mergingStage = nullptr;
-        logic.shardsStage = nullptr;
+        logic.shardsStage = this;
         logic.mergeSortPattern = BSON("a" << 1);
         logic.needsSplit = false;
+        logic.canMovePast = canMovePastDuringSplit;
 
         return logic;
     }
