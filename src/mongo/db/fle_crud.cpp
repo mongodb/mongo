@@ -1156,6 +1156,7 @@ uint64_t FLEQueryInterfaceImpl::countDocuments(const NamespaceString& nss) {
     if (!firstBatch.empty()) {
         auto countObj = firstBatch.front();
         docCount = countObj.getIntField("n"_sd);
+        uassert(6520701, "Unexpected negative document count", docCount >= 0);
     }
 
     return docCount;
