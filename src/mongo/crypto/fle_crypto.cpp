@@ -1154,7 +1154,15 @@ stdx::unordered_map<std::string, EncryptedField> toFieldMap(const EncryptedField
 }
 
 uint64_t generateRandomContention(uint64_t cm) {
-    return cm > 0 ? SecureRandom().nextInt64(cm) + 1 : 0;
+    // For non-contentious fields, we select the partition number, u, to be equal to 0.
+    //
+    // for contentious fields, with a contention factor, p, we pick the partition number, u,
+    // uniformly at random from the set {0, ..., p}.
+    //
+    // Note: nextInt64() returns [0,p) instead of [0,p] so we +1.
+    //
+    uassert(6535701, "Illegal contention factor", cm != std::numeric_limits<uint64_t>::max());
+    return cm > 0 ? SecureRandom().nextInt64(cm + 1) : 0;
 }
 
 }  // namespace

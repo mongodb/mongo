@@ -1155,23 +1155,23 @@ TEST_F(FleTagsTest, ContentionFactor) {
     auto doc2 = BSON("encrypted"
                      << "b");
 
-    // Insert doc1 twice with a contention factor of 1 and once with a contention factor or 4.
-    doSingleInsertWithContention(1, doc1, 4, 1, efc);
-    doSingleInsertWithContention(4, doc1, 4, 4, efc);
-    doSingleInsertWithContention(5, doc1, 4, 1, efc);
+    // Insert doc1 twice with a contention factor of 0 and once with a contention factor or 3.
+    doSingleInsertWithContention(1, doc1, 4, 0, efc);
+    doSingleInsertWithContention(4, doc1, 4, 3, efc);
+    doSingleInsertWithContention(5, doc1, 4, 0, efc);
 
-    // Insert doc2 once with a contention factor of 3 and once with a contention factor of 4.
-    doSingleInsertWithContention(7, doc2, 4, 3, efc);
-    doSingleInsertWithContention(8, doc2, 4, 4, efc);
+    // Insert doc2 once with a contention factor of 2 and once with a contention factor of 3.
+    doSingleInsertWithContention(7, doc2, 4, 2, efc);
+    doSingleInsertWithContention(8, doc2, 4, 3, efc);
 
-    ASSERT_EQ(2, readTagsWithContention(doc1, 1).size());
+    ASSERT_EQ(2, readTagsWithContention(doc1, 0).size());
+    ASSERT_EQ(0, readTagsWithContention(doc2, 0).size());
+    ASSERT_EQ(0, readTagsWithContention(doc1, 1).size());
     ASSERT_EQ(0, readTagsWithContention(doc2, 1).size());
     ASSERT_EQ(0, readTagsWithContention(doc1, 2).size());
-    ASSERT_EQ(0, readTagsWithContention(doc2, 2).size());
-    ASSERT_EQ(0, readTagsWithContention(doc1, 3).size());
+    ASSERT_EQ(1, readTagsWithContention(doc2, 2).size());
+    ASSERT_EQ(1, readTagsWithContention(doc1, 3).size());
     ASSERT_EQ(1, readTagsWithContention(doc2, 3).size());
-    ASSERT_EQ(1, readTagsWithContention(doc1, 4).size());
-    ASSERT_EQ(1, readTagsWithContention(doc2, 4).size());
     ASSERT_EQ(3, readTags(doc1, 4).size());
     ASSERT_EQ(2, readTags(doc2, 4).size());
 }

@@ -59,7 +59,7 @@ using TwiceDerived = FLETwiceDerivedTokenGenerator;
 //      d: EDCDerivedFromDataToken
 // Do:
 //      n = ESC::emuBinary(s)
-//      tags = [1..n]
+//      tags = [0..n)
 //      pos = ECC::nullDocument(c) ? ECC::nullDocument(c).position : 1
 //      LOOP:
 //          doc = ECC::getDocument(c, pos)
@@ -155,7 +155,7 @@ std::vector<PrfBlock> readTags(const FLEStateCollectionReader& esc,
         readTagsWithContention(esc, ecc, s, c, d, 0, binaryTags);
         return binaryTags;
     }
-    for (auto i = 1; i <= cm.get(); i++) {
+    for (auto i = 0; i <= cm.get(); i++) {
         readTagsWithContention(esc, ecc, s, c, d, i, binaryTags);
     }
     return binaryTags;
