@@ -137,6 +137,7 @@ else
 
 	if ! expr "$f" : 'examples/c/*' > /dev/null &&
 	   ! expr "$f" : '.*cxx' > /dev/null &&
+	   ! expr "$f" : '.*cpp' > /dev/null &&
 	   ! expr "$f" : 'ext/*' > /dev/null &&
 	   ! expr "$f" : 'src/os_posix/os_snprintf.c' > /dev/null &&
 	    egrep '[^a-z_]snprintf\(|[^a-z_]vsnprintf\(' $f > $t; then

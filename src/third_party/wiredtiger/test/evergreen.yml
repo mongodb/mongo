@@ -1001,11 +1001,11 @@ tasks:
       - func: "cppsuite test"
         vars:
           test_config: debug_mode=(cursor_copy=true)
-          test_config_filename: configs/base_test_default.txt
-          test_name: base_test
+          test_config_filename: configs/operations_test_default.txt
+          test_name: operations_test
       - func: "upload test stats"
         vars:
-          test_path: test/cppsuite/base_test
+          test_path: test/cppsuite/operations_test
 
   - name: cppsuite-hs-cleanup-default
     tags: ["pull_request"]
@@ -1071,11 +1071,11 @@ tasks:
       - func: "fetch artifacts"
       - func: "cppsuite test"
         vars:
-          test_config_filename: configs/base_test_stress.txt
-          test_name: base_test
+          test_config_filename: configs/operations_test_stress.txt
+          test_name: operations_test
       - func: "upload test stats"
         vars:
-          test_path: test/cppsuite/base_test
+          test_path: test/cppsuite/operations_test
 
   - name: cppsuite-hs-cleanup-stress
     depends_on:

@@ -32,9 +32,9 @@
  * Class that defines operations that do nothing as an example. This shows how database operations
  * can be overridden and customized.
  */
-class example_test : public test_harness::test {
+class test_template : public test_harness::test {
     public:
-    example_test(const test_harness::test_args &args) : test(args) {}
+    test_template(const test_harness::test_args &args) : test(args) {}
 
     void
     run() override final

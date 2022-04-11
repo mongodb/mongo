@@ -34,7 +34,7 @@
  *
  * Can be used to create stress tests in various ways.
  */
-class base_test : public test_harness::test {
+class operations_test : public test_harness::test {
     public:
-    base_test(const test_harness::test_args &args) : test(args) {}
+    operations_test(const test_harness::test_args &args) : test(args) {}
 };
