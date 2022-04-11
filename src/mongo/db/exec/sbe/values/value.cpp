@@ -836,6 +836,9 @@ std::pair<TypeTags, Value> compareValue(TypeTags lhsTag,
                             bitcastFrom<const char*>(rhsCws.scope));
     } else {
         // Different types.
+        if (lhsTag == TypeTags::Nothing || rhsTag == TypeTags::Nothing) {
+            return {TypeTags::Nothing, 0};
+        }
         auto lhsType = tagToType(lhsTag);
         auto rhsType = tagToType(rhsTag);
         tassert(5365500, "values cannot have the same type", lhsType != rhsType);

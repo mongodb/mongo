@@ -284,8 +284,7 @@ function runTests() {
                 localField: "b",
                 foreignRecords: docs,
                 foreignField: "a",
-                // TODO SERVER-65202: matching of "undefined" isn't consistent
-                idsExpectedToMatch: (currentJoinAlgorithm != JoinAlgorithm.HJ) ? [2] : []
+                idsExpectedToMatch: []
             });
         } else {
             // Due to legacy reasons, in the classic engine "undefined" either matches to null or
