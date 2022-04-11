@@ -2966,6 +2966,7 @@ buildvariants:
 
 - name: enterprise-ubuntu-join-ingress-sessions-on-shutdown
   display_name: "~ Enterprise Ubuntu 18.04 (with {joinIngressSessionsOnShutdown: \"true\"})"
+  activate: false
   run_on:
     - ubuntu1804-test
   modules:
