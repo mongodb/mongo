@@ -64,8 +64,9 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildPipeline(
     if (!userRequestedResumePoint) {
         // Make sure we update the 'resumeAfter' in the 'spec' so that we serialize the
         // correct resume token when sending it to the shards.
-        spec.setResumeAfter(ResumeToken::makeHighWaterMarkToken(
-            DocumentSourceChangeStream::getStartTimeForNewStream(expCtx)));
+        auto clusterTime = DocumentSourceChangeStream::getStartTimeForNewStream(expCtx);
+        spec.setResumeAfter(
+            ResumeToken::makeHighWaterMarkToken(clusterTime, expCtx->changeStreamTokenVersion));
     }
 
     // Unfold the $changeStream into its constituent stages and add them to the pipeline.

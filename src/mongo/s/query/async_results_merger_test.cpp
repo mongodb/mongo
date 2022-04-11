@@ -54,7 +54,10 @@ LogicalSessionId parseSessionIdFromCmd(BSONObj cmdObj) {
 }
 
 BSONObj makePostBatchResumeToken(Timestamp clusterTime) {
-    auto pbrt = ResumeToken::makeHighWaterMarkToken(clusterTime).toDocument().toBson();
+    auto pbrt =
+        ResumeToken::makeHighWaterMarkToken(clusterTime, ResumeTokenData::kDefaultTokenVersion)
+            .toDocument()
+            .toBson();
     invariant(pbrt.firstElement().type() == BSONType::String);
     return pbrt;
 }

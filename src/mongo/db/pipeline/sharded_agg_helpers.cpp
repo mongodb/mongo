@@ -113,6 +113,12 @@ RemoteCursor openChangeStreamNewShardMonitor(const boost::intrusive_ptr<Expressi
                       << DocumentSourceChangeStreamSpec::kAllowToRunOnConfigDBFieldName << true))});
     aggReq.setFromMongos(true);
     aggReq.setNeedsMerge(true);
+
+    // TODO SERVER-65370: from 6.1 onwards, we will default to v2 and this block should be removed.
+    if (expCtx->inMongos) {
+        aggReq.setGenerateV2ResumeTokens(expCtx->changeStreamTokenVersion == 2);
+    }
+
     SimpleCursorOptions cursor;
     cursor.setBatchSize(0);
     aggReq.setCursor(cursor);
@@ -143,6 +149,17 @@ BSONObj genericTransformForShards(MutableDocument&& cmdForShards,
 
     if (!collationObj.isEmpty()) {
         cmdForShards[AggregateCommandRequest::kCollationFieldName] = Value(collationObj);
+    }
+
+    // We explicitly set $_generateV2ResumeTokens to false, if not already set, to indicate that the
+    // shards should NOT produce v2 resume tokens for change streams; instead, they should continue
+    // generating v1 tokens. This facilitates upgrade between 6.0 (which produces v1 by default)
+    // and 7.0 (which will produce v2 by default, but will be capable of generating v1) by ensuring
+    // that a 6.0 mongoS on a mixed 6.0/7.0 cluster will see only v1 tokens in the stream.
+    // TODO SERVER-65370: from 6.1 onwards, we will default to v2 and this block should be removed.
+    const auto& v2FieldName = AggregateCommandRequest::kGenerateV2ResumeTokensFieldName;
+    if (auto cmdObj = cmdForShards.peek(); expCtx->inMongos && cmdObj[v2FieldName].missing()) {
+        cmdForShards[v2FieldName] = Value(false);
     }
 
     // If this is a request for an aggregation explain, then we must wrap the aggregate inside an

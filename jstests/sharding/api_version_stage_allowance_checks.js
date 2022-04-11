@@ -19,6 +19,17 @@ const mongos = st.s0;
 const dbName = jsTestName();
 const db = mongos.getDB(dbName);
 
+// Test that a $changeStream can be opened with 'apiStrict: true'.
+const result = db.runCommand({
+    aggregate: 1,
+    pipeline: [{$changeStream: {}}],
+    cursor: {},
+    writeConcern: {w: "majority"},
+    apiVersion: "1",
+    apiStrict: true
+});
+assert.commandWorked(result);
+
 // Tests that sharded time-series collection can be queried (invoking $_internalUnpackBucket stage)
 // from an external client with 'apiStrict'.
 (function testInternalUnpackBucketAllowance() {

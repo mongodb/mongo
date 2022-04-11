@@ -75,9 +75,12 @@ void setResumeTokenForEvent(const ResumeTokenData& resumeTokenData, MutableDocum
 }  // namespace
 
 ChangeStreamEventTransformation::ChangeStreamEventTransformation(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const DocumentSourceChangeStreamSpec& spec)
-    : _changeStreamSpec(spec) {
-    _resumeToken = DocumentSourceChangeStream::resolveResumeTokenFromSpec(_changeStreamSpec);
+    : _changeStreamSpec(spec), _expCtx(expCtx) {
+    // Extract the resume token from the spec and store it.
+    _resumeToken =
+        DocumentSourceChangeStream::resolveResumeTokenFromSpec(_expCtx, _changeStreamSpec);
 
     // Determine whether the user requested a point-in-time pre-image, which will affect this
     // stage's output.
@@ -104,7 +107,7 @@ ResumeTokenData ChangeStreamEventTransformation::makeResumeToken(Value tsVal,
 
     // If we have a resume token, we need to match the version with which it was generated until we
     // have surpassed it, at which point we can begin generating tokens with our default version.
-    auto version = (clusterTime > _resumeToken.clusterTime) ? ResumeTokenData::kDefaultTokenVersion
+    auto version = (clusterTime > _resumeToken.clusterTime) ? _expCtx->changeStreamTokenVersion
                                                             : _resumeToken.version;
 
     // Construct and return the final resume token.
@@ -114,7 +117,7 @@ ResumeTokenData ChangeStreamEventTransformation::makeResumeToken(Value tsVal,
 ChangeStreamDefaultEventTransformation::ChangeStreamDefaultEventTransformation(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const DocumentSourceChangeStreamSpec& spec)
-    : ChangeStreamEventTransformation(spec) {
+    : ChangeStreamEventTransformation(expCtx, spec) {
     _documentKeyCache =
         std::make_unique<change_stream_legacy::DocumentKeyCache>(expCtx, _resumeToken);
 }
@@ -471,6 +474,11 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
     return doc.freeze();
 }
 
+ChangeStreamViewDefinitionEventTransformation::ChangeStreamViewDefinitionEventTransformation(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const DocumentSourceChangeStreamSpec& spec)
+    : ChangeStreamEventTransformation(expCtx, spec) {}
+
 std::set<std::string> ChangeStreamViewDefinitionEventTransformation::getFieldNameDependencies()
     const {
     return std::set<std::string>{repl::OplogEntry::kOpTypeFieldName.toString(),
@@ -541,7 +549,8 @@ ChangeStreamEventTransformer::ChangeStreamEventTransformer(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const DocumentSourceChangeStreamSpec& spec) {
     _defaultEventBuilder = std::make_unique<ChangeStreamDefaultEventTransformation>(expCtx, spec);
-    _viewNsEventBuilder = std::make_unique<ChangeStreamViewDefinitionEventTransformation>(spec);
+    _viewNsEventBuilder =
+        std::make_unique<ChangeStreamViewDefinitionEventTransformation>(expCtx, spec);
     _isSingleCollStream = DocumentSourceChangeStream::getChangeStreamType(expCtx->ns) ==
         DocumentSourceChangeStream::ChangeStreamType::kSingleCollection;
 }

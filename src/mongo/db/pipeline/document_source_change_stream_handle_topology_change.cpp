@@ -174,8 +174,8 @@ BSONObj DocumentSourceChangeStreamHandleTopologyChange::createUpdatedCommandForN
     Timestamp shardAddedTime) {
     // We must start the new cursor from the moment at which the shard became visible.
     const auto newShardAddedTime = LogicalTime{shardAddedTime};
-    auto resumeTokenForNewShard =
-        ResumeToken::makeHighWaterMarkToken(newShardAddedTime.addTicks(1).asTimestamp());
+    auto resumeTokenForNewShard = ResumeToken::makeHighWaterMarkToken(
+        newShardAddedTime.addTicks(1).asTimestamp(), pExpCtx->changeStreamTokenVersion);
 
     // Create a new shard command object containing the new resume token.
     auto shardCommand = replaceResumeTokenInCommand(resumeTokenForNewShard.toDocument());

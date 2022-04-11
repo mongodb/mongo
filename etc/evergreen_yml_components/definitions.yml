@@ -4201,6 +4201,13 @@ tasks:
   - func: "do setup"
   - func: "run tests"
 
+- <<: *task_template
+  name: change_streams_v2_resume_token_passthrough
+  tags: ["change_streams"]
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+
 - <<: *gen_task_template
   name: change_streams_multiversion_gen
   tags: ["multiversion", "multiversion_passthrough"]
@@ -4251,6 +4258,15 @@ tasks:
 
 - <<: *task_template
   name: change_streams_sharded_collections_passthrough
+  tags: ["change_streams"]
+  depends_on:
+  - name: change_streams
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+
+- <<: *task_template
+  name: change_streams_v2_resume_token_sharded_collections_passthrough
   tags: ["change_streams"]
   depends_on:
   - name: change_streams

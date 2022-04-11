@@ -287,7 +287,9 @@ public:
      * returns the equivalent high-watermark token. This method should only ever be called on a spec
      * where one of 'resumeAfter', 'startAfter', or 'startAtOperationTime' is populated.
      */
-    static ResumeTokenData resolveResumeTokenFromSpec(const DocumentSourceChangeStreamSpec& spec);
+    static ResumeTokenData resolveResumeTokenFromSpec(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const DocumentSourceChangeStreamSpec& spec);
 
     /**
      * For a change stream with no resume information supplied by the user, returns the clusterTime

@@ -71,7 +71,7 @@ DocumentSourceChangeStreamCheckInvalidate::create(
     const DocumentSourceChangeStreamSpec& spec) {
     // If resuming from an "invalidate" using "startAfter", pass along the resume token data to
     // DSCSCheckInvalidate to signify that another invalidate should not be generated.
-    auto resumeToken = DocumentSourceChangeStream::resolveResumeTokenFromSpec(spec);
+    auto resumeToken = DocumentSourceChangeStream::resolveResumeTokenFromSpec(expCtx, spec);
     return new DocumentSourceChangeStreamCheckInvalidate(
         expCtx, boost::make_optional(resumeToken.fromInvalidate, std::move(resumeToken)));
 }

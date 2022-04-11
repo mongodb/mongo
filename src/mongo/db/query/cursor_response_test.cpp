@@ -395,7 +395,9 @@ TEST(CursorResponseTest, addToBSONSubsequentResponse) {
 TEST(CursorResponseTest, serializePostBatchResumeToken) {
     std::vector<BSONObj> batch = {BSON("_id" << 1), BSON("_id" << 2)};
     auto postBatchResumeToken =
-        ResumeToken::makeHighWaterMarkToken(Timestamp(1, 2)).toDocument().toBson();
+        ResumeToken::makeHighWaterMarkToken(Timestamp(1, 2), ResumeTokenData::kDefaultTokenVersion)
+            .toDocument()
+            .toBson();
     CursorResponse response(
         NamespaceString("db.coll"), CursorId(123), batch, boost::none, postBatchResumeToken);
     auto serialized = response.toBSON(CursorResponse::ResponseType::SubsequentResponse);

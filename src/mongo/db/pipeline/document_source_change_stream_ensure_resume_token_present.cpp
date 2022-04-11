@@ -45,7 +45,7 @@ boost::intrusive_ptr<DocumentSourceChangeStreamEnsureResumeTokenPresent>
 DocumentSourceChangeStreamEnsureResumeTokenPresent::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const DocumentSourceChangeStreamSpec& spec) {
-    auto resumeToken = DocumentSourceChangeStream::resolveResumeTokenFromSpec(spec);
+    auto resumeToken = DocumentSourceChangeStream::resolveResumeTokenFromSpec(expCtx, spec);
     tassert(5666902,
             "Expected non-high-water-mark resume token",
             !ResumeToken::isHighWaterMarkToken(resumeToken));

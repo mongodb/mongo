@@ -40,7 +40,8 @@ namespace mongo {
  */
 class ChangeStreamEventTransformation {
 public:
-    ChangeStreamEventTransformation(const DocumentSourceChangeStreamSpec& spec);
+    ChangeStreamEventTransformation(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                    const DocumentSourceChangeStreamSpec& spec);
 
     virtual ~ChangeStreamEventTransformation() {}
 
@@ -64,6 +65,7 @@ protected:
                                     Value opDescription) const;
 
     const DocumentSourceChangeStreamSpec _changeStreamSpec;
+    boost::intrusive_ptr<ExpressionContext> _expCtx;
     ResumeTokenData _resumeToken;
 
     // Set to true if the pre-image should be included in the output documents.
@@ -94,8 +96,9 @@ private:
  */
 class ChangeStreamViewDefinitionEventTransformation final : public ChangeStreamEventTransformation {
 public:
-    ChangeStreamViewDefinitionEventTransformation(const DocumentSourceChangeStreamSpec& spec)
-        : ChangeStreamEventTransformation(spec) {}
+    ChangeStreamViewDefinitionEventTransformation(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const DocumentSourceChangeStreamSpec& spec);
 
     Document applyTransformation(const Document& fromDoc) const override;
 

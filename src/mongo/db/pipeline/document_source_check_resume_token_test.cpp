@@ -385,7 +385,9 @@ protected:
     }
     intrusive_ptr<DocumentSourceChangeStreamCheckResumability> createDSCheckResumability(
         Timestamp ts) {
-        return createDSCheckResumability(ResumeToken::makeHighWaterMarkToken(ts).getData());
+        return createDSCheckResumability(
+            ResumeToken::makeHighWaterMarkToken(ts, ResumeTokenData::kDefaultTokenVersion)
+                .getData());
     }
 };
 

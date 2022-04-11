@@ -174,7 +174,8 @@ void PlanExecutorPipeline::_performChangeStreamsAccounting(const boost::optional
         // high-water-mark token at the current clusterTime.
         auto highWaterMark = PipelineD::getLatestOplogTimestamp(_pipeline.get());
         if (highWaterMark > _latestOplogTimestamp) {
-            auto token = ResumeToken::makeHighWaterMarkToken(highWaterMark);
+            auto token = ResumeToken::makeHighWaterMarkToken(
+                highWaterMark, _pipeline->getContext()->changeStreamTokenVersion);
             _postBatchResumeToken = token.toDocument().toBson();
             _latestOplogTimestamp = highWaterMark;
             _setSpeculativeReadTimestamp();

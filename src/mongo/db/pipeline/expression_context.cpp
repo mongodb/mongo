@@ -218,6 +218,9 @@ intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
     expCtx->exprDeprectedForApiV1 = exprDeprectedForApiV1;
 
     expCtx->initialPostBatchResumeToken = initialPostBatchResumeToken.getOwned();
+    expCtx->changeStreamTokenVersion = changeStreamTokenVersion;
+    expCtx->changeStreamSpec = changeStreamSpec;
+
     expCtx->originalAggregateCommand = originalAggregateCommand.getOwned();
 
     // Note that we intentionally skip copying the value of '_interruptCounter' because 'expCtx' is

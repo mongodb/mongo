@@ -142,7 +142,7 @@ public:
     /**
      * Generate a high-water-mark token for 'clusterTime', with no UUID or documentKey.
      */
-    static ResumeToken makeHighWaterMarkToken(Timestamp clusterTime);
+    static ResumeToken makeHighWaterMarkToken(Timestamp clusterTime, int version);
 
     /**
      * Returns true if the given token data represents a valid high-water-mark resume token; that

@@ -4515,7 +4515,7 @@ TEST_F(MultiTokenFormatVersionTest, CanResumeFromV2HighWaterMark) {
     auto oplogAfterResumeTime = makeAnOplogEntry(afterResumeTs, documentKey);
 
     // Create a v2 high water mark token which sorts immediately before 'firstOplogAtResumeTime'.
-    ResumeTokenData resumeToken = ResumeToken::makeHighWaterMarkToken(resumeTs).getData();
+    ResumeTokenData resumeToken = ResumeToken::makeHighWaterMarkToken(resumeTs, 2).getData();
     resumeToken.version = 2;
     auto expCtx = getExpCtxRaw();
     expCtx->ns = NamespaceString::makeCollectionlessAggregateNSS("unittests");

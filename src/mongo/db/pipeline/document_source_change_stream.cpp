@@ -227,13 +227,16 @@ std::string DocumentSourceChangeStream::regexEscapeNsForChangeStream(StringData 
 }
 
 ResumeTokenData DocumentSourceChangeStream::resolveResumeTokenFromSpec(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const DocumentSourceChangeStreamSpec& spec) {
     if (spec.getStartAfter()) {
         return spec.getStartAfter()->getData();
     } else if (spec.getResumeAfter()) {
         return spec.getResumeAfter()->getData();
     } else if (spec.getStartAtOperationTime()) {
-        return ResumeToken::makeHighWaterMarkToken(*spec.getStartAtOperationTime()).getData();
+        return ResumeToken::makeHighWaterMarkToken(*spec.getStartAtOperationTime(),
+                                                   expCtx->changeStreamTokenVersion)
+            .getData();
     }
     tasserted(5666901,
               "Expected one of 'startAfter', 'resumeAfter' or 'startAtOperationTime' to be "
@@ -292,7 +295,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::_bui
     }
 
     // Obtain the resume token from the spec. This will be used when building the pipeline.
-    auto resumeToken = DocumentSourceChangeStream::resolveResumeTokenFromSpec(spec);
+    auto resumeToken = DocumentSourceChangeStream::resolveResumeTokenFromSpec(expCtx, spec);
 
     // Unfold the $changeStream into its constituent stages and add them to the pipeline.
     stages.push_back(DocumentSourceChangeStreamOplogMatch::create(expCtx, spec));
@@ -441,7 +444,7 @@ void DocumentSourceChangeStream::assertIsLegalSpecification(
             !spec.getResumeAfter() || !spec.getStartAfter());
 
     auto resumeToken = (spec.getResumeAfter() || spec.getStartAfter())
-        ? resolveResumeTokenFromSpec(spec)
+        ? resolveResumeTokenFromSpec(expCtx, spec)
         : boost::optional<ResumeTokenData>();
 
     uassert(40674,

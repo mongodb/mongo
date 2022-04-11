@@ -50,9 +50,9 @@ namespace {
 // Helper function for makeHighWaterMarkToken and isHighWaterMarkToken.
 ResumeTokenData makeHighWaterMarkResumeTokenData(Timestamp clusterTime, int version) {
     ResumeTokenData tokenData;
+    tokenData.version = version;
     tokenData.clusterTime = clusterTime;
     tokenData.tokenType = ResumeTokenData::kHighWaterMarkToken;
-    tokenData.version = version;
     return tokenData;
 }
 }  // namespace
@@ -297,9 +297,8 @@ ResumeToken ResumeToken::parse(const Document& resumeDoc) {
     return ResumeToken(resumeDoc);
 }
 
-ResumeToken ResumeToken::makeHighWaterMarkToken(Timestamp clusterTime) {
-    return ResumeToken(
-        makeHighWaterMarkResumeTokenData(clusterTime, ResumeTokenData::kDefaultTokenVersion));
+ResumeToken ResumeToken::makeHighWaterMarkToken(Timestamp clusterTime, int version) {
+    return ResumeToken(makeHighWaterMarkResumeTokenData(clusterTime, version));
 }
 
 bool ResumeToken::isHighWaterMarkToken(const ResumeTokenData& tokenData) {

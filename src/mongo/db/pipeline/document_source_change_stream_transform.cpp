@@ -74,7 +74,8 @@ DocumentSourceChangeStreamTransform::DocumentSourceChangeStreamTransform(
       _isIndependentOfAnyCollection(expCtx->ns.isCollectionlessAggregateNS()) {
 
     // Extract the resume token or high-water-mark from the spec.
-    auto tokenData = DocumentSourceChangeStream::resolveResumeTokenFromSpec(_changeStreamSpec);
+    auto tokenData =
+        DocumentSourceChangeStream::resolveResumeTokenFromSpec(expCtx, _changeStreamSpec);
 
     // Set the initialPostBatchResumeToken on the expression context.
     expCtx->initialPostBatchResumeToken = ResumeToken(tokenData).toBSON();

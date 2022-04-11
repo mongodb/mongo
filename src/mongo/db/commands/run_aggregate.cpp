@@ -442,6 +442,14 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
     expCtx->collationMatchesDefault = collationMatchesDefault;
     expCtx->forPerShardCursor = request.getPassthroughToShard().has_value();
 
+    // If the request specified v2 resume tokens for change streams, set this on the expCtx. On 6.0
+    // we only expect this to occur during testing.
+    // TODO SERVER-65370: after 6.0, assume true unless present and explicitly false.
+    if (request.getGenerateV2ResumeTokens()) {
+        uassert(6528200, "Invalid request for v2 resume tokens", getTestCommandsEnabled());
+        expCtx->changeStreamTokenVersion = 2;
+    }
+
     return expCtx;
 }
 
