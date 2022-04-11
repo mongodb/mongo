@@ -297,7 +297,7 @@ public:
     bool getDedupRID() const;
     void setDedupRID(bool value);
 
-    const GroupIdType getSatisfiedPartialIndexesGroupId() const;
+    GroupIdType getSatisfiedPartialIndexesGroupId() const;
 
 private:
     const IndexReqTarget _indexReqTarget;

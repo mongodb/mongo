@@ -208,7 +208,7 @@ void IndexingRequirement::setDedupRID(const bool value) {
     _dedupRID = value;
 }
 
-const GroupIdType IndexingRequirement::getSatisfiedPartialIndexesGroupId() const {
+GroupIdType IndexingRequirement::getSatisfiedPartialIndexesGroupId() const {
     return _satisfiedPartialIndexesGroupId;
 }
 
