@@ -79,6 +79,13 @@ if platform_family? 'debian'
   ENV['DEBIAN_FRONTEND'] = 'noninteractive'
   package 'openssl'
 
+  if node['platform_version'] == '16.04'
+    execute 'update ca-certificates' do
+      command 'apt-get install -y ca-certificates'
+      live_stream true
+    end
+  end
+
   # the ubuntu 16.04 image does not have some dependencies installed by default
   # and it is required for the install_compass script
   execute 'install dependencies' do
