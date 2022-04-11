@@ -62,10 +62,13 @@ winningPlan = getWinningPlan(explain.queryPlanner);
 engineSpecificAssertion(!isIdhack(db, winningPlan), isIxscan(db, winningPlan), db, winningPlan);
 
 // Covered query returning _id field only can be handled by ID hack.
+// TODO SERVER-65129
+const isAutoParameterizationEnabled = checkSBEEnabled(db, ["featureFlagAutoParameterization"]);
+const parentStage = isAutoParameterizationEnabled ? "PROJECTION_COVERED" : "FETCH";
 explain = t.find(query, {_id: 1}).explain();
 winningPlan = getWinningPlan(explain.queryPlanner);
 engineSpecificAssertion(
-    isIdhack(db, winningPlan), isIdIndexScan(db, winningPlan, "FETCH"), db, winningPlan);
+    isIdhack(db, winningPlan), isIdIndexScan(db, winningPlan, parentStage), db, winningPlan);
 
 // Check doc from covered ID hack query.
 assert.eq({_id: {x: 2}}, t.findOne(query, {_id: 1}), explain);

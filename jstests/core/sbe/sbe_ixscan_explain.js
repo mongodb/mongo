@@ -35,8 +35,11 @@ assert.commandWorked(coll.insertMany([
 ]));
 
 let explain = coll.find({a: 3}).hint({a: 1}).explain("executionStats");
-let ixscanStage = getPlanStage(explain.executionStats.executionStages, "ixseek");
-
 assert(isIxscan(db, getWinningPlan(explain.queryPlanner)));
-assertStageContainsIndexName(ixscanStage);
+
+let ixscanStages = getPlanStages(explain.executionStats.executionStages, "ixseek");
+assert(ixscanStages.length !== 0);
+for (let ixscanStage of ixscanStages) {
+    assertStageContainsIndexName(ixscanStage);
+}
 }());
