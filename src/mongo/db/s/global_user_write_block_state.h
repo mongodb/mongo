@@ -49,7 +49,7 @@ public:
 
     /**
      * Checks that user writes are allowed on the specified namespace. Callers must hold the
-     * GlobalLock in any mode. Throws OperationFailed if user writes are disallowed.
+     * GlobalLock in any mode. Throws UserWritesBlocked if user writes are disallowed.
      */
     void checkUserWritesAllowed(OperationContext* opCtx, const NamespaceString& nss) const;
 
@@ -66,14 +66,29 @@ public:
     void disableUserShardedDDLBlocking(OperationContext* opCtx);
 
     /**
-     * Checks that new sharded DDL operations are allowed to start. Throws OperationFailed if
+     * Checks that new sharded DDL operations are allowed to start. Throws UserWritesBlocked if
      * starting new sharded DDL operations is disallowed.
      */
     void checkShardedDDLAllowedToStart(OperationContext* opCtx, const NamespaceString& nss) const;
 
+    /**
+     * Methods to enable/disable blocking new user index builds.
+     */
+    void enableUserIndexBuildBlocking(OperationContext* opCtx);
+    void disableUserIndexBuildBlocking(OperationContext* opCtx);
+
+    /**
+     * Checks that an index build is allowed to start on the specified namespace. Returns
+     * UserWritesBlocked if user index builds are disallowed, OK otherwise.
+     */
+    Status checkIfIndexBuildAllowedToStart(OperationContext* opCtx,
+                                           const NamespaceString& nss) const;
+
+
 private:
     bool _globalUserWritesBlocked{false};
     AtomicWord<bool> _userShardedDDLBlocked{false};
+    AtomicWord<bool> _userIndexBuildsBlocked{false};
 };
 
 }  // namespace mongo

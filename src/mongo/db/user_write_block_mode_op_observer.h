@@ -79,13 +79,6 @@ public:
                            const std::vector<BSONObj>& indexes,
                            bool fromMigrate) final;
 
-    void onCommitIndexBuild(OperationContext* opCtx,
-                            const NamespaceString& nss,
-                            const UUID& collUUID,
-                            const UUID& indexBuildUUID,
-                            const std::vector<BSONObj>& indexes,
-                            bool fromMigrate) final;
-
     void onStartIndexBuildSinglePhase(OperationContext* opCtx, const NamespaceString& nss) final;
 
     void onCreateCollection(OperationContext* opCtx,
@@ -154,6 +147,17 @@ public:
                        const BSONObj& doc) final;
 
     // Noop operations (don't perform any check).
+
+    // Index builds committing can be left unchecked since we kill any active index builds before
+    // enabling write blocking. This means any index build which gets to the commit phase while
+    // write blocking is active was started and hit the onStartIndexBuild hook with write blocking
+    // active, and thus must be allowed under user write blocking.
+    void onCommitIndexBuild(OperationContext* opCtx,
+                            const NamespaceString& nss,
+                            const UUID& collUUID,
+                            const UUID& indexBuildUUID,
+                            const std::vector<BSONObj>& indexes,
+                            bool fromMigrate) final {}
 
     // At the moment we are leaving the onAbortIndexBuilds as unchecked. This is because they can be
     // called from both user and internal codepaths, and we don't want to risk throwing an assert

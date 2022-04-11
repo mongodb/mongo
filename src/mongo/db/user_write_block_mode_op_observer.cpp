@@ -192,15 +192,6 @@ void UserWriteBlockModeOpObserver::onStartIndexBuild(OperationContext* opCtx,
     _checkWriteAllowed(opCtx, nss);
 }
 
-void UserWriteBlockModeOpObserver::onCommitIndexBuild(OperationContext* opCtx,
-                                                      const NamespaceString& nss,
-                                                      const UUID& collUUID,
-                                                      const UUID& indexBuildUUID,
-                                                      const std::vector<BSONObj>& indexes,
-                                                      bool fromMigrate) {
-    _checkWriteAllowed(opCtx, nss);
-}
-
 void UserWriteBlockModeOpObserver::onStartIndexBuildSinglePhase(OperationContext* opCtx,
                                                                 const NamespaceString& nss) {
     _checkWriteAllowed(opCtx, nss);

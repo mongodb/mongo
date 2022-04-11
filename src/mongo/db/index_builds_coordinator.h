@@ -276,6 +276,16 @@ public:
     void abortAllIndexBuildsForInitialSync(OperationContext* opCtx, const std::string& reason);
 
     /**
+     * Signals all index builds on non-internal databases to abort and waits until they are no
+     * longer running.
+     *
+     * Does not require holding locks.
+     *
+     * Does not stop new index builds from starting. Caller must make that guarantee.
+     */
+    void abortUserIndexBuildsForUserWriteBlocking(OperationContext* opCtx);
+
+    /**
      * Aborts an index build by index build UUID. Returns when the index build thread exits.
      *
      * Returns true if the index build was aborted or the index build is already aborted.

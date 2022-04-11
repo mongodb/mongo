@@ -34,7 +34,9 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/s/global_user_write_block_state.h"
 #include "mongo/db/s/sharding_ddl_coordinator.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/db/s/user_writes_recoverable_critical_section_service.h"
@@ -119,13 +121,25 @@ public:
                                 ->waitForOngoingCoordinatorsToFinish(opCtx, shouldWaitPred);
                         }
                         break;
-                    case ShardsvrSetUserWriteBlockModePhaseEnum::kComplete:
+                    case ShardsvrSetUserWriteBlockModePhaseEnum::kComplete: {
+                        // The way we enable/disable user index build blocking is not
+                        // concurrency-safe, so use a mutex to make this a critical section
+                        stdx::lock_guard lock(_mutex);
+                        auto writeBlockState = GlobalUserWriteBlockState::get(opCtx);
+                        writeBlockState->enableUserIndexBuildBlocking(opCtx);
+                        // Ensure that we eventually restore index build state.
+                        ScopeGuard guard(
+                            [&]() { writeBlockState->disableUserIndexBuildBlocking(opCtx); });
+                        // Abort and wait for ongoing index builds to finish.
+                        IndexBuildsCoordinator::get(opCtx)
+                            ->abortUserIndexBuildsForUserWriteBlocking(opCtx);
+
                         UserWritesRecoverableCriticalSectionService::get(opCtx)
                             ->promoteRecoverableCriticalSectionToBlockUserWrites(
                                 opCtx,
                                 UserWritesRecoverableCriticalSectionService::
                                     kGlobalUserWritesNamespace);
-                        break;
+                    } break;
                     default:
                         MONGO_UNREACHABLE;
                 }
@@ -166,6 +180,8 @@ public:
                         ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
                                                            ActionType::internal));
         }
+
+        Mutex _mutex = MONGO_MAKE_LATCH("ShardsvrSetUserWriteBlockCommand::_mutex");
     };
 
     std::string help() const override {

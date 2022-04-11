@@ -847,6 +847,50 @@ void IndexBuildsCoordinator::abortAllIndexBuildsForInitialSync(OperationContext*
     }
 }
 
+void IndexBuildsCoordinator::abortUserIndexBuildsForUserWriteBlocking(OperationContext* opCtx) {
+    LOGV2(6511600,
+          "About to abort index builders running on user databases for user write blocking");
+
+    auto builds = [&]() -> std::vector<std::shared_ptr<ReplIndexBuildState>> {
+        auto indexBuildFilter = [](const auto& replState) {
+            return !NamespaceString(replState.dbName).isOnInternalDb();
+        };
+        return activeIndexBuilds.filterIndexBuilds(indexBuildFilter);
+    }();
+
+    std::vector<std::shared_ptr<ReplIndexBuildState>> buildsWaitingToFinish;
+
+    for (const auto& replState : builds) {
+        if (!abortIndexBuildByBuildUUID(opCtx,
+                                        replState->buildUUID,
+                                        IndexBuildAction::kPrimaryAbort,
+                                        "User write blocking")) {
+            // If the index build is already finishing and thus can't be aborted, we must wait on
+            // it.
+            LOGV2(6511601,
+                  "Index build: failed to abort index build for write blocking, will wait for "
+                  "completion instead",
+                  "buildUUID"_attr = replState->buildUUID,
+                  "db"_attr = replState->dbName,
+                  "collectionUUID"_attr = replState->collectionUUID);
+            buildsWaitingToFinish.push_back(replState);
+        }
+    }
+
+    // Before returning, we must wait on all index builds which could not be aborted to finish.
+    // Otherwise, index builds started before enabling user write block mode could commit after
+    // enabling it.
+    for (const auto& replState : buildsWaitingToFinish) {
+        LOGV2(6511602,
+              "Waiting on index build to finish for user write blocking",
+              "buildUUID"_attr = replState->buildUUID,
+              "db"_attr = replState->dbName,
+              "collectionUUID"_attr = replState->collectionUUID);
+        awaitNoIndexBuildInProgressForCollection(
+            opCtx, replState->collectionUUID, replState->protocol);
+    }
+}
+
 namespace {
 NamespaceString getNsFromUUID(OperationContext* opCtx, const UUID& uuid) {
     auto catalog = CollectionCatalog::get(opCtx);

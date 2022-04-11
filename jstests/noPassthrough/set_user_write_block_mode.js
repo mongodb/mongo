@@ -206,34 +206,97 @@ function runTest(fixture) {
     fixture.asAdmin(({conn}) => testCheckedOps(conn, true));
     fixture.asUser(({conn}) => testCheckedOps(conn, true));
 
-    // Test that enabling write blocking while there is an active index build will cause the index
-    // build to fail.
+    // Test that enabling write blocking while there is an active index build on a user collection
+    // (i.e. non-internal) will cause the index build to fail.
     fixture.asUser(({conn}) => {
         const db = conn.getDB(jsTestName());
         assert.commandWorked(db.createCollection("test"));
         assert.commandWorked(db.test.insert({"a": 2}));
     });
 
-    const fp = fixture.setFailPoint('hangAfterInitializingIndexBuild');
-    // This createIndex should hang at setup, and when it resumes, userWriteBlockMode will be
-    // enabled and it should eventually fail.
-    const parallelShell = fixture.runInParallelShell(false /* asAdmin */,
-                                                     `({conn}) => { 
-            assert.commandFailedWithCode(
-                conn.getDB(jsTestName()).test.createIndex({"a": 1}, {"name": "index"}),
-                ErrorCodes.UserWritesBlocked);
+    fixture.asAdmin(({conn}) => {
+        // We use config.system.sessions because it is a collection in an internal DB (config) which
+        // is sharded, meaning index builds will be handled by the shard servers. Indexes on
+        // non-sharded collections in internal DBs are built by the config server, which doesn't
+        // have the UserWriteBlockModeOpObserver installed.
+        const config = conn.getDB('config');
+        assert.commandWorked(config.createCollection("system.sessions"));
+        assert.commandWorked(config.system.sessions.insert({"a": 2}));
+    });
+
+    const testParallelShellWithFailpoint = makeParallelShell => {
+        const fp = fixture.setFailPoint('hangAfterInitializingIndexBuild');
+        const shell = makeParallelShell();
+        fp.wait();
+        fixture.enableWriteBlockMode();
+        fp.off();
+        shell();
+        fixture.disableWriteBlockMode();
+    };
+
+    const indexName = "testIndex";
+
+    // Test that index builds on user collections spawned by both non-privileged and privileged
+    // users will be aborted on enableWriteBlockMode.
+    testParallelShellWithFailpoint(() => fixture.runInParallelShell(false /* asAdmin */,
+                                                                    `({conn}) => { 
+        assert.commandFailedWithCode(
+            conn.getDB(jsTestName()).test.createIndex({"a": 1}, {"name": "${indexName}"}),
+            ErrorCodes.IndexBuildAborted);
+    }`));
+    testParallelShellWithFailpoint(() => fixture.runInParallelShell(true /* asAdmin */,
+                                                                    `({conn}) => {
+        assert.commandFailedWithCode(
+            conn.getDB(jsTestName()).test.createIndex({"a": 1}, {"name": "${indexName}"}),
+            ErrorCodes.IndexBuildAborted);
+    }`));
+
+    // Test that index builds on non-user (internal collections) won't be aborted on
+    // enableWriteBlockMode.
+    testParallelShellWithFailpoint(() => fixture.runInParallelShell(true /* asAdmin */,
+                                                                    `({conn}) => {
+        assert.commandWorked(
+            conn.getDB('config').system.sessions.createIndex(
+                {"a": 1}, {"name": "${indexName}"}));
+    }`));
+
+    // Ensure index was not successfully created on user db, but was on internal db.
+    fixture.asAdmin(({conn}) => {
+        assert.eq(undefined,
+                  conn.getDB(jsTestName()).test.getIndexes().find(i => i.name === indexName));
+        assert.neq(
+            undefined,
+            conn.getDB('config').system.sessions.getIndexes().find(i => i.name === indexName));
+    });
+
+    // Test that index builds which hang before commit will block activation of
+    // enableWriteBlockMode.
+    {
+        const fp = fixture.setFailPoint("hangIndexBuildBeforeCommit");
+        const waitIndexBuild = fixture.runInParallelShell(true /* asAdmin */,
+                                                                    `({conn}) => { 
+            assert.commandWorked(
+                conn.getDB(jsTestName()).test.createIndex({"a": 1}, {"name": "${indexName}"}));
         }`);
+        fp.wait();
 
-    // Let index build progress to the point where it hits the failpoint.
-    fp.wait();
-    fixture.enableWriteBlockMode();
-    fp.off();
-    parallelShell();
+        const waitWriteBlock = fixture.runInParallelShell(true /* asAdmin */,
+                                                          `({conn}) => { 
+            assert.commandWorked(
+                conn.getDB("admin").runCommand({setUserWriteBlockMode: 1, global: true}));
+        }`);
+        // Wait, and ensure that the setUserWriteBlockMode has not finished yet (it must wait for
+        // the index build to finish).
+        sleep(3000);
+        fixture.assertWriteBlockMode(UserWriteBlockHelpers.WriteBlockState.DISABLED);
 
-    // Ensure index was not created.
-    fixture.asAdmin(
-        ({conn}) => assert.eq(
-            undefined, conn.getDB(jsTestName()).test.getIndexes().find(i => i.name === "index")));
+        fp.off();
+        waitIndexBuild();
+        waitWriteBlock();
+        fixture.assertWriteBlockMode(UserWriteBlockHelpers.WriteBlockState.ENABLED);
+
+        fixture.disableWriteBlockMode();
+    }
 
     if (fixture.takeGlobalLock) {
         // Test that serverStatus will produce WriteBlockState.UNKNOWN when the global lock is held.

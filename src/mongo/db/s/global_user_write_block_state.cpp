@@ -88,4 +88,21 @@ void GlobalUserWriteBlockState::checkShardedDDLAllowedToStart(OperationContext* 
                 WriteBlockBypass::get(opCtx).isWriteBlockBypassEnabled() || nss.isOnInternalDb());
 }
 
+void GlobalUserWriteBlockState::enableUserIndexBuildBlocking(OperationContext* opCtx) {
+    _userIndexBuildsBlocked.store(true);
+}
+
+void GlobalUserWriteBlockState::disableUserIndexBuildBlocking(OperationContext* opCtx) {
+    _userIndexBuildsBlocked.store(false);
+}
+
+Status GlobalUserWriteBlockState::checkIfIndexBuildAllowedToStart(
+    OperationContext* opCtx, const NamespaceString& nss) const {
+    if (_userIndexBuildsBlocked.load() &&
+        !WriteBlockBypass::get(opCtx).isWriteBlockBypassEnabled() && !nss.isOnInternalDb()) {
+        return Status(ErrorCodes::UserWritesBlocked, "User writes blocked");
+    }
+    return Status::OK();
+}
+
 }  // namespace mongo
