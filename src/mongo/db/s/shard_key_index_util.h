@@ -85,11 +85,11 @@ bool isCompatibleWithShardKey(OperationContext* opCtx,
  * If the parameter 'requireSingleKey' is true, then this index additionally must not be
  * multi-key.
  */
-const boost::optional<ShardKeyIndex> findShardKeyPrefixedIndex(OperationContext* opCtx,
-                                                               const CollectionPtr& collection,
-                                                               const IndexCatalog* indexCatalog,
-                                                               const BSONObj& shardKey,
-                                                               bool requireSingleKey);
+boost::optional<ShardKeyIndex> findShardKeyPrefixedIndex(OperationContext* opCtx,
+                                                         const CollectionPtr& collection,
+                                                         const IndexCatalog* indexCatalog,
+                                                         const BSONObj& shardKey,
+                                                         bool requireSingleKey);
 
 /**
  * Returns true if the given index name is the last remaining index that is compatible with the

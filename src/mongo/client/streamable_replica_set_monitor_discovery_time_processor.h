@@ -38,7 +38,7 @@ public:
     void onTopologyDescriptionChangedEvent(sdam::TopologyDescriptionPtr previousDescription,
                                            sdam::TopologyDescriptionPtr newDescription) override;
 
-    const Milliseconds getPrimaryServerChangeElapsedTime() const;
+    Milliseconds getPrimaryServerChangeElapsedTime() const;
 
 private:
     mutable Mutex _mutex =

@@ -168,8 +168,7 @@ Status _applyTransactionFromOplogChain(OperationContext* opCtx,
 /**
  * Helper used to get previous oplog entry from the same transaction.
  */
-const repl::OplogEntry getPreviousOplogEntry(OperationContext* opCtx,
-                                             const repl::OplogEntry& entry) {
+repl::OplogEntry getPreviousOplogEntry(OperationContext* opCtx, const repl::OplogEntry& entry) {
     const auto prevOpTime = entry.getPrevWriteOpTimeInTransaction();
     invariant(prevOpTime);
     TransactionHistoryIterator iter(prevOpTime.get());

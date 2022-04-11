@@ -94,7 +94,7 @@ public:
     bool isDataBearingServer() const;
 
     // server 'time'
-    const Date_t getLastUpdateTime() const;
+    Date_t getLastUpdateTime() const;
     const boost::optional<Date_t>& getLastWriteDate() const;
     const boost::optional<repl::OpTime>& getOpTime() const;
 
@@ -103,9 +103,9 @@ public:
     const std::set<HostAndPort>& getHosts() const;
     const std::set<HostAndPort>& getPassives() const;
     const std::set<HostAndPort>& getArbiters() const;
-    const ElectionIdSetVersionPair getElectionIdSetVersionPair() const;
+    ElectionIdSetVersionPair getElectionIdSetVersionPair() const;
     const boost::optional<TopologyVersion>& getTopologyVersion() const;
-    const boost::optional<TopologyDescriptionPtr> getTopologyDescription();
+    boost::optional<TopologyDescriptionPtr> getTopologyDescription();
 
     BSONObj toBson() const;
     std::string toString() const;

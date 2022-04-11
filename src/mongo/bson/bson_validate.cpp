@@ -134,7 +134,7 @@ private:
         }
 
         template <typename T>
-        const T read() {
+        T read() {
             auto val = ptr;
             skip(sizeof(T));
             return ConstDataView(val).read<LittleEndian<T>>();

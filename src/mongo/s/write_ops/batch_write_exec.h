@@ -97,7 +97,7 @@ public:
 
     const std::set<ShardId>& getTargetedShards() const;
     const HostOpTimeMap& getWriteOpTimes() const;
-    const boost::optional<int> getNumShardsOwningChunks() const;
+    boost::optional<int> getNumShardsOwningChunks() const;
 
     // Expose via helpers if this gets more complex
 

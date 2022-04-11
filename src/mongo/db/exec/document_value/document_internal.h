@@ -183,7 +183,7 @@ public:
      * Get the field name that the iterator currently points to without bringing anything into
      * cache.
      */
-    const StringData fieldName() {
+    StringData fieldName() {
         if (_it) {
             return _it->nameSD();
         }

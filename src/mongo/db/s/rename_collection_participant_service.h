@@ -96,7 +96,7 @@ public:
      */
     bool hasSameOptions(const BSONObj& participantDoc);
 
-    const BSONObj doc() {
+    BSONObj doc() {
         return _doc.toBSON();
     }
 

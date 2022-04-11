@@ -145,7 +145,7 @@ public:
     /**
      * Returns the expression to use to determine the group id of each document.
      */
-    const boost::intrusive_ptr<Expression> getIdExpression() const {
+    boost::intrusive_ptr<Expression> getIdExpression() const {
         return _idExpression;
     }
 

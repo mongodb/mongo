@@ -317,7 +317,8 @@ void BSONLexer::tokenize(BSONElement elem, bool includeFieldName) {
             context.emplace(this, elem.fieldNameStringData());
         } else if (elem.fieldNameStringData().find('.') != std::string::npos) {
             auto components = std::vector<std::string>{};
-            boost::split(components, elem.fieldNameStringData(), [](auto&& c) { return c == '.'; });
+            const auto fieldName = elem.fieldNameStringData();
+            boost::split(components, fieldName, [](auto c) { return c == '.'; });
             pushToken(elem.fieldNameStringData(),
                       ParserGen::token::DOTTED_FIELDNAME,
                       std::move(components));

@@ -95,7 +95,7 @@ public:
         }
 
     private:
-        const StringData getDbName() const {
+        StringData getDbName() const {
             return request().getCommandParameter();
         }
         NamespaceString ns() const override {

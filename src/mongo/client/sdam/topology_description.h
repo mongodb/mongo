@@ -77,7 +77,7 @@ public:
     const boost::optional<int>& getLogicalSessionTimeoutMinutes() const;
     const Milliseconds& getHeartBeatFrequency() const;
 
-    const boost::optional<ServerDescriptionPtr> findServerByAddress(HostAndPort address) const;
+    boost::optional<ServerDescriptionPtr> findServerByAddress(HostAndPort address) const;
     bool containsServerAddress(const HostAndPort& address) const;
     std::vector<ServerDescriptionPtr> findServers(
         std::function<bool(const ServerDescriptionPtr&)> predicate) const;
@@ -128,7 +128,7 @@ private:
      * Source:
      * https://github.com/mongodb/specifications/blob/master/source/wireversion-featurelist.rst
      */
-    const std::string minimumRequiredMongoVersionString(int version);
+    std::string minimumRequiredMongoVersionString(int version);
 
     /**
      * From Server Discovery and Monitoring:

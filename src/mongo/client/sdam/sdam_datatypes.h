@@ -53,7 +53,7 @@ enum class TopologyType {
     kSharded,
     kUnknown
 };
-const std::vector<TopologyType> allTopologyTypes();
+std::vector<TopologyType> allTopologyTypes();
 std::string toString(TopologyType topologyType);
 StatusWith<TopologyType> parseTopologyType(StringData strTopologyType);
 std::ostream& operator<<(std::ostream& os, TopologyType topologyType);
@@ -68,7 +68,7 @@ enum class ServerType {
     kRSGhost,
     kUnknown
 };
-const std::vector<ServerType> allServerTypes();
+std::vector<ServerType> allServerTypes();
 std::string toString(ServerType serverType);
 StatusWith<ServerType> parseServerType(StringData strServerType);
 std::ostream& operator<<(std::ostream& os, ServerType serverType);

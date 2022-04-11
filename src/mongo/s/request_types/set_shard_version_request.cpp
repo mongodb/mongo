@@ -135,7 +135,7 @@ const NamespaceString& SetShardVersionRequest::getNS() const {
     return _nss.get();
 }
 
-const ChunkVersion SetShardVersionRequest::getNSVersion() const {
+ChunkVersion SetShardVersionRequest::getNSVersion() const {
     return _version.get();
 }
 

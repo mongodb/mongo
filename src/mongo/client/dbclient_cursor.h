@@ -390,7 +390,7 @@ public:
         return _c.getNamespaceString();
     }
 
-    const long long getCursorId() const {
+    long long getCursorId() const {
         return _c.getCursorId();
     }
 

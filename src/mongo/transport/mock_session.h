@@ -87,7 +87,7 @@ public:
         return nullptr;
     }
 
-    const std::shared_ptr<SSLManagerInterface> getSSLManager() const override {
+    std::shared_ptr<SSLManagerInterface> getSSLManager() const override {
         return nullptr;
     }
 #endif

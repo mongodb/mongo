@@ -60,7 +60,7 @@ void testEquals(Value actual, Value expected, double delta = DELTA) {
     }
 }
 
-const vector<double> getSeries(intrusive_ptr<GranularityRounder> rounder) {
+vector<double> getSeries(intrusive_ptr<GranularityRounder> rounder) {
     const auto* preferredNumbersRounder =
         dynamic_cast<GranularityRounderPreferredNumbers*>(rounder.get());
     ASSERT(preferredNumbersRounder != nullptr);
@@ -73,7 +73,7 @@ const vector<double> getSeries(intrusive_ptr<GranularityRounder> rounder) {
  * Decimal128. This helps with testing that the GranularityRounders work with the Decimal128
  * datatype.
  */
-const vector<Decimal128> getSeriesDecimal(intrusive_ptr<GranularityRounder> rounder) {
+vector<Decimal128> getSeriesDecimal(intrusive_ptr<GranularityRounder> rounder) {
     const auto* preferredNumbersRounder =
         dynamic_cast<GranularityRounderPreferredNumbers*>(rounder.get());
     ASSERT(preferredNumbersRounder != nullptr);

@@ -181,7 +181,7 @@ const std::string& SplitChunkRequest::getShardName() const {
     return _shardName;
 }
 
-const bool SplitChunkRequest::isFromChunkSplitter() const {
+bool SplitChunkRequest::isFromChunkSplitter() const {
     return _fromChunkSplitter;
 }
 

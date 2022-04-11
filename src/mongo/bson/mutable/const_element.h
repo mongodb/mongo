@@ -71,7 +71,7 @@ public:
     inline size_t countChildren() const;
 
     inline bool hasValue() const;
-    inline const BSONElement getValue() const;
+    inline BSONElement getValue() const;
 
     inline double getValueDouble() const;
     inline StringData getValueString() const;
@@ -198,7 +198,7 @@ inline bool ConstElement::hasValue() const {
     return _basis.hasValue();
 }
 
-inline const BSONElement ConstElement::getValue() const {
+inline BSONElement ConstElement::getValue() const {
     return _basis.getValue();
 }
 

@@ -115,6 +115,8 @@ private:
         return std::tie(_password, _salt, _iterationCount);
     }
 
+    // clang-tidy flags this return type as readability-const-return-type
+    // NOLINTNEXTLINE(readability-const-return-type)
     static constexpr auto saltLength() -> decltype(HashBlock::kHashLength) {
         return HashBlock::kHashLength - 4;
     }

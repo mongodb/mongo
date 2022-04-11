@@ -63,9 +63,9 @@ BSONObj prettyKey(const BSONObj& keyPattern, const BSONObj& key) {
  * object extended to cover the entire shardKey. See KeyPattern::extendRangeBound documentation for
  * some examples.
  */
-const std::tuple<BSONObj, BSONObj> getMinMaxExtendedBounds(const ShardKeyIndex& shardKeyIdx,
-                                                           const BSONObj& min,
-                                                           const BSONObj& max) {
+std::tuple<BSONObj, BSONObj> getMinMaxExtendedBounds(const ShardKeyIndex& shardKeyIdx,
+                                                     const BSONObj& min,
+                                                     const BSONObj& max) {
     KeyPattern kp(shardKeyIdx.keyPattern());
 
     // Extend min to get (min, MinKey, MinKey, ....)

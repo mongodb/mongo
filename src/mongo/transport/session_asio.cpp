@@ -291,7 +291,7 @@ const SSLConfiguration* TransportLayerASIO::ASIOSession::getSSLConfiguration() c
     return nullptr;
 }
 
-const std::shared_ptr<SSLManagerInterface> TransportLayerASIO::ASIOSession::getSSLManager() const {
+std::shared_ptr<SSLManagerInterface> TransportLayerASIO::ASIOSession::getSSLManager() const {
     return _sslContext->manager;
 }
 

@@ -58,7 +58,7 @@ void StreamableReplicaSetMonitor::StreamableReplicaSetMonitorDiscoveryTimeProces
         _elapsedTime.reset();
     }
 }
-const Milliseconds StreamableReplicaSetMonitor::StreamableReplicaSetMonitorDiscoveryTimeProcessor::
+Milliseconds StreamableReplicaSetMonitor::StreamableReplicaSetMonitorDiscoveryTimeProcessor::
     getPrimaryServerChangeElapsedTime() const {
     stdx::lock_guard lock(_mutex);
     return Milliseconds(_elapsedTime.millis());

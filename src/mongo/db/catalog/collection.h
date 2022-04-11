@@ -326,7 +326,7 @@ public:
      */
     virtual std::shared_ptr<Ident> getSharedIdent() const = 0;
 
-    virtual const BSONObj getValidatorDoc() const = 0;
+    virtual BSONObj getValidatorDoc() const = 0;
 
     /**
      * Returns 'kPass' with an ok Status if the document passes this collection's schema validator.

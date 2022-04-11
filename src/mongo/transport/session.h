@@ -212,7 +212,7 @@ public:
     /**
      * Get the SSL manager associated with this session.
      */
-    virtual const std::shared_ptr<SSLManagerInterface> getSSLManager() const = 0;
+    virtual std::shared_ptr<SSLManagerInterface> getSSLManager() const = 0;
 #endif
 
 protected:

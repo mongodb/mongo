@@ -41,7 +41,7 @@ class OperationContext;
  * Parse a command's API Version parameters from a request and store the apiVersion,
  * apiStrict, and apiDeprecationErrors fields.
  */
-const APIParametersFromClient initializeAPIParameters(const BSONObj& requestBody, Command* command);
+APIParametersFromClient initializeAPIParameters(const BSONObj& requestBody, Command* command);
 
 /**
  * If the server parameter "requireApiVersion" is set, enforce it.

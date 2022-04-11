@@ -927,7 +927,7 @@ public:
     static const char* ns() {
         return "unittests.querytests.AutoResetIndexCache";
     }
-    static const NamespaceString nss() {
+    static NamespaceString nss() {
         return NamespaceString(ns());
     }
     void index() {

@@ -79,7 +79,7 @@ public:
     }
     void setProcess(const std::string& process);
 
-    const Date_t getPing() const {
+    Date_t getPing() const {
         return _ping.get();
     }
     void setPing(Date_t ping);

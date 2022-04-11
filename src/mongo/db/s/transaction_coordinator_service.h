@@ -132,8 +132,8 @@ public:
      * Returns a vector of futures that wait on the removal of transaction
      * coordinators for internal transactions.
      */
-    const std::vector<SharedSemiFuture<void>>
-    getAllRemovalFuturesForCoordinatorsForInternalTransactions(OperationContext* opCtx);
+    std::vector<SharedSemiFuture<void>> getAllRemovalFuturesForCoordinatorsForInternalTransactions(
+        OperationContext* opCtx);
 
 private:
     struct CatalogAndScheduler {

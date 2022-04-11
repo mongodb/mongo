@@ -124,7 +124,7 @@ public:
      */
     void populateCursor(OperationContext* opCtx);
 
-    const CursorId getCursorId() const {
+    CursorId getCursorId() const {
         return _cursorId;
     }
 

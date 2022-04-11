@@ -42,7 +42,7 @@ public:
     void onServerRTTUpdated(HostAndPort hostAndPort, HelloRTT rtt) override;
 
     void setTopologyDescription(TopologyDescriptionPtr newDescription);
-    const TopologyDescriptionPtr getTopologyDescription() const override;
+    TopologyDescriptionPtr getTopologyDescription() const override;
 
     SemiFuture<std::vector<HostAndPort>> executeWithLock(
         std::function<SemiFuture<std::vector<HostAndPort>>(const TopologyDescriptionPtr&)> func)

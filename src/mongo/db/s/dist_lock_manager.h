@@ -76,7 +76,7 @@ public:
 
         ScopedLock(ScopedLock&& other);
 
-        const StringData getNs() {
+        StringData getNs() {
             return _ns;
         }
 

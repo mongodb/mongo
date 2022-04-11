@@ -114,7 +114,7 @@ public:
         return _range.getMax();
     }
 
-    const OID getVersionEpoch() const {
+    OID getVersionEpoch() const {
         return _versionEpoch;
     }
 

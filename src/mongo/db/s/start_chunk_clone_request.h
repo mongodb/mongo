@@ -102,7 +102,7 @@ public:
         return _lsid;
     }
 
-    const TxnNumber getTxnNumber() const {
+    TxnNumber getTxnNumber() const {
         return _txnNumber;
     }
 

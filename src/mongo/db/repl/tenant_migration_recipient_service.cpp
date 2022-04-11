@@ -2982,7 +2982,7 @@ const MigrationProtocolEnum& TenantMigrationRecipientService::Instance::getProto
     return _protocol;
 }
 
-const TenantMigrationRecipientDocument TenantMigrationRecipientService::Instance::getState() const {
+TenantMigrationRecipientDocument TenantMigrationRecipientService::Instance::getState() const {
     stdx::lock_guard lk(_mutex);
     return _stateDoc;
 }

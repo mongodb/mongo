@@ -49,7 +49,7 @@ public:
             std::shared_ptr<TenantMigrationRecipientAccessBlocker> recipient)
             : _donor(donor), _recipient(recipient) {}
 
-        const std::shared_ptr<TenantMigrationAccessBlocker> getAccessBlocker(
+        std::shared_ptr<TenantMigrationAccessBlocker> getAccessBlocker(
             TenantMigrationAccessBlocker::BlockerType type) const {
             if (type == TenantMigrationAccessBlocker::BlockerType::kDonor) {
                 return _donor;

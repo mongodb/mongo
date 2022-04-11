@@ -96,7 +96,7 @@ public:
         std::abort();
     }
 
-    const BSONObj getValidatorDoc() const {
+    BSONObj getValidatorDoc() const {
         std::abort();
     }
 

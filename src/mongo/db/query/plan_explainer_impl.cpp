@@ -630,7 +630,7 @@ MultiPlanStage* getMultiPlanStage(PlanStage* root) {
  * If 'root' has a MultiPlanStage returns the index of its best plan. Otherwise returns an
  * initialized value.
  */
-const boost::optional<size_t> getWinningPlanIdx(PlanStage* root) {
+boost::optional<size_t> getWinningPlanIdx(PlanStage* root) {
     if (auto mps = getMultiPlanStage(root); mps) {
         auto planIdx = mps->bestPlanIdx();
         tassert(3420008, "Trying to get stats of a MultiPlanStage without winning plan", planIdx);

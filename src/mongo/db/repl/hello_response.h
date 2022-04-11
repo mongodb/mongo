@@ -137,7 +137,7 @@ public:
         return _secondaryDelaySecs;
     }
 
-    const stdx::unordered_map<std::string, std::string> getTags() const {
+    stdx::unordered_map<std::string, std::string> getTags() const {
         return _tags;
     }
 

@@ -46,7 +46,7 @@ public:
     void reportState(BSONObjBuilder* parent) const;
 
 private:
-    static const std::string toString(CoordinatorAction action);
+    static std::string toString(CoordinatorAction action);
 
     LogicalSessionId _lsid;
     TxnNumberAndRetryCounter _txnNumberAndRetryCounter;

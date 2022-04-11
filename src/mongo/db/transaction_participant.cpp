@@ -1683,7 +1683,7 @@ void TransactionParticipant::Participant::setPrepareOpTimeForRecovery(OperationC
     o(lk).recoveryPrepareOpTime = prepareOpTime;
 }
 
-const repl::OpTime TransactionParticipant::Participant::getPrepareOpTimeForRecovery() const {
+repl::OpTime TransactionParticipant::Participant::getPrepareOpTimeForRecovery() const {
     return o().recoveryPrepareOpTime;
 }
 

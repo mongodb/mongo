@@ -114,7 +114,7 @@ public:
         MONGO_UNREACHABLE;
     };
 
-    const std::string getField() const {
+    std::string getField() const {
         return _field;
     }
 
@@ -122,7 +122,7 @@ public:
         return *_geoContainer;
     }
 
-    const StringData path() const final {
+    StringData path() const final {
         return _indexField;
     }
 

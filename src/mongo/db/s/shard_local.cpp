@@ -55,7 +55,7 @@ ShardLocal::ShardLocal(const ShardId& id) : Shard(id) {
     invariant(serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
 }
 
-const ConnectionString ShardLocal::getConnString() const {
+ConnectionString ShardLocal::getConnString() const {
     return repl::ReplicationCoordinator::get(getGlobalServiceContext())
         ->getConfigConnectionString();
 }

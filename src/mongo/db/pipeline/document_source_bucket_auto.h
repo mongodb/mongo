@@ -92,7 +92,7 @@ public:
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
-    const boost::intrusive_ptr<Expression> getGroupByExpression() const;
+    boost::intrusive_ptr<Expression> getGroupByExpression() const;
     const std::vector<AccumulationStatement>& getAccumulatedFields() const;
 
 protected:

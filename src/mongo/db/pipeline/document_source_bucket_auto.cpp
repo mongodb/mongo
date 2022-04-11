@@ -443,7 +443,7 @@ DocumentSourceBucketAuto::DocumentSourceBucketAuto(
     }
 }
 
-const boost::intrusive_ptr<Expression> DocumentSourceBucketAuto::getGroupByExpression() const {
+boost::intrusive_ptr<Expression> DocumentSourceBucketAuto::getGroupByExpression() const {
     return _groupByExpression;
 }
 

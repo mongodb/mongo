@@ -114,7 +114,7 @@ public:
         return {_shared, _shared->_recordStore.get()};
     }
 
-    const BSONObj getValidatorDoc() const final {
+    BSONObj getValidatorDoc() const final {
         return _validator.validatorDoc.getOwned();
     }
 

@@ -257,7 +257,7 @@ public:
         return _stmtIds;
     }
 
-    const std::string toString() const {
+    std::string toString() const {
         StringBuilder builder;
         builder << " query: " << getQuery();
         builder << " projection: " << _proj;

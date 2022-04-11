@@ -228,7 +228,7 @@ public:
     /**
      * Gets the set of actions this user is allowed to perform on the given resource.
      */
-    const ActionSet getActionsForResource(const ResourcePattern& resource) const;
+    ActionSet getActionsForResource(const ResourcePattern& resource) const;
 
     /**
      * Returns true if the user has is allowed to perform an action on the given resource.

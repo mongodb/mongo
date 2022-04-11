@@ -199,9 +199,9 @@ public:
      * shardIds[i] is the id of shard for the chunk for chunkRanges[i].
      * Checks that chunkRanges and shardIds have the same length.
      */
-    const std::vector<ChunkType> makeChunks(const std::vector<ChunkRange> chunkRanges,
-                                            const std::vector<ShardId> shardIds,
-                                            Timestamp timeStamp) {
+    std::vector<ChunkType> makeChunks(const std::vector<ChunkRange> chunkRanges,
+                                      const std::vector<ShardId> shardIds,
+                                      Timestamp timeStamp) {
         ASSERT_EQ(chunkRanges.size(), shardIds.size());
         std::vector<ChunkType> chunks;
 
@@ -218,7 +218,7 @@ public:
      * Returns a vector of numShards shard ids with shard names
      * prefixed by _shardName
      */
-    const std::vector<ShardId> makeShardIds(const int numShards) {
+    std::vector<ShardId> makeShardIds(const int numShards) {
         std::vector<ShardId> shardIds;
         for (int i = 0; i < numShards; i++) {
             shardIds.push_back(shardId(std::to_string(i)));
@@ -226,7 +226,7 @@ public:
         return shardIds;
     }
 
-    const NamespaceString nss() {
+    NamespaceString nss() {
         return _nss;
     }
 
@@ -242,11 +242,11 @@ public:
         return _shardKeyPattern.getKeyPattern();
     }
 
-    const ShardId shardId(std::string shardNum) {
+    ShardId shardId(std::string shardNum) {
         return ShardId(_shardName + shardNum);
     }
 
-    const Timestamp timeStamp() {
+    Timestamp timeStamp() {
         return _timeStamp;
     }
 
@@ -352,11 +352,11 @@ public:
         assertChunkVectorsAreEqual(expectedChunks, shardCollectionConfig.chunks);
     }
 
-    const std::string shardKey() {
+    std::string shardKey() {
         return _shardKey;
     }
 
-    const std::string zoneName(std::string zoneNum) {
+    std::string zoneName(std::string zoneNum) {
         return _zoneName + zoneNum;
     }
 

@@ -383,7 +383,7 @@ HostAndPort TopologyCoordinator::_chooseNearbySyncSource(Date_t now,
     return syncSource;
 }
 
-const OpTime TopologyCoordinator::_getOldestSyncOpTime() const {
+OpTime TopologyCoordinator::_getOldestSyncOpTime() const {
     OpTime oldestSyncOpTime = OpTime();
 
     // Find primary's oplog time. We will reject sync candidates that are more than
@@ -2376,7 +2376,7 @@ MemberData& TopologyCoordinator::_selfMemberData() {
     return _memberData[_selfMemberDataIndex()];
 }
 
-const int TopologyCoordinator::_selfMemberDataIndex() const {
+int TopologyCoordinator::_selfMemberDataIndex() const {
     invariant(!_memberData.empty());
     if (_selfIndex >= 0)
         return _selfIndex;

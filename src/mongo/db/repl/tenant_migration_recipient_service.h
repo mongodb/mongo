@@ -152,7 +152,7 @@ public:
         /*
          * Returns the recipient document state.
          */
-        const TenantMigrationRecipientDocument getState() const;
+        TenantMigrationRecipientDocument getState() const;
 
         /**
          * To be called on the instance returned by PrimaryOnlyService::getOrCreate(). Returns an

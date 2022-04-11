@@ -103,7 +103,7 @@ const User::CredentialData& User::getCredentials() const {
     return _credentials;
 }
 
-const ActionSet User::getActionsForResource(const ResourcePattern& resource) const {
+ActionSet User::getActionsForResource(const ResourcePattern& resource) const {
     stdx::unordered_map<ResourcePattern, Privilege>::const_iterator it = _privileges.find(resource);
     if (it == _privileges.end()) {
         return ActionSet();

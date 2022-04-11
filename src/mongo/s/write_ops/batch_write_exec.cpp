@@ -514,7 +514,7 @@ const HostOpTimeMap& BatchWriteExecStats::getWriteOpTimes() const {
     return _writeOpTimes;
 }
 
-const boost::optional<int> BatchWriteExecStats::getNumShardsOwningChunks() const {
+boost::optional<int> BatchWriteExecStats::getNumShardsOwningChunks() const {
     return _numShardsOwningChunks;
 }
 

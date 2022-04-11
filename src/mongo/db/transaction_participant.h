@@ -567,7 +567,7 @@ public:
         /**
          * Gets the prepare optime used for recovery. Returns a null optime if unset.
          */
-        const repl::OpTime getPrepareOpTimeForRecovery() const;
+        repl::OpTime getPrepareOpTimeForRecovery() const;
 
         /**
          * Commits the transaction, including committing the write unit of work and updating

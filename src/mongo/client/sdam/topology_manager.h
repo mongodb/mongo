@@ -44,7 +44,7 @@ public:
 
     virtual void onServerRTTUpdated(HostAndPort hostAndPort, HelloRTT rtt) = 0;
 
-    virtual const TopologyDescriptionPtr getTopologyDescription() const = 0;
+    virtual TopologyDescriptionPtr getTopologyDescription() const = 0;
 
     virtual SemiFuture<std::vector<HostAndPort>> executeWithLock(
         std::function<SemiFuture<std::vector<HostAndPort>>(const TopologyDescriptionPtr&)>
@@ -92,7 +92,7 @@ public:
     /**
      * Get the current TopologyDescription. This is safe to call from multiple threads.
      */
-    const TopologyDescriptionPtr getTopologyDescription() const override;
+    TopologyDescriptionPtr getTopologyDescription() const override;
 
     /**
      * Executes the given function with the current TopologyDescription while holding the mutex.

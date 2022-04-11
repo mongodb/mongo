@@ -40,7 +40,7 @@
 namespace mongo {
 
 namespace {
-const boost::optional<ShardKeyIndex> _findShardKeyPrefixedIndex(
+boost::optional<ShardKeyIndex> _findShardKeyPrefixedIndex(
     OperationContext* opCtx,
     const CollectionPtr& collection,
     const IndexCatalog* indexCatalog,
@@ -138,11 +138,11 @@ bool isLastShardKeyIndex(OperationContext* opCtx,
                 .is_initialized();
 }
 
-const boost::optional<ShardKeyIndex> findShardKeyPrefixedIndex(OperationContext* opCtx,
-                                                               const CollectionPtr& collection,
-                                                               const IndexCatalog* indexCatalog,
-                                                               const BSONObj& shardKey,
-                                                               bool requireSingleKey) {
+boost::optional<ShardKeyIndex> findShardKeyPrefixedIndex(OperationContext* opCtx,
+                                                         const CollectionPtr& collection,
+                                                         const IndexCatalog* indexCatalog,
+                                                         const BSONObj& shardKey,
+                                                         bool requireSingleKey) {
     return _findShardKeyPrefixedIndex(
         opCtx, collection, indexCatalog, boost::none, shardKey, requireSingleKey);
 }

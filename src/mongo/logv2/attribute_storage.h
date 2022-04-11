@@ -200,10 +200,10 @@ inline StringData mapValue(const char* value) {
     return value;
 }
 
-inline const BSONObj mapValue(BSONObj const& value) {
+inline BSONObj mapValue(BSONObj const& value) {
     return value;
 }
-inline const BSONArray mapValue(BSONArray const& value) {
+inline BSONArray mapValue(BSONArray const& value) {
     return value;
 }
 inline CustomAttributeValue mapValue(BSONElement const& val) {

@@ -143,7 +143,7 @@ public:
 #ifdef MONGO_CONFIG_SSL
     const SSLConfiguration* getSSLConfiguration() const override;
 
-    const std::shared_ptr<SSLManagerInterface> getSSLManager() const override;
+    std::shared_ptr<SSLManagerInterface> getSSLManager() const override;
 #endif
 
 protected:

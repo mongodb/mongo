@@ -46,7 +46,7 @@ bool MockTopologyManager::onServerDescription(const HelloOutcome& helloOutcome) 
     return true;
 }
 
-const std::shared_ptr<TopologyDescription> MockTopologyManager::getTopologyDescription() const {
+std::shared_ptr<TopologyDescription> MockTopologyManager::getTopologyDescription() const {
     stdx::lock_guard<mongo::Mutex> lock(_mutex);
     return _topologyDescription;
 }

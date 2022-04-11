@@ -137,16 +137,16 @@ public:
      * instead.
      */
     template <typename T>
-    const Value operator[](T key) const {
+    Value operator[](T key) const {
         return getField(key);
     }
     template <typename T>
-    const Value getField(T key) const {
+    Value getField(T key) const {
         return storage().getField(key);
     }
 
     /// Look up a field by Position. See positionOf and getNestedField.
-    const Value getField(Position pos) const {
+    Value getField(Position pos) const {
         return storage().getField(pos).val;
     }
 
@@ -155,8 +155,7 @@ public:
      * If 'positions' is non-null, it will be filled with a path suitable to pass to
      * MutableDocument::setNestedField().
      */
-    const Value getNestedField(const FieldPath& path,
-                               std::vector<Position>* positions = nullptr) const;
+    Value getNestedField(const FieldPath& path, std::vector<Position>* positions = nullptr) const;
 
     /**
      * Returns field at given path as either BSONElement or Value, depending on how it is

@@ -107,7 +107,7 @@ public:
     }
     void setClusterId(const OID& clusterId);
 
-    const std::vector<MongoVersionRange> getExcludingMongoVersions() const {
+    std::vector<MongoVersionRange> getExcludingMongoVersions() const {
         if (!isExcludingMongoVersionsSet()) {
             return std::vector<MongoVersionRange>();
         }

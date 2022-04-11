@@ -73,7 +73,7 @@ public:
 
     static TenantDatabaseName createSystemTenantDbName(StringData dbName);
 
-    const boost::optional<TenantId> tenantId() const {
+    boost::optional<TenantId> tenantId() const {
         return _tenantId;
     }
 

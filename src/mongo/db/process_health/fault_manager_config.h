@@ -68,7 +68,7 @@ static const StringData FaultFacetTypeStrings[] = {
 FaultFacetType toFaultFacetType(HealthObserverTypeEnum type);
 
 
-static const StringData FaultFacetType_serializer(const FaultFacetType value) {
+static StringData FaultFacetType_serializer(const FaultFacetType value) {
     return FaultFacetTypeStrings[static_cast<int>(value)];
 }
 

@@ -2162,6 +2162,29 @@ buildvariants:
     scons_cache_scope: shared
     scons_cache_mode: all
     show_scons_timings: false
+    clang_tidy_toolchain: v3
+  tasks:
+  - name: clang_tidy_TG
+
+- name: enterprise-rhel80-dynamic-clang-tidy-v4
+  display_name: "Enterprise Clang Tidy v4 Toolchain"
+  cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
+  modules:
+  - enterprise
+  run_on:
+  - rhel80-xlarge
+  expansions:
+    lang_environment: LANG=C
+    compile_flags: --link-model=dynamic -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v4_clang.vars
+    # Unlike static builds, dynamic builds have no need to
+    # constrain the number of link jobs. Unfortunately, --jlink=1
+    # means one link job, not 100%. So this is a bit gross but set
+    # it to .99.
+    num_scons_link_jobs_available: 0.99
+    scons_cache_scope: shared
+    scons_cache_mode: all
+    show_scons_timings: false
+    clang_tidy_toolchain: v4
   tasks:
   - name: clang_tidy_TG
 

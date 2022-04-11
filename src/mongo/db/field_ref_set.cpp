@@ -164,7 +164,7 @@ bool FieldRefSet::insert(const FieldRef* toInsert, const FieldRef** conflict) {
     return true;
 }
 
-const std::string FieldRefSet::toString() const {
+std::string FieldRefSet::toString() const {
     str::stream ss;
     ss << "{";
     const auto last = _fieldSet.rbegin();

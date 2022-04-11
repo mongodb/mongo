@@ -698,7 +698,7 @@ static Value getNestedFieldHelper(const Document& doc,
     return getNestedFieldHelper(val.getDocument(), fieldNames, positions, level + 1);
 }
 
-const Value Document::getNestedField(const FieldPath& path, vector<Position>* positions) const {
+Value Document::getNestedField(const FieldPath& path, vector<Position>* positions) const {
     fassert(16489, path.getPathLength());
     assertFieldPathLengthOK(path);
     return getNestedFieldHelper(*this, path, positions, 0);

@@ -1153,7 +1153,7 @@ std::shared_ptr<BucketCatalog::ExecutionStats> BucketCatalog::_getExecutionStats
     return res.first->second;
 }
 
-const std::shared_ptr<BucketCatalog::ExecutionStats> BucketCatalog::_getExecutionStats(
+std::shared_ptr<BucketCatalog::ExecutionStats> BucketCatalog::_getExecutionStats(
     const NamespaceString& ns) const {
     static const auto kEmptyStats{std::make_shared<ExecutionStats>()};
 

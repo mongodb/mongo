@@ -1023,7 +1023,7 @@ Status WiredTigerKVEngine::disableIncrementalBackup(OperationContext* opCtx) {
 
 namespace {
 
-const boost::filesystem::path constructFilePath(std::string path, std::string filename) {
+boost::filesystem::path constructFilePath(std::string path, std::string filename) {
     const auto directoryPath = boost::filesystem::path(path);
     const auto wiredTigerLogFilePrefix = "WiredTigerLog";
 

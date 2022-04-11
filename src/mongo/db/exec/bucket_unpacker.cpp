@@ -808,7 +808,7 @@ bool BucketUnpackerV1::getNext(MutableDocument& measurement,
         measurement.addField(*spec.metaFieldHashed(), metaValue);
     }
 
-    auto& currentIdx = timeElem.fieldNameStringData();
+    const auto& currentIdx = timeElem.fieldNameStringData();
     for (auto&& [colName, colIter] : _fieldIters) {
         if (auto&& elem = *colIter; colIter.more() && elem.fieldNameStringData() == currentIdx) {
             measurement.addField(colName, Value{elem});
@@ -838,7 +838,7 @@ void BucketUnpackerV1::extractSingleMeasurement(
     }
 
     for (auto&& dataElem : dataRegion) {
-        auto colName = dataElem.fieldNameStringData();
+        const auto& colName = dataElem.fieldNameStringData();
         if (!determineIncludeField(colName, behavior, unpackFieldsToIncludeExclude)) {
             continue;
         }
@@ -1249,7 +1249,7 @@ void BucketUnpacker::reset(BSONObj&& bucket) {
     // Walk the data region of the bucket, and decide if an iterator should be set up based on the
     // include or exclude case.
     for (auto&& elem : dataRegion) {
-        auto& colName = elem.fieldNameStringData();
+        auto colName = elem.fieldNameStringData();
         if (colName == _spec.timeField()) {
             // Skip adding a FieldIterator for the timeField since the timestamp value from
             // _timeFieldIter can be placed accordingly in the materialized measurement.

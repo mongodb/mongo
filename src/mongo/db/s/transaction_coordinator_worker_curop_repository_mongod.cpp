@@ -87,7 +87,7 @@ TransactionCoordinatorWorkerCurOpInfo::TransactionCoordinatorWorkerCurOpInfo(
       _action(action) {}
 
 
-const std::string TransactionCoordinatorWorkerCurOpInfo::toString(CoordinatorAction action) {
+std::string TransactionCoordinatorWorkerCurOpInfo::toString(CoordinatorAction action) {
     switch (action) {
         case CoordinatorAction::kSendingPrepare:
             return "sendingPrepare";

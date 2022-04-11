@@ -90,7 +90,7 @@ public:
     const ChunkRange& getChunkRange() const;
     const std::vector<BSONObj>& getSplitPoints() const;
     const std::string& getShardName() const;
-    const bool isFromChunkSplitter() const;
+    bool isFromChunkSplitter() const;
 
 private:
     /**

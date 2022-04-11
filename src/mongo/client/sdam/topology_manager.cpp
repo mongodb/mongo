@@ -116,7 +116,7 @@ bool TopologyManagerImpl::onServerDescription(const HelloOutcome& helloOutcome) 
     return true;
 }
 
-const std::shared_ptr<TopologyDescription> TopologyManagerImpl::getTopologyDescription() const {
+std::shared_ptr<TopologyDescription> TopologyManagerImpl::getTopologyDescription() const {
     stdx::lock_guard<mongo::Mutex> lock(_mutex);
     return _topologyDescription;
 }

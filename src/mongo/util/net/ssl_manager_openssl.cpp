@@ -601,7 +601,7 @@ struct OCSPFetchResponse {
         return (statusOfResponse == ErrorCodes::OCSPCertificateStatusRevoked) || hasNextUpdate;
     }
 
-    const Milliseconds fetchNewResponseDuration() {
+    Milliseconds fetchNewResponseDuration() {
         Milliseconds timeBeforeNextUpdate = refreshTime - Date_t::now();
         if (timeBeforeNextUpdate < Milliseconds(0)) {
             return Milliseconds(0);
@@ -620,7 +620,7 @@ struct OCSPFetchResponse {
         return timeBeforeNextUpdate / 2;
     }
 
-    const Date_t nextStapleRefresh() {
+    Date_t nextStapleRefresh() {
         return refreshTime;
     }
 };
@@ -1323,7 +1323,7 @@ public:
 
     SSLInformationToLog getSSLInformationToLog() const final;
 
-    const std::shared_ptr<OCSPStaplingContext> getOcspStaplingContext() {
+    std::shared_ptr<OCSPStaplingContext> getOcspStaplingContext() {
         stdx::lock_guard<mongo::Mutex> guard(_sharedResponseMutex);
         return _ocspStaplingContext;
     }

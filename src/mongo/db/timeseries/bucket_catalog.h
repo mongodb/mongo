@@ -461,7 +461,7 @@ private:
                       const CreationInfo& info);
 
     std::shared_ptr<ExecutionStats> _getExecutionStats(const NamespaceString& ns);
-    const std::shared_ptr<ExecutionStats> _getExecutionStats(const NamespaceString& ns) const;
+    std::shared_ptr<ExecutionStats> _getExecutionStats(const NamespaceString& ns) const;
 
     /**
      * Retreives the bucket state if it is tracked in the catalog.

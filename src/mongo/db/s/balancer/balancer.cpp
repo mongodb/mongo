@@ -207,7 +207,7 @@ uint64_t getMaxChunkSizeBytes(OperationContext* opCtx, const CollectionType& col
     return coll.getMaxChunkSizeBytes().value_or(balancerConfig->getMaxChunkSizeBytes());
 }
 
-const int64_t getMaxChunkSizeMB(OperationContext* opCtx, const CollectionType& coll) {
+int64_t getMaxChunkSizeMB(OperationContext* opCtx, const CollectionType& coll) {
     return getMaxChunkSizeBytes(opCtx, coll) / (1024 * 1024);
 }
 

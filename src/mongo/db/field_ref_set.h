@@ -143,7 +143,7 @@ public:
     /**
      * A debug/log-able string
      */
-    const std::string toString() const;
+    std::string toString() const;
 
 private:
     // A set of field_ref pointers, none of which is owned here.

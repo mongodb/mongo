@@ -62,7 +62,7 @@ public:
         db.dropCollection(_ns);
     }
 
-    const NamespaceString nss() {
+    NamespaceString nss() {
         return NamespaceString(_ns);
     }
 

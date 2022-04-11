@@ -370,7 +370,7 @@ void TransactionCoordinatorService::cancelIfCommitNotYetStarted(
     }
 }
 
-const std::vector<SharedSemiFuture<void>>
+std::vector<SharedSemiFuture<void>>
 TransactionCoordinatorService::getAllRemovalFuturesForCoordinatorsForInternalTransactions(
     OperationContext* opCtx) {
     std::vector<SharedSemiFuture<void>> coordinatorStateDocRemovalFutures;

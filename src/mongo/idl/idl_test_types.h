@@ -78,7 +78,7 @@ public:
         return object;
     }
 
-    const BSONObj serializeToBSON() const {
+    BSONObj serializeToBSON() const {
         return _obj;
     }
 

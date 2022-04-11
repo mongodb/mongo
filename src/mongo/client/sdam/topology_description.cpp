@@ -141,7 +141,7 @@ std::vector<ServerDescriptionPtr> TopologyDescription::findServers(
     return result;
 }
 
-const boost::optional<ServerDescriptionPtr> TopologyDescription::findServerByAddress(
+boost::optional<ServerDescriptionPtr> TopologyDescription::findServerByAddress(
     HostAndPort address) const {
     auto results = findServers([address](const ServerDescriptionPtr& serverDescription) {
         return serverDescription->getAddress() == address;
@@ -223,7 +223,7 @@ void TopologyDescription::checkWireCompatibilityVersions() {
     _compatibleError = (_compatible) ? boost::none : boost::make_optional(errorOss.str());
 }
 
-const std::string TopologyDescription::minimumRequiredMongoVersionString(int version) {
+std::string TopologyDescription::minimumRequiredMongoVersionString(int version) {
     switch (version) {
         case RESUMABLE_INITIAL_SYNC:
             return "4.4";

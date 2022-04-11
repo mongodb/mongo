@@ -284,7 +284,7 @@ protected:
         return std::string(stitch_support_v1_status_get_explanation(updateStatus));
     }
 
-    const std::string getModifiedPaths() {
+    std::string getModifiedPaths() {
         ASSERT(updateDetails);
 
         std::stringstream ss;

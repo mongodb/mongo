@@ -138,7 +138,7 @@ BSONObj ChunkRange::toBSON() const {
     return builder.obj();
 }
 
-const Status ChunkRange::extractKeyPattern(KeyPattern* shardKeyPatternOut) const {
+Status ChunkRange::extractKeyPattern(KeyPattern* shardKeyPatternOut) const {
     BSONObjIterator min(getMin());
     BSONObjIterator max(getMax());
     BSONObjBuilder b;

@@ -2018,7 +2018,7 @@ ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::awaitRepli
         return {interruptStatus, duration_cast<Milliseconds>(timer.elapsed())};
     }
 
-    const auto wTimeoutDate = [&]() -> const Date_t {
+    auto wTimeoutDate = [&]() -> Date_t {
         auto clockSource = opCtx->getServiceContext()->getFastClockSource();
         if (writeConcern.wDeadline != Date_t::max()) {
             return writeConcern.wDeadline;

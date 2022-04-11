@@ -112,7 +112,7 @@ public:
 
     FLEEncryptionFrame() : _plaintext(ConstDataRange(nullptr, 0)){};
 
-    const ConstDataRange get() const& {
+    ConstDataRange get() const& {
         return ConstDataRange(_data);
     }
 
@@ -120,11 +120,11 @@ public:
         return _key;
     }
 
-    const ConstDataRange getPlaintext() const {
+    ConstDataRange getPlaintext() const {
         return _plaintext;
     }
 
-    const ConstDataRange getAssociatedData() const {
+    ConstDataRange getAssociatedData() const {
         return ConstDataRange(_data.data(), kAssociatedDataLength);
     }
 
@@ -177,7 +177,7 @@ public:
         return _key;
     }
 
-    const ConstDataRange getAssociatedData() const {
+    ConstDataRange getAssociatedData() const {
         return ConstDataRange(_data.data(), kAssociatedDataLength);
     }
 

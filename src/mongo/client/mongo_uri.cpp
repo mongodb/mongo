@@ -533,7 +533,7 @@ StatusWith<MongoURI> MongoURI::parse(StringData url) try {
     return exceptionToStatus();
 }
 
-const boost::optional<std::string> MongoURI::getAppName() const {
+boost::optional<std::string> MongoURI::getAppName() const {
     const auto optIter = _options.find("appName");
     if (optIter != end(_options)) {
         return optIter->second;

@@ -83,7 +83,7 @@ std::ostream& operator<<(std::ostream& os, const ServerType serverType) {
     return os;
 }
 
-const std::vector<ServerType> allServerTypes() {
+std::vector<ServerType> allServerTypes() {
     static auto const result = std::vector<ServerType>{ServerType::kStandalone,
                                                        ServerType::kMongos,
                                                        ServerType::kRSPrimary,
@@ -136,7 +136,7 @@ std::ostream& operator<<(std::ostream& os, const TopologyType topologyType) {
     return os;
 }
 
-const std::vector<TopologyType> allTopologyTypes() {
+std::vector<TopologyType> allTopologyTypes() {
     static auto const result = std::vector<TopologyType>{TopologyType::kSingle,
                                                          TopologyType::kReplicaSetNoPrimary,
                                                          TopologyType::kReplicaSetWithPrimary,

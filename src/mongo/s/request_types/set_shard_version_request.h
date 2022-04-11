@@ -92,7 +92,7 @@ public:
      * Returns the version of the namespace associated with this set shard version request. It is
      * illegal to access this field if isInit() returns true.
      */
-    const ChunkVersion getNSVersion() const;
+    ChunkVersion getNSVersion() const;
 
 private:
     SetShardVersionRequest();

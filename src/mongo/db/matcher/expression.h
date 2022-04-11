@@ -376,7 +376,7 @@ public:
     /**
      * Get the path of the leaf.  Returns StringData() if there is no path (node is logical).
      */
-    virtual const StringData path() const {
+    virtual StringData path() const {
         return StringData();
     }
     /**

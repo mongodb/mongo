@@ -68,7 +68,7 @@ protected:
         ConfigServerTestFixture::tearDown();
     }
 
-    const std::string shardKey() {
+    std::string shardKey() {
         return _shardKey;
     }
 
@@ -76,7 +76,7 @@ protected:
         return _shardKeyPattern.getKeyPattern();
     }
 
-    const NamespaceString nss() {
+    NamespaceString nss() {
         return _nss;
     }
 
@@ -84,7 +84,7 @@ protected:
         return ReshardingZoneType(zoneName, range.getMin(), range.getMax());
     }
 
-    const std::string zoneName(std::string zoneNum) {
+    std::string zoneName(std::string zoneNum) {
         return "_zoneName" + zoneNum;
     }
 

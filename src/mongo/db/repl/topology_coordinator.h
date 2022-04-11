@@ -986,7 +986,7 @@ private:
 
     // Returns the oldest acceptable OpTime that a node must have for us to choose it as our sync
     // source.
-    const OpTime _getOldestSyncOpTime() const;
+    OpTime _getOldestSyncOpTime() const;
 
     // Returns true if the candidate node is viable as our sync source.
     bool _isEligibleSyncSource(int candidateIndex,
@@ -1038,7 +1038,7 @@ private:
     MemberData& _selfMemberData();
 
     // Index of self member in member data.
-    const int _selfMemberDataIndex() const;
+    int _selfMemberDataIndex() const;
 
     /*
      * Returns information we have on the state of the node identified by memberId.  Returns

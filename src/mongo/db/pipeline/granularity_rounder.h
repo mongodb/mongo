@@ -150,7 +150,7 @@ public:
      * Returns a vector that represents the preferred number series that this
      * GranularityRounderPreferredNumbers is using for rounding.
      */
-    const std::vector<double> getSeries() const;
+    std::vector<double> getSeries() const;
 
 private:
     GranularityRounderPreferredNumbers(const boost::intrusive_ptr<ExpressionContext>& expCtx,

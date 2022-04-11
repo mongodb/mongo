@@ -131,7 +131,7 @@ public:
     // TODO: Remove these hacks
     const CapWithCRS* getCapGeometryHack() const;
 
-    const BSONElement getGeoElement() const {
+    BSONElement getGeoElement() const {
         return _geoElm;
     }
 

@@ -233,7 +233,7 @@ public:
     }
 
 
-    const boost::optional<std::string> getAppName() const;
+    boost::optional<std::string> getAppName() const;
 
     std::string canonicalizeURIAsString() const;
 

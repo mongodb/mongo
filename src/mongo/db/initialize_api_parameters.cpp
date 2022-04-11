@@ -41,8 +41,7 @@
 
 namespace mongo {
 
-const APIParametersFromClient initializeAPIParameters(const BSONObj& requestBody,
-                                                      Command* command) {
+APIParametersFromClient initializeAPIParameters(const BSONObj& requestBody, Command* command) {
     auto apiParamsFromClient =
         APIParametersFromClient::parse("APIParametersFromClient"_sd, requestBody);
 

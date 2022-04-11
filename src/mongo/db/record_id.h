@@ -168,7 +168,7 @@ public:
      * Returns the raw value to be used as a key in a RecordStore. Requires that this RecordId was
      * constructed with a binary string value, and invariants otherwise.
      */
-    const StringData getStr() const {
+    StringData getStr() const {
         invariant(
             isStr(),
             fmt::format("expected RecordID string format, got: {}", _formatToString(_format)));

@@ -1503,7 +1503,7 @@ bool Element::isIntegral() const {
     return ((type == mongo::NumberLong) || (type == mongo::NumberInt));
 }
 
-const BSONElement Element::getValue() const {
+BSONElement Element::getValue() const {
     invariant(ok());
     const Document::Impl& impl = getDocument().getImpl();
     const ElementRep& thisRep = impl.getElementRep(_repIdx);

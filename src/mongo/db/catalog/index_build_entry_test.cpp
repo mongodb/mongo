@@ -45,7 +45,7 @@
 namespace mongo {
 namespace {
 
-const std::vector<std::string> generateIndexes(size_t numIndexes) {
+std::vector<std::string> generateIndexes(size_t numIndexes) {
     std::vector<std::string> indexes;
     for (size_t i = 0; i < numIndexes; i++) {
         indexes.push_back("index_" + std::to_string(i));
@@ -53,7 +53,7 @@ const std::vector<std::string> generateIndexes(size_t numIndexes) {
     return indexes;
 }
 
-const std::vector<HostAndPort> generateCommitReadyMembers(size_t numMembers) {
+std::vector<HostAndPort> generateCommitReadyMembers(size_t numMembers) {
     std::vector<HostAndPort> members;
     for (size_t i = 0; i < numMembers; i++) {
         members.push_back(HostAndPort("localhost:27017"));

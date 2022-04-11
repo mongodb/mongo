@@ -335,7 +335,7 @@ public:
      */
     void remove(const Value& val);
 
-    const SortPattern getSortPattern() const {
+    SortPattern getSortPattern() const {
         return _sortPattern;
     }
 

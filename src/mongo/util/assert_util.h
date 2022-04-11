@@ -112,7 +112,7 @@ public:
     /**
      * Returns the generic ErrorExtraInfo if present.
      */
-    const std::shared_ptr<const ErrorExtraInfo> extraInfo() const {
+    std::shared_ptr<const ErrorExtraInfo> extraInfo() const {
         return _status.extraInfo();
     }
 

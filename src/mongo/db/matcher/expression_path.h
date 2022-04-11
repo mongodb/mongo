@@ -66,7 +66,7 @@ public:
         return false;
     }
 
-    const StringData path() const override final {
+    StringData path() const override final {
         return _elementPath.fieldRef().dottedField();
     }
 

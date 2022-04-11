@@ -277,7 +277,7 @@ const boost::optional<std::string>& ServerDescription::getSetName() const {
     return _setName;
 }
 
-const ElectionIdSetVersionPair ServerDescription::getElectionIdSetVersionPair() const {
+ElectionIdSetVersionPair ServerDescription::getElectionIdSetVersionPair() const {
     return ElectionIdSetVersionPair{_electionId, _setVersion};
 }
 
@@ -285,7 +285,7 @@ const boost::optional<HostAndPort>& ServerDescription::getPrimary() const {
     return _primary;
 }
 
-const mongo::Date_t ServerDescription::getLastUpdateTime() const {
+mongo::Date_t ServerDescription::getLastUpdateTime() const {
     return *_lastUpdateTime;
 }
 
@@ -436,7 +436,7 @@ ServerDescriptionPtr ServerDescription::cloneWithRTT(HelloRTT rtt) {
     return newServerDescription;
 }
 
-const boost::optional<TopologyDescriptionPtr> ServerDescription::getTopologyDescription() {
+boost::optional<TopologyDescriptionPtr> ServerDescription::getTopologyDescription() {
     if (_topologyDescription) {
         const auto result = _topologyDescription->lock();
         invariant(result);
