@@ -164,3 +164,7 @@ feature_flags:
         cpp_varname: feature_flags::gTimeseriesBucketCompressionWithArrays
         default: true
         version: 6.0
+    featureFlagDerivedMetadata:
+        description: "When enabled, support storing derived collection and index metadata"
+        cpp_varname: feature_flags::gDerivedMetadata
+        default: false
