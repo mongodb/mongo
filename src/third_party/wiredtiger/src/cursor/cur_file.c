@@ -16,6 +16,73 @@ WT_STAT_USECS_HIST_INCR_FUNC(opread, perf_hist_opread_latency, 100)
 WT_STAT_USECS_HIST_INCR_FUNC(opwrite, perf_hist_opwrite_latency, 100)
 
 /*
+ * Wrapper for substituting checkpoint state when doing checkpoint cursor operations.
+ *
+ * A checkpoint cursor has two extra things in it: a dummy transaction (always), and a dhandle for
+ * the corresponding history store checkpoint (mostly but not always).
+ *
+ * If there's a checkpoint transaction, it means we're a checkpoint cursor. In that case we
+ * substitute the transaction into the session, and also stick the checkpoint name of the history
+ * store dhandle in the session for when the history store is opened. After the operation completes
+ * we then undo it all.
+ *
+ * If the current transaction is _already_ a checkpoint cursor dummy transaction, however, do
+ * nothing. This happens when the history store logic opens history store cursors inside checkpoint
+ * cursor operations on the data store. In that case we want to keep the existing state.
+ */
+#define WT_WITH_CHECKPOINT(session, cbt, op)                                           \
+    do {                                                                               \
+        WT_TXN *__saved_txn;                                                           \
+                                                                                       \
+        if ((cbt)->checkpoint_txn != NULL) {                                           \
+            __saved_txn = (session)->txn;                                              \
+            if (F_ISSET(__saved_txn, WT_TXN_IS_CHECKPOINT))                            \
+                __saved_txn = NULL;                                                    \
+            else {                                                                     \
+                (session)->txn = (cbt)->checkpoint_txn;                                \
+                if ((cbt)->checkpoint_hs_dhandle != NULL) {                            \
+                    WT_ASSERT(session, session->hs_checkpoint == NULL);                \
+                    session->hs_checkpoint = (cbt)->checkpoint_hs_dhandle->checkpoint; \
+                }                                                                      \
+            }                                                                          \
+        } else                                                                         \
+            __saved_txn = NULL;                                                        \
+        op;                                                                            \
+        if (__saved_txn != NULL) {                                                     \
+            (session)->txn = __saved_txn;                                              \
+            session->hs_checkpoint = NULL;                                             \
+        }                                                                              \
+    } while (0)
+
+/*
+ * __curfile_check_cbt_txn --
+ *     Enforce restrictions on nesting checkpoint cursors. The only nested cursors we should get to
+ *     from a checkpoint cursor are cursors for the corresponding history store checkpoint.
+ */
+static inline int
+__curfile_check_cbt_txn(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
+{
+    WT_TXN *txn;
+
+    txn = session->txn;
+
+    /* If not reading a checkpoint, everything's fine. */
+    if (cbt->checkpoint_txn == NULL)
+        return (0);
+
+    /*
+     * It is ok if the current transaction is already a checkpoint transaction. Assert that we are
+     * the history store.
+     */
+    if (F_ISSET(txn, WT_TXN_IS_CHECKPOINT)) {
+        WT_ASSERT(session, WT_IS_HS(cbt->dhandle));
+        WT_ASSERT(session, WT_DHANDLE_IS_CHECKPOINT(cbt->dhandle));
+    }
+
+    return (0);
+}
+
+/*
  * __curfile_compare --
  *     WT_CURSOR->compare method for the btree cursor type.
  */
@@ -90,7 +157,10 @@ __curfile_next(WT_CURSOR *cursor)
     CURSOR_API_CALL(cursor, session, next, CUR2BT(cbt));
     WT_ERR(__cursor_copy_release(cursor));
 
-    WT_ERR(__wt_btcur_next(cbt, false));
+    WT_ERR(__curfile_check_cbt_txn(session, cbt));
+
+    WT_WITH_CHECKPOINT(session, cbt, ret = __wt_btcur_next(cbt, false));
+    WT_ERR(ret);
 
     /* Next maintains a position, key and value. */
     WT_ASSERT(session,
@@ -117,7 +187,10 @@ __wt_curfile_next_random(WT_CURSOR *cursor)
     CURSOR_API_CALL(cursor, session, next, CUR2BT(cbt));
     WT_ERR(__cursor_copy_release(cursor));
 
-    WT_ERR(__wt_btcur_next_random(cbt));
+    WT_ERR(__curfile_check_cbt_txn(session, cbt));
+
+    WT_WITH_CHECKPOINT(session, cbt, ret = __wt_btcur_next_random(cbt));
+    WT_ERR(ret);
 
     /* Next-random maintains a position, key and value. */
     WT_ASSERT(session,
@@ -143,7 +216,10 @@ __curfile_prev(WT_CURSOR *cursor)
     CURSOR_API_CALL(cursor, session, prev, CUR2BT(cbt));
     WT_ERR(__cursor_copy_release(cursor));
 
-    WT_ERR(__wt_btcur_prev(cbt, false));
+    WT_ERR(__curfile_check_cbt_txn(session, cbt));
+
+    WT_WITH_CHECKPOINT(session, cbt, ret = __wt_btcur_prev(cbt, false));
+    WT_ERR(ret);
 
     /* Prev maintains a position, key and value. */
     WT_ASSERT(session,
@@ -197,8 +273,11 @@ __curfile_search(WT_CURSOR *cursor)
     WT_ERR(__cursor_copy_release(cursor));
     WT_ERR(__cursor_checkkey(cursor));
 
+    WT_ERR(__curfile_check_cbt_txn(session, cbt));
+
     time_start = __wt_clock(session);
-    WT_ERR(__wt_btcur_search(cbt));
+    WT_WITH_CHECKPOINT(session, cbt, ret = __wt_btcur_search(cbt));
+    WT_ERR(ret);
     time_stop = __wt_clock(session);
     __wt_stat_usecs_hist_incr_opread(session, WT_CLOCKDIFF_US(time_stop, time_start));
 
@@ -228,8 +307,11 @@ __curfile_search_near(WT_CURSOR *cursor, int *exact)
     WT_ERR(__cursor_copy_release(cursor));
     WT_ERR(__cursor_checkkey(cursor));
 
+    WT_ERR(__curfile_check_cbt_txn(session, cbt));
+
     time_start = __wt_clock(session);
-    WT_ERR(__wt_btcur_search_near(cbt, exact));
+    WT_WITH_CHECKPOINT(session, cbt, ret = __wt_btcur_search_near(cbt, exact));
+    WT_ERR(ret);
     time_stop = __wt_clock(session);
     __wt_stat_usecs_hist_incr_opread(session, WT_CLOCKDIFF_US(time_stop, time_start));
 
@@ -512,6 +594,17 @@ err:
 
     WT_ASSERT(session, session->dhandle == NULL || session->dhandle->session_inuse > 0);
 
+    /* Free any private transaction set up for a checkpoint cursor. */
+    if (cbt->checkpoint_txn != NULL)
+        __wt_txn_close_checkpoint_cursor(session, &cbt->checkpoint_txn);
+
+    /* Close any history store handle set up for a checkpoint cursor. */
+    if (cbt->checkpoint_hs_dhandle != NULL) {
+        WT_WITH_DHANDLE(
+          session, cbt->checkpoint_hs_dhandle, WT_TRET(__wt_session_release_dhandle(session)));
+        cbt->checkpoint_hs_dhandle = NULL;
+    }
+
     __wt_cursor_close(cursor);
 
     /*
@@ -647,12 +740,145 @@ __curfile_reopen(WT_CURSOR *cursor, bool sweep_check_only)
 }
 
 /*
+ * __curfile_setup_checkpoint --
+ *     Open helper code for checkpoint cursors.
+ */
+static int
+__curfile_setup_checkpoint(WT_CURSOR_BTREE *cbt, const char *cfg[], WT_DATA_HANDLE *hs_dhandle,
+  WT_CKPT_SNAPSHOT *ckpt_snapshot)
+{
+    WT_CONFIG_ITEM cval;
+    WT_DECL_RET;
+    WT_SESSION_IMPL *session;
+
+    session = CUR2S(cbt);
+
+    /*
+     * It is important that reading from a checkpoint also reads from the corresponding
+     * checkpoint of the history store and also uses matching snapshot and timestamp data;
+     * otherwise all kinds of things go wrong. The logic for getting a matching set is complex (what
+     * it means to be "matching" is also complex) and is explained in session_dhandle.c. This
+     * comment explains what happens once we get a matching set so that subsequent reads work
+     * correctly.
+     *
+     * 1. When we get here, if we are opening a data store checkpoint, our "current" dhandle in the
+     * session is the data store checkpoint, hs_dhandle is the matching history store checkpoint,
+     * and ckpt_snapshot contains the snapshot and timestamp data. It is at least theoretically
+     * possible for hs_dhandle to be null; this means there is no corresponding history store
+     * checkpoint. In this case we will avoid trying to open it later.
+     *
+     * We keep the history store checkpoint dhandle in the checkpoint cursor, and hold it open as
+     * long as the checkpoint cursor remains open. It is never directly used, but it ensures that
+     * the history store checkpoint will not be removed under us and any history store lookups done
+     * via the checkpoint cursor (which open the history store separately themselves) will be able
+     * to open the right version of the history store. This is essential for unnamed checkpoints as
+     * they turn over frequently and asynchronously. It is, strictly speaking, not necessary for
+     * named checkpoints, because as long as a named checkpoint data store cursor is open that named
+     * checkpoint cannot be changed. However, making the behavior conditional would introduce
+     * substantial interface complexity to little benefit.
+     *
+     * 2. When we get here, if we are opening a history store checkpoint, our "current" dhandle in
+     * the session is the history store checkpoint, hs_dhandle is null, and ckpt_snapshot contains
+     * the checkpoint's snapshot and timestamp information.
+     *
+     * If we are opening a history store checkpoint directly from the application (normally the
+     * application should never do this, but one or two tests do) we will get snapshot information
+     * matching the checkpoint. If we are opening a history store checkpoint internally, as part of
+     * an operation on a data store checkpoint cursor, we will have explicitly opened the right
+     * history store checkpoint. The snapshot information may be from a newer checkpoint, but will
+     * not be used.
+     *
+     * 3. To make visibility checks work correctly relative to the checkpoint snapshot, we concoct a
+     * dummy transaction and load the snapshot data into it. This transaction lives in the
+     * checkpoint cursor. It is substituted into session->txn during checkpoint cursor operations.
+     * Note that we do _not_ substitute into txn_shared, so using a checkpoint cursor does not cause
+     * interactions with other threads and in particular does not affect the pinned timestamp
+     * computation. The read timestamp associated with the checkpoint is kept in the dummy
+     * transaction, and there's a (single) special case in the visibility code to check it instead
+     * of the normal read timestamp in txn_shared.
+     *
+     * Global visibility checks that can occur during checkpoint cursor operations need to be
+     * special-cased, because global visibility checks against the current world and not the
+     * checkpoint. There are only a few of these and it seemed more effective to conditionalize them
+     * directly rather than tinkering with the visibility code itself.
+     *
+     * 4. We do not substitute into session->txn if we are already in a checkpoint cursor (that is,
+     * if session->txn is a checkpoint cursor dummy transaction) -- this happens when doing history
+     * store accesses within a data store operation, and means that the history store accesses use
+     * the same snapshot and timestamp information as the data store accesses, which is important
+     * for consistency.
+     *
+     * 5. Because the checkpoint cursor in use is not itself visible in various parts of the
+     * system (most notably the history store code) anything else we need to know about
+     * elsewhere also gets substituted into the session at this point. Currently the only such item
+     * is the name for the matching history store checkpoint.
+     *
+     * 6. When accessing the history store, we will use the history store checkpoint name stashed in
+     * the session if there is one.
+     */
+
+    /* We may have gotten a history store handle, but not if we're the history store. */
+    WT_ASSERT(session, !WT_IS_HS(session->dhandle) || hs_dhandle == NULL);
+
+    /* We should always have snapshot data, though it might be degenerate. */
+    WT_ASSERT(session, ckpt_snapshot != NULL);
+
+    /*
+     * Override the read timestamp if explicitly provided. Otherwise it's the stable timestamp from
+     * the checkpoint. Replace it in the snapshot info if necessary.
+     */
+    WT_ERR_NOTFOUND_OK(
+      __wt_config_gets_def(session, cfg, "debug.checkpoint_read_timestamp", 0, &cval), true);
+    if (ret == 0) {
+        if (cval.len > 0 && cval.val == 0)
+            /*
+             * Allow setting "0" explicitly to mean "none". Otherwise 0 is rejected by the timestamp
+             * parser. Note that the default is not "none", it is the checkpoint's stable timestamp.
+             */
+            ckpt_snapshot->stable_ts = WT_TXN_NONE;
+        else if (cval.val != 0) {
+            WT_ERR(__wt_txn_parse_timestamp(
+              session, "checkpoint_read", &ckpt_snapshot->stable_ts, &cval));
+            /*
+             * Fail if the read timestamp is less than checkpoint's oldest timestamp. Since this is
+             * a debug setting it's not super critical to make it a usable interface, and for
+             * testing it's usually more illuminating to fail if something unexpected happens. If we
+             * end up exposing the checkpoint read timestamp, it might be better to have this always
+             * round up instead, since there's no useful way for the application to get the
+             * checkpoint's oldest timestamp itself.
+             */
+            if (ckpt_snapshot->stable_ts < ckpt_snapshot->oldest_ts)
+                WT_ERR_MSG(session, EINVAL,
+                  "checkpoint_read_timestamp must not be before the checkpoint oldest "
+                  "timestamp");
+        }
+    }
+
+    /*
+     * Always create the dummy transaction. If we're opening the history store from inside a data
+     * store checkpoint cursor, we'll end up not using it, but we can't easily tell from here
+     * whether that's the case. Pass in the snapshot info.
+     */
+    WT_ERR(__wt_txn_init_checkpoint_cursor(session, ckpt_snapshot, &cbt->checkpoint_txn));
+
+    /*
+     * Stow the history store handle on success. (It will be released further up the call chain if
+     * we fail.)
+     */
+    WT_ASSERT(session, ret == 0);
+    cbt->checkpoint_hs_dhandle = hs_dhandle;
+
+err:
+    return (ret);
+}
+
+/*
  * __curfile_create --
  *     Open a cursor for a given btree handle.
  */
 static int
 __curfile_create(WT_SESSION_IMPL *session, WT_CURSOR *owner, const char *cfg[], bool bulk,
-  bool bitmap, WT_CURSOR **cursorp)
+  bool bitmap, WT_DATA_HANDLE *hs_dhandle, WT_CKPT_SNAPSHOT *ckpt_snapshot, WT_CURSOR **cursorp)
 {
     WT_CURSOR_STATIC_INIT(iface, __wt_cursor_get_key, /* get-key */
       __wt_cursor_get_value,                          /* get-value */
@@ -707,8 +933,17 @@ __curfile_create(WT_SESSION_IMPL *session, WT_CURSOR *owner, const char *cfg[], 
      */
     __wt_cursor_dhandle_incr_use(session);
 
-    if (session->dhandle->checkpoint != NULL)
-        F_SET(cbt, WT_CBT_NO_TXN | WT_CBT_NO_TRACKING);
+    if (WT_READING_CHECKPOINT(session)) {
+        /* Checkpoint cursor. */
+        if (bulk)
+            /* Fail now; otherwise we fail further down and then segfault trying to recover. */
+            WT_RET_MSG(session, EINVAL, "checkpoints are read-only and cannot be bulk-loaded");
+        WT_RET(__curfile_setup_checkpoint(cbt, cfg, hs_dhandle, ckpt_snapshot));
+    } else {
+        /* We should not have been given the bits used by checkpoint cursors. */
+        WT_ASSERT(session, hs_dhandle == NULL);
+        WT_ASSERT(session, ckpt_snapshot->snapshot_txns == NULL);
+    }
 
     if (bulk) {
         F_SET(cursor, WT_CURSTD_BULK);
@@ -767,10 +1002,11 @@ err:
         __wt_cursor_dhandle_decr_use(session);
 
         /*
-         * Our caller expects to release the data handle if we fail. Disconnect it from the cursor
-         * before closing.
+         * Our caller expects to release the data handles if we fail. Disconnect both the main and
+         * any history store handle from the cursor before closing.
          */
         cbt->dhandle = NULL;
+        cbt->checkpoint_hs_dhandle = NULL;
 
         WT_TRET(__curfile_close(cursor));
         *cursorp = NULL;
@@ -787,14 +1023,24 @@ int
 __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, const char *cfg[],
   WT_CURSOR **cursorp)
 {
+    WT_CKPT_SNAPSHOT ckpt_snapshot;
     WT_CONFIG_ITEM cval;
+    WT_DATA_HANDLE *hs_dhandle;
     WT_DECL_RET;
     uint32_t flags;
-    bool bitmap, bulk, checkpoint_wait;
+    bool bitmap, bulk, checkpoint_use_history, checkpoint_wait;
 
+    ckpt_snapshot.snapshot_max = WT_TXN_MAX;
+    ckpt_snapshot.snapshot_min = WT_TXN_MAX;
+    ckpt_snapshot.snapshot_txns = NULL;
+    ckpt_snapshot.snapshot_count = 0;
+    hs_dhandle = NULL;
     bitmap = bulk = false;
+    checkpoint_use_history = true;
     checkpoint_wait = true;
     flags = 0;
+
+    WT_ASSERT(session, WT_BTREE_PREFIX(uri));
 
     /*
      * Decode the bulk configuration settings. In memory databases ignore bulk load.
@@ -825,25 +1071,71 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, c
     if (bulk)
         LF_SET(WT_BTREE_BULK | WT_DHANDLE_EXCLUSIVE);
 
-    WT_ASSERT(session, WT_BTREE_PREFIX(uri));
+    /* Find out if we're supposed to avoid opening the history store. */
+    WT_RET(__wt_config_gets_def(session, cfg, "checkpoint_use_history", 0, &cval));
+    if (cval.len > 0)
+        checkpoint_use_history = (cval.val != 0);
+
+    /*
+     * This open path is used for checkpoint cursors and bulk cursors as well as ordinary cursors.
+     * Several considerations apply as a result.
+     *
+     * 1. For bulk cursors we need to do an exclusive open. In this case, a running database-wide
+     * checkpoint can result in EBUSY. To avoid this, we can take the checkpoint lock while opening
+     * the dhandle, which causes us to block until any running checkpoint finishes. This is
+     * controlled by the "checkpoint_wait" config. Nothing else does an exclusive open, so the path
+     * with the checkpoint lock is not otherwise reachable.
+     *
+     * 2. For checkpoint cursors it is not safe to take the checkpoint lock here, because the LSM
+     * code opens checkpoint cursors while holding the schema lock and the checkpoint lock is
+     * supposed to come before the schema lock. If there should ever be some reason to do an
+     * exclusive open of a checkpoint cursor, something will have to give.
+     *
+     * 3. If we are opening a checkpoint cursor, we need two dhandles, one for the tree we're
+     * actually trying to open and (unless that's itself the history store) one for the history
+     * store, and also a copy of the snapshot and timestamp metadata for the checkpoint. It's
+     * necessary for data correctness for all three of these to match. There's a complicated scheme
+     * for getting a matching set while avoiding races with a running checkpoint inside the open
+     * logic (see session_dhandle.c) that we fortunately don't need to think about here.
+     *
+     * 4. The LSM code also opens cursors on single-file checkpoints with no corresponding history
+     * store or snapshot information. It takes steps to make sure everything in the checkpoint is
+     * globally visible and sets checkpoint_use_history=false to indicate we shouldn't try to open
+     * the history store or retrieve the snapshot. If we were to try, we'd fail and the LSM code
+     * would get upset.
+     *
+     * 5. To avoid a proliferation of cases, and to avoid repeatedly parsing config strings, we
+     * always pass down the return arguments for the history store dhandle and checkpoint snapshot
+     * information (except for the bulk-only case and the LSM case) and pass the results on to
+     * __curfile_create. We will not get anything back unless we are actually opening a checkpoint
+     * cursor. The open code takes care of the special case of opening a checkpoint cursor on the
+     * history store. (This is not normally done by applications; but it is done by a couple tests,
+     * and furthermore any internally opened history store cursors come through here, so this case
+     * does matter.)
+     */
 
     /* Get the handle and lock it while the cursor is using it. */
-    /*
-     * If we are opening exclusive and don't want a bulk cursor open to fail with EBUSY due to a
-     * database-wide checkpoint, get the handle while holding the checkpoint lock.
-     */
     if (LF_ISSET(WT_DHANDLE_EXCLUSIVE) && checkpoint_wait)
         WT_WITH_CHECKPOINT_LOCK(
-          session, ret = __wt_session_get_btree_ckpt(session, uri, cfg, flags));
+          session, ret = __wt_session_get_btree_ckpt(session, uri, cfg, flags, NULL, NULL));
+    else if (checkpoint_use_history)
+        ret = __wt_session_get_btree_ckpt(session, uri, cfg, flags, &hs_dhandle, &ckpt_snapshot);
     else
-        ret = __wt_session_get_btree_ckpt(session, uri, cfg, flags);
+        ret = __wt_session_get_btree_ckpt(session, uri, cfg, flags, NULL, NULL);
     WT_RET(ret);
 
-    WT_ERR(__curfile_create(session, owner, cfg, bulk, bitmap, cursorp));
+    WT_ERR(
+      __curfile_create(session, owner, cfg, bulk, bitmap, hs_dhandle, &ckpt_snapshot, cursorp));
 
     return (0);
 
 err:
+    if (hs_dhandle != NULL)
+        WT_WITH_DHANDLE(session, hs_dhandle, WT_TRET(__wt_session_release_dhandle(session)));
+
+    /* If a snapshot array was returned and hasn't been moved elsewhere, discard it now. */
+    __wt_free(session, ckpt_snapshot.snapshot_txns);
+
     /* If the cursor could not be opened, release the handle. */
     WT_TRET(__wt_session_release_dhandle(session));
     return (ret);

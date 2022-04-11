@@ -1329,7 +1329,7 @@ __rollback_to_stable_btree(WT_SESSION_IMPL *session, wt_timestamp_t rollback_tim
         return (0);
 
     /* There is never anything to do for checkpoint handles. */
-    if (session->dhandle->checkpoint != NULL)
+    if (WT_READING_CHECKPOINT(session))
         return (0);
 
     /* There is nothing to do on an empty tree. */

@@ -9,7 +9,7 @@
 #include "wt_internal.h"
 
 static int __ckpt_last(WT_SESSION_IMPL *, const char *, WT_CKPT *);
-static int __ckpt_last_name(WT_SESSION_IMPL *, const char *, const char **);
+static int __ckpt_last_name(WT_SESSION_IMPL *, const char *, const char **, int64_t *, uint64_t *);
 static int __ckpt_load(WT_SESSION_IMPL *, WT_CONFIG_ITEM *, WT_CONFIG_ITEM *, WT_CKPT *);
 static int __ckpt_named(WT_SESSION_IMPL *, const char *, const char *, WT_CKPT *);
 static int __ckpt_set(WT_SESSION_IMPL *, const char *, const char *, bool);
@@ -146,10 +146,12 @@ err:
 
 /*
  * __wt_meta_checkpoint_last_name --
- *     Return the last unnamed checkpoint's name.
+ *     Return the last unnamed checkpoint's name. Return the order number and wall-clock time if
+ *     requested so the caller can check for races with a currently running checkpoint.
  */
 int
-__wt_meta_checkpoint_last_name(WT_SESSION_IMPL *session, const char *fname, const char **namep)
+__wt_meta_checkpoint_last_name(
+  WT_SESSION_IMPL *session, const char *fname, const char **namep, int64_t *orderp, uint64_t *timep)
 {
     WT_DECL_RET;
     char *config;
@@ -157,13 +159,64 @@ __wt_meta_checkpoint_last_name(WT_SESSION_IMPL *session, const char *fname, cons
     config = NULL;
 
     /* Retrieve the metadata entry for the file. */
-    WT_ERR(__wt_metadata_search(session, fname, &config));
+    WT_RET(__wt_metadata_search(session, fname, &config));
 
     /* Check the major/minor version numbers. */
     WT_ERR(__ckpt_version_chk(session, fname, config));
 
     /* Retrieve the name of the last unnamed checkpoint. */
-    WT_ERR(__ckpt_last_name(session, config, namep));
+    WT_ERR(__ckpt_last_name(session, config, namep, orderp, timep));
+
+err:
+    __wt_free(session, config);
+    return (ret);
+}
+
+/*
+ * __wt_meta_checkpoint_by_name --
+ *     Look up the requested named checkpoint in the metadata and return its order and time
+ *     information.
+ */
+int
+__wt_meta_checkpoint_by_name(WT_SESSION_IMPL *session, const char *uri, const char *checkpoint,
+  int64_t *orderp, uint64_t *timep)
+{
+    WT_CONFIG ckptconf;
+    WT_CONFIG_ITEM a, k, v;
+    WT_CONNECTION_IMPL *conn;
+    WT_DECL_RET;
+    char *config;
+
+    conn = S2C(session);
+    config = NULL;
+    *orderp = 0;
+    *timep = 0;
+
+    /* Retrieve the metadata entry. */
+    WT_RET(__wt_metadata_search(session, uri, &config));
+
+    /* Check the major/minor version numbers. */
+    WT_ERR(__ckpt_version_chk(session, uri, config));
+
+    WT_ERR(__wt_config_getones(session, config, "checkpoint", &v));
+    __wt_config_subinit(session, &ckptconf, &v);
+
+    /*
+     * Take the first match: there should never be more than a single checkpoint of any name.
+     */
+    while (__wt_config_next(&ckptconf, &k, &v) == 0)
+        if (WT_STRING_MATCH(checkpoint, k.str, k.len)) {
+
+            WT_ERR(__wt_config_subgets(session, &v, "order", &a));
+            if (a.val > 0)
+                *orderp = a.val;
+            WT_ERR(__wt_config_subgets(session, &v, "write_gen", &a));
+            if ((uint64_t)a.val >= conn->base_write_gen) {
+                WT_ERR(__wt_config_subgets(session, &v, "time", &a));
+                *timep = (uint64_t)a.val;
+            }
+            break;
+        }
 
 err:
     __wt_free(session, config);
@@ -308,40 +361,55 @@ __ckpt_last(WT_SESSION_IMPL *session, const char *config, WT_CKPT *ckpt)
 
 /*
  * __ckpt_last_name --
- *     Return the name associated with the file's last unnamed checkpoint.
+ *     Return the name associated with the file's last unnamed checkpoint. Except: in keeping with
+ *     global snapshot/timestamp metadata being about the most recent checkpoint (named or unnamed),
+ *     we return the most recent checkpoint (named or unnamed), since all callers need a checkpoint
+ *     that matches the snapshot info they're using.
  */
 static int
-__ckpt_last_name(WT_SESSION_IMPL *session, const char *config, const char **namep)
+__ckpt_last_name(WT_SESSION_IMPL *session, const char *config, const char **namep, int64_t *orderp,
+  uint64_t *timep)
 {
     WT_CONFIG ckptconf;
     WT_CONFIG_ITEM a, k, v;
+    WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
+    uint64_t time;
     int64_t found;
 
+    conn = S2C(session);
     *namep = NULL;
+    time = 0;
 
     WT_ERR(__wt_config_getones(session, config, "checkpoint", &v));
     __wt_config_subinit(session, &ckptconf, &v);
     for (found = 0; __wt_config_next(&ckptconf, &k, &v) == 0;) {
-        /*
-         * We only care about unnamed checkpoints; applications may not use any matching prefix as a
-         * checkpoint name, the comparison is pretty simple.
-         */
-        if (k.len < strlen(WT_CHECKPOINT) ||
-          strncmp(k.str, WT_CHECKPOINT, strlen(WT_CHECKPOINT)) != 0)
-            continue;
 
-        /* Ignore checkpoints before the ones we've already seen. */
+        /* Ignore checkpoints before (by the order numbering) the ones we've already seen. */
         WT_ERR(__wt_config_subgets(session, &v, "order", &a));
         if (found && a.val < found)
             continue;
+        found = a.val;
+
+        /* If the write generation is current, extract the wall-clock time for matching purposes. */
+        WT_ERR(__wt_config_subgets(session, &v, "write_gen", &a));
+        if ((uint64_t)a.val >= conn->base_write_gen) {
+            WT_ERR(__wt_config_subgets(session, &v, "time", &a));
+            time = (uint64_t)a.val;
+        } else
+            time = 0;
 
         __wt_free(session, *namep);
         WT_ERR(__wt_strndup(session, k.str, k.len, namep));
-        found = a.val;
     }
     if (!found)
         ret = WT_NOTFOUND;
+    else {
+        if (orderp != NULL)
+            *orderp = found;
+        if (timep != NULL)
+            *timep = time;
+    }
 
     if (0) {
 err:
@@ -566,12 +634,9 @@ __meta_ckptlist_allocate_new_ckpt(
   WT_SESSION_IMPL *session, WT_CKPT **ckptbasep, size_t *allocated, const char *config)
 {
     WT_CKPT *ckptbase, *ckpt;
-    WT_CONNECTION_IMPL *conn;
     size_t slot;
-    uint64_t most_recent;
 
     ckptbase = *ckptbasep;
-    conn = S2C(session);
     slot = 0;
 
     if (ckptbase != NULL)
@@ -598,27 +663,29 @@ __meta_ckptlist_allocate_new_ckpt(
 
     ckpt = &ckptbase[slot];
     ckpt->order = (slot == 0) ? 1 : ckptbase[slot - 1].order + 1;
-    __wt_seconds(session, &ckpt->sec);
+
+    ckpt->sec = session->current_ckpt_sec;
+    WT_ASSERT(session, ckpt->sec > 0);
+
     /*
-     * Update time value for most recent checkpoint, not letting it move backwards. It is possible
-     * to race here, so use atomic CAS. This code relies on the fact that anyone we race with will
-     * only increase (never decrease) the most recent checkpoint time value.
+     * If we're adding a checkpoint, in general it should be newer than the previous one according
+     * to the time field. However, we don't try to crosscheck that here because it's not quite
+     * always true, and ultimately it doesn't matter.
      *
-     * Update the time for this checkpoint not letting it move backwards. If tiered storage is in
-     * use move it at least up to the most recent flush. Then move it up to at least the most
-     * checkpoint.
+     * First, if the previous checkpoint is from an earlier database run its time might be off,
+     * either because of issues with the system clock or because the checkpoint clock got run
+     * forward (see notes in txn_ckpt.c) and we crashed and restarted and are still behind it. This
+     * could be ruled out by checking the write generation.
      *
-     * NOTE: reading the most recent flush time is not an ordered read because currently checkpoint
-     * and flush tier are mutually exclusive.
+     * Second, a single-tree checkpoint can occur while a global checkpoint is in progress. In that
+     * case the global checkpoint will have an earlier time, but might get to the tree in question
+     * later. With WT-8695 this should only be possible with the metadata, so we could rule it out
+     * by only checking non-metadata files.
+     *
+     * Third, it appears to be possible for a close checkpoint to occur while a global checkpoint is
+     * in progress, with the same consequences. There doesn't seem to be any obvious way to detect
+     * and rule out this case.
      */
-    for (;;) {
-        WT_ORDERED_READ(most_recent, conn->ckpt_most_recent);
-        ckpt->sec = WT_MAX(ckpt->sec, conn->flush_most_recent);
-        ckpt->sec = WT_MAX(ckpt->sec, most_recent);
-        if (ckpt->sec == most_recent ||
-          __wt_atomic_cas64(&conn->ckpt_most_recent, most_recent, ckpt->sec))
-            break;
-    }
 
     /* Either load block mods from the config, or from the previous checkpoint. */
     WT_RET(
@@ -984,7 +1051,7 @@ err:
 
 /*
  * __wt_metadata_correct_base_write_gen --
- *     Update the connection's base write generation from all files in metadata at then end of the
+ *     Update the connection's base write generation from all files in metadata at the end of the
  *     recovery checkpoint.
  */
 int
@@ -1268,76 +1335,177 @@ __wt_meta_checkpoint_free(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 }
 
 /*
- * __wt_meta_sysinfo_set --
- *     Set the system information in the metadata.
+ * __meta_print_snapshot --
+ *     Generate the text form of the checkpoint's snapshot for recording in the metadata.
  */
-int
-__wt_meta_sysinfo_set(WT_SESSION_IMPL *session)
+static int
+__meta_print_snapshot(WT_SESSION_IMPL *session, WT_ITEM *buf)
 {
-    WT_DECL_ITEM(buf);
-    WT_DECL_RET;
     WT_TXN *txn;
-    WT_TXN_GLOBAL *txn_global;
-    wt_timestamp_t oldest_timestamp;
     uint32_t snap_count;
-    char hex_timestamp[WT_TS_HEX_STRING_SIZE];
-    char ts_string[2][WT_TS_INT_STRING_SIZE];
-
-    txn_global = &S2C(session)->txn_global;
 
     txn = session->txn;
-    WT_ERR(__wt_scr_alloc(session, 1024, &buf));
-    /*
-     * We need to record the timestamp of the checkpoint in the metadata. The timestamp value is set
-     * at a higher level, either in checkpoint or in recovery.
-     */
-    __wt_timestamp_to_hex_string(txn_global->meta_ckpt_timestamp, hex_timestamp);
 
-    /*
-     * Don't leave a zero entry in the metadata: remove it. This avoids downgrade issues if the
-     * metadata is opened with an older version of WiredTiger that does not understand the new
-     * entry.
-     */
-    if (strcmp(hex_timestamp, "0") == 0)
-        WT_ERR_NOTFOUND_OK(__wt_metadata_remove(session, WT_SYSTEM_CKPT_URI), false);
-    else {
-        WT_ERR(__wt_buf_fmt(session, buf, WT_SYSTEM_CKPT_TS "=\"%s\"", hex_timestamp));
-        WT_ERR(__wt_metadata_update(session, WT_SYSTEM_CKPT_URI, buf->data));
-    }
-
-    /*
-     * We also need to record the oldest timestamp in the metadata so we can set it on startup. We
-     * should set the checkpoint's oldest timestamp as the minimum of the current oldest timestamp
-     * and the checkpoint timestamp.
-     *
-     * Cache the oldest timestamp and use a read barrier to prevent us from reading two different
-     * values of the oldest timestamp.
-     */
-    oldest_timestamp = txn_global->oldest_timestamp;
-    WT_READ_BARRIER();
-    __wt_timestamp_to_hex_string(
-      WT_MIN(oldest_timestamp, txn_global->meta_ckpt_timestamp), hex_timestamp);
-    if (strcmp(hex_timestamp, "0") == 0)
-        WT_ERR_NOTFOUND_OK(__wt_metadata_remove(session, WT_SYSTEM_OLDEST_URI), false);
-    else {
-        WT_ERR(__wt_buf_fmt(session, buf, WT_SYSTEM_OLDEST_TS "=\"%s\"", hex_timestamp));
-        WT_ERR(__wt_metadata_update(session, WT_SYSTEM_OLDEST_URI, buf->data));
-    }
-
-    /* Record snapshot information in metadata for checkpoint. */
-    WT_ERR(__wt_buf_fmt(session, buf,
+    WT_RET(__wt_buf_fmt(session, buf,
       WT_SYSTEM_CKPT_SNAPSHOT_MIN "=%" PRIu64 "," WT_SYSTEM_CKPT_SNAPSHOT_MAX "=%" PRIu64
                                   "," WT_SYSTEM_CKPT_SNAPSHOT_COUNT "=%" PRIu32,
       txn->snap_min, txn->snap_max, txn->snapshot_count));
 
     if (txn->snapshot_count > 0) {
-        WT_ERR(__wt_buf_catfmt(session, buf, "," WT_SYSTEM_CKPT_SNAPSHOT "=["));
+        WT_RET(__wt_buf_catfmt(session, buf, "," WT_SYSTEM_CKPT_SNAPSHOT "=["));
         for (snap_count = 0; snap_count < txn->snapshot_count - 1; ++snap_count)
-            WT_ERR(__wt_buf_catfmt(session, buf, "%" PRIu64 "%s", txn->snapshot[snap_count], ","));
+            WT_RET(__wt_buf_catfmt(session, buf, "%" PRIu64 "%s", txn->snapshot[snap_count], ","));
 
-        WT_ERR(__wt_buf_catfmt(session, buf, "%" PRIu64 "%s", txn->snapshot[snap_count], "]"));
+        WT_RET(__wt_buf_catfmt(session, buf, "%" PRIu64 "%s", txn->snapshot[snap_count], "]"));
     }
-    WT_ERR(__wt_metadata_update(session, WT_SYSTEM_CKPT_SNAPSHOT_URI, buf->data));
+
+    WT_RET(__wt_buf_catfmt(session, buf,
+      "," WT_SYSTEM_TS_TIME "=%" PRIu64 "," WT_SYSTEM_TS_WRITE_GEN "=%" PRIu64,
+      session->current_ckpt_sec, S2C(session)->base_write_gen));
+
+    return (0);
+}
+
+/*
+ * __meta_sysinfo_update --
+ *     Helper to update the most recent and/or named checkpoint snapshot metadata entry.
+ */
+static int
+__meta_sysinfo_update(WT_SESSION_IMPL *session, bool full, const char *name, size_t namelen,
+  WT_ITEM *buf, const char *uri, const char *value)
+{
+    if (full)
+        WT_RET(__wt_metadata_update(session, uri, value));
+    if (name != NULL) {
+        WT_RET(__wt_buf_fmt(session, buf, "%s.%.*s", uri, (int)namelen, name));
+        WT_RET(__wt_metadata_update(session, buf->data, value));
+    }
+    return (0);
+}
+
+/*
+ * __meta_sysinfo_remove --
+ *     Helper to remove the most recent and/or named checkpoint snapshot metadata entry.
+ */
+static int
+__meta_sysinfo_remove(WT_SESSION_IMPL *session, bool full, const char *name, size_t namelen,
+  WT_ITEM *buf, const char *uri)
+{
+    if (full)
+        WT_RET_NOTFOUND_OK(__wt_metadata_remove(session, uri));
+    if (name != NULL) {
+        WT_RET(__wt_buf_fmt(session, buf, "%s.%.*s", uri, (int)namelen, name));
+        WT_RET_NOTFOUND_OK(__wt_metadata_remove(session, buf->data));
+    }
+    return (0);
+}
+
+/*
+ * __wt_meta_sysinfo_set --
+ *     Set the system information in the metadata.
+ */
+int
+__wt_meta_sysinfo_set(WT_SESSION_IMPL *session, bool full, const char *name, size_t namelen)
+{
+    WT_CONNECTION_IMPL *conn;
+    WT_DECL_ITEM(uribuf);
+    WT_DECL_ITEM(valbuf);
+    WT_DECL_RET;
+    WT_TXN *txn;
+    WT_TXN_GLOBAL *txn_global;
+    wt_timestamp_t oldest_timestamp;
+    char hex_timestamp[WT_TS_HEX_STRING_SIZE];
+    char ts_string[2][WT_TS_INT_STRING_SIZE];
+
+    /*
+     * Write the checkpoint timestamp and snapshot information to the metadata. For any full
+     * checkpoint, including most named checkpoints, write the most recent checkpoint's entries. For
+     * all named checkpoints, whether or not full, write it to that checkpoint's entries by name.
+     * This writes out two copies for most named checkpoints, but that's ok.
+     *
+     * The most recent checkpoint's entries are
+     *    system:checkpoint (contains checkpoint_timestamp=TS)
+     *    system:oldest (contains oldest_timestamp=TS)
+     *    system:checkpoint_snapshot (contains snapshot_{min,max}=TXN, snapshot_count=N,
+     *       snapshots=[TXN,TXN,...])
+     * and a named checkpoint's entries are
+     *    system:checkpoint.NAME
+     *    system:oldest.NAME
+     *    system:checkpoint_snapshot.NAME
+     * with the same contents.
+     *
+     * All three entries also include time=SEC and write_gen=WRITE-GEN, where the time is the wall
+     * clock time (not timestamp) from the checkpoint and the write generation is the base write
+     * generation as of when the checkpoint was taken. This information relates the metadata info to
+     * specific tree-level checkpoints.
+     *
+     * We also write the base write generation to system:system:checkpoint_base_write_gen for full
+     * checkpoints. This information doesn't appear needed for named checkpoints and isn't written.
+     *
+     * The checkpoint timestamp written is set by higher-level code, either in checkpoint or in
+     * recovery.
+     *
+     * We also need to record the oldest timestamp in the metadata so we can set it on startup. The
+     * checkpoint's oldest timestamp is the minimum of the current oldest timestamp and the
+     * checkpoint timestamp.
+     *
+     * For both timestamps, don't store zero entries in the metadata: remove the entry instead. This
+     * avoids downgrade issues if the metadata is opened with an older version of WiredTiger that
+     * doesn't understand the new entry.
+     */
+
+    conn = S2C(session);
+    txn_global = &conn->txn_global;
+
+    txn = session->txn;
+    if (name != NULL)
+        WT_ERR(__wt_scr_alloc(session, namelen + 128, &uribuf));
+    WT_ERR(__wt_scr_alloc(session, 1024, &valbuf));
+
+    /* Handle the checkpoint timestamp. */
+
+    __wt_timestamp_to_hex_string(txn_global->meta_ckpt_timestamp, hex_timestamp);
+    if (strcmp(hex_timestamp, "0") == 0)
+        WT_ERR(__meta_sysinfo_remove(session, full, name, namelen, uribuf, WT_SYSTEM_CKPT_URI));
+    else {
+        WT_ERR(__wt_buf_fmt(session, valbuf,
+          WT_SYSTEM_CKPT_TS "=\"%s\"," WT_SYSTEM_TS_TIME "=%" PRIu64 "," WT_SYSTEM_TS_WRITE_GEN
+                            "=%" PRIu64,
+          hex_timestamp, session->current_ckpt_sec, conn->base_write_gen));
+        WT_ERR(__meta_sysinfo_update(
+          session, full, name, namelen, uribuf, WT_SYSTEM_CKPT_URI, valbuf->data));
+    }
+
+    /*
+     * Handle the oldest timestamp.
+     *
+     * Cache the oldest timestamp and use a read barrier to prevent us from reading two different
+     * values of the oldest timestamp.
+     */
+
+    oldest_timestamp = txn_global->oldest_timestamp;
+    WT_READ_BARRIER();
+    __wt_timestamp_to_hex_string(
+      WT_MIN(oldest_timestamp, txn_global->meta_ckpt_timestamp), hex_timestamp);
+
+    if (strcmp(hex_timestamp, "0") == 0)
+        WT_ERR(__meta_sysinfo_remove(session, full, name, namelen, uribuf, WT_SYSTEM_OLDEST_URI));
+    else {
+        WT_ERR(__wt_buf_fmt(session, valbuf,
+          WT_SYSTEM_OLDEST_TS "=\"%s\"," WT_SYSTEM_TS_TIME "=%" PRIu64 "," WT_SYSTEM_TS_WRITE_GEN
+                              "=%" PRIu64,
+          hex_timestamp, session->current_ckpt_sec, conn->base_write_gen));
+        WT_ERR(__meta_sysinfo_update(
+          session, full, name, namelen, uribuf, WT_SYSTEM_OLDEST_URI, valbuf->data));
+    }
+
+    /* Handle the snapshot information. */
+
+    WT_ERR(__meta_print_snapshot(session, valbuf));
+    WT_ERR(__meta_sysinfo_update(
+      session, full, name, namelen, uribuf, WT_SYSTEM_CKPT_SNAPSHOT_URI, valbuf->data));
+
+    /* Print what we did. */
 
     __wt_verbose(session, WT_VERB_CHECKPOINT_PROGRESS,
       "saving checkpoint snapshot min: %" PRIu64 ", snapshot max: %" PRIu64
@@ -1347,16 +1515,257 @@ __wt_meta_sysinfo_set(WT_SESSION_IMPL *session)
       txn->snap_min, txn->snap_max, txn->snapshot_count,
       __wt_timestamp_to_string(txn_global->oldest_timestamp, ts_string[0]),
       __wt_timestamp_to_string(txn_global->meta_ckpt_timestamp, ts_string[1]),
-      S2C(session)->base_write_gen);
+      conn->base_write_gen);
 
-    /* Record the base write gen in metadata as part of checkpoint */
-    WT_ERR(__wt_buf_fmt(
-      session, buf, WT_SYSTEM_BASE_WRITE_GEN "=%" PRIu64, S2C(session)->base_write_gen));
-    WT_ERR(__wt_metadata_update(session, WT_SYSTEM_BASE_WRITE_GEN_URI, buf->data));
+    /*
+     * Record the base write gen in metadata as part of full checkpoints.
+     *
+     * Note that "full" here means what it does in __txn_checkpoint: the user didn't give an
+     * explicit list of trees to checkpoint. It is allowed (though currently not sensible) for the
+     * user to do that with a named checkpoint, in which case we don't want to make this change.
+     */
+    if (full) {
+        WT_ERR(__wt_buf_fmt(
+          session, valbuf, WT_SYSTEM_BASE_WRITE_GEN "=%" PRIu64, conn->base_write_gen));
+        WT_ERR(__wt_metadata_update(session, WT_SYSTEM_BASE_WRITE_GEN_URI, valbuf->data));
+    }
 
 err:
-    __wt_scr_free(session, &buf);
+    __wt_scr_free(session, &valbuf);
+    if (name != NULL)
+        __wt_scr_free(session, &uribuf);
     return (ret);
+}
+
+/*
+ * __wt_meta_sysinfo_clear --
+ *     Clear the system information (for a named checkpoint) from the metadata.
+ */
+int
+__wt_meta_sysinfo_clear(WT_SESSION_IMPL *session, const char *name, size_t namelen)
+{
+    WT_DECL_ITEM(uribuf);
+    WT_DECL_RET;
+
+    WT_RET(__wt_scr_alloc(session, namelen + 128, &uribuf));
+
+    WT_ERR(__meta_sysinfo_remove(session, false, name, namelen, uribuf, WT_SYSTEM_CKPT_URI));
+    WT_ERR(__meta_sysinfo_remove(session, false, name, namelen, uribuf, WT_SYSTEM_OLDEST_URI));
+    WT_ERR(
+      __meta_sysinfo_remove(session, false, name, namelen, uribuf, WT_SYSTEM_CKPT_SNAPSHOT_URI));
+
+err:
+    __wt_scr_free(session, &uribuf);
+    return (ret);
+}
+
+/*
+ * __wt_meta_read_checkpoint_snapshot --
+ *     Fetch the snapshot data for a checkpoint from the metadata file. Reads the selected named
+ *     checkpoint's snapshot, or if the checkpoint name passed is null, the most recent checkpoint's
+ *     snapshot. The snapshot list returned is allocated and must be freed by the caller.
+ */
+int
+__wt_meta_read_checkpoint_snapshot(WT_SESSION_IMPL *session, const char *ckpt_name,
+  uint64_t *snap_min, uint64_t *snap_max, uint64_t **snapshot, uint32_t *snapshot_count,
+  uint64_t *ckpttime)
+{
+    WT_CONFIG list;
+    WT_CONFIG_ITEM cval;
+    WT_CONFIG_ITEM k;
+    WT_CONNECTION_IMPL *conn;
+    WT_DECL_ITEM(tmp);
+    WT_DECL_RET;
+    uint32_t counter;
+    char *sys_config;
+
+    conn = S2C(session);
+    counter = 0;
+    sys_config = NULL;
+
+    /*
+     * There's an issue with checkpoints produced by some old versions having bad snapshot data.
+     * (See WT-8395.) We should ignore those snapshots when we can identify them. This only applies
+     * to reading the last checkpoint during recovery, however, so it is done in our caller. (In
+     * other cases, for WiredTigerCheckpoint the checkpoint taken after recovery will have replaced
+     * any old and broken snapshot; and for named checkpoints, the broken versions didn't write out
+     * snapshot information at all anyway.)
+     */
+
+    /* Initialize to an empty snapshot. */
+    *snap_min = WT_TXN_NONE;
+    *snap_max = WT_TXN_NONE;
+    *snapshot = NULL;
+    *snapshot_count = 0;
+
+    /* Fetch the metadata string. */
+    if (ckpt_name == NULL)
+        WT_ERR_NOTFOUND_OK(
+          __wt_metadata_search(session, WT_SYSTEM_CKPT_SNAPSHOT_URI, &sys_config), false);
+    else {
+        WT_ERR(__wt_scr_alloc(session, 0, &tmp));
+        WT_ERR(__wt_buf_fmt(session, tmp, "%s.%s", WT_SYSTEM_CKPT_SNAPSHOT_URI, ckpt_name));
+        WT_ERR_NOTFOUND_OK(__wt_metadata_search(session, tmp->data, &sys_config), false);
+    }
+
+    /* Extract the components of the metadata string. */
+    if (sys_config != NULL) {
+        WT_CLEAR(cval);
+        if (__wt_config_getones(session, sys_config, WT_SYSTEM_CKPT_SNAPSHOT_MIN, &cval) == 0 &&
+          cval.len != 0)
+            *snap_min = (uint64_t)cval.val;
+
+        if (__wt_config_getones(session, sys_config, WT_SYSTEM_CKPT_SNAPSHOT_MAX, &cval) == 0 &&
+          cval.len != 0)
+            *snap_max = (uint64_t)cval.val;
+
+        if (__wt_config_getones(session, sys_config, WT_SYSTEM_CKPT_SNAPSHOT_COUNT, &cval) == 0 &&
+          cval.len != 0)
+            *snapshot_count = (uint32_t)cval.val;
+
+        if (__wt_config_getones(session, sys_config, WT_SYSTEM_CKPT_SNAPSHOT, &cval) == 0 &&
+          cval.len != 0) {
+            __wt_config_subinit(session, &list, &cval);
+            WT_ERR(__wt_calloc_def(session, *snapshot_count, snapshot));
+            while (__wt_config_subget_next(&list, &k) == 0)
+                (*snapshot)[counter++] = (uint64_t)k.val;
+        }
+
+        if (ckpttime != NULL) {
+            /* If the write generation is current, extract the checkpoint time. Otherwise we use 0.
+             */
+            WT_ERR_NOTFOUND_OK(
+              __wt_config_getones(session, sys_config, WT_SYSTEM_CKPT_SNAPSHOT_WRITE_GEN, &cval),
+              false);
+            if (cval.val != 0 && (uint64_t)cval.val >= conn->base_write_gen) {
+                WT_ERR_NOTFOUND_OK(
+                  __wt_config_getones(session, sys_config, WT_SYSTEM_CKPT_SNAPSHOT_TIME, &cval),
+                  false);
+                if (cval.val != 0)
+                    *ckpttime = (uint64_t)cval.val;
+            }
+        }
+
+        /*
+         * Make sure that the snapshot is self-consistent. The snapshot array should contain only
+         * transaction IDs between min and max.
+         */
+        WT_ASSERT(session,
+          *snapshot == NULL ||
+            (*snapshot_count == counter && (*snapshot)[0] == *snap_min &&
+              (*snapshot)[counter - 1] < *snap_max));
+    }
+
+err:
+    __wt_free(session, sys_config);
+    if (ckpt_name != NULL)
+        __wt_scr_free(session, &tmp);
+    return (ret);
+}
+
+/*
+ * __meta_retrieve_timestamp --
+ *     Retrieve a timestamp from the metadata. Not present explicitly means WT_TXN_NONE.
+ */
+static int
+__meta_retrieve_timestamp(WT_SESSION_IMPL *session, const char *system_uri,
+  const char *timestamp_name, wt_timestamp_t *timestampp, uint64_t *ckpttime)
+{
+    WT_CONFIG_ITEM cval;
+    WT_CONNECTION_IMPL *conn;
+    WT_DECL_RET;
+    char *sys_config;
+
+    conn = S2C(session);
+    sys_config = NULL;
+    *timestampp = WT_TXN_NONE;
+    if (ckpttime != NULL)
+        *ckpttime = 0;
+
+    /* Search the metadata for the system information. */
+    WT_ERR_NOTFOUND_OK(__wt_metadata_search(session, system_uri, &sys_config), false);
+    if (sys_config != NULL) {
+        WT_CLEAR(cval);
+        WT_ERR_NOTFOUND_OK(__wt_config_getones(session, sys_config, timestamp_name, &cval), false);
+        if (cval.len != 0) {
+            __wt_verbose(session, WT_VERB_RECOVERY, "Recovery %s %.*s", timestamp_name,
+              (int)cval.len, cval.str);
+            WT_ERR(__wt_txn_parse_timestamp_raw(session, timestamp_name, timestampp, &cval));
+        }
+
+        if (ckpttime != NULL) {
+            /* If the write generation is current, extract the checkpoint time. Otherwise we use 0.
+             */
+            WT_ERR_NOTFOUND_OK(
+              __wt_config_getones(session, sys_config, WT_SYSTEM_TS_WRITE_GEN, &cval), false);
+            if (cval.val != 0 && (uint64_t)cval.val >= conn->base_write_gen) {
+                WT_ERR_NOTFOUND_OK(
+                  __wt_config_getones(session, sys_config, WT_SYSTEM_TS_TIME, &cval), false);
+                if (cval.val != 0)
+                    *ckpttime = (uint64_t)cval.val;
+            }
+        }
+    }
+
+err:
+    __wt_free(session, sys_config);
+    return (ret);
+}
+
+/*
+ * __meta_retrieve_a_checkpoint_timestamp --
+ *     Fetch a timestamp associated with the checkpoint from the metadata. If the checkpoint name
+ *     passed is null, returns the timestamp from the most recent checkpoint. Also returns the
+ *     checkpoint wall-clock time the timestamp came from (which is a time, but not a timestamp...)
+ *
+ * Here "checkpoint timestamp" means "a timestamp in a checkpoint". This variance in terminology is
+ *     confusing, but at this point not readily avoided.
+ */
+static int
+__meta_retrieve_a_checkpoint_timestamp(WT_SESSION_IMPL *session, const char *ckpt_name,
+  const char *uri, const char *key, wt_timestamp_t *timestampp, uint64_t *ckpttime)
+{
+    WT_DECL_ITEM(tmp);
+    WT_DECL_RET;
+
+    if (ckpt_name == NULL)
+        return (__meta_retrieve_timestamp(session, uri, key, timestampp, ckpttime));
+
+    WT_ERR(__wt_scr_alloc(session, 0, &tmp));
+    WT_ERR(__wt_buf_fmt(session, tmp, "%s.%s", uri, ckpt_name));
+    WT_ERR(__meta_retrieve_timestamp(session, tmp->data, key, timestampp, ckpttime));
+err:
+    __wt_scr_free(session, &tmp);
+    return (ret);
+}
+
+/*
+ * __wt_meta_read_checkpoint_timestamp --
+ *     Fetch a checkpoint's checkpoint timestamp, aka stable timestamp, from the metadata. If the
+ *     checkpoint name passed is null, returns the timestamp from the most recent checkpoint.
+ *
+ * Here "checkpoint timestamp" means "the stable timestamp saved with a checkpoint". This variance
+ *     in terminology is confusing, but at this point not readily avoided.
+ */
+int
+__wt_meta_read_checkpoint_timestamp(
+  WT_SESSION_IMPL *session, const char *ckpt_name, wt_timestamp_t *timestampp, uint64_t *ckpttime)
+{
+    return (__meta_retrieve_a_checkpoint_timestamp(
+      session, ckpt_name, WT_SYSTEM_CKPT_URI, WT_SYSTEM_CKPT_TS, timestampp, ckpttime));
+}
+
+/*
+ * __wt_meta_read_checkpoint_oldest --
+ *     Fetch a checkpoint's oldest timestamp from the metadata. If the checkpoint name passed is
+ *     null, returns the timestamp from the most recent checkpoint.
+ */
+int
+__wt_meta_read_checkpoint_oldest(
+  WT_SESSION_IMPL *session, const char *ckpt_name, wt_timestamp_t *timestampp, uint64_t *ckpttime)
+{
+    return (__meta_retrieve_a_checkpoint_timestamp(
+      session, ckpt_name, WT_SYSTEM_OLDEST_URI, WT_SYSTEM_OLDEST_TS, timestampp, ckpttime));
 }
 
 /*

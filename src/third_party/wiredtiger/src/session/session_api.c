@@ -143,7 +143,7 @@ __wt_session_copy_values(WT_SESSION_IMPL *session)
             WT_ASSERT(session,
               txn_shared->pinned_id != WT_TXN_NONE ||
                 (WT_BTREE_PREFIX(cursor->uri) &&
-                  F_ISSET((WT_CURSOR_BTREE *)cursor, WT_CBT_NO_TXN)));
+                  WT_DHANDLE_IS_CHECKPOINT(((WT_CURSOR_BTREE *)cursor)->dhandle)));
 #endif
             WT_RET(__cursor_localvalue(cursor));
         }

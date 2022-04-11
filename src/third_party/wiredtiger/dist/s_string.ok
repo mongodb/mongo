@@ -686,6 +686,7 @@ compressStream
 compressibility
 concat
 cond
+conditionalize
 conf
 confchk
 config

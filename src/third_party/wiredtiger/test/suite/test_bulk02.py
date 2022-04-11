@@ -73,8 +73,8 @@ class test_bulkload_checkpoint(wttest.WiredTigerTestCase, suite_subprocess):
         # Close the bulk cursor.
         cursor.close()
 
-        # In the case of named checkpoints, verify they're still there,
-        # reflecting an empty file.
+        # Because the checkpoint skipped the table (because of the open bulk cursor), the
+        # checkpoint may exist (appears to) but the table isn't in it and can't be opened.
         if self.ckpt_type == 'named':
             self.assertRaises(wiredtiger.WiredTigerError,
                 lambda: self.session.open_cursor(self.uri, None, 'checkpoint=myckpt'))

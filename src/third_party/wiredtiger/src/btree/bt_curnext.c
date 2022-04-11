@@ -325,10 +325,16 @@ restart_read:
          * Note: it's important that we're checking the on-disk value for global visibility, and not
          * whatever __wt_txn_read returned, which might be something else. (If it's something else,
          * we can't cache it; but in that case the on-disk value cannot be globally visible.)
+         *
+         * If we're reading from a checkpoint, it's sufficient to check visibility against the
+         * checkpoint's snapshot. Don't check global visibility, because that checks the current
+         * state of the world rather than the checkpoint state.
          */
         cbt->cip_saved = cip;
         if (rle > 1 &&
-          __wt_txn_visible_all(session, unpack.tw.start_txn, unpack.tw.durable_start_ts)) {
+          (WT_READING_CHECKPOINT(session) ?
+              __wt_txn_visible(session, unpack.tw.start_txn, unpack.tw.durable_start_ts) :
+              __wt_txn_visible_all(session, unpack.tw.start_txn, unpack.tw.durable_start_ts))) {
             /*
              * Copy the value into cbt->tmp to cache it. This is perhaps unfortunate, because
              * copying isn't free, but it's currently necessary. The memory we're copying might be

@@ -502,7 +502,7 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
      * Open a handle on the new chunk before application threads attempt to access it, opening it
      * pre-loads internal pages into the file system cache.
      */
-    cfg[1] = "checkpoint=" WT_CHECKPOINT;
+    cfg[1] = "checkpoint=" WT_CHECKPOINT ",checkpoint_use_history=false";
     WT_ERR(__wt_open_cursor(session, chunk->uri, NULL, cfg, &dest));
     WT_TRET(dest->close(dest));
     dest = NULL;

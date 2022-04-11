@@ -402,6 +402,8 @@ class test_checkpoint_empty(wttest.WiredTigerTestCase):
         cursor = self.session.open_cursor(self.uri, None, "checkpoint=ckpt")
         self.assertEquals(cursor.next(), wiredtiger.WT_NOTFOUND)
 
+    # Check that if we create an unnamed and then a named checkpoint, opening
+    # WiredTigerCheckpoint opens the most recent (the named) checkpoint.
     def test_checkpoint_empty_six(self):
         self.session.create(self.uri, "key_format=S,value_format=S")
         self.session.checkpoint()
@@ -416,7 +418,25 @@ class test_checkpoint_empty(wttest.WiredTigerTestCase):
 
         cursor = self.session.open_cursor(
             self.uri, None, "checkpoint=WiredTigerCheckpoint")
+        self.assertEquals(cursor.next(), 0)
+
+    # Check that if we create a named and then an unnamed checkpoint, opening
+    # WiredTigerCheckpoint opens the most recent (the named) checkpoint.
+    def test_checkpoint_empty_seven(self):
+        self.session.create(self.uri, "key_format=S,value_format=S")
+        self.session.checkpoint('name=ckpt')
+        cursor = self.session.open_cursor(
+            self.uri, None, "checkpoint=WiredTigerCheckpoint")
         self.assertEquals(cursor.next(), wiredtiger.WT_NOTFOUND)
+        cursor.close()
+
+        cursor = self.session.open_cursor(self.uri, None)
+        cursor["key"] = "value"
+        self.session.checkpoint()
+
+        cursor = self.session.open_cursor(
+            self.uri, None, "checkpoint=WiredTigerCheckpoint")
+        self.assertEquals(cursor.next(), 0)
 
 if __name__ == '__main__':
     wttest.run()

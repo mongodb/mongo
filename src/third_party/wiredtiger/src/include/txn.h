@@ -290,6 +290,11 @@ struct __wt_txn {
      */
     wt_timestamp_t prepare_timestamp;
 
+    /*
+     * Timestamp used for reading via a checkpoint cursor instead of txn_shared->read_timestamp.
+     */
+    wt_timestamp_t checkpoint_read_timestamp;
+
     /* Array of modifications by this transaction. */
     WT_TXN_OP *mod;
     size_t mod_alloc;
@@ -333,16 +338,17 @@ struct __wt_txn {
 #define WT_TXN_HAS_TS_DURABLE 0x00020u
 #define WT_TXN_HAS_TS_PREPARE 0x00040u
 #define WT_TXN_IGNORE_PREPARE 0x00080u
-#define WT_TXN_PREPARE 0x00100u
-#define WT_TXN_PREPARE_IGNORE_API_CHECK 0x00200u
-#define WT_TXN_READONLY 0x00400u
-#define WT_TXN_RUNNING 0x00800u
-#define WT_TXN_SHARED_TS_DURABLE 0x01000u
-#define WT_TXN_SHARED_TS_READ 0x02000u
-#define WT_TXN_SYNC_SET 0x04000u
-#define WT_TXN_TS_ROUND_PREPARED 0x08000u
-#define WT_TXN_TS_ROUND_READ 0x10000u
-#define WT_TXN_UPDATE 0x20000u
+#define WT_TXN_IS_CHECKPOINT 0x00100u
+#define WT_TXN_PREPARE 0x00200u
+#define WT_TXN_PREPARE_IGNORE_API_CHECK 0x00400u
+#define WT_TXN_READONLY 0x00800u
+#define WT_TXN_RUNNING 0x01000u
+#define WT_TXN_SHARED_TS_DURABLE 0x02000u
+#define WT_TXN_SHARED_TS_READ 0x04000u
+#define WT_TXN_SYNC_SET 0x08000u
+#define WT_TXN_TS_ROUND_PREPARED 0x10000u
+#define WT_TXN_TS_ROUND_READ 0x20000u
+#define WT_TXN_UPDATE 0x40000u
     /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t flags;
 

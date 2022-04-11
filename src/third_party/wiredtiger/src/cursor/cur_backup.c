@@ -360,7 +360,7 @@ __backup_add_id(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval)
      * Get the most recent checkpoint name. For now just use the one that is part of the metadata.
      * We only care whether or not a checkpoint exists, so immediately free it.
      */
-    ret = __wt_meta_checkpoint_last_name(session, WT_METAFILE_URI, &ckpt);
+    ret = __wt_meta_checkpoint_last_name(session, WT_METAFILE_URI, &ckpt, NULL, NULL);
     __wt_free(session, ckpt);
     WT_ERR_NOTFOUND_OK(ret, true);
     if (ret == WT_NOTFOUND) {

@@ -69,6 +69,14 @@ This scenario is not currently detected by WiredTiger; applications are
 responsible for avoiding it.
 In future versions such transactions might fail.
 
+\warning
+Similarly, if a transaction has a durable timestamp later than its commit
+timestamp, and a checkpoint is taken while the global stable timestamp
+is between these points, the transaction may or may not be visible
+when the checkpoint is opened with a checkpoint cursor; the behavior
+is unspecified.
+Applications should avoid this situation.
+
 @section timestamp_prepare_ignore_prepare Configuring ignore_prepare
 
 The WT_SESSION::begin_transaction method includes the \c ignore_prepare
@@ -88,5 +96,18 @@ only causes readers to ignore prepared transactions, but also allows the
 transaction to make updates. This can cause data inconsistency problems with
 the commit or rollback of the prepared transaction, or the disappearance of
 a prepared update by overwriting it.
+
+Checkpoints taken while a transaction is prepared but not committed
+will not include the prepared transaction; reading from the checkpoint
+with a checkpoint cursor will behave as if the prepared transaction
+did not exist.
+This is comparable to the \c ignore_prepare behavior and carries the
+same consequences: reading the checkpoint and reading the live
+database at the checkpoint's time after the prepared transaction is
+resolved may produce different values.
+This situation can only arise if the stable timestamp is advanced
+(and a checkpoint then taken) while a transaction is prepared and
+still unresolved.
+Applications wishing to rule out this situation can avoid doing that.
 
 */

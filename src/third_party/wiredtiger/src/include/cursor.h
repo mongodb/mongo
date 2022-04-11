@@ -196,6 +196,15 @@ struct __wt_cursor_btree {
     WT_UPDATE_VALUE *upd_value, _upd_value;
 
     /*
+     * Bits used by checkpoint cursor: a private transaction, used to provide the proper read
+     * snapshot, and a reference to the corresponding history store checkpoint, which keeps it from
+     * disappearing under us if it's unnamed and also tracks its identity for use in history store
+     * accesses.
+     */
+    WT_TXN *checkpoint_txn;
+    WT_DATA_HANDLE *checkpoint_hs_dhandle;
+
+    /*
      * Fixed-length column-store items are a single byte, and it's simpler and cheaper to allocate
      * the space for it now than keep checking to see if we need to grow the buffer.
      */
@@ -223,11 +232,9 @@ struct __wt_cursor_btree {
 #define WT_CBT_ITERATE_PREV 0x010u       /* Prev iteration configuration */
 #define WT_CBT_ITERATE_RETRY_NEXT 0x020u /* Prepare conflict by next. */
 #define WT_CBT_ITERATE_RETRY_PREV 0x040u /* Prepare conflict by prev. */
-#define WT_CBT_NO_TRACKING 0x080u        /* Non tracking cursor. */
-#define WT_CBT_NO_TXN 0x100u             /* Non-txn cursor (e.g. a checkpoint) */
-#define WT_CBT_READ_ONCE 0x200u          /* Page in with WT_READ_WONT_NEED */
-#define WT_CBT_SEARCH_SMALLEST 0x400u    /* Row-store: small-key insert list */
-#define WT_CBT_VAR_ONPAGE_MATCH 0x800u   /* Var-store: on-page recno match */
+#define WT_CBT_READ_ONCE 0x080u          /* Page in with WT_READ_WONT_NEED */
+#define WT_CBT_SEARCH_SMALLEST 0x100u    /* Row-store: small-key insert list */
+#define WT_CBT_VAR_ONPAGE_MATCH 0x200u   /* Var-store: on-page recno match */
     /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
 
 #define WT_CBT_POSITION_MASK /* Flags associated with position */                      \

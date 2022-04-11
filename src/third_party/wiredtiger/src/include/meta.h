@@ -38,11 +38,15 @@
 #define WT_SYSTEM_CKPT_URI "system:checkpoint"                   /* Checkpoint timestamp URI */
 #define WT_SYSTEM_OLDEST_TS "oldest_timestamp"                   /* Oldest timestamp name */
 #define WT_SYSTEM_OLDEST_URI "system:oldest"                     /* Oldest timestamp URI */
+#define WT_SYSTEM_TS_TIME "checkpoint_time"                      /* Checkpoint wall time */
+#define WT_SYSTEM_TS_WRITE_GEN "write_gen"                       /* Checkpoint write generation */
 #define WT_SYSTEM_CKPT_SNAPSHOT "snapshots"                      /* List of snapshots */
 #define WT_SYSTEM_CKPT_SNAPSHOT_MIN "snapshot_min"               /* Snapshot minimum */
 #define WT_SYSTEM_CKPT_SNAPSHOT_MAX "snapshot_max"               /* Snapshot maximum */
 #define WT_SYSTEM_CKPT_SNAPSHOT_COUNT "snapshot_count"           /* Snapshot count */
 #define WT_SYSTEM_CKPT_SNAPSHOT_URI "system:checkpoint_snapshot" /* Checkpoint snapshot URI */
+#define WT_SYSTEM_CKPT_SNAPSHOT_TIME "checkpoint_time"           /* Checkpoint wall time */
+#define WT_SYSTEM_CKPT_SNAPSHOT_WRITE_GEN "write_gen"            /* Checkpoint write generation */
 #define WT_SYSTEM_BASE_WRITE_GEN_URI "system:checkpoint_base_write_gen" /* Base write gen URI */
 #define WT_SYSTEM_BASE_WRITE_GEN "base_write_gen"                       /* Base write gen name */
 
@@ -164,4 +168,17 @@ struct __wt_ckpt {
 #define WT_CKPT_UPDATE 0x10u     /* Checkpoint requires update */
                                  /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t flags;
+};
+
+/*
+ * WT_CKPT_SNAPSHOT --
+ *     Snapshot and timestamp information associated with a checkpoint.
+ */
+struct __wt_ckpt_snapshot {
+    uint64_t oldest_ts;
+    uint64_t stable_ts;
+    uint64_t snapshot_min;
+    uint64_t snapshot_max;
+    uint64_t *snapshot_txns;
+    uint32_t snapshot_count;
 };

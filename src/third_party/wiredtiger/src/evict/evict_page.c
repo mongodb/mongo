@@ -76,7 +76,16 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
     evict_flags = LF_ISSET(WT_READ_NO_SPLIT) ? WT_EVICT_CALL_NO_SPLIT : 0;
     FLD_SET(evict_flags, WT_EVICT_CALL_URGENT);
 
-    WT_RET(__wt_curhs_cache(session));
+    /*
+     * There is no need to cache a history store cursor if evicting a readonly page. That includes
+     * pages from a checkpoint. Note that opening a history store cursor on a checkpoint page from
+     * here will explode because the identity of the matching history store checkpoint isn't
+     * available.
+     */
+    if (ref->page != NULL && !__wt_page_evict_clean(ref->page)) {
+        WT_ASSERT(session, !WT_READING_CHECKPOINT(session));
+        WT_RET(__wt_curhs_cache(session));
+    }
     (void)__wt_atomic_addv32(&btree->evict_busy, 1);
     ret = __wt_evict(session, ref, previous_state, evict_flags);
     (void)__wt_atomic_subv32(&btree->evict_busy, 1);

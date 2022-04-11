@@ -55,6 +55,8 @@
             WT_DHANDLE_ACQUIRE(dhandle);                                                   \
     } while (0)
 
+#define WT_DHANDLE_IS_CHECKPOINT(dhandle) ((dhandle)->checkpoint != NULL)
+
 /*
  * WT_DATA_HANDLE --
  *	A handle for a generic named data source.
@@ -64,12 +66,13 @@ struct __wt_data_handle {
     TAILQ_ENTRY(__wt_data_handle) q;
     TAILQ_ENTRY(__wt_data_handle) hashq;
 
-    const char *name;        /* Object name as a URI */
-    uint64_t name_hash;      /* Hash of name */
-    const char *checkpoint;  /* Checkpoint name (or NULL) */
-    const char **cfg;        /* Configuration information */
-    const char *meta_base;   /* Base metadata configuration */
-    size_t meta_base_length; /* Base metadata length */
+    const char *name;         /* Object name as a URI */
+    uint64_t name_hash;       /* Hash of name */
+    const char *checkpoint;   /* Checkpoint name (or NULL) */
+    int64_t checkpoint_order; /* Checkpoint order number, when applicable */
+    const char **cfg;         /* Configuration information */
+    const char *meta_base;    /* Base metadata configuration */
+    size_t meta_base_length;  /* Base metadata length */
 #ifdef HAVE_DIAGNOSTIC
     const char *orig_meta_base; /* Copy of the base metadata configuration */
 #endif
