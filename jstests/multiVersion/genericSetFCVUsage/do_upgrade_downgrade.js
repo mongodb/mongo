@@ -75,7 +75,7 @@ let recreateUniqueIndexes = function(db, secondary) {
             }
 
             currentCollection.getIndexes().forEach(function(spec) {
-                if (!spec.unique) {
+                if (!spec.unique || spec.clustered) {
                     return;
                 }
 
