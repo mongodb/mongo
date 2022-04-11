@@ -1149,9 +1149,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWith
     auto genericIndexKeySlots = state.slotIdGenerator->generateMultiple(indexKeyBitset.count());
     auto optimizedIndexKeySlots = state.slotIdGenerator->generateMultiple(indexKeyBitset.count());
     auto outputIndexKeySlots = state.slotIdGenerator->generateMultiple(indexKeyBitset.count());
-    sbe::value::SlotVector genericIndexScanSlots = genericIndexKeySlots;
-    sbe::value::SlotVector optimizedIndexScanSlots = optimizedIndexKeySlots;
-    sbe::value::SlotVector relevantSlots = outputIndexKeySlots;
+    auto genericIndexScanSlots = genericIndexKeySlots;
+    auto optimizedIndexScanSlots = optimizedIndexKeySlots;
+    auto branchOutputSlots = outputIndexKeySlots;
+    sbe::value::SlotVector relevantSlots;
 
     auto makeSlotsForThenElseBranches = [&](bool cond, StringData slotKey)
         -> std::tuple<boost::optional<sbe::value::SlotId>, boost::optional<sbe::value::SlotId>> {
@@ -1164,6 +1165,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWith
         outputs.set(slotKey, outputSlot);
         genericIndexScanSlots.push_back(genericSlot);
         optimizedIndexScanSlots.push_back(optimizedSlot);
+        branchOutputSlots.push_back(outputSlot);
         relevantSlots.push_back(outputSlot);
         return {genericSlot, optimizedSlot};
     };
@@ -1234,27 +1236,32 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWith
     auto isGenericScanCondition = makeVariable(isGenericScanSlot);
     auto recordIdSlot = state.slotId();
     relevantSlots.push_back(recordIdSlot);
+    branchOutputSlots.push_back(recordIdSlot);
+    outputs.set(PlanStageSlots::kRecordId, recordIdSlot);
     auto stage = sbe::makeS<sbe::BranchStage>(std::move(genericIndexScanPlanStage),
                                               std::move(optimizedIndexScanPlanStage),
                                               std::move(isGenericScanCondition),
                                               genericIndexScanSlots,
                                               optimizedIndexScanSlots,
-                                              relevantSlots,
+                                              branchOutputSlots,
                                               ixn->nodeId());
-    outputs.set(PlanStageSlots::kRecordId, recordIdSlot);
 
     if (ixn->shouldDedup) {
         stage = sbe::makeS<sbe::UniqueStage>(
             std::move(stage), sbe::makeSV(outputs.get(PlanStageSlots::kRecordId)), ixn->nodeId());
     }
 
-    relevantSlots.push_back(outputs.get(PlanStageSlots::kRecordId));
-
     if (ixn->filter) {
         // We only need to pass those index key slots to the filter generator which correspond
         // to the fields of the index key pattern that are depended on to compute the predicate.
         auto indexFilterKeySlots = makeIndexKeyOutputSlotsMatchingParentReqs(
             ixn->index.keyPattern, indexFilterKeyBitset, indexKeyBitset, outputIndexKeySlots);
+
+        // Relevant slots must include slots for all index keys in case they are needed by parent
+        // stages (for instance, covered shard filter).
+        relevantSlots.insert(
+            relevantSlots.end(), outputIndexKeySlots.begin(), outputIndexKeySlots.end());
+
         auto outputStage = generateIndexFilter(state,
                                                ixn->filter.get(),
                                                {std::move(stage), std::move(relevantSlots)},
