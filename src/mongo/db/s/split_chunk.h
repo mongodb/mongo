@@ -33,16 +33,16 @@
 #include <string>
 #include <vector>
 
+#include "mongo/base/status_with.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
+
 namespace mongo {
 
 class BSONObj;
 class ChunkRange;
-class KeyPattern;
 class NamespaceString;
-class OID;
 class OperationContext;
-template <typename T>
-class StatusWith;
 
 /**
  * Attempts to split a chunk with the specified parameters. If the split fails, then the StatusWith
@@ -55,12 +55,15 @@ class StatusWith;
  * range for the top chunk. Note that this ChunkRange is boost::optional, meaning that if top-chunk
  * optimization is not performed, boost::none will be returned inside of the StatusWith instead.
  */
-StatusWith<boost::optional<ChunkRange>> splitChunk(OperationContext* opCtx,
-                                                   const NamespaceString& nss,
-                                                   const BSONObj& keyPatternObj,
-                                                   const ChunkRange& chunkRange,
-                                                   std::vector<BSONObj>&& splitPoints,
-                                                   const std::string& shardName,
-                                                   const OID& expectedCollectionEpoch,
-                                                   bool fromChunkSplitter = false);
+StatusWith<boost::optional<ChunkRange>> splitChunk(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const BSONObj& keyPatternObj,
+    const ChunkRange& chunkRange,
+    std::vector<BSONObj>&& splitPoints,
+    const std::string& shardName,
+    const OID& expectedCollectionEpoch,
+    const boost::optional<Timestamp>& expectedCollectionTimestamp,
+    bool fromChunkSplitter = false);
+
 }  // namespace mongo

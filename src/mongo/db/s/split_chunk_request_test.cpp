@@ -27,15 +27,11 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/s/request_types/split_chunk_request_type.h"
-
+#include "mongo/db/s/split_chunk_request_type.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
-
 namespace {
 
 using unittest::assertGet;

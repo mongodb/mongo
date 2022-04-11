@@ -249,6 +249,7 @@ public:
     StatusWith<BSONObj> commitChunkSplit(OperationContext* opCtx,
                                          const NamespaceString& nss,
                                          const OID& requestEpoch,
+                                         const boost::optional<Timestamp>& requestTimestamp,
                                          const ChunkRange& range,
                                          const std::vector<BSONObj>& splitPoints,
                                          const std::string& shardName,

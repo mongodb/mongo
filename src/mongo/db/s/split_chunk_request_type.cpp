@@ -27,44 +27,41 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/s/request_types/split_chunk_request_type.h"
+#include "mongo/db/s/split_chunk_request_type.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/write_concern_options.h"
 
 namespace mongo {
-
-using std::string;
-using std::vector;
-
 namespace {
 
 const char kConfigsvrSplitChunk[] = "_configsvrCommitChunkSplit";
 const char kCollEpoch[] = "collEpoch";
+const char kCollTimestamp[] = "collTimestamp";
 const char kSplitPoints[] = "splitPoints";
 const char kShardName[] = "shard";
 const char kFromChunkSplitter[] = "fromChunkSplitter";
 
-}  // unnamed namespace
+}  // namespace
 
 SplitChunkRequest::SplitChunkRequest(NamespaceString nss,
-                                     string shardName,
+                                     std::string shardName,
                                      OID epoch,
+                                     boost::optional<Timestamp> timestamp,
                                      ChunkRange chunkRange,
-                                     vector<BSONObj> splitPoints,
+                                     std::vector<BSONObj> splitPoints,
                                      bool fromChunkSplitter)
     : _nss(std::move(nss)),
       _epoch(std::move(epoch)),
+      _timestamp(std::move(timestamp)),
       _chunkRange(std::move(chunkRange)),
       _splitPoints(std::move(splitPoints)),
       _shardName(std::move(shardName)),
       _fromChunkSplitter(fromChunkSplitter) {}
 
 StatusWith<SplitChunkRequest> SplitChunkRequest::parseFromConfigCommand(const BSONObj& cmdObj) {
-    string ns;
+    std::string ns;
     auto parseNamespaceStatus = bsonExtractStringField(cmdObj, kConfigsvrSplitChunk, &ns);
 
     if (!parseNamespaceStatus.isOK()) {
@@ -78,13 +75,24 @@ StatusWith<SplitChunkRequest> SplitChunkRequest::parseFromConfigCommand(const BS
         return parseEpochStatus;
     }
 
+    boost::optional<Timestamp> timestamp;
+    if (cmdObj[kCollTimestamp]) {
+        timestamp.emplace();
+        auto parseTimestampStatus =
+            bsonExtractTimestampField(cmdObj, kCollTimestamp, timestamp.get_ptr());
+
+        if (!parseTimestampStatus.isOK()) {
+            return parseTimestampStatus;
+        }
+    }
+
     auto chunkRangeStatus = ChunkRange::fromBSON(cmdObj);
 
     if (!chunkRangeStatus.isOK()) {
         return chunkRangeStatus.getStatus();
     }
 
-    vector<BSONObj> splitPoints;
+    std::vector<BSONObj> splitPoints;
     {
         BSONElement splitPointsElem;
         auto splitPointsElemStatus =
@@ -99,7 +107,7 @@ StatusWith<SplitChunkRequest> SplitChunkRequest::parseFromConfigCommand(const BS
         }
     }
 
-    string shardName;
+    std::string shardName;
     auto parseShardNameStatus = bsonExtractStringField(cmdObj, kShardName, &shardName);
 
     if (!parseShardNameStatus.isOK()) {
@@ -115,6 +123,7 @@ StatusWith<SplitChunkRequest> SplitChunkRequest::parseFromConfigCommand(const BS
     auto request = SplitChunkRequest(NamespaceString(ns),
                                      std::move(shardName),
                                      std::move(epoch),
+                                     std::move(timestamp),
                                      std::move(chunkRangeStatus.getValue()),
                                      std::move(splitPoints),
                                      fromChunkSplitter);
@@ -164,11 +173,11 @@ const ChunkRange& SplitChunkRequest::getChunkRange() const {
     return _chunkRange;
 }
 
-const vector<BSONObj>& SplitChunkRequest::getSplitPoints() const {
+const std::vector<BSONObj>& SplitChunkRequest::getSplitPoints() const {
     return _splitPoints;
 }
 
-const string& SplitChunkRequest::getShardName() const {
+const std::string& SplitChunkRequest::getShardName() const {
     return _shardName;
 }
 

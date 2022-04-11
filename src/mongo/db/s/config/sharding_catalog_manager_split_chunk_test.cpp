@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/client/read_preference.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
@@ -86,6 +84,7 @@ TEST_F(SplitChunkTest, SplitExistingChunkCorrectlyShouldSucceed) {
                                       ->commitChunkSplit(operationContext(),
                                                          nss,
                                                          collEpoch,
+                                                         collTimestamp,
                                                          ChunkRange(chunkMin, chunkMax),
                                                          splitPoints,
                                                          "shard0000",
@@ -170,6 +169,7 @@ TEST_F(SplitChunkTest, MultipleSplitsOnExistingChunkShouldSucceed) {
                       ->commitChunkSplit(operationContext(),
                                          nss,
                                          collEpoch,
+                                         collTimestamp,
                                          ChunkRange(chunkMin, chunkMax),
                                          splitPoints,
                                          "shard0000",
@@ -266,6 +266,7 @@ TEST_F(SplitChunkTest, NewSplitShouldClaimHighestVersion) {
                       ->commitChunkSplit(operationContext(),
                                          nss,
                                          collEpoch,
+                                         collTimestamp,
                                          ChunkRange(chunkMin, chunkMax),
                                          splitPoints,
                                          "shard0000",
@@ -326,6 +327,7 @@ TEST_F(SplitChunkTest, PreConditionFailErrors) {
                                ->commitChunkSplit(operationContext(),
                                                   nss,
                                                   collEpoch,
+                                                  collTimestamp,
                                                   ChunkRange(chunkMin, BSON("a" << 7)),
                                                   splitPoints,
                                                   "shard0000",
@@ -360,6 +362,7 @@ TEST_F(SplitChunkTest, NonExisingNamespaceErrors) {
                                ->commitChunkSplit(operationContext(),
                                                   NamespaceString("TestDB.NonExistingColl"),
                                                   collEpoch,
+                                                  Timestamp{50, 0},
                                                   ChunkRange(chunkMin, chunkMax),
                                                   splitPoints,
                                                   "shard0000",
@@ -395,6 +398,7 @@ TEST_F(SplitChunkTest, NonMatchingEpochsOfChunkAndRequestErrors) {
                                ->commitChunkSplit(operationContext(),
                                                   nss,
                                                   OID::gen(),
+                                                  Timestamp{50, 0},
                                                   ChunkRange(chunkMin, chunkMax),
                                                   splitPoints,
                                                   "shard0000",
@@ -430,6 +434,7 @@ TEST_F(SplitChunkTest, SplitPointsOutOfOrderShouldFail) {
                                ->commitChunkSplit(operationContext(),
                                                   nss,
                                                   collEpoch,
+                                                  collTimestamp,
                                                   ChunkRange(chunkMin, chunkMax),
                                                   splitPoints,
                                                   "shard0000",
@@ -464,6 +469,7 @@ TEST_F(SplitChunkTest, SplitPointsOutOfRangeAtMinShouldFail) {
                                ->commitChunkSplit(operationContext(),
                                                   nss,
                                                   collEpoch,
+                                                  collTimestamp,
                                                   ChunkRange(chunkMin, chunkMax),
                                                   splitPoints,
                                                   "shard0000",
@@ -499,6 +505,7 @@ TEST_F(SplitChunkTest, SplitPointsOutOfRangeAtMaxShouldFail) {
                                ->commitChunkSplit(operationContext(),
                                                   nss,
                                                   collEpoch,
+                                                  collTimestamp,
                                                   ChunkRange(chunkMin, chunkMax),
                                                   splitPoints,
                                                   "shard0000",
@@ -530,6 +537,7 @@ TEST_F(SplitChunkTest, SplitPointsWithDollarPrefixShouldFail) {
                           ->commitChunkSplit(operationContext(),
                                              nss,
                                              collEpoch,
+                                             collTimestamp,
                                              ChunkRange(chunkMin, chunkMax),
                                              {BSON("a" << BSON("$minKey" << 1))},
                                              "shard0000",
@@ -538,6 +546,7 @@ TEST_F(SplitChunkTest, SplitPointsWithDollarPrefixShouldFail) {
                           ->commitChunkSplit(operationContext(),
                                              nss,
                                              collEpoch,
+                                             collTimestamp,
                                              ChunkRange(chunkMin, chunkMax),
                                              {BSON("a" << BSON("$maxKey" << 1))},
                                              "shard0000",
@@ -550,13 +559,14 @@ TEST_F(SplitChunkTest, SplitPointsWithDollarPrefixShouldFail) {
 TEST_F(SplitChunkTest, CantCommitSplitFromChunkSplitterDuringDefragmentation) {
     const auto& nss = _nss2;
     const auto collEpoch = OID::gen();
+    const Timestamp collTimestamp{1, 0};
     const auto collUuid = UUID::gen();
 
     ChunkType chunk;
     chunk.setName(OID::gen());
     chunk.setCollectionUUID(collUuid);
 
-    auto version = ChunkVersion(1, 0, collEpoch, Timestamp(42));
+    auto version = ChunkVersion(1, 0, collEpoch, collTimestamp);
     chunk.setVersion(version);
     chunk.setShard(ShardId(_shardName));
 
@@ -587,6 +597,7 @@ TEST_F(SplitChunkTest, CantCommitSplitFromChunkSplitterDuringDefragmentation) {
                            ->commitChunkSplit(operationContext(),
                                               nss,
                                               collEpoch,
+                                              collTimestamp,
                                               ChunkRange(chunkMin, chunkMax),
                                               splitPoints,
                                               "shard0000",
@@ -599,6 +610,7 @@ TEST_F(SplitChunkTest, CantCommitSplitFromChunkSplitterDuringDefragmentation) {
                         ->commitChunkSplit(operationContext(),
                                            nss,
                                            collEpoch,
+                                           collTimestamp,
                                            ChunkRange(chunkMin, chunkMax),
                                            splitPoints,
                                            "shard0000",

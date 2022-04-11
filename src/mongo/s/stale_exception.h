@@ -74,7 +74,6 @@ public:
 
     void serialize(BSONObjBuilder* bob) const;
     static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj& obj);
-    static StaleConfigInfo parseFromCommandError(const BSONObj& obj);
 
 protected:
     NamespaceString _nss;
@@ -96,17 +95,8 @@ public:
         return _nss;
     }
 
-    void serialize(BSONObjBuilder* bob) const {
-        bob->append("ns", _nss.ns());
-    }
-
-    static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj& obj) {
-        return std::make_shared<StaleEpochInfo>(parseFromCommandError(obj));
-    }
-
-    static StaleEpochInfo parseFromCommandError(const BSONObj& obj) {
-        return StaleEpochInfo(NamespaceString(obj["ns"].String()));
-    }
+    void serialize(BSONObjBuilder* bob) const;
+    static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj& obj);
 
 private:
     NamespaceString _nss;
@@ -146,7 +136,6 @@ public:
 
     void serialize(BSONObjBuilder* bob) const override;
     static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj&);
-    static StaleDbRoutingVersion parseFromCommandError(const BSONObj& commandError);
 
 private:
     std::string _db;

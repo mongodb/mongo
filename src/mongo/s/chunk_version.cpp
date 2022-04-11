@@ -27,12 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/s/chunk_version.h"
+
 #include "mongo/s/chunk_version_gen.h"
 #include "mongo/s/pm2583_feature_flags_gen.h"
-
 #include "mongo/util/str.h"
 
 namespace mongo {

@@ -47,11 +47,11 @@
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/shard_key_index_util.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/s/split_chunk_request_type.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/request_types/split_chunk_request_type.h"
 
 namespace mongo {
 namespace {
@@ -96,6 +96,7 @@ bool checkIfSingleDoc(OperationContext* opCtx,
 bool checkMetadataForSuccessfulSplitChunk(OperationContext* opCtx,
                                           const NamespaceString& nss,
                                           const OID& epoch,
+                                          const boost::optional<Timestamp>& expectedTimestamp,
                                           const ChunkRange& chunkRange,
                                           const std::vector<BSONObj>& splitPoints) {
     AutoGetCollection autoColl(opCtx, nss, MODE_IS);
@@ -104,7 +105,9 @@ bool checkMetadataForSuccessfulSplitChunk(OperationContext* opCtx,
 
     uassert(ErrorCodes::StaleEpoch,
             str::stream() << "Collection " << nss.ns() << " changed since split start",
-            metadataAfterSplit && metadataAfterSplit->getShardVersion().epoch() == epoch);
+            metadataAfterSplit && metadataAfterSplit->getShardVersion().epoch() == epoch &&
+                (!expectedTimestamp ||
+                 metadataAfterSplit->getShardVersion().getTimestamp() == expectedTimestamp));
 
     ChunkType nextChunk;
     for (auto it = splitPoints.begin(); it != splitPoints.end(); ++it) {
@@ -128,14 +131,16 @@ bool checkMetadataForSuccessfulSplitChunk(OperationContext* opCtx,
 
 }  // namespace
 
-StatusWith<boost::optional<ChunkRange>> splitChunk(OperationContext* opCtx,
-                                                   const NamespaceString& nss,
-                                                   const BSONObj& keyPatternObj,
-                                                   const ChunkRange& chunkRange,
-                                                   std::vector<BSONObj>&& splitPoints,
-                                                   const std::string& shardName,
-                                                   const OID& expectedCollectionEpoch,
-                                                   const bool fromChunkSplitter) {
+StatusWith<boost::optional<ChunkRange>> splitChunk(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const BSONObj& keyPatternObj,
+    const ChunkRange& chunkRange,
+    std::vector<BSONObj>&& splitPoints,
+    const std::string& shardName,
+    const OID& expectedCollectionEpoch,
+    const boost::optional<Timestamp>& expectedCollectionTimestamp,
+    const bool fromChunkSplitter) {
     auto scopedSplitOrMergeChunk(uassertStatusOK(
         ActiveMigrationsRegistry::get(opCtx).registerSplitOrMergeChunk(opCtx, nss, chunkRange)));
 
@@ -159,6 +164,7 @@ StatusWith<boost::optional<ChunkRange>> splitChunk(OperationContext* opCtx,
     auto request = SplitChunkRequest(nss,
                                      shardName,
                                      expectedCollectionEpoch,
+                                     expectedCollectionTimestamp,
                                      chunkRange,
                                      std::move(splitPoints),
                                      fromChunkSplitter);
@@ -250,8 +256,12 @@ StatusWith<boost::optional<ChunkRange>> splitChunk(OperationContext* opCtx,
     // getting the response from the first call to _configsvrCommitChunkSplit, but it actually
     // succeeds, thus the automatic retry fails with a precondition violation, for example.
     if (!commandStatus.isOK() || !writeConcernStatus.isOK()) {
-        if (checkMetadataForSuccessfulSplitChunk(
-                opCtx, nss, expectedCollectionEpoch, chunkRange, request.getSplitPoints())) {
+        if (checkMetadataForSuccessfulSplitChunk(opCtx,
+                                                 nss,
+                                                 expectedCollectionEpoch,
+                                                 expectedCollectionTimestamp,
+                                                 chunkRange,
+                                                 request.getSplitPoints())) {
             // Split was committed.
         } else if (!commandStatus.isOK()) {
             return commandStatus;

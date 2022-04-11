@@ -197,6 +197,7 @@ StatusWith<boost::optional<ChunkRange>> splitChunkAtMultiplePoints(
     const NamespaceString& nss,
     const ShardKeyPattern& shardKeyPattern,
     const OID& epoch,
+    const Timestamp& timestamp,
     ChunkVersion shardVersion,
     const ChunkRange& chunkRange,
     const std::vector<BSONObj>& splitPoints) {
@@ -237,6 +238,7 @@ StatusWith<boost::optional<ChunkRange>> splitChunkAtMultiplePoints(
     cmd.append("from", shardId.toString());
     cmd.append("keyPattern", shardKeyPattern.toBSON());
     cmd.append("epoch", epoch);
+    cmd.append("timestamp", timestamp);
     shardVersion.serializeToBSON(ChunkVersion::kShardVersionField, &cmd);
 
     chunkRange.append(&cmd);

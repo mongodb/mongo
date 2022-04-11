@@ -27,23 +27,16 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/s/shard_id.h"
-#include "mongo/s/sharding_router_test_fixture.h"
 #include "mongo/s/stale_exception.h"
-#include "mongo/util/assert_util.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
-
 namespace {
-
-using StaleExceptionTest = ShardingTestFixture;
 
 const NamespaceString kNss("test.nss");
 
-TEST_F(StaleExceptionTest, StaleConfigInfoSerializationTest) {
+TEST(StaleExceptionTest, StaleConfigInfoSerializationTest) {
     const ShardId kShardId("SHARD_ID");
 
     StaleConfigInfo info(kNss, ChunkVersion::UNSHARDED(), ChunkVersion::UNSHARDED(), kShardId);
@@ -53,15 +46,16 @@ TEST_F(StaleExceptionTest, StaleConfigInfoSerializationTest) {
     info.serialize(&bob);
 
     // Deserialize
-    auto deserializedInfo = StaleConfigInfo::parseFromCommandError(bob.obj());
+    auto deserializedInfo =
+        std::static_pointer_cast<const StaleConfigInfo>(StaleConfigInfo::parse(bob.obj()));
 
-    ASSERT_EQUALS(deserializedInfo.getNss(), kNss);
-    ASSERT_EQUALS(deserializedInfo.getVersionReceived(), ChunkVersion::UNSHARDED());
-    ASSERT_EQUALS(*deserializedInfo.getVersionWanted(), ChunkVersion::UNSHARDED());
-    ASSERT_EQUALS(deserializedInfo.getShardId(), kShardId);
+    ASSERT_EQUALS(deserializedInfo->getNss(), kNss);
+    ASSERT_EQUALS(deserializedInfo->getVersionReceived(), ChunkVersion::UNSHARDED());
+    ASSERT_EQUALS(*deserializedInfo->getVersionWanted(), ChunkVersion::UNSHARDED());
+    ASSERT_EQUALS(deserializedInfo->getShardId(), kShardId);
 }
 
-TEST_F(StaleExceptionTest, StaleEpochInfoSerializationTest) {
+TEST(StaleExceptionTest, StaleEpochInfoSerializationTest) {
     StaleEpochInfo info(kNss);
 
     // Serialize
@@ -69,9 +63,10 @@ TEST_F(StaleExceptionTest, StaleEpochInfoSerializationTest) {
     info.serialize(&bob);
 
     // Deserialize
-    auto deserializedInfo = StaleEpochInfo::parseFromCommandError(bob.obj());
+    auto deserializedInfo =
+        std::static_pointer_cast<const StaleEpochInfo>(StaleEpochInfo::parse(bob.obj()));
 
-    ASSERT_EQUALS(deserializedInfo.getNss(), kNss);
+    ASSERT_EQUALS(deserializedInfo->getNss(), kNss);
 }
 
 }  // namespace

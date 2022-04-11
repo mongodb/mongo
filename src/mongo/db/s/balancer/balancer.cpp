@@ -29,8 +29,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/s/balancer/balancer.h"
 
 #include <algorithm>
@@ -201,7 +199,6 @@ Status processManualMigrationOutcome(OperationContext* opCtx,
     return outcome;
 }
 
-
 uint64_t getMaxChunkSizeBytes(OperationContext* opCtx, const CollectionType& coll) {
     const auto balancerConfig = Grid::get(opCtx)->getBalancerConfiguration();
     uassertStatusOK(balancerConfig->refreshAndCheck(opCtx));
@@ -210,7 +207,7 @@ uint64_t getMaxChunkSizeBytes(OperationContext* opCtx, const CollectionType& col
 
 const int64_t getMaxChunkSizeMB(OperationContext* opCtx, const CollectionType& coll) {
     return getMaxChunkSizeBytes(opCtx, coll) / (1024 * 1024);
-};
+}
 
 const auto _balancerDecoration = ServiceContext::declareDecoration<Balancer>();
 
@@ -885,6 +882,7 @@ Status Balancer::_splitChunksIfNeeded(OperationContext* opCtx) {
                                                   splitInfo.nss,
                                                   cm.getShardKeyPattern(),
                                                   splitInfo.collectionVersion.epoch(),
+                                                  splitInfo.collectionVersion.getTimestamp(),
                                                   ChunkVersion::IGNORED() /*shardVersion*/,
                                                   ChunkRange(splitInfo.minKey, splitInfo.maxKey),
                                                   splitInfo.splitKeys);

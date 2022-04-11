@@ -160,6 +160,7 @@ const std::string SplitChunkCommandInfo::kKeyPattern = "keyPattern";
 const std::string SplitChunkCommandInfo::kLowerBound = "min";
 const std::string SplitChunkCommandInfo::kUpperBound = "max";
 const std::string SplitChunkCommandInfo::kEpoch = "epoch";
+const std::string SplitChunkCommandInfo::kTimestamp = "timestamp";
 const std::string SplitChunkCommandInfo::kSplitKeys = "splitKeys";
 
 BalancerCommandsSchedulerImpl::BalancerCommandsSchedulerImpl() {}

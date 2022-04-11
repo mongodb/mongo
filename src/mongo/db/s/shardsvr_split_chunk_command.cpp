@@ -165,6 +165,13 @@ public:
         OID expectedCollectionEpoch;
         uassertStatusOK(bsonExtractOIDField(cmdObj, "epoch", &expectedCollectionEpoch));
 
+        boost::optional<Timestamp> expectedCollectionTimestamp;
+        if (cmdObj["timestamp"]) {
+            expectedCollectionTimestamp.emplace();
+            uassertStatusOK(bsonExtractTimestampField(
+                cmdObj, "timestamp", expectedCollectionTimestamp.get_ptr()));
+        }
+
         bool fromChunkSplitter = [&]() {
             bool field = false;
             Status status = bsonExtractBooleanField(cmdObj, "fromChunkSplitter", &field);
@@ -178,6 +185,7 @@ public:
                                                    std::move(splitKeys),
                                                    shardName,
                                                    expectedCollectionEpoch,
+                                                   expectedCollectionTimestamp,
                                                    fromChunkSplitter));
 
         // Otherwise, we want to check whether or not top-chunk optimization should be performed. If

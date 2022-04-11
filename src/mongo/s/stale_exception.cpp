@@ -53,17 +53,12 @@ void StaleConfigInfo::serialize(BSONObjBuilder* bob) const {
 }
 
 std::shared_ptr<const ErrorExtraInfo> StaleConfigInfo::parse(const BSONObj& obj) {
-    return std::make_shared<StaleConfigInfo>(parseFromCommandError(obj));
-}
-
-StaleConfigInfo StaleConfigInfo::parseFromCommandError(const BSONObj& obj) {
     const auto shardId = obj["shardId"].String();
-    invariant(shardId != "");
+    uassert(ErrorCodes::NoSuchKey, "The shardId field is missing", !shardId.empty());
 
     auto extractOptionalChunkVersion = [&obj](StringData field) -> boost::optional<ChunkVersion> {
         try {
-            return boost::make_optional<ChunkVersion>(
-                ChunkVersion::fromBSONLegacyOrNewerFormat(obj, field));
+            return ChunkVersion::fromBSONLegacyOrNewerFormat(obj, field);
         } catch (const DBException& ex) {
             auto status = ex.toStatus();
             if (status != ErrorCodes::NoSuchKey) {
@@ -73,10 +68,19 @@ StaleConfigInfo StaleConfigInfo::parseFromCommandError(const BSONObj& obj) {
         return boost::none;
     };
 
-    return StaleConfigInfo(NamespaceString(obj["ns"].String()),
-                           ChunkVersion::fromBSONLegacyOrNewerFormat(obj, "vReceived"),
-                           extractOptionalChunkVersion("vWanted"),
-                           ShardId(shardId));
+    return std::make_shared<StaleConfigInfo>(
+        NamespaceString(obj["ns"].String()),
+        ChunkVersion::fromBSONLegacyOrNewerFormat(obj, "vReceived"),
+        extractOptionalChunkVersion("vWanted"),
+        ShardId(shardId));
+}
+
+void StaleEpochInfo::serialize(BSONObjBuilder* bob) const {
+    bob->append("ns", _nss.ns());
+}
+
+std::shared_ptr<const ErrorExtraInfo> StaleEpochInfo::parse(const BSONObj& obj) {
+    return std::make_shared<StaleEpochInfo>(NamespaceString(obj["ns"].String()));
 }
 
 void StaleDbRoutingVersion::serialize(BSONObjBuilder* bob) const {
@@ -88,13 +92,10 @@ void StaleDbRoutingVersion::serialize(BSONObjBuilder* bob) const {
 }
 
 std::shared_ptr<const ErrorExtraInfo> StaleDbRoutingVersion::parse(const BSONObj& obj) {
-    return std::make_shared<StaleDbRoutingVersion>(parseFromCommandError(obj));
-}
-
-StaleDbRoutingVersion StaleDbRoutingVersion::parseFromCommandError(const BSONObj& obj) {
-    return StaleDbRoutingVersion(obj["db"].String(),
-                                 DatabaseVersion(obj["vReceived"].Obj()),
-                                 !obj["vWanted"].eoo() ? DatabaseVersion(obj["vWanted"].Obj())
+    return std::make_shared<StaleDbRoutingVersion>(obj["db"].String(),
+                                                   DatabaseVersion(obj["vReceived"].Obj()),
+                                                   !obj["vWanted"].eoo()
+                                                       ? DatabaseVersion(obj["vWanted"].Obj())
                                                        : boost::optional<DatabaseVersion>{});
 }
 

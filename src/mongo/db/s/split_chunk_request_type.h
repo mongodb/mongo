@@ -48,6 +48,7 @@ public:
     SplitChunkRequest(NamespaceString nss,
                       std::string shardName,
                       OID epoch,
+                      boost::optional<Timestamp> timestamp,
                       ChunkRange chunkRange,
                       std::vector<BSONObj> splitPoints,
                       bool fromChunkSplitter);
@@ -83,6 +84,9 @@ public:
 
     const NamespaceString& getNamespace() const;
     const OID& getEpoch() const;
+    const auto& getTimestamp() const {
+        return _timestamp;
+    }
     const ChunkRange& getChunkRange() const;
     const std::vector<BSONObj>& getSplitPoints() const;
     const std::string& getShardName() const;
@@ -97,6 +101,7 @@ private:
 
     NamespaceString _nss;
     OID _epoch;
+    boost::optional<Timestamp> _timestamp;
     ChunkRange _chunkRange;
     std::vector<BSONObj> _splitPoints;
     std::string _shardName;

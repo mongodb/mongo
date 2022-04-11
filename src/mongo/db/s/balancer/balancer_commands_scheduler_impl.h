@@ -393,6 +393,7 @@ public:
             .append(kShardName, getTarget().toString())
             .append(kKeyPattern, _shardKeyPattern)
             .append(kEpoch, _version.epoch())
+            .append(kTimestamp, _version.getTimestamp())
             .append(kLowerBound, _lowerBoundKey)
             .append(kUpperBound, _upperBoundKey)
             .append(kSplitKeys, _splitPoints);
@@ -412,6 +413,7 @@ private:
     static const std::string kLowerBound;
     static const std::string kUpperBound;
     static const std::string kEpoch;
+    static const std::string kTimestamp;
     static const std::string kSplitKeys;
 };
 

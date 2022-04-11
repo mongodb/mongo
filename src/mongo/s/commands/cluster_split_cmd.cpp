@@ -270,6 +270,7 @@ public:
             nss,
             cm.getShardKeyPattern(),
             cm.getVersion().epoch(),
+            cm.getVersion().getTimestamp(),
             cm.getVersion(chunk->getShardId()) /* shardVersion */,
             ChunkRange(chunk->getMin(), chunk->getMax()),
             {splitPoint}));

@@ -29,8 +29,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/s/chunk_splitter.h"
 
 #include "mongo/client/dbclient_cursor.h"
@@ -49,8 +47,8 @@
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"
-#include "mongo/s/config_server_client.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/request_types/balance_chunk_request_type.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/shard_util.h"
 #include "mongo/util/assert_util.h"
@@ -104,9 +102,22 @@ Status splitChunkAtMultiplePoints(OperationContext* opCtx,
                       std::move(splitPoints),
                       shardId.toString(),
                       collectionVersion.epoch(),
+                      collectionVersion.getTimestamp(),
                       true /* fromChunkSplitter */)
         .getStatus()
         .withContext("split failed");
+}
+
+void rebalanceChunk(OperationContext* opCtx, const NamespaceString& nss, const ChunkType& chunk) {
+    auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+    auto shard = shardRegistry->getConfigShard();
+    auto response = uassertStatusOK(shard->runCommandWithFixedRetryAttempts(
+        opCtx,
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        "admin",
+        BalanceChunkRequest::serializeToRebalanceCommandForConfig(nss, chunk),
+        Shard::RetryPolicy::kNotIdempotent));
+    uassertStatusOK(response.commandStatus);
 }
 
 /**
@@ -130,7 +141,7 @@ void moveChunk(OperationContext* opCtx, const NamespaceString& nss, const BSONOb
     chunkToMove.setMax(suggestedChunk.getMax());
     chunkToMove.setVersion(suggestedChunk.getLastmod());
 
-    uassertStatusOK(configsvr_client::rebalanceChunk(opCtx, nss, chunkToMove));
+    rebalanceChunk(opCtx, nss, chunkToMove);
 }
 
 /**

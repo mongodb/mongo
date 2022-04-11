@@ -565,6 +565,7 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkSplit(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const OID& requestEpoch,
+    const boost::optional<Timestamp>& requestTimestamp,
     const ChunkRange& range,
     const std::vector<BSONObj>& splitPoints,
     const std::string& shardName,
@@ -605,7 +606,8 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkSplit(
     auto collVersion = swCollVersion.getValue();
 
     // Return an error if collection epoch does not match epoch of request.
-    if (coll.getEpoch() != requestEpoch) {
+    if (coll.getEpoch() != requestEpoch ||
+        (requestTimestamp && coll.getTimestamp() != requestTimestamp)) {
         return {ErrorCodes::StaleEpoch,
                 str::stream() << "splitChunk cannot split chunk " << range.toString()
                               << ". Epoch of collection '" << nss.ns() << "' has changed."
@@ -1794,6 +1796,7 @@ void ShardingCatalogManager::splitOrMarkJumbo(OperationContext* opCtx,
                                                   nss,
                                                   cm.getShardKeyPattern(),
                                                   cm.getVersion().epoch(),
+                                                  cm.getVersion().getTimestamp(),
                                                   ChunkVersion::IGNORED() /*shardVersion*/,
                                                   ChunkRange(chunk.getMin(), chunk.getMax()),
                                                   splitPoints));

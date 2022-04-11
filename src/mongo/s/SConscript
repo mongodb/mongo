@@ -213,7 +213,6 @@ env.Library(
         'request_types/set_allow_migrations.idl',
         'request_types/set_shard_version_request.cpp',
         'request_types/sharded_ddl_commands.idl',
-        'request_types/split_chunk_request_type.cpp',
         'request_types/update_zone_key_range_request_type.cpp',
         'request_types/wait_for_fail_point.idl',
         'resharding/common_types.idl',
@@ -325,7 +324,6 @@ env.Library(
         'catalog_cache_loader.cpp',
         'cluster_identity_loader.cpp',
         'config_server_catalog_cache_loader.cpp',
-        'config_server_client.cpp',
         'shard_util.cpp',
     ],
     LIBDEPS=[
@@ -639,7 +637,6 @@ env.CppUnitTest(
         'request_types/move_chunk_request_test.cpp',
         'request_types/remove_shard_from_zone_request_test.cpp',
         'request_types/set_shard_version_request_test.cpp',
-        'request_types/split_chunk_request_test.cpp',
         'request_types/update_zone_key_range_request_test.cpp',
         'routing_table_history_test.cpp',
         'sessions_collection_sharded_test.cpp',
