@@ -425,6 +425,17 @@ public:
                             opCtx, DDLCoordinatorTypeEnum::kRefineCollectionShardKey);
                 }
 
+                // TODO SERVER-65077: Remove FCV check once 6.0 is released
+                if (actualVersion > requestedVersion &&
+                    !gFeatureFlagFLE2.isEnabledOnVersion(requestedVersion)) {
+                    // No more (recoverable) CompactStructuredEncryptionDataCoordinator will start
+                    // because we have already switched the FCV value to kDowngrading. Wait for the
+                    // ongoing CompactStructuredEncryptionDataCoordinator to finish.
+                    ShardingDDLCoordinatorService::getService(opCtx)
+                        ->waitForCoordinatorsOfGivenTypeToComplete(
+                            opCtx, DDLCoordinatorTypeEnum::kCompactStructuredEncryptionData);
+                }
+
                 // If we are only running phase-1, then we are done
                 return true;
             }

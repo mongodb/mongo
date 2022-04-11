@@ -48,6 +48,11 @@ struct EncryptedStateCollectionsNamespaces {
     NamespaceString ecocRenameNss;
 };
 
+/**
+ * Validate a compact request has the right encryption tokens.
+ */
+void validateCompactRequest(const CompactStructuredEncryptionData& request, const Collection& edc);
+
 CompactStats processFLECompact(OperationContext* opCtx,
                                const CompactStructuredEncryptionData& request,
                                GetTxnCallback getTxn,

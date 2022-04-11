@@ -649,4 +649,14 @@ CompactStats processFLECompact(OperationContext* opCtx,
     return stats;
 }
 
+void validateCompactRequest(const CompactStructuredEncryptionData& request, const Collection& edc) {
+    uassert(6346807,
+            "Target namespace is not an encrypted collection",
+            edc.getCollectionOptions().encryptedFieldConfig);
+
+    // Validate the request contains a compaction token for each encrypted field
+    const auto& efc = edc.getCollectionOptions().encryptedFieldConfig.value();
+    CompactionHelpers::validateCompactionTokens(efc, request.getCompactionTokens());
+}
+
 }  // namespace mongo

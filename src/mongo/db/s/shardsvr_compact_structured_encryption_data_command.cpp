@@ -33,6 +33,7 @@
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/fle2_compact.h"
 #include "mongo/db/commands/fle2_compact_gen.h"
 #include "mongo/db/s/compact_structured_encryption_data_coordinator.h"
@@ -78,6 +79,7 @@ public:
             uassert(6350499,
                     "FLE 2 is only supported when FCV supports 6.0",
                     gFeatureFlagFLE2.isEnabled(serverGlobalParams.featureCompatibility));
+            FixedFCVRegion fixedFcvRegion(opCtx);
 
             auto compact = makeRequest(opCtx);
             if (!compact) {
@@ -101,26 +103,34 @@ public:
                     str::stream() << "Unknown collection: " << nss,
                     baseColl.getCollection());
 
+            validateCompactRequest(req, *(baseColl.getCollection().get()));
+
             auto namespaces =
                 uassertStatusOK(EncryptedStateCollectionsNamespaces::createFromDataCollection(
                     *(baseColl.getCollection().get())));
 
             AutoGetCollection ecocColl(opCtx, namespaces.ecocNss, MODE_IX);
-            if (!ecocColl.getCollection()) {
+            AutoGetCollection ecocTempColl(opCtx, namespaces.ecocRenameNss, MODE_IX);
+
+            if (!ecocColl.getCollection() && !ecocTempColl.getCollection()) {
                 return boost::none;
             }
-            auto ecocUUID = ecocColl->uuid();
-
-            // Append UUID to rename namespace.
-            NamespaceString renameNss(namespaces.ecocRenameNss.db(),
-                                      str::stream() << namespaces.ecocRenameNss << '.' << ecocUUID);
 
             CompactStructuredEncryptionDataState compact;
+
+            if (ecocColl.getCollection()) {
+                compact.setEcocUuid(ecocColl->uuid());
+            }
+            if (ecocTempColl.getCollection()) {
+                compact.setEcocRenameUuid(ecocTempColl->uuid());
+            }
+
             compact.setShardingDDLCoordinatorMetadata(
                 {{nss, DDLCoordinatorTypeEnum::kCompactStructuredEncryptionData}});
+            compact.setEscNss(namespaces.escNss);
+            compact.setEccNss(namespaces.eccNss);
             compact.setEcocNss(namespaces.ecocNss);
-            compact.setEcocUuid(std::move(ecocUUID));
-            compact.setEcocRenameNss(renameNss);
+            compact.setEcocRenameNss(namespaces.ecocRenameNss);
             compact.setCompactionTokens(req.getCompactionTokens().getOwned());
 
             return compact;

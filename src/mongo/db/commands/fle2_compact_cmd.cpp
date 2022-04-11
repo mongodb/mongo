@@ -77,13 +77,7 @@ CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
             "FLE 2 is only supported when FCV supports 6.0",
             gFeatureFlagFLE2.isEnabled(serverGlobalParams.featureCompatibility));
 
-    uassert(6346807,
-            "Target namespace is not an encrypted collection",
-            edc->getCollectionOptions().encryptedFieldConfig);
-
-    // Validate the request contains a compaction token for each encrypted field
-    const auto& efc = edc->getCollectionOptions().encryptedFieldConfig.value();
-    CompactionHelpers::validateCompactionTokens(efc, request.getCompactionTokens());
+    validateCompactRequest(request, *edc.get());
 
     auto namespaces =
         uassertStatusOK(EncryptedStateCollectionsNamespaces::createFromDataCollection(*edc.get()));

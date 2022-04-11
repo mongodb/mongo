@@ -95,6 +95,8 @@ private:
 private:
     StateDoc _doc;
     boost::optional<CompactStructuredEncryptionDataCommandReply> _response;
+    bool _skipCompact{false};
+    boost::optional<UUID> _ecocRenameUuid;
 };
 
 }  // namespace mongo
