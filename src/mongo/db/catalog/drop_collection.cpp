@@ -200,6 +200,8 @@ Status _abortIndexBuildsAndDrop(OperationContext* opCtx,
         return status;
     }
 
+    warnEncryptedCollectionsIfNeeded(opCtx, coll);
+
     try {
         checkCollectionUUIDMismatch(opCtx, startingNss, coll, expectedUUID);
     } catch (const DBException& ex) {
@@ -356,11 +358,7 @@ Status _dropCollection(OperationContext* opCtx,
                 return Status(ErrorCodes::NamespaceNotFound, "ns not found");
             }
 
-            auto collectionPtr =
-                CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, collectionName);
-            if (collectionPtr) {
-                warnEncryptedCollectionsIfNeeded(opCtx, collectionPtr);
-
+            if (CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, collectionName)) {
                 return _abortIndexBuildsAndDrop(
                     opCtx,
                     std::move(autoDb),
