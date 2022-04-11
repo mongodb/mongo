@@ -312,6 +312,7 @@ LockerImpl::~LockerImpl() {
     // to delete with unaccounted locks anyways.
     invariant(!inAWriteUnitOfWork());
     invariant(_numResourcesToUnlockAtEndUnitOfWork == 0);
+    invariant(!_ticket.valid());
 
     if (!_requests.empty()) {
         _dumpLockerAndLockManagerRequests();
@@ -374,10 +375,13 @@ bool LockerImpl::_acquireTicket(OperationContext* opCtx, LockMode mode, Date_t d
         if (opCtx)
             invariant(!opCtx->recoveryUnit()->isTimestamped());
 
-        OperationContext* interruptible = _uninterruptibleLocksRequested ? nullptr : opCtx;
+        auto waitMode = _uninterruptibleLocksRequested ? TicketHolder::WaitMode::kUninterruptible
+                                                       : TicketHolder::WaitMode::kInterruptible;
         if (deadline == Date_t::max()) {
-            holder->waitForTicket(interruptible);
-        } else if (!holder->waitForTicketUntil(interruptible, deadline)) {
+            _ticket = holder->waitForTicket(opCtx, &_admCtx, waitMode);
+        } else if (auto ticket = holder->waitForTicketUntil(opCtx, &_admCtx, deadline, waitMode)) {
+            _ticket = std::move(*ticket);
+        } else {
             return false;
         }
         restoreStateOnErrorGuard.dismiss();
@@ -1073,7 +1077,7 @@ void LockerImpl::_releaseTicket() {
     auto& ticketHolders = ticketHoldersDecoration(getGlobalServiceContext());
     auto holder = shouldAcquireTicket() ? ticketHolders.getTicketHolder(_modeForTicket) : nullptr;
     if (holder) {
-        holder->release();
+        holder->release(&_admCtx, std::move(_ticket));
     }
     _clientState.store(kInactive);
 }

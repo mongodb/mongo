@@ -232,7 +232,8 @@ class TicketHolderWaits : public ThreadedTest<10> {
 
 public:
     TicketHolderWaits()
-        : _hotel(rooms), _tickets(std::make_unique<SemaphoreTicketHolder>(_hotel._nRooms)) {}
+        : _hotel(rooms),
+          _tickets(std::make_unique<SemaphoreTicketHolder>(_hotel._nRooms, nullptr)) {}
 
 private:
     class Hotel {
@@ -265,10 +266,13 @@ private:
     virtual void subthread(int x) {
         string threadName = (str::stream() << "ticketHolder" << x);
         Client::initThread(threadName.c_str());
+        auto opCtx = Client::getCurrent()->makeOperationContext();
 
         for (int i = 0; i < checkIns; i++) {
-            _tickets->waitForTicket();
-            TicketHolderReleaser whenDone(_tickets.get());
+            AdmissionContext admCtx;
+            auto ticket = _tickets->waitForTicket(
+                opCtx.get(), &admCtx, TicketHolder::WaitMode::kUninterruptible);
+            TicketHolderReleaser whenDone(std::move(ticket), &admCtx, _tickets.get());
 
             _hotel.checkIn();
 

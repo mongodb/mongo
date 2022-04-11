@@ -36,7 +36,9 @@
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/concurrency/spin_lock.h"
+#include "mongo/util/concurrency/ticket.h"
 
 namespace mongo {
 
@@ -375,6 +377,12 @@ private:
 
     // A structure for accumulating time spent getting flow control tickets.
     FlowControlTicketholder::CurOp _flowControlStats;
+
+    // Keeps state and statistics related to admission control.
+    AdmissionContext _admCtx;
+
+    // This will only be valid when holding a ticket.
+    Ticket _ticket;
 
     // Tracks the global lock modes ever acquired in this Locker's life. This value should only ever
     // be accessed from the thread that owns the Locker.

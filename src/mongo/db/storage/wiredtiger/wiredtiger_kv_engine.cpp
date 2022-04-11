@@ -585,7 +585,6 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
     }
 
     _sizeStorer = std::make_unique<WiredTigerSizeStorer>(_conn, _sizeStorerUri, _readOnly);
-
     _runTimeConfigParam.reset(makeServerParameter<WiredTigerEngineRuntimeConfigParameter>(
         "wiredTigerEngineRuntimeConfig", ServerParameterType::kRuntimeOnly));
     _runTimeConfigParam->_data.second = this;
@@ -613,17 +612,13 @@ void WiredTigerKVEngine::appendGlobalStats(BSONObjBuilder& b) {
     {
         auto writer = ticketHolders.getTicketHolder(MODE_IX);
         BSONObjBuilder bbb(bb.subobjStart("write"));
-        bbb.append("out", writer->used());
-        bbb.append("available", writer->available());
-        bbb.append("totalTickets", writer->outof());
+        writer->appendStats(bbb);
         bbb.done();
     }
     {
         auto reader = ticketHolders.getTicketHolder(MODE_IS);
         BSONObjBuilder bbb(bb.subobjStart("read"));
-        bbb.append("out", reader->used());
-        bbb.append("available", reader->available());
-        bbb.append("totalTickets", reader->outof());
+        reader->appendStats(bbb);
         bbb.done();
     }
     bb.done();

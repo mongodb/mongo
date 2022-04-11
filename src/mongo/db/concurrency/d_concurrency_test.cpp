@@ -72,8 +72,9 @@ class UseGlobalThrottling {
 public:
     explicit UseGlobalThrottling(OperationContext* opCtx, int numTickets) {
         auto& ticketHolders = ticketHoldersDecoration(getGlobalServiceContext());
-        ticketHolders.setGlobalThrottling(std::make_unique<SemaphoreTicketHolder>(numTickets),
-                                          std::make_unique<SemaphoreTicketHolder>(numTickets));
+        ticketHolders.setGlobalThrottling(
+            std::make_unique<SemaphoreTicketHolder>(numTickets, nullptr),
+            std::make_unique<SemaphoreTicketHolder>(numTickets, nullptr));
     }
     ~UseGlobalThrottling() noexcept(false) {
         auto& ticketHolders = ticketHoldersDecoration(getGlobalServiceContext());

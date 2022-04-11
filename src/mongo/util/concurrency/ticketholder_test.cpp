@@ -32,44 +32,212 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/concurrency/locker_noop_client_observer.h"
+#include "mongo/db/service_context_test_fixture.h"
+#include "mongo/unittest/barrier.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/concurrency/ticketholder.h"
+#include "mongo/util/tick_source_mock.h"
 
 namespace {
 using namespace mongo;
 
-TEST(TicketholderTest, BasicTimeout) {
-    std::unique_ptr<TicketHolder> holder = std::make_unique<SemaphoreTicketHolder>(1);
+class TicketHolderTest : public ServiceContextTest {
+    void setUp() override {
+        ServiceContextTest::setUp();
+
+        getServiceContext()->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
+        _client = getServiceContext()->makeClient("test");
+        _opCtx = _client->makeOperationContext();
+    }
+
+protected:
+    ServiceContext::UniqueClient _client;
+    ServiceContext::UniqueOperationContext _opCtx;
+};
+
+template <class H>
+void basicTimeout(OperationContext* opCtx) {
+    ServiceContext serviceContext;
+    serviceContext.setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
+    auto mode = TicketHolder::WaitMode::kInterruptible;
+    std::unique_ptr<TicketHolder> holder = std::make_unique<H>(1, &serviceContext);
     ASSERT_EQ(holder->used(), 0);
     ASSERT_EQ(holder->available(), 1);
     ASSERT_EQ(holder->outof(), 1);
 
+    AdmissionContext admCtx;
     {
-        ScopedTicket ticket(holder.get());
+        ScopedTicket ticket(opCtx, holder.get(), mode);
         ASSERT_EQ(holder->used(), 1);
         ASSERT_EQ(holder->available(), 0);
         ASSERT_EQ(holder->outof(), 1);
 
-        ASSERT_FALSE(holder->tryAcquire());
-        ASSERT_FALSE(holder->waitForTicketUntil(Date_t::now()));
-        ASSERT_FALSE(holder->waitForTicketUntil(Date_t::now() + Milliseconds(1)));
-        ASSERT_FALSE(holder->waitForTicketUntil(Date_t::now() + Milliseconds(42)));
+        ASSERT_FALSE(holder->tryAcquire(&admCtx));
+        ASSERT_FALSE(holder->waitForTicketUntil(opCtx, &admCtx, Date_t::now(), mode));
+        ASSERT_FALSE(
+            holder->waitForTicketUntil(opCtx, &admCtx, Date_t::now() + Milliseconds(1), mode));
+        ASSERT_FALSE(
+            holder->waitForTicketUntil(opCtx, &admCtx, Date_t::now() + Milliseconds(42), mode));
     }
 
     ASSERT_EQ(holder->used(), 0);
     ASSERT_EQ(holder->available(), 1);
     ASSERT_EQ(holder->outof(), 1);
 
-    ASSERT(holder->waitForTicketUntil(Date_t::now()));
-    holder->release();
+    auto ticket = holder->waitForTicketUntil(opCtx, &admCtx, Date_t::now(), mode);
+    ASSERT(ticket);
+    holder->release(&admCtx, std::move(*ticket));
 
     ASSERT_EQ(holder->used(), 0);
 
-    ASSERT(holder->waitForTicketUntil(Date_t::now() + Milliseconds(20)));
+    ticket = holder->waitForTicketUntil(opCtx, &admCtx, Date_t::now() + Milliseconds(20), mode);
+    ASSERT(ticket);
     ASSERT_EQ(holder->used(), 1);
 
-    ASSERT_FALSE(holder->waitForTicketUntil(Date_t::now() + Milliseconds(2)));
-    holder->release();
+    ASSERT_FALSE(holder->waitForTicketUntil(opCtx, &admCtx, Date_t::now() + Milliseconds(2), mode));
+    holder->release(&admCtx, std::move(*ticket));
     ASSERT_EQ(holder->used(), 0);
+}
+
+TEST_F(TicketHolderTest, BasicTimeoutFifo) {
+    basicTimeout<FifoTicketHolder>(_opCtx.get());
+}
+TEST_F(TicketHolderTest, BasicTimeoutSemaphore) {
+    basicTimeout<SemaphoreTicketHolder>(_opCtx.get());
+}
+
+class Stats {
+public:
+    Stats(TicketHolder* holder) : _holder(holder){};
+
+    long long operator[](StringData field) {
+        BSONObjBuilder bob;
+        _holder->appendStats(bob);
+        auto stats = bob.obj();
+        return stats[field].numberLong();
+    }
+
+private:
+    TicketHolder* _holder;
+};
+
+TEST_F(TicketHolderTest, FifoBasicMetrics) {
+    ServiceContext serviceContext;
+    serviceContext.setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
+    auto tickSource = dynamic_cast<TickSourceMock<Microseconds>*>(serviceContext.getTickSource());
+    FifoTicketHolder holder(1, &serviceContext);
+    Stats stats(&holder);
+    AdmissionContext admCtx;
+
+    auto ticket =
+        holder.waitForTicket(_opCtx.get(), &admCtx, TicketHolder::WaitMode::kInterruptible);
+
+    unittest::Barrier barrier(2);
+    stdx::thread waiting([this, &holder, &barrier]() {
+        auto client = this->getServiceContext()->makeClient("waiting");
+        auto opCtx = client->makeOperationContext();
+        AdmissionContext admCtx;
+
+        auto ticket =
+            holder.waitForTicket(opCtx.get(), &admCtx, TicketHolder::WaitMode::kInterruptible);
+        barrier.countDownAndWait();
+        holder.release(&admCtx, std::move(ticket));
+    });
+
+    while (holder.queued() == 0) {
+        // Wait for thread to start waiting.
+    }
+
+    ASSERT_EQ(stats["out"], 1);
+    ASSERT_EQ(stats["available"], 0);
+    ASSERT_EQ(stats["addedToQueue"], 1);
+    ASSERT_EQ(stats["queueLength"], 1);
+
+    tickSource->advance(Microseconds(100));
+    holder.release(&admCtx, std::move(ticket));
+
+    while (holder.queued() > 0) {
+        // Wait for thread to take ticket.
+    }
+
+    tickSource->advance(Microseconds(200));
+    barrier.countDownAndWait();
+
+    waiting.join();
+
+    ASSERT_EQ(admCtx.getAdmissions(), 1);
+    ASSERT_EQ(stats["out"], 0);
+    ASSERT_EQ(stats["available"], 1);
+    ASSERT_EQ(stats["addedToQueue"], 1);
+    ASSERT_EQ(stats["removedFromQueue"], 1);
+    ASSERT_EQ(stats["queueLength"], 0);
+    ASSERT_EQ(stats["totalTimeQueuedMicros"], 100);
+    ASSERT_EQ(stats["startedProcessing"], 2);
+    ASSERT_EQ(stats["finishedProcessing"], 2);
+    ASSERT_EQ(stats["processing"], 0);
+    ASSERT_EQ(stats["totalTimeProcessingMicros"], 300);
+    ASSERT_EQ(stats["canceled"], 0);
+    ASSERT_EQ(stats["newAdmissions"], 2);
+
+    // Retake ticket.
+    ticket = holder.waitForTicket(_opCtx.get(), &admCtx, TicketHolder::WaitMode::kInterruptible);
+    holder.release(&admCtx, std::move(ticket));
+
+    ASSERT_EQ(admCtx.getAdmissions(), 2);
+    ASSERT_EQ(stats["newAdmissions"], 2);
+}
+
+TEST_F(TicketHolderTest, FifoCanceled) {
+    ServiceContext serviceContext;
+    serviceContext.setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
+    auto tickSource = dynamic_cast<TickSourceMock<Microseconds>*>(serviceContext.getTickSource());
+    FifoTicketHolder holder(1, &serviceContext);
+    Stats stats(&holder);
+    AdmissionContext admCtx;
+
+    auto ticket =
+        holder.waitForTicket(_opCtx.get(), &admCtx, TicketHolder::WaitMode::kInterruptible);
+
+    stdx::thread waiting([this, &holder]() {
+        auto client = this->getServiceContext()->makeClient("waiting");
+        auto opCtx = client->makeOperationContext();
+
+        AdmissionContext admCtx;
+        auto deadline = Date_t::now() + Milliseconds(100);
+        ASSERT_FALSE(holder.waitForTicketUntil(
+            opCtx.get(), &admCtx, deadline, TicketHolder::WaitMode::kInterruptible));
+    });
+
+    while (holder.queued() == 0) {
+        // Wait for thread to take ticket.
+    }
+
+    tickSource->advance(Microseconds(100));
+    waiting.join();
+    holder.release(&admCtx, std::move(ticket));
+
+    ASSERT_EQ(stats["addedToQueue"], 1);
+    ASSERT_EQ(stats["removedFromQueue"], 1);
+    ASSERT_EQ(stats["queueLength"], 0);
+    ASSERT_EQ(stats["totalTimeQueuedMicros"], 100);
+    ASSERT_EQ(stats["startedProcessing"], 1);
+    ASSERT_EQ(stats["finishedProcessing"], 1);
+    ASSERT_EQ(stats["processing"], 0);
+    ASSERT_EQ(stats["totalTimeProcessingMicros"], 100);
+    ASSERT_EQ(stats["canceled"], 1);
+}
+
+DEATH_TEST_F(TicketHolderTest, UnreleasedTicket, "invariant") {
+    ServiceContext serviceContext;
+    serviceContext.setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
+    FifoTicketHolder holder(1, &serviceContext);
+    Stats stats(&holder);
+    AdmissionContext admCtx;
+
+    auto ticket =
+        holder.waitForTicket(_opCtx.get(), &admCtx, TicketHolder::WaitMode::kInterruptible);
 }
 }  // namespace

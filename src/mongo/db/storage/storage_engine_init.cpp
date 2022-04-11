@@ -175,20 +175,20 @@ StorageEngine::LastShutdownState initializeStorageEngine(OperationContext* opCtx
                 case QueueingPolicyEnum::Semaphore:
                     LOGV2_DEBUG(6382201, 1, "Using Semaphore-based ticketing scheduler");
                     ticketHolders.setGlobalThrottling(
-                        std::make_unique<SemaphoreTicketHolder>(readTransactions),
-                        std::make_unique<SemaphoreTicketHolder>(writeTransactions));
+                        std::make_unique<SemaphoreTicketHolder>(readTransactions, serviceContext),
+                        std::make_unique<SemaphoreTicketHolder>(writeTransactions, serviceContext));
                     break;
                 case QueueingPolicyEnum::FifoQueue:
                     LOGV2_DEBUG(6382200, 1, "Using FIFO queue-based ticketing scheduler");
                     ticketHolders.setGlobalThrottling(
-                        std::make_unique<FifoTicketHolder>(readTransactions),
-                        std::make_unique<FifoTicketHolder>(writeTransactions));
+                        std::make_unique<FifoTicketHolder>(readTransactions, serviceContext),
+                        std::make_unique<FifoTicketHolder>(writeTransactions, serviceContext));
                     break;
             }
         } else {
             ticketHolders.setGlobalThrottling(
-                std::make_unique<SemaphoreTicketHolder>(readTransactions),
-                std::make_unique<SemaphoreTicketHolder>(writeTransactions));
+                std::make_unique<SemaphoreTicketHolder>(readTransactions, serviceContext),
+                std::make_unique<SemaphoreTicketHolder>(writeTransactions, serviceContext));
         }
     }
 

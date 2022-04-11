@@ -35,10 +35,13 @@
 #include <queue>
 
 #include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/future.h"
+#include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/concurrency/mutex.h"
+#include "mongo/util/concurrency/ticket.h"
 #include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/time_support.h"
 
@@ -46,37 +49,38 @@ namespace mongo {
 
 class TicketHolder {
 public:
+    /**
+     * Wait mode for ticket acquisition: interruptible or uninterruptible.
+     */
+    enum WaitMode { kInterruptible, kUninterruptible };
+
     virtual ~TicketHolder() = 0;
 
     /**
      * Attempts to acquire a ticket without blocking.
      * Returns a boolean indicating whether the operation was successful or not.
      */
-    virtual bool tryAcquire() = 0;
+    virtual boost::optional<Ticket> tryAcquire(AdmissionContext* admCtx) = 0;
 
     /**
      * Attempts to acquire a ticket. Blocks until a ticket is acquired or the OperationContext
      * 'opCtx' is killed, throwing an AssertionException.
-     * If 'opCtx' is not provided or equal to nullptr, the wait is not interruptible.
      */
-    virtual void waitForTicket(OperationContext* opCtx) = 0;
-    void waitForTicket() {
-        this->waitForTicket(nullptr);
-    };
+    virtual Ticket waitForTicket(OperationContext* opCtx,
+                                 AdmissionContext* admCtx,
+                                 WaitMode waitMode) = 0;
 
     /**
      * Attempts to acquire a ticket within a deadline, 'until'. Returns 'true' if a ticket is
      * acquired and 'false' if the deadline is reached, but the operation is retryable. Throws an
      * AssertionException if the OperationContext 'opCtx' is killed and no waits for tickets can
      * proceed.
-     * If 'opCtx' is not provided or equal to nullptr, the wait is not interruptible.
      */
-    virtual bool waitForTicketUntil(OperationContext* opCtx, Date_t until) = 0;
-    bool waitForTicketUntil(Date_t until) {
-        return this->waitForTicketUntil(nullptr, until);
-    };
-
-    virtual void release() = 0;
+    virtual boost::optional<Ticket> waitForTicketUntil(OperationContext* opCtx,
+                                                       AdmissionContext* admCtx,
+                                                       Date_t until,
+                                                       WaitMode waitMode) = 0;
+    virtual void release(AdmissionContext* admCtx, Ticket&& ticket) = 0;
 
     virtual Status resize(int newSize) = 0;
 
@@ -85,20 +89,27 @@ public:
     virtual int used() const = 0;
 
     virtual int outof() const = 0;
+
+    virtual void appendStats(BSONObjBuilder& b) const = 0;
 };
 
 class SemaphoreTicketHolder final : public TicketHolder {
 public:
-    explicit SemaphoreTicketHolder(int num);
+    explicit SemaphoreTicketHolder(int num, ServiceContext* serviceContext);
     ~SemaphoreTicketHolder() override final;
 
-    bool tryAcquire() override final;
+    boost::optional<Ticket> tryAcquire(AdmissionContext* admCtx) override final;
 
-    void waitForTicket(OperationContext* opCtx) override final;
+    Ticket waitForTicket(OperationContext* opCtx,
+                         AdmissionContext* admCtx,
+                         WaitMode waitMode) override final;
 
-    bool waitForTicketUntil(OperationContext* opCtx, Date_t until) override final;
+    boost::optional<Ticket> waitForTicketUntil(OperationContext* opCtx,
+                                               AdmissionContext* admCtx,
+                                               Date_t until,
+                                               WaitMode waitMode) override final;
 
-    void release() override final;
+    void release(AdmissionContext* admCtx, Ticket&& ticket) override final;
 
     Status resize(int newSize) override final;
 
@@ -107,6 +118,8 @@ public:
     int used() const override final;
 
     int outof() const override final;
+
+    void appendStats(BSONObjBuilder& b) const override final;
 
 private:
 #if defined(__linux__)
@@ -134,16 +147,21 @@ private:
  */
 class FifoTicketHolder final : public TicketHolder {
 public:
-    explicit FifoTicketHolder(int num);
+    explicit FifoTicketHolder(int num, ServiceContext* serviceContext);
     ~FifoTicketHolder() override final;
 
-    bool tryAcquire() override final;
+    boost::optional<Ticket> tryAcquire(AdmissionContext* admCtx) override final;
 
-    void waitForTicket(OperationContext* opCtx) override final;
+    Ticket waitForTicket(OperationContext* opCtx,
+                         AdmissionContext* admCtx,
+                         WaitMode waitMode) override final;
 
-    bool waitForTicketUntil(OperationContext* opCtx, Date_t until) override final;
+    boost::optional<Ticket> waitForTicketUntil(OperationContext* opCtx,
+                                               AdmissionContext* admCtx,
+                                               Date_t until,
+                                               WaitMode waitMode) override final;
 
-    void release() override final;
+    void release(AdmissionContext* admCtx, Ticket&& ticket) override final;
 
     Status resize(int newSize) override final;
 
@@ -153,12 +171,25 @@ public:
 
     int outof() const override final;
 
+    int queued() const;
+
+    void appendStats(BSONObjBuilder& b) const override final;
+
 private:
     void _release(WithLock);
 
     Mutex _resizeMutex =
         MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(2), "FifoTicketHolder::_resizeMutex");
     AtomicWord<int> _capacity;
+    AtomicWord<std::int64_t> _totalNewAdmissions{0};
+    AtomicWord<std::int64_t> _totalAddedQueue{0};
+    AtomicWord<std::int64_t> _totalRemovedQueue{0};
+    AtomicWord<std::int64_t> _totalTimeQueuedMicros{0};
+    AtomicWord<std::int64_t> _totalStartedProcessing{0};
+    AtomicWord<std::int64_t> _totalFinishedProcessing{0};
+    AtomicWord<std::int64_t> _totalTimeProcessingMicros{0};
+    AtomicWord<std::int64_t> _totalCanceled{0};
+
     enum class WaitingState { Waiting, Cancelled, Assigned };
     struct WaitingElement {
         stdx::condition_variable signaler;
@@ -173,20 +204,22 @@ private:
         MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(1), "FifoTicketHolder::_queueMutex");
     AtomicWord<int> _enqueuedElements;
     AtomicWord<int> _ticketsAvailable;
+    ServiceContext* _serviceContext;
 };
 
 class ScopedTicket {
 public:
-    ScopedTicket(TicketHolder* holder) : _holder(holder) {
-        _holder->waitForTicket();
-    }
+    ScopedTicket(OperationContext* opCtx, TicketHolder* holder, TicketHolder::WaitMode waitMode)
+        : _holder(holder), _ticket(_holder->waitForTicket(opCtx, &_admCtx, waitMode)) {}
 
     ~ScopedTicket() {
-        _holder->release();
+        _holder->release(&_admCtx, std::move(_ticket));
     }
 
 private:
+    AdmissionContext _admCtx;
     TicketHolder* _holder;
+    Ticket _ticket;
 };
 
 class TicketHolderReleaser {
@@ -198,13 +231,13 @@ public:
         _holder = nullptr;
     }
 
-    explicit TicketHolderReleaser(TicketHolder* holder) {
-        _holder = holder;
-    }
+    explicit TicketHolderReleaser(Ticket&& ticket, AdmissionContext* admCtx, TicketHolder* holder)
+        : _holder(holder), _ticket(std::move(ticket)), _admCtx(admCtx) {}
+
 
     ~TicketHolderReleaser() {
         if (_holder) {
-            _holder->release();
+            _holder->release(_admCtx, std::move(_ticket));
         }
     }
 
@@ -214,12 +247,14 @@ public:
 
     void reset(TicketHolder* holder = nullptr) {
         if (_holder) {
-            _holder->release();
+            _holder->release(_admCtx, std::move(_ticket));
         }
         _holder = holder;
     }
 
 private:
     TicketHolder* _holder;
+    Ticket _ticket;
+    AdmissionContext* _admCtx;
 };
 }  // namespace mongo

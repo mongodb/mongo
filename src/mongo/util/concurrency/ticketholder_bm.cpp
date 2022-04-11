@@ -29,10 +29,14 @@
 
 #include <benchmark/benchmark.h>
 
+#include <string>
 #include <vector>
 
+#include "mongo/db/concurrency/locker_noop_client_observer.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
 #include "mongo/util/concurrency/ticketholder.h"
-
+#include "mongo/util/tick_source_mock.h"
 
 namespace mongo {
 namespace {
@@ -40,22 +44,46 @@ namespace {
 static int kTickets = 128;
 static int kThreadMin = 8;
 static int kThreadMax = 1024;
+static TicketHolder::WaitMode waitMode = TicketHolder::WaitMode::kUninterruptible;
+
+template <typename TicketHolderImpl>
+class TicketHolderFixture {
+public:
+    ServiceContext::UniqueServiceContext serviceContext;
+    std::unique_ptr<TicketHolder> ticketHolder;
+    std::vector<ServiceContext::UniqueClient> clients;
+    std::vector<ServiceContext::UniqueOperationContext> opCtxs;
+
+
+    TicketHolderFixture(int threads) {
+        serviceContext = ServiceContext::make();
+        serviceContext->setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
+        ticketHolder = std::make_unique<TicketHolderImpl>(kTickets, serviceContext.get());
+        serviceContext->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
+        for (int i = 0; i < threads; ++i) {
+            clients.push_back(
+                serviceContext->makeClient(str::stream() << "test client for thread " << i));
+            opCtxs.push_back(clients[i]->makeOperationContext());
+        }
+    }
+};
 
 template <class TicketHolderImpl>
 void BM_tryAcquire(benchmark::State& state) {
-    static std::unique_ptr<TicketHolder> ticketHolder;
+    static std::unique_ptr<TicketHolderFixture<TicketHolderImpl>> p;
     if (state.thread_index == 0) {
-        ticketHolder = std::make_unique<TicketHolderImpl>(kTickets);
+        p = std::make_unique<TicketHolderFixture<TicketHolderImpl>>(state.threads);
     }
     double attempted = 0, acquired = 0;
     for (auto _ : state) {
-        auto hasAcquired = ticketHolder->tryAcquire();
+        AdmissionContext admCtx;
+        auto ticket = p->ticketHolder->tryAcquire(&admCtx);
         state.PauseTiming();
         sleepmicros(1);
         attempted++;
-        if (hasAcquired) {
+        if (ticket) {
             acquired++;
-            ticketHolder->release();
+            p->ticketHolder->release(&admCtx, std::move(*ticket));
         }
         state.ResumeTiming();
     }
@@ -69,16 +97,18 @@ BENCHMARK_TEMPLATE(BM_tryAcquire, FifoTicketHolder)->ThreadRange(kThreadMin, kTh
 
 template <class TicketHolderImpl>
 void BM_acquire(benchmark::State& state) {
-    static std::unique_ptr<TicketHolder> ticketHolder;
+    static std::unique_ptr<TicketHolderFixture<TicketHolderImpl>> p;
     if (state.thread_index == 0) {
-        ticketHolder = std::make_unique<TicketHolderImpl>(kTickets);
+        p = std::make_unique<TicketHolderFixture<TicketHolderImpl>>(state.threads);
     }
     double acquired = 0;
     for (auto _ : state) {
-        ticketHolder->waitForTicket();
+        AdmissionContext admCtx;
+        auto opCtx = p->opCtxs[state.thread_index].get();
+        auto ticket = p->ticketHolder->waitForTicket(opCtx, &admCtx, waitMode);
         state.PauseTiming();
         sleepmicros(1);
-        ticketHolder->release();
+        p->ticketHolder->release(&admCtx, std::move(ticket));
         acquired++;
         state.ResumeTiming();
     }
@@ -93,17 +123,19 @@ BENCHMARK_TEMPLATE(BM_acquire, FifoTicketHolder)->ThreadRange(kThreadMin, kThrea
 
 template <class TicketHolderImpl>
 void BM_release(benchmark::State& state) {
-    static std::unique_ptr<TicketHolder> ticketHolder;
+    static std::unique_ptr<TicketHolderFixture<TicketHolderImpl>> p;
     if (state.thread_index == 0) {
-        ticketHolder = std::make_unique<TicketHolderImpl>(kTickets);
+        p = std::make_unique<TicketHolderFixture<TicketHolderImpl>>(state.threads);
     }
     double acquired = 0;
     for (auto _ : state) {
+        AdmissionContext admCtx;
+        auto opCtx = p->opCtxs[state.thread_index].get();
         state.PauseTiming();
-        ticketHolder->waitForTicket();
+        auto ticket = p->ticketHolder->waitForTicket(opCtx, &admCtx, waitMode);
         sleepmicros(1);
         state.ResumeTiming();
-        ticketHolder->release();
+        p->ticketHolder->release(&admCtx, std::move(ticket));
         acquired++;
     }
     state.counters["Acquired"] = benchmark::Counter(acquired, benchmark::Counter::kIsRate);
@@ -116,19 +148,21 @@ BENCHMARK_TEMPLATE(BM_release, SemaphoreTicketHolder)->ThreadRange(kThreadMin, k
 BENCHMARK_TEMPLATE(BM_release, FifoTicketHolder)->ThreadRange(kThreadMin, kThreadMax);
 
 
-template <class H>
+template <class TicketHolderImpl>
 void BM_acquireAndRelease(benchmark::State& state) {
-    static std::unique_ptr<TicketHolder> ticketHolder;
+    static std::unique_ptr<TicketHolderFixture<TicketHolderImpl>> p;
     if (state.thread_index == 0) {
-        ticketHolder = std::make_unique<H>(kTickets);
+        p = std::make_unique<TicketHolderFixture<TicketHolderImpl>>(state.threads);
     }
     double acquired = 0;
     for (auto _ : state) {
-        ticketHolder->waitForTicket();
+        AdmissionContext admCtx;
+        auto opCtx = p->opCtxs[state.thread_index].get();
+        auto ticket = p->ticketHolder->waitForTicket(opCtx, &admCtx, waitMode);
         state.PauseTiming();
         sleepmicros(1);
         state.ResumeTiming();
-        ticketHolder->release();
+        p->ticketHolder->release(&admCtx, std::move(ticket));
         acquired++;
     }
     state.counters["Acquired"] = benchmark::Counter(acquired, benchmark::Counter::kIsRate);
