@@ -21,6 +21,33 @@ if platform_family? 'rhel'
   end
 end
 
+if %w(6 7).include?(node['platform_version'][0]) and node['platform'] == 'redhat'
+
+  # RHEL 6 client
+  if node['platform'] == 'redhat' and node['platform_version'][0] == "6"
+    rhui_client_url = "http://boxes.10gen.com/build/rh-amazon-rhui-client-els-3.0.45-1.el6.noarch.rpm"
+  end
+
+  # RHEL 7 client
+  if node['platform'] == 'redhat' and node['platform_version'][0] == "7"
+    rhui_client_url = "http://boxes.10gen.com/build/rh-amazon-rhui-client-3.0.45-1.el7.noarch.rpm"
+  end
+
+  execute 'remove old amazon rhui client' do
+    command 'rpm -ev rh-amazon-rhui-client'
+    live_stream true
+  end
+  execute 'install updated amazon rhui client' do
+    command "rpm -ivh --nodeps #{rhui_client_url}"
+    cwd homedir
+    live_stream true
+  end
+  execute 'reinstall updated amazon rhui client for dependencies' do
+    command 'yum reinstall -y rh-amazon-rhui-client*'
+    live_stream true
+  end
+end
+
 remote_file "#{homedir}/#{artifacts_tarball}" do
   source node['artifacts_url']
 end
