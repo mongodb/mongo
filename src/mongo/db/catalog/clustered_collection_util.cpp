@@ -150,5 +150,9 @@ StringData getClusterKeyFieldName(const ClusteredIndexSpec& indexSpec) {
     return indexSpec.getKey().firstElement().fieldNameStringData();
 }
 
+BSONObj getSortPattern(const ClusteredIndexSpec& indexSpec) {
+    return indexSpec.getKey();
+}
+
 }  // namespace clustered_util
 }  // namespace mongo

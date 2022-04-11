@@ -104,7 +104,8 @@ public:
      */
     static std::unique_ptr<QuerySolutionNode> makeCollectionScan(const CanonicalQuery& query,
                                                                  bool tailable,
-                                                                 const QueryPlannerParams& params);
+                                                                 const QueryPlannerParams& params,
+                                                                 int direction = 1);
 
     /**
      * Return a plan that uses the provided index as a proxy for a collection scan.

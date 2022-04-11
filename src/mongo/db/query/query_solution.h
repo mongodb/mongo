@@ -33,6 +33,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj_comparator_interface.h"
+#include "mongo/db/catalog/clustered_collection_options_gen.h"
 #include "mongo/db/fts/fts_query.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
@@ -75,6 +76,8 @@ class ProvidedSortSet {
 public:
     ProvidedSortSet(BSONObj pattern, std::set<std::string> ignoreFields)
         : _baseSortPattern(std::move(pattern)), _ignoredFields(std::move(ignoreFields)) {}
+    ProvidedSortSet(BSONObj pattern)
+        : _baseSortPattern(std::move(pattern)), _ignoredFields(std::set<std::string>()) {}
     ProvidedSortSet() = default;
 
     /**
@@ -440,6 +443,7 @@ struct CollectionScanNode : public QuerySolutionNodeWithSortSet {
         return STAGE_COLLSCAN;
     }
 
+    virtual void computeProperties() override;
     virtual void appendToString(str::stream* ss, int indent) const;
 
     bool fetched() const {
@@ -449,6 +453,11 @@ struct CollectionScanNode : public QuerySolutionNodeWithSortSet {
         return FieldAvailability::kFullyProvided;
     }
     bool sortedByDiskLoc() const {
+        // It's possible this is overly conservative. By definition
+        // a collection scan is sorted by its record ids, so if
+        // we're scanning forward this might be true. However,
+        // in practice this is only important for choosing between
+        // hash and merge for index intersection.
         return false;
     }
 
@@ -464,6 +473,13 @@ struct CollectionScanNode : public QuerySolutionNodeWithSortSet {
     // If present, this parameter sets the start point of a reverse scan or the end point of a
     // forward scan.
     boost::optional<RecordIdBound> maxRecord;
+
+    // If present, this parameter denotes the clustering info on the collection
+    boost::optional<ClusteredIndexSpec> clusteredIndex;
+
+    // Are the query and collection using the same collation?
+    // Or are the bounds excluding situations where collation matters?
+    bool hasCompatibleCollation;
 
     // If true, the collection scan will return a token that can be used to resume the scan.
     bool requestResumeToken = false;

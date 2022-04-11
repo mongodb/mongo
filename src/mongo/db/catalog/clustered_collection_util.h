@@ -92,5 +92,10 @@ bool isClusteredOnId(const boost::optional<ClusteredCollectionInfo>& collInfo);
  */
 StringData getClusterKeyFieldName(const ClusteredIndexSpec& indexSpec);
 
+/**
+ * Returns the sort pattern and directions for use by the planner
+ */
+BSONObj getSortPattern(const ClusteredIndexSpec& collInfo);
+
 }  // namespace clustered_util
 }  // namespace mongo

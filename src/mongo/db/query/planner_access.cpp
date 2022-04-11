@@ -340,6 +340,10 @@ void handleRIDRangeScan(const MatchExpression* conjunct,
         return;  // Collator affects probe and it's not compatible with collection's collator.
     }
 
+    // Even if the collations don't match at this point, it's fine,
+    // because the bounds exclude values that use it
+    collScan->hasCompatibleCollation = true;
+
     const auto collated = IndexBoundsBuilder::objFromElement(element, collator);
     if (dynamic_cast<const EqualityMatchExpression*>(match)) {
         setMinRecord(collScan, collated);
@@ -356,7 +360,7 @@ void handleRIDRangeScan(const MatchExpression* conjunct,
 }  // namespace
 
 std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
-    const CanonicalQuery& query, bool tailable, const QueryPlannerParams& params) {
+    const CanonicalQuery& query, bool tailable, const QueryPlannerParams& params, int direction) {
     // Make the (only) node, a collection scan.
     auto csn = std::make_unique<CollectionScanNode>();
     csn->name = query.ns();
@@ -366,6 +370,11 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
         params.options & QueryPlannerParams::TRACK_LATEST_OPLOG_TS;
     csn->shouldWaitForOplogVisibility =
         params.options & QueryPlannerParams::OPLOG_SCAN_WAIT_FOR_VISIBLE;
+    csn->direction = direction;
+
+    if (params.clusteredInfo) {
+        csn->clusteredIndex = params.clusteredInfo->getIndexSpec();
+    }
 
     const BSONObj& hint = query.getFindCommandRequest().getHint();
     if (!hint.isEmpty()) {
@@ -434,11 +443,16 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
                 csn->assertTsHasNotFallenOffOplog);
     }
 
+    auto queryCollator = query.getCollator();
+    auto collCollator = params.clusteredCollectionCollator;
+    csn->hasCompatibleCollation =
+        !queryCollator || (collCollator && *queryCollator == *collCollator);
+
     if (params.clusteredInfo && !csn->resumeAfterRecordId) {
         // This is a clustered collection. Attempt to perform an efficient, bounded collection scan
         // via minRecord and maxRecord if applicable.
-        handleRIDRangeScan(csn->filter.get(), csn.get(), params, query.getCollator());
-        handleRIDRangeMinMax(query, csn.get(), params, query.getCollator());
+        handleRIDRangeScan(csn->filter.get(), csn.get(), params, queryCollator);
+        handleRIDRangeMinMax(query, csn.get(), params, queryCollator);
     }
 
     return csn;

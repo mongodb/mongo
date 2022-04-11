@@ -39,6 +39,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/db/bson/dotted_path_support.h"
+#include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/index/wildcard_key_generator.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/matcher/expression_algo.h"
@@ -469,9 +470,10 @@ static BSONObj finishMaxObj(const IndexEntry& indexEntry,
 
 std::unique_ptr<QuerySolution> buildCollscanSoln(const CanonicalQuery& query,
                                                  bool tailable,
-                                                 const QueryPlannerParams& params) {
+                                                 const QueryPlannerParams& params,
+                                                 int direction = 1) {
     std::unique_ptr<QuerySolutionNode> solnRoot(
-        QueryPlannerAccess::makeCollectionScan(query, tailable, params));
+        QueryPlannerAccess::makeCollectionScan(query, tailable, params, direction));
     return QueryPlannerAnalysis::analyzeDataAccess(query, params, std::move(solnRoot));
 }
 
@@ -1238,6 +1240,37 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
                         scd->tree.reset(indexTree);
                         scd->solnType = SolutionCacheData::WHOLE_IXSCAN_SOLN;
                         scd->wholeIXSolnDir = -1;
+
+                        soln->cacheData.reset(scd);
+                        out.push_back(std::move(soln));
+                    }
+                }
+            }
+        }
+
+        // The base index is sorted on some key, so it's possible we might want to use
+        // a collection scan to provide the sort requested
+        if (params.clusteredInfo) {
+            if (CollatorInterface::collatorsMatch(params.clusteredCollectionCollator,
+                                                  query.getCollator())) {
+                auto kp = clustered_util::getSortPattern(params.clusteredInfo->getIndexSpec());
+                int direction = 0;
+                if (providesSort(query, kp)) {
+                    direction = 1;
+                } else if (providesSort(query, QueryPlannerCommon::reverseSortObj(kp))) {
+                    direction = -1;
+                }
+
+                if (direction != 0) {
+                    auto soln = buildCollscanSoln(query, isTailable, params, direction);
+                    if (soln) {
+                        LOGV2_DEBUG(
+                            6082401,
+                            5,
+                            "Planner: outputting soln that uses clustered index to provide sort");
+                        SolutionCacheData* scd = new SolutionCacheData();
+                        scd->solnType = SolutionCacheData::COLLSCAN_SOLN;
+                        scd->wholeIXSolnDir = direction;
 
                         soln->cacheData.reset(scd);
                         out.push_back(std::move(soln));

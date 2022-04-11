@@ -38,6 +38,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/simple_bsonelement_comparator.h"
+#include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/keypattern.h"
@@ -303,8 +304,15 @@ std::vector<NamespaceStringOrUUID> QuerySolution::getAllSecondaryNamespaces(
 //
 // CollectionScanNode
 //
+CollectionScanNode::CollectionScanNode()
+    : clusteredIndex(boost::none), tailable(false), direction(1) {}
 
-CollectionScanNode::CollectionScanNode() : tailable(false), direction(1) {}
+void CollectionScanNode::computeProperties() {
+    if (clusteredIndex && hasCompatibleCollation) {
+        auto sort = clustered_util::getSortPattern(*clusteredIndex);
+        sortSet = ProvidedSortSet(sort);
+    }
+}
 
 void CollectionScanNode::appendToString(str::stream* ss, int indent) const {
     addIndent(ss, indent);
@@ -328,7 +336,8 @@ QuerySolutionNode* CollectionScanNode::clone() const {
     copy->shouldTrackLatestOplogTimestamp = this->shouldTrackLatestOplogTimestamp;
     copy->assertTsHasNotFallenOffOplog = this->assertTsHasNotFallenOffOplog;
     copy->shouldWaitForOplogVisibility = this->shouldWaitForOplogVisibility;
-
+    copy->clusteredIndex = this->clusteredIndex;
+    copy->hasCompatibleCollation = this->hasCompatibleCollation;
     return copy;
 }
 
