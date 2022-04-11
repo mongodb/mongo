@@ -469,8 +469,10 @@ void ValuePrinter<T>::writeValueToStream(TypeTags tag, Value val, size_t depth) 
             // going to put the resulting string into a BSON object and return it across the wire.
             // While passing true may be misleading in cases when the index has no collation, it is
             // safer to do so.
-            stream << "IndexBounds("
-                   << getIndexBoundsView(val)->toString(true /* hasNonSimpleCollation */) << ")";
+            stream << "IndexBounds(";
+            writeStringDataToStream(
+                getIndexBoundsView(val)->toString(true /* hasNonSimpleCollation */));
+            stream << ")";
             break;
         default:
             MONGO_UNREACHABLE;
