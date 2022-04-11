@@ -274,6 +274,9 @@ public:
 
     TrialRunTrackerAttachResultMask attachToTrialRunTracker(TrialRunTracker* tracker) {
         TrialRunTrackerAttachResultMask result = TrialRunTrackerAttachResultFlags::NoAttachment;
+        if (!_participateInTrialRunTracking) {
+            return result;
+        }
 
         auto stage = static_cast<T*>(this);
         for (auto&& child : stage->_children) {
@@ -307,6 +310,10 @@ public:
         }
     }
 
+    void disableTrialRunTracking() {
+        _participateInTrialRunTracking = false;
+    }
+
 protected:
     PlanState trackPlanState(PlanState state) {
         if (state == PlanState::IS_EOF) {
@@ -319,7 +326,6 @@ protected:
         }
         return state;
     }
-
 
     void trackClose() {
         _commonStats.closes++;
@@ -347,12 +353,20 @@ protected:
 
 private:
     /**
-     * In general, accessors can be accesed only after getNext returns a row. It is most definitely
+     * In general, accessors can be accessed only after getNext returns a row. It is most definitely
      * not OK to access accessors in ANY other state; e.g. closed, not yet opened, after EOF. We
      * need this tracker to support unfortunate consequences of the internal yielding feature. Once
      * that feature is retired we can then simply revisit all stages and simplify them.
      */
     bool _slotsAccessible{false};
+
+    /**
+     * Flag which determines whether this node and its children can participate in trial run
+     * tracking. A stage and its children are not eligible for trial run tracking when they are
+     * planned deterministically (that is, the amount of work they perform is independent of
+     * other parts of the tree which are multiplanned).
+     */
+    bool _participateInTrialRunTracking{true};
 };
 
 /**

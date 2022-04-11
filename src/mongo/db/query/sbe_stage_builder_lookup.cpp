@@ -479,6 +479,10 @@ std::pair<SlotId /* matched docs */, std::unique_ptr<sbe::PlanStage>> buildNljLo
                                                                     slotIdGenerator,
                                                                     allowDiskUse);
 
+    // 'innerRootStage' should not participate in trial run tracking as the number of reads that
+    // it performs should not influence planning decisions made for 'outerRootStage'.
+    innerRootStage->disableTrialRunTracking();
+
     // Connect the two branches with a nested loop join. For each outer record with a corresponding
     // value in the 'localKeySlot', the inner branch will be executed and will place the result into
     // 'matchedRecordsSlot'.
@@ -791,6 +795,10 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
                                                                      slotIdGenerator,
                                                                      state.allowDiskUse);
 
+    // 'foreignGroupStage' should not participate in trial run tracking as the number of reads
+    // that it performs should not influence planning decisions for 'localKeysSetStage'.
+    foreignGroupStage->disableTrialRunTracking();
+
     // The top level loop join stage that joins each local field with the matched foreign
     // documents.
     auto nljStage = makeS<LoopJoinStage>(std::move(localKeysSetStage),
@@ -831,6 +839,10 @@ std::pair<SlotId /*matched docs*/, std::unique_ptr<sbe::PlanStage>> buildHashJoi
                                                          nodeId,
                                                          slotIdGenerator,
                                                          allowDiskUse);
+
+    // 'foreignKeyStage' should not participate in trial run tracking as the number of
+    // reads that it performs should not influence planning decisions for 'outerRootStage'.
+    foreignKeyStage->disableTrialRunTracking();
 
     // Build lookup stage that matches the local and foreign rows and aggregates the
     // foreign values in an array.

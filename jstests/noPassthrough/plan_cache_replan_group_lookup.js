@@ -141,11 +141,11 @@ function dropLookupForeignColl() {
 }
 
 const lookupPushdownEnabled = checkSBEEnabled(db, ["featureFlagSBELookupPushdown"]);
-function verifyCorrectLookupAlgorithmUsed(targetJoinAlgorithm, pipeline) {
+function verifyCorrectLookupAlgorithmUsed(targetJoinAlgorithm, pipeline, options = {}) {
     if (!lookupPushdownEnabled) {
         return;
     }
-    const explain = coll.explain().aggregate(pipeline);
+    const explain = coll.explain().aggregate(pipeline, options);
     const eqLookupNodes = getAggPlanStages(explain, "EQ_LOOKUP");
 
     // Verify via explain that $lookup was lowered and appropriate $lookup algorithm was chosen.
@@ -173,5 +173,64 @@ testFn(aLookup,
 
 // TODO SERVER-64443: Verify that replanning works when HashLookupStage is implemented.
 
+// Verify that changing the plan for the right side does not trigger a replan.
+const foreignColl = db[foreignCollName];
+coll.drop();
+foreignColl.drop();
+coll.getPlanCache().clear();
+
+assert.commandWorked(coll.createIndex({a: 1}));
+assert.commandWorked(coll.createIndex({b: 1}));
+assert.commandWorked(coll.insert([
+    {_id: 0, a: 1, b: 1},
+    {_id: 1, a: 1, b: 2},
+    {_id: 2, a: 1, b: 3},
+    {_id: 3, a: 1, b: 4},
+]));
+
+assert.commandWorked(foreignColl.createIndex({c: 1}));
+for (let i = -30; i < 30; ++i) {
+    assert.commandWorked(foreignColl.insert({_id: i, c: i}));
+}
+
+const avoidReplanPipeline = [
+    {$match: {a: 1, b: 3}},
+    {$lookup: {from: foreignColl.getName(), as: "as", localField: "a", foreignField: "c"}}
+];
+function runQuery(options = {}) {
+    assert.eq([{_id: 2, a: 1, b: 3, as: [{_id: 1, c: 1}]}],
+              coll.aggregate(avoidReplanPipeline, options).toArray());
+}
+
+// Verify that we are using IndexedLoopJoin.
+verifyCorrectLookupAlgorithmUsed("IndexedLoopJoin", avoidReplanPipeline);
+
+runQuery();
+assertCacheUsage(true /*multiPlanning*/, false /*activeCacheEntry*/, {b: 1} /*cachedIndex*/);
+
+runQuery();
+assertCacheUsage(true /*multiPlanning*/, true /*activeCacheEntry*/, {b: 1} /*cachedIndex*/);
+
+// After dropping the index on the right-hand side, we should NOT replan the cached query. We
+// will, however, choose a different join algorithm.
+assert.commandWorked(foreignColl.dropIndex({c: 1}));
+
+// Verify that we are now using NestedLoopJoin.
+verifyCorrectLookupAlgorithmUsed("NestedLoopJoin", avoidReplanPipeline, {allowDiskUse: false});
+
+runQuery({allowDiskUse: false});
+assertCacheUsage(false /*multiPlanning*/, true /*activeCacheEntry*/, {b: 1} /*cachedIndex*/);
+runQuery({allowDiskUse: false});
+assertCacheUsage(false /*multiPlanning*/, true /*activeCacheEntry*/, {b: 1} /*cachedIndex*/);
+
+// Run with 'allowDiskUse: true'. This should now use HashJoin, and we should still avoid
+// replanning the cached query.
+
+verifyCorrectLookupAlgorithmUsed("HashJoin", avoidReplanPipeline, {allowDiskUse: true});
+
+runQuery({allowDiskUse: true});
+assertCacheUsage(false /*multiPlanning*/, true /*activeCacheEntry*/, {b: 1} /*cachedIndex*/);
+runQuery({allowDiskUse: true});
+assertCacheUsage(false /*multiPlanning*/, true /*activeCacheEntry*/, {b: 1} /*cachedIndex*/);
 MongoRunner.stopMongod(conn);
 }());

@@ -330,4 +330,132 @@ TEST_F(TrialRunTrackerTest, SiblingBlockingStagesBothGetTrialRunTracker) {
                        DBException,
                        ErrorCodes::QueryTrialRunCompleted);
 }
+
+TEST_F(TrialRunTrackerTest, TrialRunTrackingCanBeDisabled) {
+    auto scanStage =
+        makeS<ScanStage>(UUID::parse("00000000-0000-0000-0000-000000000000").getValue(),
+                         generateSlotId(),
+                         generateSlotId(),
+                         generateSlotId(),
+                         generateSlotId(),
+                         generateSlotId(),
+                         generateSlotId(),
+                         boost::none,
+                         std::vector<std::string>{"field"},
+                         makeSV(generateSlotId()),
+                         generateSlotId(),
+                         true,
+                         nullptr,
+                         kEmptyPlanNodeId,
+                         ScanCallbacks());
+
+    scanStage->disableTrialRunTracking();
+    auto tracker = std::make_unique<TrialRunTracker>(size_t{0}, size_t{0});
+    auto attachResult = scanStage->attachToTrialRunTracker(tracker.get());
+    ASSERT_EQ(attachResult, PlanStage::TrialRunTrackerAttachResultFlags::NoAttachment);
+}
+
+TEST_F(TrialRunTrackerTest, DisablingTrackingForChildDoesNotInhibitTrackingForParent) {
+    auto scanStage =
+        makeS<ScanStage>(UUID::parse("00000000-0000-0000-0000-000000000000").getValue(),
+                         generateSlotId(),
+                         generateSlotId(),
+                         generateSlotId(),
+                         generateSlotId(),
+                         generateSlotId(),
+                         generateSlotId(),
+                         boost::none,
+                         std::vector<std::string>{"field"},
+                         makeSV(generateSlotId()),
+                         generateSlotId(),
+                         true,
+                         nullptr,
+                         kEmptyPlanNodeId,
+                         ScanCallbacks());
+
+    // Disable tracking for 'scanStage'. We should still attach the tracker for 'rootSortStage'.
+    scanStage->disableTrialRunTracking();
+
+    auto rootSortStage = makeS<SortStage>(std::move(scanStage),
+                                          makeSV(),
+                                          std::vector<value::SortDirection>{},
+                                          makeSV(),
+                                          std::numeric_limits<std::size_t>::max(),
+                                          204857600,
+                                          false,
+                                          kEmptyPlanNodeId);
+
+
+    auto tracker = std::make_unique<TrialRunTracker>(size_t{0}, size_t{0});
+    ON_BLOCK_EXIT([&]() { rootSortStage->detachFromTrialRunTracker(); });
+
+    auto attachResult = rootSortStage->attachToTrialRunTracker(tracker.get());
+    ASSERT_EQ(attachResult, PlanStage::TrialRunTrackerAttachResultFlags::AttachedToBlockingStage);
+}
+
+TEST_F(TrialRunTrackerTest, DisablingTrackingForAChildStagePreventsEarlyExit) {
+    auto ctx = makeCompileCtx();
+
+    // This PlanStage tree allows us to observe what happens when we attach a TrialRunTracker to
+    // one of two sibling HashAgg stages.
+    auto buildHashAgg = [&]() {
+        auto [inputTag, inputVal] = stage_builder::makeValue(BSON_ARRAY(1 << 2 << 3 << 4 << 5));
+        auto [scanSlot, scanStage] = generateVirtualScan(inputTag, inputVal);
+
+        // Build a HashAggStage, group by the scanSlot and compute a simple count.
+        auto countsSlot = generateSlotId();
+        auto hashAggStage = makeS<HashAggStage>(
+            std::move(scanStage),
+            makeSV(scanSlot),
+            makeEM(countsSlot,
+                   stage_builder::makeFunction("sum",
+                                               makeE<EConstant>(value::TypeTags::NumberInt64,
+                                                                value::bitcastFrom<int64_t>(1)))),
+            makeSV(),  // Seek slot
+            true,
+            boost::none,
+            false /* allowDiskUse */,
+            kEmptyPlanNodeId);
+
+        return std::make_pair(countsSlot, std::move(hashAggStage));
+    };
+
+    auto [leftCountsSlot, leftHashAggStage] = buildHashAgg();
+    auto [rightCountsSlot, rightHashAggStage] = buildHashAgg();
+
+    // Disable trial run tracking for the right HashAgg stage.
+    rightHashAggStage->disableTrialRunTracking();
+    auto resultSlot = generateSlotId();
+    auto unionStage = makeS<UnionStage>(
+        makeSs(std::move(leftHashAggStage), std::move(rightHashAggStage)),
+        std::vector<value::SlotVector>{makeSV(leftCountsSlot), makeSV(rightCountsSlot)},
+        makeSV(resultSlot),
+        kEmptyPlanNodeId);
+
+    // The blocking SortStage at the root ensures that both of the child HashAgg stages will be
+    // opened during the open phase of the root stage.
+    auto sortStage =
+        makeS<SortStage>(std::move(unionStage),
+                         makeSV(resultSlot),
+                         std::vector<value::SortDirection>{value::SortDirection::Ascending},
+                         makeSV(),
+                         std::numeric_limits<std::size_t>::max(),
+                         204857600,
+                         false,
+                         kEmptyPlanNodeId);
+
+    // We expect the TrialRunTracker to attach to _only_ the left child.
+    auto tracker = std::make_unique<TrialRunTracker>(size_t{9}, size_t{0});
+    auto attachResult = sortStage->attachToTrialRunTracker(tracker.get());
+
+    // Note: A scan is a streaming stage, but the "virtual scan" used here does not attach to the
+    // tracker.
+    ASSERT_EQ(attachResult, PlanStage::TrialRunTrackerAttachResultFlags::AttachedToBlockingStage);
+
+    // The 'prepareTree()' function opens the SortStage, causing it to read documents from its
+    // child. Because only one of the HashAgg stages is attached to the TrialRunTracker, the
+    // 'numResults' metric will not be incremented enough to end the trial. As such, this call to
+    // 'prepareTree()' will not end the trial.
+    prepareTree(ctx.get(), sortStage.get(), resultSlot);
+}
 }  // namespace mongo::sbe
