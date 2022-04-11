@@ -60,12 +60,10 @@ assert.commandWorked(coll.insertMany([
 
 // Test query: {}.
 assertSbeCommandWorked({query: {}});
-// Test query {b: 1}.
-assertSbeCommandWorked({query: {b: 1}});
-// Test query: {a: 1, c: 3}.
-assertSbeCommandWorked({query: {a: 1, c: 3}});
-// Test query: {a: 1, c: 3} with projection {_id: 0}.
-assertSbeCommandWorked({query: {a: 1, c: 3}, projection: {_id: 0}});
+// Test query {b: {$type: "string"}}.
+assertSbeCommandWorked({query: {b: {$type: "number"}}});
+// Test query: {a: {$exists: true}}.
+assertSbeCommandWorked({query: {a: {$exists: true}}});
 
 // Verify that the sbe command can detect if a collection has been dropped.
 const explain = coll.find().explain();
