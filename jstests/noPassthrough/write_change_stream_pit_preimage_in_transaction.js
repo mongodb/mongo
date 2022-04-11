@@ -103,7 +103,7 @@ const otherColl = assertDropAndRecreateCollection(testDB, "coll_regular");
 function getPreviousTimestampValue(timestamp) {
     assert(timestamp.getInc() > 0, `Non-positive timestamp inc value ${timestamp.getInc()}`);
     if (timestamp.getInc() == 1) {
-        return new Timestamp(timestamp.getTime() - 1, Number.MAX_VALUE);
+        return new Timestamp(timestamp.getTime() - 1, Math.pow(2, 32) - 1);
     } else {
         return new Timestamp(timestamp.getTime(), timestamp.getInc() - 1);
     }
