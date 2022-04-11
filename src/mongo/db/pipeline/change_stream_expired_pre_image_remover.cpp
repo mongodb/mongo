@@ -382,10 +382,13 @@ void deleteExpiredChangeStreamPreImages(Client* client, Date_t currentTimeForTim
             });
     }
 
-    LOGV2(5869104,
-          "Periodic expired pre-images removal job finished executing",
-          "numberOfRemovals"_attr = numberOfRemovals,
-          "jobDuration"_attr = (Date_t::now() - startTime).toString());
+    if (numberOfRemovals > 0) {
+        LOGV2_DEBUG(5869104,
+                    3,
+                    "Periodic expired pre-images removal job finished executing",
+                    "numberOfRemovals"_attr = numberOfRemovals,
+                    "jobDuration"_attr = (Date_t::now() - startTime).toString());
+    }
 }
 
 void performExpiredChangeStreamPreImagesRemovalPass(Client* client) {
