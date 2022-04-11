@@ -403,6 +403,47 @@ TEST(FLECollectionOptions, DuplicateKeyIds) {
     }})")));
 }
 
+TEST(FLECollectionOptions, NonConflictingPrefixes) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagFLE2", true);
+    ASSERT_OK(CollectionOptions::parse(fromjson(R"({
+    encryptedFields: {
+        "fields": [
+            {
+                "path": "name",
+                "keyId": { '$uuid': '11d58b8a-0c6c-4d69-a0bd-70c6d9befae9' },
+                "bsonType": "string",
+                "queries": {"queryType": "equality"}
+            },
+            {
+                "path": "nameOther",
+                "keyId": { '$uuid': '5f34e99a-b214-451f-b6f6-d3d28e933d15' },
+                "bsonType": "string",
+                "queries": [{"queryType": "equality"}]
+            }
+        ]
+    }})"))
+                  .getStatus());
+
+    ASSERT_OK(CollectionOptions::parse(fromjson(R"({
+    encryptedFields: {
+        "fields": [
+            {
+                "path": "a.b.c",
+                "keyId": { '$uuid': '11d58b8a-0c6c-4d69-a0bd-70c6d9befae9' },
+                "bsonType": "string",
+                "queries": {"queryType": "equality"}
+            },
+            {
+                "path": "a.b.cde",
+                "keyId": { '$uuid': '5f34e99a-b214-451f-b6f6-d3d28e933d15' },
+                "bsonType": "string",
+                "queries": [{"queryType": "equality"}]
+            }
+        ]
+    }})"))
+                  .getStatus());
+}
+
 TEST(FLECollectionOptions, ConflictingPrefixes) {
     RAIIServerParameterControllerForTest featureFlagController("featureFlagFLE2", true);
 

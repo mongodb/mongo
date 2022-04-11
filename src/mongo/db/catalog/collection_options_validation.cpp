@@ -59,7 +59,7 @@ Status validateStorageEngineOptions(const BSONObj& storageEngine) {
 EncryptedFieldConfig processAndValidateEncryptedFields(EncryptedFieldConfig config) {
 
     stdx::unordered_set<UUID, UUID::Hash> keys(config.getFields().size());
-    std::vector<std::string> fieldPaths;
+    std::vector<FieldRef> fieldPaths;
     fieldPaths.reserve(config.getFields().size());
 
     for (const auto& field : config.getFields()) {
@@ -69,16 +69,17 @@ EncryptedFieldConfig processAndValidateEncryptedFields(EncryptedFieldConfig conf
         uassert(6338401, "Duplicate key ids are not allowed", keys.count(keyId) == 0);
         keys.insert(keyId);
 
+        FieldRef newPath(field.getPath());
         for (const auto& path : fieldPaths) {
-            uassert(6338402, "Duplicate paths are not allowed", field.getPath() != path);
+            uassert(6338402, "Duplicate paths are not allowed", newPath != path);
             // Cannot have indexes on "a" and "a.b"
             uassert(6338403,
                     str::stream() << "Conflicting index paths found as one is a prefix of another '"
-                                  << field.getPath() << "' and '" << path << "'",
-                    !field.getPath().startsWith(path) &&
-                        !StringData(path).startsWith(field.getPath()));
+                                  << newPath.dottedField() << "' and '" << path.dottedField()
+                                  << "'",
+                    !path.fullyOverlapsWith(newPath));
         }
-        fieldPaths.push_back(field.getPath().toString());
+        fieldPaths.push_back(std::move(newPath));
 
         if (field.getQueries().has_value()) {
             auto queriesVariant = field.getQueries().get();
