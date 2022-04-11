@@ -1,0 +1,114 @@
+/**
+ * Validate batched multi-deleter's parameters.
+ *
+ * @tags: [
+ *  # Running as a replica set requires journaling.
+ *  requires_journaling,
+ * ]
+ */
+
+(function() {
+"use strict";
+load("jstests/libs/fail_point_util.js");  // For 'configureFailPoint()'
+
+const rst = new ReplSetTest({
+    nodes: 2,
+});
+rst.startSet();
+rst.initiate();
+rst.awaitNodesAgreeOnPrimary();
+const conn = rst.getPrimary();
+
+// '__internalBatchedDeletesTesting.Collection0' is a special, hardcoded namespace that batches
+// multi-doc deletes if the 'internalBatchUserMultiDeletesForTest' server parameter is set.
+// TODO (SERVER-63044): remove this special handling.
+const db = conn.getDB("__internalBatchedDeletesTesting");
+const coll = db.getCollection('Collection0');
+
+assert.commandWorked(db.adminCommand({setParameter: 1, internalBatchUserMultiDeletesForTest: 1}));
+
+function validateTargetDocsPerBatch() {
+    const collCount = 1234;
+
+    assert.commandWorked(db.adminCommand({setParameter: 1, batchedDeletesTargetBatchTimeMS: 0}));
+
+    for (let docsPerBatch of [0, 1, 20, 100]) {
+        jsTestLog("Validating targetBatchDocs=" + docsPerBatch);
+
+        coll.drop();
+        assert.commandWorked(
+            coll.insertMany([...Array(collCount).keys()].map(x => ({_id: x, a: "a".repeat(10)}))));
+
+        assert.commandWorked(
+            db.adminCommand({setParameter: 1, batchedDeletesTargetBatchDocs: docsPerBatch}));
+
+        // batchedDeletesTargetBatchDocs := 0 means no limit.
+        const expectedBatches = docsPerBatch ? Math.ceil(collCount / docsPerBatch) : 1;
+        const serverStatusBatchesBefore = db.serverStatus()['batchedDeletes']['batches'];
+        const serverStatusDocsBefore = db.serverStatus()['batchedDeletes']['docs'];
+
+        assert.eq(collCount, coll.find().itcount());
+        assert.commandWorked(coll.deleteMany({_id: {$gte: 0}}));
+        assert.eq(0, coll.find().itcount());
+
+        const serverStatusBatchesAfter = db.serverStatus()['batchedDeletes']['batches'];
+        const serverStatusDocsAfter = db.serverStatus()['batchedDeletes']['docs'];
+        const serverStatusDocsExpected = serverStatusDocsBefore + collCount;
+        const serverStatusBatchesExpected = serverStatusBatchesBefore + expectedBatches;
+        assert.eq(serverStatusBatchesAfter, serverStatusBatchesExpected);
+        assert.eq(serverStatusDocsAfter, serverStatusDocsExpected);
+
+        rst.awaitReplication();
+        rst.checkReplicatedDataHashes();
+    }
+}
+
+function validateTargetBatchTimeMS() {
+    const collCount = 10;
+
+    assert.commandWorked(db.adminCommand({setParameter: 1, batchedDeletesTargetBatchDocs: 0}));
+
+    for (let targetBatchTimeMS of [0, 1000]) {
+        jsTestLog("Validating targetBatchTimeMS=" + targetBatchTimeMS);
+
+        coll.drop();
+        assert.commandWorked(
+            coll.insertMany([...Array(collCount).keys()].map(x => ({_id: x, a: "a".repeat(10)}))));
+
+        assert.commandWorked(
+            db.adminCommand({setParameter: 1, batchedDeletesTargetBatchTimeMS: targetBatchTimeMS}));
+
+        // batchedDeletesTargetBatchTimeMS := 0 means no limit.
+        const expectedBatches = targetBatchTimeMS ? collCount : 1;
+        const serverStatusBatchesBefore = db.serverStatus()['batchedDeletes']['batches'];
+        const serverStatusDocsBefore = db.serverStatus()['batchedDeletes']['docs'];
+
+        assert.eq(collCount, coll.find().itcount());
+
+        // Make every delete take >> targetBatchTimeMS.
+        const fp = configureFailPoint(db,
+                                      "batchedDeleteStageSleepAfterNDocuments",
+                                      {nDocs: 1, ns: coll.getFullName(), sleepMs: 2000});
+
+        assert.commandWorked(coll.deleteMany({_id: {$gte: 0}}));
+        assert.eq(0, coll.find().itcount());
+
+        fp.off();
+        const serverStatusBatchesAfter = db.serverStatus()['batchedDeletes']['batches'];
+        const serverStatusDocsAfter = db.serverStatus()['batchedDeletes']['docs'];
+        const serverStatusDocsExpected = serverStatusDocsBefore + collCount;
+        const serverStatusBatchesExpected = serverStatusBatchesBefore + expectedBatches;
+        assert.eq(serverStatusBatchesAfter, serverStatusBatchesExpected);
+        assert.eq(serverStatusDocsAfter, serverStatusDocsExpected);
+
+        rst.awaitReplication();
+        rst.checkReplicatedDataHashes();
+    }
+}
+
+validateTargetDocsPerBatch();
+validateTargetBatchTimeMS();
+// TODO (SERVER-63039): validate targetStagedDocBytes.
+
+rst.stopSet();
+})();

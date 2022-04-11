@@ -52,7 +52,7 @@
 namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(throwWriteConflictExceptionInBatchedDeleteStage);
-MONGO_FAIL_POINT_DEFINE(batchedDeleteStageHangAfterNDocuments);
+MONGO_FAIL_POINT_DEFINE(batchedDeleteStageSleepAfterNDocuments);
 
 namespace {
 
@@ -232,21 +232,25 @@ PlanStage::StageState BatchedDeleteStage::_deleteBatch(WorkingSetID* out) {
                                                  : Collection::StoreDeletedDoc::Off);
 
                 docsDeleted++;
+
+                batchedDeleteStageSleepAfterNDocuments.executeIf(
+                    [&](const BSONObj& data) {
+                        int sleepMs = data["sleepMs"].safeNumberInt();
+                        opCtx()->sleepFor(Milliseconds(sleepMs));
+                    },
+                    [&](const BSONObj& data) {
+                        // hangAfterApproxNDocs is roughly estimated as the number of deletes
+                        // committed
+                        // + the number of documents deleted in the current unit of work.
+                        return data.hasField("sleepMs") && data.hasField("ns") &&
+                            data.getStringField("ns") == collection()->ns().toString() &&
+                            data.hasField("nDocs") &&
+                            static_cast<int>(_specificStats.docsDeleted + docsDeleted) >=
+                            data.getIntField("nDocs");
+                    });
             } else {
                 recordsThatNoLongerMatch.insert(stagedDocument.rid);
             }
-
-            batchedDeleteStageHangAfterNDocuments.executeIf(
-                [&](auto&) { batchedDeleteStageHangAfterNDocuments.pauseWhileSet(opCtx()); },
-                [&](const BSONObj& data) {
-                    // hangAfterApproxNDocs is roughly estimated as the number of deletes committed
-                    // + the number of documents deleted in the current unit of work.
-                    return data.hasField("ns") &&
-                        data.getStringField("ns") == collection()->ns().toString() &&
-                        data.hasField("nDocs") &&
-                        data.getIntField("nDocs") >=
-                        static_cast<int>(_specificStats.docsDeleted + docsDeleted);
-                });
 
             const Milliseconds elapsedMillis(batchTimer.millis());
             if (_batchParams->targetBatchTimeMS != Milliseconds(0) &&

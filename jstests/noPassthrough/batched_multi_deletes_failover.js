@@ -134,9 +134,10 @@ function runTest(failoverFn, clustered, expectNetworkErrorOnDelete) {
 
     // When the delete fails, the failpoint will automatically unpause. If the connection is killed,
     // it is unsafe to try and disable the failpoint tied to testDB's original connection.
-    const fp = configureFailPoint(testDB,
-                                  "batchedDeleteStageHangAfterNDocuments",
-                                  {nDocs: hangAfterApproxNDocs, ns: coll.getFullName()});
+    const fp = configureFailPoint(
+        testDB,
+        "batchedDeleteStageSleepAfterNDocuments",
+        {nDocs: hangAfterApproxNDocs, ns: coll.getFullName(), sleepMs: 60 * 60 * 1000});
 
     const awaitDeleteFails = startParallelShell(
         funWithArgs((dbName, collName, expectNetworkErrorOnDelete) => {
