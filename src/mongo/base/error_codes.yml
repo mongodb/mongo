@@ -484,6 +484,8 @@ error_codes:
 
     - {code: 371, name: UserWritesBlocked}
 
+    - {code: 372, name: CloseConnectionForShutdownCommand, categories: [CloseConnectionError,InternalOnly]}
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)

@@ -1221,7 +1221,7 @@ Future<void> ClientCommand::_execute() {
 }
 
 Future<void> ClientCommand::_handleException(Status status) {
-    if (_propagateException) {
+    if (status == ErrorCodes::CloseConnectionForShutdownCommand || _propagateException) {
         return status;
     }
 

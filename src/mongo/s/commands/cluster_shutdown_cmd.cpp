@@ -44,7 +44,7 @@ public:
                "run, but directs clients to route new operations to other mongos nodes.";
     }
 
-    static void beginShutdown(OperationContext* opCtx, bool force, long long timeoutSecs) {}
+    static void beginShutdown(OperationContext* opCtx, bool force, Milliseconds timeout) {}
 
 } clusterShutdownCmd;
 

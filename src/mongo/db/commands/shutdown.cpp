@@ -31,7 +31,10 @@
 
 #include "mongo/logv2/log.h"
 
+#include "mongo/base/error_codes.h"
 #include "mongo/db/commands/shutdown.h"
+#include "mongo/stdx/thread.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 
 namespace mongo {
@@ -41,11 +44,10 @@ namespace shutdown_detail {
 MONGO_FAIL_POINT_DEFINE(crashOnShutdown);
 int* volatile illegalAddress;  // NOLINT - used for fail point only
 
-void finishShutdown(bool force, long long timeoutSecs, Milliseconds quiesceTime) {
-    ShutdownTaskArgs shutdownArgs;
-    shutdownArgs.isUserInitiated = true;
-    shutdownArgs.quiesceTime = quiesceTime;
-
+void finishShutdown(OperationContext* opCtx,
+                    bool force,
+                    Milliseconds timeout,
+                    Milliseconds quiesceTime) {
     crashOnShutdown.execute([&](const BSONObj& data) {
         if (data["how"].str() == "fault") {
             ++*illegalAddress;
@@ -57,22 +59,38 @@ void finishShutdown(bool force, long long timeoutSecs, Milliseconds quiesceTime)
     LOGV2(4695400,
           "Terminating via shutdown command",
           "force"_attr = force,
-          "timeoutSecs"_attr = timeoutSecs);
+          "timeout"_attr = timeout);
+
+    // Only allow the first shutdown command to spawn a new thread and execute the shutdown.
+    // Late arrivers will skip and wait until operations are killed.
+    static StaticImmortal<AtomicWord<bool>> shutdownAlreadyInProgress{false};
+    if (!shutdownAlreadyInProgress->swap(true)) {
+        stdx::thread([quiesceTime] {
+            ShutdownTaskArgs shutdownArgs;
+            shutdownArgs.isUserInitiated = true;
+            shutdownArgs.quiesceTime = quiesceTime;
 
 #if defined(_WIN32)
-    // Signal the ServiceMain thread to shutdown.
-    if (ntservice::shouldStartService()) {
-        shutdownNoTerminate(shutdownArgs);
-
-        // Client expects us to abruptly close the socket as part of exiting
-        // so this function is not allowed to return.
-        // The ServiceMain thread will quit for us so just sleep until it does.
-        while (true)
-            sleepsecs(60);  // Loop forever
-        return;
-    }
+            // Signal the ServiceMain thread to shutdown.
+            if (ntservice::shouldStartService()) {
+                shutdownNoTerminate(shutdownArgs);
+                return;
+            }
 #endif
-    shutdown(EXIT_CLEAN, shutdownArgs);  // this never returns
+            shutdown(EXIT_CLEAN, shutdownArgs);  // this never returns
+        })
+            .detach();
+    }
+
+    // Client expects the shutdown command to abruptly close the socket as part of exiting.
+    // This function is not allowed to return until the server interrupts its operation.
+    // The following requires the shutdown task to kill all the operations after the server
+    // stops accepting incoming connections.
+    while (opCtx->checkForInterruptNoAssert().isOK())
+        sleepsecs(1);
+
+    iasserted({ErrorCodes::CloseConnectionForShutdownCommand,
+               "Closing the connection running the shutdown command"});
 }
 
 }  // namespace shutdown_detail
