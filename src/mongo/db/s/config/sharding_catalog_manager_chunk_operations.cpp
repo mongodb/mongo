@@ -1195,7 +1195,7 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
         configShard->runCommandWithFixedRetryAttempts(
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            nss.db().toString(),
+            NamespaceString::kAdminDb.toString(),
             command,
             Shard::RetryPolicy::kIdempotent);
 
