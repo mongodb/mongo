@@ -251,7 +251,7 @@ selector:
   # process.
   - uses_full_validation
   # Multi-updates that conflict with tenant migration are not retried by inject_tenant_prefix.js.
-  - requires_multi_update
+  - requires_multi_updates
 
 executor:
   archive:
