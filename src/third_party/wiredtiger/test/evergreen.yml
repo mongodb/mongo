@@ -1864,6 +1864,8 @@ tasks:
     - name: compile
     - name: generate-datafile-little-endian
       variant: little-endian
+    - name: verify-datafile-little-endian
+      variant: little-endian
     commands:
       - func: "fetch artifacts"
       - func: "fetch endian format artifacts"
@@ -1913,6 +1915,8 @@ tasks:
     depends_on:
     - name: compile
     - name: generate-datafile-big-endian
+      variant: big-endian
+    - name: verify-datafile-big-endian
       variant: big-endian
     commands:
       - func: "fetch artifacts"
