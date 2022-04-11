@@ -17,6 +17,8 @@
 load("jstests/aggregation/extras/utils.js");
 load('jstests/libs/fixture_helpers.js');            // For 'FixtureHelpers'
 load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
+load("jstests/libs/sbe_explain_helpers.js");        // For getSbePlanStages.
+load("jstests/libs/sbe_util.js");                   // For checkSBEEnabled.
 
 const coll = db.spill_to_disk;
 coll.drop();
@@ -202,24 +204,34 @@ function setupCollections(localRecords, foreignRecords, foreignField) {
 }
 
 function setHashLookupParameters(memoryLimit) {
-    const oldMemoryLimit =
-        assert
-            .commandWorked(db.adminCommand({
-                setParameter: 1,
-                internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill:
-                    memoryLimit
-            }))
-            .was;
-
+    const commandResArr = FixtureHelpers.runCommandOnEachPrimary({
+        db: db.getSiblingDB("admin"),
+        cmdObj: {
+            setParameter: 1,
+            internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill: memoryLimit,
+        }
+    });
+    assert.gt(commandResArr.length, 0, "Setting memory limit on primaries failed.");
+    const oldMemoryLimit = assert.commandWorked(commandResArr[0]).was;
     return oldMemoryLimit;
 }
 
+const isSBELookupEnabled = checkSBEEnabled(db, ["featureFlagSBELookupPushdown"]);
+
 /**
  * Executes $lookup with multiple records in the local/foreign collections and checks that the "as"
- * field for it contains documents with ids from `idsExpectedToMatch`.
+ * field for it contains documents with ids from `idsExpectedToMatch`. In addition, it checks
+ * whether it spills to disk as expected.
  */
-function runTest_MultipleLocalForeignRecords(
-    {testDescription, localRecords, localField, foreignRecords, foreignField, idsExpectedToMatch}) {
+function runTest_MultipleLocalForeignRecords({
+    testDescription,
+    localRecords,
+    localField,
+    foreignRecords,
+    foreignField,
+    idsExpectedToMatch,
+    spillsToDisk
+}) {
     setupCollections(localRecords, foreignRecords, foreignField);
     const pipeline = [{
                   $lookup: {
@@ -229,7 +241,16 @@ function runTest_MultipleLocalForeignRecords(
                                 as: "matched"
                             }}];
     const results = localColl.aggregate(pipeline, {allowDiskUse: true}).toArray();
-    const explain = localColl.explain().aggregate(pipeline, {allowDiskUse: true});
+    const explain = localColl.explain('executionStats').aggregate(pipeline, {allowDiskUse: true});
+    // If sharding is enabled, '$lookup' is not pushed down to SBE.
+    if (isSBELookupEnabled && !sharded) {
+        const hLookups = getSbePlanStages(explain, 'hash_lookup');
+        assert.eq(hLookups.length, 1, explain);
+        const hLookup = hLookups[0];
+        assert(hLookup, explain);
+        assert(hLookup.hasOwnProperty("usedDisk"), hLookup);
+        assert.eq(hLookup.usedDisk, spillsToDisk, hLookup);
+    }
 
     assert.eq(localRecords.length, results.length);
 
@@ -245,7 +266,7 @@ function runTest_MultipleLocalForeignRecords(
     }
 }
 
-function runHashLookupSpill(memoryLimit) {
+function runHashLookupSpill({memoryLimit, spillsToDisk}) {
     const oldSettings = setHashLookupParameters(memoryLimit);
 
     (function testMultipleMatchesOnSingleLocal() {
@@ -263,7 +284,8 @@ function runHashLookupSpill(memoryLimit) {
             localField: "b",
             foreignRecords: docs,
             foreignField: "a",
-            idsExpectedToMatch: [[1, 2, 4]]
+            idsExpectedToMatch: [[1, 2, 4]],
+            spillsToDisk: spillsToDisk
         });
     })();
 
@@ -294,7 +316,8 @@ function runHashLookupSpill(memoryLimit) {
             localField: "a",
             foreignRecords: foreignDocs,
             foreignField: "b",
-            idsExpectedToMatch: [[], [8], [9, 10], [11, 12, 13], [11, 12, 13], []]
+            idsExpectedToMatch: [[], [8], [9, 10], [11, 12, 13], [11, 12, 13], []],
+            spillsToDisk: spillsToDisk
         });
     })();
 
@@ -312,7 +335,7 @@ const oldMemSettings =
 (function runAllDiskTest() {
     try {
         // Spill at one byte.
-        runHashLookupSpill(1);
+        runHashLookupSpill({memoryLimit: 1, spillsToDisk: true});
     } finally {
         setHashLookupParameters(oldMemSettings);
     }
@@ -321,7 +344,7 @@ const oldMemSettings =
 (function runMixedInMemoryAndDiskTest() {
     try {
         // Spill at 128 bytes.
-        runHashLookupSpill(128);
+        runHashLookupSpill({memoryLimit: 128, spillsToDisk: true});
     } finally {
         setHashLookupParameters(oldMemSettings);
     }
@@ -330,7 +353,7 @@ const oldMemSettings =
 (function runMixedAllInMemory() {
     try {
         // Spill at 100 mb.
-        runHashLookupSpill(100 * 1024 * 1024);
+        runHashLookupSpill({memoryLimit: 100 * 1024 * 1024, spillsToDisk: false});
     } finally {
         setHashLookupParameters(oldMemSettings);
     }

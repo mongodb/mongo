@@ -6,6 +6,9 @@
 (function() {
 "use strict";
 
+load("jstests/libs/sbe_explain_helpers.js");  // For getSbePlanStages.
+load("jstests/libs/sbe_util.js");             // For checkSBEEnabled.
+
 const replTest = new ReplSetTest({
     nodes: 3,
 });
@@ -43,6 +46,20 @@ let res =
 
 pipeline =
     [{$lookup: {from: readColl.getName(), localField: "a", foreignField: "a", as: "results"}}];
+
+const isSBELookupEnabled =
+    checkSBEEnabled(secondary.getDB("test"), ["featureFlagSBELookupPushdown"]);
+if (isSBELookupEnabled) {
+    let explainRes = readColl.explain('executionStats').aggregate(pipeline, {allowDiskUse: true});
+    const hLookups = getSbePlanStages(explainRes, 'hash_lookup');
+    assert.eq(hLookups.length, 1, explainRes);
+    const hLookup = hLookups[0];
+    assert(hLookup, explainRes);
+    assert(hLookup.hasOwnProperty("usedDisk"), hLookup);
+    assert.eq(hLookup.usedDisk, true, hLookup);
+    assert.eq(hLookup.spilledRecords, 1000, hLookup);
+    assert.eq(hLookup.spilledBytesApprox, 63000, hLookup);
+}
 
 res =
     readColl

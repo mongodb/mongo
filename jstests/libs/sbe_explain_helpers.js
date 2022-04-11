@@ -20,6 +20,27 @@ function isIdIndexScan(db, root, expectedParentStageForIxScan) {
 }
 
 /**
+ * Given the root stage of agg explain's JSON representation of a query plan ('queryLayerOutput'),
+ * returns all sub-documents whose stage is 'stage'. This can be a SBE stage name like "nlj" or
+ * "hash_lookup".
+ *
+ * Returns an empty array if the plan does not have the requested stage. Asserts that agg explain
+ * structure matches expected format.
+ */
+function getSbePlanStages(queryLayerOutput, stage) {
+    assert(queryLayerOutput);
+    const queryInfo = getQueryInfoAtTopLevelOrFirstStage(queryLayerOutput);
+    // If execution stats are available, then use the execution stats tree.
+    if (queryInfo.hasOwnProperty("executionStats")) {
+        assert(queryInfo.executionStats.hasOwnProperty("executionStages"), queryInfo);
+        return getPlanStages(queryInfo.executionStats.executionStages, stage);
+    }
+
+    // Otherwise, we won't extract from the 'queryPlanner' for now.
+    return [];
+}
+
+/**
  * Helper to make an assertion depending on the engine being used. If we're in a mixed version
  * cluster, then we assert that either 'classicAssert' or 'sbeAssert' is true because the outcome
  * will depend on which node we're making assertions against. If we're not in a mixed version
@@ -52,6 +73,6 @@ function getQueryInfoAtTopLevelOrFirstStage(explainOutputV2) {
         return explainOutputV2.stages[0].$cursor;
     }
 
-    assert(false, `expected version 2 explain output but got ${explainOutputV2}`);
+    assert(false, `expected version 2 explain output but got ${JSON.stringify(explainOutputV2)}`);
     return undefined;
 }

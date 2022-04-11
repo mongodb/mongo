@@ -109,7 +109,6 @@ public:
                                                   collatorSlot,
                                                   kEmptyPlanNodeId);
 
-        stream << "-- OUTPUT ";
         StageResultsPrinters::SlotNames slotNames;
         if (outerKeyOnly) {
             slotNames.emplace_back(outerScanSlots[1], "outer_key");
@@ -152,6 +151,8 @@ public:
         StageResultsPrinters::make(firstStream, printOptions)
             .printStageResults(ctx, slotNames, stage);
         std::string firstStr = firstStream.str();
+        stream << "--- First Stats" << std::endl;
+        printHashLookupStats(stream, stage);
 
         // Execute the stage after reopen and verify that output is the same.
         stage->open(true);
@@ -160,6 +161,8 @@ public:
             .printStageResults(ctx, slotNames, stage);
         std::string secondStr = secondStream.str();
         ASSERT_EQ(firstStr, secondStr);
+        stream << "--- Second Stats" << std::endl;
+        printHashLookupStats(stream, stage);
 
         // Execute the stage after close and open and verify that output is the same.
         stage->close();
@@ -169,11 +172,12 @@ public:
             .printStageResults(ctx, slotNames, stage);
         std::string thirdStr = thirdStream.str();
         ASSERT_EQ(firstStr, thirdStr);
+        stream << "--- Third Stats" << std::endl;
+        printHashLookupStats(stream, stage);
+
+        stage->close();
 
         // Execute the stage with spilling to disk.
-        stage->close();
-        stage->open(false);
-
         auto defaultInternalQuerySBELookupApproxMemoryUseInBytesBeforeSpill =
             internalQuerySBELookupApproxMemoryUseInBytesBeforeSpill.load();
         internalQuerySBELookupApproxMemoryUseInBytesBeforeSpill.store(10);
@@ -181,11 +185,27 @@ public:
             internalQuerySBELookupApproxMemoryUseInBytesBeforeSpill.store(
                 defaultInternalQuerySBELookupApproxMemoryUseInBytesBeforeSpill);
         });
+
+        // TODO SERVER-65420: to enable the spilling tests, you need to uncomment the three lines
+        // below to clone the stage and prepare it again, as
+        // 'internalQuerySBELookupApproxMemoryUseInBytesBeforeSpill' is only considered at
+        // construction time of a `HashLookup` stage.
+        // auto stageUnqPtr = stage->clone();
+        // stage = stageUnqPtr.get();
+        // prepareTree(ctx, stage);
+
+        // TODO SERVER-65420: after enabling the spilling tests, there's no need to open the stage
+        // again, as it already get opened in the prepareTree call (above). Hence, you can remove
+        // the line below. stage->open(false);
+        stage->open(false);
+
         std::stringstream fourthStream;
         StageResultsPrinters::make(fourthStream, printOptions)
             .printStageResults(ctx, slotNames, stage);
         std::string fourthStr = fourthStream.str();
         ASSERT_EQ(firstStr, fourthStr);
+        stream << "--- Fourth Stats" << std::endl;
+        printHashLookupStats(stream, stage);
 
         // Execute the stage after reopen and we have spilled to disk and verify that output is the
         // same.
@@ -195,14 +215,32 @@ public:
             .printStageResults(ctx, slotNames, stage);
         std::string fifthStr = fifthStream.str();
         ASSERT_EQ(firstStr, fifthStr);
+        stream << "--- Fifth Stats" << std::endl;
+        printHashLookupStats(stream, stage);
+        stream << std::endl;
 
         stage->close();
+
+        stream << "-- OUTPUT ";
         stream << firstStr;
     }
 
 public:
     PrintOptions printOptions =
         PrintOptions().arrayObjectOrNestingMaxDepth(SIZE_MAX).useTagForAmbiguousValues(true);
+
+private:
+    static void printHashLookupStats(std::ostream& stream, const PlanStage* stage) {
+        auto stats = static_cast<const HashLookupStats*>(stage->getSpecificStats());
+        printHashLookupStats(stream, stats);
+    }
+    static void printHashLookupStats(std::ostream& stream, const HashLookupStats* stats) {
+        stream << "dsk:" << stats->usedDisk << std::endl;
+        stream << "htRecs:" << stats->spilledHtRecords << std::endl;
+        stream << "htIndices:" << stats->spilledHtBytesOverAllRecords << std::endl;
+        stream << "buffRecs:" << stats->spilledBuffRecords << std::endl;
+        stream << "buffBytes:" << stats->spilledBuffBytesOverAllRecords << std::endl;
+    }
 };
 
 TEST_F(HashLookupStageTest, BasicTests) {

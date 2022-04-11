@@ -282,6 +282,38 @@ struct HashAggStats : public SpecificStats {
     long long lastSpilledRecordSize{0};
 };
 
+struct HashLookupStats : public SpecificStats {
+    std::unique_ptr<SpecificStats> clone() const final {
+        return std::make_unique<HashLookupStats>(*this);
+    }
+
+    uint64_t estimateObjectSizeInBytes() const final {
+        return sizeof(*this);
+    }
+
+    void acceptVisitor(PlanStatsConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
+    long long getSpilledRecords() const {
+        return spilledHtRecords + spilledBuffRecords;
+    }
+
+    long long getSpilledBytesApprox() const {
+        return spilledHtBytesOverAllRecords + spilledBuffBytesOverAllRecords;
+    }
+
+    bool usedDisk{false};
+    long long spilledHtRecords{0};
+    long long spilledHtBytesOverAllRecords{0};
+    long long spilledBuffRecords{0};
+    long long spilledBuffBytesOverAllRecords{0};
+};
+
 /**
  * Visitor for calculating the number of storage reads during plan execution.
  */
@@ -304,4 +336,9 @@ struct PlanStatsNumReadsVisitor : PlanStatsVisitorBase<true> {
  * a physical read (e.g. COLLSCAN or IXSCAN), then its 'numReads' stats is added to the total.
  */
 size_t calculateNumberOfReads(const PlanStageStats* root);
+
+/**
+ * Accumulates the summary of all execution statistics by walking over the specific-stats of stages.
+ */
+PlanSummaryStats collectExecutionStatsSummary(const PlanStageStats* root);
 }  // namespace mongo::sbe

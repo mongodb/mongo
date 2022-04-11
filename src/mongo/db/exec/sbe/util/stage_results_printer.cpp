@@ -103,6 +103,43 @@ void StageResultsPrinter<T>::printSlotNames(const SlotNames& slotNames) {
     _stream << "]";
 }
 
+/**
+ * Visitor for printing the specific stats of a query stage into a stream.
+ */
+template <typename T>
+struct PlanStatsSpecificStatsPrinter : PlanStatsVisitorBase<true> {
+    PlanStatsSpecificStatsPrinter() = delete;
+    PlanStatsSpecificStatsPrinter(T& stream) : _stream(stream) {}
+
+    // To avoid overloaded-virtual warnings.
+    using PlanStatsConstVisitor::visit;
+
+    void visit(tree_walker::MaybeConstPtr<true, sbe::HashLookupStats> stats) override final {
+        _stream << "dsk:" << stats->usedDisk << "\n";
+        _stream << "htRecs:" << stats->spilledHtRecords << "\n";
+        _stream << "htIndices:" << stats->spilledHtBytesOverAllRecords << "\n";
+        _stream << "buffRecs:" << stats->spilledBuffRecords << "\n";
+        _stream << "buffBytes:" << stats->spilledBuffBytesOverAllRecords << "\n";
+    }
+
+    // TODO: Add an overload for the specific stats of other stages by overriding their
+    // corresponding `visit` method if needed.
+
+private:
+    T& _stream;
+};
+
+template <typename T>
+void StageResultsPrinter<T>::printSpecificStats(const SpecificStats* stats) {
+    auto visitor = PlanStatsSpecificStatsPrinter<T>(_stream);
+    stats->acceptVisitor(&visitor);
+}
+
+template <typename T>
+void StageResultsPrinter<T>::printSpecificStats(const PlanStage* stage) {
+    printSpecificStats(stage->getSpecificStats());
+}
+
 template class StageResultsPrinter<std::ostream>;
 template class StageResultsPrinter<str::stream>;
 

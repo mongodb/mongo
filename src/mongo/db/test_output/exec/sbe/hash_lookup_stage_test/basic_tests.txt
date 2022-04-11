@@ -12,6 +12,37 @@ INNER [value, key]:
 {"_id" : 13}, 2
 {"_id" : 14}, 7
 
+--- First Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Second Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Third Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Fourth Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Fifth Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+
 -- OUTPUT [outer_key, inner_agg]:
 1, [{"_id" : 11}]
 2, [{"_id" : 12}, {"_id" : 13}]
@@ -27,6 +58,37 @@ OUTER [value, key]:
 INNER [value, key]:
 {"_id" : 11}, 2
 {"_id" : 12}, 3
+
+--- First Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Second Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Third Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Fourth Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Fifth Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
 
 -- OUTPUT [outer_key, inner_agg]:
 1, Nothing
@@ -45,6 +107,37 @@ INNER [value, key]:
 {"_id" : 12}, 4
 {"_id" : 13}, [1, 2, 3]
 {"_id" : 14}, []
+
+--- First Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Second Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Third Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Fourth Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Fifth Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
 
 -- OUTPUT [outer_key, inner_agg]:
 1, [{"_id" : 13}]
@@ -71,6 +164,37 @@ INNER [value, key]:
 {"_id" : 15}, [3]
 {"_id" : 16}, [[3]]
 {"_id" : 17}, [2, [3]]
+
+--- First Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Second Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Third Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Fourth Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Fifth Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
 
 -- OUTPUT [outer_key, inner_agg]:
 1, [{"_id" : 11}, {"_id" : 14}]
@@ -102,6 +226,37 @@ INNER [value, key]:
 {"_id" : 16}, [{"a" : 1}, {"b" : 1}]
 {"_id" : 17}, [{"a" : 1, "b" : 1}]
 {"_id" : 18}, [{"b" : 1, "a" : 1}]
+
+--- First Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Second Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Third Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Fourth Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Fifth Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
 
 -- OUTPUT [outer_key, inner_agg]:
 {"a" : 1}, [{"_id" : 11}, {"_id" : 15}, {"_id" : 16}]
@@ -137,6 +292,37 @@ INNER [value, key]:
 {"_id" : 18}, [null, "1", "abc", NumberDecimal(1)]
 {"_id" : 19}, [{"x" : 1, "y" : "abc"}]
 
+--- First Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Second Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Third Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Fourth Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Fifth Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+
 -- OUTPUT [outer_key, inner_agg]:
 null, [{"_id" : 11}, {"_id" : 17}, {"_id" : 18}]
 1, [{"_id" : 12}, {"_id" : 14}, {"_id" : 15}, {"_id" : 18}]
@@ -165,6 +351,37 @@ INNER [value, key]:
 {"_id" : 14}, "Abc"
 {"_id" : 15}, "def"
 
+--- First Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Second Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Third Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Fourth Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Fifth Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+
 -- OUTPUT [outer_key, inner_agg]:
 null, [{"_id" : 11}]
 "abc", [{"_id" : 12}, {"_id" : 13}, {"_id" : 14}]
@@ -178,6 +395,37 @@ OUTER [value, key]:
 
 INNER [value, key]:
 
+--- First Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Second Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Third Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Fourth Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Fifth Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+
 -- OUTPUT [outer_key, inner_agg]:
 
 ==== VARIATION: empty outer ====
@@ -188,6 +436,37 @@ INNER [value, key]:
 {"_id" : 11}, 2
 {"_id" : 12}, 3
 
+--- First Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Second Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Third Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Fourth Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Fifth Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+
 -- OUTPUT [outer_key, inner_agg]:
 
 ==== VARIATION: empty inner ====
@@ -197,6 +476,37 @@ OUTER [value, key]:
 {"_id" : 2}, 2
 
 INNER [value, key]:
+
+--- First Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Second Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Third Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Fourth Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Fifth Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
 
 -- OUTPUT [outer_key, inner_agg]:
 1, Nothing

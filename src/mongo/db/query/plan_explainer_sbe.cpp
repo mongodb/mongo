@@ -301,22 +301,6 @@ void statsToBSON(const sbe::PlanStageStats* stats,
     statsToBSONHelper(stats, bob, topLevelBob, 0);
 }
 
-PlanSummaryStats collectExecutionStatsSummary(const sbe::PlanStageStats* stats) {
-    invariant(stats);
-
-    PlanSummaryStats summary;
-    summary.nReturned = stats->common.advances;
-
-    if (stats->common.executionTimeMillis) {
-        summary.executionTimeMillisEstimate = *stats->common.executionTimeMillis;
-    }
-
-    auto visitor = PlanSummaryStatsVisitor(summary);
-    auto walker = PlanStageStatsWalker<true, sbe::CommonStats>(nullptr, nullptr, &visitor);
-    tree_walker::walk<true, sbe::PlanStageStats>(stats, &walker);
-    return summary;
-}
-
 PlanExplainer::PlanStatsDetails buildPlanStatsDetails(
     const QuerySolution* solution,
     const sbe::PlanStageStats* stats,
@@ -326,7 +310,7 @@ PlanExplainer::PlanStatsDetails buildPlanStatsDetails(
     BSONObjBuilder bob;
 
     if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-        auto summary = collectExecutionStatsSummary(stats);
+        auto summary = sbe::collectExecutionStatsSummary(stats);
         if (solution != nullptr && verbosity >= ExplainOptions::Verbosity::kExecAllPlans) {
             summary.score = solution->score;
         }

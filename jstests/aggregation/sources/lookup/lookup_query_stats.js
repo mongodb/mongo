@@ -17,7 +17,8 @@
 
 load("jstests/libs/analyze_plan.js");         // For 'getAggPlanStages'
 load("jstests/libs/sbe_util.js");             // For checkSBEEnabled.
-load("jstests/libs/sbe_explain_helpers.js");  // For getQueryInfoAtTopLevelOrFirstStage
+load("jstests/libs/sbe_explain_helpers.js");  // For getSbePlanStages and
+                                              // getQueryInfoAtTopLevelOrFirstStage.
 
 const isSBELookupEnabled = checkSBEEnabled(db, ["featureFlagSBELookupPushdown"]);
 
@@ -84,7 +85,7 @@ let getCurrentQueryExecutorStats = function() {
 
 let checkExplainOutputForVerLevel = function(
     explainOutput, expected, verbosityLevel, expectedQueryPlan) {
-    let lkpStages = getAggPlanStages(explainOutput, "$lookup");
+    const lkpStages = getAggPlanStages(explainOutput, "$lookup");
     if (isSBELookupEnabled) {
         // If the SBE lookup is enabled, the $lookup stage is pushed down to the SBE and it's
         // not visible in 'stages' field of the explain output. Instead, 'queryPlan.stage' must be
@@ -105,20 +106,37 @@ let checkExplainOutputForVerLevel = function(
             assert.eq(plan.indexName, expectedQueryPlan.indexName, explainOutput);
         }
 
-        if (verbosityLevel && verbosityLevel !== kQueryPlanner) {
-            assert(queryInfo.hasOwnProperty("executionStats"), explainOutput);
+        const expectedTopLevelJoinStage =
+            expectedQueryPlan.strategy == "HashJoin" ? "hash_lookup" : "nlj";
 
-            const executionStats = queryInfo.executionStats;
-            assert(executionStats.hasOwnProperty("totalDocsExamined"), executionStats);
-            assert.eq(executionStats.totalDocsExamined, expected.totalDocsExamined, executionStats);
-            assert(executionStats.hasOwnProperty("totalKeysExamined"), executionStats);
-            assert.eq(executionStats.totalKeysExamined, expected.totalKeysExamined, executionStats);
+        const sbeNljStages = getSbePlanStages(explainOutput, expectedTopLevelJoinStage);
+        if (verbosityLevel && verbosityLevel !== kQueryPlanner) {
+            assert.gt(sbeNljStages.length, 0, explainOutput);
+            const topNljStage = sbeNljStages[0];
+
+            assert(topNljStage.hasOwnProperty("totalDocsExamined"), explainOutput);
+            assert.eq(topNljStage.totalDocsExamined, expected.totalDocsExamined, explainOutput);
+            assert(topNljStage.hasOwnProperty("totalKeysExamined"), explainOutput);
+            assert.eq(topNljStage.totalKeysExamined, expected.totalKeysExamined, explainOutput);
+
+            assert(topNljStage.hasOwnProperty("collectionScans"), explainOutput);
+            assert.eq(topNljStage.collectionScans, expected.collectionScans, explainOutput);
+            assert(topNljStage.hasOwnProperty("collectionSeeks"), explainOutput);
+            assert.eq(topNljStage.collectionSeeks, expected.collectionSeeks, explainOutput);
+            assert(topNljStage.hasOwnProperty("indexScans"), explainOutput);
+            assert.eq(topNljStage.indexScans, expected.indexScans, explainOutput);
+            assert(topNljStage.hasOwnProperty("indexSeeks"), explainOutput);
+            assert.eq(topNljStage.indexSeeks, expected.indexSeeks, explainOutput);
+            assert(topNljStage.hasOwnProperty("indexesUsed"), explainOutput);
+            assert(Array.isArray(topNljStage.indexesUsed), explainOutput);
+            assert.eq(topNljStage.indexesUsed, expected.indexesUsed, explainOutput);
         } else {  // If no `verbosityLevel` is passed or 'queryPlanner' is passed.
-            assert(!queryInfo.hasOwnProperty("executionStats"), explainOutput);
+            assert(!plan.hasOwnProperty("executionStats"), explainOutput);
+            assert.eq(sbeNljStages.length, 0, explainOutput);
         }
     } else {
         assert.eq(lkpStages.length, 1, lkpStages);
-        let lkpStage = lkpStages[0];
+        const lkpStage = lkpStages[0];
         if (verbosityLevel && verbosityLevel !== kQueryPlanner) {
             assert(lkpStage.hasOwnProperty("totalDocsExamined"), lkpStage);
             assert.eq(lkpStage.totalDocsExamined, expected.totalDocsExamined, lkpStage);
@@ -184,15 +202,28 @@ let testQueryExecutorStatsWithCollectionScan = function() {
     assert.eq(0, curScannedKeys);
 
     if (isSBELookupEnabled) {
-        // When the SBE lookup is enabled, the execution stats can capture all the scanning
-        // objects. So, totalDocsExmained must be same as
-        // (total documents in local collection +
-        //  total documents in local collection * total documents in foreign collection)
-        checkExplainOutputForAllVerbosityLevels(localColl,
-                                                fromColl,
-                                                {totalDocsExamined: 22, totalKeysExamined: 0},
-                                                {allowDiskUse: false},
-                                                {strategy: "NestedLoopJoin"});
+        checkExplainOutputForAllVerbosityLevels(
+            localColl,
+            fromColl,
+            {
+                // When the SBE lookup is enabled, the execution stats can capture all the scanning
+                // objects. So, totalDocsExmained must be same as
+                // (total documents in local collection +
+                //  total documents in local collection * total documents in foreign collection)
+                // In this case: two documents in the local collection + one iteration over the
+                // foreign collection for each document in the local collection (i.e., 2*10) = 22.
+                totalDocsExamined: 2 + 2 * 10,
+                totalKeysExamined: 0,
+                // one scan over the local collection + one scan over the foreign collection for
+                // each document in the local collection = 3.
+                collectionScans: 1 + 2,
+                collectionSeeks: 0,
+                indexScans: 0,
+                indexSeeks: 0,
+                indexesUsed: []
+            },
+            {allowDiskUse: false},
+            {strategy: "NestedLoopJoin"});
     } else {
         checkExplainOutputForAllVerbosityLevels(
             localColl,
@@ -226,14 +257,28 @@ let testQueryExecutorStatsWithHashLookup = function() {
     // There is no index in the collection.
     assert.eq(0, curScannedKeys);
 
-    // When the SBE lookup is enabled, the execution stats can capture all the scanning
-    // objects. So, totalDocsExmained must be same as
-    // (total documents in local collection + total documents in foreign collection)
-    checkExplainOutputForAllVerbosityLevels(localColl,
-                                            fromColl,
-                                            {totalDocsExamined: 12, totalKeysExamined: 0},
-                                            {allowDiskUse: true},
-                                            {strategy: "HashJoin"});
+    checkExplainOutputForAllVerbosityLevels(
+        localColl,
+        fromColl,
+        {
+            // When the SBE lookup is enabled, the execution stats can capture all the scanning
+            // objects. So, totalDocsExmained must be same as
+            // (total documents in local collection + total documents in foreign collection).
+            // In this case, we scan the foreign collection once (10 docs) to create the hash-table
+            // and then scan the local collection (2 docs) once to check each document in the built
+            // hash-table = 12.
+            totalDocsExamined: 10 + 2,
+            totalKeysExamined: 0,
+            // scan the foreign collection once to create the hash-table and then scan the local
+            // collection once to check each document in the built hash-table = 2.
+            collectionScans: 1 + 1,
+            collectionSeeks: 0,
+            indexScans: 0,
+            indexSeeks: 0,
+            indexesUsed: []
+        },
+        {allowDiskUse: true},
+        {strategy: "HashJoin"});
 };
 
 let createIndexForCollection = function(collection, fieldName) {
@@ -265,13 +310,28 @@ let testQueryExecutorStatsWithIndexScan = function() {
     assert.eq(localDocCount, curScannedKeys);
 
     if (isSBELookupEnabled) {
-        // When the SBE lookup is enabled, the execution stats can capture all the scanning
-        // objects. So, totalDocsExmained must be same as
-        // (total documents in local collection + total matched documents in foreign collection)
         checkExplainOutputForAllVerbosityLevels(
             localColl,
             fromColl,
-            {totalDocsExamined: 4, totalKeysExamined: 2},
+            {
+                // When the SBE lookup is enabled, the execution stats can capture all the scanning
+                // objects. So, totalDocsExmained must be same as
+                // (total docs in local collection + total matched docs in foreign collection)
+                totalDocsExamined: 2 + 2,
+                // One index seek is done per each document in the local collection and one key is
+                // examined per seek = 2.
+                totalKeysExamined: 2,
+                // The local collection get scanned = 1.
+                collectionScans: 1,
+                // For each examined key that matches in the index scan stage, a seek on foreign
+                // collection is done to acquire the corresponding document in the foreign
+                // collection = 2.
+                collectionSeeks: 2,
+                indexScans: 0,
+                // One index seek is done per each document in the local collection = 2
+                indexSeeks: 2,
+                indexesUsed: ["foreignField_1"]
+            },
             {allowDiskUse: false},
             {strategy: "IndexedLoopJoin", indexName: "foreignField_1"});
     } else {

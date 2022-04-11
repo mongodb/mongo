@@ -231,5 +231,7 @@ private:
 
     std::unique_ptr<TemporaryRecordStore> _recordStoreHt;
     std::unique_ptr<TemporaryRecordStore> _recordStoreBuf;
+
+    HashLookupStats _specificStats;
 };
 }  // namespace mongo::sbe

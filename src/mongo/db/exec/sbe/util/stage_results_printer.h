@@ -78,6 +78,10 @@ public:
 
     void printSlotNames(const SlotNames& slotNames);
 
+    void printSpecificStats(const PlanStage* stage);
+
+    void printSpecificStats(const SpecificStats* stats);
+
 private:
     T& _stream;
     const PrintOptions& _options;

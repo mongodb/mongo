@@ -194,6 +194,25 @@ protected:
 #endif
 };
 
+template <typename T>
+class CanTrackStats;
+
+/**
+ * An abstract class to be used for traversing a plan-stage tree.
+ */
+class PlanStageVisitor {
+public:
+    virtual ~PlanStageVisitor() = default;
+
+    friend class CanTrackStats<PlanStage>;
+
+protected:
+    /**
+     * Visits one plan-stage during a traversal over the plan-stage tree.
+     */
+    virtual void visit(const PlanStage* stage) = 0;
+};
+
 /**
  * Provides methods to obtain execution statistics specific to a plan stage.
  *
@@ -250,6 +269,18 @@ public:
         auto stage = static_cast<const T*>(this);
         for (auto&& child : stage->_children) {
             child->accumulate(nodeId, visitor);
+        }
+    }
+
+    /**
+     * Implements a pre-order traversal over the plan-stage tree starting from this node. The
+     * visitor parameter plays the role of an accumulator during this traversal.
+     */
+    void accumulate(PlanStageVisitor& visitor) const {
+        auto stage = static_cast<const T*>(this);
+        visitor.visit(stage);
+        for (auto&& child : stage->_children) {
+            child->accumulate(visitor);
         }
     }
 

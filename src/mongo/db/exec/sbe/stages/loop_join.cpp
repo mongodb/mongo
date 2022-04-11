@@ -30,6 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/exec/sbe/stages/loop_join.h"
+#include "mongo/db/exec/sbe/stages/stage_visitors.h"
 
 #include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/util/str.h"
@@ -173,22 +174,22 @@ void LoopJoinStage::doSaveState(bool relinquishCursor) {
 
 std::unique_ptr<PlanStageStats> LoopJoinStage::getStats(bool includeDebugInfo) const {
     auto ret = std::make_unique<PlanStageStats>(_commonStats);
+    ret->children.emplace_back(_children[0]->getStats(includeDebugInfo));
+    ret->children.emplace_back(_children[1]->getStats(includeDebugInfo));
+    ret->specific = std::make_unique<LoopJoinStats>(_specificStats);
 
     if (includeDebugInfo) {
-        BSONObjBuilder bob;
-        bob.appendNumber("innerOpens", static_cast<long long>(_specificStats.innerOpens));
-        bob.appendNumber("innerCloses", static_cast<long long>(_specificStats.innerCloses));
-        bob.append("outerProjects", _outerProjects.begin(), _outerProjects.end());
-        bob.append("outerCorrelated", _outerCorrelated.begin(), _outerCorrelated.end());
+        BSONObjBuilder bob(StorageAccessStatsVisitor::collectStats(*this, ret.get()).toBSON());
+        bob.appendNumber("innerOpens", static_cast<long long>(_specificStats.innerOpens))
+            .appendNumber("innerCloses", static_cast<long long>(_specificStats.innerCloses))
+            .append("outerProjects", _outerProjects.begin(), _outerProjects.end())
+            .append("outerCorrelated", _outerCorrelated.begin(), _outerCorrelated.end());
         if (_predicate) {
             bob.append("predicate", DebugPrinter{}.print(_predicate->debugPrint()));
         }
 
         ret->debugInfo = bob.obj();
     }
-
-    ret->children.emplace_back(_children[0]->getStats(includeDebugInfo));
-    ret->children.emplace_back(_children[1]->getStats(includeDebugInfo));
     return ret;
 }
 

@@ -30,6 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/exec/sbe/stages/hash_lookup.h"
+#include "mongo/db/exec/sbe/stages/stage_visitors.h"
 
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
@@ -249,7 +250,7 @@ void HashLookupStage::addHashTableEntry(value::SlotAccessor* keyAccessor, size_t
             _computedTotalMemUsage = newMemUsage;
         } else {
             // Write record to rs.
-            if (!_recordStoreHt) {
+            if (!hasSpilledHtToDisk()) {
                 makeTemporaryRecordStore();
             }
 
@@ -298,6 +299,8 @@ void HashLookupStage::makeTemporaryRecordStore() {
 
     _recordStoreHt = _opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStore(
         _opCtx, KeyFormat::String);
+
+    _specificStats.usedDisk = true;
 }
 
 void HashLookupStage::spillBufferedValueToDisk(OperationContext* opCtx,
@@ -318,6 +321,10 @@ void HashLookupStage::spillBufferedValueToDisk(OperationContext* opCtx,
     tassert(6373906,
             str::stream() << "Failed to write to disk because " << status.getStatus().reason(),
             status.isOK());
+
+    _specificStats.spilledBuffRecords++;
+    // Add size of record ID + size of buffer.
+    _specificStats.spilledBuffBytesOverAllRecords += sizeof(size_t) + buf.len();
     return;
 }
 
@@ -328,7 +335,7 @@ size_t HashLookupStage::bufferValueOrSpill(value::MaterializedRow& value) {
         _buffer.emplace_back(std::move(value));
         _computedTotalMemUsage = newMemUsage;
     } else {
-        if (!_recordStoreHt) {
+        if (!hasSpilledBufToDisk()) {
             makeTemporaryRecordStore();
         }
         spillBufferedValueToDisk(_opCtx, _recordStoreBuf->rs(), bufferIndex, value);
@@ -449,6 +456,15 @@ void HashLookupStage::writeIndicesToRecordStore(RecordStore* rs,
     auto [rid, typeBits] = serializeKeyForRecordStore(key);
 
     upsertToRecordStore(_opCtx, rs, rid, buf, typeBits, update);
+    if (!update) {
+        _specificStats.spilledHtRecords++;
+        // Add the size of key (which comprises of the memory usage for the key + its type bits),
+        // as well as the size of one integer to store the length of indices vector in the value.
+        _specificStats.spilledHtBytesOverAllRecords +=
+            rid.memUsage() + typeBits.getSize() + sizeof(size_t);
+    }
+    // Add the size of indices vector used in the hash-table value to the accounting.
+    _specificStats.spilledHtBytesOverAllRecords += value.size() * sizeof(size_t);
 }
 
 boost::optional<std::vector<size_t>> HashLookupStage::readIndicesFromRecordStore(
@@ -481,8 +497,11 @@ void HashLookupStage::spillIndicesToRecordStore(RecordStore* rs,
 
     auto update = false;
     if (valFromRs) {
-        update = true;
         valFromRs->insert(valFromRs->end(), value.begin(), value.end());
+        update = true;
+        // As we're updating these records, we'd remove the old size from the accounting. The new
+        // size is added back to the accounting in the call to 'writeIndicesToRecordStore' below.
+        _specificStats.spilledHtBytesOverAllRecords -= value.size();
     } else {
         valFromRs = value;
     }
@@ -570,11 +589,20 @@ std::unique_ptr<PlanStageStats> HashLookupStage::getStats(bool includeDebugInfo)
     auto ret = std::make_unique<PlanStageStats>(_commonStats);
     ret->children.emplace_back(outerChild()->getStats(includeDebugInfo));
     ret->children.emplace_back(innerChild()->getStats(includeDebugInfo));
+    ret->specific = std::make_unique<HashLookupStats>(_specificStats);
+    if (includeDebugInfo) {
+        BSONObjBuilder bob(StorageAccessStatsVisitor::collectStats(*this, ret.get()).toBSON());
+        // Spilling stats.
+        bob.appendBool("usedDisk", _specificStats.usedDisk)
+            .appendNumber("spilledRecords", _specificStats.getSpilledRecords())
+            .appendNumber("spilledBytesApprox", _specificStats.getSpilledBytesApprox());
+        ret->debugInfo = bob.obj();
+    }
     return ret;
 }
 
 const SpecificStats* HashLookupStage::getSpecificStats() const {
-    return nullptr;
+    return &_specificStats;
 }
 
 std::vector<DebugPrinter::Block> HashLookupStage::debugPrint() const {
