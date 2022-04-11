@@ -999,6 +999,14 @@ makeLoopJoinForFetch(std::unique_ptr<sbe::PlanStage> inputStage,
 
 sbe::value::SlotId StageBuilderState::registerInputParamSlot(
     MatchExpression::InputParamId paramId) {
+    auto it = data->inputParamToSlotMap.find(paramId);
+    if (it != data->inputParamToSlotMap.end()) {
+        // This input parameter id has already been tied to a particular runtime environment slot.
+        // Just return that slot to the caller. This can happen if a query planning optimization or
+        // rewrite chose to clone one of the input expressions from the user's query.
+        return it->second;
+    }
+
     auto slotId = data->env->registerSlot(
         sbe::value::TypeTags::Nothing, 0, false /* owned */, slotIdGenerator);
     data->inputParamToSlotMap.emplace(paramId, slotId);
