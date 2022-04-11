@@ -2319,6 +2319,7 @@ buildvariants:
   - name: cqf
   - name: cqf_parallel
   - name: compile_and_archive_dist_test_then_package_TG
+  - name: compile_benchmarks
   - name: build_variant_gen
   - name: .aggregation
   #  - name: .auth
@@ -2358,6 +2359,7 @@ buildvariants:
   - name: .watchdog
   - name: .stitch
 # Disabling the following tests as they are not aware of feature flags.
+#  - name: .benchmarks
 #  - name: unittest_shell_hang_analyzer_gen
 #  - name: server_discovery_and_monitoring_json_test_TG
 #  - name: server_selection_json_test_TG
@@ -2389,10 +2391,12 @@ buildvariants:
     separate_debug: off
   tasks:
   - name: compile_test_and_package_serial_TG
+  - name: compile_benchmarks
   - name: build_variant_gen
   - name: .aggregation
   - name: .auth
   - name: audit
+  - name: .benchmarks
   - name: .causally_consistent !.wo_snapshot
   - name: .change_streams
   - name: .misc_js
@@ -2463,6 +2467,7 @@ buildvariants:
   - name: cqf
   - name: cqf_parallel
   - name: compile_and_archive_dist_test_then_package_TG
+  - name: compile_benchmarks
   - name: build_variant_gen
   - name: .aggregation
   - name: .auth
@@ -2501,6 +2506,7 @@ buildvariants:
   - name: .updatefuzzer
   - name: watchdog_wiredtiger
 # Disabling the following tests as they are not aware of feature flags.
+#  - name: .benchmarks
 #  - name: server_discovery_and_monitoring_json_test_TG
 #  - name: server_selection_json_test_TG
 
@@ -2529,10 +2535,12 @@ buildvariants:
     separate_debug: off
   tasks:
   - name: compile_test_and_package_serial_TG
+  - name: compile_benchmarks
   - name: build_variant_gen
   - name: .aggregation
   - name: .auth
   - name: audit
+  - name: .benchmarks
   - name: .causally_consistent !.wo_snapshot
   - name: .change_streams
   - name: .misc_js
