@@ -252,12 +252,10 @@ __debug_config(WT_SESSION_IMPL *session, WT_DBG *ds, const char *ofile)
     WT_ERR(__wt_scr_alloc(session, 512, &ds->t2));
 
     /*
-     * Set up history store support, opening a history store cursor on demand, except while running
-     * in-memory configuration, or when reading a checkpoint that has no corresponding history store
-     * checkpoint.
+     * Set up history store support, opening a history store cursor on demand. Return error if that
+     * doesn't work, except while running in-memory configuration.
      */
-    if (!F_ISSET(conn, WT_CONN_IN_MEMORY) && !WT_IS_HS(session->dhandle) &&
-      !(WT_READING_CHECKPOINT(session) && session->hs_checkpoint == NULL))
+    if (!F_ISSET(conn, WT_CONN_IN_MEMORY) && !WT_IS_HS(session->dhandle))
         WT_ERR(__wt_curhs_open(session, NULL, &ds->hs_cursor));
 
     if (ds->hs_cursor != NULL) {

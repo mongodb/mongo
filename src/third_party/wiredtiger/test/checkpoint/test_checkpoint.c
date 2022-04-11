@@ -182,7 +182,6 @@ main(int argc, char *argv[])
 
     /* Start time at 1 since 0 is not a valid timestamp. */
     g.ts_stable = 1;
-    g.ts_oldest = 1;
 
     printf("%s: process %" PRIu64 "\n", progname, (uint64_t)getpid());
     for (cnt = 1; (runs == 0 || cnt <= runs) && g.status == 0; ++cnt) {
@@ -221,7 +220,7 @@ main(int argc, char *argv[])
                 break;
             }
 
-            verify_consistency(session, WT_TS_NONE, false);
+            verify_consistency(session, WT_TS_NONE);
             goto run_complete;
         }
 
@@ -344,6 +343,7 @@ cleanup(bool remove_dir)
 {
     g.running = 0;
     g.ntables_created = 0;
+    g.ts_oldest = 0;
 
     if (remove_dir)
         testutil_make_work_dir(g.home);

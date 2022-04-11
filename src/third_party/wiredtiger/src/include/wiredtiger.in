@@ -911,8 +911,8 @@ struct __wt_session {
 	 * Bulk-loaded bitmap values must end on a byte boundary relative to the bit count (except
 	 * for the last set of values loaded)., a string; default \c false.}
 	 * @config{checkpoint, the name of a checkpoint to open (the reserved name
-	 * "WiredTigerCheckpoint" opens the most recent checkpoint taken for the object). The cursor
-	 * does not support data modification., a string; default empty.}
+	 * "WiredTigerCheckpoint" opens the most recent internal checkpoint taken for the object).
+	 * The cursor does not support data modification., a string; default empty.}
 	 * @config{debug = (, configure debug specific behavior on a cursor.  Generally only used
 	 * for internal testing purposes., a set of related configuration options defined below.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;dump_version, open a version cursor\, which is a debug
