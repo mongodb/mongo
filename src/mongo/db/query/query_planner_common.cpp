@@ -77,7 +77,7 @@ void QueryPlannerCommon::reverseScans(QuerySolutionNode* node) {
     }
 
     for (size_t i = 0; i < node->children.size(); ++i) {
-        reverseScans(node->children[i]);
+        reverseScans(node->children[i].get());
     }
 }
 

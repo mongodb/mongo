@@ -1049,7 +1049,7 @@ protected:
         initializePlannerParamsIfNeeded();
         if (_plannerParams.options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
             auto shardFilter = std::make_unique<ShardingFilterNode>();
-            shardFilter->children.push_back(root.release());
+            shardFilter->children.push_back(std::move(root));
             root = std::move(shardFilter);
         }
 
@@ -1927,7 +1927,7 @@ bool turnIxscanIntoCount(QuerySolution* soln) {
     }
 
     IndexScanNode* isn = (STAGE_FETCH == root->getType())
-        ? static_cast<IndexScanNode*>(root->children[0])
+        ? static_cast<IndexScanNode*>(root->children[0].get())
         : static_cast<IndexScanNode*>(root);
 
     // No filters allowed and side-stepping isSimpleRange for now.  TODO: do we ever see
@@ -2240,13 +2240,13 @@ bool turnIxscanIntoDistinctIxscan(QuerySolution* soln,
     }
 
     if (!fetchNode && (STAGE_FETCH == root->children[0]->getType())) {
-        fetchNode = static_cast<FetchNode*>(root->children[0]);
+        fetchNode = static_cast<FetchNode*>(root->children[0].get());
     }
 
     if (fetchNode && (STAGE_IXSCAN == fetchNode->children[0]->getType())) {
-        indexScanNode = static_cast<IndexScanNode*>(fetchNode->children[0]);
+        indexScanNode = static_cast<IndexScanNode*>(fetchNode->children[0].get());
     } else if (projectNode && (STAGE_IXSCAN == projectNode->children[0]->getType())) {
-        indexScanNode = static_cast<IndexScanNode*>(projectNode->children[0]);
+        indexScanNode = static_cast<IndexScanNode*>(projectNode->children[0].get());
     }
 
     if (!indexScanNode) {
@@ -2345,36 +2345,22 @@ bool turnIxscanIntoDistinctIxscan(QuerySolution* soln,
         // transforming the plan from PROJECT=>FETCH=>IXSCAN to FETCH=>DISTINCT_SCAN.
         if (projectNode) {
             invariant(projectNode == root);
-            projectNode = nullptr;
-
+            invariant(fetchNode == root->children[0].get());
             invariant(STAGE_FETCH == root->children[0]->getType());
             invariant(STAGE_IXSCAN == root->children[0]->children[0]->getType());
-
-            // Detach the fetch from its parent projection.
-            root->children.clear();
-
             // Make the fetch the new root. This destroys the project stage.
-            soln->setRoot(std::unique_ptr<QuerySolutionNode>(fetchNode));
+            soln->setRoot(std::move(root->children[0]));
         }
 
-        // Whenver we have a FETCH node, the IXSCAN is its child. We detach the IXSCAN from the
-        // solution tree and take ownership of it, so that it gets destroyed when we leave this
-        // scope.
-        std::unique_ptr<IndexScanNode> ownedIsn(indexScanNode);
-        indexScanNode = nullptr;
-
         // Attach the distinct node in the index scan's place.
-        fetchNode->children[0] = distinctNode.release();
+        fetchNode->children[0] = std::move(distinctNode);
     } else {
         // There is no fetch node. The PROJECT=>IXSCAN tree should become PROJECT=>DISTINCT_SCAN.
         invariant(projectNode == root);
         invariant(STAGE_IXSCAN == root->children[0]->getType());
 
-        // Take ownership of the index scan node, detaching it from the solution tree.
-        std::unique_ptr<IndexScanNode> ownedIsn(indexScanNode);
-
         // Attach the distinct node in the index scan's place.
-        root->children[0] = distinctNode.release();
+        root->children[0] = std::move(distinctNode);
     }
 
     return true;
@@ -2500,7 +2486,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorForS
     if (plannerParams.indices[distinctNodeIndex].collator) {
         if (!solnRoot->fetched()) {
             auto fetch = std::make_unique<FetchNode>();
-            fetch->children.push_back(solnRoot.release());
+            fetch->children.push_back(std::move(solnRoot));
             solnRoot = std::move(fetch);
         }
     }

@@ -1010,7 +1010,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     _shouldProduceRecordIdSlot = false;
 
     auto localReqs = reqs.copy().set(kResult);
-    auto [localStage, localOutputs] = build(eqLookupNode->children[0], localReqs);
+    auto [localStage, localOutputs] = build(eqLookupNode->children[0].get(), localReqs);
     SlotId localDocumentSlot = localOutputs.get(PlanStageSlots::kResult);
 
     auto [matchedDocumentsSlot, foreignStage] = [&, localStage = std::move(localStage)]() mutable

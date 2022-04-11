@@ -582,7 +582,7 @@ void getAllNodesByTypeHelper(const QuerySolutionNode* root,
     }
 
     for (auto&& child : root->children) {
-        getAllNodesByTypeHelper(child, type, results);
+        getAllNodesByTypeHelper(child.get(), type, results);
     }
 }
 
@@ -609,7 +609,7 @@ std::pair<const QuerySolutionNode*, size_t> getFirstNodeByType(const QuerySoluti
     }
 
     for (auto&& child : root->children) {
-        auto [subTreeResult, subTreeCount] = getFirstNodeByType(child, type);
+        auto [subTreeResult, subTreeCount] = getFirstNodeByType(child.get(), type);
         if (!result) {
             result = subTreeResult;
         }
@@ -1016,7 +1016,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                          .set(kIndexKey)
                          .set(kIndexKeyPattern);
 
-    auto [stage, outputs] = build(fn->children[0], childReqs);
+    auto [stage, outputs] = build(fn->children[0].get(), childReqs);
 
     auto iamMap = _data.iamMap;
     uassert(4822880, "RecordId slot is not defined", outputs.has(kRecordId));
@@ -1085,11 +1085,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         if (ln->children[0]->getType() == StageType::STAGE_SKIP) {
             // If we have both limit and skip stages and the skip stage is beneath the limit, then
             // we can combine these two stages into one.
-            const auto sn = static_cast<const SkipNode*>(ln->children[0]);
+            const auto sn = static_cast<const SkipNode*>(ln->children[0].get());
             skip = sn->skip;
-            return build(sn->children[0], reqs);
+            return build(sn->children[0].get(), reqs);
         } else {
-            return build(ln->children[0], reqs);
+            return build(ln->children[0].get(), reqs);
         }
     }();
 
@@ -1104,7 +1104,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildSkip(
     const QuerySolutionNode* root, const PlanStageReqs& reqs) {
     const auto sn = static_cast<const SkipNode*>(root);
-    auto [stage, outputs] = build(sn->children[0], reqs);
+    auto [stage, outputs] = build(sn->children[0].get(), reqs);
 
     if (!reqs.getIsTailableCollScanResumeBranch()) {
         stage = std::make_unique<sbe::LimitSkipStage>(
@@ -1288,7 +1288,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     // The child must produce all of the slots required by the parent of this SortNode.
     auto childReqs = reqs.copy();
-    auto child = sn->children[0];
+    auto child = sn->children[0].get();
 
     const auto isCoveredQuery = reqs.getIndexKeyBitset().has_value();
     BSONObj indexKeyPattern;
@@ -1546,11 +1546,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         // if the bounds are fixed, the fields will be marked as 'ignored'). Otherwise, we attempt
         // to retrieve it from 'providedSorts'.
         auto childSortPattern = [&]() {
-            if (auto [msn, _] = getFirstNodeByType(child, STAGE_SORT_MERGE); msn) {
+            if (auto [msn, _] = getFirstNodeByType(child.get(), STAGE_SORT_MERGE); msn) {
                 auto node = static_cast<const MergeSortNode*>(msn);
                 return node->sort;
             } else {
-                auto [ixn, ct] = getFirstNodeByType(child, STAGE_IXSCAN);
+                auto [ixn, ct] = getFirstNodeByType(child.get(), STAGE_IXSCAN);
                 if (ixn && ct == 1) {
                     auto node = static_cast<const IndexScanNode*>(ixn);
                     return node->index.keyPattern;
@@ -1587,7 +1587,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         childReqs.getIndexKeyBitset() = indexKeyBitset;
 
         // Children must produce a 'resultSlot' if they produce fetched results.
-        auto [stage, outputs] = build(child, childReqs);
+        auto [stage, outputs] = build(child.get(), childReqs);
 
         tassert(5184301,
                 "SORT_MERGE node must receive a RecordID slot as input from child stage"
@@ -1682,7 +1682,7 @@ SlotBasedStageBuilder::buildProjectionSimple(const QuerySolutionNode* root,
     // In addition to that, the child must always produce a 'resultSlot' because it's needed by the
     // projection logic below.
     auto childReqs = reqs.copy().set(kResult);
-    auto [inputStage, outputs] = build(pn->children[0], childReqs);
+    auto [inputStage, outputs] = build(pn->children[0].get(), childReqs);
 
     const auto childResult = outputs.get(kResult);
 
@@ -1735,7 +1735,7 @@ SlotBasedStageBuilder::buildProjectionCovered(const QuerySolutionNode* root,
         makeIndexKeyInclusionSet(pn->coveredKeyObj, requiredFields);
     childReqs.getIndexKeyBitset() = std::move(indexKeyBitset);
 
-    auto [inputStage, outputs] = build(pn->children[0], childReqs);
+    auto [inputStage, outputs] = build(pn->children[0].get(), childReqs);
 
     // Assert that the index scan produced index key slots for this covered projection.
     auto indexKeySlots = *outputs.extractIndexKeySlots();
@@ -1810,7 +1810,7 @@ SlotBasedStageBuilder::buildProjectionDefault(const QuerySolutionNode* root,
         childReqs.set(kResult);
     }
 
-    auto [inputStage, outputs] = build(pn->children[0], childReqs);
+    auto [inputStage, outputs] = build(pn->children[0].get(), childReqs);
 
     sbe::value::SlotId resultSlot;
     std::unique_ptr<sbe::PlanStage> resultStage;
@@ -1862,7 +1862,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto childReqs = reqs.copy().setIf(kResult, orn->filter.get()).setIf(kRecordId, orn->dedup);
 
     for (auto&& child : orn->children) {
-        auto [stage, outputs] = build(child, childReqs);
+        auto [stage, outputs] = build(child.get(), childReqs);
 
         auto sv = sbe::makeSV();
         outputs.forEachSlot(childReqs, [&](auto&& slot) { sv.push_back(slot); });
@@ -1918,7 +1918,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     tassert(5432216, "text match input must be fetched", root->children[0]->fetched());
 
     auto childReqs = reqs.copy().set(kResult);
-    auto [stage, outputs] = build(textNode->children[0], childReqs);
+    auto [stage, outputs] = build(textNode->children[0].get(), childReqs);
     tassert(5432217, "result slot is not produced by text match sub-plan", outputs.has(kResult));
 
     // Create an FTS 'matcher' to apply 'ftsQuery' to matching documents.
@@ -1969,7 +1969,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // After build() returns, we take the 'returnKeySlot' produced by the child and store it into
     // 'resultSlot' for the parent of this ReturnKeyNode to consume.
     auto childReqs = reqs.copy().clear(kResult).set(kReturnKey);
-    auto [stage, outputs] = build(returnKeyNode->children[0], childReqs);
+    auto [stage, outputs] = build(returnKeyNode->children[0].get(), childReqs);
 
     outputs.set(kResult, outputs.get(kReturnKey));
     outputs.clear(kReturnKey);
@@ -1990,8 +1990,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     auto childReqs = reqs.copy().set(kResult).set(kRecordId);
 
-    auto outerChild = andHashNode->children[0];
-    auto innerChild = andHashNode->children[1];
+    auto outerChild = andHashNode->children[0].get();
+    auto innerChild = andHashNode->children[1].get();
 
     auto [outerStage, outerOutputs] = build(outerChild, childReqs);
     auto outerIdSlot = outerOutputs.get(kRecordId);
@@ -2056,7 +2056,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // If there are more than 2 children, iterate all remaining children and hash
     // join together.
     for (size_t i = 2; i < andHashNode->children.size(); i++) {
-        auto [stage, outputs] = build(andHashNode->children[i], childReqs);
+        auto [stage, outputs] = build(andHashNode->children[i].get(), childReqs);
         tassert(5073714, "outputs must contain kRecordId slot", outputs.has(kRecordId));
         tassert(5073715, "outputs must contain kResult slot", outputs.has(kResult));
         auto idSlot = outputs.get(kRecordId);
@@ -2089,8 +2089,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     auto childReqs = reqs.copy().set(kResult).set(kRecordId);
 
-    auto outerChild = andSortedNode->children[0];
-    auto innerChild = andSortedNode->children[1];
+    auto outerChild = andSortedNode->children[0].get();
+    auto innerChild = andSortedNode->children[1].get();
 
     auto [outerStage, outerOutputs] = build(outerChild, childReqs);
     auto outerIdSlot = outerOutputs.get(kRecordId);
@@ -2167,7 +2167,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // If there are more than 2 children, iterate all remaining children and merge
     // join together.
     for (size_t i = 2; i < andSortedNode->children.size(); i++) {
-        auto [stage, outputs] = build(andSortedNode->children[i], childReqs);
+        auto [stage, outputs] = build(andSortedNode->children[i].get(), childReqs);
         tassert(5073709, "outputs must contain kRecordId slot", outputs.has(kRecordId));
         tassert(5073710, "outputs must contain kResult slot", outputs.has(kResult));
         auto idSlot = outputs.get(kRecordId);
@@ -2564,7 +2564,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         5851600, "should have one and only one child for GROUP", groupNode->children.size() == 1);
     tassert(5851601, "GROUP should have had group-by key expression", idExpr);
 
-    const auto& childNode = groupNode->children[0];
+    const auto& childNode = groupNode->children[0].get();
     const auto& accStmts = groupNode->accumulators;
     auto childStageType = childNode->getType();
 
@@ -2932,7 +2932,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // Determine if our child is an index scan and extract it's key pattern, or empty BSONObj if our
     // child is not an IXSCAN node.
     BSONObj indexKeyPattern = [&]() {
-        auto childNode = filterNode->children[0];
+        auto childNode = filterNode->children[0].get();
         switch (childNode->getType()) {
             case StageType::STAGE_IXSCAN:
                 return static_cast<const IndexScanNode*>(childNode)->index.keyPattern;
@@ -2957,11 +2957,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                        shardFiltererSlot,
                                        shardKeyPattern,
                                        std::move(indexKeyPattern),
-                                       filterNode->children[0],
+                                       filterNode->children[0].get(),
                                        std::move(childReqs));
     }
 
-    auto [stage, outputs] = build(filterNode->children[0], childReqs);
+    auto [stage, outputs] = build(filterNode->children[0].get(), childReqs);
 
     // Build an expression to extract the shard key from the document based on the shard key
     // pattern. To do this, we iterate over the shard key pattern parts and build nested 'getField'

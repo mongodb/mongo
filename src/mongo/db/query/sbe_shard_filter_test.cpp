@@ -79,7 +79,7 @@ protected:
         auto virtScan =
             std::make_unique<VirtualScanNode>(docs, VirtualScanNode::ScanType::kCollScan, false);
         auto shardFilter = std::make_unique<ShardingFilterNode>();
-        shardFilter->children.push_back(virtScan.release());
+        shardFilter->children.push_back(std::move(virtScan));
         return std::move(shardFilter);
     }
 
@@ -251,7 +251,7 @@ TEST_F(SbeShardFilterTest, CoveredShardFilterPlan) {
     auto virtScan = std::make_unique<VirtualScanNode>(
         mockedIndexKeys, VirtualScanNode::ScanType::kIxscan, false, indexKeyPattern);
     auto shardFilter = std::make_unique<ShardingFilterNode>();
-    shardFilter->children.push_back(virtScan.release());
+    shardFilter->children.push_back(std::move(virtScan));
     auto projectNode = std::make_unique<ProjectionNodeCovered>(
         std::move(shardFilter), *emptyMatchExpression, projectionAst, indexKeyPattern);
 

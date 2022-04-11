@@ -214,7 +214,7 @@ TEST(QueryPlannerAnalysis, GeoSkipValidation) {
 
     OrNode orNode;
     // Takes ownership.
-    orNode.children.push_back(fetchNodePtr.release());
+    orNode.children.push_back(std::move(fetchNodePtr));
 
     // We should not skip validation if there are no indices.
     QueryPlannerAnalysis::analyzeGeo(params, fetchNode);

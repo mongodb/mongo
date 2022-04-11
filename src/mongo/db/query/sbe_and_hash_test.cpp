@@ -51,7 +51,7 @@ protected:
         for (auto docs : docsVec) {
             auto virtScan =
                 std::make_unique<VirtualScanNode>(docs, VirtualScanNode::ScanType::kCollScan, true);
-            andHashNode->children.push_back(virtScan.release());
+            andHashNode->children.push_back(std::move(virtScan));
         }
         return std::move(andHashNode);
     }

@@ -68,7 +68,7 @@ void getLeafNodes(QuerySolutionNode* root, vector<QuerySolutionNode*>* leafNodes
         leafNodes->push_back(root);
     } else {
         for (size_t i = 0; i < root->children.size(); ++i) {
-            getLeafNodes(root->children[i], leafNodes);
+            getLeafNodes(root->children[i].get(), leafNodes);
         }
     }
 }
@@ -91,7 +91,7 @@ void getExplodableNodes(QuerySolutionNode* root, vector<QuerySolutionNode*>* exp
         explodableNodes->push_back(root);
     } else {
         for (auto&& childNode : root->children) {
-            getExplodableNodes(childNode, explodableNodes);
+            getExplodableNodes(childNode.get(), explodableNodes);
         }
     }
 }
@@ -104,7 +104,7 @@ const IndexScanNode* getIndexScanNode(const QuerySolutionNode* node) {
     if (STAGE_IXSCAN == node->getType()) {
         return static_cast<const IndexScanNode*>(node);
     } else if (isFetchNodeWithIndexScanChild(node)) {
-        return static_cast<const IndexScanNode*>(node->children[0]);
+        return static_cast<const IndexScanNode*>(node->children[0].get());
     }
     MONGO_UNREACHABLE;
     return nullptr;
@@ -132,10 +132,12 @@ bool isUnionOfPoints(const OrderedIntervalList& oil) {
 /**
  * Should we try to expand the index scan(s) in 'solnRoot' to pull out an indexed sort?
  *
- * Returns the node which should be replaced by the merge sort of exploded scans
- * in the out-parameter 'toReplace'.
+ * Returns the node which should be replaced by the merge sort of exploded scans, or nullptr
+ * if there is no such node. The result is a pointer to a unique_ptr so that the caller
+ * can replace the unique_ptr.
  */
-bool structureOKForExplode(QuerySolutionNode* solnRoot, QuerySolutionNode** toReplace) {
+std::unique_ptr<QuerySolutionNode>* structureOKForExplode(
+    std::unique_ptr<QuerySolutionNode>* solnRoot) {
     // For now we only explode if we *know* we will pull the sort out.  We can look at
     // more structure (or just explode and recalculate properties and see what happens)
     // but for now we just explode if it's a sure bet.
@@ -144,33 +146,30 @@ bool structureOKForExplode(QuerySolutionNode* solnRoot, QuerySolutionNode** toRe
     // or other less obvious cases...
 
     // Skip over a sharding filter stage.
-    if (STAGE_SHARDING_FILTER == solnRoot->getType()) {
-        solnRoot = solnRoot->children[0];
+    if (STAGE_SHARDING_FILTER == (*solnRoot)->getType()) {
+        solnRoot = &(*solnRoot)->children[0];
     }
 
-    if (STAGE_IXSCAN == solnRoot->getType()) {
-        *toReplace = solnRoot;
-        return true;
+    if (STAGE_IXSCAN == (*solnRoot)->getType()) {
+        return solnRoot;
     }
 
-    if (isFetchNodeWithIndexScanChild(solnRoot)) {
-        *toReplace = solnRoot->children[0];
-        return true;
+    if (isFetchNodeWithIndexScanChild(solnRoot->get())) {
+        return &(*solnRoot)->children[0];
     }
 
     // If we have a STAGE_OR, we can explode only when all children are either IXSCANs or FETCHes
     // that have an IXSCAN as a child.
-    if (STAGE_OR == solnRoot->getType()) {
-        for (auto&& child : solnRoot->children) {
-            if (STAGE_IXSCAN != child->getType() && !isFetchNodeWithIndexScanChild(child)) {
-                return false;
+    if (STAGE_OR == (*solnRoot)->getType()) {
+        for (auto&& child : (*solnRoot)->children) {
+            if (STAGE_IXSCAN != child->getType() && !isFetchNodeWithIndexScanChild(child.get())) {
+                return nullptr;
             }
         }
-        *toReplace = solnRoot;
-        return true;
+        return solnRoot;
     }
 
-    return false;
+    return nullptr;
 }
 
 // vectors of vectors can be > > annoying.
@@ -223,10 +222,10 @@ void makeCartesianProduct(const IndexBounds& bounds,
 
 /**
  * Takes the provided 'node', either an IndexScanNode or FetchNode with a direct child that is an
- * IndexScanNode. Returns a list of nodes which are logically equivalent to 'node' if joined by a
- * MergeSort through the out-parameter 'explosionResult'. These nodes are owned by the caller.
+ * IndexScanNode. Produces a list of new nodes, which are logically equivalent to 'node' if joined
+ * by a MergeSort. Inserts these new nodes at the end of 'explosionResult'.
  *
- * fieldsToExplode is a count of how many fields in the scan's bounds are the union of point
+ * 'fieldsToExplode' is a count of how many fields in the scan's bounds are the union of point
  * intervals.  This is computed beforehand and provided as a small optimization.
  *
  * Example:
@@ -243,7 +242,7 @@ void makeCartesianProduct(const IndexBounds& bounds,
 void explodeNode(const QuerySolutionNode* node,
                  const BSONObj& sort,
                  size_t fieldsToExplode,
-                 vector<QuerySolutionNode*>* explosionResult) {
+                 vector<std::unique_ptr<QuerySolutionNode>>* explosionResult) {
     // Get the 'isn' from either the FetchNode or IndexScanNode.
     const IndexScanNode* isn = getIndexScanNode(node);
 
@@ -256,7 +255,7 @@ void explodeNode(const QuerySolutionNode* node,
         verify(prefix.size() == fieldsToExplode);
 
         // Copy boring fields into new child.
-        IndexScanNode* child = new IndexScanNode(isn->index);
+        auto child = std::make_unique<IndexScanNode>(isn->index);
         child->direction = isn->direction;
         child->addKeyMetadata = isn->addKeyMetadata;
         child->queryCollator = isn->queryCollator;
@@ -287,25 +286,10 @@ void explodeNode(const QuerySolutionNode* node,
             }
 
             // Add the 'child' IXSCAN under the FETCH stage, and the FETCH stage to the result set.
-            newFetchNode->children.push_back(child);
-            explosionResult->push_back(newFetchNode.release());
+            newFetchNode->children.push_back(std::move(child));
+            explosionResult->push_back(std::move(newFetchNode));
         } else {
-            explosionResult->push_back(child);
-        }
-    }
-}
-
-/**
- * In the tree '*root', replace 'oldNode' with 'newNode'.
- */
-void replaceNodeInTree(QuerySolutionNode** root,
-                       QuerySolutionNode* oldNode,
-                       QuerySolutionNode* newNode) {
-    if (*root == oldNode) {
-        *root = newNode;
-    } else {
-        for (size_t i = 0; i < (*root)->children.size(); ++i) {
-            replaceNodeInTree(&(*root)->children[i], oldNode, newNode);
+            explosionResult->push_back(std::move(child));
         }
     }
 }
@@ -328,8 +312,8 @@ void geoSkipValidationOn(const std::set<StringData>& twoDSphereFields,
         }
     }
 
-    for (QuerySolutionNode* child : solnRoot->children) {
-        geoSkipValidationOn(twoDSphereFields, child);
+    for (auto&& child : solnRoot->children) {
+        geoSkipValidationOn(twoDSphereFields, child.get());
     }
 }
 
@@ -374,7 +358,7 @@ std::unique_ptr<QuerySolutionNode> addSortKeyGeneratorStageIfNeeded(
     if (!hasSortStage && query.metadataDeps()[DocumentMetadataFields::kSortKey]) {
         auto keyGenNode = std::make_unique<SortKeyGeneratorNode>();
         keyGenNode->sortSpec = query.getFindCommandRequest().getSort();
-        keyGenNode->children.push_back(solnRoot.release());
+        keyGenNode->children.push_back(std::move(solnRoot));
         return keyGenNode;
     }
     return solnRoot;
@@ -395,7 +379,7 @@ std::unique_ptr<ProjectionNode> analyzeProjection(const CanonicalQuery& query,
         (query.getProj()->requiresDocument() ||
          (!providesAllFields(query.getProj()->getRequiredFields(), *solnRoot)))) {
         auto fetch = std::make_unique<FetchNode>();
-        fetch->children.push_back(solnRoot.release());
+        fetch->children.push_back(std::move(solnRoot));
         solnRoot = std::move(fetch);
     }
 
@@ -461,10 +445,10 @@ std::unique_ptr<QuerySolutionNode> tryPushdownProjectBeneathSort(
     //   PROJECT => SKIP => SORT
     // In this case we still want to push PROJECT beneath SORT.
     bool hasSkipBetween = false;
-    auto sortNodeCandidate = projectNode->children[0];
+    QuerySolutionNode* sortNodeCandidate = projectNode->children[0].get();
     if (sortNodeCandidate->getType() == STAGE_SKIP) {
         hasSkipBetween = true;
-        sortNodeCandidate = sortNodeCandidate->children[0];
+        sortNodeCandidate = sortNodeCandidate->children[0].get();
     }
 
     if (!isSortStageType(sortNodeCandidate->getType())) {
@@ -498,7 +482,7 @@ std::unique_ptr<QuerySolutionNode> tryPushdownProjectBeneathSort(
     //   SKIP => SORT => PROJECT => CHILD
     //
     // First, detach the bottom of the tree. This part is CHILD in the comment above.
-    std::unique_ptr<QuerySolutionNode> restOfTree{sortNode->children[0]};
+    std::unique_ptr<QuerySolutionNode> restOfTree = std::move(sortNode->children[0]);
     invariant(sortNode->children.size() == 1u);
     sortNode->children.clear();
 
@@ -507,7 +491,7 @@ std::unique_ptr<QuerySolutionNode> tryPushdownProjectBeneathSort(
     //   SORT
     // Or this if we have SKIP:
     //   SKIP => SORT
-    std::unique_ptr<QuerySolutionNode> ownedProjectionInput{projectNode->children[0]};
+    std::unique_ptr<QuerySolutionNode> ownedProjectionInput = std::move(projectNode->children[0]);
     sortNode = nullptr;
     invariant(projectNode->children.size() == 1u);
     projectNode->children.clear();
@@ -516,19 +500,19 @@ std::unique_ptr<QuerySolutionNode> tryPushdownProjectBeneathSort(
     // We want to get the following structure:
     //   PROJECT => CHILD
     std::unique_ptr<QuerySolutionNode> ownedProjectionNode = std::move(root);
-    ownedProjectionNode->children.push_back(restOfTree.release());
+    ownedProjectionNode->children.push_back(std::move(restOfTree));
 
     // Attach the projection as the child of the sort stage.
     if (hasSkipBetween) {
         // In this case 'ownedProjectionInput' points to the structure:
         //   SKIP => SORT
         // And to attach PROJECT => CHILD to it, we need to access children of SORT stage.
-        ownedProjectionInput->children[0]->children.push_back(ownedProjectionNode.release());
+        ownedProjectionInput->children[0]->children.push_back(std::move(ownedProjectionNode));
     } else {
         // In this case 'ownedProjectionInput' points to the structure:
         //   SORT
         // And we can just add PROJECT => CHILD to its children.
-        ownedProjectionInput->children.push_back(ownedProjectionNode.release());
+        ownedProjectionInput->children.push_back(std::move(ownedProjectionNode));
     }
 
     // Re-compute properties so that they reflect the new structure of the tree.
@@ -565,7 +549,7 @@ void removeProjectSimpleBelowGroupRecursive(QuerySolutionNode* solnRoot) {
     if (solnRoot->getType() == StageType::STAGE_GROUP) {
         auto groupNode = static_cast<GroupNode*>(solnRoot);
 
-        auto projectNodeCandidate = groupNode->children[0];
+        QuerySolutionNode* projectNodeCandidate = groupNode->children[0].get();
         if (projectNodeCandidate->getType() == StageType::STAGE_GROUP) {
             // Multiple $group stages may be pushed down. So, if the child is a GROUP, then recurse.
             removeProjectSimpleBelowGroupRecursive(projectNodeCandidate);
@@ -588,15 +572,11 @@ void removeProjectSimpleBelowGroupRecursive(QuerySolutionNode* solnRoot) {
         };
 
         // Attach the projectNode's child to the groupNode's child.
-        groupNode->children[0] = projectNode->children[0];
-        projectNode->children[0] = nullptr;
-
-        // Get rid of the project simple node.
-        delete projectNode;
+        groupNode->children[0] = std::move(projectNode->children[0]);
     } else {
         // Keep traversing the tree in search of a GROUP stage.
         for (size_t i = 0; i < solnRoot->children.size(); ++i) {
-            removeProjectSimpleBelowGroupRecursive(solnRoot->children[i]);
+            removeProjectSimpleBelowGroupRecursive(solnRoot->children[i].get());
         }
     }
 }
@@ -730,16 +710,15 @@ BSONObj QueryPlannerAnalysis::getSortPattern(const BSONObj& indexKeyPattern) {
 // static
 bool QueryPlannerAnalysis::explodeForSort(const CanonicalQuery& query,
                                           const QueryPlannerParams& params,
-                                          QuerySolutionNode** solnRoot) {
+                                          std::unique_ptr<QuerySolutionNode>* solnRoot) {
     vector<QuerySolutionNode*> explodableNodes;
 
-    QuerySolutionNode* toReplace;
-    if (!structureOKForExplode(*solnRoot, &toReplace)) {
+    std::unique_ptr<QuerySolutionNode>* toReplace = structureOKForExplode(solnRoot);
+    if (!toReplace)
         return false;
-    }
 
     // Find explodable nodes in the subtree rooted at 'toReplace'.
-    getExplodableNodes(toReplace, &explodableNodes);
+    getExplodableNodes(toReplace->get(), &explodableNodes);
 
     const BSONObj& desiredSort = query.getFindCommandRequest().getSort();
 
@@ -860,7 +839,7 @@ bool QueryPlannerAnalysis::explodeForSort(const CanonicalQuery& query,
 
     // If we're here, we can (probably?  depends on how restrictive the structure check is)
     // get our sort order via ixscan blow-up.
-    MergeSortNode* merge = new MergeSortNode();
+    auto merge = std::make_unique<MergeSortNode>();
     merge->sort = desiredSort;
     for (size_t i = 0; i < explodableNodes.size(); ++i) {
         explodeNode(explodableNodes[i], desiredSort, fieldsToExplode[i], &merge->children);
@@ -868,19 +847,17 @@ bool QueryPlannerAnalysis::explodeForSort(const CanonicalQuery& query,
 
     merge->computeProperties();
 
-    // Replace 'toReplace' with the new merge sort node.
-    replaceNodeInTree(solnRoot, toReplace, merge);
-    // And get rid of the node that got replaced.
-    delete toReplace;
+    *toReplace = std::move(merge);
 
     return true;
 }
 
 // static
-QuerySolutionNode* QueryPlannerAnalysis::analyzeSort(const CanonicalQuery& query,
-                                                     const QueryPlannerParams& params,
-                                                     QuerySolutionNode* solnRoot,
-                                                     bool* blockingSortOut) {
+std::unique_ptr<QuerySolutionNode> QueryPlannerAnalysis::analyzeSort(
+    const CanonicalQuery& query,
+    const QueryPlannerParams& params,
+    std::unique_ptr<QuerySolutionNode> solnRoot,
+    bool* blockingSortOut) {
     *blockingSortOut = false;
 
     const FindCommandRequest& findCommand = query.getFindCommandRequest();
@@ -913,7 +890,7 @@ QuerySolutionNode* QueryPlannerAnalysis::analyzeSort(const CanonicalQuery& query
     // If so, we can reverse the scan direction(s).
     BSONObj reverseSort = QueryPlannerCommon::reverseSortObj(sortObj);
     if (providedSorts.contains(reverseSort)) {
-        QueryPlannerCommon::reverseScans(solnRoot);
+        QueryPlannerCommon::reverseScans(solnRoot.get());
         LOGV2_DEBUG(20951,
                     5,
                     "Reversing ixscan to provide sort",
@@ -931,19 +908,18 @@ QuerySolutionNode* QueryPlannerAnalysis::analyzeSort(const CanonicalQuery& query
     // If we're here, we need to add a sort stage.
 
     if (!solnRoot->fetched()) {
-        const bool sortIsCovered =
-            std::all_of(sortObj.begin(), sortObj.end(), [solnRoot](BSONElement e) {
-                // Note that hasField() will return 'false' in the case that this field is a string
-                // and there is a non-simple collation on the index. This will lead to encoding of
-                // the field from the document on fetch, despite having read the encoded value from
-                // the index.
-                return solnRoot->hasField(e.fieldName());
-            });
+        const bool sortIsCovered = std::all_of(sortObj.begin(), sortObj.end(), [&](BSONElement e) {
+            // Note that hasField() will return 'false' in the case that this field is a string
+            // and there is a non-simple collation on the index. This will lead to encoding of
+            // the field from the document on fetch, despite having read the encoded value from
+            // the index.
+            return solnRoot->hasField(e.fieldName());
+        });
 
         if (!sortIsCovered) {
-            FetchNode* fetch = new FetchNode();
-            fetch->children.push_back(solnRoot);
-            solnRoot = fetch;
+            auto fetch = std::make_unique<FetchNode>();
+            fetch->children.push_back(std::move(solnRoot));
+            solnRoot = std::move(fetch);
         }
     }
 
@@ -954,20 +930,19 @@ QuerySolutionNode* QueryPlannerAnalysis::analyzeSort(const CanonicalQuery& query
         sortNode = std::make_unique<SortNodeDefault>();
     }
     sortNode->pattern = sortObj;
-    sortNode->children.push_back(solnRoot);
+    sortNode->children.push_back(std::move(solnRoot));
     sortNode->addSortKeyMetadata = query.metadataDeps()[DocumentMetadataFields::kSortKey];
-    solnRoot = sortNode.release();
-    auto sortNodeRaw = static_cast<SortNode*>(solnRoot);
     // When setting the limit on the sort, we need to consider both
     // the limit N and skip count M. The sort should return an ordered list
     // N + M items so that the skip stage can discard the first M results.
     if (findCommand.getLimit()) {
         // The limit can be combined with the SORT stage.
-        sortNodeRaw->limit = static_cast<size_t>(*findCommand.getLimit()) +
+        sortNode->limit = static_cast<size_t>(*findCommand.getLimit()) +
             static_cast<size_t>(findCommand.getSkip().value_or(0));
     } else {
-        sortNodeRaw->limit = 0;
+        sortNode->limit = 0;
     }
+    solnRoot = std::move(sortNode);
 
     *blockingSortOut = true;
 
@@ -1015,19 +990,19 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
             }
 
             if (fetch) {
-                FetchNode* fetchNode = new FetchNode();
-                fetchNode->children.push_back(solnRoot.release());
-                solnRoot.reset(fetchNode);
+                auto fetchNode = std::make_unique<FetchNode>();
+                fetchNode->children.push_back(std::move(solnRoot));
+                solnRoot = std::move(fetchNode);
             }
         }
 
-        ShardingFilterNode* sfn = new ShardingFilterNode();
-        sfn->children.push_back(solnRoot.release());
-        solnRoot.reset(sfn);
+        auto sfn = std::make_unique<ShardingFilterNode>();
+        sfn->children.push_back(std::move(solnRoot));
+        solnRoot = std::move(sfn);
     }
 
     bool hasSortStage = false;
-    solnRoot.reset(analyzeSort(query, params, solnRoot.release(), &hasSortStage));
+    solnRoot = analyzeSort(query, params, std::move(solnRoot), &hasSortStage);
 
     // This can happen if we need to create a blocking sort stage and we're not allowed to.
     if (!solnRoot) {
@@ -1044,7 +1019,7 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
     if (findCommand.getSkip()) {
         auto skip = std::make_unique<SkipNode>();
         skip->skip = *findCommand.getSkip();
-        skip->children.push_back(solnRoot.release());
+        skip->children.push_back(std::move(solnRoot));
         solnRoot = std::move(skip);
     }
 
@@ -1065,9 +1040,9 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
 
         // If there's no projection, we must fetch, as the user wants the entire doc.
         if (!solnRoot->fetched() && !(params.options & QueryPlannerParams::IS_COUNT)) {
-            FetchNode* fetch = new FetchNode();
-            fetch->children.push_back(solnRoot.release());
-            solnRoot.reset(fetch);
+            auto fetch = std::make_unique<FetchNode>();
+            fetch->children.push_back(std::move(solnRoot));
+            solnRoot = std::move(fetch);
         }
     }
 
@@ -1075,10 +1050,10 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
     // sort. Otherwise, we will have to enforce the limit ourselves since it's not handled inside
     // SORT.
     if (!hasSortStage && findCommand.getLimit()) {
-        LimitNode* limit = new LimitNode();
+        auto limit = std::make_unique<LimitNode>();
         limit->limit = *findCommand.getLimit();
-        limit->children.push_back(solnRoot.release());
-        solnRoot.reset(limit);
+        limit->children.push_back(std::move(solnRoot));
+        solnRoot = std::move(limit);
     }
 
     solnRoot = tryPushdownProjectBeneathSort(std::move(solnRoot));

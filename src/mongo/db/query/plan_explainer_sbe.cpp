@@ -197,7 +197,7 @@ void statsToBSON(const QuerySolutionNode* node,
     // rather than 'inputStages'.
     if (node->children.size() == 1) {
         BSONObjBuilder childBob(bob->subobjStart("inputStage"));
-        statsToBSON(node->children[0], &childBob, topLevelBob);
+        statsToBSON(node->children[0].get(), &childBob, topLevelBob);
         return;
     }
 
@@ -206,7 +206,7 @@ void statsToBSON(const QuerySolutionNode* node,
     BSONArrayBuilder childrenBob(bob->subarrayStart("inputStages"));
     for (auto&& child : node->children) {
         BSONObjBuilder childBob(childrenBob.subobjStart());
-        statsToBSON(child, &childBob, topLevelBob);
+        statsToBSON(child.get(), &childBob, topLevelBob);
     }
     childrenBob.doneFast();
 }

@@ -65,13 +65,6 @@ namespace wcp = ::mongo::wildcard_planning;
 namespace dps = ::mongo::dotted_path_support;
 
 /**
- * Text node functors.
- */
-bool isTextNode(const QuerySolutionNode* node) {
-    return STAGE_TEXT_MATCH == node->getType();
-}
-
-/**
  * Casts 'node' to a FetchNode* if it is a FetchNode, otherwise returns null.
  */
 FetchNode* getFetchNode(QuerySolutionNode* node) {
@@ -92,7 +85,7 @@ const IndexScanNode* getIndexScanNode(const QuerySolutionNode* node) {
         return static_cast<const IndexScanNode*>(node);
     } else if (STAGE_FETCH == node->getType()) {
         invariant(1U == node->children.size());
-        const QuerySolutionNode* child = node->children[0];
+        const QuerySolutionNode* child = node->children[0].get();
         if (STAGE_IXSCAN == child->getType()) {
             return static_cast<const IndexScanNode*>(child);
         }
@@ -790,11 +783,8 @@ void buildTextSubPlan(TextMatchNode* tn) {
         // compute their text scores. This is a blocking operation.
         auto textScorer = std::make_unique<TextOrNode>();
         textScorer->filter = std::move(tn->filter);
-        for (auto&& ixscan : indexScanList) {
-            textScorer->children.push_back(ixscan.release());
-        }
-
-        tn->children.push_back(textScorer.release());
+        textScorer->addChildren(std::move(indexScanList));
+        tn->children.push_back(std::move(textScorer));
     } else {
         // Because we don't need the text score, we can use a non-blocking OR stage to get the union
         // of the index scans or use the index scan directly if there is only one.
@@ -808,10 +798,8 @@ void buildTextSubPlan(TextMatchNode* tn) {
             } else {
                 auto orTextSearcher = std::make_unique<OrNode>();
                 orTextSearcher->filter = std::move(tn->filter);
-                for (auto&& ixscan : indexScanList) {
-                    orTextSearcher->children.push_back(ixscan.release());
-                }
-                return std::move(orTextSearcher);
+                orTextSearcher->addChildren(std::move(indexScanList));
+                return orTextSearcher;
             }
         }();
 
@@ -819,9 +807,9 @@ void buildTextSubPlan(TextMatchNode* tn) {
         // add our own FETCH stage to satisfy the requirement of the TEXT_MATCH stage that its
         // WorkingSetMember inputs have fetched data.
         auto fetchNode = std::make_unique<FetchNode>();
-        fetchNode->children.push_back(textSearcher.release());
+        fetchNode->children.push_back(std::move(textSearcher));
 
-        tn->children.push_back(fetchNode.release());
+        tn->children.push_back(std::move(fetchNode));
     }
 }
 
@@ -932,7 +920,7 @@ void QueryPlannerAccess::finishAndOutputLeaf(ScanBuildingState* scanState,
             // Takes ownership.
             fetch->filter = std::move(scanState->curOr);
             // Takes ownership.
-            fetch->children.push_back(scanState->currentScan.release());
+            fetch->children.push_back(std::move(scanState->currentScan));
 
             scanState->currentScan = std::move(fetch);
         } else if (scanState->loosestBounds == IndexBoundsBuilder::INEXACT_COVERED) {
@@ -1527,8 +1515,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedAnd(
         invariant(clonedRoot);
         auto fetch = std::make_unique<FetchNode>();
         fetch->filter = std::move(clonedRoot);
-        // Takes ownership of 'andResult'.
-        fetch->children.push_back(andResult.release());
+        fetch->children.push_back(std::move(andResult));
         return fetch;
     }
 
@@ -1547,7 +1534,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedAnd(
             fetch->filter = std::move(ownedRoot);
         }
         // takes ownership
-        fetch->children.push_back(andResult.release());
+        fetch->children.push_back(std::move(andResult));
         andResult = std::move(fetch);
     } else {
         // root has no children, let autoRoot get rid of it when it goes out of scope.
@@ -1622,7 +1609,9 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedOr(
 
     // Evaluate text nodes first to ensure that text scores are available.
     // Move text nodes to front of vector.
-    std::stable_partition(orResult->children.begin(), orResult->children.end(), isTextNode);
+    std::stable_partition(orResult->children.begin(), orResult->children.end(), [](auto&& child) {
+        return STAGE_TEXT_MATCH == child->getType();
+    });
 
     // OR must have an index for each child, so we should have detached all children from
     // 'root', and there's nothing useful to do with an empty or MatchExpression.  We let it die
@@ -1711,7 +1700,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::_buildIndexedDataAccess(
             } else {
                 auto fetch = std::make_unique<FetchNode>();
                 fetch->filter = std::move(ownedRoot);
-                fetch->children.push_back(soln.release());
+                fetch->children.push_back(std::move(soln));
                 return fetch;
             }
         } else if (Indexability::arrayUsesIndexOnChildren(root)) {
@@ -1735,7 +1724,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::_buildIndexedDataAccess(
 
             auto fetch = std::make_unique<FetchNode>();
             fetch->filter = std::move(ownedRoot);
-            fetch->children.push_back(solution.release());
+            fetch->children.push_back(std::move(solution));
             return fetch;
         }
     }
@@ -1772,7 +1761,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::scanWholeIndex(
         // for now it's safe (though *maybe* slower).
         unique_ptr<FetchNode> fetch = std::make_unique<FetchNode>();
         fetch->filter = std::move(filter);
-        fetch->children.push_back(isn.release());
+        fetch->children.push_back(std::move(isn));
         solnRoot = std::move(fetch);
     }
 
@@ -1903,7 +1892,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeIndexScan(
         // for now it's safe (though *maybe* slower).
         unique_ptr<FetchNode> fetch = std::make_unique<FetchNode>();
         fetch->filter = std::move(filter);
-        fetch->children.push_back(isn.release());
+        fetch->children.push_back(std::move(isn));
         solnRoot = std::move(fetch);
     }
 

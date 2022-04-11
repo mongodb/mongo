@@ -295,7 +295,7 @@ static Status childrenMatch(const BSONObj& testSoln,
                 continue;
             }
             auto matchStatus = QueryPlannerTestLib::solutionMatches(
-                child.Obj(), trueSoln->children[j], relaxBoundsCheck);
+                child.Obj(), trueSoln->children[j].get(), relaxBoundsCheck);
             if (matchStatus.isOK()) {
                 LOGV2_DEBUG(5619202, 2, "Found a matching child");
                 found = true;
@@ -830,7 +830,7 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
                     "found a fetch stage in the solution but no 'node' sub-object in the provided "
                     "JSON"};
         }
-        return solutionMatches(child.Obj(), fn->children[0], relaxBoundsCheck)
+        return solutionMatches(child.Obj(), fn->children[0].get(), relaxBoundsCheck)
             .withContext("mismatch beneath fetch node");
     } else if (STAGE_OR == trueSoln->getType()) {
         const OrNode* orn = static_cast<const OrNode*>(trueSoln);
@@ -1008,7 +1008,7 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
                                      "mismatching 'spec'. Expected: "
                                   << specProjObj << " Found: " << solnProjObj};
         }
-        return solutionMatches(child.Obj(), pn->children[0], relaxBoundsCheck)
+        return solutionMatches(child.Obj(), pn->children[0].get(), relaxBoundsCheck)
             .withContext("mismatch below projection stage");
     } else if (isSortStageType(trueSoln->getType())) {
         const SortNode* sn = static_cast<const SortNode*>(trueSoln);
@@ -1093,7 +1093,7 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
                                      "mismatching 'limit'. Expected: "
                                   << expectedLimit << " Found: " << sn->limit};
         }
-        return solutionMatches(child.Obj(), sn->children[0], relaxBoundsCheck)
+        return solutionMatches(child.Obj(), sn->children[0].get(), relaxBoundsCheck)
             .withContext("mismatch below sort stage");
     } else if (STAGE_SORT_KEY_GENERATOR == trueSoln->getType()) {
         const SortKeyGeneratorNode* keyGenNode = static_cast<const SortKeyGeneratorNode*>(trueSoln);
@@ -1113,7 +1113,7 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
                     "the provided JSON"};
         }
 
-        return solutionMatches(child.Obj(), keyGenNode->children[0], relaxBoundsCheck)
+        return solutionMatches(child.Obj(), keyGenNode->children[0].get(), relaxBoundsCheck)
             .withContext("mismatch below sortKeyGen");
     } else if (STAGE_SORT_MERGE == trueSoln->getType()) {
         const MergeSortNode* msn = static_cast<const MergeSortNode*>(trueSoln);
@@ -1157,7 +1157,7 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
                                      "mismatching 'n'. Expected: "
                                   << skipEl.numberInt() << " Found: " << sn->skip};
         }
-        return solutionMatches(child.Obj(), sn->children[0], relaxBoundsCheck)
+        return solutionMatches(child.Obj(), sn->children[0].get(), relaxBoundsCheck)
             .withContext("mismatch below skip stage");
     } else if (STAGE_LIMIT == trueSoln->getType()) {
         const LimitNode* ln = static_cast<const LimitNode*>(trueSoln);
@@ -1189,7 +1189,7 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
                                      "mismatching 'n'. Expected: "
                                   << limitEl.numberInt() << " Found: " << ln->limit};
         }
-        return solutionMatches(child.Obj(), ln->children[0], relaxBoundsCheck)
+        return solutionMatches(child.Obj(), ln->children[0].get(), relaxBoundsCheck)
             .withContext("mismatch below limit stage");
     } else if (STAGE_SHARDING_FILTER == trueSoln->getType()) {
         const ShardingFilterNode* fn = static_cast<const ShardingFilterNode*>(trueSoln);
@@ -1210,7 +1210,7 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
                     "the provided JSON"};
         }
 
-        return solutionMatches(child.Obj(), fn->children[0], relaxBoundsCheck)
+        return solutionMatches(child.Obj(), fn->children[0].get(), relaxBoundsCheck)
             .withContext("mismatch below shard filter stage");
     } else if (STAGE_GROUP == trueSoln->getType()) {
         const auto* actualGroupNode = static_cast<const GroupNode*>(trueSoln);
@@ -1265,7 +1265,7 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
                     "found a group stage in the solution but no 'node' sub-object in "
                     "the provided JSON"};
         }
-        return solutionMatches(child.Obj(), actualGroupNode->children[0], relaxBoundsCheck)
+        return solutionMatches(child.Obj(), actualGroupNode->children[0].get(), relaxBoundsCheck)
             .withContext("mismatch below group stage");
     } else if (STAGE_SENTINEL == trueSoln->getType()) {
         const auto* actualSentinelNode = static_cast<const SentinelNode*>(trueSoln);
@@ -1484,7 +1484,7 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
                     "found a eq_lookup stage in the solution but no 'node' sub-object in "
                     "the provided JSON"};
         }
-        return solutionMatches(child.Obj(), actualEqLookupNode->children[0], relaxBoundsCheck)
+        return solutionMatches(child.Obj(), actualEqLookupNode->children[0].get(), relaxBoundsCheck)
             .withContext("mismatch below eq_lookup stage");
     }
     return {ErrorCodes::Error{5698301},

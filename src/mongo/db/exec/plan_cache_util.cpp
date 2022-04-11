@@ -189,7 +189,7 @@ plan_cache_debug_info::DebugInfoSBE buildDebugInfo(const QuerySolution* solution
         }
 
         for (auto&& child : node->children) {
-            queue.push(child);
+            queue.push(child.get());
         }
     }
 

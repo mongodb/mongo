@@ -654,7 +654,7 @@ IndexBounds ChunkManager::collapseQuerySolution(const QuerySolutionNode* node) {
 
     if (node->children.size() == 1) {
         // e.g. FETCH -> IXSCAN
-        return collapseQuerySolution(node->children.front());
+        return collapseQuerySolution(node->children.front().get());
     }
 
     // children.size() > 1, assert it's OR / SORT_MERGE.
@@ -671,20 +671,18 @@ IndexBounds ChunkManager::collapseQuerySolution(const QuerySolutionNode* node) {
 
     IndexBounds bounds;
 
-    for (std::vector<QuerySolutionNode*>::const_iterator it = node->children.begin();
-         it != node->children.end();
-         it++) {
+    for (auto it = node->children.begin(); it != node->children.end(); it++) {
         // The first branch under OR
         if (it == node->children.begin()) {
             invariant(bounds.size() == 0);
-            bounds = collapseQuerySolution(*it);
+            bounds = collapseQuerySolution(it->get());
             if (bounds.size() == 0) {  // Got unexpected node in query solution tree
                 return IndexBounds();
             }
             continue;
         }
 
-        IndexBounds childBounds = collapseQuerySolution(*it);
+        IndexBounds childBounds = collapseQuerySolution(it->get());
         if (childBounds.size() == 0) {
             // Got unexpected node in query solution tree
             return IndexBounds();

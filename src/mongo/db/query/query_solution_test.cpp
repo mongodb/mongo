@@ -1137,7 +1137,7 @@ TEST(QuerySolutionTest, EqLookupNodeWithIndexScan) {
 
     node.computeProperties();
 
-    auto child = node.children[0];
+    auto child = node.children[0].get();
     ASSERT_EQ(node.fetched(), child->fetched());
     ASSERT_EQ(node.sortedByDiskLoc(), child->sortedByDiskLoc());
 
@@ -1165,7 +1165,7 @@ TEST(QuerySolutionTest, EqLookupNodeWithIndexScanFieldOverwrite) {
 
     node.computeProperties();
 
-    auto child = node.children[0];
+    auto child = node.children[0].get();
     // Expected empty sort order, as the EqLookupNode order inferrence is not supported yet.
     ASSERT_EQ(node.providedSorts(), kEmptySet);
 
