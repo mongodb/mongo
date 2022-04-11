@@ -103,8 +103,17 @@ bool PathFusion::fuse(ABT& lhs, const ABT& rhs) {
             return true;
         }
 
-        lhs = make<PathComposeM>(rhs, std::move(lhs));
-        return true;
+        switch (_kindCtx.back()) {
+            case Kind::filter:
+                break;
+
+            case Kind::project:
+                lhs = make<PathComposeM>(rhs, std::move(lhs));
+                return true;
+
+            default:
+                MONGO_UNREACHABLE;
+        }
     }
 
     return false;
