@@ -125,17 +125,22 @@ function testPreImageRemovalJob(batchedDelete) {
     // generate oplog entries, with the exception of deletions.
     const preimagesNs = 'config.system.preimages';
     if (batchedDelete) {
-        const serverStatusBatches = testDB.serverStatus()['batchedDeletes']['batches'];
-        const serverStatusDocs = testDB.serverStatus()['batchedDeletes']['docs'];
-        assert.eq(serverStatusBatches, 2);
-        assert.eq(serverStatusDocs, preImagesToExpire);
-
         // Multi-deletes are batched base on time before performing the deletion, therefore the
         // deleted pre-images can span through multiple applyOps oplog entries.
-        assert.gte(preImagesToExpire,
-                   localDB.oplog.rs
-                       .find({ns: 'admin.$cmd', 'o.applyOps.op': 'd', 'o.applyOps.ns': preimagesNs})
-                       .itcount());
+        //
+        // As pre-images span two collections, the minimum number of batches is 2, as we perform
+        // the range-deletion per collection. The maximum number of batches is 4 (one per single
+        // pre-image removed).
+        const expectedNumberOfBatchesRange = [2, 3, 4];
+        const serverStatusBatches = testDB.serverStatus()['batchedDeletes']['batches'];
+        const serverStatusDocs = testDB.serverStatus()['batchedDeletes']['docs'];
+        assert.contains(serverStatusBatches, expectedNumberOfBatchesRange);
+        assert.eq(serverStatusDocs, preImagesToExpire);
+        assert.contains(
+            localDB.oplog.rs
+                .find({ns: 'admin.$cmd', 'o.applyOps.op': 'd', 'o.applyOps.ns': preimagesNs})
+                .itcount(),
+            expectedNumberOfBatchesRange);
     } else {
         assert.eq(preImagesToExpire, localDB.oplog.rs.find({op: 'd', ns: preimagesNs}).itcount());
     }
