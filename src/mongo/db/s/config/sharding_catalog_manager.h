@@ -637,6 +637,12 @@ private:
     void _setUserWriteBlockingStateOnNewShard(OperationContext* opCtx,
                                               RemoteCommandTargeter* targeter);
 
+
+    /**
+     * Sets the cluster parameters on the shard that is being added.
+     */
+    void _setClusterParametersOnNewShard(OperationContext* opCtx, RemoteCommandTargeter* targeter);
+
     // The owning service context
     ServiceContext* const _serviceContext;
 

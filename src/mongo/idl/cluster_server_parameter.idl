@@ -75,6 +75,17 @@ structs:
                 type: string
                 default: "\"off\""
 
+    TestBoolClusterParameterStorage:
+        description: "Storage used for testBoolClusterParameter"
+        inline_chained_structs: true
+        chained_structs:
+            ClusterServerParameter: ClusterServerParameter
+        fields:
+            boolData:
+                description: "Some bool parameter"
+                type: bool
+                default: 0
+
 feature_flags:
     featureFlagClusterWideConfig:
         description: Mechanism for cluster-wide configuration options
@@ -94,4 +105,11 @@ server_parameters:
         description: "Test cluster parameter that is only usable if enableTestCommands=true"
         cpp_vartype: TestStrClusterParameterStorage
         cpp_varname: strStorage
+        test_only: true
+
+    testBoolClusterParameter:
+        set_at: cluster
+        description: "Test cluster parameter that is only usable if enableTestCommands=true"
+        cpp_vartype: TestBoolClusterParameterStorage
+        cpp_varname: boolStorage
         test_only: true
