@@ -64,6 +64,7 @@
 #include "mongo/db/repl/tenant_migration_donor_service.h"
 #include "mongo/db/repl/tenant_migration_recipient_service.h"
 #include "mongo/db/s/active_migrations_registry.h"
+#include "mongo/db/s/balancer/balancer.h"
 #include "mongo/db/s/config/configsvr_coordinator_service.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/migration_coordinator_document_gen.h"
@@ -361,30 +362,6 @@ public:
                 const auto fcvChangeRegion(
                     FeatureCompatibilityVersion::enterFCVChangeRegion(opCtx));
 
-                if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-                    if (requestedVersion < actualVersion) {
-                        // TODO SERVER-64779 review/adapt this scope before v6.0 branches out
-                        // Make sure no collection is currently being defragmented
-                        DBDirectClient client(opCtx);
-
-                        const BSONObj collBeingDefragmentedQuery =
-                            BSON(CollectionType::kDefragmentCollectionFieldName
-                                 << BSON("$exists" << true));
-
-                        const bool isDefragmenting = client.count(CollectionType::ConfigNS,
-                                                                  collBeingDefragmentedQuery,
-                                                                  0 /*options*/,
-                                                                  1 /* limit */);
-
-                        uassert(ErrorCodes::CannotDowngrade,
-                                str::stream()
-                                    << "Cannot downgrade the cluster when there are collections "
-                                       "being defragmented. Please drain all the defragmentation "
-                                       "processes before downgrading.",
-                                !isDefragmenting);
-                    }
-                }
-
                 if (!gFeatureFlagUserWriteBlocking.isEnabledOnVersion(requestedVersion)) {
                     // TODO SERVER-65010 Remove this scope once 6.0 has branched out
 
@@ -635,6 +612,8 @@ private:
             }
         }
 
+        // TODO  SERVER-65332 remove logic bound to this future object When kLastLTS is 6.0
+        boost::optional<SharedSemiFuture<void>> chunkResizeAsyncTask;
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
             // Tell the shards to enter phase-1 of setFCV
             auto requestPhase1 = request;
@@ -644,6 +623,9 @@ private:
             uassertStatusOK(
                 ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
                     opCtx, CommandHelpers::appendMajorityWriteConcern(requestPhase1.toBSON({}))));
+
+            chunkResizeAsyncTask =
+                Balancer::get(opCtx)->applyLegacyChunkSizeConstraintsOnClusterData(opCtx);
         }
 
         _cancelTenantMigrations(opCtx);
@@ -937,6 +919,13 @@ private:
                     opCtx, CommandHelpers::appendMajorityWriteConcern(requestPhase2.toBSON({}))));
         }
 
+        if (chunkResizeAsyncTask.has_value()) {
+            LOGV2(6417108, "Waiting for cluster chunks resize process to complete.");
+            uassertStatusOKWithContext(
+                chunkResizeAsyncTask->getNoThrow(opCtx),
+                "Failed to enforce chunk size constraint during FCV downgrade");
+            LOGV2(6417109, "Cluster chunks resize process completed.");
+        }
         hangWhileDowngrading.pauseWhileSet(opCtx);
 
         if (request.getDowngradeOnDiskChanges()) {

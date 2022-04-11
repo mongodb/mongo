@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/s/balancer/balancer_policy.h"
+#include "mongo/db/s/balancer/actions_stream_policy.h"
 #include "mongo/s/catalog/type_collection.h"
 
 namespace mongo {
@@ -39,7 +39,7 @@ namespace mongo {
  * - generates a single sequence of action descriptors to fairly execute the defragmentation
  * algorithm across collections.
  */
-class BalancerDefragmentationPolicy {
+class BalancerDefragmentationPolicy : public ActionsStreamPolicy {
 
 public:
     virtual ~BalancerDefragmentationPolicy() {}
@@ -66,28 +66,14 @@ public:
 
     virtual BSONObj reportProgressOn(const UUID& uuid) = 0;
 
+
+    /**
+     * Pulls the next batch of actionable chunk migration requests, given the current internal state
+     * and the passed in list of unavaible shards.
+     * Every chunk migration request is then expected to be acknowledged by the balancer by issuing
+     * a call to applyActionResult() (declared in ActionsStreamPolicy)
+     */
     virtual MigrateInfoVector selectChunksToMove(OperationContext* opCtx,
                                                  stdx::unordered_set<ShardId>* usedShards) = 0;
-
-    /**
-     * Generates a descriptor detailing the next defragmentation action (and the targeted
-     * collection/chunk[s]) to be performed.
-     *
-     * The balancer is expected to execute a command matching the content of the descriptor and to
-     * invoke the related acknowledge() method on the defragmentation policy once the result is
-     * available (this will allow to update the progress of the algorithm).
-     */
-    virtual boost::optional<DefragmentationAction> getNextStreamingAction(
-        OperationContext* opCtx) = 0;
-
-    /**
-     * Updates the internal status of the policy by notifying the result of an action previously
-     * retrieved through getNextStreamingAction() or selectChunksToMove().
-     * The types of action and response are expected to match - or an stdx::bad_variant_access
-     * error will be thrown.
-     */
-    virtual void applyActionResult(OperationContext* opCtx,
-                                   const DefragmentationAction& action,
-                                   const DefragmentationActionResponse& response) = 0;
 };
 }  // namespace mongo

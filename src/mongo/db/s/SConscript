@@ -250,6 +250,7 @@ env.Library(
         'balancer/balancer_dist_locks.cpp',
         'balancer/balancer_policy.cpp',
         'balancer/balancer.cpp',
+        'balancer/cluster_chunks_resize_policy_impl.cpp',
         'balancer/cluster_statistics_impl.cpp',
         'balancer/cluster_statistics.cpp',
         'balancer/type_migration.cpp',
@@ -637,6 +638,7 @@ env.CppUnitTest(
     source=[
         'balancer/balancer_chunk_selection_policy_test.cpp',
         'balancer/balancer_defragmentation_policy_test.cpp',
+        'balancer/cluster_chunks_resize_policy_test.cpp',
         'balancer/balancer_policy_test.cpp',
         'balancer/cluster_statistics_test.cpp',
         'balancer/core_options_stub.cpp',

@@ -23,24 +23,17 @@ assert.commandWorked(st.s.adminCommand({shardCollection: fullNs, key: {x: 1}}));
 const downgradeVersion = lastLTSFCV;
 assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
 
-// Test that downgrade is not allowed if a collection is undergoing defragmentation
+/* Test that
+ * - downgrade can be performed while a collection is undergoing defragmentation
+ * - at the end of the process,  per-collection balancing fields are removed upon setFCV < 5.3
+ */
 {
-    // Set collection under defragmentation to block downgrade
-    assert.commandWorked(
-        st.s.adminCommand({configureCollectionBalancing: fullNs, defragmentCollection: true}));
-
-    var setFCVCmdResult = st.s.adminCommand({setFeatureCompatibilityVersion: downgradeVersion});
-    assert.commandFailedWithCode(setFCVCmdResult, ErrorCodes.CannotDowngrade);
-
-    // Rollback the change to allow downgrade
-    assert.commandWorked(st.config.collections.updateOne({defragmentCollection: {$exists: true}},
-                                                         {$unset: {defragmentCollection: 1}}));
-}
-
-// Check that per-collection balancing fields are removed upon setFCV < 5.3
-{
-    assert.commandWorked(st.s.adminCommand(
-        {configureCollectionBalancing: fullNs, enableAutoSplitter: false, chunkSize: 10}));
+    assert.commandWorked(st.s.adminCommand({
+        configureCollectionBalancing: fullNs,
+        defragmentCollection: true,
+        enableAutoSplitter: false,
+        chunkSize: 10
+    }));
 
     var configEntryBeforeSetFCV =
         st.config.getSiblingDB('config').collections.findOne({_id: fullNs});
@@ -49,6 +42,7 @@ assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: latestFC
     assert(configEntryBeforeSetFCV.noAutoSplit);
     assert.eq(10 * 1024 * 1024, shardEntryBeforeSetFCV.maxChunkSizeBytes);
     assert(!shardEntryBeforeSetFCV.allowAutoSplit);
+    assert(configEntryBeforeSetFCV.defragmentCollection);
 
     assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: downgradeVersion}));
 

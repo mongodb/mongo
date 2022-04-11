@@ -85,6 +85,8 @@ public:
     MigrateInfoVector selectChunksToMove(OperationContext* opCtx,
                                          stdx::unordered_set<ShardId>* usedShards) override;
 
+    StringData getName() const override;
+
     boost::optional<DefragmentationAction> getNextStreamingAction(OperationContext* opCtx) override;
 
     void applyActionResult(OperationContext* opCtx,
@@ -134,6 +136,8 @@ private:
      * Must be called while holding the _stateMutex.
      */
     void _clearDefragmentationState(OperationContext* opCtx, const UUID& uuid);
+
+    const std::string kPolicyName{"BalancerDefragmentationPolicy"};
 
     Mutex _stateMutex = MONGO_MAKE_LATCH("BalancerChunkMergerImpl::_stateMutex");
 

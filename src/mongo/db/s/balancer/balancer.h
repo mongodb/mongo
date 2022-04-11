@@ -44,6 +44,7 @@ class ChunkType;
 class ClusterStatistics;
 class BalancerCommandsScheduler;
 class BalancerDefragmentationPolicy;
+class ClusterChunksResizePolicy;
 class MigrationSecondaryThrottleOptions;
 class OperationContext;
 class ServiceContext;
@@ -169,6 +170,12 @@ public:
     void abortCollectionDefragmentation(OperationContext* opCtx, const NamespaceString& nss);
 
     /**
+     * Asynchronously requests the resize of all the chunks defined in the cluster, so that
+     * the "Collection Max Chunk Size" constraint existing in FCV 5.0 is enforced.
+     */
+    SharedSemiFuture<void> applyLegacyChunkSizeConstraintsOnClusterData(OperationContext* opCtx);
+
+    /**
      * Returns if a given collection is draining due to a removed shard, has chunks on an invalid
      * zone or the number of chunks is imbalanced across the cluster
      */
@@ -251,6 +258,8 @@ private:
                     const MigrateInfoVector& chunksToRebalance,
                     const MigrateInfoVector& chunksToDefragment);
 
+    void _onActionsStreamPolicyStateUpdate();
+
     // Protects the state below
     Mutex _mutex = MONGO_MAKE_LATCH("Balancer::_mutex");
 
@@ -300,6 +309,9 @@ private:
     std::unique_ptr<BalancerCommandsScheduler> _commandScheduler;
 
     std::unique_ptr<BalancerDefragmentationPolicy> _defragmentationPolicy;
+
+    // TODO  SERVER-65332 remove logic bound to this policy object When kLastLTS is 6.0
+    std::unique_ptr<ClusterChunksResizePolicy> _clusterChunksResizePolicy;
 };
 
 }  // namespace mongo
