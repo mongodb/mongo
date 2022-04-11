@@ -5972,7 +5972,7 @@ tasks:
 
 - <<: *task_template
   name: fle2_query_analysis
-  tags: []
+  tags: ["encrypt"]
   commands:
   - func: "do setup"
   - func: "load aws test credentials"

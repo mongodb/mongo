@@ -1014,7 +1014,6 @@ buildvariants:
   - name: external_auth_windows
     distros:
     - windows-2016-dc
-  - name: fle2_query_analysis
   - name: .jscore .common !.sharding
   - name: jsCore_auth
   - name: jsCore_ese
@@ -1565,7 +1564,6 @@ buildvariants:
   - name: disk_wiredtiger
   - name: .encrypt
   - name: feature_flag_multiversion_gen
-  - name: fle2_query_analysis
   - name: idl_tests
   - name: initial_sync_fuzzer_gen
   - name: .integration
