@@ -378,6 +378,7 @@ private:
         }
         inputParamToSlotMap = other.inputParamToSlotMap;
         variableIdToSlotMap = other.variableIdToSlotMap;
+        indexBoundsEvaluationInfos = other.indexBoundsEvaluationInfos;
     }
 };
 
