@@ -88,12 +88,13 @@ public:
 
         auto&& [arrSetTag, arrSetVal, hasArray, hasNull] =
             stage_builder::convertInExpressionEqualities(expr);
+        bindParam(*inputParam, true /*owned*/, arrSetTag, arrSetVal);
+
         // Auto-parameterization should not kick in if the $in's list of equalities includes either
-        // any arrays or any nulls.
+        // any arrays or any nulls. Asserted after bind to avoid leaking memory allocated in
+        // 'stage_builder::convertInExpressionEqualities()'.
         tassert(6279504, "Should not auto-parameterize $in with an array value", !hasArray);
         tassert(6279505, "Should not auto-parameterize $in with a null value", !hasNull);
-
-        bindParam(*inputParam, true /*owned*/, arrSetTag, arrSetVal);
     }
 
     void visit(const ModMatchExpression* expr) final {
@@ -274,12 +275,20 @@ private:
                    bool owned,
                    sbe::value::TypeTags typeTag,
                    sbe::value::Value value) {
+        boost::optional<sbe::value::ValueGuard> guard;
+        if (owned) {
+            guard.emplace(typeTag, value);
+        }
+
         auto it = _inputParamToSlotMap.find(paramId);
         // The encoding of the plan cache key should ensure that if we recover a cached plan from
         // the cached, the auto-parameterization of the query is consistent with the way that the
         // cached plan is parameterized.
         if (it != _inputParamToSlotMap.end()) {
             auto accessor = _runtimeEnvironment->getAccessor(it->second);
+            if (guard) {
+                guard->reset();
+            }
             accessor->reset(owned, typeTag, value);
         } else {
             // TODO SERVER-65361: add tassert here if the slotId is missing from
