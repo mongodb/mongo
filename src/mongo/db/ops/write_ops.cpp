@@ -27,11 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/ops/write_ops.h"
 
 #include "mongo/db/dbmessage.h"
+#include "mongo/db/ops/new_write_error_exception_format_feature_flag_gen.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/db/update/update_oplog_entry_version.h"
@@ -326,7 +325,9 @@ BSONObj WriteError::serialize() const {
     //
     // TODO (SERVER-63327): This special serialisation should be removed in the stable version
     // following the resolution of this ticket.
-    if (_status == ErrorCodes::StaleConfig) {
+    if (_status == ErrorCodes::StaleConfig &&
+        !feature_flags::gFeatureFlagNewWriteErrorExceptionFormat.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
         errBuilder.append(WriteError::kCodeFieldName,
                           int32_t(ErrorCodes::OBSOLETE_StaleShardVersion));
         errBuilder.append(WriteError::kErrmsgFieldName, _status.reason());
