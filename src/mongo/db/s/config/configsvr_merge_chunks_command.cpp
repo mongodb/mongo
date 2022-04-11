@@ -90,6 +90,8 @@ public:
             const BSONObj shardAndCollVers = uassertStatusOK(
                 ShardingCatalogManager::get(opCtx)->commitChunksMerge(opCtx,
                                                                       ns(),
+                                                                      request().getEpoch(),
+                                                                      request().getTimestamp(),
                                                                       request().getCollectionUUID(),
                                                                       request().getChunkRange(),
                                                                       request().getShard(),

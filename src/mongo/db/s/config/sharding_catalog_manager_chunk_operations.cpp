@@ -785,6 +785,8 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkSplit(
 StatusWith<BSONObj> ShardingCatalogManager::commitChunksMerge(
     OperationContext* opCtx,
     const NamespaceString& nss,
+    const boost::optional<OID>& epoch,
+    const boost::optional<Timestamp>& timestamp,
     const UUID& requestCollectionUUID,
     const ChunkRange& chunkRange,
     const ShardId& shardId,
@@ -798,11 +800,11 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunksMerge(
     Lock::ExclusiveLock lk(opCtx, opCtx->lockState(), _kChunkOpLock);
 
     // 1. Retrieve the initial collection version info to build up the logging info.
-    auto swCollVersion = getCollectionVersion(opCtx, nss);
-    if (!swCollVersion.isOK()) {
-        return swCollVersion.getStatus().withContext(str::stream()
-                                                     << "mergeChunk cannot merge chunks.");
-    }
+    auto collVersion = uassertStatusOK(getCollectionVersion(opCtx, nss));
+    uassert(ErrorCodes::StaleEpoch,
+            "Collection changed",
+            (!epoch || collVersion.epoch() == epoch) &&
+                (!timestamp || collVersion.getTimestamp() == timestamp));
 
     // 2. Retrieve the list of chunks belonging to the requested shard + key range.
     const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
@@ -855,9 +857,8 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunksMerge(
                           << chunkRange.toString(),
             chunk.getRange() == chunkRange);
         BSONObjBuilder response;
-        swCollVersion.getValue().serializeToBSON(kCollectionVersionField, &response);
-        const auto currentShardVersion =
-            getShardVersion(opCtx, coll, shardId, swCollVersion.getValue());
+        collVersion.serializeToBSON(kCollectionVersionField, &response);
+        const auto currentShardVersion = getShardVersion(opCtx, coll, shardId, collVersion);
         currentShardVersion.serializeToBSON(ChunkVersion::kShardVersionField, &response);
         // Makes sure that the last thing we read in getCollectionVersion and getShardVersion gets
         // majority written before to return from this command, otherwise next RoutingInfo cache
@@ -896,7 +897,7 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunksMerge(
             !chunksToMerge.empty() &&
                 chunksToMerge.back().getMax().woCompare(chunkRange.getMax()) == 0);
 
-    ChunkVersion initialVersion = swCollVersion.getValue();
+    ChunkVersion initialVersion = collVersion;
     ChunkVersion mergeVersion = initialVersion;
     mergeVersion.incMinor();
 

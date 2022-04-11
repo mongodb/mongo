@@ -273,7 +273,8 @@ public:
         commandBuilder.append(kCommandName, getNameSpace().toString())
             .appendArray(kBounds, boundsArrayBuilder.arr())
             .append(kShardName, getTarget().toString())
-            .append(kEpoch, _version.epoch());
+            .append(kEpoch, _version.epoch())
+            .append(kTimestamp, _version.getTimestamp());
 
         _version.serializeToBSON(ChunkVersion::kShardVersionField, &commandBuilder);
 
@@ -289,7 +290,7 @@ private:
     static const std::string kBounds;
     static const std::string kShardName;
     static const std::string kEpoch;
-    static const std::string kConfig;
+    static const std::string kTimestamp;
 };
 
 class AutoSplitVectorCommandInfo : public CommandInfo {

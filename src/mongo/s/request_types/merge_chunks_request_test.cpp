@@ -83,8 +83,7 @@ TEST(ConfigSvrMergeChunks, ConfigCommandtoBSON) {
     };
 
     auto request = ConfigSvrMergeChunks::parse(ctx, appendDB(serializedRequest));
-    request.setWriteConcern(writeConcernObj);
-    auto requestToBSON = request.toBSON(BSONObj());
+    auto requestToBSON = request.toBSON(BSON("writeConcern" << writeConcernObj));
 
     ASSERT_BSONOBJ_EQ(cmdBuilder.obj(), requestToBSON);
 }
@@ -197,17 +196,6 @@ TEST(ConfigSvrMergeChunks, WrongShardIdTypeErrors) {
         DBException,
         ErrorCodes::TypeMismatch);
 }
-
-//// IDL validators do not work on command value
-// TEST(ConfigSvrMergeChunks, InvalidNamespaceErrors) {
-//             ASSERT_THROWS_CODE({
-//                 auto collUUID = UUID::gen();
-// ConfigSvrMergeChunks::parse(ctx,
-//         BSON("_configsvrCommitChunksMerge" << ""
-//              << "collUUID" << collUUID.toBSON() << "chunkRange" << chunkRange.toBSON() << "shard"
-//              << "shard0000" << "$db" << "admin"));
-//         }, DBException, ErrorCodes::InvalidNamespace);
-// }
 
 }  // namespace
 }  // namespace mongo

@@ -266,6 +266,8 @@ public:
      */
     StatusWith<BSONObj> commitChunksMerge(OperationContext* opCtx,
                                           const NamespaceString& nss,
+                                          const boost::optional<OID>& epoch,
+                                          const boost::optional<Timestamp>& timestamp,
                                           const UUID& requestCollectionUUID,
                                           const ChunkRange& chunkRange,
                                           const ShardId& shardId,

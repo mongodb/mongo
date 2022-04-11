@@ -54,6 +54,8 @@ namespace {
 
 Shard::CommandResponse commitMergeOnConfigServer(OperationContext* opCtx,
                                                  const NamespaceString& nss,
+                                                 const OID& epoch,
+                                                 const boost::optional<Timestamp>& timestamp,
                                                  const ChunkRange& chunkRange,
                                                  const CollectionMetadata& metadata) {
     auto const shardingState = ShardingState::get(opCtx);
@@ -61,14 +63,16 @@ Shard::CommandResponse commitMergeOnConfigServer(OperationContext* opCtx,
 
     ConfigSvrMergeChunks request{nss, shardingState->shardId(), metadata.getUUID(), chunkRange};
     request.setValidAfter(currentTime.clusterTime().asTimestamp());
-    request.setWriteConcern(ShardingCatalogClient::kMajorityWriteConcern.toBSON());
+    request.setEpoch(epoch);
+    request.setTimestamp(timestamp);
 
     auto cmdResponse =
         uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommand(
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             NamespaceString::kAdminDb.toString(),
-            request.toBSON(BSONObj()),
+            request.toBSON(BSON(WriteConcernOptions::kWriteConcernField
+                                << ShardingCatalogClient::kMajorityWriteConcern.toBSON())),
             Shard::RetryPolicy::kIdempotent));
 
     return cmdResponse;
@@ -137,7 +141,8 @@ void mergeChunks(OperationContext* opCtx,
                           << metadataBeforeMerge.getKeyPattern().toString(),
             metadataBeforeMerge.isValidKey(minKey) && metadataBeforeMerge.isValidKey(maxKey));
 
-    auto cmdResponse = commitMergeOnConfigServer(opCtx, nss, chunkRange, metadataBeforeMerge);
+    auto cmdResponse = commitMergeOnConfigServer(
+        opCtx, nss, expectedEpoch, expectedTimestamp, chunkRange, metadataBeforeMerge);
 
     uassertStatusOKWithContext(cmdResponse.commandStatus, "Failed to commit chunk merge");
     uassertStatusOKWithContext(cmdResponse.writeConcernStatus, "Failed to commit chunk merge");

@@ -146,6 +146,7 @@ const std::string MergeChunksCommandInfo::kCommandName = "mergeChunks";
 const std::string MergeChunksCommandInfo::kBounds = "bounds";
 const std::string MergeChunksCommandInfo::kShardName = "shardName";
 const std::string MergeChunksCommandInfo::kEpoch = "epoch";
+const std::string MergeChunksCommandInfo::kTimestamp = "timestamp";
 
 const std::string DataSizeCommandInfo::kCommandName = "dataSize";
 const std::string DataSizeCommandInfo::kKeyPattern = "keyPattern";

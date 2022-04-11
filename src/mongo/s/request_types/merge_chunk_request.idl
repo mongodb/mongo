@@ -84,7 +84,11 @@ commands:
                 type: timestamp
                 description: "The time after which this chunk is at this shard."
                 optional: true
-            writeConcern:
-                description: "The level of write concern for the creation operation."
-                type: object
+            epoch:
+                description: "The expected epoch of the collection that is being committed"
+                type: objectid
+                optional: true
+            timestamp:
+                description: "The expected timestamp of the collection that is being committed"
+                type: timestamp
                 optional: true
