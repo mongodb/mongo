@@ -262,7 +262,7 @@ be invoked as either:
             err = textwrap.dedent(f"""\
 Multiple testable installations were found, but installDir was not specified.
 You must either call resmoke via one of the following scripts:
-{os.linesep.join(shlex.quote(resmoke_wrappers))}
+{os.linesep.join(map(shlex.quote, resmoke_wrappers))}
 
 or explicitly pass --installDir to the run subcommand of buildscripts/resmoke.py.""")
             raise RuntimeError(err)
