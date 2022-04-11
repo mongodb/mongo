@@ -56,7 +56,6 @@ const expectedParamDefaults = {
     internalQueryMaxNumberOfFieldsToChooseUnfilteredColumnScan: 5,
     internalQueryMaxNumberOfFieldsToChooseFilteredColumnScan: 12,
     internalQueryDisableLookupExecutionUsingHashJoin: false,
-    internalQuerySlotBasedExecutionDisableLookupPushdown: false,
 };
 
 function assertDefaultParameterValues() {
@@ -230,9 +229,6 @@ assertSetParameterFails("internalQueryCollectionMaxStorageSizeBytesToChooseHashJ
 
 assertSetParameterSucceeds("internalQueryDisableLookupExecutionUsingHashJoin", true);
 assertSetParameterSucceeds("internalQueryDisableLookupExecutionUsingHashJoin", false);
-
-assertSetParameterSucceeds("internalQuerySlotBasedExecutionDisableLookupPushdown", true);
-assertSetParameterSucceeds("internalQuerySlotBasedExecutionDisableLookupPushdown", false);
 
 assertSetParameterSucceeds("internalQueryMaxNumberOfFieldsToChooseUnfilteredColumnScan", 100);
 assertSetParameterSucceeds("internalQueryMaxNumberOfFieldsToChooseUnfilteredColumnScan", 0);

@@ -71,7 +71,6 @@
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
-#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/read_concern.h"
 #include "mongo/db/repl/oplog.h"
@@ -675,8 +674,7 @@ Status runAggregate(OperationContext* opCtx,
     // Taking locks over multiple collections is not supported outside of $lookup pushdown.
     if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
         feature_flags::gFeatureFlagSBELookupPushdown.isEnabled(
-            serverGlobalParams.featureCompatibility) &&
-        !internalQuerySlotBasedExecutionDisableLookupPushdown.load()) {
+            serverGlobalParams.featureCompatibility)) {
         secondaryExecNssList = liteParsedPipeline.getForeignExecutionNamespaces();
     }
 

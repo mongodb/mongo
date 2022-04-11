@@ -56,7 +56,6 @@
 #include "mongo/db/pipeline/pipeline_d.h"
 #include "mongo/db/query/collection_index_usage_tracker_decoration.h"
 #include "mongo/db/query/collection_query_info.h"
-#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/sbe_plan_cache.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/s/sharding_state.h"
@@ -436,8 +435,7 @@ CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalRead(Pipeline*
     std::vector<NamespaceStringOrUUID> secondaryNamespaces = [&]() {
         if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
             feature_flags::gFeatureFlagSBELookupPushdown.isEnabled(
-                serverGlobalParams.featureCompatibility) &&
-            !internalQuerySlotBasedExecutionDisableLookupPushdown.load()) {
+                serverGlobalParams.featureCompatibility)) {
             auto lpp = LiteParsedPipeline(expCtx->ns, pipeline->serializeToBson());
             return lpp.getForeignExecutionNamespaces();
         } else {
