@@ -90,6 +90,7 @@ assertConstantFoldingResults([x, 1, 2, 3],
 
 // Non-optimized comparisons -- make sure that non-optimized pipelines will give the same result as
 // optimized ones.
+// This is a regression test for BF-24149.
 coll.insert({_id: 0, v: NumberDecimal("917.6875119062092")});
 coll.insert({_id: 1, v: NumberDecimal("927.3345924210555")});
 
@@ -104,4 +105,21 @@ assertArrayEq({
         {"_id": NumberDecimal("905721242210.0453137831269007622941"), "sum": 1}
     ]
 });
+
+// Function to generate random numbers of float, long, double, and NumberDecimal (with different
+// probabilities).
+const randomNumber = (min, max) => {
+    const r = Math.random() * (max - min) + min;
+    const t = Math.random();
+    if (t < 0.7) {
+        return r;
+    }
+    if (t < 0.9) {
+        return NumberInt(Math.round(r));
+    }
+    if (t < 0.999) {
+        return NumberLong(Math.round(r));
+    }
+    return NumberDecimal(String(r));
+}
 })();
