@@ -54,8 +54,7 @@ function assertIndexScanPlan(explain, isGeneric) {
 }
 
 try {
-    // TODO SERVER-65129: use 'featureFlagSbePlanCache' instead
-    const isAutoParameterizationEnabled = checkSBEEnabled(db, ["featureFlagAutoParameterization"]);
+    const isSBEPlanCacheEnabled = checkSBEEnabled(db, ["featureFlagSbePlanCache"]);
 
     // Verify that when the number of statically generated single interval bounds is less than the
     // static limit, the optimized plan is used.
@@ -63,7 +62,7 @@ try {
         coll.find({a: {$in: [1, 2, 3]}, b: {$in: [10, 11, 12]}, c: {$in: [42]}, d: {$lt: 3}})
             .explain("executionStats");
 
-    if (isAutoParameterizationEnabled) {
+    if (isSBEPlanCacheEnabled) {
         assertIndexScanPlan(optimized, /*isGeneric*/ false);
     } else {
         const optimiziedStages = optimized.executionStats.executionStages;
@@ -78,7 +77,7 @@ try {
         coll.find({a: {$in: [1, 2, 3]}, b: {$in: [10, 11, 12]}, c: {$in: [42]}, d: {$lt: 3}})
             .explain("executionStats");
 
-    if (isAutoParameterizationEnabled) {
+    if (isSBEPlanCacheEnabled) {
         assertIndexScanPlan(generic, /*isGeneric*/ true);
     } else {
         const genericStages = generic.executionStats.executionStages;

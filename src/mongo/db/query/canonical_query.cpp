@@ -200,10 +200,10 @@ Status CanonicalQuery::init(OperationContext* opCtx,
     }
     auto unavailableMetadata = validStatus.getValue();
     _root = MatchExpression::normalize(std::move(root));
-    if (feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV() &&
-        feature_flags::gFeatureFlagAutoParameterization.isEnabledAndIgnoreFCV()) {
-        // Both the SBE plan cache and auto-parameterization are enabled. Add parameter markers to
-        // the appropriate match expression leaf nodes.
+    if (feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
+        // When the SBE plan cache is enabled, we auto-parameterize queries in the hopes of caching
+        // a parameterized plan. Here we add parameter markers to the appropriate match expression
+        // leaf nodes.
         _inputParamIdToExpressionMap = MatchExpression::parameterize(_root.get());
     }
     // The tree must always be valid after normalization.

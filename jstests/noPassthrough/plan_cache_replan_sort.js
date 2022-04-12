@@ -17,14 +17,6 @@ const db = conn.getDB("test");
 const coll = db.plan_cache_replan_sort;
 coll.drop();
 
-// Replanning is not supported yet without auto-parameterization. TODO SERVER-61314: Remove this
-// check together with removal of "featureFlagSbePlanCache".
-if (checkSBEEnabled(db, ["featureFlagSbePlanCache"])) {
-    jsTest.log("Skipping test because SBE and SBE plan cache are both enabled.");
-    MongoRunner.stopMongod(conn);
-    return;
-}
-
 // Ensure a plan with a sort stage gets cached.
 assert.commandWorked(coll.createIndex({x: 1}));
 assert.commandWorked(coll.createIndex({y: 1}));
@@ -50,7 +42,16 @@ assert.eq(1, coll.find({x: 5}).sort({y: 1}).itcount());
 const cachedPlans = coll.getPlanCache().list();
 assert.eq(1, cachedPlans.length, cachedPlans);
 assert.eq(true, cachedPlans[0].isActive, cachedPlans);
-assert.eq("SORT", getCachedPlan(cachedPlans[0].cachedPlan).stage, cachedPlans);
+const cachedPlan = getCachedPlan(cachedPlans[0].cachedPlan);
+const cachedPlanVersion = cachedPlans[0].version;
+if (checkSBEEnabled(db, ["featureFlagSbePlanCache"])) {
+    // If the SBE plan cache is on, then the cached plan has a different format.
+    assert.eq(cachedPlanVersion, "2", cachedPlans);
+    assert(cachedPlan.stages.includes("sort"), cachedPlans);
+} else {
+    assert.eq(cachedPlanVersion, "1", cachedPlans);
+    assert.eq(cachedPlan.stage, "SORT", cachedPlans);
+}
 
 // Assert we "replan", by running the same query with different parameters. This time the filter is
 // not selective at all and will result in more documents attempted to be sorted.

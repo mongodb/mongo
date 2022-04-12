@@ -8,4 +8,3 @@
 # Disable featureFlagRequireTenantID until all paths pass tenant id to TenantNamespace
 # and TenantDatabase constructors.
 - featureFlagRequireTenantID
-- featureFlagAutoParameterization

@@ -364,9 +364,6 @@ TEST(CanonicalQueryEncoderTest, ComputeKeySBE) {
 
     // TODO SERVER-61314: Remove when featureFlagSbePlanCache is removed.
     RAIIServerParameterControllerForTest controllerSBEPlanCache("featureFlagSbePlanCache", true);
-    // TODO SERVER-64137: Remove when featureFlagAutoParameterization is removed.
-    RAIIServerParameterControllerForTest controllerAutoParam("featureFlagAutoParameterization",
-                                                             true);
 
     testComputeSBEKey("{}", "{}", "{}", "YW4ABQAAAAAAAAAAAAAAAG5ubm4FAAAAAAUAAAAABQAAAAA=");
     testComputeSBEKey(

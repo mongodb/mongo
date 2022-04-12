@@ -282,13 +282,6 @@ void fillOutIndexEntries(OperationContext* opCtx,
                          const CanonicalQuery* canonicalQuery,
                          const CollectionPtr& collection,
                          std::vector<IndexEntry>& entries) {
-    // TODO SERVER-65129: Eliminate this check once we support auto-parameterized index scan plans.
-    if (feature_flags::gFeatureFlagAutoParameterization.isEnabledAndIgnoreFCV()) {
-        // Indexed plans are not yet supported when auto-parameterization is enabled, so make it
-        // look to the planner like there are no indexes.
-        return;
-    }
-
     auto ii = collection->getIndexCatalog()->getIndexIterator(opCtx, false);
     while (ii->more()) {
         const IndexCatalogEntry* ice = ii->next();
@@ -1003,12 +996,15 @@ protected:
     }
 
     std::unique_ptr<SlotBasedPrepareExecutionResult> buildIdHackPlan() {
-        // Auto-parameterization currently only works for collection scan plans, but idhack plans
-        // use the _id index. Therefore, we inhibit idhack when auto-parametrization is enabled.
+        // When the SBE plan cache is enabled we rely on it for fast find-by-_id queries rather than
+        // having a special implementation of the idhack. Therefore, this function returns nullptr
+        // early when the SBE plan cache is on.
         //
-        // TODO SERVER-64237: Eliminate this check once we support auto-parameterized ID hack
-        // plans.
-        if (feature_flags::gFeatureFlagAutoParameterization.isEnabledAndIgnoreFCV()) {
+        // This is still fast for idhack eligible queries. The first invocation of such a query will
+        // go through the normal planning and plan compilation process, resulting in an
+        // auto-parameterized SBE plan cache entry. Subsequent idhack queries can simply re-use this
+        // cache entry, and the hot path for recovering cached plans is already carefully optimized.
+        if (feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
             return nullptr;
         }
 

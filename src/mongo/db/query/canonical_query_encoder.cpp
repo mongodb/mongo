@@ -724,39 +724,21 @@ public:
     void visit(const ModMatchExpression* expr) final {
         auto divisorParam = expr->getDivisorInputParamId();
         auto remainderParam = expr->getRemainderInputParamId();
-        if (divisorParam) {
-            tassert(6142105,
-                    "$mod expression had divisor param but not remainder param",
-                    remainderParam);
-            encodeParamMarker(*divisorParam);
-            encodeParamMarker(*remainderParam);
-        } else {
-            // TODO SERVER-64137: remove this branch and assert the existence of both params once
-            // auto-parameterization flag is removed.
-            tassert(6142106,
-                    "$mod expression had remainder param but not divisor param",
-                    !remainderParam);
-            encodeRhs(expr);
-        }
+        tassert(6512901, "$mod expression should have divisor param", divisorParam);
+        tassert(6512902, "$mod expression should have remainder param", remainderParam);
+
+        encodeParamMarker(*divisorParam);
+        encodeParamMarker(*remainderParam);
     }
 
     void visit(const RegexMatchExpression* expr) final {
         auto sourceRegexParam = expr->getSourceRegexInputParamId();
         auto compiledRegexParam = expr->getCompiledRegexInputParamId();
-        if (sourceRegexParam) {
-            tassert(6142107,
-                    "regex expression had source param but not compiled param",
-                    compiledRegexParam);
-            encodeParamMarker(*sourceRegexParam);
-            encodeParamMarker(*compiledRegexParam);
-        } else {
-            // TODO SERVER-64137: remove this branch and assert the existence of both params once
-            // auto-parameterization flag is removed.
-            tassert(6142108,
-                    "regex expression had compiled param but not source param",
-                    !compiledRegexParam);
-            encodeRhs(expr);
-        }
+        tassert(6512903, "regex expression should have source param", sourceRegexParam);
+        tassert(6512904, "regex expression should have compiled param", compiledRegexParam);
+
+        encodeParamMarker(*sourceRegexParam);
+        encodeParamMarker(*compiledRegexParam);
     }
 
     void visit(const SizeMatchExpression* expr) final {
@@ -916,20 +898,11 @@ private:
     void encodeBitTestExpression(const BitTestMatchExpression* expr) {
         auto bitPositionsParam = expr->getBitPositionsParamId();
         auto bitMaskParam = expr->getBitMaskParamId();
-        if (bitPositionsParam) {
-            tassert(6142100,
-                    "bit-test expression had bit positions param but not bitmask param",
-                    bitMaskParam);
-            encodeParamMarker(*bitPositionsParam);
-            encodeParamMarker(*bitMaskParam);
-        } else {
-            // TODO SERVER-64137: remove this branch and assert the existence of both params once
-            // auto-parameterization flag is removed.
-            tassert(6142101,
-                    "bit-test expression had bitmask param but not bit positions param",
-                    !bitMaskParam);
-            encodeRhs(expr);
-        }
+        tassert(6512905, "bit-test expression should have bit positions param", bitPositionsParam);
+        tassert(6512906, "$mod expression should have bitmask param", bitMaskParam);
+
+        encodeParamMarker(*bitPositionsParam);
+        encodeParamMarker(*bitMaskParam);
     }
 
     /**
@@ -1037,11 +1010,14 @@ void encodeKeyForAutoParameterizedMatchSBE(MatchExpression* matchExpr, BufBuilde
 }  // namespace
 
 std::string encodeSBE(const CanonicalQuery& cq) {
+    tassert(6512900,
+            "using the SBE plan cache key encoding requires the SBE plan cache to be enabled",
+            feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV());
     tassert(6142104,
             "attempting to encode SBE plan cache key for SBE-incompatible query",
             cq.isSbeCompatible());
 
-    auto serializedFilter = cq.root()->serialize(true);
+    const auto& filter = cq.getQueryObj();
     const auto& proj = cq.getFindCommandRequest().getProjection();
     const auto& sort = cq.getFindCommandRequest().getSort();
 
@@ -1053,17 +1029,11 @@ std::string encodeSBE(const CanonicalQuery& cq) {
     // A constant for reserving buffer size. It should be large enough to reserve the space required
     // to encode various properties from the FindCommandRequest and query knobs.
     const int kBufferSizeConstant = 200;
-    size_t bufSize = serializedFilter.objsize() + proj.objsize() + strBuilderEncoded.size() +
-        kBufferSizeConstant;
+    size_t bufSize =
+        filter.objsize() + proj.objsize() + strBuilderEncoded.size() + kBufferSizeConstant;
 
     BufBuilder bufBuilder(bufSize);
-    if (feature_flags::gFeatureFlagAutoParameterization.isEnabledAndIgnoreFCV()) {
-        encodeKeyForAutoParameterizedMatchSBE(cq.root(), &bufBuilder);
-    } else {
-        // When auto-parameterization is off, just add the entire filter BSON to the cache key,
-        // including any constants.
-        bufBuilder.appendBuf(serializedFilter.objdata(), serializedFilter.objsize());
-    }
+    encodeKeyForAutoParameterizedMatchSBE(cq.root(), &bufBuilder);
 
     bufBuilder.appendBuf(proj.objdata(), proj.objsize());
     bufBuilder.appendStr(strBuilderEncoded, false /* includeEndingNull */);

@@ -1,9 +1,6 @@
 /**
  * Tests that auto-parameterized collection scan plans are correctly stored and in the SBE plan
  * cache, and that they can be correctly recovered from the cache with new parameter values.
- *
- * TODO SERVER-64137: Move this test to jstests/core/ once we no longer need to specially configure
- * 'featureFlagAutoParameterization'.
  */
 (function() {
 "use strict";
@@ -13,12 +10,16 @@ load("jstests/libs/sbe_util.js");
 
 // TODO SERVER-64315: re-enable this test. This test depends on caching single solution plans,
 // which is disabled temporarily due to a bug.
+//
+// As part of re-enabling the test, we should move it to jstests/core/ so that it can benefit from
+// passthrough testing. This test formerly needed to be in noPassthrough because it required a
+// special flag to enable auto-parameterization, but this is no longer the case.
 if (true) {
     jsTest.log("This test is temporarily disabled");
     return;
 }
 
-const conn = MongoRunner.runMongod({setParameter: "featureFlagAutoParameterization=true"});
+const conn = MongoRunner.runMongod();
 assert.neq(conn, null, "mongod failed to start up");
 
 const dbName = jsTestName();

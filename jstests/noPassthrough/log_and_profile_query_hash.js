@@ -7,7 +7,6 @@
 // For getLatestProfilerEntry().
 load("jstests/libs/profiler.js");
 load("jstests/libs/logv2_helpers.js");
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 
 // Prevent the mongo shell from gossiping its cluster time, since this will increase the amount
 // of data logged for each op. For some of the testcases below, including the cluster time would
@@ -134,13 +133,7 @@ const hashValues = testList.map((testCase) => runTestsAndGetHashes(testDB, testC
 
 // Confirm that the same shape of query has the same hashes.
 assert.neq(hashValues[0], hashValues[1]);
-
-// TODO SERVER-61314: Remove this check when "featureFlagSbePlanCache" is removed. This part of the
-// test cannot work when the SBE plan cache is enabled until the SBE plan cache supports
-// auto-parameterization.
-if (!checkSBEEnabled(testDB, ["featureFlagSbePlanCache"])) {
-    assert.eq(hashValues[1], hashValues[2]);
-}
+assert.eq(hashValues[1], hashValues[2]);
 
 // Test that the expected 'planCacheKey' and 'queryHash' are included in the transitional
 // log lines when an inactive cache entry is created.
