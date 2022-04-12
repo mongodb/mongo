@@ -4,7 +4,6 @@
  * @tags: [
  *   uses_multi_shard_transaction,
  *   uses_transactions,
- *   featureFlagUpdateDocumentShardKeyUsingTransactionApi,
  * ]
  */
 

@@ -1,6 +1,5 @@
 /**
  * Tests that the resharding coordinator recovers its abort decision after a primary failover.
- * @tags: [featureFlagUpdateDocumentShardKeyUsingTransactionApi]
  */
 (function() {
 "use strict";

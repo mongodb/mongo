@@ -3,7 +3,7 @@
  * its shard key value during resharding is not retryable on the recipient after resharding
  * completes.
  *
- * @tags: [requires_fcv_60, featureFlagUpdateDocumentShardKeyUsingTransactionApi]
+ * @tags: [requires_fcv_60]
  */
 (function() {
 
@@ -47,8 +47,8 @@ function runTest(reshardInPlace) {
     const mongosTestDB = mongosConn.getDB(dbName);
 
     // Test commands that the shard key of a document in the test collection from change its shard
-    // key Note we don't test the remove:true case because the document can't move shards if it is
-    // being delete.
+    // key. Note we don't test the remove:true case because the document can't move shards if it is
+    // being deleted.
     const updateCmdObj = {
         update: collName,
         updates: [

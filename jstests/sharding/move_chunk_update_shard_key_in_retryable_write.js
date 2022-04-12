@@ -6,8 +6,7 @@
  * error saying that the write can't be retried since it was upgraded to a transaction as part of
  * the update. This should be true whether or not a migration occurs on the chunk containing the
  * original value of the document's shard key. This file tests that behavior.
- * @tags: [uses_transactions, uses_multi_shard_transaction,
- * featureFlagUpdateDocumentShardKeyUsingTransactionApi]
+ * @tags: [uses_transactions, uses_multi_shard_transaction,]
  */
 (function() {
 
@@ -390,7 +389,7 @@ test(
              const findAndModifyUpsertCmdObj = attachTxnFields(findAndModifyUpsertCmdObjBase);
              runCommandDuringChunkMigration(findAndModifyUpsertCmdObj);
              // Retry the command. This should retry against shard2.
-             if (areInternalTransactionsEnabled(st.s0)) {
+             if (isUpdateDocumentShardKeyUsingTransactionApiEnabled(st.s0)) {
                  // If internal transactions are enabled, shard2 is expected to throw
                  // IncompleteTransactionHistory since it should have the WouldChangeOwningShard
                  // noop oplog entry copied from shard0 during the migration.
