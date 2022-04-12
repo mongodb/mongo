@@ -191,6 +191,9 @@ value::SlotAccessor* HashLookupStage::getAccessor(CompileCtx& ctx, value::SlotId
 void HashLookupStage::reset() {
     _ht = boost::none;
 
+    // Reset the memory threshold if the knob changes between re-open calls.
+    _memoryUseInBytesBeforeSpill = internalQuerySBELookupApproxMemoryUseInBytesBeforeSpill.load();
+
     if (_recordStoreHt) {
         _recordStoreHt.reset(nullptr);
     }

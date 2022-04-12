@@ -221,7 +221,7 @@ private:
     bool _compileInnerAgg{false};
 
     // Memory tracking and spilling to disk.
-    const long long _memoryUseInBytesBeforeSpill =
+    long long _memoryUseInBytesBeforeSpill =
         internalQuerySBELookupApproxMemoryUseInBytesBeforeSpill.load();
     int _currentSwitchIdx = 0;
 

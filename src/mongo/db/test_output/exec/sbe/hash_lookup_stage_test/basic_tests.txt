@@ -31,17 +31,25 @@ htIndices:0
 buffRecs:0
 buffBytes:0
 --- Fourth Stats
-dsk:0
-htRecs:0
-htIndices:0
-buffRecs:0
-buffBytes:0
+dsk:1
+htRecs:3
+htIndices:162
+buffRecs:4
+buffBytes:124
+
 --- Fifth Stats
-dsk:0
-htRecs:0
-htIndices:0
-buffRecs:0
-buffBytes:0
+dsk:1
+htRecs:6
+htIndices:324
+buffRecs:8
+buffBytes:248
+
+--- Sixth Stats
+dsk:1
+htRecs:9
+htIndices:486
+buffRecs:12
+buffBytes:372
 
 -- OUTPUT [outer_key, inner_agg]:
 1, [{"_id" : 11}]
@@ -78,17 +86,25 @@ htIndices:0
 buffRecs:0
 buffBytes:0
 --- Fourth Stats
-dsk:0
-htRecs:0
-htIndices:0
-buffRecs:0
-buffBytes:0
+dsk:1
+htRecs:2
+htIndices:98
+buffRecs:2
+buffBytes:62
+
 --- Fifth Stats
-dsk:0
-htRecs:0
-htIndices:0
-buffRecs:0
-buffBytes:0
+dsk:1
+htRecs:4
+htIndices:196
+buffRecs:4
+buffBytes:124
+
+--- Sixth Stats
+dsk:1
+htRecs:6
+htIndices:294
+buffRecs:6
+buffBytes:186
 
 -- OUTPUT [outer_key, inner_agg]:
 1, Nothing
@@ -127,17 +143,25 @@ htIndices:0
 buffRecs:0
 buffBytes:0
 --- Fourth Stats
-dsk:0
-htRecs:0
-htIndices:0
-buffRecs:0
-buffBytes:0
+dsk:1
+htRecs:4
+htIndices:211
+buffRecs:4
+buffBytes:124
+
 --- Fifth Stats
-dsk:0
-htRecs:0
-htIndices:0
-buffRecs:0
-buffBytes:0
+dsk:1
+htRecs:8
+htIndices:422
+buffRecs:8
+buffBytes:248
+
+--- Sixth Stats
+dsk:1
+htRecs:12
+htIndices:633
+buffRecs:12
+buffBytes:372
 
 -- OUTPUT [outer_key, inner_agg]:
 1, [{"_id" : 13}]
@@ -184,17 +208,25 @@ htIndices:0
 buffRecs:0
 buffBytes:0
 --- Fourth Stats
-dsk:0
-htRecs:0
-htIndices:0
-buffRecs:0
-buffBytes:0
+dsk:1
+htRecs:4
+htIndices:256
+buffRecs:7
+buffBytes:217
+
 --- Fifth Stats
-dsk:0
-htRecs:0
-htIndices:0
-buffRecs:0
-buffBytes:0
+dsk:1
+htRecs:8
+htIndices:512
+buffRecs:14
+buffBytes:434
+
+--- Sixth Stats
+dsk:1
+htRecs:12
+htIndices:768
+buffRecs:21
+buffBytes:651
 
 -- OUTPUT [outer_key, inner_agg]:
 1, [{"_id" : 11}, {"_id" : 14}]
@@ -246,17 +278,25 @@ htIndices:0
 buffRecs:0
 buffBytes:0
 --- Fourth Stats
-dsk:0
-htRecs:0
-htIndices:0
-buffRecs:0
-buffBytes:0
+dsk:1
+htRecs:4
+htIndices:279
+buffRecs:8
+buffBytes:248
+
 --- Fifth Stats
-dsk:0
-htRecs:0
-htIndices:0
-buffRecs:0
-buffBytes:0
+dsk:1
+htRecs:8
+htIndices:558
+buffRecs:16
+buffBytes:496
+
+--- Sixth Stats
+dsk:1
+htRecs:12
+htIndices:837
+buffRecs:24
+buffBytes:744
 
 -- OUTPUT [outer_key, inner_agg]:
 {"a" : 1}, [{"_id" : 11}, {"_id" : 15}, {"_id" : 16}]
@@ -311,17 +351,25 @@ htIndices:0
 buffRecs:0
 buffBytes:0
 --- Fourth Stats
-dsk:0
-htRecs:0
-htIndices:0
-buffRecs:0
-buffBytes:0
+dsk:1
+htRecs:5
+htIndices:390
+buffRecs:9
+buffBytes:279
+
 --- Fifth Stats
-dsk:0
-htRecs:0
-htIndices:0
-buffRecs:0
-buffBytes:0
+dsk:1
+htRecs:10
+htIndices:780
+buffRecs:18
+buffBytes:558
+
+--- Sixth Stats
+dsk:1
+htRecs:15
+htIndices:1170
+buffRecs:27
+buffBytes:837
 
 -- OUTPUT [outer_key, inner_agg]:
 null, [{"_id" : 11}, {"_id" : 17}, {"_id" : 18}]
@@ -370,17 +418,25 @@ htIndices:0
 buffRecs:0
 buffBytes:0
 --- Fourth Stats
-dsk:0
-htRecs:0
-htIndices:0
-buffRecs:0
-buffBytes:0
+dsk:1
+htRecs:3
+htIndices:185
+buffRecs:5
+buffBytes:155
+
 --- Fifth Stats
-dsk:0
-htRecs:0
-htIndices:0
-buffRecs:0
-buffBytes:0
+dsk:1
+htRecs:6
+htIndices:370
+buffRecs:10
+buffBytes:310
+
+--- Sixth Stats
+dsk:1
+htRecs:9
+htIndices:555
+buffRecs:15
+buffBytes:465
 
 -- OUTPUT [outer_key, inner_agg]:
 null, [{"_id" : 11}]
@@ -419,7 +475,15 @@ htRecs:0
 htIndices:0
 buffRecs:0
 buffBytes:0
+
 --- Fifth Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+
+--- Sixth Stats
 dsk:0
 htRecs:0
 htIndices:0
@@ -455,17 +519,25 @@ htIndices:0
 buffRecs:0
 buffBytes:0
 --- Fourth Stats
-dsk:0
-htRecs:0
-htIndices:0
-buffRecs:0
-buffBytes:0
+dsk:1
+htRecs:2
+htIndices:98
+buffRecs:2
+buffBytes:62
+
 --- Fifth Stats
-dsk:0
-htRecs:0
-htIndices:0
-buffRecs:0
-buffBytes:0
+dsk:1
+htRecs:4
+htIndices:196
+buffRecs:4
+buffBytes:124
+
+--- Sixth Stats
+dsk:1
+htRecs:6
+htIndices:294
+buffRecs:6
+buffBytes:186
 
 -- OUTPUT [outer_key, inner_agg]:
 
@@ -501,7 +573,15 @@ htRecs:0
 htIndices:0
 buffRecs:0
 buffBytes:0
+
 --- Fifth Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+
+--- Sixth Stats
 dsk:0
 htRecs:0
 htIndices:0

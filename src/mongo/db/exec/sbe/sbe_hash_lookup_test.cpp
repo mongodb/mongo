@@ -186,19 +186,10 @@ public:
                 defaultInternalQuerySBELookupApproxMemoryUseInBytesBeforeSpill);
         });
 
-        // TODO SERVER-65420: to enable the spilling tests, you need to uncomment the three lines
-        // below to clone the stage and prepare it again, as
-        // 'internalQuerySBELookupApproxMemoryUseInBytesBeforeSpill' is only considered at
-        // construction time of a `HashLookup` stage.
-        // auto stageUnqPtr = stage->clone();
-        // stage = stageUnqPtr.get();
-        // prepareTree(ctx, stage);
-
-        // TODO SERVER-65420: after enabling the spilling tests, there's no need to open the stage
-        // again, as it already get opened in the prepareTree call (above). Hence, you can remove
-        // the line below. stage->open(false);
-        stage->open(false);
-
+        // Run the stage after the knob is set and spill to disk. We need to hold a global IS lock
+        // to read from WT.
+        Lock::GlobalLock lk(opCtx(), MODE_IS);
+        stage->open(true);
         std::stringstream fourthStream;
         StageResultsPrinters::make(fourthStream, printOptions)
             .printStageResults(ctx, slotNames, stage);
@@ -206,16 +197,29 @@ public:
         ASSERT_EQ(firstStr, fourthStr);
         stream << "--- Fourth Stats" << std::endl;
         printHashLookupStats(stream, stage);
+        stream << std::endl;
 
-        // Execute the stage after reopen and we have spilled to disk and verify that output is the
-        // same.
-        stage->open(true);
+        // Execute the stage after close and open and verify that output is the same.
+        stage->close();
+        stage->open(false);
         std::stringstream fifthStream;
         StageResultsPrinters::make(fifthStream, printOptions)
             .printStageResults(ctx, slotNames, stage);
         std::string fifthStr = fifthStream.str();
         ASSERT_EQ(firstStr, fifthStr);
         stream << "--- Fifth Stats" << std::endl;
+        printHashLookupStats(stream, stage);
+        stream << std::endl;
+
+        // Execute the stage after reopen and we have spilled to disk and verify that output is the
+        // same.
+        stage->open(true);
+        std::stringstream sixthStream;
+        StageResultsPrinters::make(sixthStream, printOptions)
+            .printStageResults(ctx, slotNames, stage);
+        std::string sixthStr = sixthStream.str();
+        ASSERT_EQ(firstStr, sixthStr);
+        stream << "--- Sixth Stats" << std::endl;
         printHashLookupStats(stream, stage);
         stream << std::endl;
 
