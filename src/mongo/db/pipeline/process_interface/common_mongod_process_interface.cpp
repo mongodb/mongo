@@ -435,7 +435,8 @@ CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalRead(Pipeline*
     std::vector<NamespaceStringOrUUID> secondaryNamespaces = [&]() {
         if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
             feature_flags::gFeatureFlagSBELookupPushdown.isEnabled(
-                serverGlobalParams.featureCompatibility)) {
+                serverGlobalParams.featureCompatibility) &&
+            !internalQueryForceClassicEngine.load()) {
             auto lpp = LiteParsedPipeline(expCtx->ns, pipeline->serializeToBson());
             return lpp.getForeignExecutionNamespaces();
         } else {

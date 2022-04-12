@@ -684,7 +684,8 @@ Status runAggregate(OperationContext* opCtx,
     // Taking locks over multiple collections is not supported outside of $lookup pushdown.
     if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
         feature_flags::gFeatureFlagSBELookupPushdown.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+            serverGlobalParams.featureCompatibility) &&
+        !internalQueryForceClassicEngine.load()) {
         secondaryExecNssList = liteParsedPipeline.getForeignExecutionNamespaces();
     }
 
