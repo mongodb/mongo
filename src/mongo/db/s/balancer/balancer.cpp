@@ -61,6 +61,7 @@
 #include "mongo/s/request_types/balancer_collection_status_gen.h"
 #include "mongo/s/request_types/configure_collection_balancing_gen.h"
 #include "mongo/s/shard_util.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point.h"
@@ -208,6 +209,20 @@ uint64_t getMaxChunkSizeBytes(OperationContext* opCtx, const CollectionType& col
 
 const int64_t getMaxChunkSizeMB(OperationContext* opCtx, const CollectionType& coll) {
     return getMaxChunkSizeBytes(opCtx, coll) / (1024 * 1024);
+}
+
+// Returns a boolean flag indicating whether secondary throttling is enabled and the write concern
+// to apply for migrations
+std::tuple<bool, WriteConcernOptions> getSecondaryThrottleAndWriteConcern(
+    const boost::optional<MigrationSecondaryThrottleOptions>& secondaryThrottle) {
+    if (secondaryThrottle &&
+        secondaryThrottle->getSecondaryThrottle() == MigrationSecondaryThrottleOptions::kOn) {
+        if (secondaryThrottle->isWriteConcernSpecified()) {
+            return {true, secondaryThrottle->getWriteConcern()};
+        }
+        return {true, WriteConcernOptions()};
+    }
+    return {false, WriteConcernOptions()};
 }
 
 const auto _balancerDecoration = ServiceContext::declareDecoration<Balancer>();
@@ -402,14 +417,9 @@ Status Balancer::moveRange(OperationContext* opCtx,
     shardSvrRequest.setMaxChunkSizeBytes(maxChunkSize);
     shardSvrRequest.setFromShard(fromShardId);
     shardSvrRequest.setEpoch(coll.getEpoch());
-    const auto wc = [&]() {
-        const auto& secondaryThrottle = request.getSecondaryThrottle();
-        if (secondaryThrottle) {
-            shardSvrRequest.setSecondaryThrottle(true);
-            return secondaryThrottle->getWriteConcern();
-        }
-        return WriteConcernOptions();
-    }();
+    const auto [secondaryThrottle, wc] =
+        getSecondaryThrottleAndWriteConcern(request.getSecondaryThrottle());
+    shardSvrRequest.setSecondaryThrottle(secondaryThrottle);
 
     auto response =
         _commandScheduler->requestMoveRange(opCtx, shardSvrRequest, wc, issuedByRemoteUser)
@@ -963,10 +973,36 @@ int Balancer::_moveChunks(OperationContext* opCtx,
         auto maxChunkSizeBytes =
             coll.getMaxChunkSizeBytes().value_or(balancerConfig->getMaxChunkSizeBytes());
 
-        MoveChunkSettings settings(maxChunkSizeBytes,
-                                   balancerConfig->getSecondaryThrottle(),
-                                   balancerConfig->waitForDelete());
-        return _commandScheduler->requestMoveChunk(opCtx, migrateInfo, settings);
+        if (serverGlobalParams.featureCompatibility.isLessThan(
+                multiversion::FeatureCompatibilityVersion::kVersion_6_0)) {
+            // TODO SERVER-65322 only use `moveRange` once v6.0 branches out
+            MoveChunkSettings settings(maxChunkSizeBytes,
+                                       balancerConfig->getSecondaryThrottle(),
+                                       balancerConfig->waitForDelete());
+            return _commandScheduler->requestMoveChunk(opCtx, migrateInfo, settings);
+        }
+
+        MoveRangeRequest requestBase(migrateInfo.to);
+        requestBase.setWaitForDelete(balancerConfig->waitForDelete());
+        requestBase.setMin(migrateInfo.minKey);
+        if (!feature_flags::gNoMoreAutoSplitter.isEnabled(
+                serverGlobalParams.featureCompatibility)) {
+            // Issue the equivalent of a `moveChunk` if the auto-splitter is enabled
+            requestBase.setMax(migrateInfo.maxKey);
+        }
+
+        ShardsvrMoveRange shardSvrRequest(migrateInfo.nss);
+        shardSvrRequest.setDbName(NamespaceString::kAdminDb);
+        shardSvrRequest.setMoveRangeRequest(requestBase);
+        shardSvrRequest.setMaxChunkSizeBytes(maxChunkSizeBytes);
+        shardSvrRequest.setFromShard(migrateInfo.from);
+        shardSvrRequest.setEpoch(coll.getEpoch());
+        const auto [secondaryThrottle, wc] =
+            getSecondaryThrottleAndWriteConcern(balancerConfig->getSecondaryThrottle());
+        shardSvrRequest.setSecondaryThrottle(secondaryThrottle);
+
+        return _commandScheduler->requestMoveRange(
+            opCtx, shardSvrRequest, wc, false /* issuedByRemoteUser */);
     };
 
     for (const auto& rebalanceOp : chunksToRebalance) {
