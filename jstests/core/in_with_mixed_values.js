@@ -12,6 +12,7 @@ let docs = [
     {x: 'ab'},
     {x: 'ac'},
     {x: 'ad'},
+    {x: /^ab/},
 ];
 assert.commandWorked(coll.insert(docs));
 
@@ -19,11 +20,11 @@ assert.eq(4, coll.find({x: {$in: [1, /^a/]}}).itcount());
 assert.eq(4, coll.find({x: {$in: [/^a/, 1]}}).itcount());
 assert.eq(5, coll.find({x: {$in: [/^a/, 1, 2]}}).itcount());
 assert.eq(6, coll.find({x: {$in: [/^a/, 1, 2, 3]}}).itcount());
-assert.eq(4, coll.find({x: {$in: [/^ab/, 1, 2, 3]}}).itcount());
-assert.eq(5, coll.find({x: {$in: [/^a/, 1, 2, /^ab/]}}).itcount());
-assert.eq(5, coll.find({x: {$in: [1, /^ab/, 2, /^a/]}}).itcount());
-assert.eq(6, coll.find({x: {$in: [/^a/, 1, 2, 3, /^ab/]}}).itcount());
-assert.eq(6, coll.find({x: {$in: [1, /^ab/, 2, 3, /^a/]}}).itcount());
+assert.eq(5, coll.find({x: {$in: [/^ab/, 1, 2, 3]}}).itcount());
+assert.eq(6, coll.find({x: {$in: [/^a/, 1, 2, /^ab/]}}).itcount());
+assert.eq(6, coll.find({x: {$in: [1, /^ab/, 2, /^a/]}}).itcount());
+assert.eq(7, coll.find({x: {$in: [/^a/, 1, 2, 3, /^ab/]}}).itcount());
+assert.eq(7, coll.find({x: {$in: [1, /^ab/, 2, 3, /^a/]}}).itcount());
 assert(coll.drop());
 
 // Exercise mixed regex and composite type cases.

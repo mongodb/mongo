@@ -1510,57 +1510,77 @@ public:
             // case and a case where both equalities and regexes are present. The regex-only case is
             // handled by building a traversal stage to traverse the array of regexes and call the
             // 'regexMatch' built-in to check if the field being traversed has a value that matches
-            // a regex. The combined case uses a short-circuiting limit-1/union OR stage to first
-            // exhaust the equalities 'isMember' check, and then if no match is found it executes
-            // the regex-only traversal stage.
+            // a regex. We also call 'isMember' to determine whether any of the values are equal
+            // to any of the regexes. The combined case uses a short-circuiting limit-1/union OR
+            // stage to first exhaust the equalities 'isMember' check, and then if no match is found
+            // it executes the regex-only traversal stage.
             auto& regexes = expr->getRegexes();
             auto& equalities = expr->getEqualities();
 
-            auto [arrTag, arrVal] = sbe::value::makeNewArray();
-            sbe::value::ValueGuard arrGuard{arrTag, arrVal};
+            auto [pcreArrTag, pcreArrVal] = sbe::value::makeNewArray();
+            sbe::value::ValueGuard pcreArrGuard{pcreArrTag, pcreArrVal};
+            auto pcreArr = sbe::value::getArrayView(pcreArrVal);
 
-            auto arr = sbe::value::getArrayView(arrVal);
+            auto [bsonRegexArrSetTag, bsonRegexArrSetVal] = sbe::value::makeNewArraySet();
+            sbe::value::ValueGuard bsonRegexArrSetGuard{bsonRegexArrSetTag, bsonRegexArrSetVal};
+            auto bsonRegexArrSet = sbe::value::getArraySetView(bsonRegexArrSetVal);
 
             if (regexes.size()) {
-                arr->reserve(regexes.size());
+                pcreArr->reserve(regexes.size());
 
                 for (auto&& r : regexes) {
-                    auto [regexTag, regexVal] =
+                    auto [pcreRegexTag, pcreRegexVal] =
                         sbe::value::makeNewPcreRegex(r->getString(), r->getFlags());
-                    arr->push_back(regexTag, regexVal);
+                    pcreArr->push_back(pcreRegexTag, pcreRegexVal);
+
+                    auto [bsonRegexTag, bsonRegexVal] =
+                        sbe::value::makeNewBsonRegex(r->getString(), r->getFlags());
+                    bsonRegexArrSet->push_back(bsonRegexTag, bsonRegexVal);
                 }
             }
 
             auto makePredicate = [&,
                                   arrSetTag = arrSetTag,
                                   arrSetVal = arrSetVal,
-                                  arrTag = arrTag,
-                                  arrVal = arrVal,
+                                  pcreRegexArrTag = pcreArrTag,
+                                  pcreRegexArrVal = pcreArrVal,
+                                  regexArrTag = bsonRegexArrSetTag,
+                                  regexArrVal = bsonRegexArrSetVal,
                                   hasNull = hasNull](sbe::value::SlotId inputSlot,
                                                      EvalStage inputStage) -> EvalExprStagePair {
                 auto regexArraySlot{_context->state.slotId()};
+                auto bsonRegexArraySetSlot{_context->state.slotId()};
                 auto regexInputSlot{_context->state.slotId()};
                 auto regexOutputSlot{_context->state.slotId()};
 
                 // Build a traverse stage that traverses the query regex pattern array. Here the
                 // FROM branch binds an array constant carrying the regex patterns to a slot. Then
                 // the inner branch executes 'regexMatch' once per regex.
-                auto [regexTag, regexVal] = sbe::value::copyValue(arrTag, arrVal);
+                auto [regexTag, regexVal] = sbe::value::copyValue(pcreRegexArrTag, pcreRegexArrVal);
+                auto [bsonRegexTag, bsonRegexVal] = sbe::value::copyValue(regexArrTag, regexArrVal);
 
                 auto regexFromStage =
                     makeProject(equalities.size() > 0 ? EvalStage{} : std::move(inputStage),
                                 _context->planNodeId,
                                 regexArraySlot,
-                                sbe::makeE<sbe::EConstant>(regexTag, regexVal));
+                                sbe::makeE<sbe::EConstant>(regexTag, regexVal),
+                                bsonRegexArraySetSlot,
+                                sbe::makeE<sbe::EConstant>(bsonRegexTag, bsonRegexVal));
 
-                auto regexInnerStage =
-                    makeProject(EvalStage{},
-                                _context->planNodeId,
-                                regexInputSlot,
-                                makeFillEmptyFalse(sbe::makeE<sbe::EFunction>(
-                                    "regexMatch",
-                                    sbe::makeEs(sbe::makeE<sbe::EVariable>(regexArraySlot),
-                                                sbe::makeE<sbe::EVariable>(inputSlot)))));
+                auto regexInnerStage = makeProject(
+                    EvalStage{},
+                    _context->planNodeId,
+                    regexInputSlot,
+                    makeBinaryOp(
+                        sbe::EPrimBinary::logicOr,
+                        makeFillEmptyFalse(sbe::makeE<sbe::EFunction>(
+                            "regexMatch",
+                            sbe::makeEs(sbe::makeE<sbe::EVariable>(regexArraySlot),
+                                        sbe::makeE<sbe::EVariable>(inputSlot)))),
+                        makeFillEmptyFalse(sbe::makeE<sbe::EFunction>(
+                            "isMember",
+                            sbe::makeEs(sbe::makeE<sbe::EVariable>(inputSlot),
+                                        sbe::makeE<sbe::EVariable>(bsonRegexArraySetSlot))))));
 
                 auto regexStage =
                     makeTraverse(std::move(regexFromStage),
