@@ -121,10 +121,10 @@ TEST_F(InternalUnpackBucketOptimizeLastpointTest, NonLastpointDoesNotParticipate
 
     // The _id field in $group's must match the meta field in $sort.
     assertPipelineUnoptimized(
-        "{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
-        "'m', bucketMaxSpanSeconds: 60}}",
+        "{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: 'm', "
+        "bucketMaxSpanSeconds: 60}}",
         "{$sort: {'m.a': -1, t: -1}}",
-        "{$group: {_id: '$m.z', b: {$last: '$b'}, c: {$last: '$c'}}}");
+        "{$group: {_id: '$m.z', b: {$first: '$b'}, c: {$first: '$c'}}}");
 }
 
 TEST_F(InternalUnpackBucketOptimizeLastpointTest,

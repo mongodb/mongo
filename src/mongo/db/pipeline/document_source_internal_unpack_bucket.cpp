@@ -801,16 +801,21 @@ bool DocumentSourceInternalUnpackBucket::optimizeLastpoint(Pipeline::SourceConta
     // round down control.min.time for buckets, which means that if we are given two buckets with
     // the same min time, we won't know which bucket contains the earliest time until we unpack
     // them and sort their measurements. Hence, this rewrite could give us an incorrect firstpoint.
-    auto isFirstPointQuery = [&](AccumulatorDocumentsNeeded targetAccum) {
+    auto isSortValidForGroup = [&](AccumulatorDocumentsNeeded targetAccum) {
         bool firstpointTimeIsAscending =
             (targetAccum == AccumulatorDocumentsNeeded::kFirstDocument);
         for (auto entry : sortStage->getSortKeyPattern()) {
-            if (entry.fieldPath->fullPath() == timeField) {
-                return entry.isAscending == firstpointTimeIsAscending;
+            auto isTimeField = entry.fieldPath->fullPath() == timeField;
+            if (isTimeField && (entry.isAscending == firstpointTimeIsAscending)) {
+                // This is a first-point query, which is disallowed.
+                return false;
+            } else if (!isTimeField &&
+                       (entry.fieldPath->fullPath() != fieldPath.tail().fullPath())) {
+                // This sorts on a metaField which does not match the $group's _id field.
+                return false;
             }
         }
-        // We can never reach this because we checked 'checkMetadataSortReorder()' earlier.
-        MONGO_UNREACHABLE_TASSERT(6500500);
+        return true;
     };
 
     // Try to insert bucket-level $sort and $group stages before we unpack any buckets. We ensure
@@ -825,7 +830,7 @@ bool DocumentSourceInternalUnpackBucket::optimizeLastpoint(Pipeline::SourceConta
               std::back_inserter(fieldsToInclude));
 
     auto tryInsertBucketLevelSortAndGroup = [&](AccumulatorDocumentsNeeded accum) {
-        if (!groupOnlyUsesTargetAccum(accum) || isFirstPointQuery(accum)) {
+        if (!groupOnlyUsesTargetAccum(accum) || !isSortValidForGroup(accum)) {
             return false;
         }
         bool flipSort = (accum == AccumulatorDocumentsNeeded::kLastDocument);
