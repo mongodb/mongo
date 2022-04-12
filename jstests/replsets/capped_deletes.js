@@ -1,7 +1,10 @@
 /**
  * Tests user deletes on capped collections.
  *
- * @tags: [multiversion_incompatible]
+ * @tags: [
+ *     requires_wiredtiger,
+ *     multiversion_incompatible,
+ * ]
  */
 (function() {
 "use strict";
