@@ -50,6 +50,17 @@ parameters:
 - key: burn_in_tests
   description: "Comma separated list of jstests to include when running burn_in_tests"
 
+## Cron parameters.
+- key: project_required_suggested_cron
+  value: "0 */4 * * *" # Every 4 hours starting at 0000 UTC
+  description: "Cron schedule for required and suggested variants"
+- key: project_nightly_cron
+  value: "0 4 * * *" # Every day starting at 0400 UTC
+  description: "Cron schedule for nightly variants"
+- key: project_weekly_cron
+  value: "0 4 * * 0" # Every week starting 0400 UTC Sunday
+  description: "Cron schedule for nightly variants"
+
 
 #######################################
 #               Modules               #

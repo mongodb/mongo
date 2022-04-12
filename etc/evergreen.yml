@@ -68,7 +68,7 @@ variables:
 # variants
 - &enterprise-windows-nopush-template
   name: enterprise-windows-nopush-template
-  cron: "0 12 * * *" # Every day starting at 12:00
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - windows-vsCurrent-small
   modules:
@@ -120,7 +120,7 @@ variables:
 - &enterprise-rhel-70-64-bit-template
   name: enterprise-rhel-70-64-bit
   display_name: "Enterprise RHEL 7.0"
-  cron: "0 12 * * *" # Every day starting at 12:00
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
   run_on:
@@ -215,7 +215,7 @@ buildvariants:
 - &linux-64-debug-required-template
   name: linux-64-debug-required
   display_name: "! Shared Library Linux DEBUG"
-  cron: "0 */4 * * *" # Every 4 hours starting at midnight
+  cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   run_on:
   - rhel80-medium
   expansions:
@@ -279,7 +279,7 @@ buildvariants:
 - <<: *linux-64-debug-required-template
   name: linux-64-debug-wtdevelop
   display_name: "~ Linux DEBUG WiredTiger develop"
-  cron: "0 */4 * * *" # Every 4 hours starting at midnight
+  cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   modules:
   - wtdevelop
   expansions:
@@ -293,7 +293,7 @@ buildvariants:
 
 - name: linux-64-duroff
   display_name: Linux (No Journal)
-  cron: "0 12 * * *" # Every day starting at 12:00
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - rhel80-small
   expansions: &linux-64-required-duroff-expansions
@@ -336,7 +336,7 @@ buildvariants:
   display_name: TLA+
   run_on:
   - ubuntu1804-build
-  cron: "0 0 * * 0" # Every week starting 00:00 on Sunday
+  cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   stepback: false
   expansions:
     timeout_secs: 345600 # 4 days
@@ -345,7 +345,7 @@ buildvariants:
 
 - name: enterprise-ubuntu1804-64-ninja
   display_name: "Ninja Build: Enterprise Ubuntu 18.04"
-  cron: "0 0 * * *" # Every day starting at midnight
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
   run_on:
@@ -366,7 +366,7 @@ buildvariants:
 - &enterprise-rhel80-dynamic-v4gcc-debug-experimental-template
   name: enterprise-rhel80-dynamic-v4gcc-debug-experimental
   display_name: "~ Shared Library Enterprise RHEL 8.0 v4 Toolchain GCC DEBUG"
-  cron: "0 12 * * *" # Every day starting at 12:00
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
   run_on:
@@ -477,7 +477,7 @@ buildvariants:
   - enterprise
   run_on:
   - rhel80-medium
-  cron: "0 0 * * 0" # Every week starting 00:00 on Sunday
+  cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   stepback: false
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
@@ -560,7 +560,7 @@ buildvariants:
     - enterprise
   run_on:
     - rhel80-medium
-  cron: "0 0 * * 0" # Every week starting 00:00 on Sunday
+  cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   stepback: false
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
@@ -593,7 +593,7 @@ buildvariants:
     - enterprise
   run_on:
     - rhel80-medium
-  cron: "0 0 * * 0" # Every week starting 00:00 on Sunday
+  cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   stepback: false
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
@@ -623,7 +623,7 @@ buildvariants:
     - enterprise
   run_on:
     - rhel80-medium
-  cron: "0 0 * * 0" # Every week starting 00:00 on Sunday
+  cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   stepback: false
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
@@ -762,7 +762,7 @@ buildvariants:
 #- <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-template
 #  name: enterprise-rhel80-dynamic-v4gcc-cxx20-debug-pm-1328-experimental
 #  display_name: "~ Shared Library Enterprise RHEL 8.0 v4 Toolchain GCC C++20 DEBUG + PM-1328"
-#  cron: "0 0 * * 0" # Every week starting 00:00 on Sunday
+#  cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
 #  expansions:
 #    <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-expansions
 #    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --link-model=dynamic --variables-files=etc/scons/mongodbtoolchain_testing_gcc.vars --cxx-std=20 --experimental-optimization=* --experimental-runtime-hardening=* --disable-warnings-as-errors
@@ -770,7 +770,7 @@ buildvariants:
 - <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-template
   name: enterprise-rhel80-dynamic-v4clang-cxx20-debug-pm-1328-experimental
   display_name: "~ Shared Library Enterprise RHEL 8.0 v4 Toolchain Clang C++20 DEBUG + PM-1328"
-  cron: "0 0 * * 0" # Every week starting 00:00 on Sunday
+  cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   expansions:
     <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-expansions
     compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --link-model=dynamic --variables-files=etc/scons/mongodbtoolchain_testing_clang.vars --cxx-std=20 --experimental-optimization=* --experimental-runtime-hardening=*
@@ -778,7 +778,7 @@ buildvariants:
 - <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-template
   name: enterprise-rhel80-v4gcc-cxx20-pm-1328-experimental
   display_name: "~ Enterprise RHEL 8.0 v4 Toolchain GCC C++20 + PM-1328"
-  cron: "0 0 * * 0" # Every week starting 00:00 on Sunday
+  cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   expansions:
     <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-expansions
     compile_flags: --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_testing_gcc.vars --cxx-std=20 --experimental-optimization=* --experimental-runtime-hardening=* --disable-warnings-as-errors
@@ -786,7 +786,7 @@ buildvariants:
 - <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-template
   name: enterprise-rhel80-v4clang-cxx20-pm-1328-experimental
   display_name: "~ Enterprise RHEL 8.0 v4 Toolchain Clang C++20 + PM-1328"
-  cron: "0 0 * * 0" # Every week starting 00:00 on Sunday
+  cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   expansions:
     <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-expansions
     compile_flags: --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_testing_clang.vars --cxx-std=20 --experimental-optimization=* --experimental-runtime-hardening=*
@@ -795,7 +795,7 @@ buildvariants:
   modules:
   - enterprise
   display_name: "~ STM Daily Cron"
-  cron: "0 12 * * *" # Every day starting at 12:00
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - rhel80-small
   expansions:
@@ -811,7 +811,7 @@ buildvariants:
   modules:
   - enterprise
   display_name: "~ Security Daily Cron"
-  cron: "0 12 * * *" # Every day starting at 12:00
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - rhel80-small
   stepback: false
@@ -824,7 +824,7 @@ buildvariants:
 
 - name: windows-debug-suggested
   display_name: "* Windows DEBUG"
-  cron: "0 */4 * * *" # Every 4 hours starting at midnight
+  cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   run_on:
   - windows-vsCurrent-small
   expansions:
@@ -892,7 +892,7 @@ buildvariants:
 - &enterprise-windows-required-template
   name: enterprise-windows-required
   display_name: "! Enterprise Windows"
-  cron: "0 */4 * * *" # Every 4 hours starting at midnight
+  cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   modules:
   - enterprise
   run_on:
@@ -966,7 +966,7 @@ buildvariants:
 - <<: *enterprise-windows-required-template
   name: enterprise-windows-all-feature-flags-required
   display_name: "! Enterprise Windows (all feature flags)"
-  cron: "0 */4 * * *" # Every 4 hours starting at midnight
+  cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   expansions:
     burn_in_tests_build_variant: enterprise-windows-required
     exe: ".exe"
@@ -1043,7 +1043,7 @@ buildvariants:
 
 - name: enterprise-windows-ninja
   display_name: "Ninja Build: Enterprise Windows"
-  cron: "0 0 * * *" # Every day starting at midnight
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
   expansions:
@@ -1058,7 +1058,7 @@ buildvariants:
 
 - name: enterprise-windows-cxx20-debug-experimental
   display_name: "~ Enterprise Windows C++20 DEBUG"
-  cron: "0 12 * * *" # Every day starting at 12:00
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
   run_on:
@@ -1112,7 +1112,7 @@ buildvariants:
 
 - name: enterprise-windows-debug-unoptimized
   display_name: Enterprise Windows DEBUG (Unoptimized)
-  cron: "0 12 * * *" # Every day starting at 12:00
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
   run_on:
@@ -1148,7 +1148,7 @@ buildvariants:
 - &macos-debug-template
   name: macos-debug-suggested
   display_name: "* macOS DEBUG"
-  cron: "0 */4 * * *" # Every 4 hours starting at midnight
+  cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   run_on:
   - macos-1100
   expansions: &macos-debug-expansions
@@ -1177,7 +1177,7 @@ buildvariants:
 
 - name: macos-enterprise-ninja
   display_name: "Ninja Build: macOS Enterprise"
-  cron: "0 0 * * *" # Every day starting at midnight
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
   run_on:
@@ -1191,7 +1191,7 @@ buildvariants:
 
 - name: enterprise-macos-rosetta-2
   display_name: "Enterprise macOS Via Rosetta 2"
-  cron: "0 12 * * *" # Every day starting at 12:00
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
   run_on:
@@ -1220,7 +1220,7 @@ buildvariants:
 
 - name: enterprise-macos-cxx20
   display_name: "Enterprise macOS C++20 DEBUG"
-  cron: "0 12 * * *" # Every day starting at 12:00
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
   run_on:
@@ -1288,7 +1288,7 @@ buildvariants:
   display_name: "Embedded SDK - macOS"
   run_on:
   - macos-1100
-  cron: "0 0 * * 0" # Every week starting 00:00 on Sunday
+  cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   expansions:
     test_flags: --excludeWithAnyTags=uses_transactions,incompatible_with_macos
     cmake_path: /Applications/cmake-3.11.0-Darwin-x86_64/CMake.app/Contents/bin/cmake
@@ -1313,7 +1313,7 @@ buildvariants:
 
 - name: embedded-sdk-ubuntu-1804-x86_64
   display_name: "Embedded SDK - Ubuntu 18.04 x86_64"
-  cron: "0 12 * * *" # Every day starting at 12:00
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - ubuntu1804-build
   expansions:
@@ -1340,7 +1340,7 @@ buildvariants:
 - &enterprise-rhel-80-64-bit-dynamic-required-template
   name: enterprise-rhel-80-64-bit-dynamic-required
   display_name: "! Shared Library Enterprise RHEL 8.0"
-  cron: "0 */4 * * *" # Every 4 hours starting at midnight
+  cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   modules:
   - enterprise
   run_on:
@@ -1483,7 +1483,7 @@ buildvariants:
 
 - name: enterprise-rhel-80-64-bit-dynamic-required-ninja
   display_name: "Ninja Build: Enterprise RHEL 8.0"
-  cron: "0 0 * * *" # Every day at midnight
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
   run_on:
@@ -1502,7 +1502,7 @@ buildvariants:
 - &enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-template
   name: enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required
   display_name: "! Shared Library Enterprise RHEL 8.0 (all feature flags)"
-  cron: "0 */4 * * *" # Every 4 hours starting at midnight
+  cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   stepback: false
   modules:
   - enterprise
@@ -1632,7 +1632,7 @@ buildvariants:
 - &enterprise-rhel-80-64-bit-dynamic-classic-engine
   name: enterprise-rhel-80-64-bit-dynamic-classic-engine
   display_name: "Shared Library Enterprise RHEL 8.0 (Classic Engine)"
-  cron: "0 12 * * *" # Every day starting at 12:00
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   stepback: false
   modules:
   - enterprise
@@ -1756,7 +1756,7 @@ buildvariants:
   - enterprise
   run_on:
   - rhel80-small
-  cron: "0 0 * * 0" # Every week starting 00:00 on Sunday
+  cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     compile_flags: >-
@@ -1836,7 +1836,7 @@ buildvariants:
 - &enterprise-rhel-80-64-bit-multiversion-template
   name: enterprise-rhel-80-64-bit-multiversion
   display_name: "Enterprise RHEL 8.0 (implicit multiversion)"
-  cron: "0 12 * * *" # Every day starting at 12:00
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
   run_on:
@@ -1876,7 +1876,7 @@ buildvariants:
 - <<: *enterprise-rhel-80-64-bit-multiversion-template
   name: enterprise-rhel-80-64-bit-multiversion-all-feature-flags
   display_name: "Enterprise RHEL 8.0 (implicit multiversion & all feature flags)"
-  cron: "0 12 * * *" # Every day starting at 12:00
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   expansions:
     <<: *enterprise-rhel-80-64-bit-multiversion-expansions-template
     # No feature flag tests since they aren't compatible with the older binaries.
@@ -1886,7 +1886,7 @@ buildvariants:
 
 - name: enterprise-rhel-80-64-bit-future-git-tag-multiversion
   display_name: "Enterprise RHEL 8.0 (future git tag multiversion)"
-  cron: "0 12 * * *" # Every day starting at 12:00
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
   run_on:
@@ -1929,7 +1929,7 @@ buildvariants:
 #  display_name: "RHEL 8.0 Shared Library (No SSL)"
 #  run_on:
 #  - rhel80-small
-#  cron: "0 12 * * *" # Every day starting at 12:00
+#  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
 #  expansions:
 #    compile_flags: >-
 #      -j$(grep -c ^processor /proc/cpuinfo)
@@ -1959,7 +1959,7 @@ buildvariants:
 - &enterprise-rhel-80-64-bit-suggested-template
   name: enterprise-rhel-80-64-bit-suggested
   display_name: "* Enterprise RHEL 8.0"
-  cron: "0 */4 * * *" # Every 4 hours starting at midnight
+  cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   modules:
   - enterprise
   run_on:
@@ -2016,7 +2016,7 @@ buildvariants:
 #- <<: *enterprise-rhel-70-64-bit-template
 #  name: enterprise-rhel-70-64-bit-kitchen-sink
 #  display_name: "~ Enterprise RHEL 7.0"
-#  cron: "0 12 * * *" # Every day starting at 12:00
+#  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
 #  expansions:
 #    <<: *enterprise-rhel-70-64-bit-expansions-template
 #    compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
@@ -2029,7 +2029,7 @@ buildvariants:
 - <<: *enterprise-rhel-70-64-bit-template
   name: hot_backups-rhel-70-64-bit
   display_name: "hot_backups RHEL 7.0"
-  cron: "0 12 * * *" # Every day starting at 12:00
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - rhel70
   expansions:
@@ -2051,7 +2051,7 @@ buildvariants:
 - <<: *enterprise-rhel-70-64-bit-template
   name: enterprise-rhel-70-64-bit-no-libunwind
   display_name: "~ Enterprise RHEL 7.0 (no-libunwind)"
-  cron: "0 0 * * 0" # Every week starting 00:00 on Sunday
+  cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   run_on:
   - rhel70
   expansions:
@@ -2100,7 +2100,7 @@ buildvariants:
 
 - name: ubuntu1804-container
   display_name: "Ubuntu 18.04 Container"
-  cron: "0 12 * * *" # Every day starting at 12:00
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - ubuntu1804-container-server
   expansions:
@@ -2126,7 +2126,7 @@ buildvariants:
   - enterprise
   run_on:
   - rhel72-zseries-test
-  cron: "0 0 * * 0" # Every week starting 00:00 on Sunday
+  cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   stepback: false
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
@@ -2154,7 +2154,7 @@ buildvariants:
 
 - name: enterprise-ubuntu-dynamic-1804-clang-tidy-required
   display_name: "! Enterprise Clang Tidy"
-  cron: "0 */4 * * *" # Every 4 hours starting at midnight
+  cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   modules:
   - enterprise
   run_on:
@@ -2177,7 +2177,7 @@ buildvariants:
 
 - name: ubuntu1804-debug-suggested
   display_name: "* Shared Library Ubuntu 18.04 DEBUG"
-  cron: "0 */4 * * *" # Every 4 hours starting at midnight
+  cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   run_on:
   - ubuntu1804-test
   expansions:
@@ -2217,7 +2217,7 @@ buildvariants:
 
 - name: enterprise-rhel-80-benchmarks
   display_name: Enterprise RHEL 8.0 (Benchmarks)
-  cron: "0 12 * * *" # Every day starting at 12:00
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
   run_on:
@@ -2230,7 +2230,7 @@ buildvariants:
 
 - name: linux-64-ephemeralForTest
   display_name: Linux (ephemeralForTest)
-  cron: "0 12 * * *" # Every day starting at 12:00
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - rhel80-medium
   expansions:
@@ -2288,7 +2288,7 @@ buildvariants:
 
 - name: ubuntu1804-debug-asan-all-feature-flags
   display_name: "~ Shared Library ASAN Enterprise Ubuntu 18.04 DEBUG (all feature flags)"
-  cron: "0 12 * * *" # Every day starting at 12:00
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
   run_on:
@@ -2364,7 +2364,7 @@ buildvariants:
 
 - name: ubuntu1804-debug-asan-classic-engine
   display_name: ~ ASAN Enterprise Ubuntu 18.04 DEBUG (Classic Engine)
-  cron: "0 12 * * *" # Every day starting at 12:00
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
   run_on:
@@ -2437,7 +2437,7 @@ buildvariants:
 
 - name: ubuntu1804-debug-ubsan-all-feature-flags
   display_name: "~ Shared Library UBSAN Enterprise Ubuntu 18.04 DEBUG (all feature flags)"
-  cron: "0 12 * * *" # Every day starting at 12:00
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
   run_on:
@@ -2510,7 +2510,7 @@ buildvariants:
 
 - name: ubuntu1804-debug-ubsan-classic-engine
   display_name: ~ UBSAN Enterprise Ubuntu 18.04 DEBUG (Classic Engine)
-  cron: "0 12 * * *" # Every day starting at 12:00
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
   run_on:
@@ -2578,7 +2578,7 @@ buildvariants:
 - &ubuntu1804-debug-aubsan-lite-required-template
   name: ubuntu1804-debug-aubsan-lite-required
   display_name: "! Shared Library {A,UB}SAN Enterprise Ubuntu 18.04 DEBUG"
-  cron: "0 */4 * * *" # Every 4 hours starting at midnight
+  cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   modules:
   - enterprise
   run_on:
@@ -2617,7 +2617,7 @@ buildvariants:
 - <<: *ubuntu1804-debug-aubsan-lite-required-template
   name: ubuntu1804-debug-aubsan-lite-all-feature-flags-required
   display_name: "! Shared Library {A,UB}SAN Enterprise Ubuntu 18.04 DEBUG (all feature flags)"
-  cron: "0 */4 * * *" # Every 4 hours starting at midnight
+  cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     lang_environment: LANG=C
@@ -2656,7 +2656,7 @@ buildvariants:
 
 - name: enterprise-ubuntu2004-debug-tsan
   display_name: ~ TSAN Enterprise Ubuntu 20.04 DEBUG
-  cron: "0 12 * * *" # Every day starting at 12:00
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
   run_on:
@@ -2688,7 +2688,7 @@ buildvariants:
 
 - name: enterprise-ubuntu-unoptimized-1804-64-bit
   display_name: "~ Enterprise Ubuntu 18.04 (without Diagnostic Latches)"
-  cron: "0 12 * * *" # Every day starting at 12:00
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
   expansions:
@@ -2709,7 +2709,7 @@ buildvariants:
 
 - name: enterprise-ubuntu-no-latch-1804-64-bit
   display_name: "~ Enterprise Ubuntu 18.04 DEBUG (Unoptimized)"
-  cron: "0 12 * * *" # Every day starting at 12:00
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
   expansions:
@@ -2730,7 +2730,7 @@ buildvariants:
 
 - name: enterprise-ubuntu-fixed-service-executor-1804-64-bit
   display_name: "~ Enterprise Ubuntu 18.04 (with FixedServiceExecutor)"
-  cron: "0 12 * * *" # Every day starting at 12:00
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - ubuntu1804-test
   modules:
@@ -2771,7 +2771,7 @@ buildvariants:
 
 - name: enterprise-ubuntu-sdam-replica-set-monitor-1804-64-bit
   display_name: "~ Enterprise Ubuntu 18.04 (with SdamReplicaSetMonitor)"
-  cron: "0 12 * * *" # Every day starting at 12:00
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - ubuntu1804-test
   modules:
@@ -2811,7 +2811,7 @@ buildvariants:
 
 - name: enterprise-ubuntu-task-executor-pool-size-1804-64-bit
   display_name: "~ Enterprise Ubuntu 18.04 (with {taskExecutorPoolSize: 4})"
-  cron: "0 12 * * *" # Every day starting at 12:00
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - ubuntu1804-test
   modules:
@@ -2849,7 +2849,7 @@ buildvariants:
 
 - name: enterprise-ubuntu-sharding-task-executor-pool-rsm-matchPrimary-1804-64-bit
   display_name: "~ Enterprise Ubuntu 18.04 (with {ShardingTaskExecutorPoolReplicaSetMatching: \"matchPrimaryNode\"})"
-  cron: "0 12 * * *" # Every day starting at 12:00
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - ubuntu1804-test
   modules:
@@ -2888,7 +2888,7 @@ buildvariants:
 
 - name: enterprise-ubuntu-sharding-task-executor-pool-rsm-matchBusiest-1804-64-bit
   display_name: "~ Enterprise Ubuntu 18.04 (with {ShardingTaskExecutorPoolReplicaSetMatching: \"matchBusiestNode\"})"
-  cron: "0 12 * * *" # Every day starting at 12:00
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - ubuntu1804-test
   modules:
@@ -2927,7 +2927,7 @@ buildvariants:
 
 - name: enterprise-ubuntu-sharding-task-executor-pool-rsm-disabled-1804-64-bit
   display_name: "~ Enterprise Ubuntu 18.04 (with {ShardingTaskExecutorPoolReplicaSetMatching: \"disabled\"})"
-  cron: "0 12 * * *" # Every day starting at 12:00
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - ubuntu1804-test
   modules:
@@ -2996,7 +2996,7 @@ buildvariants:
 
 - name: shared-scons-cache-pruning
   display_name: "Shared SCons Cache Pruning"
-  cron: "0 12 * * *" # Every day starting at 12:00
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - ubuntu1604-test
   stepback: false
@@ -3005,7 +3005,7 @@ buildvariants:
 
 - name: windows-shared-scons-cache-pruning
   display_name: "Windows shared SCons Cache Pruning"
-  cron: "0 12 * * *" # Every day starting at 12:00
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - windows-vsCurrent-small
   stepback: false
@@ -3020,7 +3020,7 @@ buildvariants:
   - enterprise
   run_on:
   - rhel80-small
-  cron: "0 0 * * 0" # Every week starting 00:00 on Sunday
+  cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   stepback: false
   expansions:
     selected_tests_buildvariants: enterprise-windows-required linux-64-debug-required enterprise-ubuntu-dynamic-1604-clang ubuntu1804-debug-aubsan-lite-required
@@ -3030,7 +3030,7 @@ buildvariants:
 - <<: *enterprise-rhel-80-64-bit-dynamic-required-template
   name: commit-queue
   display_name: "~ Commit Queue"
-  cron: "0 0 * * 0" # Every week starting 00:00 on Sunday
+  cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   stepback: false
   tasks:
   - name: compile_test_and_package_parallel_core_stream_TG
@@ -3052,7 +3052,7 @@ buildvariants:
 
 - name: windows-dynamic-visibility-test
   display_name: "~ Shared Library Windows (visibility test)"
-  cron: "0 12 * * *" # Every day starting at 12:00
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   expansions:
     # --link-model=dynamic is set by visiblity_test's task_compile_flags
     # expansion
@@ -3072,7 +3072,7 @@ buildvariants:
 - <<: *enterprise-rhel-80-64-bit-dynamic-classic-engine
   name: enterprise-rhel-80-64-bit-dynamic-classic-engine-query-patch-only
   display_name: "~ Shared Library Enterprise RHEL 8.0 Query Patch Only (Classic Engine)"
-  cron: "0 0 * * 0" # Every week starting 00:00 on Sunday . This is a patch-only variant but we run on mainline to pick up task history.
+  cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
   expansions:
     <<: *enterprise-rhel-80-64-bit-dynamic-classic-engine-expansions
     jstestfuzz_num_generated_files: 20
@@ -3087,7 +3087,7 @@ buildvariants:
 - <<: *enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-template
   name: enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-query-patch-only
   display_name: "~ Shared Library Enterprise RHEL 8.0 Query Patch Only (all feature flags)"
-  cron: "0 0 * * 0" # Every week starting 00:00 on Sunday . This is a patch-only variant but we run on mainline to pick up task history.
+  cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
   expansions:
     <<: *enterprise-rhel-80-64-bit-dynamic-all-feature-flags-expansions
     jstestfuzz_num_generated_files: 20
@@ -3101,7 +3101,7 @@ buildvariants:
 
 - name: enterprise-ubuntu1804-64-libvoidstar
   display_name: ~ Enterprise Ubuntu 18.04 w/ libvoidstar
-  cron: "0 0 * * FRI" # Every week starting 00:00 on Friday
+  cron: "0 4 * * FRI" # Every week at 0400 UTC Friday. This has to be a Friday since we run Antithesis on Fridays.
   modules:
   - enterprise
   run_on:
@@ -3125,7 +3125,7 @@ buildvariants:
 - <<: *enterprise-windows-nopush-template
   name: enterprise-windows-benchmarks
   display_name: "~ Enterprise Windows (Benchmarks)"
-  cron: "0 12 * * *" # Every day starting at 12:00
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   tasks:
   - name: compile_benchmarks
     distros:
@@ -3135,7 +3135,7 @@ buildvariants:
 - <<: *enterprise-windows-nopush-template
   name: enterprise-windows-wtdevelop
   display_name: "~ Enterprise Windows WiredTiger develop"
-  cron: "0 */4 * * *" # Every 4 hours starting at midnight
+  cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   modules:
   - enterprise
   - wtdevelop
@@ -3147,7 +3147,7 @@ buildvariants:
 - <<: *enterprise-windows-nopush-template
   name: windows-compile-query-patch-only
   display_name: "~ Windows Compile Query Patch Only"
-  cron: "0 0 * * 0" # Every week starting 00:00 on Sunday . This is a patch-only variant but we run on mainline to pick up task history.
+  cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
   tasks:
   - name: compile_dist_test_TG
     distros:
@@ -3155,7 +3155,7 @@ buildvariants:
 
 - name: ubuntu1804-debug-aubsan-lite_fuzzer
   display_name: "{A,UB}SAN Enterprise Ubuntu 18.04 FUZZER"
-  cron: "0 12 * * *" # Every day starting at 12:00
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
   run_on:

@@ -5,7 +5,7 @@ buildvariants:
 
 - name: ubuntu1804-asan
   display_name: ~ ASAN Ubuntu 18.04
-  cron: "0 12 * * *" # Every day starting at 12:00
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
     - ubuntu1804-build
   stepback: true
@@ -29,7 +29,7 @@ buildvariants:
 
 - name: ubuntu1804-debug-asan
   display_name: ~ ASAN Enterprise Ubuntu 18.04 DEBUG
-  cron: "0 12 * * *" # Every day starting at 12:00
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
   run_on:
@@ -104,7 +104,7 @@ buildvariants:
 
 - name: ubuntu1804-debug-ubsan
   display_name: ~ UBSAN Enterprise Ubuntu 18.04 DEBUG
-  cron: "0 12 * * *" # Every day starting at 12:00
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
   run_on:
