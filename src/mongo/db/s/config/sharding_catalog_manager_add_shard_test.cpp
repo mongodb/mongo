@@ -459,11 +459,11 @@ TEST_F(AddShardTest, StandaloneBasicSuccess) {
     // The shard receives the _addShard command
     expectAddShardCmdReturnSuccess(shardTarget, expectedShardName);
 
-    // The shard receives a delete op to clear any leftover clusterParameters doc.
-    expectRemoveSetClusterParameterDocs(shardTarget);
-
     // The shard receives a delete op to clear any leftover user_writes_critical_sections doc.
     expectRemoveUserWritesCriticalSectionsDocs(shardTarget);
+
+    // The shard receives a delete op to clear any leftover clusterParameters doc.
+    expectRemoveSetClusterParameterDocs(shardTarget);
 
     // The shard receives the setFeatureCompatibilityVersion command.
     expectSetFeatureCompatibilityVersion(shardTarget, BSON("ok" << 1), expectWriteConcern.toBSON());
@@ -545,11 +545,11 @@ TEST_F(AddShardTest, StandaloneGenerateName) {
     // The shard receives the _addShard command
     expectAddShardCmdReturnSuccess(shardTarget, expectedShardName);
 
-    // The shard receives a delete op to clear any leftover clusterParameters doc.
-    expectRemoveSetClusterParameterDocs(shardTarget);
-
     // The shard receives a delete op to clear any leftover user_writes_critical_sections doc.
     expectRemoveUserWritesCriticalSectionsDocs(shardTarget);
+
+    // The shard receives a delete op to clear any leftover clusterParameters doc.
+    expectRemoveSetClusterParameterDocs(shardTarget);
 
     // The shard receives the setFeatureCompatibilityVersion command.
     expectSetFeatureCompatibilityVersion(
@@ -946,11 +946,11 @@ TEST_F(AddShardTest, SuccessfullyAddReplicaSet) {
     // The shard receives the _addShard command
     expectAddShardCmdReturnSuccess(shardTarget, expectedShardName);
 
-    // The shard receives a delete op to clear any leftover clusterParameters doc.
-    expectRemoveSetClusterParameterDocs(shardTarget);
-
     // The shard receives a delete op to clear any leftover user_writes_critical_sections doc.
     expectRemoveUserWritesCriticalSectionsDocs(shardTarget);
+
+    // The shard receives a delete op to clear any leftover clusterParameters doc.
+    expectRemoveSetClusterParameterDocs(shardTarget);
 
     // The shard receives the setFeatureCompatibilityVersion command.
     expectSetFeatureCompatibilityVersion(
@@ -1017,11 +1017,11 @@ TEST_F(AddShardTest, ReplicaSetExtraHostsDiscovered) {
     // The shard receives the _addShard command
     expectAddShardCmdReturnSuccess(shardTarget, expectedShardName);
 
-    // The shard receives a delete op to clear any leftover clusterParameters doc.
-    expectRemoveSetClusterParameterDocs(shardTarget);
-
     // The shard receives a delete op to clear any leftover user_writes_critical_sections doc.
     expectRemoveUserWritesCriticalSectionsDocs(shardTarget);
+
+    // The shard receives a delete op to clear any leftover clusterParameters doc.
+    expectRemoveSetClusterParameterDocs(shardTarget);
 
     // The shard receives the setFeatureCompatibilityVersion command.
     expectSetFeatureCompatibilityVersion(
@@ -1101,11 +1101,11 @@ TEST_F(AddShardTest, AddShardSucceedsEvenIfAddingDBsFromNewShardFails) {
     // The shard receives the _addShard command
     expectAddShardCmdReturnSuccess(shardTarget, expectedShardName);
 
-    // The shard receives a delete op to clear any leftover clusterParameters doc.
-    expectRemoveSetClusterParameterDocs(shardTarget);
-
     // The shard receives a delete op to clear any leftover user_writes_critical_sections doc.
     expectRemoveUserWritesCriticalSectionsDocs(shardTarget);
+
+    // The shard receives a delete op to clear any leftover clusterParameters doc.
+    expectRemoveSetClusterParameterDocs(shardTarget);
 
     // The shard receives the setFeatureCompatibilityVersion command.
     expectSetFeatureCompatibilityVersion(

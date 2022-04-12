@@ -68,9 +68,10 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            uassert(ErrorCodes::IllegalOperation,
-                    "Cannot set cluster parameter, gFeatureFlagClusterWideConfig is not enabled",
-                    gFeatureFlagClusterWideConfig.isEnabledAndIgnoreFCV());
+            uassert(
+                ErrorCodes::IllegalOperation,
+                "Cannot set cluster parameter, gFeatureFlagClusterWideConfig is not enabled",
+                gFeatureFlagClusterWideConfig.isEnabled(serverGlobalParams.featureCompatibility));
 
             uassert(ErrorCodes::ErrorCodes::NotImplemented,
                     "setClusterParameter can only run on mongos in sharded clusters",
