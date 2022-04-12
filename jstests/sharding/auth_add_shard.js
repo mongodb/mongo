@@ -100,6 +100,20 @@ assert.soon(function() {
     return result.ok && result.state == "completed";
 }, "failed to drain shard completely", 5 * 60 * 1000);
 
+// create user directly on new shard to allow direct reads from config.migrationCoordinators
+rst.getPrimary()
+    .getDB(adminUser.db)
+    .createUser({user: adminUser.username, pwd: adminUser.password, roles: jsTest.adminUserRoles});
+rst.getPrimary().getDB(adminUser.db).auth(adminUser.username, adminUser.password);
+
+// wait until migration coordinator is finished
+assert.soon(function() {
+    let migrationCoordinatorDocs =
+        rst.getPrimary().getDB('config').migrationCoordinators.find().toArray();
+
+    return migrationCoordinatorDocs.length === 0;
+}, "failed to remove migration coordinator", 5 * 60 * 1000);
+
 assert.eq(1, st.config.shards.count(), "removed server still appears in count");
 
 rst.stopSet();
