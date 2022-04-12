@@ -1899,8 +1899,8 @@ void WiredTigerRecordStore::updateStatsAfterRepair(OperationContext* opCtx,
 }
 
 void WiredTigerRecordStore::_initNextIdIfNeeded(OperationContext* opCtx) {
-    // Clustered record stores do not generate unique ObjectId's for RecordId's as the expectation
-    // is for the caller to set the RecordId using the server generated ObjectId.
+    // Clustered record stores do not automatically generate int64 RecordIds. RecordIds are instead
+    // constructed as binary strings, KeyFormat::String, from the user-defined cluster key.
     invariant(_keyFormat == KeyFormat::Long);
 
     // In the normal case, this will already be initialized, so use a weak load. Since this value
@@ -1964,8 +1964,8 @@ void WiredTigerRecordStore::_initNextIdIfNeeded(OperationContext* opCtx) {
 }
 
 RecordId WiredTigerRecordStore::_nextId(OperationContext* opCtx) {
-    // Clustered record stores do not generate unique ObjectId's for RecordId's as the expectation
-    // is for the caller to set the RecordId using the server generated ObjectId.
+    // Clustered record stores do not automatically generate int64 RecordIds. RecordIds are instead
+    // constructed as binary strings, KeyFormat::String, from the user-defined cluster key.
     invariant(_keyFormat == KeyFormat::Long);
     invariant(!_isOplog);
     _initNextIdIfNeeded(opCtx);
