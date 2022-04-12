@@ -27,6 +27,8 @@ const sharded = FixtureHelpers.isSharded(coll);
 
 const memoryLimitMB = sharded ? 200 : 100;
 
+const isSBELookupEnabled = checkSBEEnabled(db, ["featureFlagSBELookupPushdown"]);
+
 const bigStr = Array(1024 * 1024 + 1).toString();  // 1MB of ','
 for (let i = 0; i < memoryLimitMB + 1; i++)
     assert.commandWorked(coll.insert({_id: i, bigStr: i + bigStr, random: Math.random()}));
@@ -55,27 +57,48 @@ function test({pipeline, expectedCodes, canSpillToDisk}) {
     if (canSpillToDisk) {
         assert.eq(new DBCommandCursor(coll.getDB(), res).itcount(),
                   coll.count());  // all tests output one doc per input doc
+
+        if (isSBELookupEnabled) {
+            const explain = db.runCommand({
+                explain:
+                    {aggregate: coll.getName(), pipeline: pipeline, cursor: {}, allowDiskUse: true}
+            });
+            const hashAggGroups = getSbePlanStages(explain, 'group');
+            if (hashAggGroups.length > 0) {
+                assert.eq(hashAggGroups.length, 1, explain);
+                const hashAggGroup = hashAggGroups[0];
+                assert(hashAggGroup, explain);
+                assert(hashAggGroup.hasOwnProperty("usedDisk"), hashAggGroup);
+                assert(hashAggGroup.usedDisk, hashAggGroup);
+                assert.gt(hashAggGroup.spilledRecords, 0, hashAggGroup);
+                assert.gt(hashAggGroup.spilledBytesApprox, 0, hashAggGroup);
+            }
+        }
     } else {
         assert.commandFailedWithCode(res, [ErrorCodes.ExceededMemoryLimit, expectedCodes]);
     }
 }
 
 function setHashAggParameters(memoryLimit, atLeast) {
-    const oldMemoryLimit =
-        assert
-            .commandWorked(db.adminCommand({
-                setParameter: 1,
-                internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill: memoryLimit
-            }))
-            .was;
+    const memLimitCommandResArr = FixtureHelpers.runCommandOnEachPrimary({
+        db: db.getSiblingDB("admin"),
+        cmdObj: {
+            setParameter: 1,
+            internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill: memoryLimit,
+        }
+    });
+    assert.gt(memLimitCommandResArr.length, 0, "Setting memory limit on primaries failed.");
+    const oldMemoryLimit = assert.commandWorked(memLimitCommandResArr[0]).was;
 
-    const oldAtLeast =
-        assert
-            .commandWorked(db.adminCommand({
-                setParameter: 1,
-                internalQuerySlotBasedExecutionHashAggMemoryCheckPerAdvanceAtLeast: atLeast
-            }))
-            .was;
+    const atLeastCommandResArr = FixtureHelpers.runCommandOnEachPrimary({
+        db: db.getSiblingDB("admin"),
+        cmdObj: {
+            setParameter: 1,
+            internalQuerySlotBasedExecutionHashAggMemoryCheckPerAdvanceAtLeast: atLeast,
+        }
+    });
+    assert.gt(atLeastCommandResArr.length, 0, "Setting atLeast limit on primaries failed.");
+    const oldAtLeast = assert.commandWorked(atLeastCommandResArr[0]).was;
     return {memoryLimit: oldMemoryLimit, atLeast: oldAtLeast};
 }
 
@@ -216,8 +239,6 @@ function setHashLookupParameters(memoryLimit) {
     return oldMemoryLimit;
 }
 
-const isSBELookupEnabled = checkSBEEnabled(db, ["featureFlagSBELookupPushdown"]);
-
 /**
  * Executes $lookup with multiple records in the local/foreign collections and checks that the "as"
  * field for it contains documents with ids from `idsExpectedToMatch`. In addition, it checks
@@ -250,6 +271,10 @@ function runTest_MultipleLocalForeignRecords({
         assert(hLookup, explain);
         assert(hLookup.hasOwnProperty("usedDisk"), hLookup);
         assert.eq(hLookup.usedDisk, spillsToDisk, hLookup);
+        if (hLookup.usedDisk) {
+            assert.gt(hLookup.spilledRecords, 0, hLookup);
+            assert.gt(hLookup.spilledBytesApprox, 0, hLookup);
+        }
     }
 
     assert.eq(localRecords.length, results.length);

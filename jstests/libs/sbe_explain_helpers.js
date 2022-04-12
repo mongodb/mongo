@@ -73,6 +73,13 @@ function getQueryInfoAtTopLevelOrFirstStage(explainOutputV2) {
         return explainOutputV2.stages[0].$cursor;
     }
 
+    if (explainOutputV2.hasOwnProperty("shards")) {
+        for (const shardName in explainOutputV2.shards) {
+            const shardExplainOutputV2 = explainOutputV2.shards[shardName];
+            return getQueryInfoAtTopLevelOrFirstStage(shardExplainOutputV2);
+        }
+    }
+
     assert(false, `expected version 2 explain output but got ${JSON.stringify(explainOutputV2)}`);
     return undefined;
 }
