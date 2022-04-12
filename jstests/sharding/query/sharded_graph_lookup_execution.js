@@ -481,7 +481,7 @@ st.shardColl(
 st.shardColl(
     airfieldsColl, {airfield: 1}, {airfield: "LHR"}, {airfield: "LHR"}, mongosDB.getName());
 
-assert.commandWorked(mongosDB.createView("airportsView", airportsColl.getName(), 
+assert.commandWorked(mongosDB.createView("airportsView", airportsColl.getName(),
     [{$lookup: {
         from: "airfields",
         localField: "airport",
@@ -579,7 +579,10 @@ expectedRes = [
     }
 ];
 assertGraphLookupExecution(
-    pipeline, {comment: "sharded_to_sharded_on_mongos_targeted"}, expectedRes, [{
+    pipeline,
+    {comment: "sharded_to_sharded_on_mongos_targeted", allowDiskUse: false},
+    expectedRes,
+    [{
         // Because the $graphLookup is after a $group that requires merging, it is executed on
         // mongos.
         toplevelExec: [0, 0],
@@ -595,7 +598,10 @@ st.shardColl(airportsColl, {_id: 1}, {_id: 1}, {_id: 1}, mongosDB.getName());
 st.shardColl(
     travelersColl, {firstName: 1}, {firstName: "Bob"}, {firstName: "Bob"}, mongosDB.getName());
 assertGraphLookupExecution(
-    pipeline, {comment: "sharded_to_sharded_on_mongos_untargeted"}, expectedRes, [{
+    pipeline,
+    {comment: "sharded_to_sharded_on_mongos_untargeted", allowDiskUse: false},
+    expectedRes,
+    [{
         // Because the $graphLookup is after a $group that requires merging, it is executed on
         // mongos.
         toplevelExec: [0, 0],

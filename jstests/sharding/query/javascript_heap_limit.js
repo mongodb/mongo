@@ -46,7 +46,8 @@ const aggregateWithJSFunction = {
     pipeline: [
         {$group: {_id: "$x"}},
         {$project: {y: {"$function": {args: [], body: allocateLargeString, lang: "js"}}}}
-    ]
+    ],
+    allowDiskUse: false
 };
 const aggregateWithInternalJsReduce = {
     aggregate: "coll",
@@ -61,7 +62,8 @@ const aggregateWithInternalJsReduce = {
                 }
             }
         }
-    }]
+    }],
+    allowDiskUse: false
 };
 const aggregateWithUserDefinedAccumulator = {
     aggregate: "coll",
@@ -79,7 +81,8 @@ const aggregateWithUserDefinedAccumulator = {
                 }
             }
         }
-    }]
+    }],
+    allowDiskUse: false
 };
 const findWithJavaScriptFunction = {
     find: "coll",

@@ -72,7 +72,8 @@ function assertSorted(result) {
             {$_internalInhibitOptimization: {}},
             {$sort: {t: 1}},
         ],
-        cursor: {}
+        cursor: {},
+        allowDiskUse: false
     }),
                                  ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed);
 
@@ -88,7 +89,8 @@ function assertSorted(result) {
                 }
             },
         ],
-        cursor: {}
+        cursor: {},
+        allowDiskUse: false
     }),
                                  ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed);
 }

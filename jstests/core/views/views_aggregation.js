@@ -133,18 +133,24 @@ assert.commandWorked(viewsDB.runCommand({
     assertErrorCode(viewsDB.largeColl,
                     [{$sort: {x: -1}}],
                     ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
-                    "Expected in-memory sort to fail due to excessive memory usage");
+                    "Expected in-memory sort to fail due to excessive memory usage",
+                    {allowDiskUse: false});
     viewsDB.largeView.drop();
     assert.commandWorked(viewsDB.createView("largeView", "largeColl", []));
     assertErrorCode(viewsDB.largeView,
                     [{$sort: {x: -1}}],
                     ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
-                    "Expected in-memory sort to fail due to excessive memory usage");
+                    "Expected in-memory sort to fail due to excessive memory usage",
+                    {allowDiskUse: false});
 
     assert.commandWorked(
         viewsDB.runCommand(
             {aggregate: "largeView", pipeline: [{$sort: {x: -1}}], cursor: {}, allowDiskUse: true}),
         "Expected aggregate to succeed since 'allowDiskUse' was specified");
+
+    assert.commandWorked(
+        viewsDB.runCommand({aggregate: "largeView", pipeline: [{$sort: {x: -1}}], cursor: {}}),
+        "Expected aggregate to succeed since 'allowDiskUse' is true by default");
 })();
 
 // Test explain modes on a view.

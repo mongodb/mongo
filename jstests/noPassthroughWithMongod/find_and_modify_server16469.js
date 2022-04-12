@@ -16,6 +16,7 @@ var oldSortLimit = result.internalQueryMaxBlockingSortMemoryUsageBytes;
 var newSortLimit = 1024 * 1024;
 assert.commandWorked(
     db.adminCommand({setParameter: 1, internalQueryMaxBlockingSortMemoryUsageBytes: newSortLimit}));
+assert.commandWorked(db.adminCommand({setParameter: 1, allowDiskUseByDefault: false}));
 
 try {
     // Insert ~3MB of data.
@@ -41,6 +42,7 @@ try {
     assert.eq(result.value.b, 0);
 } finally {
     // Restore the orginal sort memory limit.
+    assert.commandWorked(db.adminCommand({setParameter: 1, allowDiskUseByDefault: true}));
     assert.commandWorked(db.adminCommand(
         {setParameter: 1, internalQueryMaxBlockingSortMemoryUsageBytes: oldSortLimit}));
 }

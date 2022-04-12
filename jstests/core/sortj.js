@@ -17,8 +17,8 @@ for (let i = 0; i < 1200 * numShards; ++i) {
     t.save({a: 1, b: big});
 }
 
-assert.throws(function() {
-    t.find({a: {$gte: 0}, c: null}).sort({d: 1}).itcount();
-});
+assert.throwsWithCode(
+    () => t.find({a: {$gte: 0}, c: null}).sort({d: 1}).allowDiskUse(false).itcount(),
+    ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed);
 t.drop();
 })();

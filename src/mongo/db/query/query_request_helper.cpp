@@ -371,7 +371,7 @@ StatusWith<BSONObj> asAggregationCommand(const FindCommandRequest& findCommand) 
         aggregationBuilder.append(FindCommandRequest::kUnwrappedReadPrefFieldName,
                                   findCommand.getUnwrappedReadPref());
     }
-    if (findCommand.getAllowDiskUse()) {
+    if (findCommand.getAllowDiskUse().has_value()) {
         aggregationBuilder.append(FindCommandRequest::kAllowDiskUseFieldName,
                                   static_cast<bool>(findCommand.getAllowDiskUse()));
     }

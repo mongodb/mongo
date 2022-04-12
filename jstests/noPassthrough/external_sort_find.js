@@ -1,6 +1,5 @@
 /**
- * Test that the find command can spill to disk while executing a blocking sort, if the client
- * explicitly allows disk usage.
+ * Test that the find command can spill to disk while executing a blocking sort.
  */
 (function() {
 "use strict";
@@ -15,7 +14,7 @@ const kNumDocsWithinMemLimit = 70;
 const kNumDocsExceedingMemLimit = 100;
 
 const options = {
-    setParameter: "internalQueryMaxBlockingSortMemoryUsageBytes=" + kMaxMemoryUsageBytes
+    setParameter: {internalQueryMaxBlockingSortMemoryUsageBytes: kMaxMemoryUsageBytes}
 };
 const conn = MongoRunner.runMongod(options);
 assert.neq(null, conn, "mongod was unable to start up with options: " + tojson(options));
@@ -37,15 +36,14 @@ for (let i = 0; i < kNumDocsWithinMemLimit; ++i) {
 }
 
 // We should be able to successfully sort the collection with or without disk use allowed.
-assert.eq(kNumDocsWithinMemLimit, collection.find().sort({sequenceNumber: -1}).itcount());
 assert.eq(kNumDocsWithinMemLimit,
-          collection.find().sort({sequenceNumber: -1}).allowDiskUse().itcount());
+          collection.find().sort({sequenceNumber: -1}).allowDiskUse(false).itcount());
+assert.eq(kNumDocsWithinMemLimit,
+          collection.find().sort({sequenceNumber: -1}).allowDiskUse(true).itcount());
 
 function getFindSortStats(allowDiskUse) {
     let cursor = collection.find().sort({sequenceNumber: -1});
-    if (allowDiskUse) {
-        cursor = cursor.allowDiskUse();
-    }
+    cursor = cursor.allowDiskUse(allowDiskUse);
     const stageName = isSBEEnabled ? "sort" : "SORT";
     const explain = cursor.explain("executionStats");
     return getPlanStage(explain.executionStats.executionStages, stageName);
@@ -89,7 +87,8 @@ for (let i = kNumDocsWithinMemLimit; i < kNumDocsExceedingMemLimit; ++i) {
 
 // The sort should fail if disk use is not allowed, but succeed if disk use is allowed.
 assert.commandFailedWithCode(
-    testDb.runCommand({find: collection.getName(), sort: {sequenceNumber: -1}}),
+    testDb.runCommand(
+        {find: collection.getName(), sort: {sequenceNumber: -1}, allowDiskUse: false}),
     ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed);
 assert.eq(kNumDocsExceedingMemLimit,
           collection.find().sort({sequenceNumber: -1}).allowDiskUse().itcount());
@@ -116,7 +115,11 @@ assert.eq(sortStats.usedDisk, true);
 // If disk use is not allowed but there is a limit, we should be able to avoid exceeding the memory
 // limit.
 assert.eq(kNumDocsWithinMemLimit,
-          collection.find().sort({sequenceNumber: -1}).limit(kNumDocsWithinMemLimit).itcount());
+          collection.find()
+              .sort({sequenceNumber: -1})
+              .allowDiskUse(false)
+              .limit(kNumDocsWithinMemLimit)
+              .itcount());
 
 // Create a view on top of the collection. When a find command is run against the view without disk
 // use allowed, the command should fail with the expected error code. When the find command allows
@@ -124,7 +127,8 @@ assert.eq(kNumDocsWithinMemLimit,
 assert.commandWorked(testDb.createView("identityView", collection.getName(), []));
 const identityView = testDb.identityView;
 assert.commandFailedWithCode(
-    testDb.runCommand({find: identityView.getName(), sort: {sequenceNumber: -1}}),
+    testDb.runCommand(
+        {find: identityView.getName(), sort: {sequenceNumber: -1}, allowDiskUse: false}),
     ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed);
 assert.eq(kNumDocsExceedingMemLimit,
           identityView.find().sort({sequenceNumber: -1}).allowDiskUse().itcount());

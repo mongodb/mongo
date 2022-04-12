@@ -57,6 +57,7 @@ const expectedParamDefaults = {
     internalQueryMaxNumberOfFieldsToChooseFilteredColumnScan: 12,
     internalQueryFLERewriteMemoryLimit: 14 * 1024 * 1024,
     internalQueryDisableLookupExecutionUsingHashJoin: false,
+    allowDiskUseByDefault: true,
 };
 
 function assertDefaultParameterValues() {
@@ -238,6 +239,9 @@ assertSetParameterFails("internalQueryMaxNumberOfFieldsToChooseUnfilteredColumnS
 assertSetParameterSucceeds("internalQueryMaxNumberOfFieldsToChooseFilteredColumnScan", 100);
 assertSetParameterSucceeds("internalQueryMaxNumberOfFieldsToChooseFilteredColumnScan", 0);
 assertSetParameterFails("internalQueryMaxNumberOfFieldsToChooseFilteredColumnScan", -1);
+
+assertSetParameterSucceeds("allowDiskUseByDefault", false);
+assertSetParameterSucceeds("allowDiskUseByDefault", true);
 
 assertSetParameterSucceeds("internalQueryFLERewriteMemoryLimit", 14 * 1024 * 1024);
 assertSetParameterFails("internalQueryFLERewriteMemoryLimit", 0);

@@ -25,15 +25,15 @@ for (i = 0; i < 110; ++i) {
 
 function memoryException(sortSpec, querySpec) {
     querySpec = querySpec || {};
-    var ex = assert.throws(function() {
-        t.find(querySpec).sort(sortSpec).batchSize(1000).itcount();
-    });
+    var ex = assert.throwsWithCode(
+        () => t.find(querySpec).sort(sortSpec).allowDiskUse(false).batchSize(1000).itcount(),
+        ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed);
     assert(ex.toString().match(/Sort/));
 }
 
 function noMemoryException(sortSpec, querySpec) {
     querySpec = querySpec || {};
-    t.find(querySpec).sort(sortSpec).batchSize(1000).itcount();
+    t.find(querySpec).sort(sortSpec).allowDiskUse(false).batchSize(1000).itcount();
 }
 
 // Unindexed sorts.

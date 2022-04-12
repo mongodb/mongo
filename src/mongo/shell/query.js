@@ -496,8 +496,8 @@ DBQuery.prototype.collation = function(collationSpec) {
     return this._addSpecial("collation", collationSpec);
 };
 
-DBQuery.prototype.allowDiskUse = function() {
-    return this._addSpecial("allowDiskUse", true);
+DBQuery.prototype.allowDiskUse = function(value) {
+    return this._addSpecial("allowDiskUse", (value === undefined ? true : value));
 };
 
 /**

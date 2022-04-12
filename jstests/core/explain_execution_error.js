@@ -80,13 +80,12 @@ for (var i = 0; i < 120 * numShards; i++) {
 
 // A query which sorts the whole collection by "b" should throw an error due to hitting the
 // memory limit for sort.
-assert.throws(function() {
-    t.find({a: {$exists: true}}).sort({b: 1}).itcount();
-});
+assert.throwsWithCode(() => t.find({a: {$exists: true}}).sort({b: 1}).allowDiskUse(false).itcount(),
+                      ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed);
 
 // Explain of this query should succeed at query planner verbosity.
 result = db.runCommand({
-    explain: {find: t.getName(), filter: {a: {$exists: true}}, sort: {b: 1}},
+    explain: {find: t.getName(), filter: {a: {$exists: true}}, sort: {b: 1}, allowDiskUse: false},
     verbosity: "queryPlanner"
 });
 assert.commandWorked(result);
@@ -95,7 +94,7 @@ assert("queryPlanner" in result);
 // Explaining the same query at execution stats verbosity should succeed, but indicate that the
 // underlying operation failed.
 result = db.runCommand({
-    explain: {find: t.getName(), filter: {a: {$exists: true}}, sort: {b: 1}},
+    explain: {find: t.getName(), filter: {a: {$exists: true}}, sort: {b: 1}, allowDiskUse: false},
     verbosity: "executionStats"
 });
 assert.commandWorked(result);
@@ -105,7 +104,7 @@ assertExecError(result);
 
 // The underlying operation should also report a failure at allPlansExecution verbosity.
 result = db.runCommand({
-    explain: {find: t.getName(), filter: {a: {$exists: true}}, sort: {b: 1}},
+    explain: {find: t.getName(), filter: {a: {$exists: true}}, sort: {b: 1}, allowDiskUse: false},
     verbosity: "allPlansExecution"
 });
 assert.commandWorked(result);
@@ -121,19 +120,19 @@ t.createIndex({c: 1});
 
 // The query should no longer fail with a memory limit error because the planner can obtain
 // the sort by scanning an index.
-assert.eq(40, t.find({c: {$lt: 40}}).sort({b: 1}).itcount());
+assert.eq(40, t.find({c: {$lt: 40}}).sort({b: 1}).allowDiskUse(false).itcount());
 
 // The explain should succeed at all verbosity levels because the query itself succeeds.
 // First test "queryPlanner" verbosity.
 result = db.runCommand({
-    explain: {find: t.getName(), filter: {c: {$lt: 40}}, sort: {b: 1}},
+    explain: {find: t.getName(), filter: {c: {$lt: 40}}, sort: {b: 1}, allowDiskUse: false},
     verbosity: "queryPlanner"
 });
 assert.commandWorked(result);
 assert("queryPlanner" in result);
 
 result = db.runCommand({
-    explain: {find: t.getName(), filter: {c: {$lt: 40}}, sort: {b: 1}},
+    explain: {find: t.getName(), filter: {c: {$lt: 40}}, sort: {b: 1}, allowDiskUse: false},
     verbosity: "executionStats"
 });
 assert.commandWorked(result);
@@ -143,7 +142,7 @@ assertExecSuccess(result);
 
 // We expect allPlansExecution verbosity to show execution stats for both candidate plans.
 result = db.runCommand({
-    explain: {find: t.getName(), filter: {c: {$lt: 40}}, sort: {b: 1}},
+    explain: {find: t.getName(), filter: {c: {$lt: 40}}, sort: {b: 1}, allowDiskUse: false},
     verbosity: "allPlansExecution"
 });
 assert.commandWorked(result);

@@ -159,7 +159,8 @@ testFn(aLookup,
        bLookup,
        createLookupForeignColl,
        dropLookupForeignColl,
-       (pipeline) => verifyCorrectLookupAlgorithmUsed("NestedLoopJoin", pipeline));
+       (pipeline) =>
+           verifyCorrectLookupAlgorithmUsed("NestedLoopJoin", pipeline, {allowDiskUse: false}));
 
 // INLJ.
 testFn(aLookup,

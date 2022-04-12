@@ -12,7 +12,7 @@ load("jstests/libs/analyze_plan.js");
 load("jstests/libs/profiler.js");
 load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 
-const conn = MongoRunner.runMongod();
+const conn = MongoRunner.runMongod({setParameter: {allowDiskUseByDefault: false}});
 const db = conn.getDB("test");
 const coll = db.plan_cache_replan_sort;
 coll.drop();

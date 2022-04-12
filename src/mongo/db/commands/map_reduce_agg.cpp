@@ -44,6 +44,7 @@
 #include "mongo/db/commands/mr_common.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/exec/disk_use_options_gen.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
@@ -90,9 +91,9 @@ auto makeExpressionContext(OperationContext* opCtx,
     auto expCtx = make_intrusive<ExpressionContext>(
         opCtx,
         verbosity,
-        false,  // fromMongos
-        false,  // needsmerge
-        true,   // allowDiskUse
+        false,                         // fromMongos
+        false,                         // needsMerge
+        allowDiskUseByDefault.load(),  // allowDiskUse
         parsedMr.getBypassDocumentValidation().get_value_or(false),
         true,  // isMapReduceCommand
         parsedMr.getNamespace(),

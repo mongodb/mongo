@@ -99,7 +99,7 @@ let explain;
             extraErrorMsg: " Default collation on local, running: " + tojson(lookupInto)
         });
 
-        results = collAA.aggregate([lookupInto(collAa)]).toArray();
+        results = collAA.aggregate([lookupInto(collAa)], {allowDiskUse: false}).toArray();
         assertArrayEq({
             actual: results,
             expected: resultCaseInsensitive,
@@ -209,10 +209,10 @@ let explain;
             collAa.explain().aggregate([lookupInto(collAa_indexed)], {collation: caseInsensitive});
         assertIndexJoinStrategy(explain);
 
-        // If no index is compatible with the requested collation, nested loop join will be chosen
-        // instead.
-        explain =
-            collAa.explain().aggregate([lookupInto(collAa_indexed)], {collation: {locale: "fr"}});
+        // If no index is compatible with the requested collation and disk use is not allowed,
+        // nested loop join will be chosen instead.
+        explain = collAa.explain().aggregate([lookupInto(collAa_indexed)],
+                                             {collation: {locale: "fr"}, allowDiskUse: false});
         assertNestedLoopJoinStrategy(explain);
 
         // Stage-level collation overrides collection-level and command-level collations.

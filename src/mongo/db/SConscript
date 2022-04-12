@@ -1444,6 +1444,7 @@ env.Library(
         'exec/count.cpp',
         'exec/count_scan.cpp',
         'exec/delete_stage.cpp',
+        'exec/disk_use_options.idl',
         'exec/distinct_scan.cpp',
         'exec/eof.cpp',
         'exec/fetch.cpp',

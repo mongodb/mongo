@@ -1273,6 +1273,7 @@ TEST(QueryRequestTest, ConvertToAggregationSucceeds) {
     auto ar = aggregation_request_helper::parseFromBSONForTests(testns, aggCmd);
     ASSERT_OK(ar.getStatus());
     ASSERT(!ar.getValue().getExplain());
+    ASSERT(!ar.getValue().getAllowDiskUse().has_value());
     ASSERT(ar.getValue().getPipeline().empty());
     ASSERT_EQ(ar.getValue().getCursor().getBatchSize().value_or(
                   aggregation_request_helper::kDefaultBatchSize),
@@ -1515,6 +1516,7 @@ TEST(QueryRequestTest, ConvertToAggregationWithAllowDiskUseTrueSucceeds) {
     auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db(), agg.getValue()).body;
     auto ar = aggregation_request_helper::parseFromBSONForTests(testns, aggCmd);
     ASSERT_OK(ar.getStatus());
+    ASSERT(ar.getValue().getAllowDiskUse().has_value());
     ASSERT_EQ(true, ar.getValue().getAllowDiskUse());
 }
 
@@ -1527,6 +1529,7 @@ TEST(QueryRequestTest, ConvertToAggregationWithAllowDiskUseFalseSucceeds) {
     auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db(), agg.getValue()).body;
     auto ar = aggregation_request_helper::parseFromBSONForTests(testns, aggCmd);
     ASSERT_OK(ar.getStatus());
+    ASSERT(ar.getValue().getAllowDiskUse().has_value());
     ASSERT_EQ(false, ar.getValue().getAllowDiskUse());
 }
 

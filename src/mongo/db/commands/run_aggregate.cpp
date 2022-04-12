@@ -46,6 +46,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/exec/disk_use_options_gen.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/fle_crud.h"
@@ -441,6 +442,7 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
     expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
     expCtx->collationMatchesDefault = collationMatchesDefault;
     expCtx->forPerShardCursor = request.getPassthroughToShard().has_value();
+    expCtx->allowDiskUse = request.getAllowDiskUse().value_or(allowDiskUseByDefault.load());
 
     // If the request specified v2 resume tokens for change streams, set this on the expCtx. On 6.0
     // we only expect this to occur during testing.

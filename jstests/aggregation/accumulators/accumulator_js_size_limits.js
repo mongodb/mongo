@@ -5,8 +5,8 @@
 
 const coll = db.accumulator_js_size_limits;
 
-function runExample(groupKey, accumulatorSpec) {
-    return coll.runCommand({
+function runExample(groupKey, accumulatorSpec, aggregateOptions = {}) {
+    const aggregateCmd = {
         aggregate: coll.getName(),
         cursor: {},
         pipeline: [{
@@ -15,7 +15,8 @@ function runExample(groupKey, accumulatorSpec) {
                 accumulatedField: {$accumulator: accumulatorSpec},
             }
         }]
-    });
+    };
+    return coll.runCommand(Object.assign(aggregateCmd, aggregateOptions));
 }
 
 // Accumulator tries to create too long a String; it can't be serialized to BSON.
@@ -90,24 +91,26 @@ assert(coll.drop());
 assert.commandWorked(coll.insert(Array.from({length: 200}, (_, i) => ({_id: i}))));
 // By grouping on _id, each group contains only 1 document. This means it creates many
 // AccumulatorState instances.
-res = runExample("$_id", {
-    init: function() {
-        // Each accumulator state is big enough to be expensive, but not big enough to hit the BSON
-        // size limit.
-        return "a".repeat(1 * 1024 * 1024);
-    },
-    accumulate: function(state) {
-        return state;
-    },
-    accumulateArgs: [1],
-    merge: function(state1, state2) {
-        return state1;
-    },
-    finalize: function(state) {
-        return state.length;
-    },
-    lang: 'js',
-});
+res = runExample("$_id",
+                 {
+                     init: function() {
+                         // Each accumulator state is big enough to be expensive, but not big enough
+                         // to hit the BSON size limit.
+                         return "a".repeat(1 * 1024 * 1024);
+                     },
+                     accumulate: function(state) {
+                         return state;
+                     },
+                     accumulateArgs: [1],
+                     merge: function(state1, state2) {
+                         return state1;
+                     },
+                     finalize: function(state) {
+                         return state.length;
+                     },
+                     lang: 'js',
+                 },
+                 {allowDiskUse: false});
 assert.commandFailedWithCode(res, [ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed]);
 
 // Verify that having large number of documents doesn't cause the $accumulator to run out of memory.

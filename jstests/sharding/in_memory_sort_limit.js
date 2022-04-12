@@ -35,21 +35,21 @@ var failLimit = 4000;
 
 // Test on MongoD
 jsTestLog("Test no error with limit of " + passLimit + " on mongod");
-assert.eq(passLimit, shardCol.find().sort({x: 1}).limit(passLimit).itcount());
+assert.eq(passLimit, shardCol.find().sort({x: 1}).allowDiskUse(false).limit(passLimit).itcount());
 
 jsTestLog("Test error with limit of " + failLimit + " on mongod");
-assert.throws(function() {
-    shardCol.find().sort({x: 1}).limit(failLimit).itcount();
-});
+assert.throwsWithCode(
+    () => shardCol.find().sort({x: 1}).allowDiskUse(false).limit(failLimit).itcount(),
+    ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed);
 
 // Test on MongoS
 jsTestLog("Test no error with limit of " + passLimit + " on mongos");
-assert.eq(passLimit, mongosCol.find().sort({x: 1}).limit(passLimit).itcount());
+assert.eq(passLimit, mongosCol.find().sort({x: 1}).allowDiskUse(false).limit(passLimit).itcount());
 
 jsTestLog("Test error with limit of " + failLimit + " on mongos");
-assert.throws(function() {
-    mongosCol.find().sort({x: 1}).limit(failLimit).itcount();
-});
+assert.throwsWithCode(
+    () => mongosCol.find().sort({x: 1}).allowDiskUse(false).limit(failLimit).itcount(),
+    ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed);
 
 st.stop();
 })();

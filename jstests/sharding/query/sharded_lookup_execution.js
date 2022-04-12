@@ -418,7 +418,7 @@ st.shardColl(updatesColl,
              {original_review_id: 1},
              mongosDB.getName());
 
-assert.commandWorked(mongosDB.createView("reviewsView", reviewsColl.getName(), 
+assert.commandWorked(mongosDB.createView("reviewsView", reviewsColl.getName(),
     [{$lookup: {
         from: "updates",
         let: {review_id: "$_id"},
@@ -491,32 +491,34 @@ expectedRes = [
     {_id: "shirt", reviews: [{comment: "meh"}]}
 ];
 
-assertLookupExecution(pipeline, {comment: "sharded_to_sharded_on_mongos_targeted"}, {
-    results: expectedRes,
-    // Because the $lookup is after a $group that requires merging, the $lookup stage is executed on
-    // mongos.
-    toplevelExec: [0, 0],
-    mongosMerger: true,
-    // For every document that flows through the $lookup stage, the mongos executing the $lookup
-    // will target the shard that holds the relevant data for the sharded foreign collection.
-    subpipelineExec: [0, 2]
-});
+assertLookupExecution(
+    pipeline, {comment: "sharded_to_sharded_on_mongos_targeted", allowDiskUse: false}, {
+        results: expectedRes,
+        // Because the $lookup is after a $group that requires merging, the $lookup stage is
+        // executed on mongos.
+        toplevelExec: [0, 0],
+        mongosMerger: true,
+        // For every document that flows through the $lookup stage, the mongos executing the $lookup
+        // will target the shard that holds the relevant data for the sharded foreign collection.
+        subpipelineExec: [0, 2]
+    });
 
 // Test that an untargeted $lookup on a sharded collection can execute correctly on mongos.
 st.shardColl(ordersColl, {_id: 1}, {_id: 1}, {_id: 1}, mongosDB.getName());
 st.shardColl(reviewsColl, {_id: 1}, {_id: 0}, {_id: 1}, mongosDB.getName());
 
-assertLookupExecution(pipeline, {comment: "sharded_to_sharded_on_mongos_untargeted"}, {
-    results: expectedRes,
-    // Because the $lookup is after a $group that requires merging, the $lookup stage is executed on
-    // mongos.
-    toplevelExec: [0, 0],
-    mongosMerger: true,
-    // For every document that flows through the $lookup stage, the mongos executing the $lookup
-    // will perform a scatter-gather query and open a cursor on every shard that contains the
-    //  foreign collection.
-    subpipelineExec: [2, 2]
-});
+assertLookupExecution(
+    pipeline, {comment: "sharded_to_sharded_on_mongos_untargeted", allowDiskUse: false}, {
+        results: expectedRes,
+        // Because the $lookup is after a $group that requires merging, the $lookup stage is
+        // executed on mongos.
+        toplevelExec: [0, 0],
+        mongosMerger: true,
+        // For every document that flows through the $lookup stage, the mongos executing the $lookup
+        // will perform a scatter-gather query and open a cursor on every shard that contains the
+        //  foreign collection.
+        subpipelineExec: [2, 2]
+    });
 
 // Test that a targeted $lookup on a sharded collection can execute correctly when mongos delegates
 // to a merging shard.
@@ -548,7 +550,7 @@ assertLookupExecution(
         randomlyDelegatedMerger: true,
         // For every document that flows through the $lookup stage, the node executing the $lookup
         // will perform a scatter-gather query and open a cursor on every shard that contains the
-        //  foreign collection.
+        // foreign collection.
         subpipelineExec: [2, 2]
     });
 
@@ -609,19 +611,19 @@ pipeline = [
     // To make sure that there is a non-correlated pipeline prefix, we will match on "name" instead
     // of _id to prevent the $match stage from being optimized before the $group.
     {$lookup: {
-        from: "reviews", 
-        let: {customer_product_name: "$products._id"}, 
+        from: "reviews",
+        let: {customer_product_name: "$products._id"},
         pipeline: [
-            {$group: 
+            {$group:
                 {_id: "$product_id", avg_stars: {$avg: "$stars"}, name: {$first: "$product_id"}}
             },
             {$match: {$expr: {$eq: ["$name", "$$customer_product_name"]}}},
         ],
         as: "avg_review"}},
     {$unwind: {path: "$avg_review", preserveNullAndEmptyArrays: true}},
-    {$group: 
+    {$group:
         {
-            _id: "$_id", 
+            _id: "$_id",
             products: {$push: {_id: "$products._id", avg_review: "$avg_review.avg_stars"}}
         }
     }
@@ -651,18 +653,18 @@ pipeline = [
     // To make sure that there is a non-correlated pipeline prefix, we will match on "name" instead
     // of _id to prevent the $match stage from being optimized before the $group.
     {$lookup: {
-        from: "reviews", 
-        let: {customer_product_name: "$products._id"}, 
+        from: "reviews",
+        let: {customer_product_name: "$products._id"},
         pipeline: [
-            {$group: 
-                {_id: "$product_id", avg_stars: {$avg: "$stars"}, name: {$first: "$product_id"}}}, 
+            {$group:
+                {_id: "$product_id", avg_stars: {$avg: "$stars"}, name: {$first: "$product_id"}}},
             {$match: {$expr: {$eq: ["$name", "$$customer_product_name"]}}},
         ],
         as: "avg_review"}},
     {$unwind: {path: "$avg_review", preserveNullAndEmptyArrays: true}},
-    {$group: 
+    {$group:
         {
-            _id: "$_id", 
+            _id: "$_id",
             products: {$push: {_id: "$products._id", avg_review: "$avg_review.avg_stars"}}
         }
     }

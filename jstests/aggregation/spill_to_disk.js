@@ -36,23 +36,15 @@ for (let i = 0; i < memoryLimitMB + 1; i++)
 assert.gt(coll.stats().size, memoryLimitMB * 1024 * 1024);
 
 function test({pipeline, expectedCodes, canSpillToDisk}) {
-    // Test that by default we error out if exceeding memory limit.
-    assert.commandFailedWithCode(
-        db.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}}), expectedCodes);
-
     // Test that 'allowDiskUse: false' does indeed prevent spilling to disk.
     assert.commandFailedWithCode(
         db.runCommand(
             {aggregate: coll.getName(), pipeline: pipeline, cursor: {}, allowDiskUse: false}),
         expectedCodes);
 
-    // Test that allowDiskUse only supports bool. In particular, numbers aren't allowed.
-    assert.commandFailed(db.runCommand(
-        {aggregate: coll.getName(), pipeline: pipeline, cursor: {}, allowDiskUse: 1}));
-
     // If this command supports spilling to disk, ensure that it will succeed when disk use is
     // allowed.
-    let res = db.runCommand(
+    const res = db.runCommand(
         {aggregate: coll.getName(), pipeline: pipeline, cursor: {}, allowDiskUse: true});
     if (canSpillToDisk) {
         assert.eq(new DBCommandCursor(coll.getDB(), res).itcount(),
@@ -158,6 +150,7 @@ test({
     expectedCodes: ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
     canSpillToDisk: true
 });
+
 test({
     pipeline: [{$sort: {random: 1}}, {$group: {_id: '$_id', bigStr: {$first: '$bigStr'}}}],
     expectedCodes: ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
@@ -172,6 +165,7 @@ test({
         [ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed, ErrorCodes.ExceededMemoryLimit],
     canSpillToDisk: false
 });
+
 test({
     pipeline:
         [{$group: {_id: null, bigArray: {$addToSet: {$concat: ['$bigStr', {$toString: "$_id"}]}}}}],
