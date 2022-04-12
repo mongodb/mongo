@@ -510,16 +510,34 @@ void resubmitRangeDeletionsOnStepUp(ServiceContext* serviceContext) {
             }
 
             auto opCtx = tc->makeOperationContext();
+            opCtx->setAlwaysInterruptAtStepDownOrUp();
+
+            DBDirectClient client(opCtx.get());
+            FindCommandRequest findCommand(NamespaceString::kRangeDeletionNamespace);
+            findCommand.setFilter(BSON(RangeDeletionTask::kProcessingFieldName << true));
+            auto cursor = client.find(std::move(findCommand));
+            if (cursor->more()) {
+                return migrationutil::submitRangeDeletionTask(
+                    opCtx.get(),
+                    RangeDeletionTask::parse(IDLParserErrorContext("rangeDeletionRecovery"),
+                                             cursor->next()));
+            } else {
+                return ExecutorFuture<void>(getMigrationUtilExecutor(serviceContext));
+            }
+        })
+        .then([serviceContext] {
+            ThreadClient tc("ResubmitRangeDeletions", serviceContext);
+            {
+                stdx::lock_guard<Client> lk(*tc.get());
+                tc->setSystemOperationKillableByStepdown(lk);
+            }
+
+            auto opCtx = tc->makeOperationContext();
+            opCtx->setAlwaysInterruptAtStepDownOrUp();
 
             submitPendingDeletions(opCtx.get());
         })
-        .getAsync([](const Status& status) {
-            if (!status.isOK()) {
-                LOGV2(45739,
-                      "Error while submitting pending range deletions",
-                      "error"_attr = redact(status));
-            }
-        });
+        .getAsync([](auto) {});
 }
 
 void dropRangeDeletionsCollection(OperationContext* opCtx) {

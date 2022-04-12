@@ -71,6 +71,9 @@ structs:
                 type: bool
                 description: "Flag that is present if the range is not yet ready for deletion"
                 optional: true
+            processing:
+                type: optionalBool
+                description: "Flag that is present if the range is currently being deleted"
             whenToClean:
                 type: CleanWhen
                 description: "Enumeration that defines when to cleanup the range."

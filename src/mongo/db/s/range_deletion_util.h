@@ -113,6 +113,11 @@ void deleteRangeDeletionTasksForRename(OperationContext* opCtx,
                                        const NamespaceString& toNss);
 
 /**
+ * Sets the processing field on the range deletion document for the given migration id.
+ */
+void markAsProcessingRangeDeletionTask(OperationContext* opCtx, const UUID& migrationId);
+
+/**
  * Computes and sets the numOrphanDocs field for each document in `config.rangeDeletions` (skips
  * documents referring to older incarnations of a collection)
  */
