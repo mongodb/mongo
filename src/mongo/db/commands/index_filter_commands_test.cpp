@@ -337,7 +337,6 @@ private:
             boost::none /* worksGrowthCoefficient */));
     }
 
-    RAIIServerParameterControllerForTest _featureFlagSbePlanCache{"featureFlagSbePlanCache", true};
     std::unique_ptr<QueryTestServiceContext> _queryTestServiceContext;
 
     ServiceContext::UniqueOperationContext _operationContext;

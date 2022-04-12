@@ -81,7 +81,8 @@ feature_flags:
     featureFlagSbePlanCache:
       description: "Feature flag for enabling use of the SBE plan cache"
       cpp_varname: gFeatureFlagSbePlanCache
-      default: false
+      default: true
+      version: 6.0
 
     featureFlagSortArray:
         description: "Feature flag for allowing use of the $sortArray aggregation expression"
