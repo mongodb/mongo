@@ -670,7 +670,9 @@ void QueryPlannerAnalysis::determineLookupStrategy(
         return boost::none;
     }();
 
-    if (foreignIndex) {
+    if (!foreignCollItr->second.exists) {
+        eqLookupNode->lookupStrategy = EqLookupNode::LookupStrategy::kNonExistentForeignCollection;
+    } else if (foreignIndex) {
         eqLookupNode->lookupStrategy = EqLookupNode::LookupStrategy::kIndexedLoopJoin;
         eqLookupNode->idxEntry = foreignIndex;
     } else if (allowDiskUse && isEligibleForHashJoin(foreignCollItr->second)) {
