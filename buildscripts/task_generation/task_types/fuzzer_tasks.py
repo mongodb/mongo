@@ -4,7 +4,7 @@ from typing import NamedTuple, Set, Optional, Dict
 from shrub.v2 import Task, FunctionCall, TaskDependency
 
 from buildscripts.patch_builds.task_generation import TimeoutInfo
-from buildscripts.task_generation.constants import ARCHIVE_DIST_TEST_DEBUG_TASK, CONFIGURE_EVG_CREDENTIALS, \
+from buildscripts.task_generation.constants import CONFIGURE_EVG_CREDENTIALS, \
     RUN_GENERATED_TESTS
 from buildscripts.task_generation.task_types.multiversion_decorator import MultiversionGenTaskDecorator, \
     MultiversionDecoratorParams
@@ -41,6 +41,8 @@ class FuzzerGenTaskParams(NamedTuple):
     timeout_secs: Timeout before test execution is considered hung.
     require_multiversion_setup: Requires downloading Multiversion binaries.
     use_large_distro: Should tests be generated on a large distro.
+    config_location: S3 path to the generated config tarball. None if no generated config files.
+    dependencies: Set of dependencies generated tasks should depend on.
     """
 
     task_name: str
@@ -59,6 +61,7 @@ class FuzzerGenTaskParams(NamedTuple):
     use_large_distro: Optional[bool]
     large_distro_name: Optional[str]
     config_location: str
+    dependencies: Set[str]
 
     def jstestfuzz_params(self) -> Dict[str, str]:
         """Build a dictionary of parameters to pass to jstestfuzz."""
@@ -141,4 +144,6 @@ class FuzzerGenTaskService:
             FunctionCall(RUN_GENERATED_TESTS, run_tests_vars)
         ]
 
-        return Task(sub_task_name, commands, {TaskDependency(ARCHIVE_DIST_TEST_DEBUG_TASK)})
+        dependencies = {TaskDependency(dependency) for dependency in params.dependencies}
+
+        return Task(sub_task_name, commands, dependencies)

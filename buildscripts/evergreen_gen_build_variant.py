@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Generate configuration for a build variant."""
+import hashlib
+import os
 from concurrent.futures import ThreadPoolExecutor as Executor
 from datetime import datetime, timedelta
 from time import perf_counter
-from typing import Optional, Any, Set, Tuple
-import hashlib
-import os
+from typing import Any, Optional, Set, Tuple
 
 import click
 import inject
@@ -14,20 +14,25 @@ from pydantic import BaseModel
 from evergreen import EvergreenApi, RetryingEvergreenApi
 from evergreen import Task as EvgTask
 
-from buildscripts.ciconfig.evergreen import EvergreenProjectConfig, parse_evergreen_file, Task, \
-    Variant
-from buildscripts.task_generation.constants import MAX_WORKERS, LOOKBACK_DURATION_DAYS, MAX_TASK_PRIORITY, \
-    GENERATED_CONFIG_DIR, GEN_PARENT_TASK, EXPANSION_RE
+from buildscripts.ciconfig.evergreen import (EvergreenProjectConfig, Task, Variant,
+                                             parse_evergreen_file)
+from buildscripts.task_generation.constants import (EXPANSION_RE, GEN_PARENT_TASK,
+                                                    GENERATED_CONFIG_DIR, LOOKBACK_DURATION_DAYS,
+                                                    MAX_TASK_PRIORITY, MAX_WORKERS)
 from buildscripts.task_generation.evg_config_builder import EvgConfigBuilder
 from buildscripts.task_generation.gen_config import GenerationConfiguration
-from buildscripts.task_generation.gen_task_validation import GenTaskValidationService
+from buildscripts.task_generation.gen_task_validation import \
+    GenTaskValidationService
 from buildscripts.task_generation.resmoke_proxy import ResmokeProxyService
-from buildscripts.task_generation.suite_split import SuiteSplitConfig, SuiteSplitParameters
-from buildscripts.task_generation.suite_split_strategies import SplitStrategy, FallbackStrategy, \
-    greedy_division, round_robin_fallback
-from buildscripts.task_generation.task_types.fuzzer_tasks import FuzzerGenTaskParams
-from buildscripts.task_generation.task_types.gentask_options import GenTaskOptions
-from buildscripts.task_generation.task_types.resmoke_tasks import ResmokeGenTaskParams
+from buildscripts.task_generation.suite_split import (SuiteSplitConfig, SuiteSplitParameters)
+from buildscripts.task_generation.suite_split_strategies import (
+    FallbackStrategy, SplitStrategy, greedy_division, round_robin_fallback)
+from buildscripts.task_generation.task_types.fuzzer_tasks import \
+    FuzzerGenTaskParams
+from buildscripts.task_generation.task_types.gentask_options import \
+    GenTaskOptions
+from buildscripts.task_generation.task_types.resmoke_tasks import \
+    ResmokeGenTaskParams
 from buildscripts.util.cmdutils import enable_logging
 from buildscripts.util.fileops import read_yaml_file
 from buildscripts.util.taskname import remove_gen_suffix
@@ -235,7 +240,25 @@ class GenerateBuildVariantOrchestrator:
             resmoke_jobs_max=run_vars.get("resmoke_jobs_max"),
             large_distro_name=self.get_build_variant_expansion(build_variant, "large_distro_name"),
             config_location=self.evg_expansions.config_location(),
+            dependencies=self.determine_task_dependencies(task_def),
         )
+
+    def determine_task_dependencies(self, task_def: Task) -> Set[str]:
+        """
+        Determine the dependencies to use for tasks generated from the given task definition.
+
+        This should include all tasks that the task definition depends on except for the currently
+        running task.
+
+        :param task_def: Task definition to use.
+        :return: Set of dependencies to generate.
+        """
+        dependency_set = {
+            task["name"]
+            for task in task_def.depends_on if task["name"] != self.evg_expansions.task_name
+        }
+
+        return dependency_set
 
     def task_def_to_fuzzer_params(self, task_def: Task, build_variant: str) -> FuzzerGenTaskParams:
         """
@@ -268,6 +291,7 @@ class GenerateBuildVariantOrchestrator:
             use_large_distro=run_vars.get("use_large_distro", False),
             large_distro_name=self.get_build_variant_expansion(build_variant, "large_distro_name"),
             config_location=self.evg_expansions.config_location(),
+            dependencies=self.determine_task_dependencies(task_def),
         )
 
     def generate(self, task_id: str, build_variant_name: str, output_file: str) -> None:

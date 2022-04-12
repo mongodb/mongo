@@ -25,7 +25,7 @@ def build_mock_build_variant(expansions=None, task_list=None):
     return Variant(config, task_map, {})
 
 
-def build_mock_task(name, run_vars=None):
+def build_mock_task(name, run_vars=None, depends_on=None):
     config = {
         "name":
             name, "commands": [
@@ -36,6 +36,9 @@ def build_mock_task(name, run_vars=None):
                 },
             ]
     }
+
+    if depends_on is not None:
+        config["depends_on"] = depends_on
     return Task(config)
 
 
@@ -54,6 +57,7 @@ def build_mock_expansions():
     mock_expansions = MagicMock()
     mock_expansions.config_location.return_value = "/path/to/config"
     mock_expansions.get_max_sub_suites.return_value = 998
+    mock_expansions.task_name = "generating_task"
     return mock_expansions
 
 
@@ -192,6 +196,24 @@ class TestTaskDefToSplitParams(unittest.TestCase):
         self.assertEqual("my_task", split_param.task_name)
         self.assertEqual("the suite", split_param.suite_name)
         self.assertEqual("the suite", split_param.filename)
+
+
+class TestDetermineTaskDependencies(unittest.TestCase):
+    def test_running_task_should_not_be_included_in_depends_on(self):
+        run_vars = {
+            "resmoke_args": "run tests",
+        }
+        depends_on = [
+            {"name": "compile"},
+            {"name": "build_variant_gen"},
+        ]
+        mock_task_def = build_mock_task("my_task", run_vars, depends_on=depends_on)
+        mock_orchestrator = build_mock_orchestrator(task_def_list=[mock_task_def])
+
+        dependencies = mock_orchestrator.determine_task_dependencies(mock_task_def)
+
+        self.assertIn("compile", dependencies)
+        self.assertNotIn("generating_task", dependencies)
 
 
 class TestTaskDefToGenParams(unittest.TestCase):
