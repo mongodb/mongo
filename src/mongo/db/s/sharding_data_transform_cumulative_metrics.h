@@ -34,6 +34,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/util/functional.h"
 #include <set>
 
@@ -55,6 +56,11 @@ public:
     size_t getObservedMetricsCount() const;
     size_t getObservedMetricsCount(Role role) const;
     void reportForServerStatus(BSONObjBuilder* bob) const;
+
+    void onStarted();
+    void onCompletion(ReshardingOperationStatusEnum status);
+
+    void setLastOpEndingChunkImbalance(int64_t imbalanceCount);
 
 private:
     struct MetricsComparer {
@@ -82,6 +88,13 @@ private:
     const std::string _rootSectionName;
     std::vector<MetricsSet> _instanceMetricsForAllRoles;
     AtomicWord<bool> _operationWasAttempted;
+
+    AtomicWord<int64_t> _countStarted{0};
+    AtomicWord<int64_t> _countSucceeded{0};
+    AtomicWord<int64_t> _countFailed{0};
+    AtomicWord<int64_t> _countCancelled{0};
+
+    AtomicWord<int64_t> _lastOpEndingChunkImbalance{0};
 };
 
 }  // namespace mongo

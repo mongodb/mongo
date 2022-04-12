@@ -197,12 +197,14 @@ void ShardingDataTransformCumulativeMetrics::reportForServerStatus(BSONObjBuilde
     if (!_operationWasAttempted.load()) {
         return;
     }
+
     BSONObjBuilder root(bob->subobjStart(_rootSectionName));
-    root.append(kCountStarted, kPlaceholderLong);
-    root.append(kCountSucceeded, kPlaceholderLong);
-    root.append(kCountFailed, kPlaceholderLong);
-    root.append(kCountCanceled, kPlaceholderLong);
-    root.append(kLastOpEndingChunkImbalance, kPlaceholderLong);
+    root.append(kCountStarted, _countStarted.load());
+    root.append(kCountSucceeded, _countSucceeded.load());
+    root.append(kCountFailed, _countFailed.load());
+    root.append(kCountCanceled, _countCancelled.load());
+    root.append(kLastOpEndingChunkImbalance, _lastOpEndingChunkImbalance.load());
+
     reportActive(&root);
     reportOldestActive(&root);
     reportLatencies(&root);
@@ -301,6 +303,30 @@ ShardingDataTransformCumulativeMetrics::insertMetrics(const InstanceObserver* me
     auto it = set.insert(set.end(), metrics);
     invariant(before + 1 == set.size());
     return it;
+}
+
+void ShardingDataTransformCumulativeMetrics::onStarted() {
+    _countStarted.fetchAndAdd(1);
+}
+
+void ShardingDataTransformCumulativeMetrics::onCompletion(ReshardingOperationStatusEnum status) {
+    switch (status) {
+        case ReshardingOperationStatusEnum::kSuccess:
+            _countSucceeded.fetchAndAdd(1);
+            break;
+        case ReshardingOperationStatusEnum::kFailure:
+            _countFailed.fetchAndAdd(1);
+            break;
+        case ReshardingOperationStatusEnum::kCanceled:
+            _countCancelled.fetchAndAdd(1);
+            break;
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
+void ShardingDataTransformCumulativeMetrics::setLastOpEndingChunkImbalance(int64_t imbalanceCount) {
+    _lastOpEndingChunkImbalance.store(imbalanceCount);
 }
 
 }  // namespace mongo

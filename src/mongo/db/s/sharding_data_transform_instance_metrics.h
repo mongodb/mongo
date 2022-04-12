@@ -79,6 +79,9 @@ public:
     void onCriticalSectionBegin();
     void onCriticalSectionEnd();
 
+    void setLowestEstimatedRemainingOperationTime(Milliseconds time);
+    void setHighestEstimatedRemainingOperationTime(Milliseconds time);
+
     Role getRole() const;
 
 protected:
@@ -150,6 +153,9 @@ private:
     AtomicWord<Date_t> _criticalSectionEndTime;
     AtomicWord<int64_t> _readsDuringCriticalSection;
     AtomicWord<int64_t> _writesDuringCriticalSection;
+
+    AtomicWord<Milliseconds> _lowestEstimatedRemainingOperationTime;
+    AtomicWord<Milliseconds> _highestEstimatedRemainingOperationTime;
 };
 
 }  // namespace mongo

@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/s/resharding/resharding_metrics_new.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/shard_id.h"
 #include "mongo/util/cancellation.h"
@@ -72,6 +73,7 @@ public:
                              std::vector<ShardId> recipientShards,
                              TaskExecutorPtr executor,
                              CancellationToken cancelToken,
+                             ReshardingMetricsNew* metrics,
                              Milliseconds maxDelayBetweenQueries = kMaxDelayBetweenQueries);
 
     SemiFuture<void> waitUntilRecipientsAreWithinCommitThreshold() const;
@@ -97,6 +99,9 @@ private:
     const std::vector<ShardId> _recipientShards;
     const TaskExecutorPtr _executor;
     const CancellationToken _cancelToken;
+
+    ReshardingMetricsNew* _metrics;
+
     const Milliseconds _threshold;
     const Milliseconds _maxDelayBetweenQueries;
 

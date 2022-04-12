@@ -105,7 +105,9 @@ ShardingDataTransformInstanceMetrics::ShardingDataTransformInstanceMetrics(
       _oplogEntriesApplied{0},
       _criticalSectionStartTime{kNoDate},
       _criticalSectionEndTime{kNoDate},
-      _writesDuringCriticalSection{0} {}
+      _writesDuringCriticalSection{0},
+      _lowestEstimatedRemainingOperationTime{Milliseconds(0)},
+      _highestEstimatedRemainingOperationTime{Milliseconds(0)} {}
 
 ShardingDataTransformInstanceMetrics::~ShardingDataTransformInstanceMetrics() {
     if (_deregister) {
@@ -114,11 +116,11 @@ ShardingDataTransformInstanceMetrics::~ShardingDataTransformInstanceMetrics() {
 }
 
 int64_t ShardingDataTransformInstanceMetrics::getHighEstimateRemainingTimeMillis() const {
-    return kPlaceholderTimeRemainingForTesting;
+    return durationCount<Milliseconds>(_highestEstimatedRemainingOperationTime.load());
 }
 
 int64_t ShardingDataTransformInstanceMetrics::getLowEstimateRemainingTimeMillis() const {
-    return kPlaceholderTimeRemainingForTesting;
+    return durationCount<Milliseconds>(_lowestEstimatedRemainingOperationTime.load());
 }
 
 Date_t ShardingDataTransformInstanceMetrics::getStartTimestamp() const {
@@ -155,8 +157,10 @@ BSONObj ShardingDataTransformInstanceMetrics::reportForCurrentOp() const noexcep
 
     switch (_role) {
         case Role::kCoordinator:
-            builder.append(kAllShardsHighestRemainingOperationTimeEstimatedSecs, TEMP_VALUE);
-            builder.append(kAllShardsLowestRemainingOperationTimeEstimatedSecs, TEMP_VALUE);
+            builder.append(kAllShardsHighestRemainingOperationTimeEstimatedSecs,
+                           durationCount<Seconds>(_highestEstimatedRemainingOperationTime.load()));
+            builder.append(kAllShardsLowestRemainingOperationTimeEstimatedSecs,
+                           durationCount<Seconds>(_lowestEstimatedRemainingOperationTime.load()));
             builder.append(kCoordinatorState, getStateString());
             builder.append(kApplyTimeElapsed, TEMP_VALUE);
             builder.append(kCopyTimeElapsed, getCopyingElapsedTimeSecs());
@@ -265,6 +269,16 @@ void ShardingDataTransformInstanceMetrics::accumulateValues(int64_t insertsAppli
     _insertsApplied.fetchAndAdd(insertsApplied);
     _updatesApplied.fetchAndAdd(updatesApplied);
     _deletesApplied.fetchAndAdd(deletesApplied);
+}
+
+void ShardingDataTransformInstanceMetrics::setLowestEstimatedRemainingOperationTime(
+    Milliseconds time) {
+    _lowestEstimatedRemainingOperationTime.store(time);
+}
+
+void ShardingDataTransformInstanceMetrics::setHighestEstimatedRemainingOperationTime(
+    Milliseconds time) {
+    _highestEstimatedRemainingOperationTime.store(time);
 }
 
 }  // namespace mongo

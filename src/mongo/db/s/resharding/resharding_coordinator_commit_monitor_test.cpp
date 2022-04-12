@@ -105,6 +105,9 @@ private:
     std::shared_ptr<CoordinatorCommitMonitor> _commitMonitor;
 
     boost::optional<Callback> _runOnMockingNextResponse;
+
+    ShardingDataTransformCumulativeMetrics _cumulativeMetrics{"dummyForTest"};
+    std::unique_ptr<ReshardingMetricsNew> _metrics;
 };
 
 auto makeExecutor() {
@@ -117,9 +120,9 @@ auto makeExecutor() {
 void CoordinatorCommitMonitorTest::setUp() {
     ConfigServerTestFixture::setUp();
 
+    auto clockSource = getServiceContext()->getFastClockSource();
     auto metrics = ReshardingMetrics::get(getServiceContext());
-    metrics->onStart(ReshardingMetrics::Role::kCoordinator,
-                     getServiceContext()->getFastClockSource()->now());
+    metrics->onStart(ReshardingMetrics::Role::kCoordinator, clockSource->now());
     metrics->setCoordinatorState(CoordinatorStateEnum::kApplying);
 
     auto hostNameForShard = [](const ShardId& shard) -> std::string {
@@ -149,8 +152,22 @@ void CoordinatorCommitMonitorTest::setUp() {
     _futureExecutor->startup();
 
     _cancellationSource = std::make_unique<CancellationSource>();
-    _commitMonitor = std::make_shared<CoordinatorCommitMonitor>(
-        _ns, _recipientShards, _futureExecutor, _cancellationSource->token(), Milliseconds(0));
+
+    _metrics = std::make_unique<ReshardingMetricsNew>(
+        UUID::gen(),
+        BSON("y" << 1),
+        _ns,
+        ShardingDataTransformInstanceMetrics::Role::kCoordinator,
+        clockSource->now(),
+        clockSource,
+        &_cumulativeMetrics);
+
+    _commitMonitor = std::make_shared<CoordinatorCommitMonitor>(_ns,
+                                                                _recipientShards,
+                                                                _futureExecutor,
+                                                                _cancellationSource->token(),
+                                                                _metrics.get(),
+                                                                Milliseconds(0));
     _commitMonitor->setNetworkExecutorForTest(executor());
 }
 

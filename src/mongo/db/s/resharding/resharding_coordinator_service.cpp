@@ -52,6 +52,7 @@
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
+#include "mongo/db/s/sharding_data_transform_cumulative_metrics.h"
 #include "mongo/db/s/sharding_data_transform_metrics.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
@@ -1041,6 +1042,11 @@ void markCompleted(const Status& status) {
 
     metrics->onCompletion(
         ReshardingMetrics::Role::kCoordinator, metricsOperationStatus, getCurrentTime());
+
+    if (ShardingDataTransformMetrics::isEnabled()) {
+        ShardingDataTransformCumulativeMetrics::getForResharding(cc().getServiceContext())
+            ->onCompletion(metricsOperationStatus);
+    }
 }
 
 BSONObj createFlushReshardingStateChangeCommand(const NamespaceString& nss,
@@ -1527,6 +1533,11 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_insertCoordDocAndChan
         // TODO SERVER-53914 to accommodate loading metrics for the coordinator.
         ReshardingMetrics::get(cc().getServiceContext())
             ->onStart(ReshardingMetrics::Role::kCoordinator, getCurrentTime());
+
+        if (ShardingDataTransformMetrics::isEnabled()) {
+            ShardingDataTransformCumulativeMetrics::getForResharding(cc().getServiceContext())
+                ->onStarted();
+        }
     }
 
     pauseBeforeInsertCoordinatorDoc.pauseWhileSet();
@@ -1655,7 +1666,8 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_startCommitMonitor(
         _coordinatorDoc.getSourceNss(),
         extractShardIdsFromParticipantEntries(_coordinatorDoc.getRecipientShards()),
         **executor,
-        _ctHolder->getCommitMonitorToken());
+        _ctHolder->getCommitMonitorToken(),
+        _metricsNew.get());
 
     _commitMonitorQuiesced = _commitMonitor->waitUntilRecipientsAreWithinCommitThreshold()
                                  .thenRunOn(**executor)
@@ -1998,6 +2010,10 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_updateChunkImbalanceM
 
         ReshardingMetrics::get(opCtx->getServiceContext())
             ->setLastReshardChunkImbalanceCount(imbalanceCount);
+        if (ShardingDataTransformMetrics::isEnabled()) {
+            ShardingDataTransformCumulativeMetrics::getForResharding(opCtx->getServiceContext())
+                ->setLastOpEndingChunkImbalance(imbalanceCount);
+        }
     } catch (const DBException& ex) {
         LOGV2_WARNING(5543000,
                       "Encountered error while trying to update resharding chunk imbalance metrics",

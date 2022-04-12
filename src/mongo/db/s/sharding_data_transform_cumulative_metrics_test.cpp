@@ -175,5 +175,127 @@ TEST_F(ShardingDataTransformCumulativeMetricsTest, ReportContainsTimeEstimates) 
         300);
 }
 
+TEST_F(ShardingDataTransformCumulativeMetricsTest, ReportContainsRunCount) {
+    using Role = ShardingDataTransformMetrics::Role;
+    ObserverMock coordinator{Date_t::fromMillisSinceEpoch(200), 400, 300, Role::kCoordinator};
+    auto ignore = _cumulativeMetrics.registerInstanceMetrics(&coordinator);
+
+    {
+        BSONObjBuilder bob;
+        _cumulativeMetrics.reportForServerStatus(&bob);
+        auto report = bob.done();
+        ASSERT_EQ(report.getObjectField(kTestMetricsName).getIntField("countStarted"), 0);
+    }
+
+    _cumulativeMetrics.onStarted();
+
+    {
+        BSONObjBuilder bob;
+        _cumulativeMetrics.reportForServerStatus(&bob);
+        auto report = bob.done();
+        ASSERT_EQ(report.getObjectField(kTestMetricsName).getIntField("countStarted"), 1);
+    }
+}
+
+TEST_F(ShardingDataTransformCumulativeMetricsTest, ReportContainsSucceededCount) {
+    using Role = ShardingDataTransformMetrics::Role;
+    ObserverMock coordinator{Date_t::fromMillisSinceEpoch(200), 400, 300, Role::kCoordinator};
+    auto ignore = _cumulativeMetrics.registerInstanceMetrics(&coordinator);
+
+    {
+        BSONObjBuilder bob;
+        _cumulativeMetrics.reportForServerStatus(&bob);
+        auto report = bob.done();
+        ASSERT_EQ(report.getObjectField(kTestMetricsName).getIntField("countSucceeded"), 0);
+    }
+
+    _cumulativeMetrics.onCompletion(ReshardingOperationStatusEnum::kSuccess);
+
+    {
+        BSONObjBuilder bob;
+        _cumulativeMetrics.reportForServerStatus(&bob);
+        auto report = bob.done();
+        ASSERT_EQ(report.getObjectField(kTestMetricsName).getIntField("countSucceeded"), 1);
+    }
+}
+
+TEST_F(ShardingDataTransformCumulativeMetricsTest, ReportContainsFailedCount) {
+    using Role = ShardingDataTransformMetrics::Role;
+    ObserverMock coordinator{Date_t::fromMillisSinceEpoch(200), 400, 300, Role::kCoordinator};
+    auto ignore = _cumulativeMetrics.registerInstanceMetrics(&coordinator);
+
+    {
+        BSONObjBuilder bob;
+        _cumulativeMetrics.reportForServerStatus(&bob);
+        auto report = bob.done();
+        ASSERT_EQ(report.getObjectField(kTestMetricsName).getIntField("countFailed"), 0);
+    }
+
+    _cumulativeMetrics.onCompletion(ReshardingOperationStatusEnum::kFailure);
+
+    {
+        BSONObjBuilder bob;
+        _cumulativeMetrics.reportForServerStatus(&bob);
+        auto report = bob.done();
+        ASSERT_EQ(report.getObjectField(kTestMetricsName).getIntField("countFailed"), 1);
+    }
+}
+
+TEST_F(ShardingDataTransformCumulativeMetricsTest, ReportContainsCanceledCount) {
+    using Role = ShardingDataTransformMetrics::Role;
+    ObserverMock coordinator{Date_t::fromMillisSinceEpoch(200), 400, 300, Role::kCoordinator};
+    auto ignore = _cumulativeMetrics.registerInstanceMetrics(&coordinator);
+
+    {
+        BSONObjBuilder bob;
+        _cumulativeMetrics.reportForServerStatus(&bob);
+        auto report = bob.done();
+        ASSERT_EQ(report.getObjectField(kTestMetricsName).getIntField("countCanceled"), 0);
+    }
+
+    _cumulativeMetrics.onCompletion(ReshardingOperationStatusEnum::kCanceled);
+
+    {
+        BSONObjBuilder bob;
+        _cumulativeMetrics.reportForServerStatus(&bob);
+        auto report = bob.done();
+        ASSERT_EQ(report.getObjectField(kTestMetricsName).getIntField("countCanceled"), 1);
+    }
+}
+
+TEST_F(ShardingDataTransformCumulativeMetricsTest, ReportContainsLastChunkImbalanceCount) {
+    using Role = ShardingDataTransformMetrics::Role;
+    ObserverMock coordinator{Date_t::fromMillisSinceEpoch(200), 400, 300, Role::kCoordinator};
+    auto ignore = _cumulativeMetrics.registerInstanceMetrics(&coordinator);
+
+    {
+        BSONObjBuilder bob;
+        _cumulativeMetrics.reportForServerStatus(&bob);
+        auto report = bob.done();
+        ASSERT_EQ(report.getObjectField(kTestMetricsName).getIntField("lastOpEndingChunkImbalance"),
+                  0);
+    }
+
+    _cumulativeMetrics.setLastOpEndingChunkImbalance(111);
+
+    {
+        BSONObjBuilder bob;
+        _cumulativeMetrics.reportForServerStatus(&bob);
+        auto report = bob.done();
+        ASSERT_EQ(report.getObjectField(kTestMetricsName).getIntField("lastOpEndingChunkImbalance"),
+                  111);
+    }
+
+    _cumulativeMetrics.setLastOpEndingChunkImbalance(777);
+
+    {
+        BSONObjBuilder bob;
+        _cumulativeMetrics.reportForServerStatus(&bob);
+        auto report = bob.done();
+        ASSERT_EQ(report.getObjectField(kTestMetricsName).getIntField("lastOpEndingChunkImbalance"),
+                  777);
+    }
+}
+
 }  // namespace
 }  // namespace mongo

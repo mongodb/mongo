@@ -325,5 +325,29 @@ TEST_F(ShardingDataTransformInstanceMetricsTest, OnWriteToStasheddShouldIncremen
     ASSERT_EQ(report.getIntField("countWritesToStashCollections"), 1);
 }
 
+TEST_F(ShardingDataTransformInstanceMetricsTest,
+       SetLowestOperationTimeShouldBeReflectedInCurrentOp) {
+    auto metrics = createInstanceMetrics(UUID::gen(), Role::kCoordinator);
+
+    auto report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("allShardsLowestRemainingOperationTimeEstimatedSecs"), 0);
+    metrics->setLowestEstimatedRemainingOperationTime(Milliseconds(2000));
+
+    report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("allShardsLowestRemainingOperationTimeEstimatedSecs"), 2);
+}
+
+TEST_F(ShardingDataTransformInstanceMetricsTest,
+       SetHighestOperationTimeShouldBeReflectedInCurrentOp) {
+    auto metrics = createInstanceMetrics(UUID::gen(), Role::kCoordinator);
+
+    auto report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("allShardsHighestRemainingOperationTimeEstimatedSecs"), 0);
+    metrics->setHighestEstimatedRemainingOperationTime(Milliseconds(12000));
+
+    report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("allShardsHighestRemainingOperationTimeEstimatedSecs"), 12);
+}
+
 }  // namespace
 }  // namespace mongo
