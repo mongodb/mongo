@@ -23,6 +23,7 @@ env.Library(
     target='key_generator',
     source=[
         'btree_key_generator.cpp',
+        'column_key_generator.cpp',
         'expression_keys_private.cpp',
         'sort_key_generator.cpp',
         'wildcard_key_generator.cpp',
@@ -150,6 +151,7 @@ env.CppUnitTest(
     source=[
         '2d_key_generator_test.cpp',
         'btree_key_generator_test.cpp',
+        'column_key_generator_test.cpp',
         'hash_key_generator_test.cpp',
         's2_key_generator_test.cpp',
         's2_bucket_key_generator_test.cpp',

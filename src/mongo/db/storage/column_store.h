@@ -302,6 +302,23 @@ public:
         return x;
     }
 
+    /**
+     * If the range [*itPtr, end) begins with a number, returns it and positions *itPtr after the
+     * last byte of number. If there is no number, returns 0 (which is typically encoded by omitting
+     * an optional number) and does not reposition *itPtr.
+     */
+    static int readArrInfoNumber(StringData::const_iterator* itInOut,
+                                 StringData::const_iterator end) {
+        auto it = *itInOut;  // Use local to allow compiler to assume it doesn't point to itself.
+        size_t res = 0;
+        while (it != end && *it >= '0' && *it <= '9') {
+            res *= 10;  // noop first pass.
+            res += (*it++) - '0';
+        }
+        *itInOut = it;
+        return res;
+    }
+
 protected:
     class Cursor {
     public:
