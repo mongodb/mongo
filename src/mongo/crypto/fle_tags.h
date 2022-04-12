@@ -39,13 +39,14 @@ namespace mongo::fle {
  * Read a list of binary tags given ESC, ECC, and EDC derived tokens and a specific contention
  * factor.
  */
-void readTagsWithContention(const FLEStateCollectionReader& esc,
-                            const FLEStateCollectionReader& ecc,
-                            ESCDerivedFromDataToken s,
-                            ECCDerivedFromDataToken c,
-                            EDCDerivedFromDataToken d,
-                            uint64_t contentionFactor,
-                            std::vector<PrfBlock>& binaryTags);
+std::vector<PrfBlock> readTagsWithContention(const FLEStateCollectionReader& esc,
+                                             const FLEStateCollectionReader& ecc,
+                                             ESCDerivedFromDataToken s,
+                                             ECCDerivedFromDataToken c,
+                                             EDCDerivedFromDataToken d,
+                                             uint64_t contentionFactor,
+                                             size_t memoryLimit,
+                                             std::vector<PrfBlock>&& binaryTags);
 
 /**
  * Read a list of binary tags given ESC, ECC, and EDC derived tokens and a maximum contention

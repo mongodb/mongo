@@ -618,9 +618,7 @@ protected:
         auto d = getTestEDCDataToken(obj);
         auto esc = CollectionReader("test.esc", *_queryImpl);
         auto ecc = CollectionReader("test.ecc", *_queryImpl);
-        std::vector<PrfBlock> binaryTags;
-        mongo::fle::readTagsWithContention(esc, ecc, s, c, d, contention, binaryTags);
-        return binaryTags;
+        return mongo::fle::readTagsWithContention(esc, ecc, s, c, d, contention, 100, {});
     }
     std::vector<PrfBlock> readTags(BSONObj obj, uint64_t cm = 0) {
         auto s = getTestESCDataToken(obj);
@@ -1174,6 +1172,34 @@ TEST_F(FleTagsTest, ContentionFactor) {
     ASSERT_EQ(1, readTagsWithContention(doc2, 3).size());
     ASSERT_EQ(3, readTags(doc1, 4).size());
     ASSERT_EQ(2, readTags(doc2, 4).size());
+}
+
+TEST_F(FleTagsTest, MemoryLimit) {
+    auto doc = BSON("encrypted"
+                    << "a");
+
+    const auto tagLimit = 10;
+
+    // Set memory limit to 10 tags * 32 bytes per tag
+    internalQueryFLERewriteMemoryLimit.store(tagLimit * 32);
+
+    // Do 10 inserts
+    for (auto i = 0; i < tagLimit; i++) {
+        doSingleInsert(i, doc);
+    }
+
+    // readTags returns 10 tags which does not exceed memory limit.
+    ASSERT_EQ(tagLimit, readTags(doc).size());
+
+    doSingleInsert(10, doc);
+
+    // readTags returns 11 tags which does exceed memory limit.
+    ASSERT_THROWS_CODE(readTags(doc), DBException, 6401800);
+
+    doSingleDelete(5);
+
+    // readTags returns 10 tags which does not exceed memory limit.
+    ASSERT_EQ(tagLimit, readTags(doc).size());
 }
 }  // namespace
 }  // namespace mongo

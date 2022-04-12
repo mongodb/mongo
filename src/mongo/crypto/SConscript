@@ -105,6 +105,7 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/db/exec/document_value/document_value',
+        '$BUILD_DIR/mongo/db/query/query_knobs',
         'aead_encryption',
         'encrypted_field_config',
         'fle_fields',

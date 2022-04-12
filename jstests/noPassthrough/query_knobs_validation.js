@@ -55,6 +55,7 @@ const expectedParamDefaults = {
     internalQueryCollectionMaxStorageSizeBytesToChooseHashJoin: 100 * 1024 * 1024,
     internalQueryMaxNumberOfFieldsToChooseUnfilteredColumnScan: 5,
     internalQueryMaxNumberOfFieldsToChooseFilteredColumnScan: 12,
+    internalQueryFLERewriteMemoryLimit: 14 * 1024 * 1024,
     internalQueryDisableLookupExecutionUsingHashJoin: false,
 };
 
@@ -237,6 +238,9 @@ assertSetParameterFails("internalQueryMaxNumberOfFieldsToChooseUnfilteredColumnS
 assertSetParameterSucceeds("internalQueryMaxNumberOfFieldsToChooseFilteredColumnScan", 100);
 assertSetParameterSucceeds("internalQueryMaxNumberOfFieldsToChooseFilteredColumnScan", 0);
 assertSetParameterFails("internalQueryMaxNumberOfFieldsToChooseFilteredColumnScan", -1);
+
+assertSetParameterSucceeds("internalQueryFLERewriteMemoryLimit", 14 * 1024 * 1024);
+assertSetParameterFails("internalQueryFLERewriteMemoryLimit", 0);
 
 MongoRunner.stopMongod(conn);
 })();
