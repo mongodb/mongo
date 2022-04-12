@@ -30,40 +30,28 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/cluster_transaction_api.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/internal_transactions_test_command_gen.h"
 #include "mongo/db/query/find_command_gen.h"
 #include "mongo/db/transaction_api.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/commands/internal_transactions_test_commands_gen.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/transaction_router_resource_yielder.h"
+#include "mongo/stdx/future.h"
 
 namespace mongo {
 namespace {
 
-class InternalTransactionsTestCommand final : public TypedCommand<InternalTransactionsTestCommand> {
+template <typename Impl>
+class InternalTransactionsTestCommandBase : public TypedCommand<Impl> {
 public:
     using Request = TestInternalTransactions;
 
-    class Invocation final : public InvocationBase {
+    class Invocation final : public TypedCommand<Impl>::InvocationBase {
     public:
-        using InvocationBase::InvocationBase;
+        using Base = typename TypedCommand<Impl>::InvocationBase;
+        using Base::Base;
 
-        TestInternalTransactionsReply typedRun(OperationContext* opCtx) {
-            Grid::get(opCtx)->assertShardingIsInitialized();
-
-            auto fixedExec = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
-            auto txn = txn_api::TransactionWithRetries(
-                opCtx,
-                fixedExec,
-                std::make_unique<txn_api::details::SEPTransactionClient>(
-                    opCtx,
-                    fixedExec,
-                    std::make_unique<txn_api::details::ClusterSEPTransactionClientBehaviors>(
-                        opCtx->getServiceContext())),
-                TransactionRouterResourceYielder::makeForLocalHandoff());
-
+        TestInternalTransactionsCommandReply typedRun(OperationContext* opCtx) {
             struct SharedBlock {
                 SharedBlock(std::vector<TestInternalTransactionsCommandInfo> commandInfos_)
                     : commandInfos(commandInfos_) {}
@@ -71,13 +59,29 @@ public:
                 std::vector<TestInternalTransactionsCommandInfo> commandInfos;
                 std::vector<BSONObj> responses;
             };
-            auto sharedBlock = std::make_shared<SharedBlock>(request().getCommandInfos());
+
+            auto sharedBlock = std::make_shared<SharedBlock>(Base::request().getCommandInfos());
+
+            const auto executor = Grid::get(opCtx)->isShardingInitialized()
+                ? static_cast<ExecutorPtr>(Grid::get(opCtx)->getExecutorPool()->getFixedExecutor())
+                : static_cast<ExecutorPtr>(getTransactionExecutor());
+
+            // If internalTransactionsTestCommand is received by a mongod, it should be instantiated
+            // with the TransactionParticipant's resource yielder. If on a mongos, txn should be
+            // instantiated with the TransactionRouter's resource yielder.
+            auto txn = Impl::getTxn(opCtx,
+                                    std::move(executor),
+                                    Base::request().kCommandName,
+                                    Base::request().getUseClusterClient());
 
             // Swallow errors and let clients inspect the responses array to determine success /
             // failure.
             (void)txn.runSyncNoThrow(
                 opCtx,
                 [sharedBlock](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+                    // Iterate through commands and record responses for each. Return immediately if
+                    // we encounter a response with a retriedStmtId. This field indicates that the
+                    // command and everything following it have already been executed.
                     for (const auto& commandInfo : sharedBlock->commandInfos) {
                         const auto& dbName = commandInfo.getDbName();
                         const auto& command = commandInfo.getCommand();
@@ -101,26 +105,27 @@ public:
                             continue;
                         }
 
-                        auto res = txnClient.runCommand(dbName, command).get();
+                        const auto res = txnClient.runCommand(dbName, command).get();
                         sharedBlock->responses.emplace_back(
                             CommandHelpers::filterCommandReplyForPassthrough(
                                 res.removeField("recoveryToken")));
 
+                        // TODO SERVER-64986: Remove assert check.
                         if (assertSucceeds) {
                             // Note this only inspects the top level ok field for non-write
                             // commands.
                             uassertStatusOK(getStatusFromWriteCommandReply(res));
                         }
+                        // TODO SERVER-65048: Check if result has retriedStmtId & retriedStmtIds
+                        // field, exit.
                     }
-
                     return SemiFuture<void>::makeReady();
                 });
-
-            return TestInternalTransactionsReply(std::move(sharedBlock->responses));
+            return TestInternalTransactionsCommandReply(std::move(sharedBlock->responses));
         };
 
         NamespaceString ns() const override {
-            return NamespaceString(request().getDbName(), "");
+            return NamespaceString(Base::request().getDbName(), "");
         }
 
         bool supportsWriteConcern() const override {
@@ -134,6 +139,23 @@ public:
                         ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
                                                            ActionType::internal));
         }
+
+        const std::shared_ptr<ThreadPool>& getTransactionExecutor() {
+            static Mutex mutex =
+                MONGO_MAKE_LATCH("InternalTransactionsTestCommandExecutor::_mutex");
+            static std::shared_ptr<ThreadPool> executor;
+
+            stdx::lock_guard<Latch> lg(mutex);
+            if (!executor) {
+                ThreadPool::Options options;
+                options.poolName = "InternalTransaction";
+                options.minThreads = 0;
+                options.maxThreads = 4;
+                executor = std::make_shared<ThreadPool>(std::move(options));
+                executor->startup();
+            }
+            return executor;
+        }
     };
 
     std::string help() const override {
@@ -146,11 +168,10 @@ public:
         return true;
     }
 
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kNever;
+    BasicCommand::AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+        return BasicCommand::AllowedOnSecondary::kNever;
     }
 };
-MONGO_REGISTER_TEST_COMMAND(InternalTransactionsTestCommand);
 
 }  // namespace
 }  // namespace mongo

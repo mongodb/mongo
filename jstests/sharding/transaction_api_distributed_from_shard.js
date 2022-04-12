@@ -32,8 +32,8 @@ function runTestSuccess() {
     // Insert initial data.
     assert.commandWorked(st.s.getCollection(kNs).insert([{_id: 1}]));
 
-    const res = assert.commandWorked(
-        shard0Primary.adminCommand({testInternalTransactions: 1, commandInfos: commands}));
+    const res = assert.commandWorked(shard0Primary.adminCommand(
+        {testInternalTransactions: 1, commandInfos: commands, useClusterClient: true}));
     res.responses.forEach((innerRes) => {
         assert.commandWorked(innerRes, tojson(res));
     });
@@ -70,8 +70,8 @@ function runTestFailure() {
     // Insert initial data.
     assert.commandWorked(st.s.getCollection(kNs).insert([{_id: 1}]));
 
-    const res = assert.commandWorked(
-        shard0Primary.adminCommand({testInternalTransactions: 1, commandInfos: commands}));
+    const res = assert.commandWorked(shard0Primary.adminCommand(
+        {testInternalTransactions: 1, commandInfos: commands, useClusterClient: true}));
     // The clusterCount is rejected without being run, so expect one fewer response.
     assert.eq(res.responses.length, commands.length - 1, tojson(res));
 
@@ -108,8 +108,8 @@ function runTestGetMore() {
 
     const commandMetricsBefore = shard0Primary.getDB(kDbName).serverStatus().metrics.commands;
 
-    const res = assert.commandWorked(
-        shard0Primary.adminCommand({testInternalTransactions: 1, commandInfos: commands}));
+    const res = assert.commandWorked(shard0Primary.adminCommand(
+        {testInternalTransactions: 1, commandInfos: commands, useClusterClient: true}));
     assert.eq(res.responses.length, 1, tojson(res));
 
     // The response from an exhausted cursor is an array of BSON objects, so we don't assert the

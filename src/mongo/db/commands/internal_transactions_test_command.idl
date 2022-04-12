@@ -33,27 +33,29 @@ imports:
   - "mongo/idl/basic_types.idl"
 
 structs:
-    TestInternalTransactionsReply:
-        description: "Response for testInternalTransactions command"
-        strict: false
-        fields:
-            responses:
-                type: array<object>
+  TestInternalTransactionsCommandReply:
+    description: "Response for internal transaction command."
+    strict: false
+    fields:
+      responses:
+        description: "List of responses to commands in the transaction."
+        type: array<object>
 
-    TestInternalTransactionsCommandInfo:
-        description: "A command, its database name, and other test options"
-        strict: false
-        fields:
-            dbName:
-                type: string
-            command:
-                type: object
-            assertSucceeds:
-                type: bool
-                default: true
-            exhaustCursor:
-                type: bool
-                optional: true
+  TestInternalTransactionsCommandInfo:
+    description: "A command, its database name, and other test options."
+    strict: false
+    fields:
+      dbName:
+        type: string
+      command:
+        type: object
+      # TODO SERVER-64986: Remove assertSucceeds parameter.
+      assertSucceeds:
+        type: bool
+        default: true
+      exhaustCursor:
+        type: bool
+        optional: true
 
 commands:
     testInternalTransactions:
@@ -62,13 +64,14 @@ commands:
         namespace: ignored
         api_version: ""
         fields:
-            useClusterClient:
-                description: "Whether the transaction API client used should opt into running the
-                             'cluster' versions of commands that enables a non-router node to run
-                             the router versions of commands. Only meaningful on mongod because a
-                             mongos will always run 'cluster' commands."
-                type: bool
-                default: false
-            commandInfos:
-                type: array<TestInternalTransactionsCommandInfo>
-        reply_type: TestInternalTransactionsReply
+          useClusterClient:
+              description: "Whether the transaction API client used should opt into running the
+                            'cluster' versions of commands that enables a non-router node to run
+                            the router versions of commands. Only meaningful on mongod because a
+                            mongos will always run 'cluster' commands."
+              type: bool
+              default: false
+          commandInfos:
+              description: "List of TestInternalTransactionsCommandInfos to run in a single transaction."
+              type: array<TestInternalTransactionsCommandInfo>
+        reply_type: TestInternalTransactionsCommandReply
