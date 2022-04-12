@@ -1182,7 +1182,10 @@ def get_command(env, node, action):  # pylint: disable=too-many-branches
         # Possibly these could be ignore and the build would still work, however it may not always
         # rebuild correctly, so we hard stop, and force the user to fix the issue with the provided
         # ninja rule.
-        raise Exception(f"Could not resolve path for {provider_dep} dependency on node '{node}'")
+        err_msg = f"Could not resolve path for '{provider_dep}' dependency on node '{node}', you may need to setup your shell environment for ninja builds."
+        if os.name == "nt":
+            err_msg += " On Windows, please ensure that you have run the necessary Visual Studio environment setup scripts (e.g. vcvarsall.bat ...,  or launching a Visual Studio Command Prompt) before invoking SCons."
+        raise Exception(err_msg)
 
     ninja_build = {
         "order_only": get_order_only(node),
