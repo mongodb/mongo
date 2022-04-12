@@ -321,6 +321,14 @@ void HashAggStage::checkMemoryUsageAndSpillIfNecessary(MemoryCheckData& mcd) {
         return;
     }
 
+    // If the group-by key is empty we must avoid spilling it to the '_recordStore', because we
+    // cannot spill an empty RecordId per the storage contract. Never spilling for the the empty
+    // group-by key case is OK because we will only ever aggregate into a single row and spilling
+    // would mean moving this row back and forth from disk to main memory anyway.
+    if (_inKeyAccessors.size() == 0) {
+        return;
+    }
+
     mcd.memoryCheckpointCounter++;
     if (mcd.memoryCheckpointCounter >= mcd.nextMemoryCheckpoint) {
         if (_htIt == _ht->end()) {
