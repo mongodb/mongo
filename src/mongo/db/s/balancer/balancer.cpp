@@ -431,7 +431,10 @@ void Balancer::report(OperationContext* opCtx, BSONObjBuilder* builder) {
 }
 
 void Balancer::_consumeActionStreamLoop() {
-    ScopeGuard onExitCleanup([this] { _clusterChunksResizePolicy->stop(); });
+    ScopeGuard onExitCleanup([this] {
+        _defragmentationPolicy->interruptAllDefragmentations();
+        _clusterChunksResizePolicy->stop();
+    });
 
     Client::initThread("BalancerSecondary");
     auto opCtx = cc().makeOperationContext();

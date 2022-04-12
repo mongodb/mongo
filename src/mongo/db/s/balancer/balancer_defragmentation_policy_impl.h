@@ -78,6 +78,8 @@ public:
 
     ~BalancerDefragmentationPolicyImpl() {}
 
+    void interruptAllDefragmentations() override;
+
     bool isDefragmentingCollection(const UUID& uuid) override;
 
     virtual BSONObj reportProgressOn(const UUID& uuid) override;

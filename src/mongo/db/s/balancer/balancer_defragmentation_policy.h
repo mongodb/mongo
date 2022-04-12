@@ -60,6 +60,13 @@ public:
                                                 const NamespaceString& nss) = 0;
 
     /**
+     * Requests to stop the emission of any new defragmentation action request. Does not alter the
+     * persisted state of the affected collections. startCollectionDefragmentation() can be invoked
+     * on a later stage to resume the defragmentation on each item.
+     */
+    virtual void interruptAllDefragmentations() = 0;
+
+    /**
      * Returns true if the specified collection is currently being defragmented.
      */
     virtual bool isDefragmentingCollection(const UUID& uuid) = 0;

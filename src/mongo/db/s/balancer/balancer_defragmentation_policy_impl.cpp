@@ -1419,6 +1419,11 @@ void BalancerDefragmentationPolicyImpl::abortCollectionDefragmentation(Operation
     }
 }
 
+void BalancerDefragmentationPolicyImpl::interruptAllDefragmentations() {
+    stdx::lock_guard<Latch> lk(_stateMutex);
+    _defragmentationStates.clear();
+}
+
 bool BalancerDefragmentationPolicyImpl::isDefragmentingCollection(const UUID& uuid) {
     stdx::lock_guard<Latch> lk(_stateMutex);
     return _defragmentationStates.contains(uuid);
