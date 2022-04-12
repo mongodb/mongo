@@ -77,9 +77,15 @@ public:
 
             auto state = donorPtr->decisionFuture().get(opCtx);
 
-            auto response = Response(state.state);
+            uassert(ErrorCodes::TenantMigrationAborted,
+                    "The shard split operation was aborted. " +
+                        (state.abortReason ? state.abortReason->toString() : ""),
+                    state.state != ShardSplitDonorStateEnum::kAborted);
+
+            Response response(state.state);
             if (state.abortReason) {
                 BSONObjBuilder bob;
+
                 state.abortReason->serializeErrorToBSON(&bob);
                 response.setAbortReason(bob.obj());
             }

@@ -25,11 +25,12 @@ const test = new BasicServerlessTest({
 test.addRecipientNodes();
 
 const donorPrimary = test.donor.getPrimary();
-const migrationId = UUID();
+const maxTimeMS = 1 * 2000;  // 2 seconds
 const tenantIds = ["tenant1", "tenant2"];
 
 jsTestLog("Asserting no state document exist before command");
-assert.isnull(findMigration(donorPrimary, migrationId));
+const operation = test.createSplitOperation(tenantIds);
+assert.isnull(findMigration(donorPrimary, operation.migrationId));
 
 jsTestLog("Asserting we can write before the migration");
 tenantIds.forEach(id => {
@@ -44,16 +45,12 @@ const adminDb = donorPrimary.getDB("admin");
 const blockingFailPoint = configureFailPoint(adminDb, "pauseShardSplitAfterBlocking");
 
 jsTestLog("Running commitShardSplit command");
-const awaitCommand = startParallelShell(
-    funWithArgs(function(migrationId, recipientTagName, recipientSetName, tenantIds) {
-        assert.commandWorked(db.adminCommand(
-            {commitShardSplit: 1, migrationId, recipientTagName, recipientSetName, tenantIds}));
-    }, migrationId, test.recipientTagName, test.recipientSetName, tenantIds), donorPrimary.port);
+const runThread = operation.commitAsync();
 
 blockingFailPoint.wait();
 
 jsTestLog("Asserting state document is in blocking state");
-assertMigrationState(donorPrimary, migrationId, "blocking");
+assertMigrationState(donorPrimary, operation.migrationId, "blocking");
 
 jsTestLog("Asserting we cannot write in blocking state");
 let writeThreads = [];
@@ -82,16 +79,20 @@ assert.soon(function() {
 
 jsTestLog("Disabling failpoints and waiting for command to complete");
 blockingFailPoint.off();
-awaitCommand();
+
+runThread.join();
+const data = runThread.returnData();
+assert(data["ok"] == 1);
 
 writeThreads.forEach(thread => thread.join());
 
 jsTestLog("Asserting state document exist after command");
-assertMigrationState(donorPrimary, migrationId, "committed");
+assertMigrationState(donorPrimary, operation.migrationId, "committed");
 
 test.removeRecipientNodesFromDonor();
 
-test.forgetShardSplit(migrationId);
-test.waitForGarbageCollection(migrationId, tenantIds);
+operation.forget();
+
+test.waitForGarbageCollection(operation.migrationId, tenantIds);
 test.stop();
 })();

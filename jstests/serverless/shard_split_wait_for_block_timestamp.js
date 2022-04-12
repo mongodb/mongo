@@ -41,27 +41,14 @@ for (let i = 0; i < 2000; i++) {
 assert.commandWorked(bulk.execute());
 
 jsTestLog("Running commitShardSplit command");
-const firstOperationId = UUID();
-assert.isnull(findMigration(donorPrimary, firstOperationId));
-const awaitFirstSplitOperation = startParallelShell(
-    funWithArgs(
-        function(migrationId, recipientTagName, recipientSetName, tenantIds) {
-            assert.commandWorked(db.adminCommand(
-                {commitShardSplit: 1, migrationId, recipientTagName, recipientSetName, tenantIds}));
-        },
-        firstOperationId,
-        test.recipientTagName,
-        test.recipientSetName,
-        tenantIds),
-    donorPrimary.port);
+const firstOperation = test.createSplitOperation(tenantIds);
+assert.isnull(findMigration(donorPrimary, firstOperation.migrationId));
+const res = firstOperation.commit({retryOnRetryableErrors: false});
+assert.commandFailed(res);
+assert.eq(res.code, ErrorCodes.TenantMigrationAborted);
 
-awaitFirstSplitOperation();
-assertMigrationState(donorPrimary, firstOperationId, "aborted");
-
-jsTestLog(`Running forgetShardSplit command: ${tojson(firstOperationId)}`);
-test.forgetShardSplit(firstOperationId);
-
-test.waitForGarbageCollection(firstOperationId, tenantIds);
+firstOperation.forget();
+test.waitForGarbageCollection(firstOperation.migrationId, tenantIds);
 
 jsTestLog("Restarting replication on recipient nodes, and running new split operation");
 test.recipientNodes.forEach(node => restartServerReplication(node));
@@ -69,28 +56,14 @@ test.donor.awaitReplication();
 test.donor.nodes.forEach(
     node => assert.commandWorked(setParameter(node, "shardSplitTimeoutMS", 60 * 1000)));
 
-const secondOperationId = UUID();
-assert.isnull(findMigration(donorPrimary, secondOperationId));
-const awaitSecondSplitOperation = startParallelShell(
-    funWithArgs(
-        function(migrationId, recipientTagName, recipientSetName, tenantIds) {
-            assert.commandWorked(db.adminCommand(
-                {commitShardSplit: 1, migrationId, recipientTagName, recipientSetName, tenantIds}));
-        },
-        secondOperationId,
-        test.recipientTagName,
-        test.recipientSetName,
-        tenantIds),
-    donorPrimary.port);
-
-awaitSecondSplitOperation();
-assertMigrationState(donorPrimary, secondOperationId, "committed");
+const secondOperation = test.createSplitOperation(tenantIds);
+assert.isnull(findMigration(donorPrimary, secondOperation.migrationId));
+assert.commandWorked(secondOperation.commit());
+assertMigrationState(donorPrimary, secondOperation.migrationId, "committed");
 
 test.removeRecipientNodesFromDonor();
+secondOperation.forget();
 
-jsTestLog(`Running forgetShardSplit command: ${tojson(secondOperationId)}`);
-test.forgetShardSplit(secondOperationId);
-
-test.waitForGarbageCollection(secondOperationId, tenantIds);
+test.waitForGarbageCollection(secondOperation.migrationId, tenantIds);
 test.stop();
 })();

@@ -41,7 +41,7 @@ let fp = configureFailPoint(donorPrimary.getDB("admin"), "pauseShardSplitAfterDe
 
 const tenantIds = ["tenant5", "tenant6"];
 
-assert.commandWorked(donorPrimary.adminCommand(
+assert.commandFailed(donorPrimary.adminCommand(
     {commitShardSplit: 1, migrationId, recipientTagName, recipientSetName, tenantIds}));
 
 fp.wait();

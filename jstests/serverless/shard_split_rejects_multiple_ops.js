@@ -70,7 +70,8 @@ function commitShardSplitConcurrently() {
                                  117);  // ConflictingOperationInProgress
 
     test.removeRecipientNodesFromDonor();
-    test.forgetShardSplit(migrationId);
+    assert.commandWorked(
+        donorPrimary.adminCommand({forgetShardSplit: 1, migrationId: migrationId}));
 
     // fails because the commitShardSplit hasn't be garbage collected yet.
     assert.commandFailedWithCode(donorPrimary.adminCommand({
@@ -111,7 +112,7 @@ function commitShardSplitAfterAbort() {
     const admin = test.donor.getPrimary().getDB("admin");
     let fp = configureFailPoint(admin, "pauseShardSplitAfterBlocking");
 
-    assert.commandWorked(admin.runCommand(
+    assert.commandFailed(admin.runCommand(
         {commitShardSplit: 1, migrationId, recipientTagName, recipientSetName, tenantIds}));
 
     fp.wait();
