@@ -1588,7 +1588,8 @@ QuerySolutionNode* GroupNode::clone() const {
         std::make_unique<GroupNode>(std::unique_ptr<QuerySolutionNode>(children[0]->clone()),
                                     groupByExpression,
                                     accumulators,
-                                    doingMerge);
+                                    doingMerge,
+                                    shouldProduceBson);
     return copy.release();
 }
 
@@ -1620,7 +1621,8 @@ QuerySolutionNode* EqLookupNode::clone() const {
                                        foreignCollection,
                                        joinFieldLocal,
                                        joinFieldForeign,
-                                       joinField);
+                                       joinField,
+                                       shouldProduceBson);
     return copy.release();
 }
 /**

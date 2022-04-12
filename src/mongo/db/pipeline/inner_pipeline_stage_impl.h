@@ -39,11 +39,15 @@
 namespace mongo {
 class InnerPipelineStageImpl : public InnerPipelineStageInterface {
 public:
-    InnerPipelineStageImpl(const boost::intrusive_ptr<DocumentSource>& src);
+    InnerPipelineStageImpl(const boost::intrusive_ptr<DocumentSource>& src,
+                           bool isLastSource = false);
 
     DocumentSource* documentSource();
 
+    bool isLastSource() const;
+
 private:
     boost::intrusive_ptr<DocumentSource> _ds;
+    bool _isLastSource;
 };
 }  //  namespace mongo

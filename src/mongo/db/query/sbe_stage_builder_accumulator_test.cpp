@@ -101,7 +101,8 @@ protected:
         auto groupNode = std::make_unique<GroupNode>(std::move(virtScanNode),
                                                      docSrcGroup->getIdExpression(),
                                                      docSrcGroup->getAccumulatedFields(),
-                                                     false /*doingMerge*/);
+                                                     false /*doingMerge*/,
+                                                     true /*shouldProduceBson*/);
 
         // Makes a QuerySolution from the root group node.
         return {makeQuerySolution(std::move(groupNode)), docSrcGroup};

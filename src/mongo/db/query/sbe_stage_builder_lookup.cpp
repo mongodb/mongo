@@ -932,7 +932,8 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildLookupResultObject(
     SlotId resultArraySlot,
     const FieldPath& fieldPath,
     const PlanNodeId nodeId,
-    SlotIdGenerator& slotIdGenerator) {
+    SlotIdGenerator& slotIdGenerator,
+    bool shouldProduceBson) {
     const int32_t pathLength = fieldPath.getPathLength();
 
     // Extract values of all fields along the path except the last one.
@@ -953,7 +954,9 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildLookupResultObject(
         const auto rootObjectSlot = i == 0 ? localDocumentSlot : fieldSlots[i - 1];
         const auto fieldName = fieldPath.getFieldName(i).toString();
         const auto valueSlot = i == pathLength - 1 ? resultArraySlot : objectSlots[i + 1];
-        stage = makeS<MakeBsonObjStage>(std::move(stage),
+        if (shouldProduceBson) {
+            stage =
+                makeS<MakeBsonObjStage>(std::move(stage),
                                         objectSlots[i],                        /* objSlot */
                                         rootObjectSlot,                        /* rootSlot */
                                         MakeBsonObjStage::FieldBehavior::drop, /* fieldBehaviour */
@@ -963,6 +966,18 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildLookupResultObject(
                                         true,                                  /* forceNewObject */
                                         false,                                 /* returnOldObject */
                                         nodeId);
+        } else {
+            stage = makeS<MakeObjStage>(std::move(stage),
+                                        objectSlots[i],                        /* objSlot */
+                                        rootObjectSlot,                        /* rootSlot */
+                                        MakeBsonObjStage::FieldBehavior::drop, /* fieldBehaviour */
+                                        std::vector<std::string>{},            /* fields */
+                                        std::vector<std::string>{fieldName},   /* projectFields */
+                                        SlotVector{valueSlot},                 /* projectVars */
+                                        true,                                  /* forceNewObject */
+                                        false,                                 /* returnOldObject */
+                                        nodeId);
+        }
     }
 
     return {objectSlots.front(), std::move(stage)};
@@ -1063,7 +1078,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                                              matchedDocumentsSlot,
                                                              eqLookupNode->joinField,
                                                              eqLookupNode->nodeId(),
-                                                             _slotIdGenerator);
+                                                             _slotIdGenerator,
+                                                             eqLookupNode->shouldProduceBson);
 
     PlanStageSlots outputs;
     outputs.set(kResult, resultSlot);

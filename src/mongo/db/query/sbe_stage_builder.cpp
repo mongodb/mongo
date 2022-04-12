@@ -702,6 +702,12 @@ SlotBasedStageBuilder::SlotBasedStageBuilder(OperationContext* opCtx,
         }
     }
 
+    const auto [lookupNode, lookupCount] = getFirstNodeByType(solution.root(), STAGE_EQ_LOOKUP);
+    if (lookupCount) {
+        // TODO: SERVER-63604 optimize _shouldProduceRecordIdSlot maintenance
+        _shouldProduceRecordIdSlot = false;
+    }
+
     const auto [groupNode, groupCount] = getFirstNodeByType(solution.root(), STAGE_GROUP);
     if (groupCount) {
         // TODO: SERVER-63604 optimize _shouldProduceRecordIdSlot maintenance
@@ -2658,7 +2664,19 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         outputs.set(kResult, _slotIdGenerator.generate());
         // This mkbson stage combines 'finalSlots' into a bsonObject result slot which has
         // 'fieldNames' fields.
-        outStage = sbe::makeS<sbe::MakeBsonObjStage>(std::move(groupFinalEvalStage.stage),
+        if (groupNode->shouldProduceBson) {
+            outStage = sbe::makeS<sbe::MakeBsonObjStage>(std::move(groupFinalEvalStage.stage),
+                                                         outputs.get(kResult),  // objSlot
+                                                         boost::none,           // rootSlot
+                                                         boost::none,           // fieldBehavior
+                                                         std::vector<std::string>{},  // fields
+                                                         std::move(fieldNames),  // projectFields
+                                                         std::move(finalSlots),  // projectVars
+                                                         true,                   // forceNewObject
+                                                         false,                  // returnOldObject
+                                                         nodeId);
+        } else {
+            outStage = sbe::makeS<sbe::MakeObjStage>(std::move(groupFinalEvalStage.stage),
                                                      outputs.get(kResult),        // objSlot
                                                      boost::none,                 // rootSlot
                                                      boost::none,                 // fieldBehavior
@@ -2668,6 +2686,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                                      true,                        // forceNewObject
                                                      false,                       // returnOldObject
                                                      nodeId);
+        }
     } else {
         for (size_t i = 0; i < finalSlots.size(); ++i) {
             outputs.set("CURRENT." + fieldNames[i], finalSlots[i]);

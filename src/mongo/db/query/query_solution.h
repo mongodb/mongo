@@ -1382,11 +1382,13 @@ struct GroupNode : public QuerySolutionNode {
     GroupNode(std::unique_ptr<QuerySolutionNode> child,
               boost::intrusive_ptr<Expression> groupByExpression,
               std::vector<AccumulationStatement> accs,
-              bool merging)
+              bool merging,
+              bool shouldProduceBson)
         : QuerySolutionNode(std::move(child)),
           groupByExpression(groupByExpression),
           accumulators(std::move(accs)),
-          doingMerge(merging) {
+          doingMerge(merging),
+          shouldProduceBson(shouldProduceBson) {
         // Use the DepsTracker to extract the fields that the 'groupByExpression' and accumulator
         // expressions depend on.
         for (auto& groupByExprField : groupByExpression->getDependencies().fields) {
@@ -1432,6 +1434,10 @@ struct GroupNode : public QuerySolutionNode {
     // the fields in the 'groupByExpressions' and the fields in the input Expressions of the
     // 'accumulators'.
     StringSet requiredFields;
+
+    // If set to true, generated SBE plan will produce result as BSON object. If false,
+    // 'sbe::Object' is produced instead.
+    bool shouldProduceBson;
 };
 
 /**
@@ -1475,12 +1481,14 @@ struct EqLookupNode : public QuerySolutionNode {
                  const std::string& foreignCollection,
                  const FieldPath& joinFieldLocal,
                  const FieldPath& joinFieldForeign,
-                 const FieldPath& joinField)
+                 const FieldPath& joinField,
+                 bool shouldProduceBson)
         : QuerySolutionNode(std::move(child)),
           foreignCollection(foreignCollection),
           joinFieldLocal(joinFieldLocal),
           joinFieldForeign(joinFieldForeign),
-          joinField(joinField) {}
+          joinField(joinField),
+          shouldProduceBson(shouldProduceBson) {}
 
     StageType getType() const override {
         return STAGE_EQ_LOOKUP;
@@ -1547,6 +1555,12 @@ struct EqLookupNode : public QuerySolutionNode {
      * collection. Set to 'boost::none' by default and if a non-indexed strategy is chosen.
      */
     boost::optional<IndexEntry> idxEntry = boost::none;
+
+    /**
+     * If set to true, generated SBE plan will produce result as BSON object. If false,
+     * 'sbe::Object' is produced instead.
+     */
+    bool shouldProduceBson;
 };
 
 struct SentinelNode : public QuerySolutionNode {

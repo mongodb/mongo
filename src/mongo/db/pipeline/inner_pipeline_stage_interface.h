@@ -41,5 +41,6 @@ class InnerPipelineStageInterface {
 public:
     virtual ~InnerPipelineStageInterface() {}
     virtual DocumentSource* documentSource() = 0;
+    virtual bool isLastSource() const = 0;
 };
 }  // namespace mongo

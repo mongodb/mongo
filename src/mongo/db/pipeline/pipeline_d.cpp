@@ -162,12 +162,15 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> extractSbeCompatibleSt
         isMainCollectionSharded || collections.isAnySecondaryNamespaceAViewOrSharded();
 
     for (auto itr = sources.begin(); itr != sources.end();) {
+        const bool isLastSource = itr->get() == sources.back().get();
+
         // $group pushdown logic.
         if (auto groupStage = dynamic_cast<DocumentSourceGroup*>(itr->get())) {
             bool groupEligibleForPushdown =
                 groupFeatureFlagEnabled && groupStage->sbeCompatible() && !groupStage->doingMerge();
             if (groupEligibleForPushdown) {
-                stagesForPushdown.push_back(std::make_unique<InnerPipelineStageImpl>(groupStage));
+                stagesForPushdown.push_back(
+                    std::make_unique<InnerPipelineStageImpl>(groupStage, isLastSource));
                 sources.erase(itr++);
                 continue;
             }
@@ -200,7 +203,8 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> extractSbeCompatibleSt
             // Note that 'lookupStage->sbeCompatible()' encodes whether the foreign collection is a
             // view.
             if (lookupStage->sbeCompatible()) {
-                stagesForPushdown.push_back(std::make_unique<InnerPipelineStageImpl>(lookupStage));
+                stagesForPushdown.push_back(
+                    std::make_unique<InnerPipelineStageImpl>(lookupStage, isLastSource));
                 sources.erase(itr++);
                 continue;
             }

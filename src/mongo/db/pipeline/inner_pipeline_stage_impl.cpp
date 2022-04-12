@@ -33,10 +33,16 @@
 #include "mongo/db/pipeline/inner_pipeline_stage_impl.h"
 
 namespace mongo {
-InnerPipelineStageImpl::InnerPipelineStageImpl(const boost::intrusive_ptr<DocumentSource>& src)
-    : _ds(src) {}
+InnerPipelineStageImpl::InnerPipelineStageImpl(const boost::intrusive_ptr<DocumentSource>& src,
+                                               bool isLastSource)
+    : _ds(src), _isLastSource(isLastSource) {}
 
 DocumentSource* InnerPipelineStageImpl::documentSource() {
     return _ds.get();
 }
+
+bool InnerPipelineStageImpl::isLastSource() const {
+    return _isLastSource;
+}
+
 }  // namespace mongo

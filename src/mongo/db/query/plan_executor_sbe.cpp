@@ -139,7 +139,7 @@ void PlanExecutorSBE::saveState() {
     }
 
     _yieldPolicy->setYieldable(nullptr);
-    _lastGetNext = {};
+    _lastGetNext = BSONObj();
 }
 
 void PlanExecutorSBE::restoreState(const RestoreContext& context) {
@@ -197,10 +197,10 @@ PlanExecutor::ExecState PlanExecutorSBE::getNextDocument(Document* objOut, Recor
 
     checkFailPointPlanExecAlwaysFails();
 
-    BSONObj obj;
-    auto result = getNext(&obj, dlOut);
+    Document obj;
+    auto result = getNextImpl(&obj, dlOut);
     if (result == PlanExecutor::ExecState::ADVANCED) {
-        *objOut = Document{std::move(obj)};
+        *objOut = std::move(obj);
     }
     return result;
 }
@@ -210,16 +210,46 @@ PlanExecutor::ExecState PlanExecutorSBE::getNext(BSONObj* out, RecordId* dlOut) 
 
     checkFailPointPlanExecAlwaysFails();
 
+    BSONObj obj;
+    auto result = getNextImpl(&obj, dlOut);
+    if (result == PlanExecutor::ExecState::ADVANCED) {
+        *out = std::move(obj);
+    }
+    return result;
+}
+
+template <typename ObjectType>
+sbe::PlanState fetchNextImpl(sbe::PlanStage* root,
+                             sbe::value::SlotAccessor* resultSlot,
+                             sbe::value::SlotAccessor* recordIdSlot,
+                             ObjectType* out,
+                             RecordId* dlOut,
+                             bool returnOwnedBson);
+
+template <typename ObjectType>
+PlanExecutor::ExecState PlanExecutorSBE::getNextImpl(ObjectType* out, RecordId* dlOut) {
+    constexpr bool isDocument = std::is_same_v<ObjectType, Document>;
+    constexpr bool isBson = std::is_same_v<ObjectType, BSONObj>;
+    static_assert(isDocument || isBson);
+
+    invariant(!_isDisposed);
+
+    checkFailPointPlanExecAlwaysFails();
+
     if (!_stash.empty()) {
         auto&& [doc, recordId] = _stash.front();
-        *out = std::move(doc);
+        if constexpr (isBson) {
+            *out = std::move(doc);
+        } else {
+            *out = Document{std::move(doc)};
+        }
         if (dlOut && recordId) {
             *dlOut = *recordId;
         }
         _stash.pop_front();
         return PlanExecutor::ExecState::ADVANCED;
     } else if (_root->getCommonStats()->isEOF) {
-        // If we had stashed elements and consumed them all, but the PlanStage has also
+        // If we had stashed elements and consumed them all, but the PlanStage is also
         // already exhausted, we can return EOF straight away. Otherwise, proceed with
         // fetching the next document.
         _root->close();
@@ -263,11 +293,11 @@ PlanExecutor::ExecState PlanExecutorSBE::getNext(BSONObj* out, RecordId* dlOut) 
         invariant(_state == State::kOpened);
 
         auto result =
-            fetchNext(_root.get(), _result, _resultRecordId, out, dlOut, _mustReturnOwnedBson);
+            fetchNextImpl(_root.get(), _result, _resultRecordId, out, dlOut, _mustReturnOwnedBson);
         if (result == sbe::PlanState::IS_EOF) {
             _root->close();
             _state = State::kClosed;
-            _lastGetNext = {};
+            _lastGetNext = BSONObj();
 
             if (MONGO_unlikely(planExecutorHangBeforeShouldWaitForInserts.shouldFail(
                     [this](const BSONObj& data) {
@@ -298,11 +328,31 @@ PlanExecutor::ExecState PlanExecutorSBE::getNext(BSONObj* out, RecordId* dlOut) 
 
         invariant(result == sbe::PlanState::ADVANCED);
         if (_mustReturnOwnedBson) {
-            _lastGetNext = *out;
+            if constexpr (isBson) {
+                _lastGetNext = *out;
+            } else {
+                auto bson = out->toBsonIfTriviallyConvertible();
+                if (bson) {
+                    // This basically means that the 'Document' is just a wrapper around BSON
+                    // returned by the plan. In this case, 'out' must own it.
+                    invariant(out->isOwned());
+                    _lastGetNext = *bson;
+                } else {
+                    // 'Document' was created from 'sbe::Object' and there is no backing BSON for
+                    // it.
+                    _lastGetNext = BSONObj();
+                }
+            }
         }
         return PlanExecutor::ExecState::ADVANCED;
     }
 }
+
+// Explicitly instantiate the only 2 types supported by 'PlanExecutorSBE::getNextImpl'.
+template PlanExecutor::ExecState PlanExecutorSBE::getNextImpl<BSONObj>(BSONObj* out,
+                                                                       RecordId* dlOut);
+template PlanExecutor::ExecState PlanExecutorSBE::getNextImpl<Document>(Document* out,
+                                                                        RecordId* dlOut);
 
 Timestamp PlanExecutorSBE::getLatestOplogTimestamp() const {
     if (_rootData.shouldTrackLatestOplogTimestamp) {
@@ -350,12 +400,132 @@ BSONObj PlanExecutorSBE::getPostBatchResumeToken() const {
     return {};
 }
 
-sbe::PlanState fetchNext(sbe::PlanStage* root,
-                         sbe::value::SlotAccessor* resultSlot,
-                         sbe::value::SlotAccessor* recordIdSlot,
-                         BSONObj* out,
-                         RecordId* dlOut,
-                         bool returnOwnedBson) {
+namespace {
+
+Document convertToDocument(const sbe::value::Object& obj);
+
+Value convertToValue(sbe::value::TypeTags tag, sbe::value::Value val) {
+    switch (tag) {
+        case sbe::value::TypeTags::Nothing:
+            return Value();
+
+        case sbe::value::TypeTags::NumberInt32:
+            return Value(sbe::value::bitcastTo<int32_t>(val));
+
+        case sbe::value::TypeTags::NumberInt64:
+            return Value(sbe::value::bitcastTo<long long>(val));
+
+        case sbe::value::TypeTags::NumberDouble:
+            return Value(sbe::value::bitcastTo<double>(val));
+
+        case sbe::value::TypeTags::NumberDecimal:
+            return Value(sbe::value::bitcastTo<Decimal128>(val));
+
+        case sbe::value::TypeTags::Date:
+            return Value(Date_t::fromMillisSinceEpoch(sbe::value::bitcastTo<int64_t>(val)));
+
+        case sbe::value::TypeTags::Timestamp:
+            return Value(Timestamp(sbe::value::bitcastTo<uint64_t>(val)));
+
+        case sbe::value::TypeTags::Boolean:
+            return Value(sbe::value::bitcastTo<bool>(val));
+
+        case sbe::value::TypeTags::Null:
+            return Value(BSONNULL);
+
+        case sbe::value::TypeTags::StringSmall:
+        case sbe::value::TypeTags::StringBig:
+        case sbe::value::TypeTags::bsonString:
+        case sbe::value::TypeTags::bsonSymbol:
+            return Value(sbe::value::getStringOrSymbolView(tag, val));
+
+        case sbe::value::TypeTags::Array:
+        case sbe::value::TypeTags::ArraySet: {
+            std::vector<Value> vals;
+            auto enumerator = sbe::value::ArrayEnumerator{tag, val};
+            while (!enumerator.atEnd()) {
+                auto [arrTag, arrVal] = enumerator.getViewOfValue();
+                enumerator.advance();
+                vals.push_back(convertToValue(arrTag, arrVal));
+            }
+            return Value(std::move(vals));
+        }
+
+        case sbe::value::TypeTags::Object:
+            return Value(convertToDocument(*sbe::value::getObjectView(val)));
+
+        case sbe::value::TypeTags::ObjectId:
+            return Value(OID::from(sbe::value::getObjectIdView(val)->data()));
+
+        case sbe::value::TypeTags::MinKey:
+            return Value(kMinBSONKey);
+
+        case sbe::value::TypeTags::MaxKey:
+            return Value(kMaxBSONKey);
+
+        case sbe::value::TypeTags::bsonObject:
+            return Value(BSONObj{sbe::value::bitcastTo<const char*>(val)});
+
+        case sbe::value::TypeTags::bsonArray:
+            return Value(BSONArray{BSONObj{sbe::value::bitcastTo<const char*>(val)}});
+
+        case sbe::value::TypeTags::bsonObjectId:
+            return Value(OID::from(sbe::value::bitcastTo<const char*>(val)));
+
+        case sbe::value::TypeTags::bsonBinData:
+            return Value(BSONBinData(sbe::value::getBSONBinData(tag, val),
+                                     sbe::value::getBSONBinDataSize(tag, val),
+                                     sbe::value::getBSONBinDataSubtype(tag, val)));
+
+        case sbe::value::TypeTags::bsonUndefined:
+            return Value(BSONUndefined);
+
+        case sbe::value::TypeTags::bsonRegex: {
+            auto regex = sbe::value::getBsonRegexView(val);
+            return Value(BSONRegEx(regex.pattern, regex.flags));
+        }
+
+        case sbe::value::TypeTags::bsonJavascript:
+            return Value(sbe::value::getBsonJavascriptView(val));
+
+        case sbe::value::TypeTags::bsonDBPointer: {
+            auto dbptr = sbe::value::getBsonDBPointerView(val);
+            return Value(BSONDBRef(dbptr.ns, OID::from(dbptr.id)));
+        }
+
+        case sbe::value::TypeTags::bsonCodeWScope: {
+            auto bcws = sbe::value::getBsonCodeWScopeView(val);
+            return Value(BSONCodeWScope(bcws.code, BSONObj(bcws.scope)));
+        }
+
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
+Document convertToDocument(const sbe::value::Object& obj) {
+    MutableDocument doc;
+    for (size_t idx = 0; idx < obj.size(); ++idx) {
+        auto [tag, val] = obj.getAt(idx);
+        const auto& name = obj.field(idx);
+        doc.addField(name, convertToValue(tag, val));
+    }
+    return doc.freeze();
+}
+
+}  // namespace
+
+template <typename ObjectType>
+sbe::PlanState fetchNextImpl(sbe::PlanStage* root,
+                             sbe::value::SlotAccessor* resultSlot,
+                             sbe::value::SlotAccessor* recordIdSlot,
+                             ObjectType* out,
+                             RecordId* dlOut,
+                             bool returnOwnedBson) {
+    constexpr bool isDocument = std::is_same_v<ObjectType, Document>;
+    constexpr bool isBson = std::is_same_v<ObjectType, BSONObj>;
+    static_assert(isDocument || isBson);
+
     invariant(out);
     auto state = root->getNext();
 
@@ -371,17 +541,28 @@ sbe::PlanState fetchNext(sbe::PlanStage* root,
     if (resultSlot) {
         auto [tag, val] = resultSlot->getViewOfValue();
         if (tag == sbe::value::TypeTags::Object) {
-            BSONObjBuilder bb;
-            sbe::bson::convertToBsonObj(bb, sbe::value::getObjectView(val));
-            *out = bb.obj();
+            if constexpr (isBson) {
+                BSONObjBuilder bb;
+                sbe::bson::convertToBsonObj(bb, sbe::value::getObjectView(val));
+                *out = bb.obj();
+            } else {
+                *out = convertToDocument(*sbe::value::getObjectView(val));
+            }
         } else if (tag == sbe::value::TypeTags::bsonObject) {
+            BSONObj result;
             if (returnOwnedBson) {
                 auto [ownedTag, ownedVal] = resultSlot->copyOrMoveValue();
                 auto sharedBuf =
                     SharedBuffer(UniqueBuffer::reclaim(sbe::value::bitcastTo<char*>(ownedVal)));
-                *out = BSONObj(std::move(sharedBuf));
+                result = BSONObj{std::move(sharedBuf)};
             } else {
-                *out = BSONObj(sbe::value::bitcastTo<const char*>(val));
+                result = BSONObj{sbe::value::bitcastTo<const char*>(val)};
+            }
+
+            if constexpr (isBson) {
+                *out = std::move(result);
+            } else {
+                *out = Document{std::move(result)};
             }
         } else {
             // The query is supposed to return an object.
@@ -397,5 +578,30 @@ sbe::PlanState fetchNext(sbe::PlanStage* root,
         }
     }
     return state;
+}
+
+template sbe::PlanState fetchNextImpl<BSONObj>(sbe::PlanStage* root,
+                                               sbe::value::SlotAccessor* resultSlot,
+                                               sbe::value::SlotAccessor* recordIdSlot,
+                                               BSONObj* out,
+                                               RecordId* dlOut,
+                                               bool returnOwnedBson);
+
+template sbe::PlanState fetchNextImpl<Document>(sbe::PlanStage* root,
+                                                sbe::value::SlotAccessor* resultSlot,
+                                                sbe::value::SlotAccessor* recordIdSlot,
+                                                Document* out,
+                                                RecordId* dlOut,
+                                                bool returnOwnedBson);
+
+// NOTE: We intentionally do not expose overload for the 'Document' type. The only interface to get
+// result from plan in 'Document' type is to call 'PlanExecutorSBE::getNextDocument()'.
+sbe::PlanState fetchNext(sbe::PlanStage* root,
+                         sbe::value::SlotAccessor* resultSlot,
+                         sbe::value::SlotAccessor* recordIdSlot,
+                         BSONObj* out,
+                         RecordId* dlOut,
+                         bool returnOwnedBson) {
+    return fetchNextImpl(root, resultSlot, recordIdSlot, out, dlOut, returnOwnedBson);
 }
 }  // namespace mongo

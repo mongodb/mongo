@@ -144,6 +144,9 @@ public:
     }
 
 private:
+    template <typename ObjectType>
+    ExecState getNextImpl(ObjectType* out, RecordId* dlOut);
+
     enum class State { kClosed, kOpened };
 
     State _state{State::kClosed};
@@ -169,7 +172,18 @@ private:
 
     boost::optional<sbe::value::SlotId> _resumeRecordIdSlot;
 
+    // NOTE: '_stash' stores documents as BSON. Currently, one of the '_stash' is usages is to store
+    // documents received from the plan during multiplanning. This means that the documents
+    // generated during multiplanning cannot exceed maximum BSON size. $group and $lookup CAN
+    // produce documents larger than maximum BSON size. But $group and $lookup never participate in
+    // multiplanning. This is why maximum BSON size limitation in '_stash' is not an issue for such
+    // operators.
+    // Another usage of '_stash' is when the 'find' command cannot fit the last returned document
+    // into the result batch. But in this case each document is already requried to fit into the
+    // maximum BSON size, because all results are encoded into BSON before returning to client. So
+    // using BSON in '_stash' does not introduce any additional limitations.
     std::deque<std::pair<BSONObj, boost::optional<RecordId>>> _stash;
+
     // If we are returning owned result (i.e. value is moved out of the result accessor) then its
     // lifetime must extend up to the next getNext (or saveState).
     BSONObj _lastGetNext;

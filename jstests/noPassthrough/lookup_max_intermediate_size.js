@@ -88,8 +88,7 @@ function runTest(coll, from) {
 const standalone = MongoRunner.runMongod();
 const db = standalone.getDB("test");
 
-// TODO SERVER-64597 Remove 'if' block if we decide to support the same query knob for the SBE
-// $lookup.
+// TODO SERVER-65265 Remove 'if' block below.
 if (checkSBEEnabled(db, ["featureFlagSBELookupPushdown"])) {
     jsTest.log("Skipping test because SBE and SBE $lookup features are both enabled.");
     MongoRunner.stopMongod(standalone);

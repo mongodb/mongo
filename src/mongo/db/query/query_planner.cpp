@@ -1376,10 +1376,12 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
     for (auto& innerStage : query.pipeline()) {
         auto groupStage = dynamic_cast<DocumentSourceGroup*>(innerStage->documentSource());
         if (groupStage) {
-            solnForAgg = std::make_unique<GroupNode>(std::move(solnForAgg),
-                                                     groupStage->getIdExpression(),
-                                                     groupStage->getAccumulatedFields(),
-                                                     groupStage->doingMerge());
+            solnForAgg =
+                std::make_unique<GroupNode>(std::move(solnForAgg),
+                                            groupStage->getIdExpression(),
+                                            groupStage->getAccumulatedFields(),
+                                            groupStage->doingMerge(),
+                                            innerStage->isLastSource() /* shouldProduceBson */);
             continue;
         }
 
@@ -1413,7 +1415,8 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
                                                lookupStage->getFromNs().toString(),
                                                lookupStage->getLocalField()->fullPath(),
                                                lookupStage->getForeignField()->fullPath(),
-                                               lookupStage->getAsField().fullPath());
+                                               lookupStage->getAsField().fullPath(),
+                                               innerStage->isLastSource() /* shouldProduceBson */);
             QueryPlannerAnalysis::determineLookupStrategy(eqLookupNode.get(),
                                                           secondaryCollInfos,
                                                           query.getExpCtx()->allowDiskUse,

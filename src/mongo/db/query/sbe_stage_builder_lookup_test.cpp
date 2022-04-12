@@ -129,7 +129,7 @@ public:
         // Construct logical query solution.
         auto foreignCollName = _foreignNss.toString();
         auto lookupNode = std::make_unique<EqLookupNode>(
-            std::move(localScanNode), foreignCollName, localKey, foreignKey, asKey);
+            std::move(localScanNode), foreignCollName, localKey, foreignKey, asKey, true);
         lookupNode->lookupStrategy = strategy;
         auto solution = makeQuerySolution(std::move(lookupNode));
 
