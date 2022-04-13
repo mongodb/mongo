@@ -285,6 +285,7 @@ variables:
   - enterprise-debian11-64
   - enterprise-linux-64-amazon-ami
   - enterprise-macos
+  - enterprise-macos-arm64
   - enterprise-rhel-70-64-bit
   #  - enterprise-rhel-70-64-bit-kitchen-sink
   - enterprise-rhel-70-64-bit-no-libunwind
@@ -319,6 +320,7 @@ variables:
 - mh_variants: &mh_variants
   - enterprise-debian92-64
   - enterprise-macos
+  - enterprise-macos-arm64
   - enterprise-rhel-80-64-bit
   - enterprise-rhel-80-64-bit-dynamic-required
   - enterprise-rhel-70-64-bit
