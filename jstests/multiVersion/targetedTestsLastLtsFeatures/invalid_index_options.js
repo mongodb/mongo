@@ -47,5 +47,39 @@ jsTestLog("Waiting for new node to be synced.");
 rst.awaitReplication();
 rst.awaitSecondaryNodes();
 
+const [secondary1, secondary2] = rst.getSecondaries();
+const secondaryDB1 = secondary1.getDB(dbName);
+const secondaryDB2 = secondary2.getDB(dbName);
+
+// Verify that the existing nodes detect invalid index options, but the new node has the repaired
+// index spec.
+let validateRes = assert.commandWorked(primaryDB.runCommand({validate: collName}));
+assert(validateRes.valid, "validate should fail: " + tojson(validateRes));
+
+validateRes = assert.commandWorked(secondaryDB1.runCommand({validate: collName}));
+assert(validateRes.valid, "validate should fail: " + tojson(validateRes));
+
+validateRes = assert.commandWorked(secondaryDB2.runCommand({validate: collName}));
+assert(validateRes.valid, "validate should succeed: " + tojson(validateRes));
+
+// Use collMod to fix the invalid index options in the collection.
+assert.commandWorked(primaryDB.runCommand({collMod: collName}));
+
+// Fix the invalid fields from index spec.
+checkLog.containsJson(primary, 6444400, {fieldName: "sparse"});
+checkLog.containsJson(secondary1, 6444400, {fieldName: "sparse"});
+
+// Verify that the index no longer has invalid index options.
+assert.commandWorked(primaryDB.runCommand({listIndexes: collName}));
+
+validateRes = assert.commandWorked(primaryDB.runCommand({validate: collName}));
+assert(validateRes.valid, "validate should succeed: " + tojson(validateRes));
+
+validateRes = assert.commandWorked(secondaryDB1.runCommand({validate: collName}));
+assert(validateRes.valid, "validate should succeed: " + tojson(validateRes));
+
+validateRes = assert.commandWorked(secondaryDB2.runCommand({validate: collName}));
+assert(validateRes.valid, "validate should succeed: " + tojson(validateRes));
+
 rst.stopSet();
 })();

@@ -130,6 +130,7 @@ public:
 
         std::string ns;
         CollectionOptions options;
+        // May include empty instances which represent indexes already dropped.
         std::vector<IndexMetaData> indexes;
     };
 };

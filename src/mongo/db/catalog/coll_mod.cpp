@@ -692,9 +692,9 @@ Status _collModInternal(OperationContext* opCtx,
             }
         }
 
-        // Remove any invalid index options for indexes belonging to this collection.
+        // Fix any invalid index options for indexes belonging to this collection.
         std::vector<std::string> indexesWithInvalidOptions =
-            coll.getWritableCollection()->removeInvalidIndexOptions(opCtx);
+            coll.getWritableCollection()->repairInvalidIndexOptions(opCtx);
         for (const auto& indexWithInvalidOptions : indexesWithInvalidOptions) {
             const IndexDescriptor* desc =
                 coll->getIndexCatalog()->findIndexByName(opCtx, indexWithInvalidOptions);

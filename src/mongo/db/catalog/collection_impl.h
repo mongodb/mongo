@@ -421,7 +421,7 @@ public:
 
     void updateHiddenSetting(OperationContext* opCtx, StringData idxName, bool hidden) final;
 
-    std::vector<std::string> removeInvalidIndexOptions(OperationContext* opCtx) final;
+    std::vector<std::string> repairInvalidIndexOptions(OperationContext* opCtx) final;
 
     void setIsTemp(OperationContext* opCtx, bool isTemp) final;
 
