@@ -78,6 +78,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/scripting/engine.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 
@@ -315,8 +316,15 @@ void writeToImageCollection(OperationContext* opCtx,
     AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
     AutoGetCollection imageCollectionRaii(
         opCtx, NamespaceString::kConfigImagesNamespace, LockMode::MODE_IX);
+    auto curOp = CurOp::get(opCtx);
+    const std::string existingNs = curOp->getNS();
     UpdateResult res = Helpers::upsert(
         opCtx, NamespaceString::kConfigImagesNamespace.toString(), imageEntry.toBSON());
+    {
+        stdx::lock_guard<Client> clientLock(*opCtx->getClient());
+        curOp->setNS_inlock(existingNs);
+    }
+
     invariant(res.numDocsModified == 1 || !res.upsertedId.isEmpty());
 }
 

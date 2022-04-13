@@ -2276,6 +2276,7 @@ env.Library(
         'update/update_driver',
     ],
     LIBDEPS_PRIVATE=[
+        'curop',
         'repl/image_collection_entry',
     ],
 )

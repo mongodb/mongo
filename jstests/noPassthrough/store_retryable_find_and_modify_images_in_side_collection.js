@@ -74,6 +74,48 @@ function assertRetryCommand(cmdResponse, retryResponse) {
     assert.eq(cmdResponse, retryResponse);
 }
 
+function checkProfilingLogs(primary) {
+    assert.commandWorked(
+        primary.adminCommand({setParameter: 1, storeFindAndModifyImagesInSideCollection: true}));
+
+    let db = primary.getDB('for_profiling');
+    let configDB = primary.getDB('config');
+    assert.commandWorked(db.user.insert({_id: 1}));
+    assert.commandWorked(configDB.setProfilingLevel(2));
+
+    let cmd = {
+        findAndModify: 'user',
+        query: {_id: 1},
+        update: {$inc: {x: 1}},
+        new: false,
+        upsert: false,
+        lsid: {id: UUID()},
+        txnNumber: NumberLong(10),
+        writeConcern: {w: 1},
+        comment: "original command"
+    };
+    assert.commandWorked(db.runCommand(cmd));
+    let userProfileDocs = db.system.profile.find({"command.comment": cmd["comment"]}).toArray();
+    let configProfileDocs =
+        configDB.system.profile.find({"command.comment": cmd["comment"]}).toArray();
+    // The write performed by the findAndModify must show up on the `for_profiling` database's
+    // `system.profile` collection. And it must not show up in the `config` database, associated
+    // with `config.image_collection`.
+    assert.eq(1, userProfileDocs.length);
+    assert.eq(0, configProfileDocs.length);
+
+    cmd["comment"] = "retried command";
+    assert.commandWorked(db.runCommand(cmd));
+    userProfileDocs = db.system.profile.find({"command.comment": cmd["comment"]}).toArray();
+    configProfileDocs = configDB.system.profile.find({"command.comment": cmd["comment"]}).toArray();
+    assert.commandWorked(db.setProfilingLevel(0));
+    assert.commandWorked(configDB.setProfilingLevel(0));
+    // A retried `findAndModify` must not appear in the `config` database's `system.profile`
+    // collection. For flexibility of future intentional behavior changes, we omit asserting whether
+    // a retry should be written into a `system.profile` collection.
+    assert.eq(0, configProfileDocs.length);
+}
+
 function runTests(lsid,
                   mainConn,
                   primary,
@@ -349,6 +391,7 @@ const lsid = UUID();
 const rst = new ReplSetTest({nodes: numNodes});
 rst.startSet();
 rst.initiate();
+checkProfilingLogs(rst.getPrimary());
 runTests(lsid,
          rst.getPrimary(),
          rst.getPrimary(),
