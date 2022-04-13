@@ -125,7 +125,12 @@ public:
                 return BalancerStatsRegistry::get(opCtx)->getCollNumOrphanDocs(*collUUID);
             }();
 
-            invariant(numRecords >= numOrphanDocs);
+            if (numRecords <= numOrphanDocs) {
+                // The number of records and the number of orphans documents are not updated
+                // atomically, therefore it could totally happen that the total number of records is
+                // less than the total number of orphans.
+                return 0LL;
+            }
 
             const auto avgObjSizeBytes = static_cast<long long>(dataSizeBytes / numRecords);
             return avgObjSizeBytes * (numRecords - numOrphanDocs);
