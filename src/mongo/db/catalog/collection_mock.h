@@ -430,7 +430,7 @@ public:
         std::abort();
     }
 
-    std::vector<std::string> removeInvalidIndexOptions(OperationContext* opCtx) {
+    std::vector<std::string> repairInvalidIndexOptions(OperationContext* opCtx) {
         std::abort();
     }
 

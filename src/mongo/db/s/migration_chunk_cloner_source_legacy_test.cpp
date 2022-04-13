@@ -500,7 +500,7 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    std::vector<std::string> removeInvalidIndexOptions(OperationContext* opCtx) override {
+    std::vector<std::string> repairInvalidIndexOptions(OperationContext* opCtx) override {
         MONGO_UNREACHABLE;
     }
 
