@@ -588,7 +588,7 @@ public:
     }
 
     /**
-     * Returns a reference to the main collection that is targetted by this query.
+     * Returns a reference to the main collection that is targeted by this query.
      */
     virtual const CollectionPtr& getMainCollection() const = 0;
 

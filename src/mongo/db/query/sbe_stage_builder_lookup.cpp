@@ -999,18 +999,18 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         -> std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> {
         const auto& foreignColl =
             _collections.lookupCollection(NamespaceString(eqLookupNode->foreignCollection));
-        // When foreign collection doesn't exist, we create stages that simply append empty arrays
-        // to each local document and do not consider the case that foreign collection may be
-        // created during the query, since we cannot easily create dynamic plan stages and it has
-        // messier semantics. Builds a project stage that projects an empty array for each local
-        // document.
-        if (!foreignColl) {
-            return buildNonExistentForeignCollLookupStage(
-                std::move(localStage), eqLookupNode->nodeId(), _slotIdGenerator);
-        }
 
         boost::optional<SlotId> collatorSlot = _state.data->env->getSlotIfExists("collator"_sd);
         switch (eqLookupNode->lookupStrategy) {
+            // When foreign collection doesn't exist, we create stages that simply append empty
+            // arrays to each local document and do not consider the case that foreign collection
+            // may be created during the query, since we cannot easily create dynamic plan stages
+            // and it has messier semantics. Builds a project stage that projects an empty array for
+            // each local document.
+            case EqLookupNode::LookupStrategy::kNonExistentForeignCollection: {
+                return buildNonExistentForeignCollLookupStage(
+                    std::move(localStage), eqLookupNode->nodeId(), _slotIdGenerator);
+            }
             case EqLookupNode::LookupStrategy::kIndexedLoopJoin: {
                 tassert(
                     6357201,

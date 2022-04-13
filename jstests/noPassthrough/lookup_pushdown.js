@@ -14,6 +14,7 @@ const JoinAlgorithm = {
     NLJ: 1,
     INLJ: 2,
     HJ: 3,
+    NonExistentForeignCollection: 4,
 };
 
 // Standalone cases.
@@ -70,6 +71,8 @@ function getJoinAlgorithmStrategyName(joinAlgorithm) {
             return "IndexedLoopJoin";
         case JoinAlgorithm.HJ:
             return "HashJoin";
+        case JoinAlgorithm.NonExistentForeignCollection:
+            return "NonExistentForeignCollection";
         case JoinAlgorithm.Classic:
         default:
             assert(false, "No strategy for JoinAlgorithm: " + joinAlgorithm);
@@ -138,12 +141,12 @@ let view = db[viewName];
     // $lookup against a non-existent foreign collection should pick NLJ.
     runTest(coll,
             [{$lookup: {from: "nonexistent", localField: "a", foreignField: "b", as: "out"}}],
-            JoinAlgorithm.NLJ /* expectedJoinAlgorithm */);
+            JoinAlgorithm.NonExistentForeignCollection /* expectedJoinAlgorithm */);
 
     // $lookup against a non-existent foreign collection should pick NLJ even when HJ is eligible.
     runTest(coll,
             [{$lookup: {from: "nonexistent", localField: "a", foreignField: "b", as: "out"}}],
-            JoinAlgorithm.NLJ /* expectedJoinAlgorithm */,
+            JoinAlgorithm.NonExistentForeignCollection /* expectedJoinAlgorithm */,
             null /* indexKeyPattern */,
             {allowDiskUse: true});
 
