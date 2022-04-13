@@ -431,21 +431,29 @@ void ExpressionKeysPrivate::validateDocumentCommon(const CollectionPtr& collecti
                                                    const BSONObj& keyPattern) {
     // If we have a timeseries collection, check that indexed metric fields do not have expanded
     // array values
-    if (feature_flags::gTimeseriesMetricIndexes.isEnabledAndIgnoreFCV() &&
-        collection->getTimeseriesOptions()) {
+    if (auto tsOptions = collection->getTimeseriesOptions();
+        tsOptions && feature_flags::gTimeseriesMetricIndexes.isEnabledAndIgnoreFCV()) {
         // Each user metric field will be included twice, as both control.min.<field> and
         // control.max.<field>, so we'll want to keep track that we've checked data.<field> to avoid
-        // scanning it twice.
+        // scanning it twice. The time field can be excluded as it is guaranteed to be a date at
+        // insertion time.
         StringSet userFieldsChecked;
 
         for (const auto& keyElem : keyPattern) {
             if (keyElem.isNumber()) {
                 StringData field = keyElem.fieldName();
                 StringData userField;
+
                 if (field.startsWith(timeseries::kControlMaxFieldNamePrefix)) {
                     userField = field.substr(timeseries::kControlMaxFieldNamePrefix.size());
                 } else if (field.startsWith(timeseries::kControlMinFieldNamePrefix)) {
                     userField = field.substr(timeseries::kControlMinFieldNamePrefix.size());
+                }
+
+                if (!userField.empty() && userField == tsOptions->getTimeField()) {
+                    // Exclude checking the time field. Time values are explicitly dates and not
+                    // arrays.
+                    continue;
                 }
 
                 if (!userField.empty() && !userFieldsChecked.contains(userField)) {

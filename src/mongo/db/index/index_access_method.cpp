@@ -966,7 +966,9 @@ void SortedDataIndexAccessMethod::getKeys(OperationContext* opCtx,
                           id->toString()));
 
     try {
-        validateDocument(collection, obj, _descriptor->keyPattern());
+        if (_indexCatalogEntry->shouldValidateDocument()) {
+            validateDocument(collection, obj, _descriptor->keyPattern());
+        }
         doGetKeys(opCtx,
                   collection,
                   pooledBufferBuilder,

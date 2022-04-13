@@ -166,6 +166,8 @@ public:
 
     bool isFrozen() const final;
 
+    bool shouldValidateDocument() const final;
+
     bool isPresentInMySnapshot(OperationContext* opCtx) const final;
 
     bool isReadyInMySnapshot(OperationContext* opCtx) const final;
@@ -231,6 +233,7 @@ private:
     Ordering _ordering;         // TODO: this might be b-tree specific
     bool _isReady;              // cache of NamespaceDetails info
     bool _isFrozen;
+    bool _shouldValidateDocument;
     AtomicWord<bool> _isDropped;  // Whether the index drop is committed.
 
     // The earliest snapshot that is allowed to read this index.
