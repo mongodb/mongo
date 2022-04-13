@@ -1462,9 +1462,6 @@ struct EqLookupNode : public QuerySolutionNode {
 
         // Execute the join by iterating over the foreign collection for each local key.
         kNestedLoopJoin,
-
-        // Create a plan for a non existent foreign collection.
-        kNonExistentForeignCollection,
     };
 
     static StringData serializeLookupStrategy(LookupStrategy strategy) {
@@ -1475,8 +1472,6 @@ struct EqLookupNode : public QuerySolutionNode {
                 return "IndexedLoopJoin";
             case EqLookupNode::LookupStrategy::kNestedLoopJoin:
                 return "NestedLoopJoin";
-            case EqLookupNode::LookupStrategy::kNonExistentForeignCollection:
-                return "NonExistentForeignCollection";
             default:
                 uasserted(6357204, "Unknown $lookup strategy type");
         }

@@ -170,9 +170,9 @@ CandidatePlans CachedSolutionPlanner::replan(bool shouldCache, std::string reaso
     // The plan drawn from the cache is being discarded, and should no longer be registered with the
     // yield policy.
     _yieldPolicy->clearRegisteredPlans();
+    const auto& mainColl = _collections.getMainCollection();
 
     if (shouldCache) {
-        const auto& mainColl = _collections.getMainCollection();
         // Deactivate the current cache entry.
         auto cache = CollectionQueryInfo::get(mainColl).getPlanCache();
         cache->deactivate(plan_cache_key_factory::make<mongo::PlanCacheKey>(_cq, mainColl));
