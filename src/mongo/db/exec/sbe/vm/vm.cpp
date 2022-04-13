@@ -2365,7 +2365,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinDoubleDoubleSum
                                 value::TypeTags::NumberInt32,
                                 value::bitcastFrom<int32_t>(result)};
                     }
-                    // Fall through to the larger type.
+                    [[fallthrough]];  // To the larger type
                 }
                 case value::TypeTags::NumberInt64: {
                     if (sum.fitsLong()) {
@@ -2373,7 +2373,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinDoubleDoubleSum
                                 value::TypeTags::NumberInt64,
                                 value::bitcastFrom<int64_t>(sum.getLong())};
                     }
-                    // Fall through to the larger type.
+                    [[fallthrough]];  // To the larger type.
                 }
                 case value::TypeTags::NumberDouble: {
                     return {false,

@@ -463,6 +463,7 @@ std::unique_ptr<MatchExpression> FLEQueryRewriter::_rewrite(MatchExpression* exp
             if (rewritten) {
                 return std::make_unique<ExprMatchExpression>(rewritten.release(), expCtx());
             }
+            [[fallthrough]];
         }
         default:
             return nullptr;

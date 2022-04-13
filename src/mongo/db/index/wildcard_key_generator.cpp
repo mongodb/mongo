@@ -156,6 +156,7 @@ void WildcardKeyGenerator::_traverseWildcard(SharedBufferFragmentBuilder& pooled
 
                 // Add an entry for the multi-key path, and then fall through to BSONType::Object.
                 _addMultiKey(pooledBufferBuilder, *path, multikeyPaths);
+                [[fallthrough]];
 
             case BSONType::Object:
                 if (_addKeyForEmptyLeaf(pooledBufferBuilder, elem, *path, keys, id))

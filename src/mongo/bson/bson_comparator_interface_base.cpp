@@ -109,6 +109,7 @@ void BSONComparatorInterfaceBase<T>::hashCombineBSONElement(
             // Else, fall through and convert the decimal to a double and hash.
             // At this point the decimal fits into the range of doubles, is infinity, or is NaN,
             // which doubles have a cheaper representation for.
+            [[fallthrough]];
         }
         case mongo::NumberDouble:
         case mongo::NumberLong:

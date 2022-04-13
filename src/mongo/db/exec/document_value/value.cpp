@@ -908,6 +908,7 @@ void Value::hash_combine(size_t& seed,
             // Else, fall through and convert the decimal to a double and hash.
             // At this point the decimal fits into the range of doubles, is infinity, or is NaN,
             // which doubles have a cheaper representation for.
+            [[fallthrough]];
         }
         // This converts all numbers to doubles, which ignores the low-order bits of
         // NumberLongs > 2**53 and precise decimal numbers without double representations,

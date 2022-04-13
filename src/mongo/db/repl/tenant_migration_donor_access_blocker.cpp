@@ -94,6 +94,7 @@ Status TenantMigrationDonorAccessBlocker::checkIfCanWrite(Timestamp writeTs) {
             // As a sanity check, we track the highest allowed write timestamp to ensure no
             // writes are allowed with a timestamp higher than the block timestamp.
             _highestAllowedWriteTimestamp = std::max(writeTs, _highestAllowedWriteTimestamp);
+            [[fallthrough]];
         case BlockerState::State::kAborted:
             return Status::OK();
         case BlockerState::State::kBlockWrites:

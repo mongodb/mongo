@@ -209,6 +209,7 @@ BSONObj BSONElement::_jsonStringGenerator(const Generator& g,
                 break;
             }
             // fall through if scope is empty
+            [[fallthrough]];
         }
         case Code:
             g.writeCode(buffer, _asCode());

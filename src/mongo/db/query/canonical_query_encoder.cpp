@@ -133,7 +133,7 @@ void encodeUserString(StringData s, BuilderType* builder) {
                 } else {
                     *builder << '\\';
                 }
-            // Fall through to default case.
+                [[fallthrough]];
             default:
                 if constexpr (hasAppendChar<BuilderType>) {
                     builder->appendChar(c);

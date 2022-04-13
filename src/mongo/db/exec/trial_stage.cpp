@@ -119,6 +119,7 @@ PlanStage::StageState TrialStage::_workTrialPlan(WorkingSetID* out) {
             // Increment the 'advanced' count and fall through into NEED_TIME so that we check for
             // the end of the trial period and assess the results for both NEED_TIME and ADVANCED.
             ++_specificStats.trialAdvanced;
+            [[fallthrough]];
         }
         case PlanStage::NEED_TIME:
             // Check whether we have completed the evaluation phase.

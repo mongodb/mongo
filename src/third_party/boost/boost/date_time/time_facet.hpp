@@ -1140,6 +1140,9 @@ namespace date_time {
                     // %s is the same as %S%f so we drop through into %f if we are
                     // not at the end of the stream
                   }
+                  // MONGODB MODIFICATION: Without this we can't use
+                  // the automated fallthrough detection.
+                  BOOST_FALLTHROUGH;
                   /* Falls through. */
                 case 'f':
                   {

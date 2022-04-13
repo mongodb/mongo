@@ -388,8 +388,9 @@ Future<DbResponse> ServiceEntryPointBridge::handleRequest(OperationContext* opCt
                 }
                 return Future<DbResponse>::makeReady({Message()});
             }
-        // Forward the message to 'dest' after waiting for 'hostSettings.delay'
-        // milliseconds.
+            // Forward the message to 'dest' after waiting for 'hostSettings.delay'
+            // milliseconds.
+            [[fallthrough]];
         case HostSettings::State::kForward:
             sleepmillis(durationCount<Milliseconds>(hostSettings.delay));
             break;

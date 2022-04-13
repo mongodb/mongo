@@ -144,6 +144,7 @@ std::tuple<bool, value::TypeTags, value::Value> genericArithmeticOp(value::TypeT
                         false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(result)};
                 }
                 // The result does not fit into int32_t so fallthru to the wider type.
+                [[fallthrough]];
             }
             case value::TypeTags::NumberInt64: {
                 int64_t result;
@@ -154,6 +155,7 @@ std::tuple<bool, value::TypeTags, value::Value> genericArithmeticOp(value::TypeT
                         false, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(result)};
                 }
                 // The result does not fit into int64_t so fallthru to the wider type.
+                [[fallthrough]];
             }
             case value::TypeTags::NumberDecimal: {
                 Decimal128 result;

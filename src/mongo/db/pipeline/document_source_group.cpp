@@ -211,6 +211,7 @@ DocumentSource::GetNextResult DocumentSourceGroup::getNextSpilled() {
         switch (numAccumulators) {  // mirrors switch in spill()
             case 1:                 // Single accumulators serialize as a single Value.
                 _currentAccumulators[0]->process(_firstPartOfNextGroup.second, true);
+                [[fallthrough]];
             case 0:  // No accumulators so no Values.
                 break;
             default: {  // Multiple accumulators serialize as an array of Values.

@@ -119,6 +119,12 @@ namespace boost { namespace property_tree {
             case object:
             default:
                 BOOST_ASSERT(false); // must start with string, i.e. call new_value
+                // MONGODB MODIFICATION: The use of `BOOST_ASSERT(false)` above is probably a bug,
+                // because falling through into the `key` case doesn't look like what we ought to
+                // do, and that is what would happen if BOOST_ASSERT was disabled. However, we honor
+                // the behavior of the code as written, and add a fallthrough annotation so we can
+                // make use of it in our own code.
+                BOOST_FALLTHROUGH;
             case key: {
                 l.t->push_back(std::make_pair(key_buffer, Ptree()));
                 l.k = object;

@@ -8,6 +8,8 @@ import SCons
 Import('env')
 Import('module_sconscripts')
 
+env = env.Clone()
+
 # Add any "global" dependencies here. This is where we make every build node
 # depend on a list of other build nodes, such as an allocator or libunwind
 # or libstdx or similar.
@@ -21,6 +23,12 @@ env.AppendUnique(
 # that we need in the mongo sconscript
 env.SConscript('third_party/SConscript', exports=['env'])
 
+# Ensure our subsequent modifications are not shared with the
+# third_party env. Normally that SConscript would have done a clone,
+# so handled that isolation itself, but it doesn't since it needs to
+# alter the env in ways that we need to use up here.
+env = env.Clone()
+
 # Inject common dependencies from third_party globally for all core mongo code
 # and modules. Ideally, pcre wouldn't be here, but enough things require it
 # now that it seems hopeless to remove it.
@@ -32,6 +40,21 @@ env.InjectThirdParty(libraries=[
     'safeint',
     'variant',
 ])
+
+
+# It would be somewhat better if this could be applied down in
+# `src/mongo/SConscript`, since the goal of doing it here rather than
+# up in SConstruct is to only enforce this rule for code that we wrote
+# and exclude third party sources. However, doing it in
+# `src/mongo/SConscript`` would also exclude applying it for modules,
+# and we do want this enabled for enterprise.
+
+if env.ToolchainIs('gcc'):
+    # With GCC, use the implicit fallthrough flag variant that doesn't
+    # care about your feeble attempts to use comments to explain yourself.
+    env.AddToCCFLAGSIfSupported('-Wimplicit-fallthrough=5')
+elif env.ToolchainIs('clang'):
+    env.AddToCCFLAGSIfSupported('-Wimplicit-fallthrough')
 
 # Run the core mongodb SConscript.
 env.SConscript('mongo/SConscript', exports=['env'])

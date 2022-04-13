@@ -3604,7 +3604,8 @@ Status ReplicationCoordinatorImpl::_doReplSetReconfig(OperationContext* opCtx,
                           "Node not yet initialized; use the replSetInitiate command");
         case kConfigReplicationDisabled:
             invariant(
-                false);  // should be unreachable due to !_settings.usingReplSets() check above
+                false);       // should be unreachable due to !_settings.usingReplSets() check above
+            [[fallthrough]];  // Placate clang.
         case kConfigInitiating:
         case kConfigReconfiguring:
         case kConfigHBReconfiguring:
@@ -4575,7 +4576,7 @@ void ReplicationCoordinatorImpl::_performPostMemberStateUpdateAction(
             break;
         case kActionRollbackOrRemoved:
             _externalState->closeConnections();
-        /* FALLTHROUGH */
+            [[fallthrough]];
         case kActionSteppedDown:
             _externalState->onStepDownHook();
             ReplicaSetAwareServiceRegistry::get(_service).onStepDown();

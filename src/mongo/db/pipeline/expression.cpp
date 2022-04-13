@@ -398,11 +398,11 @@ Value ExpressionAdd::evaluate(const Document& root, Variables* variables) const 
             dassert(nonDecimalTotal.isInteger());
             if (nonDecimalTotal.fitsLong())
                 return Value(nonDecimalTotal.getLong());
-        // Fallthrough.
+            [[fallthrough]];
         case NumberInt:
             if (nonDecimalTotal.fitsLong())
                 return Value::createIntOrLong(nonDecimalTotal.getLong());
-        // Fallthrough.
+            [[fallthrough]];
         case NumberDouble:
             return Value(nonDecimalTotal.getDouble());
         default:

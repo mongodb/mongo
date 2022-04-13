@@ -2899,18 +2899,23 @@ def doConfigure(myenv):
 
     def AddToCFLAGSIfSupported(env, flag):
         return AddFlagIfSupported(env, 'C', '.c', flag, False, CFLAGS=[flag])
+    env.AddMethod(AddToCFLAGSIfSupported)
 
     def AddToCCFLAGSIfSupported(env, flag):
         return AddFlagIfSupported(env, 'C', '.c', flag, False, CCFLAGS=[flag])
+    env.AddMethod(AddToCCFLAGSIfSupported)
 
     def AddToCXXFLAGSIfSupported(env, flag):
         return AddFlagIfSupported(env, 'C++', '.cpp', flag, False, CXXFLAGS=[flag])
+    env.AddMethod(AddToCXXFLAGSIfSupported)
 
     def AddToLINKFLAGSIfSupported(env, flag):
         return AddFlagIfSupported(env, 'C', '.c', flag, True, LINKFLAGS=[flag])
+    env.AddMethod(AddToLINKFLAGSIfSupported)
 
     def AddToSHLINKFLAGSIfSupported(env, flag):
         return AddFlagIfSupported(env, 'C', '.c', flag, True, SHLINKFLAGS=[flag])
+    env.AddMethod(AddToSHLINKFLAGSIfSupported)
 
     if myenv.ToolchainIs('gcc', 'clang'):
         # This tells clang/gcc to use the gold linker if it is available - we prefer the gold linker

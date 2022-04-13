@@ -296,7 +296,7 @@ Status CyrusSaslClientSession::step(StringData inputData, std::string* outputDat
     switch (result) {
         case SASL_OK:
             _success = true;
-        // Fall through
+            [[fallthrough]];
         case SASL_CONTINUE:
             *outputData = std::string(output, outputSize);
             return Status::OK();

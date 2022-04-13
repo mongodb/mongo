@@ -148,7 +148,7 @@ Future<DbResponse> HandleRequest::handleRequest() {
                 return Future<DbResponse>::makeReady(
                     makeErrorResponseToDeprecatedOpQuery("OP_QUERY is no longer supported"));
             }
-        // FALLTHROUGH: it's a query containing a command
+            [[fallthrough]];  // It's a query containing a command
         case dbMsg:
             return std::make_unique<CommandOpRunner>(shared_from_this())->run();
         case dbGetMore: {

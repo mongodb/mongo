@@ -85,6 +85,7 @@ static void populateDistributionPaths(const PartialSchemaRequirements& req,
                 distributions.emplace(distributionAndPaths._type,
                                       std::move(distributionProjections));
             }
+            [[fallthrough]];
         }
 
         default:

@@ -157,6 +157,7 @@ public:
                         catalog.registerCollection(opCtx, uuid, std::move(collection));
                     });
                     // Fallthrough to the createCollection case to finish committing the collection.
+                    [[fallthrough]];
                 }
                 case UncommittedCatalogUpdates::Entry::Action::kCreatedCollection: {
                     auto collPtr = entry.collection.get();

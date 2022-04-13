@@ -428,8 +428,8 @@ void MigrationChunkClonerSourceLegacy::cancelClone(OperationContext* opCtx) noex
                       "Failed to cancel migration",
                       "error"_attr = redact(status));
             }
+            [[fallthrough]];
         }
-        // Intentional fall through
         case kNew:
             _cleanup();
             break;

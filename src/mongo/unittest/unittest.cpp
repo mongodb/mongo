@@ -336,6 +336,12 @@ bool isSubset(BSONObj haystack, BSONObj needle) {
             case Array:
                 // not supported
                 invariant(false);
+                // This annotation shouldn't really be needed because
+                // `invariantFailed` is annotated to be `noreturn`,
+                // but clang 12 doesn't seem to be able to capitalize
+                // on that fact to see that we are not actually
+                // falling through.
+                [[fallthrough]];
             default:
                 if (SimpleBSONElementComparator::kInstance.compare(foundElement, element) != 0) {
                     return false;

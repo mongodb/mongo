@@ -111,11 +111,12 @@ bool PeriodicRunnerEmbedded::tryPump() {
         switch (jobExecStatus) {
             default:
                 invariant(false);
+                [[fallthrough]];  //  Placate clang
             case PeriodicJobImpl::ExecutionStatus::kPaused:
             case PeriodicJobImpl::ExecutionStatus::kNotScheduled:
                 // Paused jobs should be moved to the paused list and removed from the running heap
                 _Pausedjobs.push_back(std::move(_jobs.back()));
-            // fall through
+                [[fallthrough]];
             case PeriodicJobImpl::ExecutionStatus::kCanceled:
                 // Cancelled jobs should be removed
                 _jobs.pop_back();

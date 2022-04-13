@@ -3088,6 +3088,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                 childReqs.setIsBuildingUnionForTailableCollScan(true);
                 return makeUnionForTailableCollScan(root, childReqs);
             }
+            [[fallthrough]];
         default:
             break;
     }

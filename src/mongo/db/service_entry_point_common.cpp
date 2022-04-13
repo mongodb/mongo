@@ -2103,9 +2103,10 @@ std::unique_ptr<HandleRequest::OpRunner> HandleRequest::makeOpRunner() {
         case dbQuery:
             if (!executionContext->nsString().isCommand())
                 return std::make_unique<QueryOpRunner>(this);
-            // FALLTHROUGH: it's a query containing a command. Ideally, we'd like to let through
-            // only hello|isMaster commands but at this point the command hasn't been parsed yet, so
-            // we don't know what it is.
+            // Fallthrough because it's a query containing a command. Ideally, we'd like to let
+            // through only hello|isMaster commands but at this point the command hasn't been parsed
+            // yet, so we don't know what it is.
+            [[fallthrough]];
         case dbMsg:
             return std::make_unique<CommandOpRunner>(this);
         case dbGetMore:

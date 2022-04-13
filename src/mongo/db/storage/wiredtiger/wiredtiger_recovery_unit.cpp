@@ -634,7 +634,7 @@ void WiredTigerRecoveryUnit::_txnOpen() {
                 _readAtTimestamp = _beginTransactionAtAllDurableTimestamp(session);
                 break;
             }
-            // Intentionally continue to the next case to read at the _readAtTimestamp.
+            [[fallthrough]];  // Continue to the next case to read at the _readAtTimestamp.
         }
         case ReadSource::kProvided: {
             WiredTigerBeginTxnBlock txnOpen(

@@ -1658,7 +1658,7 @@ void toBsonValue(uint8_t ctype,
         case CType::kNumericNegativeLargeMagnitude:
             inverted = !inverted;
             isNegative = true;
-        // fallthrough (format is the same as positive, but inverted)
+            [[fallthrough]];  // format is the same as positive, but inverted
         case CType::kNumericPositiveLargeMagnitude: {
             const uint8_t originalType = typeBits->readNumeric();
             keyStringAssert(31231,
@@ -1725,7 +1725,7 @@ void toBsonValue(uint8_t ctype,
         case CType::kNumericNegativeSmallMagnitude:
             inverted = !inverted;
             isNegative = true;
-            // fallthrough (format is the same as positive, but inverted)
+            [[fallthrough]];  // format is the same as positive, but inverted
 
         case CType::kNumericPositiveSmallMagnitude: {
             const uint8_t originalType = typeBits->readNumeric();
@@ -1856,7 +1856,7 @@ void toBsonValue(uint8_t ctype,
         case CType::kNumericNegative1ByteInt:
             inverted = !inverted;
             isNegative = true;
-            // fallthrough (format is the same as positive, but inverted)
+            [[fallthrough]];  // format is the same as positive, but inverted
 
         case CType::kNumericPositive1ByteInt:
         case CType::kNumericPositive2ByteInt:
@@ -2105,7 +2105,7 @@ void filterKeyFromKeyString(uint8_t ctype, BufReader* reader, bool inverted, Ver
         case CType::kNumericNegativeLargeMagnitude:
             inverted = !inverted;
             isNegative = true;
-        // fallthrough (format is the same as positive, but inverted)
+            [[fallthrough]];  // format is the same as positive, but inverted
         case CType::kNumericPositiveLargeMagnitude: {
             uint64_t encoded = readType<uint64_t>(reader, inverted);
             encoded = endian::bigToNative(encoded);
@@ -2131,7 +2131,7 @@ void filterKeyFromKeyString(uint8_t ctype, BufReader* reader, bool inverted, Ver
         case CType::kNumericNegativeSmallMagnitude:
             inverted = !inverted;
             isNegative = true;
-            // fallthrough (format is the same as positive, but inverted)
+            [[fallthrough]];  // format is the same as positive, but inverted
 
         case CType::kNumericPositiveSmallMagnitude: {
             uint64_t encoded = readType<uint64_t>(reader, inverted);
@@ -2193,7 +2193,7 @@ void filterKeyFromKeyString(uint8_t ctype, BufReader* reader, bool inverted, Ver
         case CType::kNumericNegative1ByteInt:
             inverted = !inverted;
             isNegative = true;
-            // fallthrough (format is the same as positive, but inverted)
+            [[fallthrough]];  // format is the same as positive, but inverted
 
         case CType::kNumericPositive1ByteInt:
         case CType::kNumericPositive2ByteInt:
@@ -2440,7 +2440,7 @@ void TypeBits::appendZero(uint8_t zeroType) {
                 break;
             }
             zeroType = kV1NegativeDoubleZero;
-        // fallthrough for 5-bit encodings
+            [[fallthrough]];  // fallthrough for 5-bit encodings
         case kDecimalZero0xxx:
         case kDecimalZero1xxx:
         case kDecimalZero2xxx:

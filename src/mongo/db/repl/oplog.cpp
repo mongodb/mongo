@@ -2025,8 +2025,8 @@ Status applyCommand_inlock(OperationContext* opCtx,
                                 "error"_attr = status,
                                 "oplogEntry"_attr = redact(entry.toBSONForLogging()));
                 }
+                [[fallthrough]];
             }
-            // fallthrough
             case ErrorCodes::OK:
                 done = true;
                 break;
