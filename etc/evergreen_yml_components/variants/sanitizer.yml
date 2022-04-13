@@ -3,17 +3,17 @@
 
 buildvariants:
 
-- name: ubuntu1804-asan
-  display_name: ~ ASAN Ubuntu 18.04
+- name: rhel80-asan
+  display_name: ~ ASAN RHEL 8.0
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-    - ubuntu1804-build
+    - rhel80-build
   stepback: true
   expansions:
     lang_environment: LANG=C
     san_options: LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer" ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
     compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --opt=on --allocator=system --sanitize=address --ssl --ocsp-stapling=off -j$(grep -c ^processor /proc/cpuinfo)
-    multiversion_platform: ubuntu1804
+    multiversion_platform: rhel80
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under ASAN build.
     hang_analyzer_dump_core: false
@@ -27,13 +27,13 @@ buildvariants:
     - name: free_monitoring
     - name: .jstestfuzz !.initsync
 
-- name: ubuntu1804-debug-asan
-  display_name: ~ ASAN Enterprise Ubuntu 18.04 DEBUG
+- name: rhel80-debug-asan
+  display_name: ~ ASAN Enterprise RHEL 8.0 DEBUG
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
   run_on:
-  - ubuntu1804-build
+  - rhel80-build
   stepback: false
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
@@ -43,13 +43,14 @@ buildvariants:
     san_options: LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer" ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
     compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=address --ssl --ocsp-stapling=off --enable-free-mon=on -j$(grep -c ^processor /proc/cpuinfo)
     test_flags: --excludeWithAnyTags=requires_fast_memory,requires_ocsp_stapling
-    multiversion_platform: ubuntu1804
+    multiversion_platform: rhel80
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under ASAN build.
     hang_analyzer_dump_core: false
     scons_cache_scope: shared
     exec_timeout_secs: 14400 # 3 hour timeout
     separate_debug: off
+    large_distro_name: rhel80-build
   tasks:
   - name: compile_test_and_package_serial_TG
   - name: compile_benchmarks
@@ -102,13 +103,13 @@ buildvariants:
   - name: server_discovery_and_monitoring_json_test_TG
   - name: server_selection_json_test_TG
 
-- name: ubuntu1804-debug-ubsan
-  display_name: ~ UBSAN Enterprise Ubuntu 18.04 DEBUG
+- name: rhel80-debug-ubsan
+  display_name: ~ UBSAN Enterprise RHEL 8.0 DEBUG
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
   run_on:
-  - ubuntu1804-build
+  - rhel80-build
   stepback: false
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
@@ -118,11 +119,12 @@ buildvariants:
     san_options: UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
     compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --sanitize=undefined --ssl --ocsp-stapling=off --enable-free-mon=on -j$(grep -c ^processor /proc/cpuinfo)
     test_flags: --excludeWithAnyTags=requires_ocsp_stapling
-    multiversion_platform: ubuntu1804
+    multiversion_platform: rhel80
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under UBSAN build.
     scons_cache_scope: shared
     separate_debug: off
+    large_distro_name: rhel80-build
   tasks:
   - name: compile_test_and_package_serial_TG
   - name: compile_benchmarks
