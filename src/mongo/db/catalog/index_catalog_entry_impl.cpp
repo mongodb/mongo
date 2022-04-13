@@ -52,6 +52,7 @@
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/durable_catalog.h"
+#include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/scopeguard.h"
@@ -72,12 +73,20 @@ IndexCatalogEntryImpl::IndexCatalogEntryImpl(OperationContext* const opCtx,
       _ordering(Ordering::make(_descriptor->keyPattern())),
       _isReady(false),
       _isFrozen(isFrozen),
+      _shouldValidateDocument(false),
       _isDropped(false),
       _indexOffset(invariantStatusOK(
           collection->checkMetaDataForIndex(_descriptor->indexName(), _descriptor->infoObj()))) {
 
     _descriptor->_entry = this;
     _isReady = collection->isIndexReady(_descriptor->indexName());
+
+    // For time-series collections, we need to check that the indexed metric fields do not have
+    // expanded array values.
+    _shouldValidateDocument =
+        collection->getTimeseriesOptions() &&
+        timeseries::doesBucketsIndexIncludeMeasurement(
+            opCtx, collection->ns(), *collection->getTimeseriesOptions(), _descriptor->infoObj());
 
     auto nss = DurableCatalog::get(opCtx)->getEntry(_catalogId).nss;
     const BSONObj& collation = _descriptor->collation();
@@ -139,6 +148,10 @@ bool IndexCatalogEntryImpl::isReady(OperationContext* opCtx) const {
 bool IndexCatalogEntryImpl::isFrozen() const {
     invariant(!_isFrozen || !_isReady);
     return _isFrozen;
+}
+
+bool IndexCatalogEntryImpl::shouldValidateDocument() const {
+    return _shouldValidateDocument;
 }
 
 bool IndexCatalogEntryImpl::isMultikey(OperationContext* const opCtx,

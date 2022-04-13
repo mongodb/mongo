@@ -177,6 +177,11 @@ public:
     virtual bool isFrozen() const = 0;
 
     /**
+     * Returns true if the documents should be validated for incompatible values for this index.
+     */
+    virtual bool shouldValidateDocument() const = 0;
+
+    /**
      * If return value is not boost::none, reads with majority read concern using an older snapshot
      * must treat this index as unfinished.
      */
