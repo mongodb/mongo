@@ -54,10 +54,10 @@ const secondaryDB2 = secondary2.getDB(dbName);
 // Verify that the existing nodes detect invalid index options, but the new node has the repaired
 // index spec.
 let validateRes = assert.commandWorked(primaryDB.runCommand({validate: collName}));
-assert(validateRes.valid, "validate should fail: " + tojson(validateRes));
+assert(!validateRes.valid, "validate should fail: " + tojson(validateRes));
 
 validateRes = assert.commandWorked(secondaryDB1.runCommand({validate: collName}));
-assert(validateRes.valid, "validate should fail: " + tojson(validateRes));
+assert(!validateRes.valid, "validate should fail: " + tojson(validateRes));
 
 validateRes = assert.commandWorked(secondaryDB2.runCommand({validate: collName}));
 assert(validateRes.valid, "validate should succeed: " + tojson(validateRes));

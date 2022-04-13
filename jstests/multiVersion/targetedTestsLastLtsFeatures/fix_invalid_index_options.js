@@ -40,10 +40,10 @@ secondaryDB = secondary.getDB(dbName);
 
 // Verify that the primary and secondary in 6.0 detect invalid index options.
 let validateRes = assert.commandWorked(primaryDB.runCommand({validate: collName}));
-assert(validateRes.valid, "validate should fail: " + tojson(validateRes));
+assert(!validateRes.valid, "validate should fail: " + tojson(validateRes));
 
 validateRes = assert.commandWorked(secondaryDB.runCommand({validate: collName}));
-assert(validateRes.valid, "validate should fail: " + tojson(validateRes));
+assert(!validateRes.valid, "validate should fail: " + tojson(validateRes));
 
 // Use collMod to fix the invalid index options in the collection.
 assert.commandWorked(primaryDB.runCommand({collMod: collName}));

@@ -102,7 +102,6 @@ function runReplicaSetTest() {
         primaryColl.insert([{_id: 4, loc: [4, 4], x: "baz"}, {_id: 5, loc: [5, 5], x: "baz"}],
                            {writeConcern: {w: 2}}));
     validateAndAssertCorrectIndexKeys(primaryColl);
-    validateAndAssertCorrectIndexKeys(secondaryColl);
 
     // Upgrade the primary and attempt to re-create the index after the upgrade.
     assert.commandWorked(
@@ -154,6 +153,7 @@ function runShardingTest() {
 
     // Wait for shard0 to finish replicating its documents and building the index.
     st.rs0.awaitReplication();
+    validateAndAssertCorrectIndexKeys(coll);
 
     // Move the [1, MaxKey] chunk to shard1.
     assert.commandWorked(mongos.adminCommand(
@@ -166,15 +166,11 @@ function runShardingTest() {
     const shard1Coll = shard1DB[collName];
     IndexBuildTest.assertIndexes(shard1Coll, indexList.length, indexList);
 
-    validateAndAssertCorrectIndexKeys(coll);
-
     // Verify that inserting documents into a shard consisting of nodes in the latest version with
     // an existing haystack index will create the correct index keys for the index.
     assert.commandWorked(
         coll.insert([{_id: 4, loc: [4, 4], x: "baz"}, {_id: 5, loc: [5, 5], x: "blah"}],
                     {writeConcern: {w: 2}}));
-
-    validateAndAssertCorrectIndexKeys(coll);
 
     // Creating a new haystack index against a sharded cluster with at least one shard upgraded to
     // the latest version should fail.

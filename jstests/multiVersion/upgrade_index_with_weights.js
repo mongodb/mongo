@@ -52,7 +52,8 @@ assert.commandFailedWithCode(coll.createIndex({b: 1}, {weights: {d: 1}}),
 // Restart the secondary node clean, and verify that the index data is synced correctly.
 const secondaryNode = rst.getSecondaries()[0];
 const secondaryNodeOptions = rst.nodeOptions[`n${rst.getNodeId(secondaryNode)}`];
-rst.restart(secondaryNode, Object.assign({startClean: true}, secondaryNodeOptions));
+rst.restart(secondaryNode,
+            Object.assign({startClean: true, skipValidation: true}, secondaryNodeOptions));
 coll = rst.getPrimary().getDB(jsTestName()).coll;
 const index = coll.getIndexes().filter(index => (index["name"] == "a_1"));
 assert.eq(index.length, 1, index);
@@ -60,5 +61,8 @@ assert.eq(index.length, 1, index);
 assert.eq(index[0]["weights"], undefined, index);
 
 rst.awaitReplication();
+
+// Fix the invalid index specs before validating the nodes.
+assert.commandWorked(testDB.runCommand({collMod: "coll"}));
 rst.stopSet();
 }());

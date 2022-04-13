@@ -52,6 +52,8 @@ function runStandaloneTest() {
     insertDocuments(coll);
     createIndexes(coll);
     IndexBuildTest.assertIndexes(testDB[collName], indexList.length, indexList);
+    const validate = assert.commandWorked(coll.validate({full: true}));
+    assert.eq(true, validate.valid);
     MongoRunner.stopMongod(mongo);
 
     // Restart the mongod in the latest version.
@@ -61,11 +63,8 @@ function runStandaloneTest() {
     testDB = mongo.getDB(dbName);
     coll = testDB[collName];
 
-    // The haystack index should still be present before the FCV is set and the validate command
-    // should succeed.
+    // The haystack index should still be present before the FCV is set.
     IndexBuildTest.assertIndexes(coll, indexList.length, indexList);
-    const validate = assert.commandWorked(coll.validate({full: true}));
-    assert.eq(true, validate.valid);
 
     // Set the FCV.
     const adminDB = mongo.getDB("admin");
