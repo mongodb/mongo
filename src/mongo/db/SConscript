@@ -1439,6 +1439,7 @@ env.Library(
         'exec/and_sorted.cpp',
         'exec/batched_delete_stage.idl',
         'exec/batched_delete_stage.cpp',
+        'exec/batched_delete_stage_buffer.cpp',
         'exec/cached_plan.cpp',
         'exec/collection_scan.cpp',
         'exec/count.cpp',
