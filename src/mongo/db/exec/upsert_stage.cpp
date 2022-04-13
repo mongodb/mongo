@@ -185,19 +185,20 @@ void UpsertStage::_performInsert(BSONObj newDocument) {
 
 BSONObj UpsertStage::_produceNewDocumentForInsert() {
     // Obtain the collection description. This will be needed to compute the shardKey paths.
-    // The collection description must remain in scope since it owns the pointers used by
+    //
+    // NOTE: The collection description must remain in scope since it owns the pointers used by
     // 'shardKeyPaths' and 'immutablePaths'.
+    boost::optional<ScopedCollectionDescription> optCollDesc;
     FieldRefSet shardKeyPaths, immutablePaths;
 
     if (_isUserInitiatedWrite) {
-        const auto collDesc =
-            CollectionShardingState::get(opCtx(), _params.request->getNamespaceString())
-                ->getCollectionDescription(opCtx());
+        optCollDesc = CollectionShardingState::get(opCtx(), _params.request->getNamespaceString())
+                          ->getCollectionDescription(opCtx());
 
         // If the collection is sharded, add all fields from the shard key to the 'shardKeyPaths'
         // set.
-        if (collDesc.isSharded()) {
-            shardKeyPaths.fillFrom(collDesc.getKeyPatternFields());
+        if (optCollDesc->isSharded()) {
+            shardKeyPaths.fillFrom(optCollDesc->getKeyPatternFields());
         }
 
         // An unversioned request cannot update the shard key, so all shardKey paths are immutable.
