@@ -18,18 +18,20 @@ const st = new ShardingTest({
     other: {shardOptions: {setParameter: {rangeDeleterBatchSize: rangeDeleterBatchSize}}}
 });
 
-function getCollSizeBytes(ns, node) {
+function getCollSizeBytes(ns, node, optUUID) {
     let res;
-
+    let collections = [{ns: ns}];
+    if (optUUID) {
+        collections[0].UUID = optUUID;
+    }
     assert.soon(() => {
         res = assert.commandWorkedOrFailedWithCode(
             node.adminCommand(
-                {_shardsvrGetStatsForBalancing: 1, collections: [ns], scaleFactor: 1}),
+                {_shardsvrGetStatsForBalancing: 1, collections: collections, scaleFactor: 1}),
             [ErrorCodes.NotYetInitialized]);
         return res.ok;
     });
 
-    jsTest.log("XOXO: " + tojson(res));
     return res['stats'][0]['collSize'];
 }
 const kSizeSingleDocBytes = 18;
@@ -72,6 +74,17 @@ assert.commandWorked(st.s.adminCommand({split: coll.getFullName(), middle: {_id:
 assert.eq(kSizeSingleDocBytes * numDocs,
           getCollSizeBytes(coll.getFullName(), st.shard0.rs.getPrimary()));
 assert.eq(0, getCollSizeBytes(coll.getFullName(), st.shard1.rs.getPrimary()));
+
+{
+    // Check that optional collection's UUID is handled correctly:
+    // - Return correct data size if UUID matches
+    // - Return `0` data size if UUID doesn't match
+    let config = st.configRS.getPrimary().getDB("config");
+    let collectionUUID = config.collections.findOne({_id: coll.getFullName()}).uuid;
+    assert.eq(kSizeSingleDocBytes * numDocs,
+              getCollSizeBytes(coll.getFullName(), st.shard0.rs.getPrimary(), collectionUUID));
+    assert.eq(0, getCollSizeBytes(coll.getFullName(), st.shard0.rs.getPrimary(), UUID()));
+}
 
 // Pause before first range deletion task
 let beforeDeletionFailpoint = configureFailPoint(st.shard0, "hangBeforeDoingDeletion");

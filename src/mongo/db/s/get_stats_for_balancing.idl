@@ -33,6 +33,18 @@ imports:
     - "mongo/idl/basic_types.idl"
 
 structs:
+    NamespaceWithOptionalUUID:
+        description: 'Namespace with an optional collection UUID'
+        strict: false
+        fields:
+            ns:
+                description: 'Namespace of the collection'
+                type: namespacestring
+            UUID:
+                description: 'Collection UUID'
+                type: uuid
+                optional: true # optional because the caller may not attach the collection UUID
+
     CollStatsForBalancing:
         description: 'Collection stats for a specific collection'
         strict: false
@@ -65,7 +77,7 @@ commands:
         fields:
             collections:
                 description: 'List of namespaces to retrieve statistic for'
-                type: array<namespacestring>
+                type: array<NamespaceWithOptionalUUID>
             scaleFactor:
                 description: 'Scale factor for data size units. If omitted 1048576 (MiB) will be used'
                 type: exactInt64

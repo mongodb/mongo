@@ -84,22 +84,30 @@ public:
             std::vector<CollStatsForBalancing> collStats;
             collStats.reserve(request().getCollections().size());
 
-            for (const auto& ns : request().getCollections()) {
-                const auto collDataSizeScaled =
-                    static_cast<long long>(_getCollDataSizeBytes(opCtx, ns) / scaleFactor);
-                collStats.emplace_back(ns, collDataSizeScaled);
+            for (const auto& nsWithOptUUID : request().getCollections()) {
+                const auto collDataSizeScaled = static_cast<long long>(
+                    _getCollDataSizeBytes(opCtx, nsWithOptUUID) / scaleFactor);
+                collStats.emplace_back(nsWithOptUUID.getNs(), collDataSizeScaled);
             }
             return {std::move(collStats)};
         }
 
     private:
-        long long _getCollDataSizeBytes(OperationContext* opCtx, const NamespaceString& ns) const {
+        long long _getCollDataSizeBytes(OperationContext* opCtx,
+                                        const NamespaceWithOptionalUUID& nsWithOptUUID) const {
+            const auto& ns = nsWithOptUUID.getNs();
             boost::optional<UUID> collUUID;
             long long numRecords{0};
             long long dataSizeBytes{0};
 
             if (AutoGetCollectionForReadCommandMaybeLockFree autoColl{opCtx, ns}) {
-                collUUID = autoColl->uuid();
+                auto localCollUUID = autoColl->uuid();
+                if (auto wantedCollUUID = nsWithOptUUID.getUUID()) {
+                    if (wantedCollUUID != localCollUUID) {
+                        return 0LL;
+                    }
+                }
+                collUUID.emplace(localCollUUID);
                 numRecords = autoColl->numRecords(opCtx);
                 dataSizeBytes = autoColl->dataSize(opCtx);
             }
