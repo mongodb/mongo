@@ -240,7 +240,8 @@ class EncryptedClient {
 
         const checkMap = {};
 
-        // Always expect ESC and ECC collections, sometimes expect ECOC as well.
+        // Always expect ESC and ECC collections, optionally expect ECOC.
+        // ECOC is not expected in sharded clusters.
         checkMap[baseCollInfo.options.encryptedFields.escCollection] = true;
         checkMap[baseCollInfo.options.encryptedFields.eccCollection] = true;
         checkMap[baseCollInfo.options.encryptedFields.ecocCollection] = ecocExists;

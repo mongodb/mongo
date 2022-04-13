@@ -41,24 +41,24 @@ assert.commandWorked(
     client.createEncryptionCollection("encrypted", {encryptedFields: encryptedFields}));
 assert.commandWorked(test.createCollection("unencrypted"));
 
-assert.commandFailedWithCode(test.unencrypted.compact(), ErrorCodes.BadValue);
+assert.commandFailedWithCode(test.unencrypted.compact(), 6346807);
 
 const reply = assert.commandWorked(test.encrypted.compact());
 jsTest.log(reply);
 
 // Validate dummy data we expect the placeholder compaction algorithm to return.
-assert.eq(reply.stats.ecoc.read, 1);
-assert.eq(reply.stats.ecoc.deleted, 2);
+assert.eq(reply.stats.ecoc.read, 0);
+assert.eq(reply.stats.ecoc.deleted, 0);
 
-assert.eq(reply.stats.ecc.read, 3);
-assert.eq(reply.stats.ecc.inserted, 4);
-assert.eq(reply.stats.ecc.updated, 5);
-assert.eq(reply.stats.ecc.deleted, 6);
+assert.eq(reply.stats.ecc.read, 0);
+assert.eq(reply.stats.ecc.inserted, 0);
+assert.eq(reply.stats.ecc.updated, 0);
+assert.eq(reply.stats.ecc.deleted, 0);
 
-assert.eq(reply.stats.esc.read, 7);
-assert.eq(reply.stats.esc.inserted, 8);
-assert.eq(reply.stats.esc.updated, 9);
-assert.eq(reply.stats.esc.deleted, 10);
+assert.eq(reply.stats.esc.read, 0);
+assert.eq(reply.stats.esc.inserted, 0);
+assert.eq(reply.stats.esc.updated, 0);
+assert.eq(reply.stats.esc.deleted, 0);
 
 // The eccoc collection is gone, so we should return quickly with no work done.
 const nowork = assert.commandWorked(test.encrypted.compact());
