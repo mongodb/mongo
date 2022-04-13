@@ -1,6 +1,9 @@
 /**
  * Test that the $_generateV2ResumeTokens parameter can be used to force change streams to return v2
  * tokens.
+ * @tags: [
+ *   requires_fcv_60
+ * ]
  */
 (function() {
 "use strict";
