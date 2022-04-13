@@ -57,6 +57,8 @@ const expectedParamDefaults = {
     internalQueryMaxNumberOfFieldsToChooseFilteredColumnScan: 12,
     internalQueryFLERewriteMemoryLimit: 14 * 1024 * 1024,
     internalQueryDisableLookupExecutionUsingHashJoin: false,
+    internalQuerySlotBasedExecutionDisableLookupPushdown: false,
+    internalQuerySlotBasedExecutionDisableGroupPushdown: false,
     allowDiskUseByDefault: true,
 };
 
@@ -231,6 +233,12 @@ assertSetParameterFails("internalQueryCollectionMaxStorageSizeBytesToChooseHashJ
 
 assertSetParameterSucceeds("internalQueryDisableLookupExecutionUsingHashJoin", true);
 assertSetParameterSucceeds("internalQueryDisableLookupExecutionUsingHashJoin", false);
+
+assertSetParameterSucceeds("internalQuerySlotBasedExecutionDisableLookupPushdown", true);
+assertSetParameterSucceeds("internalQuerySlotBasedExecutionDisableLookupPushdown", false);
+
+assertSetParameterSucceeds("internalQuerySlotBasedExecutionDisableGroupPushdown", true);
+assertSetParameterSucceeds("internalQuerySlotBasedExecutionDisableGroupPushdown", false);
 
 assertSetParameterSucceeds("internalQueryMaxNumberOfFieldsToChooseUnfilteredColumnScan", 100);
 assertSetParameterSucceeds("internalQueryMaxNumberOfFieldsToChooseUnfilteredColumnScan", 0);

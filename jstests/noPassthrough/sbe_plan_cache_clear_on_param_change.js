@@ -35,6 +35,8 @@ const paramList = [
     {name: "internalQueryCollectionMaxDataSizeBytesToChooseHashJoin", value: 100},
     {name: "internalQueryCollectionMaxStorageSizeBytesToChooseHashJoin", value: 100},
     {name: "internalQueryDisableLookupExecutionUsingHashJoin", value: true},
+    {name: "internalQuerySlotBasedExecutionDisableLookupPushdown", value: true},
+    {name: "internalQuerySlotBasedExecutionDisableGroupPushdown", value: true},
     {name: "allowDiskUseByDefault", value: false},
     {name: "internalQueryMaxNumberOfFieldsToChooseUnfilteredColumnScan", value: 100},
     {name: "internalQueryMaxNumberOfFieldsToChooseFilteredColumnScan", value: 100},
