@@ -45,6 +45,7 @@ namespace mongo {
  * 3. (n, 0), n > 0 - invalid configuration.
  * 4. (n, m), n > 0, m > 0 - normal sharded collection version.
  *
+ * TODO (SERVER-65530): Get rid of all the legacy format parsers/serialisers
  */
 struct ChunkVersion {
 public:
@@ -201,7 +202,7 @@ public:
      * Serializes the version held by this object to 'out' in the form:
      * {..., <field>: {0:<combined major/minor, 1: <epoch>, 2: <Timestamp>}}
      *  or
-     * { ..., <field> : {t: <Timestamp>, e: <OID>, v: <major/minor>}}.
+     * { ..., <field> : {t: <Timestamp>, e: <OID>, v: <major/minor> }}.
      *
      * Depending on the FCV version
      */
@@ -211,6 +212,10 @@ public:
     /**
      * Serializes the version held by this object to 'out' in the form:
      *  { ..., <field>: [ <combined major/minor>, <OID epoch>, <Timestamp> ], ... }.
+     *  or
+     * { ..., <field> : {t: <Timestamp>, e: <OID>, v: <major/minor> }}.
+     *
+     * Depending on the FCV version
      */
     void serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const;
     void serializeToPositionalFormatWronglyEncodedAsBSON(StringData fieldName,

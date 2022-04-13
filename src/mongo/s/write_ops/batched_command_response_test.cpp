@@ -67,6 +67,7 @@ TEST(BatchedCommandResponseTest, Basic) {
     ASSERT_BSONOBJ_EQ(origResponseObj, genResponseObj);
 }
 
+// TODO (SERVER-64449): Get rid of this entire test case
 TEST(BatchedCommandResponseTest, StaleErrorAsStaleShardVersionCompatibility) {
     OID epoch = OID::gen();
 

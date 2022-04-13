@@ -38,9 +38,8 @@ imports:
 
 structs:
     ChunkVersion60Format:
-        description: >
-            New chunk version format to be parsed on 6.0 binaries but only
-            generated on 6.1 binaries. DO NOT USE.
+        description: New chunk version format with is parsed by 6.0 binaries but only generated
+                     starting with the 6.0 binaries when the FCV is 6.0.
         strict: false
         fields:
             t:
@@ -57,8 +56,9 @@ structs:
                 cpp_name: Version
 
 types:
-    # The canonical serialisation format for ChunkVersions, which is written as:
-    #   [ <major/minor>, <epoch>, <timestamp> ]
+    # The canonical serialisation format for ChunkVersions
+    #
+    # TODO (SERVER-65530): Use IDL directly instead of this custom parser/serialiser
     ChunkVersion:
         bson_serialization_type: any
         description: An object representing a chunk version for a collection.

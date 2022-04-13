@@ -98,7 +98,7 @@ error_codes:
     - {code: 62,name: OplogOperationUnsupported}
     # This error code is obsolete as of version 6.0 and no new places where it is thrown should be
     # added. Use StaleConfig.
-    # TODO (SERVER-63327): Retire this code once 6.0 becomes LTS
+    # TODO (SERVER-64449): Retire this code once 6.0 becomes LTS
     - {code: 63,name: OBSOLETE_StaleShardVersion,categories: [StaleShardVersionError,NeedRetargettingError]}
     - {code: 64,name: WriteConcernFailed,categories: [WriteConcernError]}
     - {code: 65,name: MultipleErrorsOccurred, extra: MultipleErrorsOccurredInfo}

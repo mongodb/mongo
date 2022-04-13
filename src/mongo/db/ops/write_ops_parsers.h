@@ -210,7 +210,7 @@ private:
  * their extraInfo in a field called errInfo, which is not consistent with how Status(es) are
  * serialised and parsed.
  *
- * TODO (SERVER-63327): The purpose of this class is to unify that reporting in subsequent versions
+ * TODO (SERVER-64449): The purpose of this class is to unify that reporting in subsequent versions
  * after which it can become a proper IDL type.
  */
 class WriteError {

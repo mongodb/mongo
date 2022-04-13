@@ -299,7 +299,7 @@ WriteError WriteError::parse(const BSONObj& obj) {
         // into StaleShardVersion and store the extra info of StaleConfig in a sub-field called
         // "errInfo".
         //
-        // TODO (SERVER-63327): This special parsing should be removed in the stable version
+        // TODO (SERVER-64449): This special parsing should be removed in the stable version
         // following the resolution of this ticket.
         if (code == ErrorCodes::OBSOLETE_StaleShardVersion) {
             return Status(ErrorCodes::StaleConfig,
@@ -323,7 +323,7 @@ BSONObj WriteError::serialize() const {
     // StaleShardVersion and store the extra info of StaleConfig in a sub-field called "errInfo".
     // This logic preserves this for backwards compatibility.
     //
-    // TODO (SERVER-63327): This special serialisation should be removed in the stable version
+    // TODO (SERVER-64449): This special serialisation should be removed in the stable version
     // following the resolution of this ticket.
     if (_status == ErrorCodes::StaleConfig &&
         !feature_flags::gFeatureFlagNewWriteErrorExceptionFormat.isEnabled(

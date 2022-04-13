@@ -280,6 +280,7 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                 if (responseStatus.isOK()) {
                     TrackedErrors trackedErrors;
                     trackedErrors.startTracking(ErrorCodes::StaleConfig);
+                    // TODO (SERVER-64449): Get rid of this exception
                     trackedErrors.startTracking(ErrorCodes::OBSOLETE_StaleShardVersion);
                     trackedErrors.startTracking(ErrorCodes::StaleDbVersion);
                     trackedErrors.startTracking(ErrorCodes::TenantMigrationAborted);
@@ -320,6 +321,7 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                     // Note if anything was stale
                     auto staleConfigErrors = trackedErrors.getErrors(ErrorCodes::StaleConfig);
                     {
+                        // TODO (SERVER-64449): Get rid of this exception
                         const auto& staleShardVersionErrors =
                             trackedErrors.getErrors(ErrorCodes::OBSOLETE_StaleShardVersion);
                         staleConfigErrors.insert(staleConfigErrors.begin(),

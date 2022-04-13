@@ -210,22 +210,36 @@ void ChunkVersion::serializeToPositionalWronlyEcondedOr60AsBSON(StringData field
 }
 
 void ChunkVersion::serializeToBSON(StringData field, BSONObjBuilder* builder) const {
-    BSONArrayBuilder arr(builder->subarrayStart(field));
-    arr.appendTimestamp(_combined);
-    arr.append(_epoch);
-    arr.append(_timestamp);
+    if (feature_flags::gFeatureFlagNewPersistedChunkVersionFormat.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        ChunkVersion60Format chunkVersion(
+            _timestamp, _epoch, Timestamp(majorVersion(), minorVersion()));
+        builder->append(field, chunkVersion.toBSON());
+    } else {
+        BSONArrayBuilder arr(builder->subarrayStart(field));
+        arr.appendTimestamp(_combined);
+        arr.append(_epoch);
+        arr.append(_timestamp);
+    }
 }
 
 void ChunkVersion::serializeToPositionalFormatWronglyEncodedAsBSON(StringData field,
                                                                    BSONObjBuilder* builder) const {
-    BSONObjBuilder subObjBuilder(builder->subobjStart(field));
-    subObjBuilder.appendElements([&] {
-        BSONArrayBuilder arr;
-        arr.appendTimestamp(_combined);
-        arr.append(_epoch);
-        arr.append(_timestamp);
-        return arr.obj();
-    }());
+    if (feature_flags::gFeatureFlagNewPersistedChunkVersionFormat.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        ChunkVersion60Format chunkVersion(
+            _timestamp, _epoch, Timestamp(majorVersion(), minorVersion()));
+        builder->append(field, chunkVersion.toBSON());
+    } else {
+        BSONObjBuilder subObjBuilder(builder->subobjStart(field));
+        subObjBuilder.appendElements([&] {
+            BSONArrayBuilder arr;
+            arr.appendTimestamp(_combined);
+            arr.append(_epoch);
+            arr.append(_timestamp);
+            return arr.obj();
+        }());
+    }
 }
 
 void ChunkVersion::appendLegacyWithField(BSONObjBuilder* out, StringData field) const {
