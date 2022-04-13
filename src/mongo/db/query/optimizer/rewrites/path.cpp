@@ -315,7 +315,7 @@ void PathFusion::tryFuseComposition(ABT& n, const ABT& input) {
     opt::unordered_map<FieldNameType, ABT> fieldMap;
     // Used to preserve the relative order in which fields are set on the result.
     FieldPathType orderedFieldNames;
-    boost::optional<opt::unordered_set<FieldNameType>> toKeep;
+    boost::optional<std::set<FieldNameType>> toKeep;
 
     Type inputType = Type::any;
     if (auto constPtr = input.cast<Constant>(); constPtr != nullptr && constPtr->isObject()) {

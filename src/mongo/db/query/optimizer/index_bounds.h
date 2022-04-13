@@ -174,7 +174,7 @@ struct CandidateIndexEntry {
     size_t _intervalPrefixSize;
 };
 
-using CandidateIndexMap = opt::unordered_map<std::string /*index name*/, CandidateIndexEntry>;
+using CandidateIndexMap = std::map<std::string /*index name*/, CandidateIndexEntry>;
 
 class IndexSpecification {
 public:

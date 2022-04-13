@@ -96,9 +96,6 @@ private:
 
 ProjectionNameOrderedSet convertToOrderedSet(ProjectionNameSet unordered);
 
-opt::unordered_set<FieldNameType> toUnorderedFieldNameSet(std::set<FieldNameType> set);
-
-
 void combineLimitSkipProperties(properties::LimitSkipRequirement& aboveProp,
                                 const properties::LimitSkipRequirement& belowProp);
 

@@ -156,7 +156,7 @@ public:
  */
 class PathDrop final : public Operator<PathDrop, 0>, public PathSyntaxSort {
 public:
-    using NameSet = opt::unordered_set<std::string>;
+    using NameSet = std::set<std::string>;
 
     PathDrop(NameSet inNames) : _names(std::move(inNames)) {}
 
@@ -178,7 +178,7 @@ private:
  */
 class PathKeep final : public Operator<PathKeep, 0>, public PathSyntaxSort {
 public:
-    using NameSet = opt::unordered_set<std::string>;
+    using NameSet = std::set<std::string>;
 
     PathKeep(NameSet inNames) : _names(std::move(inNames)) {}
 

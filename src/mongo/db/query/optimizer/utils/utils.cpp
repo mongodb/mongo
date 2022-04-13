@@ -81,14 +81,6 @@ ProjectionNameOrderedSet convertToOrderedSet(ProjectionNameSet unordered) {
     return ordered;
 }
 
-opt::unordered_set<FieldNameType> toUnorderedFieldNameSet(std::set<FieldNameType> set) {
-    opt::unordered_set<FieldNameType> result;
-    for (auto&& fieldName : set) {
-        result.emplace(std::move(fieldName));
-    }
-    return result;
-}
-
 void combineLimitSkipProperties(properties::LimitSkipRequirement& aboveProp,
                                 const properties::LimitSkipRequirement& belowProp) {
     using namespace properties;

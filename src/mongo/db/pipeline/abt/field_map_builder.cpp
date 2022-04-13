@@ -92,10 +92,10 @@ ABT FieldMapBuilder::generateABTForField(const FieldMapEntry& entry) const {
         maybeComposePath(result, make<PathObj>());
     }
     if (!keepSet.empty()) {
-        maybeComposePath(result, make<PathKeep>(toUnorderedFieldNameSet(std::move(keepSet))));
+        maybeComposePath(result, make<PathKeep>(std::move(keepSet)));
     }
     if (!dropSet.empty()) {
-        maybeComposePath(result, make<PathDrop>(toUnorderedFieldNameSet(std::move(dropSet))));
+        maybeComposePath(result, make<PathDrop>(std::move(dropSet)));
     }
 
     for (const auto& varMapEntry : varMap) {
