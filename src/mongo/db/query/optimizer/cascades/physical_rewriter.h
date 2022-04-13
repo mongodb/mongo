@@ -65,7 +65,7 @@ public:
      */
     OptimizeGroupResult optimizeGroup(GroupIdType groupId,
                                       properties::PhysProps physProps,
-                                      PrefixId prefixId,
+                                      PrefixId& prefixId,
                                       CostType costLimit);
 
 private:
@@ -73,12 +73,12 @@ private:
                                ChildPropsType childProps,
                                NodeCEMap nodeCEMap,
                                GroupIdType groupId,
-                               const PrefixId& prefixId,
+                               PrefixId& prefixId,
                                PhysOptimizationResult& bestResult);
 
     std::pair<bool, CostType> optimizeChildren(CostType nodeCost,
                                                ChildPropsType childProps,
-                                               const PrefixId& prefixId,
+                                               PrefixId& prefixId,
                                                CostType costLimit);
 
     // We don't own any of this.

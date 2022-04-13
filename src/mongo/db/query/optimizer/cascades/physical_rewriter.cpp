@@ -138,7 +138,7 @@ void PhysicalRewriter::costAndRetainBestNode(ABT node,
                                              ChildPropsType childProps,
                                              NodeCEMap nodeCEMap,
                                              const GroupIdType groupId,
-                                             const PrefixId& prefixId,
+                                             PrefixId& prefixId,
                                              PhysOptimizationResult& bestResult) {
     const CostAndCE nodeCostAndCE =
         _costDerivation.deriveCost(_memo, bestResult._physProps, node.ref(), childProps, nodeCEMap);
@@ -182,7 +182,7 @@ void PhysicalRewriter::costAndRetainBestNode(ABT node,
  */
 std::pair<bool, CostType> PhysicalRewriter::optimizeChildren(const CostType nodeCost,
                                                              ChildPropsType childProps,
-                                                             const PrefixId& prefixId,
+                                                             PrefixId& prefixId,
                                                              const CostType costLimit) {
     const bool disableBranchAndBound = _hints._disableBranchAndBound;
 
@@ -226,7 +226,7 @@ PhysicalRewriter::OptimizeGroupResult::OptimizeGroupResult(const size_t index, c
 
 PhysicalRewriter::OptimizeGroupResult PhysicalRewriter::optimizeGroup(const GroupIdType groupId,
                                                                       PhysProps physProps,
-                                                                      PrefixId prefixId,
+                                                                      PrefixId& prefixId,
                                                                       CostType costLimit) {
     const size_t localPlanExplorationCount = ++_memo._stats._physPlanExplorationCount;
     if (_memo.getDebugInfo().hasDebugLevel(2)) {

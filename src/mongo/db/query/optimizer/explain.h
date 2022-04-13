@@ -81,6 +81,11 @@ public:
         const cascades::Memo* memo = nullptr,
         const NodeToGroupPropsMap& nodeMap = {});
 
+    static BSONObj explainBSONObj(const ABT& node,
+                                  bool displayProperties = false,
+                                  const cascades::Memo* memo = nullptr,
+                                  const NodeToGroupPropsMap& nodeMap = {});
+
     static std::string printBSON(sbe::value::TypeTags tag, sbe::value::Value val);
 
     static std::string explainLogicalProps(const std::string& description,

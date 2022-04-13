@@ -37,14 +37,8 @@
 namespace mongo::optimizer {
 
 BSONObj ABTPrinter::explainBSON() const {
-    auto [tag, val] = optimizer::ExplainGenerator::explainBSON(
+    return ExplainGenerator::explainBSONObj(
         _abtTree, true /*displayProperties*/, nullptr /*Memo*/, _nodeToPropsMap);
-    uassert(6624070, "Expected an object", tag == sbe::value::TypeTags::Object);
-    sbe::value::ValueGuard vg(tag, val);
-
-    BSONObjBuilder builder;
-    sbe::bson::convertToBsonObj(builder, sbe::value::getObjectView(val));
-    return builder.done().getOwned();
 }
 
 enum class ExplainVersion { V1, V2, V3, Vmax };
@@ -2280,6 +2274,20 @@ std::pair<sbe::value::TypeTags, sbe::value::Value> ExplainGenerator::explainBSON
     const NodeToGroupPropsMap& nodeMap) {
     ExplainGeneratorTransporter<ExplainVersion::V3> gen(displayProperties, memo, nodeMap);
     return gen.generate(node).moveValue();
+}
+
+BSONObj ExplainGenerator::explainBSONObj(const ABT& node,
+                                         const bool displayProperties,
+                                         const cascades::Memo* memo,
+                                         const NodeToGroupPropsMap& nodeMap) {
+    auto [tag, val] =
+        optimizer::ExplainGenerator::explainBSON(node, displayProperties, memo, nodeMap);
+    uassert(6624070, "Expected an object", tag == sbe::value::TypeTags::Object);
+    sbe::value::ValueGuard vg(tag, val);
+
+    BSONObjBuilder builder;
+    sbe::bson::convertToBsonObj(builder, sbe::value::getObjectView(val));
+    return builder.done().getOwned();
 }
 
 template <class PrinterType>

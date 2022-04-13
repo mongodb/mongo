@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/pipeline.h"
@@ -60,6 +61,12 @@ void maybePrintABT(const ABT& abt);
                   &phaseManager.getMemo()))
 
 #define ASSERT_EXPLAIN_MEMO(expected, memo) ASSERT_EQ(expected, ExplainGenerator::explainMemo(memo))
+
+#define ASSERT_BSON_PATH(expected, bson, path)                      \
+    ASSERT_EQ(expected,                                             \
+              dotted_path_support::extractElementAtPath(bson, path) \
+                  .toString(false /*includeFieldName*/));
+
 
 #define ASSERT_BETWEEN(a, b, value) \
     ASSERT_LTE(a, value);           \
