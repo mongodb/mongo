@@ -86,8 +86,12 @@ assert.commandWorked(mongosColl.insert({_id: -50}));
 assert.commandWorked(mongosColl.insert({_id: 50}));
 assert.commandWorked(mongosColl.insert({_id: 150}));
 
-const shardExceptions =
-    [ErrorCodes.StaleConfig, ErrorCodes.OBSOLETE_StaleShardVersion, ErrorCodes.StaleEpoch];
+const shardExceptions = [
+    ErrorCodes.StaleConfig,
+    // TODO (SERVER-64449): Get rid of this exception
+    ErrorCodes.OBSOLETE_StaleShardVersion,
+    ErrorCodes.StaleEpoch,
+];
 
 // Create an $_internalSplitPipeline stage that forces the merge to occur on the Primary shard.
 const forcePrimaryMerge = [{$_internalSplitPipeline: {mergeType: "primaryShard"}}];
