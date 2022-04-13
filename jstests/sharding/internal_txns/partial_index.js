@@ -7,6 +7,8 @@
 (function() {
 "use strict";
 
+load("jstests/libs/analyze_plan.js");
+
 const st = new ShardingTest({shards: {rs0: {nodes: 2}}});
 
 const kDbName = "testDb";
@@ -83,7 +85,7 @@ function assertFindUsesCoveredQuery(node) {
             .find({"parentLsid": parentSessionDoc._id, "_id.txnNumber": childLsid.txnNumber},
                   {_id: 1})
             .finish());
-    const winningPlan = explainRes.queryPlanner.winningPlan.queryPlan;
+    const winningPlan = getWinningPlan(explainRes.queryPlanner);
     assert.eq(winningPlan.stage, "PROJECTION_COVERED");
     assert.eq(winningPlan.inputStage.stage, "IXSCAN");
 
