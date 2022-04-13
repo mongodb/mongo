@@ -335,7 +335,7 @@ buildvariants:
 - name: tla-plus
   display_name: TLA+
   run_on:
-  - ubuntu1804-build
+  - rhel80-build
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   stepback: false
   expansions:
@@ -343,25 +343,25 @@ buildvariants:
   tasks:
   - name: tla_plus
 
-- name: enterprise-ubuntu1804-64-ninja
-  display_name: "Ninja Build: Enterprise Ubuntu 18.04"
+- name: enterprise-rhel80-ninja
+  display_name: "Ninja Build: RHEL 8.0"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
   run_on:
-  - ubuntu1804-test
+  - rhel80-small
   stepback: false
   expansions:
-    compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
+    compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
     repo_edition: enterprise
     has_packages: false
   tasks:
   - name: compile_ninja_next_TG
     distros:
-    - ubuntu1804-build
+    - rhel80-build
   - name: compile_ninja_TG
     distros:
-    - ubuntu1804-build
+    - rhel80-build
 
 - &enterprise-rhel80-dynamic-v4gcc-debug-experimental-template
   name: enterprise-rhel80-dynamic-v4gcc-debug-experimental
@@ -2167,13 +2167,13 @@ buildvariants:
   - name: generate_buildid_to_debug_symbols_mapping
 
 
-- name: enterprise-ubuntu-dynamic-1804-clang-tidy-required
+- name: enterprise-rhel80-dynamic-clang-tidy-required
   display_name: "! Enterprise Clang Tidy"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   modules:
   - enterprise
   run_on:
-  - ubuntu1804-xlarge
+  - rhel80-xlarge
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     lang_environment: LANG=C
@@ -2190,31 +2190,31 @@ buildvariants:
   - name: clang_tidy_TG
 
 
-- name: ubuntu1804-debug-suggested
-  display_name: "* Shared Library Ubuntu 18.04 DEBUG"
+- name: rhel80-debug-suggested
+  display_name: "* Shared Library RHEL 8.0 DEBUG"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   run_on:
-  - ubuntu1804-test
+  - rhel80-small
   expansions:
     resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
     compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
     scons_cache_scope: shared
     scons_cache_mode: all
     num_scons_link_jobs_available: 0.99
-    large_distro_name: ubuntu1804-large
+    large_distro_name: rhel80-large
   tasks:
   - name: compile_test_and_package_parallel_core_stream_TG
     distros:
-    - ubuntu1804-xlarge
+    - rhel80-xlarge
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
-    - ubuntu1804-xlarge
+    - rhel80-xlarge
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
-    - ubuntu1804-xlarge
+    - rhel80-xlarge
   - name: compile_build_tools_next_TG
     distros:
-    - ubuntu1804-xlarge
+    - rhel80-xlarge
   - name: build_variant_gen
   - name: jsCore
   - name: .read_write_concern !.write !.aggregation
@@ -2301,13 +2301,13 @@ buildvariants:
 #     Experimental buildvariants          #
 ###########################################
 
-- name: ubuntu1804-debug-asan-all-feature-flags
-  display_name: "~ Shared Library ASAN Enterprise Ubuntu 18.04 DEBUG (all feature flags)"
+- name: rhel80-debug-asan-all-feature-flags
+  display_name: "~ Shared Library ASAN Enterprise RHEL 8.0 DEBUG (all feature flags)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
   run_on:
-  - ubuntu1804-build
+  - rhel80-build
   stepback: false
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
@@ -2316,7 +2316,7 @@ buildvariants:
     # also made to SConstruct.
     san_options: LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer" ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
     compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=address --ssl --ocsp-stapling=off --enable-free-mon=on -j$(grep -c ^processor /proc/cpuinfo)
-    multiversion_platform: ubuntu1804
+    multiversion_platform: rhel80
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under ASAN build.
     hang_analyzer_dump_core: false
@@ -2377,13 +2377,13 @@ buildvariants:
 #  - name: server_discovery_and_monitoring_json_test_TG
 #  - name: server_selection_json_test_TG
 
-- name: ubuntu1804-debug-asan-classic-engine
-  display_name: ~ ASAN Enterprise Ubuntu 18.04 DEBUG (Classic Engine)
+- name: rhel80-debug-asan-classic-engine
+  display_name: ~ ASAN Enterprise RHEL 8.0 DEBUG (Classic Engine)
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
   run_on:
-  - ubuntu1804-build
+  - rhel80-build
   stepback: false
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
@@ -2395,13 +2395,14 @@ buildvariants:
     test_flags: >-
       --mongodSetParameters="{internalQueryForceClassicEngine: true}"
       --excludeWithAnyTags=requires_fast_memory,requires_ocsp_stapling
-    multiversion_platform: ubuntu1804
+    multiversion_platform: rhel80
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under ASAN build.
     hang_analyzer_dump_core: false
     scons_cache_scope: shared
     exec_timeout_secs: 14400 # 3 hour timeout
     separate_debug: off
+    large_distro_name: rhel80-build
   tasks:
   - name: compile_test_and_package_serial_TG
   - name: compile_benchmarks
@@ -2450,13 +2451,13 @@ buildvariants:
   - name: server_discovery_and_monitoring_json_test_TG
   - name: server_selection_json_test_TG
 
-- name: ubuntu1804-debug-ubsan-all-feature-flags
-  display_name: "~ Shared Library UBSAN Enterprise Ubuntu 18.04 DEBUG (all feature flags)"
+- name: rhel80-debug-ubsan-all-feature-flags
+  display_name: "~ Shared Library UBSAN Enterprise RHEL 8.0 DEBUG (all feature flags)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
   run_on:
-  - ubuntu1804-build
+  - rhel80-build
   stepback: false
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
@@ -2471,11 +2472,12 @@ buildvariants:
       --excludeWithAnyTags=requires_ocsp_stapling
       --excludeWithAnyTags=incompatible_with_shard_merge
       --runAllFeatureFlagTests
-    multiversion_platform: ubuntu1804
+    multiversion_platform: rhel80
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under UBSAN build.
     scons_cache_scope: shared
     separate_debug: off
+    large_distro_name: rhel80-build
   tasks:
   - name: cqf
   - name: cqf_parallel
@@ -2523,13 +2525,13 @@ buildvariants:
 #  - name: server_discovery_and_monitoring_json_test_TG
 #  - name: server_selection_json_test_TG
 
-- name: ubuntu1804-debug-ubsan-classic-engine
-  display_name: ~ UBSAN Enterprise Ubuntu 18.04 DEBUG (Classic Engine)
+- name: rhel80-debug-ubsan-classic-engine
+  display_name: "~ UBSAN Enterprise RHEL 8.0 DEBUG (Classic Engine)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
   run_on:
-  - ubuntu1804-build
+  - rhel80-build
   stepback: false
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
@@ -2541,11 +2543,12 @@ buildvariants:
     test_flags: >-
       --mongodSetParameters="{internalQueryForceClassicEngine: true}"
       --excludeWithAnyTags=requires_ocsp_stapling
-    multiversion_platform: ubuntu1804
+    multiversion_platform: rhel80
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under UBSAN build.
     scons_cache_scope: shared
     separate_debug: off
+    large_distro_name: rhel80-build
   tasks:
   - name: compile_test_and_package_serial_TG
   - name: compile_benchmarks
@@ -2590,14 +2593,14 @@ buildvariants:
   - name: server_discovery_and_monitoring_json_test_TG
   - name: server_selection_json_test_TG
 
-- &ubuntu1804-debug-aubsan-lite-required-template
-  name: ubuntu1804-debug-aubsan-lite-required
-  display_name: "! Shared Library {A,UB}SAN Enterprise Ubuntu 18.04 DEBUG"
+- &rhel80-debug-aubsan-lite-required-template
+  name: rhel80-debug-aubsan-lite-required
+  display_name: "! Shared Library {A,UB}SAN Enterprise RHEL 8.0 DEBUG"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   modules:
   - enterprise
   run_on:
-  - ubuntu1804-build
+  - rhel80-build
   stepback: true
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
@@ -2614,24 +2617,25 @@ buildvariants:
     max_sub_suites: 3
     num_scons_link_jobs_available: 0.99
     separate_debug: off
+    large_distro_name: rhel80-build
   tasks:
   - name: compile_test_and_package_parallel_core_stream_TG
     distros:
-    - ubuntu1804-xlarge
+    - rhel80-xlarge
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
-    - ubuntu1804-xlarge
+    - rhel80-xlarge
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
-    - ubuntu1804-xlarge
+    - rhel80-xlarge
   - name: build_variant_gen
   - name: jsCore
   - name: jsCore_txns
   - name: unittest_shell_hang_analyzer_gen
 
-- <<: *ubuntu1804-debug-aubsan-lite-required-template
-  name: ubuntu1804-debug-aubsan-lite-all-feature-flags-required
-  display_name: "! Shared Library {A,UB}SAN Enterprise Ubuntu 18.04 DEBUG (all feature flags)"
+- <<: *rhel80-debug-aubsan-lite-required-template
+  name: rhel80-debug-aubsan-lite-all-feature-flags-required
+  display_name: "! Shared Library {A,UB}SAN Enterprise RHEL 8.0 DEBUG (all feature flags)"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
@@ -2656,17 +2660,17 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_parallel_core_stream_TG
     distros:
-    - ubuntu1804-xlarge
+    - rhel80-xlarge
   - name: build_variant_gen
   - name: jsCore
   - name: jsCore_txns
 # Disabling these tests as they are not aware of feature flags.
 #  - name: compile_test_and_package_parallel_unittest_stream_TG
 #    distros:
-#      - ubuntu1804-xlarge
+#      - rhel80-xlarge
 #  - name: compile_test_and_package_parallel_dbtest_stream_TG
 #    distros:
-#      - ubuntu1804-xlarge
+#      - rhel80-xlarge
 #  - name: unittest_shell_hang_analyzer_gen
 
 - name: enterprise-ubuntu2004-debug-tsan
@@ -2701,76 +2705,76 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
   - name: jsCore
 
-- name: enterprise-ubuntu-unoptimized-1804-64-bit
-  display_name: "~ Enterprise Ubuntu 18.04 (without Diagnostic Latches)"
+- name: enterprise-rhel80-unoptimized-64-bit
+  display_name: "~ Enterprise RHEL 8.0 (without Diagnostic Latches)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
   expansions:
-    compile_flags: MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --use-diagnostic-latches=off --link-model=dynamic
+    compile_flags: MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --use-diagnostic-latches=off --link-model=dynamic
     scons_cache_mode: all
     scons_cache_scope: shared
     num_scons_link_jobs_available: 0.99
   tasks:
   - name: compile_test_and_package_parallel_core_stream_TG
     distros:
-    - ubuntu1804-build
+    - rhel80-build
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
-    - ubuntu1804-build
+    - rhel80-build
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
-    - ubuntu1804-build
+    - rhel80-build
 
-- name: enterprise-ubuntu-no-latch-1804-64-bit
-  display_name: "~ Enterprise Ubuntu 18.04 DEBUG (Unoptimized)"
+- name: enterprise-rhel80-no-latch-64-bit
+  display_name: "~ Enterprise RHEL 8.0 DEBUG (Unoptimized)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
   expansions:
-    compile_flags: MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --dbg=on --opt=off --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --detect-odr-violations
+    compile_flags: MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --dbg=on --opt=off --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --detect-odr-violations
     scons_cache_mode: all
     scons_cache_scope: shared
     num_scons_link_jobs_available: 0.99
   tasks:
   - name: compile_test_and_package_parallel_core_stream_TG
     distros:
-    - ubuntu1804-build
+    - rhel80-build
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
-    - ubuntu1804-build
+    - rhel80-build
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
-    - ubuntu1804-build
+    - rhel80-build
 
-- name: enterprise-ubuntu-fixed-service-executor-1804-64-bit
-  display_name: "~ Enterprise Ubuntu 18.04 (with FixedServiceExecutor)"
+- name: enterprise-rhel80-fixed-service-executor-64-bit
+  display_name: "~ Enterprise RHEL 8.0 (with FixedServiceExecutor)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - ubuntu1804-test
+  - rhel80-small
   modules:
   - enterprise
   expansions:
     scons_cache_scope: shared
     scons_cache_mode: all
     num_scons_link_jobs_available: 0.99
-    compile_flags: MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
-    multiversion_platform: ubuntu1804
+    compile_flags: MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
+    multiversion_platform: rhel80
     multiversion_edition: enterprise
     test_flags: >-
       --mongosSetParameters="{initialServiceExecutorThreadingModel: borrowed}"
       --mongodSetParameters="{initialServiceExecutorThreadingModel: borrowed}"
-    large_distro_name: ubuntu1804-build
+    large_distro_name: rhel80-build
   tasks:
   - name: compile_test_and_package_parallel_core_stream_TG
     distros:
-    - ubuntu1804-build
+    - rhel80-build
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
-    - ubuntu1804-build
+    - rhel80-build
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
-    - ubuntu1804-build
+    - rhel80-build
   - name: build_variant_gen
   - name: .aggregation !.no_async
   - name: .sharding .auth
@@ -2784,35 +2788,35 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.csrs
 
-- name: enterprise-ubuntu-sdam-replica-set-monitor-1804-64-bit
-  display_name: "~ Enterprise Ubuntu 18.04 (with SdamReplicaSetMonitor)"
+- name: enterprise-rhel80-sdam-replica-set-monitor-64-bit
+  display_name: "~ Enterprise RHEL 8.0 (with SdamReplicaSetMonitor)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - ubuntu1804-test
+  - rhel80-small
   modules:
   - enterprise
   expansions:
     scons_cache_scope: shared
     scons_cache_mode: all
     num_scons_link_jobs_available: 0.99
-    compile_flags: MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
-    multiversion_platform: ubuntu1804
+    compile_flags: MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
+    multiversion_platform: rhel80
     multiversion_edition: enterprise
     test_flags: >-
       --mongosSetParameters="{replicaSetMonitorProtocol: sdam}"
       --mongodSetParameters="{replicaSetMonitorProtocol: sdam}"
       --excludeWithAnyTags=requires_streamable_rsm
-    large_distro_name: ubuntu1804-build
+    large_distro_name: rhel80-build
   tasks:
   - name: compile_test_and_package_parallel_core_stream_TG
     distros:
-    - ubuntu1804-build
+    - rhel80-build
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
-    - ubuntu1804-build
+    - rhel80-build
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
-    - ubuntu1804-build
+    - rhel80-build
   - name: build_variant_gen
   - name: .aggregation !.no_async
   - name: .sharding .auth
@@ -2824,33 +2828,33 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.csrs
 
-- name: enterprise-ubuntu-task-executor-pool-size-1804-64-bit
-  display_name: "~ Enterprise Ubuntu 18.04 (with {taskExecutorPoolSize: 4})"
+- name: enterprise-rhel80-task-executor-pool-size-64-bit
+  display_name: "~ Enterprise RHEL 8.0 (with {taskExecutorPoolSize: 4})"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - ubuntu1804-test
+  - rhel80-small
   modules:
   - enterprise
   expansions:
     scons_cache_scope: shared
     scons_cache_mode: all
     num_scons_link_jobs_available: 0.99
-    compile_flags: MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
-    multiversion_platform: ubuntu1804
+    compile_flags: MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
+    multiversion_platform: rhel80
     multiversion_edition: enterprise
     test_flags: |- # Set the taskExecutorPoolSize for all tests
       --mongosSetParameters="taskExecutorPoolSize: 4"
-    large_distro_name: ubuntu1804-build
+    large_distro_name: rhel80-build
   tasks:
   - name: compile_test_and_package_parallel_core_stream_TG
     distros:
-    - ubuntu1804-build
+    - rhel80-build
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
-    - ubuntu1804-build
+    - rhel80-build
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
-    - ubuntu1804-build
+    - rhel80-build
   - name: build_variant_gen
   - name: .aggregation !.no_async
   - name: .sharding .auth
@@ -2862,34 +2866,34 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.csrs
 
-- name: enterprise-ubuntu-sharding-task-executor-pool-rsm-matchPrimary-1804-64-bit
-  display_name: "~ Enterprise Ubuntu 18.04 (with {ShardingTaskExecutorPoolReplicaSetMatching: \"matchPrimaryNode\"})"
+- name: enterprise-rhel80-sharding-task-executor-pool-rsm-matchPrimary-64-bit
+  display_name: "~ Enterprise RHEL 8.0 (with {ShardingTaskExecutorPoolReplicaSetMatching: \"matchPrimaryNode\"})"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - ubuntu1804-test
+  - rhel80-small
   modules:
   - enterprise
   expansions:
     scons_cache_scope: shared
     scons_cache_mode: all
     num_scons_link_jobs_available: 0.99
-    compile_flags: MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
-    multiversion_platform: ubuntu1804
+    compile_flags: MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
+    multiversion_platform: rhel80
     multiversion_edition: enterprise
     test_flags: >-
       --mongosSetParameters="ShardingTaskExecutorPoolReplicaSetMatching: \"matchPrimaryNode\""
       --excludeWithAnyTags=sets_replica_set_matching_strategy
-    large_distro_name: ubuntu1804-build
+    large_distro_name: rhel80-build
   tasks:
   - name: compile_test_and_package_parallel_core_stream_TG
     distros:
-    - ubuntu1804-build
+    - rhel80-build
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
-    - ubuntu1804-build
+    - rhel80-build
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
-    - ubuntu1804-build
+    - rhel80-build
   - name: build_variant_gen
   - name: .aggregation !.no_async
   - name: .sharding .auth
@@ -2901,34 +2905,34 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.csrs
 
-- name: enterprise-ubuntu-sharding-task-executor-pool-rsm-matchBusiest-1804-64-bit
-  display_name: "~ Enterprise Ubuntu 18.04 (with {ShardingTaskExecutorPoolReplicaSetMatching: \"matchBusiestNode\"})"
+- name: enterprise-rhel80-sharding-task-executor-pool-rsm-matchBusiest-64-bit
+  display_name: "~ Enterprise RHEL 8.0 (with {ShardingTaskExecutorPoolReplicaSetMatching: \"matchBusiestNode\"})"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - ubuntu1804-test
+  - rhel80-small
   modules:
   - enterprise
   expansions:
     scons_cache_scope: shared
     scons_cache_mode: all
     num_scons_link_jobs_available: 0.99
-    compile_flags: MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
-    multiversion_platform: ubuntu1804
+    compile_flags: MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
+    multiversion_platform: rhel80
     multiversion_edition: enterprise
     test_flags: >-
       --mongosSetParameters="ShardingTaskExecutorPoolReplicaSetMatching: \"matchBusiestNode\""
       --excludeWithAnyTags=sets_replica_set_matching_strategy
-    large_distro_name: ubuntu1804-build
+    large_distro_name: rhel80-build
   tasks:
   - name: compile_test_and_package_parallel_core_stream_TG
     distros:
-    - ubuntu1804-build
+    - rhel80-build
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
-    - ubuntu1804-build
+    - rhel80-build
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
-    - ubuntu1804-build
+    - rhel80-build
   - name: build_variant_gen
   - name: .aggregation !.no_async
   - name: .sharding .auth
@@ -2940,34 +2944,34 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.csrs
 
-- name: enterprise-ubuntu-sharding-task-executor-pool-rsm-disabled-1804-64-bit
-  display_name: "~ Enterprise Ubuntu 18.04 (with {ShardingTaskExecutorPoolReplicaSetMatching: \"disabled\"})"
+- name: enterprise-rhel80-sharding-task-executor-pool-rsm-disabled-64-bit
+  display_name: "~ Enterprise RHEL 8.0 (with {ShardingTaskExecutorPoolReplicaSetMatching: \"disabled\"})"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - ubuntu1804-test
+  - rhel80-small
   modules:
   - enterprise
   expansions:
     scons_cache_scope: shared
     scons_cache_mode: all
     num_scons_link_jobs_available: 0.99
-    compile_flags: MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
-    multiversion_platform: ubuntu1804
+    compile_flags: MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
+    multiversion_platform: rhel80
     multiversion_edition: enterprise
     test_flags: >-
       --mongosSetParameters="ShardingTaskExecutorPoolReplicaSetMatching: \"disabled\""
       --excludeWithAnyTags=sets_replica_set_matching_strategy
-    large_distro_name: ubuntu1804-build
+    large_distro_name: rhel80-build
   tasks:
   - name: compile_test_and_package_parallel_core_stream_TG
     distros:
-    - ubuntu1804-build
+    - rhel80-build
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
-    - ubuntu1804-build
+    - rhel80-build
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
-    - ubuntu1804-build
+    - rhel80-build
   - name: build_variant_gen
   - name: .aggregation !.no_async
   - name: .sharding .auth
@@ -2979,26 +2983,26 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.csrs
 
-- name: enterprise-ubuntu-join-ingress-sessions-on-shutdown
-  display_name: "~ Enterprise Ubuntu 18.04 (with {joinIngressSessionsOnShutdown: \"true\"})"
+- name: enterprise-rhel80-join-ingress-sessions-on-shutdown
+  display_name: "~ Enterprise RHEL 8.0 (with {joinIngressSessionsOnShutdown: \"true\"})"
   activate: false
   run_on:
-    - ubuntu1804-test
+    - rhel80-small
   modules:
   - enterprise
   expansions:
     scons_cache_scope: shared
-    compile_flags: MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    multiversion_platform: ubuntu1804
+    compile_flags: MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    multiversion_platform: rhel80
     multiversion_edition: enterprise
     test_flags: >-
         --mongosSetParameters="joinIngressSessionsOnShutdown: \"true\""
         --mongodSetParameters="joinIngressSessionsOnShutdown: \"true\""
-    large_distro_name: ubuntu1804-build
+    large_distro_name: rhel80-build
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - ubuntu1804-build
+    - rhel80-build
   - name: build_variant_gen
   - name: .aggregation !.no_async
   - name: .sharding .auth
@@ -3039,7 +3043,7 @@ buildvariants:
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   stepback: false
   expansions:
-    selected_tests_buildvariants: enterprise-windows-required linux-64-debug-required enterprise-ubuntu-dynamic-1604-clang ubuntu1804-debug-aubsan-lite-required
+    selected_tests_buildvariants: enterprise-windows-required linux-64-debug-required enterprise-ubuntu-dynamic-1604-clang rhel80-debug-aubsan-lite-required
   tasks:
   - name: selected_tests_gen
 
@@ -3169,13 +3173,13 @@ buildvariants:
     distros:
     - windows-vsCurrent-large
 
-- name: ubuntu1804-debug-aubsan-lite_fuzzer
-  display_name: "{A,UB}SAN Enterprise Ubuntu 18.04 FUZZER"
+- name: rhel80-debug-aubsan-lite_fuzzer
+  display_name: "{A,UB}SAN Enterprise RHEL 8.0 FUZZER"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
   run_on:
-  - ubuntu1804-build
+  - rhel80-build
   stepback: false
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug

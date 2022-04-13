@@ -54,27 +54,27 @@ overrides:
   - task: replica_sets_jscore_passthrough
     exec_timeout: 150  # 2.5 hours
 
-  ubuntu1804-asan:
+  rhel80-asan:
   - task: run_unittests
     exec_timeout: 24
 
-  ubuntu1804-debug-asan:
+  rhel80-debug-asan:
   - task: run_unittests
     exec_timeout: 24
 
-  ubuntu1804-debug-aubsan-lite:
+  rhel80-debug-aubsan-lite:
   - task: run_unittests
     exec_timeout: 24
 
-  ubuntu1804-debug-ubsan:
+  rhel80-debug-ubsan:
   - task: run_unittests
     exec_timeout: 24
 
-  ubuntu1804-debug-suggested:
+  rhel80-debug-suggested:
   - task: replica_sets_jscore_passthrough
     exec_timeout: 180  # 3 hours.
 
-  ubuntu1804-ubsan:
+  rhel80-ubsan:
   - task: run_unittests
     exec_timeout: 24
 
