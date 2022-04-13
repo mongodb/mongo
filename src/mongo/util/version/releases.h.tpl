@@ -77,7 +77,8 @@
 ## Format a Version as `{major}_{minor}`.
 #def underscores(v): ${'{}_{}'.format(v.major, v.minor)}
 #def dotted(v): ${'{}.{}'.format(v.major, v.minor)}
-#def fcv_prefix(v): ${'kFullyDowngradedTo_' if v == $last_lts else 'kVersion_'}
+## TODO (SERVER-65400): Avoid generating the LTS FCV with 'kFullyDowngradedTo...'
+#def fcv_prefix(v): ${'kFullyDowngradedTo_' if v == $lower_bound_override else 'kVersion_'}
 #def fcv_cpp_name(v): ${'{}{}'.format($fcv_prefix(v), $underscores(v))}
 ##
 #def transition_enum_name(transition, first, second):
