@@ -229,9 +229,16 @@ void ChunkVersion::serializeToPositionalFormatWronglyEncodedAsBSON(StringData fi
 }
 
 void ChunkVersion::appendLegacyWithField(BSONObjBuilder* out, StringData field) const {
-    out->appendTimestamp(field, _combined);
-    out->append(field + "Epoch", _epoch);
-    out->append(field + "Timestamp", _timestamp);
+    if (feature_flags::gFeatureFlagNewPersistedChunkVersionFormat.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        ChunkVersion60Format chunkVersion(
+            _timestamp, _epoch, Timestamp(majorVersion(), minorVersion()));
+        out->append(field, chunkVersion.toBSON());
+    } else {
+        out->appendTimestamp(field, _combined);
+        out->append(field + "Epoch", _epoch);
+        out->append(field + "Timestamp", _timestamp);
+    }
 }
 
 std::string ChunkVersion::toString() const {

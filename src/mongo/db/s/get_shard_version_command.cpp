@@ -29,8 +29,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -109,7 +107,20 @@ public:
             if (cmdObj["fullMetadata"].trueValue()) {
                 BSONObjBuilder metadataBuilder(result.subobjStart("metadata"));
                 if (metadata.isSharded()) {
-                    metadata.toBSONBasic(metadataBuilder);
+                    metadataBuilder.appendTimestamp("collVersion",
+                                                    metadata.getCollVersion().toLong());
+                    metadataBuilder.append("collVersionEpoch", metadata.getCollVersion().epoch());
+                    metadataBuilder.append("collVersionTimestamp",
+                                           metadata.getCollVersion().getTimestamp());
+
+                    metadataBuilder.appendTimestamp("shardVersion",
+                                                    metadata.getShardVersionForLogging().toLong());
+                    metadataBuilder.append("shardVersionEpoch",
+                                           metadata.getShardVersionForLogging().epoch());
+                    metadataBuilder.append("shardVersionTimestamp",
+                                           metadata.getShardVersionForLogging().getTimestamp());
+
+                    metadataBuilder.append("keyPattern", metadata.getShardKeyPattern().toBSON());
 
                     BSONArrayBuilder chunksArr(metadataBuilder.subarrayStart("chunks"));
                     metadata.toBSONChunks(&chunksArr);

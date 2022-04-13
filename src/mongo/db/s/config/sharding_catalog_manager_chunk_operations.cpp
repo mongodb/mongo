@@ -943,6 +943,7 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
     const NamespaceString& nss,
     const ChunkType& migratedChunk,
     const OID& collectionEpoch,
+    const Timestamp& collectionTimestamp,
     const ShardId& fromShard,
     const ShardId& toShard,
     const boost::optional<Timestamp>& validAfter) {
@@ -1022,7 +1023,8 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
     // failed to recover the migration. Check that the collection has not been dropped and recreated
     // or had its shard key refined since the migration began, unbeknown to the shard when the
     // command was sent.
-    if (currentCollectionVersion.epoch() != collectionEpoch) {
+    if (currentCollectionVersion.epoch() != collectionEpoch ||
+        currentCollectionVersion.getTimestamp() != collectionTimestamp) {
         return {ErrorCodes::StaleEpoch,
                 str::stream() << "The epoch of collection '" << nss.ns()
                               << "' has changed since the migration began. The config server's "
@@ -1077,9 +1079,10 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
         return {ErrorCodes::ConflictingOperationInProgress,
                 str::stream()
                     << "Rejecting migration request because the version of the requested chunk "
-                    << migratedChunk.toConfigBSON()
-                    << " is older than the version of the current chunk "
-                    << currentChunk.toConfigBSON() << " on the shard " << fromShard.toString()};
+                    << migratedChunk.toConfigBSON() << "(" << migratedChunk.getVersion().toString()
+                    << ") is older than the version of the current chunk "
+                    << currentChunk.toConfigBSON() << "(" << currentChunk.getVersion().toString()
+                    << ") on shard " << fromShard.toString()};
     }
 
     // Generate the new versions of migratedChunk and controlChunk. Migrating chunk's minor version

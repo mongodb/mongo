@@ -108,18 +108,6 @@ Status splitChunkAtMultiplePoints(OperationContext* opCtx,
         .withContext("split failed");
 }
 
-void rebalanceChunk(OperationContext* opCtx, const NamespaceString& nss, const ChunkType& chunk) {
-    auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-    auto shard = shardRegistry->getConfigShard();
-    auto response = uassertStatusOK(shard->runCommandWithFixedRetryAttempts(
-        opCtx,
-        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        "admin",
-        BalanceChunkRequest::serializeToRebalanceCommandForConfig(nss, chunk),
-        Shard::RetryPolicy::kNotIdempotent));
-    uassertStatusOK(response.commandStatus);
-}
-
 /**
  * Attempts to move the chunk specified by minKey away from its current shard.
  */
@@ -134,14 +122,18 @@ void moveChunk(OperationContext* opCtx, const NamespaceString& nss, const BSONOb
 
     const auto suggestedChunk = cm.findIntersectingChunkWithSimpleCollation(minKey);
 
-    ChunkType chunkToMove;
-    chunkToMove.setCollectionUUID(cm.getUUID());
-    chunkToMove.setShard(suggestedChunk.getShardId());
-    chunkToMove.setMin(suggestedChunk.getMin());
-    chunkToMove.setMax(suggestedChunk.getMax());
-    chunkToMove.setVersion(suggestedChunk.getLastmod());
-
-    rebalanceChunk(opCtx, nss, chunkToMove);
+    auto shard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+    auto response = uassertStatusOK(shard->runCommandWithFixedRetryAttempts(
+        opCtx,
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        "admin",
+        BalanceChunkRequest::serializeToRebalanceCommandForConfig(nss,
+                                                                  suggestedChunk.getRange(),
+                                                                  cm.getUUID(),
+                                                                  suggestedChunk.getShardId(),
+                                                                  suggestedChunk.getLastmod()),
+        Shard::RetryPolicy::kNotIdempotent));
+    uassertStatusOK(response.commandStatus);
 }
 
 /**

@@ -27,20 +27,36 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/s/request_types/balance_chunk_request_type.h"
-
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/s/request_types/balance_chunk_request_type.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {
 
 using unittest::assertGet;
+
+TEST(BalanceChunkRequest, RoundTrip) {
+    UUID uuid{UUID::gen()};
+    ChunkVersion version(30, 1, OID::gen(), Timestamp{2, 0});
+    auto obj = BalanceChunkRequest::serializeToRebalanceCommandForConfig(
+        NamespaceString("DB.Test"),
+        ChunkRange(BSON("A" << 100), BSON("A" << 200)),
+        uuid,
+        ShardId("TestShard"),
+        version);
+
+    auto request =
+        assertGet(BalanceChunkRequest::parseFromConfigCommand(obj, false /* requireUUID */));
+    ASSERT_EQ(NamespaceString("DB.Test"), request.getNss());
+    ASSERT_BSONOBJ_EQ(ChunkRange(BSON("A" << 100), BSON("A" << 200)).toBSON(),
+                      request.getChunk().getRange().toBSON());
+    ASSERT_EQ(uuid, request.getChunk().getCollectionUUID());
+    ASSERT_EQ(version, request.getChunk().getVersion());
+}
 
 TEST(BalanceChunkRequest, ParseFromConfigCommandNoSecondaryThrottle) {
     const ChunkVersion version(1, 0, OID::gen(), Timestamp(1, 1));

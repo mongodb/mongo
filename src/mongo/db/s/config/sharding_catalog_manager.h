@@ -287,6 +287,7 @@ public:
                                              const NamespaceString& nss,
                                              const ChunkType& migratedChunk,
                                              const OID& collectionEpoch,
+                                             const Timestamp& collectionTimestamp,
                                              const ShardId& fromShard,
                                              const ShardId& toShard,
                                              const boost::optional<Timestamp>& validAfter);

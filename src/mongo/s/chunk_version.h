@@ -223,6 +223,10 @@ public:
      *  { ..., <field>: [ <combined major/minor> ],
      *         <field>Epoch: [ <OID epoch> ],
      *         <field>Timestamp: [ <Timestamp> ] ... }
+     *  or
+     *  { ..., <field> : {t: <Timestamp>, e: <OID>, v: <major/minor>}}.
+     *
+     * Depending on the FCV version
      */
     void appendLegacyWithField(BSONObjBuilder* out, StringData field) const;
 

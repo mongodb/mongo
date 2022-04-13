@@ -162,20 +162,9 @@ public:
     BSONObj extractDocumentKey(const BSONObj& doc) const;
 
     /**
-     * BSON output of the basic metadata information (chunk and shard version).
-     */
-    void toBSONBasic(BSONObjBuilder& bb) const;
-
-    BSONObj toBSON() const;
-
-    /**
      * String output of the collection and shard versions.
      */
     std::string toStringBasic() const;
-
-    std::string toString() const {
-        return toStringBasic();
-    }
 
     //
     // Methods used for orphan filtering and general introspection of the chunks owned by the shard

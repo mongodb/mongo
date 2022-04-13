@@ -286,7 +286,7 @@ TEST_F(ShardMetadataUtilTest, UpdateWithWriteNewChunks) {
         subMax.append("a", 10000);
     }
     splitChunkOneBuilder.append(ChunkType::shard(), lastChunk.getShard().toString());
-    collVersion.appendLegacyWithField(&splitChunkOneBuilder, ChunkType::lastmod());
+    splitChunkOneBuilder.appendTimestamp(ChunkType::lastmod(), collVersion.toLong());
     ChunkType splitChunkOne = assertGet(ChunkType::parseFromShardBSON(
         splitChunkOneBuilder.obj(), collVersion.epoch(), collVersion.getTimestamp()));
     newChunks.push_back(splitChunkOne);
@@ -300,7 +300,7 @@ TEST_F(ShardMetadataUtilTest, UpdateWithWriteNewChunks) {
     }
     splitChunkTwoMovedBuilder.append(ChunkType::max(), lastChunk.getMax());
     splitChunkTwoMovedBuilder.append(ChunkType::shard(), "altShard");
-    collVersion.appendLegacyWithField(&splitChunkTwoMovedBuilder, ChunkType::lastmod());
+    splitChunkTwoMovedBuilder.appendTimestamp(ChunkType::lastmod(), collVersion.toLong());
     ChunkType splitChunkTwoMoved = assertGet(ChunkType::parseFromShardBSON(
         splitChunkTwoMovedBuilder.obj(), collVersion.epoch(), collVersion.getTimestamp()));
     newChunks.push_back(splitChunkTwoMoved);

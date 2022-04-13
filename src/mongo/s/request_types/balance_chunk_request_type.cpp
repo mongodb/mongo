@@ -142,17 +142,19 @@ StatusWith<BalanceChunkRequest> BalanceChunkRequest::parseFromConfigCommand(cons
     return request;
 }
 
-BSONObj BalanceChunkRequest::serializeToRebalanceCommandForConfig(const NamespaceString& nss,
-                                                                  const ChunkType& chunk) {
-    invariant(chunk.validate());
-
+BSONObj BalanceChunkRequest::serializeToRebalanceCommandForConfig(
+    const NamespaceString& nss,
+    const ChunkRange& range,
+    const UUID& collectionUUID,
+    const ShardId& owningShard,
+    const ChunkVersion& expectedChunkVersion) {
     BSONObjBuilder cmdBuilder;
     cmdBuilder.append(kConfigSvrMoveChunk, 1);
     cmdBuilder.append(kNS, nss.ns());
-    cmdBuilder.appendElements(chunk.toConfigBSON());
-    // ChunkType::toConfigBSON() no longer returns the epoch
-    cmdBuilder.append(ChunkType::lastmod() + "Epoch", chunk.getVersion().epoch());
-    cmdBuilder.append(ChunkType::lastmod() + "Timestamp", chunk.getVersion().getTimestamp());
+    range.append(&cmdBuilder);
+    cmdBuilder.append(ChunkType::shard(), owningShard);
+    collectionUUID.appendToBuilder(&cmdBuilder, ChunkType::collectionUUID());
+    expectedChunkVersion.appendLegacyWithField(&cmdBuilder, ChunkType::lastmod());
     cmdBuilder.append(WriteConcernOptions::kWriteConcernField,
                       kMajorityWriteConcernNoTimeout.toBSON());
 

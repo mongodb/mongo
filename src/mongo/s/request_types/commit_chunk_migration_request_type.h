@@ -39,8 +39,8 @@ namespace mongo {
 /**
  * Creates and parses commit chunk migration command BSON objects.
  */
-struct CommitChunkMigrationRequest {
-
+class CommitChunkMigrationRequest {
+public:
     CommitChunkMigrationRequest(const NamespaceString& nss, const ChunkType& chunk)
         : _nss(nss), _migratedChunk(chunk) {}
 
@@ -78,10 +78,14 @@ struct CommitChunkMigrationRequest {
     const OID& getCollectionEpoch() {
         return _collectionEpoch;
     }
+    const Timestamp& getCollectionTimestamp() {
+        return _collectionTimestamp;
+    }
     const boost::optional<Timestamp>& getValidAfter() {
         return _validAfter;
     }
 
+private:
     // The collection for which this request applies.
     NamespaceString _nss;
 
@@ -94,7 +98,9 @@ struct CommitChunkMigrationRequest {
     // The chunk being moved.
     ChunkType _migratedChunk;
 
+    // Epoch/Timestamp of the collection, matches the ones set in `_migratedChunk`.
     OID _collectionEpoch;
+    Timestamp _collectionTimestamp;
 
     // The time of the move
     boost::optional<Timestamp> _validAfter;

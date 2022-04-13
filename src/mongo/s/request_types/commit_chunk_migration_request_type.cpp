@@ -61,6 +61,7 @@ StatusWith<ChunkType> extractChunk(const BSONObj& source, StringData field) {
     ChunkVersion version;
     try {
         version = ChunkVersion::fromBSONLegacyOrNewerFormat(fieldObj, ChunkType::lastmod());
+        uassert(644490, "Version must be set", version.isSet());
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
@@ -68,9 +69,7 @@ StatusWith<ChunkType> extractChunk(const BSONObj& source, StringData field) {
     ChunkType chunk;
     chunk.setMin(rangeWith.getValue().getMin());
     chunk.setMax(rangeWith.getValue().getMax());
-    if (version.isSet()) {
-        chunk.setVersion(version);
-    }
+    chunk.setVersion(version);
     return chunk;
 }
 
@@ -127,6 +126,7 @@ StatusWith<CommitChunkMigrationRequest> CommitChunkMigrationRequest::createFromC
         auto fromShardVersion =
             ChunkVersion::fromBSONPositionalOrNewerFormat(obj[kFromShardCollectionVersion]);
         request._collectionEpoch = fromShardVersion.epoch();
+        request._collectionTimestamp = fromShardVersion.getTimestamp();
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
@@ -163,14 +163,10 @@ void CommitChunkMigrationRequest::appendAsCommand(BSONObjBuilder* builder,
     builder->append(kToShard, toShard.toString());
     {
         BSONObjBuilder migrateChunk(builder->subobjStart(kMigratedChunk));
-        migrateChunk.appendElements(migratedChunk.toConfigBSON());
-        // ChunkType::toConfigBSON() no longer adds the epoch
-        migrateChunk.append(ChunkType::lastmod() + "Epoch", migratedChunk.getVersion().epoch());
-        migrateChunk.append(ChunkType::lastmod() + "Timestamp",
-                            migratedChunk.getVersion().getTimestamp());
+        migratedChunk.getRange().append(&migrateChunk);
+        migratedChunk.getVersion().appendLegacyWithField(&migrateChunk, ChunkType::lastmod());
     }
     fromShardCollectionVersion.serializeToBSON(kFromShardCollectionVersion, builder);
-
     builder->append(kValidAfter, validAfter);
 }
 

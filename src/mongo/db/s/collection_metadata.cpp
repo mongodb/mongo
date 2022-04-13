@@ -127,23 +127,6 @@ BSONObj CollectionMetadata::extractDocumentKey(const BSONObj& doc) const {
     return doc;
 }
 
-void CollectionMetadata::toBSONBasic(BSONObjBuilder& bb) const {
-    if (isSharded()) {
-        _cm->getVersion().appendLegacyWithField(&bb, "collVersion");
-        getShardVersionForLogging().appendLegacyWithField(&bb, "shardVersion");
-        bb.append("keyPattern", _cm->getShardKeyPattern().toBSON());
-    } else {
-        ChunkVersion::UNSHARDED().appendLegacyWithField(&bb, "collVersion");
-        ChunkVersion::UNSHARDED().appendLegacyWithField(&bb, "shardVersion");
-    }
-}
-
-BSONObj CollectionMetadata::toBSON() const {
-    BSONObjBuilder builder;
-    toBSONBasic(builder);
-    return builder.obj();
-}
-
 std::string CollectionMetadata::toStringBasic() const {
     if (isSharded()) {
         return str::stream() << "collection version: " << _cm->getVersion().toString()

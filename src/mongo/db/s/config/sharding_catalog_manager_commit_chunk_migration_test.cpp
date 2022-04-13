@@ -98,6 +98,7 @@ TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectly) {
                                                             kNamespace,
                                                             migratedChunk,
                                                             migratedChunk.getVersion().epoch(),
+                                                            collTimestamp,
                                                             ShardId(shard0.getName()),
                                                             ShardId(shard1.getName()),
                                                             validAfter));
@@ -176,6 +177,7 @@ TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectlyWithoutControlChunk) {
                                                                 kNamespace,
                                                                 chunk0,
                                                                 origVersion.epoch(),
+                                                                collTimestamp,
                                                                 ShardId(shard0.getName()),
                                                                 ShardId(shard1.getName()),
                                                                 validAfter);
@@ -241,6 +243,7 @@ TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandNoCtlTrimHistory) {
                                                                 kNamespace,
                                                                 chunk0,
                                                                 origVersion.epoch(),
+                                                                collTimestamp,
                                                                 ShardId(shard0.getName()),
                                                                 ShardId(shard1.getName()),
                                                                 validAfter);
@@ -302,6 +305,7 @@ TEST_F(CommitChunkMigrate, RejectOutOfOrderHistory) {
                                                                 kNamespace,
                                                                 chunk0,
                                                                 origVersion.epoch(),
+                                                                origVersion.getTimestamp(),
                                                                 ShardId(shard0.getName()),
                                                                 ShardId(shard1.getName()),
                                                                 validAfter);
@@ -357,6 +361,7 @@ TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch0) {
                                                                 kNamespace,
                                                                 chunk0,
                                                                 OID::gen(),
+                                                                Timestamp(52),
                                                                 ShardId(shard0.getName()),
                                                                 ShardId(shard1.getName()),
                                                                 validAfter);
@@ -415,6 +420,7 @@ TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch1) {
                                                                 kNamespace,
                                                                 chunk0,
                                                                 origVersion.epoch(),
+                                                                origVersion.getTimestamp(),
                                                                 ShardId(shard0.getName()),
                                                                 ShardId(shard1.getName()),
                                                                 validAfter);
@@ -474,6 +480,7 @@ TEST_F(CommitChunkMigrate, CommitWithLastChunkOnShardShouldNotAffectOtherChunks)
                                                                 kNamespace,
                                                                 chunk0,
                                                                 origVersion.epoch(),
+                                                                origVersion.getTimestamp(),
                                                                 ShardId(shard0.getName()),
                                                                 ShardId(shard1.getName()),
                                                                 validAfter);
@@ -545,6 +552,7 @@ TEST_F(CommitChunkMigrate, RejectMissingChunkVersion) {
                                                   kNamespace,
                                                   migratedChunk,
                                                   origVersion.epoch(),
+                                                  origVersion.getTimestamp(),
                                                   ShardId(shard0.getName()),
                                                   ShardId(shard1.getName()),
                                                   validAfter),
@@ -596,6 +604,7 @@ TEST_F(CommitChunkMigrate, RejectOlderChunkVersion) {
                                              kNamespace,
                                              migratedChunk,
                                              origVersion.epoch(),
+                                             origVersion.getTimestamp(),
                                              ShardId(shard0.getName()),
                                              ShardId(shard1.getName()),
                                              validAfter);
@@ -647,6 +656,7 @@ TEST_F(CommitChunkMigrate, RejectMismatchedEpoch) {
                                              kNamespace,
                                              migratedChunk,
                                              origVersion.epoch(),
+                                             origVersion.getTimestamp(),
                                              ShardId(shard0.getName()),
                                              ShardId(shard1.getName()),
                                              validAfter);
@@ -745,6 +755,7 @@ public:
                                                    kNamespace,
                                                    migratedChunk,
                                                    migratedChunk.getVersion().epoch(),
+                                                   migratedChunk.getVersion().getTimestamp(),
                                                    donor,
                                                    recipient,
                                                    validAfter));

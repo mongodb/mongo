@@ -29,8 +29,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -105,7 +103,10 @@ public:
             uassert(ErrorCodes::NamespaceNotSharded,
                     str::stream() << "Collection " << nss.ns() << " is not sharded.",
                     cm.isSharded());
-            cm.getVersion().appendLegacyWithField(&result, "version");
+
+            result.appendTimestamp("version", cm.getVersion().toLong());
+            result.append("versionEpoch", cm.getVersion().epoch());
+            result.append("versionTimestamp", cm.getVersion().getTimestamp());
 
             if (cmdObj["fullMetadata"].trueValue()) {
                 BSONArrayBuilder chunksArrBuilder;

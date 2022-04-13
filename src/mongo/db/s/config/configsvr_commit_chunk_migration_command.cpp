@@ -135,6 +135,7 @@ public:
             nss,
             commitRequest.getMigratedChunk(),
             commitRequest.getCollectionEpoch(),
+            commitRequest.getCollectionTimestamp(),
             commitRequest.getFromShard(),
             commitRequest.getToShard(),
             commitRequest.getValidAfter());

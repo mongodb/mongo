@@ -62,8 +62,10 @@ public:
      * better location for a chunk.
      */
     static BSONObj serializeToRebalanceCommandForConfig(const NamespaceString& nss,
-                                                        const ChunkType& chunk);
-
+                                                        const ChunkRange& range,
+                                                        const UUID& collectionUUID,
+                                                        const ShardId& owningShard,
+                                                        const ChunkVersion& expectedChunkVersion);
 
     const NamespaceString& getNss() const {
         return _nss;
