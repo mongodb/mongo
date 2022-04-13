@@ -851,8 +851,7 @@ __txn_timestamp_usage_check(WT_SESSION_IMPL *session, WT_TXN_OP *op, WT_UPDATE *
     /* Skip timestamp usage checks unless both assert and usage configurations are set. */
     if (!LF_ISSET(WT_DHANDLE_TS_ASSERT_WRITE))
         return;
-    if (!LF_ISSET(WT_DHANDLE_TS_ALWAYS | WT_DHANDLE_TS_MIXED_MODE | WT_DHANDLE_TS_NEVER |
-          WT_DHANDLE_TS_ORDERED))
+    if (!LF_ISSET(WT_DHANDLE_TS_MIXED_MODE | WT_DHANDLE_TS_NEVER | WT_DHANDLE_TS_ORDERED))
         return;
 
     /* Timestamps are ignored on logged files. */
@@ -865,16 +864,6 @@ __txn_timestamp_usage_check(WT_SESSION_IMPL *session, WT_TXN_OP *op, WT_UPDATE *
      */
     if (F_ISSET(S2C(session), WT_CONN_RECOVERING))
         return;
-
-    /* Check for required timestamps. */
-    if (LF_ISSET(WT_DHANDLE_TS_ALWAYS) && !txn_has_ts && txn->mod_count != 0) {
-        __wt_err(session, EINVAL,
-          "%s: " WT_TS_VERBOSE_PREFIX "timestamp required by table configuration and none set",
-          name);
-#ifdef HAVE_DIAGNOSTIC
-        __wt_abort(session);
-#endif
-    }
 
     op_ts = upd->start_ts != WT_TS_NONE ? upd->start_ts : txn->commit_timestamp;
 

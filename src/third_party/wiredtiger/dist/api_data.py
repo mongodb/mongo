@@ -71,21 +71,15 @@ common_runtime_config = [
         this option is no longer supported, retained for backward compatibility''',
         type='list', choices=['write_timestamp'], undoc=True),
     Config('write_timestamp_usage', 'none', r'''
-        describe how timestamps are expected to be used on modifications
-        to the table. This option should be used in conjunction with the
-        corresponding \c write_timestamp configuration under the \c assert
-        option to provide logging and assertions for incorrect timestamp
-        usage. The choices are \c always which ensures a timestamp is used
-        for every operation on a table, \c ordered which ensures that once
-        timestamps are used for a key, they are always used, and also that
-        subsequent updates to each key must use increasing timestamps,
-        \c mixed_mode is like \c ordered except that updates with no timestamp
-        are allowed at any time, \c never enforces that timestamps are never
-        used for a table and \c none does not enforce any expectation on
-        timestamp usage meaning that no log message or assertions will be
-        produced regardless of the corresponding \c assert setting. (The
-        \c key_consistent choice is no longer supported, retained for
-        backward compatibility.)''',
+        describe how timestamps are expected to be used on table modifications. This option should
+        be used in conjunction with the corresponding \c write_timestamp configuration under the
+        \c assert option to provide errors and assertions for incorrect timestamp usage. The
+        choices are the default, which ensures that once timestamps are used for a key, they are
+        always used, and also that multiple updates to a key never use decreasing timestamps,
+        \c mixed_mode, which additionally allows updates with no timestamp even after timestamps
+        are first used, and \c never which enforces that timestamps are never used for a table.
+        (The \c always, \c key_consistent and \c ordered choices should not be used, and are
+        retained for backward compatibility.)''',
         choices=['always', 'key_consistent', 'mixed_mode', 'never', 'none', 'ordered']),
 ]
 

@@ -35,8 +35,18 @@ regardless of their read timestamps.
 
 @section timestamp_txn_api_configure Enforcing application timestamp behavior
 
-Enforcing application timestamp behavior (for example, requiring updates to a
-single data item appear in timestamp order), can be challenging for application
+By default, WiredTiger requires timestamps be used in "ordered" mode:
+updates to a table can be made either with and without a commit timestamp,
+but once a commit timestamp is used to update a key, all future updates to
+the key will require a commit timestamp. Further, each update to a key must
+have a commit timestamp at or after any previous update.
+
+These requirements can be changed on a per-table basis to require no updates
+to a table have timestamps, or that updates without timestamps be permitted
+even when a key has already been updated using a timestamp. Using timestamps
+that are before previously applied timestamps is never permitted.
+
+Enforcing application timestamp behavior can be challenging for application
 writers. WiredTiger includes diagnostic support for many common restrictions;
 see @ref timestamp_misc_diagnostic.
 
