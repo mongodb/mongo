@@ -909,6 +909,31 @@ public:
     }
 };
 
+class ValidateIndexMetadata : public ValidateBase {
+public:
+    ValidateIndexMetadata() : ValidateBase(/*full=*/false, /*background=*/false) {}
+
+    void run() {
+        SharedBufferFragmentBuilder pooledBuilder(
+            KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
+
+        // Create an index with bad index specs.
+        lockDb(MODE_X);
+
+        const std::string indexName = "bad_specs_index";
+        auto status =
+            dbtests::createIndexFromSpec(&_opCtx,
+                                         coll()->ns().ns(),
+                                         BSON("name" << indexName << "key" << BSON("a" << 1) << "v"
+                                                     << static_cast<int>(kIndexVersion) << "sparse"
+                                                     << "false"));
+
+        ASSERT_OK(status);
+        releaseDb();
+        ensureValidateFailed();
+    }
+};
+
 template <bool full, bool background>
 class ValidateWildCardIndex : public ValidateBase {
 public:
@@ -4486,6 +4511,7 @@ public:
         // Tests for index validation.
         add<ValidateIndexEntry<false, false>>();
         add<ValidateIndexEntry<false, true>>();
+        add<ValidateIndexMetadata>();
 
         // Tests that the 'missingIndexEntries' and 'extraIndexEntries' field are populated
         // correctly.
