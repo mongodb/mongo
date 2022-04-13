@@ -41,11 +41,9 @@ namespace mongo {
 class CollectionMock : public Collection {
 public:
     explicit CollectionMock(const NamespaceString& nss)
-        : CollectionMock(nss, std::unique_ptr<IndexCatalog>()) {}
+        : CollectionMock(UUID::gen(), nss, std::unique_ptr<IndexCatalog>()) {}
     CollectionMock(const UUID& uuid, const NamespaceString& nss)
         : CollectionMock(uuid, nss, std::unique_ptr<IndexCatalog>()) {}
-    CollectionMock(const NamespaceString& nss, std::unique_ptr<IndexCatalog> indexCatalog)
-        : CollectionMock(UUID::gen(), nss, std::unique_ptr<IndexCatalog>()) {}
     CollectionMock(const UUID& uuid,
                    const NamespaceString& nss,
                    std::unique_ptr<IndexCatalog> indexCatalog)
