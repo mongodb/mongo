@@ -29,8 +29,6 @@ selector:
   - jstests/replsets/transactions_committed_with_tickets_exhausted.js
   # This test disables test commands which is incompatible with this suite.
   - jstests/replsets/test_only_repl_commands.js
-  exclude_with_any_tags:
-  - disabled_due_to_server_61671
 
 executor:
   config:

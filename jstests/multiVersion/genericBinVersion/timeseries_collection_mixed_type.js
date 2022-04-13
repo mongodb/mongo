@@ -1,6 +1,8 @@
 /**
  * Test that variable-type fields are found correctly in upgraded timeseries collections with dirty
  * data.
+ *
+ * @tags: [disabled_for_fcv_6_1_upgrade]
  */
 
 (function() {

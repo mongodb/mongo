@@ -109,6 +109,8 @@
 
         # Skip any tests that run with auth explicitly.
         - jstests/multiVersion/genericBinVersion/load_keys_on_upgrade.js
+      exclude_with_any_tags:
+        - disabled_for_fcv_6_1_upgrade
 
 - name: multiversion_sanity_check_selector
   value:
@@ -125,7 +127,7 @@
         - multiversion_incompatible
         - backport_required_multiversion
         - replica_sets_multiversion_backport_required_multiversion
-        - disabled_due_to_server_60490
+        - disabled_for_fcv_6_1_upgrade
       exclude_files:
         - jstests/replsets/initial_sync_rename_collection.js
         - jstests/replsets/initial_sync_drop_collection.js
@@ -194,7 +196,7 @@
         - multiversion_incompatible
         - backport_required_multiversion
         - replica_sets_multiversion_backport_required_multiversion
-        - disabled_due_to_server_60490
+        - disabled_for_fcv_6_1_upgrade
       exclude_files:
         - jstests/sharding/**/libs/**/*.js
         # Enable when 4.6 becomes last stable

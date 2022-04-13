@@ -1,6 +1,8 @@
 /**
  * Tests that there are no upgrade or downgrade requirements for secondary indexes on time-series
  * measurements between kLastContinuous and kLatest.
+ *
+ * @tags: [disabled_for_fcv_6_1_upgrade]
  */
 (function() {
 "use strict";

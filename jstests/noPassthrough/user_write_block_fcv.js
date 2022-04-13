@@ -6,6 +6,7 @@
 //   requires_fcv_60,
 //   requires_non_retryable_commands,
 //   requires_replication,
+//   disabled_for_fcv_6_1_upgrade,
 // ]
 
 load("jstests/noPassthrough/libs/user_write_blocking.js");

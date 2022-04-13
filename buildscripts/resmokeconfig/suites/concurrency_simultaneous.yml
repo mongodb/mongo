@@ -39,7 +39,6 @@ selector:
   - uses_transactions
   - requires_replication
   - requires_sharding
-  - disabled_due_to_server_61671
   group_size: 10
   group_count_multiplier: 2.5
 

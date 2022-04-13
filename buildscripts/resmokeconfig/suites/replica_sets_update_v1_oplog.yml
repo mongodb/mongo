@@ -8,8 +8,6 @@ selector:
   - jstests/replsets/v2_delta_oplog_entries.js
   - jstests/replsets/rollback_with_coalesced_txn_table_updates_during_oplog_application.js
   - jstests/replsets/tenant_migration_recipient_fetches_retryable_writes_entry_after_committed_snapshot.js
-  exclude_with_any_tags:
-  - disabled_due_to_server_61671
 
 executor:
   config:

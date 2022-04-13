@@ -7,6 +7,8 @@
  * - Create a new collection.
  * - Insert a document into the new collection.
  * - Create an index on the new collection.
+ *
+ * @tags: [disabled_for_fcv_6_1_upgrade]
  */
 
 (function() {

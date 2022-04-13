@@ -4,8 +4,6 @@ selector:
   roots:
   - jstests/replsets/*.js
   exclude_files:
-  exclude_with_any_tags:
-  - disabled_due_to_server_61671
 
 executor:
   config:

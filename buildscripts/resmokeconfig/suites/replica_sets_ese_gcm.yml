@@ -10,7 +10,6 @@ selector:
   - src/mongo/db/modules/enterprise/jstests/fcbis/*.js
   exclude_with_any_tags:
   - does_not_support_encrypted_storage_engine
-  - disabled_due_to_server_61671
   # Shard merge protocol won't work with encrypted storage engines.
   - serverless
 executor:

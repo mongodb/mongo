@@ -6,8 +6,6 @@ selector:
   exclude_files:
   # Skip until SERVER-25618 is resolved.
   - jstests/auth/repl.js
-  exclude_with_any_tags:
-  - disabled_due_to_server_61671
 
 # Auth tests start their own mongod's.
 executor:

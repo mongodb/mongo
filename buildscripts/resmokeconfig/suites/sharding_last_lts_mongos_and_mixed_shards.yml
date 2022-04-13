@@ -8,8 +8,6 @@ selector:
   #  - jstests/sharding/**/*.js
   - jstests/sharding/query/*.js
   - jstests/sharding/change_streams/*.js
-  exclude_with_any_tags:
-  - disabled_due_to_server_60490
   exclude_files:
   # SERVER-33683: We added a restriction on using an aggregation within a transaction against
   # mongos. This should be removed and the test can be adjusted and re-added to this passthrough.

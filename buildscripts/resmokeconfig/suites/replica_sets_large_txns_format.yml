@@ -6,7 +6,6 @@ selector:
   exclude_with_any_tags:
   # Transactions are not allowed to operate on capped collections.
   - requires_capped
-  - disabled_due_to_server_61671
   exclude_files:
 
 executor:
