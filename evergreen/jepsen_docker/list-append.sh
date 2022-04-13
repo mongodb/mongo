@@ -1,7 +1,10 @@
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
 . "$DIR/../prelude.sh"
 
-set -euo pipefail
+# this file does not use set -euo pipefail because we determine test success or
+# failure parsing the log file, instead of the return value.
+# This whole script must run to ensure the report is generated and test
+# artifacts are placed in the right location.
 
 cd jepsen/docker
 
