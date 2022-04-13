@@ -49,10 +49,10 @@ secondaryDB = secondary.getDB(dbName);
 assert.commandFailedWithCode(primaryDB.runCommand({listIndexes: collName}), 5254501);
 
 let validateRes = assert.commandWorked(primaryDB.runCommand({validate: collName}));
-assert(validateRes.valid, "validate should fail: " + tojson(validateRes));
+assert(!validateRes.valid, "validate should fail: " + tojson(validateRes));
 
 validateRes = assert.commandWorked(secondaryDB.runCommand({validate: collName}));
-assert(validateRes.valid, "validate should fail: " + tojson(validateRes));
+assert(!validateRes.valid, "validate should fail: " + tojson(validateRes));
 
 // Use collMod to fix the invalid index options in the collection.
 assert.commandWorked(primaryDB.runCommand({collMod: collName}));

@@ -417,13 +417,14 @@ void _validateCatalogEntry(OperationContext* opCtx,
         const std::string indexName = indexEntry->descriptor()->indexName();
 
         Status status =
-            index_key_validate::validateIndexSpecFieldNames(indexEntry->descriptor()->infoObj());
+            index_key_validate::validateIndexSpec(opCtx, indexEntry->descriptor()->infoObj())
+                .getStatus();
         if (!status.isOK()) {
             results->valid = false;
             results->errors.push_back(
-                fmt::format("The index specification for index '{}' contains invalid field names. "
-                            "{}. Run the 'collMod' command on the collection without any arguments "
-                            "to remove the invalid index options",
+                fmt::format("The index specification for index '{}' contains invalid fields. {}. "
+                            "Run the 'collMod' command on the collection without any arguments "
+                            "to fix the invalid index options",
                             indexName,
                             status.reason()));
         }
