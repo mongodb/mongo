@@ -17,6 +17,7 @@ ASAN
 ASM
 AUS
 AWS
+AWS's
 Addr
 Ailamaki
 Alakuijala
@@ -99,6 +100,7 @@ Coverity
 CreateFileMapping
 CreateFileMappingW
 CreateFileW
+Crt
 Crummey
 CustomersPhone
 DAX
@@ -268,6 +270,7 @@ LibFuzzer
 LmRrSVv
 LoadLoad
 LockFile
+LogSystemInterface
 Lookaside
 Lookup
 MADV
@@ -392,6 +395,7 @@ RocksDB
 Rogerio
 Runtime
 SDK
+SDK's
 SDKOptions
 SIMD
 SLIST

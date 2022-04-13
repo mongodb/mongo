@@ -1,4 +1,32 @@
-#include <aws/core/Aws.h>
+/*-
+ * Public Domain 2014-present MongoDB, Inc.
+ * Public Domain 2008-2014 WiredTiger, Inc.
+ *
+ * This is free and unencumbered software released into the public domain.
+ *
+ * Anyone is free to copy, modify, publish, use, compile, sell, or
+ * distribute this software, either in source code form or as a compiled
+ * binary, for any purpose, commercial or non-commercial, and by any
+ * means.
+ *
+ * In jurisdictions that recognize copyright laws, the author or authors
+ * of this software dedicate any and all copyright interest in the
+ * software to the public domain. We make this dedication for the benefit
+ * of the public at large and to the detriment of our heirs and
+ * successors. We intend this dedication to be an overt act of
+ * relinquishment in perpetuity of all present and future rights to this
+ * software under copyright law.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ */
+#include "s3_connection.h"
+
 #include <aws/s3-crt/model/DeleteObjectRequest.h>
 #include <aws/s3-crt/model/ListObjectsV2Request.h>
 #include <aws/s3-crt/model/PutObjectRequest.h>
@@ -6,52 +34,41 @@
 #include <aws/s3-crt/model/HeadObjectRequest.h>
 #include <aws/s3-crt/model/HeadBucketRequest.h>
 
-#include "s3_connection.h"
-
 #include <fstream>
 #include <iostream>
-#include <string>
-#include <vector>
 
-#define S3_ALLOCATION_TAG ""
-/*
- * S3Connection --
- *     Constructor for AWS S3 bucket connection with provided credentials.
- */
+// Constructor for AWS S3 bucket connection with provided credentials.
 S3Connection::S3Connection(const Aws::Auth::AWSCredentials &credentials,
   const Aws::S3Crt::ClientConfiguration &config, const std::string &bucketName,
   const std::string &objPrefix)
     : _s3CrtClient(credentials, config), _bucketName(bucketName), _objectPrefix(objPrefix)
 {
-    /* Confirm that we can access the bucket, else fail. */
+    // Confirm that we can access the bucket, else fail.
     bool exists;
     int ret = BucketExists(exists);
-    if (ret != 0 || !exists)
+    if (!exists)
         throw std::invalid_argument(_bucketName + " : No such bucket.");
+    if (ret != 0)
+        throw std::invalid_argument(_bucketName + " :Unable to access bucket.");
 }
 
-/*
- * S3Connection --
- *     Constructor for AWS S3 bucket connection with credentials in local file.
- *     https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
- */
+// Constructor for AWS S3 bucket connection with credentials in local file.
 S3Connection::S3Connection(const Aws::S3Crt::ClientConfiguration &config,
   const std::string &bucketName, const std::string &objPrefix)
     : _s3CrtClient(config), _bucketName(bucketName), _objectPrefix(objPrefix)
 {
-    /* Confirm that we can access the bucket, else fail. */
+    // Confirm that we can access the bucket, else fail.
     bool exists;
     int ret = BucketExists(exists);
-    if (ret != 0 || !exists)
+    if (!exists)
         throw std::invalid_argument(_bucketName + " : No such bucket.");
+    if (ret != 0)
+        throw std::invalid_argument(_bucketName + " : Unable to access bucket.");
 }
 
-/*
- * ListObjects --
- *     Builds a list of object names, with prefix matching, from an S3 bucket into a vector. The
- *     batchSize parameter specifies the maximum number of objects returned in each AWS response, up
- *     to 1000. Returns 0 if success, otherwise 1.
- */
+// Builds a list of object names, with prefix matching, from an S3 bucket into a vector. The
+// batchSize parameter specifies the maximum number of objects returned in each AWS response, up
+// to 1000. Returns 0 if success, otherwise 1.
 int
 S3Connection::ListObjects(const std::string &prefix, std::vector<std::string> &objects,
   uint32_t batchSize, bool listSingle) const
@@ -66,14 +83,14 @@ S3Connection::ListObjects(const std::string &prefix, std::vector<std::string> &o
         return (1);
     auto result = outcomes.GetResult();
 
-    /* Returning the object name with the prefix stripped. */
+    // Returning the object name with the prefix stripped.
     for (const auto &object : result.GetContents())
         objects.push_back(object.GetKey().substr(_objectPrefix.length()));
 
     if (listSingle)
         return (0);
 
-    /* Continuation token will be an empty string if we have returned all possible objects. */
+    // Continuation token will be an empty string if we have returned all possible objects.
     std::string continuationToken = result.GetNextContinuationToken();
     while (continuationToken != "") {
         request.SetContinuationToken(continuationToken);
@@ -88,15 +105,12 @@ S3Connection::ListObjects(const std::string &prefix, std::vector<std::string> &o
     return (0);
 }
 
-/*
- * PutObject --
- *     Puts an object into an S3 bucket. Returns 0 if success, otherwise 1.
- */
+// Puts an object into an S3 bucket. Returns 0 if success, otherwise 1.
 int
 S3Connection::PutObject(const std::string &objectKey, const std::string &fileName) const
 {
     std::shared_ptr<Aws::IOStream> inputData = Aws::MakeShared<Aws::FStream>(
-      "s3-source", fileName.c_str(), std::ios_base::in | std::ios_base::binary);
+      s3AllocationTag, fileName.c_str(), std::ios_base::in | std::ios_base::binary);
 
     Aws::S3Crt::Model::PutObjectRequest request;
     request.SetBucket(_bucketName);
@@ -111,10 +125,7 @@ S3Connection::PutObject(const std::string &objectKey, const std::string &fileNam
     return (1);
 }
 
-/*
- * DeleteObject --
- *     Deletes an object from S3 bucket. Returns 0 if success, otherwise 1.
- */
+// Deletes an object from S3 bucket. Returns 0 if success, otherwise 1.
 int
 S3Connection::DeleteObject(const std::string &objectKey) const
 {
@@ -129,24 +140,19 @@ S3Connection::DeleteObject(const std::string &objectKey) const
     return (1);
 }
 
-/*
- * GetObject --
- *     Retrieves an object from S3. The object is downloaded to disk at the specified location.
- */
+// Retrieves an object from S3. The object is downloaded to disk at the specified location.
 int
 S3Connection::GetObject(const std::string &objectKey, const std::string &path) const
 {
     Aws::S3Crt::Model::GetObjectRequest request;
     request.SetBucket(_bucketName);
     request.SetKey(_objectPrefix + objectKey);
-    /*
-     * The S3 Object should be downloaded to disk rather than into an in-memory buffer. Use a custom
-     * response stream factory to specify how the response should be downloaded.
-     * https://sdk.amazonaws.com/cpp/api/0.14.3/class_aws_1_1_utils_1_1_stream_1_1_response_stream.html
-     */
+
+    // The S3 Object should be downloaded to disk rather than into an in-memory buffer. Use a custom
+    // response stream factory to specify how the response should be downloaded.
     request.SetResponseStreamFactory([=]() {
         return (Aws::New<Aws::FStream>(
-          S3_ALLOCATION_TAG, path, std::ios_base::out | std::ios_base::binary));
+          s3AllocationTag, path, std::ios_base::out | std::ios_base::binary));
     });
 
     if (!_s3CrtClient.GetObject(request).IsSuccess())
@@ -155,11 +161,8 @@ S3Connection::GetObject(const std::string &objectKey, const std::string &path) c
     return (0);
 }
 
-/*
- * ObjectExists --
- *     Checks whether an object with the given key exists in the S3 bucket and also retrieves
- *     size of the object.
- */
+// Checks whether an object with the given key exists in the S3 bucket and also retrieves
+// size of the object.
 int
 S3Connection::ObjectExists(const std::string &objectKey, bool &exists, size_t &objectSize) const
 {
@@ -171,10 +174,8 @@ S3Connection::ObjectExists(const std::string &objectKey, bool &exists, size_t &o
     request.SetKey(_objectPrefix + objectKey);
     Aws::S3Crt::Model::HeadObjectOutcome outcome = _s3CrtClient.HeadObject(request);
 
-    /*
-     * If an object with the given key does not exist the HEAD request will return a 404.
-     * https://docs.aws.amazon.com/AmazonS3/latest/API/API_HeadObject.html Do not fail in this case.
-     */
+    // If an object with the given key does not exist the HEAD request will return a 404.
+    // Do not fail in this case.
     if (outcome.IsSuccess()) {
         exists = true;
         objectSize = outcome.GetResult().GetContentLength();
@@ -182,17 +183,12 @@ S3Connection::ObjectExists(const std::string &objectKey, bool &exists, size_t &o
     } else if (outcome.GetError().GetResponseCode() == Aws::Http::HttpResponseCode::NOT_FOUND)
         return (0);
 
-    /*
-     * Fix later, return a proper error code. Not sure if we always have
-     * outcome.GetError().GetResponseCode()
-     */
+    // Fix later, return a proper error code. Not sure if we always have
+    // outcome.GetError().GetResponseCode()
     return (1);
 }
 
-/*
- * BucketExists --
- *     Checks whether the bucket configured for the class is accessible to us or not.
- */
+// Checks whether the bucket configured for the class is accessible to us or not.
 int
 S3Connection::BucketExists(bool &exists) const
 {
@@ -202,19 +198,15 @@ S3Connection::BucketExists(bool &exists) const
     request.WithBucket(_bucketName);
     Aws::S3Crt::Model::HeadBucketOutcome outcome = _s3CrtClient.HeadBucket(request);
 
-    /*
-     * If an object with the given key does not exist the HEAD request will return a 404.
-     * https://docs.aws.amazon.com/AmazonS3/latest/API/API_HeadBucket.html Do not fail in this case.
-     */
+    // If an object with the given key does not exist the HEAD request will return a 404.
+    // Do not fail in this case.
     if (outcome.IsSuccess()) {
         exists = true;
         return (0);
     } else if (outcome.GetError().GetResponseCode() == Aws::Http::HttpResponseCode::NOT_FOUND)
         return (0);
 
-    /*
-     * Fix later, return a proper error code. Not sure if we always have
-     * outcome.GetError().GetResponseCode()
-     */
+    // Fix later, return a proper error code. Not sure if we always have
+    // outcome.GetError().GetResponseCode()
     return (1);
 }
