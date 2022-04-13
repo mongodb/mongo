@@ -34,12 +34,14 @@
 #include "mongo/db/ops/write_ops_retryability.h"
 
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/repl/image_collection_entry_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/redaction.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 namespace {
@@ -118,8 +120,14 @@ BSONObj extractPreOrPostImage(OperationContext* opCtx, const repl::OplogEntry& o
         LogicalSessionId sessionId = oplog.getSessionId().get();
         TxnNumber txnNumber = oplog.getTxnNumber().get();
         Timestamp ts = oplog.getTimestamp();
+        auto curOp = CurOp::get(opCtx);
+        const std::string existingNS = curOp->getNS();
         BSONObj imageDoc = client.findOne(NamespaceString::kConfigImagesNamespace,
                                           BSON("_id" << sessionId.toBSON()));
+        {
+            stdx::lock_guard<Client> clientLock(*opCtx->getClient());
+            curOp->setNS_inlock(existingNS);
+        }
         if (imageDoc.isEmpty()) {
             LOGV2_WARNING(5676402,
                           "Image lookup for a retryable findAndModify was not found",
