@@ -133,10 +133,9 @@ class test_tiered07(wttest.WiredTigerTestCase):
 
         # By default, the remove_files configuration for drop is true. This means that the
         # drop operation for tiered tables should both remove the files from the metadata
-        # file and remove the corresponding local object files in the directory. Currently the
-        # below code is commented as the files are not removed from the directory. FIXME: WT-9003
-        # self.assertFalse(os.path.isfile("abc-0000000001.wtobj"))
-        # self.assertFalse(os.path.isfile("abc-0000000002.wtobj"))
+        # file and remove the corresponding local object files in the directory.
+        self.assertFalse(os.path.isfile("abc-0000000001.wtobj"))
+        self.assertFalse(os.path.isfile("abc-0000000002.wtobj"))
 
         # Dropping a table using the force setting should succeed even if the table does not exist.
         self.session.drop(self.localuri, 'force=true')

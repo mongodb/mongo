@@ -181,8 +181,8 @@ __drop_tiered(WT_SESSION_IMPL *session, const char *uri, bool force, const char 
     WT_DECL_RET;
     WT_TIERED *tiered;
     u_int i;
-    const char *name;
-    bool remove_files;
+    const char *filename, *name;
+    bool exist, remove_files;
 
     WT_RET(__wt_config_gets(session, cfg, "remove_files", &cval));
     remove_files = cval.val != 0;
@@ -205,8 +205,11 @@ __drop_tiered(WT_SESSION_IMPL *session, const char *uri, bool force, const char 
             session, ret = __wt_conn_dhandle_close_all(session, tier->name, true, force)));
         WT_ERR(ret);
         WT_ERR(__wt_metadata_remove(session, tier->name));
-        if (remove_files)
-            WT_TRET(__wt_meta_track_drop(session, tier->name));
+        if (remove_files) {
+            filename = tier->name;
+            WT_PREFIX_SKIP_REQUIRED(session, filename, "file:");
+            WT_ERR(__wt_meta_track_drop(session, filename));
+        }
     }
 
     /* Close any dhandle and remove any tier: entry from metadata. */
@@ -234,8 +237,13 @@ __drop_tiered(WT_SESSION_IMPL *session, const char *uri, bool force, const char 
         WT_ERR(__wt_tiered_name(session, &tiered->iface, i, WT_TIERED_NAME_OBJECT, &name));
         __wt_verbose(session, WT_VERB_TIERED, "DROP_TIERED: remove object %s from metadata", name);
         WT_ERR_NOTFOUND_OK(__wt_metadata_remove(session, name), false);
-        if (remove_files && tier != NULL)
-            WT_TRET(__wt_meta_track_drop(session, tier->name));
+        if (remove_files && tier != NULL) {
+            filename = name;
+            WT_PREFIX_SKIP_REQUIRED(session, filename, "object:");
+            WT_ERR(__wt_fs_exist(session, filename, &exist));
+            if (exist)
+                WT_ERR(__wt_meta_track_drop(session, filename));
+        }
         __wt_free(session, name);
     }
 
@@ -243,7 +251,7 @@ __drop_tiered(WT_SESSION_IMPL *session, const char *uri, bool force, const char 
      * Close all btree handles associated with this table. This must be done after we're done using
      * the tiered structure because that is from the dhandle.
      */
-    WT_TRET(__wt_session_release_dhandle(session));
+    WT_ERR(__wt_session_release_dhandle(session));
     WT_WITH_HANDLE_LIST_WRITE_LOCK(
       session, ret = __wt_conn_dhandle_close_all(session, uri, true, force));
     WT_ERR(ret);
