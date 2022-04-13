@@ -49,7 +49,8 @@ namespace mongo {
 class ObservableSession;
 
 /**
- * Keeps track of the transaction runtime state for every active session on this instance.
+ * Keeps track of the transaction runtime state for every active transaction session on this
+ * instance.
  */
 class SessionCatalog {
     SessionCatalog(const SessionCatalog&) = delete;
@@ -63,13 +64,11 @@ public:
     class SessionToKill;
 
     struct KillToken {
-        KillToken(LogicalSessionId lsid, boost::optional<LogicalSessionId> parentLsid)
-            : lsidToKill(std::move(lsid)), parentLsidToKill(std::move(parentLsid)) {}
+        KillToken(LogicalSessionId lsid) : lsidToKill(std::move(lsid)) {}
         KillToken(KillToken&&) = default;
         KillToken& operator=(KillToken&&) = default;
 
         LogicalSessionId lsidToKill;
-        boost::optional<LogicalSessionId> parentLsidToKill;
     };
 
     SessionCatalog() = default;
@@ -93,19 +92,32 @@ public:
      */
     SessionToKill checkOutSessionForKill(OperationContext* opCtx, KillToken killToken);
 
+    using ScanSessionsCallbackFn = std::function<void(ObservableSession&)>;
+
     /**
      * Iterates through the SessionCatalog under the SessionCatalog mutex and applies 'workerFn' to
-     * each Session which matches the specified 'matcher'.
+     * each Session which matches the specified 'matcher'. Does not support reaping.
      *
      * NOTE: Since this method runs with the session catalog mutex, the work done by 'workerFn' is
      * not allowed to block, perform I/O or acquire any lock manager locks.
      * Iterates through the SessionCatalog and applies 'workerFn' to each Session. This locks the
      * SessionCatalog.
      */
-    using ScanSessionsCallbackFn = std::function<void(ObservableSession&)>;
     void scanSession(const LogicalSessionId& lsid, const ScanSessionsCallbackFn& workerFn);
     void scanSessions(const SessionKiller::Matcher& matcher,
                       const ScanSessionsCallbackFn& workerFn);
+
+    /**
+     * Same as the above but applies 'parentSessionWorkerFn' to the Session whose session id is
+     * equal to 'parentLsid' and then applies 'childSessionWorkerFn' to the Sessions whose parent
+     * session id is equal to 'parentLsid'. To be used with 'markForReap' for reaping sessions
+     * from the SessionCatalog. It enables transaction sessions that corresponds to the same
+     * logical session to be reaped atomically. Returns the session ids for the matching Sessions
+     * that were not reaped after the scan.
+     */
+    LogicalSessionIdSet scanSessionsForReap(const LogicalSessionId& parentLsid,
+                                            const ScanSessionsCallbackFn& parentSessionWorkerFn,
+                                            const ScanSessionsCallbackFn& childSessionWorkerFn);
 
     /**
      * Shortcut to invoke 'kill' on the specified session under the SessionCatalog mutex. Throws a
@@ -124,42 +136,50 @@ public:
     void createSessionIfDoesNotExist(const LogicalSessionId& lsid);
 
 private:
+    /**
+     * Tracks the runtime info for transaction sessions that corresponds to the same logical
+     * session. Designed such that only one transaction session can be checked out at any given
+     * time.
+     */
     struct SessionRuntimeInfo {
-        SessionRuntimeInfo(LogicalSessionId lsid, SessionRuntimeInfo* parentSri)
-            : session(std::move(lsid)) {
-            // If we're a child we must have been given a parent session, if not, we must not have.
-            invariant(bool(getParentSessionId(lsid)) == bool(parentSri));
-            if (parentSri) {
-                session._parentSession = &parentSri->session;
-            }
+        SessionRuntimeInfo(LogicalSessionId lsid) : parentSession(std::move(lsid)) {
+            // Can only create a SessionRuntimeInfo with a parent transaction session id.
+            invariant(!getParentSessionId(lsid));
         }
-        ~SessionRuntimeInfo();
 
-        // Must only be accessed when the state is kInUse and only by the operation context, which
-        // currently has it checked out
-        Session session;
+        Session* getSession(const LogicalSessionId& lsid);
 
-        // Counts how many threads have called checkOutSession/checkOutSessionForKill and are
-        // blocked in it waiting for the session to become available. Used to block reaping of
-        // sessions entries from the map.
-        int numWaitingToCheckOut{0};
+        // Must only be accessed by the OperationContext which currently has this logical session
+        // checked out.
+        Session parentSession;
+        LogicalSessionIdMap<Session> childSessions;
 
         // Signaled when the state becomes available. Uses the transaction table's mutex to protect
         // the state transitions.
         stdx::condition_variable availableCondVar;
+
+        // Pointer to the OperationContext for the operation running on this logical session, or
+        // nullptr if there is no operation currently running on the session.
+        OperationContext* checkoutOpCtx{nullptr};
+
+        // Last check-out time for this logical session. Updated every time any of the transaction
+        // sessions gets checked out.
+        Date_t lastCheckout{Date_t::now()};
+
+        // Counter indicating the number of times ObservableSession::kill has been called on this
+        // SessionRuntimeInfo, which have not yet had a corresponding call to
+        // checkOutSessionForKill.
+        int killsRequested{0};
     };
     using SessionRuntimeInfoMap = LogicalSessionIdMap<std::unique_ptr<SessionRuntimeInfo>>;
 
     /**
-     * Blocking method, which checks-out the session with the given 'lsid'.
+     * Blocking method, which checks-out the session with the given 'lsid'. Called inside
+     * '_checkOutSession' and 'checkOutSessionForKill'.
      */
-    ScopedCheckedOutSession _checkOutSessionWithParentSession(OperationContext* opCtx,
-                                                              const LogicalSessionId& lsid,
-                                                              boost::optional<KillToken> killToken);
-    ScopedCheckedOutSession _checkOutSessionWithoutParentSession(
-        OperationContext* opCtx,
-        const LogicalSessionId& lsid,
-        boost::optional<KillToken> killToken);
+    ScopedCheckedOutSession _checkOutSessionInner(OperationContext* opCtx,
+                                                  const LogicalSessionId& lsid,
+                                                  boost::optional<KillToken> killToken);
 
     /**
      * Blocking method, which checks-out the session set on 'opCtx'.
@@ -175,19 +195,14 @@ private:
     /**
      * Creates or returns the session runtime info for 'lsid' from the '_sessions' map. The
      * returned pointer is guaranteed to be linked on the map for as long as the mutex is held.
-     *
-     * If we're creating a child session, a pointer to the session runtime info of its parent must
-     * be provided.
      */
-    SessionRuntimeInfo* _getOrCreateSessionRuntimeInfo(WithLock lk,
-                                                       const LogicalSessionId& lsid,
-                                                       SessionRuntimeInfo* parentSri);
+    SessionRuntimeInfo* _getOrCreateSessionRuntimeInfo(WithLock lk, const LogicalSessionId& lsid);
 
     /**
      * Makes a session, previously checked out through 'checkoutSession', available again.
      */
     void _releaseSession(SessionRuntimeInfo* sri,
-                         SessionRuntimeInfo* parentSri,
+                         Session* session,
                          boost::optional<KillToken> killToken);
 
     // Protects the state below
@@ -199,32 +214,27 @@ private:
 };
 
 /**
- * Scoped object representing a checked-out session. This type is an implementation detail
- * of the SessionCatalog.
+ * Scoped object representing a checked-out transaction session. This type is an implementation
+ * detail of the SessionCatalog.
  */
 class SessionCatalog::ScopedCheckedOutSession {
 public:
     ScopedCheckedOutSession(SessionCatalog& catalog,
                             SessionCatalog::SessionRuntimeInfo* sri,
-                            SessionCatalog::SessionRuntimeInfo* parentSri,
+                            Session* session,
                             boost::optional<SessionCatalog::KillToken> killToken)
-        : _catalog(catalog), _sri(sri), _parentSri(parentSri), _killToken(std::move(killToken)) {
-        if (_parentSri) {
-            invariant(getParentSessionId(_sri->session.getSessionId()) ==
-                      _parentSri->session.getSessionId());
-        }
+        : _catalog(catalog), _sri(sri), _session(session), _killToken(std::move(killToken)) {
         if (_killToken) {
-            invariant(_sri->session.getSessionId() == _killToken->lsidToKill);
+            invariant(session->getSessionId() == _killToken->lsidToKill);
         }
     }
 
     ScopedCheckedOutSession(ScopedCheckedOutSession&& other)
         : _catalog(other._catalog),
           _sri(other._sri),
-          _parentSri(other._parentSri),
+          _session(other._session),
           _killToken(std::move(other._killToken)) {
         other._sri = nullptr;
-        other._parentSri = nullptr;
     }
 
     ScopedCheckedOutSession& operator=(ScopedCheckedOutSession&&) = delete;
@@ -233,12 +243,16 @@ public:
 
     ~ScopedCheckedOutSession() {
         if (_sri) {
-            _catalog._releaseSession(_sri, _parentSri, std::move(_killToken));
+            _catalog._releaseSession(_sri, _session, std::move(_killToken));
         }
     }
 
+    OperationContext* currentOperation_forTest() const {
+        return _sri->checkoutOpCtx;
+    }
+
     Session* get() const {
-        return &_sri->session;
+        return _session;
     }
 
     Session* operator->() const {
@@ -258,7 +272,7 @@ private:
     SessionCatalog& _catalog;
 
     SessionCatalog::SessionRuntimeInfo* _sri;
-    SessionCatalog::SessionRuntimeInfo* _parentSri;
+    Session* _session;
     boost::optional<SessionCatalog::KillToken> _killToken;
 };
 
@@ -280,11 +294,13 @@ public:
     Session* get() const {
         return _scos.get();
     }
+
     const LogicalSessionId& getSessionId() const {
         return get()->getSessionId();
     }
+
     OperationContext* currentOperation_forTest() const {
-        return get()->currentOperation_forTest();
+        return _scos.currentOperation_forTest();
     }
 
 private:
@@ -295,7 +311,7 @@ private:
 using SessionToKill = SessionCatalog::SessionToKill;
 
 /**
- * This type represents access to a session inside of a scanSessions loop.
+ * This type represents access to a transaction session inside of a scanSessions loop.
  * If you have one of these, you're in a scanSessions callback context, and so
  * have locked the whole catalog and, if the observed session is bound to an operation context,
  * you hold that operation context's client's mutex, as well.
@@ -308,31 +324,34 @@ public:
     ObservableSession& operator=(ObservableSession&&) = delete;
 
     /**
-     * The logical session id that this object represents.
+     * The session id for this transaction session.
      */
     const LogicalSessionId& getSessionId() const {
         return _session->_sessionId;
     }
 
     /**
-     * Returns true if there is an operation currently running on this Session.
+     * Returns true if there is an operation currently running on the logical session that this
+     * transaction session corresponds to.
      */
     bool hasCurrentOperation() const {
-        return _session->_checkoutOpCtx || _session->_childSessionCheckoutOpCtx;
+        return _sri->checkoutOpCtx;
     }
 
     /**
-     * Returns when is the last time this session was checked-out, for reaping purposes.
+     * Returns the last check-out time for the logical session that this transaction session
+     * corresponds to. Used for reaping purposes.
      */
     Date_t getLastCheckout() const {
-        return _session->_lastCheckout;
+        return _sri->lastCheckout;
     }
 
     /**
-     * Increments the number of "killers" for this session and returns a 'kill token' to to be
-     * passed later on to 'checkOutSessionForKill' method of the SessionCatalog in order to permit
-     * the caller to execute any kill cleanup tasks. This token is later used to decrement the
-     * number of "killers".
+     * Increments the number of "killers" for the logical session that this transaction session
+     * corresponds to and returns a 'kill token' to to be passed later on to
+     * 'checkOutSessionForKill' method of the SessionCatalog in order to permit the caller to
+     * execute any kill cleanup tasks. This token is later used to decrement the number of
+     * "killers".
      *
      * Marking session as killed is an internal property only that will cause any further calls to
      * 'checkOutSession' to block until 'checkOutSessionForKill' is called the same number of times
@@ -344,14 +363,22 @@ public:
     SessionCatalog::KillToken kill(ErrorCodes::Error reason = ErrorCodes::Interrupted) const;
 
     /**
-     * Indicates to the SessionCatalog that the session tracked by this object is safe to be deleted
-     * from the map. It is up to the caller to provide the necessary checks that all the decorations
-     * they are using are prepared to be destroyed.
+     * To be used with 'scanSessionsForReap' to indicate to the SessionCatalog that, from the user
+     * perspective, this transaction session is safe to be reaped. That is, the reaper has checked
+     * that the session has expired and all the decorations they are using are prepared to be
+     * destroyed. There are two reap modes:
+     * - kExclusive indicates that the session is safe to be reaped independently of the other
+     *   sessions matched by 'scanSessionsForReap'.
+     * - kNonExclusive indicates that the session is only safe to reaped if all the other sessions
+     *   are also safe to be reaped.
      *
-     * Calling this method does not guarantee that the session will in fact be destroyed, which
-     * could happen if there are threads waiting for it to be checked-out.
+     * Calling this method does not guarantee that the session will in fact be reaped. The
+     * SessionCatalog performs additional checks to protect sessions that are still in use from
+     * being reaped. However, reaping will still obey the specified reap mode. See the comment for
+     * '_shouldBeReaped' for more info.
      */
-    void markForReap();
+    enum class ReapMode { kExclusive, kNonExclusive };
+    void markForReap(ReapMode reapMode);
 
     /**
      * Returns a pointer to the Session itself.
@@ -363,15 +390,16 @@ public:
 private:
     friend class SessionCatalog;
 
-    static stdx::unique_lock<Client> _lockClientForSession(WithLock, Session* session) {
-        if (const auto opCtx = session->_checkoutOpCtx) {
+    static stdx::unique_lock<Client> _lockClientForSession(
+        WithLock, SessionCatalog::SessionRuntimeInfo* sri) {
+        if (const auto opCtx = sri->checkoutOpCtx) {
             return stdx::unique_lock<Client>{*opCtx->getClient()};
         }
         return {};
     }
 
-    ObservableSession(WithLock wl, Session& session)
-        : _session(&session), _clientLock(_lockClientForSession(std::move(wl), _session)) {}
+    ObservableSession(WithLock wl, SessionCatalog::SessionRuntimeInfo* sri, Session* session)
+        : _sri(sri), _session(session), _clientLock(_lockClientForSession(std::move(wl), _sri)) {}
 
     /**
      * Returns whether 'kill' has been called on this session.
@@ -386,15 +414,20 @@ private:
     }
 
     /**
-     * Returns true if this Session should be be deleted from the map.
+     * Returns true if this transaction session should be be reaped from the SessionCatalog.
+     * That is, the session has been marked for reap and both of the following are true:
+     * - It is not checked out by any thread, and there are no threads waiting for it to be
+     *   checked out.
+     * - It is not marked for kill (i.e. expected to be checked out for kill).
      */
-    bool _shouldBeReaped(int numWaitingToCheckOut) const {
-        return _markedForReap && !_killed() && !hasCurrentOperation() && !numWaitingToCheckOut;
-    }
+    bool _shouldBeReaped() const;
 
+    SessionCatalog::SessionRuntimeInfo* _sri;
     Session* _session;
     stdx::unique_lock<Client> _clientLock;
+
     bool _markedForReap{false};
+    boost::optional<ReapMode> _reapMode;
 };
 
 /**

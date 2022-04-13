@@ -4671,8 +4671,12 @@ TEST_F(TransactionRouterTest, RouterMetricsCurrent_ReapForInactiveTxn) {
 
     // Mark the session for reap which will also erase it from the catalog.
     auto catalog = SessionCatalog::get(operationContext()->getServiceContext());
-    catalog->scanSession(*operationContext()->getLogicalSessionId(),
-                         [](ObservableSession& session) { session.markForReap(); });
+    catalog->scanSessionsForReap(*operationContext()->getLogicalSessionId(),
+                                 [](ObservableSession& parentSession) {
+                                     parentSession.markForReap(
+                                         ObservableSession::ReapMode::kNonExclusive);
+                                 },
+                                 [](ObservableSession& childSession) {});
 
     // Verify the session was reaped.
     catalog->scanSession(*operationContext()->getLogicalSessionId(), [](const ObservableSession&) {
@@ -4703,8 +4707,12 @@ TEST_F(TransactionRouterTest, RouterMetricsCurrent_ReapForUnstartedTxn) {
 
     // Mark the session for reap which will also erase it from the catalog.
     auto catalog = SessionCatalog::get(operationContext()->getServiceContext());
-    catalog->scanSession(*operationContext()->getLogicalSessionId(),
-                         [](ObservableSession& session) { session.markForReap(); });
+    catalog->scanSessionsForReap(*operationContext()->getLogicalSessionId(),
+                                 [](ObservableSession& parentSession) {
+                                     parentSession.markForReap(
+                                         ObservableSession::ReapMode::kNonExclusive);
+                                 },
+                                 [](ObservableSession& childSession) {});
 
     // Verify the session was reaped.
     catalog->scanSession(*operationContext()->getLogicalSessionId(), [](const ObservableSession&) {

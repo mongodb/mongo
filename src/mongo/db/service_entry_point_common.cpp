@@ -122,6 +122,7 @@ MONGO_FAIL_POINT_DEFINE(waitAfterNewStatementBlocksBehindOpenInternalTransaction
 MONGO_FAIL_POINT_DEFINE(waitAfterCommandFinishesExecution);
 MONGO_FAIL_POINT_DEFINE(failWithErrorCodeInRunCommand);
 MONGO_FAIL_POINT_DEFINE(hangBeforeSessionCheckOut);
+MONGO_FAIL_POINT_DEFINE(hangAfterSessionCheckOut);
 MONGO_FAIL_POINT_DEFINE(hangBeforeSettingTxnInterruptFlag);
 MONGO_FAIL_POINT_DEFINE(hangAfterCheckingWritabilityForMultiDocumentTransactions);
 
@@ -861,6 +862,7 @@ void CheckoutSessionAndInvokeCommand::_checkOutSession() {
     hangBeforeSessionCheckOut.pauseWhileSet();
     _sessionTxnState = std::make_unique<MongoDOperationContextSession>(opCtx);
     _txnParticipant.emplace(TransactionParticipant::get(opCtx));
+    hangAfterSessionCheckOut.pauseWhileSet();
 
     // Used for waiting for an in-progress transaction to transition out of the conflicting state.
     auto waitForInProgressTxn = [](OperationContext* opCtx, auto& stateTransitionFuture) {

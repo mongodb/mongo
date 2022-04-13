@@ -37,8 +37,8 @@
 namespace mongo {
 
 /**
- * A decorable container for state associated with an active session running on a MongoD or MongoS
- * server. Refer to SessionCatalog for more information on the semantics of sessions.
+ * A decorable container for state associated with an active transaction session running on a MongoD
+ * or MongoS server. Refer to SessionCatalog for more information on the semantics of sessions.
  */
 class Session : public Decorable<Session> {
     Session(const Session&) = delete;
@@ -50,9 +50,10 @@ class Session : public Decorable<Session> {
 public:
     explicit Session(LogicalSessionId sessionId) : _sessionId(std::move(sessionId)) {}
 
-    /**
-     * The logical session id that this object represents.
-     */
+    ~Session() {
+        invariant(!_numWaitingToCheckOut);
+    }
+
     const LogicalSessionId& getSessionId() const {
         return _sessionId;
     }
@@ -61,40 +62,18 @@ public:
         return _parentSession;
     }
 
-    OperationContext* currentOperation_forTest() const {
-        return _checkoutOpCtx;
-    }
-
 private:
-    // The id of the session with which this object is associated
+    // The session id of the transaction session that this object represents.
     const LogicalSessionId _sessionId;
 
     // A pointer to the parent Session for this Session if there is one. Set at construction for
     // child sessions. Children and parents are reaped atomically, so this pointer should always be
     // valid if it is not null.
-    //
-    // TODO SERVER-62479: Verify the implementation of this ticket matches the assumption above.
     Session* _parentSession{nullptr};
 
-    // These fields are only safe to read or write while holding the SessionCatalog::_mutex. In
-    // practice, it is only used inside of the SessionCatalog itself.
-
-    // A pointer back to the currently running operation on this Session, or nullptr if there
-    // is no operation currently running for the Session.
-    OperationContext* _checkoutOpCtx{nullptr};
-
-    // A pointer to the operation currently running on one of the child Sessions of this Session,
-    // or nullptr if this is Session does not have any child Session or if there is no operation
-    // currently running on any of its child Sessions. Used to block this Session and other child
-    // Sessions from being checked out if there is already a checked-out child Session.
-    OperationContext* _childSessionCheckoutOpCtx{nullptr};
-
-    // Keeps the last time this session was checked-out
-    Date_t _lastCheckout{Date_t::now()};
-
-    // Counter indicating the number of times ObservableSession::kill has been called on this
-    // session, which have not yet had a corresponding call to checkOutSessionForKill.
-    int _killsRequested{0};
+    // Counts how many threads are blocked waiting for this Session to become available. Used to
+    // block reaping of this Session from the SessionCatalog.
+    int _numWaitingToCheckOut{0};
 };
 
 }  // namespace mongo
