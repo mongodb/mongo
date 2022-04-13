@@ -151,6 +151,7 @@ public:
 
         std::string ns;
         CollectionOptions options;
+        // May include empty instances which represent indexes already dropped.
         std::vector<IndexMetaData> indexes;
 
         // Time-series collections created in versions 5.1 and earlier are allowed to contain

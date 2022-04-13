@@ -2104,20 +2104,22 @@ void CollectionImpl::updatePrepareUniqueSetting(OperationContext* opCtx,
     });
 }
 
-std::vector<std::string> CollectionImpl::removeInvalidIndexOptions(OperationContext* opCtx) {
+std::vector<std::string> CollectionImpl::repairInvalidIndexOptions(OperationContext* opCtx) {
     std::vector<std::string> indexesWithInvalidOptions;
 
     _writeMetadata(opCtx, [&](BSONCollectionCatalogEntry::MetaData& md) {
         for (auto& index : md.indexes) {
-            BSONObj oldSpec = index.spec;
+            if (index.isPresent()) {
+                BSONObj oldSpec = index.spec;
 
-            Status status = index_key_validate::validateIndexSpecFieldNames(oldSpec);
-            if (status.isOK()) {
-                continue;
+                Status status = index_key_validate::validateIndexSpec(opCtx, oldSpec).getStatus();
+                if (status.isOK()) {
+                    continue;
+                }
+
+                indexesWithInvalidOptions.push_back(std::string(index.nameStringData()));
+                index.spec = index_key_validate::repairIndexSpec(NamespaceString(md.ns), oldSpec);
             }
-
-            indexesWithInvalidOptions.push_back(std::string(index.nameStringData()));
-            index.spec = index_key_validate::removeUnknownFields(oldSpec);
         }
     });
 

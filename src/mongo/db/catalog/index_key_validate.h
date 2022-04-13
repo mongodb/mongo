@@ -59,7 +59,12 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& in
 /**
  * Returns a new index spec with any unknown field names removed from 'indexSpec'.
  */
-BSONObj removeUnknownFields(const BSONObj& indexSpec);
+BSONObj removeUnknownFields(const NamespaceString& ns, const BSONObj& indexSpec);
+
+/**
+ * Returns a new index spec with boolean values in correct types and unkown field names removed.
+ */
+BSONObj repairIndexSpec(const NamespaceString& ns, const BSONObj& indexSpec);
 
 /**
  * Performs additional validation for _id index specifications. This should be called after

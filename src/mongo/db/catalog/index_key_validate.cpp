@@ -130,6 +130,26 @@ Status isIndexVersionAllowedForCreation(IndexVersion indexVersion, const BSONObj
             str::stream() << "Invalid index specification " << indexSpec
                           << "; cannot create an index with v=" << static_cast<int>(indexVersion)};
 }
+
+BSONObj buildRepairedIndexSpec(
+    const NamespaceString& ns,
+    const BSONObj& indexSpec,
+    std::function<void(const BSONElement&, BSONObjBuilder*)> indexSpecHandleFn) {
+    BSONObjBuilder builder;
+    for (const auto& indexSpecElem : indexSpec) {
+        StringData fieldName = indexSpecElem.fieldNameStringData();
+        if (allowedFieldNames.count(fieldName)) {
+            indexSpecHandleFn(indexSpecElem, &builder);
+        } else {
+            LOGV2_WARNING(23878,
+                          "Removing unknown field from index spec",
+                          "namespace"_attr = redact(ns.toString()),
+                          "fieldName"_attr = redact(fieldName),
+                          "indexSpec"_attr = redact(indexSpec));
+        }
+    }
+    return builder.obj();
+}
 }  // namespace
 
 Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion indexVersion) {
@@ -263,21 +283,34 @@ Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion inde
     return Status::OK();
 }
 
-BSONObj removeUnknownFields(const BSONObj& indexSpec) {
-    BSONObjBuilder builder;
-    for (const auto& indexSpecElem : indexSpec) {
+BSONObj removeUnknownFields(const NamespaceString& ns, const BSONObj& indexSpec) {
+    auto appendIndexSpecFn = [](const BSONElement& indexSpecElem, BSONObjBuilder* builder) {
+        builder->append(indexSpecElem);
+    };
+    return buildRepairedIndexSpec(ns, indexSpec, appendIndexSpecFn);
+}
+
+BSONObj repairIndexSpec(const NamespaceString& ns, const BSONObj& indexSpec) {
+    auto fixBoolIndexSpecFn = [&indexSpec, &ns](const BSONElement& indexSpecElem,
+                                                BSONObjBuilder* builder) {
         StringData fieldName = indexSpecElem.fieldNameStringData();
-        if (allowedFieldNames.count(fieldName)) {
-            builder.append(indexSpecElem);
-        } else {
-            LOGV2_WARNING(23878,
-                          "Removing field '{fieldName}' from index spec: {indexSpec}",
-                          "Removing unknown field from index spec",
+        if ((IndexDescriptor::kBackgroundFieldName == fieldName ||
+             IndexDescriptor::kUniqueFieldName == fieldName ||
+             IndexDescriptor::kSparseFieldName == fieldName ||
+             IndexDescriptor::kDropDuplicatesFieldName == fieldName ||
+             IndexDescriptor::kPrepareUniqueFieldName == fieldName || "clustered" == fieldName) &&
+            !indexSpecElem.isNumber() && !indexSpecElem.isBoolean() && indexSpecElem.trueValue()) {
+            LOGV2_WARNING(6444400,
+                          "Fixing boolean field from index spec",
+                          "namespace"_attr = redact(ns.toString()),
                           "fieldName"_attr = redact(fieldName),
                           "indexSpec"_attr = redact(indexSpec));
+            builder->appendBool(fieldName, true);
+        } else {
+            builder->append(indexSpecElem);
         }
-    }
-    return builder.obj();
+    };
+    return buildRepairedIndexSpec(ns, indexSpec, fixBoolIndexSpecFn);
 }
 
 StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& indexSpec) {

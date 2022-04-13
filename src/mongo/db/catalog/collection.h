@@ -620,10 +620,10 @@ public:
                                             bool prepareUnique) = 0;
 
     /**
-     * Removes invalid index options on all indexes in this collection. Returns a list of index
-     * names that contained invalid index options.
+     * Repairs invalid index options on all indexes in this collection. Returns a list of
+     * index names that were repaired.
      */
-    virtual std::vector<std::string> removeInvalidIndexOptions(OperationContext* opCtx) = 0;
+    virtual std::vector<std::string> repairInvalidIndexOptions(OperationContext* opCtx) = 0;
 
     /**
      * Updates the 'temp' setting for this collection.

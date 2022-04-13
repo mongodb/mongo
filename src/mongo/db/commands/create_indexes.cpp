@@ -112,7 +112,7 @@ std::vector<BSONObj> parseAndValidateIndexSpecs(OperationContext* opCtx,
     for (const auto& index : cmd.getIndexes()) {
         BSONObj parsedIndexSpec = index;
         if (ignoreUnknownIndexOptions) {
-            parsedIndexSpec = index_key_validate::removeUnknownFields(parsedIndexSpec);
+            parsedIndexSpec = index_key_validate::removeUnknownFields(ns, parsedIndexSpec);
         }
 
         auto indexSpecStatus = index_key_validate::validateIndexSpec(opCtx, parsedIndexSpec);
