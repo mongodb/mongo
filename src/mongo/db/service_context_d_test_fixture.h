@@ -66,8 +66,9 @@ protected:
             _useReplSettings = useReplSettings;
             return *this;
         }
-        Options& useMockClock(bool useMockClock) {
+        Options& useMockClock(bool useMockClock, Milliseconds autoAdvance = Milliseconds{0}) {
             _useMockClock = useMockClock;
+            _autoAdvancingMockClockIncrement = autoAdvance;
             return *this;
         }
 
@@ -77,6 +78,7 @@ protected:
         StorageEngineInitFlags _initFlags = kDefaultStorageEngineInitFlags;
         bool _useReplSettings = false;
         bool _useMockClock = false;
+        Milliseconds _autoAdvancingMockClockIncrement{0};
 
         friend class ServiceContextMongoDTest;
     };

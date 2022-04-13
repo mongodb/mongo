@@ -90,8 +90,11 @@ ServiceContextMongoDTest::ServiceContextMongoDTest(Options options)
     if (options._useMockClock) {
         // Copied from dbtests.cpp. DBTests sets up a controlled mock clock while
         // ServiceContextMongoDTest uses the system clock. Tests moved from dbtests to unittests may
-        // depend on a deterministic clock.
-        auto fastClock = std::make_unique<ClockSourceMock>();
+        // depend on a deterministic clock. Additionally, if a test chooses to set a non-zero
+        // _autoAdvancingMockClockIncrement, the mock clock will automatically advance by that
+        // increment each time it is read.
+        auto fastClock = std::make_unique<AutoAdvancingClockSourceMock>(
+            options._autoAdvancingMockClockIncrement);
         // Timestamps are split into two 32-bit integers, seconds and "increments". Currently
         // (but maybe not for eternity), a Timestamp with a value of `0` seconds is always
         // considered "null" by `Timestamp::isNull`, regardless of its increment value. Ticking
@@ -100,7 +103,8 @@ ServiceContextMongoDTest::ServiceContextMongoDTest(Options options)
         fastClock->advance(Seconds(1));
         serviceContext->setFastClockSource(std::move(fastClock));
 
-        auto preciseClock = std::make_unique<ClockSourceMock>();
+        auto preciseClock = std::make_unique<AutoAdvancingClockSourceMock>(
+            options._autoAdvancingMockClockIncrement);
         // See above.
         preciseClock->advance(Seconds(1));
         serviceContext->setPreciseClockSource(std::move(preciseClock));

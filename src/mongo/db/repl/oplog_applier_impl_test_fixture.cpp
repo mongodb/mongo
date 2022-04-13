@@ -406,20 +406,30 @@ OplogEntry makeOplogEntry(OpTypeEnum opType,
                           BSONObj o,
                           boost::optional<BSONObj> o2,
                           boost::optional<bool> fromMigrate) {
-    return {DurableOplogEntry(OpTime(Timestamp(1, 1), 1),  // optime
-                              boost::none,                 // hash
-                              opType,                      // opType
-                              boost::none,                 // tenant id
-                              nss,                         // namespace
-                              uuid,                        // uuid
-                              fromMigrate,                 // fromMigrate
-                              OplogEntry::kOplogVersion,   // version
-                              o,                           // o
-                              o2,                          // o2
-                              {},                          // sessionInfo
-                              boost::none,                 // upsert
-                              Date_t(),                    // wall clock time
-                              {},                          // statement ids
+    return makeOplogEntry({{1, 1}, 1}, opType, std::move(nss), uuid, o, o2, fromMigrate);
+}
+
+OplogEntry makeOplogEntry(OpTime opTime,
+                          OpTypeEnum opType,
+                          NamespaceString nss,
+                          const boost::optional<UUID>& uuid,
+                          BSONObj o,
+                          boost::optional<BSONObj> o2,
+                          boost::optional<bool> fromMigrate) {
+    return {DurableOplogEntry(opTime,                     // optime
+                              boost::none,                // hash
+                              opType,                     // opType
+                              boost::none,                // tenant id
+                              std::move(nss),             // namespace
+                              uuid,                       // uuid
+                              fromMigrate,                // fromMigrate
+                              OplogEntry::kOplogVersion,  // version
+                              o,                          // o
+                              o2,                         // o2
+                              {},                         // sessionInfo
+                              boost::none,                // upsert
+                              Date_t(),                   // wall clock time
+                              {},                         // statement ids
                               boost::none,    // optime of previous write within same transaction
                               boost::none,    // pre-image optime
                               boost::none,    // post-image optime

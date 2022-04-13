@@ -196,9 +196,8 @@ public:
 
 class OplogApplierImplTest : public ServiceContextMongoDTest {
 protected:
-    // TODO (SERVER-65297): Use wiredTiger.
-    explicit OplogApplierImplTest()
-        : ServiceContextMongoDTest(Options{}.engine("ephemeralForTest")) {}
+    explicit OplogApplierImplTest(Options options = {})
+        : ServiceContextMongoDTest(std::move(options.useReplSettings(true))) {}
 
     void _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::Error expectedError,
                                                            const OplogEntry& op,
@@ -234,6 +233,20 @@ protected:
     UUID kUuid{UUID::gen()};
 };
 
+class OplogApplierImplWithFastAutoAdvancingClockTest : public OplogApplierImplTest {
+protected:
+    OplogApplierImplWithFastAutoAdvancingClockTest()
+        : OplogApplierImplTest(
+              Options{}.useMockClock(true, Milliseconds{serverGlobalParams.slowMS * 10})) {}
+};
+
+class OplogApplierImplWithSlowAutoAdvancingClockTest : public OplogApplierImplTest {
+protected:
+    OplogApplierImplWithSlowAutoAdvancingClockTest()
+        : OplogApplierImplTest(
+              Options{}.useMockClock(true, Milliseconds{serverGlobalParams.slowMS / 10})) {}
+};
+
 // Utility class to allow easily scanning a collection.  Scans in forward order, returns
 // Status::CollectionIsEmpty when scan is exhausted.
 class CollectionReader {
@@ -265,6 +278,14 @@ bool docExists(OperationContext* opCtx, const NamespaceString& nss, const BSONOb
  * Creates an OplogEntry with given parameters and preset defaults for this test suite.
  */
 OplogEntry makeOplogEntry(OpTypeEnum opType,
+                          NamespaceString nss,
+                          const boost::optional<UUID>& uuid,
+                          BSONObj o,
+                          boost::optional<BSONObj> o2 = boost::none,
+                          boost::optional<bool> fromMigrate = boost::none);
+
+OplogEntry makeOplogEntry(OpTime opTime,
+                          OpTypeEnum opType,
                           NamespaceString nss,
                           const boost::optional<UUID>& uuid,
                           BSONObj o,
