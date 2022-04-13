@@ -46,6 +46,7 @@
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_internal_bucket_geo_within.h"
 #include "mongo/db/matcher/expression_internal_expr_comparison.h"
+#include "mongo/db/pipeline/accumulator_multi.h"
 #include "mongo/db/pipeline/document_source_add_fields.h"
 #include "mongo/db/pipeline/document_source_geo_near.h"
 #include "mongo/db/pipeline/document_source_group.h"
@@ -737,15 +738,142 @@ bool DocumentSourceInternalUnpackBucket::haveComputedMetaField() const {
             _bucketUnpacker.bucketSpec().metaField().get());
 }
 
+template <TopBottomSense sense, bool single>
+bool extractFromAcc(const AccumulatorN* acc,
+                    const boost::intrusive_ptr<Expression>& init,
+                    boost::optional<BSONObj>& outputAccumulator,
+                    boost::optional<BSONObj>& outputSortPattern) {
+    // If this accumulator will not return a single document then we cannot rewrite this query to
+    // use a $sort + a $group with $first or $last.
+    if constexpr (!single) {
+        // We may have a $topN or a $bottomN with n = 1; in this case, we may still be able to
+        // perform the lastpoint rewrite.
+        if (auto constInit = dynamic_cast<ExpressionConstant*>(init.get()); constInit) {
+            // Since this is a $const expression, the input to evaluate() should not matter.
+            auto constVal = constInit->evaluate(Document(), nullptr);
+            if (!constVal.numeric() || (constVal.coerceToLong() != 1)) {
+                return false;
+            }
+        } else {
+            return false;
+        }
+    }
+
+    // Retrieve sort pattern for an equivalent $sort.
+    const auto multiAc = dynamic_cast<const AccumulatorTopBottomN<sense, single>*>(acc);
+    invariant(multiAc);
+    outputSortPattern = multiAc->getSortPattern()
+                            .serialize(SortPattern::SortKeySerialization::kForPipelineSerialization)
+                            .toBson();
+
+    // Retrieve equivalent accumulator statement using $first/$last for retrieving the entire
+    // document.
+    constexpr auto accumulator =
+        (sense == TopBottomSense::kTop) ? AccumulatorFirst::kName : AccumulatorLast::kName;
+    // Note: we don't need to preserve what the $top/$bottom accumulator outputs here. We only need
+    // a $group stage with the appropriate accumulator that retrieves the bucket in some way. For
+    // the rewrite we preserve the original group and insert an $group that returns all the data in
+    // the $first bucket selected for each _id.
+    outputAccumulator = BSON("bucket" << BSON(accumulator << "$$ROOT"));
+
+    return true;
+}
+
+bool extractFromAccIfTopBottomN(const AccumulatorN* multiAcc,
+                                const boost::intrusive_ptr<Expression>& init,
+                                boost::optional<BSONObj>& outputAccumulator,
+                                boost::optional<BSONObj>& outputSortPattern) {
+    const auto accType = multiAcc->getAccumulatorType();
+    if (accType == AccumulatorN::kTopN) {
+        return extractFromAcc<TopBottomSense::kTop, false>(
+            multiAcc, init, outputAccumulator, outputSortPattern);
+    } else if (accType == AccumulatorN::kTop) {
+        return extractFromAcc<TopBottomSense::kTop, true>(
+            multiAcc, init, outputAccumulator, outputSortPattern);
+    } else if (accType == AccumulatorN::kBottomN) {
+        return extractFromAcc<TopBottomSense::kBottom, false>(
+            multiAcc, init, outputAccumulator, outputSortPattern);
+    } else if (accType == AccumulatorN::kBottom) {
+        return extractFromAcc<TopBottomSense::kBottom, true>(
+            multiAcc, init, outputAccumulator, outputSortPattern);
+    }
+    // This isn't a topN/bottomN/top/bottom accumulator.
+    return false;
+}
+
+std::pair<boost::intrusive_ptr<DocumentSourceSort>, boost::intrusive_ptr<DocumentSourceGroup>>
+tryRewriteGroupAsSortGroup(boost::intrusive_ptr<ExpressionContext> expCtx,
+                           Pipeline::SourceContainer::iterator itr,
+                           Pipeline::SourceContainer* container,
+                           DocumentSourceGroup* groupStage) {
+    const auto accumulators = groupStage->getAccumulatedFields();
+    if (accumulators.size() != 1) {
+        // If we have multiple accumulators, we fail to optimize for a lastpoint query.
+        return {nullptr, nullptr};
+    }
+
+    const auto init = accumulators[0].expr.initializer;
+    const auto accState = accumulators[0].makeAccumulator();
+    const AccumulatorN* multiAcc = dynamic_cast<const AccumulatorN*>(accState.get());
+    if (!multiAcc) {
+        return {nullptr, nullptr};
+    }
+
+    boost::optional<BSONObj> maybeAcc;
+    boost::optional<BSONObj> maybeSortPattern;
+    if (!extractFromAccIfTopBottomN(multiAcc, init, maybeAcc, maybeSortPattern)) {
+        // This isn't a topN/bottomN/top/bottom accumulator or N != 1.
+        return {nullptr, nullptr};
+    }
+
+    tassert(6165600,
+            "sort pattern and accumulator must be initialized if cast of $top or $bottom succeeds",
+            maybeSortPattern && maybeAcc);
+
+    auto newSortStage = DocumentSourceSort::create(expCtx, SortPattern(*maybeSortPattern, expCtx));
+    auto newAccState = AccumulationStatement::parseAccumulationStatement(
+        expCtx.get(), maybeAcc->firstElement(), expCtx->variablesParseState);
+    auto newGroupStage =
+        DocumentSourceGroup::create(expCtx, groupStage->getIdExpression(), {newAccState});
+    return {newSortStage, newGroupStage};
+}
+
+
 bool DocumentSourceInternalUnpackBucket::optimizeLastpoint(Pipeline::SourceContainer::iterator itr,
                                                            Pipeline::SourceContainer* container) {
-    // A lastpoint-type aggregation must contain both a $sort and a $group stage, in that order.
-    if (std::next(itr, 2) == container->end()) {
+    // A lastpoint-type aggregation must contain both a $sort and a $group stage, in that order, or
+    // only a $group stage with a $top, $topN, $bottom, or $bottomN accumulator. This means we need
+    // at least one stage after $_internalUnpackBucket.
+    if (std::next(itr) == container->end()) {
         return false;
     }
 
-    auto sortStage = dynamic_cast<DocumentSourceSort*>(std::next(itr)->get());
-    auto groupStage = dynamic_cast<DocumentSourceGroup*>(std::next(itr, 2)->get());
+    // If we only have one stage after $_internalUnpackBucket, it must be a $group for the
+    // lastpoint rewrite to happen.
+    DocumentSourceSort* sortStage = nullptr;
+    auto groupStage = dynamic_cast<DocumentSourceGroup*>(std::next(itr)->get());
+
+    // If we don't have a $sort + $group lastpoint query, we will need to replace the $group with
+    // equivalent $sort + $group stages for the rewrite.
+    boost::intrusive_ptr<DocumentSourceSort> sortStagePtr;
+    boost::intrusive_ptr<DocumentSourceGroup> groupStagePtr;
+    if (!groupStage && (std::next(itr, 2) != container->end())) {
+        // If the first stage is not a $group, we may have a $sort + $group lastpoint query.
+        sortStage = dynamic_cast<DocumentSourceSort*>(std::next(itr)->get());
+        groupStage = dynamic_cast<DocumentSourceGroup*>(std::next(itr, 2)->get());
+    } else if (groupStage) {
+        // Try to rewrite the $group to a $sort+$group-style lastpoint query before proceeding with
+        // the optimization.
+        std::tie(sortStagePtr, groupStagePtr) =
+            tryRewriteGroupAsSortGroup(pExpCtx, itr, container, groupStage);
+
+        // Both these stages should be discarded once we exit this function; either because the
+        // rewrite failed validation checks, or because we created updated versions of these stages
+        // in 'tryInsertBucketLevelSortAndGroup' below (which will be inserted into the pipeline).
+        // The intrusive_ptrs above handle this deletion gracefully.
+        sortStage = sortStagePtr.get();
+        groupStage = groupStagePtr.get();
+    }
 
     if (!sortStage || !groupStage) {
         return false;
@@ -833,9 +961,16 @@ bool DocumentSourceInternalUnpackBucket::optimizeLastpoint(Pipeline::SourceConta
         if (!groupOnlyUsesTargetAccum(accum) || !isSortValidForGroup(accum)) {
             return false;
         }
+
         bool flipSort = (accum == AccumulatorDocumentsNeeded::kLastDocument);
         auto newSort = createMetadataSortForReorder(*sortStage, timeField, newFieldPath, flipSort);
         auto newGroup = createBucketGroupForReorder(pExpCtx, fieldsToInclude, newFieldPath);
+
+        // Note that we don't erase any of the original stages for this rewrite. This allows us to
+        // preserve the particular semantics of the original group (e.g. $top behaves differently
+        // than topN with n = 1, $group accumulators have a special way of dealing with nulls, etc.)
+        // without constructing a specialized projection to exactly match what the original query
+        // would have returned.
         container->insert(itr, newSort);
         container->insert(itr, newGroup);
         return true;

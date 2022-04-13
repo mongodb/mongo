@@ -740,7 +740,7 @@ Value AccumulatorTopBottomN<sense, single>::getValueConst(bool toBeMerged) const
     std::vector<Value> result;
     auto begin = _map->begin();
     auto end = _map->end();
-    if constexpr (sense == kBottom) {
+    if constexpr (sense == TopBottomSense::kBottom) {
         // If this accumulator is removable there may be more than n elements in the map, so we must
         // skip elements that shouldn't be in the result.
         if (static_cast<long long>(_map->size()) > *_n) {

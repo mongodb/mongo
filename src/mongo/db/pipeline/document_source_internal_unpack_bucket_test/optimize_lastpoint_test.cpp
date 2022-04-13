@@ -71,60 +71,115 @@ void assertExpectedLastpointOpt(const boost::intrusive_ptr<ExpressionContext> ex
 
 TEST_F(InternalUnpackBucketOptimizeLastpointTest, NonLastpointDoesNotParticipateInOptimization) {
     RAIIServerParameterControllerForTest controller("featureFlagLastPointQuery", true);
-    auto assertPipelineUnoptimized = [&](const std::string& unpackStr,
-                                         const std::string& sortStr,
-                                         const std::string& groupStr) {
-        std::vector stageStrs{unpackStr, sortStr, groupStr};
+    auto assertPipelineUnoptimized = [&](const std::vector<std::string>& stageStrs) {
         assertExpectedLastpointOpt(getExpCtx(), stageStrs, stageStrs, /* expectedSuccess */ false);
     };
 
     // $sort must contain a time field.
     assertPipelineUnoptimized(
-        "{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: 'm', "
-        "bucketMaxSpanSeconds: 60}}",
-        "{$sort: {'m.a': 1}}",
-        "{$group: {_id: '$m.a', b: {$first: '$b'}, c: {$first: '$c'}}}");
+        {"{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: 'm', "
+         "bucketMaxSpanSeconds: 60}}",
+         "{$sort: {'m.a': 1}}",
+         "{$group: {_id: '$m.a', b: {$first: '$b'}, c: {$first: '$c'}}}"});
+
+    assertPipelineUnoptimized(
+        {"{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: 'm', "
+         "bucketMaxSpanSeconds: 60}}",
+         "{$group: {_id: '$m.a', lastpoint: {$top: {output: {b: '$b', c: '$c'}, sortBy: {'m.a': "
+         "1}}}}}"});
 
     // $sort must have the time field as the last field in the sort key pattern.
     assertPipelineUnoptimized(
-        "{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: 'm', "
-        "bucketMaxSpanSeconds: 60}}",
-        "{$sort: {t: -1, 'm.a': 1}}",
-        "{$group: {_id: '$m.a', b: {$first: '$b'}, c: {$first: '$c'}}}");
+        {"{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: 'm', "
+         "bucketMaxSpanSeconds: 60}}",
+         "{$sort: {t: -1, 'm.a': 1}}",
+         "{$group: {_id: '$m.a', b: {$first: '$b'}, c: {$first: '$c'}}}"});
+
+    assertPipelineUnoptimized(
+        {"{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: 'm', "
+         "bucketMaxSpanSeconds: 60}}",
+         "{$group: {_id: '$m.a', lastpoint: {$top: {output: {b: '$b', c: '$c'}, sortBy: {t: -1, "
+         "'m.a': 1}}}}}"});
 
     // $group's _id must be a meta field.
     assertPipelineUnoptimized(
-        "{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: 'm', "
-        "bucketMaxSpanSeconds: 60}}",
-        "{$sort: {'m.a': 1, t: -1}}",
-        "{$group: {_id: '$nonMeta', b: {$first: '$b'}, c: {$first: '$c'}}}");
+        {"{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: 'm', "
+         "bucketMaxSpanSeconds: 60}}",
+         "{$sort: {'m.a': 1, t: -1}}",
+         "{$group: {_id: '$nonMeta', b: {$first: '$b'}, c: {$first: '$c'}}}"});
 
-    // $group can only contain $first or $last accumulators.
     assertPipelineUnoptimized(
-        "{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: 'm', "
-        "bucketMaxSpanSeconds: 60}}",
-        "{$sort: {'m.a': 1, t: -1}}",
-        "{$group: {_id: '$m.a', b: {$first: '$b'}, c: {$last: '$c'}}}");
+        {"{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: 'm', "
+         "bucketMaxSpanSeconds: 60}}",
+         "{$group: {_id: '$nonMeta', lastpoint: {$top: {output: {b: '$b', c: '$c'}, sortBy: "
+         "{'m.a': 1, t: -1}}}}}"});
+
+    // $group can only contain $first or $last accumulators or one $top/$bottom accumulator.
+    assertPipelineUnoptimized(
+        {"{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: 'm', "
+         "bucketMaxSpanSeconds: 60}}",
+         "{$sort: {'m.a': 1, t: -1}}",
+         "{$group: {_id: '$m.a', b: {$first: '$b'}, c: {$last: '$c'}}}"});
+
+    assertPipelineUnoptimized(
+        {"{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: 'm', "
+         "bucketMaxSpanSeconds: 60}}",
+         "{$group: {_id: '$nonMeta', lastpoint1: {$top: {output: {b: '$b', c: '$c'}, sortBy: "
+         "{'m.a': 1, t: -1}}}}}, lastpoint2: {$bottom: {output: {b: '$b', c: '$c'}, sortBy: "
+         "{'m.a': 1, t: 1}}}}}"});
 
     // We disallow the rewrite for firstpoint queries due to rounding behaviour on control.min.time.
     assertPipelineUnoptimized(
-        "{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
-        "'m', bucketMaxSpanSeconds: 60}}",
-        "{$sort: {'m.a': -1, t: 1}}",
-        "{$group: {_id: '$m.a', b: {$first: '$b'}, c: {$first: '$c'}}}");
+        {"{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
+         "'m', bucketMaxSpanSeconds: 60}}",
+         "{$sort: {'m.a': -1, t: 1}}",
+         "{$group: {_id: '$m.a', b: {$first: '$b'}, c: {$first: '$c'}}}"});
 
     assertPipelineUnoptimized(
-        "{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
-        "'m', bucketMaxSpanSeconds: 60}}",
-        "{$sort: {'m.a': -1, t: -1}}",
-        "{$group: {_id: '$m.a', b: {$last: '$b'}, c: {$last: '$c'}}}");
+        {"{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
+         "'m', bucketMaxSpanSeconds: 60}}",
+         "{$sort: {'m.a': -1, t: -1}}",
+         "{$group: {_id: '$m.a', b: {$last: '$b'}, c: {$last: '$c'}}}"});
+
+    assertPipelineUnoptimized(
+        {"{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: 'm', "
+         "bucketMaxSpanSeconds: 60}}",
+         "{$group: {_id: '$m.a', lastpoint: {$top: {output: {b: '$b', c: '$c'}, sortBy: {'m.a': 1, "
+         "t: 1}}}}}"});
+
+    assertPipelineUnoptimized(
+        {"{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: 'm', "
+         "bucketMaxSpanSeconds: 60}}",
+         "{$group: {_id: '$m.a', lastpoint: {$bottom: {output: {b: '$b', c: '$c'}, sortBy: {'m.a': "
+         "1, t: -1}}}}}"});
 
     // The _id field in $group's must match the meta field in $sort.
     assertPipelineUnoptimized(
-        "{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: 'm', "
-        "bucketMaxSpanSeconds: 60}}",
-        "{$sort: {'m.a': -1, t: -1}}",
-        "{$group: {_id: '$m.z', b: {$first: '$b'}, c: {$first: '$c'}}}");
+        {"{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: 'm', "
+         "bucketMaxSpanSeconds: 60}}",
+         "{$sort: {'m.a': -1, t: -1}}",
+         "{$group: {_id: '$m.z', b: {$first: '$b'}, c: {$first: '$c'}}}"});
+
+    assertPipelineUnoptimized(
+        {"{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: 'm', "
+         "bucketMaxSpanSeconds: 60}}",
+         "{$group: {_id: '$m.z', lastpoint: {$top: {output: {b: '$b', c: '$c'}, sortBy: {'m.a': 1, "
+         "t: -1}}}}}"});
+
+    // We cannot optimize for $topN or $bottomN with n != 1.
+    assertPipelineUnoptimized(
+        {"{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: 'm', "
+         "bucketMaxSpanSeconds: 60}}",
+         "{$group: {_id: '$m.a', lastpoint: {$topN: {n: {$const: 2}, output: {b: '$b', c: '$c'}, "
+         "sortBy: "
+         "{'m.a': 1, t: -1}}}}}"});
+
+    assertPipelineUnoptimized(
+        {"{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: 'm', "
+         "bucketMaxSpanSeconds: 60}}",
+         "{$group: {_id: '$m.a', lastpoint: {$bottomN: {n: {$const: 2}, output: {b: '$b', c: "
+         "'$c'}, sortBy: "
+         "{'m.a': 1, t: 1}}}}}"});
 }
 
 TEST_F(InternalUnpackBucketOptimizeLastpointTest,
@@ -144,6 +199,35 @@ TEST_F(InternalUnpackBucketOptimizeLastpointTest,
                                 "'m', bucketMaxSpanSeconds: 60}}",
                                 "{$sort: {'m.a': 1, t: -1}}",
                                 "{$group: {_id: '$m.a', b: {$first: '$b'}, c: {$first: '$c'}}}"});
+    assertExpectedLastpointOpt(getExpCtx(),
+                               /* inputPipelineStrs */
+                               {"{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
+                                "'m', bucketMaxSpanSeconds: 60}}",
+                                "{$group: {_id: '$m.a', lastpoint: {$top: {output: {b: '$b', c: "
+                                "'$c'}, sortBy: {'m.a': 1, t: -1}}}}}"},
+                               /* expectedPipelineStrs */
+                               {"{$sort: {'meta.a': 1, 'control.max.t': -1, 'control.min.t': -1}}",
+                                "{$group: {_id: '$meta.a', meta: {$first: '$meta'}, control: "
+                                "{$first: '$control'}, data: {$first: '$data'}}}",
+                                "{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
+                                "'m', bucketMaxSpanSeconds: 60}}",
+                                "{$group: {_id: '$m.a', lastpoint: {$top: {output: {b: '$b', c: "
+                                "'$c'}, sortBy: {'m.a': 1, t: -1}}}}}"});
+    assertExpectedLastpointOpt(
+        getExpCtx(),
+        /* inputPipelineStrs */
+        {"{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
+         "'m', bucketMaxSpanSeconds: 60}}",
+         "{$group: {_id: '$m.a', lastpoint: {$topN: {n: {$const: 1}, output: {b: '$b', c: "
+         "'$c'}, sortBy: {'m.a': 1, t: -1}}}}}"},
+        /* expectedPipelineStrs */
+        {"{$sort: {'meta.a': 1, 'control.max.t': -1, 'control.min.t': -1}}",
+         "{$group: {_id: '$meta.a', meta: {$first: '$meta'}, control: "
+         "{$first: '$control'}, data: {$first: '$data'}}}",
+         "{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
+         "'m', bucketMaxSpanSeconds: 60}}",
+         "{$group: {_id: '$m.a', lastpoint: {$topN: {n: {$const: 1}, output: {b: '$b', c: '$c'}, "
+         "sortBy: {'m.a': 1, t: -1}}}}}"});
 }
 
 TEST_F(InternalUnpackBucketOptimizeLastpointTest,
@@ -163,6 +247,35 @@ TEST_F(InternalUnpackBucketOptimizeLastpointTest,
                                 "'m', bucketMaxSpanSeconds: 60}}",
                                 "{$sort: {'m.a': -1, t: -1}}",
                                 "{$group: {_id: '$m.a', b: {$first: '$b'}, c: {$first: '$c'}}}"});
+    assertExpectedLastpointOpt(getExpCtx(),
+                               /* inputPipelineStrs */
+                               {"{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
+                                "'m', bucketMaxSpanSeconds: 60}}",
+                                "{$group: {_id: '$m.a', lastpoint: {$top: {output: {b: '$b', c: "
+                                "'$c'}, sortBy: {'m.a': -1, t: -1}}}}}"},
+                               /* expectedPipelineStrs */
+                               {"{$sort: {'meta.a': -1, 'control.max.t': -1, 'control.min.t': -1}}",
+                                "{$group: {_id: '$meta.a', meta: {$first: '$meta'}, control: "
+                                "{$first: '$control'}, data: {$first: '$data'}}}",
+                                "{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
+                                "'m', bucketMaxSpanSeconds: 60}}",
+                                "{$group: {_id: '$m.a', lastpoint: {$top: {output: {b: '$b', c: "
+                                "'$c'}, sortBy: {'m.a': -1, t: -1}}}}}"});
+    assertExpectedLastpointOpt(
+        getExpCtx(),
+        /* inputPipelineStrs */
+        {"{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
+         "'m', bucketMaxSpanSeconds: 60}}",
+         "{$group: {_id: '$m.a', lastpoint: {$topN: {n: {$const: 1}, output: {b: '$b', c: "
+         "'$c'}, sortBy: {'m.a': -1, t: -1}}}}}"},
+        /* expectedPipelineStrs */
+        {"{$sort: {'meta.a': -1, 'control.max.t': -1, 'control.min.t': -1}}",
+         "{$group: {_id: '$meta.a', meta: {$first: '$meta'}, control: "
+         "{$first: '$control'}, data: {$first: '$data'}}}",
+         "{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
+         "'m', bucketMaxSpanSeconds: 60}}",
+         "{$group: {_id: '$m.a', lastpoint: {$topN: {n: {$const: 1}, output: {b: '$b', c: "
+         "'$c'}, sortBy: {'m.a': -1, t: -1}}}}}"});
 }
 
 TEST_F(InternalUnpackBucketOptimizeLastpointTest, LastpointWithMetaSubfieldAscendingTimeAscending) {
@@ -181,6 +294,35 @@ TEST_F(InternalUnpackBucketOptimizeLastpointTest, LastpointWithMetaSubfieldAscen
                                 "'m', bucketMaxSpanSeconds: 60}}",
                                 "{$sort: {'m.a': 1, t: 1}}",
                                 "{$group: {_id: '$m.a', b: {$last: '$b'}, c: {$last: '$c'}}}"});
+    assertExpectedLastpointOpt(getExpCtx(),
+                               /* inputPipelineStrs */
+                               {"{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
+                                "'m', bucketMaxSpanSeconds: 60}}",
+                                "{$group: {_id: '$m.a', lastpoint: {$bottom: {output: {b: '$b', c: "
+                                "'$c'}, sortBy: {'m.a': 1, t: 1}}}}}"},
+                               /* expectedPipelineStrs */
+                               {"{$sort: {'meta.a': -1, 'control.max.t': -1, 'control.min.t': -1}}",
+                                "{$group: {_id: '$meta.a', meta: {$first: '$meta'}, control: "
+                                "{$first: '$control'}, data: {$first: '$data'}}}",
+                                "{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
+                                "'m', bucketMaxSpanSeconds: 60}}",
+                                "{$group: {_id: '$m.a', lastpoint: {$bottom: {output: {b: '$b', c: "
+                                "'$c'}, sortBy: {'m.a': 1, t: 1}}}}}"});
+    assertExpectedLastpointOpt(
+        getExpCtx(),
+        /* inputPipelineStrs */
+        {"{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
+         "'m', bucketMaxSpanSeconds: 60}}",
+         "{$group: {_id: '$m.a', lastpoint: {$bottomN: {n: {$const: 1}, output: {b: '$b', c: "
+         "'$c'}, sortBy: {'m.a': 1, t: 1}}}}}"},
+        /* expectedPipelineStrs */
+        {"{$sort: {'meta.a': -1, 'control.max.t': -1, 'control.min.t': -1}}",
+         "{$group: {_id: '$meta.a', meta: {$first: '$meta'}, control: "
+         "{$first: '$control'}, data: {$first: '$data'}}}",
+         "{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
+         "'m', bucketMaxSpanSeconds: 60}}",
+         "{$group: {_id: '$m.a', lastpoint: {$bottomN: {n: {$const: 1}, output: {b: '$b', c: "
+         "'$c'}, sortBy: {'m.a': 1, t: 1}}}}}"});
 }
 
 TEST_F(InternalUnpackBucketOptimizeLastpointTest,
@@ -200,6 +342,34 @@ TEST_F(InternalUnpackBucketOptimizeLastpointTest,
                                 "'m', bucketMaxSpanSeconds: 60}}",
                                 "{$sort: {'m.a': -1, t: 1}}",
                                 "{$group: {_id: '$m.a', b: {$last: '$b'}, c: {$last: '$c'}}}"});
+    assertExpectedLastpointOpt(getExpCtx(),
+                               /* inputPipelineStrs */
+                               {"{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
+                                "'m', bucketMaxSpanSeconds: 60}}",
+                                "{$group: {_id: '$m.a', lastpoint: {$bottom: {output: {b: '$b', c: "
+                                "'$c'}, sortBy: {'m.a': -1, t: 1}}}}}"},
+                               /* expectedPipelineStrs */
+                               {"{$sort: {'meta.a': 1, 'control.max.t': -1, 'control.min.t': -1}}",
+                                "{$group: {_id: '$meta.a', meta: {$first: '$meta'}, control: "
+                                "{$first: '$control'}, data: {$first: '$data'}}}",
+                                "{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
+                                "'m', bucketMaxSpanSeconds: 60}}",
+                                "{$group: {_id: '$m.a', lastpoint: {$bottom: {output: {b: '$b', c: "
+                                "'$c'}, sortBy: {'m.a': -1, t: 1}}}}}"});
+    assertExpectedLastpointOpt(getExpCtx(),
+                               /* inputPipelineStrs */
+                               {"{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
+                                "'m', bucketMaxSpanSeconds: 60}}",
+                                "{$group: {_id: '$m.a', lastpoint: {$bottomN: {n: {$const: 1}, "
+                                "output: {b: '$b', c: '$c'}, sortBy: {'m.a': -1, t: 1}}}}}"},
+                               /* expectedPipelineStrs */
+                               {"{$sort: {'meta.a': 1, 'control.max.t': -1, 'control.min.t': -1}}",
+                                "{$group: {_id: '$meta.a', meta: {$first: '$meta'}, control: "
+                                "{$first: '$control'}, data: {$first: '$data'}}}",
+                                "{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
+                                "'m', bucketMaxSpanSeconds: 60}}",
+                                "{$group: {_id: '$m.a', lastpoint: {$bottomN: {n: {$const: 1}, "
+                                "output: {b: '$b', c: '$c'}, sortBy: {'m.a': -1, t: 1}}}}}"});
 }
 
 TEST_F(InternalUnpackBucketOptimizeLastpointTest, LastpointWithComputedMetaProjectionFields) {
