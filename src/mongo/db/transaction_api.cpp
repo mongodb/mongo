@@ -58,6 +58,10 @@
 #include "mongo/stdx/future.h"
 #include "mongo/transport/service_entry_point.h"
 
+// TODO SERVER-65395: Remove failpoint when fle2 tests can reliably support internal transaction
+// retry limit.
+MONGO_FAIL_POINT_DEFINE(skipTransactionApiRetryCheckInHandleError);
+
 namespace mongo::txn_api {
 
 namespace {
@@ -168,15 +172,16 @@ StatusWith<CommitResult> TransactionWithRetries::runSyncNoThrow(OperationContext
         OperationTimeTracker::get(opCtx)->updateOperationTime(_internalTxn->getOperationTime());
     });
 
-    // TODO SERVER-59566 Add a retry policy.
     _internalTxn->setCallback(std::move(callback));
+    int bodyAttempts = 0;
     while (true) {
+        bodyAttempts++;
         {
             auto bodyStatus =
                 getWithYields(opCtx, [&] { return _internalTxn->runCallback(); }, _resourceYielder);
 
             if (!bodyStatus.isOK()) {
-                auto nextStep = _internalTxn->handleError(bodyStatus);
+                auto nextStep = _internalTxn->handleError(bodyStatus, bodyAttempts);
                 logNextStep(nextStep, _internalTxn->reportStateForLog());
 
                 if (nextStep == details::Transaction::ErrorHandlingStep::kDoNotRetry) {
@@ -195,7 +200,9 @@ StatusWith<CommitResult> TransactionWithRetries::runSyncNoThrow(OperationContext
             }
         }
 
+        int commitAttempts = 0;
         while (true) {
+            commitAttempts++;
             auto swResult =
                 getWithYields(opCtx, [&] { return _internalTxn->commit(); }, _resourceYielder);
 
@@ -204,7 +211,7 @@ StatusWith<CommitResult> TransactionWithRetries::runSyncNoThrow(OperationContext
                 return swResult;
             }
 
-            auto nextStep = _internalTxn->handleError(swResult);
+            auto nextStep = _internalTxn->handleError(swResult, commitAttempts);
             logNextStep(nextStep, _internalTxn->reportStateForLog());
 
             if (nextStep == details::Transaction::ErrorHandlingStep::kDoNotRetry) {
@@ -421,8 +428,8 @@ SemiFuture<void> Transaction::runCallback() {
         .semi();
 }
 
-Transaction::ErrorHandlingStep Transaction::handleError(
-    const StatusWith<CommitResult>& swResult) const {
+Transaction::ErrorHandlingStep Transaction::handleError(const StatusWith<CommitResult>& swResult,
+                                                        int attemptCounter) const {
     stdx::lock_guard<Latch> lg(_mutex);
 
     LOGV2_DEBUG(5875905,
@@ -432,11 +439,19 @@ Transaction::ErrorHandlingStep Transaction::handleError(
                                                : swResult.getStatus(),
                 "hasTransientTransactionErrorLabel"_attr =
                     _latestResponseHasTransientTransactionErrorLabel,
-                "txnInfo"_attr = _reportStateForLog(lg));
+                "txnInfo"_attr = _reportStateForLog(lg),
+                "retriesLeft"_attr =
+                    kTxnRetryLimit - attemptCounter + 1  // To account for the initial execution.
+    );
 
     if (_execContext == ExecutionContext::kClientTransaction) {
         // If we're nested in another transaction, let the outer most client decide on errors.
         return ErrorHandlingStep::kDoNotRetry;
+    }
+
+    if (!MONGO_unlikely(skipTransactionApiRetryCheckInHandleError.shouldFail()) &&
+        attemptCounter > kTxnRetryLimit) {
+        return ErrorHandlingStep::kAbortAndDoNotRetry;
     }
 
     // The transient transaction error label is always returned in command responses, even for
@@ -473,9 +488,6 @@ Transaction::ErrorHandlingStep Transaction::handleError(
         // retryable write, per the drivers specification.
         if (ErrorCodes::isRetriableError(commitStatus) ||
             ErrorCodes::isRetriableError(commitWCStatus)) {
-            // TODO SERVER-59566: Handle timeouts and max retry attempts. Note commit might be
-            // retried within the command itself, e.g. ClusterCommitTransaction uses an idempotent
-            // retry policy, so we may want a timeout policy instead of number of retries.
             return ErrorHandlingStep::kRetryCommit;
         }
     }
@@ -510,6 +522,16 @@ void Transaction::prepareRequest(BSONObjBuilder* cmdBuilder) {
         _state = TransactionState::kStarted;
         _sessionInfo.setStartTransaction(boost::none);
         cmdBuilder->append(repl::ReadConcernArgs::kReadConcernFieldName, _readConcern);
+    }
+
+    // Append the new recalculated maxTimeMS
+    if (_opDeadline) {
+        uassert(5956600,
+                "Command object passed to the transaction api should not contain maxTimeMS field",
+                !cmdBuilder->hasField(kMaxTimeMSField));
+        auto timeLeftover =
+            std::max(Milliseconds(0), *_opDeadline - _service->getFastClockSource()->now());
+        cmdBuilder->append(kMaxTimeMSField, durationCount<Milliseconds>(timeLeftover));
     }
 
     // If the transaction API caller had API parameters, we should forward them in all requests.
@@ -643,6 +665,10 @@ void Transaction::_primeTransaction(OperationContext* opCtx) {
     _writeConcern = opCtx->getWriteConcern().toBSON().removeField(
         ReadWriteConcernProvenanceBase::kSourceFieldName);
     _apiParameters = APIParameters::get(opCtx);
+
+    if (opCtx->hasDeadline()) {
+        _opDeadline = opCtx->getDeadline();
+    }
 
     LOGV2_DEBUG(5875901,
                 3,

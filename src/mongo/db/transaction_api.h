@@ -46,6 +46,10 @@ class TxnMetadataHooks;
 class Transaction;
 }  // namespace details
 
+// Max number of retries allowed for a transaction operation.
+static constexpr int kTxnRetryLimit = 10;
+static constexpr auto kMaxTimeMSField = "maxTimeMS";
+
 /**
  * Encapsulates the command status and write concern error from a response to a commitTransaction
  * command.
@@ -367,7 +371,8 @@ public:
      * its execution context, e.g. by updating its txnNumber, returning the next step for the
      * transaction runner.
      */
-    ErrorHandlingStep handleError(const StatusWith<CommitResult>& swResult) const;
+    ErrorHandlingStep handleError(const StatusWith<CommitResult>& swResult,
+                                  int attemptCounter) const;
 
     /**
      * Returns an object with info about the internal transaction for diagnostics.
@@ -424,6 +429,7 @@ private:
     std::unique_ptr<TransactionClient> _txnClient;
     Callback _callback;
 
+    boost::optional<Date_t> _opDeadline;
     BSONObj _writeConcern;
     BSONObj _readConcern;
     APIParameters _apiParameters;
