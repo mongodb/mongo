@@ -2698,7 +2698,11 @@ void RetryableWriteTransactionParticipantCatalog::addParticipant(
         _activeTxnNumber = *txnNumber;
         _participants.clear();
     }
-    _participants.emplace(participant._sessionId(), participant);
+    if (auto it = _participants.find(participant._sessionId()); it != _participants.end()) {
+        invariant(it->second._tp == participant._tp);
+    } else {
+        _participants.emplace(participant._sessionId(), participant);
+    }
 }
 
 void RetryableWriteTransactionParticipantCatalog::reset() {

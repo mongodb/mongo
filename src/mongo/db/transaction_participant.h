@@ -303,6 +303,14 @@ public:
         bool expiredAsOf(Date_t when) const;
 
         /**
+         * Returns if this TransactionParticipant instance can be reaped. Always true unless there
+         * is an open transaction on this session.
+         */
+        auto canBeReaped() const {
+            return !transactionIsOpen();
+        }
+
+        /**
          * Returns whether we are in an open multi-document transaction, which means we have an
          * active transaction which has autocommit:false and has not been committed or aborted. It
          * is possible that the current transaction is stashed onto the stack via a
@@ -1212,9 +1220,9 @@ public:
     }
 
     /**
-     * Adds the given participant to the catalog (overrides any existing participant with the same
-     * session id) and sets the txnNumber to that of the retryable write running on the participant.
-     * Throws an invariant error if the participant requires a refresh.
+     * Adds the given participant to the catalog and sets the txnNumber to that of the retryable
+     * write running on the participant. If a participant with the same session id already exists,
+     * invariants that it corresponds to the same TransactionParticipant.
      */
     void addParticipant(const TransactionParticipant::Participant& participant);
 

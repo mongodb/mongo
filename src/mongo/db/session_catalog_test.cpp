@@ -79,6 +79,35 @@ protected:
         ASSERT_THROWS_CODE(future.get(), AssertionException, ErrorCodes::MaxTimeMSExpired);
     }
 
+    /**
+     * Creates the session with the given 'lsid' by checking it out from the SessionCatalog and then
+     * checking it back in.
+     */
+    void createSession(const LogicalSessionId& lsid) {
+        stdx::async(stdx::launch::async,
+                    [this, lsid] {
+                        ThreadClient tc(getServiceContext());
+                        auto opCtx = makeOperationContext();
+                        opCtx->setLogicalSessionId(lsid);
+                        OperationContextSession ocs(opCtx.get());
+                    })
+            .get();
+    }
+
+    /**
+     * Returns the session ids for all sessions in the SessionCatalog.
+     */
+    std::vector<LogicalSessionId> getAllSessionIds(OperationContext* opCtx) {
+        std::vector<LogicalSessionId> lsidsFound;
+        SessionKiller::Matcher matcherAllSessions(
+            KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
+        const auto getAllSessionIdsWorkerFn = [&lsidsFound](const ObservableSession& session) {
+            lsidsFound.push_back(session.getSessionId());
+        };
+        catalog()->scanSessions(matcherAllSessions, getAllSessionIdsWorkerFn);
+        return lsidsFound;
+    };
+
     RAIIServerParameterControllerForTest _controller{"featureFlagInternalTransactions", true};
 };
 
@@ -274,7 +303,7 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, NestedOperationContextSession) {
 
 TEST_F(SessionCatalogTest, ScanSession) {
     // Create sessions in the catalog.
-    const auto lsids = []() -> std::vector<LogicalSessionId> {
+    const auto& lsids = []() -> std::vector<LogicalSessionId> {
         auto lsid0 = makeLogicalSessionIdForTest();
         auto lsid1 = makeLogicalSessionIdForTest();
         auto lsid2 = makeLogicalSessionIdWithTxnNumberAndUUIDForTest(lsid1);
@@ -313,46 +342,113 @@ TEST_F(SessionCatalogTest, ScanSession) {
     });
 }
 
-TEST_F(SessionCatalogTest, ScanSessionMarkForReapWhenSessionIsIdle) {
-    // Create sessions in the catalog.
-    const auto lsids = []() -> std::vector<LogicalSessionId> {
-        auto lsid0 = makeLogicalSessionIdForTest();
-        auto lsid1 = makeLogicalSessionIdForTest();
-        auto lsid2 = makeLogicalSessionIdWithTxnNumberAndUUIDForTest(lsid1);
-        auto lsid3 = makeLogicalSessionIdWithTxnUUIDForTest(lsid1);
-        return {lsid0, lsid1, lsid2, lsid3};
-    }();
-    for (const auto& lsid : lsids) {
-        stdx::async(stdx::launch::async,
-                    [this, lsid] {
-                        ThreadClient tc(getServiceContext());
-                        auto opCtx = makeOperationContext();
-                        opCtx->setLogicalSessionId(lsid);
-                        OperationContextSession ocs(opCtx.get());
-                    })
-            .get();
+TEST_F(SessionCatalogTestWithDefaultOpCtx, ScanSessionsForReapWhenSessionIsIdle) {
+    auto parentLsid = makeLogicalSessionIdForTest();
+    auto childLsid0 = makeLogicalSessionIdWithTxnUUIDForTest(parentLsid);
+    auto childLsid1 = makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid);
+    auto otherParentLsid = makeLogicalSessionIdForTest();
+
+    createSession(parentLsid);
+    createSession(childLsid0);
+    createSession(childLsid1);
+    createSession(otherParentLsid);
+    auto lsidsFound = getAllSessionIds(_opCtx);
+    ASSERT_EQ(4U, lsidsFound.size());
+
+    // Mark otherParentSession for reap. The session should get reaped since it doesn't have any
+    // child session.
+    auto lsidsNotReaped = catalog()->scanSessionsForReap(
+        otherParentLsid,
+        [](ObservableSession& parentSession) {
+            parentSession.markForReap(ObservableSession::ReapMode::kNonExclusive);
+        },
+        [](ObservableSession& childSession) {});
+    lsidsFound = getAllSessionIds(_opCtx);
+    ASSERT_EQ(3U, lsidsFound.size());
+    catalog()->scanSession(otherParentLsid, [](const ObservableSession&) {
+        FAIL("Found a session that should have been reaped");
+    });
+    ASSERT_EQ(0U, lsidsNotReaped.size());
+
+    // Mark parentSession for reap. The session should not get reaped since its child sessions
+    // (i.e. childSession0 and childSession1) are not marked for reaped.
+    lsidsNotReaped = catalog()->scanSessionsForReap(
+        parentLsid,
+        [](ObservableSession& parentSession) {
+            parentSession.markForReap(ObservableSession::ReapMode::kNonExclusive);
+        },
+        [](ObservableSession& childSession) {});
+    lsidsFound = getAllSessionIds(_opCtx);
+    ASSERT_EQ(3U, lsidsFound.size());
+    ASSERT_EQ(lsidsFound.size(), lsidsNotReaped.size());
+    for (const auto& lsid : lsidsFound) {
+        ASSERT(lsidsNotReaped.find(lsid) != lsidsNotReaped.end());
     }
 
-    catalog()->scanSession(lsids[0],
-                           [&lsids](ObservableSession& session) { session.markForReap(); });
+    // Mark childSession0 and childSession1 for reap with kNonExclusive mode. The sessions should
+    // not get reaped since parentSession is not marked for reaped.
+    lsidsNotReaped = catalog()->scanSessionsForReap(
+        parentLsid,
+        [](ObservableSession& parentSession) {
 
-    catalog()->scanSession(lsids[0], [](const ObservableSession&) {
-        FAIL("The callback was called for non-existent session");
+        },
+        [](ObservableSession& childSession) {
+            childSession.markForReap(ObservableSession::ReapMode::kNonExclusive);
+        });
+    lsidsFound = getAllSessionIds(_opCtx);
+    ASSERT_EQ(3U, lsidsFound.size());
+    ASSERT_EQ(lsidsFound.size(), lsidsNotReaped.size());
+    for (const auto& lsid : lsidsFound) {
+        ASSERT(lsidsNotReaped.find(lsid) != lsidsNotReaped.end());
+    }
+
+    // Mark childSession0 for reap with kExclusive mode. The session should get reaped.
+    lsidsNotReaped = catalog()->scanSessionsForReap(
+        parentLsid,
+        [](ObservableSession& parentSession) {},
+        [&](ObservableSession& childSession) {
+            if (childSession.getSessionId() == childLsid0) {
+                childSession.markForReap(ObservableSession::ReapMode::kExclusive);
+            }
+        });
+    lsidsFound = getAllSessionIds(_opCtx);
+    ASSERT_EQ(2U, lsidsFound.size());
+    catalog()->scanSession(childLsid0, [](const ObservableSession&) {
+        FAIL("Found a session that should have been reaped");
     });
+    ASSERT_EQ(lsidsFound.size(), lsidsNotReaped.size());
+    for (const auto& lsid : lsidsFound) {
+        ASSERT(lsidsNotReaped.find(lsid) != lsidsNotReaped.end());
+    }
 
-    catalog()->scanSession(lsids[1], [&lsids](const ObservableSession& session) {
-        ASSERT_EQ(lsids[1], session.get()->getSessionId());
-    });
+    // Mark parentSession and childSession1 for reap with kNonExclusive mode. Both sessions should
+    // get reaped since all sessions are now marked for reap.
+    lsidsNotReaped = catalog()->scanSessionsForReap(
+        parentLsid,
+        [](ObservableSession& parentSession) {
+            parentSession.markForReap(ObservableSession::ReapMode::kNonExclusive);
+        },
+        [](ObservableSession& childSession) {
+            childSession.markForReap(ObservableSession::ReapMode::kNonExclusive);
+        });
 
-    catalog()->scanSession(lsids[2],
-                           [&lsids](ObservableSession& session) { session.markForReap(); });
+    lsidsFound = getAllSessionIds(_opCtx);
+    ASSERT_EQ(0U, lsidsFound.size());
+    ASSERT_EQ(lsidsFound.size(), lsidsNotReaped.size());
+}
 
-    catalog()->scanSession(lsids[2], [](const ObservableSession&) {
-        FAIL("The callback was called for non-existent session");
-    });
+DEATH_TEST_F(SessionCatalogTestWithDefaultOpCtx,
+             ScanSessionDoesNotSupportReaping,
+             "Cannot reap a session via 'scanSession'") {
+    auto lsid = makeLogicalSessionIdForTest();
 
-    catalog()->scanSession(lsids[3], [&lsids](const ObservableSession& session) {
-        ASSERT_EQ(lsids[3], session.get()->getSessionId());
+    {
+        _opCtx->setLogicalSessionId(lsid);
+        OperationContextSession ocs(_opCtx);
+    }
+
+    catalog()->scanSession(lsid, [](ObservableSession& session) {
+        session.markForReap(ObservableSession::ReapMode::kNonExclusive);
     });
 }
 
@@ -370,7 +466,7 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, ScanSessions) {
     lsidsFound.clear();
 
     // Create sessions in the catalog.
-    const auto lsids = []() -> std::vector<LogicalSessionId> {
+    const auto& lsids = []() -> std::vector<LogicalSessionId> {
         auto lsid0 = makeLogicalSessionIdForTest();
         auto lsid1 = makeLogicalSessionIdForTest();
         auto lsid2 = makeLogicalSessionIdWithTxnNumberAndUUIDForTest(lsid1);
@@ -417,48 +513,216 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, ScanSessions) {
                        ErrorCodes::InvalidOptions);
 }
 
-TEST_F(SessionCatalogTestWithDefaultOpCtx, ScanSessionsMarkForReap) {
-    // Create sessions in the catalog.
-    const auto lsids = []() -> std::vector<LogicalSessionId> {
-        auto lsid0 = makeLogicalSessionIdForTest();
-        auto lsid1 = makeLogicalSessionIdForTest();
-        auto lsid2 = makeLogicalSessionIdWithTxnNumberAndUUIDForTest(lsid1);
-        auto lsid3 = makeLogicalSessionIdWithTxnUUIDForTest(lsid1);
-        return {lsid0, lsid1, lsid2, lsid3};
-    }();
+TEST_F(SessionCatalogTestWithDefaultOpCtx, ScanSessionsForReapWhenParentSessionIsCheckedOut) {
+    auto parentLsid = makeLogicalSessionIdForTest();
+    auto childLsid0 = makeLogicalSessionIdWithTxnUUIDForTest(parentLsid);
+    auto childLsid1 = makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid);
+
+    createSession(parentLsid);
+    createSession(childLsid0);
+    createSession(childLsid1);
+    auto lsidsFound = getAllSessionIds(_opCtx);
+    ASSERT_EQ(3U, lsidsFound.size());
 
     unittest::Barrier sessionsCheckedOut(2);
     unittest::Barrier sessionsCheckedIn(2);
 
+    // Check out parentSession.
     auto f = stdx::async(stdx::launch::async, [&] {
         ThreadClient tc(getServiceContext());
         auto opCtx = makeOperationContext();
-        opCtx->setLogicalSessionId(lsids[1]);
+        opCtx->setLogicalSessionId(parentLsid);
         OperationContextSession ocs(opCtx.get());
         sessionsCheckedOut.countDownAndWait();
         sessionsCheckedIn.countDownAndWait();
     });
-
-    // After this wait, session 1 is checked-out and waiting on the barrier, because of which only
-    // sessions 0, 2 and 3 will be reaped.
+    // After this wait, parentSession is checked out and waiting on the barrier.
     sessionsCheckedOut.countDownAndWait();
 
-    SessionKiller::Matcher matcherAllSessions(
-        KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(_opCtx)});
+    // Mark parentSession for reap, and additionally mark childSession0 and childSession1 for reap
+    // with kNonExclusive mode. parentSession should not get reaped because it is checked out.
+    // childSession0 and childSession1 also should not get reaped since they must be reaped with
+    // parentSession.
+    auto lsidsNotReaped = catalog()->scanSessionsForReap(
+        parentLsid,
+        [](ObservableSession& parentSession) {
+            parentSession.markForReap(ObservableSession::ReapMode::kNonExclusive);
+        },
+        [](ObservableSession& childSession) {
+            childSession.markForReap(ObservableSession::ReapMode::kNonExclusive);
+        });
+    lsidsFound = getAllSessionIds(_opCtx);
+    ASSERT_EQ(3U, lsidsFound.size());
+    ASSERT_EQ(lsidsFound.size(), lsidsNotReaped.size());
+    for (const auto& lsid : lsidsFound) {
+        ASSERT(lsidsNotReaped.find(lsid) != lsidsNotReaped.end());
+    }
 
-    catalog()->scanSessions(matcherAllSessions,
-                            [&](ObservableSession& session) { session.markForReap(); });
-
-    catalog()->scanSessions(matcherAllSessions, [&](const ObservableSession& session) {
-        ASSERT_EQ(lsids[1], session.get()->getSessionId());
+    // Mark childSession0 for reap with kExclusive mode. It should get reaped although parentSession
+    // is checked out.
+    lsidsNotReaped = catalog()->scanSessionsForReap(
+        parentLsid,
+        [](ObservableSession& parentSession) {},
+        [&](ObservableSession& childSession) {
+            if (childSession.getSessionId() == childLsid0) {
+                childSession.markForReap(ObservableSession::ReapMode::kExclusive);
+            }
+        });
+    lsidsFound = getAllSessionIds(_opCtx);
+    ASSERT_EQ(2U, lsidsFound.size());
+    catalog()->scanSession(childLsid0, [](const ObservableSession&) {
+        FAIL("Found a session that should have been reaped");
     });
+    ASSERT_EQ(lsidsFound.size(), lsidsNotReaped.size());
+    for (const auto& lsid : lsidsFound) {
+        ASSERT(lsidsNotReaped.find(lsid) != lsidsNotReaped.end());
+    }
 
-    // After this point, session 1 is checked back in
+    // Mark childSession1 for reap with mode kExclusive. The session should get reaped although
+    // parentSession is checked out.
+    lsidsNotReaped = catalog()->scanSessionsForReap(
+        parentLsid,
+        [](ObservableSession& parentSession) {},
+        [](ObservableSession& childSession) {
+            childSession.markForReap(ObservableSession::ReapMode::kExclusive);
+        });
+    lsidsFound = getAllSessionIds(_opCtx);
+    ASSERT_EQ(1U, lsidsFound.size());
+    catalog()->scanSession(childLsid1, [](const ObservableSession&) {
+        FAIL("Found a session that should have been reaped");
+    });
+    ASSERT_EQ(lsidsFound.size(), lsidsNotReaped.size());
+    for (const auto& lsid : lsidsFound) {
+        ASSERT(lsidsNotReaped.find(lsid) != lsidsNotReaped.end());
+    }
+
+    // After this point, parentSession is checked back in.
     sessionsCheckedIn.countDownAndWait();
     f.get();
 
-    catalog()->scanSessions(matcherAllSessions, [&](const ObservableSession& session) {
-        ASSERT_EQ(lsids[1], session.get()->getSessionId());
+    // Mark parentSession for reap. The session should now get reaped.
+    lsidsNotReaped = catalog()->scanSessionsForReap(
+        parentLsid,
+        [](ObservableSession& parentSession) {
+            parentSession.markForReap(ObservableSession::ReapMode::kNonExclusive);
+        },
+        [](ObservableSession& childSession) {
+
+        });
+
+    lsidsFound = getAllSessionIds(_opCtx);
+    ASSERT_EQ(0U, lsidsFound.size());
+    ASSERT_EQ(lsidsFound.size(), lsidsNotReaped.size());
+}
+
+TEST_F(SessionCatalogTestWithDefaultOpCtx, ScanSessionsForReapWhenChildSessionIsCheckedOut) {
+    auto parentLsid = makeLogicalSessionIdForTest();
+    auto parentTxnNumber = TxnNumber{0};
+    auto childLsid0 = makeLogicalSessionIdWithTxnUUIDForTest(parentLsid);
+    auto childLsid1 =
+        makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, parentTxnNumber++);
+    auto childLsid2 = makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, parentTxnNumber);
+
+    createSession(parentLsid);
+    createSession(childLsid0);
+    createSession(childLsid1);
+    createSession(childLsid2);
+    auto lsidsFound = getAllSessionIds(_opCtx);
+    ASSERT_EQ(4U, lsidsFound.size());
+
+    unittest::Barrier sessionsCheckedOut(2);
+    unittest::Barrier sessionsCheckedIn(2);
+
+    // Check out childSession2.
+    auto f = stdx::async(stdx::launch::async, [&] {
+        ThreadClient tc(getServiceContext());
+        auto opCtx = makeOperationContext();
+        opCtx->setLogicalSessionId(childLsid2);
+        OperationContextSession ocs(opCtx.get());
+        sessionsCheckedOut.countDownAndWait();
+        sessionsCheckedIn.countDownAndWait();
+    });
+    // After this wait, childSession2 is checked out and waiting on the barrier.
+    sessionsCheckedOut.countDownAndWait();
+
+    // Mark childSession2 for reap with kExclusive mode. The session should not get reaped since it
+    // is checked out.
+    auto lsidsNotReaped = catalog()->scanSessionsForReap(
+        parentLsid,
+        [](ObservableSession& parentSession) {},
+        [&](ObservableSession& childSession) {
+            if (childSession.getSessionId() == childLsid2) {
+                childSession.markForReap(ObservableSession::ReapMode::kExclusive);
+            }
+        });
+    lsidsFound = getAllSessionIds(_opCtx);
+    ASSERT_EQ(4U, lsidsFound.size());
+    ASSERT_EQ(lsidsFound.size(), lsidsNotReaped.size());
+    for (const auto& lsid : lsidsFound) {
+        ASSERT(lsidsNotReaped.find(lsid) != lsidsNotReaped.end());
+    }
+
+    // Mark parentSession for reap, and additionally mark Reap childSession0 and childSession1 with
+    // mode kExclusive. parentSession should not get reaped because childSession2 is checked out.
+    // childSession0 and childSession1 should get reaped since they are not checked out.
+    lsidsNotReaped = catalog()->scanSessionsForReap(
+        parentLsid,
+        [&](ObservableSession& parentSession) {
+            parentSession.markForReap(ObservableSession::ReapMode::kNonExclusive);
+        },
+        [&](ObservableSession& childSession) {
+            auto lsid = childSession.getSessionId();
+            if (lsid == childLsid0 || lsid == childLsid1) {
+                childSession.markForReap(ObservableSession::ReapMode::kExclusive);
+            }
+        });
+
+    lsidsFound = getAllSessionIds(_opCtx);
+    ASSERT_EQ(2U, lsidsFound.size());
+    catalog()->scanSession(childLsid0, [](const ObservableSession&) {
+        FAIL("Found a session that should have been reaped");
+    });
+    catalog()->scanSession(childLsid1, [](const ObservableSession&) {
+        FAIL("Found a session that should have been reaped");
+    });
+    ASSERT_EQ(lsidsFound.size(), lsidsNotReaped.size());
+    for (const auto& lsid : lsidsFound) {
+        ASSERT(lsidsNotReaped.find(lsid) != lsidsNotReaped.end());
+    }
+
+    // After this point, childSession2 is checked back in.
+    sessionsCheckedIn.countDownAndWait();
+    f.get();
+
+    // Mark parentSession and childSession2 for reap with kNonExclusive mode. Both sessions should
+    // get reaped.
+    lsidsNotReaped = catalog()->scanSessionsForReap(
+        parentLsid,
+        [](ObservableSession& parentSession) {
+            parentSession.markForReap(ObservableSession::ReapMode::kNonExclusive);
+        },
+        [](ObservableSession& childSession) {
+            childSession.markForReap(ObservableSession::ReapMode::kNonExclusive);
+        });
+
+    lsidsFound = getAllSessionIds(_opCtx);
+    ASSERT_EQ(0U, lsidsFound.size());
+    ASSERT_EQ(lsidsFound.size(), lsidsNotReaped.size());
+}
+
+DEATH_TEST_F(SessionCatalogTestWithDefaultOpCtx,
+             ScanSessionsDoesNotSupportReaping,
+             "Cannot reap a session via 'scanSessions'") {
+    {
+        auto lsid = makeLogicalSessionIdForTest();
+        _opCtx->setLogicalSessionId(lsid);
+        OperationContextSession ocs(_opCtx);
+    }
+
+    SessionKiller::Matcher matcherAllSessions(
+        KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(_opCtx)});
+    catalog()->scanSessions(matcherAllSessions, [](ObservableSession& session) {
+        session.markForReap(ObservableSession::ReapMode::kNonExclusive);
     });
 }
 

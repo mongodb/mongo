@@ -43,26 +43,54 @@ int RouterSessionCatalog::reapSessionsOlderThan(OperationContext* opCtx,
                                                 Date_t possiblyExpired) {
     const auto catalog = SessionCatalog::get(opCtx);
 
-    // Capture the possbily expired in-memory session ids
-    LogicalSessionIdSet lsids;
+    // Find the possibly expired logical session ids in the in-memory catalog.
+    LogicalSessionIdSet possiblyExpiredLogicalSessionIds;
     catalog->scanSessions(
         SessionKiller::Matcher(KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)}),
         [&](const ObservableSession& session) {
-            if (session.getLastCheckout() < possiblyExpired) {
-                lsids.insert(session.getSessionId());
+            const auto sessionId = session.getSessionId();
+
+            // Skip child transaction sessions since they correspond to the same logical session as
+            // their parent transaction session so they have the same last check-out time as the
+            // the parent's.
+            if (session.getLastCheckout() < possiblyExpired && !getParentSessionId(sessionId)) {
+                possiblyExpiredLogicalSessionIds.insert(session.getSessionId());
             }
         });
+    // From the possibly expired logical session ids, find the ones that have been removed from
+    // from the config.system.sessions collection.
+    auto expiredLogicalSessionIds =
+        sessionsCollection.findRemovedSessions(opCtx, possiblyExpiredLogicalSessionIds);
 
-    // From the passed-in sessions, find the ones which are actually expired/removed
-    auto expiredSessionIds = sessionsCollection.findRemovedSessions(opCtx, lsids);
-
-    // Remove the session ids from the in-memory catalog
+    // For each removed logical session id, removes all of its transaction session ids that are no
+    // longer in use from the in-memory catalog.
     int numReaped = 0;
-    for (const auto& lsid : expiredSessionIds) {
-        catalog->scanSession(lsid, [&](ObservableSession& session) {
-            session.markForReap();
-            ++numReaped;
-        });
+
+    for (const auto& logicalSessionId : expiredLogicalSessionIds) {
+        // Scan all the transaction sessions for this logical session at once so reaping can be done
+        // atomically.
+        int numTransactionSessions = 0;
+        const auto transactionSessionIdsNotReaped = catalog->scanSessionsForReap(
+            logicalSessionId,
+            [&](ObservableSession& parentSession) {
+                const auto txnRouter = TransactionRouter::get(parentSession);
+                if (txnRouter.canBeReaped()) {
+                    // Only reap this transaction session if every other transaction session for
+                    // this logical session is also safe to be reaped.
+                    parentSession.markForReap(ObservableSession::ReapMode::kNonExclusive);
+                }
+                ++numTransactionSessions;
+            },
+            [&](ObservableSession& childSession) {
+                const auto txnRouter = TransactionRouter::get(childSession);
+                if (txnRouter.canBeReaped()) {
+                    // Only reap this transaction session if every other transaction session for
+                    // this logical session is also safe to be reaped.
+                    childSession.markForReap(ObservableSession::ReapMode::kNonExclusive);
+                }
+                ++numTransactionSessions;
+            });
+        numReaped += numTransactionSessions - transactionSessionIdsNotReaped.size();
     }
 
     return numReaped;

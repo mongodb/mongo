@@ -87,6 +87,7 @@ namespace mongo {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangWriteBeforeWaitingForMigrationDecision);
+MONGO_FAIL_POINT_DEFINE(hangInsertBeforeWrite);
 MONGO_FAIL_POINT_DEFINE(hangTimeseriesInsertBeforeCommit);
 MONGO_FAIL_POINT_DEFINE(hangTimeseriesInsertBeforeWrite);
 MONGO_FAIL_POINT_DEFINE(failUnorderedTimeseriesInsert);
@@ -546,6 +547,14 @@ public:
                     throw;
                 }
             }
+
+            if (hangInsertBeforeWrite.shouldFail([&](const BSONObj& data) {
+                    const auto ns = data.getStringField("ns");
+                    return ns == request().getNamespace().toString();
+                })) {
+                hangInsertBeforeWrite.pauseWhileSet();
+            }
+
             auto reply = write_ops_exec::performInserts(opCtx, request());
 
             write_ops::InsertCommandReply insertReply;
