@@ -108,6 +108,9 @@ private:
     long long _term;
 };
 
+class ReplSetConfig;
+using ReplSetConfigPtr = std::shared_ptr<ReplSetConfig>;
+
 /**
  * This class is used for mutating the ReplicaSetConfig.  Call ReplSetConfig::getMutable()
  * to get a mutable copy, mutate it, and use the ReplSetConfig(MutableReplSetConfig&&) constructor
@@ -143,10 +146,9 @@ protected:
      * Returns a pointer to a mutable MemberConfig.
      */
     MemberConfig* _findMemberByID(MemberId id);
-};
 
-class ReplSetConfig;
-using ReplSetConfigPtr = std::shared_ptr<ReplSetConfig>;
+    ReplSetConfigPtr _recipientConfig;
+};
 
 /**
  * Representation of the configuration information about a particular replica set.
@@ -609,7 +611,6 @@ private:
     ReplSetTagConfig _tagConfig;
     StringMap<ReplSetTagPattern> _customWriteConcernModes;
     ConnectionString _connectionString;
-    ReplSetConfigPtr _recipientConfig;
 };
 
 }  // namespace repl

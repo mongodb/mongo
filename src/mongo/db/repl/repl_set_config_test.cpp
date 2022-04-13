@@ -35,6 +35,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/repl_set_config.h"
+#include "mongo/db/repl/repl_set_config_checks.h"
 #include "mongo/db/repl/repl_set_config_test.h"
 #include "mongo/db/server_options.h"
 #include "mongo/idl/server_parameter_test_util.h"
@@ -2116,6 +2117,45 @@ TEST(ReplSetConfig, DifferentWriteConcernModesSameNameDifferentDefinition) {
 
     ASSERT_FALSE(config.areWriteConcernModesTheSame(&otherConfig));
     ASSERT_FALSE(otherConfig.areWriteConcernModesTheSame(&config));
+}
+
+TEST(ReplSetConfig, MutableCompatibilityForRecipientConfig) {
+    const std::string recipientTagName{"recipient"};
+    const auto donorReplSetId = OID::gen();
+    const std::string recipientConfigSetName{"recipientSetName"};
+    BSONObj recipientConfigBSON = BSON(
+        "_id" << recipientConfigSetName << "version" << 1 << "protocolVersion" << 1 << "members"
+              << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                       << "localhost:20002"
+                                       << "priority" << 1 << "votes" << 1 << "tags"
+                                       << BSON(recipientTagName << "one")))
+              << "settings"
+              << BSON("heartbeatIntervalMillis" << 5000 << "heartbeatTimeoutSecs" << 20));
+    BSONObj replSetConfigWithRecipientConfig = BSON("_id"
+                                                    << "rs0"
+                                                    << "version" << 1 << "protocolVersion" << 1
+                                                    << "members"
+                                                    << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                             << "localhost:12345"))
+                                                    << "settings"
+                                                    << BSON("heartbeatIntervalMillis"
+                                                            << 5000 << "heartbeatTimeoutSecs" << 20
+                                                            << "replicaSetId" << donorReplSetId)
+                                                    << "recipientConfig" << recipientConfigBSON);
+
+    ReplSetConfig config(ReplSetConfig::parse(replSetConfigWithRecipientConfig));
+    ASSERT_OK(config.validate());
+    auto mutableConfig = config.getMutable();
+    mutableConfig.setConfigVersion(1);
+    mutableConfig.setConfigTerm(1);
+    ReplSetConfig rolledBackConfig = ReplSetConfig(std::move(mutableConfig));
+    ASSERT_OK(rolledBackConfig.validate());
+    ASSERT_EQUALS("rs0", rolledBackConfig.getReplSetName());
+    ASSERT_EQUALS(1, rolledBackConfig.getConfigVersion());
+    ASSERT_EQUALS(1, rolledBackConfig.getConfigTerm());
+    ASSERT_EQUALS(1, rolledBackConfig.getNumMembers());
+    ASSERT_TRUE(sameConfigContents(config, rolledBackConfig));
+    ASSERT_FALSE(rolledBackConfig.getRecipientConfig() == nullptr);
 }
 
 }  // namespace
