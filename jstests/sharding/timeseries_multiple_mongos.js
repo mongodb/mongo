@@ -12,6 +12,7 @@
 "use strict";
 
 load("jstests/core/timeseries/libs/timeseries.js");  // For 'TimeseriesTest' helpers.
+load('jstests/sharding/libs/shard_versioning_util.js');
 
 Random.setRandomSeed();
 
@@ -106,7 +107,29 @@ function runTest({shardKey, cmdObj, numProfilerEntries}) {
         }
 
         const queryField = `command.${Object.keys(cmdObj)[0]}`;
-        let filter = {[queryField]: cmdCollName, "command.shardVersion.0": {$ne: Timestamp(0, 0)}};
+        let filter = {
+            [queryField]: cmdCollName,
+            "$or": [
+                {
+                    "$and": [
+                        {"command.shardVersion.0": {"$exists": true}},
+                        {
+                            "command.shardVersion.0":
+                                {$ne: ShardVersioningUtil.kIgnoredShardVersion[0]}
+                        },
+                    ]
+                },
+                {
+                    "$and": [
+                        {"command.shardVersion.v": {"$exists": true}},
+                        {
+                            "command.shardVersion.v":
+                                {$ne: ShardVersioningUtil.kIgnoredShardVersion[0]}
+                        },
+                    ]
+                },
+            ]
+        };
 
         // We currently do not log 'shardVersion' for updates. See SERVER-60354 for details.
         if (isUpdate) {
@@ -117,7 +140,13 @@ function runTest({shardKey, cmdObj, numProfilerEntries}) {
             const command = unVersioned ? "_shardsvrCollMod" : "_shardsvrCollModParticipant";
             filter = {[`command.${command}`]: cmdCollName, "ok": {$ne: 0}};
         } else if (unVersioned && !isCollMod) {
-            filter["command.shardVersion.0"] = Timestamp(0, 0);
+            filter = {
+                [queryField]: cmdCollName,
+                "$or": [
+                    {"command.shardVersion.0": ShardVersioningUtil.kIgnoredShardVersion[0]},
+                    {"command.shardVersion.v": ShardVersioningUtil.kIgnoredShardVersion[0]},
+                ]
+            };
         }
 
         // Filter out the profiler entries with $indexStats pipeline stage, as the

@@ -506,8 +506,52 @@ for (let command of commands) {
             profileDB: recipientShardSecondary.getDB(db),
             filter: Object.extend({
                 "command.shardVersion": {"$exists": true},
-                "command.shardVersion.0": {$ne: ShardVersioningUtil.kIgnoredShardVersion[0]},
-                "command.shardVersion.1": {$ne: ShardVersioningUtil.kIgnoredShardVersion[1]},
+                "$and": [
+                    {
+                        "$or": [
+                            {
+                                "$and": [
+                                    {"command.shardVersion.0": {"$exists": true}},
+                                    {
+                                        "command.shardVersion.0":
+                                            {$ne: ShardVersioningUtil.kIgnoredShardVersion[0]}
+                                    },
+                                ]
+                            },
+                            {
+                                "$and": [
+                                    {"command.shardVersion.v": {"$exists": true}},
+                                    {
+                                        "command.shardVersion.v":
+                                            {$ne: ShardVersioningUtil.kIgnoredShardVersion[0]}
+                                    },
+                                ]
+                            },
+                        ]
+                    },
+                    {
+                        "$or": [
+                            {
+                                "$and": [
+                                    {"command.shardVersion.1": {"$exists": true}},
+                                    {
+                                        "command.shardVersion.1":
+                                            {$ne: ShardVersioningUtil.kIgnoredShardVersion[1]}
+                                    },
+                                ]
+                            },
+                            {
+                                "$and": [
+                                    {"command.shardVersion.e": {"$exists": true}},
+                                    {
+                                        "command.shardVersion.e":
+                                            {$ne: ShardVersioningUtil.kIgnoredShardVersion[1]}
+                                    },
+                                ]
+                            },
+                        ]
+                    }
+                ],
                 "command.$readPreference": {"mode": "secondary"},
                 "command.readConcern": {"level": "local"},
                 "errCode": {"$ne": ErrorCodes.StaleConfig},
