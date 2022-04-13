@@ -83,7 +83,11 @@ void incrementSSSMetricNoOverflow(AtomicWord<long long>& metric, long long value
  */
 struct BatchedDeletesSSS : ServerStatusSection {
     BatchedDeletesSSS()
-        : ServerStatusSection("batchedDeletes"), batches(0), docs(0), sizeBytes(0), timeMillis(0) {}
+        : ServerStatusSection("batchedDeletes"),
+          batches(0),
+          docs(0),
+          stagedSizeBytes(0),
+          timeMillis(0) {}
 
     bool includeByDefault() const override {
         return true;
@@ -93,7 +97,7 @@ struct BatchedDeletesSSS : ServerStatusSection {
         BSONObjBuilder bob;
         bob.appendNumber("batches", batches.loadRelaxed());
         bob.appendNumber("docs", docs.loadRelaxed());
-        bob.appendNumber("sizeBytes", sizeBytes.loadRelaxed());
+        bob.appendNumber("stagedSizeBytes", stagedSizeBytes.loadRelaxed());
         bob.append("timeMillis", timeMillis.loadRelaxed());
 
         return bob.obj();
@@ -101,7 +105,7 @@ struct BatchedDeletesSSS : ServerStatusSection {
 
     AtomicWord<long long> batches;
     AtomicWord<long long> docs;
-    AtomicWord<long long> sizeBytes;
+    AtomicWord<long long> stagedSizeBytes;
     AtomicWord<long long> timeMillis;
 } batchedDeletesSSS;
 
@@ -115,6 +119,7 @@ BatchedDeleteStage::BatchedDeleteStage(ExpressionContext* expCtx,
           kStageType.rawData(), expCtx, std::move(params), ws, collection, child),
       _batchParams(std::move(batchParams)),
       _stagedDeletesBuffer(ws),
+      _stagedDeletesWatermarkBytes(0),
       _drainRemainingBuffer(false) {
     tassert(6303800,
             "batched deletions only support multi-document deletions (multi: true)",
@@ -133,15 +138,9 @@ BatchedDeleteStage::BatchedDeleteStage(ExpressionContext* expCtx,
     tassert(6303805,
             "batched deletions do not support the 'numStatsForDoc' parameter",
             !_params->numStatsForDoc);
-    tassert(6303806,
-            "batch size cannot be unbounded; you must specify at least one of the following batch "
-            "parameters: "
-            "'targetBatchBytes', 'targetBatchDocs', 'targetBatchTimeMS'",
-            _batchParams->targetBatchBytes || _batchParams->targetBatchDocs ||
-                _batchParams->targetBatchTimeMS != Milliseconds(0));
     tassert(6303807,
             "batch size parameters must be greater than or equal to zero",
-            _batchParams->targetBatchBytes >= 0 && _batchParams->targetBatchDocs >= 0 &&
+            _batchParams->targetStagedDocBytes >= 0 && _batchParams->targetBatchDocs >= 0 &&
                 _batchParams->targetBatchTimeMS >= Milliseconds(0));
 }
 
@@ -248,7 +247,6 @@ PlanStage::StageState BatchedDeleteStage::_deleteBatch(WorkingSetID* out) {
     incrementSSSMetricNoOverflow(batchedDeletesSSS.docs, docsDeleted);
     incrementSSSMetricNoOverflow(batchedDeletesSSS.batches, 1);
     incrementSSSMetricNoOverflow(batchedDeletesSSS.timeMillis, batchTimer.millis());
-    // TODO (SERVER-63039): report batch size
     _specificStats.docsDeleted += docsDeleted;
 
     if (bufferOffset < _stagedDeletesBuffer.size()) {
@@ -322,10 +320,15 @@ PlanStage::StageState BatchedDeleteStage::doWork(WorkingSetID* out) {
             // retry deleting it.
             member->makeObjOwnedIfNeeded();
             _stagedDeletesBuffer.append(id);
+            const auto memberMemFootprintBytes = member->getMemUsage();
+            _stagedDeletesWatermarkBytes += memberMemFootprintBytes;
+            incrementSSSMetricNoOverflow(batchedDeletesSSS.stagedSizeBytes,
+                                         memberMemFootprintBytes);
         }
     }
 
     if (!_params->isExplain && (_drainRemainingBuffer || _batchTargetMet())) {
+        _stagedDeletesWatermarkBytes = 0;
         return _deleteBatch(out);
     }
 
@@ -355,8 +358,15 @@ void BatchedDeleteStage::_signalIfDrainComplete() {
 }
 
 bool BatchedDeleteStage::_batchTargetMet() {
-    return _batchParams->targetBatchDocs &&
-        _stagedDeletesBuffer.size() >=
-        static_cast<unsigned long long>(_batchParams->targetBatchDocs);
+    tassert(6303900,
+            "not expecting to be still draining staged deletions while evaluating whether to "
+            "commit staged deletions",
+            !_drainRemainingBuffer);
+    return (_batchParams->targetBatchDocs &&
+            _stagedDeletesBuffer.size() >=
+                static_cast<unsigned long long>(_batchParams->targetBatchDocs)) ||
+        (_batchParams->targetStagedDocBytes &&
+         _stagedDeletesWatermarkBytes >=
+             static_cast<unsigned long long>(_batchParams->targetStagedDocBytes));
 }
 }  // namespace mongo

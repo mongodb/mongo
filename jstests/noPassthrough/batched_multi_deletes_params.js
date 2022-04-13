@@ -106,9 +106,51 @@ function validateTargetBatchTimeMS() {
     }
 }
 
+function validateTargetStagedDocsBytes() {
+    const collCount = 10000;
+    const docPaddingBytes = 1024;
+    const cumulativePaddingBytes = collCount *
+        (bsonsize({_id: ObjectId(), a: 'a'}) +
+         100 /* allow for getMemUsage() own metadata and overestimation */ + docPaddingBytes);
+
+    assert.commandWorked(db.adminCommand({setParameter: 1, batchedDeletesTargetBatchTimeMS: 0}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, batchedDeletesTargetBatchDocs: 0}));
+
+    for (let stagedDocsBytes of [0, 1024 * 1024, 5 * 1024 * 1024]) {
+        jsTestLog("Validating stagedDocsBytes=" + stagedDocsBytes);
+
+        assert.commandWorked(db.adminCommand(
+            {setParameter: 1, batchedDeletesTargetStagedDocBytes: stagedDocsBytes}));
+
+        coll.drop();
+        assert.commandWorked(coll.insertMany(
+            [...Array(collCount).keys()].map(x => ({a: "a".repeat(docPaddingBytes)}))));
+
+        // batchedDeletesTargetStagedDocsBytes := 0 means no limit.
+        const expectedBatches =
+            stagedDocsBytes ? Math.ceil(cumulativePaddingBytes / stagedDocsBytes) : 1;
+        const serverStatusBatchesBefore = db.serverStatus()['batchedDeletes']['batches'];
+        const serverStatusDocsBefore = db.serverStatus()['batchedDeletes']['docs'];
+
+        assert.eq(collCount, coll.find().itcount());
+        assert.commandWorked(coll.deleteMany({}));
+        assert.eq(0, coll.find().itcount());
+
+        const serverStatusBatchesAfter = db.serverStatus()['batchedDeletes']['batches'];
+        const serverStatusDocsAfter = db.serverStatus()['batchedDeletes']['docs'];
+        const serverStatusDocsExpected = serverStatusDocsBefore + collCount;
+        const serverStatusBatchesExpected = serverStatusBatchesBefore + expectedBatches;
+        assert.eq(serverStatusBatchesAfter, serverStatusBatchesExpected);
+        assert.eq(serverStatusDocsAfter, serverStatusDocsExpected);
+
+        rst.awaitReplication();
+        rst.checkReplicatedDataHashes();
+    }
+}
+
 validateTargetDocsPerBatch();
 validateTargetBatchTimeMS();
-// TODO (SERVER-63039): validate targetStagedDocBytes.
+validateTargetStagedDocsBytes();
 
 rst.stopSet();
 })();

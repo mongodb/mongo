@@ -23,9 +23,9 @@ function validateBatchedDeletesOplogDocsPerBatch(conn) {
 
     assert.commandWorked(
         db.adminCommand({setParameter: 1, internalBatchUserMultiDeletesForTest: 1}));
-    // Disable time-based batching
-    assert.commandWorked(db.adminCommand({setParameter: 1, batchedDeletesTargetBatchBytes: 0}));
     // Disable size-based batching
+    assert.commandWorked(db.adminCommand({setParameter: 1, batchedDeletesTargetStagedDocBytes: 0}));
+    // Disable time-based batching
     assert.commandWorked(db.adminCommand({setParameter: 1, batchedDeletesTargetBatchTimeMS: 0}));
     // Set docs per batch target
     assert.commandWorked(
@@ -66,9 +66,9 @@ function validateBatchedDeletesOplogBatchAbove16MB(conn) {
         Math.ceil(collCount / 63600 /* max docs per batch, see comment above. */);
     assert.commandWorked(
         db.adminCommand({setParameter: 1, internalBatchUserMultiDeletesForTest: 1}));
-    // Disable time-based batching
-    assert.commandWorked(db.adminCommand({setParameter: 1, batchedDeletesTargetBatchBytes: 0}));
     // Disable size-based batching
+    assert.commandWorked(db.adminCommand({setParameter: 1, batchedDeletesTargetStagedDocBytes: 0}));
+    // Disable time-based batching
     assert.commandWorked(db.adminCommand({setParameter: 1, batchedDeletesTargetBatchTimeMS: 0}));
     // Set artificially high docs per batch target
     assert.commandWorked(

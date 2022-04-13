@@ -33,12 +33,12 @@ imports:
     - "mongo/idl/basic_types.idl"
 
 server_parameters:
-  batchedDeletesTargetBatchBytes:
-    description: "Threshold in bytes accounting for documents and index entries at which a batch of document deletions is committed. A value of zero means unlimited"
+  batchedDeletesTargetStagedDocBytes:
+    description: "Threshold in bytes accounting for documents (not index entries) at which a batch of document deletions is committed. A value of zero means unlimited"
     set_at: [startup, runtime]
     cpp_vartype: 'AtomicWord<long long>'
-    cpp_varname: gBatchedDeletesTargetBatchBytes
-    default: 52428800 # 50MB
+    cpp_varname: gBatchedDeletesTargetStagedDocBytes
+    default: 31457280 # 30MB
     validator:
       gte: 0
   batchedDeletesTargetBatchDocs:

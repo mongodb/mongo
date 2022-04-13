@@ -43,18 +43,18 @@ namespace mongo {
  */
 struct BatchedDeleteStageBatchParams {
     BatchedDeleteStageBatchParams()
-        : targetBatchBytes(gBatchedDeletesTargetBatchBytes.load()),
-          targetBatchDocs(gBatchedDeletesTargetBatchDocs.load()),
-          targetBatchTimeMS(Milliseconds(gBatchedDeletesTargetBatchTimeMS.load())) {}
+        : targetBatchDocs(gBatchedDeletesTargetBatchDocs.load()),
+          targetBatchTimeMS(Milliseconds(gBatchedDeletesTargetBatchTimeMS.load())),
+          targetStagedDocBytes(gBatchedDeletesTargetStagedDocBytes.load()) {}
 
-    // Documents staged for deletions are processed in a batch once this batch size target is met.
-    // Accounts for documents and indexes. A value of zero means unlimited.
-    long long targetBatchBytes = 0;
     // Documents staged for deletions are processed in a batch once this document count target is
     // met. A value of zero means unlimited.
     long long targetBatchDocs = 0;
     // A batch is committed as soon as this target execution time is met. Zero means unlimited.
     Milliseconds targetBatchTimeMS = Milliseconds(0);
+    // Documents staged for deletions are processed in a batch once this size target is met.
+    // Accounts for document size, not for indexes. A value of zero means unlimited.
+    long long targetStagedDocBytes = 0;
 };
 
 /**
@@ -114,6 +114,11 @@ private:
 
     // Holds information for each document staged for delete.
     BatchedDeleteStageBuffer _stagedDeletesBuffer;
+
+    // Holds the maximum cumulative size of all documents staged for delete. It is a watermark in
+    // that it resets to zero once the target is met and the staged documents start being processed,
+    // regardless of whether all staged deletes have been committed yet.
+    size_t _stagedDeletesWatermarkBytes;
 
     // Whether there are remaining docs in the buffer from a previous call to doWork() that should
     // be drained before fetching more documents.

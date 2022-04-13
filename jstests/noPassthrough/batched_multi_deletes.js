@@ -51,8 +51,9 @@ function validateBatchedDeletes(conn) {
     assert.commandWorked(
         db.adminCommand({setParameter: 1, internalBatchUserMultiDeletesForTest: 1}));
 
-    // For consistent results, don't enforce the targetBatchTimeMS.
+    // For consistent results, don't enforce the targetBatchTimeMS and targetStagedDocBytes.
     assert.commandWorked(db.adminCommand({setParameter: 1, batchedDeletesTargetBatchTimeMS: 0}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, batchedDeletesTargetStagedDocBytes: 0}));
 
     // Explain plan and executionStats.
     {

@@ -126,7 +126,7 @@ function runTest(failoverFn, clustered, expectNetworkErrorOnDelete) {
     assert.commandWorked(coll.createIndex({b: 1}));
 
     const hangAfterApproxNDocs = Random.randInt(collCount);
-    jsTestLog(`About to hang batched delete after evaluationg approximatly ${
+    jsTestLog(`About to hang batched delete after evaluating approximately ${
         hangAfterApproxNDocs} documents`);
 
     assert.commandWorked(
