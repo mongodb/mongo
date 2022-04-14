@@ -115,7 +115,7 @@ void importCopiedFiles(OperationContext* opCtx,
             opCtx,
             NamespaceString(m.ns.db(), NamespaceString::kSystemDotViewsCollectionName),
             MODE_X);
-        uassertStatusOK(catalog->reloadViews(opCtx, m.ns.db()));
+        uassertStatusOK(catalog->reloadViews(opCtx, TenantDatabaseName(boost::none, m.ns.db())));
     }
 }
 }  // namespace

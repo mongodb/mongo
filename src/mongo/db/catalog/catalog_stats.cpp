@@ -84,8 +84,7 @@ public:
         const auto viewCatalogDbNames = catalog->getViewCatalogDbNames(opCtx);
         for (const auto& tenantDbName : viewCatalogDbNames) {
             try {
-                const auto viewStats =
-                    catalog->getViewStatsForDatabase(opCtx, tenantDbName.dbName());
+                const auto viewStats = catalog->getViewStatsForDatabase(opCtx, tenantDbName);
                 invariant(viewStats);
 
                 stats.timeseries += viewStats->userTimeseries;

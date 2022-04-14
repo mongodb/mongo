@@ -207,7 +207,7 @@ Status DatabaseImpl::init(OperationContext* const opCtx) {
             }
 
             CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
-                catalog.onOpenDatabase(opCtx, _name.dbName(), std::move(viewsForDb));
+                catalog.onOpenDatabase(opCtx, _name, std::move(viewsForDb));
             });
         } catch (DBException& ex) {
             // Another operation may have tried to simultaneously open the database and register it
@@ -233,7 +233,7 @@ Status DatabaseImpl::init(OperationContext* const opCtx) {
                 NamespaceString resolvedNs;
             };
             std::vector<ViewToDrop> viewsToDrop;
-            catalog->iterateViews(opCtx, _name.dbName(), [&](const ViewDefinition& view) {
+            catalog->iterateViews(opCtx, _name, [&](const ViewDefinition& view) {
                 auto swResolvedView =
                     view_catalog_helpers::resolveView(opCtx, catalog, view.name(), boost::none);
                 if (!swResolvedView.isOK()) {
@@ -375,11 +375,10 @@ void DatabaseImpl::getStats(OperationContext* opCtx,
         });
 
 
-    CollectionCatalog::get(opCtx)->iterateViews(
-        opCtx, name().dbName(), [&](const ViewDefinition& view) {
-            nViews += 1;
-            return true;
-        });
+    CollectionCatalog::get(opCtx)->iterateViews(opCtx, name(), [&](const ViewDefinition& view) {
+        nViews += 1;
+        return true;
+    });
 
     // Make sure that the same fields are returned for non-existing dbs
     // in `DBStats::errmsgRun`
@@ -458,7 +457,7 @@ Status DatabaseImpl::dropCollection(OperationContext* opCtx,
                               "turn off profiling before dropping system.profile collection");
         } else if (nss.isSystemDotViews()) {
             if (!MONGO_unlikely(allowSystemViewsDrop.shouldFail())) {
-                const auto viewStats = catalog->getViewStatsForDatabase(opCtx, _name.dbName());
+                const auto viewStats = catalog->getViewStatsForDatabase(opCtx, _name);
                 uassert(ErrorCodes::CommandFailed,
                         str::stream() << "cannot drop collection " << nss
                                       << " when time-series collections are present.",

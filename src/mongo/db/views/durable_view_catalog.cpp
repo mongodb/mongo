@@ -65,7 +65,7 @@ void DurableViewCatalog::onExternalChange(OperationContext* opCtx, const Namespa
     // is reloaded. This will prevent any further usage of the views for this database until the
     // invalid view definitions are removed.
     auto catalog = CollectionCatalog::get(opCtx);
-    catalog->reloadViews(opCtx, name.db()).ignore();
+    catalog->reloadViews(opCtx, TenantDatabaseName(boost::none, name.db())).ignore();
 }
 
 void DurableViewCatalog::onSystemViewsCollectionDrop(OperationContext* opCtx,
@@ -76,10 +76,11 @@ void DurableViewCatalog::onSystemViewsCollectionDrop(OperationContext* opCtx,
     dassert(name.coll() == NamespaceString::kSystemDotViewsCollectionName);
 
     auto catalog = CollectionCatalog::get(opCtx);
+    const TenantDatabaseName dbName(boost::none, name.db());
 
     // First, iterate through the views on this database and audit them before they are dropped.
     catalog->iterateViews(opCtx,
-                          name.db(),
+                          dbName,
                           [&](const ViewDefinition& view) -> bool {
                               audit::logDropView(opCtx->getClient(),
                                                  view.name(),
@@ -92,7 +93,7 @@ void DurableViewCatalog::onSystemViewsCollectionDrop(OperationContext* opCtx,
 
     // If the 'system.views' collection is dropped, we need to clear the in-memory state of the
     // view catalog.
-    catalog->clearViews(opCtx, name.db());
+    catalog->clearViews(opCtx, dbName);
 }
 
 // DurableViewCatalogImpl

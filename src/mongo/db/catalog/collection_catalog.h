@@ -191,7 +191,7 @@ public:
      *
      * Requires an IS lock on the 'system.views' collection'.
      */
-    Status reloadViews(OperationContext* opCtx, StringData dbName) const;
+    Status reloadViews(OperationContext* opCtx, const TenantDatabaseName& dbName) const;
 
     /**
      * Handles committing a collection to the catalog within a WriteUnitOfWork.
@@ -223,7 +223,9 @@ public:
      * Initializes view records for database 'dbName'. Can throw a 'WriteConflictException' if this
      * database has already been initialized.
      */
-    void onOpenDatabase(OperationContext* opCtx, StringData dbName, ViewsForDatabase&& viewsForDb);
+    void onOpenDatabase(OperationContext* opCtx,
+                        const TenantDatabaseName& dbName,
+                        ViewsForDatabase&& viewsForDb);
 
     /**
      * Removes the view records associated with 'tenantDbName', if any, from the in-memory
@@ -265,7 +267,7 @@ public:
      *
      * Callers must re-fetch the catalog to observe changes.
      */
-    void clearViews(OperationContext* opCtx, StringData dbName) const;
+    void clearViews(OperationContext* opCtx, const TenantDatabaseName& dbName) const;
 
     /**
      * This function gets the Collection pointer that corresponds to the UUID.
@@ -340,7 +342,7 @@ public:
      */
     void iterateViews(
         OperationContext* opCtx,
-        StringData dbName,
+        const TenantDatabaseName& dbName,
         ViewIteratorCallback callback,
         ViewCatalogLookupBehavior lookupBehavior = ViewCatalogLookupBehavior::kValidateViews) const;
 
@@ -457,8 +459,8 @@ public:
     /**
      * Returns view statistics for the specified database.
      */
-    boost::optional<ViewsForDatabase::Stats> getViewStatsForDatabase(OperationContext* opCtx,
-                                                                     StringData dbName) const;
+    boost::optional<ViewsForDatabase::Stats> getViewStatsForDatabase(
+        OperationContext* opCtx, const TenantDatabaseName& dbName) const;
 
     /**
      * Returns a set of databases, by name, that have view catalogs.
@@ -530,14 +532,14 @@ private:
      * Retrieves the views for a given database, including any uncommitted changes for this
      * operation.
      */
-    boost::optional<const ViewsForDatabase&> _getViewsForDatabase(OperationContext* opCtx,
-                                                                  StringData dbName) const;
+    boost::optional<const ViewsForDatabase&> _getViewsForDatabase(
+        OperationContext* opCtx, const TenantDatabaseName& dbName) const;
 
     /**
      * Sets all namespaces used by views for a database. Will uassert if there is a conflicting
      * collection name in the catalog.
      */
-    void _replaceViewsForDatabase(StringData dbName, ViewsForDatabase&& views);
+    void _replaceViewsForDatabase(const TenantDatabaseName& dbName, ViewsForDatabase&& views);
 
     /**
      * Helper to take care of shared functionality for 'createView(...)' and 'modifyView(...)'.
@@ -589,6 +591,7 @@ private:
         stdx::unordered_map<NamespaceString, std::shared_ptr<Collection>>;
     using UncommittedViewsSet = stdx::unordered_set<NamespaceString>;
     using DatabaseProfileSettingsMap = StringMap<ProfileSettings>;
+    using ViewsForDatabaseMap = stdx::unordered_map<TenantDatabaseName, ViewsForDatabase>;
 
     CollectionCatalogMap _catalog;
     OrderedCollectionMap _orderedCollections;  // Ordered by <tenantDbName, collUUID> pair
@@ -596,7 +599,7 @@ private:
     UncommittedViewsSet _uncommittedViews;
 
     // Map of database names to their corresponding views and other associated state.
-    StringMap<ViewsForDatabase> _viewsForDatabase;
+    ViewsForDatabaseMap _viewsForDatabase;
 
     // Incremented whenever the CollectionCatalog gets closed and reopened (onCloseCatalog and
     // onOpenCatalog).

@@ -453,7 +453,7 @@ public:
                             ListCollectionsFilter::makeTypeCollectionFilter());
 
                     if (!skipViews) {
-                        catalog->iterateViews(opCtx, dbName, [&](const ViewDefinition& view) {
+                        catalog->iterateViews(opCtx, tenantDbName, [&](const ViewDefinition& view) {
                             if (authorizedCollections &&
                                 !as->isAuthorizedForAnyActionOnResource(
                                     ResourcePattern::forExactNamespace(view.name()))) {

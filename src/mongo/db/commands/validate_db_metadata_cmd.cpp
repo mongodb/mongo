@@ -145,7 +145,7 @@ public:
                 // If there is no collection name present in the input, run validation against all
                 // the collections.
                 collectionCatalog->iterateViews(
-                    opCtx, tenantDbName.dbName(), [this, opCtx](const ViewDefinition& view) {
+                    opCtx, tenantDbName, [this, opCtx](const ViewDefinition& view) {
                         return _validateView(opCtx, view);
                     });
 
