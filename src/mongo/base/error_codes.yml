@@ -486,6 +486,8 @@ error_codes:
 
     - {code: 372, name: CloseConnectionForShutdownCommand, categories: [CloseConnectionError,InternalOnly]}
 
+    - {code: 373, name: InternalTransactionsExhaustiveFindHasMore}
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)
