@@ -2,10 +2,12 @@
  * Checks that setClusterParameter behaves as expected during initial sync and restart.
  *
  * @tags: [
+ *   does_not_support_stepdowns,
+ *   featureFlagClusterWideConfig,
  *   # Requires all nodes to be running the latest binary.
  *   requires_fcv_60,
- *   featureFlagClusterWideConfig,
- *   does_not_support_stepdowns
+ *   # Restarts all replica set member nodes mid-test.
+ *   requires_persistence,
  *  ]
  */
 (function() {
