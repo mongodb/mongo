@@ -1913,7 +1913,8 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinSqrt(ArityType 
 
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinAddToArray(ArityType arity) {
     auto [ownAgg, tagAgg, valAgg] = getFromStack(0);
-    auto [_, tagField, valField] = getFromStack(1);
+    auto [tagField, valField] = moveOwnedFromStack(1);
+    value::ValueGuard guardField{tagField, valField};
 
     // Create a new array is it does not exist yet.
     if (tagAgg == value::TypeTags::Nothing) {
@@ -1929,11 +1930,80 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinAddToArray(Arit
     auto arr = value::getArrayView(valAgg);
 
     // Push back the value. Note that array will ignore Nothing.
-    auto [tagCopy, valCopy] = value::copyValue(tagField, valField);
-    arr->push_back(tagCopy, valCopy);
+    arr->push_back(tagField, valField);
+    guardField.reset();
 
     guard.reset();
     return {ownAgg, tagAgg, valAgg};
+}
+
+// The value being accumulated is an SBE array that contains an integer and the accumulated array,
+// where the integer is the total size in bytes of the elements in the array.
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinAddToArrayCapped(ArityType arity) {
+    auto [ownArr, tagArr, valArr] = getFromStack(0);
+    auto [tagNewElem, valNewElem] = moveOwnedFromStack(1);
+    value::ValueGuard guardNewElem{tagNewElem, valNewElem};
+    auto [_, tagSizeCap, valSizeCap] = getFromStack(2);
+
+    if (tagSizeCap != value::TypeTags::NumberInt32) {
+        auto [ownArr, tagArr, valArr] = getFromStack(0);
+        topStack(false, value::TypeTags::Nothing, 0);
+        return {ownArr, tagArr, valArr};
+    }
+    const int32_t sizeCap = value::bitcastTo<int32_t>(valSizeCap);
+
+    // Create a new array to hold size and added elements, if is it does not exist yet.
+    if (tagArr == value::TypeTags::Nothing) {
+        ownArr = true;
+        std::tie(tagArr, valArr) = value::makeNewArray();
+        auto arr = value::getArrayView(valArr);
+
+        auto [tagAccArr, valAccArr] = value::makeNewArray();
+
+        // The order is important! The accumulated array should be at index
+        // AggArrayWithSize::kValues, and the size should be at index
+        // AggArrayWithSize::kSizeOfValues.
+        arr->push_back(tagAccArr, valAccArr);
+        arr->push_back(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(0));
+    } else {
+        // Take ownership of the accumulator.
+        topStack(false, value::TypeTags::Nothing, 0);
+    }
+    value::ValueGuard guardArr{tagArr, valArr};
+
+    invariant(ownArr && tagArr == value::TypeTags::Array);
+    auto arr = value::getArrayView(valArr);
+    invariant(arr->size() == static_cast<size_t>(AggArrayWithSize::kLast));
+
+    // Check that the accumulated size of the array doesn't exceed the limit.
+    int elemSize = value::getApproximateSize(tagNewElem, valNewElem);
+    auto [tagAccSize, valAccSize] =
+        arr->getAt(static_cast<size_t>(AggArrayWithSize::kSizeOfValues));
+    invariant(tagAccSize == value::TypeTags::NumberInt64);
+    const int64_t currentSize = value::bitcastTo<int64_t>(valAccSize);
+    const int64_t newSize = currentSize + elemSize;
+
+    auto [tagAccArr, valAccArr] = arr->getAt(static_cast<size_t>(AggArrayWithSize::kValues));
+    auto accArr = value::getArrayView(valAccArr);
+    if (newSize >= static_cast<int64_t>(sizeCap)) {
+        uasserted(ErrorCodes::ExceededMemoryLimit,
+                  str::stream() << "Used too much memory for a single array. Memory limit: "
+                                << sizeCap << " bytes. The array contains " << accArr->size()
+                                << " elements and is of size " << currentSize
+                                << " bytes. The element being added has size " << elemSize
+                                << " bytes.");
+    }
+
+    arr->setAt(static_cast<size_t>(AggArrayWithSize::kSizeOfValues),
+               value::TypeTags::NumberInt64,
+               value::bitcastFrom<int64_t>(newSize));
+
+    // Push back the new value. Note that array will ignore Nothing.
+    guardNewElem.reset();
+    accArr->push_back(tagNewElem, valNewElem);
+
+    guardArr.reset();
+    return {ownArr, tagArr, valArr};
 }
 
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinMergeObjects(ArityType arity) {
@@ -1996,7 +2066,8 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinMergeObjects(Ar
 
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinAddToSet(ArityType arity) {
     auto [ownAgg, tagAgg, valAgg] = getFromStack(0);
-    auto [_, tagField, valField] = getFromStack(1);
+    auto [tagField, valField] = moveOwnedFromStack(1);
+    value::ValueGuard guardField{tagField, valField};
 
     // Create a new array is it does not exist yet.
     if (tagAgg == value::TypeTags::Nothing) {
@@ -2012,17 +2083,100 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinAddToSet(ArityT
     auto arr = value::getArraySetView(valAgg);
 
     // Push back the value. Note that array will ignore Nothing.
-    auto [tagCopy, valCopy] = value::copyValue(tagField, valField);
-    arr->push_back(tagCopy, valCopy);
+    guardField.reset();
+    arr->push_back(tagField, valField);
 
     guard.reset();
     return {ownAgg, tagAgg, valAgg};
 }
 
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::addToSetCappedImpl(
+    value::TypeTags tagNewElem,
+    value::Value valNewElem,
+    int32_t sizeCap,
+    CollatorInterface* collator) {
+    value::ValueGuard guardNewElem{tagNewElem, valNewElem};
+    auto [ownArr, tagArr, valArr] = getFromStack(0);
+
+    // Create a new array is it does not exist yet.
+    if (tagArr == value::TypeTags::Nothing) {
+        ownArr = true;
+        std::tie(tagArr, valArr) = value::makeNewArray();
+        auto arr = value::getArrayView(valArr);
+
+        auto [tagAccSet, valAccSet] = value::makeNewArraySet(collator);
+
+        // The order is important! The accumulated array should be at index
+        // AggArrayWithSize::kValues, and the size should be at index
+        // AggArrayWithSize::kSizeOfValues.
+        arr->push_back(tagAccSet, valAccSet);
+        arr->push_back(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(0));
+    } else {
+        // Take ownership of the accumulator.
+        topStack(false, value::TypeTags::Nothing, 0);
+    }
+    value::ValueGuard guardArr{tagArr, valArr};
+
+    invariant(ownArr && tagArr == value::TypeTags::Array);
+    auto arr = value::getArrayView(valArr);
+    invariant(arr->size() == static_cast<size_t>(AggArrayWithSize::kLast));
+
+    // Check that the accumulated size of the set won't exceed the limit after adding the new value,
+    // and if so, add the value.
+    auto [tagAccSet, valAccSet] = arr->getAt(static_cast<size_t>(AggArrayWithSize::kValues));
+    invariant(tagAccSet == value::TypeTags::ArraySet);
+    auto accSet = value::getArraySetView(valAccSet);
+    if (!accSet->values().contains({tagNewElem, valNewElem})) {
+        auto elemSize = value::getApproximateSize(tagNewElem, valNewElem);
+        auto [tagAccSize, valAccSize] =
+            arr->getAt(static_cast<size_t>(AggArrayWithSize::kSizeOfValues));
+        invariant(tagAccSize == value::TypeTags::NumberInt64);
+        const int64_t currentSize = value::bitcastTo<int64_t>(valAccSize);
+        int64_t newSize = currentSize + elemSize;
+
+        if (newSize >= static_cast<int64_t>(sizeCap)) {
+            uasserted(ErrorCodes::ExceededMemoryLimit,
+                      str::stream()
+                          << "Used too much memory for a single set. Memory limit: " << sizeCap
+                          << " bytes. The set contains " << accSet->size()
+                          << " elements and is of size " << currentSize
+                          << " bytes. The element being added has size " << elemSize << " bytes.");
+        }
+
+        arr->setAt(static_cast<size_t>(AggArrayWithSize::kSizeOfValues),
+                   value::TypeTags::NumberInt64,
+                   value::bitcastFrom<int64_t>(newSize));
+
+        // Push back the new value. Note that array will ignore Nothing.
+        guardNewElem.reset();
+        accSet->push_back(tagNewElem, valNewElem);
+    }
+
+    guardArr.reset();
+    return {ownArr, tagArr, valArr};
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinAddToSetCapped(ArityType arity) {
+    auto [tagNewElem, valNewElem] = moveOwnedFromStack(1);
+    value::ValueGuard guardNewElem{tagNewElem, valNewElem};
+    auto [_, tagSizeCap, valSizeCap] = getFromStack(2);
+
+    if (tagSizeCap != value::TypeTags::NumberInt32) {
+        auto [ownArr, tagArr, valArr] = getFromStack(0);
+        topStack(false, value::TypeTags::Nothing, 0);
+        return {ownArr, tagArr, valArr};
+    }
+
+    guardNewElem.reset();
+    return addToSetCappedImpl(
+        tagNewElem, valNewElem, value::bitcastTo<int32_t>(valSizeCap), nullptr /*collator*/);
+}
+
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollAddToSet(ArityType arity) {
     auto [ownAgg, tagAgg, valAgg] = getFromStack(0);
     auto [ownColl, tagColl, valColl] = getFromStack(1);
-    auto [_, tagField, valField] = getFromStack(2);
+    auto [tagField, valField] = moveOwnedFromStack(2);
+    value::ValueGuard guardField{tagField, valField};
 
     // If the collator is Nothing or if it's some unexpected type, don't push back the value
     // and just return the accumulator.
@@ -2045,11 +2199,33 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollAddToSet(Ar
     auto arr = value::getArraySetView(valAgg);
 
     // Push back the value. Note that array will ignore Nothing.
-    auto [tagCopy, valCopy] = value::copyValue(tagField, valField);
-    arr->push_back(tagCopy, valCopy);
+    guardField.reset();
+    arr->push_back(tagField, valField);
 
     guard.reset();
     return {ownAgg, tagAgg, valAgg};
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollAddToSetCapped(
+    ArityType arity) {
+    auto [_1, tagColl, valColl] = getFromStack(1);
+    auto [tagNewElem, valNewElem] = moveOwnedFromStack(2);
+    value::ValueGuard guardNewElem{tagNewElem, valNewElem};
+    auto [_2, tagSizeCap, valSizeCap] = getFromStack(3);
+
+    // If the collator is Nothing or if it's some unexpected type, don't push back the value
+    // and just return the accumulator.
+    if (tagColl != value::TypeTags::collator || tagSizeCap != value::TypeTags::NumberInt32) {
+        auto [ownArr, tagArr, valArr] = getFromStack(0);
+        topStack(false, value::TypeTags::Nothing, 0);
+        return {ownArr, tagArr, valArr};
+    }
+
+    guardNewElem.reset();
+    return addToSetCappedImpl(tagNewElem,
+                              valNewElem,
+                              value::bitcastTo<int32_t>(valSizeCap),
+                              value::getCollatorView(valColl));
 }
 
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinRunJsPredicate(ArityType arity) {
@@ -4172,12 +4348,18 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builti
             return builtinSqrt(arity);
         case Builtin::addToArray:
             return builtinAddToArray(arity);
+        case Builtin::addToArrayCapped:
+            return builtinAddToArrayCapped(arity);
         case Builtin::mergeObjects:
             return builtinMergeObjects(arity);
         case Builtin::addToSet:
             return builtinAddToSet(arity);
+        case Builtin::addToSetCapped:
+            return builtinAddToSetCapped(arity);
         case Builtin::collAddToSet:
             return builtinCollAddToSet(arity);
+        case Builtin::collAddToSetCapped:
+            return builtinCollAddToSetCapped(arity);
         case Builtin::doubleDoubleSum:
             return builtinDoubleDoubleSum(arity);
         case Builtin::aggDoubleDoubleSum:

@@ -27,7 +27,7 @@ function testPipeline(pipeline, expectedResult, collection) {
               expectedResult.sort(compareId));
 }
 
-function runTest(coll, from) {
+function runTest(coll, from, expectedErrorCode) {
     const db = null;  // Using the db variable is banned in this function.
 
     from.drop();
@@ -81,29 +81,28 @@ function runTest(coll, from) {
         {$project: {_id: 1}}
     ];
 
-    assertErrorCode(coll, pipeline, 4568);
+    assertErrorCode(coll, pipeline, expectedErrorCode);
 }
 
-// Run tests on single node.
+/**
+ * Run tests on single node.
+ */
 const standalone = MongoRunner.runMongod();
 const db = standalone.getDB("test");
-
-// TODO SERVER-65265 Remove 'if' block below.
-if (checkSBEEnabled(db, ["featureFlagSBELookupPushdown"])) {
-    jsTest.log("Skipping test because SBE and SBE $lookup features are both enabled.");
-    MongoRunner.stopMongod(standalone);
-    return;
-}
 
 assert.commandWorked(db.adminCommand(
     {setParameter: 1, internalLookupStageIntermediateDocumentMaxSizeBytes: 30 * 1024 * 1024}));
 
 db.lookUp.drop();
-runTest(db.lookUp, db.from);
+const expectedErrorCode =
+    (checkSBEEnabled(db, ["featureFlagSBELookupPushdown"])) ? ErrorCodes.ExceededMemoryLimit : 4568;
+runTest(db.lookUp, db.from, expectedErrorCode);
 
 MongoRunner.stopMongod(standalone);
 
-// Run tests in a sharded environment.
+/**
+ * Run tests in a sharded environment.
+ */
 const sharded = new ShardingTest({
     mongos: 1,
     shards: 2,
@@ -117,7 +116,10 @@ assert(sharded.adminCommand({enableSharding: "test"}));
 
 sharded.getDB('test').lookUp.drop();
 assert(sharded.adminCommand({shardCollection: "test.lookUp", key: {_id: 'hashed'}}));
-runTest(sharded.getDB('test').lookUp, sharded.getDB('test').from);
+
+// If foreign collection is sharded, $lookup isn't lowered into SBE, so the memory limit error will
+// be coming from the classical aggregation pipeline.
+runTest(sharded.getDB('test').lookUp, sharded.getDB('test').from, 4568);
 
 sharded.stop();
 }());

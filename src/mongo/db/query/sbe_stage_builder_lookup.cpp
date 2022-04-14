@@ -300,7 +300,8 @@ std::pair<SlotId /* keyValuesSetSlot */, std::unique_ptr<sbe::PlanStage>> buildK
         ? buildLocalKeysStream(recordSlot, fp, nodeId, slotIdGenerator)
         : buildForeignKeysStream(recordSlot, fp, nodeId, slotIdGenerator);
 
-    // Re-pack the individual key values into a set.
+    // Re-pack the individual key values into a set. We don't cap "addToSet" here because its size
+    // is bounded by the size of the record.
     SlotId keyValuesSetSlot = slotIdGenerator.generate();
     EvalStage packedKeyValuesStage = makeHashAgg(
         EvalStage{std::move(keyValuesStage), SlotVector{}},
@@ -361,14 +362,31 @@ std::pair<SlotId /* resultSlot */, std::unique_ptr<sbe::PlanStage>> buildForeign
     // that could do this grouping _after_ Nlj, so we achieve it by having a hash_agg inside the
     // inner branch that aggregates all matched records into a single accumulator. When there
     // are no matches, return an empty array.
+    const int sizeCap = internalLookupStageIntermediateDocumentMaxSizeBytes.load();
     SlotId accumulatorSlot = slotIdGenerator.generate();
     innerBranch = makeHashAgg(
         std::move(innerBranch),
         makeSV(), /* groupBy slots */
-        makeEM(accumulatorSlot, makeFunction("addToArray"_sd, makeVariable(foreignRecordSlot))),
+        makeEM(accumulatorSlot,
+               makeFunction("addToArrayCapped"_sd,
+                            makeVariable(foreignRecordSlot),
+                            makeConstant(TypeTags::NumberInt32, sizeCap))),
         {} /* collatorSlot, no collation here because we want to return all matches "as is" */,
         allowDiskUse,
         nodeId);
+
+    // 'accumulatorSlot' is either Nothing or contains an array of size two, where the front element
+    // is the array of matched records and the back element is their cumulative size (in bytes).
+    SlotId matchedRecordsSlot = slotIdGenerator.generate();
+    innerBranch =
+        makeProject(std::move(innerBranch),
+                    nodeId,
+                    matchedRecordsSlot,
+                    makeFunction("getElement",
+                                 makeVariable(accumulatorSlot),
+                                 makeConstant(sbe::value::TypeTags::NumberInt32,
+                                              static_cast<int>(vm::AggArrayWithSize::kValues))));
+
 
     // $lookup is an _outer_ left join that returns an empty array for "as" field rather than
     // dropping the unmatched local records. The branch that accumulates the matched records into an
@@ -388,7 +406,7 @@ std::pair<SlotId /* resultSlot */, std::unique_ptr<sbe::PlanStage>> buildForeign
     EvalStage unionStage =
         makeUnion(makeVector(EvalStage{std::move(innerBranch.stage), SlotVector{}},
                              EvalStage{std::move(emptyArrayStage), SlotVector{}}),
-                  {makeSV(accumulatorSlot), makeSV(emptyArraySlot)} /* inputs */,
+                  {makeSV(matchedRecordsSlot), makeSV(emptyArraySlot)} /* inputs */,
                   makeSV(unionOutputSlot),
                   nodeId);
 

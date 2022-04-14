@@ -345,14 +345,44 @@ std::pair<std::vector<std::unique_ptr<sbe::EExpression>>, EvalStage> buildAccumu
     EvalStage inputStage,
     PlanNodeId planNodeId) {
     std::vector<std::unique_ptr<sbe::EExpression>> aggs;
+    const int cap = internalQueryMaxAddToSetBytes.load();
     auto collatorSlot = state.data->env->getSlotIfExists("collator"_sd);
     if (collatorSlot) {
         aggs.push_back(makeFunction(
-            "collAddToSet"_sd, sbe::makeE<sbe::EVariable>(*collatorSlot), std::move(arg)));
+            "collAddToSetCapped"_sd,
+            sbe::makeE<sbe::EVariable>(*collatorSlot),
+            std::move(arg),
+            makeConstant(sbe::value::TypeTags::NumberInt32, sbe::value::bitcastFrom<int>(cap))));
     } else {
-        aggs.push_back(makeFunction("addToSet", std::move(arg)));
+        aggs.push_back(makeFunction(
+            "addToSetCapped",
+            std::move(arg),
+            makeConstant(sbe::value::TypeTags::NumberInt32, sbe::value::bitcastFrom<int>(cap))));
     }
     return {std::move(aggs), std::move(inputStage)};
+}
+
+std::pair<std::unique_ptr<sbe::EExpression>, EvalStage> buildFinalizeCappedAccumulator(
+    StageBuilderState& state,
+    const AccumulationExpression& expr,
+    const sbe::value::SlotVector& accSlots,
+    EvalStage inputStage,
+    PlanNodeId planNodeId) {
+    tassert(6526500,
+            str::stream() << "Expected one input slot for finalization of capped accumulator, got: "
+                          << accSlots.size(),
+            accSlots.size() == 1);
+
+    // 'accSlots[0]' should contain an array of size two, where the front element is the accumulated
+    // values and the back element is their cumulative size in bytes. We just ignore the size
+    // because if it exceeded the size cap, we should have thrown an error during accumulation.
+    auto pushFinalize =
+        makeFunction("getElement",
+                     makeVariable(accSlots[0]),
+                     makeConstant(sbe::value::TypeTags::NumberInt32,
+                                  static_cast<int>(sbe::vm::AggArrayWithSize::kValues)));
+
+    return {std::move(pushFinalize), std::move(inputStage)};
 }
 
 std::pair<std::vector<std::unique_ptr<sbe::EExpression>>, EvalStage> buildAccumulatorPush(
@@ -361,8 +391,12 @@ std::pair<std::vector<std::unique_ptr<sbe::EExpression>>, EvalStage> buildAccumu
     std::unique_ptr<sbe::EExpression> arg,
     EvalStage inputStage,
     PlanNodeId planNodeId) {
+    const int cap = internalQueryMaxPushBytes.load();
     std::vector<std::unique_ptr<sbe::EExpression>> aggs;
-    aggs.push_back(makeFunction("addToArray", std::move(arg)));
+    aggs.push_back(makeFunction(
+        "addToArrayCapped"_sd,
+        std::move(arg),
+        makeConstant(sbe::value::TypeTags::NumberInt32, sbe::value::bitcastFrom<int>(cap))));
     return {std::move(aggs), std::move(inputStage)};
 }
 
@@ -542,9 +576,9 @@ std::pair<std::unique_ptr<sbe::EExpression>, EvalStage> buildFinalize(
         {AccumulatorFirst::kName, nullptr},
         {AccumulatorLast::kName, nullptr},
         {AccumulatorAvg::kName, &buildFinalizeAvg},
-        {AccumulatorAddToSet::kName, nullptr},
+        {AccumulatorAddToSet::kName, &buildFinalizeCappedAccumulator},
         {AccumulatorSum::kName, &buildFinalizeSum},
-        {AccumulatorPush::kName, nullptr},
+        {AccumulatorPush::kName, &buildFinalizeCappedAccumulator},
         {AccumulatorMergeObjects::kName, nullptr},
         {AccumulatorStdDevPop::kName, &buildFinalizeStdDevPop},
         {AccumulatorStdDevSamp::kName, &buildFinalizeStdDevSamp},

@@ -281,7 +281,7 @@ struct Instruction {
         traverseP,  // traverse projection paths
         traverseF,  // traverse filter paths
         setField,
-        getArraySize,
+        getArraySize,  // number of elements
 
         aggSum,
         aggMin,
@@ -498,11 +498,16 @@ enum class Builtin : uint8_t {
     ln,
     log10,
     sqrt,
-    addToArray,       // agg function to append to an array
-    mergeObjects,     // agg function to merge BSON documents
-    addToSet,         // agg function to append to a set
-    collAddToSet,     // agg function to append to a set (with collation)
-    doubleDoubleSum,  // special double summation
+    addToArray,        // agg function to append to an array
+    addToArrayCapped,  // agg function to append to an array, fails when the array reaches specified
+                       // size
+    mergeObjects,      // agg function to merge BSON documents
+    addToSet,          // agg function to append to a set
+    addToSetCapped,    // agg function to append to a set, fails when the set reaches specified size
+    collAddToSet,      // agg function to append to a set (with collation)
+    collAddToSetCapped,  // agg function to append to a set (with collation), fails when the set
+                         // reaches specified size
+    doubleDoubleSum,     // special double summation
     aggDoubleDoubleSum,
     doubleDoubleSumFinalize,
     doubleDoubleMergeSumFinalize,
@@ -598,6 +603,12 @@ enum AggStdDevValueElems {
     // This is actually not an index but represents the number of elements stored
     kSizeOfArray
 };
+
+/**
+ * This enum defines indices into an 'Array' that returns the result of accumulators that track the
+ * size of accumulated values, such as 'addToArrayCapped' and 'addToSetCapped'.
+ */
+enum class AggArrayWithSize { kValues = 0, kSizeOfValues, kLast = kSizeOfValues + 1 };
 
 using SmallArityType = uint8_t;
 using ArityType = uint32_t;
@@ -1077,9 +1088,16 @@ private:
     std::tuple<bool, value::TypeTags, value::Value> builtinLog10(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinSqrt(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinAddToArray(ArityType arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinAddToArrayCapped(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinMergeObjects(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinAddToSet(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinCollAddToSet(ArityType arity);
+    std::tuple<bool, value::TypeTags, value::Value> addToSetCappedImpl(value::TypeTags tagNewElem,
+                                                                       value::Value valNewElem,
+                                                                       int32_t sizeCap,
+                                                                       CollatorInterface* collator);
+    std::tuple<bool, value::TypeTags, value::Value> builtinAddToSetCapped(ArityType arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinCollAddToSetCapped(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinDoubleDoubleSum(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinAggDoubleDoubleSum(ArityType arity);
     // This is only for compatibility with mongos/sharding and we will revisit this later.
