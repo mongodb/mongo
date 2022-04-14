@@ -88,8 +88,12 @@ public:
         txnParticipant.beginOrContinue(
             opCtx, {txnNumber}, boost::none /* autocommit */, boost::none /* startTransaction */);
 
+        auto opTime = [opCtx] {
+            WriteUnitOfWork wuow(opCtx);
+            ScopeGuard guard{[&wuow] { wuow.commit(); }};
+            return repl::getNextOpTime(opCtx);
+        }();
         WriteUnitOfWork wuow(opCtx);
-        auto opTime = repl::getNextOpTime(opCtx);
         SessionTxnRecord sessionTxnRecord(*opCtx->getLogicalSessionId(),
                                           *opCtx->getTxnNumber(),
                                           opTime,
@@ -121,7 +125,18 @@ public:
 
         // The transaction machinery cannot store an empty locker.
         { Lock::GlobalLock globalLock(opCtx, MODE_IX); }
-        auto opTime = repl::getNextOpTime(opCtx);
+        auto opTime = [opCtx] {
+            TransactionParticipant::SideTransactionBlock sideTxn{opCtx};
+
+            WriteUnitOfWork wuow{opCtx};
+            auto opTime = repl::getNextOpTime(opCtx);
+            wuow.release();
+
+            opCtx->recoveryUnit()->abortUnitOfWork();
+            opCtx->lockState()->endWriteUnitOfWork();
+
+            return opTime;
+        }();
         txnParticipant.prepareTransaction(opCtx, opTime);
         txnParticipant.stashTransactionResources(opCtx);
 
@@ -309,11 +324,6 @@ public:
     const NamespaceString& oplogBufferNss() {
         return _oplogBufferNss;
     }
-
-protected:
-    // TODO (SERVER-65306): Use wiredTiger.
-    ReshardingOplogSessionApplicationTest()
-        : ServiceContextMongoDTest(Options{}.engine("ephemeralForTest")) {}
 
 private:
     // Used for pre/post image oplog entry lookup.
