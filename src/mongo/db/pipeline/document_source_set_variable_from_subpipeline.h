@@ -31,8 +31,6 @@
 
 #include "mongo/db/pipeline/document_source.h"
 
-#include "mongo/db/pipeline/document_source_set_variable_from_subpipeline_gen.h"
-
 namespace mongo {
 
 
@@ -46,8 +44,7 @@ public:
     static boost::intrusive_ptr<DocumentSourceSetVariableFromSubPipeline> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         std::unique_ptr<Pipeline, PipelineDeleter> subpipeline,
-        Variables::Id varID,
-        boost::intrusive_ptr<Expression> defaultExpression = nullptr);
+        Variables::Id varID);
 
     ~DocumentSourceSetVariableFromSubPipeline() = default;
 
@@ -101,26 +98,10 @@ public:
 protected:
     DocumentSourceSetVariableFromSubPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                              std::unique_ptr<Pipeline, PipelineDeleter> subpipeline,
-                                             Variables::Id varID,
-                                             boost::intrusive_ptr<Expression> ifEmptyExpr)
+                                             Variables::Id varID)
         : DocumentSource(kStageName, expCtx),
           _subPipeline(std::move(subpipeline)),
-          _variableID(varID),
-          _ifEmptyExpr(std::move(ifEmptyExpr)) {
-        if (_ifEmptyExpr) {
-            // The 'ifEmpty' expression runs if there were no results, so naturally will have no
-            // document to use for expressions like "$a" to make sense. Here we assert that whatever
-            // expression is given doesn't depend on any specific fields. It should be something
-            // like a $$SEARCH_META variable or a constant, not something like {$ifNull: ["$a", 0]}.
-            DepsTracker deps;
-            _ifEmptyExpr->addDependencies(&deps);
-            uassert(6448000,
-                    str::stream() << SetVariableFromSubPipelineSpec::kIfEmptyExprFieldName
-                                  << " must not reference any field paths: "
-                                  << _ifEmptyExpr->serialize(true /* explain */).toString(),
-                    !deps.needWholeDocument && deps.fields.empty());
-        }
-    }
+          _variableID(varID) {}
 
 
 private:
@@ -128,8 +109,6 @@ private:
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
     std::unique_ptr<Pipeline, PipelineDeleter> _subPipeline;
     Variables::Id _variableID;
-    // An expression to use if the pipeline does not return any results.
-    boost::intrusive_ptr<Expression> _ifEmptyExpr;
     // $setVariableFromSubPipeline sets the value of $$SEARCH_META only on the first call to
     // doGetNext().
     bool _firstCallForInput = true;

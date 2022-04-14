@@ -159,35 +159,5 @@ TEST_F(DocumentSourceSetVariableFromSubPipelineTest, testDoGetNext) {
                                nullptr) == 0);
 }
 
-TEST_F(DocumentSourceSetVariableFromSubPipelineTest, ReturnExpressionWhenNoResults) {
-    const auto inputDocs =
-        std::vector{Document{{"a", 1}}, Document{{"b", 1}}, Document{{"c", 1}}, Document{{"d", 1}}};
-    const auto expCtx = getExpCtx();
-    const auto mockSourceForSetVarStage =
-        DocumentSourceMock::createForTest(inputDocs[0], getExpCtx());
-    auto ctxForSubPipeline = expCtx->copyForSubPipeline(expCtx->ns);
-    const auto mockSourceForSubPipeline =
-        DocumentSourceMock::createForTest(inputDocs, ctxForSubPipeline);
-    auto setVariableFromSubPipeline = DocumentSourceSetVariableFromSubPipeline::create(
-        expCtx,
-        Pipeline::create(
-            {DocumentSourceMatch::create(BSON("does not exist" << 1), ctxForSubPipeline)},
-            ctxForSubPipeline),
-        Variables::kSearchMetaId,
-        ExpressionConstant::create(ctxForSubPipeline.get(), Value{Document{{"fallback", 1}}}));
-
-    setVariableFromSubPipeline->addSubPipelineInitialSource(mockSourceForSubPipeline);
-    setVariableFromSubPipeline->setSource(mockSourceForSetVarStage.get());
-
-    auto comparator = DocumentComparator();
-    auto results = comparator.makeUnorderedDocumentSet();
-    auto next = setVariableFromSubPipeline->getNext();
-    ASSERT_TRUE(next.isAdvanced());
-
-    ASSERT_TRUE(Value::compare(expCtx->variables.getValue(Variables::kSearchMetaId),
-                               Value((BSON("fallback" << 1))),
-                               nullptr) == 0);
-}
-
 }  // namespace
 }  // namespace mongo

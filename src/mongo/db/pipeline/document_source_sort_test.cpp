@@ -135,7 +135,7 @@ TEST_F(DocumentSourceSortTest, SortWithLimit) {
 
         ASSERT(sort()->distributedPlanLogic());
         ASSERT(sort()->distributedPlanLogic()->shardsStage != nullptr);
-        ASSERT(sort()->distributedPlanLogic()->mergingStage == nullptr);
+        ASSERT(sort()->distributedPlanLogic()->mergingStages.empty());
     }
 
     container.push_back(DocumentSourceLimit::create(expCtx, 10));
@@ -161,8 +161,9 @@ TEST_F(DocumentSourceSortTest, SortWithLimit) {
 
     ASSERT(sort()->distributedPlanLogic());
     ASSERT(sort()->distributedPlanLogic()->shardsStage != nullptr);
-    ASSERT(sort()->distributedPlanLogic()->mergingStage != nullptr);
-    ASSERT(dynamic_cast<DocumentSourceLimit*>(sort()->distributedPlanLogic()->mergingStage.get()));
+    ASSERT_EQ(sort()->distributedPlanLogic()->mergingStages.size(), 1);
+    ASSERT(dynamic_cast<DocumentSourceLimit*>(
+        sort()->distributedPlanLogic()->mergingStages.begin()->get()));
 }
 
 TEST_F(DocumentSourceSortTest, DoesNotPushProjectBeforeSelf) {

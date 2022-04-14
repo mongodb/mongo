@@ -272,6 +272,22 @@ boost::optional<BSONObj> getOwnedOrNone(boost::optional<BSONObj> obj) {
     return boost::none;
 }
 
+void addSplitStages(const DocumentSource::DistributedPlanLogic& distributedPlanLogic,
+                    Pipeline* mergePipe,
+                    Pipeline* shardPipe) {
+    // This stage must be split, split it normally.
+    // Add in reverse order since we add each to the front and this would flip the order otherwise.
+    for (auto reverseIt = distributedPlanLogic.mergingStages.rbegin();
+         reverseIt != distributedPlanLogic.mergingStages.rend();
+         ++reverseIt) {
+        tassert(6448012,
+                "A stage cannot simultaneously be present on both sides of a pipeline split",
+                distributedPlanLogic.shardsStage != *reverseIt);
+        mergePipe->addInitialSource(*reverseIt);
+    }
+    addMaybeNullStageToBack(shardPipe, distributedPlanLogic.shardsStage);
+}
+
 /**
  * Helper for find split point that handles the split after a stage that must be on
  * the merging half of the pipeline defers being added to the merging pipeline.
@@ -295,11 +311,7 @@ finishFindSplitPointAfterDeferral(
 
         // If this stage also would like to split, split here. Don't defer multiple stages.
         if (auto distributedPlanLogic = current->distributedPlanLogic()) {
-            // A source may not simultaneously be present on both sides of the split.
-            invariant(distributedPlanLogic->shardsStage != distributedPlanLogic->mergingStage);
-            // This stage must be split, split it normally.
-            addMaybeNullStageToBack(shardPipe.get(), std::move(distributedPlanLogic->shardsStage));
-            addMaybeNullStageToFront(mergePipe, std::move(distributedPlanLogic->mergingStage));
+            addSplitStages(*distributedPlanLogic, mergePipe, shardPipe.get());
 
             // The sort that was earlier in the pipeline takes precedence.
             if (!mergeSort) {
@@ -347,22 +359,21 @@ std::pair<std::unique_ptr<Pipeline, PipelineDeleter>, boost::optional<BSONObj>> 
             tassert(6253721,
                     "Must have deferral function if deferring pipeline split",
                     distributedPlanLogic->canMovePast);
+            auto mergingStageList = distributedPlanLogic->mergingStages;
+            tassert(6448007,
+                    "Only support deferring at most one stage for now.",
+                    mergingStageList.size() <= 1);
             // We know these are all currently null/none, as if we had deferred something and
             // 'current' did not need split we would have returned above.
             return finishFindSplitPointAfterDeferral(
                 mergePipe,
                 std::move(shardPipe),
-                std::move(distributedPlanLogic->mergingStage),
+                mergingStageList.empty() ? nullptr : std::move(*mergingStageList.begin()),
                 getOwnedOrNone(distributedPlanLogic->mergeSortPattern),
                 distributedPlanLogic->canMovePast);
         }
 
-        // A source may not simultaneously be present on both sides of the split.
-        invariant(distributedPlanLogic->shardsStage != distributedPlanLogic->mergingStage);
-
-        addMaybeNullStageToBack(shardPipe.get(), std::move(distributedPlanLogic->shardsStage));
-        addMaybeNullStageToFront(mergePipe, std::move(distributedPlanLogic->mergingStage));
-
+        addSplitStages(*distributedPlanLogic, mergePipe, shardPipe.get());
         return {std::move(shardPipe), getOwnedOrNone(distributedPlanLogic->mergeSortPattern)};
     }
 

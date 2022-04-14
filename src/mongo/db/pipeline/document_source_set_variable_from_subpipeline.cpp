@@ -63,10 +63,6 @@ Value DocumentSourceSetVariableFromSubPipeline::serialize(
     tassert(625298, "SubPipeline cannot be null during serialization", _subPipeline);
     spec.setSetVariable(var);
     spec.setPipeline(_subPipeline->serializeToBson(explain));
-    if (_ifEmptyExpr) {
-        auto ifEmptyBson = BSON("ifEmpty" << _ifEmptyExpr->serialize(bool(explain)));
-        spec.setIfEmptyExpr(IDLAnyTypeOwned::parseFromBSON(ifEmptyBson.firstElement()));
-    }
     return Value(DOC(getSourceName() << spec.toBSON()));
 }
 
@@ -97,35 +93,22 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceSetVariableFromSubPipeline::c
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline =
         Pipeline::parse(spec.getPipeline(), expCtx->copyForSubPipeline(expCtx->ns));
 
-
-    boost::intrusive_ptr<Expression> ifEmptyExpr;
-    if (spec.getIfEmptyExpr()) {
-        // The semantics of 'ifEmpty' are to execute in the sub-pipeline's context. So for example,
-        // it should see the sub-pipelines definition of "$$SEARCH_META", if there was one. So it's
-        // important to use that pipeline's ExpressionContext and variables here during evaluation.
-        ifEmptyExpr = Expression::parseOperand(pipeline->getContext().get(),
-                                               spec.getIfEmptyExpr()->getElement(),
-                                               pipeline->getContext()->variablesParseState);
-    }
-
     return DocumentSourceSetVariableFromSubPipeline::create(
-        expCtx, std::move(pipeline), Variables::kSearchMetaId, ifEmptyExpr);
+        expCtx, std::move(pipeline), Variables::kSearchMetaId);
 }
 
 intrusive_ptr<DocumentSourceSetVariableFromSubPipeline>
 DocumentSourceSetVariableFromSubPipeline::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     std::unique_ptr<Pipeline, PipelineDeleter> subpipeline,
-    Variables::Id varID,
-    boost::intrusive_ptr<Expression> ifEmptyExpression) {
+    Variables::Id varID) {
     uassert(625290,
             str::stream()
                 << "SetVariableFromSubPipeline only allows setting $$SEARCH_META variable,  '$$"
                 << Variables::getBuiltinVariableName(varID) << "' is not allowed.",
             !Variables::isUserDefinedVariable(varID) && varID == Variables::kSearchMetaId);
     return intrusive_ptr<DocumentSourceSetVariableFromSubPipeline>(
-        new DocumentSourceSetVariableFromSubPipeline(
-            expCtx, std::move(subpipeline), varID, std::move(ifEmptyExpression)));
+        new DocumentSourceSetVariableFromSubPipeline(expCtx, std::move(subpipeline), varID));
 };
 
 DocumentSource::GetNextResult DocumentSourceSetVariableFromSubPipeline::doGetNext() {
@@ -134,20 +117,9 @@ DocumentSource::GetNextResult DocumentSourceSetVariableFromSubPipeline::doGetNex
                 "Expected to have already attached a cursor source to the pipeline",
                 !_subPipeline->peekFront()->constraints().requiresInputDocSource);
         auto nextSubPipelineInput = _subPipeline->getNext();
-        if (!nextSubPipelineInput) {
-            uassert(625296,
-                    "No document returned from $SetVariableFromSubPipeline subpipeline, and no "
-                    "default expression",
-                    _ifEmptyExpr);
-            auto exprResult =
-                _ifEmptyExpr->evaluate(Document{}, &_subPipeline->getContext()->variables);
-            uassert(6448001,
-                    str::stream() << "ifEmpty expression did not evaluate to an object: "
-                                  << exprResult.toString() << " (_ifEmptyExpr: "
-                                  << _ifEmptyExpr->serialize(true).toString() << ")",
-                    exprResult.isObject());
-            nextSubPipelineInput = exprResult.getDocument();
-        }
+        uassert(625296,
+                "No document returned from $SetVariableFromSubPipeline subpipeline",
+                nextSubPipelineInput);
         uassert(625297,
                 "Multiple documents returned from $SetVariableFromSubPipeline subpipeline when "
                 "only one expected",

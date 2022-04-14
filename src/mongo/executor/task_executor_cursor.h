@@ -134,15 +134,15 @@ public:
         return toRet;
     }
 
-    boost::optional<BSONObj> getCursorVars() {
+    boost::optional<BSONObj> getCursorVars() const {
         return _cursorVars;
     }
 
-    auto getType() {
+    auto getType() const {
         return _cursorType;
     }
 
-    long long getBatchNum() {
+    long long getBatchNum() const {
         return _batchNum;
     }
 

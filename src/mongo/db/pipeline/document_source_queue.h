@@ -48,11 +48,6 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         boost::optional<StringData> aliasStageName = boost::none);
 
-    static boost::intrusive_ptr<DocumentSourceQueue> create(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        std::deque<GetNextResult> docs,
-        boost::optional<StringData> aliasStageName = boost::none);
-
     DocumentSourceQueue(std::deque<GetNextResult> results,
                         const boost::intrusive_ptr<ExpressionContext>& expCtx,
                         boost::optional<StringData> aliasStageName = boost::none);
@@ -90,7 +85,7 @@ public:
         return DepsTracker::SEE_NEXT;
     }
 
-    virtual boost::optional<DistributedPlanLogic> distributedPlanLogic() override {
+    boost::optional<DistributedPlanLogic> distributedPlanLogic() override {
         return boost::none;
     }
 
@@ -111,11 +106,6 @@ public:
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
 protected:
-    static std::deque<DocumentSource::GetNextResult> parseFromArray(BSONElement arrayElem);
-
-    Value serializeWithName(boost::optional<ExplainOptions::Verbosity> explain,
-                            StringData stageName) const;
-
     GetNextResult doGetNext() override;
     // Return documents from front of queue.
     std::deque<GetNextResult> _queue;

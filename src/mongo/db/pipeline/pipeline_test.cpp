@@ -4031,8 +4031,8 @@ public:
     boost::optional<DistributedPlanLogic> distributedPlanLogic() override {
         DistributedPlanLogic logic;
 
-        logic.mergingStage = nullptr;
         logic.shardsStage = this;
+        logic.mergingStages = {};
         logic.mergeSortPattern = BSON("a" << 1);
         logic.needsSplit = false;
         logic.canMovePast = canMovePastDuringSplit;

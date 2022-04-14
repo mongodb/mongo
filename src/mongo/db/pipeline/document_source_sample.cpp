@@ -128,7 +128,7 @@ boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceSample::dist
     DistributedPlanLogic logic;
     logic.shardsStage = this;
     if (_size > 0) {
-        logic.mergingStage = DocumentSourceLimit::create(pExpCtx, _size);
+        logic.mergingStages = {DocumentSourceLimit::create(pExpCtx, _size)};
     }
 
     // Here we don't use 'randSortSpec' because it uses a metadata sort which the merging logic does

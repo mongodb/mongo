@@ -602,10 +602,12 @@ protected:
         // case only one shard is in use.
         auto distributedPlanLogic = group()->distributedPlanLogic();
         ASSERT(distributedPlanLogic);
-        ASSERT(distributedPlanLogic->mergingStage);
-        ASSERT_NOT_EQUALS(group(), distributedPlanLogic->mergingStage);
+        ASSERT_EQ(distributedPlanLogic->mergingStages.size(), 1)
+            << distributedPlanLogic->mergingStages.size();
+        auto mergingStage = *distributedPlanLogic->mergingStages.begin();
+        ASSERT_NOT_EQUALS(group(), mergingStage);
         ASSERT_FALSE(static_cast<bool>(distributedPlanLogic->mergeSortPattern));
-        return distributedPlanLogic->mergingStage;
+        return mergingStage;
     }
     void checkResultSet(const intrusive_ptr<DocumentSource>& sink) {
         // Load the results from the DocumentSourceGroup and sort them by _id.

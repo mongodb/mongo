@@ -751,7 +751,7 @@ TEST_F(DocumentSourceLookUpTest, LookupDistributedPlanLogic) {
         expCtx);
     ASSERT(lookupStage->distributedPlanLogic());
     ASSERT(lookupStage->distributedPlanLogic()->shardsStage == nullptr);
-    ASSERT(lookupStage->distributedPlanLogic()->mergingStage != nullptr);
+    ASSERT_EQ(lookupStage->distributedPlanLogic()->mergingStages.size(), 1);
 }
 
 TEST(MakeMatchStageFromInput, NonArrayValueUsesEqQuery) {

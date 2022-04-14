@@ -48,9 +48,3 @@ structs:
         description: A required aggregation pipeline that will return at most one document.
         optional: false
         type: pipeline
-      ifEmpty:
-        description: An expression to run to set the variable value if the pipeline returned no
-          results.
-        optional: true
-        cpp_name: IfEmptyExpr
-        type: IDLAnyTypeOwned

@@ -642,7 +642,7 @@ boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceSort::distri
                                  .serialize(SortPattern::SortKeySerialization::kForSortKeyMerging)
                                  .toBson();
     if (auto limit = getLimit()) {
-        split.mergingStage = DocumentSourceLimit::create(pExpCtx, *limit);
+        split.mergingStages = {DocumentSourceLimit::create(pExpCtx, *limit)};
     }
     return split;
 }
