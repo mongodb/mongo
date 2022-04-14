@@ -630,6 +630,50 @@ TEST_F(ReplCoordHBV1SplitConfigTest, RecipientNodeApplyConfig) {
     validateNextRequest("", _recipientSetName, 1, 1);
 }
 
+using InNetworkGuard = NetworkInterfaceMock::InNetworkGuard;
+TEST_F(ReplCoordHBV1SplitConfigTest, RejectMismatchedSetNameInHeartbeatResponse) {
+    startUp(_recipientSecondaryNode);
+
+    // Receive a heartbeat request that tells us about a config with a newer version
+    ReplSetConfig rsConfig =
+        makeRSConfigWithVersionAndTerm((_configVersion + 1), (_configTerm + 1));
+    receiveHeartbeatFrom(rsConfig, 1, HostAndPort("h1", 1));
+
+    {
+        InNetworkGuard guard(getNet());
+
+        // The received heartbeat has a greater (term, version), so verify that the next request
+        // targets that host to retrieve the new config.
+        auto noi = validateNextRequest("h1", _donorSetName, _configVersion, _configTerm);
+
+        // Schedule a heartbeat response which reports the higher (term, version) but wrong setName
+        auto response = [&]() {
+            ReplSetHeartbeatResponse hbResp;
+            hbResp.setSetName("differentSetName");
+            hbResp.setState(MemberState::RS_PRIMARY);
+            hbResp.setConfig(
+                ReplSetConfig::parse(makeConfigObj((_configVersion + 1), (_configTerm + 1))));
+            hbResp.setConfigVersion(_configVersion + 1);
+            hbResp.setConfigTerm(_configTerm + 1);
+            OpTime opTime(Timestamp(), 0);
+            hbResp.setAppliedOpTimeAndWallTime({opTime, Date_t()});
+            hbResp.setDurableOpTimeAndWallTime({opTime, Date_t()});
+
+            BSONObjBuilder responseBuilder;
+            responseBuilder << "ok" << 1;
+            hbResp.addToBSON(&responseBuilder);
+            return responseBuilder.obj();
+        }();
+
+        getNet()->scheduleResponse(noi, getNet()->now(), makeResponseStatus(response));
+        getNet()->runReadyNetworkOperations();
+    }
+
+    // Validate that the recipient has rejected the heartbeat response
+    ASSERT_EQ(getReplCoord()->getConfigVersion(), _configVersion);
+    ASSERT_EQ(getReplCoord()->getConfigTerm(), _configTerm);
+}
+
 TEST_F(ReplCoordHBV1SplitConfigTest, RecipientNodeNonZeroVotes) {
     _members = BSON_ARRAY(BSON("_id" << 1 << "host"
                                      << "h1:1")

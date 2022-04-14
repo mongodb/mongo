@@ -938,6 +938,10 @@ std::pair<ReplSetHeartbeatArgsV1, Milliseconds> TopologyCoordinator::prepareHear
     return std::make_pair(hbArgs, timeout);
 }
 
+bool isUnrecoverableHeartbeatFailure(Status status) {
+    return status.code() == ErrorCodes::InconsistentReplicaSetNames;
+}
+
 HeartbeatResponseAction TopologyCoordinator::processHeartbeatResponse(
     Date_t now,
     Milliseconds networkRoundTripTime,
@@ -1080,7 +1084,8 @@ HeartbeatResponseAction TopologyCoordinator::processHeartbeatResponse(
         }
         // If the heartbeat has failed i.e. used up all retries, then we mark the target node as
         // down.
-        else if (hbStats.failed() || (alreadyElapsed >= _rsConfig.getHeartbeatTimeoutPeriod())) {
+        else if (hbStats.failed() || (alreadyElapsed >= _rsConfig.getHeartbeatTimeoutPeriod()) ||
+                 isUnrecoverableHeartbeatFailure(hbResponse.getStatus())) {
             hbData.setDownValues(now, hbResponse.getStatus().reason());
         } else {
             LOGV2_DEBUG(21807,
