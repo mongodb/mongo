@@ -2,7 +2,7 @@
  * Tests that resharding does not transfer the history for non-retryable internal transactions that
  * commit or abort on the donor(s) during resharding to the recipient.
  *
- * @tags: [requires_fcv_60]
+ * @tags: [requires_fcv_60, requires_persistence]
  */
 (function() {
 "use strict";

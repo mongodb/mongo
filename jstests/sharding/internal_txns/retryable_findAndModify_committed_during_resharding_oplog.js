@@ -3,7 +3,7 @@
  * inside internal transactions that start and commit the donor(s) during resharding are retryable
  * on the recipient after resharding.
  *
- * @tags: [requires_fcv_60]
+ * @tags: [requires_fcv_60, requires_persistence]
  */
 (function() {
 "use strict";
