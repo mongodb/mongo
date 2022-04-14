@@ -49,7 +49,7 @@ var $config = (function() {
             db[this.collName].drop();
 
             // Restore the collection.
-            populateIndexes(db[this].collName, this.indexSpecs);
+            populateIndexes(db[this.collName], this.indexSpecs);
             populateCollection(db[this.collName], this.numDocs);
         },
 
@@ -95,11 +95,13 @@ var $config = (function() {
             assertWorkedOrFailedHandleTxnErrors(coll.createIndex(indexSpec),
                                                 [
                                                     ErrorCodes.CannotImplicitlyCreateCollection,
+                                                    ErrorCodes.IndexBuildAborted,
                                                     ErrorCodes.IndexBuildAlreadyInProgress,
                                                     ErrorCodes.NoMatchingDocument,
                                                 ],
                                                 [
                                                     ErrorCodes.CannotImplicitlyCreateCollection,
+                                                    ErrorCodes.IndexBuildAborted,
                                                     ErrorCodes.NoMatchingDocument,
                                                 ]);
         });
