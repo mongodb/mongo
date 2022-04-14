@@ -45,6 +45,8 @@
 namespace mongo {
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(hangInShardsvrSetClusterParameter);
+
 const WriteConcernOptions kLocalWriteConcern{
     1, WriteConcernOptions::SyncMode::UNSET, WriteConcernOptions::kNoTimeout};
 
@@ -63,6 +65,8 @@ public:
                     serverGlobalParams.clusterRole == ClusterRole::ShardServer);
             CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
                                                           opCtx->getWriteConcern());
+
+            hangInShardsvrSetClusterParameter.pauseWhileSet();
 
             SetClusterParameter setClusterParameterRequest(request().getCommandParameter());
             setClusterParameterRequest.setDbName(NamespaceString::kAdminDb);
