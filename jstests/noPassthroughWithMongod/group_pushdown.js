@@ -12,6 +12,13 @@ if (!checkSBEEnabled(db, ["featureFlagSBEGroupPushdown"])) {
     return;
 }
 
+// Ensure group pushdown is enabled and capture the original value of
+// 'internalQuerySlotBasedExecutionDisableGroupPushdown' to use at the end of the test.
+const originalValue = assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQuerySlotBasedExecutionDisableGroupPushdown: false}));
+assert(originalValue.hasOwnProperty("was"));
+const oldValue = originalValue.was;
+
 const coll = db.group_pushdown;
 coll.drop();
 
@@ -597,4 +604,25 @@ assert.commandWorked(tcoll.insert(
 assert.commandWorked(
     tcoll.insert([{item: "b", price: NumberDecimal("3.7")}, {item: "b", price: 2.3}]));
 assertShardedGroupResultsMatch(tcoll, [{$group: {_id: "$item", a: {$avg: "$price"}}}]);
+
+// Verify that $group pushdown can be disabled with the
+// 'internalQuerySlotBasedExecutionDisableGroupPushdown' flag.
+const basicGroup = [{$group: {_id: "$item", out: {$sum: 1}}}];
+const basicGroupResults = [{_id: "a", out: 2}, {_id: "b", out: 2}, {_id: "c", out: 1}];
+
+// $group pushdown should work as expected before setting
+// 'internalQuerySlotBasedExecutionDisableGroupPushdown' to true.
+assertGroupPushdown(coll,
+                    basicGroup,
+                    basicGroupResults,
+                    /* expectedGroupCountInExplain */ 1);
+
+// Turn group pushdown off.
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQuerySlotBasedExecutionDisableGroupPushdown: true}));
+assertNoGroupPushdown(coll, basicGroup, basicGroupResults);
+
+// Reset 'internalQuerySlotBasedExecutionDisableGroupPushdown' to its original value.
+assert.commandWorked(db.adminCommand(
+    {setParameter: 1, internalQuerySlotBasedExecutionDisableGroupPushdown: oldValue}));
 })();

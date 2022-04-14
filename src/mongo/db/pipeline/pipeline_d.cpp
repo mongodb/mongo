@@ -80,6 +80,7 @@
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/sort_pattern.h"
 #include "mongo/db/s/collection_sharding_state.h"
@@ -140,8 +141,11 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> extractSbeCompatibleSt
 
     auto&& sources = pipeline->getSources();
 
-    const auto groupFeatureFlagEnabled = feature_flags::gFeatureFlagSBEGroupPushdown.isEnabled(
-        serverGlobalParams.featureCompatibility);
+    const auto disallowGroupPushdown =
+        !(serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+          feature_flags::gFeatureFlagSBEGroupPushdown.isEnabled(
+              serverGlobalParams.featureCompatibility)) ||
+        internalQuerySlotBasedExecutionDisableGroupPushdown.load();
 
     bool isMainCollectionSharded = false;
     if (const auto& mainColl = collections.getMainCollection()) {
@@ -159,16 +163,19 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> extractSbeCompatibleSt
         !(serverGlobalParams.featureCompatibility.isVersionInitialized() &&
           feature_flags::gFeatureFlagSBELookupPushdown.isEnabled(
               serverGlobalParams.featureCompatibility)) ||
-        isMainCollectionSharded || collections.isAnySecondaryNamespaceAViewOrSharded();
+        internalQuerySlotBasedExecutionDisableLookupPushdown.load() || isMainCollectionSharded ||
+        collections.isAnySecondaryNamespaceAViewOrSharded();
 
     for (auto itr = sources.begin(); itr != sources.end();) {
         const bool isLastSource = itr->get() == sources.back().get();
 
         // $group pushdown logic.
         if (auto groupStage = dynamic_cast<DocumentSourceGroup*>(itr->get())) {
-            bool groupEligibleForPushdown =
-                groupFeatureFlagEnabled && groupStage->sbeCompatible() && !groupStage->doingMerge();
-            if (groupEligibleForPushdown) {
+            if (disallowGroupPushdown) {
+                break;
+            }
+
+            if (groupStage->sbeCompatible() && !groupStage->doingMerge()) {
                 stagesForPushdown.push_back(
                     std::make_unique<InnerPipelineStageImpl>(groupStage, isLastSource));
                 sources.erase(itr++);

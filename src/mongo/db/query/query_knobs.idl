@@ -637,6 +637,22 @@ server_parameters:
     validator:
         gt: 0
 
+  internalQuerySlotBasedExecutionDisableLookupPushdown:
+    description: "If true, the system will not push down $lookup to the SBE execution engine."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQuerySlotBasedExecutionDisableLookupPushdown"
+    cpp_vartype: AtomicWord<bool>
+    default: false
+    on_update: plan_cache_util::clearSbeCacheOnParameterChange
+
+  internalQuerySlotBasedExecutionDisableGroupPushdown:
+    description: "If true, the system will not push down $group to the SBE execution engine."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQuerySlotBasedExecutionDisableGroupPushdown"
+    cpp_vartype: AtomicWord<bool>
+    default: false
+    on_update: plan_cache_util::clearSbeCacheOnParameterChange
+
   internalQueryForceClassicEngine:
     description: "If true, the system will use the classic execution engine for all queries,
     otherwise eligible queries will execute using the SBE execution engine."

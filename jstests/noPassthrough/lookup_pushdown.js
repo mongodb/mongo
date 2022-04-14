@@ -132,6 +132,20 @@ assert.commandWorked(foreignColl.insert(foreignDocs));
 assert.commandWorked(db.createView(viewName, foreignCollName, [{$match: {b: {$gte: 0}}}]));
 let view = db[viewName];
 
+function setLookupPushdownDisabled(value) {
+    assert.commandWorked(db.adminCommand(
+        {setParameter: 1, internalQuerySlotBasedExecutionDisableLookupPushdown: value}));
+}
+
+(function testLookupPushdownQueryKnob() {
+    const pipeline =
+        [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}];
+    setLookupPushdownDisabled(true);
+    runTest(coll, pipeline, JoinAlgorithm.Classic /* expectedJoinAlgorithm */);
+    setLookupPushdownDisabled(false);
+    runTest(coll, pipeline, JoinAlgorithm.NLJ /* expectedJoinAlgorithm */);
+}());
+
 (function testLookupPushdownBasicCases() {
     // Basic $lookup.
     runTest(coll,
