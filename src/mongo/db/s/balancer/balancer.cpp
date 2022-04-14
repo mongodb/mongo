@@ -389,6 +389,8 @@ void Balancer::report(OperationContext* opCtx, BSONObjBuilder* builder) {
 }
 
 void Balancer::_consumeActionStreamLoop() {
+    ScopeGuard onExitCleanup([this] { _defragmentationPolicy->interruptAllDefragmentations(); });
+
     Client::initThread("BalancerSecondary");
     auto applyThrottling = [lastActionTime = Date_t::fromMillisSinceEpoch(0)]() mutable {
         const Milliseconds throttle{chunkDefragmentationThrottlingMS.load()};
