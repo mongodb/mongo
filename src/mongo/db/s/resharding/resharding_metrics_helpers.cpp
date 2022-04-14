@@ -81,9 +81,8 @@ void onCriticalSectionError(OperationContext* opCtx, const StaleConfigInfo& info
         onCriticalSectionErrorThrows(opCtx, info);
     } catch (const DBException& e) {
         LOGV2(6437201,
-              "Exception while recording resharding metrics after an operation failure due to the "
-              "critical section being held",
-              "Status"_attr = redact(e.toStatus()));
+              "Unable to record resharding critical section metrics for the current operation",
+              "reason"_attr = redact(e.toStatus()));
     }
 }
 

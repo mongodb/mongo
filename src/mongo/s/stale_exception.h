@@ -88,7 +88,7 @@ protected:
     boost::optional<ChunkVersion> _wanted;
     ShardId _shardId;
 
-    // This fields below are not serialized and therefore do not get propagated to the router
+    // The following fields are not serialized and therefore do not get propagated to the router.
     boost::optional<SharedSemiFuture<void>> _criticalSectionSignal;
     boost::optional<OperationType> _duringOperationType;
 };

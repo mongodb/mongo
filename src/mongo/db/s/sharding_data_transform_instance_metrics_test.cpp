@@ -204,7 +204,7 @@ TEST_F(ShardingDataTransformInstanceMetricsTest, DonorIncrementWritesDuringCriti
 TEST_F(ShardingDataTransformInstanceMetricsTest, CurrentOpReportsCriticalSectionTime) {
     const auto roles = {Role::kDonor, Role::kCoordinator};
     for (const auto& role : roles) {
-        LOGV2(6437200, "CurrentOpReportsCriticalSectionTime", "Role"_attr = role);
+        LOGV2(6437200, "CurrentOpReportsCriticalSectionTime", "role"_attr = role);
         constexpr auto kFiveSeconds = Milliseconds(5000);
         auto uuid = UUID::gen();
         const auto& clock = getClockSource();
