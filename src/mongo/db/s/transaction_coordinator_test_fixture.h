@@ -44,6 +44,9 @@ namespace mongo {
  */
 class TransactionCoordinatorTestFixture : public ShardServerTestFixture {
 protected:
+    explicit TransactionCoordinatorTestFixture(Options options = {})
+        : ShardServerTestFixture(std::move(options)) {}
+
     void setUp() override;
     void tearDown() override;
 

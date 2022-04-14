@@ -100,6 +100,9 @@ void killClientOpCtx(ServiceContext* service, const std::string& clientName) {
 
 class TransactionCoordinatorTestBase : public TransactionCoordinatorTestFixture {
 protected:
+    explicit TransactionCoordinatorTestBase(Options options = {})
+        : TransactionCoordinatorTestFixture(std::move(options)) {}
+
     void assertPrepareSentAndRespondWithSuccess() {
         assertCommandSentAndRespondWith(
             PrepareTransaction::kCommandName, kPrepareOk, WriteConcernOptions::Majority);
@@ -1311,12 +1314,13 @@ TEST_F(TransactionCoordinatorTest,
 }
 
 class TransactionCoordinatorMetricsTest : public TransactionCoordinatorTestBase {
-public:
+protected:
+    TransactionCoordinatorMetricsTest()
+        : TransactionCoordinatorTestBase(Options{}.useMockTickSource<Microseconds>(true)) {}
+
     void setUp() override {
         getServiceContext()->setPreciseClockSource(std::make_unique<ClockSourceMock>());
-        auto tickSource = std::make_unique<TickSourceMock<Microseconds>>();
-        tickSource->reset(1);
-        getServiceContext()->setTickSource(std::move(tickSource));
+        tickSource()->reset(1);
 
         TransactionCoordinatorTestBase::setUp();
     }

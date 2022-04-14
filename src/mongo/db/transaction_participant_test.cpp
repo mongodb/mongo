@@ -266,6 +266,8 @@ private:
 
 class TxnParticipantTest : public MockReplCoordServerFixture {
 protected:
+    TxnParticipantTest(Options options = {}) : MockReplCoordServerFixture(std::move(options)) {}
+
     void setUp() override {
         MockReplCoordServerFixture::setUp();
         const auto service = opCtx()->getServiceContext();
@@ -1823,7 +1825,15 @@ TEST_F(TxnParticipantTest, ReacquireLocksForPreparedTransactionsOnStepUp) {
  */
 class TransactionsMetricsTest : public TxnParticipantTest {
 protected:
-    using TickSourceMicrosecondMock = TickSourceMock<Microseconds>;
+    TransactionsMetricsTest()
+        : TxnParticipantTest(Options{}.useMockTickSource<Microseconds>(true)) {}
+
+    void setUp() override {
+        TxnParticipantTest::setUp();
+
+        // Ensure that the tick source is not initialized to zero.
+        mockTickSource()->reset(1);
+    }
 
     /**
      * Set up and return a mock clock source.
@@ -1834,15 +1844,10 @@ protected:
     }
 
     /**
-     * Set up and return a mock tick source.
+     * Returns the mock tick source.
      */
-    TickSourceMicrosecondMock* initMockTickSource() {
-        getServiceContext()->setTickSource(std::make_unique<TickSourceMicrosecondMock>());
-        auto tickSource =
-            dynamic_cast<TickSourceMicrosecondMock*>(getServiceContext()->getTickSource());
-        // Ensure that the tick source is not initialized to zero.
-        tickSource->reset(1);
-        return tickSource;
+    TickSourceMock<Microseconds>* mockTickSource() {
+        return dynamic_cast<TickSourceMock<Microseconds>*>(getServiceContext()->getTickSource());
     }
 };
 
@@ -2272,7 +2277,7 @@ TEST_F(TransactionsMetricsTest, TransactionErrorsBeforeUnstash) {
 }
 
 TEST_F(TransactionsMetricsTest, SingleTransactionStatsDurationShouldBeSetUponCommit) {
-    auto tickSource = initMockTickSource();
+    auto tickSource = mockTickSource();
 
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
@@ -2290,7 +2295,7 @@ TEST_F(TransactionsMetricsTest, SingleTransactionStatsDurationShouldBeSetUponCom
 }
 
 TEST_F(TransactionsMetricsTest, SingleTransactionStatsPreparedDurationShouldBeSetUponCommit) {
-    auto tickSource = initMockTickSource();
+    auto tickSource = mockTickSource();
 
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
@@ -2313,7 +2318,7 @@ TEST_F(TransactionsMetricsTest, SingleTransactionStatsPreparedDurationShouldBeSe
 }
 
 TEST_F(TransactionsMetricsTest, SingleTransactionStatsDurationShouldBeSetUponAbort) {
-    auto tickSource = initMockTickSource();
+    auto tickSource = mockTickSource();
 
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
@@ -2329,7 +2334,7 @@ TEST_F(TransactionsMetricsTest, SingleTransactionStatsDurationShouldBeSetUponAbo
 }
 
 TEST_F(TransactionsMetricsTest, SingleTransactionStatsPreparedDurationShouldBeSetUponAbort) {
-    auto tickSource = initMockTickSource();
+    auto tickSource = mockTickSource();
 
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
@@ -2349,7 +2354,7 @@ TEST_F(TransactionsMetricsTest, SingleTransactionStatsPreparedDurationShouldBeSe
 }
 
 TEST_F(TransactionsMetricsTest, SingleTransactionStatsDurationShouldKeepIncreasingUntilCommit) {
-    auto tickSource = initMockTickSource();
+    auto tickSource = mockTickSource();
 
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
@@ -2381,7 +2386,7 @@ TEST_F(TransactionsMetricsTest, SingleTransactionStatsDurationShouldKeepIncreasi
 
 TEST_F(TransactionsMetricsTest,
        SingleTransactionStatsPreparedDurationShouldKeepIncreasingUntilCommit) {
-    auto tickSource = initMockTickSource();
+    auto tickSource = mockTickSource();
 
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
@@ -2415,7 +2420,7 @@ TEST_F(TransactionsMetricsTest,
 }
 
 TEST_F(TransactionsMetricsTest, SingleTransactionStatsDurationShouldKeepIncreasingUntilAbort) {
-    auto tickSource = initMockTickSource();
+    auto tickSource = mockTickSource();
 
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
@@ -2447,7 +2452,7 @@ TEST_F(TransactionsMetricsTest, SingleTransactionStatsDurationShouldKeepIncreasi
 
 TEST_F(TransactionsMetricsTest,
        SingleTransactionStatsPreparedDurationShouldKeepIncreasingUntilAbort) {
-    auto tickSource = initMockTickSource();
+    auto tickSource = mockTickSource();
 
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
@@ -2481,7 +2486,7 @@ TEST_F(TransactionsMetricsTest,
 }
 
 TEST_F(TransactionsMetricsTest, TimeActiveMicrosShouldBeSetUponUnstashAndStash) {
-    auto tickSource = initMockTickSource();
+    auto tickSource = mockTickSource();
 
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
@@ -2529,7 +2534,7 @@ TEST_F(TransactionsMetricsTest, TimeActiveMicrosShouldBeSetUponUnstashAndStash) 
 }
 
 TEST_F(TransactionsMetricsTest, TimeActiveMicrosShouldBeSetUponUnstashAndAbort) {
-    auto tickSource = initMockTickSource();
+    auto tickSource = mockTickSource();
 
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
@@ -2557,7 +2562,7 @@ TEST_F(TransactionsMetricsTest, TimeActiveMicrosShouldBeSetUponUnstashAndAbort) 
 }
 
 TEST_F(TransactionsMetricsTest, TimeActiveMicrosShouldNotBeSetUponAbortOnly) {
-    auto tickSource = initMockTickSource();
+    auto tickSource = mockTickSource();
 
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
@@ -2579,7 +2584,7 @@ TEST_F(TransactionsMetricsTest, TimeActiveMicrosShouldNotBeSetUponAbortOnly) {
 }
 
 TEST_F(TransactionsMetricsTest, TimeActiveMicrosShouldIncreaseUntilStash) {
-    auto tickSource = initMockTickSource();
+    auto tickSource = mockTickSource();
 
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
@@ -2616,7 +2621,7 @@ TEST_F(TransactionsMetricsTest, TimeActiveMicrosShouldIncreaseUntilStash) {
 }
 
 TEST_F(TransactionsMetricsTest, TimeActiveMicrosShouldIncreaseUntilCommit) {
-    auto tickSource = initMockTickSource();
+    auto tickSource = mockTickSource();
 
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
@@ -2770,7 +2775,7 @@ TEST_F(TransactionsMetricsTest, AdditiveMetricsObjectsShouldBeAddedTogetherUponA
 }
 
 TEST_F(TransactionsMetricsTest, TimeInactiveMicrosShouldBeSetUponUnstashAndStash) {
-    auto tickSource = initMockTickSource();
+    auto tickSource = mockTickSource();
 
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
@@ -2809,7 +2814,7 @@ TEST_F(TransactionsMetricsTest, TimeInactiveMicrosShouldBeSetUponUnstashAndStash
 }
 
 TEST_F(TransactionsMetricsTest, TimeInactiveMicrosShouldBeSetUponUnstashAndAbort) {
-    auto tickSource = initMockTickSource();
+    auto tickSource = mockTickSource();
 
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
@@ -2842,7 +2847,7 @@ TEST_F(TransactionsMetricsTest, TimeInactiveMicrosShouldBeSetUponUnstashAndAbort
 }
 
 TEST_F(TransactionsMetricsTest, TimeInactiveMicrosShouldIncreaseUntilCommit) {
-    auto tickSource = initMockTickSource();
+    auto tickSource = mockTickSource();
 
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
@@ -2873,7 +2878,7 @@ TEST_F(TransactionsMetricsTest, TimeInactiveMicrosShouldIncreaseUntilCommit) {
 }
 
 TEST_F(TransactionsMetricsTest, ReportStashedResources) {
-    auto tickSource = initMockTickSource();
+    auto tickSource = mockTickSource();
     auto clockSource = initMockPreciseClockSource();
     auto startTime = Date_t::now();
     clockSource->reset(startTime);
@@ -2975,7 +2980,7 @@ TEST_F(TransactionsMetricsTest, ReportStashedResources) {
 }
 
 TEST_F(TransactionsMetricsTest, ReportUnstashedResources) {
-    auto tickSource = initMockTickSource();
+    auto tickSource = mockTickSource();
     auto clockSource = initMockPreciseClockSource();
     auto startTime = Date_t::now();
     clockSource->reset(startTime);
@@ -3576,7 +3581,7 @@ TEST_F(TransactionsMetricsTest, TestTransactionInfoForLogAfterCommit) {
 }
 
 TEST_F(TransactionsMetricsTest, TestPreparedTransactionInfoForLogAfterCommit) {
-    auto tickSource = initMockTickSource();
+    auto tickSource = mockTickSource();
 
     // Initialize SingleTransactionStats AdditiveMetrics objects.
     const int metricValue = 1;
@@ -3671,7 +3676,7 @@ TEST_F(TransactionsMetricsTest, TestTransactionInfoForLogAfterAbort) {
 }
 
 TEST_F(TransactionsMetricsTest, TestPreparedTransactionInfoForLogAfterAbort) {
-    auto tickSource = initMockTickSource();
+    auto tickSource = mockTickSource();
 
     // Initialize SingleTransactionStats AdditiveMetrics objects.
     const int metricValue = 1;
@@ -3750,7 +3755,7 @@ DEATH_TEST_F(TransactionsMetricsTest, TestTransactionInfoForLogWithNoLockerInfoS
 }
 
 TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowCommit) {
-    auto tickSource = initMockTickSource();
+    auto tickSource = mockTickSource();
 
     auto sessionCheckout = checkOutSession();
 
@@ -3807,7 +3812,7 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowCommit) {
 }
 
 TEST_F(TransactionsMetricsTest, LogPreparedTransactionInfoAfterSlowCommit) {
-    auto tickSource = initMockTickSource();
+    auto tickSource = mockTickSource();
 
     auto sessionCheckout = checkOutSession();
 
@@ -3861,7 +3866,7 @@ TEST_F(TransactionsMetricsTest, LogPreparedTransactionInfoAfterSlowCommit) {
 }
 
 TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowAbort) {
-    auto tickSource = initMockTickSource();
+    auto tickSource = mockTickSource();
 
     auto sessionCheckout = checkOutSession();
 
@@ -3914,7 +3919,7 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowAbort) {
 }
 
 TEST_F(TransactionsMetricsTest, LogPreparedTransactionInfoAfterSlowAbort) {
-    auto tickSource = initMockTickSource();
+    auto tickSource = mockTickSource();
 
     auto sessionCheckout = checkOutSession();
 
@@ -3977,7 +3982,7 @@ TEST_F(TransactionsMetricsTest, LogPreparedTransactionInfoAfterSlowAbort) {
 }
 
 TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterExceptionInPrepare) {
-    auto tickSource = initMockTickSource();
+    auto tickSource = mockTickSource();
     auto sessionCheckout = checkOutSession();
 
     APIParameters apiParameters = APIParameters();
@@ -4040,7 +4045,7 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterExceptionInPrepare) {
 }
 
 TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowStashedAbort) {
-    auto tickSource = initMockTickSource();
+    auto tickSource = mockTickSource();
 
     auto sessionCheckout = checkOutSession();
 
@@ -4095,7 +4100,7 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowStashedAbort) {
 }
 
 TEST_F(TransactionsMetricsTest, LogTransactionInfoZeroSampleRate) {
-    auto tickSource = initMockTickSource();
+    auto tickSource = mockTickSource();
 
     auto sessionCheckout = checkOutSession();
 

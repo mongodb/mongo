@@ -32,6 +32,7 @@
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/unittest/temp_dir.h"
+#include "mongo/util/tick_source_mock.h"
 
 namespace mongo {
 
@@ -50,25 +51,32 @@ protected:
     public:
         Options(){};
 
-        Options& engine(std::string engine) {
+        Options engine(std::string engine) {
             _engine = std::move(engine);
-            return *this;
+            return std::move(*this);
         }
-        Options& repair(RepairAction repair) {
+        Options repair(RepairAction repair) {
             _repair = repair;
-            return *this;
+            return std::move(*this);
         }
-        Options& initFlags(StorageEngineInitFlags initFlags) {
+        Options initFlags(StorageEngineInitFlags initFlags) {
             _initFlags = initFlags;
-            return *this;
+            return std::move(*this);
         }
-        Options& useReplSettings(bool useReplSettings) {
+        Options useReplSettings(bool useReplSettings) {
             _useReplSettings = useReplSettings;
-            return *this;
+            return std::move(*this);
         }
-        Options& useMockClock(bool useMockClock) {
+        Options useMockClock(bool useMockClock) {
             _useMockClock = useMockClock;
-            return *this;
+            return std::move(*this);
+        }
+        template <class D = Milliseconds>
+        Options useMockTickSource(bool useMockTickSource) {
+            if (useMockTickSource) {
+                _mockTickSource = std::make_unique<TickSourceMock<D>>();
+            }
+            return std::move(*this);
         }
 
     private:
@@ -77,6 +85,7 @@ protected:
         StorageEngineInitFlags _initFlags = kDefaultStorageEngineInitFlags;
         bool _useReplSettings = false;
         bool _useMockClock = false;
+        std::unique_ptr<TickSource> _mockTickSource;
 
         friend class ServiceContextMongoDTest;
     };
