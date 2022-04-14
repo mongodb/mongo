@@ -2673,13 +2673,13 @@ buildvariants:
 #      - rhel80-xlarge
 #  - name: unittest_shell_hang_analyzer_gen
 
-- name: enterprise-ubuntu2004-debug-tsan
-  display_name: ~ TSAN Enterprise Ubuntu 20.04 DEBUG
+- name: enterprise-rhel80-debug-tsan
+  display_name: ~ TSAN Enterprise RHEL 8.0 DEBUG
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
   run_on:
-  - ubuntu2004-large
+  - rhel80-large
   stepback: false
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
