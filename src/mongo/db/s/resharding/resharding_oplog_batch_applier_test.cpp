@@ -196,7 +196,18 @@ public:
 
         // The transaction machinery cannot store an empty locker.
         { Lock::GlobalLock globalLock(opCtx, MODE_IX); }
-        auto opTime = repl::getNextOpTime(opCtx);
+        auto opTime = [opCtx] {
+            TransactionParticipant::SideTransactionBlock sideTxn{opCtx};
+
+            WriteUnitOfWork wuow{opCtx};
+            auto opTime = repl::getNextOpTime(opCtx);
+            wuow.release();
+
+            opCtx->recoveryUnit()->abortUnitOfWork();
+            opCtx->lockState()->endWriteUnitOfWork();
+
+            return opTime;
+        }();
         txnParticipant.prepareTransaction(opCtx, opTime);
         txnParticipant.stashTransactionResources(opCtx);
 
@@ -297,11 +308,6 @@ public:
         ASSERT_EQ(sessionTxnRecord.getLastWriteDate(), foundOp.getWallClockTime())
             << sessionTxnRecord.toBSON() << ", " << foundOp;
     }
-
-protected:
-    // TODO (SERVER-65307): Use wiredTiger.
-    ReshardingOplogBatchApplierTest()
-        : ServiceContextMongoDTest(Options{}.engine("ephemeralForTest")) {}
 
 private:
     ChunkManager makeChunkManagerForSourceCollection() {
