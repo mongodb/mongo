@@ -110,6 +110,10 @@ ServiceContextMongoDTest::ServiceContextMongoDTest(Options options)
         serviceContext->setPreciseClockSource(std::move(preciseClock));
     }
 
+    if (options._mockTickSource) {
+        serviceContext->setTickSource(std::move(options._mockTickSource));
+    }
+
     serviceContext->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>(serviceContext));
 
     // Set up the periodic runner to allow background job execution for tests that require it.

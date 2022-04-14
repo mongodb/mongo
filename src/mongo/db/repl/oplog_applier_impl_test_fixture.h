@@ -197,7 +197,7 @@ public:
 class OplogApplierImplTest : public ServiceContextMongoDTest {
 protected:
     explicit OplogApplierImplTest(Options options = {})
-        : ServiceContextMongoDTest(std::move(options.useReplSettings(true))) {}
+        : ServiceContextMongoDTest(options.useReplSettings(true)) {}
 
     void _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::Error expectedError,
                                                            const OplogEntry& op,

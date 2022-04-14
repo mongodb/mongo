@@ -46,9 +46,8 @@ const NamespaceString kNss("foo.bar");
 
 class NamespaceMetadataChangeNotificationsTest : public ServiceContextMongoDTest {
 protected:
-    NamespaceMetadataChangeNotificationsTest() {
-        getServiceContext()->setTickSource(std::make_unique<TickSourceMock<>>());
-    }
+    NamespaceMetadataChangeNotificationsTest()
+        : ServiceContextMongoDTest(Options{}.useMockTickSource(true)) {}
 };
 
 TEST_F(NamespaceMetadataChangeNotificationsTest, WaitForNotify) {

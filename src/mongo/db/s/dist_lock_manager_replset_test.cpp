@@ -87,6 +87,9 @@ std::string vectorToString(const std::vector<std::string>& list) {
  */
 class DistLockManagerReplSetTest : public ShardServerTestFixture {
 protected:
+    explicit DistLockManagerReplSetTest(Options options = {})
+        : ShardServerTestFixture(std::move(options)) {}
+
     void tearDown() override {
         // Don't care about what shutDown passes to stopPing here.
         getMockCatalog()->expectStopPing([](StringData) {}, Status::OK());
@@ -1614,9 +1617,8 @@ TEST_F(DistLockManagerReplSetTest, RecoverySuccess) {
 
 class DistLockManagerReplSetTestWithMockTickSource : public DistLockManagerReplSetTest {
 protected:
-    DistLockManagerReplSetTestWithMockTickSource() {
-        getServiceContext()->setTickSource(std::make_unique<TickSourceMock<>>());
-    }
+    DistLockManagerReplSetTestWithMockTickSource()
+        : DistLockManagerReplSetTest(Options{}.useMockTickSource(true)) {}
 
     /**
      * Returns the mock tick source.
