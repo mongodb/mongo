@@ -18,7 +18,7 @@ overrides:
   - task: replica_sets_jscore_passthrough
     exec_timeout: 150  # 2.5 hours.
 
-  enterprise-ubuntu2004-debug-tsan:
+  enterprise-rhel80-debug-tsan:
   - task: run_unittests
     exec_timeout: 24
 
