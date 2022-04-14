@@ -147,6 +147,9 @@ CandidatePlans MultiPlanner::finalizeExecutionPlans(
             _cq, std::move(winner.solution), _queryParams.secondaryCollectionsInfo);
         auto [rootStage, data] = stage_builder::buildSlotBasedExecutableTree(
             _opCtx, _collections, _cq, *solution, _yieldPolicy);
+        // The winner might have been replanned. So, pass through the replanning reason to the new
+        // plan.
+        data.replanReason = std::move(winner.data.replanReason);
         stage_builder::prepareSlotBasedExecutableTree(
             _opCtx, rootStage.get(), &data, _cq, _collections, _yieldPolicy);
         candidates[winnerIdx] = sbe::plan_ranker::CandidatePlan{
