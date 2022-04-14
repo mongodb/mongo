@@ -150,9 +150,6 @@ class ReshardingTxnClonerTest : public ShardServerTestFixture {
     }
 
 protected:
-    // TODO (SERVER-65303): Use wiredTiger.
-    ReshardingTxnClonerTest() : ShardServerTestFixture(Options{}.engine("ephemeralForTest")) {}
-
     const UUID kDefaultReshardingId = UUID::gen();
     const std::vector<ShardId> kTwoShardIdList{_myShardName, {"otherShardName"}};
     const std::vector<ReshardingSourceId> kTwoSourceIdList = {
@@ -399,7 +396,18 @@ protected:
 
         // The transaction machinery cannot store an empty locker.
         { Lock::GlobalLock globalLock(opCtx, MODE_IX); }
-        auto opTime = repl::getNextOpTime(opCtx);
+        auto opTime = [opCtx] {
+            TransactionParticipant::SideTransactionBlock sideTxn{opCtx};
+
+            WriteUnitOfWork wuow{opCtx};
+            auto opTime = repl::getNextOpTime(opCtx);
+            wuow.release();
+
+            opCtx->recoveryUnit()->abortUnitOfWork();
+            opCtx->lockState()->endWriteUnitOfWork();
+
+            return opTime;
+        }();
         txnParticipant.prepareTransaction(opCtx, opTime);
         txnParticipant.stashTransactionResources(opCtx);
 
