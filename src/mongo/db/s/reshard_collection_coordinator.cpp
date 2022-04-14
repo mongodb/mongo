@@ -32,7 +32,9 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/catalog/collection_uuid_mismatch.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/op_observer.h"
 #include "mongo/db/s/reshard_collection_coordinator.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
@@ -40,6 +42,35 @@
 
 
 namespace mongo {
+
+namespace {
+
+void writeOpLogOnReshardCollectionDone(OperationContext* opCtx,
+                                       const NamespaceString& collNss,
+                                       const KeyPattern& shardKey,
+                                       BSONObj cmd,
+                                       UUID reshardingUUID) {
+
+    const std::string oMessage = str::stream()
+        << "Reshard collection " << collNss << " with shard key " << shardKey.toString();
+    auto const serviceContext = opCtx->getClient()->getServiceContext();
+
+    writeConflictRetry(opCtx, "ReshardCollection", NamespaceString::kRsOplogNamespace.ns(), [&] {
+        AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
+        WriteUnitOfWork uow(opCtx);
+        serviceContext->getOpObserver()->onInternalOpMessage(opCtx,
+                                                             collNss,
+                                                             reshardingUUID,
+                                                             BSON("msg" << oMessage),
+                                                             cmd,
+                                                             boost::none,
+                                                             boost::none,
+                                                             boost::none,
+                                                             boost::none);
+        uow.commit();
+    });
+}
+}  // namespace
 
 ReshardCollectionCoordinator::ReshardCollectionCoordinator(ShardingDDLCoordinatorService* service,
                                                            const BSONObj& initialState)
@@ -144,6 +175,27 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
                             configsvrReshardCollection.toBSON({}), opCtx->getWriteConcern()),
                         Shard::RetryPolicy::kIdempotent));
                 uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(std::move(cmdResponse)));
+
+                // Report command completion to the oplog.
+                const auto cm = uassertStatusOK(
+                    Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(
+                        opCtx, nss()));
+
+                BSONObjBuilder cmdBuilder;
+                cmdBuilder.append("reshardCollection", nss().ns());
+                cm.getUUID().appendToBuilder(&cmdBuilder, "reshardUUID");
+                cmdBuilder.append("key", _doc.getKey());
+
+                cmdBuilder.append("unique", _doc.getUnique().get_value_or(false));
+                if (_doc.getNumInitialChunks()) {
+                    cmdBuilder.append("numInitialChunks", _doc.getNumInitialChunks().get());
+                }
+                if (_doc.getCollation()) {
+                    cmdBuilder.append("collation", _doc.getCollation().get());
+                }
+
+                writeOpLogOnReshardCollectionDone(
+                    opCtx, nss(), _doc.getKey(), cmdBuilder.obj(), cm.getUUID());
             }))
         .onError([this, anchor = shared_from_this()](const Status& status) {
             LOGV2_ERROR(6206401,
