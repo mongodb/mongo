@@ -14,7 +14,6 @@
 'use strict';
 
 load('jstests/libs/chunk_manipulation_util.js');
-load('jstests/libs/fail_point_util.js');
 load('jstests/sharding/libs/sharded_transactions_helpers.js');
 
 function InternalTransactionChunkMigrationTest(storeFindAndModifyImagesInSideCollection = true) {
@@ -319,19 +318,12 @@ function InternalTransactionChunkMigrationTest(storeFindAndModifyImagesInSideCol
     }
 
     function abortTransaction(lsid, txnNumber, isPreparedTxn) {
-        if (!isPreparedTxn) {
-            assert.commandWorked(st.s.adminCommand(makeAbortTransactionCmdObj(lsid, txnNumber)));
-        } else {
-            let fp = configureFailPoint(st.rs1.getPrimary(), "failCommand", {
-                failInternalCommands: true,
-                failCommands: ["prepareTransaction"],
-                errorCode: ErrorCodes.NoSuchTransaction,
-            });
-            assert.commandFailedWithCode(
-                st.s.adminCommand(makeCommitTransactionCmdObj(lsid, txnNumber)),
-                ErrorCodes.NoSuchTransaction);
-            fp.off();
+        if (isPreparedTxn) {
+            const shard0Primary = st.rs0.getPrimary();
+            assert.commandWorked(
+                shard0Primary.adminCommand(makePrepareTransactionCmdObj(lsid, txnNumber)));
         }
+        assert.commandWorked(st.s.adminCommand(makeAbortTransactionCmdObj(lsid, txnNumber)));
     }
 
     function getTransactionSessionId(txnType, testCase) {

@@ -286,23 +286,14 @@ function InternalTransactionReshardingTest(
     }
 
     function abortTransaction(lsid, txnNumber, isPreparedTxn) {
-        if (!isPreparedTxn) {
-            assert.commandWorked(
-                mongosConn.adminCommand(makeAbortTransactionCmdObj(lsid, txnNumber)));
-        } else {
+        if (isPreparedTxn) {
             const topology = DiscoverTopology.findConnectedNodes(mongosConn);
-            const donor1Conn =
-                new Mongo(topology.shards[reshardingTest.donorShardNames[1]].primary);
-            let fp = configureFailPoint(donor1Conn, "failCommand", {
-                failInternalCommands: true,
-                failCommands: ["prepareTransaction"],
-                errorCode: ErrorCodes.NoSuchTransaction,
-            });
-            assert.commandFailedWithCode(
-                mongosConn.adminCommand(makeCommitTransactionCmdObj(lsid, txnNumber)),
-                ErrorCodes.NoSuchTransaction);
-            fp.off();
+            const donor0Conn =
+                new Mongo(topology.shards[reshardingTest.donorShardNames[0]].primary);
+            assert.commandWorked(
+                donor0Conn.adminCommand(makePrepareTransactionCmdObj(lsid, txnNumber)));
         }
+        assert.commandWorked(mongosConn.adminCommand(makeAbortTransactionCmdObj(lsid, txnNumber)));
     }
 
     function getTransactionSessionId(txnType, testCase) {
