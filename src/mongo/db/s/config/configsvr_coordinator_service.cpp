@@ -93,10 +93,11 @@ ConfigsvrCoordinatorService::constructInstance(BSONObj initialState) {
     }
 }
 
-bool ConfigsvrCoordinatorService::isAnyCoordinatorOfGivenTypeRunning(
+bool ConfigsvrCoordinatorService::areAllCoordinatorsOfTypeFinished(
     OperationContext* opCtx, ConfigsvrCoordinatorTypeEnum coordinatorType) {
 
-    const auto instances = getAllInstances(opCtx);
+    // First, check if all in-memory ConfigsvrCoordinators are finished.
+    const auto& instances = getAllInstances(opCtx);
     for (const auto& instance : instances) {
         auto typedInstance = checked_pointer_cast<ConfigsvrCoordinator>(instance);
         if (typedInstance->coordinatorType() == coordinatorType) {
@@ -106,7 +107,14 @@ bool ConfigsvrCoordinatorService::isAnyCoordinatorOfGivenTypeRunning(
         }
     }
 
-    return true;
+    // If the POS has just been rebuilt on a newly-elected primary, there is a chance that the
+    // the coordinator instance does not exist yet. Query the state document namespace for any
+    // documents that will be built into instances.
+    DBDirectClient client(opCtx);
+    FindCommandRequest findStateDocs{NamespaceString::kConfigsvrCoordinatorsNamespace};
+    findStateDocs.setFilter(BSON("_id" << BSON("coordinatorType" << coordinatorType)));
+
+    return !client.find(std::move(findStateDocs))->more();
 }
 
 }  // namespace mongo

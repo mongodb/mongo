@@ -33,6 +33,7 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/set_cluster_parameter_invocation.h"
 #include "mongo/db/s/config/configsvr_coordinator_service.h"
 #include "mongo/db/s/config/set_cluster_parameter_coordinator.h"
@@ -58,46 +59,51 @@ public:
                     str::stream() << Request::kCommandName << " can only be run on config servers",
                     serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
 
-            uassert(
-                ErrorCodes::IllegalOperation,
-                "featureFlagClusterWideConfig not enabled",
-                gFeatureFlagClusterWideConfig.isEnabled(serverGlobalParams.featureCompatibility));
-
-            // Validate parameter before creating coordinator.
-            {
-                BSONObj cmdParamObj = request().getCommandParameter();
-                BSONElement commandElement = cmdParamObj.firstElement();
-                StringData parameterName = commandElement.fieldName();
-                std::unique_ptr<ServerParameterService> sps =
-                    std::make_unique<ClusterParameterService>();
-                const ServerParameter* serverParameter = sps->getIfExists(parameterName);
-
+            const auto coordinatorCompletionFuture = [&]() -> SharedSemiFuture<void> {
+                FixedFCVRegion fcvRegion(opCtx);
                 uassert(ErrorCodes::IllegalOperation,
-                        str::stream() << "Unknown Cluster Parameter " << parameterName,
-                        serverParameter != nullptr);
+                        "featureFlagClusterWideConfig not enabled",
+                        gFeatureFlagClusterWideConfig.isEnabled(
+                            serverGlobalParams.featureCompatibility));
 
-                uassert(ErrorCodes::IllegalOperation,
-                        "Cluster parameter value must be an object",
-                        BSONType::Object == commandElement.type());
+                // Validate parameter before creating coordinator.
+                {
+                    BSONObj cmdParamObj = request().getCommandParameter();
+                    BSONElement commandElement = cmdParamObj.firstElement();
+                    StringData parameterName = commandElement.fieldName();
+                    std::unique_ptr<ServerParameterService> sps =
+                        std::make_unique<ClusterParameterService>();
+                    const ServerParameter* serverParameter = sps->getIfExists(parameterName);
 
-                BSONObjBuilder clusterParamBuilder;
-                clusterParamBuilder << "_id" << parameterName;
-                clusterParamBuilder.appendElements(commandElement.Obj());
+                    uassert(ErrorCodes::IllegalOperation,
+                            str::stream() << "Unknown Cluster Parameter " << parameterName,
+                            serverParameter != nullptr);
 
-                BSONObj clusterParam = clusterParamBuilder.obj();
+                    uassert(ErrorCodes::IllegalOperation,
+                            "Cluster parameter value must be an object",
+                            BSONType::Object == commandElement.type());
 
-                uassertStatusOK(serverParameter->validate(clusterParam));
-            }
+                    BSONObjBuilder clusterParamBuilder;
+                    clusterParamBuilder << "_id" << parameterName;
+                    clusterParamBuilder.appendElements(commandElement.Obj());
 
-            SetClusterParameterCoordinatorDocument coordinatorDoc;
-            coordinatorDoc.setConfigsvrCoordinatorMetadata(
-                {ConfigsvrCoordinatorTypeEnum::kSetClusterParameter});
-            coordinatorDoc.setParameter(request().getCommandParameter());
+                    BSONObj clusterParam = clusterParamBuilder.obj();
 
-            const auto service = ConfigsvrCoordinatorService::getService(opCtx);
-            const auto instance = service->getOrCreateService(opCtx, coordinatorDoc.toBSON());
+                    uassertStatusOK(serverParameter->validate(clusterParam));
+                }
 
-            instance->getCompletionFuture().get(opCtx);
+                SetClusterParameterCoordinatorDocument coordinatorDoc;
+                coordinatorDoc.setConfigsvrCoordinatorMetadata(
+                    {ConfigsvrCoordinatorTypeEnum::kSetClusterParameter});
+                coordinatorDoc.setParameter(request().getCommandParameter());
+
+                const auto service = ConfigsvrCoordinatorService::getService(opCtx);
+                const auto instance = service->getOrCreateService(opCtx, coordinatorDoc.toBSON());
+
+                return instance->getCompletionFuture();
+            }();
+
+            coordinatorCompletionFuture.get(opCtx);
         }
 
     private:

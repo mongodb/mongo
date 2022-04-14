@@ -82,6 +82,7 @@
 #include "mongo/db/session_txn_record_gen.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/vector_clock.h"
+#include "mongo/idl/cluster_server_parameter_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/pm2423_feature_flags_gen.h"
@@ -370,7 +371,7 @@ public:
                             ErrorCodes::CannotDowngrade,
                             "Cannot downgrade while user write blocking is being changed",
                             ConfigsvrCoordinatorService::getService(opCtx)
-                                ->isAnyCoordinatorOfGivenTypeRunning(
+                                ->areAllCoordinatorsOfTypeFinished(
                                     opCtx, ConfigsvrCoordinatorTypeEnum::kSetUserWriteBlockMode));
                     }
 
@@ -382,6 +383,30 @@ public:
                     uassert(ErrorCodes::CannotDowngrade,
                             "Cannot downgrade while user write blocking is enabled.",
                             !isBlockingUserWrites);
+                }
+
+                // TODO (SERVER-65572): Remove setClusterParameter serialization and collection
+                // drop after this is backported to 6.0.
+                if (!gFeatureFlagClusterWideConfig.isEnabledOnVersion(requestedVersion)) {
+                    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+                        uassert(ErrorCodes::CannotDowngrade,
+                                "Cannot downgrade while cluster server parameter is being set",
+                                ConfigsvrCoordinatorService::getService(opCtx)
+                                    ->areAllCoordinatorsOfTypeFinished(
+                                        opCtx, ConfigsvrCoordinatorTypeEnum::kSetClusterParameter));
+                    }
+
+                    DropReply dropReply;
+                    const auto dropStatus = dropCollection(
+                        opCtx,
+                        NamespaceString::kClusterParametersNamespace,
+                        &dropReply,
+                        DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops);
+                    uassert(
+                        dropStatus.code(),
+                        str::stream() << "Failed to drop the cluster server parameters collection"
+                                      << causedBy(dropStatus.reason()),
+                        dropStatus.isOK() || dropStatus.code() == ErrorCodes::NamespaceNotFound);
                 }
 
                 FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(

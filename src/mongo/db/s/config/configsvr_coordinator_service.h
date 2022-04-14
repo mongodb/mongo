@@ -68,8 +68,8 @@ public:
 
     std::shared_ptr<Instance> constructInstance(BSONObj initialState) override;
 
-    bool isAnyCoordinatorOfGivenTypeRunning(OperationContext* opCtx,
-                                            ConfigsvrCoordinatorTypeEnum coordinatorType);
+    bool areAllCoordinatorsOfTypeFinished(OperationContext* opCtx,
+                                          ConfigsvrCoordinatorTypeEnum coordinatorType);
 };
 
 }  // namespace mongo

@@ -66,7 +66,12 @@ const UserWriteBlockHelpers = (function() {
         asAdmin(fun) {
             const db = this.adminConn.getDB(jsTestName());
             const coll = db.test;
-            return fun({conn: this.adminConn, db: db, admin: db.getSiblingDB("admin"), coll: coll});
+            return fun({
+                conn: this.adminConn,
+                db: db,
+                admin: db.getSiblingDB("admin"),
+                coll: coll,
+            });
         }
 
         runInParallelShell(asAdmin, funString) {
@@ -96,21 +101,10 @@ const UserWriteBlockHelpers = (function() {
             assert.eq(expectedUserWriteBlockMode, status.repl.userWriteBlockMode);
         }
 
-        _hangTransition(targetConn, failpoint) {
-            let hangWhileSetingUserWriteBlockModeFailPoint =
-                configureFailPoint(targetConn, failpoint);
-
-            const awaitShell = startParallelShell(
-                funWithArgs((username, password) => {
-                    let admin = db.getSiblingDB("admin");
-                    admin.auth(username, password);
-                    assert.commandWorked(
-                        admin.runCommand({setUserWriteBlockMode: 1, global: true}));
-                }, bypassUser, password), this.conn.port);
-
-            hangWhileSetingUserWriteBlockModeFailPoint.wait();
-
-            return {waiter: awaitShell, failpoint: hangWhileSetingUserWriteBlockModeFailPoint};
+        _hangTransition(targetConn, failpoint, awaitShell) {
+            let hangFailPoint = configureFailPoint(targetConn, failpoint);
+            hangFailPoint.wait();
+            return {waiter: awaitShell, failpoint: hangFailPoint};
         }
 
         setFailPoint(failpointName) {
@@ -223,8 +217,8 @@ const UserWriteBlockHelpers = (function() {
 
     class ShardingFixture extends Fixture {
         constructor() {
-            const st = new ShardingTest(
-                {shards: 1, mongos: 1, config: 1, auth: "", other: {keyFile: keyfile}});
+            const st =
+                new ShardingTest({shards: 1, rs: {nodes: 3}, auth: "", other: {keyFile: keyfile}});
 
             super(st.s.port);
             this.st = st;
@@ -236,8 +230,19 @@ const UserWriteBlockHelpers = (function() {
                 backend, keyfile, () => backend.getDB('admin').serverStatus());
         }
 
-        hangTransition() {
-            return this._hangTransition(this.st.shard0, "hangInShardsvrSetUserWriteBlockMode");
+        hangTransition(command, failpoint) {
+            const awaitShell =
+                startParallelShell(funWithArgs((username, password, command) => {
+                                       let admin = db.getSiblingDB("admin");
+                                       admin.auth(username, password);
+                                       assert.commandWorked(admin.runCommand(command));
+                                   }, bypassUser, password, command), this.conn.port);
+            return this._hangTransition(this.st.shard0, failpoint, awaitShell);
+        }
+
+        restartConfigPrimary() {
+            jsTestLog('Restarting config primary');
+            this.st.restartConfigServer(this.st.configRS.getPrimary());
         }
 
         setFailPoint(failpointName) {

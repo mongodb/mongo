@@ -34,6 +34,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/cluster_server_parameter_cmds_gen.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/set_cluster_parameter_invocation.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/idl/cluster_server_parameter_gen.h"
@@ -68,14 +69,15 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
+            uassert(ErrorCodes::ErrorCodes::NotImplemented,
+                    "setClusterParameter can only run on mongos in sharded clusters",
+                    (serverGlobalParams.clusterRole == ClusterRole::None));
+
+            FixedFCVRegion fcvRegion(opCtx);
             uassert(
                 ErrorCodes::IllegalOperation,
                 "Cannot set cluster parameter, gFeatureFlagClusterWideConfig is not enabled",
                 gFeatureFlagClusterWideConfig.isEnabled(serverGlobalParams.featureCompatibility));
-
-            uassert(ErrorCodes::ErrorCodes::NotImplemented,
-                    "setClusterParameter can only run on mongos in sharded clusters",
-                    (serverGlobalParams.clusterRole == ClusterRole::None));
 
             // TODO SERVER-65249: This will eventually be made specific to the parameter being set
             // so that some parameters will be able to use setClusterParameter even on standalones.
