@@ -52,9 +52,6 @@ buildvariants:
   - name: test_packages
     distros:
     - ubuntu2004-package
-  - name: .publish
-    distros:
-    - amazon1-2018-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-linux-64-amazon-ami
@@ -109,13 +106,9 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .csfle
-  - name: .publish_csfle
   - name: test_packages
     distros:
     - ubuntu2004-package
-  - name: .publish
-    distros:
-    - amazon1-2018-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: amazon2
