@@ -1104,9 +1104,10 @@ void ColumnIndexScanNode::appendToString(str::stream* ss, int indent) const {
     addIndent(ss, indent + 1);
     *ss << "matchFields = [" << boost::algorithm::join(matchFields, ", ") << "]\n";
     addIndent(ss, indent + 1);
-    *ss << "filtersByPath = [" << expression::filterMapToString(filtersByPath) << "]\n";
+    *ss << "filtersByPath = " << expression::filterMapToString(filtersByPath) << "\n";
     addIndent(ss, indent + 1);
-    *ss << "postAssemblyFilter = [" << postAssemblyFilter->toString() << "]\n";
+    *ss << "postAssemblyFilter = " << (postAssemblyFilter ? postAssemblyFilter->toString() : "{}")
+        << "\n";
     addCommon(ss, indent);
 }
 

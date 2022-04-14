@@ -367,11 +367,12 @@ TEST_F(QueryPlannerColumnarTest, NumberOfFieldsComputedUsingSetSize) {
 TEST_F(QueryPlannerColumnarTest, ComplexPredicateSplitDemo) {
     addColumnarIndex();
 
-    auto complexPredicate =
-        BSON("a" << BSON("$gte" << 0 << "$lt" << 10) << "addresses.zip"
-                 << BSON("$in" << BSON_ARRAY("12345"
-                                             << "01234"))
-                 << "unsubscribed" << false << "specialAddress" << BSON("$exists" << true));
+    auto complexPredicate = fromjson(R"({
+        a: {$gte: 0, $lt: 10},
+        "addresses.zip": {$in: ["12345", "01234"]},
+        unsubscribed: false,
+        specialAddress: {$exists: true}
+    })");
     runQuerySortProj(complexPredicate, BSONObj(), BSON("a" << 1 << "_id" << 0));
     assertNumSolutions(1U);
     assertSolutionExists(R"({
@@ -393,33 +394,35 @@ TEST_F(QueryPlannerColumnarTest, ComplexPredicateSplitDemo) {
     })");
 }
 
-TEST_F(QueryPlannerColumnarTest, ComplexPredicateSplitFailureDemo) {
+TEST_F(QueryPlannerColumnarTest, ComplexPredicateSplitsIntoParts) {
     addColumnarIndex();
 
     // Same predicate as above, except with exists: false, which disqualifies the whole thing.
-    auto complexPredicate =
-        BSON("a" << BSON("$gte" << 0 << "$lt" << 10) << "addresses.zip"
-                 << BSON("$in" << BSON_ARRAY("12345"
-                                             << "01234"))
-                 << "unsubscribed" << false << "specialAddress" << BSON("$exists" << false));
+    auto complexPredicate = fromjson(R"({
+        a: {$gte: 0, $lt: 10},
+        "addresses.zip": {$in: ["12345", "01234"]},
+        unsubscribed: false,
+        specialAddress: {$exists: false},
+        doNotContact: {$exists: false}
+    })");
     runQuerySortProj(complexPredicate, BSONObj(), BSON("a" << 1 << "_id" << 0));
     assertSolutionExists(R"({
         proj: {
             spec: {a: 1, _id: 0},
             node: {
                 column_ixscan: {
-                    filtersByPath: {},
+                    filtersByPath: {
+                        a: {a: {$gte: 0, $lt: 10}},
+                        "addresses.zip": {"addresses.zip": {$in: ['12345', '01234']}},
+                        unsubscribed: {unsubscribed: false}
+                    },
                     outputFields: ['a'],
                     postAssemblyFilter: {
-                        $and: [
-                            {a: {$gte: 0}},
-                            {a: {$lt: 10}},
-                            {'addresses.zip': {$in: ['12345', '01234']}},
-                            {unsubscribed: false},
-                            {specialAddress: {$exists: false}}
-                        ]
+                        specialAddress: {$exists: false},
+                        doNotContact: {$exists: false}
                     },
-                    matchFields: ['a', 'addresses.zip', 'unsubscribed', 'specialAddress']
+                    matchFields:
+                        ['a', 'addresses.zip', 'unsubscribed', 'specialAddress', 'doNotContact']
                 }
             }
         }

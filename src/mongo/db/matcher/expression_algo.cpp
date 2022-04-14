@@ -443,9 +443,9 @@ bool pathDependenciesAreExact(StringData key, const MatchExpression* expr) {
     return !columnDeps.needWholeDocument && columnDeps.fields == std::set{key.toString()};
 }
 
-bool tryAddExprHelper(StringData path,
-                      std::unique_ptr<MatchExpression> me,
-                      StringMap<std::unique_ptr<MatchExpression>>& out) {
+void addExpr(StringData path,
+             std::unique_ptr<MatchExpression> me,
+             StringMap<std::unique_ptr<MatchExpression>>& out) {
     // In order for this to be correct, the dependencies of the filter by column must be exactly
     // this column.
     dassert(pathDependenciesAreExact(path, me.get()));
@@ -467,20 +467,24 @@ bool tryAddExprHelper(StringData path,
         auto andME = checked_cast<AndMatchExpression*>(entryForPath.get());
         andME->add(std::move(me));
     }
-    return true;
 }
 
-bool tryAddExpr(StringData path,
-                const MatchExpression* me,
-                StringMap<std::unique_ptr<MatchExpression>>& out) {
+std::unique_ptr<MatchExpression> tryAddExpr(StringData path,
+                                            const MatchExpression* me,
+                                            StringMap<std::unique_ptr<MatchExpression>>& out) {
     if (FieldRef(path).hasNumericPathComponents())
-        return false;
+        return me->shallowClone();
 
-    return tryAddExprHelper(path, me->shallowClone(), out);
+    addExpr(path, me->shallowClone(), out);
+    return nullptr;
 }
 
-bool splitMatchExpressionForColumns(const MatchExpression* me,
-                                    StringMap<std::unique_ptr<MatchExpression>>& out) {
+/**
+ * Helper for the main public API. Returns only the residual predicate and adds any columnar
+ * predicates into 'out'.
+ */
+std::unique_ptr<MatchExpression> splitMatchExpressionForColumns(
+    const MatchExpression* me, StringMap<std::unique_ptr<MatchExpression>>& out) {
     auto canCompareWith = [](const BSONElement& elem, bool isEQ) {
         // Here we check whether the comparison can work with the given value. Objects and arrays
         // are generally not permitted. Objects can't work because the paths will be split apart in
@@ -509,6 +513,7 @@ bool splitMatchExpressionForColumns(const MatchExpression* me,
         case MatchExpression::BITS_ANY_SET:
         case MatchExpression::BITS_ANY_CLEAR:
         case MatchExpression::EXISTS: {
+            // Note: {$exists: false} is represented as {$not: {$exists: true}}.
             auto sub = checked_cast<const PathMatchExpression*>(me);
             return tryAddExpr(sub->path(), me, out);
         }
@@ -520,7 +525,7 @@ bool splitMatchExpressionForColumns(const MatchExpression* me,
         case MatchExpression::GTE: {
             auto sub = checked_cast<const ComparisonMatchExpressionBase*>(me);
             if (!canCompareWith(sub->getData(), me->matchType() == MatchExpression::EQ))
-                return false;
+                return me->shallowClone();
             return tryAddExpr(sub->path(), me, out);
         }
 
@@ -533,27 +538,35 @@ bool splitMatchExpressionForColumns(const MatchExpression* me,
             // be present in the columnar storage.
             for (auto&& elem : sub->getEqualities()) {
                 if (!canCompareWith(elem, true))
-                    return false;
+                    return me->shallowClone();
             }
             return tryAddExpr(sub->path(), me, out);
         }
 
         case MatchExpression::TYPE_OPERATOR: {
             auto sub = checked_cast<const TypeMatchExpression*>(me);
-            if (sub->typeSet().hasType(BSONType::EOO) || sub->typeSet().hasType(BSONType::Object) ||
-                sub->typeSet().hasType(BSONType::Array))
-                return false;
+            tassert(6430600,
+                    "Not expecting to find EOO in a $type expression",
+                    !sub->typeSet().hasType(BSONType::EOO));
+            if (sub->typeSet().hasType(BSONType::Object) || sub->typeSet().hasType(BSONType::Array))
+                return me->shallowClone();
             return tryAddExpr(sub->path(), me, out);
         }
 
         case MatchExpression::AND: {
-            auto sub = checked_cast<const AndMatchExpression*>(me);
-            for (size_t i = 0, end = sub->numChildren(); i != end; i++) {
-                if (!splitMatchExpressionForColumns(sub->getChild(i), out)) {
-                    return false;
+            auto originalAnd = checked_cast<const AndMatchExpression*>(me);
+            std::vector<std::unique_ptr<MatchExpression>> newChildren;
+            for (size_t i = 0, end = originalAnd->numChildren(); i != end; ++i) {
+                if (auto residual = splitMatchExpressionForColumns(originalAnd->getChild(i), out)) {
+                    newChildren.emplace_back(std::move(residual));
                 }
             }
-            return true;
+            if (newChildren.empty()) {
+                return nullptr;
+            }
+            return newChildren.size() == 1
+                ? std::move(newChildren[0])
+                : std::make_unique<AndMatchExpression>(std::move(newChildren));
         }
 
 
@@ -571,20 +584,20 @@ bool splitMatchExpressionForColumns(const MatchExpression* me,
                 }
                 auto eqPred = checked_cast<const EqualityMatchExpression*>(negatedPred);
                 if (eqPred->getData().isNull()) {
-                    return tryAddExpr(eqPred->path(), me, out);
+                    return tryAddExpr(eqPred->path(), me, out) == nullptr;
                 }
                 return false;
             };
             if (tryAddNENull(withinNot)) {
                 // {$ne: null}. We had equality just under NOT.
-                return true;
+                return nullptr;
             } else if (withinNot->matchType() == MatchExpression::AND &&
                        withinNot->numChildren() == 1 && tryAddNENull(withinNot->getChild(0))) {
                 // {$not: {$eq: null}}: NOT -> AND -> EQ.
-                return true;
+                return nullptr;
             }
             // May be other cases, but left as future work.
-            return false;
+            return me->shallowClone();
         }
 
         // We don't currently handle any of these cases, but some may be possible in the future.
@@ -627,7 +640,7 @@ bool splitMatchExpressionForColumns(const MatchExpression* me,
         case MatchExpression::SIZE:
         case MatchExpression::TEXT:
         case MatchExpression::WHERE:
-            return false;
+            return me->shallowClone();
     }
     MONGO_UNREACHABLE;
 }
@@ -884,13 +897,11 @@ bool bidirectionalPathPrefixOf(StringData first, StringData second) {
         expression::isPathPrefixOf(second, first);
 }
 
-boost::optional<StringMap<std::unique_ptr<MatchExpression>>> splitMatchExpressionForColumns(
-    const MatchExpression* me) {
-    boost::optional<StringMap<std::unique_ptr<MatchExpression>>> out;
-    out.emplace();
-    if (!mongo::splitMatchExpressionForColumns(me, *out))
-        out = {};
-    return out;
+std::pair<StringMap<std::unique_ptr<MatchExpression>>, std::unique_ptr<MatchExpression>>
+splitMatchExpressionForColumns(const MatchExpression* me) {
+    StringMap<std::unique_ptr<MatchExpression>> out;
+    auto residualMatch = mongo::splitMatchExpressionForColumns(me, out);
+    return {std::move(out), std::move(residualMatch)};
 }
 
 std::string filterMapToString(const StringMap<std::unique_ptr<MatchExpression>>& filterMap) {

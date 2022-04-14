@@ -159,15 +159,17 @@ splitMatchExpressionBy(std::unique_ptr<MatchExpression> expr,
 void applyRenamesToExpression(MatchExpression* expr, const StringMap<std::string>& renames);
 
 /**
- * Split a MatchExpression into subexpressions targeted to separate columns. A document will match
- * the query if all of the sub expressions match. Returns an empty optional if the entire match
- * cannot be handled by the column store.
- *
- * This API will need to change in order to support more complex queries, such as $or and
- * $elemMatch.
+ * Split a MatchExpression into two parts:
+ *  - Filters which can be applied to one "column" at a time in a columnstore index. This will be
+ *    returned as a map from path to MatchExpression. For this to be safe:
+ *    - any predicate which does not  match should disqualify the entire document
+ *    - any document which doesn't contain the path should not match.
+ *  - A "residual" predicate which captures any pieces of the expression which cannot be pushed down
+ *    into a column, either because it would be incorrect to do so, or we're not smart enough to do
+ *    so yet.
  */
-boost::optional<StringMap<std::unique_ptr<MatchExpression>>> splitMatchExpressionForColumns(
-    const MatchExpression* me);
+std::pair<StringMap<std::unique_ptr<MatchExpression>>, std::unique_ptr<MatchExpression>>
+splitMatchExpressionForColumns(const MatchExpression* me);
 
 /**
  * Serializes this complex data structure for debugging purposes.

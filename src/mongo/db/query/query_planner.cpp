@@ -213,26 +213,16 @@ void tryToAddColumnScan(const QueryPlannerParams& params,
             6430502, 3, "Not yet prepared to handle and test CQ pipeline with a columnstore index");
         return;
     }
-    // TODO SERVER-63123: Check if the columnar index actually provides the fields we need.
-    auto fieldsNeededForFilter = std::move(filterDeps.fields);
-    auto filterSplitByColumn = expression::splitMatchExpressionForColumns(query.root());
-    auto canPushFilters = bool(filterSplitByColumn) && !query.getQueryObj().isEmpty();
-    if (canPushFilters) {
-        fieldsNeededForFilter.clear();
-        for (auto&& [key, expr] : *filterSplitByColumn) {
-            fieldsNeededForFilter.emplace(key);
-        }
-    }
 
-    // TODO SERVER-64306 support splitting into 'can push down' and 'cannot push down' rather
-    // than all or nothing.
-    auto columnScan = std::make_unique<ColumnIndexScanNode>(
-        params.columnarIndexes.front(),
-        std::move(outputDeps.fields),
-        std::move(fieldsNeededForFilter),
-        filterSplitByColumn ? std::move(*filterSplitByColumn)
-                            : StringMap<std::unique_ptr<MatchExpression>>{},
-        query.root()->shallowClone());
+    // TODO SERVER-63123: Check if the columnar index actually provides the fields we need.
+    auto [filterSplitByColumn, residualPredicate] =
+        expression::splitMatchExpressionForColumns(query.root());
+    auto canPushFilters = filterSplitByColumn.size() > 0;
+    auto columnScan = std::make_unique<ColumnIndexScanNode>(params.columnarIndexes.front(),
+                                                            std::move(outputDeps.fields),
+                                                            std::move(filterDeps.fields),
+                                                            std::move(filterSplitByColumn),
+                                                            std::move(residualPredicate));
 
     const int nReferencedFields = static_cast<int>(columnScan->allFields.size());
     const int maxNumFields = canPushFilters
