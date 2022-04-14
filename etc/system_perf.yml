@@ -1098,6 +1098,8 @@ buildvariants:
     tasks:
       - name: schedule_variant_auto_tasks
       - name: schedule_patch_auto_tasks
+      - name: tpch_1_normalized
+      - name: tpch_1_denormalized
 
   - name: compile-rhel70
     display_name: Compile for Atlas-like
