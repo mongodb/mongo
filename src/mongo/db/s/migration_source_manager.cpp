@@ -254,6 +254,39 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
                           << " because the shard doesn't contain any chunks",
             shardVersion.majorVersion() > 0);
 
+    const auto& keyPattern = collectionMetadata.getKeyPattern();
+    const bool validBounds = [&]() {
+        // Return true if provided bounds are respecting the shard key format, false otherwise
+        const auto nFields = keyPattern.nFields();
+        if (nFields != _args.getMinKey().nFields() || nFields != _args.getMaxKey().nFields()) {
+            return false;
+        }
+
+        BSONObjIterator keyPatternIt(keyPattern), minIt(_args.getMinKey()),
+            maxIt(_args.getMaxKey());
+
+        while (keyPatternIt.more()) {
+            const auto keyPatternField = keyPatternIt.next().fieldNameStringData();
+            const auto minField = minIt.next().fieldNameStringData();
+            const auto maxField = maxIt.next().fieldNameStringData();
+
+            if (keyPatternField != minField || keyPatternField != maxField) {
+                return false;
+            }
+        }
+
+        return true;
+    }();
+    uassert(StaleConfigInfo(_args.getNss(),
+                            ChunkVersion::IGNORED() /* receivedVersion */,
+                            shardVersion /* wantedVersion */,
+                            shardId,
+                            boost::none),
+            str::stream() << "Range bounds do not match the shard key pattern. KeyPattern:  "
+                          << keyPattern.toString() << " - Bounds: "
+                          << ChunkRange(_args.getMinKey(), _args.getMaxKey()).toString() << ".",
+            validBounds);
+
     ChunkType existingChunk;
     uassert(StaleConfigInfo(_args.getNss(),
                             ChunkVersion::IGNORED() /* receivedVersion */,
@@ -264,6 +297,7 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
                           << ChunkRange(_args.getMinKey(), _args.getMaxKey()).toString()
                           << " is not owned by this shard.",
             collectionMetadata.getNextChunk(_args.getMinKey(), &existingChunk));
+
     uassert(StaleConfigInfo(_args.getNss(),
                             ChunkVersion::IGNORED() /* receivedVersion */,
                             shardVersion /* wantedVersion */,
