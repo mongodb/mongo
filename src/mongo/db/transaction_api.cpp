@@ -58,6 +58,8 @@
 #include "mongo/rpc/reply_interface.h"
 #include "mongo/stdx/future.h"
 #include "mongo/transport/service_entry_point.h"
+#include "mongo/util/cancellation.h"
+#include "mongo/util/future_util.h"
 
 // TODO SERVER-65395: Remove failpoint when fle2 tests can reliably support internal transaction
 // retry limit.
@@ -319,31 +321,50 @@ SemiFuture<BatchedCommandResponse> SEPTransactionClient::runCRUDOp(
 
 SemiFuture<std::vector<BSONObj>> SEPTransactionClient::exhaustiveFind(
     const FindCommandRequest& cmd) const {
-    // TODO SERVER-64793: Make exhaustiveFind asynchronous
     return runCommand(cmd.getDbName(), cmd.toBSON({}))
         .thenRunOn(_executor)
         .then([this, batchSize = cmd.getBatchSize()](BSONObj reply) {
-            std::vector<BSONObj> response;
-            auto cursorResponse = uassertStatusOK(CursorResponse::parseFromBSON(reply));
-            while (true) {
-                auto releasedBatch = cursorResponse.releaseBatch();
-                response.insert(response.end(), releasedBatch.begin(), releasedBatch.end());
+            auto cursorResponse = std::make_shared<CursorResponse>(
+                uassertStatusOK(CursorResponse::parseFromBSON(reply)));
+            auto response = std::make_shared<std::vector<BSONObj>>();
+            return AsyncTry([this,
+                             batchSize = batchSize,
+                             cursorResponse = std::move(cursorResponse),
+                             response]() mutable {
+                       auto releasedBatch = cursorResponse->releaseBatch();
+                       response->insert(
+                           response->end(), releasedBatch.begin(), releasedBatch.end());
 
-                // We keep issuing getMores until the cursorId signifies that there are no more
-                // documents to fetch.
-                if (!cursorResponse.getCursorId()) {
-                    break;
-                }
+                       // If we've fetched all the documents, we can return the response vector
+                       // wrapped in an OK status.
+                       if (!cursorResponse->getCursorId()) {
+                           return SemiFuture<void>(Status::OK());
+                       }
 
-                GetMoreCommandRequest getMoreRequest(cursorResponse.getCursorId(),
-                                                     cursorResponse.getNSS().coll().toString());
-                getMoreRequest.setBatchSize(batchSize);
+                       GetMoreCommandRequest getMoreRequest(
+                           cursorResponse->getCursorId(),
+                           cursorResponse->getNSS().coll().toString());
+                       getMoreRequest.setBatchSize(batchSize);
 
-                // We block until we get the response back from runCommand().
-                cursorResponse = uassertStatusOK(CursorResponse::parseFromBSON(
-                    runCommand(cursorResponse.getNSS().db(), getMoreRequest.toBSON({})).get()));
-            }
-            return response;
+                       return runCommand(cursorResponse->getNSS().db(), getMoreRequest.toBSON({}))
+                           .thenRunOn(_executor)
+                           .then([response, cursorResponse](BSONObj reply) {
+                               // We keep the state of cursorResponse to be able to check the
+                               // cursorId in the next iteration.
+                               *cursorResponse =
+                                   uassertStatusOK(CursorResponse::parseFromBSON(reply));
+                               uasserted(ErrorCodes::InternalTransactionsExhaustiveFindHasMore,
+                                         "More documents to fetch");
+                           })
+                           .semi();
+                   })
+                .until([&](Status result) {
+                    // We stop execution if there is either no more documents to fetch or there was
+                    // an error upon fetching more documents.
+                    return result != ErrorCodes::InternalTransactionsExhaustiveFindHasMore;
+                })
+                .on(_executor, CancellationToken::uncancelable())
+                .then([response = std::move(response)] { return std::move(*response); });
         })
         .semi();
 }
