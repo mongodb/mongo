@@ -1480,133 +1480,42 @@ TEST(PhysRewriter, FilterIndexingStress) {
     // be exploring 2^kFilterCount plans, one for each created group.
     ASSERT_EQ(51, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
-    ASSERT_EXPLAIN_V2(
-        "Root []\n"
-        "|   |   projections: \n"
-        "|   |       root\n"
-        "|   RefBlock: \n"
-        "|       Variable [root]\n"
-        "Filter []\n"
-        "|   EvalFilter []\n"
-        "|   |   Variable [root]\n"
-        "|   PathGet [field14]\n"
-        "|   PathTraverse []\n"
-        "|   PathCompare [Eq]\n"
-        "|   Const [0]\n"
-        "Filter []\n"
-        "|   EvalFilter []\n"
-        "|   |   Variable [root]\n"
-        "|   PathGet [field13]\n"
-        "|   PathTraverse []\n"
-        "|   PathCompare [Eq]\n"
-        "|   Const [0]\n"
-        "Filter []\n"
-        "|   EvalFilter []\n"
-        "|   |   Variable [root]\n"
-        "|   PathGet [field12]\n"
-        "|   PathTraverse []\n"
-        "|   PathCompare [Eq]\n"
-        "|   Const [0]\n"
-        "Filter []\n"
-        "|   EvalFilter []\n"
-        "|   |   Variable [root]\n"
-        "|   PathGet [field11]\n"
-        "|   PathTraverse []\n"
-        "|   PathCompare [Eq]\n"
-        "|   Const [0]\n"
-        "Filter []\n"
-        "|   EvalFilter []\n"
-        "|   |   Variable [root]\n"
-        "|   PathGet [field10]\n"
-        "|   PathTraverse []\n"
-        "|   PathCompare [Eq]\n"
-        "|   Const [0]\n"
-        "BinaryJoin [joinType: Inner, {rid_0}]\n"
-        "|   |   Const [true]\n"
-        "|   Filter []\n"
-        "|   |   EvalFilter []\n"
-        "|   |   |   Variable [evalTemp_81]\n"
-        "|   |   PathTraverse []\n"
-        "|   |   PathCompare [Eq]\n"
-        "|   |   Const [0]\n"
-        "|   Filter []\n"
-        "|   |   EvalFilter []\n"
-        "|   |   |   Variable [evalTemp_80]\n"
-        "|   |   PathTraverse []\n"
-        "|   |   PathCompare [Eq]\n"
-        "|   |   Const [0]\n"
-        "|   Filter []\n"
-        "|   |   EvalFilter []\n"
-        "|   |   |   Variable [evalTemp_79]\n"
-        "|   |   PathTraverse []\n"
-        "|   |   PathCompare [Eq]\n"
-        "|   |   Const [0]\n"
-        "|   Filter []\n"
-        "|   |   EvalFilter []\n"
-        "|   |   |   Variable [evalTemp_78]\n"
-        "|   |   PathTraverse []\n"
-        "|   |   PathCompare [Eq]\n"
-        "|   |   Const [0]\n"
-        "|   Filter []\n"
-        "|   |   EvalFilter []\n"
-        "|   |   |   Variable [evalTemp_77]\n"
-        "|   |   PathTraverse []\n"
-        "|   |   PathCompare [Eq]\n"
-        "|   |   Const [0]\n"
-        "|   Filter []\n"
-        "|   |   EvalFilter []\n"
-        "|   |   |   Variable [evalTemp_76]\n"
-        "|   |   PathTraverse []\n"
-        "|   |   PathCompare [Eq]\n"
-        "|   |   Const [0]\n"
-        "|   LimitSkip []\n"
-        "|   |   limitSkip:\n"
-        "|   |       limit: 1\n"
-        "|   |       skip: 0\n"
-        "|   Seek [ridProjection: rid_0, {'<root>': root, 'field2': evalTemp_76, 'field5': "
-        "evalTemp_77, 'field6': evalTemp_78, 'field7': evalTemp_79, 'field8': evalTemp_80, "
-        "'field9': evalTemp_81}, c1]\n"
-        "|   |   BindBlock:\n"
-        "|   |       [evalTemp_76]\n"
-        "|   |           Source []\n"
-        "|   |       [evalTemp_77]\n"
-        "|   |           Source []\n"
-        "|   |       [evalTemp_78]\n"
-        "|   |           Source []\n"
-        "|   |       [evalTemp_79]\n"
-        "|   |           Source []\n"
-        "|   |       [evalTemp_80]\n"
-        "|   |           Source []\n"
-        "|   |       [evalTemp_81]\n"
-        "|   |           Source []\n"
-        "|   |       [root]\n"
-        "|   |           Source []\n"
-        "|   RefBlock: \n"
-        "|       Variable [rid_0]\n"
-        "MergeJoin []\n"
-        "|   |   |   Condition\n"
-        "|   |   |       rid_0 = rid_2\n"
-        "|   |   Collation\n"
-        "|   |       Ascending\n"
-        "|   Union []\n"
-        "|   |   BindBlock:\n"
-        "|   |       [rid_2]\n"
-        "|   |           Source []\n"
-        "|   Evaluation []\n"
-        "|   |   BindBlock:\n"
-        "|   |       [rid_2]\n"
-        "|   |           Variable [rid_0]\n"
-        "|   IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index3, interval: {[Const "
-        "[0], Const [0]], [Const [0], Const [0]]}]\n"
-        "|       BindBlock:\n"
-        "|           [rid_0]\n"
-        "|               Source []\n"
-        "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {[Const "
-        "[0], Const [0]], [Const [0], Const [0]]}]\n"
-        "    BindBlock:\n"
-        "        [rid_0]\n"
-        "            Source []\n",
-        optimized);
+    const BSONObj& explainRoot = ExplainGenerator::explainBSONObj(optimized);
+    ASSERT_BSON_PATH("\"Filter\"", explainRoot, "child.nodeType");
+    ASSERT_BSON_PATH("\"Filter\"", explainRoot, "child.child.nodeType");
+    ASSERT_BSON_PATH("\"Filter\"", explainRoot, "child.child.child.nodeType");
+    ASSERT_BSON_PATH("\"Filter\"", explainRoot, "child.child.child.child.nodeType");
+    ASSERT_BSON_PATH("\"Filter\"", explainRoot, "child.child.child.child.child.nodeType");
+
+    const BSONObj& explainBinaryJoin = dotted_path_support::extractElementAtPath(
+                                           explainRoot, "child.child.child.child.child.child")
+                                           .Obj();
+    ASSERT_BSON_PATH("\"BinaryJoin\"", explainBinaryJoin, "nodeType");
+    ASSERT_BSON_PATH("\"Filter\"", explainBinaryJoin, "rightChild.nodeType");
+    ASSERT_BSON_PATH("\"Filter\"", explainBinaryJoin, "rightChild.child.nodeType");
+    ASSERT_BSON_PATH("\"Filter\"", explainBinaryJoin, "rightChild.child.child.nodeType");
+    ASSERT_BSON_PATH("\"Filter\"", explainBinaryJoin, "rightChild.child.child.child.nodeType");
+    ASSERT_BSON_PATH(
+        "\"Filter\"", explainBinaryJoin, "rightChild.child.child.child.child.nodeType");
+    ASSERT_BSON_PATH(
+        "\"Filter\"", explainBinaryJoin, "rightChild.child.child.child.child.child.nodeType");
+    ASSERT_BSON_PATH("\"LimitSkip\"",
+                     explainBinaryJoin,
+                     "rightChild.child.child.child.child.child.child.nodeType");
+    ASSERT_BSON_PATH("\"Seek\"",
+                     explainBinaryJoin,
+                     "rightChild.child.child.child.child.child.child.child.nodeType");
+
+    ASSERT_BSON_PATH("\"MergeJoin\"", explainBinaryJoin, "leftChild.nodeType");
+    ASSERT_BSON_PATH("\"IndexScan\"", explainBinaryJoin, "leftChild.leftChild.nodeType");
+    ASSERT_BSON_PATH("\"index1\"", explainBinaryJoin, "leftChild.leftChild.indexDefName");
+    ASSERT_BSON_PATH("\"Union\"", explainBinaryJoin, "leftChild.rightChild.nodeType");
+    ASSERT_BSON_PATH(
+        "\"Evaluation\"", explainBinaryJoin, "leftChild.rightChild.children.0.nodeType");
+    ASSERT_BSON_PATH(
+        "\"IndexScan\"", explainBinaryJoin, "leftChild.rightChild.children.0.child.nodeType");
+    ASSERT_BSON_PATH(
+        "\"index3\"", explainBinaryJoin, "leftChild.rightChild.children.0.child.indexDefName");
 }
 
 TEST(PhysRewriter, FilterIndexingVariable) {
@@ -2341,48 +2250,16 @@ TEST(PhysRewriter, CompoundIndex1) {
     ASSERT_TRUE(phaseManager.optimize(optimized));
     ASSERT_BETWEEN(60, 110, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
-    ASSERT_EXPLAIN_V2(
-        "Root []\n"
-        "|   |   projections: \n"
-        "|   |       root\n"
-        "|   RefBlock: \n"
-        "|       Variable [root]\n"
-        "BinaryJoin [joinType: Inner, {rid_0}]\n"
-        "|   |   Const [true]\n"
-        "|   LimitSkip []\n"
-        "|   |   limitSkip:\n"
-        "|   |       limit: 1\n"
-        "|   |       skip: 0\n"
-        "|   Seek [ridProjection: rid_0, {'<root>': root}, c1]\n"
-        "|   |   BindBlock:\n"
-        "|   |       [root]\n"
-        "|   |           Source []\n"
-        "|   RefBlock: \n"
-        "|       Variable [rid_0]\n"
-        "MergeJoin []\n"
-        "|   |   |   Condition\n"
-        "|   |   |       rid_0 = rid_3\n"
-        "|   |   Collation\n"
-        "|   |       Ascending\n"
-        "|   Union []\n"
-        "|   |   BindBlock:\n"
-        "|   |       [rid_3]\n"
-        "|   |           Source []\n"
-        "|   Evaluation []\n"
-        "|   |   BindBlock:\n"
-        "|   |       [rid_3]\n"
-        "|   |           Variable [rid_0]\n"
-        "|   IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index2, interval: {[Const "
-        "[2], Const [2]], [Const [4], Const [4]]}]\n"
-        "|       BindBlock:\n"
-        "|           [rid_0]\n"
-        "|               Source []\n"
-        "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {[Const "
-        "[1], Const [1]], [Const [3], Const [3]]}]\n"
-        "    BindBlock:\n"
-        "        [rid_0]\n"
-        "            Source []\n",
-        optimized);
+    const BSONObj& explainRoot = ExplainGenerator::explainBSONObj(optimized);
+    ASSERT_BSON_PATH("\"BinaryJoin\"", explainRoot, "child.nodeType");
+    ASSERT_BSON_PATH("\"Seek\"", explainRoot, "child.rightChild.child.nodeType");
+    ASSERT_BSON_PATH("\"MergeJoin\"", explainRoot, "child.leftChild.nodeType");
+    ASSERT_BSON_PATH("\"IndexScan\"", explainRoot, "child.leftChild.leftChild.nodeType");
+    ASSERT_BSON_PATH("\"index1\"", explainRoot, "child.leftChild.leftChild.indexDefName");
+    ASSERT_BSON_PATH(
+        "\"IndexScan\"", explainRoot, "child.leftChild.rightChild.children.0.child.nodeType");
+    ASSERT_BSON_PATH(
+        "\"index2\"", explainRoot, "child.leftChild.rightChild.children.0.child.indexDefName");
 }
 
 TEST(PhysRewriter, CompoundIndex2) {
@@ -2457,48 +2334,16 @@ TEST(PhysRewriter, CompoundIndex2) {
     ASSERT_TRUE(phaseManager.optimize(optimized));
     ASSERT_BETWEEN(100, 170, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
-    ASSERT_EXPLAIN_V2(
-        "Root []\n"
-        "|   |   projections: \n"
-        "|   |       root\n"
-        "|   RefBlock: \n"
-        "|       Variable [root]\n"
-        "BinaryJoin [joinType: Inner, {rid_0}]\n"
-        "|   |   Const [true]\n"
-        "|   LimitSkip []\n"
-        "|   |   limitSkip:\n"
-        "|   |       limit: 1\n"
-        "|   |       skip: 0\n"
-        "|   Seek [ridProjection: rid_0, {'<root>': root}, c1]\n"
-        "|   |   BindBlock:\n"
-        "|   |       [root]\n"
-        "|   |           Source []\n"
-        "|   RefBlock: \n"
-        "|       Variable [rid_0]\n"
-        "MergeJoin []\n"
-        "|   |   |   Condition\n"
-        "|   |   |       rid_0 = rid_32\n"
-        "|   |   Collation\n"
-        "|   |       Ascending\n"
-        "|   Union []\n"
-        "|   |   BindBlock:\n"
-        "|   |       [rid_32]\n"
-        "|   |           Source []\n"
-        "|   Evaluation []\n"
-        "|   |   BindBlock:\n"
-        "|   |       [rid_32]\n"
-        "|   |           Variable [rid_0]\n"
-        "|   IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index2, interval: {[Const "
-        "[2], Const [2]], [Const [4], Const [4]]}]\n"
-        "|       BindBlock:\n"
-        "|           [rid_0]\n"
-        "|               Source []\n"
-        "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {[Const "
-        "[1], Const [1]], [Const [3], Const [3]]}]\n"
-        "    BindBlock:\n"
-        "        [rid_0]\n"
-        "            Source []\n",
-        optimized);
+    const BSONObj& explainRoot = ExplainGenerator::explainBSONObj(optimized);
+    ASSERT_BSON_PATH("\"BinaryJoin\"", explainRoot, "child.nodeType");
+    ASSERT_BSON_PATH("\"Seek\"", explainRoot, "child.rightChild.child.nodeType");
+    ASSERT_BSON_PATH("\"MergeJoin\"", explainRoot, "child.leftChild.nodeType");
+    ASSERT_BSON_PATH("\"IndexScan\"", explainRoot, "child.leftChild.leftChild.nodeType");
+    ASSERT_BSON_PATH("\"index1\"", explainRoot, "child.leftChild.leftChild.indexDefName");
+    ASSERT_BSON_PATH(
+        "\"IndexScan\"", explainRoot, "child.leftChild.rightChild.children.0.child.nodeType");
+    ASSERT_BSON_PATH(
+        "\"index2\"", explainRoot, "child.leftChild.rightChild.children.0.child.indexDefName");
 }
 
 TEST(PhysRewriter, CompoundIndex3) {
@@ -2681,38 +2526,13 @@ TEST(PhysRewriter, CompoundIndex4Negative) {
     // Demonstrate that we do not get a merge join when the lookup keys on both intersected indexes
     // do not cover all field indexes. In this case there is no guarantee that the RIDs of all
     // matching keys will be sorted, and therefore they cannot be merge-joined.
-    ASSERT_EXPLAIN_V2(
-        "Root []\n"
-        "|   |   projections: \n"
-        "|   |       root\n"
-        "|   RefBlock: \n"
-        "|       Variable [root]\n"
-        "BinaryJoin [joinType: Inner, {rid_0}]\n"
-        "|   |   Const [true]\n"
-        "|   Filter []\n"
-        "|   |   EvalFilter []\n"
-        "|   |   |   Variable [evalTemp_2]\n"
-        "|   |   PathTraverse []\n"
-        "|   |   PathCompare [Eq]\n"
-        "|   |   Const [2]\n"
-        "|   LimitSkip []\n"
-        "|   |   limitSkip:\n"
-        "|   |       limit: 1\n"
-        "|   |       skip: 0\n"
-        "|   Seek [ridProjection: rid_0, {'<root>': root, 'b': evalTemp_2}, c1]\n"
-        "|   |   BindBlock:\n"
-        "|   |       [evalTemp_2]\n"
-        "|   |           Source []\n"
-        "|   |       [root]\n"
-        "|   |           Source []\n"
-        "|   RefBlock: \n"
-        "|       Variable [rid_0]\n"
-        "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {[Const "
-        "[1], Const [1]], (-inf, +inf)}]\n"
-        "    BindBlock:\n"
-        "        [rid_0]\n"
-        "            Source []\n",
-        optimized);
+    const BSONObj& explainRoot = ExplainGenerator::explainBSONObj(optimized);
+    ASSERT_BSON_PATH("\"BinaryJoin\"", explainRoot, "child.nodeType");
+    ASSERT_BSON_PATH("\"Filter\"", explainRoot, "child.rightChild.nodeType");
+    ASSERT_BSON_PATH("\"LimitSkip\"", explainRoot, "child.rightChild.child.nodeType");
+    ASSERT_BSON_PATH("\"Seek\"", explainRoot, "child.rightChild.child.child.nodeType");
+    ASSERT_BSON_PATH("\"IndexScan\"", explainRoot, "child.leftChild.nodeType");
+    ASSERT_BSON_PATH("\"index1\"", explainRoot, "child.leftChild.indexDefName");
 }
 
 TEST(PhysRewriter, IndexBoundsIntersect) {
@@ -3954,7 +3774,6 @@ TEST(PhysRewriter, IndexPartitioning1) {
     const BSONObj& result = ExplainGenerator::explainBSONObj(optimized);
 
     // Compare using BSON since the rid vars are currently unstable for this test.
-    ASSERT_BSON_PATH("\"Root\"", result, "nodeType");
     ASSERT_BSON_PATH("\"Exchange\"", result, "child.nodeType");
     ASSERT_BSON_PATH(
         "{ type: \"Centralized\", disableExchanges: false }", result, "child.distribution");
