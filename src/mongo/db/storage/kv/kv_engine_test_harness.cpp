@@ -150,8 +150,6 @@ protected:
     }
 };
 
-const std::unique_ptr<ClockSource> clock = std::make_unique<ClockSourceMock>();
-
 TEST_F(KVEngineTestHarness, SimpleRS1) {
     std::unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create(getServiceContext()));
     KVEngine* engine = helper->getEngine();

@@ -1316,10 +1316,10 @@ TEST_F(TransactionCoordinatorTest,
 class TransactionCoordinatorMetricsTest : public TransactionCoordinatorTestBase {
 protected:
     TransactionCoordinatorMetricsTest()
-        : TransactionCoordinatorTestBase(Options{}.useMockTickSource<Microseconds>(true)) {}
+        : TransactionCoordinatorTestBase(
+              Options{}.useMockClock(true).useMockTickSource<Microseconds>(true)) {}
 
     void setUp() override {
-        getServiceContext()->setPreciseClockSource(std::make_unique<ClockSourceMock>());
         tickSource()->reset(1);
 
         TransactionCoordinatorTestBase::setUp();
