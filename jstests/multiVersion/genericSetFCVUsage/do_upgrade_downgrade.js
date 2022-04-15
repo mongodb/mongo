@@ -79,11 +79,10 @@ let recreateUniqueIndexes = function(db, secondary) {
                     return;
                 }
 
-                const ns = d.name + "." + c.name;
                 if (spec.v === 1) {
-                    unique_idx_v1.push({ns: ns, spec: spec});
+                    unique_idx_v1.push({dbName: d.name, collName: c.name, spec: spec});
                 } else {
-                    unique_idx.push({ns: ns, spec: spec});
+                    unique_idx.push({dbName: d.name, collName: c.name, spec: spec});
                 }
             });
         });
@@ -91,9 +90,9 @@ let recreateUniqueIndexes = function(db, secondary) {
 
     // Drop and create all v:2 indexes
     for (let pair of unique_idx) {
-        const ns = pair.ns;
         const idx = pair.spec;
-        let [dbName, collName] = ns.split(".");
+        const dbName = pair.dbName;
+        const collName = pair.collName;
         let res = db.getSiblingDB(dbName).runCommand(
             {dropIndexes: collName, index: idx.name, writeConcern: {w: 1}});
         assert.commandWorked(res);
@@ -107,9 +106,9 @@ let recreateUniqueIndexes = function(db, secondary) {
 
     // Drop and create all v:1 indexes
     for (let pair of unique_idx_v1) {
-        const ns = pair.ns;
         const idx = pair.spec;
-        let [dbName, collName] = ns.split(".");
+        const dbName = pair.dbName;
+        const collName = pair.collName;
         let res = db.getSiblingDB(dbName).runCommand(
             {dropIndexes: collName, index: idx.name, writeConcern: {w: 1}});
         assert.commandWorked(res);
