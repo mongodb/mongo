@@ -54,7 +54,7 @@ class FixtureBuilder(ABC, metaclass=registry.make_registry_metaclass(_BUILDERS, 
     REGISTERED_NAME = "Builder"
 
     @abstractmethod
-    def build_fixture(self, logger, job_num, fixturelib, *args, **kwargs):
+    def build_fixture(self, logger, job_num, fixturelib, *args, existing_nodes=None, **kwargs):
         """Abstract method to build a fixture."""
         return
 
@@ -73,7 +73,7 @@ class ReplSetBuilder(FixtureBuilder):
     latest_class = "MongoDFixture"
     multiversion_class_suffix = "_multiversion_class_suffix"
 
-    def build_fixture(self, logger, job_num, fixturelib, *args, **kwargs):  # pylint: disable=too-many-locals
+    def build_fixture(self, logger, job_num, fixturelib, *args, existing_nodes=None, **kwargs):  # pylint: disable=too-many-locals
         """Build a replica set."""
         # We hijack the mixed_bin_versions passed to the fixture.
         mixed_bin_versions = kwargs.pop("mixed_bin_versions", config.MIXED_BIN_VERSIONS)
@@ -152,6 +152,15 @@ class ReplSetBuilder(FixtureBuilder):
         replset = _FIXTURES[self.REGISTERED_NAME](logger, job_num, fixturelib, *args, **kwargs)
 
         replset.set_fcv(fcv)
+
+        # Don't build new nodes if existing nodes are provided.
+        if existing_nodes:
+            # Rename the logger to improve readability when printing node info maps
+            for idx, node in enumerate(existing_nodes):
+                node.logger = replset.get_logger_for_mongod(idx)
+                replset.install_mongod(node)
+            return replset
+
         for node_index in range(replset.num_nodes):
             node = self._new_mongod(replset, node_index, executables, classes,
                                     mongod_binary_versions[node_index], is_multiversion)

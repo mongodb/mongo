@@ -5078,6 +5078,15 @@ tasks:
     vars:
       use_large_distro: "true"
 
+# TODO(SERVER-65178): Add "serverless" tag to shard split passthrough when no longer feature flagged
+- <<: *gen_task_template
+  name: shard_split_jscore_passthrough_gen
+  tags: ["shard_split"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+
 - <<: *gen_task_template
   name: tenant_migration_jscore_passthrough_gen
   tags: ["serverless"]

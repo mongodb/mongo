@@ -1621,6 +1621,7 @@ buildvariants:
   - name: .serverless
   - name: .updatefuzzer
   - name: secondary_reads_passthrough_gen
+  - name: .shard_split
 # Disabling as the following tests are not aware of feature flags.
 #  - name: server_discovery_and_monitoring_json_test_TG
 #    distros:
@@ -2371,6 +2372,7 @@ buildvariants:
   - name: .serverless
   - name: .watchdog
   - name: .stitch
+  - name: .shard_split
 # Disabling the following tests as they are not aware of feature flags.
 #  - name: .benchmarks
 #  - name: unittest_shell_hang_analyzer_gen
@@ -2520,6 +2522,7 @@ buildvariants:
   - name: .serverless
   - name: .updatefuzzer
   - name: watchdog_wiredtiger
+  - name: .shard_split
 # Disabling the following tests as they are not aware of feature flags.
 #  - name: .benchmarks
 #  - name: server_discovery_and_monitoring_json_test_TG

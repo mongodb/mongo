@@ -1,0 +1,104 @@
+config_variables:
+- &keyFile jstests/libs/authTestsKey
+- &keyFileData Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
+- &authOptions
+  authenticationDatabase: admin
+  authenticationMechanism: SCRAM-SHA-256
+  password: *keyFileData
+  username: __system
+
+test_kind: js_test
+
+selector:
+  roots:
+  - jstests/core/**/*.js
+  exclude_files:
+  - jstests/core/txns/**/*.js
+  # Skip any tests that run with auth explicitly.
+  - jstests/core/*[aA]uth*.js
+
+  exclude_with_any_tags:
+  - assumes_standalone_mongod
+  # These tests run getMore commands which are not supported in the tenant migration passthrough.
+  - requires_getmore
+  # Due to background tenant migrations, operations in the main test shell are not guaranteed to
+  # be causally consistent with operations in a parallel shell. The reason is that
+  # TenantMigrationCommitted error is only thrown when the client does a write or a atClusterTime/
+  # afterClusterTime or linearlizable read. Therefore, one of shell may not be aware that the
+  # migration has occurred and would not forward the read/write command to the right replica set.
+  - uses_parallel_shell
+  # Profile settings are stored in-memory only so are not transferred to the recipient.
+  - requires_profiling
+  # capped collections are banned in Serverless
+  - requires_capped
+  # emptycapped command is blocked during tenant migration.
+  - requires_emptycapped
+  # Multi-updates that conflict with tenant migration are not retried by inject_tenant_prefix.js.
+  - requires_multi_updates
+  # Full validation can cause ongoing queries to fail. This can affect the tenant migration
+  # process.
+  - uses_full_validation
+  - tenant_migration_incompatible
+
+executor:
+  archive:
+    tests: true
+    hooks:
+      - CheckReplDBHash
+      - CheckReplOplogs
+      - ValidateCollections
+
+  config:
+    shell_options:
+      eval: >-
+        testingReplication = true;
+        jsTest.authenticate(db.getMongo());
+      global_vars:
+        TestData: &TestData
+          tenantIds: ["tenantA", "tenantB"]
+          auth: true
+          authMechanism: SCRAM-SHA-256
+          keyFile: *keyFile
+          keyFileData: *keyFileData
+          roleGraphInvalidationIsFatal: true
+  hooks:
+  # Hooks are set up in the order listed here, and torn down in the same order (not as a stack).
+  # The ContinuousShardSplit hook must come before CleanEveryN so that the ShardSplitFixture's list
+  # of nodes can't be modified while CleanEveryN is running
+  - class: ContinuousShardSplit
+    shell_options:
+      global_vars:
+        TestData:
+          <<: *TestData
+          authOptions: *authOptions
+  # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+  # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+  # validating the entire contents of the collection.
+  - class: CheckReplOplogs
+    shell_options:
+      global_vars:
+        TestData: *TestData
+  - class: CheckReplDBHash
+    shell_options:
+      global_vars:
+        TestData: *TestData
+  - class: ValidateCollections
+    shell_options:
+      global_vars:
+        TestData: *TestData
+  - class: CleanEveryN
+    n: 20
+  fixture:
+    class: ShardSplitFixture
+    common_mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        # To avoid routing commands in each test incorrectly, the ContinuousTenantMigration hook
+        # only runs donorForgetMigration against the donor of each migration when it is safe to do
+        # so. Therefore, the garbage collection delay doesn't need to be large.
+        shardSplitGarbageCollectionDelayMS: 1
+        ttlMonitorSleepSecs: 1
+      auth: ''
+      keyFile: *keyFile
+    num_nodes_per_replica_set: 3
+    auth_options: *authOptions
