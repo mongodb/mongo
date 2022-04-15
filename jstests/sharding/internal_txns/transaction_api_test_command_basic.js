@@ -1,7 +1,7 @@
 /*
  * Basic tests confirming functionality of the interalTransactionsTestCommand.
  *
- * @tags: [requires_fcv_60]
+ * @tags: [requires_fcv_60, uses_transactions]
  */
 (function() {
 'use strict';

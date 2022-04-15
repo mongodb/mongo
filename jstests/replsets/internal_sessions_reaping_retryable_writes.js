@@ -3,7 +3,7 @@
  * config.transactions and config.image_collection entries that correspond to the same retryable
  * write atomically.
  *
- * @tags: [requires_fcv_53, featureFlagInternalTransactions]
+ * @tags: [requires_fcv_60, uses_transactions]
  */
 (function() {
 "use strict";

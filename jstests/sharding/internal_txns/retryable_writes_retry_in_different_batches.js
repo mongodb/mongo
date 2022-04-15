@@ -3,7 +3,7 @@
  * once regardless of how they are batched on retries, and that the responses from mongoses and
  * mongods include a "retriedStmtIds" field containing the statement ids for retried statements.
  *
- * @tags: [requires_fcv_60]
+ * @tags: [requires_fcv_60, uses_transactions]
  */
 (function() {
 "use strict";

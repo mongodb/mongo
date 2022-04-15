@@ -3,7 +3,7 @@
  * external session that they correspond to and cause a migration that moves a chunk back to a
  * shard to fail.
  *
- * @tags: [requires_fcv_60, requires_persistence]
+ * @tags: [requires_fcv_60, uses_transactions, requires_persistence]
  */
 (function() {
 "use strict";
