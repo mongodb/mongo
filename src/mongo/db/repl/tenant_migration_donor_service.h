@@ -178,17 +178,21 @@ public:
 
         ExecutorFuture<void> _enterDataSyncState(
             const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-            const CancellationToken& token);
+            const CancellationToken& abortToken);
 
         ExecutorFuture<void> _waitForRecipientToBecomeConsistentAndEnterBlockingState(
             const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
             std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS,
-            const CancellationToken& token);
+            const CancellationToken& abortToken);
+
+        ExecutorFuture<void> _waitUntilStartMigrationDonorTimestampIsCheckpointed(
+            const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+            const CancellationToken& abortToken);
 
         ExecutorFuture<void> _waitForRecipientToReachBlockTimestampAndEnterCommittedState(
             const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
             std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS,
-            const CancellationToken& token);
+            const CancellationToken& abortToken);
 
         ExecutorFuture<void> _handleErrorOrEnterAbortedState(
             const std::shared_ptr<executor::ScopedTaskExecutor>& executor,

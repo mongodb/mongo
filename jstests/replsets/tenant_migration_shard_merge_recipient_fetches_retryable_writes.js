@@ -34,6 +34,7 @@ const tenantMigrationTest = new TenantMigrationTest({
 });
 
 const kTenantId = "testTenantId";
+const tenantDB = tenantMigrationTest.tenantDB(kTenantId, "database");
 
 const donorRst = tenantMigrationTest.getDonorRst();
 const donorPrimary = tenantMigrationTest.getDonorPrimary();
@@ -50,8 +51,8 @@ const cmd = {
     txnNumber: NumberLong(123),
 };
 
-assert.commandWorked(donorPrimary.getDB("database").runCommand(cmd));
-assert.eq(2, donorPrimary.getDB("database").collection.find().itcount());
+assert.commandWorked(donorPrimary.getDB(tenantDB).runCommand(cmd));
+assert.eq(2, donorPrimary.getDB(tenantDB).collection.find().itcount());
 
 const migrationId = UUID();
 const migrationOpts = {
@@ -62,10 +63,10 @@ const migrationOpts = {
 jsTestLog(`Starting migration: ${tojson(migrationOpts)}`);
 TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(migrationOpts));
 
-const {ok, n} = assert.commandWorked(recipientPrimary.getDB("database").runCommand(cmd));
+const {ok, n} = assert.commandWorked(recipientPrimary.getDB(tenantDB).runCommand(cmd));
 assert.eq(1, ok);
 assert.eq(2, n);
-assert.eq(2, recipientPrimary.getDB("database").collection.find().itcount());
+assert.eq(2, recipientPrimary.getDB(tenantDB).collection.find().itcount());
 
 tenantMigrationTest.stop();
 })();

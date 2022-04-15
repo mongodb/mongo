@@ -21,21 +21,27 @@ load("jstests/libs/uuid_util.js");
 load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/replsets/libs/tenant_migration_util.js");
 
+const kTenantId = "testTenantId";
+
 const tenantMigrationTest =
     new TenantMigrationTest({name: jsTestName(), quickGarbageCollection: true});
 
-const donorRst = tenantMigrationTest.getDonorRst();
-const donorPrimary = donorRst.getPrimary();
-const recipientRst = tenantMigrationTest.getRecipientRst();
-const recipientPrimary = recipientRst.getPrimary();
-
-const kTenantId = "testTenantId";
+function cleanup(dbName) {
+    const donorPrimary = tenantMigrationTest.getDonorRst().getPrimary();
+    const donorDB = donorPrimary.getDB(dbName);
+    assert.commandWorked(donorDB.dropDatabase());
+}
 
 (() => {
     jsTest.log("Test writes during and after a migration that commits");
 
-    const tenantId = kTenantId + "Commit";
-    tenantMigrationTest.insertDonorDB(`${tenantId}_test`, "test");
+    const donorRst = tenantMigrationTest.getDonorRst();
+    const donorPrimary = donorRst.getPrimary();
+    const recipientPrimary = tenantMigrationTest.getRecipientRst().getPrimary();
+
+    const tenantId = `${kTenantId}Commit`;
+    const donorDB = `${tenantId}_test`;
+    tenantMigrationTest.insertDonorDB(donorDB, "test");
     const ns = tenantId + "_testDb.testColl";
     const tenantCollOnRecipient = recipientPrimary.getCollection(ns);
 
@@ -91,14 +97,18 @@ const kTenantId = "testTenantId";
 
     tenantMigrationTest.waitForMigrationGarbageCollection(migrationOpts.migrationIdString,
                                                           migrationOpts.tenantId);
+    cleanup(donorDB);
 })();
 
 (() => {
     jsTest.log("Test writes after a migration aborted before the recipient receives the " +
                "returnAfterReachingTimestamp");
 
-    const tenantId = kTenantId + "AbortBeforeReturnAfterReachingTs";
-    tenantMigrationTest.insertDonorDB(`${tenantId}_test`, "test");
+    const recipientPrimary = tenantMigrationTest.getRecipientRst().getPrimary();
+
+    const tenantId = `${kTenantId}AbortBeforeReturnAfterReachingTs`;
+    const donorDB = `${tenantId}_test`;
+    tenantMigrationTest.insertDonorDB(donorDB, "test");
     const ns = tenantId + "_testDb.testColl";
     const tenantCollOnRecipient = recipientPrimary.getCollection(ns);
 
@@ -128,14 +138,19 @@ const kTenantId = "testTenantId";
 
     tenantMigrationTest.waitForMigrationGarbageCollection(migrationOpts.migrationIdString,
                                                           migrationOpts.tenantId);
+    cleanup(donorDB);
 })();
 
 (() => {
     jsTest.log("Test writes after the migration aborted after the recipient finished oplog" +
                " application");
 
-    const tenantId = kTenantId + "AbortAfterReturnAfterReachingTs";
-    tenantMigrationTest.insertDonorDB(`${tenantId}_test`, "test");
+    const donorPrimary = tenantMigrationTest.getDonorRst().getPrimary();
+    const recipientPrimary = tenantMigrationTest.getRecipientRst().getPrimary();
+
+    const tenantId = `${kTenantId}AbortAfterReturnAfterReachingTs`;
+    const donorDB = `${tenantId}_test`;
+    tenantMigrationTest.insertDonorDB(donorDB, "test");
     const ns = tenantId + "_testDb.testColl";
     const tenantCollOnRecipient = recipientPrimary.getCollection(ns);
 
@@ -163,7 +178,7 @@ const kTenantId = "testTenantId";
 
     tenantMigrationTest.waitForMigrationGarbageCollection(migrationOpts.migrationIdString,
                                                           migrationOpts.tenantId);
+    cleanup(donorDB);
 })();
-
 tenantMigrationTest.stop();
 })();

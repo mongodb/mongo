@@ -9,13 +9,15 @@
  * because the recipient will invalidate its in-memory understanding and refetch the on-disk
  * transaction state instead.
  *
- * Note: this test is designed to emulate a back-and-forth migration from donor to recipient,
- * recipient to donor, then donor to recipient again.
+ * Note: incompatible_with_shard_merge because (1) this test runs back-to-back migrations, and
+ * (2) because of the two-phase nature of the database drop between migrations, wt files will
+ * still be present on the recipient during the second migration, leading to errors.
  *
  * @tags: [
  *   incompatible_with_eft,
  *   incompatible_with_macos,
  *   incompatible_with_windows_tls,
+ *   incompatible_with_shard_merge,
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   serverless,

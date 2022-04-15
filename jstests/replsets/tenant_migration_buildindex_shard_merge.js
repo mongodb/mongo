@@ -28,13 +28,6 @@ load("jstests/replsets/libs/tenant_migration_util.js");
 const tenantMigrationTest = new TenantMigrationTest(
     {name: jsTestName(), sharedOptions: {setParameter: {maxNumActiveUserIndexBuilds: 100}}});
 
-if (TenantMigrationUtil.isShardMergeEnabled(tenantMigrationTest.getDonorPrimary().getDB("admin"))) {
-    // TODO (SERVER-65084): Re-enable this test.
-    jsTestLog("Skip: Temporarily skipping test, see SERVER-65084.");
-    tenantMigrationTest.stop();
-    return;
-}
-
 const donorPrimary = tenantMigrationTest.getDonorPrimary();
 const kTenant1Id = "testTenantId1";
 const kTenant2Id = "testTenantId2";

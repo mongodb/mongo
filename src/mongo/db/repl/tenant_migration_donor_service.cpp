@@ -1168,7 +1168,8 @@ TenantMigrationDonorService::Instance::_fetchAndStoreRecipientClusterTimeKeyDocs
 }
 
 ExecutorFuture<void> TenantMigrationDonorService::Instance::_enterDataSyncState(
-    const std::shared_ptr<executor::ScopedTaskExecutor>& executor, const CancellationToken& token) {
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    const CancellationToken& abortToken) {
     pauseTenantMigrationAfterFetchingAndStoringKeys.pauseWhileSet();
     {
         stdx::lock_guard<Latch> lg(_mutex);
@@ -1180,17 +1181,66 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_enterDataSyncState(
     pauseTenantMigrationBeforeLeavingAbortingIndexBuildsState.pauseWhileSet();
 
     // Enter "dataSync" state.
-    return _updateStateDoc(executor, TenantMigrationDonorStateEnum::kDataSync, token)
-        .then([this, self = shared_from_this(), executor, token](repl::OpTime opTime) {
-            return _waitForMajorityWriteConcern(executor, std::move(opTime), token);
+    return _updateStateDoc(executor, TenantMigrationDonorStateEnum::kDataSync, abortToken)
+        .then([this, self = shared_from_this(), executor, abortToken](repl::OpTime opTime) {
+            return _waitForMajorityWriteConcern(executor, std::move(opTime), abortToken);
         });
+}
+
+ExecutorFuture<void>
+TenantMigrationDonorService::Instance::_waitUntilStartMigrationDonorTimestampIsCheckpointed(
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    const CancellationToken& abortToken) {
+
+    if (getProtocol() != MigrationProtocolEnum::kShardMerge) {
+        return ExecutorFuture(**executor);
+    }
+
+    auto opCtxHolder = cc().makeOperationContext();
+    auto opCtx = opCtxHolder.get();
+    auto startMigrationDonorTimestamp = [&] {
+        stdx::lock_guard<Latch> lg(_mutex);
+        return *_stateDoc.getStartMigrationDonorTimestamp();
+    }();
+
+    invariant(startMigrationDonorTimestamp <= repl::ReplicationCoordinator::get(opCtx)
+                                                  ->getCurrentCommittedSnapshotOpTime()
+                                                  .getTimestamp());
+
+    // For shard merge, we set startApplyingDonorOpTime timestamp on the recipient to the donor's
+    // backup cursor checkpoint timestamp, and startMigrationDonorTimestamp to the timestamp after
+    // aborting all index builds. As a result, startApplyingDonorOpTime timestamp can be <
+    // startMigrationDonorTimestamp, which means we can erroneously fetch and apply index build
+    // operations before startMigrationDonorTimestamp. Trigger a stable checkpoint to ensure that
+    // the recipient does not fetch and apply donor index build entries before
+    // startMigrationDonorTimestamp.
+    return AsyncTry([this, self = shared_from_this(), startMigrationDonorTimestamp] {
+               auto opCtxHolder = cc().makeOperationContext();
+               auto opCtx = opCtxHolder.get();
+               auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+               if (storageEngine->getLastStableRecoveryTimestamp() < startMigrationDonorTimestamp) {
+                   opCtx->recoveryUnit()->waitUntilUnjournaledWritesDurable(
+                       opCtx,
+                       /*stableCheckpoint*/ true);
+               }
+           })
+        .until([this, self = shared_from_this(), startMigrationDonorTimestamp](Status status) {
+            uassertStatusOK(status);
+            auto storageEngine = getGlobalServiceContext()->getStorageEngine();
+            if (storageEngine->getLastStableRecoveryTimestamp() < startMigrationDonorTimestamp) {
+                return false;
+            }
+            return true;
+        })
+        .withBackoffBetweenIterations(Backoff(Milliseconds(100), Milliseconds(100)))
+        .on(**executor, abortToken);
 }
 
 ExecutorFuture<void>
 TenantMigrationDonorService::Instance::_waitForRecipientToBecomeConsistentAndEnterBlockingState(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS,
-    const CancellationToken& token) {
+    const CancellationToken& abortToken) {
     {
         stdx::lock_guard<Latch> lg(_mutex);
         if (_stateDoc.getState() > TenantMigrationDonorStateEnum::kDataSync) {
@@ -1198,21 +1248,24 @@ TenantMigrationDonorService::Instance::_waitForRecipientToBecomeConsistentAndEnt
         }
     }
 
-    return _sendRecipientSyncDataCommand(executor, recipientTargeterRS, token)
+    return _waitUntilStartMigrationDonorTimestampIsCheckpointed(executor, abortToken)
+        .then([this, self = shared_from_this(), executor, recipientTargeterRS, abortToken] {
+            return _sendRecipientSyncDataCommand(executor, recipientTargeterRS, abortToken);
+        })
         .then([this, self = shared_from_this()] {
             auto opCtxHolder = cc().makeOperationContext();
             auto opCtx = opCtxHolder.get();
             pauseTenantMigrationBeforeLeavingDataSyncState.pauseWhileSet(opCtx);
         })
-        .then([this, self = shared_from_this(), executor, token] {
+        .then([this, self = shared_from_this(), executor, abortToken] {
             // Enter "blocking" state.
             LOGV2(6104907,
                   "Updating its state doc to enter 'blocking' state.",
                   "migrationId"_attr = _migrationUuid,
                   "tenantId"_attr = _tenantId);
-            return _updateStateDoc(executor, TenantMigrationDonorStateEnum::kBlocking, token)
-                .then([this, self = shared_from_this(), executor, token](repl::OpTime opTime) {
-                    return _waitForMajorityWriteConcern(executor, std::move(opTime), token);
+            return _updateStateDoc(executor, TenantMigrationDonorStateEnum::kBlocking, abortToken)
+                .then([this, self = shared_from_this(), executor, abortToken](repl::OpTime opTime) {
+                    return _waitForMajorityWriteConcern(executor, std::move(opTime), abortToken);
                 });
         });
 }
@@ -1221,7 +1274,7 @@ ExecutorFuture<void>
 TenantMigrationDonorService::Instance::_waitForRecipientToReachBlockTimestampAndEnterCommittedState(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS,
-    const CancellationToken& token) {
+    const CancellationToken& abortToken) {
     {
         stdx::lock_guard<Latch> lg(_mutex);
         if (_stateDoc.getState() > TenantMigrationDonorStateEnum::kBlocking) {
@@ -1233,7 +1286,7 @@ TenantMigrationDonorService::Instance::_waitForRecipientToReachBlockTimestampAnd
 
     // Source to cancel the timeout if the operation completed in time.
     CancellationSource cancelTimeoutSource;
-    CancellationSource recipientSyncDataSource(token);
+    CancellationSource recipientSyncDataSource(abortToken);
 
     auto deadlineReachedFuture =
         (*executor)->sleepFor(Milliseconds(repl::tenantMigrationBlockingStateTimeoutMS.load()),
@@ -1286,15 +1339,15 @@ TenantMigrationDonorService::Instance::_waitForRecipientToReachBlockTimestampAnd
                 uasserted(ErrorCodes::InternalError, "simulate a tenant migration error");
             }
         })
-        .then([this, self = shared_from_this(), executor, token] {
+        .then([this, self = shared_from_this(), executor, abortToken] {
             // Enter "commit" state.
             LOGV2(6104908,
                   "Entering 'committed' state.",
                   "migrationId"_attr = _migrationUuid,
                   "tenantId"_attr = _tenantId);
-            return _updateStateDoc(executor, TenantMigrationDonorStateEnum::kCommitted, token)
-                .then([this, self = shared_from_this(), executor, token](repl::OpTime opTime) {
-                    return _waitForMajorityWriteConcern(executor, std::move(opTime), token)
+            return _updateStateDoc(executor, TenantMigrationDonorStateEnum::kCommitted, abortToken)
+                .then([this, self = shared_from_this(), executor, abortToken](repl::OpTime opTime) {
+                    return _waitForMajorityWriteConcern(executor, std::move(opTime), abortToken)
                         .then([this, self = shared_from_this()] {
                             pauseTenantMigrationBeforeLeavingCommittedState.pauseWhileSet();
 
