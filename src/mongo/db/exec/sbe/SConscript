@@ -62,6 +62,7 @@ sbeEnv.Library(
         'util/debug_print.cpp',
         'util/spilling.cpp',
         'util/stage_results_printer.cpp',
+        'values/column_store_encoder.cpp',
         'values/sbe_pattern_value_cmp.cpp',
         'values/slot.cpp',
         'values/slot_printer.cpp',

@@ -347,11 +347,12 @@ struct SplitCellView {
     template <class ValueEncoder>
     auto subcellValuesGenerator(ValueEncoder&& valEncoder) const {
         struct Cursor {
-            typename ValueEncoder::Out nextValue() {
+            using Out = typename std::remove_reference_t<ValueEncoder>::Out;
+            Out nextValue() {
                 if (!elemPtr)
-                    return ValueEncoder::Out();
+                    return Out();
                 if (elemPtr == end)
-                    return ValueEncoder::Out();
+                    return Out();
 
                 invariant(elemPtr < end);
                 return decodeAndAdvance(elemPtr, encoder);
@@ -361,7 +362,7 @@ struct SplitCellView {
             const char* end;
             ValueEncoder encoder;
         };
-        return Cursor{firstElementPtr, arrInfo.rawData(), std::forward(valEncoder)};
+        return Cursor{firstElementPtr, arrInfo.rawData(), std::forward<ValueEncoder>(valEncoder)};
     }
 
     static SplitCellView parse(CellView cell) {
@@ -438,11 +439,11 @@ struct SplitCellView {
         }
 
         // TODO SERVER-63284: This would be more concisely expressed using the case range syntax.
-        if (Bytes::kTinyIntMin >= byte && byte <= Bytes::kTinyIntMax) {
+        if (byte >= Bytes::kTinyIntMin && byte <= Bytes::kTinyIntMax) {
             return encoder(int32_t(int8_t(byte - TinyNum::kTinyIntZero)));
-        } else if (Bytes::kTinyLongMin >= byte && byte <= Bytes::kTinyLongMax) {
+        } else if (byte >= Bytes::kTinyLongMin && byte <= Bytes::kTinyLongMax) {
             return encoder(int64_t(int8_t(byte - TinyNum::kTinyLongZero)));
-        } else if (Bytes::kStringSizeMin >= byte && byte <= Bytes::kStringSizeMax) {
+        } else if (byte >= Bytes::kStringSizeMin && byte <= Bytes::kStringSizeMax) {
             auto size = size_t(byte - Bytes::kStringSizeMin);
             return encoder(StringData(std::exchange(ptr, ptr + size), size));
         } else {
@@ -464,9 +465,9 @@ struct SplitCellView {
                     return encoder(true);
                     // Size and type encoded in byte, value follows.
                 case Bytes::kDecimal128: {
-                    auto val = ConstDataView(ptr).read<Decimal128>();
-                    ptr += 16;
-                    return encoder(val);
+                    auto val = encoder(ConstDataView(ptr).read<Decimal128>());
+                    ptr += DataType::Handler<Decimal128>::kSizeOfDecimal;
+                    return val;
                 }
                 case Bytes::kDouble: {
                     auto val = ConstDataView(ptr).read<LittleEndian<double>>();

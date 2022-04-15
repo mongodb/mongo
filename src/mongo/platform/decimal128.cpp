@@ -1044,4 +1044,31 @@ std::ostream& operator<<(std::ostream& stream, const Decimal128& value) {
     return stream << value.toString();
 }
 
+void DataType::Handler<Decimal128>::unsafeLoad(Decimal128* valueOut,
+                                               const char* ptr,
+                                               size_t* advanced) {
+    if (valueOut) {
+        ConstDataView decimalView(ptr);
+        uint64_t low = decimalView.read<LittleEndian<uint64_t>>();
+        uint64_t high = decimalView.read<LittleEndian<uint64_t>>(sizeof(uint64_t));
+        *valueOut = Decimal128(Decimal128::Value{low, high});
+    }
+
+    if (advanced) {
+        *advanced = kSizeOfDecimal;
+    }
+}
+
+void DataType::Handler<Decimal128>::unsafeStore(const Decimal128& valueIn,
+                                                char* ptr,
+                                                size_t* advanced) {
+    DataView decimalView(ptr);
+    decimalView.write<LittleEndian<uint64_t>>(valueIn.getValue().low64, 0);
+    decimalView.write<LittleEndian<uint64_t>>(valueIn.getValue().high64, sizeof(uint64_t));
+
+    if (advanced) {
+        *advanced = kSizeOfDecimal;
+    }
+}
+
 }  // namespace mongo

@@ -39,6 +39,7 @@
 
 #include "mongo/config.h"
 
+#include "mongo/base/data_type.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -634,5 +635,43 @@ inline bool operator!=(const Decimal128& lhs, const Decimal128& rhs) {
 }
 
 }  // namespace literals
+
+template <>
+struct DataType::Handler<Decimal128> {
+    static void unsafeLoad(Decimal128* valueOut, const char* ptr, size_t* advanced);
+    static void unsafeStore(const Decimal128& valueIn, char* ptr, size_t* advanced);
+
+    static Status load(Decimal128* valueOut,
+                       const char* ptr,
+                       size_t length,
+                       size_t* advanced,
+                       std::ptrdiff_t debug_offset) {
+        if (length < kSizeOfDecimal) {
+            return Status(ErrorCodes::Overflow, "Buffer too small to hold Decimal128 value");
+        }
+
+        unsafeLoad(valueOut, ptr, advanced);
+        return Status::OK();
+    }
+
+    static Status store(const Decimal128& valueIn,
+                        char* ptr,
+                        size_t length,
+                        size_t* advanced,
+                        std::ptrdiff_t debug_offset) {
+        if (length < kSizeOfDecimal) {
+            return Status(ErrorCodes::Overflow, "Buffer too small to write Decimal128 value");
+        }
+
+        unsafeStore(valueIn, ptr, advanced);
+        return Status::OK();
+    }
+
+    static Decimal128 defaultConstruct() {
+        return Decimal128();
+    }
+
+    static constexpr size_t kSizeOfDecimal = 2 * sizeof(uint64_t);
+};
 
 }  // namespace mongo
