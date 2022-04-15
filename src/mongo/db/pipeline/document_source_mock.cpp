@@ -65,15 +65,6 @@ boost::intrusive_ptr<DocumentSourceMock> DocumentSourceMock::createForTest(
 }
 
 boost::intrusive_ptr<DocumentSourceMock> DocumentSourceMock::createForTest(
-    const std::vector<BSONObj>& docs, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    std::deque<GetNextResult> results;
-    for (auto&& doc : docs) {
-        results.emplace_back(Document(doc));
-    }
-    return new DocumentSourceMock(std::move(results), expCtx);
-}
-
-boost::intrusive_ptr<DocumentSourceMock> DocumentSourceMock::createForTest(
     std::deque<GetNextResult> results, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     return new DocumentSourceMock(std::move(results), expCtx);
 }

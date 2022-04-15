@@ -2,7 +2,10 @@
  * Verify the error behavior of '$$SEARCH_META' when it is not properly configured. $$SEARCH_META
  * throws if used in aggregations on sharded collections.
  * @tags: [
- *   assumes_unsharded_collection,
+ *   # $search/$searchMeta cannot be used within a facet
+ *   do_not_wrap_aggregations_in_facets,
+ *   # $search/$searchMeta do not support any read concern other than "local"
+ *   assumes_read_concern_unchanged
  * ]
  */
 (function() {
@@ -18,10 +21,14 @@ const coll = db.searchCollector;
 coll.drop();
 assert.commandWorked(coll.insert({"_id": 1, "title": "cakes"}));
 
-// Check that a query without a search stage gets a missing value if SEARCH_META is accessed.
-const result = coll.aggregate([{$project: {_id: 1, meta: "$$SEARCH_META"}}]).toArray();
-assert.eq(result.length, 1);
-assert.eq(result[0], {_id: 1});
+// Check that a query without a search stage gets errors if SEARCH_META is accessed.
+assert.commandFailedWithCode(
+    db.runCommand({
+        aggregate: coll.getName(),
+        cursor: {},
+        pipeline: [{$project: {_id: 1, meta: "$$SEARCH_META"}}]
+    }),
+    [6347902, 6347903]);  // Error code depends on presence of the enterprise module.
 
 // Check that users cannot assign values to SEARCH_META.
 assert.commandFailedWithCode(db.runCommand({
@@ -32,4 +39,8 @@ assert.commandFailedWithCode(db.runCommand({
     cursor: {}
 }),
                              ErrorCodes.FailedToParse);
+
+assert.throwsWithCode(
+    () => db.non_existent_namespace.aggregate([{$searchMeta: {query: {nonsense: true}}}]),
+    [6448001, 31082, 40324]);  // Error code may change on mongos or on community server.
 })();

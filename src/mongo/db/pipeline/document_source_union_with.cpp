@@ -220,14 +220,6 @@ DocumentSource::GetNextResult DocumentSourceUnionWith::doGetNext() {
     if (_executionState == ExecutionProgress::kStartingSubPipeline) {
         auto serializedPipe = _pipeline->serializeToBson();
         logStartingSubPipeline(serializedPipe);
-        // $$SEARCH_META can be set during runtime earlier in the pipeline, and therefore must be
-        // copied to the subpipeline manually.
-        if (pExpCtx->variables.hasConstantValue(Variables::kSearchMetaId)) {
-            _pipeline->getContext()->variables.setReservedValue(
-                Variables::kSearchMetaId,
-                pExpCtx->variables.getValue(Variables::kSearchMetaId, Document()),
-                true);
-        }
         try {
             _pipeline =
                 pExpCtx->mongoProcessInterface->attachCursorSourceToPipeline(_pipeline.release());
@@ -351,7 +343,7 @@ Value DocumentSourceUnionWith::serialize(boost::optional<ExplainOptions::Verbosi
             // The plan does not require reading from the sub-pipeline, so just include the
             // serialization in the explain output.
             BSONArrayBuilder bab;
-            for (auto&& stage : _pipeline->serialize())
+            for (auto&& stage : _pipeline->serialize(explain))
                 bab << stage;
             auto spec = collectionless
                 ? DOC("pipeline" << bab.arr())
@@ -398,7 +390,11 @@ DepsTracker::State DocumentSourceUnionWith::getDependencies(DepsTracker* deps) c
     }
     // Add sub-pipeline variable dependencies. Do not add field dependencies, since these refer
     // to the fields from the foreign collection rather than the local collection.
-    deps->vars.insert(subDeps.vars.begin(), subDeps.vars.end());
+    // Similarly, do not add SEARCH_META as a dependency, since it is scoped to one pipeline.
+    for (auto&& varId : subDeps.vars) {
+        if (varId != Variables::kSearchMetaId)
+            deps->vars.insert(varId);
+    }
 
     return DepsTracker::State::SEE_NEXT;
 }

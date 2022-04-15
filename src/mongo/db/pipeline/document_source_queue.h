@@ -48,6 +48,11 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         boost::optional<StringData> aliasStageName = boost::none);
 
+    static boost::intrusive_ptr<DocumentSourceQueue> create(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        std::deque<GetNextResult> docs,
+        boost::optional<StringData> aliasStageName = boost::none);
+
     DocumentSourceQueue(std::deque<GetNextResult> results,
                         const boost::intrusive_ptr<ExpressionContext>& expCtx,
                         boost::optional<StringData> aliasStageName = boost::none);
@@ -58,15 +63,14 @@ public:
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const override;
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const override {
-        StageConstraints constraints(StreamType::kStreaming,
+        StageConstraints constraints{StreamType::kStreaming,
                                      PositionRequirement::kFirst,
                                      HostTypeRequirement::kLocalOnly,
                                      DiskUseRequirement::kNoDiskUse,
                                      FacetRequirement::kNotAllowed,
                                      TransactionRequirement::kAllowed,
                                      LookupRequirement::kAllowed,
-                                     UnionRequirement::kAllowed);
-
+                                     UnionRequirement::kAllowed};
         constraints.requiresInputDocSource = false;
         constraints.isIndependentOfAnyCollection = true;
         return constraints;
@@ -79,7 +83,14 @@ public:
         return {GetModPathsReturn::Type::kFiniteSet, std::set<std::string>{}, {}};
     }
 
-    boost::optional<DistributedPlanLogic> distributedPlanLogic() override {
+    /**
+     * This stage does not depend on anything.
+     */
+    DepsTracker::State getDependencies(DepsTracker* deps) const override {
+        return DepsTracker::SEE_NEXT;
+    }
+
+    virtual boost::optional<DistributedPlanLogic> distributedPlanLogic() override {
         return boost::none;
     }
 
@@ -100,6 +111,11 @@ public:
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
 protected:
+    static std::deque<DocumentSource::GetNextResult> parseFromArray(BSONElement arrayElem);
+
+    Value serializeWithName(boost::optional<ExplainOptions::Verbosity> explain,
+                            StringData stageName) const;
+
     GetNextResult doGetNext() override;
     // Return documents from front of queue.
     std::deque<GetNextResult> _queue;

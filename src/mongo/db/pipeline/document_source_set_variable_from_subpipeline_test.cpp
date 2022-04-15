@@ -134,25 +134,19 @@ TEST_F(DocumentSourceSetVariableFromSubPipelineTest, testParserErrors) {
 
 TEST_F(DocumentSourceSetVariableFromSubPipelineTest, testDoGetNext) {
     const auto inputDocs =
-        std::array{Document{{"a", 1}}, Document{{"b", 1}}, Document{{"c", 1}}, Document{{"d", 1}}};
-    const auto mockSourceForSetVarStage =
-        DocumentSourceMock::createForTest(inputDocs[0], getExpCtx());
+        std::vector{Document{{"a", 1}}, Document{{"b", 1}}, Document{{"c", 1}}, Document{{"d", 1}}};
+    auto expCtx = getExpCtx();
+    const auto mockSourceForSetVarStage = DocumentSourceMock::createForTest(inputDocs[1], expCtx);
+    auto ctxForSubPipeline = expCtx->copyForSubPipeline(expCtx->ns);
     const auto mockSourceForSubPipeline =
-        DocumentSourceMock::createForTest(inputDocs[1], getExpCtx());
-    const auto mockSourceForSubPipelineDocSource =
-        DocumentSourceMock::createForTest(inputDocs[3], getExpCtx());
-    const auto mockDequeOne = std::deque<DocumentSource::GetNextResult>{Document{inputDocs[2]}};
-    const auto mockDequeTwo = std::deque<DocumentSource::GetNextResult>{Document{inputDocs[3]}};
-    const auto mockCtxOne = getExpCtx()->copyWith({});
-    mockCtxOne->mongoProcessInterface = std::make_unique<MockMongoInterface>(mockDequeOne);
-    const auto filter = DocumentSourceMatch::create(BSON("d" << 1), mockCtxOne);
+        DocumentSourceMock::createForTest(inputDocs, ctxForSubPipeline);
     auto setVariableFromSubPipeline = DocumentSourceSetVariableFromSubPipeline::create(
-        mockCtxOne,
-        Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{filter}, getExpCtx()),
+        expCtx,
+        Pipeline::create({DocumentSourceMatch::create(BSON("d" << 1), ctxForSubPipeline)},
+                         ctxForSubPipeline),
         Variables::kSearchMetaId);
 
-    // filter->setSource(mockSourceForSubPipelineDocSource.get());
-    setVariableFromSubPipeline->addSubPipelineInitialSource(mockSourceForSubPipelineDocSource);
+    setVariableFromSubPipeline->addSubPipelineInitialSource(mockSourceForSubPipeline);
     setVariableFromSubPipeline->setSource(mockSourceForSetVarStage.get());
 
     auto comparator = DocumentComparator();
@@ -160,8 +154,38 @@ TEST_F(DocumentSourceSetVariableFromSubPipelineTest, testDoGetNext) {
     auto next = setVariableFromSubPipeline->getNext();
     ASSERT_TRUE(next.isAdvanced());
 
-    ASSERT_TRUE(Value::compare(mockCtxOne->variables.getValue(Variables::kSearchMetaId),
+    ASSERT_TRUE(Value::compare(expCtx->variables.getValue(Variables::kSearchMetaId),
                                Value((BSON("d" << 1))),
+                               nullptr) == 0);
+}
+
+TEST_F(DocumentSourceSetVariableFromSubPipelineTest, ReturnExpressionWhenNoResults) {
+    const auto inputDocs =
+        std::vector{Document{{"a", 1}}, Document{{"b", 1}}, Document{{"c", 1}}, Document{{"d", 1}}};
+    const auto expCtx = getExpCtx();
+    const auto mockSourceForSetVarStage =
+        DocumentSourceMock::createForTest(inputDocs[0], getExpCtx());
+    auto ctxForSubPipeline = expCtx->copyForSubPipeline(expCtx->ns);
+    const auto mockSourceForSubPipeline =
+        DocumentSourceMock::createForTest(inputDocs, ctxForSubPipeline);
+    auto setVariableFromSubPipeline = DocumentSourceSetVariableFromSubPipeline::create(
+        expCtx,
+        Pipeline::create(
+            {DocumentSourceMatch::create(BSON("does not exist" << 1), ctxForSubPipeline)},
+            ctxForSubPipeline),
+        Variables::kSearchMetaId,
+        ExpressionConstant::create(ctxForSubPipeline.get(), Value{Document{{"fallback", 1}}}));
+
+    setVariableFromSubPipeline->addSubPipelineInitialSource(mockSourceForSubPipeline);
+    setVariableFromSubPipeline->setSource(mockSourceForSetVarStage.get());
+
+    auto comparator = DocumentComparator();
+    auto results = comparator.makeUnorderedDocumentSet();
+    auto next = setVariableFromSubPipeline->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+
+    ASSERT_TRUE(Value::compare(expCtx->variables.getValue(Variables::kSearchMetaId),
+                               Value((BSON("fallback" << 1))),
                                nullptr) == 0);
 }
 
