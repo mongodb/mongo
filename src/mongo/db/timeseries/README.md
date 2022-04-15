@@ -59,12 +59,12 @@ certain properties:
         },
         <field0>: {
             '0', <value of 'field0' in first measurement>,
-            '1', <value of 'field0' in first measurement>,
+            '1', <value of 'field0' in second measurement>,
             ...
         },
         <field1>: {
             '0', <value of 'field1' in first measurement>,
-            '1', <value of 'field1' in first measurement>,
+            '1', <value of 'field1' in second measurement>,
             ...
         },
         ...
