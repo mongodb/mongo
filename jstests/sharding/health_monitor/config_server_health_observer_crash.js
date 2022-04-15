@@ -116,6 +116,9 @@ assert.soon(() => {
 }, 'Mongos is not shutting down as expected', 40000, 400);
 
 try {
+    // Refresh PIDs to force de-registration of the crashed mongos.
+    var pids = _runningMongoChildProcessIds();
+    jsTestLog(`Running processes: ${tojson(pids)}`);
     st.stop({skipValidatingExitCode: true, skipValidation: true});
 } catch (e) {
     jsTestLog(`Exception during shutdown: ${e}`);
