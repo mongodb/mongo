@@ -203,9 +203,6 @@
         # TODO SERVER-46040: Enable when SERVER-46040 is backported
         - jstests/sharding/drop_indexes_with_stale_config_error.js
         - jstests/sharding/query/merge_write_concern.js
-        # TODO (SERVER-64908): Enable lookup_graph_lookup_foreign_becomes_sharded.js in the
-        # sharding_multiversion suite
-        - jstests/sharding/query/lookup_graph_lookup_foreign_becomes_sharded.js
 
 - name: sharding_multiversion_testdata_last_lts
   value:
