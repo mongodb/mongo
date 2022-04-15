@@ -1826,21 +1826,13 @@ TEST_F(TxnParticipantTest, ReacquireLocksForPreparedTransactionsOnStepUp) {
 class TransactionsMetricsTest : public TxnParticipantTest {
 protected:
     TransactionsMetricsTest()
-        : TxnParticipantTest(Options{}.useMockTickSource<Microseconds>(true)) {}
+        : TxnParticipantTest(Options{}.useMockClock(true).useMockTickSource<Microseconds>(true)) {}
 
     void setUp() override {
         TxnParticipantTest::setUp();
 
         // Ensure that the tick source is not initialized to zero.
         mockTickSource()->reset(1);
-    }
-
-    /**
-     * Set up and return a mock clock source.
-     */
-    ClockSourceMock* initMockPreciseClockSource() {
-        getServiceContext()->setPreciseClockSource(std::make_unique<ClockSourceMock>());
-        return dynamic_cast<ClockSourceMock*>(getServiceContext()->getPreciseClockSource());
     }
 
     /**
@@ -2879,9 +2871,8 @@ TEST_F(TransactionsMetricsTest, TimeInactiveMicrosShouldIncreaseUntilCommit) {
 
 TEST_F(TransactionsMetricsTest, ReportStashedResources) {
     auto tickSource = mockTickSource();
-    auto clockSource = initMockPreciseClockSource();
     auto startTime = Date_t::now();
-    clockSource->reset(startTime);
+    ClockSourceMock{}.reset(startTime);
 
     const bool autocommit = false;
 
@@ -2981,9 +2972,8 @@ TEST_F(TransactionsMetricsTest, ReportStashedResources) {
 
 TEST_F(TransactionsMetricsTest, ReportUnstashedResources) {
     auto tickSource = mockTickSource();
-    auto clockSource = initMockPreciseClockSource();
     auto startTime = Date_t::now();
-    clockSource->reset(startTime);
+    ClockSourceMock{}.reset(startTime);
 
     ASSERT(opCtx()->lockState());
     ASSERT(opCtx()->recoveryUnit());
