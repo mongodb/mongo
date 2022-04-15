@@ -472,6 +472,9 @@ var ShardingTest = function(params) {
             let query = {};
             let sorting_criteria = {};
             const collection = this.config.collections.findOne({_id: ns});
+            if (!collection) {
+                return "";
+            }
 
             if (collection.timestamp) {
                 const collectionUUID = collection.uuid;
