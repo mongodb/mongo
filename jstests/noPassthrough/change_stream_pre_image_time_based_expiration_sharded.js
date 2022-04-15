@@ -2,6 +2,7 @@
 // @tags: [
 //  requires_fcv_60,
 //  featureFlagClusterWideConfig,
+//  requires_sharding,
 // ]
 (function() {
 "use strict";
