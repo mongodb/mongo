@@ -67,9 +67,9 @@ public:
     /**
      * This is the minimum valid timestamp; it can be used for reads that need to see all
      * untimestamped data but no timestamped data. We cannot use 0 here because 0 means see all
-     * timestamped data.
+     * timestamped data. The high-order 4 bytes are for the seconds field in a Timestamp object.
      */
-    static const uint64_t kMinimumTimestamp = 1;
+    static const unsigned long long kMinimumTimestamp = 1ULL << 32;
 
     /**
      * When the storage engine needs to know how much oplog to preserve for the sake of active

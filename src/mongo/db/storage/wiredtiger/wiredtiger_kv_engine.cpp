@@ -498,14 +498,18 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
         int ret = _conn->query_timestamp(_conn, buf, "get=oldest");
         if (ret != WT_NOTFOUND) {
             invariantWTOK(ret, nullptr);
-
             std::uint64_t tmp;
             fassert(5380107, NumberParser().base(16)(buf, &tmp));
-            LOGV2_FOR_RECOVERY(
-                5380106, 0, "WiredTiger oldestTimestamp", "oldestTimestamp"_attr = Timestamp(tmp));
-            // The oldest timestamp is set in WT. Only set the in-memory variable.
-            _oldestTimestamp.store(tmp);
-            setInitialDataTimestamp(Timestamp(tmp));
+
+            if (tmp != 0) {
+                LOGV2_FOR_RECOVERY(5380106,
+                                   0,
+                                   "WiredTiger oldestTimestamp",
+                                   "oldestTimestamp"_attr = Timestamp(tmp));
+                // The oldest timestamp is set in WT. Only set the in-memory variable.
+                _oldestTimestamp.store(tmp);
+                setInitialDataTimestamp(Timestamp(tmp));
+            }
         }
     }
 
@@ -2187,12 +2191,18 @@ uint64_t _fetchAllDurableValue(WT_CONNECTION* conn) {
         // Treat this as lowest possible timestamp; we need to see all preexisting data but no new
         // (timestamped) data.
         return StorageEngine::kMinimumTimestamp;
-    } else {
-        invariantWTOK(wtStatus, nullptr);
     }
+
+    invariantWTOK(wtStatus, nullptr);
 
     uint64_t tmp;
     fassert(38002, NumberParser().base(16)(buf, &tmp));
+    if (tmp == 0) {
+        // Treat this as lowest possible timestamp; we need to see all preexisting data but no new
+        // (timestamped) data.
+        return StorageEngine::kMinimumTimestamp;
+    }
+
     return tmp;
 }
 }  // namespace
