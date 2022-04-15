@@ -18,7 +18,7 @@ let primary = replSet.getPrimary();
 const initialPrimaryStatus = assert.commandWorked(primary.adminCommand({serverStatus: 1}));
 
 jsTestLog('2: step down primary');
-assert.commandWorked(primary.getDB("admin").runCommand({replSetStepDown: 1, force: 1}));
+assert.commandWorked(primary.getDB("admin").runCommand({replSetStepDown: 30, force: 1}));
 
 jsTestLog('3: wait for stepped down node to become primary again');
 primary = replSet.getPrimary();
