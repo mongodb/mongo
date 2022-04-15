@@ -2,7 +2,7 @@
  * Test that the in-memory execution history of write statements executed in a retryable internal
  * transaction gets discarded after the transaction aborts.
  *
- * @tags: [requires_fcv_60]
+ * @tags: [requires_fcv_60, uses_transactions]
  */
 (function() {
 "use strict";

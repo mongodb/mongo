@@ -2,7 +2,7 @@
  * Test that retryable internal transactions cannot be retried while they are still open (i.e. not
  * committed or aborted).
  *
- * @tags: [requires_fcv_60]
+ * @tags: [requires_fcv_60, uses_transactions]
  */
 (function() {
 "use strict";

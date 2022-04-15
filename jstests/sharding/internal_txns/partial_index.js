@@ -2,7 +2,7 @@
  * Tests that the config.transactions collection has a partial index such that the find query of the
  * form {"parentLsid": ..., "_id.txnNumber": ...} is a covered query.
  *
- * @tags: [requires_fcv_60]
+ * @tags: [requires_fcv_60, uses_transactions]
  */
 (function() {
 "use strict";

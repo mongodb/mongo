@@ -1,7 +1,7 @@
 /*
  * Tests that txnRetryCounter is only supported in sharded clusters and in transactions.
  *
- * @tags: [requires_fcv_60]
+ * @tags: [requires_fcv_60, uses_transactions]
  */
 (function() {
 'use strict';

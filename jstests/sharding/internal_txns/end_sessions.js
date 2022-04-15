@@ -2,7 +2,7 @@
  * Tests that running the endSessions command for a parent session causes the config.transactions
  * and config.image_collection entries for its child sessions to get reaped.
  *
- * @tags: [requires_fcv_60]
+ * @tags: [requires_fcv_60, uses_transactions]
  */
 
 (function() {

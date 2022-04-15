@@ -4,7 +4,7 @@
  * is blocked until the transaction commits or aborts and does not cause any write statements that
  * have already executed to execute again.
  *
- * @tags: [requires_fcv_60]
+ * @tags: [requires_fcv_60, uses_transactions]
  */
 (function() {
 "use strict";
