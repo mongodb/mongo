@@ -207,7 +207,7 @@ private:
     const FLEStateCollectionReader* _eccReader;
 
     // True if the last Expression or MatchExpression processed by this rewriter was rewritten.
-    bool _rewroteLastExpression;
+    bool _rewroteLastExpression = false;
 };
 
 
