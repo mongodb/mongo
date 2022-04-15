@@ -1157,6 +1157,15 @@ void CollectionImpl::deleteDocument(OperationContext* opCtx,
         }
     }
 
+    if (_shared->_needCappedLock) {
+        // X-lock the metadata resource for this capped collection until the end of the WUOW. This
+        // prevents the primary from executing with more concurrency than secondaries and protects
+        // '_cappedFirstRecord'.
+        // See SERVER-21646.
+        Lock::ResourceLock heldUntilEndOfWUOW{
+            opCtx->lockState(), ResourceId(RESOURCE_METADATA, _ns.ns()), MODE_X};
+    }
+
     std::vector<OplogSlot> oplogSlots;
     if (storeDeletedDoc == Collection::StoreDeletedDoc::On && !getRecordPreImages()) {
         oplogSlots = reserveOplogSlotsForRetryableFindAndModify(opCtx, 2);

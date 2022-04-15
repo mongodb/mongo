@@ -192,7 +192,8 @@ void ScanStage::doRestoreState() {
     _coll = restoreCollection(_opCtx, _collName, _collUuid, _catalogEpoch);
 
     if (_cursor) {
-        const bool couldRestore = _cursor->restore();
+        const auto tolerateCappedCursorRepositioning = false;
+        const bool couldRestore = _cursor->restore(tolerateCappedCursorRepositioning);
         uassert(ErrorCodes::CappedPositionLost,
                 str::stream()
                     << "CollectionScan died due to position in capped collection being deleted. ",

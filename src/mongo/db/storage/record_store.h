@@ -132,15 +132,18 @@ public:
      * Returns false if it is invalid to continue using this Cursor. This usually means that
      * capped deletes have caught up to the position of this Cursor and continuing could
      * result in missed data. Note that Cursors, unlike iterators can continue to iterate past the
-     * "end"
+     * "end".
      *
      * If the former position no longer exists, but it is safe to continue iterating, the
      * following call to next() will return the next closest position in the direction of the
      * scan, if any.
      *
      * This handles restoring after either save() or SeekableRecordCursor::saveUnpositioned().
+     *
+     * 'tolerateCappedRepositioning' allows repositioning a capped cursor, which is useful for
+     * range writes.
      */
-    virtual bool restore() = 0;
+    virtual bool restore(bool tolerateCappedRepositioning = true) = 0;
 
     /**
      * Detaches from the OperationContext and releases any storage-engine state.

@@ -51,7 +51,7 @@ public:
         return {};
     }
     void save() final {}
-    bool restore() final {
+    bool restore(bool tolerateCappedRepositioning = true) final {
         return true;
     }
     void detachFromOperationContext() final {}

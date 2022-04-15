@@ -461,7 +461,7 @@ void RecordStore::Cursor::saveUnpositioned() {
     _savedPosition = boost::none;
 }
 
-bool RecordStore::Cursor::restore() {
+bool RecordStore::Cursor::restore(bool tolerateCappedRepositioning) {
     if (!_savedPosition)
         return true;
 
@@ -588,7 +588,7 @@ void RecordStore::ReverseCursor::saveUnpositioned() {
     _savedPosition = boost::none;
 }
 
-bool RecordStore::ReverseCursor::restore() {
+bool RecordStore::ReverseCursor::restore(bool tolerateCappedRepositioning) {
     if (!_savedPosition)
         return true;
 

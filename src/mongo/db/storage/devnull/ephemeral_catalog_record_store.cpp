@@ -163,7 +163,7 @@ public:
         _savedId = RecordId();
     }
 
-    bool restore() final {
+    bool restore(bool tolerateCappedRepositioning) final {
         if (_savedId.isNull()) {
             _it = _records.end();
             return true;
@@ -241,7 +241,7 @@ public:
         _savedId = RecordId();
     }
 
-    bool restore() final {
+    bool restore(bool tolerateCappedRepositioning) final {
         if (_savedId.isNull()) {
             _it = _records.rend();
             return true;

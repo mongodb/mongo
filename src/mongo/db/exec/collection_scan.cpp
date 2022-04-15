@@ -299,7 +299,8 @@ void CollectionScan::doSaveStateRequiresCollection() {
 
 void CollectionScan::doRestoreStateRequiresCollection() {
     if (_cursor) {
-        const bool couldRestore = _cursor->restore();
+        const auto tolerateCappedCursorRepositioning = expCtx()->getIsCappedDelete();
+        const bool couldRestore = _cursor->restore(tolerateCappedCursorRepositioning);
         uassert(ErrorCodes::CappedPositionLost,
                 str::stream()
                     << "CollectionScan died due to position in capped collection being deleted. "

@@ -272,7 +272,7 @@ public:
         return {};
     }
     void save() final {}
-    bool restore() final {
+    bool restore(bool tolerateCappedRepositioning) final {
         return true;
     }
     void detachFromOperationContext() final {}

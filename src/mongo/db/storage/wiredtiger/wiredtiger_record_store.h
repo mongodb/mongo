@@ -402,7 +402,7 @@ public:
 
     void saveUnpositioned();
 
-    bool restore();
+    bool restore(bool tolerateCappedRepositioning = true);
 
     void detachFromOperationContext();
 
