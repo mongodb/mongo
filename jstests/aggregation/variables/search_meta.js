@@ -42,5 +42,5 @@ assert.commandFailedWithCode(db.runCommand({
 
 assert.throwsWithCode(
     () => db.non_existent_namespace.aggregate([{$searchMeta: {query: {nonsense: true}}}]),
-    [6448001, 31082]);  // Error code may change on mongos
+    [6448001, 31082, 40324]);  // Error code may change on mongos or on community server.
 })();
