@@ -48,8 +48,19 @@ public:
 
     static boost::intrusive_ptr<DocumentSourceMock> createForTest(
         Document doc, const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+    /**
+     * Convenience constructor that works with a vector of BSONObj or vector of Documents.
+     */
+    template <typename Doc>
     static boost::intrusive_ptr<DocumentSourceMock> createForTest(
-        const std::vector<BSONObj>& docs, const boost::intrusive_ptr<ExpressionContext>& expCtx);
+        const std::vector<Doc>& docs, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+        std::deque<GetNextResult> results;
+        for (auto&& doc : docs) {
+            results.emplace_back(Document(doc));
+        }
+        return new DocumentSourceMock(std::move(results), expCtx);
+    }
 
     static boost::intrusive_ptr<DocumentSourceMock> createForTest(
         const GetNextResult& result, const boost::intrusive_ptr<ExpressionContext>& expCtx);

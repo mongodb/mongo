@@ -57,11 +57,15 @@ REGISTER_INTERNAL_DOCUMENT_SOURCE(
 Value DocumentSourceSetVariableFromSubPipeline::serialize(
     boost::optional<ExplainOptions::Verbosity> explain) const {
     const auto var = "$$" + Variables::getBuiltinVariableName(_variableID);
+    SetVariableFromSubPipelineSpec spec;
     tassert(625298, "SubPipeline cannot be null during serialization", _subPipeline);
-    MutableDocument mDoc;
-    mDoc.addField("setVariable", Value(StringData(var)));
-    mDoc.addField("pipeline", Value(_subPipeline->serialize()));
-    return Value(DOC(getSourceName() << mDoc.freezeToValue()));
+    spec.setSetVariable(var);
+    spec.setPipeline(_subPipeline->serializeToBson(explain));
+    if (_ifEmptyExpr) {
+        auto ifEmptyBson = BSON("ifEmpty" << _ifEmptyExpr->serialize(bool(explain)));
+        spec.setIfEmptyExpr(IDLAnyTypeOwned::parseFromBSON(ifEmptyBson.firstElement()));
+    }
+    return Value(DOC(getSourceName() << spec.toBSON()));
 }
 
 DepsTracker::State DocumentSourceSetVariableFromSubPipeline::getDependencies(
@@ -89,33 +93,60 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceSetVariableFromSubPipeline::c
         spec.getSetVariable().toString() == searchMetaStr);
 
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline =
-        Pipeline::parse(spec.getPipeline(), expCtx);
+        Pipeline::parse(spec.getPipeline(), expCtx->copyForSubPipeline(expCtx->ns));
+
+
+    boost::intrusive_ptr<Expression> ifEmptyExpr;
+    if (spec.getIfEmptyExpr()) {
+        // The semantics of 'ifEmpty' are to execute in the sub-pipeline's context. So for example,
+        // it should see the sub-pipelines definition of "$$SEARCH_META", if there was one. So it's
+        // important to use that pipeline's ExpressionContext and variables here during evaluation.
+        ifEmptyExpr = Expression::parseOperand(pipeline->getContext().get(),
+                                               spec.getIfEmptyExpr()->getElement(),
+                                               pipeline->getContext()->variablesParseState);
+    }
 
     return DocumentSourceSetVariableFromSubPipeline::create(
-        expCtx, std::move(pipeline), Variables::kSearchMetaId);
+        expCtx, std::move(pipeline), Variables::kSearchMetaId, ifEmptyExpr);
 }
 
 intrusive_ptr<DocumentSourceSetVariableFromSubPipeline>
 DocumentSourceSetVariableFromSubPipeline::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     std::unique_ptr<Pipeline, PipelineDeleter> subpipeline,
-    Variables::Id varID) {
+    Variables::Id varID,
+    boost::intrusive_ptr<Expression> ifEmptyExpression) {
     uassert(625290,
             str::stream()
                 << "SetVariableFromSubPipeline only allows setting $$SEARCH_META variable,  '$$"
                 << Variables::getBuiltinVariableName(varID) << "' is not allowed.",
             !Variables::isUserDefinedVariable(varID) && varID == Variables::kSearchMetaId);
     return intrusive_ptr<DocumentSourceSetVariableFromSubPipeline>(
-        new DocumentSourceSetVariableFromSubPipeline(expCtx, std::move(subpipeline), varID));
+        new DocumentSourceSetVariableFromSubPipeline(
+            expCtx, std::move(subpipeline), varID, std::move(ifEmptyExpression)));
 };
 
 DocumentSource::GetNextResult DocumentSourceSetVariableFromSubPipeline::doGetNext() {
-    if (_firstCallForInput && !_subPipeline->peekFront()->constraints().requiresInputDocSource) {
+    if (_firstCallForInput) {
+        tassert(6448002,
+                "Expected to have already attached a cursor source to the pipeline",
+                !_subPipeline->peekFront()->constraints().requiresInputDocSource);
         auto nextSubPipelineInput = _subPipeline->getNext();
-        tassert(625296,
-                "No document returned from $SetVariableFromSubPipeline subpipeline ",
-                nextSubPipelineInput);
-        tassert(625297,
+        if (!nextSubPipelineInput) {
+            uassert(625296,
+                    "No document returned from $SetVariableFromSubPipeline subpipeline, and no "
+                    "default expression",
+                    _ifEmptyExpr);
+            auto exprResult =
+                _ifEmptyExpr->evaluate(Document{}, &_subPipeline->getContext()->variables);
+            uassert(6448001,
+                    str::stream() << "ifEmpty expression did not evaluate to an object: "
+                                  << exprResult.toString() << " (_ifEmptyExpr: "
+                                  << _ifEmptyExpr->serialize(true).toString() << ")",
+                    exprResult.isObject());
+            nextSubPipelineInput = exprResult.getDocument();
+        }
+        uassert(625297,
                 "Multiple documents returned from $SetVariableFromSubPipeline subpipeline when "
                 "only one expected",
                 !_subPipeline->getNext());

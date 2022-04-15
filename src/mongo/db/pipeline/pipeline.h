@@ -277,11 +277,14 @@ public:
     stdx::unordered_set<NamespaceString> getInvolvedCollections() const;
 
     /**
-     * Serializes the pipeline into a form that can be parsed into an equivalent pipeline.
+     * Helpers to serialize a pipeline.
      */
-    std::vector<Value> serialize() const;
-    std::vector<BSONObj> serializeToBson() const;
-    static std::vector<Value> serializeContainer(const SourceContainer& container);
+    std::vector<Value> serialize(
+        boost::optional<ExplainOptions::Verbosity> explain = boost::none) const;
+    std::vector<BSONObj> serializeToBson(
+        boost::optional<ExplainOptions::Verbosity> explain = boost::none) const;
+    static std::vector<Value> serializeContainer(
+        const SourceContainer& container, boost::optional<ExplainOptions::Verbosity> = boost::none);
 
     /**
      * Serializes the pipeline into BSON for explain/debug logging purposes.

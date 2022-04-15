@@ -118,7 +118,7 @@ void validateTopLevelPipeline(const Pipeline& pipeline) {
     // Verify that usage of $searchMeta and $search is legal.
     if (pipeline.getContext()->opCtx->getServiceContext()) {
         getSearchHelpers(pipeline.getContext()->opCtx->getServiceContext())
-            ->assertSearchMetaAccessValid(sources);
+            ->assertSearchMetaAccessValid(sources, pipeline.getContext().get());
     }
 }
 
@@ -445,19 +445,21 @@ stdx::unordered_set<NamespaceString> Pipeline::getInvolvedCollections() const {
     return collectionNames;
 }
 
-vector<Value> Pipeline::serializeContainer(const SourceContainer& container) {
+vector<Value> Pipeline::serializeContainer(const SourceContainer& container,
+                                           boost::optional<ExplainOptions::Verbosity> explain) {
     vector<Value> serializedSources;
     for (auto&& source : container) {
-        source->serializeToArray(serializedSources);
+        source->serializeToArray(serializedSources, explain);
     }
     return serializedSources;
 }
-vector<Value> Pipeline::serialize() const {
-    return serializeContainer(_sources);
+vector<Value> Pipeline::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
+    return serializeContainer(_sources, explain);
 }
 
-vector<BSONObj> Pipeline::serializeToBson() const {
-    const auto serialized = serialize();
+vector<BSONObj> Pipeline::serializeToBson(
+    boost::optional<ExplainOptions::Verbosity> explain) const {
+    const auto serialized = serialize(explain);
     std::vector<BSONObj> asBson;
     asBson.reserve(serialized.size());
     for (auto&& stage : serialized) {

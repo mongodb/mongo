@@ -35,14 +35,22 @@ imports:
 
 structs:
   SetVariableFromSubPipelineSpec:
-    description: Specification for a $setVariableFromSubPipeline stage given in the full, explicit format.
+    description: Specification for a $setVariableFromSubPipeline stage given in the full, explicit
+      format.
     strict: true
     fields:
       setVariable:
-        description: The variable to set equal to the document returned by the pipeline arg.
+        description: The variable to set equal to the document returned by the pipeline arg,
+          double-dollar ($$) prefixed.
         optional: false
         type: string
       pipeline:
-        description: A required aggregation pipeline that will return only one document.
+        description: A required aggregation pipeline that will return at most one document.
         optional: false
         type: pipeline
+      ifEmpty:
+        description: An expression to run to set the variable value if the pipeline returned no
+          results.
+        optional: true
+        cpp_name: IfEmptyExpr
+        type: IDLAnyTypeOwned

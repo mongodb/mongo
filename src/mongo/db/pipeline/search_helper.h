@@ -40,11 +40,18 @@ namespace mongo {
 class SearchDefaultHelperFunctions {
 public:
     virtual ~SearchDefaultHelperFunctions() {}
-    virtual void assertSearchMetaAccessValid(const Pipeline::SourceContainer& pipeline) {}
 
-    // Injects shard filterer for $_internalSearchIdLookup stage on shard only. This method is not
-    // invoked for inner collection in $lookup, for instance, only when expanded pipeline is passed
-    // to the specific shard.
+    /**
+     * Any access of $$SEARCH_META is invalid without enterprise.
+     */
+    virtual void assertSearchMetaAccessValid(const Pipeline::SourceContainer& pipeline,
+                                             ExpressionContext* expCtx);
+
+    /**
+     * Injects shard filterer for $_internalSearchIdLookup stage on shard only. This method is not
+     * invoked for inner collection in $lookup, for instance, only when expanded pipeline is passed
+     * to the specific shard.
+     */
     virtual void injectSearchShardFiltererIfNeeded(Pipeline* pipeline){};
 
     /**

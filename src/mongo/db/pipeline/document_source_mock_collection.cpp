@@ -27,32 +27,26 @@
  *    it in the license file.
  */
 
-#include "mongo/db/pipeline/search_helper.h"
-#include "mongo/db/pipeline/dependencies.h"
-#include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/variables.h"
+#include "mongo/db/pipeline/document_source_mock_collection.h"
 
 namespace mongo {
-ServiceContext::Decoration<std::unique_ptr<SearchDefaultHelperFunctions>> getSearchHelpers =
-    ServiceContext::declareDecoration<std::unique_ptr<SearchDefaultHelperFunctions>>();
 
-void SearchDefaultHelperFunctions::assertSearchMetaAccessValid(
-    const Pipeline::SourceContainer& pipeline, ExpressionContext* expCtx) {
-    // Any access of $$SEARCH_META is invalid. Note that if we hit a stage that does not support
-    // dep tracking we can't detect whether $$SEARCH_META is present. In that context $$SEARCH_META
-    // will evaluate to missing.
-    for (const auto& source : pipeline) {
-        DepsTracker dep;
-        source->getDependencies(&dep);
-        uassert(6347903,
-                "Can't access $$SEARCH_META without a $search stage earlier in the pipeline",
-                !dep.hasVariableReferenceTo({Variables::kSearchMetaId}));
-    }
+REGISTER_INTERNAL_DOCUMENT_SOURCE(mockCollection,
+                                  LiteParsedDocumentSourceDefault::parse,
+                                  DocumentSourceMockCollection::createFromBson,
+                                  true);
+
+boost::intrusive_ptr<DocumentSource> DocumentSourceMockCollection::createFromBson(
+    BSONElement arrayElem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    // Since we've already determined the stage name matched, the parser for $mockCollection is the
+    // same as the parser for $queue. Let's just re-use that parse function.
+    return make_intrusive<DocumentSourceMockCollection>(
+        DocumentSourceQueue::parseFromArray(arrayElem), expCtx);
 }
 
-ServiceContext::ConstructorActionRegisterer searchQueryHelperRegisterer{
-    "searchQueryHelperRegisterer", [](ServiceContext* context) {
-        invariant(context);
-        getSearchHelpers(context) = std::make_unique<SearchDefaultHelperFunctions>();
-    }};
+Value DocumentSourceMockCollection::serialize(
+    boost::optional<ExplainOptions::Verbosity> explain) const {
+    return DocumentSourceQueue::serializeWithName(explain, kStageName);
+}
+
 }  // namespace mongo

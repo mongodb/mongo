@@ -39,16 +39,21 @@ REGISTER_INTERNAL_DOCUMENT_SOURCE(queue,
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceQueue::createFromBson(
     BSONElement arrayElem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    return DocumentSourceQueue::create(expCtx, parseFromArray(arrayElem));
+}
+
+std::deque<DocumentSource::GetNextResult> DocumentSourceQueue::parseFromArray(
+    BSONElement arrayElem) {
     uassert(5858201,
             "literal documents specification must be an array",
             arrayElem.type() == BSONType::Array);
-    auto queue = DocumentSourceQueue::create(expCtx);
+    std::deque<GetNextResult> queue;
     // arrayElem is an Array and can be iterated through by using .Obj() method
     for (auto elem : arrayElem.Obj()) {
         uassert(5858202,
                 "literal documents specification must be an array of objects",
                 elem.type() == BSONType::Object);
-        queue->emplace_back(Document{elem.Obj()}.getOwned());
+        queue.emplace_back(Document{elem.Obj()}.getOwned());
     }
     return queue;
 }
@@ -56,7 +61,14 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceQueue::createFromBson(
 boost::intrusive_ptr<DocumentSourceQueue> DocumentSourceQueue::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     boost::optional<StringData> aliasStageName) {
-    return new DocumentSourceQueue({}, expCtx, aliasStageName);
+    return DocumentSourceQueue::create(expCtx, {}, aliasStageName);
+}
+
+boost::intrusive_ptr<DocumentSourceQueue> DocumentSourceQueue::create(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    std::deque<GetNextResult> documents,
+    boost::optional<StringData> aliasStageName) {
+    return make_intrusive<DocumentSourceQueue>(std::move(documents), expCtx, aliasStageName);
 }
 
 DocumentSourceQueue::DocumentSourceQueue(std::deque<GetNextResult> results,
@@ -81,11 +93,16 @@ DocumentSource::GetNextResult DocumentSourceQueue::doGetNext() {
 }
 
 Value DocumentSourceQueue::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
+    return serializeWithName(explain, kStageName);
+}
+
+Value DocumentSourceQueue::serializeWithName(boost::optional<ExplainOptions::Verbosity> explain,
+                                             StringData stageName) const {
     ValueArrayStream vals;
     for (auto elem : _queue) {
         vals << elem.getDocument().getOwned();
     }
-    return Value(DOC(kStageName << vals.done()));
+    return Value(DOC(stageName << vals.done()));
 }
 
 }  // namespace mongo
