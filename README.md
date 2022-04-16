@@ -2,6 +2,10 @@
 
 Welcome to MongoDB!
 
+## Definition
+
+ MongoDB is an open source NoSQL database program that uses document models instead of relational tables.
+
 ## Components
 
   - `mongod` - The database server.
