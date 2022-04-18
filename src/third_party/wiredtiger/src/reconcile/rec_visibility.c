@@ -459,14 +459,6 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, W
           !is_hs_page &&
           (F_ISSET(r, WT_REC_VISIBLE_ALL) ? WT_TXNID_LE(r->last_running, txnid) :
                                             !__txn_visible_id(session, txnid))) {
-            /*
-             * Rare case: when applications run at low isolation levels, eviction may see a
-             * committed update followed by uncommitted updates. Give up in that case because we
-             * can't move uncommitted updates to the history store.
-             */
-            if (upd_select->upd != NULL)
-                return (__wt_set_return(session, EBUSY));
-
             has_newer_updates = true;
             continue;
         }
