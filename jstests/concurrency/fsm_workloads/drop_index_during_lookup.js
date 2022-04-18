@@ -13,7 +13,7 @@ var $config = (function() {
     };
 
     let states = {
-        lookup(db, collName) {
+        lookup: function lookup(db, collName) {
             try {
                 const coll = db[this.collName];
                 const result = coll.aggregate([{$lookup: { from: this.foreignCollName, localField: 'a', foreignField: 'b', as: 'out'}}]).toArray();
@@ -26,7 +26,7 @@ var $config = (function() {
             }
         },
 
-        dropIndex(db, collName) {
+        dropIndex: function dropIndex(db, collName) {
             // We don't assert that the command succeeded when dropping an index because it's
             // possible another thread has already dropped this index.
             db[this.foreignCollName].dropIndex({b: 1});
