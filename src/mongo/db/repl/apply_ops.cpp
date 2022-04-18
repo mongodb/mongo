@@ -107,17 +107,6 @@ Status _applyOps(OperationContext* opCtx,
             // ApplyOps does not have the global writer lock when applying transaction
             // operations, so we need to acquire the DB and Collection locks.
             Lock::DBLock dbLock(opCtx, nss.db(), MODE_IX);
-            // TODO SERVER-64608 Use the tenantID from 'nss' to construct the DatabaseName
-            const TenantDatabaseName tenantDbName(boost::none, nss.db());
-            auto databaseHolder = DatabaseHolder::get(opCtx);
-            auto db = databaseHolder->getDb(opCtx, tenantDbName);
-            if (!db) {
-                // Retry in non-atomic mode, since MMAP cannot implicitly create a new database
-                // within an active WriteUnitOfWork.
-                uasserted(ErrorCodes::AtomicityFailure,
-                          "cannot create a database in atomic applyOps mode; will retry without "
-                          "atomicity");
-            }
 
             // When processing an update on a non-existent collection, applyOperation_inlock()
             // returns UpdateOperationFailed on updates and allows the collection to be
