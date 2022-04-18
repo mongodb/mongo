@@ -8,3 +8,4 @@ structlog ~= 19.2.0
 typing <= 3.7.4.3
 yamllint == 1.15.0
 yapf == 0.26.0
+types-setuptools == 57.4.12
