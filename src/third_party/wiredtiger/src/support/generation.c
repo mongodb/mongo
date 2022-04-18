@@ -107,8 +107,9 @@ __wt_gen_drain(WT_SESSION_IMPL *session, int which, uint64_t generation)
     struct timespec start, stop;
     WT_CONNECTION_IMPL *conn;
     WT_SESSION_IMPL *s;
-    uint64_t time_diff_ms, v, minutes;
+    uint64_t time_diff_ms, v;
     uint32_t i, session_cnt;
+    u_int minutes;
     int pause_cnt;
     bool verbose_timeout_flags;
 
@@ -168,7 +169,7 @@ __wt_gen_drain(WT_SESSION_IMPL *session, int which, uint64_t generation)
 #define WT_GEN_DRAIN_TIMEOUT_MIN 4
                 if (time_diff_ms > minutes * WT_MINUTE * WT_THOUSAND) {
                     __wt_verbose_notice(session, WT_VERB_GENERATION,
-                      "%s generation drain waited %lu minutes", __gen_name(which), minutes);
+                      "%s generation drain waited %u minutes", __gen_name(which), minutes);
                     ++minutes;
                     WT_ASSERT(session, minutes < WT_GEN_DRAIN_TIMEOUT_MIN);
                 }
