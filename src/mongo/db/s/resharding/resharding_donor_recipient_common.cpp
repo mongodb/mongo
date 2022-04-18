@@ -263,20 +263,21 @@ ReshardingRecipientDocument constructRecipientDocumentFromReshardingFields(
     const NamespaceString& nss,
     const CollectionMetadata& metadata,
     const ReshardingFields& reshardingFields) {
+    const auto& recipientFields = reshardingFields.getRecipientFields();
     // The recipient state machines are created before the donor shards are prepared to donate but
     // will remain idle until the donor shards are prepared to donate.
-    invariant(!reshardingFields.getRecipientFields()->getCloneTimestamp());
+    invariant(!recipientFields->getCloneTimestamp());
 
     RecipientShardContext recipientCtx;
     recipientCtx.setState(RecipientStateEnum::kAwaitingFetchTimestamp);
 
-    auto recipientDoc = ReshardingRecipientDocument{
-        std::move(recipientCtx),
-        reshardingFields.getRecipientFields()->getDonorShards(),
-        reshardingFields.getRecipientFields()->getMinimumOperationDurationMillis()};
+    auto recipientDoc =
+        ReshardingRecipientDocument{std::move(recipientCtx),
+                                    recipientFields->getDonorShards(),
+                                    recipientFields->getMinimumOperationDurationMillis()};
 
-    auto sourceNss = reshardingFields.getRecipientFields()->getSourceNss();
-    auto sourceUUID = reshardingFields.getRecipientFields()->getSourceUUID();
+    auto sourceNss = recipientFields->getSourceNss();
+    auto sourceUUID = recipientFields->getSourceUUID();
     auto commonMetadata = CommonReshardingMetadata(reshardingFields.getReshardingUUID(),
                                                    sourceNss,
                                                    sourceUUID,
@@ -284,6 +285,10 @@ ReshardingRecipientDocument constructRecipientDocumentFromReshardingFields(
                                                    metadata.getShardKeyPattern().toBSON());
     if (ShardingDataTransformMetrics::isEnabled()) {
         commonMetadata.setStartTime(reshardingFields.getStartTime());
+        ReshardingRecipientMetrics metrics;
+        metrics.setApproxDocumentsToCopy(recipientFields->getApproxDocumentsToCopy());
+        metrics.setApproxBytesToCopy(recipientFields->getApproxBytesToCopy());
+        recipientDoc.setMetrics(std::move(metrics));
     }
     recipientDoc.setCommonReshardingMetadata(std::move(commonMetadata));
 

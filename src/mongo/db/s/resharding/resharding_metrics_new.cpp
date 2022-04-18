@@ -146,4 +146,28 @@ void ReshardingMetricsNew::accumulateFrom(const ReshardingOplogApplierProgress& 
                      progressDoc.getWritesToStashCollections());
 }
 
+void ReshardingMetricsNew::restoreRecipientSpecificFields(
+    const ReshardingRecipientDocument& document) {
+    auto metrics = document.getMetrics();
+    if (!metrics) {
+        return;
+    }
+    auto docsToCopy = metrics->getApproxDocumentsToCopy();
+    auto bytesToCopy = metrics->getApproxBytesToCopy();
+    if (docsToCopy && bytesToCopy) {
+        setDocumentsToCopyCounts(*docsToCopy, *bytesToCopy);
+    }
+    auto docsCopied = metrics->getFinalDocumentsCopiedCount();
+    auto bytesCopied = metrics->getFinalBytesCopiedCount();
+    if (docsCopied && bytesCopied) {
+        restoreDocumentsCopied(*docsCopied, *bytesCopied);
+    }
+    restorePhaseDurationFields(document);
+}
+
+void ReshardingMetricsNew::restoreCoordinatorSpecificFields(
+    const ReshardingCoordinatorDocument& document) {
+    restorePhaseDurationFields(document);
+}
+
 }  // namespace mongo

@@ -72,6 +72,27 @@ inline constexpr ShardingDataTransformMetrics::Role getRoleForStateDocument() {
 
 void onCriticalSectionError(OperationContext* opCtx, const StaleConfigInfo& info) noexcept;
 
+template <typename T>
+std::string getMetricsPrefix() {
+    static_assert(isStateDocument<T>);
+    return T::kMetricsFieldName + ".";
+}
+
+template <typename T>
+std::string getIntervalPrefix(const StringData& intervalFieldName) {
+    return getMetricsPrefix<T>() + intervalFieldName + ".";
+}
+
+template <typename T>
+std::string getIntervalStartFieldName(const StringData& intervalFieldName) {
+    return getIntervalPrefix<T>(intervalFieldName) + ReshardingMetricsTimeInterval::kStartFieldName;
+}
+
+template <typename T>
+std::string getIntervalEndFieldName(const StringData& intervalFieldName) {
+    return getIntervalPrefix<T>(intervalFieldName) + ReshardingMetricsTimeInterval::kStopFieldName;
+}
+
 }  // namespace resharding_metrics
 
 }  // namespace mongo

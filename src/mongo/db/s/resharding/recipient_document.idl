@@ -55,6 +55,22 @@ structs:
                 description: >-
                     The time interval that it takes to apply oplog entries on this recipient.
                 optional: true
+            approxDocumentsToCopy:
+                type: long
+                optional: true
+            approxBytesToCopy:
+                type: long
+                optional: true
+            finalDocumentsCopiedCount:
+                type: long
+                description: >-
+                    The total number of documents copied after the cloning step completes.
+                optional: true
+            finalBytesCopiedCount:
+                type: long
+                description: >-
+                    The total number of bytes copied after the cloning step completes.
+                optional: true
 
     ReshardingRecipientDocument:
         description: "Represents a resharding operation on the recipient shard."

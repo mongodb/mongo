@@ -72,6 +72,11 @@ structs:
                     type: ReshardingMetricsTimeInterval
                     description: >-
                         The time interval of the entire resharding operation on the coordinator.
+                    optional: true            
+            documentCopy:
+                    type: ReshardingMetricsTimeInterval
+                    description: >-
+                        The time interval that it takes to clone documents on this recipient.
                     optional: true
 
     ReshardingCoordinatorDocument:

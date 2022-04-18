@@ -79,6 +79,14 @@ protected:
         LogicalSessionCache::set(getServiceContext(), std::make_unique<LogicalSessionCacheNoop>());
         TransactionCoordinatorService::get(operationContext())
             ->onShardingInitialization(operationContext(), true);
+
+        _metrics =
+            ReshardingMetricsNew::makeInstance(_originalUUID,
+                                               _newShardKey.toBSON(),
+                                               _originalNss,
+                                               ReshardingMetricsNew::Role::kCoordinator,
+                                               getServiceContext()->getFastClockSource()->now(),
+                                               getServiceContext());
     }
 
     void tearDown() override {
@@ -568,7 +576,7 @@ protected:
 
         auto reshardingCoordinatorExternalState = ReshardingCoordinatorExternalStateImpl();
 
-        insertCoordDocAndChangeOrigCollEntry(opCtx, expectedCoordinatorDoc);
+        insertCoordDocAndChangeOrigCollEntry(opCtx, _metrics.get(), expectedCoordinatorDoc);
 
         auto shardsAndChunks =
             reshardingCoordinatorExternalState.calculateParticipantShardsAndChunks(
@@ -587,7 +595,8 @@ protected:
         expectedCoordinatorDoc.setZones(boost::none);
         expectedCoordinatorDoc.setPresetReshardedChunks(boost::none);
 
-        writeParticipantShardsAndTempCollInfo(opCtx, expectedCoordinatorDoc, initialChunks, zones);
+        writeParticipantShardsAndTempCollInfo(
+            opCtx, _metrics.get(), expectedCoordinatorDoc, initialChunks, zones);
 
         // Check that config.reshardingOperations and config.collections entries are updated
         // correctly
@@ -601,7 +610,8 @@ protected:
 
     void writeStateTransitionUpdateExpectSuccess(
         OperationContext* opCtx, ReshardingCoordinatorDocument expectedCoordinatorDoc) {
-        writeStateTransitionAndCatalogUpdatesThenBumpShardVersions(opCtx, expectedCoordinatorDoc);
+        writeStateTransitionAndCatalogUpdatesThenBumpShardVersions(
+            opCtx, _metrics.get(), expectedCoordinatorDoc);
 
         // Check that config.reshardingOperations and config.collections entries are updated
         // correctly
@@ -614,8 +624,11 @@ protected:
         Timestamp fetchTimestamp,
         std::vector<ChunkType> expectedChunks,
         std::vector<TagsType> expectedZones) {
-        writeDecisionPersistedState(
-            operationContext(), expectedCoordinatorDoc, _finalEpoch, _finalTimestamp);
+        writeDecisionPersistedState(operationContext(),
+                                    _metrics.get(),
+                                    expectedCoordinatorDoc,
+                                    _finalEpoch,
+                                    _finalTimestamp);
 
         // Check that config.reshardingOperations and config.collections entries are updated
         // correctly
@@ -645,7 +658,7 @@ protected:
 
     void removeCoordinatorDocAndReshardingFieldsExpectSuccess(
         OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) {
-        removeCoordinatorDocAndReshardingFields(opCtx, coordinatorDoc);
+        removeCoordinatorDocAndReshardingFields(opCtx, _metrics.get(), coordinatorDoc);
 
         auto expectedCoordinatorDoc = coordinatorDoc;
         expectedCoordinatorDoc.setState(CoordinatorStateEnum::kDone);
@@ -705,6 +718,8 @@ protected:
 
     ShardKeyPattern _oldShardKey = ShardKeyPattern(BSON("oldSK" << 1));
     ShardKeyPattern _newShardKey = ShardKeyPattern(BSON("newSK" << 1));
+
+    std::unique_ptr<ReshardingMetricsNew> _metrics;
 
     const std::vector<ChunkRange> _oldChunkRanges = {
         ChunkRange(_oldShardKey.getKeyPattern().globalMin(), BSON("oldSK" << 12345)),
@@ -895,7 +910,7 @@ TEST_F(ReshardingCoordinatorPersistenceTest, StateTransitionWhenCoordinatorDocDo
     // state documents.
     auto coordinatorDoc = makeCoordinatorDoc(CoordinatorStateEnum::kCloning, Timestamp(1, 1));
     ASSERT_THROWS_CODE(writeStateTransitionAndCatalogUpdatesThenBumpShardVersions(
-                           operationContext(), coordinatorDoc),
+                           operationContext(), _metrics.get(), coordinatorDoc),
                        AssertionException,
                        ErrorCodes::NamespaceNotFound);
 }
@@ -908,9 +923,10 @@ TEST_F(ReshardingCoordinatorPersistenceTest,
     expectedCoordinatorDoc.setState(CoordinatorStateEnum::kPreparingToDonate);
 
     // Do not create the config.collections entry for the original collection
-    ASSERT_THROWS_CODE(insertCoordDocAndChangeOrigCollEntry(operationContext(), coordinatorDoc),
-                       AssertionException,
-                       ErrorCodes::NamespaceNotFound);
+    ASSERT_THROWS_CODE(
+        insertCoordDocAndChangeOrigCollEntry(operationContext(), _metrics.get(), coordinatorDoc),
+        AssertionException,
+        ErrorCodes::NamespaceNotFound);
 }
 
 TEST_F(ReshardingCoordinatorPersistenceTest, SourceCleanupBetweenTransitionsSucceeds) {

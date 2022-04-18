@@ -72,6 +72,7 @@ public:
                                                    clockSource,
                                                    cumulativeMetrics);
         result->setState(resharding_metrics::getState(document));
+        result->restoreRoleSpecificFields(document);
         return result;
     }
 
@@ -96,6 +97,40 @@ protected:
 
 private:
     std::string createOperationDescription() const noexcept override;
+    void restoreRecipientSpecificFields(const ReshardingRecipientDocument& document);
+    void restoreCoordinatorSpecificFields(const ReshardingCoordinatorDocument& document);
+
+    template <typename T>
+    void restoreRoleSpecificFields(const T& document) {
+        if constexpr (std::is_same_v<T, ReshardingRecipientDocument>) {
+            restoreRecipientSpecificFields(document);
+            return;
+        }
+        if constexpr (std::is_same_v<T, ReshardingCoordinatorDocument>) {
+            restoreCoordinatorSpecificFields(document);
+            return;
+        }
+    }
+
+    template <typename T>
+    void restorePhaseDurationFields(const T& document) {
+        static_assert(resharding_metrics::isStateDocument<T>);
+        auto metrics = document.getMetrics();
+        if (!metrics) {
+            return;
+        }
+        auto copyDurations = metrics->getDocumentCopy();
+        if (copyDurations) {
+            auto copyingBegin = copyDurations->getStart();
+            if (copyingBegin) {
+                restoreCopyingBegin(*copyingBegin);
+            }
+            auto copyingEnd = copyDurations->getStop();
+            if (copyingEnd) {
+                restoreCopyingEnd(*copyingEnd);
+            }
+        }
+    }
 
     AtomicWord<State> _state;
 };

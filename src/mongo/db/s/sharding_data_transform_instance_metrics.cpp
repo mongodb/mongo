@@ -241,12 +241,42 @@ void ShardingDataTransformInstanceMetrics::onApplyingEnd() {
     _applyingEndTime.store(_clockSource->now());
 }
 
+void ShardingDataTransformInstanceMetrics::restoreCopyingBegin(Date_t date) {
+    _copyingStartTime.store(date);
+}
+
+void ShardingDataTransformInstanceMetrics::restoreCopyingEnd(Date_t date) {
+    _copyingEndTime.store(date);
+}
+
+Date_t ShardingDataTransformInstanceMetrics::getCopyingBegin() const {
+    return _copyingStartTime.load();
+}
+
+Date_t ShardingDataTransformInstanceMetrics::getCopyingEnd() const {
+    return _copyingEndTime.load();
+}
+
 void ShardingDataTransformInstanceMetrics::onDocumentsCopied(int64_t documentCount,
                                                              int64_t totalDocumentsSizeBytes,
                                                              Milliseconds elapsed) {
     _documentsCopied.addAndFetch(documentCount);
     _bytesCopied.addAndFetch(totalDocumentsSizeBytes);
     _cumulativeMetrics->onInsertsDuringCloning(documentCount, elapsed);
+}
+
+int64_t ShardingDataTransformInstanceMetrics::getDocumentsCopiedCount() const {
+    return _documentsCopied.load();
+}
+
+int64_t ShardingDataTransformInstanceMetrics::getBytesCopiedCount() const {
+    return _bytesCopied.load();
+}
+
+void ShardingDataTransformInstanceMetrics::restoreDocumentsCopied(int64_t documentCount,
+                                                                  int64_t totalDocumentsSizeBytes) {
+    _documentsCopied.store(documentCount);
+    _bytesCopied.store(totalDocumentsSizeBytes);
 }
 
 void ShardingDataTransformInstanceMetrics::setDocumentsToCopyCounts(

@@ -52,6 +52,7 @@
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_future_util.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
+#include "mongo/db/s/resharding/resharding_metrics_helpers.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier.h"
 #include "mongo/db/s/resharding/resharding_recipient_service_external_state.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
@@ -109,6 +110,40 @@ void ensureFulfilledPromise(WithLock lk, SharedPromise<T>& sp, T value) {
     } else {
         // Ensure that we would only attempt to fulfill the promise with the same value.
         invariant(future.get() == value);
+    }
+}
+
+using resharding_metrics::getIntervalEndFieldName;
+using resharding_metrics::getIntervalStartFieldName;
+using DocT = ReshardingRecipientDocument;
+const auto metricsPrefix = resharding_metrics::getMetricsPrefix<DocT>();
+
+void buildStateDocumentCloneMetricsForUpdate(BSONObjBuilder& bob, ReshardingMetricsNew* metrics) {
+    bob.append(getIntervalStartFieldName<DocT>(ReshardingRecipientMetrics::kDocumentCopyFieldName),
+               metrics->getCopyingBegin());
+}
+
+void buildStateDocumentApplyMetricsForUpdate(BSONObjBuilder& bob, ReshardingMetricsNew* metrics) {
+    bob.append(getIntervalEndFieldName<DocT>(ReshardingRecipientMetrics::kDocumentCopyFieldName),
+               metrics->getCopyingEnd());
+    bob.append(metricsPrefix + ReshardingRecipientMetrics::kFinalDocumentsCopiedCountFieldName,
+               metrics->getDocumentsCopiedCount());
+    bob.append(metricsPrefix + ReshardingRecipientMetrics::kFinalBytesCopiedCountFieldName,
+               metrics->getBytesCopiedCount());
+}
+
+void buildStateDocumentMetricsForUpdate(BSONObjBuilder& bob,
+                                        ReshardingMetricsNew* metrics,
+                                        RecipientStateEnum newState) {
+    switch (newState) {
+        case RecipientStateEnum::kCloning:
+            buildStateDocumentCloneMetricsForUpdate(bob, metrics);
+            return;
+        case RecipientStateEnum::kApplying:
+            buildStateDocumentApplyMetricsForUpdate(bob, metrics);
+            return;
+        default:
+            return;
     }
 }
 
@@ -814,13 +849,13 @@ void ReshardingRecipientService::RecipientStateMachine::_transitionToCreatingCol
 
 void ReshardingRecipientService::RecipientStateMachine::_transitionToCloning(
     const CancelableOperationContextFactory& factory) {
+    if (ShardingDataTransformMetrics::isEnabled()) {
+        _metricsNew->onCopyingBegin();
+    }
     auto newRecipientCtx = _recipientCtx;
     newRecipientCtx.setState(RecipientStateEnum::kCloning);
     _transitionState(std::move(newRecipientCtx), boost::none, boost::none, factory);
     _metrics()->startCopyingDocuments(getCurrentTime());
-    if (ShardingDataTransformMetrics::isEnabled()) {
-        _metricsNew->onCopyingBegin();
-    }
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_transitionToApplying(
@@ -1005,6 +1040,11 @@ void ReshardingRecipientService::RecipientStateMachine::_updateRecipientDocument
                               *configStartTime);
         }
 
+        if (ShardingDataTransformMetrics::isEnabled()) {
+            buildStateDocumentMetricsForUpdate(
+                setBuilder, _metricsNew.get(), newRecipientCtx.getState());
+        }
+
         setBuilder.doneFast();
     }
 
@@ -1118,6 +1158,14 @@ void ReshardingRecipientService::RecipientStateMachine::_restoreMetrics(
         if (tempReshardingColl) {
             documentBytesCopied = tempReshardingColl->dataSize(opCtx.get());
             documentCountCopied = tempReshardingColl->numRecords(opCtx.get());
+        }
+        if (ShardingDataTransformMetrics::isEnabled() &&
+            _recipientCtx.getState() == RecipientStateEnum::kCloning) {
+            // Before cloning, these values are 0. After cloning these values are written to the
+            // metrics section of the recipient state document and restored during metrics
+            // initialization. This is so that applied oplog entries that add or remove documents do
+            // not affect the cloning metrics.
+            _metricsNew->restoreDocumentsCopied(documentCountCopied, documentBytesCopied);
         }
     }
 

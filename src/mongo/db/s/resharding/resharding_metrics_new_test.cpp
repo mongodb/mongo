@@ -71,6 +71,30 @@ public:
         return metrics->reportForCurrentOp();
     }
 
+    ReshardingRecipientDocument createRecipientDocument(RecipientStateEnum state,
+                                                        const UUID& operationId) {
+        RecipientShardContext recipientCtx;
+        recipientCtx.setState(state);
+        ReshardingRecipientDocument doc{std::move(recipientCtx), {ShardId{"donor1"}}, 5};
+        doc.setCommonReshardingMetadata(createCommonReshardingMetadata(operationId));
+        return doc;
+    }
+
+    ReshardingDonorDocument createDonorDocument(DonorStateEnum state, const UUID& operationId) {
+        DonorShardContext donorCtx;
+        donorCtx.setState(state);
+        ReshardingDonorDocument doc{std::move(donorCtx), {ShardId{"recipient1"}}};
+        doc.setCommonReshardingMetadata(createCommonReshardingMetadata(operationId));
+        return doc;
+    }
+
+    ReshardingCoordinatorDocument createCoordinatorDocument(CoordinatorStateEnum state,
+                                                            const UUID& operationId) {
+        ReshardingCoordinatorDocument doc{state, {}, {}};
+        doc.setCommonReshardingMetadata(createCommonReshardingMetadata(operationId));
+        return doc;
+    }
+
     CommonReshardingMetadata createCommonReshardingMetadata(const UUID& operationId) {
         CommonReshardingMetadata metadata{
             operationId,
@@ -95,6 +119,58 @@ public:
                   0);
         ASSERT_EQ(report.getIntField("totalOperationTimeElapsedSecs"), kRunningTime.count());
     }
+
+    template <typename MetricsDocument, typename Document>
+    void doRestoreOngoingPhaseTest(const std::function<Document()>& createDocument,
+                                   const std::string& fieldName) {
+        doRestorePhaseTestImpl<MetricsDocument>(createDocument, fieldName, false);
+    }
+
+    template <typename MetricsDocument, typename Document>
+    void doRestoreCompletedPhaseTest(const std::function<Document()>& createDocument,
+                                     const std::string& fieldName) {
+        doRestorePhaseTestImpl<MetricsDocument>(createDocument, fieldName, true);
+    }
+
+    template <typename MetricsDocument, typename Document>
+    void doRestorePhaseTestImpl(const std::function<Document()>& createDocument,
+                                const std::string& fieldName,
+                                bool completed) {
+        constexpr auto kInterval = Milliseconds{5000};
+        auto clock = getClockSource();
+        const auto start = clock->now();
+        boost::optional<long long> finishedPhaseDuration;
+
+        auto getExpectedDuration = [&] {
+            if (finishedPhaseDuration) {
+                return *finishedPhaseDuration;
+            }
+            return durationCount<Seconds>(clock->now() - start);
+        };
+
+        ReshardingMetricsTimeInterval interval;
+        interval.setStart(start);
+        if (completed) {
+            clock->advance(kInterval);
+            interval.setStop(clock->now());
+            finishedPhaseDuration = durationCount<Seconds>(kInterval);
+        }
+        MetricsDocument metricsDoc;
+        metricsDoc.setDocumentCopy(interval);
+        auto doc = createDocument();
+        doc.setMetrics(metricsDoc);
+
+        auto metrics =
+            ReshardingMetricsNew::initializeFrom(doc, getClockSource(), &_cumulativeMetrics);
+
+        clock->advance(kInterval);
+        auto report = metrics->reportForCurrentOp();
+        ASSERT_EQ(report.getIntField(fieldName), getExpectedDuration());
+
+        clock->advance(kInterval);
+        report = metrics->reportForCurrentOp();
+        ASSERT_EQ(report.getIntField(fieldName), getExpectedDuration());
+    }
 };
 
 
@@ -113,14 +189,10 @@ TEST_F(ReshardingMetricsTest, ReportForCurrentOpShouldHaveGlobalIndexDescription
     });
 }
 
-TEST_F(ReshardingMetricsTest, RestoresFromRecipientStateDocument) {
-    RecipientShardContext recipientCtx;
+TEST_F(ReshardingMetricsTest, RestoresGeneralFieldsFromRecipientStateDocument) {
     auto state = RecipientStateEnum::kAwaitingFetchTimestamp;
-    recipientCtx.setState(state);
-    ReshardingRecipientDocument doc{std::move(recipientCtx), {ShardId{"donor1"}}, 5};
     auto opId = UUID::gen();
-    doc.setCommonReshardingMetadata(createCommonReshardingMetadata(opId));
-    auto report = getReportFromStateDocument(std::move(doc));
+    auto report = getReportFromStateDocument(createRecipientDocument(state, opId));
 
     verifyCommonCurrentOpFields(report);
     ASSERT_EQ(report.getStringField("desc"),
@@ -128,26 +200,64 @@ TEST_F(ReshardingMetricsTest, RestoresFromRecipientStateDocument) {
     ASSERT_EQ(report.getStringField("recipientState").toString(), RecipientState_serializer(state));
 }
 
-TEST_F(ReshardingMetricsTest, RestoresFromDonorStateDocument) {
-    DonorShardContext donorCtx;
-    auto state = DonorStateEnum::kDonatingInitialData;
-    donorCtx.setState(state);
-    ReshardingDonorDocument doc{std::move(donorCtx), {ShardId{"recipient1"}}};
-    auto opId = UUID::gen();
-    doc.setCommonReshardingMetadata(createCommonReshardingMetadata(opId));
+TEST_F(ReshardingMetricsTest, RestoresByteAndDocumentCountsFromRecipientStateDocument) {
+    constexpr auto kDocsToCopy = 100;
+    constexpr auto kBytesToCopy = 1000;
+    constexpr auto kDocsCopied = 101;
+    constexpr auto kBytesCopied = 1001;
+    ReshardingRecipientMetrics metrics;
+    metrics.setApproxDocumentsToCopy(kDocsToCopy);
+    metrics.setApproxBytesToCopy(kBytesToCopy);
+    metrics.setFinalBytesCopiedCount(kBytesCopied);
+    metrics.setFinalDocumentsCopiedCount(kDocsCopied);
+    auto doc = createRecipientDocument(RecipientStateEnum::kApplying, UUID::gen());
+    doc.setMetrics(metrics);
     auto report = getReportFromStateDocument(std::move(doc));
+
+    ASSERT_EQ(report.getIntField("approxDocumentsToCopy"), kDocsToCopy);
+    ASSERT_EQ(report.getIntField("approxBytesToCopy"), kBytesToCopy);
+    ASSERT_EQ(report.getIntField("documentsCopied"), kDocsCopied);
+    ASSERT_EQ(report.getIntField("bytesCopied"), kBytesCopied);
+}
+
+TEST_F(ReshardingMetricsTest, RestoresByteAndDocumentCountsDuringCloning) {
+    constexpr auto kDocsCopied = 50;
+    constexpr auto kBytesCopied = 500;
+
+    auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kRecipient);
+    metrics->restoreDocumentsCopied(kDocsCopied, kBytesCopied);
+    auto report = metrics->reportForCurrentOp();
+
+    ASSERT_EQ(report.getIntField("documentsCopied"), kDocsCopied);
+    ASSERT_EQ(report.getIntField("bytesCopied"), kBytesCopied);
+}
+
+TEST_F(ReshardingMetricsTest, RestoresOngoingCloningTimeFromRecipientStateDocument) {
+    doRestoreOngoingPhaseTest<ReshardingRecipientMetrics, ReshardingRecipientDocument>(
+        [this] { return createRecipientDocument(RecipientStateEnum::kCloning, UUID::gen()); },
+        "totalCopyTimeElapsedSecs");
+}
+
+TEST_F(ReshardingMetricsTest, RestoresFinishedCloningTimeFromRecipientStateDocument) {
+    doRestoreCompletedPhaseTest<ReshardingRecipientMetrics, ReshardingRecipientDocument>(
+        [this] { return createRecipientDocument(RecipientStateEnum::kApplying, UUID::gen()); },
+        "totalCopyTimeElapsedSecs");
+}
+
+TEST_F(ReshardingMetricsTest, RestoresGeneralFieldsFromDonorStateDocument) {
+    auto state = DonorStateEnum::kDonatingInitialData;
+    auto opId = UUID::gen();
+    auto report = getReportFromStateDocument(createDonorDocument(state, opId));
 
     verifyCommonCurrentOpFields(report);
     ASSERT_EQ(report.getStringField("desc"), "ReshardingMetricsDonorService " + opId.toString());
     ASSERT_EQ(report.getStringField("donorState").toString(), DonorState_serializer(state));
 }
 
-TEST_F(ReshardingMetricsTest, RestoresFromCoordinatorStateDocument) {
+TEST_F(ReshardingMetricsTest, RestoresGeneralFieldsFromCoordinatorStateDocument) {
     auto state = CoordinatorStateEnum::kPreparingToDonate;
-    ReshardingCoordinatorDocument doc{state, {}, {}};
     auto opId = UUID::gen();
-    doc.setCommonReshardingMetadata(createCommonReshardingMetadata(opId));
-    auto report = getReportFromStateDocument(std::move(doc));
+    auto report = getReportFromStateDocument(createCoordinatorDocument(state, opId));
 
     verifyCommonCurrentOpFields(report);
     ASSERT_EQ(report.getStringField("desc"),
@@ -171,6 +281,18 @@ TEST_F(ReshardingMetricsTest, RestoresFromReshardingApplierProgressDocument) {
     ASSERT_EQ(report.getIntField("updatesApplied"), 456);
     ASSERT_EQ(report.getIntField("deletesApplied"), 789);
     ASSERT_EQ(report.getIntField("countWritesToStashCollections"), 800);
+}
+
+TEST_F(ReshardingMetricsTest, RestoresOngoingCloningTimeFromCoordinatorStateDocument) {
+    doRestoreOngoingPhaseTest<ReshardingCoordinatorMetrics, ReshardingCoordinatorDocument>(
+        [this] { return createCoordinatorDocument(CoordinatorStateEnum::kCloning, UUID::gen()); },
+        "totalCopyTimeElapsedSecs");
+}
+
+TEST_F(ReshardingMetricsTest, RestoresFinishedCloningTimeFromCoordinatorStateDocument) {
+    doRestoreCompletedPhaseTest<ReshardingCoordinatorMetrics, ReshardingCoordinatorDocument>(
+        [this] { return createCoordinatorDocument(CoordinatorStateEnum::kApplying, UUID::gen()); },
+        "totalCopyTimeElapsedSecs");
 }
 
 }  // namespace

@@ -55,22 +55,28 @@ void cleanupSourceConfigCollections(OperationContext* opCtx,
                                     const ReshardingCoordinatorDocument& coordinatorDoc);
 
 void writeDecisionPersistedState(OperationContext* opCtx,
+                                 ReshardingMetricsNew* metrics,
                                  const ReshardingCoordinatorDocument& coordinatorDoc,
                                  OID newCollectionEpoch,
                                  Timestamp newCollectionTimestamp);
 
 void insertCoordDocAndChangeOrigCollEntry(OperationContext* opCtx,
+                                          ReshardingMetricsNew* metrics,
                                           const ReshardingCoordinatorDocument& coordinatorDoc);
 
 void writeParticipantShardsAndTempCollInfo(OperationContext* opCtx,
+                                           ReshardingMetricsNew* metrics,
                                            const ReshardingCoordinatorDocument& coordinatorDoc,
                                            std::vector<ChunkType> initialChunks,
                                            std::vector<BSONObj> zones);
 
 void writeStateTransitionAndCatalogUpdatesThenBumpShardVersions(
-    OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc);
+    OperationContext* opCtx,
+    ReshardingMetricsNew* metrics,
+    const ReshardingCoordinatorDocument& coordinatorDoc);
 
 void removeCoordinatorDocAndReshardingFields(OperationContext* opCtx,
+                                             ReshardingMetricsNew* metrics,
                                              const ReshardingCoordinatorDocument& coordinatorDoc,
                                              boost::optional<Status> abortReason = boost::none);
 }  // namespace resharding

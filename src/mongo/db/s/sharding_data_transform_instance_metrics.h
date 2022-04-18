@@ -72,6 +72,11 @@ public:
     void onDocumentsCopied(int64_t documentCount,
                            int64_t totalDocumentsSizeBytes,
                            Milliseconds elapsed);
+    Date_t getCopyingBegin() const;
+    Date_t getCopyingEnd() const;
+    int64_t getDocumentsCopiedCount() const;
+    int64_t getBytesCopiedCount() const;
+    void restoreDocumentsCopied(int64_t documentCount, int64_t totalDocumentsSizeBytes);
     void setDocumentsToCopyCounts(int64_t documentCount, int64_t totalDocumentsSizeBytes);
     void setCoordinatorHighEstimateRemainingTimeMillis(Milliseconds milliseconds);
     void setCoordinatorLowEstimateRemainingTimeMillis(Milliseconds milliseconds);
@@ -96,6 +101,8 @@ public:
     Seconds getCriticalSectionElapsedTimeSecs() const;
 
 protected:
+    void restoreCopyingBegin(Date_t date);
+    void restoreCopyingEnd(Date_t date);
     virtual std::string createOperationDescription() const noexcept;
     virtual StringData getStateString() const noexcept;
 
