@@ -178,6 +178,7 @@ def main():
 
         def __init__(self):
             self.INSTALL_DIR = args.install_dir  # pylint: disable=invalid-name
+            self.command = ""
 
     # pylint: disable=protected-access
     configure_resmoke._update_config_vars(FakeArgs())
