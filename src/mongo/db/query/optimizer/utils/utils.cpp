@@ -485,6 +485,22 @@ public:
                                          const PathComposeA& pathComposeA,
                                          PartialSchemaReqConversion leftResult,
                                          PartialSchemaReqConversion rightResult) {
+        const auto& path1 = pathComposeA.getPath1();
+        const auto& path2 = pathComposeA.getPath2();
+        const auto& eqNull = make<PathCompare>(Operations::Eq, Constant::null());
+        const auto& pathDefault = make<PathDefault>(Constant::boolean(true));
+
+        if ((path1 == eqNull && path2 == pathDefault) ||
+            (path1 == pathDefault && path2 == eqNull)) {
+            // In order to create null bound, we need to query for Nothing or Null.
+
+            auto intervalExpr = IntervalReqExpr::makeSingularDNF(IntervalRequirement{
+                {true /*inclusive*/, Constant::null()}, {true /*inclusive*/, Constant::null()}});
+            return {PartialSchemaRequirements{
+                {PartialSchemaKey{},
+                 PartialSchemaRequirement{"" /*boundProjectionName*/, std::move(intervalExpr)}}}};
+        }
+
         return handleComposition(
             false /*isMultiplicative*/, std::move(leftResult), std::move(rightResult));
     }
@@ -594,6 +610,14 @@ public:
 
     PartialSchemaReqConversion transport(const ABT& n, const PathIdentity& pathIdentity) {
         return {PartialSchemaRequirements{{{}, {}}}};
+    }
+
+    PartialSchemaReqConversion transport(const ABT& n, const Constant& c) {
+        if (c.isNull()) {
+            // Cannot create bounds with just NULL.
+            return {};
+        }
+        return {n};
     }
 
     template <typename T, typename... Ts>
@@ -1038,13 +1062,30 @@ CandidateIndexMap computeCandidateIndexMap(PrefixId& prefixId,
 
 class PartialSchemaReqLowerTransport {
 public:
+    PartialSchemaReqLowerTransport(const bool hasBoundProjName)
+        : _hasBoundProjName(hasBoundProjName) {}
+
     ABT transport(const IntervalReqExpr::Atom& node) {
         const auto& interval = node.getExpr();
         const auto& lowBound = interval.getLowBound();
         const auto& highBound = interval.getHighBound();
 
         if (interval.isEquality()) {
-            return make<PathCompare>(Operations::Eq, lowBound.getBound());
+            if (auto constPtr = lowBound.getBound().cast<Constant>()) {
+                if (constPtr->isNull()) {
+                    uassert(6624163,
+                            "Cannot lower null index bound with bound projection",
+                            !_hasBoundProjName);
+                    return make<PathComposeA>(make<PathDefault>(Constant::boolean(true)),
+                                              make<PathCompare>(Operations::Eq, Constant::null()));
+                }
+                return make<PathCompare>(Operations::Eq, lowBound.getBound());
+            } else {
+                uassert(6624164,
+                        "Cannot lower variable index bound with bound projection",
+                        !_hasBoundProjName);
+                return make<PathCompare>(Operations::Eq, lowBound.getBound());
+            }
         }
 
         ABT result = make<PathIdentity>();
@@ -1083,17 +1124,21 @@ public:
     ABT lower(const IntervalReqExpr::Node& intervals) {
         return algebra::transport<false>(intervals, *this);
     }
+
+private:
+    const bool _hasBoundProjName;
 };
 
 void lowerPartialSchemaRequirement(const PartialSchemaKey& key,
                                    const PartialSchemaRequirement& req,
                                    ABT& node,
                                    const std::function<void(const ABT& node)>& visitor) {
-    PartialSchemaReqLowerTransport transport;
+    const bool hasBoundProjName = req.hasBoundProjectionName();
+    PartialSchemaReqLowerTransport transport(hasBoundProjName);
     ABT path = transport.lower(req.getIntervals());
     const bool pathIsId = path.is<PathIdentity>();
 
-    if (req.hasBoundProjectionName()) {
+    if (hasBoundProjName) {
         node = make<EvaluationNode>(req.getBoundProjectionName(),
                                     make<EvalPath>(key._path, make<Variable>(key._projectionName)),
                                     std::move(node));

@@ -50,12 +50,16 @@ static bool compareResults(const std::vector<BSONObj>& expected,
     if (expected.size() != actual.size()) {
         std::cout << "Different result size: expected: " << expected.size()
                   << " vs actual: " << actual.size() << "\n";
-        if (!expected.empty()) {
-            std::cout << "First expected result: " << expected.front() << "\n";
+
+        std::cout << "Expected results:\n";
+        for (const auto& result : expected) {
+            std::cout << result << "\n";
         }
-        if (!actual.empty()) {
-            std::cout << "First actual result: " << actual.front() << "\n";
+        std::cout << "Actual results:\n";
+        for (const auto& result : actual) {
+            std::cout << result << "\n";
         }
+
         return false;
     }
 
@@ -227,6 +231,19 @@ TEST_F(NodeSBE, DiffTest) {
 
     ASSERT_TRUE(compare("[{$match: {a: {$elemMatch: {$elemMatch: {$lt: 6, $gt: 4}}}}}]",
                         {"{a: [[4, 5, 6], [5]]}", "{a: [4, 5, 6]}"}));
+
+    // "{a: [2]}" will not match on classic.
+    ASSERT_TRUE(compare("[{$match: {'a.b': {$eq: null}}}]",
+                        {"{a: 2}",
+                         "{}",
+                         "{a: []}",
+                         "{a: [{}]}",
+                         "{a: {b: null}}",
+                         "{a: {c: 1}}",
+                         "{a: {b: 2}}",
+                         "{a: [{b: null}, {b: 1}]}"}));
+
+    ASSERT_TRUE(compare("[{$match: {'a': {$eq: null}}}]", {"{a: 2}"}));
 }
 
 }  // namespace

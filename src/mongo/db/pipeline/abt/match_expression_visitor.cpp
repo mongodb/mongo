@@ -439,6 +439,16 @@ private:
                 break;
             }
 
+            case Operations::Eq: {
+                if (tag == sbe::value::TypeTags::Null) {
+                    // Handle null and missing semantics. Matching against null also implies
+                    // matching against missing.
+                    result = make<PathComposeA>(make<PathDefault>(Constant::boolean(true)),
+                                                std::move(result));
+                }
+                break;
+            }
+
             default:
                 break;
         }

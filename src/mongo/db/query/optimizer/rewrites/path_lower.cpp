@@ -244,7 +244,15 @@ void EvalFilterLowering::transport(ABT& n, const PathLambda&, ABT& lam) {
 }
 
 void EvalFilterLowering::transport(ABT& n, const PathDefault&, ABT& c) {
-    uasserted(6624135, "cannot lower default in filter");
+    const std::string& name = _prefixId.getNextId("valDefault");
+
+    n = make<LambdaAbstraction>(
+        name,
+        make<If>(make<FunctionCall>("exists", makeSeq(make<Variable>(name))),
+                 Constant::boolean(false),
+                 std::exchange(c, make<Blackhole>())));
+
+    _changed = true;
 }
 
 void EvalFilterLowering::transport(ABT& n, const PathCompare& cmp, ABT& c) {

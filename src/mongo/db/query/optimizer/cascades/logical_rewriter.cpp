@@ -603,9 +603,9 @@ static void addElemMatchAndSargableNode(const ABT& node, ABT sargableNode, Rewri
     ctx.addNode(newNode, false /*substitute*/, true /*addExistingNodeWithNewChild*/);
 }
 
-void convertFilterToSargableNode(ABT::reference_type node,
-                                 const FilterNode& filterNode,
-                                 RewriteContext& ctx) {
+static void convertFilterToSargableNode(ABT::reference_type node,
+                                        const FilterNode& filterNode,
+                                        RewriteContext& ctx) {
     using namespace properties;
 
     const LogicalProps& props = ctx.getAboveLogicalProps();
