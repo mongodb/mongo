@@ -8,9 +8,9 @@ doassert = function(msg, obj) {
 
     if (jsTest.options().traceExceptions) {
         if (typeof (msg) == "string" && msg.indexOf("assert") == 0)
-            print(msg);
+            print(new Date().toISOString() + " " + msg);
         else
-            print("assert: " + msg);
+            print(new Date().toISOString() + " assert: " + msg);
     }
 
     var ex;
