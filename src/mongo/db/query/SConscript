@@ -111,6 +111,7 @@ env.Library(
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
         '$BUILD_DIR/mongo/db/exec/sbe/query_sbe',
+        '$BUILD_DIR/mongo/db/exec/sbe/query_sbe_stages',
         '$BUILD_DIR/mongo/db/exec/sbe/query_sbe_storage',
         "$BUILD_DIR/mongo/db/index/index_access_method",
         "$BUILD_DIR/mongo/db/matcher/expressions",

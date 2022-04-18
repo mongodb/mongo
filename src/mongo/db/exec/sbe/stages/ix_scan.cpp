@@ -509,4 +509,8 @@ size_t IndexScanStage::estimateCompileTimeSize() const {
     return size;
 }
 
+std::string IndexScanStage::getIndexName() const {
+    return _indexName;
+}
+
 }  // namespace mongo::sbe

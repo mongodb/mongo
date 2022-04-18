@@ -73,9 +73,7 @@ protected:
         } else if (stats->stageType == "scan"_sd) {
             collectionScans += stats->opens;
         } else if (stats->stageType == "ixseek"_sd || stats->stageType == "ixscan"_sd) {
-            // It's not possible to use a 'dynamic_cast' here, as 'IndexScanStage' is defined inside
-            // a separate compilation unit and it's type information is not available at this point.
-            auto indexScanStage = static_cast<const IndexScanStage*>(root);
+            auto indexScanStage = dynamic_cast<const IndexScanStage*>(root);
             uassert(6267647,
                     str::stream() << stats->stageType
                                   << " stage is not an instance of IndexScanStage",

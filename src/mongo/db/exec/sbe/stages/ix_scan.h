@@ -97,11 +97,7 @@ public:
     const SpecificStats* getSpecificStats() const final;
     std::vector<DebugPrinter::Block> debugPrint() const final;
     size_t estimateCompileTimeSize() const final;
-    std::string getIndexName() const {
-        // Note: the implementation of this getter cannot be moved to 'ix_scan.cpp', as it'd create
-        // a circular dependency after fixing the compilation scripts.
-        return _indexName;
-    }
+    std::string getIndexName() const;
 
 protected:
     void doSaveState(bool relinquishCursor) override;
