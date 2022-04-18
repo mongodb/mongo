@@ -34,6 +34,8 @@
 
 using namespace test_harness;
 /*
+ * Disabled as part of WT-8909.
+ *
  * In this test, we want to verify that search_near with prefix enabled only traverses the portion
  * of the tree that follows the prefix portion of the search key. The test is composed of a populate
  * phase followed by a read phase. The populate phase will insert a set of random generated keys

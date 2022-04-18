@@ -580,20 +580,17 @@ __wt_rec_col_var(
     WT_CELL *cell;
     WT_CELL_UNPACK_KV *vpack, _vpack;
     WT_COL *cip;
-    WT_CURSOR *hs_cursor;
     WT_CURSOR_BTREE *cbt;
     WT_DECL_ITEM(orig);
     WT_DECL_RET;
     WT_INSERT *ins;
-    WT_ITEM hs_recno_key;
     WT_PAGE *page;
     WT_TIME_WINDOW clear_tw, *twp;
     WT_UPDATE *upd;
     WT_UPDATE_SELECT upd_select;
     uint64_t n, nrepeat, repeat_count, rle, skip, src_recno;
     uint32_t i, size;
-    uint8_t *p, hs_recno_key_buf[WT_INTPACK64_MAXSIZE];
-    bool deleted, hs_clear, orig_deleted, update_no_copy;
+    bool deleted, orig_deleted, update_no_copy;
     const void *data;
 
     btree = S2BT(session);
@@ -625,11 +622,6 @@ __wt_rec_col_var(
      * they shouldn't open new dhandles. In those cases we won't ever need to blow away history
      * store content, so we can skip this.
      */
-    hs_cursor = NULL;
-    hs_clear = F_ISSET(S2C(session), WT_CONN_HS_OPEN) &&
-      !F_ISSET(session, WT_SESSION_NO_DATA_HANDLES) && !WT_IS_HS(btree->dhandle) &&
-      !WT_IS_METADATA(btree->dhandle);
-
     WT_RET(__wt_rec_split_init(session, r, page, pageref->ref_recno, btree->maxleafpage_precomp));
 
     WT_RET(__wt_scr_alloc(session, 0, &orig));
@@ -816,41 +808,25 @@ record_loop:
                 case WT_UPDATE_STANDARD:
                     data = upd->data;
                     size = upd->size;
+                    /*
+                     * When an out-of-order or mixed-mode tombstone is getting written to disk,
+                     * remove any historical versions that are greater in the history store for this
+                     * key.
+                     */
+                    if (upd_select.ooo_tombstone && r->hs_clear_on_tombstone)
+                        WT_ERR(__wt_rec_hs_clear_on_tombstone(
+                          session, r, twp->durable_stop_ts, src_recno, NULL, true));
+
                     break;
                 case WT_UPDATE_TOMBSTONE:
                     /*
-                     * When removing a key due to a tombstone with a durable timestamp of "none",
-                     * also remove the history store contents associated with that key.
+                     * When an out-of-order or mixed-mode tombstone is getting written to disk,
+                     * remove any historical versions that are greater in the history store for this
+                     * key.
                      */
-                    if (twp->durable_stop_ts == WT_TS_NONE && hs_clear) {
-                        p = hs_recno_key_buf;
-                        WT_ERR(__wt_vpack_uint(&p, 0, src_recno));
-                        hs_recno_key.data = hs_recno_key_buf;
-                        hs_recno_key.size = WT_PTRDIFF(p, hs_recno_key_buf);
-
-                        /* Open a history store cursor if we don't yet have one. */
-                        if (hs_cursor == NULL)
-                            WT_ERR(__wt_curhs_open(session, NULL, &hs_cursor));
-
-                        /*
-                         * From WT_TS_NONE delete all the history store content of the key. This
-                         * path will never be taken for a mixed-mode deletion being evicted and with
-                         * a checkpoint that started prior to the eviction starting its
-                         * reconciliation as previous checks done while selecting an update will
-                         * detect that.
-                         */
-                        WT_ERR(__wt_hs_delete_key_from_ts(
-                          session, hs_cursor, btree->id, &hs_recno_key, WT_TS_NONE, false, false));
-
-                        /* Fail 0.01% of the time. */
-                        if (F_ISSET(r, WT_REC_EVICT) &&
-                          __wt_failpoint(session,
-                            WT_TIMING_STRESS_FAILPOINT_HISTORY_STORE_DELETE_KEY_FROM_TS, 0.01))
-                            WT_ERR(EBUSY);
-
-                        WT_STAT_CONN_INCR(session, cache_hs_key_truncate_onpage_removal);
-                        WT_STAT_DATA_INCR(session, cache_hs_key_truncate_onpage_removal);
-                    }
+                    if (upd_select.ooo_tombstone && r->hs_clear_on_tombstone)
+                        WT_ERR(__wt_rec_hs_clear_on_tombstone(
+                          session, r, twp->durable_stop_ts, src_recno, NULL, false));
 
                     deleted = true;
                     twp = &clear_tw;
@@ -1077,8 +1053,6 @@ next:
     ret = __wt_rec_split_finish(session, r);
 
 err:
-    if (hs_cursor != NULL)
-        WT_TRET(hs_cursor->close(hs_cursor));
     __wt_scr_free(session, &orig);
     return (ret);
 }

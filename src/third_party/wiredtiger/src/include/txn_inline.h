@@ -1353,8 +1353,13 @@ __wt_txn_modify_check(
      * Check conflict against any on-page value if there is no update on the update chain except
      * aborted updates. Otherwise, we would have either already detected a conflict if we saw an
      * uncommitted update or determined that it would be safe to write if we saw a committed update.
+     *
+     * In the case of row-store we also need to check that the insert list is empty as the existence
+     * of it implies there is no on disk value for the given key. However we can still get a
+     * time-window from an unrelated on-disk value if we are not careful as the slot can still be
+     * set on the cursor b-tree.
      */
-    if (!rollback && upd == NULL) {
+    if (!rollback && upd == NULL && (CUR2BT(cbt)->type != BTREE_ROW || cbt->ins == NULL)) {
         __wt_read_cell_time_window(cbt, &tw, &tw_found);
         if (tw_found) {
             if (WT_TIME_WINDOW_HAS_STOP(&tw))

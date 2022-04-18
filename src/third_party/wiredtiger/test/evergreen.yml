@@ -1050,7 +1050,6 @@ tasks:
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} $(pwd)/test/cppsuite/run -t search_near_01 -f test/cppsuite/configs/search_near_01_default.txt -l 2
             ${test_env_vars|} $(pwd)/test/cppsuite/run -t search_near_02 -f test/cppsuite/configs/search_near_02_default.txt -l 2
 
   - name: cppsuite-base-test-stress
@@ -3456,6 +3455,9 @@ buildvariants:
 
 - name: code-statistics
   display_name: "Code statistics"
+  # Code coverage and complexity metrics are not required on the mongodb-4.4 branch as
+  # they are only required on the 'develop' branch.
+  activate: false
   batchtime: 10080 # 7 days
   run_on:
   - ubuntu2004-test
