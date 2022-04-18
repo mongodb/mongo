@@ -1348,6 +1348,17 @@ TEST(Simple8b, ValueTooLargeMaxUInt128) {
     ASSERT_FALSE(builder.append(value));
 }
 
+TEST(Simple8b, ValueTooLargeMaxUInt64AsUInt128) {
+    // Make sure we handle uint128_t max correctly.
+    uint128_t value = std::numeric_limits<uint64_t>::max();
+
+    Simple8bBuilder<uint128_t> builder([](uint64_t) {
+        ASSERT(false);
+        return true;
+    });
+    ASSERT_FALSE(builder.append(value));
+}
+
 TEST(Simple8b, ValueTooManyTrailingFor8SmallTooManyMeaningfulFor8Large) {
     // This value has 52 meaningful bits and 61 trailing zeros. This is too many trailing zeros for
     // Selector 8 Small and too many meaningful bits for Selector 8 Large.
