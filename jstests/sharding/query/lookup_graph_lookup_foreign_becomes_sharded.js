@@ -116,11 +116,8 @@ const isShardedLookupEnabled = getShardedLookupParam.hasOwnProperty("featureFlag
 
 let res = shard0.getPrimary().getDB("admin").adminCommand(
     {getParameter: 1, featureFlagSBELookupPushdown: 1});
-let fcvCmdRes = assert.commandWorked(shard0.getPrimary().getDB("admin").adminCommand(
-    {getParameter: 1, featureCompatibilityVersion: 1}));
 let isSBELookupEnabled = res.ok && res.hasOwnProperty("featureFlagSBELookupPushdown") &&
-    res.featureFlagSBELookupPushdown.value &&
-    parseFloat(fcvCmdRes.featureCompatibilityVersion.version) >= 6.0;
+    res.featureFlagSBELookupPushdown.value;
 
 // Now run a getMore for each of the test cases. The collection has become sharded mid-iteration, so
 // we should observe the error code associated with the test case.
@@ -201,11 +198,8 @@ shard0.restart(shard0.getPrimary());
 // is running after restart.
 res = shard0.getPrimary().getDB("admin").adminCommand(
     {getParameter: 1, featureFlagSBELookupPushdown: 1});
-fcvCmdRes = assert.commandWorked(shard0.getPrimary().getDB("admin").adminCommand(
-    {getParameter: 1, featureCompatibilityVersion: 1}));
 isSBELookupEnabled = res.ok && res.hasOwnProperty("featureFlagSBELookupPushdown") &&
-    res.featureFlagSBELookupPushdown.value &&
-    parseFloat(fcvCmdRes.featureCompatibilityVersion.version) >= 6.0;
+    res.featureFlagSBELookupPushdown.value;
 
 // Enable profiling on shard0 to capture stale shard version exceptions.
 const primaryDB = shard0.getPrimary().getDB(jsTestName());

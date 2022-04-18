@@ -434,9 +434,7 @@ CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalRead(Pipeline*
     // Reparse 'pipeline' to discover whether there are secondary namespaces that we need to lock
     // when constructing our query executor.
     std::vector<NamespaceStringOrUUID> secondaryNamespaces = [&]() {
-        if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-            feature_flags::gFeatureFlagSBELookupPushdown.isEnabled(
-                serverGlobalParams.featureCompatibility) &&
+        if (feature_flags::gFeatureFlagSBELookupPushdown.isEnabledAndIgnoreFCV() &&
             !internalQuerySlotBasedExecutionDisableLookupPushdown.load() &&
             !internalQueryForceClassicEngine.load()) {
             auto lpp = LiteParsedPipeline(expCtx->ns, pipeline->serializeToBson());
