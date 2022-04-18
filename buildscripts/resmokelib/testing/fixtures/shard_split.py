@@ -8,8 +8,11 @@ import pymongo
 from bson.objectid import ObjectId
 
 import buildscripts.resmokelib.testing.fixtures.interface as interface
-from buildscripts.resmokelib.testing.fixtures import replicaset
-from buildscripts.resmokelib.core import network
+
+
+def _is_replica_set_fixture(fixture):
+    """Determine whether the passed in fixture is a ReplicaSetFixture."""
+    return hasattr(fixture, 'replset_name')
 
 
 class ShardSplitFixture(interface.MultiClusterFixture):  # pylint: disable=too-many-instance-attributes
@@ -80,7 +83,7 @@ class ShardSplitFixture(interface.MultiClusterFixture):  # pylint: disable=too-m
         self._port_index = 0
         self._ports = [[node.port for node in self.get_donor_rs().nodes],
                        [
-                           network.PortAllocator.next_fixture_port(self.job_num)
+                           self.fixturelib.get_next_port(self.job_num)
                            for _ in range(self.num_nodes_per_replica_set)
                        ]]
 
@@ -142,8 +145,8 @@ class ShardSplitFixture(interface.MultiClusterFixture):  # pylint: disable=too-m
                                       mode=mode)
 
         for fixture in reversed(self.fixtures):
-            type_name = f"replica set '{fixture.replset_name}'" if isinstance(
-                fixture, replicaset.ReplicaSetFixture) else f"standalone on port {fixture.port}"
+            type_name = f"replica set '{fixture.replset_name}'" if _is_replica_set_fixture(
+                fixture) else f"standalone on port {fixture.port}"
             teardown_handler.teardown(fixture, type_name, mode=mode)
 
         # Remove the recipient nodes outright now that they have been torn down
@@ -199,7 +202,7 @@ class ShardSplitFixture(interface.MultiClusterFixture):  # pylint: disable=too-m
         """:return the donor replica set."""
         with self.__lock:
             donor_rs = next(iter(self.fixtures), None)
-            if donor_rs and not isinstance(donor_rs, replicaset.ReplicaSetFixture):
+            if donor_rs and not _is_replica_set_fixture(donor_rs):
                 raise ValueError("Invalid configuration, donor_rs is not a ReplicaSetFixture")
             return donor_rs
 
