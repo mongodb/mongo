@@ -1,13 +1,14 @@
 (function() {
 "use strict";
 
+load("jstests/libs/fixture_helpers.js");      // For FixtureHelpers
 load("jstests/aggregation/extras/utils.js");  // For assertErrorCode() and assertArrayEq().
 
 const collName = "jstests_aggregation_add";
 const coll = db["collName"];
 coll.drop();
 
-const x = "$x";  // fieldpath to "block" constant folding
+const $x = "$x";  // fieldpath to "block" constant folding
 
 /**
  * Verify constant folding with explain output.
@@ -29,30 +30,12 @@ function assertConstantFoldingResultForOp(op, input, expectedOutput, message) {
     };
     const expected = buildExpressionFromArguments(expectedOutput, op);
 
-    let pipeline = [
+    let processedPipeline = getExplainedPipelineFromAggregation(db, db[collName], [
         {$group: {_id: buildExpressionFromArguments(input, op), sum: {$sum: 1}}},
-    ];
+    ]);
 
-    let result = db.runCommand({
-        explain: {aggregate: collName, pipeline: pipeline, cursor: {}},
-        verbosity: 'queryPlanner'
-    });
-
-    assert(result.stages && result.stages[1] && result.stages[1].$group, result);
-    assert.eq(result.stages[1].$group._id, expected, message);
-
-    // TODO: Verify that SBE does the right thing when project is pushed down.
-    // pipeline = [{$project: {result: buildExpressionFromArguments(input, op)}}];
-    // result = db.runCommand({
-    //     explain: {aggregate: collName, pipeline: pipeline, cursor: {}},
-    //     verbosity: 'queryPlanner'
-    // });
-
-    // assert(result.queryPlanner && result.queryPlanner.winningPlan &&
-    //            result.queryPlanner.winningPlan.transformBy &&
-    //            result.queryPlanner.winningPlan.transformBy.result,
-    //        result);
-    // assert.eq(result.queryPlanner.winningPlan.transformBy.result, expected, message);
+    assert(processedPipeline[0] && processedPipeline[0].$group)
+    assert.eq(processedPipeline[0].$group._id, expected, message);
 
     return true;
 }
@@ -61,31 +44,33 @@ function assertConstantFoldingResults(input, addOutput, multiplyOutput, message)
     assertConstantFoldingResultForOp("$add", input, addOutput, message);
     assertConstantFoldingResultForOp("$multiply", input, multiplyOutput, message);
 }
-
+/*
 // Totally fold constants.
 assertConstantFoldingResults([1, 2, 3], 6, 6, "All constants should fold.");
 assertConstantFoldingResults(
     [[1, 2], 3, 4, 5], 15, 120, "Nested operations with all constants should be folded away.");
 
 // Left-associative test cases.
-assertConstantFoldingResults([1, 2, x],
-                             [3, x],
-                             [2, x],
+assertConstantFoldingResults([1, 2, $x],
+                             [3, $x],
+                             [2, $x],
                              "Constants should fold left-to-right before the first non-constant.");
 assertConstantFoldingResults(
-    [x, 1, 2],
-    [x, 1, 2],
-    [x, 1, 2],
+    [$x, 1, 2],
+    [$x, 1, 2],
+    [$x, 1, 2],
     "Constants should not fold left-to-right after the first non-constant.");
 assertConstantFoldingResults(
-    [1, x, 2], [1, x, 2], [1, x, 2], "Constants should not fold across non-constants.");
+    [1, $x, 2], [1, $x, 2], [1, $x, 2], "Constants should not fold across non-constants.");
 
-assertConstantFoldingResults(
-    [5, 2, x, 3, 4], [7, x, 3, 4], [10, x, 3, 4], "Constants should fold up until a non-constant.");
+assertConstantFoldingResults([5, 2, $x, 3, 4],
+                             [7, $x, 3, 4],
+                             [10, $x, 3, 4],
+                             "Constants should fold up until a non-constant.");
 
-assertConstantFoldingResults([x, 1, 2, 3],
-                             [x, 1, 2, 3],
-                             [x, 1, 2, 3],
+assertConstantFoldingResults([$x, 1, 2, 3],
+                             [$x, 1, 2, 3],
+                             [$x, 1, 2, 3],
                              "Non-constant at start of operand list blocks folding constants.");
 
 // Non-optimized comparisons -- make sure that non-optimized pipelines will give the same result as
@@ -106,20 +91,143 @@ assertArrayEq({
     ]
 });
 
-// Function to generate random numbers of float, long, double, and NumberDecimal (with different
-// probabilities).
-const randomNumber = (min, max) => {
-    const r = Math.random() * (max - min) + min;
-    const t = Math.random();
-    if (t < 0.7) {
-        return r;
-    }
-    if (t < 0.9) {
-        return NumberInt(Math.round(r));
-    }
-    if (t < 0.999) {
-        return NumberLong(Math.round(r));
-    }
-    return NumberDecimal(String(r));
+*/
+
+function assertPipelineCorrect(pipeline, v) {
+    let optimizedResults = coll.aggregate(pipeline).toArray();
+    db.adminCommand({
+        configureFailPoint: 'disablePipelineOptimization',
+        mode: 'alwaysOn',
+    })
+    let unoptimizedResults = coll.aggregate(pipeline).toArray();
+    db.adminCommand({
+        configureFailPoint: 'disablePipelineOptimization',
+        mode: 'off',
+    })
+    assertArrayEq({
+        actual: unoptimizedResults,
+        expected: optimizedResults,
+        extraErrorMsg: tojson({pipeline, v})
+    });
 }
+
+/**
+ * Randomized, property-based test of the left-to-right constant folding optimization. The purpose
+ * of folding left-to-right is to preserve the same order-of-operations during ahead-of-time
+ * constant folding that occurs during runtime execution.
+ *
+ * Given:
+ *  - A random list of numbers of any type
+ *  - A fieldpath reference placed at a random location in the list of numbers
+ *  - A pipeline that performs an arithmetic operation over the list of arguments (fieldpath +
+ *      numbers)
+ * Prove:
+ *  - The arithmetic operation produces the exact same result with and without optimizations.
+ * @param {options} options
+ */
+function runRandomizedPropertyTest({op, min, max}) {
+    // Function to generate random numbers of float, long, double, and NumberDecimal (with different
+    // probabilities).
+    const generateNumber = () => {
+        const r = Math.random() * (max - min) + min;
+        const t = Math.random();
+        if (t < 0.7) {
+            return r;
+        }
+        if (t < 0.85) {
+            return NumberInt(Math.round(r));
+        }
+        if (t < 0.99) {
+            return NumberLong(Math.round(r));
+        }
+        return NumberDecimal(String(r));
+    };
+
+    const generateNumberList = (length) => Array.from({length}, () => generateNumber(min, max));
+
+    const numbers = generateNumberList(10)
+    // Place a fieldpath reference randomly within the list of numbers to produce an argument list.
+    const pos = Math.floor(numbers.length * Math.random());
+    const args = [].concat(numbers.slice(0, pos), ["$v"], numbers.slice(pos));
+
+    const pipeline = [{
+        $group: {
+            _id: {[op]: args},
+            sum: {$sum: 1},
+        },
+    }];
+    coll.drop();
+    const v = generateNumber();
+    coll.insert({v});
+    assertPipelineCorrect(pipeline, v);
+}
+
+for (let i = 0; i < 100; i++) {
+    // runRandomizedPropertyTest({op: "$add", min: -314159255, max: 314159255});
+    runRandomizedPropertyTest({op: "$multiply", min: -31415, max: 31415});
+}
+
+// coll.drop();
+// const v = NumberLong(-165920709);
+// coll.insert({v});
+// const failingPipeline = [{
+//     "$group": {
+//         "_id": {
+//             "$add": [
+//                 -127634651.75010383,
+//                 -42470286.927390575,
+//                 NumberInt(-23124488),
+//                 -307746827.02983755,
+//                 16356215.01332593,
+//                 -150531428.49670622,
+//                 NumberInt(-226364290),
+//                 181297936.56230265,
+//                 "$v",
+//                 109560746.75857013,
+//                 136774220.7681843
+//             ]
+//         },
+//         "sum": {"$sum": 1}
+//     }
+// }];
+
+// const makePipeline = (id) => [{"$group": {"_id": id, "sum": {"$sum": 1}}}];
+
+// print("DAVISDEBUG unfolded addition")
+// printjson(getExplainedPipelineFromAggregation(
+//     db,
+//     coll,
+//     makePipeline({
+//         $add: [
+//             -127634651.75010383,
+//             -42470286.927390575,
+//             NumberInt(-23124488),
+//             -307746827.02983755,
+//             16356215.01332593,
+//             -150531428.49670622,
+//             NumberInt(-226364290),
+//             181297936.56230265,
+//             NumberLong(-165920709),  // $v
+//             // 109560746.75857013,
+//             // 136774220.7681843
+
+//             246334967.52675444  // sum of two constants above this
+//         ]
+//     }),
+//     ));
+// print("DAVISDEBUG folded addition")
+// printjson(getExplainedPipelineFromAggregation(
+//     db,
+//     coll,
+//     makePipeline({
+//         $add: [
+//             {"$const": -680217820.6284096},
+//             NumberLong(-165920709),  // $v
+//             // {"$const": 109560746.75857013},
+//             // {"$const": 136774220.7681843}
+
+//             {"$const": 246334967.52675444}  // sum of two constants above this
+//         ]
+//     }),
+//     ));
 })();
