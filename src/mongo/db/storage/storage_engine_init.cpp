@@ -159,7 +159,9 @@ StorageEngine::LastShutdownState initializeStorageEngine(OperationContext* opCtx
         uassertStatusOK(factory->validateMetadata(*metadata, storageGlobalParams));
     }
 
-    if (storageGlobalParams.engine != "ephemeralForTest") {
+    // This should be set once during startup.
+    if (storageGlobalParams.engine != "ephemeralForTest" &&
+        (initFlags & StorageEngineInitFlags::kForRestart) == StorageEngineInitFlags{}) {
         auto readTransactions = gConcurrentReadTransactions.load();
         static constexpr auto DEFAULT_TICKETS_VALUE = 128;
         readTransactions = readTransactions == 0 ? DEFAULT_TICKETS_VALUE : readTransactions;
@@ -237,12 +239,15 @@ StorageEngine::LastShutdownState initializeStorageEngine(OperationContext* opCtx
 }
 
 namespace {
-void shutdownGlobalStorageEngineCleanly(ServiceContext* service, Status errorToReport) {
+void shutdownGlobalStorageEngineCleanly(ServiceContext* service,
+                                        Status errorToReport,
+                                        bool forRestart) {
     auto storageEngine = service->getStorageEngine();
     invariant(storageEngine);
     // We always use 'forRestart' = false here because 'forRestart' = true is only appropriate if
     // we're going to restart controls on the same storage engine, which we are not here because
-    // we are shutting the storage engine down.
+    // we are shutting the storage engine down. Additionally, we need to terminate any background
+    // threads as they may be holding onto an OperationContext, as opposed to pausing them.
     StorageControl::stopStorageControls(service, errorToReport, /*forRestart=*/false);
     storageEngine->cleanShutdown();
     auto& lockFile = StorageEngineLockFile::get(service);
@@ -252,7 +257,7 @@ void shutdownGlobalStorageEngineCleanly(ServiceContext* service, Status errorToR
     }
     // TODO SERVER-64467: Remove the globalServiceContext for TicketHolders
     // Cleanup the ticket holders.
-    if (hasGlobalServiceContext()) {
+    if (hasGlobalServiceContext() && !forRestart) {
         auto serviceContext = getGlobalServiceContext();
         auto& ticketHolders = ticketHoldersDecoration(serviceContext);
         ticketHolders.setGlobalThrottling(nullptr, nullptr);
@@ -262,7 +267,9 @@ void shutdownGlobalStorageEngineCleanly(ServiceContext* service, Status errorToR
 
 void shutdownGlobalStorageEngineCleanly(ServiceContext* service) {
     shutdownGlobalStorageEngineCleanly(
-        service, {ErrorCodes::ShutdownInProgress, "The storage catalog is being closed."});
+        service,
+        {ErrorCodes::ShutdownInProgress, "The storage catalog is being closed."},
+        /*forRestart=*/false);
 }
 
 StorageEngine::LastShutdownState reinitializeStorageEngine(
@@ -273,7 +280,8 @@ StorageEngine::LastShutdownState reinitializeStorageEngine(
     opCtx->recoveryUnit()->abandonSnapshot();
     shutdownGlobalStorageEngineCleanly(
         service,
-        {ErrorCodes::InterruptedDueToStorageChange, "The storage engine is being reinitialized."});
+        {ErrorCodes::InterruptedDueToStorageChange, "The storage engine is being reinitialized."},
+        /*forRestart=*/true);
     opCtx->setRecoveryUnit(std::make_unique<RecoveryUnitNoop>(),
                            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
     changeConfigurationCallback();
