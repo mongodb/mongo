@@ -76,6 +76,28 @@ function runTest(reshardInPlace) {
         txnNumber: NumberLong(3),
     };
 
+    function runCommandRetryOnTransientErrors(db, cmdObj) {
+        let res;
+        assert.soon(() => {
+            res = db.runCommand(cmdObj);
+            try {
+                assert.commandWorked(res);
+                return true;
+            } catch (error) {
+                assert.commandFailedWithCode(res, [
+                    ErrorCodes.StaleConfig,
+                    ErrorCodes.NoSuchTransaction,
+                    ErrorCodes.ShardCannotRefreshDueToLocksHeld,
+                    ErrorCodes.LockTimeout,
+                    ErrorCodes.IncompleteTransactionHistory
+                ]);
+                cmdObj.txnNumber = NumberLong(cmdObj.txnNumber + 1);
+                return false;
+            }
+        });
+        return res;
+    }
+
     assert.commandWorked(mongosTestColl.insert({oldShardKey: -1, newShardKey: -1}));
     assert.commandWorked(mongosTestColl.insert({oldShardKey: -2, newShardKey: -2}));
 
@@ -96,19 +118,19 @@ function runTest(reshardInPlace) {
 
             jsTest.log("Start running retryable writes during resharding");
 
-            const updateRes = assert.commandWorked(mongosTestDB.runCommand(updateCmdObj));
+            const updateRes = runCommandRetryOnTransientErrors(mongosTestDB, updateCmdObj);
             assert.eq(updateRes.n, 1, tojson(updateRes));
             assert.eq(updateRes.nModified, 1, tojson(updateRes));
 
             const findAndModifyUpdateRes =
-                assert.commandWorked(mongosTestDB.runCommand(findAndModifyUpdateCmdObj));
+                runCommandRetryOnTransientErrors(mongosTestDB, findAndModifyUpdateCmdObj);
             assert.eq(findAndModifyUpdateRes.lastErrorObject.n, 1, tojson(findAndModifyUpdateRes));
             assert.eq(findAndModifyUpdateRes.lastErrorObject.updatedExisting,
                       true,
                       tojson(findAndModifyUpdateRes));
 
-            const findAndModifyUpsertRes =
-                assert.commandWorked(mongosTestDB.runCommand(findAndModifyUpsertCmdObj));
+            let findAndModifyUpsertRes =
+                runCommandRetryOnTransientErrors(mongosTestDB, findAndModifyUpsertCmdObj);
             assert.eq(findAndModifyUpsertRes.lastErrorObject.n, 1, tojson(findAndModifyUpsertRes));
             assert.eq(findAndModifyUpsertRes.lastErrorObject.updatedExisting,
                       false,
