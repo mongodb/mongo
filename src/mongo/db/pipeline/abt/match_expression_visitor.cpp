@@ -264,7 +264,11 @@ public:
     }
 
     void visit(const NotMatchExpression* expr) override {
-        unsupportedExpression(expr);
+        ABT result = generateMatchExpression(
+            expr->getChild(0), _allowAggExpressions, _ctx.getRootProjection(), getNextId("not"));
+        _ctx.push(make<PathConstant>(make<UnaryOp>(
+            Operations::Not,
+            make<EvalFilter>(std::move(result), make<Variable>(_ctx.getRootProjection())))));
     }
 
     void visit(const OrMatchExpression* expr) override {
@@ -276,7 +280,7 @@ public:
     }
 
     void visit(const SizeMatchExpression* expr) override {
-        const std::string lambdaProjName = _prefixId.getNextId("lambda_sizeMatch");
+        const std::string lambdaProjName = getNextId("lambda_sizeMatch");
         ABT result = make<PathLambda>(make<LambdaAbstraction>(
             lambdaProjName,
             make<BinaryOp>(
@@ -309,7 +313,7 @@ public:
     }
 
     void visit(const TypeMatchExpression* expr) override {
-        const std::string lambdaProjName = _prefixId.getNextId("lambda_typeMatch");
+        const std::string lambdaProjName = getNextId("lambda_typeMatch");
         ABT result = make<PathLambda>(make<LambdaAbstraction>(
             lambdaProjName,
             make<FunctionCall>("typeMatch",

@@ -2564,5 +2564,35 @@ TEST(ABTTranslate, GroupByDependency) {
         optimized);
 }
 
+TEST(ABTTranslate, NotEquals) {
+    PrefixId prefixId;
+    Metadata metadata = {{{"test", {{}, {}}}}};
+
+    ABT translated = translatePipeline(metadata, "[{$match: {'a': {$ne: 2}}}]", "test", prefixId);
+
+    ASSERT_EXPLAIN_V2(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       scan_0\n"
+        "|   RefBlock: \n"
+        "|       Variable [scan_0]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [scan_0]\n"
+        "|   PathConstant []\n"
+        "|   UnaryOp [Not]\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [scan_0]\n"
+        "|   PathGet [a]\n"
+        "|   PathTraverse []\n"
+        "|   PathCompare [Eq]\n"
+        "|   Const [2]\n"
+        "Scan [test]\n"
+        "    BindBlock:\n"
+        "        [scan_0]\n"
+        "            Source []\n",
+        translated);
+}
+
 }  // namespace
 }  // namespace mongo

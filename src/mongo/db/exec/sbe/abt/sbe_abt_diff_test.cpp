@@ -244,6 +244,9 @@ TEST_F(NodeSBE, DiffTest) {
                          "{a: [{b: null}, {b: 1}]}"}));
 
     ASSERT_TRUE(compare("[{$match: {'a': {$eq: null}}}]", {"{a: 2}"}));
+
+    ASSERT_TRUE(compare("[{$match: {'a': {$ne: 2}}}]",
+                        {"{a: 1}", "{a: 2}", "{a: [1, 2]}", "{a: [1]}", "{a: [2]}"}));
 }
 
 }  // namespace
