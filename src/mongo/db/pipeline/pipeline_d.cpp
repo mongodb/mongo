@@ -160,9 +160,7 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> extractSbeCompatibleSt
     // sharded and which ones aren't. As such, if any secondary collection is a view or is sharded,
     // no $lookup will be eligible for pushdown.
     const bool disallowLookupPushdown =
-        !(serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-          feature_flags::gFeatureFlagSBELookupPushdown.isEnabled(
-              serverGlobalParams.featureCompatibility)) ||
+        !feature_flags::gFeatureFlagSBELookupPushdown.isEnabledAndIgnoreFCV() ||
         internalQuerySlotBasedExecutionDisableLookupPushdown.load() || isMainCollectionSharded ||
         collections.isAnySecondaryNamespaceAViewOrSharded();
 
