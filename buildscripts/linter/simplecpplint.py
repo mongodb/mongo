@@ -55,7 +55,7 @@ _RE_COMMENT_STRIP = re.compile("//.*")
 
 _RE_PATTERN_MONGO_POLYFILL = _make_polyfill_regex()
 _RE_VOLATILE = re.compile('[^_]volatile')
-_RE_MUTEX = re.compile('[ ({,]stdx?::mutex[ ({]')
+_RE_MUTEX = re.compile('(^|[ ({,])stdx?::mutex[ ({]')
 _RE_ASSERT = re.compile(r'\bassert\s*\(')
 _RE_UNSTRUCTURED_LOG = re.compile(r'\blogd\s*\(')
 _RE_STD_OPTIONAL = re.compile(r'\bstd::optional\b')
