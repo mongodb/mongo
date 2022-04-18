@@ -11,7 +11,7 @@ stepback: true
 pre:
   - func: "cleanup"
 post:
-  - func: "print python stacktrace"
+  - func: "dump stacktraces"
   - func: "dump stderr/stdout"
   - func: "upload artifact"
     vars:
@@ -504,16 +504,30 @@ functions:
         display_name: WT Hang Analyzer Output - Execution ${execution}
         remote_file: wiredtiger/${build_variant}/${revision}/wt_hang_analyzer/wt-hang-analyzer_${task_name}_${build_id}${postfix|}.tgz
 
-  "print python stacktrace":
-    command: shell.exec
-    params:
-      working_dir: "wiredtiger/cmake_build"
-      script: |
-        set -o errexit
-        set -o verbose
-        if [ -d "WT_TEST" ]; then
-          ${python_binary|python3} ../test/evergreen/print_python_stack_trace.py -e ${python_binary|python3} -c WT_TEST -l .
-        fi
+  "dump stacktraces":
+    - command: shell.exec
+      params:
+        working_dir: "wiredtiger/cmake_build"
+        script: |
+          set -o errexit
+          set -o verbose
+          # Parse through any failures inside the WT_TEST directory.
+          ${python_binary|python3} ../test/evergreen/print_stack_trace.py --unit_test -e ${python_binary|python3} -c WT_TEST -l .
+          
+          # Look through the stress format directory for any coredumps.
+          cd test/format
+          ${python_binary|python3} ../../../test/evergreen/print_stack_trace.py --format -e ./t -c . -l .
+    - command: s3.put
+      params:
+        aws_secret: ${aws_secret}
+        aws_key: ${aws_key}
+        local_files_include_filter:
+          - wiredtiger/cmake_build/*stacktrace.txt
+          - wiredtiger/cmake_build/test/format/*stacktrace.txt
+        bucket: build_external
+        permissions: public-read
+        content_type: text/plain
+        remote_file: wiredtiger/${build_variant}/${revision}/artifacts/
 
   "dump stderr/stdout":
     command: shell.exec

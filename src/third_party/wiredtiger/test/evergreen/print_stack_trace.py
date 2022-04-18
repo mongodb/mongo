@@ -51,20 +51,24 @@ class LLDBDumper:
         """Find the installed debugger."""
         return which(debugger)
 
-    def dump(self, exe_path: str, core_path: str):
+    def dump(self, exe_path: str, core_path: str, dump_all: bool, output_file: str):
         """Dump stack trace."""
         if self.dbg is None:
             sys.exit("Debugger lldb not found,"
                      "skipping dumping of {}".format(core_path))
 
-        cmds = [
-            "thread backtrace all -c 30",
-            "quit"
-        ]
+        if dump_all:
+            cmds.append("thread apply all backtrace -c 30")
+        else:
+            cmds.append("backtrace -c 30")
+        cmds.append("quit")
 
+        output = None
+        if (output_file):
+            output = open(output_file, "w")
         subprocess.run([self.dbg, "--batch"] + [exe_path, "-c", core_path] +
                        list(itertools.chain.from_iterable([['-o', b] for b in cmds])),
-                       check=True)
+                       check=True, stdout=output)
 
 
 class GDBDumper:
@@ -77,7 +81,7 @@ class GDBDumper:
         """Find the installed debugger."""
         return which(debugger)
 
-    def dump(self, exe_path: str, core_path: str, lib_path: str):
+    def dump(self, exe_path: str, core_path: str, lib_path: str, dump_all: bool, output_file: str):
         """Dump stack trace."""
         if self.dbg is None:
             sys.exit("Debugger gdb not found,"
@@ -86,15 +90,20 @@ class GDBDumper:
         cmds = []
         if lib_path:
             cmds.append("set solib-search-path " + lib_path)
-        cmds.extend([
-            "thread apply all backtrace 30",
-            "quit"
-        ])
 
+        if dump_all:
+            cmds.append("thread apply all backtrace 30")
+        else:
+            cmds.append("backtrace 30")
+        cmds.append("quit")
+
+        output = None
+        if (output_file):
+            output = open(output_file, "w")
         subprocess.run([self.dbg, "--batch", "--quiet"] +
                        list(itertools.chain.from_iterable([['-ex', b] for b in cmds])) +
                        [exe_path, core_path],
-                       check=True)
+                       check=True, stdout=output)
 
 
 def main():
@@ -106,25 +115,43 @@ def main():
                         help='directory path to the core dumps',
                         required=True)
     parser.add_argument('-l', '--lib_path', help='library path')
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument('--unit_test', action='store_true', help='Format core dumps from python unit tests')
+    group.add_argument('--format', action='store_true', help='Format core dumps from format tests')
     args = parser.parse_args()
 
     # Store the path of the core files as a list.
     core_files = []
-    regex = re.compile(r'.*dump.*python.*', re.IGNORECASE)
+    dump_all = args.unit_test
+
+    regex = None
+    if (args.format):
+        regex = re.compile(r'dump_t.*core', re.IGNORECASE)
+    elif (args.unit_test):
+        regex = re.compile(r'dump.*python.*core', re.IGNORECASE)
+
     for root, _, files in os.walk(args.core_path):
         for file in files:
             if regex.match(file):
-                core_files.extend([os.path.join(root, file)])
+                core_files.append(os.path.join(root, file))
 
     for core_file_path in core_files:
         print(border_msg(core_file_path), flush=True)
         if sys.platform.startswith('linux'):
             dbg = GDBDumper()
-            dbg.dump(args.executable_path, core_file_path, args.lib_path)
+            dbg.dump(args.executable_path, core_file_path, args.lib_path, dump_all, None)
+
+            # Extract the filename from the core file path, to create a stacktrace output file.
+            file_name, _ = os.path.splitext(os.path.basename(core_file_path))
+            dbg.dump(args.executable_path, core_file_path, args.lib_path, True, file_name + ".stacktrace.txt")
         elif sys.platform.startswith('darwin'):
             # FIXME - macOS to be supported in WT-8976
             # dbg = LLDBDumper()
-            # dbg.dump(args.executable_path, core_file_path)
+            # dbg.dump(args.executable_path, core_file_path, dump_all)
+
+            # Extract the filename from the core file path, to create a stacktrace output file.
+            # file_name, _ = os.path.splitext(os.path.basename(core_file_path))
+            # dbg.dump(args.executable_path, core_file_path, args.lib_path, dump_all, file_name + ".stacktrace.txt")
             pass
         elif sys.platform.startswith('win32') or sys.platform.startswith('cygwin'):
             # FIXME - Windows to be supported in WT-8937
