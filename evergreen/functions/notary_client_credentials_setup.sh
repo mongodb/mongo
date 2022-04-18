@@ -9,6 +9,7 @@ cat << EOF > notary_env.sh
 export NOTARY_TOKEN=${signing_auth_token_60}
 export BARQUE_USERNAME=${barque_user}
 export BARQUE_API_KEY=${barque_api_key}
+export MACOS_NOTARY_TOKEN=${macos_notarization_secret}
 EOF
 
 echo "${signing_auth_token_60}" > signing_auth_token
