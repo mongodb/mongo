@@ -49,6 +49,7 @@ public:
         tasserted(5424002,
                   str::stream() << "Invalid call to getAssociativity() in accumulator "
                                 << getOpName());
+        return ExpressionNary::Associativity::kNone;
     }
 
     bool isCommutative() const final {
