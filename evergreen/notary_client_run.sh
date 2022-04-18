@@ -13,6 +13,19 @@ if [ "$long_ext" == "tgz" ]; then
   long_ext="tar.gz"
 fi
 
+if [[ "${push_name}" == "macos"* ]]; then
+  curl https://macos-notary-1628249594.s3.amazonaws.com/releases/client/v3.3.0/linux_amd64.zip -o linux_amd64.zip
+  unzip linux_amd64.zip
+  chmod +x ./linux_amd64/macnotary
+  bins=("mongo-binaries.tgz" "mongo-shell.tgz" "mongo-cryptd.tgz" "mh.tgz")
+  for archive in ${bins[@]}; do
+    TEMP_ARCHIVE="$(mktemp -p $PWD)"
+    mv "$archive" "$TEMP_ARCHIVE"
+    ./linux_amd64/macnotary -f "$TEMP_ARCHIVE" -m notarizeAndSign -u https://dev.macos-notary.build.10gen.cc/api -k server -s ${MACOS_NOTARY_TOKEN} -b server.mongodb.com -o "$archive"
+    rm -f "$TEMP_ARCHIVE"
+  done
+fi
+
 mv mongo-binaries.tgz mongodb-${push_name}-${push_arch}-${suffix}.${ext}
 mv mongo-shell.tgz mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext}
 mv mongo-cryptd.tgz mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext} || true
