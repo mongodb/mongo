@@ -97,19 +97,6 @@ Status updateStateDoc(OperationContext* opCtx, const ShardSplitDonorDocument& st
 StatusWith<bool> deleteStateDoc(OperationContext* opCtx, const UUID& shardSplitId);
 
 /**
- * Returns the state doc matching the document with shardSplitId from the disk if it
- * exists. Reads at "no" timestamp i.e, reading with the "latest" snapshot reflecting up to date
- * data.
- *
- * If the stored state doc on disk contains invalid BSON, the 'InvalidBSON' error code is
- * returned.
- *
- * Returns 'NoMatchingDocument' error code if no document with 'shardSplitId' is found.
- */
-StatusWith<ShardSplitDonorDocument> getStateDocument(OperationContext* opCtx,
-                                                     const UUID& shardSplitId);
-
-/**
  * Returns true if the state document should be removed for a shard split recipient which is based
  * on having a local state doc in kBlocking state and having matching recipientSetName matching the
  * config.replSetName.

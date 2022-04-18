@@ -180,40 +180,6 @@ Status updateStateDoc(OperationContext* opCtx, const ShardSplitDonorDocument& st
     });
 }
 
-StatusWith<ShardSplitDonorDocument> getStateDocument(OperationContext* opCtx,
-                                                     const UUID& shardSplitId) {
-    // Read the most up to date data.
-    ReadSourceScope readSourceScope(opCtx, RecoveryUnit::ReadSource::kNoTimestamp);
-    AutoGetCollectionForRead collection(opCtx, NamespaceString::kTenantSplitDonorsNamespace);
-    if (!collection) {
-        return Status(ErrorCodes::NamespaceNotFound,
-                      str::stream() << "Collection not found looking for state document: "
-                                    << NamespaceString::kTenantSplitDonorsNamespace.ns());
-    }
-
-    BSONObj result;
-    auto foundDoc = Helpers::findOne(opCtx,
-                                     collection.getCollection(),
-                                     BSON(ShardSplitDonorDocument::kIdFieldName << shardSplitId),
-                                     result,
-                                     true);
-
-    if (!foundDoc) {
-        return Status(ErrorCodes::NoMatchingDocument,
-                      str::stream()
-                          << "No matching state doc found with shard split id: " << shardSplitId);
-    }
-
-    try {
-        return ShardSplitDonorDocument::parse(IDLParserErrorContext("shardSplitStateDocument"),
-                                              result);
-    } catch (DBException& ex) {
-        return ex.toStatus(str::stream()
-                           << "Invalid BSON found for matching document with shard split id: "
-                           << shardSplitId << " , res: " << result);
-    }
-}
-
 StatusWith<bool> deleteStateDoc(OperationContext* opCtx, const UUID& shardSplitId) {
     const auto nss = NamespaceString::kTenantSplitDonorsNamespace;
     AutoGetCollection collection(opCtx, nss, MODE_IX);

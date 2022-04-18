@@ -73,6 +73,50 @@
 
 
 namespace mongo {
+/**
+ * Returns the state doc matching the document with shardSplitId from the disk if it
+ * exists.
+ *
+ * If the stored state doc on disk contains invalid BSON, the 'InvalidBSON' error code is
+ * returned.
+ *
+ * Returns 'NoMatchingDocument' error code if no document with 'shardSplitId' is found.
+ */
+namespace {
+StatusWith<ShardSplitDonorDocument> getStateDocument(OperationContext* opCtx,
+                                                     const UUID& shardSplitId) {
+    // Use kLastApplied so that we can read the state document as a secondary.
+    ReadSourceScope readSourceScope(opCtx, RecoveryUnit::ReadSource::kLastApplied);
+    AutoGetCollectionForRead collection(opCtx, NamespaceString::kTenantSplitDonorsNamespace);
+    if (!collection) {
+        return Status(ErrorCodes::NamespaceNotFound,
+                      str::stream() << "Collection not found looking for state document: "
+                                    << NamespaceString::kTenantSplitDonorsNamespace.ns());
+    }
+
+    BSONObj result;
+    auto foundDoc = Helpers::findOne(opCtx,
+                                     collection.getCollection(),
+                                     BSON(ShardSplitDonorDocument::kIdFieldName << shardSplitId),
+                                     result,
+                                     true);
+
+    if (!foundDoc) {
+        return Status(ErrorCodes::NoMatchingDocument,
+                      str::stream()
+                          << "No matching state doc found with shard split id: " << shardSplitId);
+    }
+
+    try {
+        return ShardSplitDonorDocument::parse(IDLParserErrorContext("shardSplitStateDocument"),
+                                              result);
+    } catch (DBException& ex) {
+        return ex.toStatus(str::stream()
+                           << "Invalid BSON found for matching document with shard split id: "
+                           << shardSplitId << " , res: " << result);
+    }
+}
+}  // namespace
 
 class MockReplReconfigCommandInvocation : public CommandInvocation {
 public:
@@ -173,7 +217,7 @@ void fastForwardCommittedSnapshotOpTime(
     auto replCoord = dynamic_cast<repl::ReplicationCoordinatorMock*>(
         repl::ReplicationCoordinator::get(serviceContext));
 
-    auto foundStateDoc = uassertStatusOK(serverless::getStateDocument(opCtx, uuid));
+    auto foundStateDoc = uassertStatusOK(getStateDocument(opCtx, uuid));
     invariant(foundStateDoc.getCommitOrAbortOpTime());
 
     replCoord->setCurrentCommittedSnapshotOpTime(*foundStateDoc.getCommitOrAbortOpTime());
@@ -228,10 +272,6 @@ public:
     }
 
 protected:
-    // TODO (SERVER-65218): Use wiredTiger.
-    ShardSplitDonorServiceTest()
-        : repl::PrimaryOnlyServiceMongoDTest(Options{}.engine("ephemeralForTest")) {}
-
     std::unique_ptr<repl::PrimaryOnlyService> makeService(ServiceContext* serviceContext) override {
         return std::make_unique<ShardSplitDonorService>(serviceContext);
     }
@@ -323,7 +363,9 @@ TEST_F(ShardSplitDonorServiceTest, BasicShardSplitDonorServiceInstanceCreation) 
     _net->enterNetwork();
     waitForHelloRequest(_net);
     processHelloRequest(_net, &_recipientSet);
+    waitForHelloRequest(_net);
     processHelloRequest(_net, &_recipientSet);
+    waitForHelloRequest(_net);
     processHelloRequest(_net, &_recipientSet);
     _net->runReadyNetworkOperations();
     _net->exitNetwork();
@@ -512,7 +554,7 @@ TEST_F(ShardSplitDonorServiceTest, DeleteStateDocMarkedGarbageCollectable) {
     ASSERT_OK(deleted.getStatus());
     ASSERT_TRUE(deleted.getValue());
 
-    ASSERT_EQ(serverless::getStateDocument(opCtx.get(), _uuid).getStatus().code(),
+    ASSERT_EQ(getStateDocument(opCtx.get(), _uuid).getStatus().code(),
               ErrorCodes::NoMatchingDocument);
 }
 
@@ -655,7 +697,7 @@ TEST_F(ShardSplitDonorServiceTest, ResumeAfterStepdownTest) {
     ASSERT_EQ(ErrorCodes::InterruptedDueToReplStateChange, result.getStatus().code());
 
     // verify that the state document exists
-    ASSERT_OK(serverless::getStateDocument(opCtx.get(), _uuid).getStatus());
+    ASSERT_OK(getStateDocument(opCtx.get(), _uuid).getStatus());
 
     auto fp = std::make_unique<FailPointEnableBlock>("pauseShardSplitAfterBlocking");
     auto initialTimesEntered = fp->initialTimesEntered();
@@ -665,7 +707,7 @@ TEST_F(ShardSplitDonorServiceTest, ResumeAfterStepdownTest) {
     fp->failPoint()->waitForTimesEntered(initialTimesEntered + 1);
 
     // verify that the state document exists
-    ASSERT_OK(serverless::getStateDocument(opCtx.get(), _uuid).getStatus());
+    ASSERT_OK(getStateDocument(opCtx.get(), _uuid).getStatus());
     auto donor = ShardSplitDonorService::DonorStateMachine::lookup(
         opCtx.get(), _service, BSON("_id" << _uuid));
     ASSERT(donor);
@@ -736,7 +778,7 @@ TEST_F(ShardSplitRecipientCleanupTest, ShardSplitRecipientCleanup) {
     auto opCtx = makeOperationContext();
     test::shard_split::ScopedTenantAccessBlocker scopedTenants(_tenantIds, opCtx.get());
 
-    ASSERT_OK(serverless::getStateDocument(opCtx.get(), _uuid).getStatus());
+    ASSERT_OK(getStateDocument(opCtx.get(), _uuid).getStatus());
 
     ASSERT_FALSE(hasActiveSplitForTenants(opCtx.get(), _tenantIds));
 
@@ -769,7 +811,7 @@ TEST_F(ShardSplitRecipientCleanupTest, ShardSplitRecipientCleanup) {
     ASSERT_EQ(result.state, mongo::ShardSplitDonorStateEnum::kCommitted);
 
     // deleted the local state doc so this should return NoMatchingDocument
-    ASSERT_EQ(serverless::getStateDocument(opCtx.get(), _uuid).getStatus().code(),
+    ASSERT_EQ(getStateDocument(opCtx.get(), _uuid).getStatus().code(),
               ErrorCodes::NoMatchingDocument);
 }
 
@@ -803,7 +845,7 @@ TEST_F(ShardSplitStepUpWithCommitted, StepUpWithkCommitted) {
     test::shard_split::reconfigToAddRecipientNodes(
         getServiceContext(), _recipientTagName, _replSet.getHosts(), _recipientSet.getHosts());
 
-    auto foundStateDoc = uassertStatusOK(serverless::getStateDocument(opCtx.get(), _uuid));
+    auto foundStateDoc = uassertStatusOK(getStateDocument(opCtx.get(), _uuid));
     invariant(foundStateDoc.getExpireAt());
     ASSERT_EQ(*foundStateDoc.getExpireAt(), *_expireAt);
 
