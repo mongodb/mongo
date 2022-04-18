@@ -49,7 +49,7 @@ __blkcache_alloc(WT_SESSION_IMPL *session, size_t size, void **retp)
     if (blkcache->type == BLKCACHE_DRAM)
         return (__wt_malloc(session, size, retp));
     else if (blkcache->type == BLKCACHE_NVRAM) {
-#ifdef HAVE_LIBMEMKIND
+#ifdef ENABLE_MEMKIND
         *retp = memkind_malloc(blkcache->pmem_kind, size);
 #else
         WT_RET_MSG(session, EINVAL, "NVRAM block cache type requires libmemkind");
@@ -72,7 +72,7 @@ __blkcache_free(WT_SESSION_IMPL *session, void *ptr)
     if (blkcache->type == BLKCACHE_DRAM)
         __wt_free(session, ptr);
     else if (blkcache->type == BLKCACHE_NVRAM) {
-#ifdef HAVE_LIBMEMKIND
+#ifdef ENABLE_MEMKIND
         memkind_free(blkcache->pmem_kind, ptr);
 #else
         __wt_err(session, EINVAL, "NVRAM block cache type requires libmemkind");
@@ -557,7 +557,7 @@ __blkcache_init(WT_SESSION_IMPL *session, size_t cache_size, u_int hash_size, u_
     blkcache->system_ram = system_ram;
 
     if (type == BLKCACHE_NVRAM) {
-#ifdef HAVE_LIBMEMKIND
+#ifdef ENABLE_MEMKIND
         if ((ret = memkind_create_pmem(nvram_device_path, 0, &blkcache->pmem_kind)) != 0)
             WT_RET_MSG(session, ret, "block cache failed to initialize: memkind_create_pmem");
 
@@ -650,7 +650,7 @@ __wt_blkcache_destroy(WT_SESSION_IMPL *session)
     __blkcache_print_reference_hist(
       session, "Evicted blocks", blkcache->cache_references_evicted_blocks);
 
-#ifdef HAVE_LIBMEMKIND
+#ifdef ENABLE_MEMKIND
     if (blkcache->type == BLKCACHE_NVRAM) {
         memkind_destroy_kind(blkcache->pmem_kind);
         __wt_free(session, blkcache->nvram_device_path);
@@ -749,7 +749,7 @@ __wt_blkcache_setup(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig)
         cache_type = BLKCACHE_DRAM;
     else if (WT_STRING_MATCH("nvram", cval.str, cval.len) ||
       WT_STRING_MATCH("NVRAM", cval.str, cval.len)) {
-#ifdef HAVE_LIBMEMKIND
+#ifdef ENABLE_MEMKIND
         cache_type = BLKCACHE_NVRAM;
         WT_RET(__wt_config_gets(session, cfg, "block_cache.nvram_path", &cval));
         WT_RET(__wt_strndup(session, cval.str, cval.len, &nvram_device_path));

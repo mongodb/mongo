@@ -11,7 +11,7 @@
  * faster storage medium, such as NVRAM.
  */
 
-#ifdef HAVE_LIBMEMKIND
+#ifdef ENABLE_MEMKIND
 #include <memkind.h>
 #endif
 
@@ -80,7 +80,7 @@ struct __wt_blkcache {
     bool cache_on_checkpoint; /* Don't cache blocks written by checkpoints */
     bool cache_on_writes;     /* Cache blocks on writes */
 
-#ifdef HAVE_LIBMEMKIND
+#ifdef ENABLE_MEMKIND
     struct memkind *pmem_kind; /* NVRAM connection */
 #endif
     char *nvram_device_path; /* The absolute path of the file system on NVRAM device */
