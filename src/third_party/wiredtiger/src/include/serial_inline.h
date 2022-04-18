@@ -228,9 +228,8 @@ __wt_update_serial(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_PAGE *page
     /* Clear references to memory we now own and must free on error. */
     upd = *updp;
     *updp = NULL;
-    prev_upd_ts = WT_TS_NONE;
 
-    prev_upd_ts = upd->prev_durable_ts;
+    prev_upd_ts = (upd == NULL) ? WT_TS_NONE : upd->prev_durable_ts;
 
     /*
      * All structure setup must be flushed before the structure is entered into the list. We need a
