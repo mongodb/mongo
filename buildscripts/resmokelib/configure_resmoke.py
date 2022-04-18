@@ -146,7 +146,7 @@ def _find_resmoke_wrappers():
     # We assume that users who fall under either case will explicitly pass the
     # --installDir argument.
     candidate_installs = glob.glob("**/bin/resmoke.py", recursive=True)
-    return list(map(os.path.dirname, candidate_installs))
+    return list(candidate_installs)
 
 
 def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many-locals,too-many-branches
@@ -163,7 +163,7 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
         if cmdline_vars[cmdline_key] is not None:
             config[cmdline_key] = cmdline_vars[cmdline_key]
 
-    if os.path.isfile("resmoke.ini"):
+    if values.command == "run" and os.path.isfile("resmoke.ini"):
         err = textwrap.dedent("""\
 Support for resmoke.ini has been removed. You must delete
 resmoke.ini and rerun your build to run resmoke. If only one testable
@@ -254,10 +254,10 @@ be invoked as either:
     _config.MULTIVERSION_BIN_VERSION = config.pop("old_bin_version")
 
     _config.INSTALL_DIR = config.pop("install_dir")
-    if _config.INSTALL_DIR is None:
+    if values.command == "run" and _config.INSTALL_DIR is None:
         resmoke_wrappers = _find_resmoke_wrappers()
         if len(resmoke_wrappers) == 1:
-            _config.INSTALL_DIR = resmoke_wrappers[0]
+            _config.INSTALL_DIR = os.path.dirname(resmoke_wrappers[0])
         elif len(resmoke_wrappers) > 1:
             err = textwrap.dedent(f"""\
 Multiple testable installations were found, but installDir was not specified.
