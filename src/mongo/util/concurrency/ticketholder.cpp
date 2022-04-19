@@ -201,7 +201,7 @@ boost::optional<Ticket> SemaphoreTicketHolder::tryAcquire(AdmissionContext* admC
     if (!_tryAcquire()) {
         return boost::none;
     }
-    return boost::make_optional(Ticket::makeValid());
+    return Ticket{};
 }
 
 Ticket SemaphoreTicketHolder::waitForTicket(OperationContext* opCtx,
@@ -214,7 +214,7 @@ Ticket SemaphoreTicketHolder::waitForTicket(OperationContext* opCtx,
     } else {
         _newTicket.wait(lk, [this] { return _tryAcquire(); });
     }
-    return Ticket::makeValid();
+    return Ticket{};
 }
 
 
@@ -236,7 +236,7 @@ boost::optional<Ticket> SemaphoreTicketHolder::waitForTicketUntil(OperationConte
     if (!taken) {
         return boost::none;
     }
-    return boost::make_optional(Ticket::makeValid());
+    return Ticket{};
 }
 
 void SemaphoreTicketHolder::release(AdmissionContext* admCtx, Ticket&& ticket) {
