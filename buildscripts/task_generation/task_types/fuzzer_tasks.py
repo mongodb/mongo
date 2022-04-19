@@ -141,7 +141,8 @@ class FuzzerGenTaskService:
             FunctionCall(CONFIGURE_EVG_CREDENTIALS),
             FunctionCall("setup jstestfuzz"),
             FunctionCall("run jstestfuzz", params.jstestfuzz_params()),
-            FunctionCall(RUN_GENERATED_TESTS, run_tests_vars)
+            FunctionCall(RUN_GENERATED_TESTS, run_tests_vars),
+            FunctionCall("minimize jstestfuzz")
         ]
 
         dependencies = {TaskDependency(dependency) for dependency in params.dependencies}

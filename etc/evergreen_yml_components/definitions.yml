@@ -988,7 +988,7 @@ functions:
       args:
       - "./src/evergreen/extract_generated_test_configuration.sh"
 
-  "minimize jstestfuzz": &minimize_jstestfuzz
+  "minimize jstestfuzz":
     command: subprocess.exec
     type: test
     params:
@@ -1162,7 +1162,6 @@ functions:
       args:
       - "./src/evergreen/multiversion_exclude_tags_generate.sh"
   - *execute_resmoke_tests
-  - *minimize_jstestfuzz
     # The existence of the "run_tests_infrastructure_failure" file indicates this failure isn't
     # directly actionable. We use type=setup rather than type=system or type=test for this command
   # because we don't intend for any human to look at this failure.
