@@ -150,28 +150,28 @@ public:
 
 private:
     // Increment member `counter` by `n`, resetting all counters if it was > 2^60.
-    void _checkWrap(CacheAligned<AtomicWord<long long>> OpCounters::*counter, int n);
+    void _checkWrap(CacheExclusive<AtomicWord<long long>> OpCounters::*counter, int n);
 
-    CacheAligned<AtomicWord<long long>> _insert;
-    CacheAligned<AtomicWord<long long>> _query;
-    CacheAligned<AtomicWord<long long>> _update;
-    CacheAligned<AtomicWord<long long>> _delete;
-    CacheAligned<AtomicWord<long long>> _getmore;
-    CacheAligned<AtomicWord<long long>> _command;
+    CacheExclusive<AtomicWord<long long>> _insert;
+    CacheExclusive<AtomicWord<long long>> _query;
+    CacheExclusive<AtomicWord<long long>> _update;
+    CacheExclusive<AtomicWord<long long>> _delete;
+    CacheExclusive<AtomicWord<long long>> _getmore;
+    CacheExclusive<AtomicWord<long long>> _command;
 
-    CacheAligned<AtomicWord<long long>> _insertOnExistingDoc;
-    CacheAligned<AtomicWord<long long>> _updateOnMissingDoc;
-    CacheAligned<AtomicWord<long long>> _deleteWasEmpty;
-    CacheAligned<AtomicWord<long long>> _deleteFromMissingNamespace;
-    CacheAligned<AtomicWord<long long>> _acceptableErrorInCommand;
+    CacheExclusive<AtomicWord<long long>> _insertOnExistingDoc;
+    CacheExclusive<AtomicWord<long long>> _updateOnMissingDoc;
+    CacheExclusive<AtomicWord<long long>> _deleteWasEmpty;
+    CacheExclusive<AtomicWord<long long>> _deleteFromMissingNamespace;
+    CacheExclusive<AtomicWord<long long>> _acceptableErrorInCommand;
 
     // Counters for deprecated opcodes.
-    CacheAligned<AtomicWord<long long>> _insertDeprecated;
-    CacheAligned<AtomicWord<long long>> _queryDeprecated;
-    CacheAligned<AtomicWord<long long>> _updateDeprecated;
-    CacheAligned<AtomicWord<long long>> _deleteDeprecated;
-    CacheAligned<AtomicWord<long long>> _getmoreDeprecated;
-    CacheAligned<AtomicWord<long long>> _killcursorsDeprecated;
+    CacheExclusive<AtomicWord<long long>> _insertDeprecated;
+    CacheExclusive<AtomicWord<long long>> _queryDeprecated;
+    CacheExclusive<AtomicWord<long long>> _updateDeprecated;
+    CacheExclusive<AtomicWord<long long>> _deleteDeprecated;
+    CacheExclusive<AtomicWord<long long>> _getmoreDeprecated;
+    CacheExclusive<AtomicWord<long long>> _killcursorsDeprecated;
 };
 
 extern OpCounters globalOpCounters;
@@ -198,48 +198,47 @@ public:
     void acceptedTFOIngress();
 
     void setTFOKernelSetting(std::int64_t val) {
-        _tfo->kernelSetting = val;
+        _tfoKernelSetting = val;
     }
 
     void setTFOServerSupport(bool val) {
-        _tfo->kernelSupportServer = val;
+        _tfoKernelSupportServer = val;
     }
 
     void setTFOClientSupport(bool val) {
-        _tfo->kernelSupportClient = val;
+        _tfoKernelSupportClient = val;
     }
 
     void append(BSONObjBuilder& b);
 
 private:
-    CacheAligned<AtomicWord<long long>> _physicalBytesIn{0};
-    CacheAligned<AtomicWord<long long>> _physicalBytesOut{0};
+    CacheExclusive<AtomicWord<long long>> _physicalBytesIn{0};
+    CacheExclusive<AtomicWord<long long>> _physicalBytesOut{0};
 
     // These two counters are always incremented at the same time, so
-    // we place them on the same cache line.
+    // we place them on the same cache line. We use
+    // CacheCombinedExclusive to ensure that they are combined within
+    // the scope of a constructive interference region, and protected
+    // from false sharing by padding out to destructive interference
+    // size.
     struct Together {
         AtomicWord<long long> logicalBytesIn{0};
         AtomicWord<long long> requests{0};
     };
-    CacheAligned<Together> _together{};
-    static_assert(sizeof(decltype(_together)) <= stdx::hardware_constructive_interference_size,
-                  "cache line spill");
+    CacheCombinedExclusive<Together> _together{};
 
-    CacheAligned<AtomicWord<long long>> _logicalBytesOut{0};
+    CacheExclusive<AtomicWord<long long>> _logicalBytesOut{0};
 
-    CacheAligned<AtomicWord<long long>> _numSlowDNSOperations{0};
-    CacheAligned<AtomicWord<long long>> _numSlowSSLOperations{0};
+    CacheExclusive<AtomicWord<long long>> _numSlowDNSOperations{0};
+    CacheExclusive<AtomicWord<long long>> _numSlowSSLOperations{0};
 
-    struct TFO {
-        // Counter of inbound connections at runtime.
-        AtomicWord<std::int64_t> accepted{0};
+    // Counter of inbound connections at runtime.
+    CacheExclusive<AtomicWord<std::int64_t>> _tfoAccepted{0};
 
-        // Info determined at startup.
-        std::int64_t kernelSetting;
-        bool kernelSupportServer{false};
-        bool kernelSupportClient{false};
-    };
-    CacheAligned<TFO> _tfo{};
+    // TFO info determined at startup.
+    std::int64_t _tfoKernelSetting;
+    bool _tfoKernelSupportServer{false};
+    bool _tfoKernelSupportClient{false};
 };
 
 extern NetworkCounter networkCounter;

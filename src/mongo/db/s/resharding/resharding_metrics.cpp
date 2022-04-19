@@ -124,7 +124,7 @@ public:
 
 private:
     // Increment member `counter` by n, resetting all counters if it was > 2^60.
-    void _checkWrap(CacheAligned<AtomicWord<long long>> ReshardingOpCounters::*counter, int n) {
+    void _checkWrap(CacheExclusive<AtomicWord<long long>> ReshardingOpCounters::*counter, int n) {
         static constexpr auto maxCount = 1LL << 60;
         auto oldValue = (this->*counter)->fetchAndAddRelaxed(n);
         if (oldValue > maxCount - n) {
@@ -139,9 +139,9 @@ private:
         }
     }
 
-    CacheAligned<AtomicWord<long long>> _insert;
-    CacheAligned<AtomicWord<long long>> _update;
-    CacheAligned<AtomicWord<long long>> _delete;
+    CacheExclusive<AtomicWord<long long>> _insert;
+    CacheExclusive<AtomicWord<long long>> _update;
+    CacheExclusive<AtomicWord<long long>> _delete;
 };
 
 // Allows tracking elapsed time for the resharding operation and its sub operations (e.g.,
