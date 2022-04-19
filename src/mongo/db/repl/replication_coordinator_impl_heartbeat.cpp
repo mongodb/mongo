@@ -860,9 +860,11 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
                 auto opCtx = cc().makeOperationContext();
                 // Initializing minvalid is not allowed to be interrupted.  Make sure it
                 // can't be interrupted by a storage change by taking the global lock first.
-                Lock::GlobalLock lk(opCtx.get(), MODE_IX);
-                _replicationProcess->getConsistencyMarkers()->initializeMinValidDocument(
-                    opCtx.get());
+                {
+                    Lock::GlobalLock lk(opCtx.get(), MODE_IX);
+                    _replicationProcess->getConsistencyMarkers()->initializeMinValidDocument(
+                        opCtx.get());
+                }
                 _externalState->startThreads();
                 _startDataReplication(opCtx.get());
                 break;

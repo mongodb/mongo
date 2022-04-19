@@ -723,6 +723,9 @@ void ReplicationCoordinatorImpl::_startInitialSync(
     InitialSyncerInterface::OnCompletionFn onCompletion,
     bool fallbackToLogical) {
     std::shared_ptr<InitialSyncerInterface> initialSyncerCopy;
+
+    // Initial sync may take locks during startup; make sure there is no possibility of conflict.
+    dassert(!opCtx->lockState()->isLocked());
     try {
         {
             // Must take the lock to set _initialSyncer, but not call it.
@@ -848,6 +851,10 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx) 
         // This is not the first call.
         return;
     }
+
+    // Make sure we're not holding any locks; existing locks might conflict with operations
+    // we take during initial sync or replication steady state startup.
+    dassert(!opCtx->lockState()->isLocked());
 
     // Check to see if we need to do an initial sync.
     const auto lastOpTime = getMyLastAppliedOpTime();
