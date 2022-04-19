@@ -297,7 +297,8 @@ __wt_cursor_valid(WT_CURSOR_BTREE *cbt, WT_ITEM *key, uint64_t recno, bool *vali
 
         /*
          * Check for an update. For column store, modifications are handled with insert lists, so an
-         * insert can have the same key as an on-page or history store object.
+         * insert can have the same key as an on-page or history store object. Setting update here,
+         * even after checking the insert list above, is correct, see the comment below for details.
          */
         upd = cbt->ins ? cbt->ins->upd : NULL;
         break;
@@ -338,7 +339,14 @@ __wt_cursor_valid(WT_CURSOR_BTREE *cbt, WT_ITEM *key, uint64_t recno, bool *vali
         break;
     }
 
-    /* Check for a value on disk or in the history store. Pass in any update. */
+    /*
+     * Check for a value on disk or in the history store, passing in any update.
+     *
+     * Potentially checking an update chain twice (both here, and above if the insert list is set in
+     * the case of column-store), isn't a mistake. In a modify chain, if rollback-to-stable recovers
+     * a history store record into the update list, the base update may be in the update list and we
+     * must use it rather than falling back to the on-disk value as the base update.
+     */
     WT_RET(__wt_txn_read(session, cbt, key, recno, upd));
     if (cbt->upd_value->type != WT_UPDATE_INVALID) {
         if (cbt->upd_value->type == WT_UPDATE_TOMBSTONE)
