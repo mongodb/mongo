@@ -31,42 +31,6 @@ The database must be quiescent during this process, and applications must close
 or reset all open cursors before calling the WT_CONNECTION::rollback_to_stable
 method.
 
-@section timestamp_misc_diagnostic Using diagnostic configurations to enforce timestamp usage
-
-The WT_SESSION::create method supports additional checking of timestamp
-usage on a per-table basis. While these usage checks can decrease
-application performance, and applications may not choose to configure them
-in production settings, they are strongly recommended during development.
-
-By default, WiredTiger requires timestamps be used in "ordered" mode:
-updates to a table can be made either with and without a commit timestamp,
-but once a commit timestamp is used to update a key, all future updates to
-the key will require a commit timestamp. Further, each update to a key must
-have a commit timestamp at or after any previous update.
-
-Setting the \c write_timestamp_usage configuration changes how timestamps
-are expected to be used in the table:
-
-| Configuration | Description |
-|---------------|-------------|
-| never | Require no updates to the table have a commit timestamp. |
-| mixed_mode | Allow updates both with and without a commit timestamp. Each update must have a commit timestamp at or after the previous update, or no timestamp at all. |
-
-The \c write_timestamp_usage configuration is expected to be used with the
-WT_SESSION::create method's \c assert configuration. The \c
-"assert(read_timestamp)" configuration requires timestamps always or never
-be used on reads in the table.
-
-The \c "assert(write_timestamp)" configuration requires update
-timestamps conform to the \c write_timestamp_usage setting. If WiredTiger
-detects a violation of the configured policy, an error message will be
-logged. Additionally, in diagnostic builds, the library will fail and drop
-core at the failing check.
-
-\warning
-These are best-effort checks by WiredTiger, and there are cases where
-application misbehavior will not be detected.
-
 @section timestamps_misc_in_memory In-memory configurations and timestamps
 
 Timestamps are supported for in-memory databases, but must be configured as in

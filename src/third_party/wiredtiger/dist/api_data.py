@@ -46,7 +46,7 @@ common_runtime_config = [
     Config('app_metadata', '', r'''
         application-owned metadata for this object'''),
     Config('assert', '', r'''
-        enable enhanced timestamp checking with error messages and optional core dump''',
+        declare timestamp usage''',
         type='category', subconfig= [
         Config('commit_timestamp', 'none', r'''
             this option is no longer supported, retained for backward compatibility''',
@@ -65,7 +65,7 @@ common_runtime_config = [
             \c write_timestamp_usage option for this table, writing
             an error message if policy is violated. If the library was
             built in diagnostic mode, drop core at the failing check''',
-            choices=['off', 'on']),
+            choices=['off', 'on'], undoc=True),
         ]),
     Config('verbose', '[]', r'''
         this option is no longer supported, retained for backward compatibility''',

@@ -33,22 +33,42 @@ values based on their timestamps. Readers acquiring a snapshot after the
 commit of the update without a timestamp will not see prior historical values
 regardless of their read timestamps.
 
-@section timestamp_txn_api_configure Enforcing application timestamp behavior
+@section timestamp_txn_api_configure Application timestamp configuration
 
 By default, WiredTiger requires timestamps be used in "ordered" mode:
-updates to a table can be made either with and without a commit timestamp,
+updates to a table can be made both with and without a commit timestamp,
 but once a commit timestamp is used to update a key, all future updates to
 the key will require a commit timestamp. Further, each update to a key must
 have a commit timestamp at or after any previous update.
 
-These requirements can be changed on a per-table basis to require no updates
+These requirements can be changed on a per-table basis to specify no updates
 to a table have timestamps, or that updates without timestamps be permitted
-even when a key has already been updated using a timestamp. Using timestamps
-that are before previously applied timestamps is never permitted.
+even when a key has already been updated using a timestamp. Commit timestamps
+before previously applied timestamps is never permitted.
 
-Enforcing application timestamp behavior can be challenging for application
-writers. WiredTiger includes diagnostic support for many common restrictions;
-see @ref timestamp_misc_diagnostic.
+Setting the WT_SESSION::create \c write_timestamp_usage configuration changes
+how timestamps are expected to be used in the table:
+
+| Configuration | Description |
+|---------------|-------------|
+| never | Require no updates to the table have a commit timestamp. |
+| mixed_mode | Allow updates both with and without a commit timestamp. Each update must have a commit timestamp at or after the previous update, or no timestamp at all. |
+
+The WT_SESSION::create \c "assert(read_timestamp)" configuration specifies
+that timestamps always or never be used on reads in the table.
+
+There are additional timestamp usage checks in diagnostic builds. While
+building in diagnostic mode to enable these usage checks will decrease
+application performance, and applications should not configure diagnostic
+builds for production use, they are strongly recommended during development.
+
+If WiredTiger detects a violation of timestamp policy, an error message
+will be logged and the transaction commit will fail. In diagnostic builds,
+the library will log an error message and drop core at the failing check.
+
+\warning
+These are best-effort checks by WiredTiger, and there are cases where
+application misbehavior will not be detected.
 
 @section timestamp_txn_api_query Querying transaction timestamp information
 
@@ -137,16 +157,6 @@ multiple commit timestamps, the first commit timestamp set is also required to
 be the earliest: the second and subsequent commit timestamps may not be
 earlier than the first commit timestamp.  This feature is not compatible with
 prepared transactions, which must use only a single commit timestamp.
-
-\warning
-It is \b strongly recommended that updates to a single data item always be presented
-in timestamp order, although this is not enforced by WiredTiger. Updating a
-single data item in other than timestamp order is allowed, and if applications
-do this, data consistency can be violated. This is not expected to be supported
-in future WiredTiger releases, and applications updating keys in other then
-timestamp order are expected to explicitly fail in future releases.
-Some diagnostic tools are available to help enforce this constraint;
-see @ref timestamp_misc_diagnostic.
 
 For prepared transactions, the commit timestamp must not be before the prepare
 timestamp. Otherwise, the commit timestamp must be after the stable timestamp.

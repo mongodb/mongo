@@ -831,7 +831,7 @@ done:
  * __txn_timestamp_usage_check --
  *     Check if a commit will violate timestamp rules.
  */
-static inline void
+static inline int
 __txn_timestamp_usage_check(WT_SESSION_IMPL *session, WT_TXN_OP *op, WT_UPDATE *upd)
 {
     WT_BTREE *btree;
@@ -848,22 +848,25 @@ __txn_timestamp_usage_check(WT_SESSION_IMPL *session, WT_TXN_OP *op, WT_UPDATE *
     name = btree->dhandle->name;
     txn_has_ts = F_ISSET(txn, WT_TXN_HAS_TS_COMMIT | WT_TXN_HAS_TS_DURABLE);
 
-    /* Skip timestamp usage checks unless both assert and usage configurations are set. */
-    if (!LF_ISSET(WT_DHANDLE_TS_ASSERT_WRITE))
-        return;
+    /*
+     * Skip timestamp usage checks unless a usage configuration is set.
+     *
+     * FIXME: WT-9055 Once WT-9055 goes in, there are no more cases where usage configurations are
+     * not set, as ordered will be the default.
+     */
     if (!LF_ISSET(WT_DHANDLE_TS_MIXED_MODE | WT_DHANDLE_TS_NEVER | WT_DHANDLE_TS_ORDERED))
-        return;
+        return (0);
 
     /* Timestamps are ignored on logged files. */
     if (F_ISSET(btree, WT_BTREE_LOGGED))
-        return;
+        return (0);
 
     /*
      * Do not check for timestamp usage in recovery. We don't expect recovery to be using timestamps
      * when applying commits, and it is possible that timestamps may be out of order in log replay.
      */
     if (F_ISSET(S2C(session), WT_CONN_RECOVERING))
-        return;
+        return (0);
 
     op_ts = upd->start_ts != WT_TS_NONE ? upd->start_ts : txn->commit_timestamp;
 
@@ -874,6 +877,9 @@ __txn_timestamp_usage_check(WT_SESSION_IMPL *session, WT_TXN_OP *op, WT_UPDATE *
           name, __wt_timestamp_to_string(op_ts, ts_string[0]));
 #ifdef HAVE_DIAGNOSTIC
         __wt_abort(session);
+#endif
+#ifdef WT_STANDALONE_BUILD
+        return (EINVAL);
 #endif
     }
 
@@ -888,6 +894,9 @@ __txn_timestamp_usage_check(WT_SESSION_IMPL *session, WT_TXN_OP *op, WT_UPDATE *
           name);
 #ifdef HAVE_DIAGNOSTIC
         __wt_abort(session);
+#endif
+#ifdef WT_STANDALONE_BUILD
+        return (EINVAL);
 #endif
     }
 
@@ -904,7 +913,12 @@ __txn_timestamp_usage_check(WT_SESSION_IMPL *session, WT_TXN_OP *op, WT_UPDATE *
 #ifdef HAVE_DIAGNOSTIC
         __wt_abort(session);
 #endif
+#ifdef WT_STANDALONE_BUILD
+        return (EINVAL);
+#endif
     }
+
+    return (0);
 }
 
 /*
@@ -1244,7 +1258,7 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
 
     /* A prepared operation that is rolled back will not have a timestamp worth asserting on. */
     if (commit)
-        __txn_timestamp_usage_check(session, op, upd);
+        WT_RET(__txn_timestamp_usage_check(session, op, upd));
 
     for (first_committed_upd = upd; first_committed_upd != NULL &&
          (first_committed_upd->txnid == WT_TXN_ABORTED ||
@@ -1596,7 +1610,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
                     break;
 
                 __wt_txn_op_set_timestamp(session, op);
-                __txn_timestamp_usage_check(session, op, upd);
+                WT_ERR(__txn_timestamp_usage_check(session, op, upd));
             } else {
                 /*
                  * If an operation has the key repeated flag set, skip resolving prepared updates as

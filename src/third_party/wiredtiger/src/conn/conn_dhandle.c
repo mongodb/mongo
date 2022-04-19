@@ -477,9 +477,6 @@ __conn_dhandle_config_parse_ts(WT_SESSION_IMPL *session)
         LF_SET(WT_DHANDLE_TS_ASSERT_READ_ALWAYS);
     else if (WT_STRING_MATCH("never", cval.str, cval.len))
         LF_SET(WT_DHANDLE_TS_ASSERT_READ_NEVER);
-    WT_RET(__wt_config_gets(session, cfg, "assert.write_timestamp", &cval));
-    if (WT_STRING_MATCH("on", cval.str, cval.len))
-        LF_SET(WT_DHANDLE_TS_ASSERT_WRITE);
 
     /*
      * Timestamp usage configuration: Ignore the "always", "key_consistent" and "ordered" keywords:
