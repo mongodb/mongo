@@ -32,12 +32,13 @@ This method will find an existing system installation of the SDK and will not re
 $ mkdir build && cd build
 
 # Configure and run cmake with Ninja
-cmake -DENABLE_PYTHON=1 -DHAVE_DIAGNOSTIC=1 -DENABLE_S3=1 -DENABLE_STRICT=0 -G Ninja ../.
+cmake -DENABLE_PYTHON=1 -DHAVE_DIAGNOSTIC=1 -DENABLE_S3=1 -DENABLE_STRICT=0 -DCMAKE_CXX_FLAGS="-ggdb" -G Ninja ../.
 ninja
 ```
 
 * Setting the `IMPORT_S3_SDK` flag is optional for this build method.
 * `ENABLE_S3` will default to looking for a local installation of the SDK.
+* `CMAKE_CXX_FLAGS="-ggdb"` should be set to enable gdb for debugging information.
 * `ENABLE_STRICT` should be set to 0.
     This is to to turn off strict compiler warnings so it does not pick up different formatting errors of the 3rd party dependencies.
 
@@ -51,7 +52,7 @@ This method configures CMake to download, compile, and install the AWS SDK while
 $ mkdir build && cd build
 
 # Configure and run cmake with Ninja
-cmake -DENABLE_PYTHON=1 -DHAVE_DIAGNOSTIC=1 -DIMPORT_S3_SDK=external -DENABLE_S3=1 -DENABLE_STRICT=0 -G Ninja ../.
+cmake -DENABLE_PYTHON=1 -DHAVE_DIAGNOSTIC=1 -DIMPORT_S3_SDK=external -DENABLE_S3=1 -DENABLE_STRICT=0 -DCMAKE_CXX_FLAGS="-ggdb" -G Ninja ../.
 ninja
 ```
 
