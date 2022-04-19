@@ -168,62 +168,57 @@ thread_ts_run(void *arg)
     testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
     first = true;
     /* Update the oldest timestamp every 1 millisecond. */
-    for (;;) {
+    for (;; __wt_sleep(0, 1000)) {
         /*
          * We get the last committed timestamp periodically in order to update the oldest timestamp,
-         * that requires locking out transactional ops that set or query a timestamp.
+         * that requires locking out transactional ops that set or query a timestamp. If there is no
+         * work to do, all-durable will be 0 and we just wait.
          */
         testutil_check(pthread_rwlock_wrlock(&ts_lock));
         ret = td->conn->query_timestamp(td->conn, ts_string, "get=all_durable");
         testutil_check(pthread_rwlock_unlock(&ts_lock));
-        testutil_assert(ret == 0 || ret == WT_NOTFOUND);
+        testutil_assert(ret == 0);
         /*
          * All durable can intermittently move backwards, we do not want to set stable and the
          * oldest timestamps backwards.
          */
-        all_dur_ts = strtoul(ts_string, NULL, 16);
-        if (!first && all_dur_ts < prev_all_dur_ts) {
-            __wt_sleep(0, 1000);
+        all_dur_ts = testutil_timestamp_parse(ts_string);
+        if (all_dur_ts == 0 || all_dur_ts < prev_all_dur_ts)
             continue;
-        }
-        if (ret == 0) {
-            rand_op = __wt_random(&rnd) % 4;
-            /*
-             * Periodically let the oldest timestamp lag. Other times set the stable and oldest
-             * timestamps as separate API calls. The rest of the time set them both as one call.
-             */
-            if (rand_op == 0) {
+        prev_all_dur_ts = all_dur_ts;
+
+        rand_op = __wt_random(&rnd) % 4;
+        /*
+         * Periodically let the oldest timestamp lag. Other times set the stable and oldest
+         * timestamps as separate API calls. The rest of the time set them both as one call.
+         */
+        if (rand_op == 0) {
+            testutil_check(__wt_snprintf(tscfg, sizeof(tscfg), "stable_timestamp=%s", ts_string));
+            testutil_check(td->conn->set_timestamp(td->conn, tscfg));
+            testutil_check(__wt_snprintf(tscfg, sizeof(tscfg), "oldest_timestamp=%s", ts_string));
+            testutil_check(td->conn->set_timestamp(td->conn, tscfg));
+        } else {
+            if (!first && rand_op == 1)
                 testutil_check(
                   __wt_snprintf(tscfg, sizeof(tscfg), "stable_timestamp=%s", ts_string));
-                testutil_check(td->conn->set_timestamp(td->conn, tscfg));
-                testutil_check(
-                  __wt_snprintf(tscfg, sizeof(tscfg), "oldest_timestamp=%s", ts_string));
-                testutil_check(td->conn->set_timestamp(td->conn, tscfg));
-            } else {
-                if (!first && rand_op == 1)
-                    testutil_check(
-                      __wt_snprintf(tscfg, sizeof(tscfg), "stable_timestamp=%s", ts_string));
-                else
-                    testutil_check(__wt_snprintf(tscfg, sizeof(tscfg),
-                      "oldest_timestamp=%s,stable_timestamp=%s", ts_string, ts_string));
-                testutil_check(td->conn->set_timestamp(td->conn, tscfg));
-            }
-            prev_all_dur_ts = all_dur_ts;
-            first = false;
-            /*
-             * Set and reset the checkpoint retention setting on a regular basis. We want to test
-             * racing with the internal log removal thread while we're here.
-             */
-            dbg = __wt_random(&rnd) % 2;
-            if (dbg == 0)
-                testutil_check(
-                  __wt_snprintf(tscfg, sizeof(tscfg), "debug_mode=(checkpoint_retention=0)"));
             else
-                testutil_check(
-                  __wt_snprintf(tscfg, sizeof(tscfg), "debug_mode=(checkpoint_retention=5)"));
-            testutil_check(td->conn->reconfigure(td->conn, tscfg));
+                testutil_check(__wt_snprintf(tscfg, sizeof(tscfg),
+                  "oldest_timestamp=%s,stable_timestamp=%s", ts_string, ts_string));
+            testutil_check(td->conn->set_timestamp(td->conn, tscfg));
         }
-        __wt_sleep(0, 1000);
+        first = false;
+        /*
+         * Set and reset the checkpoint retention setting on a regular basis. We want to test racing
+         * with the internal log removal thread while we're here.
+         */
+        dbg = __wt_random(&rnd) % 2;
+        if (dbg == 0)
+            testutil_check(
+              __wt_snprintf(tscfg, sizeof(tscfg), "debug_mode=(checkpoint_retention=0)"));
+        else
+            testutil_check(
+              __wt_snprintf(tscfg, sizeof(tscfg), "debug_mode=(checkpoint_retention=5)"));
+        testutil_check(td->conn->reconfigure(td->conn, tscfg));
     }
     /* NOTREACHED */
 }
