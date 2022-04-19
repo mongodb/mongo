@@ -246,32 +246,45 @@ public:
         }
 
         BSONObjBuilder result;
-        // TODO(siyuan) Output term of OpTime
         result.append("latestOptime", replCoord->getMyLastAppliedOpTime().getTimestamp());
 
-        auto earliestOplogTimestampFetch = [&] {
+        auto earliestOplogTimestampFetch = [&]() -> StatusWith<Timestamp> {
             auto oplog = CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForRead(
                 opCtx, NamespaceString::kRsOplogNamespace);
             if (!oplog) {
                 return StatusWith<Timestamp>(ErrorCodes::NamespaceNotFound, "oplog doesn't exist");
             }
 
-            Lock::GlobalLock globalLock(opCtx,
-                                        MODE_IS,
-                                        Date_t::max(),
-                                        Lock::InterruptBehavior::kThrow,
-                                        true /* skipRSTLLock */);
-            return oplog->getRecordStore()->getEarliestOplogTimestamp(opCtx);
-        }();
-
-        if (earliestOplogTimestampFetch.getStatus() == ErrorCodes::OplogOperationUnsupported) {
-            // Falling back to use getSingleton if the storage engine does not support
-            // getEarliestOplogTimestamp.
-            BSONObj o;
-            if (Helpers::getSingleton(opCtx, NamespaceString::kRsOplogNamespace.ns().c_str(), o)) {
-                earliestOplogTimestampFetch = o["ts"].timestamp();
+            // Try to get the lock. If it's already locked, immediately return null timestamp.
+            Lock::GlobalLock lk(opCtx,
+                                MODE_IS,
+                                Date_t::now(),
+                                Lock::InterruptBehavior::kLeaveUnlocked,
+                                true /* skipRSTLLock */);
+            if (!lk.isLocked()) {
+                LOGV2_DEBUG(
+                    6294100, 2, "Failed to get global lock for oplog server status section");
+                return Timestamp();
             }
-        }
+
+            // Try getting earliest oplog timestamp using getEarliestOplogTimestamp
+            auto swEarliestOplogTimestamp =
+                oplog->getRecordStore()->getEarliestOplogTimestamp(opCtx);
+
+            if (swEarliestOplogTimestamp.getStatus() == ErrorCodes::OplogOperationUnsupported) {
+                // Falling back to use getSingleton if the storage engine does not support
+                // getEarliestOplogTimestamp.
+                // Note that getSingleton will take a global IS lock, but this won't block because
+                // we are already holding the global IS lock.
+                BSONObj o;
+                if (Helpers::getSingleton(
+                        opCtx, NamespaceString::kRsOplogNamespace.ns().c_str(), o)) {
+                    return o["ts"].timestamp();
+                }
+            }
+
+            return swEarliestOplogTimestamp;
+        }();
 
         uassert(
             17347, "Problem reading earliest entry from oplog", earliestOplogTimestampFetch.isOK());
