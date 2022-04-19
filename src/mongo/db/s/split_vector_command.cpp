@@ -133,6 +133,11 @@ public:
             maxChunkSizeBytes = maxSizeBytesElem.numberLong();
         }
 
+        if (maxChunkSizeBytes.is_initialized() && *maxChunkSizeBytes < 1024 * 1024) {
+            errmsg = "maxChunkSize must be at least 1MB";
+            return false;
+        }
+
         auto splitKeys = splitVector(opCtx,
                                      nss,
                                      keyPattern,
