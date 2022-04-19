@@ -71,14 +71,8 @@ public:
         return _valid;
     }
 
-    Ticket() : _valid(false) {}
-
 private:
-    static Ticket makeValid() {
-        Ticket ticket;
-        ticket._valid = true;
-        return ticket;
-    }
+    Ticket() : _valid(true) {}
 
     void release() {
         invariant(_valid);

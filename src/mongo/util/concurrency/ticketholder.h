@@ -227,10 +227,6 @@ class TicketHolderReleaser {
     TicketHolderReleaser& operator=(const TicketHolderReleaser&) = delete;
 
 public:
-    TicketHolderReleaser() {
-        _holder = nullptr;
-    }
-
     explicit TicketHolderReleaser(Ticket&& ticket, AdmissionContext* admCtx, TicketHolder* holder)
         : _holder(holder), _ticket(std::move(ticket)), _admCtx(admCtx) {}
 

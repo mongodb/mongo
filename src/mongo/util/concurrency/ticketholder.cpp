@@ -91,7 +91,7 @@ boost::optional<Ticket> SemaphoreTicketHolder::tryAcquire(AdmissionContext* admC
         if (errno != EINTR)
             failWithErrno(errno);
     }
-    return boost::make_optional(Ticket::makeValid());
+    return Ticket{};
 }
 
 Ticket SemaphoreTicketHolder::waitForTicket(OperationContext* opCtx,
@@ -106,11 +106,10 @@ boost::optional<Ticket> SemaphoreTicketHolder::waitForTicketUntil(OperationConte
                                                                   AdmissionContext* admCtx,
                                                                   Date_t until,
                                                                   WaitMode waitMode) {
-    invariant(opCtx);
 
     // Attempt to get a ticket without waiting in order to avoid expensive time calculations.
     if (sem_trywait(&_sem) == 0) {
-        return boost::make_optional(Ticket::makeValid());
+        return Ticket{};
     }
 
     const Milliseconds intervalMs(500);
@@ -140,7 +139,7 @@ boost::optional<Ticket> SemaphoreTicketHolder::waitForTicketUntil(OperationConte
         if (waitMode == WaitMode::kInterruptible)
             opCtx->checkForInterrupt();
     }
-    return boost::make_optional(Ticket::makeValid());
+    return Ticket{};
 }
 
 void SemaphoreTicketHolder::release(AdmissionContext* admCtx, Ticket&& ticket) {
@@ -169,6 +168,7 @@ Status SemaphoreTicketHolder::resize(int newSize) {
 
     while (_outof.load() > newSize) {
         auto ticket = waitForTicket(nullptr, &admCtx, WaitMode::kUninterruptible);
+        ticket.release();
         _outof.subtractAndFetch(1);
     }
 
@@ -380,7 +380,7 @@ boost::optional<Ticket> FifoTicketHolder::tryAcquire(AdmissionContext* admCtx) {
     }
     admCtx->start(_serviceContext->getTickSource());
     _totalStartedProcessing.fetchAndAddRelaxed(1);
-    return boost::make_optional(Ticket::makeValid());
+    return Ticket{};
 }
 
 Ticket FifoTicketHolder::waitForTicket(OperationContext* opCtx,
@@ -436,7 +436,7 @@ boost::optional<Ticket> FifoTicketHolder::waitForTicketUntil(OperationContext* o
         if (remaining >= 0) {
             _enqueuedElements.subtractAndFetch(1);
             startProcessing();
-            return boost::make_optional(Ticket::makeValid());
+            return Ticket{};
         }
         _ticketsAvailable.addAndFetch(1);
         // We copy-construct the shared_ptr here as the waiting element needs to be alive in both
@@ -458,7 +458,7 @@ boost::optional<Ticket> FifoTicketHolder::waitForTicketUntil(OperationContext* o
             // To cover the edge case of getting a ticket assigned before cancelling the ticket
             // request. As we have been granted a ticket we must release it.
             startProcessing();
-            release(admCtx, Ticket());
+            release(admCtx, Ticket{});
         }
     });
 
@@ -485,7 +485,7 @@ boost::optional<Ticket> FifoTicketHolder::waitForTicketUntil(OperationContext* o
     if (assigned) {
         cancelWait.dismiss();
         startProcessing();
-        return boost::make_optional(Ticket::makeValid());
+        return Ticket{};
     } else {
         return boost::none;
     }
@@ -508,6 +508,7 @@ Status FifoTicketHolder::resize(int newSize) {
 
     while (_capacity.load() > newSize) {
         Ticket ticket = waitForTicket(nullptr, &admCtx, WaitMode::kUninterruptible);
+        ticket.release();
         _capacity.subtractAndFetch(1);
     }
 
