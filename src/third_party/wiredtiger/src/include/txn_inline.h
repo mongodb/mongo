@@ -969,7 +969,7 @@ retry:
     WT_ASSERT(session, cbt->upd_value->type == WT_UPDATE_INVALID);
 
     /* If there is no ondisk value, there can't be anything in the history store either. */
-    if (cbt->ref->page->dsk == NULL || cbt->slot == UINT32_MAX) {
+    if (cbt->ref->page->dsk == NULL) {
         cbt->upd_value->type = WT_UPDATE_TOMBSTONE;
         return (0);
     }
