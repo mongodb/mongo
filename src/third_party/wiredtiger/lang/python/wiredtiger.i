@@ -409,6 +409,7 @@ typedef struct {
 } PY_CALLBACK;
 
 static PyObject *wtError;
+static PyObject *wtRollbackError;
 
 static int sessionFreeHandler(WT_SESSION *session_arg);
 static int cursorFreeHandler(WT_CURSOR *cursor_arg);
@@ -424,19 +425,22 @@ static int unpackBytesOrString(PyObject *obj, void **data, size_t *size);
 
 %init %{
 	/*
-	 * Create an exception type and put it into the _wiredtiger module.
-	 * First increment the reference count because PyModule_AddObject
-	 * decrements it.  Then note that "m" is the local variable for the
-	 * module in the SWIG generated code.  If there is a SWIG variable for
-	 * this, I haven't found it.
+	 * Create exception types and put them into the _wiredtiger module.
+	 * For each, first increment the reference count because PyModule_AddObject
+	 * decrements it, and we don't want to look it up later.
 	 */
 	wtError = PyErr_NewException("_wiredtiger.WiredTigerError", NULL, NULL);
 	Py_INCREF(wtError);
 	PyModule_AddObject(m, "WiredTigerError", wtError);
+
+	wtRollbackError = PyErr_NewException("_wiredtiger.WiredTigerRollbackError", wtError, NULL);
+	Py_INCREF(wtRollbackError);
+	PyModule_AddObject(m, "WiredTigerRollbackError", wtRollbackError);
 %}
 
 %pythoncode %{
 WiredTigerError = _wiredtiger.WiredTigerError
+WiredTigerRollbackError = _wiredtiger.WiredTigerRollbackError
 
 # Python3 has no explicit long type, recnos work as ints
 import sys
@@ -532,7 +536,10 @@ SELFHELPER(struct __wt_storage_source, storage_source)
 do {
 	if (PyErr_Occurred() == NULL) {
 		/* We could use PyErr_SetObject for more complex reporting. */
-		SWIG_SetErrorMsg(wtError, wiredtiger_strerror(result));
+		if (PyErr_Occurred() == NULL && (uintptr_t)result == WT_ROLLBACK)
+			SWIG_SetErrorMsg(wtRollbackError, wiredtiger_strerror(result));
+                else
+			SWIG_SetErrorMsg(wtError, wiredtiger_strerror(result));
 	}
 	SWIG_fail;
 } while(0)
