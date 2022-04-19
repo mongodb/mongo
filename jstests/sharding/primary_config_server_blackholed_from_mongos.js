@@ -83,5 +83,9 @@ assert.lt(0, configDB.chunks.find().itcount());
 assert.lt(0, configDB.chunks.find().count());
 assert.lt(0, configDB.chunks.aggregate().itcount());
 
+jsTest.log('Remove network partition before tearing down');
+configPrimary.discardMessagesFrom(st.s, 0.0);
+st.s.discardMessagesFrom(configPrimary, 0.0);
+
 st.stop();
 }());

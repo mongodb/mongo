@@ -261,6 +261,10 @@ def mongo_shell_program(  # pylint: disable=too-many-arguments,too-many-branches
     # Load a callback to check that all orphans are deleted before shutting down a ShardingTest.
     eval_sb.append("load('jstests/libs/override_methods/check_orphans_are_deleted.js');")
 
+    # Load a callback to check that the info stored in config.collections and config.chunks is
+    # semantically correct before shutting down a ShardingTest.
+    eval_sb.append("load('jstests/libs/override_methods/check_routing_table_consistency.js');")
+
     # Load this file to retry operations that fail due to in-progress background operations.
     eval_sb.append(
         "load('jstests/libs/override_methods/implicitly_retry_on_background_op_in_progress.js');")

@@ -380,6 +380,7 @@ var ShardingTest = function(params) {
         this.checkUUIDsConsistentAcrossCluster();
         this.checkIndexesConsistentAcrossCluster();
         this.checkOrphansAreDeleted();
+        this.checkRoutingTableConsistency();
 
         if (jsTestOptions().alwaysUseLogFiles) {
             if (opts.noCleanData === false) {
@@ -1752,4 +1753,8 @@ ShardingTest.prototype.checkIndexesConsistentAcrossCluster = function() {};
 
 ShardingTest.prototype.checkOrphansAreDeleted = function() {
     print("Unhooked function");
+};
+
+ShardingTest.prototype.checkRoutingTableConsistency = function() {
+    print("Unhooked checkRoutingTableConsistency function");
 };

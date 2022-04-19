@@ -413,6 +413,7 @@ jsTestOptions = function() {
             // is shut down.
             alwaysUseLogFiles: TestData.alwaysUseLogFiles || false,
             skipCheckOrphans: TestData.skipCheckOrphans || false,
+            skipCheckRoutingTableConsistency: TestData.skipCheckRoutingTableConsistency || false,
             inEvergreen: TestData.inEvergreen || false,
 
             undoRecorderPath: TestData.undoRecorderPath,

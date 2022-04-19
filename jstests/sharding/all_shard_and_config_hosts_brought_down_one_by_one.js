@@ -80,5 +80,7 @@ for (var i = 0; i < 2; i++) {
     }
 }
 
+// Restart one config server node to ensure that teardown checks may be executed
+st.restartConfigServer(0);
 st.stop();
 }());

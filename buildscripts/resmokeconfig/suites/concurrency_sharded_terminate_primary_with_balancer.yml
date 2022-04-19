@@ -201,6 +201,7 @@ executor:
     terminate: true
   - class: CheckReplDBHash
   - class: CheckOrphansDeleted
+  - class: CheckRoutingTableConsistency
   - class: ValidateCollections # Validation can interfere with other operations, so this goes last.
   - class: CleanupConcurrencyWorkloads
   fixture:
