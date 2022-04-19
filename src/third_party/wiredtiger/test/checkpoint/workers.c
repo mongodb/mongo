@@ -131,6 +131,7 @@ start_workers(void)
     (void)gettimeofday(&stop, NULL);
     seconds = (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) * 1e-6;
     printf("Ran workers for: %f seconds\n", seconds);
+    fflush(stdout);
 
 err:
     free(tids);
@@ -339,6 +340,7 @@ worker(void *arg)
 
     testutil_check(__wt_thread_str(tid, sizeof(tid)));
     printf("worker thread starting: tid: %s\n", tid);
+    fflush(stdout);
 
     (void)real_worker();
     return (WT_THREAD_RET_VALUE);

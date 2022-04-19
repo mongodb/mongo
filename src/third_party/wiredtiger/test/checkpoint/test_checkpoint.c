@@ -309,6 +309,7 @@ wt_connect(const char *config_open)
           config_open == NULL ? "" : config_open, timing_stress ? timing_stress_config : ""));
 
     printf("WT open config: %s\n", config);
+    fflush(stdout);
     if ((ret = wiredtiger_open(g.home, &event_handler, config, &g.conn)) != 0)
         return (log_print_err("wiredtiger_open", ret, 1));
     return (0);
@@ -327,6 +328,7 @@ wt_shutdown(void)
         return (0);
 
     printf("Closing connection\n");
+    fflush(stdout);
     ret = g.conn->close(g.conn, NULL);
     g.conn = NULL;
     if (ret != 0)
@@ -356,11 +358,15 @@ cleanup(bool remove_dir)
 static int
 handle_error(WT_EVENT_HANDLER *handler, WT_SESSION *session, int error, const char *errmsg)
 {
+    int ret;
+
     WT_UNUSED(handler);
     WT_UNUSED(session);
     WT_UNUSED(error);
 
-    return (fprintf(stderr, "%s\n", errmsg) < 0 ? -1 : 0);
+    ret = fprintf(stderr, "%s\n", errmsg) < 0 ? -1 : 0;
+    fflush(stderr);
+    return (ret);
 }
 
 /*
@@ -370,13 +376,17 @@ handle_error(WT_EVENT_HANDLER *handler, WT_SESSION *session, int error, const ch
 static int
 handle_message(WT_EVENT_HANDLER *handler, WT_SESSION *session, const char *message)
 {
+    int ret;
+
     WT_UNUSED(handler);
     WT_UNUSED(session);
 
     if (g.logfp != NULL)
         return (fprintf(g.logfp, "%s\n", message) < 0 ? -1 : 0);
 
-    return (printf("%s\n", message) < 0 ? -1 : 0);
+    ret = printf("%s\n", message) < 0 ? -1 : 0;
+    fflush(stdout);
+    return (ret);
 }
 
 /*
@@ -406,6 +416,7 @@ log_print_err_worker(const char *func, int line, const char *m, int e, int fatal
         g.status = e;
     }
     fprintf(stderr, "%s: %s,%d: %s: %s\n", progname, func, line, m, wiredtiger_strerror(e));
+    fflush(stderr);
     if (g.logfp != NULL)
         fprintf(g.logfp, "%s: %s,%d: %s: %s\n", progname, func, line, m, wiredtiger_strerror(e));
     return (e);
