@@ -2317,14 +2317,6 @@ intrusive_ptr<ExpressionFieldPath> ExpressionFieldPath::parse(ExpressionContext*
         const StringData varName = fieldPath.substr(0, fieldPath.find('.'));
         variableValidation::validateNameForUserRead(varName);
         auto varId = vps.getVariable(varName);
-        if (varName.compare(Variables::getBuiltinVariableName(Variables::kSearchMetaId)) == 0) {
-            return new ExpressionFieldPathNonSharded(
-                expCtx,
-                fieldPath.toString(),
-                varId,
-                std::string("Search queries accessing $$SEARCH_META are not supported in sharded "
-                            "pipelines"));
-        }
         return new ExpressionFieldPath(expCtx, fieldPath.toString(), varId);
     } else {
         return new ExpressionFieldPath(expCtx,
@@ -2388,7 +2380,7 @@ void ExpressionFieldPath::_doAddDependencies(DepsTracker* deps) const {
         } else {
             deps->fields.insert(_fieldPath.tail().fullPath());
         }
-    } else if (Variables::isUserDefinedVariable(_variable)) {
+    } else {
         deps->vars.insert(_variable);
     }
 }
@@ -2459,12 +2451,6 @@ Value ExpressionFieldPath::serialize(bool explain) const {
     } else {
         return Value("$$" + _fieldPath.fullPath());
     }
-}
-
-Value ExpressionFieldPathNonSharded::evaluate(const Document& root, Variables* variables) const {
-    uassert(
-        5858100, _errMsg, !getExpressionContext()->needsMerge && !getExpressionContext()->inMongos);
-    return ExpressionFieldPath::evaluate(root, variables);
 }
 
 Expression::ComputedPaths ExpressionFieldPath::getComputedPaths(const std::string& exprFieldPath,
