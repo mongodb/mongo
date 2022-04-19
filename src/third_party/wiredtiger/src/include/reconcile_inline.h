@@ -323,22 +323,20 @@ __wt_rec_auximage_copy(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint32_t count
  */
 static inline void
 __wt_rec_cell_build_addr(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_ADDR *addr,
-  WT_CELL_UNPACK_ADDR *vpack, bool proxy_cell, uint64_t recno)
+  WT_CELL_UNPACK_ADDR *vpack, uint64_t recno, WT_PAGE_DELETED *page_del)
 {
     WT_REC_KV *val;
+    WT_TIME_AGGREGATE *ta;
     u_int cell_type;
 
     val = &r->v;
 
     /*
-     * Our caller optionally specifies a cell type (deleted proxy cells), otherwise go with what we
-     * know.
+     * Caller includes fast-delete information in the case of fast-delete proxy cells, which both
+     * flags the fast-delete case and provides the additional information written in the parent's
+     * address cell.
      */
-    if (proxy_cell)
-        cell_type = WT_CELL_ADDR_DEL;
-    else if (vpack != NULL)
-        cell_type = vpack->type;
-    else {
+    if (vpack == NULL) {
         switch (addr->type) {
         case WT_ADDR_INT:
             cell_type = WT_CELL_ADDR_INT;
@@ -352,16 +350,12 @@ __wt_rec_cell_build_addr(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_ADDR *add
             break;
         }
         WT_ASSERT(session, addr->size != 0);
+        ta = &addr->ta;
+    } else {
+        cell_type = vpack->type;
+        ta = &vpack->ta;
     }
-
-    __rec_cell_addr_stats(r, vpack == NULL ? &addr->ta : &vpack->ta);
-
-    /*
-     * We don't check the address size because we can't store an address on an overflow page: if the
-     * address won't fit, the overflow page's address won't fit either. This possibility must be
-     * handled by Btree configuration, we have to disallow internal page sizes that are too small
-     * with respect to the largest address cookie the underlying block manager might return.
-     */
+    __rec_cell_addr_stats(r, ta);
 
     /*
      * We don't copy the data into the buffer, it's not necessary; just re-point the buffer's
@@ -371,16 +365,14 @@ __wt_rec_cell_build_addr(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_ADDR *add
         WT_ASSERT(session, addr != NULL);
         val->buf.data = addr->addr;
         val->buf.size = addr->size;
-        val->cell_len =
-          __wt_cell_pack_addr(session, &val->cell, cell_type, recno, &addr->ta, val->buf.size);
     } else {
         WT_ASSERT(session, addr == NULL);
         val->buf.data = vpack->data;
         val->buf.size = vpack->size;
-        val->cell_len =
-          __wt_cell_pack_addr(session, &val->cell, cell_type, recno, &vpack->ta, val->buf.size);
     }
 
+    val->cell_len =
+      __wt_cell_pack_addr(session, &val->cell, cell_type, recno, page_del, ta, val->buf.size);
     val->len = val->cell_len + val->buf.size;
 }
 

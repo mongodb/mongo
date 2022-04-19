@@ -1097,8 +1097,8 @@ __rollback_get_ref_max_durable_timestamp(WT_SESSION_IMPL *session, WT_TIME_AGGRE
 
 /*
  * __rollback_page_needs_abort --
- *     Check whether the page needs rollback. Return true if the page has modifications newer than
- *     the given timestamp Otherwise return false.
+ *     Check whether the page needs rollback, returning true if the page has modifications newer
+ *     than the given timestamp.
  */
 static bool
 __rollback_page_needs_abort(
@@ -1224,54 +1224,40 @@ __rollback_abort_updates(WT_SESSION_IMPL *session, WT_REF *ref, wt_timestamp_t r
 }
 
 /*
- * __rollback_abort_fast_truncate --
- *     Abort fast truncate for an internal page of leaf pages.
+ * __rollback_to_stable_page_skip --
+ *     Skip if rollback to stable doesn't require reading this page.
  */
 static int
-__rollback_abort_fast_truncate(
-  WT_SESSION_IMPL *session, WT_REF *ref, wt_timestamp_t rollback_timestamp)
-{
-    WT_REF *child_ref;
-
-    WT_INTL_FOREACH_BEGIN (session, ref->page, child_ref) {
-        /*
-         * A fast-truncate page is either in the WT_REF_DELETED state (where the WT_PAGE_DELETED
-         * structure has the timestamp information), or in an in-memory state where it started as a
-         * fast-truncate page which was then instantiated and the timestamp information moved to the
-         * individual WT_UPDATE structures. When reviewing internal pages, ignore the second case,
-         * an instantiated page is handled when the leaf page is visited.
-         */
-        if (child_ref->state == WT_REF_DELETED && child_ref->ft_info.del != NULL &&
-          rollback_timestamp < child_ref->ft_info.del->durable_timestamp) {
-            __wt_verbose_multi(session, WT_VERB_RECOVERY_RTS(session),
-              "%p: deleted page rolled back", (void *)child_ref);
-            WT_RET(__wt_delete_page_rollback(session, child_ref));
-        }
-    }
-    WT_INTL_FOREACH_END;
-    return (0);
-}
-
-/*
- * __wt_rts_page_skip --
- *     Skip if rollback to stable doesn't requires to read this page.
- */
-int
-__wt_rts_page_skip(
+__rollback_to_stable_page_skip(
   WT_SESSION_IMPL *session, WT_REF *ref, void *context, bool visible_all, bool *skipp)
 {
+    WT_PAGE_DELETED *page_del;
     wt_timestamp_t rollback_timestamp;
 
-    rollback_timestamp = *(wt_timestamp_t *)(context);
-    *skipp = false; /* Default to reading */
-
+    rollback_timestamp = *(wt_timestamp_t *)context;
     WT_UNUSED(visible_all);
 
-    /* If the page state is other than on disk, we want to look at it. */
+    *skipp = false; /* Default to reading */
+
+    /*
+     * Skip fast-truncate operations durable at or before the RTS timestamp (reading the page will
+     * delete it). A page without fast-truncate timestamp information is an old format page: skip
+     * them as there's no way to get correct behavior, and skipping them matches historic behavior.
+     */
+    if (ref->state == WT_REF_DELETED) {
+        page_del = ref->ft_info.del;
+        if (page_del == NULL ||
+          (__rollback_txn_visible_id(session, page_del->txnid) &&
+            page_del->durable_timestamp <= rollback_timestamp))
+            *skipp = true;
+        return (0);
+    }
+
+    /* Otherwise, if the page state is other than on disk, we want to look at it. */
     if (ref->state != WT_REF_DISK)
         return (0);
 
-    /* Check whether this ref has any possible updates to be aborted. */
+    /* Check whether this on-disk page has any updates to be aborted. */
     if (!__rollback_page_needs_abort(session, ref, rollback_timestamp)) {
         *skipp = true;
         __wt_verbose_multi(
@@ -1294,13 +1280,11 @@ __rollback_to_stable_btree_walk(WT_SESSION_IMPL *session, wt_timestamp_t rollbac
 
     /* Walk the tree, marking commits aborted where appropriate. */
     ref = NULL;
-    while ((ret = __wt_tree_walk_custom_skip(session, &ref, __wt_rts_page_skip, &rollback_timestamp,
-              WT_READ_NO_EVICT | WT_READ_WONT_NEED | WT_READ_VISIBLE_ALL)) == 0 &&
+    while (
+      (ret = __wt_tree_walk_custom_skip(session, &ref, __rollback_to_stable_page_skip,
+         &rollback_timestamp, WT_READ_NO_EVICT | WT_READ_WONT_NEED | WT_READ_VISIBLE_ALL)) == 0 &&
       ref != NULL)
-        if (F_ISSET(ref, WT_REF_FLAG_INTERNAL))
-            WT_WITH_PAGE_INDEX(
-              session, ret = __rollback_abort_fast_truncate(session, ref, rollback_timestamp));
-        else
+        if (F_ISSET(ref, WT_REF_FLAG_LEAF))
             WT_RET(__rollback_abort_updates(session, ref, rollback_timestamp));
 
     return (ret);

@@ -17,88 +17,74 @@ __rec_child_deleted(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *ref, WT_C
 {
     WT_PAGE_DELETED *page_del;
     WT_TXN *txn;
+    uint8_t prepare_state;
 
-    page_del = ref->ft_info.del;
+    *statep = WT_CHILD_IGNORE;
+
     txn = session->txn;
 
     /*
-     * Internal pages with child leaf pages in the WT_REF_DELETED state are a special case during
-     * reconciliation. First, if the deletion was a result of a session truncate call, the deletion
-     * may not be visible to us. In that case, we proceed as with any change not visible during
-     * reconciliation by ignoring the change for the purposes of writing the internal page.
-     *
-     * In this case, there must be an associated page-deleted structure, and it holds the
-     * transaction ID we care about.
-     *
-     * In some cases, there had better not be any updates we can't see.
-     *
-     * A visible update to be in READY state (i.e. not in LOCKED or PREPARED state), for truly
-     * visible to others.
+     * The complicated case is a fast-delete which may not be visible or stable. Otherwise, discard
+     * any underlying disk blocks and don't write anything.
      */
-    if (F_ISSET(r, WT_REC_CLEAN_AFTER_REC | WT_REC_VISIBILITY_ERR) && page_del != NULL &&
-      __wt_page_del_active(session, ref, !F_ISSET(txn, WT_TXN_HAS_SNAPSHOT))) {
+    page_del = ref->ft_info.del;
+    if (page_del == NULL)
+        return (ref->addr == NULL ? 0 : __wt_ref_block_free(session, ref));
+
+    /*
+     * The fast-delete may not yet be visible to us. In that case, we proceed as with any change not
+     * visible during reconciliation by ignoring the change for the purposes of writing the internal
+     * page.
+     *
+     * We expect the page to be clean after reconciliation. If there are invisible updates, abort
+     * eviction.
+     */
+    if (__wt_page_del_active(session, ref, !F_ISSET(txn, WT_TXN_HAS_SNAPSHOT))) {
         if (F_ISSET(r, WT_REC_VISIBILITY_ERR))
             WT_RET_PANIC(session, EINVAL, "reconciliation illegally skipped an update");
-        return (__wt_set_return(session, EBUSY));
-    }
-
-    /*
-     * Deal with any underlying disk blocks.
-     *
-     * First, check to see if there is an address associated with this leaf: if there isn't, we're
-     * done, the underlying page is already gone. If the page still exists, check for any
-     * transactions in the system that might want to see the page's state before it's deleted.
-     *
-     * If any such transactions exist, we cannot discard the underlying leaf page to the block
-     * manager because the transaction may eventually read it. However, this write might be part of
-     * a checkpoint, and should we recover to that checkpoint, we'll need to delete the leaf page,
-     * else we'd leak it. The solution is to write a proxy cell on the internal page ensuring the
-     * leaf page is eventually discarded.
-     *
-     * If no such transactions exist, we can discard the leaf page to the block manager and no cell
-     * needs to be written at all. We do this outside of the underlying tracking routines because
-     * this action is permanent and irrevocable. (Clearing the address means we've lost track of the
-     * disk address in a permanent way. This is safe because there's no path to reading the leaf
-     * page again: if there's ever a read into this part of the name space again, the cache read
-     * function instantiates an entirely new page.)
-     */
-    if (ref->addr != NULL && !__wt_page_del_active(session, ref, true)) {
-        WT_RET(__wt_ref_block_free(session, ref));
-
-        /* Any fast-truncate information can be freed as soon as the delete is stable. */
-        __wt_overwrite_and_free(session, ref->ft_info.del);
-    }
-
-    /*
-     * If the original page is gone, we can skip the slot on the internal page.
-     */
-    if (ref->addr == NULL) {
-        *statep = WT_CHILD_IGNORE;
+        if (F_ISSET(r, WT_REC_CLEAN_AFTER_REC))
+            return (__wt_set_return(session, EBUSY));
+        *statep = WT_CHILD_ORIGINAL;
         return (0);
     }
 
     /*
-     * Internal pages with deletes that aren't stable cannot be evicted, we don't have sufficient
-     * information to restore the page's information if subsequently read (we wouldn't know which
-     * transactions should see the original page and which should see the deleted page).
+     * A visible entry can be in a prepared state and checkpoints skip in-progress prepared changes.
+     * We can't race here, the entry won't be visible to the checkpoint, or will be in a prepared
+     * state, one or the other.
+     *
+     * We should never see an in-progress prepare in eviction: when we check to see if an internal
+     * page can be evicted, we check for an unresolved fast-truncate, which includes a fast-truncate
+     * in a prepared state, so it's an error to see that during eviction.
      */
-    if (F_ISSET(r, WT_REC_EVICT))
-        return (__wt_set_return(session, EBUSY));
+    WT_ORDERED_READ(prepare_state, page_del->prepare_state);
+    if (prepare_state == WT_PREPARE_INPROGRESS || prepare_state == WT_PREPARE_LOCKED) {
+        WT_ASSERT(session, !F_ISSET(r, WT_REC_EVICT));
 
-    /* If the page cannot be marked clean. */
-    r->leave_dirty = true;
+        *statep = WT_CHILD_ORIGINAL;
+        return (0);
+    }
 
     /*
-     * If the original page cannot be freed, we need to keep a slot on the page to reference it from
-     * the parent page.
-     *
-     * If the delete is not visible in this checkpoint, write the original address normally.
-     * Otherwise, we have to write a proxy record. If the delete state is not ready, then delete is
-     * not visible as it is in prepared state.
+     * Deal with underlying disk blocks. If there are readers that might want to see the page's
+     * state before it's deleted, or the fast-delete can be undone by RTS, we can't discard the
+     * pages. Write a cell to the internal page with information describing the fast-delete.
      */
-    if (!__wt_page_del_active(session, ref, false))
+    if (__wt_page_del_active(session, ref, true)) {
         *statep = WT_CHILD_PROXY;
+        return (0);
+    }
 
+    /*
+     * Otherwise, we can discard the leaf page to the block manager and no cell needs to be written.
+     * Done outside of the underlying tracking routines because this action is permanent and
+     * irrevocable. (Clearing the address means we've lost track of the disk address in a permanent
+     * way. This is safe because there's no path to reading the leaf page again: if there's ever a
+     * read into this part of the name space again, the cache read function instantiates an entirely
+     * new page.)
+     */
+    WT_RET(__wt_ref_block_free(session, ref));
+    __wt_overwrite_and_free(session, ref->ft_info.del);
     return (0);
 }
 

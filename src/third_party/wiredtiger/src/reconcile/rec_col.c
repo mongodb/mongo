@@ -187,7 +187,7 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
         /* Build the value cell. */
         addr = &multi->addr;
-        __wt_rec_cell_build_addr(session, r, addr, NULL, false, r->recno);
+        __wt_rec_cell_build_addr(session, r, addr, NULL, r->recno, NULL);
 
         /* Boundary: split or write the page. */
         if (__wt_rec_need_split(r, val->len))
@@ -296,7 +296,7 @@ __wt_rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *pageref)
             __wt_cell_unpack_addr(session, page->dsk, ref->addr, vpack);
             if (F_ISSET(vpack, WT_CELL_UNPACK_TIME_WINDOW_CLEARED)) {
                 /* Need to rebuild the cell with the updated time info. */
-                __wt_rec_cell_build_addr(session, r, NULL, vpack, false, ref->ref_recno);
+                __wt_rec_cell_build_addr(session, r, NULL, vpack, ref->ref_recno, NULL);
             } else {
                 val->buf.data = ref->addr;
                 val->buf.size = __wt_cell_total_len(vpack);
@@ -305,7 +305,7 @@ __wt_rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *pageref)
             }
             WT_TIME_AGGREGATE_COPY(&ta, &vpack->ta);
         } else {
-            __wt_rec_cell_build_addr(session, r, addr, NULL, false, ref->ref_recno);
+            __wt_rec_cell_build_addr(session, r, addr, NULL, ref->ref_recno, NULL);
             WT_TIME_AGGREGATE_COPY(&ta, &addr->ta);
         }
         WT_CHILD_RELEASE_ERR(session, hazard, ref);

@@ -1862,16 +1862,17 @@ __rec_split_write_header(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REC_CHUNK
     dsk->type = page->type;
 
     dsk->flags = 0;
-
-    /* Set the zero-length value flag in the page header. */
+    /* Set the all/none zero-length value flags. */
     if (page->type == WT_PAGE_ROW_LEAF) {
-        F_CLR(dsk, WT_PAGE_EMPTY_V_ALL | WT_PAGE_EMPTY_V_NONE);
-
         if (chunk->entries != 0 && r->all_empty_value)
             F_SET(dsk, WT_PAGE_EMPTY_V_ALL);
         if (chunk->entries != 0 && !r->any_empty_value)
             F_SET(dsk, WT_PAGE_EMPTY_V_NONE);
     }
+
+    /* Set the fast-truncate proxy cell information flag. */
+    if (page->type == WT_PAGE_ROW_INT && __wt_process.fast_truncate_2022)
+        F_SET(dsk, WT_PAGE_FT_UPDATE);
 
     dsk->unused = 0;
     dsk->version = WT_PAGE_VERSION_TS;

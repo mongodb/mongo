@@ -77,6 +77,7 @@ struct __wt_page_header {
 #define WT_PAGE_EMPTY_V_NONE 0x04u /* Page has no zero-length values */
 #define WT_PAGE_ENCRYPTED 0x08u    /* Page is encrypted on disk */
 #define WT_PAGE_UNUSED 0x10u       /* Historic lookaside store page updates, no longer used */
+#define WT_PAGE_FT_UPDATE 0x20u    /* Page contains updated fast-truncate information */
     uint8_t flags;                 /* 25: flags */
 
     /* A byte of padding, positioned to be added to the flags. */
@@ -857,20 +858,37 @@ struct __wt_page {
  *	Related information for truncated pages.
  */
 struct __wt_page_deleted {
+    /*
+     * Transaction IDs are set when updates are created (before they become visible) and only change
+     * when marked with WT_TXN_ABORTED. Transaction ID readers expect to copy a transaction ID into
+     * a local variable and see a stable value. In case a compiler might re-read the transaction ID
+     * from memory rather than using the local variable, mark the shared transaction IDs volatile to
+     * prevent unexpected repeated/reordered reads.
+     */
     volatile uint64_t txnid; /* Transaction ID */
 
     wt_timestamp_t timestamp; /* Timestamps */
     wt_timestamp_t durable_timestamp;
 
     /*
-     * The state is used for transaction prepare to manage visibility and inheriting prepare state
-     * to update_list.
+     * The prepare state is used for transaction prepare to manage visibility and inheriting prepare
+     * state to update_list.
      */
-    volatile uint8_t prepare_state; /* Prepare state. */
+    volatile uint8_t prepare_state;
 
-    uint8_t previous_state; /* Previous state */
+    /*
+     * The previous state of the WT_REF; if the fast-truncate transaction is rolled back without the
+     * page first being instantiated, this is the state to which the WT_REF returns.
+     */
+    uint8_t previous_ref_state;
 
-    uint8_t committed; /* Committed */
+    /*
+     * If the fast-truncate transaction has committed. If we're forced to instantiate the page, and
+     * the committed flag isn't set, we have to create an update structure list for the transaction
+     * to resolve in a subsequent commit. (This is tricky: if the transaction is rolled back, the
+     * entire structure is discarded, that is, the flag is set only on commit and not on rollback.)
+     */
+    bool committed;
 };
 
 /*
@@ -1135,6 +1153,13 @@ struct __wt_ikey {
  * WT_UPDATE structures are formed into a forward-linked list.
  */
 struct __wt_update {
+    /*
+     * Transaction IDs are set when updates are created (before they become visible) and only change
+     * when marked with WT_TXN_ABORTED. Transaction ID readers expect to copy a transaction ID into
+     * a local variable and see a stable value. In case a compiler might re-read the transaction ID
+     * from memory rather than using the local variable, mark the shared transaction IDs volatile to
+     * prevent unexpected repeated/reordered reads.
+     */
     volatile uint64_t txnid; /* transaction ID */
 
     wt_timestamp_t durable_ts; /* timestamps */

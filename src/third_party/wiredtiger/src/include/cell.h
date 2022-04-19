@@ -132,20 +132,21 @@
  */
 struct __wt_cell {
     /*
-     * Maximum of 71 bytes:
+     * Maximum of 98 bytes:
      *  1: cell descriptor byte
      *  1: prefix compression count
      *  1: secondary descriptor byte
      * 36: 4 timestamps		(uint64_t encoding, max 9 bytes)
      * 18: 2 transaction IDs	(uint64_t encoding, max 9 bytes)
      *  9: associated 64-bit value	(uint64_t encoding, max 9 bytes)
+     * 27: fast-delete information (transaction ID, 2 timestamps)
      *  5: data length		(uint32_t encoding, max 5 bytes)
      *
-     * This calculation is extremely pessimistic: the prefix compression
-     * count and 64V value overlap, and the validity window, 64V value
-     * and data length are all optional in some cases.
+     * This calculation is pessimistic: the prefix compression count and 64V value overlap, and the
+     * validity window, 64V value, fast-delete information and data length are all optional in some
+     * or even most cases.
      */
-    uint8_t __chunk[1 + 1 + 1 + 7 * WT_INTPACK64_MAXSIZE + WT_INTPACK32_MAXSIZE];
+    uint8_t __chunk[98];
 };
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
@@ -197,6 +198,8 @@ struct __wt_cell_unpack_addr {
     WT_CELL_COMMON_FIELDS;
 
     WT_TIME_AGGREGATE ta; /* Address validity window */
+
+    WT_PAGE_DELETED page_del; /* Fast-truncate information */
 };
 
 /*

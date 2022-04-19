@@ -1274,8 +1274,6 @@ extern int __wt_row_modify(WT_CURSOR_BTREE *cbt, const WT_ITEM *key, const WT_IT
   ) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_row_search(WT_CURSOR_BTREE *cbt, WT_ITEM *srch_key, bool insert, WT_REF *leaf,
   bool leaf_safe, bool *leaf_foundp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-extern int __wt_rts_page_skip(WT_SESSION_IMPL *session, WT_REF *ref, void *context,
-  bool visible_all, bool *skipp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_rwlock_init(WT_SESSION_IMPL *session, WT_RWLOCK *l)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
@@ -2206,7 +2204,7 @@ static inline int __wt_vunpack_uint(const uint8_t **pp, size_t maxlen, uint64_t 
 static inline int __wt_write(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, size_t len,
   const void *buf) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static inline size_t __wt_cell_pack_addr(WT_SESSION_IMPL *session, WT_CELL *cell, u_int cell_type,
-  uint64_t recno, WT_TIME_AGGREGATE *ta, size_t size)
+  uint64_t recno, WT_PAGE_DELETED *page_del, WT_TIME_AGGREGATE *ta, size_t size)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static inline size_t __wt_cell_pack_copy(WT_SESSION_IMPL *session, WT_CELL *cell,
   WT_TIME_WINDOW *tw, uint64_t rle, uint64_t v) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
@@ -2320,7 +2318,7 @@ static inline void __wt_rec_auximage_copy(
 static inline void __wt_rec_auxincr(
   WT_SESSION_IMPL *session, WT_RECONCILE *r, uint32_t v, size_t size);
 static inline void __wt_rec_cell_build_addr(WT_SESSION_IMPL *session, WT_RECONCILE *r,
-  WT_ADDR *addr, WT_CELL_UNPACK_ADDR *vpack, bool proxy_cell, uint64_t recno);
+  WT_ADDR *addr, WT_CELL_UNPACK_ADDR *vpack, uint64_t recno, WT_PAGE_DELETED *page_del);
 static inline void __wt_rec_image_copy(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REC_KV *kv);
 static inline void __wt_rec_incr(
   WT_SESSION_IMPL *session, WT_RECONCILE *r, uint32_t v, size_t size);

@@ -256,7 +256,7 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
         r->cell_zero = false;
 
         addr = &multi->addr;
-        __wt_rec_cell_build_addr(session, r, addr, NULL, false, WT_RECNO_OOB);
+        __wt_rec_cell_build_addr(session, r, addr, NULL, WT_RECNO_OOB, NULL);
 
         /* Boundary: split or write the page. */
         if (__wt_rec_need_split(r, key->len + val->len))
@@ -290,7 +290,7 @@ __wt_rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
     WT_PAGE *child;
     WT_REC_KV *key, *val;
     WT_REF *ref;
-    WT_TIME_AGGREGATE ta;
+    WT_TIME_AGGREGATE ft_ta, ta;
     size_t size;
     bool hazard;
     const void *p;
@@ -298,6 +298,7 @@ __wt_rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
     btree = S2BT(session);
     child = NULL;
     hazard = false;
+    WT_TIME_AGGREGATE_INIT(&ft_ta);
 
     key = &r->k;
     kpack = &_kpack;
@@ -388,32 +389,28 @@ __wt_rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
             /* Original child. */
             break;
         case WT_CHILD_PROXY:
-            /* Deleted child where we write a proxy cell. */
+            /* Fast-delete child where we write a proxy cell. */
             break;
         }
 
         /*
          * Build the value cell, the child page's address. Addr points to an on-page cell or an
-         * off-page WT_ADDR structure. There's a special cell type in the case of page deletion
-         * requiring a proxy cell, otherwise use the information from the addr or original cell.
+         * off-page WT_ADDR structure.
          */
         if (__wt_off_page(page, addr)) {
-            __wt_rec_cell_build_addr(session, r, addr, NULL, state == WT_CHILD_PROXY, WT_RECNO_OOB);
+            __wt_rec_cell_build_addr(session, r, addr, NULL, WT_RECNO_OOB,
+              state == WT_CHILD_PROXY ? ref->ft_info.del : NULL);
             WT_TIME_AGGREGATE_COPY(&ta, &addr->ta);
         } else {
             __wt_cell_unpack_addr(session, page->dsk, ref->addr, vpack);
-            if (F_ISSET(vpack, WT_CELL_UNPACK_TIME_WINDOW_CLEARED)) {
+            if (F_ISSET(vpack, WT_CELL_UNPACK_TIME_WINDOW_CLEARED) || state == WT_CHILD_PROXY) {
                 /*
                  * The transaction ids are cleared after restart. Repack the cell with new validity
-                 * to flush the cleared transaction ids.
+                 * to flush the cleared transaction ids. The other use is proxy cells where we need
+                 * to write additional information into the address cell.
                  */
-                __wt_rec_cell_build_addr(
-                  session, r, NULL, vpack, state == WT_CHILD_PROXY, WT_RECNO_OOB);
-            } else if (state == WT_CHILD_PROXY) {
-                WT_ERR(__wt_buf_set(session, &val->buf, ref->addr, __wt_cell_total_len(vpack)));
-                __wt_cell_type_reset(session, val->buf.mem, 0, WT_CELL_ADDR_DEL);
-                val->cell_len = 0;
-                val->len = val->buf.size;
+                __wt_rec_cell_build_addr(session, r, NULL, vpack, WT_RECNO_OOB,
+                  state == WT_CHILD_PROXY ? ref->ft_info.del : NULL);
             } else {
                 val->buf.data = ref->addr;
                 val->buf.size = __wt_cell_total_len(vpack);
@@ -421,6 +418,19 @@ __wt_rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
                 val->len = val->buf.size;
             }
             WT_TIME_AGGREGATE_COPY(&ta, &vpack->ta);
+        }
+
+        /*
+         * The fast-truncate is a stop time window and has to be considered in the internal page's
+         * aggregate information for RTS to find it.
+         */
+        if (state == WT_CHILD_PROXY) {
+            ft_ta.newest_start_durable_ts = ta.newest_start_durable_ts;
+            ft_ta.newest_stop_durable_ts = ref->ft_info.del->durable_timestamp;
+            ft_ta.oldest_start_ts = ta.oldest_start_ts;
+            ft_ta.newest_txn = ref->ft_info.del->txnid;
+            ft_ta.newest_stop_ts = ref->ft_info.del->timestamp;
+            ft_ta.newest_stop_txn = ref->ft_info.del->txnid;
         }
         WT_CHILD_RELEASE_ERR(session, hazard, ref);
 
@@ -438,6 +448,8 @@ __wt_rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
         /* Copy the key and value onto the page. */
         __wt_rec_image_copy(session, r, key);
         __wt_rec_image_copy(session, r, val);
+        if (state == WT_CHILD_PROXY)
+            WT_TIME_AGGREGATE_MERGE(session, &r->cur_ptr->ta, &ft_ta);
         WT_TIME_AGGREGATE_MERGE(session, &r->cur_ptr->ta, &ta);
 
         /* Update compression state. */
