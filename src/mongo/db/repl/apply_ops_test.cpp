@@ -154,40 +154,6 @@ TEST_F(ApplyOpsTest, CommandInNestedApplyOpsReturnsSuccess) {
     ASSERT_BSONOBJ_EQ({}, _opObserver->onApplyOpsCmdObj);
 }
 
-TEST_F(ApplyOpsTest, InsertInNestedApplyOpsReturnsSuccess) {
-    auto opCtx = cc().makeOperationContext();
-    auto mode = OplogApplication::Mode::kApplyOpsCmd;
-    // Make sure the apply ops command object contains the correct UUID information.
-    CollectionOptions options;
-    options.uuid = UUID::gen();
-    BSONObjBuilder resultBuilder;
-    NamespaceString nss("test", "foo");
-    auto innerCmdObj = BSON("op"
-                            << "i"
-                            << "ns" << nss.ns() << "o"
-                            << BSON("_id"
-                                    << "a")
-                            << "ui" << options.uuid.get());
-    auto innerApplyOpsObj = BSON("op"
-                                 << "c"
-                                 << "ns" << nss.getCommandNS().ns() << "o"
-                                 << BSON("applyOps" << BSON_ARRAY(innerCmdObj)));
-    auto cmdObj = BSON("applyOps" << BSON_ARRAY(innerApplyOpsObj));
-
-    ASSERT_OK(_storage->createCollection(opCtx.get(), nss, options));
-    ASSERT_OK(applyOps(opCtx.get(), nss.db().toString(), cmdObj, mode, &resultBuilder));
-    ASSERT_BSONOBJ_EQ(BSON("applyOps" << BSON_ARRAY(innerCmdObj)), _opObserver->onApplyOpsCmdObj);
-}
-
-TEST_F(ApplyOpsTest, AtomicApplyOpsWithNoOpsReturnsSuccess) {
-    auto opCtx = cc().makeOperationContext();
-    auto mode = OplogApplication::Mode::kApplyOpsCmd;
-    BSONObjBuilder resultBuilder;
-    auto cmdObj = BSON("applyOps" << BSONArray());
-    ASSERT_OK(applyOps(opCtx.get(), "test", cmdObj, mode, &resultBuilder));
-    ASSERT_BSONOBJ_EQ(cmdObj, _opObserver->onApplyOpsCmdObj);
-}
-
 /**
  * Creates an applyOps command object with a single insert operation.
  */
@@ -218,25 +184,6 @@ TEST_F(ApplyOpsTest,
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, status);
 }
 
-
-TEST_F(ApplyOpsTest, AtomicApplyOpsInsertWithUuidIntoCollectionWithUuid) {
-    auto opCtx = cc().makeOperationContext();
-    auto mode = OplogApplication::Mode::kApplyOpsCmd;
-    NamespaceString nss("test.t");
-
-    auto uuid = UUID::gen();
-
-    CollectionOptions collectionOptions;
-    collectionOptions.uuid = uuid;
-    ASSERT_OK(_storage->createCollection(opCtx.get(), nss, collectionOptions));
-
-    auto documentToInsert = BSON("_id" << 0);
-    auto cmdObj = makeApplyOpsWithInsertOperation(nss, uuid, documentToInsert);
-    BSONObjBuilder resultBuilder;
-    ASSERT_OK(applyOps(opCtx.get(), "test", cmdObj, mode, &resultBuilder));
-    ASSERT_BSONOBJ_EQ(cmdObj, _opObserver->onApplyOpsCmdObj);
-}
-
 TEST_F(ApplyOpsTest, AtomicApplyOpsInsertWithUuidIntoCollectionWithOtherUuid) {
     auto opCtx = cc().makeOperationContext();
     auto mode = OplogApplication::Mode::kApplyOpsCmd;
@@ -260,28 +207,6 @@ TEST_F(ApplyOpsTest, AtomicApplyOpsInsertWithUuidIntoCollectionWithOtherUuid) {
     auto result = resultBuilder.obj();
     auto status = getStatusFromApplyOpsResult(result);
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, status);
-}
-
-TEST_F(ApplyOpsTest, AtomicApplyOpsInsertWithoutUuidIntoCollectionWithUuid) {
-    auto opCtx = cc().makeOperationContext();
-    auto mode = OplogApplication::Mode::kApplyOpsCmd;
-    NamespaceString nss("test.t");
-
-    auto uuid = UUID::gen();
-
-    CollectionOptions collectionOptions;
-    collectionOptions.uuid = uuid;
-    ASSERT_OK(_storage->createCollection(opCtx.get(), nss, collectionOptions));
-
-    auto documentToInsert = BSON("_id" << 0);
-    auto cmdObj = makeApplyOpsWithInsertOperation(nss, boost::none, documentToInsert);
-    BSONObjBuilder resultBuilder;
-    ASSERT_OK(applyOps(opCtx.get(), "test", cmdObj, mode, &resultBuilder));
-
-    // Insert operation provided by caller did not contain collection uuid but applyOps() should add
-    // the uuid to the oplog entry.
-    auto expectedCmdObj = makeApplyOpsWithInsertOperation(nss, uuid, documentToInsert);
-    ASSERT_BSONOBJ_EQ(expectedCmdObj, _opObserver->onApplyOpsCmdObj);
 }
 
 TEST_F(ApplyOpsTest, ApplyOpsPropagatesOplogApplicationMode) {

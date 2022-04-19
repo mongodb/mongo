@@ -48,7 +48,7 @@
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/read_write_concern_defaults_cache_lookup_mock.h"
-#include "mongo/db/repl/apply_ops_command_info.h"
+#include "mongo/db/repl/apply_ops.h"
 #include "mongo/db/repl/image_collection_entry_gen.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
@@ -184,7 +184,9 @@ public:
         serverGlobalParams.clusterRole = ClusterRole::None;
     }
 
-    void reset(OperationContext* opCtx, NamespaceString nss) const {
+    void reset(OperationContext* opCtx,
+               NamespaceString nss,
+               boost::optional<UUID> uuid = boost::none) const {
         writeConflictRetry(opCtx, "deleteAll", nss.ns(), [&] {
             opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
             opCtx->recoveryUnit()->abandonSnapshot();
@@ -195,7 +197,11 @@ public:
                 invariant(collRaii.getWritableCollection(opCtx)->truncate(opCtx).isOK());
             } else {
                 auto db = collRaii.ensureDbExists(opCtx);
-                invariant(db->createCollection(opCtx, nss));
+                CollectionOptions opts;
+                if (uuid) {
+                    opts.uuid = uuid;
+                }
+                invariant(db->createCollection(opCtx, nss, opts));
             }
             wunit.commit();
         });
@@ -2394,16 +2400,17 @@ protected:
 };
 
 DEATH_TEST_REGEX_F(BatchedWriteOutputsTest,
-                   TestCannotGroupInserts,
-                   "Invariant failure.*getOpType.*repl::OpTypeEnum::kDelete") {
+                   TestCannotGroupDDLOperation,
+                   "Invariant failure.*getOpType.*repl::OpTypeEnum::kDelete.*kInsert.*kUpdate") {
     auto opCtxRaii = cc().makeOperationContext();
     OperationContext* opCtx = opCtxRaii.get();
     WriteUnitOfWork wuow(opCtx, true /* groupOplogEntries */);
 
     auto& bwc = BatchedWriteContext::get(opCtx);
-    bwc.addBatchedOperation(opCtx,
-                            repl::MutableOplogEntry::makeInsertOperation(
-                                _nss, _uuid, BSON("_id" << 0), BSON("_id" << 0)));
+    bwc.addBatchedOperation(
+        opCtx,
+        repl::MutableOplogEntry::makeCreateCommand(
+            NamespaceString("other", "coll"), CollectionOptions(), BSON("v" << 2)));
 }
 
 DEATH_TEST_REGEX_F(BatchedWriteOutputsTest,
@@ -2534,6 +2541,94 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsGrouping) {
     }
 }
 
+// Verifies that a WriteUnitOfWork with groupOplogEntries=true constisting of an insert, an update
+// and a delete replicates as a single applyOps.
+TEST_F(BatchedWriteOutputsTest, TestApplyOpsInsertDeleteUpdate) {
+    // Setup.
+    auto opCtxRaii = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxRaii.get();
+    reset(opCtx, NamespaceString::kRsOplogNamespace);
+    auto opObserverRegistry = std::make_unique<OpObserverRegistry>();
+    opObserverRegistry->addObserver(std::make_unique<OpObserverImpl>());
+    opCtx->getServiceContext()->setOpObserver(std::move(opObserverRegistry));
+
+    // Start a WUOW with groupOplogEntries=true. Verify that initialises the
+    // BatchedWriteContext.
+    auto& bwc = BatchedWriteContext::get(opCtx);
+    ASSERT(!bwc.writesAreBatched());
+    WriteUnitOfWork wuow(opCtx, true /* groupOplogEntries */);
+    ASSERT(bwc.writesAreBatched());
+
+    AutoGetCollection locks(opCtx, _nss, LockMode::MODE_IX);
+
+    // (0) Insert
+    {
+        std::vector<InsertStatement> insert;
+        insert.emplace_back(BSON("_id" << 0 << "data"
+                                       << "x"));
+        opCtx->getServiceContext()->getOpObserver()->onInserts(
+            opCtx, _nss, _uuid, insert.begin(), insert.end(), false);
+    }
+    // (1) Delete
+    {
+        documentKeyDecoration(opCtx).emplace(BSON("_id" << 1), boost::none);
+        const OplogDeleteEntryArgs args;
+        opCtx->getServiceContext()->getOpObserver()->onDelete(
+            opCtx, _nss, _uuid, kUninitializedStmtId, args);
+    }
+    // (2) Update
+    {
+        CollectionUpdateArgs collUpdateArgs;
+        collUpdateArgs.update = BSON("fieldToUpdate"
+                                     << "valueToUpdate");
+        collUpdateArgs.criteria = BSON("_id" << 2);
+        auto args = OplogUpdateEntryArgs(&collUpdateArgs, _nss, _uuid);
+        opCtx->getServiceContext()->getOpObserver()->onUpdate(opCtx, args);
+    }
+
+    // And commit the WUOW
+    wuow.commit();
+
+    // Retrieve the oplog entries. Implicitly asserts that there's one and only one oplog entry.
+    std::vector<BSONObj> oplogs = getNOplogEntries(opCtx, 1);
+    auto lastOplogEntry = oplogs.back();
+    auto lastOplogEntryParsed = assertGet(OplogEntry::parse(oplogs.back()));
+
+    // The batch consists of an applyOps, whose array contains the three writes issued within the
+    // WUOW.
+    ASSERT(lastOplogEntryParsed.getCommandType() == OplogEntry::CommandType::kApplyOps);
+    std::vector<repl::OplogEntry> innerEntries;
+    repl::ApplyOps::extractOperationsTo(
+        lastOplogEntryParsed, lastOplogEntryParsed.getEntry().toBSON(), &innerEntries);
+    ASSERT_EQ(innerEntries.size(), 3);
+
+    {
+        const auto innerEntry = innerEntries[0];
+        ASSERT(innerEntry.getCommandType() == OplogEntry::CommandType::kNotCommand);
+        ASSERT(innerEntry.getOpType() == repl::OpTypeEnum::kInsert);
+        ASSERT(innerEntry.getNss() == NamespaceString("test.coll"));
+        ASSERT(0 ==
+               innerEntry.getObject().woCompare(BSON("_id" << 0 << "data"
+                                                           << "x")));
+    }
+    {
+        const auto innerEntry = innerEntries[1];
+        ASSERT(innerEntry.getCommandType() == OplogEntry::CommandType::kNotCommand);
+        ASSERT(innerEntry.getOpType() == repl::OpTypeEnum::kDelete);
+        ASSERT(innerEntry.getNss() == NamespaceString("test.coll"));
+        ASSERT(0 == innerEntry.getObject().woCompare(BSON("_id" << 1)));
+    }
+    {
+        const auto innerEntry = innerEntries[2];
+        ASSERT(innerEntry.getCommandType() == OplogEntry::CommandType::kNotCommand);
+        ASSERT(innerEntry.getOpType() == repl::OpTypeEnum::kUpdate);
+        ASSERT(innerEntry.getNss() == NamespaceString("test.coll"));
+        ASSERT(0 ==
+               innerEntry.getObject().woCompare(BSON("fieldToUpdate"
+                                                     << "valueToUpdate")));
+    }
+}
+
 // Verifies an empty WUOW doesn't generate an oplog entry.
 TEST_F(BatchedWriteOutputsTest, testEmptyWUOW) {
     // Setup.
@@ -2632,6 +2727,162 @@ TEST_F(BatchedWriteOutputsTest, testWUOWTooLarge) {
 
     // The getNOplogEntries call below asserts that the oplog is empty.
     getNOplogEntries(opCtx, 0);
+}
+
+class AtomicApplyOpsOutputsTest : public OpObserverTest {
+protected:
+    const NamespaceString _nss{"test", "coll"};
+    const UUID _uuid = UUID::gen();
+};
+
+TEST_F(AtomicApplyOpsOutputsTest, InsertInNestedApplyOpsReturnsSuccess) {
+    auto opCtxRaii = cc().makeOperationContext();
+    auto opCtx = opCtxRaii.get();
+
+    reset(opCtx, _nss, _uuid);
+    resetOplogAndTransactions(opCtx);
+
+    auto opObserverRegistry = std::make_unique<OpObserverRegistry>();
+    opObserverRegistry->addObserver(std::make_unique<OpObserverImpl>());
+    opCtx->getServiceContext()->setOpObserver(std::move(opObserverRegistry));
+
+    auto mode = repl::OplogApplication::Mode::kApplyOpsCmd;
+    // Make sure the apply ops command object contains the correct UUID information.
+    CollectionOptions options;
+    options.uuid = _uuid;
+    BSONObjBuilder resultBuilder;
+    // NamespaceString nss("test", "foo");
+    auto innerCmdObj = BSON("op"
+                            << "i"
+                            << "ns" << _nss.ns() << "o"
+                            << BSON("_id"
+                                    << "a")
+                            << "ui" << options.uuid.get());
+    auto innerApplyOpsObj = BSON("op"
+                                 << "c"
+                                 << "ns" << _nss.getCommandNS().ns() << "o"
+                                 << BSON("applyOps" << BSON_ARRAY(innerCmdObj)));
+    auto cmdObj = BSON("applyOps" << BSON_ARRAY(innerApplyOpsObj));
+
+    ASSERT_OK(repl::applyOps(opCtx, _nss.db().toString(), cmdObj, mode, &resultBuilder));
+
+    // Retrieve the oplog entries, implicitly asserting that there's exactly one entry in the whole
+    // oplog.
+    std::vector<BSONObj> oplogs = getNOplogEntries(opCtx, 1);
+    auto lastOplogEntry = oplogs.back();
+    auto lastOplogEntryParsed = assertGet(OplogEntry::parse(oplogs.back()));
+
+    // The oplog entry is an applyOps containing the insert.
+    ASSERT(lastOplogEntryParsed.getCommandType() == OplogEntry::CommandType::kApplyOps);
+    std::vector<repl::OplogEntry> innerEntries;
+    repl::ApplyOps::extractOperationsTo(
+        lastOplogEntryParsed, lastOplogEntryParsed.getEntry().toBSON(), &innerEntries);
+    ASSERT(innerEntries.size() == 1);
+    const auto innerEntry = innerEntries[0];
+    ASSERT(innerEntry.getCommandType() == OplogEntry::CommandType::kNotCommand);
+    ASSERT(innerEntry.getOpType() == repl::OpTypeEnum::kInsert);
+    ASSERT(innerEntry.getNss() == NamespaceString("test.coll"));
+    ASSERT(0 ==
+           innerEntry.getObject().woCompare(BSON("_id"
+                                                 << "a")));
+}
+
+TEST_F(AtomicApplyOpsOutputsTest, AtomicApplyOpsWithNoOpsReturnsSuccess) {
+    auto opCtxRaii = cc().makeOperationContext();
+    auto opCtx = opCtxRaii.get();
+    reset(opCtx, _nss, _uuid);
+    resetOplogAndTransactions(opCtx);
+
+    auto opObserverRegistry = std::make_unique<OpObserverRegistry>();
+    opObserverRegistry->addObserver(std::make_unique<OpObserverImpl>());
+    opCtx->getServiceContext()->setOpObserver(std::move(opObserverRegistry));
+
+    auto mode = repl::OplogApplication::Mode::kApplyOpsCmd;
+    BSONObjBuilder resultBuilder;
+    auto cmdObj = BSON("applyOps" << BSONArray());
+    ASSERT_OK(repl::applyOps(opCtx, _nss.db().toString(), cmdObj, mode, &resultBuilder));
+
+    // Retrieve the oplog entries, implicitly asserting that there's exactly no entry in the whole
+    // oplog.
+    getNOplogEntries(opCtx, 0);
+}
+
+TEST_F(AtomicApplyOpsOutputsTest, AtomicApplyOpsInsertWithUuidIntoCollectionWithUuid) {
+    auto opCtxRaii = cc().makeOperationContext();
+    auto opCtx = opCtxRaii.get();
+    reset(opCtx, _nss, _uuid);
+    resetOplogAndTransactions(opCtx);
+
+    auto opObserverRegistry = std::make_unique<OpObserverRegistry>();
+    opObserverRegistry->addObserver(std::make_unique<OpObserverImpl>());
+    opCtx->getServiceContext()->setOpObserver(std::move(opObserverRegistry));
+
+    auto mode = repl::OplogApplication::Mode::kApplyOpsCmd;
+
+    auto const insertOp = BSON("op"
+                               << "i"
+                               << "ns" << _nss.ns() << "o" << BSON("_id" << 0) << "ui" << _uuid);
+    auto const cmdObj = BSON("applyOps" << BSON_ARRAY(insertOp));
+
+    BSONObjBuilder resultBuilder;
+    ASSERT_OK(repl::applyOps(opCtx, _nss.db().toString(), cmdObj, mode, &resultBuilder));
+
+    // Retrieve the oplog entries, implicitly asserting that there's exactly one entry in the whole
+    // oplog.
+    std::vector<BSONObj> oplogs = getNOplogEntries(opCtx, 1);
+    auto lastOplogEntry = oplogs.back();
+    auto lastOplogEntryParsed = assertGet(OplogEntry::parse(oplogs.back()));
+
+    // The oplog entry is an applyOps containing the insert.
+    ASSERT(lastOplogEntryParsed.getCommandType() == OplogEntry::CommandType::kApplyOps);
+    std::vector<repl::OplogEntry> innerEntries;
+    repl::ApplyOps::extractOperationsTo(
+        lastOplogEntryParsed, lastOplogEntryParsed.getEntry().toBSON(), &innerEntries);
+    ASSERT(innerEntries.size() == 1);
+    const auto innerEntry = innerEntries[0];
+    ASSERT(innerEntry.getCommandType() == OplogEntry::CommandType::kNotCommand);
+    ASSERT(innerEntry.getOpType() == repl::OpTypeEnum::kInsert);
+    ASSERT(innerEntry.getNss() == NamespaceString("test.coll"));
+    ASSERT(0 == innerEntry.getObject().woCompare(BSON("_id" << 0)));
+}
+
+TEST_F(AtomicApplyOpsOutputsTest, AtomicApplyOpsInsertWithoutUuidIntoCollectionWithUuid) {
+    auto opCtxRaii = cc().makeOperationContext();
+    auto opCtx = opCtxRaii.get();
+    reset(opCtx, _nss, _uuid);
+    resetOplogAndTransactions(opCtx);
+
+    auto opObserverRegistry = std::make_unique<OpObserverRegistry>();
+    opObserverRegistry->addObserver(std::make_unique<OpObserverImpl>());
+    opCtx->getServiceContext()->setOpObserver(std::move(opObserverRegistry));
+
+    auto mode = repl::OplogApplication::Mode::kApplyOpsCmd;
+
+    auto const insertOp = BSON("op"
+                               << "i"
+                               << "ns" << _nss.ns() << "o" << BSON("_id" << 0) /* no UUID */);
+    auto const cmdObj = BSON("applyOps" << BSON_ARRAY(insertOp));
+
+    BSONObjBuilder resultBuilder;
+    ASSERT_OK(repl::applyOps(opCtx, _nss.db().toString(), cmdObj, mode, &resultBuilder));
+
+    // Retrieve the oplog entries, implicitly asserting that there's exactly one entry in the whole
+    // oplog.
+    std::vector<BSONObj> oplogs = getNOplogEntries(opCtx, 1);
+    auto lastOplogEntry = oplogs.back();
+    auto lastOplogEntryParsed = assertGet(OplogEntry::parse(oplogs.back()));
+
+    // The oplog entry is an applyOps containing the insert.
+    ASSERT(lastOplogEntryParsed.getCommandType() == OplogEntry::CommandType::kApplyOps);
+    std::vector<repl::OplogEntry> innerEntries;
+    repl::ApplyOps::extractOperationsTo(
+        lastOplogEntryParsed, lastOplogEntryParsed.getEntry().toBSON(), &innerEntries);
+    ASSERT(innerEntries.size() == 1);
+    const auto innerEntry = innerEntries[0];
+    ASSERT(innerEntry.getCommandType() == OplogEntry::CommandType::kNotCommand);
+    ASSERT(innerEntry.getOpType() == repl::OpTypeEnum::kInsert);
+    ASSERT(innerEntry.getNss() == NamespaceString("test.coll"));
+    ASSERT(0 == innerEntry.getObject().woCompare(BSON("_id" << 0)));
 }
 
 class OnDeleteOutputsTest : public OpObserverTest {

@@ -520,7 +520,18 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
 
     ShardingWriteRouter shardingWriteRouter(opCtx, nss, Grid::get(opCtx)->catalogCache());
 
-    if (inMultiDocumentTransaction) {
+    auto& batchedWriteContext = BatchedWriteContext::get(opCtx);
+    const bool inBatchedWrite = batchedWriteContext.writesAreBatched();
+
+    if (inBatchedWrite) {
+        for (auto iter = first; iter != last; iter++) {
+            const auto docKey = repl::getDocumentKey(opCtx, nss, iter->doc).getShardKeyAndId();
+            auto operation = MutableOplogEntry::makeInsertOperation(nss, uuid, iter->doc, docKey);
+            operation.setDestinedRecipient(
+                shardingWriteRouter.getReshardingDestinedRecipient(iter->doc));
+            batchedWriteContext.addBatchedOperation(opCtx, operation);
+        }
+    } else if (inMultiDocumentTransaction) {
         // Do not add writes to the profile collection to the list of transaction operations, since
         // these are done outside the transaction. There is no top-level WriteUnitOfWork when we are
         // in a SideTransactionBlock.
@@ -643,7 +654,16 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
     ShardingWriteRouter shardingWriteRouter(opCtx, args.nss, Grid::get(opCtx)->catalogCache());
 
     OpTimeBundle opTime;
-    if (inMultiDocumentTransaction) {
+    auto& batchedWriteContext = BatchedWriteContext::get(opCtx);
+    const bool inBatchedWrite = batchedWriteContext.writesAreBatched();
+
+    if (inBatchedWrite) {
+        auto operation = MutableOplogEntry::makeUpdateOperation(
+            args.nss, args.uuid, args.updateArgs->update, args.updateArgs->criteria);
+        operation.setDestinedRecipient(
+            shardingWriteRouter.getReshardingDestinedRecipient(args.updateArgs->updatedDoc));
+        batchedWriteContext.addBatchedOperation(opCtx, operation);
+    } else if (inMultiDocumentTransaction) {
         const bool inRetryableInternalTransaction =
             isInternalSessionForRetryableWrite(*opCtx->getLogicalSessionId());
 
@@ -847,6 +867,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
     if (inBatchedWrite) {
         auto operation =
             MutableOplogEntry::makeDeleteOperation(nss, uuid, documentKey.getShardKeyAndId());
+        operation.setDestinedRecipient(destinedRecipientDecoration(opCtx));
         batchedWriteContext.addBatchedOperation(opCtx, operation);
     } else if (inMultiDocumentTransaction) {
         const bool inRetryableInternalTransaction =

@@ -123,6 +123,10 @@ Status _applyOps(OperationContext* opCtx,
                         << "cannot apply insert or update operation on a non-existent namespace "
                         << nss.ns() << " in atomic applyOps mode: " << redact(opObj));
             }
+            uassert(ErrorCodes::AtomicityFailure,
+                    str::stream() << "cannot run atomic applyOps on namespace " << nss.ns()
+                                  << " which has change stream pre- or post-images enabled",
+                    !collection->isChangeStreamPreAndPostImagesEnabled());
 
             // Reject malformed or over-specified operations in an atomic applyOps.
             try {
@@ -415,48 +419,19 @@ Status applyOps(OperationContext* opCtx,
         writeConflictRetry(opCtx, "applyOps", dbName, [&] {
             BSONObjBuilder intermediateResult;
             std::unique_ptr<BSONArrayBuilder> opsBuilder;
-            if (opCtx->writesAreReplicated()) {
-                opsBuilder = std::make_unique<BSONArrayBuilder>();
-            }
-            WriteUnitOfWork wunit(opCtx);
+
+            // If we were to replicate the original applyOps operation we received, we could
+            // replicate an applyOps that includes no-op writes. Oplog readers, like change streams,
+            // would then see entries for writes that did not happen. To work around this, we group
+            // all writes in this WUOW into a new applyOps entry so that we only replicate writes
+            // that actually happen.
+            // Note that the applyOps command doesn't update config.transactions for retryable
+            // writes, nor does it support change stream pre- and post-images.
+
+            WriteUnitOfWork wunit(opCtx, true /*groupOplogEntries*/);
             numApplied = 0;
-            {
-                // Suppress replication for atomic operations until end of applyOps.
-                repl::UnreplicatedWritesBlock uwb(opCtx);
-                uassertStatusOK(_applyOps(opCtx,
-                                          info,
-                                          oplogApplicationMode,
-                                          &intermediateResult,
-                                          &numApplied,
-                                          opsBuilder.get()));
-            }
-            // Generate oplog entry for all atomic ops collectively.
-            if (opCtx->writesAreReplicated()) {
-                // We want this applied atomically on secondaries so we rewrite the oplog entry
-                // without the pre-condition for speed.
-
-                BSONObjBuilder cmdBuilder;
-
-                auto opsFieldName = applyOpCmd.firstElement().fieldNameStringData();
-                for (auto elem : applyOpCmd) {
-                    auto name = elem.fieldNameStringData();
-                    if (name == opsFieldName && opsBuilder) {
-                        cmdBuilder.append(opsFieldName, opsBuilder->arr());
-                        continue;
-                    }
-                    if (name == ApplyOps::kPreconditionFieldName)
-                        continue;
-                    if (name == bypassDocumentValidationCommandOption())
-                        continue;
-                    cmdBuilder.append(elem);
-                }
-
-                const BSONObj cmdRewritten = cmdBuilder.done();
-
-                auto opObserver = getGlobalServiceContext()->getOpObserver();
-                invariant(opObserver);
-                opObserver->onApplyOps(opCtx, dbName, cmdRewritten);
-            }
+            uassertStatusOK(_applyOps(
+                opCtx, info, oplogApplicationMode, &intermediateResult, &numApplied, nullptr));
             wunit.commit();
             result->appendElements(intermediateResult.obj());
         });

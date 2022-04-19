@@ -217,6 +217,22 @@ function getCollections(db) {
     }, [{_id: 1, a: 1}, {_id: 2, a: 1}]);
 })();
 
+(function testPreImageWritingForAtomicApplyOpsCommandAutoConvertedToNonAtomic() {
+    assert.commandWorked(coll.deleteMany({}));
+    assert.commandWorked(coll.insert([{_id: 1, a: 1}, {_id: 2, a: 1}]));
+
+    // Verify that pre-images are written correctly for the atomic "applyOps" command, which is
+    // automatically converted to a non-atomic one.
+    assertPreImagesWrittenForOps(testDB, function() {
+        assert.commandWorked(testDB.runCommand({
+            applyOps: [
+                {op: "u", ns: coll.getFullName(), o2: {_id: 1}, o: {$set: {a: 2}}},
+                {op: "d", ns: coll.getFullName(), o: {_id: 2}}
+            ],
+        }));
+    }, [{_id: 1, a: 1}, {_id: 2, a: 1}]);
+})();
+
 (function testPreImageWritingForPreparedTransaction() {
     assert.commandWorked(coll.deleteMany({}));
     assert.commandWorked(coll.insert([{_id: 1, a: 1}, {_id: 3, a: 1}, {_id: 11}]));
