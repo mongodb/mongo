@@ -5,6 +5,7 @@
 //   requires_auth,
 //   requires_fcv_60,
 //   requires_non_retryable_commands,
+//   requires_persistence,
 //   requires_replication,
 //   disabled_for_fcv_6_1_upgrade,
 // ]
