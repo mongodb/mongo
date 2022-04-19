@@ -294,7 +294,9 @@ sbe::value::SlotVector SBENodeLowering::convertProjectionsToSlots(
 }
 
 sbe::value::SlotVector SBENodeLowering::convertRequiredProjectionsToSlots(
-    const NodeProps& props, const bool removeRIDProjection, const ProjectionNameVector& toExclude) {
+    const NodeProps& props,
+    const bool removeRIDProjection,
+    const sbe::value::SlotVector& toExclude) {
     using namespace properties;
 
     const PhysProps& physProps = props._physicalProps;
@@ -306,11 +308,18 @@ sbe::value::SlotVector SBENodeLowering::convertRequiredProjectionsToSlots(
         projections.erase(_ridProjections.at(scanDefName));
     }
 
-    for (const ProjectionName& projName : toExclude) {
-        projections.erase(projName);
+    sbe::value::SlotSet toExcludeSet;
+    for (const auto slot : toExclude) {
+        toExcludeSet.insert(slot);
     }
 
-    return convertProjectionsToSlots(projections.getVector());
+    sbe::value::SlotVector result;
+    for (const auto slot : convertProjectionsToSlots(projections.getVector())) {
+        if (toExcludeSet.count(slot) == 0) {
+            result.push_back(slot);
+        }
+    }
+    return result;
 }
 
 std::unique_ptr<sbe::PlanStage> SBENodeLowering::optimize(const ABT& n) {
@@ -523,8 +532,8 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const CollationNode& n,
     const size_t memoryLimit = 100 * (1ul << 20);  // 100MB
     const bool allowDiskUse = false;
 
-    auto vals = convertRequiredProjectionsToSlots(
-        nodeProps, false /*removeRIDProjection*/, collationProjections);
+    auto vals =
+        convertRequiredProjectionsToSlots(nodeProps, false /*removeRIDProjection*/, orderBySlots);
     return sbe::makeS<sbe::SortStage>(std::move(input),
                                       std::move(orderBySlots),
                                       std::move(directions),
@@ -657,11 +666,11 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const HashJoinNode& n,
 
     // Add RID projection only from outer side.
     auto innerKeys = convertProjectionsToSlots(n.getLeftKeys());
-    auto innerProjects = convertRequiredProjectionsToSlots(
-        leftProps, false /*removeRIDProjection*/, n.getLeftKeys());
+    auto innerProjects =
+        convertRequiredProjectionsToSlots(leftProps, false /*removeRIDProjection*/, innerKeys);
     auto outerKeys = convertProjectionsToSlots(n.getRightKeys());
-    auto outerProjects = convertRequiredProjectionsToSlots(
-        rightProps, true /*removeRIDProjection*/, n.getRightKeys());
+    auto outerProjects =
+        convertRequiredProjectionsToSlots(rightProps, true /*removeRIDProjection*/, outerKeys);
 
     // TODO: use collator slot.
     boost::optional<sbe::value::SlotId> collatorSlot;
@@ -705,11 +714,11 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const MergeJoinNode& n,
 
     // Add RID projection only from outer side.
     auto outerKeys = convertProjectionsToSlots(n.getLeftKeys());
-    auto outerProjects = convertRequiredProjectionsToSlots(
-        leftProps, false /*removeRIDProjection*/, n.getLeftKeys());
+    auto outerProjects =
+        convertRequiredProjectionsToSlots(leftProps, false /*removeRIDProjection*/, outerKeys);
     auto innerKeys = convertProjectionsToSlots(n.getRightKeys());
-    auto innerProjects = convertRequiredProjectionsToSlots(
-        rightProps, true /*removeRIDProjection*/, n.getRightKeys());
+    auto innerProjects =
+        convertRequiredProjectionsToSlots(rightProps, true /*removeRIDProjection*/, innerKeys);
 
     const PlanNodeId planNodeId = _nodeToGroupPropsMap.at(&n)._planNodeId;
     return sbe::makeS<sbe::MergeJoinStage>(std::move(outerStage),

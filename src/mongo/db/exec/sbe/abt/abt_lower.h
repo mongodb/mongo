@@ -182,7 +182,7 @@ private:
     sbe::value::SlotVector convertRequiredProjectionsToSlots(
         const NodeProps& props,
         bool removeRIDProjection,
-        const ProjectionNameVector& toExclude = {});
+        const sbe::value::SlotVector& toExclude = {});
 
     std::unique_ptr<sbe::EExpression> convertBoundsToExpr(
         bool isLower, const IndexDefinition& indexDef, const MultiKeyIntervalRequirement& interval);
