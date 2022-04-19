@@ -166,6 +166,8 @@ __flush_tier_once(WT_SESSION_IMPL *session, uint32_t flags)
     }
     WT_ERR(__wt_metadata_cursor_release(session, &cursor));
 
+    /* Clear the flag on success. */
+    F_CLR(conn, WT_CONN_TIERED_FIRST_FLUSH);
     return (0);
 
 err:
@@ -773,6 +775,12 @@ __wt_tiered_storage_create(WT_SESSION_IMPL *session, const char *cfg[])
     WT_ERR(__wt_open_internal_session(conn, "tiered-server", true, 0, 0, &conn->tiered_session));
     session = conn->tiered_session;
 
+    /*
+     * Check for objects that are not flushed on the first flush_tier call. We cannot do that work
+     * right now because it would entail opening and getting the dhandle for every table and that
+     * work is already done in the flush_tier. So do it there and keep that code together.
+     */
+    F_SET(conn, WT_CONN_TIERED_FIRST_FLUSH);
     /* Start the thread. */
     WT_ERR(__wt_thread_create(session, &conn->tiered_tid, __tiered_server, session));
     conn->tiered_tid_set = true;
