@@ -804,6 +804,9 @@ S3FlushFinish(WT_STORAGE_SOURCE *storage, WT_SESSION *session, WT_FILE_SYSTEM *f
     std::string srcPath = S3Path(fs->homeDir, source);
     std::string destPath = S3Path(fs->cacheDir, object);
 
+    // Converting S3 object name to cache directory strcture to link the cache file with local file.
+    std::filesystem::create_directories(std::filesystem::path(destPath).parent_path());
+
     // Linking file with the local file.
     std::error_code ec;
     std::filesystem::create_hard_link(srcPath.c_str(), destPath.c_str(), ec);

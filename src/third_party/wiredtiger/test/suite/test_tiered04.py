@@ -47,7 +47,8 @@ class test_tiered04(wttest.WiredTigerTestCase):
             bucket = get_bucket1_name('s3_store'),
             bucket1 = get_bucket2_name('s3_store'),
             prefix = generate_s3_prefix(),
-            prefix1 = generate_s3_prefix(),
+            # Test that object name with "/" are processed. 
+            prefix1 = generate_s3_prefix() + "/s3/source/",
             ss_name = 's3_store')),
     ]
     # Make scenarios for different cloud service providers
