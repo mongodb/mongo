@@ -764,7 +764,7 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientSyncDa
         MigrationRecipientCommonData commonData(
             _migrationUuid, donorConnString.toString(), _readPreference);
         commonData.setRecipientCertificateForDonor(_recipientCertificateForDonor);
-        // TODO SERVER-59794: Pass tenantId only for 'kMultitenantMigrations' protocol.
+        // TODO SERVER-63454: Pass tenantId only for 'kMultitenantMigrations' protocol.
         commonData.setTenantId(_tenantId);
 
         stdx::lock_guard<Latch> lg(_mutex);
@@ -797,7 +797,7 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientForget
     MigrationRecipientCommonData commonData(
         _migrationUuid, donorConnString.toString(), _readPreference);
     commonData.setRecipientCertificateForDonor(_recipientCertificateForDonor);
-    // TODO SERVER-59794: Pass tenantId only for 'kMultitenantMigrations' protocol.
+    // TODO SERVER-63454: Pass tenantId only for 'kMultitenantMigrations' protocol.
     commonData.setTenantId(_tenantId);
     auto isAtLeastFCV52AtStart = [&]() -> bool {
         stdx::lock_guard<Latch> lg(_mutex);

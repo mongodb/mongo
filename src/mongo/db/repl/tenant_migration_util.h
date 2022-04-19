@@ -168,7 +168,7 @@ inline Status protocolTenantIdCompatibilityCheck(const MigrationProtocolEnum& pr
                                                  const std::string& tenantId) noexcept {
     switch (protocol) {
         case MigrationProtocolEnum::kShardMerge: {
-            // TODO SERVER-59794: Add a check to ensure tenantId is not provided for 'Merge'
+            // TODO SERVER-63454: Add a check to ensure tenantId is not provided for 'Merge'
             // protocol.
             break;
         }
