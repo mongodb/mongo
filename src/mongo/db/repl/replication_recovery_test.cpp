@@ -136,8 +136,7 @@ public:
 
 class ReplicationRecoveryTest : public ServiceContextMongoDTest {
 protected:
-    // TODO (SERVER-65304): Use wiredTiger.
-    ReplicationRecoveryTest() : ServiceContextMongoDTest(Options{}.engine("ephemeralForTest")) {}
+    ReplicationRecoveryTest() : ServiceContextMongoDTest(Options{}.useReplSettings(true)) {}
 
     OperationContext* getOperationContext() {
         return _opCtx.get();
@@ -346,12 +345,17 @@ CollectionOptions _createOplogCollectionOptions() {
 }
 
 /**
- * Creates an oplog with insert entries at the given timestamps.
+ * Creates an oplog with insert entries at the given timestamps, which must be in increasing order.
  */
 void _setUpOplog(OperationContext* opCtx, StorageInterface* storage, std::vector<int> timestamps) {
     for (int ts : timestamps) {
         ASSERT_OK(storage->insertDocument(
             opCtx, oplogNs, _makeInsertOplogEntry(ts), OpTime::kUninitializedTerm));
+    }
+    if (!timestamps.empty()) {
+        // Use the highest inserted timestamp to update oplog visibilty so that all of the inserted
+        // oplog entries are visible.
+        storage->oplogDiskLocRegister(opCtx, Timestamp(timestamps.back(), timestamps.back()), true);
     }
 }
 
@@ -374,7 +378,7 @@ void _assertDocumentsInCollectionEqualsUnordered(OperationContext* opCtx,
     SimpleBSONObjSet actualDocs;
     CollectionReader reader(opCtx, nss);
     for (std::size_t i = 0; i < docs.size(); ++i) {
-        actualDocs.insert(unittest::assertGet(reader.next()));
+        actualDocs.insert(unittest::assertGet(reader.next()).getOwned());
     }
     auto docIt = docs.begin();
     auto docEnd = docs.end();
@@ -875,6 +879,7 @@ TEST_F(ReplicationRecoveryTest, RecoveryAppliesUpdatesIdempotently) {
              .toBSON(),
          Timestamp(ts, ts)},
         OpTime::kUninitializedTerm));
+    getStorageInterface()->oplogDiskLocRegister(opCtx, Timestamp(ts, ts), true);
 
     recovery.recoverFromOplog(opCtx, boost::none);
 
@@ -899,6 +904,7 @@ DEATH_TEST_F(ReplicationRecoveryTest, RecoveryFailsWithBadOp, "terminate() calle
              .toBSON(),
          Timestamp(2, 2)},
         OpTime::kUninitializedTerm));
+    getStorageInterface()->oplogDiskLocRegister(opCtx, Timestamp(2, 2), true);
 
     recovery.recoverFromOplog(opCtx, boost::none);
 }
@@ -935,6 +941,7 @@ TEST_F(ReplicationRecoveryTest, CorrectlyUpdatesConfigTransactions) {
 
     ASSERT_OK(getStorageInterface()->insertDocument(
         opCtx, oplogNs, {insertOp2.getEntry().toBSON(), Timestamp(3, 0)}, 1));
+    getStorageInterface()->oplogDiskLocRegister(opCtx, Timestamp(3, 0), true);
 
     recovery.recoverFromOplog(opCtx, boost::none);
 
@@ -982,6 +989,7 @@ TEST_F(ReplicationRecoveryTest, PrepareTransactionOplogEntryCorrectlyUpdatesConf
 
     ASSERT_OK(getStorageInterface()->insertDocument(
         opCtx, oplogNs, {prepareOp.getEntry().toBSON(), Timestamp(2, 0)}, 1));
+    getStorageInterface()->oplogDiskLocRegister(opCtx, Timestamp(2, 0), true);
 
     recovery.recoverFromOplog(opCtx, boost::none);
 
@@ -1041,6 +1049,7 @@ TEST_F(ReplicationRecoveryTest, AbortTransactionOplogEntryCorrectlyUpdatesConfig
 
     ASSERT_OK(getStorageInterface()->insertDocument(
         opCtx, oplogNs, {abortOp.getEntry().toBSON(), Timestamp(3, 0)}, 1));
+    getStorageInterface()->oplogDiskLocRegister(opCtx, Timestamp(3, 0), true);
 
     recovery.recoverFromOplog(opCtx, boost::none);
 
@@ -1106,6 +1115,7 @@ TEST_F(ReplicationRecoveryTest, CommitTransactionOplogEntryCorrectlyUpdatesConfi
 
     ASSERT_OK(getStorageInterface()->insertDocument(
         opCtx, oplogNs, {commitOp.getEntry().toBSON(), Timestamp(3, 0)}, 1));
+    getStorageInterface()->oplogDiskLocRegister(opCtx, Timestamp(3, 0), true);
 
     recovery.recoverFromOplog(opCtx, boost::none);
 
@@ -1192,6 +1202,7 @@ TEST_F(ReplicationRecoveryTest,
 
     ASSERT_OK(getStorageInterface()->insertDocument(
         opCtx, oplogNs, {commitOp.getEntry().toBSON(), Timestamp(3, 0)}, 1));
+    getStorageInterface()->oplogDiskLocRegister(opCtx, Timestamp(3, 0), true);
 
     recovery.recoverFromOplog(opCtx, boost::none);
 
@@ -1337,6 +1348,7 @@ TEST_F(ReplicationRecoveryTest, RecoverFromOplogUpToReconstructsPreparedTransact
                                        lastDate);
         ASSERT_OK(getStorageInterface()->insertDocument(
             opCtx, oplogNs, {prepareOp.getEntry().toBSON(), Timestamp(3, 3)}, 1));
+        getStorageInterface()->oplogDiskLocRegister(opCtx, Timestamp(3, 3), true);
     }
 
     recovery.recoverFromOplogUpTo(opCtx, Timestamp(3, 3));
@@ -1347,6 +1359,7 @@ TEST_F(ReplicationRecoveryTest, RecoverFromOplogUpToReconstructsPreparedTransact
         auto txnParticipant = TransactionParticipant::get(opCtx);
         ASSERT_EQ(txnParticipant.getPrepareOpTime().getTimestamp(), Timestamp(3, 3));
         ASSERT_TRUE(txnParticipant.transactionIsPrepared());
+        txnParticipant.abortTransaction(opCtx);
     }
 }
 
@@ -1379,6 +1392,7 @@ TEST_F(ReplicationRecoveryTest,
                                        lastDate);
         ASSERT_OK(getStorageInterface()->insertDocument(
             opCtx, oplogNs, {prepareOp.getEntry().toBSON(), Timestamp(1, 1)}, 1));
+        getStorageInterface()->oplogDiskLocRegister(opCtx, Timestamp(1, 1), true);
 
         const BSONObj doc =
             BSON("_id" << sessionId.toBSON() << "txnNum" << static_cast<long long>(1)
@@ -1403,6 +1417,7 @@ TEST_F(ReplicationRecoveryTest,
         auto txnParticipant = TransactionParticipant::get(opCtx);
         ASSERT_EQ(txnParticipant.getPrepareOpTime().getTimestamp(), Timestamp(1, 1));
         ASSERT_TRUE(txnParticipant.transactionIsPrepared());
+        txnParticipant.abortTransaction(opCtx);
     }
 }
 
