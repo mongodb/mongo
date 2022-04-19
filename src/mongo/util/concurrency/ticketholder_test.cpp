@@ -100,6 +100,35 @@ void basicTimeout(OperationContext* opCtx) {
     ASSERT_FALSE(holder->waitForTicketUntil(opCtx, &admCtx, Date_t::now() + Milliseconds(2), mode));
     holder->release(&admCtx, std::move(*ticket));
     ASSERT_EQ(holder->used(), 0);
+
+    //
+    // Test resize
+    //
+    ASSERT(holder->resize(6).isOK());
+    ticket = holder->waitForTicket(opCtx, &admCtx, mode);
+    ASSERT(ticket);
+    ASSERT_EQ(holder->used(), 1);
+    ASSERT_EQ(holder->outof(), 6);
+
+    std::array<boost::optional<Ticket>, 5> tickets;
+    for (int i = 0; i < 5; ++i) {
+        tickets[i] = holder->waitForTicket(opCtx, &admCtx, mode);
+        ASSERT_EQ(holder->used(), 2 + i);
+        ASSERT_EQ(holder->outof(), 6);
+    }
+
+    ASSERT_FALSE(holder->waitForTicketUntil(opCtx, &admCtx, Date_t::now() + Milliseconds(1), mode));
+
+    holder->release(&admCtx, std::move(*ticket));
+
+    ASSERT(holder->resize(5).isOK());
+    ASSERT_EQ(holder->used(), 5);
+    ASSERT_EQ(holder->outof(), 5);
+    ASSERT_FALSE(holder->waitForTicketUntil(opCtx, &admCtx, Date_t::now() + Milliseconds(1), mode));
+
+    for (int i = 0; i < 5; ++i) {
+        holder->release(&admCtx, std::move(*tickets[i]));
+    }
 }
 
 TEST_F(TicketHolderTest, BasicTimeoutFifo) {

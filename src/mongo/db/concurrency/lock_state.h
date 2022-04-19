@@ -382,7 +382,7 @@ private:
     AdmissionContext _admCtx;
 
     // This will only be valid when holding a ticket.
-    Ticket _ticket;
+    boost::optional<Ticket> _ticket;
 
     // Tracks the global lock modes ever acquired in this Locker's life. This value should only ever
     // be accessed from the thread that owns the Locker.

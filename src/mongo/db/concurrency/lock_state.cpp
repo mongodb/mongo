@@ -312,7 +312,7 @@ LockerImpl::~LockerImpl() {
     // to delete with unaccounted locks anyways.
     invariant(!inAWriteUnitOfWork());
     invariant(_numResourcesToUnlockAtEndUnitOfWork == 0);
-    invariant(!_ticket.valid());
+    invariant(!_ticket || !_ticket->valid());
 
     if (!_requests.empty()) {
         _dumpLockerAndLockManagerRequests();
@@ -1077,8 +1077,9 @@ void LockerImpl::_releaseTicket() {
     auto& ticketHolders = ticketHoldersDecoration(getGlobalServiceContext());
     auto holder = shouldAcquireTicket() ? ticketHolders.getTicketHolder(_modeForTicket) : nullptr;
     if (holder) {
-        holder->release(&_admCtx, std::move(_ticket));
+        holder->release(&_admCtx, std::move(*_ticket));
     }
+    _ticket.reset();
     _clientState.store(kInactive);
 }
 
