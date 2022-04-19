@@ -36,6 +36,9 @@ assert.commandWorked(mongosDB.createView(viewName, collName, [{$addFields: {foo:
 function assertReadOnView(view) {
     const result = view.find({}).sort({_id: 1}).toArray();
     assert.eq(result, [{_id: 1, foo: 1}, {_id: 2, foo: 2}, {_id: 3, foo: 3}]);
+
+    const resultAvailable = view.find({}).readConcern('available').sort({_id: 1}).toArray();
+    assert.eq(resultAvailable, [{_id: 1, foo: 1}, {_id: 2, foo: 2}, {_id: 3, foo: 3}]);
 }
 
 // View read with unsharded collection works on both the primary shard and mongos.

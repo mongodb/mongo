@@ -42,6 +42,9 @@ const lookupUnderUnionPipeline = [{
     }
 }];
 assert.eq(baseColl.aggregate(lookupUnderUnionPipeline).toArray(), expectedResults);
+assert.eq(
+    baseColl.aggregate(lookupUnderUnionPipeline, {readConcern: {level: 'available'}}).toArray(),
+    expectedResults);
 
 // Test that $unionWith within a $lookup sub-pipeline works when all collections are unsharded.
 const unionUnderLookupPipeline = [{
@@ -50,6 +53,9 @@ const unionUnderLookupPipeline = [{
 }];
 expectedResults = [{_id: 0, result: [{_id: 0, foreignField: 1, data: "lookup_data"}, {_id: 1}]}];
 assert.eq(baseColl.aggregate(unionUnderLookupPipeline).toArray(), expectedResults);
+assert.eq(
+    baseColl.aggregate(unionUnderLookupPipeline, {readConcern: {level: 'available'}}).toArray(),
+    expectedResults);
 
 // Shard the base and union collection.
 assert.commandWorked(

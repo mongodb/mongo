@@ -328,9 +328,9 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
 
     const auto& receivedShardVersion = *optReceivedShardVersion;
 
-    // An operation with read concern 'available' should never have shardVersion set.
-    invariant(repl::ReadConcernArgs::get(opCtx).getLevel() !=
-              repl::ReadConcernLevel::kAvailableReadConcern);
+    if (repl::ReadConcernArgs::get(opCtx).getLevel() ==
+        repl::ReadConcernLevel::kAvailableReadConcern)
+        return kUnshardedCollection;
 
     auto csrLock = CSRLock::lockShared(opCtx, this);
 
