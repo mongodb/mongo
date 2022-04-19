@@ -408,11 +408,11 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
         // Note: If the UUID is a missing value (which can be true for events like 'dropDatabase'),
         // 'addField' will not add anything to the document.
         doc.addField(DocumentSourceChangeStream::kCollectionUuidField, uuid);
-
-        const auto wallTime = input[repl::OplogEntry::kWallClockTimeFieldName];
-        checkValueType(wallTime, repl::OplogEntry::kWallClockTimeFieldName, BSONType::Date);
-        doc.addField(DocumentSourceChangeStream::kWallTimeField, wallTime);
     }
+
+    const auto wallTime = input[repl::OplogEntry::kWallClockTimeFieldName];
+    checkValueType(wallTime, repl::OplogEntry::kWallClockTimeFieldName, BSONType::Date);
+    doc.addField(DocumentSourceChangeStream::kWallTimeField, wallTime);
 
     // Invalidation, topology change, and resharding events have fewer fields.
     if (operationType == DocumentSourceChangeStream::kInvalidateOpType ||

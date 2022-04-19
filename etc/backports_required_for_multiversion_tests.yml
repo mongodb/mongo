@@ -204,6 +204,8 @@ last-continuous:
       test_file: jstests/sharding/resharding_change_stream_namespace_filtering.js
     - ticket: SERVER-65261
       test_file: jstests/replsets/capped_deletes.js
+    - ticket: SERVER-65022
+      test_file: jstests/sharding/change_stream_shard_failover.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -543,6 +545,8 @@ last-lts:
       test_file: jstests/sharding/refine_collection_shard_key_basic.js
     - ticket: SERVER-65261
       test_file: jstests/replsets/capped_deletes.js
+    - ticket: SERVER-65022
+      test_file: jstests/sharding/change_stream_shard_failover.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
