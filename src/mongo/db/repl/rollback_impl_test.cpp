@@ -152,9 +152,6 @@ private:
     friend class RollbackImplTest::Listener;
 
 protected:
-    // TODO (SERVER-65305): Use wiredTiger.
-    RollbackImplTest() : RollbackTest(Options{}.engine("ephemeralForTest")) {}
-
     /**
      * Creates a new mock collection with name 'nss' via the StorageInterface and associates 'uuid'
      * with the new collection in the CollectionCatalog. There must not already exist a collection
@@ -236,7 +233,10 @@ protected:
                                          boost::optional<long> optime = boost::none) {
         const auto time = optime.value_or(_counter++);
         ASSERT_OK(_insertOplogEntry(makeDeleteOplogEntry(time, id.wrap(), nss.ns(), uuid)));
+        WriteUnitOfWork wuow{_opCtx.get()};
         ASSERT_OK(_storageInterface->deleteById(_opCtx.get(), nss, id));
+        ASSERT_OK(_opCtx->recoveryUnit()->setTimestamp(Timestamp(time, time)));
+        wuow.commit();
     }
 
     /**
@@ -1834,7 +1834,7 @@ TEST_F(RollbackImplTest, RollbackDoesNotRestoreTxnsTableWhenNoRetryableWritesEnt
     auto insertEntry = makeInsertOplogEntry(7, BSON("_id" << 3), nss.ns(), collUuid);
 
     // Create migrated no-op transactions entry after 'stableTimestamp'.
-    auto txnEntryAfterStableTs = makeMigratedNoop(txnOpTime,
+    auto txnEntryAfterStableTs = makeMigratedNoop({{8, 8}, 8},
                                                   BSONObj(),
                                                   lsid,
                                                   txnNumTwo,
@@ -1880,6 +1880,8 @@ public:
         for (auto it = ops.rbegin(); it != ops.rend(); it++) {
             ASSERT_OK(_insertOplogEntry(it->first));
         }
+        _storageInterface->oplogDiskLocRegister(
+            _opCtx.get(), ops.front().first["ts"].timestamp(), true);
         _onRollbackOpObserverFn = [&](const OpObserver::RollbackObserverInfo& rbInfo) {
             _rbInfo = rbInfo;
         };

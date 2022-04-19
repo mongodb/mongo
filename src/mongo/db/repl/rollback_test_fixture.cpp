@@ -252,6 +252,7 @@ void RollbackTest::_insertDocument(OperationContext* opCtx,
 Status RollbackTest::_insertOplogEntry(const BSONObj& doc) {
     TimestampedBSONObj obj;
     obj.obj = doc;
+    _storageInterface->oplogDiskLocRegister(_opCtx.get(), doc["ts"].timestamp(), true);
     return _storageInterface->insertDocument(
         _opCtx.get(), NamespaceString::kRsOplogNamespace, obj, 0);
 }
