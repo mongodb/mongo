@@ -15,9 +15,9 @@ requireSSLProvider('apple', function() {
     'use strict';
 
     const CLIENT =
-        'C=US,ST=New York,L=New York City,O=MongoDB,OU=Kernel,CN=Trusted Kernel Test Client';
+        'CN=Trusted Kernel Test Client,OU=Kernel,O=MongoDB,L=New York City,ST=New York,C=US';
     const SERVER =
-        'C=US,ST=New York,L=New York City,O=MongoDB,OU=Kernel,CN=Trusted Kernel Test Server';
+        'CN=Trusted Kernel Test Server,OU=Kernel,O=MongoDB,L=New York City,ST=New York,C=US';
     const INVALID = null;
 
     function getCertificateSHA1BySubject(subject) {
@@ -34,16 +34,20 @@ requireSSLProvider('apple', function() {
         const searchIdx = out.indexOf(kSearchStr);
         assert.neq(searchIdx, -1, "SHA-1 hash not found in command output!");
 
-        return out.substr(searchIdx + searchStr.length, kHashHexitLen);
+        return out.substr(searchIdx + kSearchStr.length, kHashHexitLen);
     }
 
     // Using the thumbprint of the certificate stored in the keychain should always work as a
-    // selector.
-    const trusted_server_thumbprint = getCertificateSHA1BySubject("Trusted Kernel Test Server");
-    const trusted_client_thumbprint = getCertificateSHA1BySubject("Trusted Kernel Test Client");
+    // selector. Uppercase everything so we don't fail on unmatching case.
+    const trusted_server_thumbprint =
+        getCertificateSHA1BySubject("Trusted Kernel Test Server").toUpperCase();
+    const trusted_client_thumbprint =
+        getCertificateSHA1BySubject("Trusted Kernel Test Client").toUpperCase();
 
-    const expected_server_thumbprint = cat("jstests/libs/trusted-server.pem.digest.sha1");
-    const expected_client_thumbprint = cat("jstests/libs/trusted-client.pem.digest.sha1");
+    const expected_server_thumbprint =
+        cat("jstests/libs/trusted-server.pem.digest.sha1").toUpperCase();
+    const expected_client_thumbprint =
+        cat("jstests/libs/trusted-client.pem.digest.sha1").toUpperCase();
 
     // If we fall into this case, our trusted certificates are not installed on the machine's
     // certificate keychain. This probably means that certificates have just been renewed, but have
@@ -103,8 +107,15 @@ requireSSLProvider('apple', function() {
         }
     }
 
+    // Test each possible combination of server/cluster certificate selectors. Make sure we only use
+    // the trusted-server certificate as the server certificate, and only use the trusted-client
+    // certificate as the cluster certificate.
     testCases.forEach(cert => {
+        if (cert.name === CLIENT)
+            return;
         testCases.forEach(cluster => {
+            if (cluster.name === SERVER)
+                return;
             test(cert, cluster);
         });
     });

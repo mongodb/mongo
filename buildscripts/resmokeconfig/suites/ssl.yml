@@ -4,9 +4,6 @@ selector:
   roots:
   - jstests/ssl/*.js
   - src/mongo/db/modules/*/jstests/fips/*.js
-  exclude_files:
-  # TODO SERVER-63155 Re-enable this test.
-  - jstests/ssl/ssl_cert_selector_apple.js
 
 # ssl tests start their own mongod's.
 executor:
