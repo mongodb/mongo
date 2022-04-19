@@ -229,12 +229,12 @@ err:
 }
 
 /*
- * __tiered_flush_older_objects --
- *     Check earlier objects and see if flush work units for earlier objects need to be pushed onto
- *     the work queue. This can happen if the system crashed during a flush tier.
+ * __tiered_restart_work --
+ *     Check local objects and see if various work units need to be pushed onto the work queue. This
+ *     can be necessary anytime the system restarts.
  */
 static int
-__tiered_flush_older_objects(WT_SESSION_IMPL *session, WT_TIERED *tiered)
+__tiered_restart_work(WT_SESSION_IMPL *session, WT_TIERED *tiered)
 {
     WT_CONFIG_ITEM cval;
     WT_DECL_RET;
@@ -264,6 +264,9 @@ __tiered_flush_older_objects(WT_SESSION_IMPL *session, WT_TIERED *tiered)
          * backward we cannot guarantee that the work is queued and processed and the metadata
          * flushed in order to stop at the first flushed object in the face of multiple crashes. So
          * check all objects that exist locally.
+         *
+         * If the object is flushed but still exists locally, restart the work to drop it after the
+         * local retention period expires.
          */
         if (exist) {
             WT_ERR(__wt_metadata_search(session, obj_uri, (char **)&obj_val));
@@ -272,6 +275,8 @@ __tiered_flush_older_objects(WT_SESSION_IMPL *session, WT_TIERED *tiered)
               "OLDER_OBJECTS: local object %s has flush time %d", obj_uri, (int)cval.val);
             if (cval.val == 0)
                 WT_ERR(__wt_tiered_put_flush(session, tiered, i));
+            else
+                WT_ERR(__wt_tiered_put_drop_local(session, tiered, i));
             __wt_free(session, obj_val);
         }
         __wt_free(session, obj_uri);
@@ -523,7 +528,7 @@ __tiered_switch(WT_SESSION_IMPL *session, const char *config)
      * middle of flushing and restarted.
      */
     if (F_ISSET(S2C(session), WT_CONN_TIERED_FIRST_FLUSH))
-        WT_ERR(__tiered_flush_older_objects(session, tiered));
+        WT_ERR(__tiered_restart_work(session, tiered));
 
     /* Create the object: entry in the metadata. */
     if (need_object) {
