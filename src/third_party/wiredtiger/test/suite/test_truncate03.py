@@ -96,8 +96,12 @@ class test_truncate_address_deleted(wttest.WiredTigerTestCase):
         # Create the object on disk.
         ds = self.address_deleted()
 
-        # That's all just verify that worked.
-        self.session.verify(self.uri)
+        # That's all just verify that worked; eviction can re-dirty the cache and cause verify to
+        # fail, checkpoint until verify succeeds.
+        while True:
+            if not self.raisesBusy(lambda: self.session.verify(self.uri)):
+                break
+            self.session.checkpoint()
 
     # Test object creation, recovery, and conversion of address-deleted cells
     # into free pages, but instead of verifying the final object, instantiate
