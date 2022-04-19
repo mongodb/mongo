@@ -106,6 +106,11 @@ function isNetworkError(errorOrResponse) {
  *     representing an error
  */
 function isRetryableError(errorOrResponse) {
+    // Network errors are retryable
+    if (isNetworkError(errorOrResponse)) {
+        return true;
+    }
+
     // First check if this is a command response, if so determine retryability by error code
     if (errorOrResponse.code) {
         if (ErrorCodes.isRetriableError(errorOrResponse.code)) {

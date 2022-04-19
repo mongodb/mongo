@@ -11,13 +11,24 @@ load("jstests/libs/transactions_util.js");
 
 // Save references to the original methods in the IIFE's scope.
 // This scoping allows the original methods to be called by the overrides below.
-let originalRunCommand = Mongo.prototype.runCommand;
-let originalMarkNodeAsFailed = Mongo.prototype._markNodeAsFailed;
+const originalRunCommand = Mongo.prototype.runCommand;
+const originalMarkNodeAsFailed = Mongo.prototype._markNodeAsFailed;
 
-const denylistedDbNames = ["config", "admin", "local"];
+function getRoutingConnection(conn) {
+    if (conn._conn == null) {
+        conn._conn = conn;
+    }
 
+    return conn._conn;
+}
+
+function setRoutingConnection(conn, mongo) {
+    conn._conn = mongo;
+}
+
+const kDenylistedDbNames = new Set(["config", "admin", "local"]);
 function isDenylistedDb(dbName) {
-    return denylistedDbNames.includes(dbName);
+    return kDenylistedDbNames.has(dbName);
 }
 
 /**
@@ -329,31 +340,30 @@ function removeSuccessfulOpIndexesExceptForUpserted(resObj, indexMap, ordered) {
  * Returns the state document for the outgoing tenant migration for TestData.tenantId. Asserts
  * that there is only one such migration.
  */
-Mongo.prototype.getTenantMigrationStateDoc = function() {
+function getTenantMigrationStateDoc(conn) {
     const findRes = assert.commandWorked(originalRunCommand.apply(
-        this,
+        conn,
         ["config", {find: "tenantMigrationDonors", filter: {tenantId: TestData.tenantId}}, 0]));
     const docs = findRes.cursor.firstBatch;
     // There should only be one active migration at any given time.
     assert.eq(docs.length, 1, tojson(docs));
     return docs[0];
-};
+}
 
 /**
  * Marks the outgoing migration for TestData.tenantId as having caused the shell to reroute
  * commands by inserting a document for it into the testTenantMigration.rerouted collection.
  */
-Mongo.prototype.recordRerouteDueToTenantMigration = function() {
-    assert.neq(null, this.migrationStateDoc);
-    assert.neq(null, this.reroutingMongo);
+function recordRerouteDueToTenantMigration(conn, migrationStateDoc) {
+    assert.neq(null, conn._conn);
 
     while (true) {
         try {
-            const res = originalRunCommand.apply(this, [
+            const res = originalRunCommand.apply(conn, [
                 "testTenantMigration",
                 {
                     insert: "rerouted",
-                    documents: [{_id: this.migrationStateDoc._id}],
+                    documents: [{_id: migrationStateDoc._id}],
                     writeConcern: {w: "majority"}
                 },
                 0
@@ -361,8 +371,7 @@ Mongo.prototype.recordRerouteDueToTenantMigration = function() {
 
             if (res.ok) {
                 break;
-            } else if (ErrorCodes.isNetworkError(res.code) ||
-                       ErrorCodes.isNotPrimaryError(res.code)) {
+            } else if (isRetryableError(res)) {
                 jsTest.log(
                     "Failed to write to testTenantMigration.rerouted due to a retryable error " +
                     tojson(res));
@@ -376,8 +385,7 @@ Mongo.prototype.recordRerouteDueToTenantMigration = function() {
             // these exceptions for specific network error messages.
             // TODO SERVER-54026: Remove check for network error messages once the shell reliably
             // returns error codes.
-            if (ErrorCodes.isNetworkError(e.code) || ErrorCodes.isNotPrimaryError(e.code) ||
-                isNetworkError(e)) {
+            if (isRetryableError(e)) {
                 jsTest.log(
                     "Failed to write to testTenantMigration.rerouted due to a retryable error exception " +
                     tojson(e));
@@ -386,7 +394,7 @@ Mongo.prototype.recordRerouteDueToTenantMigration = function() {
             throw e;
         }
     }
-};
+}
 
 /**
  * Keeps executing 'cmdObjWithTenantId' by running 'originalRunCommandFunc' if 'this.reroutingMongo'
@@ -395,12 +403,8 @@ Mongo.prototype.recordRerouteDueToTenantMigration = function() {
  * with TenantMigrationCommitted, sets 'this.reroutingMongo' to the mongo connection to the
  * recipient for the migration. 'dbNameWithTenantId' is only used for logging.
  */
-Mongo.prototype.runCommandRetryOnTenantMigrationErrors = function(
-    dbNameWithTenantId, cmdObjWithTenantId, originalRunCommandFunc, reroutingRunCommandFunc) {
-    if (this.reroutingMongo) {
-        return reroutingRunCommandFunc();
-    }
-
+function runCommandRetryOnTenantMigrationErrors(
+    conn, dbNameWithTenantId, cmdObjWithTenantId, options) {
     let numAttempts = 0;
 
     // Keep track of the write operations that were applied.
@@ -432,13 +436,8 @@ Mongo.prototype.runCommandRetryOnTenantMigrationErrors = function(
 
     while (true) {
         numAttempts++;
-        let resObj;
-        if (this.reroutingMongo) {
-            this.recordRerouteDueToTenantMigration();
-            resObj = reroutingRunCommandFunc();
-        } else {
-            resObj = originalRunCommandFunc();
-        }
+        let resObj = originalRunCommand.apply(getRoutingConnection(conn),
+                                              [dbNameWithTenantId, cmdObjWithTenantId, options]);
 
         const migrationCommittedErr =
             extractTenantMigrationError(resObj, ErrorCodes.TenantMigrationCommitted);
@@ -528,28 +527,32 @@ Mongo.prototype.runCommandRetryOnTenantMigrationErrors = function(
                 jsTestLog(`Got TenantMigrationCommitted for command against database ${
                     dbNameWithTenantId} after trying ${numAttempts} times: ${tojson(resObj)}`);
                 // Store the connection to the recipient so the next commands can be rerouted.
-                this.migrationStateDoc = this.getTenantMigrationStateDoc();
-                this.reroutingMongo =
-                    connect(this.migrationStateDoc.recipientConnectionString).getMongo();
+                const donorConnection = getRoutingConnection(conn);
+                const migrationStateDoc = getTenantMigrationStateDoc(donorConnection);
+                setRoutingConnection(
+                    conn, connect(migrationStateDoc.recipientConnectionString).getMongo());
 
                 // After getting a TenantMigrationCommitted error, wait for the python test fixture
                 // to do a dbhash check on the donor and recipient primaries before we retry the
                 // command on the recipient.
                 if (!TestData.skipTenantMigrationDBHash) {
                     assert.soon(() => {
-                        let findRes = assert.commandWorked(originalRunCommand.apply(this, [
-                            "testTenantMigration",
-                            {
-                                find: "dbhashCheck",
-                                filter: {_id: this.migrationStateDoc._id},
-                            },
-                            0
-                        ]));
+                        let findRes =
+                            assert.commandWorked(originalRunCommand.apply(donorConnection, [
+                                "testTenantMigration",
+                                {
+                                    find: "dbhashCheck",
+                                    filter: {_id: migrationStateDoc._id},
+                                },
+                                0
+                            ]));
 
                         const docs = findRes.cursor.firstBatch;
                         return docs[0] != null;
                     });
                 }
+
+                recordRerouteDueToTenantMigration(donorConnection, migrationStateDoc);
             } else if (migrationAbortedErr) {
                 jsTestLog(`Got TenantMigrationAborted for command against database ${
                               dbNameWithTenantId} after trying ${numAttempts} times: ` +
@@ -584,7 +587,7 @@ Mongo.prototype.runCommandRetryOnTenantMigrationErrors = function(
             return resObj;
         }
     }
-};
+}
 
 Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
     const dbNameWithTenantId = prependTenantIdToDbNameIfApplicable(dbName);
@@ -595,11 +598,8 @@ Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
     let cmdObjWithTenantId =
         originalCmdObjContainsTenantId ? cmdObj : createCmdObjWithTenantId(cmdObj);
 
-    let resObj = this.runCommandRetryOnTenantMigrationErrors(
-        dbNameWithTenantId,
-        cmdObjWithTenantId,
-        () => originalRunCommand.apply(this, [dbNameWithTenantId, cmdObjWithTenantId, options]),
-        () => this.reroutingMongo.runCommand(dbNameWithTenantId, cmdObjWithTenantId, options));
+    let resObj = runCommandRetryOnTenantMigrationErrors(
+        this, dbNameWithTenantId, cmdObjWithTenantId, options);
 
     if (!originalCmdObjContainsTenantId) {
         // Remove TestData.tenantId from all database names and namespaces in the resObj since tests
@@ -607,14 +607,11 @@ Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
         removeTenantId(resObj);
     }
 
-    Mongo.prototype._markNodeAsFailed = function(hostName, errorCode, errorReason) {
-        if (this.reroutingMongo)
-            originalMarkNodeAsFailed.apply(this.reroutingMongo, [hostName, errorCode, errorReason]);
-        else
-            originalMarkNodeAsFailed.apply(this, [hostName, errorCode, errorReason]);
-    };
-
     return resObj;
+};
+
+Mongo.prototype._markNodeAsFailed = function() {
+    return originalMarkNodeAsFailed.apply(getRoutingConnection(this), arguments);
 };
 
 OverrideHelpers.prependOverrideInParallelShell(
