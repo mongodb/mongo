@@ -121,6 +121,9 @@ public:
      */
     virtual Status setup() = 0;
 
+    /** Allows a `TransportLayer` to contribute to a stats summary (e.g. `serverStatus`). */
+    virtual void appendStats(BSONObjBuilder* bob) const {}
+
     enum WhichReactor { kIngress, kEgress, kNewReactor };
     virtual ReactorHandle getReactor(WhichReactor which) = 0;
 

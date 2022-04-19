@@ -44,6 +44,7 @@
 #include "mongo/config.h"
 
 #include "mongo/base/system_error.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
@@ -1228,6 +1229,11 @@ Status TransportLayerASIO::setup() {
     return Status::OK();
 }
 
+void TransportLayerASIO::appendStats(BSONObjBuilder* bob) const {
+    if (gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCV())
+        bob->append("listenerProcessingTime", _listenerProcessingTime.load().toBSON());
+}
+
 void TransportLayerASIO::_runListener() noexcept {
     setThreadName("listener");
 
@@ -1360,6 +1366,7 @@ ReactorHandle TransportLayerASIO::getReactor(WhichReactor which) {
 void TransportLayerASIO::_acceptConnection(GenericAcceptor& acceptor) {
     auto acceptCb = [this, &acceptor](const std::error_code& ec,
                                       ASIOSession::GenericSocket peerSocket) mutable {
+        Timer timer;
         transportLayerASIOhangBeforeAccept.pauseWhileSet();
 
         if (auto lk = stdx::lock_guard(_mutex); _isShutdown) {
@@ -1415,6 +1422,9 @@ void TransportLayerASIO::_acceptConnection(GenericAcceptor& acceptor) {
                           "error"_attr = e);
         }
 
+        // _acceptConnection() is accessed by only one thread (i.e. the listener thread), so an
+        // atomic increment is not required here
+        _listenerProcessingTime.store(_listenerProcessingTime.load() + timer.elapsed());
         _acceptConnection(acceptor);
     };
 

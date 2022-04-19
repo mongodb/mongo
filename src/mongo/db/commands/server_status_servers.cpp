@@ -86,10 +86,10 @@ public:
         networkCounter.append(b);
         appendMessageCompressionStats(&b);
 
+        auto svcCtx = opCtx->getServiceContext();
         {
             BSONObjBuilder section = b.subobjStart("serviceExecutors");
 
-            auto svcCtx = opCtx->getServiceContext();
             if (auto executor = transport::ServiceExecutorSynchronous::get(svcCtx)) {
                 executor->appendStats(&section);
             }
@@ -102,6 +102,8 @@ public:
                 executor->appendStats(&section);
             }
         }
+        if (auto tl = svcCtx->getTransportLayer())
+            tl->appendStats(&b);
 
         return b.obj();
     }

@@ -113,6 +113,10 @@ Status TransportLayerManager::setup() {
     return Status::OK();
 }
 
+void TransportLayerManager::appendStats(BSONObjBuilder* bob) const {
+    _foreach([&](const TransportLayer* tl) { tl->appendStats(bob); });
+}
+
 Status TransportLayerManager::addAndStartTransportLayer(std::unique_ptr<TransportLayer> tl) {
     auto ptr = tl.get();
     {

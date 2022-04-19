@@ -191,6 +191,8 @@ public:
 
     void shutdown() final;
 
+    void appendStats(BSONObjBuilder* bob) const override;
+
     int listenerPort() const {
         return _listenerPort;
     }
@@ -297,6 +299,10 @@ private:
     bool _isShutdown = false;
 
     const std::unique_ptr<TimerService> _timerService;
+
+    // Tracks the cumulative time the listener spends between accepting incoming connections to
+    // handing them off to dedicated connection threads.
+    AtomicWord<Microseconds> _listenerProcessingTime;
 };
 
 }  // namespace transport
