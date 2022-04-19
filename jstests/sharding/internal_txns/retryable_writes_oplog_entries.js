@@ -2,7 +2,11 @@
  * Tests that the stmtIds for write statements in an internal transaction for retryable writes
  * are stored in the individual operation entries in the applyOps oplog entry for the transaction.
  *
- * @tags: [requires_fcv_60, uses_transactions]
+ * Exclude this test from large_txn variants because the variant enforces that the max transaction
+ * oplog entry length is 2 operations, and the oplog length assertions in this test do not account
+ * for this. We are not losing test coverage as this test inherently tests large transactionss.
+ *
+ * @tags: [requires_fcv_60, uses_transactions, exclude_from_large_txns]
  */
 (function() {
 'use strict';
