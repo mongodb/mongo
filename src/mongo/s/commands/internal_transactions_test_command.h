@@ -116,8 +116,14 @@ public:
                             // commands.
                             uassertStatusOK(getStatusFromWriteCommandReply(res));
                         }
-                        // TODO SERVER-65048: Check if result has retriedStmtId & retriedStmtIds
-                        // field, exit.
+
+                        // Exit if we are reexecuting commands in a retryable write, identified by a
+                        // populated retriedStmtId. eoo() is false if field is found.
+                        const auto isRetryStmt = !(res.getField("retriedStmtIds").eoo() &&
+                                                   res.getField("retriedStmtId").eoo());
+                        if (isRetryStmt) {
+                            break;
+                        }
                     }
                     return SemiFuture<void>::makeReady();
                 });
