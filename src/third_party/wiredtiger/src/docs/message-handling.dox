@@ -41,7 +41,7 @@ By default, all the messages going through the WT_EVENT_HANDLER are generated as
 example below shows a message following the flat string format:
 
 @code
-[1637732238:116292][11175:0x123456789012], test_salvage.test_salvage.test_salvage_api(column-fix), file:test_salvage.a.wt, WT_SESSION.salvage: [WT_VERB_SALVAGE_PROGRESS][INFO]: WT_SESSION.salvage
+[1637732238:116292][11175:0x123456789012], test_salvage01.test_salvage.test_salvage_api(column-fix), file:test_salvage.a.wt, WT_SESSION.salvage: [WT_VERB_SALVAGE_PROGRESS][INFO]: WT_SESSION.salvage
 @endcode
 
 @subsection message_handling_output_json JSON format
@@ -92,7 +92,7 @@ as shown in the example below:
     "category_id":31,
     "msg":"WT_SESSION.salvage"
     "session_dhandle_name":"file:test_salvage.a.wt",
-    "session_err_prefix":"test_salvage.test_salvage.test_salvage_api(column-fix)",
+    "session_err_prefix":"test_salvage01.test_salvage.test_salvage_api(column-fix)",
     "session_name":"WT_SESSION.salvage",
     "thread":"22604:0x123456789012",
     "ts_sec":1637730626,

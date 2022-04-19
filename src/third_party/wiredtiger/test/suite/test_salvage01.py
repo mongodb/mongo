@@ -31,14 +31,14 @@ from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
 from wtscenario import make_scenarios
 
-# test_salvage.py
+# test_salvage01.py
 #    Utilities: wt salvage
 
 # Note that this class is reused by test_encrypt07; be sure to test any changes with
 # that version as well.
 
 class test_salvage(wttest.WiredTigerTestCase, suite_subprocess):
-    tablename = 'test_salvage.a'
+    tablename = 'test_salvage01.a'
     nentries = 1000
 
     format_values = [
