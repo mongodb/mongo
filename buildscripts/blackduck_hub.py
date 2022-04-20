@@ -287,7 +287,9 @@ class VersionInfo:
             self.production_version = True
 
             # Abseil has an empty string for one version
-            if self.ver_str == "":
+            # Abseil thinks "~" is character to use in versions
+            # Geary thinks "+" is character to use in versions
+            if self.ver_str == "" or "~" in self.ver_str or "+" in self.ver_str:
                 self.production_version = False
                 return
 
@@ -570,7 +572,7 @@ curl --retry 5 -s -L https://detect.synopsys.com/detect.sh  | bash -s -- --black
 """.encode())
         fp.flush()
 
-        subprocess.call(["/bin/sh", fp.name])
+        subprocess.check_call(["/bin/sh", fp.name])
 
 
 def _scan_cmd_args(args):
