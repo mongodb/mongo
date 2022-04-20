@@ -105,11 +105,18 @@ private:
     // This node represents a view namespace if and only if 'children' is nonempty and 'collator' is
     // set.
     struct Node {
+        Node() = default;
+        Node(const Node& other)
+            : ns(other.ns), children(other.children), parents(other.parents), size(other.size) {
+            if (other.collator) {
+                collator = CollatorInterface::cloneCollator(other.collator.get());
+            }
+        }
+
         /**
          * Returns true if this node represents a view.
          */
         bool isView() const {
-            invariant(children.empty() == !static_cast<bool>(collator));
             return !children.empty();
         }
 
@@ -124,10 +131,10 @@ private:
         // Represents the views that depend on this namespace.
         stdx::unordered_set<uint64_t> parents;
 
-        // When set, this is an unowned pointer to the view's collation, or nullptr if the view has
-        // the binary collation. When not set, this namespace is not a view and we don't care about
-        // its collator.
-        boost::optional<const CollatorInterface*> collator;
+        // When set to nullptr, the view either has the binary collation or this namespace is not a
+        // view and we don't care about its collator. Verify if view with isView. ViewGraph owns the
+        // collator in order to keep pointer alive after insertion.
+        std::unique_ptr<const CollatorInterface> collator;
 
         // The size of this view's "pipeline", in bytes.
         int size = 0;

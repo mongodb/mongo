@@ -93,6 +93,11 @@ public:
     Status reload(OperationContext* opCtx);
 
     /**
+     * Inserts the view into the view map.
+     */
+    Status insert(OperationContext* opCtx, const BSONObj& view);
+
+    /**
      * Returns Status::OK if each view namespace in 'refs' has the same default collation as
      * 'view'. Otherwise, returns ErrorCodes::OptionNotSupportedOnView.
      */
@@ -103,11 +108,17 @@ public:
     /**
      * Parses the view definition pipeline, attempts to upsert into the view graph, and
      * refreshes the graph if necessary. Returns an error status if the resulting graph
-     * would be invalid.
+     * would be invalid. needsValidation can be set to false if the view already exists in the
+     * durable view catalog and skips checking that the resulting dependency graph is acyclic and
+     * within the maximum depth.
      */
     Status upsertIntoGraph(OperationContext* opCtx,
                            const ViewDefinition& viewDef,
-                           const PipelineValidatorFn&);
+                           const PipelineValidatorFn&,
+                           bool needsValidation);
+
+private:
+    Status _insert(OperationContext* opCtx, const BSONObj& view);
 };
 
 }  // namespace mongo
