@@ -47,7 +47,12 @@ const actualCount = newTop.totals[foreignColl.getFullName()].commands.count -
 // because when executing $lookup in the classic engine, we will add one entry to top for the
 // foreign collection for each document in the local collection (of which there are three).
 let expectedCount = 0;
-if (checkSBEEnabled(db, ["featureFlagSBELookupPushdown"])) {
+const getFeatureFlagSBELookupPushdown =
+    db.adminCommand({getParameter: 1, featureFlagSBELookupPushdown: 1});
+const isSBELookupPushdownEnabled =
+    getFeatureFlagSBELookupPushdown.hasOwnProperty("featureFlagSBELookupPushdown") &&
+    getFeatureFlagSBELookupPushdown["featureFlagSBELookupPushdown"]["value"];
+if (isSBELookupPushdownEnabled) {
     expectedCount++;
 }
 const eqLookupNodes = getAggPlanStages(localColl.explain().aggregate(pipeline), "EQ_LOOKUP");
