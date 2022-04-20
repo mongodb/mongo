@@ -56,45 +56,45 @@ runMoveChunkMakeDonorStepDownAfterFailpoint(
     dbName,
     "hangInPersistMigrateAbortDecisionThenSimulateErrorUninterruptible",
     true /* shouldMakeMigrationFailToCommitOnConfig */,
-    ErrorCodes.StaleEpoch);
+    [ErrorCodes.OperationFailed, ErrorCodes.StaleEpoch]);
 
 runMoveChunkMakeDonorStepDownAfterFailpoint(
     st,
     dbName,
     "hangInDeleteRangeDeletionLocallyThenSimulateErrorUninterruptible",
     true /* shouldMakeMigrationFailToCommitOnConfig */,
-    ErrorCodes.StaleEpoch);
+    [ErrorCodes.OperationFailed, ErrorCodes.StaleEpoch]);
 
 runMoveChunkMakeDonorStepDownAfterFailpoint(
     st,
     dbName,
     "hangInReadyRangeDeletionOnRecipientThenSimulateErrorUninterruptible",
     true /* shouldMakeMigrationFailToCommitOnConfig */,
-    ErrorCodes.StaleEpoch);
+    [ErrorCodes.OperationFailed, ErrorCodes.StaleEpoch]);
 
 runMoveChunkMakeDonorStepDownAfterFailpoint(st,
                                             dbName,
                                             "hangInAdvanceTxnNumThenSimulateErrorUninterruptible",
                                             true /* shouldMakeMigrationFailToCommitOnConfig */,
-                                            ErrorCodes.StaleEpoch);
+                                            [ErrorCodes.OperationFailed, ErrorCodes.StaleEpoch]);
 
 runMoveChunkMakeDonorStepDownAfterFailpoint(st,
                                             dbName,
                                             "hangBeforeMakingAbortDecisionDurable",
                                             true /* shouldMakeMigrationFailToCommitOnConfig */,
-                                            ErrorCodes.StaleEpoch);
+                                            [ErrorCodes.OperationFailed, ErrorCodes.StaleEpoch]);
 
 runMoveChunkMakeDonorStepDownAfterFailpoint(st,
                                             dbName,
                                             "hangBeforeSendingAbortDecision",
                                             true /* shouldMakeMigrationFailToCommitOnConfig */,
-                                            ErrorCodes.StaleEpoch);
+                                            [ErrorCodes.OperationFailed, ErrorCodes.StaleEpoch]);
 
 runMoveChunkMakeDonorStepDownAfterFailpoint(st,
                                             dbName,
                                             "hangBeforeForgettingMigrationAfterAbortDecision",
                                             true /* shouldMakeMigrationFailToCommitOnConfig */,
-                                            ErrorCodes.StaleEpoch);
+                                            [ErrorCodes.OperationFailed, ErrorCodes.StaleEpoch]);
 
 st.stop();
 })();
