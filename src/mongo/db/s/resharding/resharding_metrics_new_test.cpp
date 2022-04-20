@@ -161,6 +161,7 @@ TEST_F(ReshardingMetricsTest, RestoresFromReshardingApplierProgressDocument) {
     progressDoc.setInsertsApplied(123);
     progressDoc.setUpdatesApplied(456);
     progressDoc.setDeletesApplied(789);
+    progressDoc.setWritesToStashCollections(800);
 
     auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kRecipient);
     metrics->accumulateFrom(progressDoc);
@@ -169,6 +170,7 @@ TEST_F(ReshardingMetricsTest, RestoresFromReshardingApplierProgressDocument) {
     ASSERT_EQ(report.getIntField("insertsApplied"), 123);
     ASSERT_EQ(report.getIntField("updatesApplied"), 456);
     ASSERT_EQ(report.getIntField("deletesApplied"), 789);
+    ASSERT_EQ(report.getIntField("countWritesToStashCollections"), 800);
 }
 
 }  // namespace

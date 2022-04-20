@@ -243,6 +243,9 @@ void ReshardingOplogApplier::_clearAppliedOpsAndStoreProgress(OperationContext* 
         builder.append("$set",
                        BSON(ReshardingOplogApplierProgress::kDeletesAppliedFieldName
                             << _env->applierMetrics()->getDeletesApplied()));
+        builder.append("$set",
+                       BSON(ReshardingOplogApplierProgress::kWritesToStashCollectionsFieldName
+                            << _env->applierMetrics()->getWritesToStashCollections()));
     }
 
     store.upsert(

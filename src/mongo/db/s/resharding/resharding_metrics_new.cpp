@@ -142,7 +142,8 @@ void ReshardingMetricsNew::accumulateFrom(const ReshardingOplogApplierProgress& 
 
     accumulateValues(progressDoc.getInsertsApplied(),
                      progressDoc.getUpdatesApplied(),
-                     progressDoc.getDeletesApplied());
+                     progressDoc.getDeletesApplied(),
+                     progressDoc.getWritesToStashCollections());
 }
 
 }  // namespace mongo

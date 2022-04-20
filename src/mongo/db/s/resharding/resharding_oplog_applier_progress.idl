@@ -77,3 +77,9 @@ structs:
                 description: >-
                     The total number of delete type oplog entries that have been applied by this
                     ReshardingOplogApplier.
+            writesToStashCollections:
+                type: safeInt64
+                default: 0
+                description: >-
+                    The total number of insert/update/delete to stash collections (including writes
+                    that resulted in no-op).

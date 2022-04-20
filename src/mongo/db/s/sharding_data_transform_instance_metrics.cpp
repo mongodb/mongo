@@ -320,10 +320,12 @@ void ShardingDataTransformInstanceMetrics::onReadDuringCriticalSection() {
 
 void ShardingDataTransformInstanceMetrics::accumulateValues(int64_t insertsApplied,
                                                             int64_t updatesApplied,
-                                                            int64_t deletesApplied) {
+                                                            int64_t deletesApplied,
+                                                            int64_t writesToStashCollections) {
     _insertsApplied.fetchAndAdd(insertsApplied);
     _updatesApplied.fetchAndAdd(updatesApplied);
     _deletesApplied.fetchAndAdd(deletesApplied);
+    _writesToStashCollections.fetchAndAdd(writesToStashCollections);
 }
 
 }  // namespace mongo

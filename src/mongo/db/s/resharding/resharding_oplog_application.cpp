@@ -272,7 +272,7 @@ void ReshardingOplogApplicationRules::_applyInsert_inlock(OperationContext* opCt
         invariant(ur.numMatched != 0);
 
         if (ShardingDataTransformMetrics::isEnabled()) {
-            _applierMetrics->onWriteToStashedCollections();
+            _applierMetrics->onWriteToStashCollections();
         }
 
         return;
@@ -317,7 +317,7 @@ void ReshardingOplogApplicationRules::_applyInsert_inlock(OperationContext* opCt
         opCtx, InsertStatement(oField), nullptr /* nullOpDebug */, false /* fromMigrate */));
 
     if (ShardingDataTransformMetrics::isEnabled()) {
-        _applierMetrics->onWriteToStashedCollections();
+        _applierMetrics->onWriteToStashCollections();
     }
 }
 
@@ -373,7 +373,7 @@ void ReshardingOplogApplicationRules::_applyUpdate_inlock(OperationContext* opCt
         invariant(ur.numMatched != 0);
 
         if (ShardingDataTransformMetrics::isEnabled()) {
-            _applierMetrics->onWriteToStashedCollections();
+            _applierMetrics->onWriteToStashCollections();
         }
 
         return;
@@ -451,7 +451,7 @@ void ReshardingOplogApplicationRules::_applyDelete_inlock(OperationContext* opCt
         invariant(nDeleted != 0);
 
         if (ShardingDataTransformMetrics::isEnabled()) {
-            _applierMetrics->onWriteToStashedCollections();
+            _applierMetrics->onWriteToStashCollections();
         }
 
         return;
@@ -539,7 +539,7 @@ void ReshardingOplogApplicationRules::_applyDelete_inlock(OperationContext* opCt
             auto state = exec->getNext(&res, nullptr);
 
             if (ShardingDataTransformMetrics::isEnabled()) {
-                _applierMetrics->onWriteToStashedCollections();
+                _applierMetrics->onWriteToStashCollections();
             }
 
             if (PlanExecutor::ADVANCED == state) {

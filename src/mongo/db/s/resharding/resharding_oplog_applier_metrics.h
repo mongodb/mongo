@@ -46,12 +46,13 @@ public:
     void onUpdateApplied();
     void onDeleteApplied();
     void onOplogEntriesApplied(int64_t numEntries);
-    void onWriteToStashedCollections();
+    void onWriteToStashCollections();
 
     int64_t getInsertsApplied() const;
     int64_t getUpdatesApplied() const;
     int64_t getDeletesApplied() const;
     int64_t getOplogEntriesApplied() const;
+    int64_t getWritesToStashCollections() const;
 
 private:
     ReshardingMetricsNew* _metricsNew;
@@ -59,6 +60,7 @@ private:
     int64_t _updatesApplied{0};
     int64_t _deletesApplied{0};
     int64_t _oplogEntriesApplied{0};
+    int64_t _writesToStashCollections{0};
 };
 
 }  // namespace mongo

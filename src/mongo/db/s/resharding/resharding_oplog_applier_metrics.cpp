@@ -40,6 +40,7 @@ ReshardingOplogApplierMetrics::ReshardingOplogApplierMetrics(
         _insertsApplied = progressDoc->getInsertsApplied();
         _updatesApplied = progressDoc->getUpdatesApplied();
         _deletesApplied = progressDoc->getDeletesApplied();
+        _writesToStashCollections = progressDoc->getWritesToStashCollections();
     }
 }
 
@@ -63,7 +64,8 @@ void ReshardingOplogApplierMetrics::onOplogEntriesApplied(int64_t numEntries) {
     _metricsNew->onOplogEntriesApplied(numEntries);
 }
 
-void ReshardingOplogApplierMetrics::onWriteToStashedCollections() {
+void ReshardingOplogApplierMetrics::onWriteToStashCollections() {
+    _writesToStashCollections++;
     _metricsNew->onWriteToStashedCollections();
 }
 
@@ -81,6 +83,10 @@ int64_t ReshardingOplogApplierMetrics::getDeletesApplied() const {
 
 int64_t ReshardingOplogApplierMetrics::getOplogEntriesApplied() const {
     return _oplogEntriesApplied;
+}
+
+int64_t ReshardingOplogApplierMetrics::getWritesToStashCollections() const {
+    return _writesToStashCollections;
 }
 
 }  // namespace mongo

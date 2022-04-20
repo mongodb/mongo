@@ -94,7 +94,10 @@ protected:
     virtual std::string createOperationDescription() const noexcept;
     virtual StringData getStateString() const noexcept;
 
-    void accumulateValues(int64_t insertsApplied, int64_t updatesApplied, int64_t deletesApplied);
+    void accumulateValues(int64_t insertsApplied,
+                          int64_t updatesApplied,
+                          int64_t deletesApplied,
+                          int64_t writesToStashCollections);
 
     const UUID _instanceId;
     const BSONObj _originalCommand;
