@@ -245,6 +245,11 @@ public:
         _explain = explain;
     }
 
+    OperationContext* getOpCtx() const {
+        tassert(6508300, "'CanonicalQuery' does not have an 'ExpressionContext'", _expCtx);
+        return _expCtx->opCtx;
+    }
+
     auto& getExpCtx() const {
         return _expCtx;
     }

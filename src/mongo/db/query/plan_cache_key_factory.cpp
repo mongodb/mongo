@@ -94,14 +94,52 @@ PlanCacheKey make(const CanonicalQuery& query,
     return {makePlanCacheKeyInfo(query, collection)};
 }
 
+namespace {
+/**
+ * Returns the highest index commit timestamp associated with an index on 'collection' that is
+ * visible to this operation.
+ */
+boost::optional<Timestamp> computeNewestVisibleIndexTimestamp(OperationContext* opCtx,
+                                                              const CollectionPtr& collection) {
+    auto recoveryUnit = opCtx->recoveryUnit();
+    auto mySnapshot = recoveryUnit->getPointInTimeReadTimestamp(opCtx).get_value_or(
+        recoveryUnit->getCatalogConflictingTimestamp());
+    if (mySnapshot.isNull()) {
+        return boost::none;
+    }
+
+    Timestamp currentNewestVisible = Timestamp::min();
+
+    std::unique_ptr<IndexCatalog::IndexIterator> ii =
+        collection->getIndexCatalog()->getIndexIterator(opCtx, /*includeUnfinishedIndexes*/ true);
+    while (ii->more()) {
+        const IndexCatalogEntry* ice = ii->next();
+        auto minVisibleSnapshot = ice->getMinimumVisibleSnapshot();
+        if (!minVisibleSnapshot) {
+            continue;
+        }
+
+        if (mySnapshot < *minVisibleSnapshot) {
+            continue;
+        }
+
+        currentNewestVisible = std::max(currentNewestVisible, *minVisibleSnapshot);
+    }
+
+    return currentNewestVisible.isNull() ? boost::optional<Timestamp>{} : currentNewestVisible;
+}
+}  // namespace
+
 sbe::PlanCacheKey make(const CanonicalQuery& query,
                        const CollectionPtr& collection,
                        PlanCacheKeyTag<sbe::PlanCacheKey>) {
+    OperationContext* opCtx = query.getOpCtx();
     auto collectionVersion = CollectionQueryInfo::get(collection).getPlanCacheInvalidatorVersion();
 
     return {makePlanCacheKeyInfo(query, collection),
             collection->uuid(),
             collectionVersion,
+            computeNewestVisibleIndexTimestamp(opCtx, collection),
             collection.isSharded()};
 }
 }  // namespace plan_cache_detail
