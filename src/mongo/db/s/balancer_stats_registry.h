@@ -89,9 +89,10 @@ private:
     void onStepUpComplete(OperationContext* opCtx, long long term) override final;
     void onStepDown() override final;
 
-    void _initialize(OperationContext* opCtx);
-
     void _loadOrphansCount(OperationContext* opCtx);
+    bool _isInitialized() const {
+        return _state.load() == State::kInitialized;
+    }
 
     struct CollectionStats {
         // Number of orphan documents for this collection
@@ -100,9 +101,17 @@ private:
         long long numRangeDeletionTasks;
     };
 
-    // The registry could be only initialized when this node is replicaset primary.
-    // If the registry is not initialized this node could be either primary or secondary.
-    AtomicWord<bool> _isInitialized{false};
+    enum class State {
+        kPrimaryIdle,  // The node is primary but the registry is not initialzed
+        kInitializing,
+        kInitialized,
+        kTerminating,
+        kSecondary,
+    };
+
+    mutable Mutex _stateMutex = MONGO_MAKE_LATCH("BalancerStatsRegistry::_stateMutex");
+    AtomicWord<State> _state{State::kSecondary};
+    ServiceContext::UniqueOperationContext _initOpCtxHolder;
 
     mutable Mutex _mutex = MONGO_MAKE_LATCH("BalancerStatsRegistry::_mutex");
     // Map containing all the currently cached collection stats
