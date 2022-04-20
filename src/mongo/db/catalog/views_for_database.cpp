@@ -61,47 +61,8 @@ std::shared_ptr<const ViewDefinition> ViewsForDatabase::lookup(const NamespaceSt
 }
 
 Status ViewsForDatabase::reload(OperationContext* opCtx) {
-    auto reloadCallback = [&](const BSONObj& view) -> Status {
-        BSONObj collationSpec = view.hasField("collation") ? view["collation"].Obj() : BSONObj();
-        auto collator = parseCollator(opCtx, collationSpec);
-        if (!collator.isOK()) {
-            return collator.getStatus();
-        }
-
-        NamespaceString viewName(view["_id"].str());
-
-        auto pipeline = view["pipeline"].Obj();
-        for (auto&& stage : pipeline) {
-            if (BSONType::Object != stage.type()) {
-                return Status(ErrorCodes::InvalidViewDefinition,
-                              str::stream() << "View 'pipeline' entries must be objects, but "
-                                            << viewName.toString()
-                                            << " has a pipeline element of type " << stage.type());
-            }
-        }
-
-        auto viewDef = std::make_shared<ViewDefinition>(viewName.db(),
-                                                        viewName.coll(),
-                                                        view["viewOn"].str(),
-                                                        pipeline,
-                                                        std::move(collator.getValue()));
-
-        if (!viewName.isOnInternalDb() && !viewName.isSystem()) {
-            if (viewDef->timeseries()) {
-                stats.userTimeseries += 1;
-            } else {
-                stats.userViews += 1;
-            }
-        } else {
-            stats.internal += 1;
-        }
-
-        viewMap[viewName.ns()] = std::move(viewDef);
-        return Status::OK();
-    };
-
     try {
-        durable->iterate(opCtx, reloadCallback);
+        durable->iterate(opCtx, [&](const BSONObj& view) { return _insert(opCtx, view); });
     } catch (const DBException& ex) {
         auto status = ex.toStatus();
         LOGV2(22547,
@@ -110,9 +71,60 @@ Status ViewsForDatabase::reload(OperationContext* opCtx) {
               "error"_attr = status);
         return status;
     }
-
     valid = true;
+    return Status::OK();
+}
 
+
+Status ViewsForDatabase::insert(OperationContext* opCtx, const BSONObj& view) {
+    auto status = _insert(opCtx, view);
+    if (!status.isOK()) {
+        LOGV2(5387000,
+              "Could not insert view",
+              "db"_attr = durable->getName(),
+              "error"_attr = status);
+        return status;
+    }
+    valid = true;
+    return Status::OK();
+};
+
+Status ViewsForDatabase::_insert(OperationContext* opCtx, const BSONObj& view) {
+    BSONObj collationSpec = view.hasField("collation") ? view["collation"].Obj() : BSONObj();
+    auto collator = parseCollator(opCtx, collationSpec);
+    if (!collator.isOK()) {
+        return collator.getStatus();
+    }
+
+    NamespaceString viewName(view["_id"].str());
+
+    auto pipeline = view["pipeline"].Obj();
+    for (auto&& stage : pipeline) {
+        if (BSONType::Object != stage.type()) {
+            return Status(ErrorCodes::InvalidViewDefinition,
+                          str::stream() << "View 'pipeline' entries must be objects, but "
+                                        << viewName.toString() << " has a pipeline element of type "
+                                        << stage.type());
+        }
+    }
+
+    auto viewDef = std::make_shared<ViewDefinition>(viewName.db(),
+                                                    viewName.coll(),
+                                                    view["viewOn"].str(),
+                                                    pipeline,
+                                                    std::move(collator.getValue()));
+
+    if (!viewName.isOnInternalDb() && !viewName.isSystem()) {
+        if (viewDef->timeseries()) {
+            stats.userTimeseries += 1;
+        } else {
+            stats.userViews += 1;
+        }
+    } else {
+        stats.internal += 1;
+    }
+
+    viewMap[viewName.ns()] = std::move(viewDef);
     return Status::OK();
 }
 
@@ -135,7 +147,8 @@ Status ViewsForDatabase::validateCollation(OperationContext* opCtx,
 
 Status ViewsForDatabase::upsertIntoGraph(OperationContext* opCtx,
                                          const ViewDefinition& viewDef,
-                                         const PipelineValidatorFn& validatePipeline) {
+                                         const PipelineValidatorFn& validatePipeline,
+                                         const bool needsValidation) {
     // Performs the insert into the graph.
     auto doInsert = [this, opCtx, &validatePipeline](const ViewDefinition& viewDef,
                                                      bool needsValidation) -> Status {
@@ -190,7 +203,7 @@ Status ViewsForDatabase::upsertIntoGraph(OperationContext* opCtx,
     // is simply a no-op.
     viewGraph.remove(viewDef.name());
 
-    return doInsert(viewDef, true);
+    return doInsert(viewDef, needsValidation);
 }
 
 }  // namespace mongo

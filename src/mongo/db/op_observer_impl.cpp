@@ -611,7 +611,15 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
     if (nss.coll() == "system.js") {
         Scope::storedFuncMod(opCtx);
     } else if (nss.coll() == DurableViewCatalog::viewsCollectionName()) {
-        DurableViewCatalog::onExternalChange(opCtx, nss);
+        try {
+            for (auto it = first; it != last; it++) {
+                uassertStatusOK(DurableViewCatalog::onExternalInsert(opCtx, it->doc, nss));
+            }
+        } catch (const DBException&) {
+            // If a previous operation left the view catalog in an invalid state, our inserts can
+            // fail even if all the definitions are valid. Reloading may help us reset the state.
+            DurableViewCatalog::onExternalChange(opCtx, nss);
+        }
     } else if (nss == NamespaceString::kSessionTransactionsTableNamespace && !lastOpTime.isNull()) {
         for (auto it = first; it != last; it++) {
             MongoDSessionCatalog::observeDirectWriteToConfigTransactions(opCtx, it->doc);

@@ -68,6 +68,14 @@ public:
     static void onExternalChange(OperationContext* opCtx, const NamespaceString& name);
 
     /**
+     * Thread-safe method to insert into the in-memory view catalog when there is an insert to
+     * 'system.views'.
+     */
+    static Status onExternalInsert(OperationContext* opCtx,
+                                   const BSONObj& doc,
+                                   const NamespaceString& name);
+
+    /**
      * Thread-safe method to clear the in-memory state of the view catalog when the 'system.views'
      * collection is dropped.
      */

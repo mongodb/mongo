@@ -126,10 +126,9 @@ void ViewGraph::insertWithoutValidating(const ViewDefinition& view,
     // pointers for its children.
     Node* node = &(_graph[nodeId]);
     invariant(node->children.empty());
-    invariant(!static_cast<bool>(node->collator));
 
     node->size = pipelineSize;
-    node->collator = view.defaultCollator();
+    node->collator = CollatorInterface::cloneCollator(view.defaultCollator());
 
     for (const NamespaceString& childNss : refs) {
         uint64_t childId = _getNodeId(childNss);
@@ -165,7 +164,7 @@ void ViewGraph::remove(const NamespaceString& viewNss) {
     // This node no longer represents a view, so its children must be cleared and its collator
     // unset.
     node->children.clear();
-    node->collator = boost::none;
+    node->collator = nullptr;
 
     // Only remove node if there are no remaining references to this node.
     if (node->parents.size() == 0) {

@@ -154,7 +154,8 @@ public:
                       const NamespaceString& viewOn,
                       const BSONArray& pipeline,
                       const BSONObj& collation,
-                      const ViewsForDatabase::PipelineValidatorFn& pipelineValidator) const;
+                      const ViewsForDatabase::PipelineValidatorFn& pipelineValidator,
+                      bool updateDurableViewCatalog = true) const;
 
     /**
      * Drop the view named 'viewName'.
@@ -539,6 +540,19 @@ private:
      */
     void _replaceViewsForDatabase(StringData dbName, ViewsForDatabase&& views);
 
+    enum class ViewUpsertMode {
+        // Insert all data for that view into the view map, view graph, and durable view catalog.
+        kCreateView,
+
+        // Insert into the view map and view graph without reinserting the view into the durable
+        // view catalog. Skip view graph validation.
+        kAlreadyDurableView,
+
+        // Reload the view map, insert into the view graph (flagging it as needing refresh), and
+        // update the durable view catalog.
+        kUpdateView,
+    };
+
     /**
      * Helper to take care of shared functionality for 'createView(...)' and 'modifyView(...)'.
      */
@@ -548,7 +562,8 @@ private:
                                const BSONArray& pipeline,
                                const ViewsForDatabase::PipelineValidatorFn& pipelineValidator,
                                std::unique_ptr<CollatorInterface> collator,
-                               ViewsForDatabase&& viewsForDb) const;
+                               ViewsForDatabase&& viewsForDb,
+                               ViewUpsertMode mode) const;
 
     /**
      * Returns true if this CollectionCatalog instance is part of an ongoing batched catalog write.

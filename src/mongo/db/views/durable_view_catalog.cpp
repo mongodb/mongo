@@ -47,12 +47,60 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/tenant_database_name.h"
+#include "mongo/db/views/view_catalog_helpers.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
+
+namespace {
+void validateViewDefinitionBSON(OperationContext* opCtx,
+                                const BSONObj& viewDefinition,
+                                StringData dbName) {
+    bool valid = true;
+
+    for (const BSONElement& e : viewDefinition) {
+        std::string name(e.fieldName());
+        valid &= name == "_id" || name == "viewOn" || name == "pipeline" || name == "collation" ||
+            name == "timeseries";
+    }
+
+    const auto viewName = viewDefinition["_id"].str();
+    const auto viewNameIsValid = NamespaceString::validCollectionComponent(viewName) &&
+        NamespaceString::validDBName(nsToDatabaseSubstring(viewName));
+    valid &= viewNameIsValid;
+
+    // Only perform validation via NamespaceString if the collection name has been determined to
+    // be valid. If not valid then the NamespaceString constructor will uassert.
+    if (viewNameIsValid) {
+        NamespaceString viewNss(viewName);
+        valid &= viewNss.isValid() && viewNss.db() == dbName;
+    }
+
+    valid &= NamespaceString::validCollectionName(viewDefinition["viewOn"].str());
+
+    const bool hasPipeline = viewDefinition.hasField("pipeline");
+    valid &= hasPipeline;
+    if (hasPipeline) {
+        valid &= viewDefinition["pipeline"].type() == mongo::Array;
+    }
+
+    valid &= (!viewDefinition.hasField("collation") ||
+              viewDefinition["collation"].type() == BSONType::Object);
+
+    valid &= !viewDefinition.hasField("timeseries") ||
+        viewDefinition["timeseries"].type() == BSONType::Object;
+
+    uassert(ErrorCodes::InvalidViewDefinition,
+            str::stream() << "found invalid view definition " << viewDefinition["_id"]
+                          << " while reading '"
+                          << NamespaceString(dbName, NamespaceString::kSystemDotViewsCollectionName)
+                          << "'",
+            valid);
+}
+}  // namespace
 
 // DurableViewCatalog
 
@@ -66,6 +114,33 @@ void DurableViewCatalog::onExternalChange(OperationContext* opCtx, const Namespa
     // invalid view definitions are removed.
     auto catalog = CollectionCatalog::get(opCtx);
     catalog->reloadViews(opCtx, name.db()).ignore();
+}
+
+Status DurableViewCatalog::onExternalInsert(OperationContext* opCtx,
+                                            const BSONObj& doc,
+                                            const NamespaceString& name) {
+    try {
+        validateViewDefinitionBSON(opCtx, doc, name.toString());
+    } catch (const DBException& e) {
+        return e.toStatus();
+    }
+
+    auto catalog = CollectionCatalog::get(opCtx);
+    NamespaceString viewName(doc.getStringField("_id"));
+    NamespaceString viewOn(name.db(), doc.getStringField("viewOn"));
+    BSONArray pipeline(doc.getObjectField("pipeline"));
+    BSONObj collation(doc.getObjectField("collation"));
+    // Set updateDurableViewCatalog to false because the view has already been inserted into the
+    // durable view catalog.
+    const bool updateDurableViewCatalog = false;
+
+    return catalog->createView(opCtx,
+                               viewName,
+                               viewOn,
+                               pipeline,
+                               collation,
+                               view_catalog_helpers::validatePipeline,
+                               updateDurableViewCatalog);
 }
 
 void DurableViewCatalog::onSystemViewsCollectionDrop(OperationContext* opCtx,
@@ -127,9 +202,9 @@ void DurableViewCatalogImpl::_iterate(OperationContext* opCtx,
         try {
             viewDefinition = _validateViewDefinition(opCtx, record->data);
             uassertStatusOK(callback(viewDefinition));
-        } catch (const ExceptionFor<ErrorCodes::InvalidViewDefinition>& ex) {
+        } catch (const ExceptionFor<ErrorCodes::InvalidViewDefinition>&) {
             if (lookupBehavior == ViewCatalogLookupBehavior::kValidateViews) {
-                throw ex;
+                throw;
             }
         }
     }
@@ -142,46 +217,9 @@ BSONObj DurableViewCatalogImpl::_validateViewDefinition(OperationContext* opCtx,
     // decimal data even if decimal is disabled.
     fassert(40224, validateBSON(recordData.data(), recordData.size()));
     BSONObj viewDefinition = recordData.toBson();
+    std::string dbName(_db->name().dbName());
 
-    bool valid = true;
-
-    for (const BSONElement& e : viewDefinition) {
-        std::string name(e.fieldName());
-        valid &= name == "_id" || name == "viewOn" || name == "pipeline" || name == "collation" ||
-            name == "timeseries";
-    }
-
-    const auto viewName = viewDefinition["_id"].str();
-    const auto viewNameIsValid = NamespaceString::validCollectionComponent(viewName) &&
-        NamespaceString::validDBName(nsToDatabaseSubstring(viewName));
-    valid &= viewNameIsValid;
-
-    // Only perform validation via NamespaceString if the collection name has been determined to
-    // be valid. If not valid then the NamespaceString constructor will uassert.
-    if (viewNameIsValid) {
-        NamespaceString viewNss(viewName);
-        valid &= viewNss.isValid() && viewNss.db() == _db->name().dbName();
-    }
-
-    valid &= NamespaceString::validCollectionName(viewDefinition["viewOn"].str());
-
-    const bool hasPipeline = viewDefinition.hasField("pipeline");
-    valid &= hasPipeline;
-    if (hasPipeline) {
-        valid &= viewDefinition["pipeline"].type() == mongo::Array;
-    }
-
-    valid &= (!viewDefinition.hasField("collation") ||
-              viewDefinition["collation"].type() == BSONType::Object);
-
-    valid &= !viewDefinition.hasField("timeseries") ||
-        viewDefinition["timeseries"].type() == BSONType::Object;
-
-    uassert(ErrorCodes::InvalidViewDefinition,
-            str::stream() << "found invalid view definition " << viewDefinition["_id"]
-                          << " while reading '" << _db->getSystemViewsName() << "'",
-            valid);
-
+    validateViewDefinitionBSON(opCtx, viewDefinition, dbName);
     return viewDefinition;
 }
 

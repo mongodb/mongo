@@ -17,6 +17,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/audit',
         '$BUILD_DIR/mongo/db/catalog/database_holder',
         '$BUILD_DIR/mongo/db/multitenancy',
+        '$BUILD_DIR/mongo/db/views/view_catalog_helpers',
     ],
 )
 
