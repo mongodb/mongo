@@ -84,6 +84,7 @@ public:
             auto compact = makeRequest(opCtx);
             if (!compact) {
                 // Nothing to do.
+                LOGV2(6548305, "Skipping compaction as there is no ECOC collection to compact");
                 return CompactStats({}, {}, {});
             }
 

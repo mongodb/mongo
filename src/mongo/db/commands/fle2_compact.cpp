@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWrite
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/commands/fle2_compact.h"
@@ -35,7 +37,14 @@
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/commands/fle2_compact_gen.h"
 #include "mongo/db/commands/server_status.h"
+#include "mongo/logv2/log.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/util/fail_point.h"
+
+MONGO_FAIL_POINT_DEFINE(fleCompactHangBeforeESCPlaceholderInsert);
+MONGO_FAIL_POINT_DEFINE(fleCompactHangAfterESCPlaceholderInsert);
+MONGO_FAIL_POINT_DEFINE(fleCompactHangBeforeECCPlaceholderInsert);
+MONGO_FAIL_POINT_DEFINE(fleCompactHangAfterECCPlaceholderInsert);
 
 namespace mongo {
 namespace {
@@ -213,10 +222,10 @@ ESCPreCompactState prepareESCForCompaction(FLEQueryInterface* queryImpl,
 
     auto alpha = ESCCollection::emuBinary(reader, tagToken, valueToken);
     if (alpha.has_value() && alpha.value() == 0) {
-        // no null doc & no entries yet for this field/value pair so nothing to compact.
-        // this can happen if a previous compact command deleted all ESC entries for this
+        // No null doc & no entries yet for this field/value pair so nothing to compact.
+        // This can happen if a previous compact command deleted all ESC entries for this
         // field/value pair, but failed before the renamed ECOC collection could be dropped.
-        // skip inserting the compaction placeholder.
+        // Skip inserting the compaction placeholder.
         return state;
     } else if (!alpha.has_value()) {
         // only the null doc exists
@@ -258,6 +267,11 @@ ESCPreCompactState prepareESCForCompaction(FLEQueryInterface* queryImpl,
     // Insert a placeholder at the next ESC position; this is deleted later in compact.
     // This serves to trigger a write conflict if another write transaction is
     // committed before the current compact transaction commits
+    if (MONGO_unlikely(fleCompactHangBeforeESCPlaceholderInsert.shouldFail())) {
+        LOGV2(6548301, "Hanging due to fleCompactHangBeforeESCPlaceholderInsert fail point");
+        fleCompactHangBeforeESCPlaceholderInsert.pauseWhileSet();
+    }
+
     auto placeholder = ESCCollection::generateCompactionPlaceholderDocument(
         tagToken, valueToken, state.pos, state.count);
     StmtId stmtId = kUninitializedStmtId;
@@ -266,6 +280,10 @@ ESCPreCompactState prepareESCForCompaction(FLEQueryInterface* queryImpl,
     checkWriteErrors(insertReply);
     stats.addInserts(1);
 
+    if (MONGO_unlikely(fleCompactHangAfterESCPlaceholderInsert.shouldFail())) {
+        LOGV2(6548302, "Hanging due to fleCompactHangAfterESCPlaceholderInsert fail point");
+        fleCompactHangAfterESCPlaceholderInsert.pauseWhileSet();
+    }
     return state;
 }
 
@@ -339,10 +357,20 @@ ECCPreCompactState prepareECCForCompaction(FLEQueryInterface* queryImpl,
         auto placeholder =
             ECCCollection::generateCompactionDocument(tagToken, valueToken, state.pos);
         StmtId stmtId = kUninitializedStmtId;
+
+        if (MONGO_unlikely(fleCompactHangBeforeECCPlaceholderInsert.shouldFail())) {
+            LOGV2(6548303, "Hanging due to fleCompactHangBeforeECCPlaceholderInsert fail point");
+            fleCompactHangBeforeECCPlaceholderInsert.pauseWhileSet();
+        }
         auto insertReply =
             uassertStatusOK(queryImpl->insertDocument(nssEcc, placeholder, &stmtId, true));
         checkWriteErrors(insertReply);
         stats.addInserts(1);
+
+        if (MONGO_unlikely(fleCompactHangAfterECCPlaceholderInsert.shouldFail())) {
+            LOGV2(6548304, "Hanging due to fleCompactHangAfterECCPlaceholderInsert fail point");
+            fleCompactHangAfterECCPlaceholderInsert.pauseWhileSet();
+        }
     } else {
         // adjust pos back to the last document found
         state.pos -= 1;

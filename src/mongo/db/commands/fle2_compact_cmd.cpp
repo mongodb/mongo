@@ -42,13 +42,22 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/create_gen.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
 namespace {
 
+/**
+ * Ensures that only one compactStructuredEncryptionData can run at a given time.
+ */
+Lock::ResourceMutex commandMutex("compactStructuredEncryptionDataCommandMutex");
+
 CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
                                                   const CompactStructuredEncryptionData& request) {
+
+    // Only allow one instance of compactStructuredEncryptionData to run at a time.
+    Lock::ExclusiveLock fleCompactCommandLock(opCtx->lockState(), commandMutex);
 
     const auto& edcNss = request.getNamespace();
 
@@ -99,23 +108,30 @@ CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
         renamed = true;
     }
 
-    // Step 2: create the ECOC collection if renamed or did not exist before the rename
-    if (!ecoc) {
-        uassertStatusOK(
-            createCollection(opCtx, namespaces.ecocNss, CreateCommand(namespaces.ecocNss)));
-    }
     if (!ecocRename && !renamed) {
         // no pre-existing renamed ECOC collection and the rename did not occur,
         // so there is nothing to compact
+        LOGV2(6548306, "Skipping compaction as there is no ECOC collection to compact");
         return CompactStats(ECOCStats(), ECStats(), ECStats());
     }
 
-    // Step 3: for each encrypted field in compactionTokens, get distinct set of entries 'C'
+    // Step 2: for each encrypted field in compactionTokens, get distinct set of entries 'C'
     // from ECOC, and for each entry in 'C', compact ESC and ECC.
-    CompactStats stats =
-        processFLECompact(opCtx, request, &getTransactionWithRetriesForMongoD, namespaces);
+    CompactStats stats;
+    {
+        // acquire IS lock on the ecocRenameNss to prevent it from being dropped during compact
+        AutoGetCollection tempEcocColl(opCtx, namespaces.ecocRenameNss, MODE_IS);
 
-    // Step 4: drop the renamed ECOC collection
+        uassert(ErrorCodes::NamespaceNotFound,
+                str::stream() << "Renamed encrypted compaction collection "
+                              << namespaces.ecocRenameNss
+                              << " no longer exists prior to compaction",
+                tempEcocColl.getCollection());
+
+        stats = processFLECompact(opCtx, request, &getTransactionWithRetriesForMongoD, namespaces);
+    }
+
+    // Step 3: drop the renamed ECOC collection
     DropReply dropReply;
     uassertStatusOK(
         dropCollection(opCtx,

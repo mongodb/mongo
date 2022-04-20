@@ -245,11 +245,12 @@ class EncryptedClient {
         checkMap[baseCollInfo.options.encryptedFields.escCollection] = true;
         checkMap[baseCollInfo.options.encryptedFields.eccCollection] = true;
         checkMap[baseCollInfo.options.encryptedFields.ecocCollection] = ecocExists;
+        checkMap[baseCollInfo.options.encryptedFields.ecocCollection + ".compact"] = false;
 
         const edb = this._edb;
         Object.keys(checkMap).forEach(function(coll) {
             const info = edb.getCollectionInfos({"name": coll});
-            const msg = coll + (checkMap[coll] ? " does not exit" : " exists") + " after compact";
+            const msg = coll + (checkMap[coll] ? " does not exist" : " exists") + " after compact";
             assert.eq(info.length, checkMap[coll], msg);
         });
     }
