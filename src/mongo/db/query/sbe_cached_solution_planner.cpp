@@ -174,8 +174,16 @@ CandidatePlans CachedSolutionPlanner::replan(bool shouldCache, std::string reaso
     if (shouldCache) {
         const auto& mainColl = _collections.getMainCollection();
         // Deactivate the current cache entry.
+        //
+        // TODO SERVER-64882: We currently deactivate cache entries in both the classic and SBE plan
+        // caches. Once we always use the SBE plan cache for queries eligible for SBE, this code can
+        // be simplified to only deactivate the entry in the SBE plan cache.
         auto cache = CollectionQueryInfo::get(mainColl).getPlanCache();
         cache->deactivate(plan_cache_key_factory::make<mongo::PlanCacheKey>(_cq, mainColl));
+        if (feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
+            auto&& sbePlanCache = sbe::getPlanCache(_opCtx);
+            sbePlanCache.deactivate(plan_cache_key_factory::make<sbe::PlanCacheKey>(_cq, mainColl));
+        }
     }
 
     auto buildExecutableTree = [&](const QuerySolution& sol) {
