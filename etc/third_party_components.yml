@@ -39,7 +39,7 @@
 
 components:
 
-  abseil/abseil-cpp:
+  abseil:
     homepage_url: https://abseil.io
     open_hub_url: N/A
     release_monitoring_id: 115295
@@ -249,9 +249,9 @@ components:
     is_test_only: true
     team_owner: "Wiredtiger"
 
-  python3-extras:
+  extras:
     homepage_url: https://github.com/testing-cabal/extras
-    open_hub_url: N/A
+    open_hub_url: https://www.openhub.net/p/550227
     release_monitoring_id: 13192
     local_directory_path: src/third_party/wiredtiger/test/3rdparty/extras-0.0.3
     is_test_only: true
