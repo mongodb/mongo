@@ -62,6 +62,7 @@ repl::OplogEntry makeOplogEntry(
     UUID uuid,
     BSONObj oField,
     OperationSessionInfo sessionInfo,
+    std::vector<StmtId> stmtIds,
     boost::optional<repl::OpTime> preImageOpTime = boost::none,
     boost::optional<repl::OpTime> postImageOpTime = boost::none,
     boost::optional<repl::RetryImageEnum> needsRetryImage = boost::none) {
@@ -79,7 +80,7 @@ repl::OplogEntry makeOplogEntry(
                                 sessionInfo,                      // sessionInfo
                                 boost::none,                      // upsert
                                 Date_t(),                         // wall clock time
-                                {1},                              // statement ids
+                                stmtIds,                          // statement ids
                                 boost::none,     // optime of previous write within same transaction
                                 preImageOpTime,  // pre-image optime
                                 postImageOpTime,    // post-image optime
@@ -125,6 +126,7 @@ TEST_F(FindAndModifyImageLookupTest, NoopWhenEntryDoesNotHaveNeedsRetryImageFiel
     OperationSessionInfo sessionInfo;
     sessionInfo.setSessionId(sessionId);
     sessionInfo.setTxnNumber(1);
+    const auto stmtId = 1;
     const auto opTime = repl::OpTime(Timestamp(2, 1), 1);
     const auto preImageOpTime = repl::OpTime(Timestamp(1, 1), 1);
     const auto oplogEntryBson = makeOplogEntry(opTime,
@@ -133,6 +135,7 @@ TEST_F(FindAndModifyImageLookupTest, NoopWhenEntryDoesNotHaveNeedsRetryImageFiel
                                                UUID::gen(),
                                                BSON("a" << 1),
                                                sessionInfo,
+                                               {stmtId},
                                                preImageOpTime)
                                     .getEntry()
                                     .toBSON();
@@ -158,6 +161,7 @@ TEST_F(FindAndModifyImageLookupTest, ShouldNotForgeImageEntryWhenImageDocMissing
     OperationSessionInfo sessionInfo;
     sessionInfo.setSessionId(sessionId);
     sessionInfo.setTxnNumber(1);
+    const auto stmtId = 1;
     const auto opTime = repl::OpTime(Timestamp(2, 1), 1);
     const auto oplogEntryBson = makeOplogEntry(opTime,
                                                repl::OpTypeEnum::kNoop,
@@ -165,6 +169,7 @@ TEST_F(FindAndModifyImageLookupTest, ShouldNotForgeImageEntryWhenImageDocMissing
                                                UUID::gen(),
                                                BSON("a" << 1),
                                                sessionInfo,
+                                               {stmtId},
                                                boost::none /* preImageOpTime */,
                                                boost::none /* postImageOpTime */,
                                                repl::RetryImageEnum::kPreImage)
@@ -193,6 +198,7 @@ TEST_F(FindAndModifyImageLookupTest, ShouldNotForgeImageEntryWhenImageDocHasDiff
     OperationSessionInfo sessionInfo;
     sessionInfo.setSessionId(sessionId);
     sessionInfo.setTxnNumber(1);
+    const auto stmtId = 1;
     const auto ts = Timestamp(2, 1);
     const auto opTime = repl::OpTime(ts, 1);
     const auto oplogEntryBson = makeOplogEntry(opTime,
@@ -201,6 +207,7 @@ TEST_F(FindAndModifyImageLookupTest, ShouldNotForgeImageEntryWhenImageDocHasDiff
                                                UUID::gen(),
                                                BSON("a" << 1),
                                                sessionInfo,
+                                               {stmtId},
                                                boost::none /* preImageOpTime */,
                                                boost::none /* postImageOpTime */,
                                                repl::RetryImageEnum::kPreImage)
@@ -242,6 +249,7 @@ TEST_F(FindAndModifyImageLookupTest, ShouldForgeImageEntryWhenMatchingImageDocIs
         auto imageLookup = DocumentSourceFindAndModifyImageLookup::create(getExpCtx());
         const auto sessionId = makeLogicalSessionIdForTest();
         const auto txnNum = 1LL;
+        const auto stmtId = 1;
         OperationSessionInfo sessionInfo;
         sessionInfo.setSessionId(sessionId);
         sessionInfo.setTxnNumber(txnNum);
@@ -257,6 +265,7 @@ TEST_F(FindAndModifyImageLookupTest, ShouldForgeImageEntryWhenMatchingImageDocIs
                                                    uuid,
                                                    BSON("a" << 1),
                                                    sessionInfo,
+                                                   {stmtId},
                                                    boost::none /* preImageOpTime */,
                                                    boost::none /* postImageOpTime */,
                                                    imageType)
@@ -288,7 +297,9 @@ TEST_F(FindAndModifyImageLookupTest, ShouldForgeImageEntryWhenMatchingImageDocIs
         ASSERT_EQUALS(txnNum, forgedImageEntry.getTxnNumber().get());
         ASSERT_EQUALS(sessionId, forgedImageEntry.getSessionId().get());
         ASSERT_EQUALS("n", repl::OpType_serializer(forgedImageEntry.getOpType()));
-        ASSERT_EQUALS(0LL, forgedImageEntry.getStatementIds().front());
+        const auto stmtIds = forgedImageEntry.getStatementIds();
+        ASSERT_EQUALS(1U, stmtIds.size());
+        ASSERT_EQUALS(stmtId, stmtIds.front());
         ASSERT_EQUALS(ts - 1, forgedImageEntry.getTimestamp());
         ASSERT_EQUALS(1, forgedImageEntry.getTerm().get());
 
@@ -327,6 +338,7 @@ TEST_F(FindAndModifyImageLookupTest, ShouldForgeImageEntryWhenMatchingImageDocIs
         OperationSessionInfo sessionInfo;
         sessionInfo.setSessionId(sessionId);
         sessionInfo.setTxnNumber(txnNum);
+        const auto stmtId = 1;
         const auto applyOpsTs = Timestamp(2, 1);
         const auto applyOpsOpTime = repl::OpTime(applyOpsTs, 1);
         const auto commitTxnTs = Timestamp(3, 1);
@@ -340,6 +352,7 @@ TEST_F(FindAndModifyImageLookupTest, ShouldForgeImageEntryWhenMatchingImageDocIs
             nss, uuid, BSON("_id" << 0 << "a" << 0), BSON("_id" << 0));
         auto updateOp = repl::MutableOplogEntry::makeUpdateOperation(
             nss, uuid, BSON("$set" << BSON("a" << 1)), BSON("_id" << 1));
+        updateOp.setStatementIds({{stmtId}});
         updateOp.setNeedsRetryImage(imageType);
         BSONObjBuilder applyOpsBuilder;
         applyOpsBuilder.append("applyOps", BSON_ARRAY(insertOp.toBSON() << updateOp.toBSON()));
@@ -348,7 +361,8 @@ TEST_F(FindAndModifyImageLookupTest, ShouldForgeImageEntryWhenMatchingImageDocIs
                                              {},
                                              UUID::gen(),
                                              applyOpsBuilder.obj(),
-                                             sessionInfo)
+                                             sessionInfo,
+                                             {})
                                   .getEntry()
                                   .toBSON()
                                   .addFields(BSON(commitTxnTsFieldName << commitTxnTs));
@@ -383,7 +397,9 @@ TEST_F(FindAndModifyImageLookupTest, ShouldForgeImageEntryWhenMatchingImageDocIs
         ASSERT_EQUALS(txnNum, forgedImageEntry.getTxnNumber().get());
         ASSERT_EQUALS(sessionId, forgedImageEntry.getSessionId().get());
         ASSERT_EQUALS("n", repl::OpType_serializer(forgedImageEntry.getOpType()));
-        ASSERT_EQUALS(0LL, forgedImageEntry.getStatementIds().front());
+        const auto stmtIds = forgedImageEntry.getStatementIds();
+        ASSERT_EQUALS(1U, stmtIds.size());
+        ASSERT_EQUALS(stmtId, stmtIds.front());
         ASSERT_EQUALS(applyOpsTs - 1, forgedImageEntry.getTimestamp());
         ASSERT_EQUALS(1, forgedImageEntry.getTerm().get());
 
@@ -400,6 +416,7 @@ TEST_F(FindAndModifyImageLookupTest, ShouldForgeImageEntryWhenMatchingImageDocIs
         auto applyOpsInfo = repl::ApplyOpsCommandInfo::parse(
             downConvertedOplogEntryBson.getObjectField(repl::OplogEntry::kObjectFieldName));
         auto operationDocs = applyOpsInfo.getOperations();
+        ASSERT_EQ(operationDocs.size(), 2U);
 
         ASSERT_BSONOBJ_EQ(operationDocs[0], insertOp.toBSON());
 
@@ -410,7 +427,10 @@ TEST_F(FindAndModifyImageLookupTest, ShouldForgeImageEntryWhenMatchingImageDocIs
             : repl::OplogEntry::kPostImageOpTimeFieldName;
         expectedUpdateOpBson = expectedUpdateOpBson.addFields(
             BSON(expectedImageOpTimeFieldName << forgedImageEntry.getOpTime()));
-        ASSERT_BSONOBJ_EQ(operationDocs[1], expectedUpdateOpBson);
+        ASSERT_EQ(operationDocs[1].getIntField("stmtId"),
+                  expectedUpdateOpBson.getIntField("stmtId"));
+        ASSERT_BSONOBJ_EQ(operationDocs[1].removeField("stmtId"),
+                          expectedUpdateOpBson.removeField("stmtId"));
 
         ASSERT_TRUE(imageLookup->getNext().isEOF());
         ASSERT_TRUE(imageLookup->getNext().isEOF());
