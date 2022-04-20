@@ -124,12 +124,12 @@ bool PathFusion::optimize(ABT& root) {
         _changed = false;
         algebra::transport<true>(root, *this);
 
-        if (!_changed) {
+        // If we have nodes in _redundant then continue iterating even if _changed is not set.
+        if (!_changed && _redundant.empty()) {
             break;
         }
 
         _env.rebuild(root);
-        _redundant.clear();
         _info.clear();
     }
 
@@ -294,7 +294,10 @@ void PathFusion::transport(ABT& n, const PathComposeM& path, ABT& p1, ABT& p2) {
         for (auto l : left) {
             if (l.is<PathObj>()) {
                 _redundant.emplace(l.cast<PathSyntaxSort>());
-                _changed = true;
+
+                // Specifically not setting _changed here. Since we are trying to erase a child we
+                // need to traverse the tree again on the next iteration of the optimize() loop (see
+                // conditions above which erase from _redundant).
             }
         }
         _info[&path] = p2InfoIt->second;

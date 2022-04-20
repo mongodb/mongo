@@ -484,6 +484,81 @@ TEST(Path, Fuse5) {
         tree);
 }
 
+TEST(Path, Fuse6) {
+    auto scanNode = make<ScanNode>("root", "test");
+
+    auto project = make<EvaluationNode>(
+        "x",
+        make<EvalPath>(
+            make<PathComposeM>(make<PathComposeM>(make<PathObj>(),
+                                                  make<PathKeep>(PathKeep::NameSet{"a", "b", "c"})),
+                               make<PathField>("a", make<PathConstant>(Constant::emptyObject()))),
+            make<Variable>("root")),
+        std::move(scanNode));
+
+    auto tree = make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"x"}},
+                               std::move(project));
+
+    ASSERT_EXPLAIN(
+        "Root []\n"
+        "  projections: \n"
+        "    x\n"
+        "  RefBlock: \n"
+        "    Variable [x]\n"
+        "  Evaluation []\n"
+        "    BindBlock:\n"
+        "      [x]\n"
+        "        EvalPath []\n"
+        "          PathComposeM []\n"
+        "            PathComposeM []\n"
+        "              PathObj []\n"
+        "              PathKeep [a, b, c]\n"
+        "            PathField [a]\n"
+        "              PathConstant []\n"
+        "                Const [{}]\n"
+        "          Variable [root]\n"
+        "    Scan [test]\n"
+        "      BindBlock:\n"
+        "        [root]\n"
+        "          Source []\n",
+        tree);
+
+    auto env = VariableEnvironment::build(tree);
+    bool changed = false;
+    do {
+        changed = false;
+        if (PathFusion{env}.optimize(tree)) {
+            changed = true;
+        }
+        if (ConstEval{env}.optimize(tree)) {
+            changed = true;
+        }
+    } while (changed);
+
+    // PathObj is removed.
+    ASSERT_EXPLAIN(
+        "Root []\n"
+        "  projections: \n"
+        "    x\n"
+        "  RefBlock: \n"
+        "    Variable [x]\n"
+        "  Evaluation []\n"
+        "    BindBlock:\n"
+        "      [x]\n"
+        "        EvalPath []\n"
+        "          PathComposeM []\n"
+        "            PathKeep [a, b, c]\n"
+        "            PathField [a]\n"
+        "              PathConstant []\n"
+        "                Const [{}]\n"
+        "          Variable [root]\n"
+        "    Scan [test]\n"
+        "      BindBlock:\n"
+        "        [root]\n"
+        "          Source []\n",
+        tree);
+}
+
 TEST(Path, Lower1) {
     PrefixId prefixId;
 
