@@ -21,7 +21,9 @@ load("jstests/libs/write_concern_util.js");
 load("jstests/libs/fail_point_util.js");
 
 var name = "interruptStepDown";
-var replSet = new ReplSetTest({name: name, nodes: 3});
+// Set the fassert timeout to shorter than the default to avoid having a long-running test.
+var replSet = new ReplSetTest(
+    {name: name, nodes: 3, nodeOptions: {setParameter: "fassertOnLockTimeoutForStepUpDown=5"}});
 var nodes = replSet.nodeList();
 replSet.startSet();
 replSet.initiate({
@@ -60,7 +62,7 @@ failPoint.wait();
 
 var stepDownCmd = function() {
     jsTestLog("Sending stepdown to primary");
-    db.getSiblingDB('admin').runCommand({replSetStepDown: 20, force: true});
+    db.getSiblingDB('admin').runCommand({replSetStepDown: 10, force: true});
 };
 var stepDowner = startParallelShell(stepDownCmd, primary.port);
 
