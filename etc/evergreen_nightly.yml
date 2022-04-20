@@ -2,6 +2,7 @@
 
 include:
 - filename: etc/evergreen_yml_components/definitions.yml
+- filename: etc/evergreen_yml_components/variants/task_generation.yml
 - filename: etc/evergreen_yml_components/variants/atlas.yml
 - filename: etc/evergreen_yml_components/variants/misc_release.yml
 ### Comment out when using this file for a LTS or Rapid release branch. ###

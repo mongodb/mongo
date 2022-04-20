@@ -31,7 +31,6 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - rhel81-power8-large
-  - name: build_variant_gen
   - name: .aggregation .common
   - name: audit
   - name: .auth !.multiversion !.jscore
@@ -88,7 +87,6 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - rhel72-zseries-build
-  - name: build_variant_gen
   - name: .aggregation .common
   - name: audit
   - name: .auth !.multiversion !.jscore
@@ -145,7 +143,6 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - rhel83-zseries-large
-  - name: build_variant_gen
   - name: .aggregation .common
   - name: audit
   - name: .auth !.multiversion !.jscore

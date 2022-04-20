@@ -2,5 +2,6 @@
 
 Documentation about how MongoDB is tested in Evergreen.
 
-* [Task Timeouts](task_timeouts.md)
 * [Configuration for Evergreen Integration](configuration.md)
+* [Task Timeouts](task_timeouts.md)
+* [Task Generation](task_generation.md)

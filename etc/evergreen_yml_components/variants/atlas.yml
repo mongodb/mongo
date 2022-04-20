@@ -31,7 +31,6 @@ buildvariants:
   - name: compile_build_tools_next_TG
     distros:
     - rhel70
-  - name: build_variant_gen
   #  - name: .aggfuzzer # Disabled for FCV 5.3
   - name: audit
   - name: auth_audit_gen

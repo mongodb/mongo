@@ -22,7 +22,6 @@ buildvariants:
     separate_debug: off
   tasks:
     - name: compile_test_and_package_serial_TG
-    - name: build_variant_gen
     #  - name: .aggfuzzer .common # Disabled for FCV 5.3
     - name: free_monitoring
     - name: .jstestfuzz !.initsync
@@ -54,7 +53,6 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
   - name: compile_benchmarks
-  - name: build_variant_gen
   - name: .aggregation
   - name: .auth
   - name: audit
@@ -128,7 +126,6 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
   - name: compile_benchmarks
-  - name: build_variant_gen
   - name: .aggregation
   - name: .auth
   - name: audit

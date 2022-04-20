@@ -54,6 +54,7 @@
 
 include:
 - filename: etc/evergreen_yml_components/definitions.yml
+- filename: etc/evergreen_yml_components/variants/task_generation.yml
 - filename: etc/evergreen_yml_components/variants/sanitizer.yml
 - filename: etc/evergreen_yml_components/variants/in_memory.yml
 
@@ -91,7 +92,6 @@ variables:
   - name: compile_test_and_package_serial_TG
     distros:
     - windows-vsCurrent-large
-  - name: build_variant_gen
   - name: burn_in_tests_gen
   #  - name: .aggfuzzer .common # Disabled for FCV 5.3
   - name: audit
@@ -148,7 +148,6 @@ variables:
   - name: compile_build_tools_next_TG
     distros:
     - rhel70
-  - name: build_variant_gen
   #  - name: .aggfuzzer # Disabled for FCV 5.3
   - name: audit
   - name: auth_audit_gen
@@ -238,7 +237,6 @@ buildvariants:
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel80-xlarge
-  - name: build_variant_gen
   - name: .aggregation !.encrypt
   - name: .auth !.audit !.multiversion
   - name: .batched_deletes
@@ -318,7 +316,6 @@ buildvariants:
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel80-xlarge
-  - name: build_variant_gen
   #  - name: .aggfuzzer .common # Disabled for FCV 5.3
   - name: aggregation
   - name: aggregation_auth
@@ -389,7 +386,6 @@ buildvariants:
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel80-xlarge
-  - name: build_variant_gen
   - name: test_api_version_compatibility
   #  - name: .aggfuzzer !.multiversion # Disabled for FCV 5.3
   - name: .aggregation !.multiversion
@@ -508,7 +504,6 @@ buildvariants:
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel80-large
-  - name: build_variant_gen
   # to reduce the overall size of the generated configuration, most of the
   # tasks we would normally include have been disabled. See revert of
   # SERVER-60832
@@ -683,7 +678,6 @@ buildvariants:
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel80-xlarge
-  - name: build_variant_gen
   #  - name: .aggfuzzer # Disabled for FCV 5.3
   - name: .aggregation
   - name: audit
@@ -846,7 +840,6 @@ buildvariants:
   - name: compile_build_tools_next_TG
     distros:
     - windows-vsCurrent-xlarge
-  - name: build_variant_gen
   - name: .aggregation !.auth !.encrypt
   - name: aggregation_expression_multiversion_fuzzer_gen
   - name: aggregation_expression_optimization_fuzzer_gen
@@ -925,7 +918,6 @@ buildvariants:
   - name: compile_build_tools_next_TG
     distros:
     - windows-vsCurrent-xlarge
-  - name: build_variant_gen
   - name: burn_in_tests_gen
   - name: audit
   - name: auth_audit_gen
@@ -998,7 +990,6 @@ buildvariants:
   - name: compile_build_tools_next_TG
     distros:
     - windows-vsCurrent-xlarge
-  - name: build_variant_gen
   - name: burn_in_tests_gen
   - name: audit
   - name: auth_audit_gen
@@ -1082,7 +1073,6 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - windows-vsCurrent-large
-  - name: build_variant_gen
   #  - name: .aggfuzzer # Disabled for FCV 5.3
   - name: .aggregation !.auth !.encrypt !.unwind
   - name: auth_gen
@@ -1160,7 +1150,6 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
   - name: compile_build_tools_next_TG
-  - name: build_variant_gen
   - name: aggregation
   - name: auth_gen
   - name: causally_consistent_jscore_txns_passthrough
@@ -1204,7 +1193,6 @@ buildvariants:
     num_scons_link_jobs_available: 0.99
   tasks:
   - name: compile_test_and_package_serial_TG
-  - name: build_variant_gen
   - name: audit
   - name: auth_audit_gen
   - name: causally_consistent_jscore_txns_passthrough
@@ -1233,7 +1221,6 @@ buildvariants:
     num_scons_link_jobs_available: 0.99
   tasks:
   - name: compile_test_and_package_serial_TG
-  - name: build_variant_gen
   - name: audit
   - name: auth_audit_gen
   - name: causally_consistent_jscore_txns_passthrough
@@ -1260,7 +1247,6 @@ buildvariants:
     num_scons_link_jobs_available: 0.99
   tasks:
   - name: compile_test_and_package_serial_TG
-  - name: build_variant_gen
   - name: audit
   - name: auth_audit_gen
   - name: causally_consistent_jscore_txns_passthrough
@@ -1376,7 +1362,6 @@ buildvariants:
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel80-xlarge
-  - name: build_variant_gen
   - name: .lint
   - name: lint_fuzzer_sanity_patch
   - name: test_api_version_compatibility
@@ -1544,7 +1529,6 @@ buildvariants:
   - name: libdeps_graph_linting_TG
     distros:
     - rhel80-large
-  - name: build_variant_gen
   - name: burn_in_tests_gen
   #  - name: .aggfuzzer # Disabled for FCV 5.3
   - name: .aggregation
@@ -1696,7 +1680,6 @@ buildvariants:
     - rhel80-xlarge
   - name: .updatefuzzer
   - name: audit
-  - name: build_variant_gen
   - name: burn_in_tags_gen
   - name: burn_in_tests_gen
   - name: check_feature_flag_tags
@@ -1786,7 +1769,6 @@ buildvariants:
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel80-large
-  - name: build_variant_gen
   - name: auth_gen
   - name: auth_audit_gen
   - name: causally_consistent_jscore_txns_passthrough
@@ -1869,7 +1851,6 @@ buildvariants:
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel80-xlarge
-  - name: build_variant_gen
   - name: .multiversion_fuzzer
   - name: .multiversion_passthrough
   - name: .random_multiversion_ds
@@ -1895,7 +1876,6 @@ buildvariants:
   # - name: compile_test_and_package_parallel_dbtest_stream_TG
   #   distros:
   #   - rhel80-xlarge
-  - name: build_variant_gen
   - name: .multiversion_fuzzer
   - name: .multiversion_passthrough
   - name: .random_multiversion_ds
@@ -1937,7 +1917,6 @@ buildvariants:
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel80-xlarge
-  - name: build_variant_gen
   - name: .multiversion !.future_git_tag_incompatible
   - name: .multiversion_future_git_tag
 
@@ -1996,7 +1975,6 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - rhel80-xlarge
-  - name: build_variant_gen
   #  - name: .aggfuzzer # Disabled for FCV 5.3
   - name: audit
   - name: auth_audit_gen
@@ -2060,7 +2038,6 @@ buildvariants:
   - name: compile_test_and_package_parallel_core_stream_TG
   - name: compile_test_and_package_parallel_unittest_stream_TG
   - name: compile_test_and_package_parallel_dbtest_stream_TG
-  - name: build_variant_gen
   - name: jsCore
   - name: noPassthroughHotBackups_gen
 
@@ -2089,7 +2066,6 @@ buildvariants:
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel70
-  - name: build_variant_gen
   #  - name: .aggfuzzer # Disabled for FCV 5.3
   - name: audit
   - name: auth_audit_gen
@@ -2131,7 +2107,6 @@ buildvariants:
   - name: compile_and_archive_dist_test_then_package_TG
     distros:
     - ubuntu1804-build
-  - name: build_variant_gen
   - name: jsCore
   - name: sharding_gen
   - name: replica_sets_gen
@@ -2216,7 +2191,6 @@ buildvariants:
   - name: compile_build_tools_next_TG
     distros:
     - rhel80-xlarge
-  - name: build_variant_gen
   - name: jsCore
   - name: .read_write_concern !.write !.aggregation
   - name: replica_sets_jscore_passthrough
@@ -2270,7 +2244,6 @@ buildvariants:
   - name: compile_test_and_package_parallel_unittest_stream_TG
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     # TODO (SERVER-58125): Re-enable the timeseries fuzzer for EFT
-  - name: build_variant_gen
   #  - name: .aggfuzzer .common !.timeseries # Disabled for FCV 5.3
   - name: aggregation
   - name: .auth !.multiversion !.audit !.sharding
@@ -2335,7 +2308,6 @@ buildvariants:
   - name: cqf_parallel
   - name: compile_and_archive_dist_test_then_package_TG
   - name: compile_benchmarks
-  - name: build_variant_gen
   - name: .aggregation
   #  - name: .auth
   - name: audit
@@ -2409,7 +2381,6 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
   - name: compile_benchmarks
-  - name: build_variant_gen
   - name: .aggregation
   - name: .auth
   - name: audit
@@ -2486,7 +2457,6 @@ buildvariants:
   - name: cqf_parallel
   - name: compile_and_archive_dist_test_then_package_TG
   - name: compile_benchmarks
-  - name: build_variant_gen
   - name: .aggregation
   - name: .auth
   - name: audit
@@ -2556,7 +2526,6 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
   - name: compile_benchmarks
-  - name: build_variant_gen
   - name: .aggregation
   - name: .auth
   - name: audit
@@ -2632,7 +2601,6 @@ buildvariants:
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel80-xlarge
-  - name: build_variant_gen
   - name: jsCore
   - name: jsCore_txns
   - name: unittest_shell_hang_analyzer_gen
@@ -2665,7 +2633,6 @@ buildvariants:
   - name: compile_test_and_package_parallel_core_stream_TG
     distros:
     - rhel80-xlarge
-  - name: build_variant_gen
   - name: jsCore
   - name: jsCore_txns
 # Disabling these tests as they are not aware of feature flags.
@@ -2779,7 +2746,6 @@ buildvariants:
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel80-build
-  - name: build_variant_gen
   - name: .aggregation !.no_async
   - name: .sharding .auth
   - name: .sharding .causally_consistent !.wo_snapshot
@@ -2821,7 +2787,6 @@ buildvariants:
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel80-build
-  - name: build_variant_gen
   - name: .aggregation !.no_async
   - name: .sharding .auth
   - name: .sharding .causally_consistent !.wo_snapshot
@@ -2859,7 +2824,6 @@ buildvariants:
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel80-build
-  - name: build_variant_gen
   - name: .aggregation !.no_async
   - name: .sharding .auth
   - name: .sharding .causally_consistent !.wo_snapshot
@@ -2898,7 +2862,6 @@ buildvariants:
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel80-build
-  - name: build_variant_gen
   - name: .aggregation !.no_async
   - name: .sharding .auth
   - name: .sharding .causally_consistent !.wo_snapshot
@@ -2937,7 +2900,6 @@ buildvariants:
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel80-build
-  - name: build_variant_gen
   - name: .aggregation !.no_async
   - name: .sharding .auth
   - name: .sharding .causally_consistent !.wo_snapshot
@@ -2976,7 +2938,6 @@ buildvariants:
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel80-build
-  - name: build_variant_gen
   - name: .aggregation !.no_async
   - name: .sharding .auth
   - name: .sharding .causally_consistent !.wo_snapshot
@@ -3007,7 +2968,6 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - rhel80-build
-  - name: build_variant_gen
   - name: .aggregation !.no_async
   - name: .sharding .auth
   - name: .sharding .causally_consistent !.wo_snapshot

@@ -99,7 +99,8 @@ variables:
 - &gen_task_template
   name: gen_task_template
   depends_on:
-  - name: build_variant_gen
+  - name: version_gen
+    variant: generate-tasks-for-version
   - name: archive_dist_test_debug
   commands:
   - func: "generate resmoke tasks"
@@ -164,7 +165,8 @@ variables:
   name: jstestfuzz_template
   exec_timeout_secs: 14400 # Time out the task if it runs for more than 4 hours.
   depends_on:
-  - build_variant_gen
+  - name: version_gen
+    variant: generate-tasks-for-version
   - archive_dist_test_debug
   commands:
   - func: "generate resmoke tasks"
@@ -973,11 +975,7 @@ functions:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
       bucket: mciuploads
-      # This expansion's name was shortened to reduce the overall size of
-      # the generated configuration file
-      # gtcl = gen_task_config_location
-      # gtcl expansion is a variable included in the call of the parent function.
-      remote_file: ${project}/${gtcl}
+      remote_file: ${project}/${revision}/generate_tasks/generated-config-${version_id}.tgz
       local_file: "generate_tasks_config.tgz"
 
   "extract generated test configuration": &extract_generated_test_configuration
@@ -1006,11 +1004,6 @@ functions:
       binary: bash
       args:
       - "./src/evergreen/selected_tests_generate.sh"
-  # this sets the gtcl expansion
-  - command: expansions.update
-    params:
-      ignore_missing_file: false
-      file: src/gtcl_update_expansions.yml
   - *f_expansions_write
   - command: archive.targz_pack
     params:
@@ -1023,7 +1016,7 @@ functions:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
       local_file: generate_tasks_config.tgz
-      remote_file: ${project}/${gtcl}
+      remote_file: ${project}/${revision}/generate_tasks/generated-config-${version_id}.tgz
       bucket: mciuploads
       permissions: public-read
       content_type: ${content_type|application/gzip}
@@ -1035,7 +1028,7 @@ functions:
       files:
       - src/generated_resmoke_config/*.json
 
-  "generate build variant":
+  "generate version":
   - *f_expansions_write
   - *configure_evergreen_api_credentials
   - command: subprocess.exec
@@ -1043,13 +1036,7 @@ functions:
     params:
       binary: bash
       args:
-      - "./src/evergreen/generate_build_variant.sh"
-  # this sets the gtcl expansion
-  - command: expansions.update
-    params:
-      ignore_missing_file: false
-      file: src/gtcl_update_expansions.yml
-  - *f_expansions_write
+      - "./src/evergreen/generate_version.sh"
   - command: archive.targz_pack
     params:
       target: generate_tasks_config.tgz
@@ -1061,7 +1048,7 @@ functions:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
       local_file: generate_tasks_config.tgz
-      remote_file: ${project}/${gtcl}
+      remote_file: ${project}/${revision}/generate_tasks/generated-config-${version_id}.tgz
       bucket: mciuploads
       permissions: public-read
       content_type: ${content_type|application/gzip}
@@ -4176,7 +4163,7 @@ tasks:
       repeat_tests_min: 2
       repeat_tests_max: 1000
 
-- name: build_variant_gen
+- name: version_gen
   commands:
   - command: manifest.load
   - *git_get_project
@@ -4186,7 +4173,7 @@ tasks:
   - *cleanup_environment
   - func: "set up venv"
   - func: "upload pip requirements"
-  - func: "generate build variant"
+  - func: "generate version"
 
 - name: selected_tests_gen
   tags: []
