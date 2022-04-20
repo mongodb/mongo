@@ -54,14 +54,6 @@ ThreadPool::Options makeDefaultThreadPoolOptions() {
     options.poolName = "BalancerStatsRegistry";
     options.minThreads = 0;
     options.maxThreads = 1;
-
-    // Ensure all threads have a client
-    options.onCreateThread = [](const std::string& threadName) {
-        Client::initThread(threadName.c_str());
-        stdx::lock_guard<Client> lk{cc()};
-        cc().setSystemOperationKillableByStepdown(lk);
-    };
-
     return options;
 }
 }  // namespace
@@ -84,6 +76,9 @@ void BalancerStatsRegistry::onStartup(OperationContext* opCtx) {
 }
 
 void BalancerStatsRegistry::onStepUpComplete(OperationContext* opCtx, long long term) {
+    dassert(_state.load() == State::kSecondary);
+    _state.store(State::kPrimaryIdle);
+
     if (!feature_flags::gOrphanTracking.isEnabled(serverGlobalParams.featureCompatibility)) {
         // If future flag is disabled do not initialize the registry
         return;
@@ -94,14 +89,28 @@ void BalancerStatsRegistry::onStepUpComplete(OperationContext* opCtx, long long 
 void BalancerStatsRegistry::initializeAsync(OperationContext* opCtx) {
     ExecutorFuture<void>(_threadPool)
         .then([this] {
-            // All threads in this pool
-            auto opCtxHolder{cc().makeOperationContext()};
-            opCtxHolder->setAlwaysInterruptAtStepDownOrUp();
-            auto opCtx{opCtxHolder.get()};
+            ThreadClient tc("BalancerStatsRegistry::asynchronousInitialization",
+                            getGlobalServiceContext());
 
-            if (!repl::ReplicationCoordinator::get(opCtx)->getMemberState().primary()) {
-                return;
+            {
+                stdx::lock_guard lk{_stateMutex};
+                if (const auto currentState = _state.load(); currentState != State::kPrimaryIdle) {
+                    LOGV2_DEBUG(6419631,
+                                2,
+                                "Abandoning BalancerStatsRegistry initialization",
+                                "currentState"_attr = currentState);
+                    return;
+                }
+                _state.store(State::kInitializing);
+                _initOpCtxHolder = tc->makeOperationContext();
             }
+
+            ON_BLOCK_EXIT([this] {
+                stdx::lock_guard lk{_stateMutex};
+                _initOpCtxHolder.reset();
+            });
+
+            auto opCtx{_initOpCtxHolder.get()};
 
             LOGV2_DEBUG(6419601, 2, "Initializing BalancerStatsRegistry");
             try {
@@ -111,8 +120,10 @@ void BalancerStatsRegistry::initializeAsync(OperationContext* opCtx) {
                 // Load current ophans count from disk
                 _loadOrphansCount(opCtx);
                 LOGV2_DEBUG(6419602, 2, "Completed BalancerStatsRegistry initialization");
+
                 // Start accepting updates to the cached orphan count
-                _isInitialized.store(true);
+                auto expectedState = State::kInitializing;
+                _state.compareAndSwap(&expectedState, State::kInitialized);
                 // Unlock the range deleter (~ScopedRangeDeleterLock)
             } catch (const DBException& ex) {
                 LOGV2_ERROR(6419600,
@@ -124,22 +135,37 @@ void BalancerStatsRegistry::initializeAsync(OperationContext* opCtx) {
 }
 
 void BalancerStatsRegistry::terminate() {
-    // Wait for the  asyncronous initialization to complete
+    {
+        stdx::lock_guard lk{_stateMutex};
+        _state.store(State::kTerminating);
+        if (_initOpCtxHolder) {
+            stdx::lock_guard<Client> lk(*_initOpCtxHolder->getClient());
+            _initOpCtxHolder->markKilled(ErrorCodes::Interrupted);
+        }
+    }
+
+    // Wait for the  asynchronous initialization to complete
     _threadPool->waitForIdle();
-    // Prevent future usages until next stepup
-    _isInitialized.store(false);
-    // Clear the stats
-    stdx::lock_guard lk{_mutex};
-    _collStatsMap.clear();
+
+    {
+        // Clear the stats
+        stdx::lock_guard lk{_mutex};
+        _collStatsMap.clear();
+    }
+
+    dassert(_state.load() == State::kTerminating);
+    _state.store(State::kPrimaryIdle);
     LOGV2_DEBUG(6419603, 2, "BalancerStatsRegistry terminated");
 }
 
 void BalancerStatsRegistry::onStepDown() {
+    // TODO SERVER-65817 inline the terminate() function
     terminate();
+    _state.store(State::kSecondary);
 }
 
 long long BalancerStatsRegistry::getCollNumOrphanDocs(const UUID& collectionUUID) const {
-    if (!_isInitialized.load())
+    if (!_isInitialized())
         uasserted(ErrorCodes::NotYetInitialized, "BalancerStatsRegistry is not initialized");
 
     stdx::lock_guard lk{_mutex};
@@ -152,7 +178,7 @@ long long BalancerStatsRegistry::getCollNumOrphanDocs(const UUID& collectionUUID
 
 void BalancerStatsRegistry::onRangeDeletionTaskInsertion(const UUID& collectionUUID,
                                                          long long numOrphanDocs) {
-    if (!_isInitialized.load())
+    if (!_isInitialized())
         return;
 
     stdx::lock_guard lk{_mutex};
@@ -163,7 +189,7 @@ void BalancerStatsRegistry::onRangeDeletionTaskInsertion(const UUID& collectionU
 
 void BalancerStatsRegistry::onRangeDeletionTaskDeletion(const UUID& collectionUUID,
                                                         long long numOrphanDocs) {
-    if (!_isInitialized.load())
+    if (!_isInitialized())
         return;
 
     stdx::lock_guard lk{_mutex};
@@ -193,7 +219,7 @@ void BalancerStatsRegistry::onRangeDeletionTaskDeletion(const UUID& collectionUU
 }
 
 void BalancerStatsRegistry::updateOrphansCount(const UUID& collectionUUID, long long delta) {
-    if (!_isInitialized.load() || delta == 0)
+    if (!_isInitialized() || delta == 0)
         return;
 
     stdx::lock_guard lk{_mutex};
