@@ -495,21 +495,16 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
 
     {
         char buf[(2 * 8 /*bytes in hex*/) + 1 /*nul terminator*/];
-        int ret = _conn->query_timestamp(_conn, buf, "get=oldest");
-        if (ret != WT_NOTFOUND) {
-            invariantWTOK(ret, nullptr);
-            std::uint64_t tmp;
-            fassert(5380107, NumberParser().base(16)(buf, &tmp));
+        invariantWTOK(_conn->query_timestamp(_conn, buf, "get=oldest"), nullptr);
+        std::uint64_t tmp;
+        fassert(5380107, NumberParser().base(16)(buf, &tmp));
 
-            if (tmp != 0) {
-                LOGV2_FOR_RECOVERY(5380106,
-                                   0,
-                                   "WiredTiger oldestTimestamp",
-                                   "oldestTimestamp"_attr = Timestamp(tmp));
-                // The oldest timestamp is set in WT. Only set the in-memory variable.
-                _oldestTimestamp.store(tmp);
-                setInitialDataTimestamp(Timestamp(tmp));
-            }
+        if (tmp != 0) {
+            LOGV2_FOR_RECOVERY(
+                5380106, 0, "WiredTiger oldestTimestamp", "oldestTimestamp"_attr = Timestamp(tmp));
+            // The oldest timestamp is set in WT. Only set the in-memory variable.
+            _oldestTimestamp.store(tmp);
+            setInitialDataTimestamp(Timestamp(tmp));
         }
     }
 
@@ -2186,14 +2181,7 @@ uint64_t _fetchAllDurableValue(WT_CONNECTION* conn) {
     // Fetch the latest all_durable value from the storage engine. This value will be a timestamp
     // that has no holes (uncommitted transactions with lower timestamps) behind it.
     char buf[(2 * 8 /*bytes in hex*/) + 1 /*nul terminator*/];
-    auto wtStatus = conn->query_timestamp(conn, buf, "get=all_durable");
-    if (wtStatus == WT_NOTFOUND) {
-        // Treat this as lowest possible timestamp; we need to see all preexisting data but no new
-        // (timestamped) data.
-        return StorageEngine::kMinimumTimestamp;
-    }
-
-    invariantWTOK(wtStatus, nullptr);
+    invariantWTOK(conn->query_timestamp(conn, buf, "get=all_durable"), nullptr);
 
     uint64_t tmp;
     fassert(38002, NumberParser().base(16)(buf, &tmp));

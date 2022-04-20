@@ -333,72 +333,63 @@ TEST_F(KVEngineTestHarness, AllDurableTimestamp) {
     std::unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create(getServiceContext()));
     KVEngine* engine = helper->getEngine();
 
-    return;
+    // TODO SERVER-65151: Remove after removing EFT.
+    if (engine->isEphemeral()) {
+        return;
+    }
 
+    std::string ns = "a.b";
     std::unique_ptr<RecordStore> rs;
     {
         auto opCtx = _makeOperationContext(engine);
-        WriteUnitOfWork uow(opCtx.get());
-        CollectionOptions options;
-        options.capped = true;
-        options.cappedSize = 10240;
-        options.cappedMaxDocs = -1;
-
-        NamespaceString oplogNss("local.oplog.rs");
-        ASSERT_OK(engine->createRecordStore(opCtx.get(), oplogNss, "ident", options));
-        rs = engine->getRecordStore(opCtx.get(), oplogNss, "ident", options);
+        ASSERT_OK(
+            engine->createRecordStore(opCtx.get(), NamespaceString(ns), ns, CollectionOptions()));
+        rs = engine->getRecordStore(opCtx.get(), NamespaceString(ns), ns, CollectionOptions());
         ASSERT(rs);
     }
+
     {
         auto opCtxs = _makeOperationContexts(engine, 2);
 
-        Timestamp t11(1, 1);
-        Timestamp t12(1, 2);
-        Timestamp t21(2, 1);
-
-        auto t11Doc = BSON("ts" << t11);
-        auto t12Doc = BSON("ts" << t12);
-        auto t21Doc = BSON("ts" << t21);
+        Timestamp t51(5, 1);
+        Timestamp t52(5, 2);
+        Timestamp t61(6, 1);
 
         Timestamp allDurable = engine->getAllDurableTimestamp();
+        ASSERT_EQ(allDurable, Timestamp(StorageEngine::kMinimumTimestamp));
+
         auto opCtx1 = opCtxs[0].second.get();
         WriteUnitOfWork uow1(opCtx1);
-        ASSERT_EQ(invariant(rs->insertRecord(
-                      opCtx1, t11Doc.objdata(), t11Doc.objsize(), Timestamp::min())),
-                  RecordId(1, 1));
+        ASSERT_OK(rs->insertRecord(opCtx1, "abc", 4, t51));
 
         Timestamp lastAllDurable = allDurable;
         allDurable = engine->getAllDurableTimestamp();
-        ASSERT_GTE(allDurable, lastAllDurable);
-        ASSERT_LT(allDurable, t11);
+        ASSERT_GT(allDurable, lastAllDurable);
+        ASSERT_EQ(allDurable, t51);
 
         auto opCtx2 = opCtxs[1].second.get();
         WriteUnitOfWork uow2(opCtx2);
-        ASSERT_EQ(invariant(rs->insertRecord(
-                      opCtx2, t21Doc.objdata(), t21Doc.objsize(), Timestamp::min())),
-                  RecordId(2, 1));
+        ASSERT_OK(rs->insertRecord(opCtx2, "abc", 4, t61));
         uow2.commit();
 
         lastAllDurable = allDurable;
         allDurable = engine->getAllDurableTimestamp();
-        ASSERT_GTE(allDurable, lastAllDurable);
-        ASSERT_LT(allDurable, t11);
+        ASSERT_EQ(allDurable, lastAllDurable);
+        ASSERT_EQ(allDurable, t51);
 
-        ASSERT_EQ(invariant(rs->insertRecord(
-                      opCtx1, t12Doc.objdata(), t12Doc.objsize(), Timestamp::min())),
-                  RecordId(1, 2));
+        ASSERT_OK(rs->insertRecord(opCtx1, "abc", 4, t52));
 
         lastAllDurable = allDurable;
         allDurable = engine->getAllDurableTimestamp();
-        ASSERT_GTE(allDurable, lastAllDurable);
-        ASSERT_LT(allDurable, t11);
+        ASSERT_EQ(allDurable, lastAllDurable);
+        ASSERT_EQ(allDurable, t51);
 
         uow1.commit();
 
         lastAllDurable = allDurable;
         allDurable = engine->getAllDurableTimestamp();
-        ASSERT_GTE(allDurable, lastAllDurable);
-        ASSERT_LTE(allDurable, t21);
+        ASSERT_GT(allDurable, lastAllDurable);
+        ASSERT_EQ(allDurable, t61);
     }
 }
 
