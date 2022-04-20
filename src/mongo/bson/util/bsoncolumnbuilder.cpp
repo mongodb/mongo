@@ -140,10 +140,6 @@ std::pair<BSONObj::iterator, bool> _traverseLockStep(const BSONObj& reference,
                 }
             }
         } else {
-            // Going from scalar to object is not allowed, this would compress inefficiently
-            if (it->type() == Object || it->type() == Array) {
-                return {it, false};
-            }
             // Non-object, call provided function with the two elements
             elemFunc(elem,
                      it != end && elem.fieldNameStringData() == it->fieldNameStringData()
@@ -360,10 +356,6 @@ std::pair<BSONObj::iterator, bool> _traverseLockStepLegacy(const BSONObj& refere
                 }
             }
         } else {
-            // Going from scalar to object is not allowed, this would compress inefficiently
-            if (it->type() == Object) {
-                return {it, false};
-            }
             // Non-object, call provided function with the two elements
             elemFunc(elem,
                      it != end && elem.fieldNameStringData() == it->fieldNameStringData()
