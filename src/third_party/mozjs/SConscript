@@ -90,10 +90,6 @@ else:
         ],
     )
 
-# Allow for using string formatting macros (e.g., 'PRIxPTR' defined in 'inttypes.h')
-if env.ToolchainIs('clang', 'GCC'):
-    env.Append(CCFLAGS=['-D__STDC_FORMAT_MACROS'])
-
 # js/src, js/public and mfbt are the only required sources right now, that
 # could change in the future
 #
