@@ -382,7 +382,7 @@ void checkRenamePreconditions(OperationContext* opCtx,
         // Check that the unsharded target collection doesn't exist
         auto collectionCatalog = CollectionCatalog::get(opCtx);
         auto targetColl = collectionCatalog->lookupCollectionByNamespace(opCtx, toNss);
-        uassert(5807601,
+        uassert(ErrorCodes::NamespaceExists,
                 str::stream() << "Target collection " << toNss.ns()
                               << " exists but dropTarget is not set",
                 !targetColl);
