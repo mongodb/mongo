@@ -26,6 +26,8 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#define FORMAT_PREPARE_TIMEOUT 120
+
 /*
  * read_op --
  *     Perform a read operation, waiting out prepare conflicts.
@@ -48,7 +50,7 @@ read_op(WT_CURSOR *cursor, read_operation op, int *exactp)
 
             /* Ignore clock reset. */
             __wt_seconds(NULL, &now);
-            testutil_assertfmt(now < start || now - start < 60,
+            testutil_assertfmt(now < start || now - start < FORMAT_PREPARE_TIMEOUT,
               "%s: timed out with prepare-conflict", "WT_CURSOR.next");
         }
         break;
@@ -58,7 +60,7 @@ read_op(WT_CURSOR *cursor, read_operation op, int *exactp)
 
             /* Ignore clock reset. */
             __wt_seconds(NULL, &now);
-            testutil_assertfmt(now < start || now - start < 60,
+            testutil_assertfmt(now < start || now - start < FORMAT_PREPARE_TIMEOUT,
               "%s: timed out with prepare-conflict", "WT_CURSOR.prev");
         }
         break;
@@ -68,7 +70,7 @@ read_op(WT_CURSOR *cursor, read_operation op, int *exactp)
 
             /* Ignore clock reset. */
             __wt_seconds(NULL, &now);
-            testutil_assertfmt(now < start || now - start < 60,
+            testutil_assertfmt(now < start || now - start < FORMAT_PREPARE_TIMEOUT,
               "%s: timed out with prepare-conflict", "WT_CURSOR.search");
         }
         break;
@@ -78,7 +80,7 @@ read_op(WT_CURSOR *cursor, read_operation op, int *exactp)
 
             /* Ignore clock reset. */
             __wt_seconds(NULL, &now);
-            testutil_assertfmt(now < start || now - start < 60,
+            testutil_assertfmt(now < start || now - start < FORMAT_PREPARE_TIMEOUT,
               "%s: timed out with prepare-conflict", "WT_CURSOR.search_near");
         }
         break;

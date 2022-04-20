@@ -64,6 +64,11 @@ class test_verbose_base(wttest.WiredTigerTestCase, suite_subprocess):
         else:
             self.assertEqual(len(verbose_messages), 0)
 
+        if len(output) >= self.nlines:
+            # If we've read the maximum number of characters, its likely that the last line is truncated ('...'). In this
+            # case, trim the last message as we can't parse it.
+            verbose_messages = verbose_messages[:-1]
+
         # Test the contents of each verbose message, ensuring it satisfies the expected pattern.
         verb_pattern = re.compile('|'.join(patterns))
         for line in verbose_messages:
