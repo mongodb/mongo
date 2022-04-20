@@ -269,7 +269,7 @@ public:
         // It is necessary to lock the client to change the Locker on the OperationContext.
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         invariant(!opCtx->lockState()->isLocked());
-        opCtx->swapLockState(std::make_unique<LockerImpl>(), lk);
+        opCtx->swapLockState(std::make_unique<LockerImpl>(opCtx->getServiceContext()), lk);
     }
 
     std::unique_ptr<PolymorphicScoped> scopedOperationCompletionShardingActions(

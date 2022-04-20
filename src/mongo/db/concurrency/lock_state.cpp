@@ -291,8 +291,11 @@ void CondVarLockGrantNotification::notify(ResourceId resId, LockResult result) {
 // Locker
 //
 
-LockerImpl::LockerImpl()
-    : _id(idCounter.addAndFetch(1)), _wuowNestingLevel(0), _threadId(stdx::this_thread::get_id()) {}
+LockerImpl::LockerImpl(ServiceContext* serviceCtx)
+    : _id(idCounter.addAndFetch(1)),
+      _wuowNestingLevel(0),
+      _threadId(stdx::this_thread::get_id()),
+      _ticketHolders(&TicketHolders::get(serviceCtx)) {}
 
 stdx::thread::id LockerImpl::getThreadId() const {
     return _threadId;
@@ -361,8 +364,7 @@ void LockerImpl::reacquireTicket(OperationContext* opCtx) {
 
 bool LockerImpl::_acquireTicket(OperationContext* opCtx, LockMode mode, Date_t deadline) {
     const bool reader = isSharedLockMode(mode);
-    auto& ticketHolders = ticketHoldersDecoration(getGlobalServiceContext());
-    auto holder = shouldAcquireTicket() ? ticketHolders.getTicketHolder(mode) : nullptr;
+    auto holder = shouldAcquireTicket() ? _ticketHolders->getTicketHolder(mode) : nullptr;
     if (holder) {
         _clientState.store(reader ? kQueuedReader : kQueuedWriter);
 
@@ -1074,8 +1076,7 @@ void LockerImpl::releaseTicket() {
 }
 
 void LockerImpl::_releaseTicket() {
-    auto& ticketHolders = ticketHoldersDecoration(getGlobalServiceContext());
-    auto holder = shouldAcquireTicket() ? ticketHolders.getTicketHolder(_modeForTicket) : nullptr;
+    auto holder = shouldAcquireTicket() ? _ticketHolders->getTicketHolder(_modeForTicket) : nullptr;
     if (holder) {
         holder->release(&_admCtx, std::move(*_ticket));
     }

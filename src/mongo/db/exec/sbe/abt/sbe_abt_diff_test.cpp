@@ -133,7 +133,7 @@ public:
     void onDestroyClient(Client* client) final {}
 
     void onCreateOperationContext(OperationContext* opCtx) override {
-        opCtx->setLockState(std::make_unique<LockerImpl>());
+        opCtx->setLockState(std::make_unique<LockerImpl>(opCtx->getServiceContext()));
     }
 
     void onDestroyOperationContext(OperationContext* opCtx) final {}

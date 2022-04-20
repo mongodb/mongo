@@ -30,27 +30,34 @@
 #include "mongo/db/storage/ticketholders.h"
 #include "mongo/util/concurrency/ticketholder.h"
 
+namespace {
+const auto ticketHoldersDecoration =
+    mongo::ServiceContext::declareDecoration<mongo::TicketHolders>();
+}
+
 namespace mongo {
 
 Status TicketHolders::updateConcurrentWriteTransactions(const int& newWriteTransactions) {
-    if (hasGlobalServiceContext()) {
-        auto serviceContext = getGlobalServiceContext();
-        auto& ticketHolders = ticketHoldersDecoration(serviceContext);
-        auto& writer = ticketHolders._openWriteTransaction;
-        if (writer) {
-            return writer->resize(newWriteTransactions);
+    if (auto client = Client::getCurrent()) {
+        if (auto svcCtx = client->getServiceContext()) {
+            auto& ticketHolders = TicketHolders::get(svcCtx);
+            auto& writer = ticketHolders._openWriteTransaction;
+            if (writer) {
+                return writer->resize(newWriteTransactions);
+            }
         }
     }
     return Status::OK();
 };
 
 Status TicketHolders::updateConcurrentReadTransactions(const int& newReadTransactions) {
-    if (hasGlobalServiceContext()) {
-        auto serviceContext = getGlobalServiceContext();
-        auto& ticketHolders = ticketHoldersDecoration(serviceContext);
-        auto& reader = ticketHolders._openReadTransaction;
-        if (reader) {
-            return reader->resize(newReadTransactions);
+    if (auto client = Client::getCurrent()) {
+        if (auto svcCtx = client->getServiceContext()) {
+            auto& ticketHolders = TicketHolders::get(svcCtx);
+            auto& reader = ticketHolders._openReadTransaction;
+            if (reader) {
+                return reader->resize(newReadTransactions);
+            }
         }
     }
     return Status::OK();
@@ -74,8 +81,12 @@ TicketHolder* TicketHolders::getTicketHolder(LockMode mode) {
     }
 }
 
-const Decorable<ServiceContext>::Decoration<TicketHolders> ticketHoldersDecoration =
-    ServiceContext::declareDecoration<TicketHolders>();
+TicketHolders& TicketHolders::get(ServiceContext* svcCtx) {
+    return ticketHoldersDecoration(svcCtx);
+}
 
+TicketHolders& TicketHolders::get(ServiceContext& svcCtx) {
+    return ticketHoldersDecoration(svcCtx);
+}
 
 }  // namespace mongo

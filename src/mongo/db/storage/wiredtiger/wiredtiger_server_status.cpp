@@ -90,7 +90,7 @@ BSONObj WiredTigerServerStatusSection::generateSection(OperationContext* opCtx,
         bob.append("reason", status.reason());
     }
 
-    WiredTigerKVEngine::appendGlobalStats(bob);
+    WiredTigerKVEngine::appendGlobalStats(opCtx, bob);
 
     WiredTigerKVEngine* engine = checked_cast<WiredTigerKVEngine*>(
         opCtx->getServiceContext()->getStorageEngine()->getEngine());

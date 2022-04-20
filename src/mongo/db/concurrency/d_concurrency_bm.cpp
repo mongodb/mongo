@@ -58,7 +58,7 @@ public:
     void onDestroyClient(Client* client) final {}
 
     void onCreateOperationContext(OperationContext* opCtx) override {
-        opCtx->setLockState(std::make_unique<LockerImpl>());
+        opCtx->setLockState(std::make_unique<LockerImpl>(opCtx->getServiceContext()));
     }
 
     void onDestroyOperationContext(OperationContext* opCtx) final {}
@@ -83,6 +83,7 @@ public:
             auto client = getGlobalServiceContext()->makeClient(str::stream()
                                                                 << "test client for thread " << i);
             auto opCtx = client->makeOperationContext();
+            locker[i] = std::make_unique<LockerImpl>(opCtx->getServiceContext());
             clients.emplace_back(std::move(client), std::move(opCtx));
         }
     }
@@ -90,7 +91,7 @@ public:
 protected:
     std::vector<std::pair<ServiceContext::UniqueClient, ServiceContext::UniqueOperationContext>>
         clients;
-    std::array<LockerImpl, kMaxPerfThreads> locker;
+    std::array<std::unique_ptr<LockerImpl>, kMaxPerfThreads> locker;
 };
 
 BENCHMARK_DEFINE_F(DConcurrencyTest, BM_StdMutex)(benchmark::State& state) {
@@ -105,7 +106,7 @@ BENCHMARK_DEFINE_F(DConcurrencyTest, BM_ResourceMutexShared)(benchmark::State& s
     static Lock::ResourceMutex mtx("testMutex");
 
     for (auto keepRunning : state) {
-        Lock::SharedLock lk(&locker[state.thread_index], mtx);
+        Lock::SharedLock lk(locker[state.thread_index].get(), mtx);
     }
 }
 
@@ -113,7 +114,7 @@ BENCHMARK_DEFINE_F(DConcurrencyTest, BM_ResourceMutexExclusive)(benchmark::State
     static Lock::ResourceMutex mtx("testMutex");
 
     for (auto keepRunning : state) {
-        Lock::ExclusiveLock lk(&locker[state.thread_index], mtx);
+        Lock::ExclusiveLock lk(locker[state.thread_index].get(), mtx);
     }
 }
 

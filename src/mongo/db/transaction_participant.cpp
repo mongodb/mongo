@@ -1161,7 +1161,7 @@ TransactionParticipant::TxnResources::TxnResources(WithLock wl,
     _ruState = opCtx->getWriteUnitOfWork()->release();
     opCtx->setWriteUnitOfWork(nullptr);
 
-    _locker = opCtx->swapLockState(std::make_unique<LockerImpl>(), wl);
+    _locker = opCtx->swapLockState(std::make_unique<LockerImpl>(opCtx->getServiceContext()), wl);
     // Inherit the locking setting from the original one.
     opCtx->lockState()->setShouldConflictWithSecondaryBatchApplication(
         _locker->shouldConflictWithSecondaryBatchApplication());

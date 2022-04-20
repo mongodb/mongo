@@ -168,29 +168,28 @@ StorageEngine::LastShutdownState initializeStorageEngine(OperationContext* opCtx
         auto writeTransactions = gConcurrentWriteTransactions.load();
         writeTransactions = writeTransactions == 0 ? DEFAULT_TICKETS_VALUE : writeTransactions;
 
-        // TODO SERVER-64467: Remove the globalServiceContext for TicketHolders
-        auto serviceContext = getGlobalServiceContext();
-        auto& ticketHolders = ticketHoldersDecoration(serviceContext);
+        auto svcCtx = opCtx->getServiceContext();
+        auto& ticketHolders = TicketHolders::get(svcCtx);
         if (feature_flags::gFeatureFlagExecutionControl.isEnabledAndIgnoreFCV()) {
             LOGV2_DEBUG(5190400, 1, "Enabling new ticketing policies");
             switch (gTicketQueueingPolicy) {
                 case QueueingPolicyEnum::Semaphore:
                     LOGV2_DEBUG(6382201, 1, "Using Semaphore-based ticketing scheduler");
                     ticketHolders.setGlobalThrottling(
-                        std::make_unique<SemaphoreTicketHolder>(readTransactions, serviceContext),
-                        std::make_unique<SemaphoreTicketHolder>(writeTransactions, serviceContext));
+                        std::make_unique<SemaphoreTicketHolder>(readTransactions, svcCtx),
+                        std::make_unique<SemaphoreTicketHolder>(writeTransactions, svcCtx));
                     break;
                 case QueueingPolicyEnum::FifoQueue:
                     LOGV2_DEBUG(6382200, 1, "Using FIFO queue-based ticketing scheduler");
                     ticketHolders.setGlobalThrottling(
-                        std::make_unique<FifoTicketHolder>(readTransactions, serviceContext),
-                        std::make_unique<FifoTicketHolder>(writeTransactions, serviceContext));
+                        std::make_unique<FifoTicketHolder>(readTransactions, svcCtx),
+                        std::make_unique<FifoTicketHolder>(writeTransactions, svcCtx));
                     break;
             }
         } else {
             ticketHolders.setGlobalThrottling(
-                std::make_unique<SemaphoreTicketHolder>(readTransactions, serviceContext),
-                std::make_unique<SemaphoreTicketHolder>(writeTransactions, serviceContext));
+                std::make_unique<SemaphoreTicketHolder>(readTransactions, svcCtx),
+                std::make_unique<SemaphoreTicketHolder>(writeTransactions, svcCtx));
         }
     }
 
@@ -254,13 +253,6 @@ void shutdownGlobalStorageEngineCleanly(ServiceContext* service,
     if (lockFile) {
         lockFile->clearPidAndUnlock();
         lockFile = boost::none;
-    }
-    // TODO SERVER-64467: Remove the globalServiceContext for TicketHolders
-    // Cleanup the ticket holders.
-    if (hasGlobalServiceContext() && !forRestart) {
-        auto serviceContext = getGlobalServiceContext();
-        auto& ticketHolders = ticketHoldersDecoration(serviceContext);
-        ticketHolders.setGlobalThrottling(nullptr, nullptr);
     }
 }
 } /* namespace */
@@ -412,7 +404,7 @@ public:
     void onDestroyClient(Client* client) override{};
     void onCreateOperationContext(OperationContext* opCtx) {
         // Use a fully fledged lock manager even when the storage engine is not set.
-        opCtx->setLockState(std::make_unique<LockerImpl>());
+        opCtx->setLockState(std::make_unique<LockerImpl>(opCtx->getServiceContext()));
 
         auto service = opCtx->getServiceContext();
 

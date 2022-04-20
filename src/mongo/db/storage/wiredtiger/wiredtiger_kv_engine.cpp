@@ -604,10 +604,9 @@ void WiredTigerKVEngine::notifyStartupComplete() {
     WiredTigerUtil::notifyStartupComplete();
 }
 
-void WiredTigerKVEngine::appendGlobalStats(BSONObjBuilder& b) {
+void WiredTigerKVEngine::appendGlobalStats(OperationContext* opCtx, BSONObjBuilder& b) {
     BSONObjBuilder bb(b.subobjStart("concurrentTransactions"));
-    auto serviceContext = getGlobalServiceContext();
-    auto& ticketHolders = ticketHoldersDecoration(serviceContext);
+    auto& ticketHolders = TicketHolders::get(opCtx->getServiceContext());
     {
         auto writer = ticketHolders.getTicketHolder(MODE_IX);
         BSONObjBuilder bbb(bb.subobjStart("write"));
