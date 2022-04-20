@@ -3894,6 +3894,71 @@ def doConfigure(myenv):
 
         myenv = conf.Finish()
 
+    # Our build generally assumes that we have C11-compliant libc headers for
+    # C++ source. On most systems, that will be the case. However, on systems
+    # using glibc older than 2.18 (or other libc implementations that have
+    # stubbornly refused to update), we need to add some preprocessor defines.
+    #
+    # See: https://sourceware.org/bugzilla/show_bug.cgi?id=15366
+    #
+    # These headers are only fully standards-compliant on POSIX platforms. Windows
+    # in particular doesn't implement inttypes.h
+    if env.TargetOSIs('posix'):
+        def NeedStdCLimitMacros(context):
+            test_body="""
+            #undef __STDC_LIMIT_MACROS
+            #include <stdint.h>
+            #if defined(INT64_MAX)
+            #  error
+            #endif
+            """
+            context.Message('Checking whether to define __STDC_LIMIT_MACROS... ')
+            ret = context.TryCompile(textwrap.dedent(test_body), '.cpp')
+            context.Result(ret)
+            return ret
+
+        def NeedStdCConstantMacros(context):
+            test_body="""
+            #undef __STDC_CONSTANT_MACROS
+            #include <stdint.h>
+            #if defined(INTMAX_C)
+            #  error
+            #endif
+            """
+            context.Message('Checking whether to define __STDC_CONSTANT_MACROS... ')
+            ret = context.TryCompile(textwrap.dedent(test_body), '.cpp')
+            context.Result(ret)
+            return ret
+
+        def NeedStdCFormatMacros(context):
+            test_body="""
+            #undef __STDC_FORMAT_MACROS
+            #include <inttypes.h>
+            #if defined(PRIx64)
+            #  error
+            #endif
+            """
+            context.Message('Checking whether to define __STDC_FORMAT_MACROS... ')
+            ret = context.TryCompile(textwrap.dedent(test_body), '.cpp')
+            context.Result(ret)
+            return ret
+
+        conf = Configure(myenv, help=False, custom_tests = {
+            'NeedStdCLimitMacros': NeedStdCLimitMacros,
+            'NeedStdCConstantMacros': NeedStdCConstantMacros,
+            'NeedStdCFormatMacros': NeedStdCFormatMacros,
+        })
+
+        conf.env.AppendUnique(
+            CPPDEFINES=[
+                '__STDC_LIMIT_MACROS' if conf.NeedStdCLimitMacros() else '',
+                '__STDC_CONSTANT_MACROS' if conf.NeedStdCConstantMacros() else '',
+                '__STDC_FORMAT_MACROS' if conf.NeedStdCFormatMacros() else '',
+            ]
+        )
+
+        myenv = conf.Finish()
+
     # We set this with GCC on x86 platforms to work around
     # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=43052
     if myenv.ToolchainIs('gcc') and (env['TARGET_ARCH'] in ['i386', 'x86_64']):
