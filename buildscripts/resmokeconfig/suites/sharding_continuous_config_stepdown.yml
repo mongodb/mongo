@@ -233,6 +233,9 @@ selector:
   # SERVER-51805 splitChunk op is not idempotent
   - jstests/sharding/mongos_get_shard_version.js
 
+  # Expects reshardCollection executes without config server stepdown
+  - jstests/sharding/shard_encrypted_collection.js
+
   exclude_with_any_tags:
   - does_not_support_stepdowns
 
