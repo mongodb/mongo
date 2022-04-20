@@ -45,6 +45,8 @@ public:
 
     static Status updateConcurrentReadTransactions(const int& newReadTransactions);
 
+    static TicketHolders& get(ServiceContext* svcCtx);
+    static TicketHolders& get(ServiceContext& svcCtx);
     /**
      * Sets the TicketHolder implementation to use to obtain tickets from 'reading' (for MODE_S and
      * MODE_IS), and from 'writing' (for MODE_IX) in order to throttle database access. There is no
@@ -61,10 +63,5 @@ private:
     std::unique_ptr<TicketHolder> _openWriteTransaction;
     std::unique_ptr<TicketHolder> _openReadTransaction;
 };
-
-/**
- * Decorated accessor to the 'TicketHolders' stored in 'ServiceContext'.
- */
-extern const Decorable<ServiceContext>::Decoration<TicketHolders> ticketHoldersDecoration;
 
 }  // namespace mongo
