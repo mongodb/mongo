@@ -50,10 +50,12 @@ public:
     PlanCacheKey(PlanCacheKeyInfo&& info,
                  UUID collectionUuid,
                  size_t collectionVersion,
+                 boost::optional<Timestamp> newestVisibleIndexTimestamp,
                  bool isShardedCollection)
         : _info{std::move(info)},
           _collectionUuid{collectionUuid},
           _collectionVersion{collectionVersion},
+          _newestVisibleIndexTimestamp{newestVisibleIndexTimestamp},
           _isShardedCollection{isShardedCollection} {}
 
     const UUID& getCollectionUuid() const {
@@ -71,7 +73,9 @@ public:
     bool operator==(const PlanCacheKey& other) const {
         return other._collectionVersion == _collectionVersion &&
             other._isShardedCollection == _isShardedCollection &&
-            other._collectionUuid == _collectionUuid && other._info == _info;
+            other._collectionUuid == _collectionUuid &&
+            other._newestVisibleIndexTimestamp == _newestVisibleIndexTimestamp &&
+            other._info == _info;
     }
 
     bool operator!=(const PlanCacheKey& other) const {
@@ -86,6 +90,9 @@ public:
         size_t hash = _info.planCacheKeyHash();
         boost::hash_combine(hash, UUID::Hash{}(_collectionUuid));
         boost::hash_combine(hash, _collectionVersion);
+        if (_newestVisibleIndexTimestamp) {
+            boost::hash_combine(hash, _newestVisibleIndexTimestamp->asULL());
+        }
         boost::hash_combine(hash, _isShardedCollection);
         return hash;
     }
@@ -95,9 +102,38 @@ public:
     }
 
 private:
+    // Contains the actual encoding of the query shape as well as the index discriminators.
     const PlanCacheKeyInfo _info;
+
     const UUID _collectionUuid;
+
+    // There is a special collection versioning scheme associated with the SBE plan cache. Whenever
+    // an action against a collection is made which should invalidate the plan cache entries for the
+    // collection -- in particular index builds and drops -- the version number is incremented.
+    // Readers specify the version number that they are reading at so that they only pick up cache
+    // entries with the right set of indexes.
+    //
+    // We also clean up all cache entries for a particular (collectionUuid, versionNumber) pair when
+    // all readers seeing this version of the collection have drained.
     const size_t _collectionVersion;
+
+    // The '_collectionVersion' is not currently sufficient in order to ensure that the indexes
+    // visible to the reader are consistent with the indexes present in the cache entry. The reason
+    // is that all readers see the latest copy-on-write version of the 'Collection' object, even
+    // though they are allowed to read at an older timestamp, potentially at a time before an index
+    // build completed.
+    //
+    // To solve this problem, we incorporate the timestamp of the newest index visible to the reader
+    // into the plan cache key. This ensures that the set of indexes visible to the reader match
+    // those present in the plan cache entry, preventing a situation where the plan cache entry
+    // reflects a newer version of the index catalog than the one visible to the reader.
+    //
+    // In the future, this could instead be solved with point-in-time catalog lookups.
+    const boost::optional<Timestamp> _newestVisibleIndexTimestamp;
+
+    // Ensures that a cached SBE plan cannot be reused if the collection has since become sharded.
+    // The cached plan may no longer be valid after sharding, since orphan filtering is necessary
+    // for sharded collections.
     const bool _isShardedCollection;
 };
 

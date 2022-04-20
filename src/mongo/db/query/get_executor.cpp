@@ -277,6 +277,7 @@ void applyIndexFilters(const CollectionPtr& collection,
     }
 }
 
+namespace {
 void fillOutIndexEntries(OperationContext* opCtx,
                          bool apiStrict,
                          const CanonicalQuery* canonicalQuery,
@@ -301,6 +302,7 @@ void fillOutIndexEntries(OperationContext* opCtx,
             indexEntryFromIndexCatalogEntry(opCtx, collection, *ice, canonicalQuery));
     }
 }
+}  // namespace
 
 void fillOutPlannerParams(OperationContext* opCtx,
                           const CollectionPtr& collection,

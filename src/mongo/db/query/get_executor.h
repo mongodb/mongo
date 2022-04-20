@@ -74,15 +74,6 @@ void filterAllowedIndexEntries(const AllowedIndicesFilter& allowedIndicesFilter,
                                std::vector<IndexEntry>* indexEntries);
 
 /**
- * Fills out 'entries' with information about the indexes on 'collection'.
- */
-void fillOutIndexEntries(OperationContext* opCtx,
-                         bool apiStrict,
-                         const CanonicalQuery* canonicalQuery,
-                         const CollectionPtr& collection,
-                         std::vector<IndexEntry>& entries);
-
-/**
  * Fills out information about secondary collections held by 'collections' in 'plannerParams'.
  */
 std::map<NamespaceString, SecondaryCollectionInfo> fillOutSecondaryCollectionsInformation(
