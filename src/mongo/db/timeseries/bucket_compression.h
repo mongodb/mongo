@@ -60,5 +60,10 @@ CompressionResult compressBucket(const BSONObj& bucketDoc,
                                  const NamespaceString& nss,
                                  bool validateDecompression);
 
+/**
+ * Returns whether a timeseries bucket has been compressed to the v2 format.
+ */
+bool isCompressedBucket(const BSONObj& bucketDoc);
+
 }  // namespace timeseries
 }  // namespace mongo
