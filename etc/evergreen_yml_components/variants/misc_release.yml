@@ -27,7 +27,6 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - amazon1-2018-build
-  - name: build_variant_gen
   - name: .aggfuzzer .common
   - name: aggregation
   - name: .auth !.audit !.multiversion
@@ -83,7 +82,6 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - amazon1-2018-build
-  - name: build_variant_gen
   - name: .aggfuzzer .common
   - name: aggregation
   - name: .auth !.multiversion
@@ -137,7 +135,6 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - amazon2-build
-  - name: build_variant_gen
   - name: .aggfuzzer .common
   - name: aggregation
   - name: .auth !.audit !.multiversion
@@ -197,7 +194,6 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - amazon2-build
-  - name: build_variant_gen
   - name: .aggfuzzer .common
   - name: aggregation
   - name: audit
@@ -251,7 +247,6 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - amazon2-arm64-large
-  - name: build_variant_gen
   - name: aggregation
   - name: .auth !.audit !.multiversion
   - name: causally_consistent_jscore_txns_passthrough
@@ -306,7 +301,6 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - amazon2-arm64-large
-  - name: build_variant_gen
   - name: test_api_version_compatibility
   - name: .aggfuzzer
   - name: .aggregation
@@ -425,7 +419,6 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - debian10-build
-  - name: build_variant_gen
   - name: .aggfuzzer .common
   - name: aggregation
   - name: aggregation_auth
@@ -484,7 +477,6 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - debian10-build
-  - name: build_variant_gen
   - name: .aggfuzzer .common
   - name: audit
   - name: causally_consistent_jscore_txns_passthrough
@@ -537,7 +529,6 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - debian11-large
-  - name: build_variant_gen
   - name: .aggfuzzer .common
   - name: aggregation
   - name: aggregation_auth
@@ -596,7 +587,6 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - debian11-large
-  - name: build_variant_gen
   - name: .aggfuzzer .common
   - name: audit
   - name: causally_consistent_jscore_txns_passthrough
@@ -647,7 +637,6 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - rhel70
-  - name: build_variant_gen
   - name: aggregation
   - name: .auth !.audit !.multiversion
   - name: causally_consistent_jscore_txns_passthrough
@@ -689,7 +678,6 @@ buildvariants:
   - name: compile_and_archive_dist_test_then_package_TG
     distros:
     - rhel70
-  - name: build_variant_gen
   - name: .ssl
   - name: jsCore
   - name: external_auth
@@ -711,7 +699,6 @@ buildvariants:
   - name: compile_and_archive_dist_test_then_package_TG
     distros:
     - rhel80-large
-  - name: build_variant_gen
   - name: jsCore
   - name: sharding_gen
   - name: replica_sets_gen
@@ -740,7 +727,6 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - rhel80-build
-  - name: build_variant_gen
   - name: aggregation
   - name: .auth !.audit !.multiversion
   - name: causally_consistent_jscore_txns_passthrough
@@ -801,7 +787,6 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - rhel80-large
-  - name: build_variant_gen
   - name: .aggfuzzer
   - name: .aggregation
   - name: audit
@@ -908,7 +893,6 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - rhel82-arm64-large
-  - name: build_variant_gen
   - name: aggregation
   - name: .auth !.audit !.multiversion
   - name: causally_consistent_jscore_txns_passthrough
@@ -961,7 +945,6 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - rhel82-arm64-large
-  - name: build_variant_gen
   - name: .aggfuzzer !.multiversion
   - name: audit
   - name: auth_audit_gen
@@ -1021,7 +1004,6 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - suse12-sp5-large
-  - name: build_variant_gen
   - name: .aggfuzzer .common
   - name: aggregation
   - name: .auth !.audit !.multiversion
@@ -1076,7 +1058,6 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - suse12-sp5-large
-  - name: build_variant_gen
   - name: .aggfuzzer .common
   - name: audit
   - name: causally_consistent_jscore_txns_passthrough
@@ -1125,7 +1106,6 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - suse15-build
-  - name: build_variant_gen
   - name: .aggfuzzer .common !.multiversion
   - name: audit
   - name: causally_consistent_jscore_txns_passthrough
@@ -1172,7 +1152,6 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - suse15-build
-  - name: build_variant_gen
   - name: .aggfuzzer .common !.multiversion
   - name: aggregation
   - name: .auth !.audit !.multiversion
@@ -1223,7 +1202,6 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - ubuntu1804-build
-  - name: build_variant_gen
   - name: .aggfuzzer .common
   - name: aggregation
   - name: .auth !.audit !.multiversion
@@ -1293,7 +1271,6 @@ buildvariants:
   - name: libdeps_graph_linting_TG
     distros:
     - ubuntu1804-build
-  - name: build_variant_gen
   - name: .csfle
   - name: .publish_csfle
   - name: .aggfuzzer .common
@@ -1357,7 +1334,6 @@ buildvariants:
     scons_cache_scope: shared
   tasks:
   - name: compile_test_and_package_serial_TG
-  - name: build_variant_gen
   - name: aggregation
   - name: aggregation_wildcard_fuzzer_gen
   - name: .auth !.audit !.multiversion !.jscore
@@ -1413,7 +1389,6 @@ buildvariants:
     scons_cache_scope: shared
   tasks:
   - name: compile_test_and_package_serial_TG
-  - name: build_variant_gen
   - name: free_monitoring
   - name: jsCore
   - name: replica_sets_jscore_passthrough
@@ -1449,7 +1424,6 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - ubuntu2004-large
-  - name: build_variant_gen
   - name: .aggfuzzer .common !.multiversion
   - name: aggregation
   - name: .auth !.audit !.multiversion
@@ -1507,7 +1481,6 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - ubuntu2004-large
-  - name: build_variant_gen
   - name: .csfle
   - name: .publish_csfle
   - name: .aggfuzzer .common !.multiversion
@@ -1563,7 +1536,6 @@ buildvariants:
     scons_cache_scope: shared
   tasks:
   - name: compile_test_and_package_serial_TG
-  - name: build_variant_gen
   - name: aggregation
   - name: aggregation_wildcard_fuzzer_gen
   - name: .auth !.audit !.multiversion !.jscore
@@ -1616,7 +1588,6 @@ buildvariants:
     scons_cache_scope: shared
   tasks:
   - name: compile_test_and_package_serial_TG
-  - name: build_variant_gen
   - name: free_monitoring
   - name: jsCore
   - name: replica_sets_jscore_passthrough
@@ -1656,7 +1627,6 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - windows-vsCurrent-large
-  - name: build_variant_gen
   - name: .aggfuzzer
   - name: .aggregation !.auth !.encrypt !.unwind
   - name: auth_gen
@@ -1721,7 +1691,6 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - windows-vsCurrent-large
-  - name: build_variant_gen
   - name: .aggfuzzer
   - name: .aggregation !.auth !.encrypt !.unwind
   - name: auth_gen
@@ -1780,7 +1749,6 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
   - name: compile_build_tools_next_TG
-  - name: build_variant_gen
   - name: .aggregation !.auth !.encrypt !.unwind
   - name: auth_gen
   - name: .causally_consistent !.sharding
@@ -1832,7 +1800,6 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
   - name: compile_build_tools_next_TG
-  - name: build_variant_gen
   - name: .aggregation !.auth !.encrypt !.unwind
   - name: auth_gen
   - name: .causally_consistent !.sharding
@@ -1887,7 +1854,6 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
   - name: compile_build_tools_next_TG
-  - name: build_variant_gen
   - name: audit
   - name: auth_audit_gen
   - name: causally_consistent_jscore_txns_passthrough
@@ -1927,7 +1893,6 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
   - name: compile_build_tools_next_TG
-  - name: build_variant_gen
   - name: audit
   - name: auth_audit_gen
   - name: causally_consistent_jscore_txns_passthrough
