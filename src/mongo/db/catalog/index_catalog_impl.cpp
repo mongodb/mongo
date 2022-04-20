@@ -538,8 +538,8 @@ IndexCatalogEntry* IndexCatalogImpl::createIndexEntry(OperationContext* opCtx,
     std::unique_ptr<SortedDataInterface> sdi = engine->getEngine()->getSortedDataInterface(
         opCtx, collection->ns(), collOptions, ident, desc);
 
-    std::unique_ptr<IndexAccessMethod> accessMethod =
-        IndexAccessMethodFactory::get(opCtx)->make(entry.get(), std::move(sdi));
+    std::unique_ptr<IndexAccessMethod> accessMethod = IndexAccessMethodFactory::get(opCtx)->make(
+        opCtx, collection->ns(), collection->getCollectionOptions(), entry.get(), ident);
 
     entry->init(std::move(accessMethod));
 

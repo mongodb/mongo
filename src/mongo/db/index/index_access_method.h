@@ -51,6 +51,7 @@ class MatchExpression;
 struct UpdateTicket;
 struct InsertDeleteOptions;
 class SortedDataIndexAccessMethod;
+struct CollectionOptions;
 
 /**
  * An IndexAccessMethod is the interface through which all the mutation, lookup, and
@@ -253,8 +254,12 @@ public:
     static void set(ServiceContext* service,
                     std::unique_ptr<IndexAccessMethodFactory> collectionFactory);
 
-    virtual std::unique_ptr<IndexAccessMethod> make(
-        IndexCatalogEntry* entry, std::unique_ptr<SortedDataInterface> sortedDataInterface) = 0;
+
+    virtual std::unique_ptr<IndexAccessMethod> make(OperationContext* opCtx,
+                                                    const NamespaceString& nss,
+                                                    const CollectionOptions& collectionOptions,
+                                                    IndexCatalogEntry* entry,
+                                                    StringData ident) = 0;
 };
 
 /**

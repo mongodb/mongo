@@ -43,6 +43,7 @@ const string IndexNames::TEXT = "text";
 const string IndexNames::HASHED = "hashed";
 const string IndexNames::BTREE = "";
 const string IndexNames::WILDCARD = "wildcard";
+const string IndexNames::COLUMN = "columnstore";
 // We no longer support geo haystack indexes. We use this value to reject creating them.
 const string IndexNames::GEO_HAYSTACK = "geoHaystack";
 

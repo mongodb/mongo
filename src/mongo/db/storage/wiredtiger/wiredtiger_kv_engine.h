@@ -162,6 +162,11 @@ public:
         const CollectionOptions& collOptions,
         StringData ident,
         const IndexDescriptor* desc) override;
+    std::unique_ptr<ColumnStore> getColumnStore(OperationContext* opCtx,
+                                                const NamespaceString& nss,
+                                                const CollectionOptions& collOptions,
+                                                StringData ident,
+                                                const IndexDescriptor*) override;
 
     Status importRecordStore(OperationContext* opCtx,
                              StringData ident,

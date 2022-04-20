@@ -1714,6 +1714,15 @@ std::unique_ptr<SortedDataInterface> WiredTigerKVEngine::getSortedDataInterface(
         opCtx, _uri(ident), ident, keyFormat, desc, WiredTigerUtil::useTableLogging(nss));
 }
 
+std::unique_ptr<ColumnStore> WiredTigerKVEngine::getColumnStore(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const CollectionOptions& collOptions,
+    StringData ident,
+    const IndexDescriptor*) {
+    uasserted(ErrorCodes::NotImplemented, "getColumnStore() NYI");
+}
+
 std::unique_ptr<RecordStore> WiredTigerKVEngine::makeTemporaryRecordStore(OperationContext* opCtx,
                                                                           StringData ident,
                                                                           KeyFormat keyFormat) {

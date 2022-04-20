@@ -42,6 +42,7 @@ class BSONObj;
  */
 enum IndexType {
     INDEX_BTREE,
+    INDEX_COLUMN,
     INDEX_2D,
     INDEX_HAYSTACK,
     INDEX_2DSPHERE,
@@ -65,6 +66,7 @@ public:
     static const std::string HASHED;
     static const std::string TEXT;
     static const std::string WILDCARD;
+    static const std::string COLUMN;
 
     /**
      * Return the first std::string value in the provided object.  For an index key pattern,

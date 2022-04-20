@@ -35,33 +35,50 @@
 
 #include "mongo/db/index/2d_access_method.h"
 #include "mongo/db/index/btree_access_method.h"
+#include "mongo/db/index/columns_access_method.h"
 #include "mongo/db/index/fts_access_method.h"
 #include "mongo/db/index/hash_access_method.h"
 #include "mongo/db/index/s2_access_method.h"
 #include "mongo/db/index/s2_bucket_access_method.h"
 #include "mongo/db/index/wildcard_access_method.h"
+#include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
 
 std::unique_ptr<IndexAccessMethod> IndexAccessMethodFactoryImpl::make(
-    IndexCatalogEntry* entry, std::unique_ptr<SortedDataInterface> sortedDataInterface) {
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const CollectionOptions& collectionOptions,
+    IndexCatalogEntry* entry,
+    StringData ident) {
+
+    auto engine = opCtx->getServiceContext()->getStorageEngine()->getEngine();
     auto desc = entry->descriptor();
+    auto makeSDI = [&] {
+        return engine->getSortedDataInterface(opCtx, nss, collectionOptions, ident, desc);
+    };
+    auto makeCS = [&] {
+        return engine->getColumnStore(opCtx, nss, collectionOptions, ident, desc);
+    };
     const std::string& type = desc->getAccessMethodName();
+
     if ("" == type)
-        return std::make_unique<BtreeAccessMethod>(entry, std::move(sortedDataInterface));
+        return std::make_unique<BtreeAccessMethod>(entry, makeSDI());
     else if (IndexNames::HASHED == type)
-        return std::make_unique<HashAccessMethod>(entry, std::move(sortedDataInterface));
+        return std::make_unique<HashAccessMethod>(entry, makeSDI());
     else if (IndexNames::GEO_2DSPHERE == type)
-        return std::make_unique<S2AccessMethod>(entry, std::move(sortedDataInterface));
+        return std::make_unique<S2AccessMethod>(entry, makeSDI());
     else if (IndexNames::GEO_2DSPHERE_BUCKET == type)
-        return std::make_unique<S2BucketAccessMethod>(entry, std::move(sortedDataInterface));
+        return std::make_unique<S2BucketAccessMethod>(entry, makeSDI());
     else if (IndexNames::TEXT == type)
-        return std::make_unique<FTSAccessMethod>(entry, std::move(sortedDataInterface));
+        return std::make_unique<FTSAccessMethod>(entry, makeSDI());
     else if (IndexNames::GEO_2D == type)
-        return std::make_unique<TwoDAccessMethod>(entry, std::move(sortedDataInterface));
+        return std::make_unique<TwoDAccessMethod>(entry, makeSDI());
     else if (IndexNames::WILDCARD == type)
-        return std::make_unique<WildcardAccessMethod>(entry, std::move(sortedDataInterface));
+        return std::make_unique<WildcardAccessMethod>(entry, makeSDI());
+    else if (IndexNames::COLUMN == type)
+        return std::make_unique<ColumnStoreAccessMethod>(entry, makeCS());
     LOGV2(20688,
           "Can't find index for keyPattern {keyPattern}",
           "Can't find index for keyPattern",

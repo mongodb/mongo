@@ -33,13 +33,18 @@
 
 namespace mongo {
 
+struct CollectionOptions;
+
 class IndexAccessMethodFactoryImpl : public IndexAccessMethodFactory {
 public:
     IndexAccessMethodFactoryImpl() = default;
     ~IndexAccessMethodFactoryImpl() = default;
 
-    std::unique_ptr<IndexAccessMethod> make(
-        IndexCatalogEntry* entry, std::unique_ptr<SortedDataInterface> SortedDataInterface) final;
+    std::unique_ptr<IndexAccessMethod> make(OperationContext* opCtx,
+                                            const NamespaceString& nss,
+                                            const CollectionOptions& collectionOptions,
+                                            IndexCatalogEntry* entry,
+                                            StringData ident) final;
 };
 
 }  // namespace mongo

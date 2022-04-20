@@ -70,6 +70,14 @@ public:
         const IndexDescriptor* desc) override {
         return nullptr;
     }
+    std::unique_ptr<ColumnStore> getColumnStore(OperationContext* opCtx,
+                                                const NamespaceString& nss,
+                                                const CollectionOptions& collOptions,
+                                                StringData ident,
+                                                const IndexDescriptor*) override {
+        return nullptr;
+    }
+
     Status createRecordStore(OperationContext* opCtx,
                              const NamespaceString& nss,
                              StringData ident,

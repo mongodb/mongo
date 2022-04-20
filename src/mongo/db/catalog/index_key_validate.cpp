@@ -245,7 +245,8 @@ Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion inde
 
         // "$**" is acceptable for a text index or wildcard index.
         if ((keyElement.fieldNameStringData() == "$**") &&
-            ((keyElement.isNumber()) || (keyElement.str() == IndexNames::TEXT)))
+            ((keyElement.isNumber()) || (keyElement.str() == IndexNames::TEXT) ||
+             (keyElement.str() == IndexNames::COLUMN)))
             continue;
 
         if ((keyElement.fieldNameStringData() == "_fts") && keyElement.str() != IndexNames::TEXT) {

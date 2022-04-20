@@ -87,6 +87,13 @@ public:
         const CollectionOptions& collOptions,
         StringData ident,
         const IndexDescriptor* desc);
+    std::unique_ptr<ColumnStore> getColumnStore(OperationContext* opCtx,
+                                                const NamespaceString& nss,
+                                                const CollectionOptions& collOptions,
+                                                StringData ident,
+                                                const IndexDescriptor*) override {
+        uasserted(ErrorCodes::NotImplemented, "getColumnStore()");
+    }
 
     virtual Status dropIdent(RecoveryUnit* ru,
                              StringData ident,
