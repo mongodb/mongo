@@ -1,11 +1,10 @@
 test_kind: js_test
-# TODO SERVER-65370: remove this suite when v2 tokens become the default, or rework it to test v1.
 selector:
   roots:
   - jstests/change_streams/**/*.js
   exclude_files:
   # This test explicitly compares v1 and v2 tokens, and must be able to generate the former.
-  - jstests/change_streams/generate_v2_resume_token.js
+  - jstests/change_streams/generate_v1_resume_token.js
   exclude_with_any_tags:
   ##
   # The next tags correspond to the special errors thrown by the
@@ -37,7 +36,7 @@ executor:
         load('jstests/libs/override_methods/set_read_and_write_concerns.js');
         load('jstests/libs/override_methods/implicitly_shard_accessed_collections.js');
         load('jstests/libs/override_methods/enable_causal_consistency_without_read_pref.js');
-        load('jstests/libs/override_methods/implicit_v2_resume_token_changestreams.js');
+        load('jstests/libs/override_methods/implicit_v1_resume_token_changestreams.js');
   hooks:
   - class: CheckReplDBHash
   - class: ValidateCollections

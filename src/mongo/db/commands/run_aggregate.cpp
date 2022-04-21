@@ -445,12 +445,12 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
     expCtx->forPerShardCursor = request.getPassthroughToShard().has_value();
     expCtx->allowDiskUse = request.getAllowDiskUse().value_or(allowDiskUseByDefault.load());
 
-    // If the request specified v2 resume tokens for change streams, set this on the expCtx. On 6.0
-    // we only expect this to occur during testing.
-    // TODO SERVER-65370: after 6.0, assume true unless present and explicitly false.
-    if (request.getGenerateV2ResumeTokens()) {
-        uassert(6528200, "Invalid request for v2 resume tokens", getTestCommandsEnabled());
-        expCtx->changeStreamTokenVersion = 2;
+    // If the request explicitly specified NOT to use v2 resume tokens for change streams, set this
+    // on the expCtx. This can happen if a the request originated from 6.0 mongos, or in test mode.
+    if (request.getGenerateV2ResumeTokens().has_value()) {
+        // We only ever expect an explicit $_generateV2ResumeTokens to be false.
+        uassert(6528200, "Invalid request for v2 tokens", !request.getGenerateV2ResumeTokens());
+        expCtx->changeStreamTokenVersion = 1;
     }
 
     return expCtx;

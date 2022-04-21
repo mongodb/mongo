@@ -1,8 +1,8 @@
 /**
- * Test that the $_generateV2ResumeTokens parameter can be used to force change streams to return v2
+ * Test that the $_generateV2ResumeTokens parameter can be used to force change streams to return v1
  * tokens.
  * @tags: [
- *   requires_fcv_60
+ *   requires_fcv_61
  * ]
  */
 (function() {
@@ -12,11 +12,11 @@ load("jstests/libs/collection_drop_recreate.js");  // For assertDropAndRecreateC
 
 const coll = assertDropAndRecreateCollection(db, jsTestName());
 
-// Create one stream that returns v1 tokens, the default.
-const v1Stream = coll.watch([]);
+// Create one stream that returns v2 tokens, the default.
+const v2Stream = coll.watch([]);
 
-// Create a second stream that explicitly requests v2 tokens.
-const v2Stream = coll.watch([], {$_generateV2ResumeTokens: true});
+// Create a second stream that explicitly requests v1 tokens.
+const v1Stream = coll.watch([], {$_generateV2ResumeTokens: false});
 
 // Insert a test document into the collection.
 assert.commandWorked(coll.insert({_id: 1}));
@@ -34,5 +34,5 @@ delete v1Event._id;
 delete v2Event._id;
 
 assert.docEq(v1Event, v2Event);
-assert.neq(v1ResumeToken, v2ResumeToken);
+assert.neq(v1ResumeToken, v2ResumeToken, {v1ResumeToken, v2ResumeToken});
 })();

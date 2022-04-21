@@ -133,12 +133,14 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
 
     mergeCtx->inMongos = true;
 
-    // If the request specified v2 resume tokens for change streams, set this on the expCtx. On 6.0
-    // we only expect this to occur during testing.
-    // TODO SERVER-65370: after 6.0, assume true unless present and explicitly false.
-    if (request.getGenerateV2ResumeTokens()) {
-        uassert(6528201, "Invalid request for v2 resume tokens", getTestCommandsEnabled());
-        mergeCtx->changeStreamTokenVersion = 2;
+    // If the request explicity specified NOT to use v2 resume tokens for change streams, set this
+    // on the expCtx. We only ever expect to see an explicit value during testing.
+    if (request.getGenerateV2ResumeTokens().has_value()) {
+        // If $_generateV2ResumeTokens was specified, we must be testing and it must be false.
+        uassert(6528201,
+                "Invalid request for v2 resume tokens",
+                getTestCommandsEnabled() && !request.getGenerateV2ResumeTokens());
+        mergeCtx->changeStreamTokenVersion = 1;
     }
 
     // Serialize the 'AggregateCommandRequest' and save it so that the original command can be

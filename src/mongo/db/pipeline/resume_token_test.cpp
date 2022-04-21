@@ -61,6 +61,7 @@ TEST(ResumeToken, EncodesTimestampOnlyTokenFromData) {
 
     ResumeTokenData resumeTokenDataIn;
     resumeTokenDataIn.clusterTime = ts;
+    resumeTokenDataIn.eventIdentifier = Value(Document{{"operationType", "drop"_sd}});
 
     ResumeToken token(resumeTokenDataIn);
     ResumeTokenData tokenData = token.getData();
@@ -91,6 +92,7 @@ TEST(ResumeToken, TimestampOnlyTokenShouldRoundTripThroughHexEncoding) {
 
     ResumeTokenData resumeTokenDataIn;
     resumeTokenDataIn.clusterTime = ts;
+    resumeTokenDataIn.eventIdentifier = Value(Document{{"operationType", "drop"_sd}});
 
     // Test serialization/parsing through Document.
     auto rtToken = ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument().toBson());
@@ -243,6 +245,7 @@ TEST(ResumeToken, FailsToParseForInvalidTokenFormats) {
     Timestamp ts(1010, 4);
     ResumeTokenData tokenData;
     tokenData.clusterTime = ts;
+    tokenData.eventIdentifier = Value(Document{{"operationType", "drop"_sd}});
     auto goodTokenDocBinData = ResumeToken(tokenData).toDocument();
     auto goodData = goodTokenDocBinData["_data"].getStringData();
     ASSERT_THROWS(ResumeToken::parse(Document{{"_data"_sd, goodData}, {"_typeBits", "string"_sd}}),
@@ -259,6 +262,7 @@ TEST(ResumeToken, FailsToDecodeInvalidKeyString) {
 
     ResumeTokenData tokenData;
     tokenData.clusterTime = ts;
+    tokenData.eventIdentifier = Value(Document{{"operationType", "drop"_sd}});
 
     auto goodTokenDocBinData = ResumeToken(tokenData).toDocument();
     auto goodData = goodTokenDocBinData["_data"].getStringData();
@@ -382,6 +386,7 @@ TEST(ResumeToken, InvalidTxnOpIndex) {
     ResumeTokenData resumeTokenDataIn;
     resumeTokenDataIn.clusterTime = ts;
     resumeTokenDataIn.txnOpIndex = 1234;
+    resumeTokenDataIn.eventIdentifier = Value(Document{{"operationType", "drop"_sd}});
 
     // Should round trip with a non-negative txnOpIndex.
     auto rtToken = ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument().toBson());

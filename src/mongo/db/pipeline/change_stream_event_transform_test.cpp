@@ -73,7 +73,10 @@ TEST(ChangeStreamEventTransformTest, TestDefaultUpdateTransform) {
     // Update fields
     Document expectedUpdateField{
         {DocumentSourceChangeStream::kIdField,
-         makeResumeToken(kDefaultTs, testUuid(), Value(documentKey))},
+         makeResumeToken(kDefaultTs,
+                         testUuid(),
+                         Value(documentKey),
+                         DocumentSourceChangeStream::kUpdateOpType)},
         {DocumentSourceChangeStream::kOperationTypeField,
          DocumentSourceChangeStream::kUpdateOpType},
         {DocumentSourceChangeStream::kClusterTimeField, kDefaultTs},
@@ -111,10 +114,7 @@ TEST(ChangeStreamEventTransformTest, TestCreateViewTransform) {
     Document expectedDoc{
         {DocumentSourceChangeStream::kIdField,
          makeResumeToken(
-             kDefaultTs,
-             testUuid(),
-             Value(Document{{"operationType", DocumentSourceChangeStream::kCreateOpType},
-                            {"operationDescription", opDescription}}))},
+             kDefaultTs, testUuid(), opDescription, DocumentSourceChangeStream::kCreateOpType)},
         {DocumentSourceChangeStream::kOperationTypeField,
          DocumentSourceChangeStream::kCreateOpType},
         {DocumentSourceChangeStream::kClusterTimeField, kDefaultTs},
@@ -145,17 +145,19 @@ TEST(ChangeStreamEventTransformTest, TestCreateViewOnSingleCollection) {
                                      boost::none,                // fromMigrate
                                      boost::none);               // o2
 
-    Document expectedDoc{{DocumentSourceChangeStream::kIdField,
-                          makeResumeToken(kDefaultTs, testUuid(), documentKey)},
-                         {DocumentSourceChangeStream::kOperationTypeField,
-                          DocumentSourceChangeStream::kInsertOpType},
-                         {DocumentSourceChangeStream::kClusterTimeField, kDefaultTs},
-                         {DocumentSourceChangeStream::kCollectionUuidField, testUuid()},
-                         {DocumentSourceChangeStream::kWallTimeField, Date_t()},
-                         {DocumentSourceChangeStream::kFullDocumentField, Document(document)},
-                         {DocumentSourceChangeStream::kNamespaceField,
-                          Document{{"db", systemViewNss.db()}, {"coll", systemViewNss.coll()}}},
-                         {DocumentSourceChangeStream::kDocumentKeyField, documentKey}};
+    Document expectedDoc{
+        {DocumentSourceChangeStream::kIdField,
+         makeResumeToken(
+             kDefaultTs, testUuid(), documentKey, DocumentSourceChangeStream::kInsertOpType)},
+        {DocumentSourceChangeStream::kOperationTypeField,
+         DocumentSourceChangeStream::kInsertOpType},
+        {DocumentSourceChangeStream::kClusterTimeField, kDefaultTs},
+        {DocumentSourceChangeStream::kCollectionUuidField, testUuid()},
+        {DocumentSourceChangeStream::kWallTimeField, Date_t()},
+        {DocumentSourceChangeStream::kFullDocumentField, Document(document)},
+        {DocumentSourceChangeStream::kNamespaceField,
+         Document{{"db", systemViewNss.db()}, {"coll", systemViewNss.coll()}}},
+        {DocumentSourceChangeStream::kDocumentKeyField, documentKey}};
 
     ASSERT_DOCUMENT_EQ(applyTransformation(oplogEntry), expectedDoc);
 }

@@ -655,6 +655,7 @@ TEST_F(CheckResumeTokenTest, ShouldSwallowInvalidateFromEachShardForStartAfterIn
     invalidateToken.clusterTime = resumeTimestamp;
     invalidateToken.uuid = uuids[0];
     invalidateToken.fromInvalidate = ResumeTokenData::kFromInvalidate;
+    invalidateToken.eventIdentifier = Value(Document{{"operationType", "drop"_sd}});
     auto checkResumeToken = createDSEnsureResumeTokenPresent(invalidateToken);
 
     // Add three documents which each have the invalidate resume token. We expect to see this in the
@@ -695,6 +696,7 @@ TEST_F(CheckResumeTokenTest, ShouldNotSwallowUnrelatedInvalidateForStartAfterInv
     invalidateToken.clusterTime = resumeTimestamp;
     invalidateToken.uuid = uuids[0];
     invalidateToken.fromInvalidate = ResumeTokenData::kFromInvalidate;
+    invalidateToken.eventIdentifier = Value(Document{{"operationType", "drop"_sd}});
     auto checkResumeToken = createDSEnsureResumeTokenPresent(invalidateToken);
 
     // Create a second invalidate token with the same clusterTime but a different UUID.

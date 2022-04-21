@@ -261,7 +261,6 @@ commands:
                 cpp_name: passthroughToShard
                 optional: true
                 unstable: true
-            # TODO SERVER-65370: after 6.0, $_generateV2ResumeTokens should be assumed true if absent.
             # TODO SERVER-65369: $_generateV2ResumeTokens can be removed after 7.0.
             $_generateV2ResumeTokens:
                 description: "Internal parameter to signal whether v2 resume tokens should be generated."

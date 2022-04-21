@@ -1,9 +1,8 @@
 /**
- * Test that mongoS explicitly sets the value of $_generateV2ResumeTokens to 'false' on the commands
- * it sends to the shards if no value was specified by the client, and that if a value was
- * specified, it forwards it to the shards. On a replica set, no explicit value is set; the
- * aggregation simply treats it as default-false.
- * TODO SERVER-65370: remove or rework this test when v2 tokens become the default.
+ * Test that mongoS does not set the value of $_generateV2ResumeTokens on the commands it sends to
+ * the shards, if no value was specified by the client. If a value was specified, mongoS forwards it
+ * to the shards. On a replica set, no explicit value is set; the aggregation simply treats it as
+ * default-true.
  * @tags: [
  *   uses_change_streams,
  *   requires_sharding,
@@ -34,24 +33,24 @@ const configColl = configDB.shards;
 assert.commandWorked(shardDB.setProfilingLevel(2));
 assert.commandWorked(configDB.setProfilingLevel(2));
 
-// Create one stream on mongoS that returns v1 tokens, the default.
-const v1MongosStream = mongosColl.watch([], {comment: "v1MongosStream"});
+// Create one stream on mongoS that returns v2 tokens, the default.
+const v2MongosStream = mongosColl.watch([], {comment: "v2MongosStream"});
 
-// Create a second stream on mongoS that explicitly requests v2 tokens.
-const v2MongosStream =
-    mongosColl.watch([], {comment: "v2MongosStream", $_generateV2ResumeTokens: true});
+// Create a second stream on mongoS that explicitly requests v1 tokens.
+const v1MongosStream =
+    mongosColl.watch([], {comment: "v1MongosStream", $_generateV2ResumeTokens: false});
 
-// Create a stream directly on the shard which returns the default v1 tokens.
-const v1ShardStream = shardColl.watch([], {comment: "v1ShardStream"});
+// Create a stream directly on the shard which returns the default v2 tokens.
+const v2ShardStream = shardColl.watch([], {comment: "v2ShardStream"});
 
 // Insert a test document into the collection.
 assert.commandWorked(mongosColl.insert({_id: 1}));
 
 // Wait until all streams have encountered the insert operation.
-assert.soon(() => v1MongosStream.hasNext() && v2MongosStream.hasNext() && v1ShardStream.hasNext());
+assert.soon(() => v1MongosStream.hasNext() && v2MongosStream.hasNext() && v2ShardStream.hasNext());
 
-// Confirm that in a sharded cluster, mongoS explicitly sets $_generateV2ResumeTokens to false on
-// the command that it sends to the shards if nothing was specified by the client.
+// Confirm that in a sharded cluster, when v1 token is explicitly requested, mongoS fowards
+// $_generateV2ResumeTokens:false to the shard.
 profilerHasAtLeastOneMatchingEntryOrThrow({
     profileDB: shardDB,
     filter: {
@@ -72,35 +71,36 @@ profilerHasAtLeastOneMatchingEntryOrThrow({
     }
 });
 
-// Confirm that mongoS correctly forwards the value of $_generateV2ResumeTokens to the shards if it
-// is specified by the client.
+// Confirm that mongoS never sets the $_generateV2ResumeTokens field when client didn't explicitly
+// specify.
 profilerHasAtLeastOneMatchingEntryOrThrow({
     profileDB: shardDB,
     filter: {
         "originatingCommand.aggregate": mongosColl.getName(),
         "originatingCommand.comment": "v2MongosStream",
-        "originatingCommand.$_generateV2ResumeTokens": true
+        "originatingCommand.$_generateV2ResumeTokens": {$exists: false}
     }
 });
 
-// Confirm that we also forward the value of $_generateV2ResumeTokens to the config servers.
+// Confirm that we also do not set the $_generateV2ResumeTokens field on the request sent to the
+// config server.
 profilerHasAtLeastOneMatchingEntryOrThrow({
     profileDB: configDB,
     filter: {
         "originatingCommand.aggregate": configColl.getName(),
         "originatingCommand.comment": "v2MongosStream",
-        "originatingCommand.$_generateV2ResumeTokens": true
+        "originatingCommand.$_generateV2ResumeTokens": {$exists: false}
     }
 });
 
 // Confirm that on a replica set - in this case, a direct connection to the shard - no value is set
 // for $_generateV2ResumeTokens if the client did not specify one. The aggregation defaults to
-// treating the value as false.
+// treating the value as true.
 profilerHasAtLeastOneMatchingEntryOrThrow({
     profileDB: shardDB,
     filter: {
         "originatingCommand.aggregate": mongosColl.getName(),
-        "originatingCommand.comment": "v1ShardStream",
+        "originatingCommand.comment": "v2ShardStream",
         "originatingCommand.$_generateV2ResumeTokens": {$exists: false}
     }
 });

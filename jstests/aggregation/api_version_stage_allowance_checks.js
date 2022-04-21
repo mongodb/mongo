@@ -149,7 +149,7 @@ result = testDB.runCommand({
     pipeline: [{$project: {_id: 0}}],
     cursor: {},
     writeConcern: {w: "majority"},
-    $_generateV2ResumeTokens: true,
+    $_generateV2ResumeTokens: false,
     apiVersion: "1",
     apiStrict: true
 });

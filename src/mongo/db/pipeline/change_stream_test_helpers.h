@@ -57,11 +57,19 @@ const UUID& testUuid();
 LogicalSessionFromClient testLsid();
 
 Document makeResumeToken(Timestamp ts,
-                         ImplicitValue uuid = Value(),
-                         ImplicitValue docKey = Value(),
+                         ImplicitValue uuid,
+                         ImplicitValue docKeyOrOpDesc,
+                         StringData operationType,
                          ResumeTokenData::FromInvalidate fromInvalidate =
                              ResumeTokenData::FromInvalidate::kNotFromInvalidate,
                          size_t txnOpIndex = 0);
+
+Document makeResumeTokenWithEventId(Timestamp ts,
+                                    ImplicitValue uuid,
+                                    ImplicitValue eventIdentifier,
+                                    ResumeTokenData::FromInvalidate fromInvalidate =
+                                        ResumeTokenData::FromInvalidate::kNotFromInvalidate,
+                                    size_t txnOpIndex = 0);
 
 /**
  * Creates an OplogEntry with given parameters and preset defaults for this test suite.
