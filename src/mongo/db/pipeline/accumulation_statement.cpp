@@ -38,6 +38,7 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/query/allowed_contexts.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
@@ -63,6 +64,7 @@ void AccumulationStatement::registerAccumulator(
             str::stream() << "Duplicate accumulator (" << name << ") registered.",
             it == parserMap.end());
     parserMap[name] = {parser, allowedWithApiStrict, allowedWithClientType, requiredMinVersion};
+    operatorCountersGroupAccumulatorExpressions.addCounter(name);
 }
 
 AccumulationStatement::ParserRegistration& AccumulationStatement::getParser(StringData name) {
@@ -118,6 +120,8 @@ AccumulationStatement AccumulationStatement::parseAccumulationStatement(
     tassert(5837900, "Accumulators should only appear in a user operation", expCtx->opCtx);
     assertLanguageFeatureIsAllowed(
         expCtx->opCtx, accName.toString(), allowedWithApiStrict, allowedWithClientType);
+
+    expCtx->incrementGroupAccumulatorExprCounter(accName);
     auto accExpr = parser(expCtx, specElem, vps);
 
     return AccumulationStatement(fieldName.toString(), std::move(accExpr));

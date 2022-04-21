@@ -336,6 +336,10 @@ AuthCounter authCounter;
 AggStageCounters aggStageCounters;
 DotsAndDollarsFieldsCounters dotsAndDollarsFieldsCounters;
 QueryEngineCounters queryEngineCounters;
-OperatorCountersAggExpressions operatorCountersAggExpressions;
-OperatorCountersMatchExpressions operatorCountersMatchExpressions;
+
+OperatorCounters operatorCountersAggExpressions{"operatorCounters.expressions."};
+OperatorCounters operatorCountersMatchExpressions{"operatorCounters.match."};
+OperatorCounters operatorCountersGroupAccumulatorExpressions{"operatorCounters.groupAccumulators."};
+OperatorCounters operatorCountersWindowAccumulatorExpressions{
+    "operatorCounters.windowAccumulators."};
 }  // namespace mongo

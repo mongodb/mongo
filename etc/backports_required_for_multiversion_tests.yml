@@ -236,6 +236,8 @@ last-continuous:
       test_file: jstests/replsets/optime.js
     - ticket: SERVER-66072
       test_file: jstests/aggregation/match_no_swap_rand.js
+    - ticket: SERVER-63049
+      test_file: jstests/noPassthrough/operator_counters_accumulators.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
