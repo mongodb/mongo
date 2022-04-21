@@ -70,9 +70,11 @@ var $config = extendWorkload($config, function($config, $super) {
         const id = this.getIdForThread(collName);
 
         const doMultiUpdate = () => {
-            jsTest.log("tid:" + this.tid + " multiUpdate _id: " + id);
-            assertWhenOwnColl.commandWorked(
-                collection.update({x: id}, {$inc: {counter: 1}}, {multi: true}));
+            const result = db.runCommand(
+                {update: collName, updates: [{q: {x: id}, u: {$inc: {counter: 1}}, multi: true}]});
+            assertWhenOwnColl.commandWorked(result);
+            jsTest.log("tid:" + this.tid + " multiUpdate _id: " + id +
+                       " at operationTime: " + tojson(result.operationTime));
         };
 
         if (TestData.runningWithShardStepdowns && !TestData.runInsideTransaction) {
@@ -107,8 +109,12 @@ var $config = extendWorkload($config, function($config, $super) {
         const id = this.getIdForThread(collName);
 
         const doMultiDelete = () => {
-            jsTest.log("tid:" + this.tid + " multiDelete _id: " + id);
-            assertWhenOwnColl.commandWorked(collection.remove({x: id}, {multi: true}));
+            const result = db.runCommand(
+                {delete: collName, deletes: [{q: {x: id}, limit: 0 /* multi:true */}]});
+            assertWhenOwnColl.commandWorked(result);
+
+            jsTest.log("tid:" + this.tid + " multiDelete _id: " + id +
+                       " at operationTime: " + tojson(result.operationTime));
         };
 
         if (TestData.runningWithShardStepdowns && !TestData.runInsideTransaction) {
@@ -184,7 +190,10 @@ var $config = extendWorkload($config, function($config, $super) {
         while (true) {
             const events = runWithManualRetriesIfInStepdownSuite(consumeChangeStream);
             if (events.length > 0) {
-                this.resumeToken = events[events.length - 1]._id;
+                const lastEvent = events[events.length - 1];
+                this.resumeToken = lastEvent._id;
+                jsTest.log("tid:" + this.tid +
+                           " timestamp of the last event:" + tojson(lastEvent.clusterTime));
             }
 
             events.forEach(event => {
