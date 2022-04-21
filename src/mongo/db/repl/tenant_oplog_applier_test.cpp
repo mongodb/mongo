@@ -1231,5 +1231,47 @@ TEST_F(TenantOplogApplierTest, ApplyResumeTokenInsertThenNoop_Success) {
     applier->join();
 }
 
+TEST_F(TenantOplogApplierTest, ApplyInsert_MultiKeyIndex) {
+    createCollectionWithUuid(_opCtx.get(), NamespaceString::kSessionTransactionsTableNamespace);
+    NamespaceString indexedNss(dbName, "indexedColl");
+    NamespaceString nonIndexedNss(dbName, "nonIndexedColl");
+    auto indexedCollUUID = createCollectionWithUuid(_opCtx.get(), indexedNss);
+    createCollection(_opCtx.get(), nonIndexedNss, CollectionOptions());
+
+    // Create index on the collection.
+    auto indexKey = BSON("val" << 1);
+    auto spec = BSON("v" << int(IndexDescriptor::kLatestIndexVersion) << "key" << indexKey << "name"
+                         << "val_1");
+    createIndex(_opCtx.get(), indexedNss, indexedCollUUID, spec);
+
+    const BSONObj multiKeyDoc = BSON("_id" << 1 << "val" << BSON_ARRAY(1 << 2));
+    const BSONObj singleKeyDoc = BSON("_id" << 2 << "val" << 1);
+
+    auto indexedOp =
+        makeInsertDocumentOplogEntry(OpTime(Timestamp(1, 1), 1LL), indexedNss, multiKeyDoc);
+    auto unindexedOp =
+        makeInsertDocumentOplogEntry(OpTime(Timestamp(2, 1), 1LL), nonIndexedNss, singleKeyDoc);
+
+    pushOps({indexedOp, unindexedOp});
+
+    // Use a writer pool size of 1 to ensure that both ops from the batch are applied in the same
+    // writer worker thread to ensure that the same opCtx is used.
+    auto writerPool = makeTenantMigrationWriterPool(1);
+
+    auto applier = std::make_shared<TenantOplogApplier>(
+        _migrationUuid, _tenantId, OpTime(), &_oplogBuffer, _executor, writerPool.get());
+    ASSERT_OK(applier->startup());
+
+    auto opAppliedFuture = applier->getNotificationForOpTime(unindexedOp.getOpTime());
+    ASSERT_OK(opAppliedFuture.getNoThrow().getStatus());
+
+    ASSERT_TRUE(docExists(_opCtx.get(), indexedNss, multiKeyDoc));
+    ASSERT_TRUE(docExists(_opCtx.get(), nonIndexedNss, singleKeyDoc));
+
+    applier->shutdown();
+    _oplogBuffer.shutdown(_opCtx.get());
+    applier->join();
+}
+
 }  // namespace repl
 }  // namespace mongo

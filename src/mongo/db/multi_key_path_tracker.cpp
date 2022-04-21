@@ -101,6 +101,11 @@ void MultikeyPathTracker::addMultikeyPathInfo(MultikeyPathInfo info) {
     _multikeyPathInfo.emplace_back(info);
 }
 
+void MultikeyPathTracker::clear() {
+    invariant(!_trackMultikeyPathInfo);
+    _multikeyPathInfo.clear();
+}
+
 const WorkerMultikeyPathInfo& MultikeyPathTracker::getMultikeyPathInfo() const {
     return _multikeyPathInfo;
 }
@@ -126,6 +131,10 @@ void MultikeyPathTracker::stopTrackingMultikeyPathInfo() {
 
 bool MultikeyPathTracker::isTrackingMultikeyPathInfo() const {
     return _trackMultikeyPathInfo;
+}
+
+bool MultikeyPathTracker::isEmpty() const {
+    return _multikeyPathInfo.empty();
 }
 
 }  // namespace mongo
