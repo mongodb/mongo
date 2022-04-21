@@ -477,11 +477,12 @@ boost::optional<std::vector<size_t>> HashLookupStage::readIndicesFromRecordStore
     auto [rid, _] = serializeKeyForRecordStore(_probeKey);
     RecordData record;
     if (rs->findRecord(_opCtx, rid, &record)) {
+        // 'BufBuilder' writes numbers in little endian format, so must read them using the same.
         auto valueReader = BufReader(record.data(), record.size());
-        auto nRecords = valueReader.read<size_t>();
+        auto nRecords = valueReader.read<LittleEndian<size_t>>();
         std::vector<size_t> result(nRecords);
         for (size_t i = 0; i < nRecords; ++i) {
-            auto idx = valueReader.read<size_t>();
+            auto idx = valueReader.read<LittleEndian<size_t>>();
             result[i] = idx;
         }
         return result;
