@@ -387,6 +387,7 @@ TEST_F(StorageEngineTest, ReconcileTwoPhaseIndexBuilds) {
     ASSERT_EQUALS(0UL, reconcileResult.indexBuildsToResume.size());
 }
 
+#ifndef _WIN32  // WiredTiger does not support orphan file recovery on Windows.
 TEST_F(StorageEngineRepairTest, LoadCatalogRecoversOrphans) {
     auto opCtx = cc().makeOperationContext();
 
@@ -394,7 +395,8 @@ TEST_F(StorageEngineRepairTest, LoadCatalogRecoversOrphans) {
     auto swCollInfo = createCollection(opCtx.get(), collNs);
     ASSERT_OK(swCollInfo.getStatus());
 
-    ASSERT_OK(dropIdent(opCtx.get()->recoveryUnit(), swCollInfo.getValue().ident));
+    // Drop the ident from the storage engine but keep the underlying files.
+    _storageEngine->getEngine()->dropIdentForImport(opCtx.get(), swCollInfo.getValue().ident);
     ASSERT(collectionExists(opCtx.get(), collNs));
 
     // After the catalog is reloaded, we expect that the ident has been recovered because the
@@ -410,6 +412,7 @@ TEST_F(StorageEngineRepairTest, LoadCatalogRecoversOrphans) {
     StorageRepairObserver::get(getGlobalServiceContext())->onRepairDone(opCtx.get());
     ASSERT_EQ(1U, StorageRepairObserver::get(getGlobalServiceContext())->getModifications().size());
 }
+#endif
 
 TEST_F(StorageEngineRepairTest, ReconcileSucceeds) {
     auto opCtx = cc().makeOperationContext();
