@@ -439,9 +439,9 @@ public:
     LogicalTime getClusterParameterTime() const final {
         if constexpr (hasClusterServerParameter<T>) {
             return getValue().getClusterParameterTime();
-        } else {
-            return LogicalTime();
         }
+
+        return LogicalTime::kUninitialized;
     }
 
     /**

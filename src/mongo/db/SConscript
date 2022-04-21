@@ -517,6 +517,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         'change_stream_options',
+        'service_context',
     ],
 )
 
@@ -874,6 +875,7 @@ env.Library(
         '$BUILD_DIR/mongo/transport/service_entry_point',
         'logical_session_id',
         'logical_session_id_helpers',
+        'operation_time_tracker',
         'repl/repl_coordinator_interface',
         'service_context',
         'session_catalog',
@@ -1876,10 +1878,21 @@ env.Library(
     target='logical_time',
     source=[
         'logical_time.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+    ],
+)
+
+env.Library(
+    target='operation_time_tracker',
+    source=[
         'operation_time_tracker.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        'logical_time',
         'service_context',
     ],
 )
@@ -2105,7 +2118,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/rpc/metadata',
-        'logical_time',
+        'operation_time_tracker',
         'vector_clock',
     ],
 )
@@ -2769,6 +2782,7 @@ if wiredtiger:
             'namespace_string',
             'op_observer',
             'op_observer_impl',
+            'operation_time_tracker',
             'query_exec',
             'range_arithmetic',
             'read_write_concern_defaults_mock',

@@ -335,7 +335,7 @@ TEST(IDLServerParameterWithStorage, CSPStorageTest) {
     test::ChangeStreamOptionsClusterParam retrievedParam = clusterParam->getValue();
     ASSERT_EQ(retrievedParam.getPreAndPostImages().getExpireAfterSeconds(), 30);
     ASSERT_EQ(retrievedParam.getTestStringField(), "");
-    ASSERT_EQ(clusterParam->getClusterParameterTime(), LogicalTime());
+    ASSERT_EQ(clusterParam->getClusterParameterTime(), LogicalTime::kUninitialized);
 
     // Set to new value and check that the updated value is seen on get.
     test::ChangeStreamOptionsClusterParam updatedParam;
@@ -377,8 +377,8 @@ TEST(IDLServerParameterWithStorage, CSPStorageTest) {
     retrievedParam = clusterParam->getValue();
     ASSERT_EQ(retrievedParam.getPreAndPostImages().getExpireAfterSeconds(), 30);
     ASSERT_EQ(retrievedParam.getTestStringField(), "");
-    ASSERT_EQ(retrievedParam.getClusterParameterTime(), LogicalTime());
-    ASSERT_EQ(clusterParam->getClusterParameterTime(), LogicalTime());
+    ASSERT_EQ(retrievedParam.getClusterParameterTime(), LogicalTime::kUninitialized);
+    ASSERT_EQ(clusterParam->getClusterParameterTime(), LogicalTime::kUninitialized);
     ASSERT_EQ(test::count, 2);
 
     // Update the default value. The parameter should automatically reset to the new default value.
@@ -392,8 +392,8 @@ TEST(IDLServerParameterWithStorage, CSPStorageTest) {
     retrievedParam = clusterParam->getValue();
     ASSERT_EQ(retrievedParam.getPreAndPostImages().getExpireAfterSeconds(), 35);
     ASSERT_EQ(retrievedParam.getTestStringField(), "default");
-    ASSERT_EQ(retrievedParam.getClusterParameterTime(), LogicalTime());
-    ASSERT_EQ(clusterParam->getClusterParameterTime(), LogicalTime());
+    ASSERT_EQ(retrievedParam.getClusterParameterTime(), LogicalTime::kUninitialized);
+    ASSERT_EQ(clusterParam->getClusterParameterTime(), LogicalTime::kUninitialized);
     ASSERT_EQ(test::count, 3);
 
     // Updating the default value a second time should have no effect.
@@ -415,7 +415,7 @@ TEST(IDLServerParameterWithStorage, CSPStorageTest) {
     retrievedParam = clusterParam->getValue();
     ASSERT_EQ(retrievedParam.getPreAndPostImages().getExpireAfterSeconds(), 35);
     ASSERT_EQ(retrievedParam.getTestStringField(), "default");
-    ASSERT_EQ(clusterParam->getClusterParameterTime(), LogicalTime());
+    ASSERT_EQ(clusterParam->getClusterParameterTime(), LogicalTime::kUninitialized);
     ASSERT_EQ(test::count, 3);
 }
 

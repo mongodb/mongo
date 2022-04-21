@@ -187,7 +187,7 @@ public:
      * retrieving it via this method.
      */
     virtual LogicalTime getClusterParameterTime() const {
-        return LogicalTime();
+        return LogicalTime::kUninitialized;
     }
 
     bool isTestOnly() const {
