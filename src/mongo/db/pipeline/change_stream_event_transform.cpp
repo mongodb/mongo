@@ -408,7 +408,13 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
         // Note: If the UUID is a missing value (which can be true for events like 'dropDatabase'),
         // 'addField' will not add anything to the document.
         doc.addField(DocumentSourceChangeStream::kCollectionUuidField, uuid);
+    }
 
+    // Check if the FCV is <= 5.3
+    bool FCVLessThanEq53 = serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+    serverGlobalParams.featureCompatibility.isLessThanOrEqualTo(
+    multiversion::FeatureCompatibilityVersion::kVersion_5_3);
+    if ((FCVLessThanEq53 && _changeStreamSpec.getShowExpandedEvents()) || !FCVLessThanEq53) {
         const auto wallTime = input[repl::OplogEntry::kWallClockTimeFieldName];
         checkValueType(wallTime, repl::OplogEntry::kWallClockTimeFieldName, BSONType::Date);
         doc.addField(DocumentSourceChangeStream::kWallTimeField, wallTime);

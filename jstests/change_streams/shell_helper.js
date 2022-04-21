@@ -73,6 +73,7 @@ resumeToken = change._id;
 // Remove the fields we cannot predict, then test that the change is as expected.
 delete change._id;
 delete change.clusterTime;
+delete change.wallTime;
 assert.docEq(change, expected);
 
 jsTestLog("Testing watch() with pipeline");

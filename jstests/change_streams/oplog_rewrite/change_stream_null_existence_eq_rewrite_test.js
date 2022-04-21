@@ -266,6 +266,10 @@ for (let csConfig of [{fullDocument: "updateLookup"}]) {
             for (let i = 0; i < nonOptimizedOutput.length; ++i) {
                 try {
                     assert(i < optimizedOutput.length);
+                    if (optimizedOutput[i].hasOwnProperty("wallTime") &&
+                        nonOptimizedOutput[i].hasOwnProperty("wallTime")) {
+                        optimizedOutput[i].wallTime = nonOptimizedOutput[i].wallTime;
+                    }
                     assert(friendlyEqual(optimizedOutput[i], nonOptimizedOutput[i]));
                 } catch (error) {
                     failedTestCases.push({
