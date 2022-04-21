@@ -108,7 +108,8 @@ class SimulateCrash(bghook.BGHook):
             mdb = process.Process(self.logger, [
                 node.mongod_executable, "--dbpath", path, "--port",
                 str(self.validate_port), "--logpath",
-                node.get_dbpath_prefix() + "/simulateCrashes/validate.log"
+                node.get_dbpath_prefix() + "/simulateCrashes/validate.log", "--setParameter",
+                "enableTestCommands=1"
             ])
             mdb.start()
 
