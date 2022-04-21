@@ -79,8 +79,8 @@ public:
     long long getCollNumOrphanDocs(const UUID& collectionUUID) const;
 
 private:
-    void onStartupRecoveryComplete(OperationContext* opCtx) override final {}
-    void onInitialSyncComplete(OperationContext* opCtx) override final {}
+    void onInitialDataAvailable(OperationContext* opCtx,
+                                bool isMajorityDataAvailable) override final {}
     void onStepUpBegin(OperationContext* opCtx, long long term) override final {}
     void onBecomeArbiter() override final {}
     void onShutdown() override final {}

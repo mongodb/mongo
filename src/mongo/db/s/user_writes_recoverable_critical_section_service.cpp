@@ -53,7 +53,7 @@ bool inRecoveryMode(OperationContext* opCtx) {
     }
 
     const auto memberState = replCoord->getMemberState();
-    return memberState.startup() || memberState.startup2() || memberState.rollback();
+    return memberState.startup2() || memberState.rollback();
 }
 
 }  // namespace user_writes_recoverable_critical_section_util

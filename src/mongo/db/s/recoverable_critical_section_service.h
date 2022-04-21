@@ -104,11 +104,8 @@ public:
     void recoverRecoverableCriticalSections(OperationContext* opCtx);
 
 private:
-    void onStartupRecoveryComplete(OperationContext* opCtx) override final {
-        recoverRecoverableCriticalSections(opCtx);
-    }
-
-    void onInitialSyncComplete(OperationContext* opCtx) override final {
+    void onInitialDataAvailable(OperationContext* opCtx,
+                                bool isMajorityDataAvailable) override final {
         recoverRecoverableCriticalSections(opCtx);
     }
 

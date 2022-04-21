@@ -118,14 +118,17 @@ public:
     virtual void onStartup(OperationContext* opCtx) = 0;
 
     /**
-     * Called after startup recovery has completed.
+     * Called when either initial sync or startup recovery have completed.
+     * Local reads are always available at this point, with no special restrictions on resource
+     * locks. If the "isMajorityDataAvailable" flag is set, the data read locally is also committed
+     * to a majority of replica set members. In the opposite case, the local data may be subject to
+     * rollback attempts, which will also crash the server.
+     * This is one of the first hooks that a node will run after starting up and this is expected to
+     * be evoked strictly before any calls to onRollback, although it may be preceded by OpObserver
+     * calls. In-memory state may be reconstructed here, pending the difference in data availability
+     * described above.
      */
-    virtual void onStartupRecoveryComplete(OperationContext* opCtx) = 0;
-
-    /**
-     * Called after initial sync has completed.
-     */
-    virtual void onInitialSyncComplete(OperationContext* opCtx) = 0;
+    virtual void onInitialDataAvailable(OperationContext* opCtx, bool isMajorityDataAvailable) = 0;
 
     /**
      * Called as part of ReplicationCoordinator shutdown.
@@ -200,8 +203,7 @@ public:
     static ReplicaSetAwareServiceRegistry& get(ServiceContext* serviceContext);
 
     void onStartup(OperationContext* opCtx) final;
-    void onStartupRecoveryComplete(OperationContext* opCtx) final;
-    void onInitialSyncComplete(OperationContext* opCtx) final;
+    void onInitialDataAvailable(OperationContext* opCtx, bool isMajorityDataAvailable) final;
     void onShutdown() final;
     void onStepUpBegin(OperationContext* opCtx, long long term) final;
     void onStepUpComplete(OperationContext* opCtx, long long term) final;

@@ -537,8 +537,6 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(
     LOGV2(4280506, "Reconstructing prepared transactions");
     reconstructPreparedTransactions(opCtx, OplogApplication::Mode::kRecovering);
 
-    ReplicaSetAwareServiceRegistry::get(_service).onStartupRecoveryComplete(opCtx);
-
     const auto lastOpTimeAndWallTimeResult = _externalState->loadLastOpTimeAndWallTime(opCtx);
 
     // Use a callback here, because _finishLoadLocalConfig calls isself() which requires
@@ -833,6 +831,9 @@ void ReplicationCoordinatorImpl::_initialSyncerCompletionFunction(
 
         _topCoord->resetMaintenanceCount();
     }
+
+    ReplicaSetAwareServiceRegistry::get(_service).onInitialDataAvailable(
+        cc().makeOperationContext().get(), false /* isMajorityDataAvailable */);
 
     // Transition from STARTUP2 to RECOVERING and start the producer and the applier.
     // If the member state is REMOVED, this will do nothing until we receive a config with

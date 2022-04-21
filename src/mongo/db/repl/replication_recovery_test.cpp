@@ -53,6 +53,7 @@
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -1612,6 +1613,31 @@ TEST_F(ReplicationRecoveryTest, RecoverySetsValidateFeaturesAsPrimaryToFalseWhil
     recovery.recoverFromOplog(opCtx, boost::none /* recoveryTs */);
 
     ASSERT_FALSE(serverGlobalParams.validateFeaturesAsPrimary.load());
+}
+
+TEST_F(ReplicationRecoveryTest, StartupRecoveryRunsCompletionHook) {
+    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
+    auto opCtx = getOperationContext();
+
+    getConsistencyMarkers()->setOplogTruncateAfterPoint(opCtx, Timestamp(2, 2));
+    getStorageInterfaceRecovery()->setRecoveryTimestamp(Timestamp(4, 4));
+    getConsistencyMarkers()->setAppliedThrough(opCtx, OpTime(Timestamp(4, 4), 1));
+    _setUpOplog(opCtx, getStorageInterface(), {1, 2, 3, 4});
+
+    auto severityGuard = unittest::MinimumLoggedSeverityGuard{logv2::LogComponent::kSharding,
+                                                              logv2::LogSeverity::Debug(2)};
+    startCapturingLogMessages();
+    recovery.recoverFromOplog(opCtx, boost::none);
+    stopCapturingLogMessages();
+
+    ASSERT_EQUALS(1,
+                  countTextFormatLogLinesContaining(
+                      "Recovering all user writes recoverable critical sections"));
+
+    _assertDocsInOplog(opCtx, {1, 2, 3, 4});
+    _assertDocsInTestCollection(opCtx, {});
+
+    ASSERT_EQ(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx), Timestamp());
 }
 
 }  // namespace

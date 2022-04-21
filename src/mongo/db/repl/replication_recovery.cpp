@@ -46,6 +46,7 @@
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/oplog_interface_local.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
+#include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/repl/replication_consistency_markers_impl.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/transaction_oplog_application.h"
@@ -470,6 +471,12 @@ void ReplicationRecoveryImpl::recoverFromOplog(OperationContext* opCtx,
     _truncateOplogIfNeededAndThenClearOplogTruncateAfterPoint(opCtx, &stableTimestamp);
 
     hangAfterOplogTruncationInRollback.pauseWhileSet();
+
+    // Truncation may need to adjust the initialDataTimestamp so we let it complete first.
+    if (!isRollbackRecovery) {
+        ReplicaSetAwareServiceRegistry::get(getGlobalServiceContext())
+            .onInitialDataAvailable(opCtx, true /* isMajorityDataAvailable */);
+    }
 
     auto topOfOplogSW = _getTopOfOplog(opCtx);
     if (topOfOplogSW.getStatus() == ErrorCodes::CollectionIsEmpty ||
