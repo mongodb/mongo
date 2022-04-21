@@ -819,11 +819,8 @@ Status runAggregate(OperationContext* opCtx,
             invariant(nss != NamespaceString::kRsOplogNamespace);
             invariant(!nss.isCollectionlessAggregateNS());
 
-            checkCollectionUUIDMismatch(opCtx,
-                                        nss,
-                                        collections.getMainCollection(),
-                                        request.getCollectionUUID(),
-                                        false /* checkFeatureFlag */);
+            checkCollectionUUIDMismatch(
+                opCtx, nss, collections.getMainCollection(), request.getCollectionUUID());
 
             uassert(ErrorCodes::CommandNotSupportedOnView,
                     "mapReduce on a view is not supported",
@@ -899,11 +896,8 @@ Status runAggregate(OperationContext* opCtx,
         }
 
         // If collectionUUID was provided, verify the collection exists and has the expected UUID.
-        checkCollectionUUIDMismatch(opCtx,
-                                    nss,
-                                    collections.getMainCollection(),
-                                    request.getCollectionUUID(),
-                                    false /* checkFeatureFlag */);
+        checkCollectionUUIDMismatch(
+            opCtx, nss, collections.getMainCollection(), request.getCollectionUUID());
 
         invariant(collatorToUse);
         expCtx = makeExpressionContext(

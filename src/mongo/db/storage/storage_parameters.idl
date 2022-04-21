@@ -140,11 +140,6 @@ feature_flags:
         cpp_varname: feature_flags::gCollModIndexUnique
         default: true
         version: 6.0
-    featureFlagCommandsAcceptCollectionUUID:
-        description: "When enabled, support specifying collection UUID for commands"
-        cpp_varname: feature_flags::gCommandsAcceptCollectionUUID
-        default: true
-        version: 6.0
     featureFlagSelectiveBackup:
         description: "When enabled, support selective backups and restores on collections"
         cpp_varname: feature_flags::gSelectiveBackup

@@ -37,17 +37,10 @@ namespace mongo {
 void checkCollectionUUIDMismatch(OperationContext* opCtx,
                                  const NamespaceString& ns,
                                  const CollectionPtr& coll,
-                                 const boost::optional<UUID>& uuid,
-                                 bool checkFeatureFlag) {
+                                 const boost::optional<UUID>& uuid) {
     if (!uuid) {
         return;
     }
-
-    uassert(ErrorCodes::InvalidOptions,
-            "The collectionUUID parameter is not enabled",
-            !checkFeatureFlag ||
-                feature_flags::gCommandsAcceptCollectionUUID.isEnabled(
-                    serverGlobalParams.featureCompatibility));
 
     auto actualNamespace = CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, *uuid);
     uassert(
