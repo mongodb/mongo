@@ -43,7 +43,6 @@
 #include "mongo/db/pipeline/document_source_change_stream_transform.h"
 #include "mongo/db/pipeline/document_source_change_stream_unwind_transaction.h"
 #include "mongo/db/pipeline/expression.h"
-#include "mongo/s/grid.h"
 
 namespace mongo {
 namespace change_stream_legacy {
@@ -129,99 +128,6 @@ boost::optional<Document> legacyLookupPreImage(boost::intrusive_ptr<ExpressionCo
             !opLogEntry.getObject().isEmpty());
 
     return Document{opLogEntry.getObject().getOwned()};
-}
-
-DocumentKeyCache::DocumentKeyCache(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                   const ResumeTokenData& tokenData)
-    : _expCtx(expCtx) {
-    if (!tokenData.eventIdentifier.missing() && tokenData.uuid) {
-        auto docKey = tokenData.eventIdentifier.getDocument();
-
-        // Newly added events store their operationType and operationDescription as the
-        // eventIdentifier, not a documentKey.
-        if (docKey["_id"].missing()) {
-            return;
-        }
-
-        // Extract the list of documentKey fields from the resume token.
-        std::vector<FieldPath> docKeyFields;
-        auto iter = docKey.fieldIterator();
-        while (iter.more()) {
-            auto fieldPair = iter.next();
-            docKeyFields.push_back(fieldPair.first);
-        }
-
-        // If the document key from the resume token has more than one field, that means it
-        // includes the shard key and thus should never change.
-        const bool isFinal = docKeyFields.size() > 1;
-
-        _cache[tokenData.uuid.get()] = std::make_pair(docKeyFields, isFinal);
-    }
-}
-
-Value DocumentKeyCache::getDocumentKeyForOplogInsert(Document oplogInsert) {
-    tassert(63860,
-            "Expected 'insert' oplog entry",
-            oplogInsert["op"].getType() == BSONType::String &&
-                oplogInsert["op"].getStringData() == "i"_sd);
-
-    auto nss = NamespaceString(oplogInsert["ns"].getStringData());
-    auto uuid = oplogInsert["ui"].getUuid();
-
-    // Extract the documentKey fields from the cache, or add them if not already present.
-    auto it = _cache.find(uuid);
-    if (it == _cache.end() || !it->second.second) {
-        auto docKeyFields = _collectDocumentKeyFieldsForHostedCollection(nss, uuid);
-        if (it == _cache.end() || docKeyFields.second) {
-            _cache[uuid] = docKeyFields;
-        }
-    }
-
-    // Extract the documentKey values from the inserted document.
-    return Value(document_path_support::extractPathsFromDoc(oplogInsert["o"].getDocument(),
-                                                            _cache[uuid].first));
-}
-
-DocumentKeyCache::DocumentKeyCacheEntry
-DocumentKeyCache::_collectDocumentKeyFieldsForHostedCollection(const NamespaceString& nss,
-                                                               const UUID& uuid) const {
-    // If this is a replica set, nothing is sharded and never will be.
-    if (serverGlobalParams.clusterRole != ClusterRole::ShardServer) {
-        return {{"_id"}, true};
-    }
-
-    auto* const catalogCache = Grid::get(_expCtx->opCtx)->catalogCache();
-    auto swCM = catalogCache->getCollectionRoutingInfo(_expCtx->opCtx, nss);
-    if (swCM.isOK()) {
-        const auto& cm = swCM.getValue();
-        if (cm.isSharded() && cm.uuidMatches(uuid)) {
-            // Unpack the shard key. Collection is sharded so mark as final.
-            const auto& shardKeyPattern = cm.getShardKeyPattern().getKeyPatternFields();
-            return {_shardKeyToDocumentKeyFields(shardKeyPattern), true};
-        }
-    } else if (swCM != ErrorCodes::NamespaceNotFound) {
-        uassertStatusOK(std::move(swCM));
-    }
-
-    // An unsharded collection can still become sharded so is not final. If the uuid doesn't match
-    // the one stored in the ScopedCollectionDescription, this implies that the collection has been
-    // dropped and recreated as sharded. We don't know what the old document key fields might have
-    // been in this case so we return just _id.
-    return {{"_id"}, false};
-}
-
-std::vector<FieldPath> DocumentKeyCache::_shardKeyToDocumentKeyFields(
-    const std::vector<std::unique_ptr<FieldRef>>& keyPatternFields) const {
-    std::vector<FieldPath> result;
-    bool gotId = false;
-    for (auto& field : keyPatternFields) {
-        result.emplace_back(field->dottedField());
-        gotId |= (result.back().fullPath() == "_id");
-    }
-    if (!gotId) {  // If not part of the shard key, "_id" comes last.
-        result.emplace_back("_id");
-    }
-    return result;
 }
 
 }  // namespace change_stream_legacy

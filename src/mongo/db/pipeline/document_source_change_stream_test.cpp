@@ -2616,7 +2616,7 @@ TEST_F(ChangeStreamStageTest, CloseCursorEvenIfInvalidateEntriesGetFilteredOut) 
     ASSERT_THROWS(match->getNext(), ExceptionFor<ErrorCodes::ChangeStreamInvalidated>);
 }
 
-TEST_F(ChangeStreamStageTest, DocumentKeyShouldIncludeShardKeyFromResumeTokenWhenNoO2FieldInOplog) {
+TEST_F(ChangeStreamStageTest, DocumentKeyShouldNotIncludeShardKeyWhenNoO2FieldInOplog) {
     const Timestamp ts(3, 45);
     const long long term = 4;
     const auto opTime = repl::OpTime(ts, term);
@@ -2640,17 +2640,16 @@ TEST_F(ChangeStreamStageTest, DocumentKeyShouldIncludeShardKeyFromResumeTokenWhe
                                       boost::none,          // o2
                                       opTime);              // opTime
 
+    // The documentKey should have just an _id in this case.
     Document expectedInsert{
-        {DSChangeStream::kIdField, makeResumeToken(ts, uuid, insertDoc)},
+        {DSChangeStream::kIdField, makeResumeToken(ts, uuid, D{{"_id", 2}})},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kInsertOpType},
         {DSChangeStream::kClusterTimeField, ts},
         {DSChangeStream::kWallTimeField, Date_t()},
         {DSChangeStream::kFullDocumentField, D{{"_id", 2}, {"shardKey", 3}}},
         {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
-        {DSChangeStream::kDocumentKeyField, D{{"_id", 2}, {"shardKey", 3}}},
+        {DSChangeStream::kDocumentKeyField, D{{"_id", 2}}},
     };
-    // Although the chunk manager and sharding catalog are not aware of the shard key in this test,
-    // the expectation is for the $changeStream stage to infer the shard key from the resume token.
     checkTransformation(
         insertEntry, expectedInsert, BSON("$changeStream" << BSON("resumeAfter" << resumeToken)));
 
@@ -2659,7 +2658,7 @@ TEST_F(ChangeStreamStageTest, DocumentKeyShouldIncludeShardKeyFromResumeTokenWhe
         insertEntry, expectedInsert, BSON("$changeStream" << BSON("startAfter" << resumeToken)));
 }
 
-TEST_F(ChangeStreamStageTest, DocumentKeyShouldPrioritizeO2FieldOverDocumentKeyCache) {
+TEST_F(ChangeStreamStageTest, DocumentKeyShouldUseO2FieldInOplog) {
     const Timestamp ts(3, 45);
     const long long term = 4;
     const auto opTime = repl::OpTime(ts, term);
@@ -2695,47 +2694,6 @@ TEST_F(ChangeStreamStageTest, DocumentKeyShouldPrioritizeO2FieldOverDocumentKeyC
     };
     // When o2 is present in the oplog entry, we should use its value for the document key, even if
     // the resume token doesn't contain shard key.
-    checkTransformation(
-        insertEntry, expectedInsert, BSON("$changeStream" << BSON("resumeAfter" << resumeToken)));
-
-    // Verify the same behavior with resuming using 'startAfter'.
-    checkTransformation(
-        insertEntry, expectedInsert, BSON("$changeStream" << BSON("startAfter" << resumeToken)));
-}
-
-TEST_F(ChangeStreamStageTest, DocumentKeyShouldNotIncludeShardKeyFieldsIfNotPresentInOplogEntry) {
-    const Timestamp ts(3, 45);
-    const long long term = 4;
-    const auto opTime = repl::OpTime(ts, term);
-    const auto uuid = testUuid();
-
-    std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
-    CollectionCatalog::write(getExpCtx()->opCtx, [&](CollectionCatalog& catalog) {
-        catalog.registerCollection(getExpCtx()->opCtx, uuid, std::move(collection));
-    });
-
-    BSONObj docKey = BSON("_id" << 1 << "shardKey" << 2);
-    auto resumeToken = makeResumeToken(ts, uuid, docKey);
-
-    // Note that the 'o' field in the oplog entry does not contain the shard key field.
-    BSONObj insertDoc = BSON("_id" << 2);
-    auto insertEntry = makeOplogEntry(OpTypeEnum::kInsert,  // op type
-                                      nss,                  // namespace
-                                      insertDoc,            // o
-                                      uuid,                 // uuid
-                                      boost::none,          // fromMigrate
-                                      boost::none,          // o2
-                                      opTime);              // opTime
-
-    Document expectedInsert{
-        {DSChangeStream::kIdField, makeResumeToken(ts, uuid, insertDoc)},
-        {DSChangeStream::kOperationTypeField, DSChangeStream::kInsertOpType},
-        {DSChangeStream::kClusterTimeField, ts},
-        {DSChangeStream::kWallTimeField, Date_t()},
-        {DSChangeStream::kFullDocumentField, D{{"_id", 2}}},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
-        {DSChangeStream::kDocumentKeyField, D{{"_id", 2}}},
-    };
     checkTransformation(
         insertEntry, expectedInsert, BSON("$changeStream" << BSON("resumeAfter" << resumeToken)));
 
@@ -3543,8 +3501,7 @@ TEST_F(ChangeStreamStageDBTest, MatchFiltersNoOp) {
     checkTransformation(noOp, boost::none);
 }
 
-TEST_F(ChangeStreamStageDBTest,
-       DocumentKeyShouldIncludeShardKeyFromResumeTokenWhenNoO2FieldInOplog) {
+TEST_F(ChangeStreamStageDBTest, DocumentKeyShouldNotIncludeShardKeyWhenNoO2FieldInOplog) {
     const Timestamp ts(3, 45);
     const long long term = 4;
     const auto opTime = repl::OpTime(ts, term);
@@ -3567,22 +3524,21 @@ TEST_F(ChangeStreamStageDBTest,
                                       boost::none,          // o2
                                       opTime);              // opTime
 
+    // The documentKey should just have an _id in this case.
     Document expectedInsert{
-        {DSChangeStream::kIdField, makeResumeToken(ts, uuid, insertDoc)},
+        {DSChangeStream::kIdField, makeResumeToken(ts, uuid, D{{"_id", 2}})},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kInsertOpType},
         {DSChangeStream::kClusterTimeField, ts},
         {DSChangeStream::kWallTimeField, Date_t()},
         {DSChangeStream::kFullDocumentField, D{{"_id", 2}, {"shardKey", 3}}},
         {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
-        {DSChangeStream::kDocumentKeyField, D{{"_id", 2}, {"shardKey", 3}}},
+        {DSChangeStream::kDocumentKeyField, D{{"_id", 2}}},
     };
-    // Although the chunk manager and sharding catalog are not aware of the shard key in this test,
-    // the expectation is for the $changeStream stage to infer the shard key from the resume token.
     checkTransformation(
         insertEntry, expectedInsert, BSON("$changeStream" << BSON("resumeAfter" << resumeToken)));
 }
 
-TEST_F(ChangeStreamStageDBTest, DocumentKeyShouldPrioritizeO2FieldOverDocumentKeyCache) {
+TEST_F(ChangeStreamStageDBTest, DocumentKeyShouldUseO2FieldInOplog) {
     const Timestamp ts(3, 45);
     const long long term = 4;
     const auto opTime = repl::OpTime(ts, term);
@@ -3617,81 +3573,6 @@ TEST_F(ChangeStreamStageDBTest, DocumentKeyShouldPrioritizeO2FieldOverDocumentKe
     };
     // When o2 is present in the oplog entry, we should use its value for the document key, even if
     // the resume token doesn't contain shard key.
-    checkTransformation(
-        insertEntry, expectedInsert, BSON("$changeStream" << BSON("resumeAfter" << resumeToken)));
-}
-
-TEST_F(ChangeStreamStageDBTest, DocumentKeyShouldNotIncludeShardKeyFieldsIfNotPresentInOplogEntry) {
-    const Timestamp ts(3, 45);
-    const long long term = 4;
-    const auto opTime = repl::OpTime(ts, term);
-    const auto uuid = testUuid();
-
-    std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
-    CollectionCatalog::write(getExpCtx()->opCtx, [&](CollectionCatalog& catalog) {
-        catalog.registerCollection(getExpCtx()->opCtx, uuid, std::move(collection));
-    });
-
-    BSONObj docKey = BSON("_id" << 1 << "shardKey" << 2);
-    auto resumeToken = makeResumeToken(ts, uuid, docKey);
-
-    // Note that the 'o' field in the oplog entry does not contain the shard key field.
-    BSONObj insertDoc = BSON("_id" << 2);
-    auto insertEntry = makeOplogEntry(OpTypeEnum::kInsert,  // op type
-                                      nss,                  // namespace
-                                      insertDoc,            // o
-                                      uuid,                 // uuid
-                                      boost::none,          // fromMigrate
-                                      boost::none,          // o2
-                                      opTime);              // opTime
-
-    Document expectedInsert{
-        {DSChangeStream::kIdField, makeResumeToken(ts, uuid, insertDoc)},
-        {DSChangeStream::kOperationTypeField, DSChangeStream::kInsertOpType},
-        {DSChangeStream::kClusterTimeField, ts},
-        {DSChangeStream::kWallTimeField, Date_t()},
-        {DSChangeStream::kFullDocumentField, D{{"_id", 2}}},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
-        {DSChangeStream::kDocumentKeyField, D{{"_id", 2}}},
-    };
-    checkTransformation(
-        insertEntry, expectedInsert, BSON("$changeStream" << BSON("resumeAfter" << resumeToken)));
-}
-
-TEST_F(ChangeStreamStageDBTest, DocumentKeyShouldNotIncludeShardKeyIfResumeTokenDoesntContainUUID) {
-    const Timestamp ts(3, 45);
-    const long long term = 4;
-    const auto opTime = repl::OpTime(ts, term);
-    const auto uuid = testUuid();
-
-    std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
-    CollectionCatalog::write(getExpCtx()->opCtx, [&](CollectionCatalog& catalog) {
-        catalog.registerCollection(getExpCtx()->opCtx, uuid, std::move(collection));
-    });
-
-    // Create a resume token from only the timestamp.
-    auto resumeToken = makeResumeToken(ts);
-
-    // Insert oplog entry contains shardKey, however we are not able to extract the shard key from
-    // the resume token.
-    BSONObj insertDoc = BSON("_id" << 2 << "shardKey" << 3);
-    auto insertEntry = makeOplogEntry(OpTypeEnum::kInsert,  // op type
-                                      nss,                  // namespace
-                                      insertDoc,            // o
-                                      uuid,                 // uuid
-                                      boost::none,          // fromMigrate
-                                      boost::none,          // o2
-                                      opTime);              // opTime
-
-    Document expectedInsert{
-        {DSChangeStream::kIdField, makeResumeToken(ts, uuid, BSON("_id" << 2))},
-        {DSChangeStream::kOperationTypeField, DSChangeStream::kInsertOpType},
-        {DSChangeStream::kClusterTimeField, ts},
-        {DSChangeStream::kWallTimeField, Date_t()},
-        {DSChangeStream::kFullDocumentField, D{{"_id", 2}, {"shardKey", 3}}},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
-        {DSChangeStream::kDocumentKeyField, D{{"_id", 2}}},
-    };
     checkTransformation(
         insertEntry, expectedInsert, BSON("$changeStream" << BSON("resumeAfter" << resumeToken)));
 }

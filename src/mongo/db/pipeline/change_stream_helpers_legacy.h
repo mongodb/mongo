@@ -50,32 +50,6 @@ boost::optional<Document> legacyLookupPreImage(boost::intrusive_ptr<ExpressionCo
                                                const Document& preImageId);
 
 /**
- * Maintains a document key cache. The cache will be used when the insert oplog entry does not
- * contain the documentKey. This can happen when reading an oplog entry written by an older version
- * of the server. Extracts the documentKey from the resume token on construction, and consults the
- * sharding catalog as needed when getDocumentKeyForOplogInsert is called.
- * TODO SERVER-64992: remove documentKey caching after branching for 6.0.
- */
-class DocumentKeyCache {
-public:
-    using DocumentKeyCacheEntry = std::pair<std::vector<FieldPath>, bool>;
-
-    DocumentKeyCache(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                     const ResumeTokenData& token);
-
-    Value getDocumentKeyForOplogInsert(Document oplogInsert);
-
-private:
-    DocumentKeyCacheEntry _collectDocumentKeyFieldsForHostedCollection(const NamespaceString& nss,
-                                                                       const UUID& uuid) const;
-    std::vector<FieldPath> _shardKeyToDocumentKeyFields(
-        const std::vector<std::unique_ptr<FieldRef>>& keyPatternFields) const;
-
-    boost::intrusive_ptr<ExpressionContext> _expCtx;
-    std::map<UUID, DocumentKeyCacheEntry> _cache;
-};
-
-/**
  * Represents the change stream operation types that are NOT guarded behind the 'showExpandedEvents'
  * flag.
  */

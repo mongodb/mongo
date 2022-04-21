@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/pipeline/change_stream_helpers_legacy.h"
 #include "mongo/db/pipeline/document_source_change_stream_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
 
@@ -85,10 +84,6 @@ public:
 
     Document applyTransformation(const Document& fromDoc) const override;
     std::set<std::string> getFieldNameDependencies() const override;
-
-private:
-    // Records the documentKey fields from the client's resume token, if present.
-    std::unique_ptr<change_stream_legacy::DocumentKeyCache> _documentKeyCache;
 };
 
 /**
