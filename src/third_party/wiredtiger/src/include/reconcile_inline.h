@@ -358,6 +358,26 @@ __wt_rec_cell_build_addr(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_ADDR *add
     __rec_cell_addr_stats(r, ta);
 
     /*
+     * If passed fast-delete information, override the cell type. We should never see fast-truncate
+     * cell types without fast-truncate information.
+     */
+    WT_ASSERT(session, page_del != NULL || cell_type != WT_CELL_ADDR_DEL);
+    if (page_del != NULL) {
+        /*
+         * We only fast-truncate leaf pages without overflow items, however, we can write a proxy
+         * cell for a page, evict and then read the internal page, and then checkpoint is writing it
+         * again.
+         */
+        WT_ASSERT(session, cell_type == WT_CELL_ADDR_DEL || cell_type == WT_CELL_ADDR_LEAF_NO);
+        cell_type = WT_CELL_ADDR_DEL;
+
+        /* We should never be in an in-progress prepared state. */
+        WT_ASSERT(session,
+          page_del->prepare_state == WT_PREPARE_INIT ||
+            page_del->prepare_state == WT_PREPARE_RESOLVED);
+    }
+
+    /*
      * We don't copy the data into the buffer, it's not necessary; just re-point the buffer's
      * data/length fields.
      */
