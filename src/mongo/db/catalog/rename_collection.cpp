@@ -116,6 +116,10 @@ Status checkSourceAndTargetNamespaces(OperationContext* opCtx,
                       str::stream() << "Source collection " << source.ns() << " does not exist");
     }
 
+    if (sourceColl->getCollectionOptions().encryptedFieldConfig) {
+        return Status(ErrorCodes::IllegalOperation, "Cannot rename an encrypted collection");
+    }
+
     IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(sourceColl->uuid());
 
     const auto targetColl = catalog->lookupCollectionByNamespace(opCtx, target);
@@ -125,6 +129,11 @@ Status checkSourceAndTargetNamespaces(OperationContext* opCtx,
             return Status(ErrorCodes::NamespaceExists,
                           str::stream() << "a view already exists with that name: " << target);
     } else {
+        if (targetColl->getCollectionOptions().encryptedFieldConfig) {
+            return Status(ErrorCodes::IllegalOperation,
+                          "Cannot rename to an existing encrypted collection");
+        }
+
         if (!targetExistsAllowed && !options.dropTarget)
             return Status(ErrorCodes::NamespaceExists, "target namespace exists");
     }
