@@ -78,6 +78,9 @@ namespace {
 
 const auto getInstance = ServiceContext::declareDecoration<ShardingInitializationMongoD>();
 
+const ReplicaSetAwareServiceRegistry::Registerer<ShardingInitializationMongoD> _registryRegisterer(
+    "ShardingInitializationMongoDRegistry");
+
 auto makeEgressHooksList(ServiceContext* service) {
     auto unshardedHookList = std::make_unique<rpc::EgressMetadataHookList>();
     unshardedHookList->addHook(std::make_unique<rpc::VectorClockMetadataHook>(service));
@@ -483,6 +486,21 @@ void ShardingInitializationMongoD::updateShardIdentityConfigString(
                           "Error encountered while trying to update config connection string",
                           "newConnectionString"_attr = newConnectionString.toString(),
                           "error"_attr = redact(status));
+        }
+    }
+}
+
+void ShardingInitializationMongoD::onInitialDataAvailable(OperationContext* opCtx,
+                                                          bool isMajorityDataAvailable) {
+    // This function may take the global lock.
+    auto shardingInitialized = initializeShardingAwarenessIfNeeded(opCtx);
+    if (shardingInitialized) {
+        auto status = waitForShardRegistryReload(opCtx);
+        if (!status.isOK()) {
+            LOGV2(6460100,
+                  "Error loading shard registry at startup {error}",
+                  "Error loading shard registry at startup",
+                  "error"_attr = redact(status));
         }
     }
 }

@@ -31,6 +31,7 @@
 
 #include <memory>
 
+#include "mongo/db/catalog/database_holder_mock.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_test_fixture.h"
@@ -193,6 +194,8 @@ public:
         replCoord->setMyLastAppliedOpTimeAndWallTime(
             repl::OpTimeAndWallTime(repl::OpTime(Timestamp(1, 1), _term), Date_t()));
         repl::ReplicationCoordinator::set(serviceContext, std::move(replCoord));
+
+        DatabaseHolder::set(getServiceContext(), std::make_unique<DatabaseHolderMock>());
     }
 
 protected:

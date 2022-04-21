@@ -237,6 +237,56 @@ TEST_F(ShardingInitializationMongoDTest, InitializeAgainWithMatchingShardIdentit
     ASSERT_EQ("config/a:1,b:2", shardRegistry()->getConfigServerConnectionString().toString());
 }
 
+TEST_F(ShardingInitializationMongoDTest, InitializeAgainWithNonMatchingShardIdentityFails) {
+    // Must hold a lock to call initializeFromShardIdentity.
+    Lock::GlobalWrite lk(operationContext());
+
+    auto clusterID = OID::gen();
+    ShardIdentityType shardIdentity;
+    shardIdentity.setConfigsvrConnectionString(
+        ConnectionString(ConnectionString::ConnectionType::kReplicaSet, "a:1,b:2", "config"));
+    shardIdentity.setShardName(kShardName);
+    shardIdentity.setClusterId(clusterID);
+
+    shardingInitialization()->initializeFromShardIdentity(operationContext(), shardIdentity);
+
+    shardingInitialization()->setGlobalInitMethodForTest(
+        [](OperationContext* opCtx, const ShardIdentity& shardIdentity) {
+            FAIL("Should not be invoked!");
+        });
+
+    // Running again the initialization with a different shardName must result in an error
+    {
+        ShardIdentityType shardIdentity2 = shardIdentity;
+        shardIdentity2.setShardName("AnotherShardName");
+        ASSERT_THROWS_CODE(shardingInitialization()->initializeFromShardIdentity(operationContext(),
+                                                                                 shardIdentity2),
+                           AssertionException,
+                           40371);
+    }
+
+    // Running again the initialization with a different clusterId must result in an error
+    {
+        ShardIdentityType shardIdentity2 = shardIdentity;
+        shardIdentity2.setClusterId(OID::gen());
+        ASSERT_THROWS_CODE(shardingInitialization()->initializeFromShardIdentity(operationContext(),
+                                                                                 shardIdentity2),
+                           AssertionException,
+                           40372);
+    }
+
+    // Running again the initialization with a different ReplicaSetName must result in an error
+    {
+        ShardIdentityType shardIdentity2 = shardIdentity;
+        shardIdentity2.setConfigsvrConnectionString(
+            ConnectionString(ConnectionString::ConnectionType::kReplicaSet, "a:1,b:2", "config2"));
+        ASSERT_THROWS_CODE(shardingInitialization()->initializeFromShardIdentity(operationContext(),
+                                                                                 shardIdentity2),
+                           AssertionException,
+                           40374);
+    }
+}
+
 TEST_F(ShardingInitializationMongoDTest, InitializeAgainWithMatchingReplSetNameSucceeds) {
     // Must hold a lock to call initializeFromShardIdentity.
     Lock::GlobalWrite lk(operationContext());
@@ -318,6 +368,8 @@ TEST_F(
         return shardIdentity.toShardIdentityDocument();
     }();
 
+    ASSERT(shardingInitialization()->initializeShardingAwarenessIfNeeded(operationContext()));
+    // A second call with the same parameters shouldn't trigger any error.
     ASSERT(shardingInitialization()->initializeShardingAwarenessIfNeeded(operationContext()));
 }
 
@@ -477,6 +529,64 @@ TEST_F(
                                 validShardIdentity);
     }
 
+    ASSERT(shardingInitialization()->initializeShardingAwarenessIfNeeded(operationContext()));
+    // A second call with the same parameters shouldn't trigger any error.
+    ASSERT(shardingInitialization()->initializeShardingAwarenessIfNeeded(operationContext()));
+}
+
+TEST_F(
+    ShardingInitializationMongoDTest,
+    InitializeShardingAwarenessIfNeededNotQueryableBackupModeAndShardServerAsIfLogicalInitialSync) {
+    // No valid ShardIdentity yet, since we will get it through initial sync.
+    ASSERT(!shardingInitialization()->initializeShardingAwarenessIfNeeded(operationContext()));
+
+    BSONObj validShardIdentity = [&] {
+        ShardIdentityType shardIdentity;
+        shardIdentity.setConfigsvrConnectionString(
+            ConnectionString(ConnectionString::ConnectionType::kReplicaSet, "a:1,b:2", "config"));
+        shardIdentity.setShardName(kShardName);
+        shardIdentity.setClusterId(OID::gen());
+        ASSERT_OK(shardIdentity.validate());
+        return shardIdentity.toShardIdentityDocument();
+    }();
+
+    // An OpObserver will react to this insertion and initialize the ShardingState.
+    _dbDirectClient->insert(NamespaceString::kServerConfigurationNamespace.toString(),
+                            validShardIdentity);
+    ASSERT(shardingState()->enabled());
+
+    // This call represents the one done by the onInitialDataAvailable. It should be a no-op.
+    ASSERT(shardingInitialization()->initializeShardingAwarenessIfNeeded(operationContext()));
+}
+
+TEST_F(ShardingInitializationMongoDTest,
+       InitializeShardingAwarenessIfNeededNotQueryableBackupModeAndShardServerAsIfFCBIS) {
+    // No valid ShardIdentity yet, since we will get it through initial sync.
+    ASSERT(!shardingInitialization()->initializeShardingAwarenessIfNeeded(operationContext()));
+
+    // Insert the shardIdentity doc to disk while pretending that we are in "standalone" mode,
+    // otherwise OpObserver for inserts will prevent the insert from occurring because the
+    // shardIdentity doc is invalid
+    {
+        ScopedSetStandaloneMode standalone(getServiceContext());
+
+        BSONObj validShardIdentity = [&] {
+            ShardIdentityType shardIdentity;
+            shardIdentity.setConfigsvrConnectionString(ConnectionString(
+                ConnectionString::ConnectionType::kReplicaSet, "a:1,b:2", "config"));
+            shardIdentity.setShardName(kShardName);
+            shardIdentity.setClusterId(OID::gen());
+            ASSERT_OK(shardIdentity.validate());
+            return shardIdentity.toShardIdentityDocument();
+        }();
+
+        _dbDirectClient->insert(NamespaceString::kServerConfigurationNamespace.toString(),
+                                validShardIdentity);
+    }
+
+    ASSERT(!shardingState()->enabled());
+
+    // This call represents the one done by the onInitialDataAvailable. It should be a no-op.
     ASSERT(shardingInitialization()->initializeShardingAwarenessIfNeeded(operationContext()));
 }
 
