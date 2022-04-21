@@ -2744,4 +2744,23 @@ Status WiredTigerKVEngine::reconfigureLogging() {
     return wtRCToStatus(_conn->reconfigure(_conn, verboseConfig.c_str()), nullptr);
 }
 
+StatusWith<BSONObj> WiredTigerKVEngine::getStorageMetadata(StringData ident) const {
+    auto session = _sessionCache->getSession();
+
+    auto tableMetadata =
+        WiredTigerUtil::getMetadata(session->getSession(), "table:{}"_format(ident));
+    if (!tableMetadata.isOK()) {
+        return tableMetadata.getStatus();
+    }
+
+    auto fileMetadata =
+        WiredTigerUtil::getMetadata(session->getSession(), "file:{}.wt"_format(ident));
+    if (!fileMetadata.isOK()) {
+        return fileMetadata.getStatus();
+    }
+
+    return BSON("tableMetadata" << tableMetadata.getValue() << "fileMetadata"
+                                << fileMetadata.getValue());
+}
+
 }  // namespace mongo

@@ -383,6 +383,8 @@ public:
 
     Status reconfigureLogging() override;
 
+    StatusWith<BSONObj> getStorageMetadata(StringData ident) const override;
+
 private:
     class WiredTigerSessionSweeper;
 
