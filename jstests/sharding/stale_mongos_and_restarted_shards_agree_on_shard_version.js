@@ -160,6 +160,12 @@ const staleMongoS = st.s1;
     // Restart the shard to have UNKNOWN shard version.
     st.restartShardRS(0);
 
+    // Anticipate a refresh of the logical session cache to avoid the risk of it happening later by
+    // affecting the actual number of refreshing threads and sharding statistics. In sharded
+    // clusters, the logical session collection is sharded and any operations on it require the
+    // cached metadata to be updated, causing a refresh if necessary.
+    st.shard0.adminCommand({_flushRoutingTableCacheUpdates: 'config.system.sessions'});
+
     let failPoint = configureFailPoint(st.shard0, 'hangInRecoverRefreshThread');
 
     const parallelCommand = function(kDatabaseName, kCollectionName, i) {
@@ -210,15 +216,13 @@ const staleMongoS = st.s1;
     assert.eq(kNumThreadsForConvoyTest,
               freshMongoS.getDB(kDatabaseName).TestConvoyColl.countDocuments({a: 1}));
 
-    // Check for the expected number of refreshes.
+    // There must be two refreshes: one for convoy and another for the logical session.
     const catalogCacheStatistics =
         st.shard0.adminCommand({serverStatus: 1}).shardingStatistics.catalogCache;
-
-    // TODO (SERVER-64728): Remove the first predicate once 6.0 branches out.
-    const countRefreshes = catalogCacheStatistics.countFullRefreshesStarted +
-        catalogCacheStatistics.countIncrementalRefreshesStarted -
-        catalogCacheStatistics.countFailedRefreshes;
-    assert(countRefreshes == 20 || countRefreshes == 1, "Number of refreshes: " + countRefreshes);
+    assert.eq(2,
+              catalogCacheStatistics.countFullRefreshesStarted +
+                  catalogCacheStatistics.countIncrementalRefreshesStarted -
+                  catalogCacheStatistics.countFailedRefreshes);
 }
 
 st.stop();
