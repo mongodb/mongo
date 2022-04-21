@@ -140,7 +140,32 @@ public:
     }
 
     void visit(const InMatchExpression* expr) override {
-        unsupportedExpression(expr);
+        uassert(ErrorCodes::InternalErrorNotSupported,
+                "$in with regexes is not supported.",
+                expr->getRegexes().empty());
+
+        const auto& equalities = expr->getEqualities();
+
+        // $in with an empty equalities list matches nothing; replace with constant false.
+        if (equalities.empty()) {
+            generateBoolConstant(false);
+            return;
+        }
+
+        // Additively compose equality comparisons, creating one for each constant in 'equalities'.
+        auto [firstTag, firstVal] = convertFrom(Value(equalities[0]));
+        ABT result = make<PathCompare>(Operations::Eq, make<Constant>(firstTag, firstVal));
+        for (size_t i = 1; i < equalities.size(); i++) {
+            auto [tag, val] = convertFrom(Value(equalities[i]));
+            result = make<PathComposeA>(
+                std::move(result), make<PathCompare>(Operations::Eq, make<Constant>(tag, val)));
+        }
+
+        // The path can be empty if we are within an $elemMatch.
+        if (!expr->path().empty()) {
+            result = generateFieldPath(FieldPath(expr->path().toString()), std::move(result));
+        }
+        _ctx.push(std::move(result));
     }
 
     void visit(const InternalBucketGeoWithinMatchExpression* expr) override {

@@ -41,6 +41,185 @@ namespace {
 
 using namespace optimizer;
 
+TEST(ABTTranslate, MatchWithInEmptyList) {
+    // A $match with $in and an empty equalities list should not match any documents.
+    ABT emptyListIn = translatePipeline("[{$match: {a: {$in: []}}}]");
+    ASSERT_EXPLAIN_V2(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       scan_0\n"
+        "|   RefBlock: \n"
+        "|       Variable [scan_0]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [scan_0]\n"
+        "|   PathConstant []\n"
+        "|   Const [false]\n"
+        "Scan [collection]\n"
+        "    BindBlock:\n"
+        "        [scan_0]\n"
+        "            Source []\n",
+        emptyListIn);
+}
+
+TEST(ABTTranslate, MatchWithInSingletonList) {
+    // A $match with $in and singleton equalities list should simplify to single equality.
+    ABT singletonListIn = translatePipeline("[{$match: {a: {$in: [1]}}}]");
+    ASSERT_EXPLAIN_V2(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       scan_0\n"
+        "|   RefBlock: \n"
+        "|       Variable [scan_0]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [scan_0]\n"
+        "|   PathGet [a]\n"
+        "|   PathTraverse []\n"
+        "|   PathCompare [Eq]\n"
+        "|   Const [1]\n"
+        "Scan [collection]\n"
+        "    BindBlock:\n"
+        "        [scan_0]\n"
+        "            Source []\n",
+        singletonListIn);
+}
+
+TEST(ABTTranslate, MatchWithInList) {
+    // A $match with $in and a list of equalities becomes a series of nested comparisons.
+    ABT listIn = translatePipeline("[{$match: {a: {$in: [1, 2, 3]}}}]");
+    ASSERT_EXPLAIN_V2(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       scan_0\n"
+        "|   RefBlock: \n"
+        "|       Variable [scan_0]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [scan_0]\n"
+        "|   PathGet [a]\n"
+        "|   PathTraverse []\n"
+        "|   PathComposeA []\n"
+        "|   |   PathCompare [Eq]\n"
+        "|   |   Const [3]\n"
+        "|   PathComposeA []\n"
+        "|   |   PathCompare [Eq]\n"
+        "|   |   Const [2]\n"
+        "|   PathCompare [Eq]\n"
+        "|   Const [1]\n"
+        "Scan [collection]\n"
+        "    BindBlock:\n"
+        "        [scan_0]\n"
+        "            Source []\n",
+        listIn);
+}
+
+TEST(ABTTranslate, MatchWithInDuplicateElementsRemoved) {
+    // A $match with $in and a list of equalities has the duplicates removed from the list.
+    ABT listIn = translatePipeline("[{$match: {a: {$in: ['abc', 'def', 'ghi', 'def']}}}]");
+    ASSERT_EXPLAIN_V2(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       scan_0\n"
+        "|   RefBlock: \n"
+        "|       Variable [scan_0]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [scan_0]\n"
+        "|   PathGet [a]\n"
+        "|   PathTraverse []\n"
+        "|   PathComposeA []\n"
+        "|   |   PathCompare [Eq]\n"
+        "|   |   Const [\"ghi\"]\n"
+        "|   PathComposeA []\n"
+        "|   |   PathCompare [Eq]\n"
+        "|   |   Const [\"def\"]\n"
+        "|   PathCompare [Eq]\n"
+        "|   Const [\"abc\"]\n"
+        "Scan [collection]\n"
+        "    BindBlock:\n"
+        "        [scan_0]\n"
+        "            Source []\n",
+        listIn);
+}
+
+TEST(ABTTranslate, MatchWithElemMatchAndIn) {
+    ABT elemMatchIn = translatePipeline("[{$match: {'a.b': {$elemMatch: {$in: [1, 2, 3]}}}}]");
+
+    // The PathGet and PathTraverse operators interact correctly when $in is under $elemMatch.
+    ASSERT_EXPLAIN_V2(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       scan_0\n"
+        "|   RefBlock: \n"
+        "|       Variable [scan_0]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [scan_0]\n"
+        "|   PathGet [a]\n"
+        "|   PathTraverse []\n"
+        "|   PathGet [b]\n"
+        "|   PathComposeM []\n"
+        "|   |   PathArr []\n"
+        "|   PathTraverse []\n"
+        "|   PathComposeA []\n"
+        "|   |   PathCompare [Eq]\n"
+        "|   |   Const [3]\n"
+        "|   PathComposeA []\n"
+        "|   |   PathCompare [Eq]\n"
+        "|   |   Const [2]\n"
+        "|   PathCompare [Eq]\n"
+        "|   Const [1]\n"
+        "Scan [collection]\n"
+        "    BindBlock:\n"
+        "        [scan_0]\n"
+        "            Source []\n",
+        elemMatchIn);
+}
+
+TEST(ABTTranslate, MatchWithOrConvertedToIn) {
+    ABT orTranslated = translatePipeline("[{$match: {$or: [{a: 1}, {a: 2}, {a: 3}]}}]");
+    ABT inTranslated = translatePipeline("[{$match: {a: {$in: [1, 2, 3]}}}]");
+
+    PrefixId prefixId;
+    std::string scanDefName = "collection";
+    Metadata metadata = {
+        {{scanDefName,
+          ScanDefinition{{}, {{"index1", makeIndexDefinition("a", CollationOp::Ascending)}}}}}};
+    OptPhaseManager phaseManager({OptPhaseManager::OptPhase::MemoSubstitutionPhase},
+                                 prefixId,
+                                 metadata,
+                                 DebugInfo::kDefaultForTests);
+
+    ASSERT_TRUE(phaseManager.optimize(orTranslated));
+    ASSERT_TRUE(phaseManager.optimize(inTranslated));
+
+    // Both pipelines are able to use a SargableNode with a disjunction of point intervals.
+    ASSERT_EXPLAIN_V2(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       scan_0\n"
+        "|   RefBlock: \n"
+        "|       Variable [scan_0]\n"
+        "Sargable [Complete]\n"
+        "|   |   |   |   requirementsMap: \n"
+        "|   |   |   |       refProjection: scan_0, path: 'PathGet [a] PathTraverse [] "
+        "PathIdentity []', intervals: {{{[Const [1], Const [1]]}} U {{[Const [2], Const [2]]}} U "
+        "{{[Const [3], Const [3]]}}}\n"
+        "|   |   |   candidateIndexes: \n"
+        "|   |   |       candidateId: 1, index1, {}, {0}, {{{[Const [1], Const [1]]}} U {{[Const "
+        "[2], Const [2]]}} U {{[Const [3], Const [3]]}}}\n"
+        "|   |   BindBlock:\n"
+        "|   RefBlock: \n"
+        "|       Variable [scan_0]\n"
+        "Scan [collection]\n"
+        "    BindBlock:\n"
+        "        [scan_0]\n"
+        "            Source []\n",
+        orTranslated);
+    ASSERT(orTranslated == inTranslated);
+}
+
 TEST(ABTTranslate, SortLimitSkip) {
     ABT translated = translatePipeline(
         "[{$limit: 5}, "
