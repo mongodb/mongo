@@ -199,9 +199,7 @@ public:
 
 class StorageEngineRepairTest : public StorageEngineTest {
 public:
-    // TODO (SERVER-65191): Use wiredTiger.
-    StorageEngineRepairTest()
-        : StorageEngineTest(Options{}.engine("ephemeralForTest").repair(RepairAction::kRepair)) {}
+    StorageEngineRepairTest() : StorageEngineTest(Options{}.repair(RepairAction::kRepair)) {}
 
     void tearDown() {
         auto repairObserver = StorageRepairObserver::get(getGlobalServiceContext());
