@@ -14,7 +14,6 @@ class ServerSelectionJsonTestCase(interface.ProcessTestCase):
     """Server Selection JSON test case."""
 
     REGISTERED_NAME = "server_selection_json_test"
-    EXECUTABLE_BUILD_PATH = "build/**/mongo/client/sdam/server_selection_json_test"
     TEST_DIR = os.path.normpath("src/mongo/client/sdam/json_tests/server_selection_tests")
 
     def __init__(self, logger, json_test_file, program_options=None):
@@ -26,22 +25,15 @@ class ServerSelectionJsonTestCase(interface.ProcessTestCase):
         self.json_test_file = os.path.normpath(json_test_file)
         self.program_options = utils.default_if_none(program_options, {}).copy()
 
-    def _find_executable(self):
-        if config.INSTALL_DIR is not None:
-            binary = os.path.join(config.INSTALL_DIR, "server_selection_json_test")
-            if os.name == "nt":
-                binary += ".exe"
+    def _find_executable(self):  # pylint: disable=no-self-use
+        binary = os.path.join(config.INSTALL_DIR, "server_selection_json_test")
+        if os.name == "nt":
+            binary += ".exe"
 
-            if os.path.isfile(binary):
-                return binary
-
-        execs = globstar.glob(self.EXECUTABLE_BUILD_PATH + '.exe')
-        if not execs:
-            execs = globstar.glob(self.EXECUTABLE_BUILD_PATH)
-        if len(execs) != 1:
+        if not os.path.isfile(binary):
             raise errors.StopExecution(
-                "There must be a single server_selection_json_test binary in {}".format(execs))
-        return execs[0]
+                f"Failed to locate server_selection_json_test binary at {binary}")
+        return binary
 
     def _make_process(self):
         command_line = [self.program_executable]

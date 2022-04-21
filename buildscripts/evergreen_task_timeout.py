@@ -6,7 +6,6 @@ import math
 import sys
 from datetime import timedelta
 from typing import Optional
-
 import yaml
 
 COMMIT_QUEUE_ALIAS = "__commit_queue"

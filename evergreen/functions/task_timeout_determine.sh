@@ -5,6 +5,7 @@ cd src
 
 set -o verbose
 set -o errexit
+
 activate_venv
 $python buildscripts/evergreen_task_timeout.py \
   --task-name ${task_name} \

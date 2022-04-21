@@ -171,8 +171,15 @@ def main():
     arg_parser.add_argument("api_version", metavar="API_VERSION", help="API Version to check")
     args = arg_parser.parse_args()
 
+    class FakeArgs:
+        """Fake argparse.Namespace-like class to pass arguments to _update_config_vars."""
+
+        def __init__(self):
+            self.INSTALL_DIR = args.install_dir  # pylint: disable=invalid-name
+            self.command = ""
+
     # pylint: disable=protected-access
-    configure_resmoke._update_config_vars(object)
+    configure_resmoke._update_config_vars(FakeArgs())
     configure_resmoke._set_logging_config()
 
     # Configure Fixture logging.

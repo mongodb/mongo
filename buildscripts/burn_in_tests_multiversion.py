@@ -101,8 +101,8 @@ class MultiversionBurnInOrchestrator:
         multiversion_suites = get_named_suites_with_root_level_key(MULTIVERSION_CONFIG_KEY)
         assert len(multiversion_tasks) == len(multiversion_suites)
 
-    def generate_tests(self, repos: List[Repo], generate_config: GenerateConfig,
-                       target_file: str) -> None:
+    def generate_tests(self, repos: List[Repo], generate_config: GenerateConfig, target_file: str,
+                       install_dir: str) -> None:
         """
         Generate evergreen configuration to run any changed tests and save them to disk.
 
@@ -110,13 +110,13 @@ class MultiversionBurnInOrchestrator:
         :param generate_config: Configuration for how to generate tasks.
         :param target_file: File to write configuration to.
         """
-        tests_by_task = self.find_changes(repos, generate_config)
+        tests_by_task = self.find_changes(repos, generate_config, install_dir)
         generated_config = self.generate_configuration(tests_by_task, target_file,
                                                        generate_config.build_variant)
         generated_config.write_all_to_dir(DEFAULT_CONFIG_DIR)
 
-    def find_changes(self, repos: List[Repo],
-                     generate_config: GenerateConfig) -> Dict[str, TaskInfo]:
+    def find_changes(self, repos: List[Repo], generate_config: GenerateConfig,
+                     install_dir: str) -> Dict[str, TaskInfo]:
         """
         Find tests and tasks to run based on test changes.
 
@@ -126,7 +126,7 @@ class MultiversionBurnInOrchestrator:
         """
         changed_tests = self.change_detector.find_changed_tests(repos)
         tests_by_task = create_tests_by_task(generate_config.build_variant, self.evg_config,
-                                             changed_tests)
+                                             changed_tests, install_dir)
         LOGGER.debug("tests and tasks found", tests_by_task=tests_by_task)
         return tests_by_task
 
@@ -207,9 +207,11 @@ class MultiversionBurnInOrchestrator:
 @click.option("--verbose", "verbose", default=False, is_flag=True, help="Enable extra logging.")
 @click.option("--task_id", "task_id", default=None, metavar='TASK_ID',
               help="The evergreen task id.")
+@click.option("--install_dir", "install_dir", default=None, metavar='INSTALL_DIR',
+              help="Path to testable installation of MongoDB")
 # pylint: disable=too-many-arguments,too-many-locals
 def main(build_variant, run_build_variant, distro, project, generate_tasks_file, evg_api_config,
-         verbose, task_id, revision, build_id):
+         verbose, task_id, revision, build_id, install_dir: str):
     """
     Run new or changed tests in repeated mode to validate their stability.
 
@@ -290,7 +292,7 @@ def main(build_variant, run_build_variant, distro, project, generate_tasks_file,
 
     burn_in_orchestrator = MultiversionBurnInOrchestrator()  # pylint: disable=no-value-for-parameter
     burn_in_orchestrator.validate_multiversion_tasks_and_suites()
-    burn_in_orchestrator.generate_tests(repos, generate_config, generate_tasks_file)
+    burn_in_orchestrator.generate_tests(repos, generate_config, generate_tasks_file, install_dir)
 
 
 if __name__ == "__main__":

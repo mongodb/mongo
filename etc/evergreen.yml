@@ -2174,6 +2174,7 @@ tasks:
     - func: "run tests"
       vars:
         resmoke_args: --suites=sdam_json_test
+        install_dir: build/install/bin
 
 - name: server_selection_json_test
   commands:
@@ -2184,6 +2185,7 @@ tasks:
     - func: "run tests"
       vars:
         resmoke_args: --suites=server_selection_json_test
+        install_dir: build/install/bin
 
 ## compile_dbtest ##
 - name: compile_dbtest
