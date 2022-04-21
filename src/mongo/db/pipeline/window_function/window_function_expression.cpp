@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/document_source_set_window_fields_gen.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/stats/counters.h"
 
 #include "mongo/db/pipeline/window_function/partition_iterator.h"
 #include "mongo/db/pipeline/window_function/window_function_exec.h"
@@ -152,6 +153,7 @@ intrusive_ptr<Expression> Expression::parse(BSONObj obj,
                 assertLanguageFeatureIsAllowed(
                     opCtx, exprName, allowedWithApi, AllowedWithClientType::kAny);
 
+                expCtx->incrementWindowAccumulatorExprCounter(exprName);
                 return parser(obj, sortBy, expCtx);
             }
 
@@ -187,6 +189,7 @@ void Expression::registerParser(
     AllowedWithApiStrict allowedWithApi) {
     invariant(parserMap.find(functionName) == parserMap.end());
     ExpressionParserRegistration r{parser, requiredMinVersion, allowedWithApi};
+    operatorCountersWindowAccumulatorExpressions.addCounter(functionName);
     parserMap.emplace(std::move(functionName), std::move(r));
 }
 
