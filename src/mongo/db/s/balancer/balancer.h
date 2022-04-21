@@ -198,8 +198,7 @@ private:
      * ReplicaSetAwareService entry points.
      */
     void onStartup(OperationContext* opCtx) final {}
-    void onStartupRecoveryComplete(OperationContext* opCtx) final {}
-    void onInitialSyncComplete(OperationContext* opCtx) final {}
+    void onInitialDataAvailable(OperationContext* opCtx, bool isMajorityDataAvailable) final {}
     void onShutdown() final {}
     void onStepUpBegin(OperationContext* opCtx, long long term) final;
     void onStepUpComplete(OperationContext* opCtx, long long term) final;
