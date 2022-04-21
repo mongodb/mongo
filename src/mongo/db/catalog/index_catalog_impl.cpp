@@ -1588,10 +1588,18 @@ Status IndexCatalogImpl::indexRecords(OperationContext* opCtx,
     // * Not write any accumulated multikey paths to the _mdb_catalog document.
     const bool manageMultikeyWrite =
         !tracker.isTrackingMultikeyPathInfo() && !bsonRecords[0].ts.isNull();
+
+    ON_BLOCK_EXIT([&] {
+        if (manageMultikeyWrite) {
+            tracker.clear();
+        }
+    });
+
     {
         ScopeGuard stopTrackingMultikeyChanges(
             [&tracker] { tracker.stopTrackingMultikeyPathInfo(); });
         if (manageMultikeyWrite) {
+            invariant(tracker.isEmpty());
             tracker.startTrackingMultikeyPathInfo();
         } else {
             stopTrackingMultikeyChanges.dismiss();
@@ -1619,6 +1627,7 @@ Status IndexCatalogImpl::indexRecords(OperationContext* opCtx,
     }
 
     for (const MultikeyPathInfo& newPath : newPaths) {
+        invariant(newPath.nss == coll->ns());
         auto idx = findIndexByName(opCtx, newPath.indexName, /*includeUnfinishedIndexes=*/true);
         if (!idx) {
             return Status(ErrorCodes::IndexNotFound,

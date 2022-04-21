@@ -83,6 +83,12 @@ public:
     void addMultikeyPathInfo(MultikeyPathInfo info);
 
     /**
+     * Clears out any multikey path information that has been appended.
+     * Must call stopTrackingMultikeyPathInfo() first if tracking was previously started.
+     */
+    void clear();
+
+    /**
      * Returns the multikey path information that has been saved.
      */
     const WorkerMultikeyPathInfo& getMultikeyPathInfo() const;
@@ -111,6 +117,12 @@ public:
      * stopTrackingMultikeyPathInfo().
      */
     bool isTrackingMultikeyPathInfo() const;
+
+    /**
+     * Returns a boolean representing whether or not any multikey path information
+     * has been appended to the list of indexes to set as multikey.
+     */
+    bool isEmpty() const;
 
 
 private:
