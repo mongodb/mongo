@@ -176,8 +176,11 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                             opCtx, fromNss, MODE_IS, AutoGetCollectionViewMode::kViewsPermitted};
                         checkCollectionUUIDMismatch(
                             opCtx, fromNss, *coll, _doc.getExpectedSourceUUID());
-                    }
 
+                        uassert(ErrorCodes::IllegalOperation,
+                                "Cannot rename an encrypted collection",
+                                !coll || !coll->getCollectionOptions().encryptedFieldConfig);
+                    }
 
                     // Make sure the source collection exists
                     const auto optSourceCollType = getShardedCollection(opCtx, fromNss);
@@ -215,6 +218,9 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                         AutoGetCollection coll{opCtx, toNss, MODE_IS};
                         checkCollectionUUIDMismatch(
                             opCtx, toNss, *coll, _doc.getExpectedTargetUUID());
+                        uassert(ErrorCodes::IllegalOperation,
+                                "Cannot rename to an existing encrypted collection",
+                                !coll || !coll->getCollectionOptions().encryptedFieldConfig);
                     }
 
                 } catch (const DBException&) {
