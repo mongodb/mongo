@@ -91,6 +91,10 @@ selector:
   # Time-series collections are not supported on mongos.
   - jstests/concurrency/fsm_workloads/create_timeseries_collection.js
 
+  # Performs finds with $where, which are slow. Because 'orphanCleanupDelaySecs' is set to 1 second,
+  # this may cause the finds to return incomplete results.
+  - jstests/concurrency/fsm_workloads/indexed_insert_where.js
+
   exclude_with_any_tags:
   - does_not_support_causal_consistency
   # This suite uses secondary read preference, which isn't currently compatible with transactions.
