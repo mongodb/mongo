@@ -234,7 +234,7 @@ class search_near_01 : public test_harness::test {
         num_threads = _config->get_int("search_near_threads");
         tc->stat_cursor = tc->session.open_scoped_cursor(STATISTICS_URI);
         workload_config = _config->get_subconfig(WORKLOAD_GENERATOR);
-        read_config = workload_config->get_subconfig(READ_CONFIG);
+        read_config = workload_config->get_subconfig(READ_OP_CONFIG);
         z_key_searches = 0;
 
         logger::log_msg(LOG_INFO,

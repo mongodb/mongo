@@ -71,6 +71,10 @@ workload_generator=
         ops_per_transaction=(max=100,min=20),
         thread_count=10,
         value_size=20
+    ),
+    custom_config=
+    (
+        thread_count=1
     )
 ),
 workload_tracking=

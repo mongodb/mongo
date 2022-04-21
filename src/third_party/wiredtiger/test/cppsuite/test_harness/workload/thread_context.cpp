@@ -40,6 +40,8 @@ const std::string
 type_string(thread_type type)
 {
     switch (type) {
+    case thread_type::CUSTOM:
+        return ("custom");
     case thread_type::INSERT:
         return ("insert");
     case thread_type::READ:

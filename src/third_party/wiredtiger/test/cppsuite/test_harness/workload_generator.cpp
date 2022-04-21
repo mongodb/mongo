@@ -50,6 +50,8 @@ std::function<void(test_harness::thread_context *)>
 operation_config::get_func(database_operation *dbo)
 {
     switch (type) {
+    case thread_type::CUSTOM:
+        return (std::bind(&database_operation::custom_operation, dbo, std::placeholders::_1));
     case thread_type::INSERT:
         return (std::bind(&database_operation::insert_operation, dbo, std::placeholders::_1));
     case thread_type::READ:
@@ -86,11 +88,13 @@ workload_generator::run()
 
     /* Retrieve useful parameters from the test configuration. */
     operation_configs.push_back(
-      operation_config(_config->get_subconfig(INSERT_CONFIG), thread_type::INSERT));
+      operation_config(_config->get_subconfig(CUSTOM_OP_CONFIG), thread_type::CUSTOM));
     operation_configs.push_back(
-      operation_config(_config->get_subconfig(READ_CONFIG), thread_type::READ));
+      operation_config(_config->get_subconfig(INSERT_OP_CONFIG), thread_type::INSERT));
     operation_configs.push_back(
-      operation_config(_config->get_subconfig(UPDATE_CONFIG), thread_type::UPDATE));
+      operation_config(_config->get_subconfig(READ_OP_CONFIG), thread_type::READ));
+    operation_configs.push_back(
+      operation_config(_config->get_subconfig(UPDATE_OP_CONFIG), thread_type::UPDATE));
     populate_config = _config->get_subconfig(POPULATE_CONFIG);
 
     /* Populate the database. */

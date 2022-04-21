@@ -47,15 +47,16 @@ class database_operation {
     virtual void populate(database &database, timestamp_manager *tsm, configuration *config,
       workload_tracking *tracking);
 
+    /* Custom operation without a default implementation. */
+    virtual void custom_operation(thread_context *tc);
+
     /* Basic insert operation that adds a new key every rate tick. */
     virtual void insert_operation(thread_context *tc);
 
     /* Basic read operation that chooses a random collection and walks a cursor. */
     virtual void read_operation(thread_context *tc);
 
-    /*
-     * Basic update operation that chooses a random key and updates it.
-     */
+    /* Basic update operation that chooses a random key and updates it. */
     virtual void update_operation(thread_context *tc);
 
     virtual ~database_operation() = default;

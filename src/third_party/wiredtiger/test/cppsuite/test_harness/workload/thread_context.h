@@ -44,7 +44,7 @@ class timestamp_manager;
 class workload_tracking;
 
 namespace test_harness {
-enum thread_type { READ, INSERT, UPDATE };
+enum thread_type { CUSTOM, INSERT, READ, UPDATE };
 
 const std::string type_string(thread_type type);
 

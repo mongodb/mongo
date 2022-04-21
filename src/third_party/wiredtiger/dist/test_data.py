@@ -120,6 +120,7 @@ thread_count = [
 
 read_thread_config = thread_count + throttle_config + transaction_config + record_config
 update_insert_thread_config = thread_count + transaction_config + throttle_config + record_config
+custom_operation_thread_config = thread_count + transaction_config + throttle_config + record_config
 
 #
 # Configuration for the checkpoint_manager component.
@@ -164,18 +165,21 @@ workload_tracking = enabled_config_true + component_config
 # Configuration that applies to the workload_generator component.
 #
 workload_generator = enabled_config_true + component_config + [
+    Config('custom_config', '',r'''
+        Config that specifies the number of custom_operation threads and their behaviour.''',
+        type='category', subconfig=custom_operation_thread_config),
+    Config('insert_config', '', r'''
+        Config that specifies the number of insert_operation threads and their behaviour.''',
+        type='category', subconfig=update_insert_thread_config),
     Config('populate_config', '', r'''
         Config that specifies how the database will be populated initially.''',
         type='category', subconfig=populate_config),
     Config('read_config', '', r'''
-        Config that specifies the number of read threads and their behaviour.''',
+        Config that specifies the number of read_operation threads and their behaviour.''',
         type='category', subconfig=read_thread_config),
-    Config('insert_config', '', r'''
-        Config that specifies the number of insert threads and their behaviour.''',
-        type='category', subconfig=update_insert_thread_config),
     Config('update_config', '',r'''
-        Config that specifies the number of update threads and their behaviour.''',
-        type='category', subconfig=update_insert_thread_config)
+        Config that specifies the number of update_operation threads and their behaviour.''',
+        type='category', subconfig=update_insert_thread_config),
 ]
 
 test_config = [
