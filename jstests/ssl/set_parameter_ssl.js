@@ -24,7 +24,7 @@ const allowed = new TransportMode("allowSSL", "allowTLS");
 const prefered = new TransportMode("preferSSL", "preferTLS");
 const required = new TransportMode("requireSSL", "requireTLS");
 
-function testTransportTransition(scheme, oldMode, newMode, shouldSucceed) {
+function testTransportTransitionStandalone(scheme, oldMode, newMode, shouldSucceed) {
     var conn =
         MongoRunner.runMongod({sslMode: oldMode, sslPEMKeyFile: SERVER_CERT, sslCAFile: CA_CERT});
 
@@ -48,6 +48,39 @@ function testTransportTransition(scheme, oldMode, newMode, shouldSucceed) {
     let exitCode = runMongoProgram("mongo", uri, "--eval", "assert.commandWorked(db.hello())");
     assert.neq(exitCode, 0, "Was able to connect without SSL when SSLMode was requireSSL");
     MongoRunner.stopMongod(conn);
+}
+
+function testTransportTransitionCluster(scheme, oldMode, newMode) {
+    var rst = new ReplSetTest({
+        name: "switch",
+        nodes: 3,
+        nodeOptions: {
+            sslMode: oldMode,
+            sslAllowInvalidHostnames: "",
+            sslCAFile: CA_CERT,
+            sslPEMKeyFile: SERVER_CERT,
+        },
+    });
+
+    rst.startSet();
+    rst.initiate();
+    rst.awaitReplication();
+
+    print(`=== Switching ${scheme} from ${oldMode} to ${newMode[scheme]} for all nodes in cluster`);
+    for (n of rst.nodes) {
+        let adminDB = n.getDB("admin");
+        assert.commandWorked(adminDB.runCommand({"setParameter": 1, [scheme]: newMode[scheme]}));
+    }
+    rst.awaitReplication();
+
+    rst.stopSet();
+}
+
+function testTransportTransition(scheme, oldMode, newMode, shouldSucceed) {
+    testTransportTransitionStandalone(scheme, oldMode, newMode, shouldSucceed);
+    if (shouldSucceed) {
+        testTransportTransitionCluster(scheme, oldMode, newMode);
+    }
 }
 
 function testAuthModeTransition(oldMode, newMode, sslMode, shouldSucceed) {
