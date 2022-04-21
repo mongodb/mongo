@@ -42,7 +42,16 @@ class MetricTree {
 public:
     void add(ServerStatusMetric* metric);
 
+    /**
+     * Append the metrics tree to the given BSON builder.
+     */
     void appendTo(BSONObjBuilder& b) const;
+
+    /**
+     * Implementation of appendTo which allows tree of exclude paths. The alternative overload is
+     * preferred to avoid overhead when no excludes are present.
+     */
+    void appendTo(const BSONObj& excludePaths, BSONObjBuilder& b) const;
 
     static MetricTree* theMetricTree;
 
