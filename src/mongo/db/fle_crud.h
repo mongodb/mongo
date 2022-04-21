@@ -464,6 +464,19 @@ StatusWith<ReplyType> processFindAndModifyRequest(
     GetTxnCallback getTxns,
     ProcessFindAndModifyCallback<ReplyType> processCallback = processFindAndModify);
 
+extern template StatusWith<write_ops::FindAndModifyCommandReply>
+processFindAndModifyRequest<write_ops::FindAndModifyCommandReply>(
+    OperationContext* opCtx,
+    const write_ops::FindAndModifyCommandRequest& findAndModifyRequest,
+    GetTxnCallback getTxns,
+    ProcessFindAndModifyCallback<write_ops::FindAndModifyCommandReply> processCallback);
+
+extern template StatusWith<write_ops::FindAndModifyCommandRequest>
+processFindAndModifyRequest<write_ops::FindAndModifyCommandRequest>(
+    OperationContext* opCtx,
+    const write_ops::FindAndModifyCommandRequest& findAndModifyRequest,
+    GetTxnCallback getTxns,
+    ProcessFindAndModifyCallback<write_ops::FindAndModifyCommandRequest> processCallback);
 
 write_ops::UpdateCommandReply processUpdate(OperationContext* opCtx,
                                             const write_ops::UpdateCommandRequest& updateRequest,

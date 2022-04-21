@@ -623,6 +623,20 @@ StatusWith<ReplyType> processFindAndModifyRequest(
     return *reply;
 }
 
+template StatusWith<write_ops::FindAndModifyCommandReply>
+processFindAndModifyRequest<write_ops::FindAndModifyCommandReply>(
+    OperationContext* opCtx,
+    const write_ops::FindAndModifyCommandRequest& findAndModifyRequest,
+    GetTxnCallback getTxns,
+    ProcessFindAndModifyCallback<write_ops::FindAndModifyCommandReply> processCallback);
+
+template StatusWith<write_ops::FindAndModifyCommandRequest>
+processFindAndModifyRequest<write_ops::FindAndModifyCommandRequest>(
+    OperationContext* opCtx,
+    const write_ops::FindAndModifyCommandRequest& findAndModifyRequest,
+    GetTxnCallback getTxns,
+    ProcessFindAndModifyCallback<write_ops::FindAndModifyCommandRequest> processCallback);
+
 FLEQueryInterface::~FLEQueryInterface() {}
 
 StatusWith<write_ops::InsertCommandReply> processInsert(
