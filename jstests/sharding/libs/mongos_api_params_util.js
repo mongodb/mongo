@@ -292,13 +292,13 @@ let MongosAPIParametersUtil = (function() {
         {
             commandName: "count",
             run: {
-                inAPIVersion1: false,
+                inAPIVersion1: true,
                 shardCommandName: "count",
                 permittedInTxn: false,
                 command: () => ({count: "collection"})
             },
             explain: {
-                inAPIVersion1: false,
+                inAPIVersion1: true,
                 shardCommandName: "explain",
                 permittedInTxn: false,
                 command: () => ({explain: {count: "collection"}})
@@ -307,13 +307,13 @@ let MongosAPIParametersUtil = (function() {
         {
             commandName: "count",
             run: {
-                inAPIVersion1: false,
+                inAPIVersion1: true,
                 shardCommandName: "count",
                 permittedInTxn: false,
                 command: () => ({count: "collection", query: {x: 1}})
             },
             explain: {
-                inAPIVersion1: false,
+                inAPIVersion1: true,
                 shardCommandName: "explain",
                 permittedInTxn: false,
                 command: () => ({explain: {count: "collection", query: {x: 1}}})
