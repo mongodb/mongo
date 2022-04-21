@@ -33,6 +33,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/client/replica_set_change_notifier.h"
+#include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/s/sharding_initialization.h"
@@ -45,7 +46,7 @@ namespace mongo {
  * services, attaches them to the same service context to which it itself is attached and puts the
  * ShardingState in the initialized state.
  */
-class ShardingInitializationMongoD {
+class ShardingInitializationMongoD : public ReplicaSetAwareService<ShardingInitializationMongoD> {
     ShardingInitializationMongoD(const ShardingInitializationMongoD&) = delete;
     ShardingInitializationMongoD& operator=(const ShardingInitializationMongoD&) = delete;
 
@@ -73,6 +74,7 @@ public:
      *
      * If it returns false, this means the node is not yet sharding aware.
      *
+     * NOTE: this function might be called more than once.
      * NOTE: this function briefly takes the global lock to determine primary/secondary state.
      */
     bool initializeShardingAwarenessIfNeeded(OperationContext* opCtx);
@@ -107,6 +109,17 @@ public:
 private:
     void _initializeShardingEnvironmentOnShardServer(OperationContext* opCtx,
                                                      const ShardIdentity& shardIdentity);
+
+    // Virtual methods coming from the ReplicaSetAwareService
+    void onStartup(OperationContext* opCtx) override final {}
+    void onInitialDataAvailable(OperationContext* opCtx,
+                                bool isMajorityDataAvailable) override final;
+    void onShutdown() override final {}
+    void onStepUpBegin(OperationContext* opCtx, long long term) override final {}
+    void onStepUpComplete(OperationContext* opCtx, long long term) override final {}
+    void onStepDown() override final {}
+    void onBecomeArbiter() override final {}
+
 
     // This mutex ensures that only one thread at a time executes the sharding
     // initialization/teardown sequence
