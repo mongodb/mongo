@@ -43,8 +43,7 @@ template <class ActualService>
 class TestService : public ReplicaSetAwareService<ActualService> {
 public:
     int numCallsOnStartup{0};
-    int numCallsOnStartupRecoveryComplete{0};
-    int numCallsOnInitialSyncComplete{0};
+    int numCallsonInitialDataAvailable{0};
     int numCallsOnStepUpBegin{0};
     int numCallsOnStepUpComplete{0};
     int numCallsOnStepDown{0};
@@ -55,12 +54,8 @@ protected:
         numCallsOnStartup++;
     }
 
-    void onStartupRecoveryComplete(OperationContext* opCtx) override {
-        numCallsOnStartupRecoveryComplete++;
-    }
-
-    void onInitialSyncComplete(OperationContext* opCtx) override {
-        numCallsOnInitialSyncComplete++;
+    void onInitialDataAvailable(OperationContext* opCtx, bool isMajorityDataAvailable) override {
+        numCallsonInitialDataAvailable++;
     }
 
     void onStepUpBegin(OperationContext* opCtx, long long term) override {
@@ -145,10 +140,10 @@ private:
         TestService::onStartup(opCtx);
     }
 
-    void onStartupRecoveryComplete(OperationContext* opCtx) final {
-        ASSERT_EQ(numCallsOnStartupRecoveryComplete,
-                  ServiceB::get(getServiceContext())->numCallsOnStartupRecoveryComplete - 1);
-        TestService::onStartupRecoveryComplete(opCtx);
+    void onInitialDataAvailable(OperationContext* opCtx, bool isMajorityDataAvailable) final {
+        ASSERT_EQ(numCallsonInitialDataAvailable,
+                  ServiceB::get(getServiceContext())->numCallsonInitialDataAvailable - 1);
+        TestService::onInitialDataAvailable(opCtx, isMajorityDataAvailable);
     }
 
     void onStepUpBegin(OperationContext* opCtx, long long term) final {
@@ -222,32 +217,29 @@ TEST_F(ReplicaSetAwareServiceTest, ReplicaSetAwareService) {
     auto c = ServiceC::get(sc);
 
     ASSERT_EQ(0, a->numCallsOnStartup);
-    ASSERT_EQ(0, a->numCallsOnStartupRecoveryComplete);
-    ASSERT_EQ(0, a->numCallsOnInitialSyncComplete);
+    ASSERT_EQ(0, a->numCallsonInitialDataAvailable);
     ASSERT_EQ(0, a->numCallsOnStepUpBegin);
     ASSERT_EQ(0, a->numCallsOnStepUpComplete);
     ASSERT_EQ(0, a->numCallsOnStepDown);
     ASSERT_EQ(0, a->numCallsOnBecomeArbiter);
 
     ASSERT_EQ(0, b->numCallsOnStartup);
-    ASSERT_EQ(0, b->numCallsOnStartupRecoveryComplete);
-    ASSERT_EQ(0, b->numCallsOnInitialSyncComplete);
+    ASSERT_EQ(0, b->numCallsonInitialDataAvailable);
     ASSERT_EQ(0, b->numCallsOnStepUpBegin);
     ASSERT_EQ(0, b->numCallsOnStepUpComplete);
     ASSERT_EQ(0, b->numCallsOnStepDown);
     ASSERT_EQ(0, b->numCallsOnBecomeArbiter);
 
     ASSERT_EQ(0, c->numCallsOnStartup);
-    ASSERT_EQ(0, c->numCallsOnStartupRecoveryComplete);
-    ASSERT_EQ(0, c->numCallsOnInitialSyncComplete);
+    ASSERT_EQ(0, c->numCallsonInitialDataAvailable);
     ASSERT_EQ(0, c->numCallsOnStepUpBegin);
     ASSERT_EQ(0, c->numCallsOnStepUpComplete);
     ASSERT_EQ(0, c->numCallsOnStepDown);
     ASSERT_EQ(0, c->numCallsOnBecomeArbiter);
 
     ReplicaSetAwareServiceRegistry::get(sc).onStartup(opCtx);
-    ReplicaSetAwareServiceRegistry::get(sc).onStartupRecoveryComplete(opCtx);
-    ReplicaSetAwareServiceRegistry::get(sc).onInitialSyncComplete(opCtx);
+    ReplicaSetAwareServiceRegistry::get(sc).onInitialDataAvailable(opCtx, false
+                                                                   /* isMajorityDataAvailable */);
     ReplicaSetAwareServiceRegistry::get(sc).onStepUpBegin(opCtx, _term);
     ReplicaSetAwareServiceRegistry::get(sc).onStepUpBegin(opCtx, _term);
     ReplicaSetAwareServiceRegistry::get(sc).onStepUpBegin(opCtx, _term);
@@ -257,24 +249,21 @@ TEST_F(ReplicaSetAwareServiceTest, ReplicaSetAwareService) {
     ReplicaSetAwareServiceRegistry::get(sc).onBecomeArbiter();
 
     ASSERT_EQ(0, a->numCallsOnStartup);
-    ASSERT_EQ(0, a->numCallsOnStartupRecoveryComplete);
-    ASSERT_EQ(0, a->numCallsOnInitialSyncComplete);
+    ASSERT_EQ(0, a->numCallsonInitialDataAvailable);
     ASSERT_EQ(0, a->numCallsOnStepUpBegin);
     ASSERT_EQ(0, a->numCallsOnStepUpComplete);
     ASSERT_EQ(0, a->numCallsOnStepDown);
     ASSERT_EQ(0, a->numCallsOnBecomeArbiter);
 
     ASSERT_EQ(1, b->numCallsOnStartup);
-    ASSERT_EQ(1, b->numCallsOnStartupRecoveryComplete);
-    ASSERT_EQ(1, b->numCallsOnInitialSyncComplete);
+    ASSERT_EQ(1, b->numCallsonInitialDataAvailable);
     ASSERT_EQ(3, b->numCallsOnStepUpBegin);
     ASSERT_EQ(2, b->numCallsOnStepUpComplete);
     ASSERT_EQ(1, b->numCallsOnStepDown);
     ASSERT_EQ(1, b->numCallsOnBecomeArbiter);
 
     ASSERT_EQ(1, c->numCallsOnStartup);
-    ASSERT_EQ(1, c->numCallsOnStartupRecoveryComplete);
-    ASSERT_EQ(1, c->numCallsOnInitialSyncComplete);
+    ASSERT_EQ(1, c->numCallsonInitialDataAvailable);
     ASSERT_EQ(3, c->numCallsOnStepUpBegin);
     ASSERT_EQ(2, c->numCallsOnStepUpComplete);
     ASSERT_EQ(1, c->numCallsOnStepDown);

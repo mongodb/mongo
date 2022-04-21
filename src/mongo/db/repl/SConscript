@@ -306,6 +306,7 @@ env.Library(
         'oplog_application',
         'oplog_interface_local',
         'repl_server_parameters',
+        'replica_set_aware_service',
     ],
 )
 
@@ -1213,7 +1214,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
         '$BUILD_DIR/mongo/executor/scoped_task_executor',
         'repl_server_parameters',
-        'replica_set_aware_service',
     ]
 )
 
