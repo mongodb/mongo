@@ -1666,7 +1666,9 @@ OpTimeBundle logApplyOps(OperationContext* opCtx,
 
     oplogEntry->setOpType(repl::OpTypeEnum::kCommand);
     oplogEntry->setNss({"admin", "$cmd"});
-    oplogEntry->setSessionId(opCtx->getLogicalSessionId());
+    // Batched writes (that is, WUOWs with 'groupOplogEntries') are not associated with a txnNumber,
+    // so do not emit an lsid either.
+    oplogEntry->setSessionId(opCtx->getTxnNumber() ? opCtx->getLogicalSessionId() : boost::none);
     oplogEntry->setTxnNumber(opCtx->getTxnNumber());
     if (txnRetryCounter && !isDefaultTxnRetryCounter(*txnRetryCounter)) {
         oplogEntry->getOperationSessionInfo().setTxnRetryCounter(*txnRetryCounter);

@@ -11,7 +11,7 @@ selector:
   - jstests/sharding/api_params_nontransaction_unsharded.js
   # Expects DELETE stage
   - jstests/sharding/query/explain_cmd.js
-  # TODO: (SERVER-64972): add change stream support for batched deletes.
+  # TODO: (SERVER-64107): batched deleter should avoid generating events for orphaned documents.
   - jstests/sharding/change_stream_no_orphans.js
 
   exclude_with_any_tags:

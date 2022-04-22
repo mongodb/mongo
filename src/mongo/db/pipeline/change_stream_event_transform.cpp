@@ -43,6 +43,7 @@
 namespace mongo {
 namespace {
 constexpr auto checkValueType = &DocumentSourceChangeStream::checkValueType;
+constexpr auto checkValueTypeOrMissing = &DocumentSourceChangeStream::checkValueTypeOrMissing;
 
 Document copyDocExceptFields(const Document& source, const std::set<StringData>& fieldNames) {
     MutableDocument doc(source);
@@ -385,13 +386,12 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
 
     // Add some additional fields only relevant to transactions.
     if (!txnOpIndex.missing()) {
+        // The lsid and txnNumber may be missing if this is a batched write.
         auto lsid = input[DocumentSourceChangeStream::kLsidField];
-        checkValueType(lsid, DocumentSourceChangeStream::kLsidField, BSONType::Object);
-
+        checkValueTypeOrMissing(lsid, DocumentSourceChangeStream::kLsidField, BSONType::Object);
         auto txnNumber = input[DocumentSourceChangeStream::kTxnNumberField];
-        checkValueType(
+        checkValueTypeOrMissing(
             txnNumber, DocumentSourceChangeStream::kTxnNumberField, BSONType::NumberLong);
-
         doc.addField(DocumentSourceChangeStream::kTxnNumberField, txnNumber);
         doc.addField(DocumentSourceChangeStream::kLsidField, lsid);
     }

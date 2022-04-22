@@ -1,8 +1,13 @@
 /**
  * Tests that insert oplog entries created by applyOps commands do not contain the 'fromMigrate'
- * field. Additionally tests that non-atomic applyOps inserts should be returned by changeStreams.
+ * field. Additionally tests inserts originating from applyOps commands are returned by
+ * changeStreams.
  *
- * @tags: [uses_change_streams]
+ * @tags: [
+ *  uses_change_streams,
+ *  # Change streams emit events for applyOps without lsid and txnNumber as of SERVER-64972.
+ *  multiversion_incompatible,
+ * ]
  */
 (function() {
 'use strict';
@@ -53,6 +58,7 @@ assert.commandWorked(primaryDB.runCommand({
 }));
 
 // Test atomic applyOps inserts.
+// TODO (SERVER-33182): Remove the atomic applyOps testing once atomic applyOps are removed.
 assert.commandWorked(
     primaryDB.runCommand({applyOps: [{op: "i", ns: nss(dbName, collName), o: {_id: 4}}]}));
 assert.commandWorked(primaryDB.runCommand({
@@ -80,20 +86,25 @@ nonAtomicResults.forEach(function(op) {
     assert(!op.hasOwnProperty("fromMigrate"), nonAtomicResults);
 });
 
-// TODO (SERVER-33182): Remove the atomic applyOps testing once atomic applyOps are removed.
-// Atomic applyOps inserts are not expected to be picked up by changeStreams.
-primaryCST.assertNoChange(primaryChangeStream);
-secondaryCST.assertNoChange(secondaryChangeStream);
+// Atomic applyOps inserts are expected to be picked up by changeStreams.
 // We expect the operations from an atomic applyOps command to be nested in an applyOps oplog entry.
 const atomicResults = oplog.find({"o.applyOps": {$exists: true}}).toArray();
 assert.eq(atomicResults.length, 2, atomicResults);
 for (let i = 0; i < atomicResults.length; i++) {
     let ops = atomicResults[i].o.applyOps;
     ops.forEach(function(op) {
+        const primaryChange = primaryCST.getOneChange(primaryChangeStream);
+        assert.eq(primaryChange.documentKey._id, expectedCount, primaryChange);
+        const secondaryChange = secondaryCST.getOneChange(secondaryChangeStream);
+        assert.eq(secondaryChange.documentKey._id, expectedCount, secondaryChange);
         assert.eq(op.o._id, expectedCount++, atomicResults);
         assert(!op.hasOwnProperty("fromMigrate"), atomicResults);
     });
 }
+
+primaryCST.assertNoChange(primaryChangeStream);
+secondaryCST.assertNoChange(secondaryChangeStream);
+
 assert.eq(7, expectedCount);
 
 rst.stopSet();

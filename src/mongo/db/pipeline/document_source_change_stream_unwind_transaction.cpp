@@ -222,13 +222,16 @@ DocumentSourceChangeStreamUnwindTransaction::TransactionOpIterator::TransactionO
     const Document& input,
     const MatchExpression* expression)
     : _mongoProcessInterface(mongoProcessInterface), _expression(expression) {
-    Value lsidValue = input["lsid"];
-    DocumentSourceChangeStream::checkValueType(lsidValue, "lsid", BSONType::Object);
-    _lsid = lsidValue.getDocument();
 
+    // The lsid and txnNumber can be missing in case of batched writes.
+    Value lsidValue = input["lsid"];
+    DocumentSourceChangeStream::checkValueTypeOrMissing(lsidValue, "lsid", BSONType::Object);
+    _lsid = lsidValue.missing() ? boost::none : boost::optional<Document>(lsidValue.getDocument());
     Value txnNumberValue = input["txnNumber"];
-    DocumentSourceChangeStream::checkValueType(txnNumberValue, "txnNumber", BSONType::NumberLong);
-    _txnNumber = txnNumberValue.getLong();
+    DocumentSourceChangeStream::checkValueTypeOrMissing(
+        txnNumberValue, "txnNumber", BSONType::NumberLong);
+    _txnNumber = txnNumberValue.missing() ? boost::none
+                                          : boost::optional<TxnNumber>(txnNumberValue.getLong());
 
     // We want to parse the OpTime out of this document using the BSON OpTime parser. Instead of
     // converting the entire Document back to BSON, we convert only the fields we need.
@@ -380,9 +383,9 @@ DocumentSourceChangeStreamUnwindTransaction::TransactionOpIterator::_addRequired
     newDoc.addField(DocumentSourceChangeStream::kApplyOpsTsField, Value(applyOpsTs()));
 
     newDoc.addField(repl::OplogEntry::kTimestampFieldName, Value(_clusterTime));
-    newDoc.addField(repl::OplogEntry::kSessionIdFieldName, Value(_lsid));
+    newDoc.addField(repl::OplogEntry::kSessionIdFieldName, _lsid ? Value(*_lsid) : Value());
     newDoc.addField(repl::OplogEntry::kTxnNumberFieldName,
-                    Value(static_cast<long long>(_txnNumber)));
+                    _txnNumber ? Value(static_cast<long long>(*_txnNumber)) : Value());
     newDoc.addField(repl::OplogEntry::kWallClockTimeFieldName, Value(_wallTime));
 
     return newDoc.freeze();

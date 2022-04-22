@@ -236,8 +236,6 @@ std::unique_ptr<MatchExpression> buildTransactionFilter(
     applyOpsBuilder.append("o.applyOps",
                            BSON("$type"
                                 << "array"));
-    applyOpsBuilder.append("lsid", BSON("$exists" << true));
-    applyOpsBuilder.append("txnNumber", BSON("$exists" << true));
     applyOpsBuilder.append("o.prepare", BSON("$not" << BSON("$eq" << true)));
     applyOpsBuilder.append("o.partialTxn", BSON("$not" << BSON("$eq" << true)));
     {

@@ -72,13 +72,13 @@ withTxnAndAutoRetryOnMongos(session, () => {
 }, txnOptions);
 
 // Do applyOps on the collection that we care about. This is an "external" applyOps, though (not run
-// as part of a transaction) so its entries should be skipped in the change stream. This checks that
-// applyOps that don't have an 'lsid' and 'txnNumber' field do not get unwound. Skip if running in a
+// as part of a transaction). This checks that although this applyOps doesn't have an 'lsid' and
+// 'txnNumber', the field gets unwound and a change stream event is emitted. Skip if running in a
 // sharded passthrough, since the applyOps command does not exist on mongoS.
 if (!FixtureHelpers.isMongos(db)) {
     assert.commandWorked(db.runCommand({
         applyOps: [
-            {op: "i", ns: coll.getFullName(), o: {_id: 3, a: "SHOULD NOT READ THIS"}},
+            {op: "i", ns: coll.getFullName(), o: {_id: 3, a: "insert from atomic applyOps"}},
         ]
     }));
 }
@@ -87,7 +87,7 @@ if (!FixtureHelpers.isMongos(db)) {
 assert.commandWorked(db.runCommand({drop: coll.getName()}));
 
 // Define the set of changes expected for the single-collection case per the operations above.
-const expectedChanges = [
+let expectedChanges = [
     {
         documentKey: {_id: 1},
         fullDocument: {_id: 1, a: 0},
@@ -118,12 +118,21 @@ const expectedChanges = [
         operationType: "delete",
         lsid: session.getSessionId(),
         txnNumber: session.getTxnNumber_forTesting(),
-    },
-    {
-        operationType: "drop",
-        ns: {db: db.getName(), coll: coll.getName()},
-    },
+    }
 ];
+
+if (!FixtureHelpers.isMongos(db)) {
+    expectedChanges.push({
+        documentKey: {_id: 3},
+        fullDocument: {_id: 3, a: "insert from atomic applyOps"},
+        ns: {db: db.getName(), coll: coll.getName()},
+        operationType: "insert",
+    });
+}
+expectedChanges.push({
+    operationType: "drop",
+    ns: {db: db.getName(), coll: coll.getName()},
+});
 
 // If we are running in a sharded passthrough, then this may have been a multi-shard transaction.
 // Change streams will interleave the txn events from across the shards in (clusterTime, txnOpIndex)

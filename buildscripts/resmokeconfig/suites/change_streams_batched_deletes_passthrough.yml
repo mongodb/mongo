@@ -5,10 +5,8 @@ selector:
   roots:
   - jstests/change_streams/**/*.js
   exclude_files:
-  # TODO: (SERVER-64972): add change stream support for batched deletes.
-  - jstests/change_streams/change_stream.js
+  # TODO: (SERVER-64506): add PIT pre/post-image support for batched deletes.
   - jstests/change_streams/lookup_pit_pre_and_post_image.js
-  - jstests/change_streams/show_raw_update_description.js
 
   exclude_with_any_tags:
   - assumes_standalone_mongod

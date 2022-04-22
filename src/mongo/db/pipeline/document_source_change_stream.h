@@ -283,6 +283,11 @@ public:
     static void checkValueType(Value v, StringData fieldName, BSONType expectedType);
 
     /**
+     * Same as 'checkValueType', except it tolerates the field being missing.
+     */
+    static void checkValueTypeOrMissing(Value v, StringData fieldName, BSONType expectedType);
+
+    /**
      * Extracts the resume token from the given spec. If a 'startAtOperationTime' is specified,
      * returns the equivalent high-watermark token. This method should only ever be called on a spec
      * where one of 'resumeAfter', 'startAfter', or 'startAtOperationTime' is populated.

@@ -111,12 +111,20 @@ constexpr StringData DocumentSourceChangeStream::kRegexAllDBs;
 constexpr StringData DocumentSourceChangeStream::kRegexCmdColl;
 
 void DocumentSourceChangeStream::checkValueType(const Value v,
-                                                const StringData filedName,
+                                                const StringData fieldName,
                                                 BSONType expectedType) {
     uassert(40532,
-            str::stream() << "Entry field \"" << filedName << "\" should be "
+            str::stream() << "Entry field \"" << fieldName << "\" should be "
                           << typeName(expectedType) << ", found: " << typeName(v.getType()),
             (v.getType() == expectedType));
+}
+
+void DocumentSourceChangeStream::checkValueTypeOrMissing(const Value v,
+                                                         const StringData fieldName,
+                                                         BSONType expectedType) {
+    if (!v.missing()) {
+        checkValueType(v, fieldName, expectedType);
+    }
 }
 
 DocumentSourceChangeStream::ChangeStreamType DocumentSourceChangeStream::getChangeStreamType(

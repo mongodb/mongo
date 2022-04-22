@@ -313,10 +313,11 @@ public:
      */
     std::vector<Document> getApplyOpsResults(const Document& applyOpsDoc,
                                              const LogicalSessionFromClient& lsid,
-                                             BSONObj spec = kDefaultSpec) {
+                                             BSONObj spec = kDefaultSpec,
+                                             bool hasTxnNumber = true) {
         BSONObj applyOpsObj = applyOpsDoc.toBson();
 
-        // Create an oplog entry and then glue on an lsid and txnNumber
+        // Create an oplog entry and then glue on an lsid and optionally a txnNumber
         auto baseOplogEntry = makeOplogEntry(OpTypeEnum::kCommand,
                                              nss.getCommandNS(),
                                              applyOpsObj,
@@ -325,7 +326,9 @@ public:
                                              BSONObj());
         BSONObjBuilder builder(baseOplogEntry.getEntry().toBSON());
         builder.append("lsid", lsid.toBSON());
-        builder.append("txnNumber", 0LL);
+        if (hasTxnNumber) {
+            builder.append("txnNumber", 0LL);
+        }
         BSONObj oplogEntry = builder.done();
 
         // Create the stages and check that the documents produced matched those in the applyOps.
@@ -1425,26 +1428,63 @@ DEATH_TEST_F(ChangeStreamStageTest,
     getApplyOpsResults(applyOpsDoc, lsid);  // Should crash.
 }
 
-TEST_F(ChangeStreamStageTest, TransformNonTransactionApplyOps) {
-    BSONObj applyOpsObj = Document{{"applyOps",
-                                    Value{std::vector<Document>{Document{
-                                        {"op", "i"_sd},
-                                        {"ns", nss.ns()},
-                                        {"ui", testUuid()},
-                                        {"o", Value{Document{{"_id", 123}, {"x", "hallo"_sd}}}}}}}}}
-                              .toBson();
+TEST_F(ChangeStreamStageTest, TransformNonTxnNumberApplyOps) {
+    Document applyOpsDoc =
+        Document{{"applyOps",
+                  Value{std::vector<Document>{
+                      Document{{"op", "i"_sd},
+                               {"ns", nss.ns()},
+                               {"ui", testUuid()},
+                               {"o", Value{Document{{"_id", 123}, {"x", "hallo"_sd}}}}}}}}};
 
-    // Don't append lsid or txnNumber
+    LogicalSessionFromClient lsid = testLsid();
+    vector<Document> results =
+        getApplyOpsResults(applyOpsDoc, lsid, kDefaultSpec, false /* hasTxnNumber */);
 
-    auto oplogEntry = makeOplogEntry(OpTypeEnum::kCommand,
-                                     nss.getCommandNS(),
-                                     applyOpsObj,
-                                     testUuid(),
-                                     boost::none,  // fromMigrate
-                                     BSONObj());
+    ASSERT_EQ(results.size(), 1u);
 
+    const auto nextDoc = results[0];
+    ASSERT(nextDoc.getField("txnNumber").missing());
+    ASSERT_EQ(nextDoc[DSChangeStream::kOperationTypeField].getString(),
+              DSChangeStream::kInsertOpType);
+    ASSERT_EQ(nextDoc[DSChangeStream::kFullDocumentField]["_id"].getInt(), 123);
+    ASSERT_EQ(nextDoc[DSChangeStream::kFullDocumentField]["x"].getString(), "hallo");
+    ASSERT_EQ(nextDoc["lsid"].getDocument().toBson().woCompare(lsid.toBSON()), 0);
+}
 
-    checkTransformation(oplogEntry, boost::none);
+TEST_F(ChangeStreamStageTest, TransformNonTxnNumberBatchedDeleteApplyOps) {
+
+    Document applyOpsDoc{
+        {"applyOps",
+         Value{std::vector<Document>{
+             Document{{"op", "d"_sd},
+                      {"ns", nss.ns()},
+                      {"ui", testUuid()},
+                      {"o", Value{Document{{"_id", 10}}}}},
+             Document{{"op", "d"_sd},
+                      {"ns", nss.ns()},
+                      {"ui", testUuid()},
+                      {"o", Value{Document{{"_id", 11}}}}},
+             Document{{"op", "d"_sd},
+                      {"ns", nss.ns()},
+                      {"ui", testUuid()},
+                      {"o", Value{Document{{"_id", 12}}}}},
+         }}},
+    };
+    LogicalSessionFromClient lsid = testLsid();
+    vector<Document> results =
+        getApplyOpsResults(applyOpsDoc, lsid, kDefaultSpec, false /* hasTxnNumber */);
+
+    ASSERT_EQ(results.size(), 3u);
+
+    int i = 0;
+    for (const auto& nextDoc : results) {
+        ASSERT(nextDoc.getField("txnNumber").missing());
+        ASSERT_EQ(nextDoc[DSChangeStream::kOperationTypeField].getString(),
+                  DSChangeStream::kDeleteOpType);
+        ASSERT_EQ(nextDoc[DSChangeStream::kDocumentKeyField]["_id"].getInt(), 10 + i++);
+        ASSERT_EQ(nextDoc["lsid"].getDocument().toBson().woCompare(lsid.toBSON()), 0);
+    }
 }
 
 TEST_F(ChangeStreamStageTest, TransformApplyOpsWithEntriesOnDifferentNs) {
