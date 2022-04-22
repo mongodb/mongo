@@ -48,6 +48,7 @@
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/session_catalog.h"
 #include "mongo/db/transaction_validation.h"
 #include "mongo/db/write_concern_options.h"
@@ -98,6 +99,8 @@ StatusWith<CommitResult> SyncTransactionWithRetries::runNoThrow(OperationContext
 
     // Post transaction processing, which must also happen inline.
     OperationTimeTracker::get(opCtx)->updateOperationTime(_txn->getOperationTime());
+    repl::ReplClientInfo::forClient(opCtx->getClient())
+        .setLastProxyWriteTimestampForward(_txn->getOperationTime().asTimestamp());
     auto unyieldStatus = _resourceYielder ? _resourceYielder->unyieldNoThrow(opCtx) : Status::OK();
 
     if (!txnResult.isOK()) {

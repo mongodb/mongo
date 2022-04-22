@@ -135,6 +135,7 @@ const StringMap<int> txnCmdAllowlist = {{"abortTransaction", 1},
                                         {"insert", 1},
                                         {"killCursors", 1},
                                         {"prepareTransaction", 1},
+                                        {"testInternalTransactions", 1},
                                         {"update", 1}};
 
 auto getCommandInvocationHooks =

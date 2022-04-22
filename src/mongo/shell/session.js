@@ -311,7 +311,8 @@ var {
             cmdObj = driverSession._serverSession.assignTxnInfo(cmdObj);
 
             // Retryable writes code should execute only we are not in an active transaction.
-            if (jsTest.options().alwaysInjectTransactionNumber &&
+            if ((jsTest.options().alwaysInjectTransactionNumber ||
+                 (Object.keys(cmdObj)[0] == "testInternalTransactions")) &&
                 serverSupports(kWireVersionSupportingRetryableWrites) &&
                 driverSession.getOptions().shouldRetryWrites() &&
                 _ServerSession.canRetryWrites(cmdObj)) {
@@ -782,6 +783,10 @@ var {
 
         if (!isAcknowledged(cmdObj)) {
             return false;
+        }
+
+        if (cmdName == "testInternalTransactions") {
+            return true;
         }
 
         if (cmdName === "insert") {
