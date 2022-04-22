@@ -160,17 +160,14 @@ StatusWith<std::string> WiredTigerIndex::generateCreateString(
         ss << "prefix_compression=true,";
     }
 
-    // TODO (SERVER-60753): Remove special handling for index build.
-    if (TestingProctor::instance().isEnabled()) {
-        if (  // TODO (SERVER-60753): Remove special handling for index build during recovery.
-            collectionNamespace.ns() == "config.system.indexBuilds") {
-            ss << "write_timestamp_usage=mixed_mode,";
-        } else {
-            ss << "write_timestamp_usage=ordered,";
-        }
-        ss << "assert=(write_timestamp=on),";
-        ss << "verbose=[write_timestamp],";
+    if (  // TODO (SERVER-60753): Remove special handling for index build during recovery.
+        collectionNamespace.ns() == "config.system.indexBuilds") {
+        ss << "write_timestamp_usage=mixed_mode,";
+    } else {
+        ss << "write_timestamp_usage=ordered,";
     }
+    ss << "assert=(write_timestamp=on),";
+    ss << "verbose=[write_timestamp],";
 
     ss << WiredTigerCustomizationHooks::get(getGlobalServiceContext())
               ->getTableCreateConfig(collectionNamespace.ns());
