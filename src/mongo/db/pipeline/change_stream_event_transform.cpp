@@ -412,8 +412,8 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
 
     // Check if the FCV is <= 5.3
     bool FCVLessThanEq53 = serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-    serverGlobalParams.featureCompatibility.isLessThanOrEqualTo(
-    multiversion::FeatureCompatibilityVersion::kVersion_5_3);
+        serverGlobalParams.featureCompatibility.isLessThanOrEqualTo(
+            multiversion::FeatureCompatibilityVersion::kVersion_5_3);
     if ((FCVLessThanEq53 && _changeStreamSpec.getShowExpandedEvents()) || !FCVLessThanEq53) {
         const auto wallTime = input[repl::OplogEntry::kWallClockTimeFieldName];
         checkValueType(wallTime, repl::OplogEntry::kWallClockTimeFieldName, BSONType::Date);
