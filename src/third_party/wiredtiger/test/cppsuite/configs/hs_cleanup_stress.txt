@@ -42,7 +42,6 @@ runtime_monitor=
     stat_db_size=
     (
         max=1900000000,
-        runtime=false,
         save=true,
     ),
 ),
