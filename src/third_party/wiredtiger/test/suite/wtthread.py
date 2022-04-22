@@ -43,6 +43,21 @@ class checkpoint_thread(threading.Thread):
             sess.checkpoint()
         sess.close()
 
+class named_checkpoint_thread(threading.Thread):
+    def __init__(self, conn, done, ckpt_name):
+        self.conn = conn
+        self.done = done
+        self.ckpt_name = ckpt_name
+        threading.Thread.__init__(self)
+
+    def run(self):
+        sess = self.conn.open_session()
+        while not self.done.isSet():
+            # Sleep for 10 milliseconds.
+            time.sleep(0.001)
+            sess.checkpoint('name=' + self.ckpt_name)
+        sess.close()
+
 class flush_tier_thread(threading.Thread):
     def __init__(self, conn, done):
         self.conn = conn

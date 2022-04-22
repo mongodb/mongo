@@ -68,14 +68,19 @@ until those changes are made.
 
 @section checkpoint_cursors Checkpoint cursors
 
-Cursors are normally opened in the most recent version of a data source.
-However, the \c checkpoint configuration string may be provided
-to WT_SESSION::open_cursor, opening a read-only, static view of the
-data source.  This provides a limited form of time-travel, as the static
+Cursors are normally opened in the live version of a data source.
+However, it is also possible to open a read-only, static view of the
+data source as of a checkpoint.
+This is done by passing the \c checkpoint configuration string to
+WT_SESSION::open_cursor.
+This provides a limited form of time-travel, as the static
 view is not changed by subsequent checkpoints and will persist until
-the checkpoint cursor is closed. While it is not an error to set a read
-timestamp in a transaction including a checkpoint cursor, it also has no
-effect on the data returned by the checkpoint cursor.
+the checkpoint cursor is closed.
+Checkpoint cursors ignore the currently running transaction; they are (in a
+sense) their own transactions.
+When timestamps are in use, a checkpoint cursor reads at the time
+associated with the checkpoint, which is normally the stable timestamp
+as of the time the checkpoint was taken.
 
 @section checkpoint_naming Checkpoint naming
 
@@ -90,8 +95,8 @@ replaced, they can be used to save the state of the data for later use.
 
 Internal checkpoints, that is, checkpoints not named by the application, use the
 reserved name \c WiredTigerCheckpoint. (All checkpoint names beginning with this
-string are reserved.) Applications can open the most recent of these checkpoints
-by specifying \c WiredTigerCheckpoint as the checkpoint name to
+string are reserved.) Applications can open the most recent checkpoint (whether
+internal or named) by specifying \c WiredTigerCheckpoint as the checkpoint name to
 WT_SESSION::open_cursor.
 
 The name "all" is also reserved as it is used when dropping checkpoints.

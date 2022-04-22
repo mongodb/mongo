@@ -8,7 +8,7 @@
 
 #include "wt_internal.h"
 
-static int __btree_conf(WT_SESSION_IMPL *, WT_CKPT *ckpt);
+static int __btree_conf(WT_SESSION_IMPL *, WT_CKPT *ckpt, bool);
 static int __btree_get_last_recno(WT_SESSION_IMPL *);
 static int __btree_page_sizes(WT_SESSION_IMPL *);
 static int __btree_preload(WT_SESSION_IMPL *);
@@ -84,12 +84,15 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
     btree->dhandle = dhandle;
 
     /* Checkpoint and verify files are readonly. */
-    if (dhandle->checkpoint != NULL || F_ISSET(btree, WT_BTREE_VERIFY) ||
+    if (WT_DHANDLE_IS_CHECKPOINT(dhandle) || F_ISSET(btree, WT_BTREE_VERIFY) ||
       F_ISSET(S2C(session), WT_CONN_READONLY))
         F_SET(btree, WT_BTREE_READONLY);
 
     /* Get the checkpoint information for this name/checkpoint pair. */
     WT_RET(__wt_meta_checkpoint(session, dhandle->name, dhandle->checkpoint, &ckpt));
+
+    /* Set the order number. */
+    dhandle->checkpoint_order = ckpt.order;
 
     /*
      * Bulk-load is only permitted on newly created files, not any empty file -- see the checkpoint
@@ -107,7 +110,7 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
     }
 
     /* Initialize and configure the WT_BTREE structure. */
-    WT_ERR(__btree_conf(session, &ckpt));
+    WT_ERR(__btree_conf(session, &ckpt, WT_DHANDLE_IS_CHECKPOINT(dhandle)));
 
     /* Connect to the underlying block manager. */
     WT_ERR(__wt_blkcache_open(
@@ -300,7 +303,7 @@ __wt_btree_config_encryptor(
  *     Configure a WT_BTREE structure.
  */
 static int
-__btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
+__btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt, bool is_ckpt)
 {
     WT_BTREE *btree;
     WT_CONFIG_ITEM cval, metadata;
@@ -551,12 +554,14 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
      *
      * Rollback to stable does not operate on logged tables and metadata, so it is skipped.
      *
-     * The only scenario where the checkpoint run write generation number is less than the
-     * connection last checkpoint base write generation number is when rollback to stable doesn't
-     * happen during the recovery due to the unavailability of history store file.
+     * The only scenarios where the checkpoint run write generation number is less than the
+     * connection last checkpoint base write generation number are when rollback to stable doesn't
+     * happen during the recovery due to the unavailability of history store file, or when reading a
+     * checkpoint.
      */
-    if (!F_ISSET(conn, WT_CONN_RECOVERING) || F_ISSET(btree, WT_BTREE_LOGGED) ||
-      ckpt->run_write_gen < conn->last_ckpt_base_write_gen)
+    if ((!F_ISSET(conn, WT_CONN_RECOVERING) || F_ISSET(btree, WT_BTREE_LOGGED) ||
+          ckpt->run_write_gen < conn->last_ckpt_base_write_gen) &&
+      !is_ckpt)
         btree->base_write_gen = btree->run_write_gen;
     else
         btree->base_write_gen = ckpt->run_write_gen;

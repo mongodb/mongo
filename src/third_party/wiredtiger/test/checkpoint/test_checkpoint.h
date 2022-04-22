@@ -94,4 +94,4 @@ int log_print_err_worker(const char *, int, const char *, int, int);
 void start_checkpoints(void);
 int start_workers(void);
 const char *type_to_string(table_type);
-int verify_consistency(WT_SESSION *, wt_timestamp_t);
+int verify_consistency(WT_SESSION *, wt_timestamp_t, bool);

@@ -94,7 +94,23 @@ __wt_hs_find_upd(WT_SESSION_IMPL *session, uint32_t btree_id, WT_ITEM *key,
         key->size = WT_PTRDIFF(p, recno_key_buf);
     }
 
-    WT_ERR(__wt_curhs_open(session, NULL, &hs_cursor));
+    /*
+     * If reading from a checkpoint, it is possible to get here because the history store is
+     * currently open, but not be able to get a cursor because there was no history store in the
+     * checkpoint. We know this is the case if there's no history store checkpoint name stashed in
+     * the session. In this case, behave the same as if we searched and found nothing. Otherwise, we
+     * should be able to open a cursor on the selected checkpoint; if we fail because it's somehow
+     * disappeared, that's a problem and we shouldn't just silently return no data.
+     */
+    if (WT_READING_CHECKPOINT(session) && session->hs_checkpoint == NULL) {
+        ret = 0;
+        goto done;
+    }
+
+    WT_ERR_NOTFOUND_OK(__wt_curhs_open(session, NULL, &hs_cursor), true);
+    /* Do this separately for now because the behavior below is confusing if it triggers. */
+    WT_ASSERT(session, ret != WT_NOTFOUND);
+    WT_ERR(ret);
 
     /*
      * After positioning our cursor, we're stepping backwards to find the correct update. Since the
@@ -104,9 +120,12 @@ __wt_hs_find_upd(WT_SESSION_IMPL *session, uint32_t btree_id, WT_ITEM *key,
      * A reader without a timestamp should read the largest timestamp in the range, however cursor
      * search near if given a 0 timestamp will place at the top of the range and hide the records
      * below it. As such we need to adjust a 0 timestamp to the timestamp max value.
+     *
+     * If reading a checkpoint, use the checkpoint read timestamp instead.
      */
-    read_timestamp =
-      txn_shared->read_timestamp == WT_TS_NONE ? WT_TS_MAX : txn_shared->read_timestamp;
+    read_timestamp = WT_READING_CHECKPOINT(session) ? session->txn->checkpoint_read_timestamp :
+                                                      txn_shared->read_timestamp;
+    read_timestamp = read_timestamp == WT_TS_NONE ? WT_TS_MAX : read_timestamp;
 
     hs_cursor->set_key(hs_cursor, 4, btree_id, key, read_timestamp, UINT64_MAX);
     WT_ERR_NOTFOUND_OK(__wt_curhs_search_near_before(session, hs_cursor), true);

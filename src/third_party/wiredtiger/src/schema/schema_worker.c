@@ -28,7 +28,7 @@ __wt_exclusive_handle_operation(WT_SESSION_IMPL *session, const char *uri,
         WT_RET(ret);
     }
 
-    WT_RET(__wt_session_get_btree_ckpt(session, uri, cfg, open_flags));
+    WT_RET(__wt_session_get_btree_ckpt(session, uri, cfg, open_flags, NULL, NULL));
     WT_SAVE_DHANDLE(session, ret = file_func(session, cfg));
     WT_TRET(__wt_session_release_dhandle(session));
 

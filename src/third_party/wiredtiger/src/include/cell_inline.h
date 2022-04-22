@@ -1050,6 +1050,8 @@ static inline void
 __cell_unpack_window_cleanup(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk,
   WT_CELL_UNPACK_ADDR *unpack_addr, WT_CELL_UNPACK_KV *unpack_kv)
 {
+    uint64_t write_gen;
+
     /*
      * If the page came from a previous run, reset the transaction ids to "none" and timestamps to 0
      * as appropriate. Transaction ids shouldn't persist between runs so these are always set to
@@ -1069,8 +1071,23 @@ __cell_unpack_window_cleanup(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk
      * No delete              txnid=MAX, ts=MAX,            txnid=MAX, ts=MAX,
      *                        durable_ts=NONE               durable_ts=NONE
      */
+
+    if (WT_READING_CHECKPOINT(session) && session->checkpoint_write_gen != 0) {
+        /*
+         * When reading a checkpoint, override the tree's base write generation with the write
+         * generation from the global metadata, which might be newer. This comes into play if the
+         * tree checkpoint is from an older database run than the global checkpoint, which can
+         * happen if checkpointing skips the tree at the right points. Bypass this logic if the
+         * checkpoint write generation isn't set because the checkpoint is from an older version of
+         * WiredTiger; in that case we use the tree's write generation and hope for the best.
+         */
+        write_gen = session->checkpoint_write_gen;
+        WT_ASSERT(session, write_gen >= S2BT(session)->base_write_gen);
+    } else
+        write_gen = S2BT(session)->base_write_gen;
+
     WT_ASSERT(session, dsk->write_gen != 0);
-    if (dsk->write_gen > S2BT(session)->base_write_gen)
+    if (dsk->write_gen > write_gen)
         return;
 
     if (F_ISSET(session, WT_SESSION_DEBUG_DO_NOT_CLEAR_TXN_ID))

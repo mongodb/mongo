@@ -707,7 +707,7 @@ __wt_tree_modify_set(WT_SESSION_IMPL *session)
      */
     if (!S2BT(session)->modified) {
         /* Assert we never dirty a checkpoint handle. */
-        WT_ASSERT(session, session->dhandle->checkpoint == NULL);
+        WT_ASSERT(session, !WT_READING_CHECKPOINT(session));
 
         S2BT(session)->modified = true;
         WT_FULL_BARRIER();

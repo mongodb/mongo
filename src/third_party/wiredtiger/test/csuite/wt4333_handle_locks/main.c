@@ -120,14 +120,9 @@ op(WT_SESSION *session, WT_RAND_STATE *rnd, WT_CURSOR **cpp)
 
     /* Loop to open an object handle. */
     for (i = __wt_random(rnd) % uris; !done; __wt_yield()) {
-        /*
-         * Use a checkpoint handle for 50% of reads.
-         *
-         * FIXME-WT-5927: Checkpoint cursors are known to have issues in durable history so we've
-         * removing the use of checkpoint handles in this test. As part of WT-5927, we should either
-         * re-enable the testing of checkpoint cursors or remove this comment.
-         */
-        ret = session->open_cursor(session, uri_list[i], NULL, NULL, &cursor);
+        /* Use a checkpoint handle for 50% of reads. */
+        ret = session->open_cursor(session, uri_list[i], NULL,
+          readonly && (i % 2 == 0) ? "checkpoint=WiredTigerCheckpoint" : NULL, &cursor);
         if (ret != EBUSY) {
             testutil_check(ret);
             break;

@@ -373,6 +373,7 @@ static const WT_CONFIG_CHECK confchk_WT_SESSION_log_flush[] = {
   {"sync", "string", NULL, "choices=[\"off\",\"on\"]", NULL, 0}, {NULL, NULL, NULL, NULL, NULL, 0}};
 
 static const WT_CONFIG_CHECK confchk_WT_SESSION_open_cursor_debug_subconfigs[] = {
+  {"checkpoint_read_timestamp", "string", NULL, NULL, NULL, 0},
   {"dump_version", "boolean", NULL, NULL, NULL, 0},
   {"release_evict", "boolean", NULL, NULL, NULL, 0}, {NULL, NULL, NULL, NULL, NULL, 0}};
 
@@ -386,8 +387,9 @@ static const WT_CONFIG_CHECK confchk_WT_SESSION_open_cursor_incremental_subconfi
 static const WT_CONFIG_CHECK confchk_WT_SESSION_open_cursor[] = {
   {"append", "boolean", NULL, NULL, NULL, 0}, {"bulk", "string", NULL, NULL, NULL, 0},
   {"checkpoint", "string", NULL, NULL, NULL, 0},
+  {"checkpoint_use_history", "boolean", NULL, NULL, NULL, 0},
   {"checkpoint_wait", "boolean", NULL, NULL, NULL, 0},
-  {"debug", "category", NULL, NULL, confchk_WT_SESSION_open_cursor_debug_subconfigs, 2},
+  {"debug", "category", NULL, NULL, confchk_WT_SESSION_open_cursor_debug_subconfigs, 3},
   {"dump", "string", NULL,
     "choices=[\"hex\",\"json\",\"pretty\",\"pretty_hex\","
     "\"print\"]",
@@ -1287,14 +1289,15 @@ static const WT_CONFIG_ENTRY config_entries[] = {{"WT_CONNECTION.add_collator", 
   {"WT_SESSION.log_flush", "sync=on", confchk_WT_SESSION_log_flush, 1},
   {"WT_SESSION.log_printf", "", NULL, 0},
   {"WT_SESSION.open_cursor",
-    "append=false,bulk=false,checkpoint=,checkpoint_wait=true,"
-    "debug=(dump_version=false,release_evict=false),dump=,"
+    "append=false,bulk=false,checkpoint=,checkpoint_use_history=true,"
+    "checkpoint_wait=true,debug=(checkpoint_read_timestamp=,"
+    "dump_version=false,release_evict=false),dump=,"
     "incremental=(consolidate=false,enabled=false,file=,"
     "force_stop=false,granularity=16MB,src_id=,this_id=),"
     "next_random=false,next_random_sample_size=0,overwrite=true,"
     "prefix_search=false,raw=false,read_once=false,readonly=false,"
     "skip_sort_check=false,statistics=,target=",
-    confchk_WT_SESSION_open_cursor, 17},
+    confchk_WT_SESSION_open_cursor, 18},
   {"WT_SESSION.prepare_transaction", "prepare_timestamp=", confchk_WT_SESSION_prepare_transaction,
     1},
   {"WT_SESSION.query_timestamp", "get=read", confchk_WT_SESSION_query_timestamp, 1},

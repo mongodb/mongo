@@ -697,8 +697,8 @@ __txn_visible_id(WT_SESSION_IMPL *session, uint64_t id)
     if (txn->isolation == WT_ISO_READ_UNCOMMITTED)
         return (true);
 
-    /* Otherwise, we should be called with a snapshot or we are in a checkpoint cursor. */
-    WT_ASSERT(session, F_ISSET(txn, WT_TXN_HAS_SNAPSHOT) || session->dhandle->checkpoint != NULL);
+    /* Otherwise, we should be called with a snapshot. */
+    WT_ASSERT(session, F_ISSET(txn, WT_TXN_HAS_SNAPSHOT));
 
     return (__wt_txn_visible_id_snapshot(
       id, txn->snap_min, txn->snap_max, txn->snapshot, txn->snapshot_count));
@@ -727,6 +727,9 @@ __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id, wt_timestamp_t timestamp
     /* Timestamp check. */
     if (!F_ISSET(txn, WT_TXN_SHARED_TS_READ) || timestamp == WT_TS_NONE)
         return (true);
+
+    if (WT_READING_CHECKPOINT(session))
+        return (timestamp <= txn->checkpoint_read_timestamp);
 
     return (timestamp <= txn_shared->read_timestamp);
 }

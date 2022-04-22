@@ -1515,9 +1515,16 @@ methods = {
         to the bit count (except for the last set of values loaded)'''),
     Config('checkpoint', '', r'''
         the name of a checkpoint to open (the reserved name
-        "WiredTigerCheckpoint" opens the most recent internal
+        "WiredTigerCheckpoint" opens the most recent
         checkpoint taken for the object).  The cursor does not
         support data modification'''),
+    Config('checkpoint_use_history', 'true', r'''
+        when opening a checkpoint cursor, open history store cursors and retrieve
+        snapshot and timestamp information from the checkpoint. This is in general
+        required for correct reads; if setting it to false the caller must ensure
+        that the checkpoint is self-contained in the data store: timestamps are not
+        in use and the object was quiescent when the checkpoint was taken''',
+        type='boolean', undoc=True),
     Config('checkpoint_wait', 'true', r'''
         wait for the checkpoint lock, if \c checkpoint_wait=false, open the
         cursor without taking a lock, returning EBUSY if the operation
@@ -1527,6 +1534,11 @@ methods = {
         configure debug specific behavior on a cursor. Generally only
         used for internal testing purposes''',
         type='category', subconfig=[
+        Config('checkpoint_read_timestamp', '', r'''
+            read the checkpoint using the specified timestamp. The supplied value
+            must not be older than the checkpoint's oldest timestamp. Ignored if
+            not reading from a checkpoint''',
+            undoc=True),
         Config('dump_version', 'false', r'''
             open a version cursor, which is a debug cursor on a table that
             enables iteration through the history of values for a given key.''',

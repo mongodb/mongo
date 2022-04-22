@@ -225,7 +225,7 @@ __cursor_reset(WT_CURSOR_BTREE *cbt)
 
     /* If the cursor was active, deactivate it. */
     if (F_ISSET(cbt, WT_CBT_ACTIVE)) {
-        if (!F_ISSET(cbt, WT_CBT_NO_TRACKING))
+        if (!WT_READING_CHECKPOINT(session))
             __cursor_leave(session);
         F_CLR(cbt, WT_CBT_ACTIVE);
     }
@@ -234,7 +234,7 @@ __cursor_reset(WT_CURSOR_BTREE *cbt)
      * When the count of active cursors in the session goes to zero, there are no active cursors,
      * and we can release any snapshot we're holding for read committed isolation.
      */
-    if (session->ncursors == 0 && !F_ISSET(cbt, WT_CBT_NO_TXN))
+    if (session->ncursors == 0 && !WT_READING_CHECKPOINT(session))
         __wt_txn_read_last(session);
 
     /* If we're not holding a cursor reference, we're done. */
@@ -400,7 +400,7 @@ __wt_cursor_func_init(WT_CURSOR_BTREE *cbt, bool reenter)
 
     /* Activate the file cursor. */
     if (!F_ISSET(cbt, WT_CBT_ACTIVE)) {
-        if (!F_ISSET(cbt, WT_CBT_NO_TRACKING))
+        if (!WT_READING_CHECKPOINT(session))
             WT_RET(__cursor_enter(session));
         F_SET(cbt, WT_CBT_ACTIVE);
     }
@@ -408,7 +408,7 @@ __wt_cursor_func_init(WT_CURSOR_BTREE *cbt, bool reenter)
     /*
      * If this is an ordinary transactional cursor, make sure we are set up to read.
      */
-    if (!F_ISSET(cbt, WT_CBT_NO_TXN))
+    if (!WT_READING_CHECKPOINT(session))
         __wt_txn_cursor_op(session);
     return (0);
 }
