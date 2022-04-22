@@ -117,7 +117,7 @@ var $config = extendWorkload($config, function($config, $super) {
     };
 
     $config.data.getMaxClusterTime = function getMaxClusterTime(sessions) {
-        let maxClusterTime = new Timestamp(0, 0);
+        let maxClusterTime = new Timestamp(1, 0);
         for (let session of sessions) {
             if (session.getClusterTime() === undefined) {
                 continue;
