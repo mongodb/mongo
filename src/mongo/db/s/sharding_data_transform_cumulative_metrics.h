@@ -42,9 +42,23 @@ namespace mongo {
 
 class ShardingDataTransformCumulativeMetrics {
 public:
+    enum class CoordinatorStateEnum : int32_t {
+        kUnused = -1,
+        kInitializing,
+        kPreparingToDonate,
+        kCloning,
+        kApplying,
+        kBlockingWrites,
+        kAborting,
+        kCommitting,
+        kDone,
+        kNumStates
+    };
+
     using Role = ShardingDataTransformMetrics::Role;
     using InstanceObserver = ShardingDataTransformMetricsObserverInterface;
     using DeregistrationFunction = unique_function<void()>;
+
 
     static ShardingDataTransformCumulativeMetrics* getForResharding(ServiceContext* context);
     static ShardingDataTransformCumulativeMetrics* getForGlobalIndexes(ServiceContext* context);
@@ -61,6 +75,15 @@ public:
     void onCompletion(ReshardingOperationStatusEnum status);
 
     void setLastOpEndingChunkImbalance(int64_t imbalanceCount);
+
+    /**
+     * The before can be boost::none to represent the initial state transition and
+     * after can be boost::none to represent cases where it is no longer active.
+     */
+    void onCoordinatorStateTransition(boost::optional<CoordinatorStateEnum> before,
+                                      boost::optional<CoordinatorStateEnum> after);
+
+    static const char* fieldNameFor(CoordinatorStateEnum state);
 
 private:
     struct MetricsComparer {
@@ -79,9 +102,13 @@ private:
     void reportOldestActive(BSONObjBuilder* bob) const;
     void reportLatencies(BSONObjBuilder* bob) const;
     void reportCurrentInSteps(BSONObjBuilder* bob) const;
+
     MetricsSet& getMetricsSetForRole(Role role);
     const MetricsSet& getMetricsSetForRole(Role role) const;
     const InstanceObserver* getOldestOperation(WithLock, Role role) const;
+    const AtomicWord<int64_t>* getCoordinatorStateCounter(CoordinatorStateEnum state) const;
+    AtomicWord<int64_t>* getMutableCoordinatorStateCounter(CoordinatorStateEnum state);
+
     MetricsSet::iterator insertMetrics(const InstanceObserver* metrics, MetricsSet& set);
 
     mutable Mutex _mutex;
@@ -95,6 +122,9 @@ private:
     AtomicWord<int64_t> _countCancelled{0};
 
     AtomicWord<int64_t> _lastOpEndingChunkImbalance{0};
+
+    std::array<AtomicWord<int64_t>, static_cast<size_t>(CoordinatorStateEnum::kNumStates)>
+        _coordinatorStateList;
 };
 
 }  // namespace mongo

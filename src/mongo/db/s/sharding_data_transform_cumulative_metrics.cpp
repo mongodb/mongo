@@ -29,6 +29,7 @@
 
 #include "mongo/db/s/sharding_data_transform_cumulative_metrics.h"
 #include "mongo/util/assert_util.h"
+#include <cstdint>
 
 namespace mongo {
 
@@ -132,6 +133,7 @@ const auto getMetrics = ServiceContext::declareDecoration<MetricsPtr>();
 const auto metricsRegisterer = ServiceContext::ConstructorActionRegisterer{
     "ShardingDataTransformMetrics",
     [](ServiceContext* ctx) { getMetrics(ctx) = std::make_unique<Metrics>(); }};
+
 }  // namespace
 
 ShardingDataTransformCumulativeMetrics* ShardingDataTransformCumulativeMetrics::getForResharding(
@@ -150,7 +152,15 @@ ShardingDataTransformCumulativeMetrics::ShardingDataTransformCumulativeMetrics(
     const std::string& rootSectionName)
     : _rootSectionName{rootSectionName},
       _instanceMetricsForAllRoles(ShardingDataTransformMetrics::kRoleCount),
-      _operationWasAttempted{false} {}
+      _operationWasAttempted{false},
+      _coordinatorStateList{AtomicWord<int64_t>{0},
+                            AtomicWord<int64_t>{0},
+                            AtomicWord<int64_t>{0},
+                            AtomicWord<int64_t>{0},
+                            AtomicWord<int64_t>{0},
+                            AtomicWord<int64_t>{0},
+                            AtomicWord<int64_t>{0},
+                            AtomicWord<int64_t>{0}} {}
 
 ShardingDataTransformCumulativeMetrics::DeregistrationFunction
 ShardingDataTransformCumulativeMetrics::registerInstanceMetrics(const InstanceObserver* metrics) {
@@ -253,13 +263,19 @@ void ShardingDataTransformCumulativeMetrics::reportLatencies(BSONObjBuilder* bob
 
 void ShardingDataTransformCumulativeMetrics::reportCurrentInSteps(BSONObjBuilder* bob) const {
     BSONObjBuilder s(bob->subobjStart(kCurrentInSteps));
-    s.append(kCountInstancesInCoordinatorState1Initializing, kPlaceholderInt);
-    s.append(kCountInstancesInCoordinatorState2PreparingToDonate, kPlaceholderInt);
-    s.append(kCountInstancesInCoordinatorState3Cloning, kPlaceholderInt);
-    s.append(kCountInstancesInCoordinatorState4Applying, kPlaceholderInt);
-    s.append(kCountInstancesInCoordinatorState5BlockingWrites, kPlaceholderInt);
-    s.append(kCountInstancesInCoordinatorState6Aborting, kPlaceholderInt);
-    s.append(kCountInstancesInCoordinatorState7Committing, kPlaceholderInt);
+
+    auto reportCoordinatorState = [this, &s](auto state) {
+        s.append(fieldNameFor(state), getCoordinatorStateCounter(state)->load());
+    };
+
+    reportCoordinatorState(CoordinatorStateEnum::kInitializing);
+    reportCoordinatorState(CoordinatorStateEnum::kPreparingToDonate);
+    reportCoordinatorState(CoordinatorStateEnum::kCloning);
+    reportCoordinatorState(CoordinatorStateEnum::kApplying);
+    reportCoordinatorState(CoordinatorStateEnum::kBlockingWrites);
+    reportCoordinatorState(CoordinatorStateEnum::kAborting);
+    reportCoordinatorState(CoordinatorStateEnum::kCommitting);
+
     s.append(kCountInstancesInRecipientState1AwaitingFetchTimestamp, kPlaceholderInt);
     s.append(kCountInstancesInRecipientState2CreatingCollection, kPlaceholderInt);
     s.append(kCountInstancesInRecipientState3Cloning, kPlaceholderInt);
@@ -327,6 +343,80 @@ void ShardingDataTransformCumulativeMetrics::onCompletion(ReshardingOperationSta
 
 void ShardingDataTransformCumulativeMetrics::setLastOpEndingChunkImbalance(int64_t imbalanceCount) {
     _lastOpEndingChunkImbalance.store(imbalanceCount);
+}
+
+AtomicWord<int64_t>* ShardingDataTransformCumulativeMetrics::getMutableCoordinatorStateCounter(
+    ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum state) {
+    if (state == ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum::kUnused) {
+        return nullptr;
+    }
+
+    invariant(static_cast<size_t>(state) <
+              static_cast<size_t>(
+                  ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum::kNumStates));
+    return &_coordinatorStateList[static_cast<size_t>(state)];
+}
+
+const AtomicWord<int64_t>* ShardingDataTransformCumulativeMetrics::getCoordinatorStateCounter(
+    ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum state) const {
+    if (state == ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum::kUnused) {
+        return nullptr;
+    }
+
+    invariant(static_cast<size_t>(state) <
+              static_cast<size_t>(
+                  ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum::kNumStates));
+    return &_coordinatorStateList[static_cast<size_t>(state)];
+}
+
+void ShardingDataTransformCumulativeMetrics::onCoordinatorStateTransition(
+    boost::optional<ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum> before,
+    boost::optional<ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum> after) {
+    if (before) {
+        if (auto counter = getMutableCoordinatorStateCounter(*before)) {
+            counter->fetchAndSubtract(1);
+        }
+    }
+
+    if (after) {
+        if (auto counter = getMutableCoordinatorStateCounter(*after)) {
+            counter->fetchAndAdd(1);
+        }
+    }
+}
+
+const char* ShardingDataTransformCumulativeMetrics::fieldNameFor(
+    ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum state) {
+    switch (state) {
+        case CoordinatorStateEnum::kInitializing:
+            return kCountInstancesInCoordinatorState1Initializing;
+
+        case CoordinatorStateEnum::kPreparingToDonate:
+            return kCountInstancesInCoordinatorState2PreparingToDonate;
+
+        case CoordinatorStateEnum::kCloning:
+            return kCountInstancesInCoordinatorState3Cloning;
+
+        case CoordinatorStateEnum::kApplying:
+            return kCountInstancesInCoordinatorState4Applying;
+
+        case CoordinatorStateEnum::kBlockingWrites:
+            return kCountInstancesInCoordinatorState5BlockingWrites;
+
+        case CoordinatorStateEnum::kAborting:
+            return kCountInstancesInCoordinatorState6Aborting;
+
+        case CoordinatorStateEnum::kCommitting:
+            return kCountInstancesInCoordinatorState7Committing;
+
+        default:
+            uasserted(6438601,
+                      str::stream()
+                          << "no field name for coordinator state " << static_cast<int32_t>(state));
+            break;
+    }
+
+    MONGO_UNREACHABLE;
 }
 
 }  // namespace mongo

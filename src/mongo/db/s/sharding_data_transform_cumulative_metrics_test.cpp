@@ -297,5 +297,143 @@ TEST_F(ShardingDataTransformCumulativeMetricsTest, ReportContainsLastChunkImbala
     }
 }
 
+class ShardingDataTransformCumulativeStateTest : public ShardingDataTransformCumulativeMetricsTest {
+public:
+    using CoordinatorStateEnum = ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum;
+
+    BSONObj getStateSubObj(const ShardingDataTransformCumulativeMetrics& metrics) {
+        BSONObjBuilder bob;
+        metrics.reportForServerStatus(&bob);
+        auto report = bob.done();
+        return report.getObjectField(kTestMetricsName).getObjectField("currentInSteps").getOwned();
+    }
+
+    bool checkCoordinateStateField(const ShardingDataTransformCumulativeMetrics& metrics,
+                                   boost::optional<CoordinatorStateEnum> expectedState) {
+        auto serverStatusSubObj = getStateSubObj(metrics);
+        std::map<std::string, int> expectedStateFieldCount;
+
+        auto addExpectedField = [&](CoordinatorStateEnum stateToPopulate) {
+            expectedStateFieldCount.emplace(
+                ShardingDataTransformCumulativeMetrics::fieldNameFor(stateToPopulate),
+                ((expectedState && (stateToPopulate == expectedState)) ? 1 : 0));
+        };
+
+        addExpectedField(CoordinatorStateEnum::kInitializing);
+        addExpectedField(CoordinatorStateEnum::kPreparingToDonate);
+        addExpectedField(CoordinatorStateEnum::kCloning);
+        addExpectedField(CoordinatorStateEnum::kApplying);
+        addExpectedField(CoordinatorStateEnum::kBlockingWrites);
+        addExpectedField(CoordinatorStateEnum::kAborting);
+        addExpectedField(CoordinatorStateEnum::kCommitting);
+
+        for (const auto expectedState : expectedStateFieldCount) {
+            const auto actualValue = serverStatusSubObj.getIntField(expectedState.first);
+            if (actualValue != expectedState.second) {
+                LOGV2_DEBUG(6438600,
+                            0,
+                            "coordinator state field value does not match expected value",
+                            "field"_attr = expectedState.first,
+                            "serverStatus"_attr = serverStatusSubObj);
+                return false;
+            }
+        }
+
+        return true;
+    }
+};
+
+TEST_F(ShardingDataTransformCumulativeStateTest,
+       SimulatedNormalCoordinatorStateTransitionReportsStateCorrectly) {
+    using Role = ShardingDataTransformMetrics::Role;
+    ObserverMock coordinator{Date_t::fromMillisSinceEpoch(200), 400, 300, Role::kCoordinator};
+    auto ignore = _cumulativeMetrics.registerInstanceMetrics(&coordinator);
+
+    ASSERT(checkCoordinateStateField(_cumulativeMetrics, CoordinatorStateEnum::kUnused));
+
+    boost::optional<CoordinatorStateEnum> prevState;
+    boost::optional<CoordinatorStateEnum> nextState;
+
+    auto simulateTransitionTo = [&](boost::optional<CoordinatorStateEnum> newState) {
+        prevState = nextState;
+        nextState = newState;
+        _cumulativeMetrics.onCoordinatorStateTransition(prevState, nextState);
+        return checkCoordinateStateField(_cumulativeMetrics, nextState);
+    };
+
+    ASSERT(simulateTransitionTo(CoordinatorStateEnum::kUnused));
+    ASSERT(simulateTransitionTo(CoordinatorStateEnum::kInitializing));
+    ASSERT(simulateTransitionTo(CoordinatorStateEnum::kPreparingToDonate));
+    ASSERT(simulateTransitionTo(CoordinatorStateEnum::kCloning));
+    ASSERT(simulateTransitionTo(CoordinatorStateEnum::kBlockingWrites));
+    ASSERT(simulateTransitionTo(CoordinatorStateEnum::kCommitting));
+    ASSERT(simulateTransitionTo(CoordinatorStateEnum::kDone));
+    ASSERT(simulateTransitionTo(boost::none));
+}
+
+TEST_F(ShardingDataTransformCumulativeStateTest,
+       SimulatedAbortedCoordinatorStateTransitionReportsStateCorrectly) {
+    using Role = ShardingDataTransformMetrics::Role;
+    ObserverMock coordinator{Date_t::fromMillisSinceEpoch(200), 400, 300, Role::kCoordinator};
+    auto ignore = _cumulativeMetrics.registerInstanceMetrics(&coordinator);
+
+    ASSERT(checkCoordinateStateField(
+        _cumulativeMetrics, ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum::kUnused));
+
+    boost::optional<CoordinatorStateEnum> prevState;
+    boost::optional<CoordinatorStateEnum> nextState;
+
+    auto simulateTransitionTo = [&](boost::optional<CoordinatorStateEnum> newState) {
+        prevState = nextState;
+        nextState = newState;
+        _cumulativeMetrics.onCoordinatorStateTransition(prevState, nextState);
+        return checkCoordinateStateField(_cumulativeMetrics, nextState);
+    };
+
+    ASSERT(simulateTransitionTo(CoordinatorStateEnum::kUnused));
+    ASSERT(simulateTransitionTo(CoordinatorStateEnum::kInitializing));
+    ASSERT(simulateTransitionTo(CoordinatorStateEnum::kPreparingToDonate));
+    ASSERT(simulateTransitionTo(CoordinatorStateEnum::kAborting));
+    ASSERT(simulateTransitionTo(boost::none));
+}
+
+TEST_F(ShardingDataTransformCumulativeStateTest,
+       SimulatedSteppedDownCoordinatorStateFromUnusedReportsStateCorrectly) {
+    using Role = ShardingDataTransformMetrics::Role;
+    ObserverMock coordinator{Date_t::fromMillisSinceEpoch(200), 400, 300, Role::kCoordinator};
+    auto ignore = _cumulativeMetrics.registerInstanceMetrics(&coordinator);
+
+    auto initState = CoordinatorStateEnum::kUnused;
+    ASSERT(checkCoordinateStateField(_cumulativeMetrics, initState));
+
+    _cumulativeMetrics.onCoordinatorStateTransition(initState, boost::none);
+    ASSERT(checkCoordinateStateField(_cumulativeMetrics, initState));
+}
+
+TEST_F(ShardingDataTransformCumulativeStateTest,
+       SimulatedSteppedDownCoordinatorStateTransitionReportsStateCorrectly) {
+    using Role = ShardingDataTransformMetrics::Role;
+    ObserverMock coordinator{Date_t::fromMillisSinceEpoch(200), 400, 300, Role::kCoordinator};
+    auto ignore = _cumulativeMetrics.registerInstanceMetrics(&coordinator);
+
+    ASSERT(checkCoordinateStateField(
+        _cumulativeMetrics, ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum::kUnused));
+
+    boost::optional<CoordinatorStateEnum> prevState;
+    boost::optional<CoordinatorStateEnum> nextState;
+
+    auto simulateTransitionTo = [&](boost::optional<CoordinatorStateEnum> newState) {
+        prevState = nextState;
+        nextState = newState;
+        _cumulativeMetrics.onCoordinatorStateTransition(prevState, nextState);
+        return checkCoordinateStateField(_cumulativeMetrics, nextState);
+    };
+
+    ASSERT(simulateTransitionTo(CoordinatorStateEnum::kUnused));
+    ASSERT(simulateTransitionTo(CoordinatorStateEnum::kInitializing));
+    ASSERT(simulateTransitionTo(CoordinatorStateEnum::kPreparingToDonate));
+    ASSERT(simulateTransitionTo(boost::none));
+}
+
 }  // namespace
 }  // namespace mongo

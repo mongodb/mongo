@@ -564,6 +564,43 @@ BSONObj makeFlushRoutingTableCacheUpdatesCmd(const NamespaceString& nss) {
         BSON(WriteConcernOptions::kWriteConcernField << kMajorityWriteConcern.toBSON()));
 }
 
+ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum toMetricsState(
+    CoordinatorStateEnum enumVal) {
+    switch (enumVal) {
+        case CoordinatorStateEnum::kUnused:
+            return ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum::kUnused;
+
+        case CoordinatorStateEnum::kInitializing:
+            return ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum::kInitializing;
+
+        case CoordinatorStateEnum::kPreparingToDonate:
+            return ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum::kPreparingToDonate;
+
+        case CoordinatorStateEnum::kCloning:
+            return ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum::kCloning;
+
+        case CoordinatorStateEnum::kApplying:
+            return ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum::kApplying;
+
+        case CoordinatorStateEnum::kBlockingWrites:
+            return ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum::kBlockingWrites;
+
+        case CoordinatorStateEnum::kAborting:
+            return ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum::kAborting;
+
+        case CoordinatorStateEnum::kCommitting:
+            return ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum::kCommitting;
+
+        case CoordinatorStateEnum::kDone:
+            return ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum::kDone;
+        default:
+            invariant(false,
+                      str::stream() << "Unexpected resharding coordinator state: "
+                                    << CoordinatorState_serializer(enumVal));
+            MONGO_UNREACHABLE;
+    }
+}
+
 }  // namespace
 
 namespace resharding {
@@ -792,6 +829,12 @@ void removeCoordinatorDocAndReshardingFields(OperationContext* opCtx,
                 opCtx, updatedCoordinatorDoc, boost::none, boost::none, txnNumber);
         },
         ShardingCatalogClient::kLocalWriteConcern);
+
+    if (ShardingDataTransformMetrics::isEnabled()) {
+        ShardingDataTransformCumulativeMetrics::getForResharding(cc().getServiceContext())
+            ->onCoordinatorStateTransition(toMetricsState(coordinatorDoc.getState()),
+                                           toMetricsState(updatedCoordinatorDoc.getState()));
+    }
 }
 }  // namespace resharding
 
@@ -999,6 +1042,11 @@ ReshardingCoordinatorService::ReshardingCoordinator::ReshardingCoordinator(
     if (coordinatorDoc.getState() > CoordinatorStateEnum::kInitializing) {
         _reshardingCoordinatorObserver->onReshardingParticipantTransition(coordinatorDoc);
     }
+
+    if (ShardingDataTransformMetrics::isEnabled()) {
+        ShardingDataTransformCumulativeMetrics::getForResharding(cc().getServiceContext())
+            ->onCoordinatorStateTransition(boost::none, toMetricsState(coordinatorDoc.getState()));
+    }
 }
 
 void ReshardingCoordinatorService::ReshardingCoordinator::installCoordinatorDoc(
@@ -1020,7 +1068,15 @@ void ReshardingCoordinatorService::ReshardingCoordinator::installCoordinatorDoc(
                "collectionUUID"_attr = doc.getSourceUUID(),
                "reshardingUUID"_attr = doc.getReshardingUUID());
 
+    const auto previousState = _coordinatorDoc.getState();
     _coordinatorDoc = doc;
+
+    if (ShardingDataTransformMetrics::isEnabled()) {
+        ShardingDataTransformCumulativeMetrics::getForResharding(cc().getServiceContext())
+            ->onCoordinatorStateTransition(toMetricsState(previousState),
+                                           toMetricsState(_coordinatorDoc.getState()));
+    }
+
     ShardingLogging::get(opCtx)->logChange(opCtx,
                                            "resharding.coordinator.transition",
                                            doc.getSourceNss().toString(),
@@ -1372,6 +1428,12 @@ SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
                     }
                 }
                 _reshardingCoordinatorObserver->interrupt(status);
+            }
+
+            if (ShardingDataTransformMetrics::isEnabled()) {
+                ShardingDataTransformCumulativeMetrics::getForResharding(cc().getServiceContext())
+                    ->onCoordinatorStateTransition(toMetricsState(_coordinatorDoc.getState()),
+                                                   boost::none);
             }
         })
         .semi();
