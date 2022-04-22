@@ -1331,7 +1331,7 @@ checkpoint_worker(void *arg)
         goto err;
     }
 
-    while (!wtperf->stop) {
+    while (!wtperf->stop || wtperf->flushthreads != NULL) {
         /* Break the sleep up, so we notice interrupts faster. */
         for (i = 0; i < opts->checkpoint_interval; i++) {
             sleep(1);
