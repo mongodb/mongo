@@ -35,6 +35,7 @@
 
 #include "mongo/base/counter.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/util/interruptible.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -136,11 +137,33 @@ public:
     virtual bool tryPop(OperationContext* opCtx, Value* value) = 0;
 
     /**
-     * Waits "waitDuration" for an operation to be pushed into the oplog buffer.
+     * Waits uninterruptibly for "waitDuration" for an operation to be pushed into the oplog buffer.
      * Returns false if oplog buffer is still empty after "waitDuration".
      * Otherwise, returns true.
      */
-    virtual bool waitForData(Seconds waitDuration) = 0;
+    bool waitForData(Seconds waitDuration) {
+        return waitForDataFor(duration_cast<Milliseconds>(waitDuration),
+                              Interruptible::notInterruptible());
+    };
+
+    /**
+     * Interruptible wait with millisecond granularity.
+     *
+     * Waits "waitDuration" for an operation to be pushed into the oplog buffer.
+     * Returns false if oplog buffer is still empty after "waitDuration".
+     * Otherwise, returns true.
+     * Throws if the interruptible is interrupted.
+     */
+    virtual bool waitForDataFor(
+        Milliseconds waitDuration,
+        Interruptible* interruptible = Interruptible::notInterruptible()) = 0;
+
+    /**
+     * Same as waitForDataFor(Milliseconds, Interruptible) above but takes a deadline instead
+     * of a duration.
+     */
+    virtual bool waitForDataUntil(
+        Date_t deadline, Interruptible* interruptible = Interruptible::notInterruptible()) = 0;
 
     /**
      * Returns false if oplog buffer is empty.

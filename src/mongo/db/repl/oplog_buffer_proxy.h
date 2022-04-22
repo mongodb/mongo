@@ -68,7 +68,8 @@ public:
     std::size_t getCount() const override;
     void clear(OperationContext* opCtx) override;
     bool tryPop(OperationContext* opCtx, Value* value) override;
-    bool waitForData(Seconds waitDuration) override;
+    bool waitForDataFor(Milliseconds waitDuration, Interruptible* interruptible) override;
+    bool waitForDataUntil(Date_t deadline, Interruptible* interruptible) override;
     bool peek(OperationContext* opCtx, Value* value) override;
     boost::optional<Value> lastObjectPushed(OperationContext* opCtx) const override;
 

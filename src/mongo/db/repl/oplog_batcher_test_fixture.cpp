@@ -109,11 +109,17 @@ bool OplogBufferMock::tryPop(OperationContext* opCtx, Value* value) {
     return true;
 }
 
-bool OplogBufferMock::waitForData(Seconds waitDuration) {
+bool OplogBufferMock::waitForDataFor(Milliseconds waitDuration, Interruptible* interruptible) {
     stdx::unique_lock<Latch> lk(_mutex);
-    _notEmptyCv.wait_for(lk, waitDuration.toSystemDuration(), [&] {
-        return _hasShutDown || _curIndex < _data.size();
-    });
+    interruptible->waitForConditionOrInterruptFor(
+        _notEmptyCv, lk, waitDuration, [&] { return _hasShutDown || _curIndex < _data.size(); });
+    return _curIndex < _data.size();
+}
+
+bool OplogBufferMock::waitForDataUntil(Date_t deadline, Interruptible* interruptible) {
+    stdx::unique_lock<Latch> lk(_mutex);
+    interruptible->waitForConditionOrInterruptUntil(
+        _notEmptyCv, lk, deadline, [&] { return _hasShutDown || _curIndex < _data.size(); });
     return _curIndex < _data.size();
 }
 

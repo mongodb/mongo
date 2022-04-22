@@ -58,7 +58,8 @@ public:
     std::size_t getCount() const final;
     void clear(OperationContext* opCtx) final;
     bool tryPop(OperationContext* opCtx, Value* value) final;
-    bool waitForData(Seconds waitDuration) final;
+    bool waitForDataFor(Milliseconds waitDuration, Interruptible* interruptible) final;
+    bool waitForDataUntil(Date_t deadline, Interruptible* interruptible) final;
     bool peek(OperationContext* opCtx, Value* value) final;
     boost::optional<Value> lastObjectPushed(OperationContext* opCtx) const final;
     StatusWith<Value> findByTimestamp(OperationContext* opCtx, const Timestamp& ts) final;
