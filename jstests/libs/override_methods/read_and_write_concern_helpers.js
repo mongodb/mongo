@@ -82,6 +82,7 @@ var kCommandsSupportingWriteConcern = new Set([
     "revokeRolesFromRole",
     "revokeRolesFromUser",
     "setFeatureCompatibilityVersion",
+    "testInternalTransactions",
     "update",
     "updateRole",
     "updateUser",

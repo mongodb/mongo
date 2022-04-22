@@ -49,10 +49,6 @@ structs:
         type: string
       command:
         type: object
-      # TODO SERVER-64986: Remove assertSucceeds parameter.
-      assertSucceeds:
-        type: bool
-        default: true
       exhaustCursor:
         type: bool
         optional: true

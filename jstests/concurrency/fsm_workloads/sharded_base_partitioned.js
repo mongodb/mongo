@@ -40,6 +40,7 @@ var $config = (function() {
     data.makePartition = function makePartition(ns, tid, partitionSize) {
         var partition = {ns: ns};
         partition.lower = tid * partitionSize;
+        partition.mid = (tid * partitionSize) + (partitionSize / 2);
         partition.upper = (tid * partitionSize) + partitionSize;
 
         partition.isLowChunk = (tid === 0) ? true : false;
