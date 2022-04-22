@@ -237,22 +237,6 @@ class test_tiered04(wttest.WiredTigerTestCase):
         self.check_metadata(fileuri, intl_page)
         self.check_metadata(self.objuri, intl_page)
 
-        #self.pr("verify stats")
-        # Verify the table settings.
-        #obj = self.get_stat(stat.dsrc.tiered_object_size, self.uri)
-        #self.assertEqual(obj, self.object_sys_val)
-        #obj = self.get_stat(stat.dsrc.tiered_object_size, self.uri1)
-        #self.assertEqual(obj, self.object_uri_val)
-        #obj = self.get_stat(stat.dsrc.tiered_object_size, self.uri_none)
-        #self.assertEqual(obj, 0)
-
-        #retain = self.get_stat(stat.dsrc.tiered_retention, self.uri)
-        #self.assertEqual(retain, self.retention)
-        #retain = self.get_stat(stat.dsrc.tiered_retention, self.uri1)
-        #self.assertEqual(retain, self.retention1)
-        #retain = self.get_stat(stat.dsrc.tiered_retention, self.uri_none)
-        #self.assertEqual(retain, 0)
-
         # Now test some connection statistics with operations.
         retain = self.get_stat(stat.conn.tiered_retention, None)
         self.assertEqual(retain, self.retention)

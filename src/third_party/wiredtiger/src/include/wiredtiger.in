@@ -7047,43 +7047,35 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_DSRC_REC_TIME_WINDOW_STOP_TXN		2212
 /*! session: object compaction */
 #define	WT_STAT_DSRC_SESSION_COMPACT			2213
-/*! session: tiered operations dequeued and processed */
-#define	WT_STAT_DSRC_TIERED_WORK_UNITS_DEQUEUED		2214
-/*! session: tiered operations scheduled */
-#define	WT_STAT_DSRC_TIERED_WORK_UNITS_CREATED		2215
-/*! session: tiered storage local retention time (secs) */
-#define	WT_STAT_DSRC_TIERED_RETENTION			2216
-/*! session: tiered storage object size */
-#define	WT_STAT_DSRC_TIERED_OBJECT_SIZE			2217
 /*! transaction: race to read prepared update retry */
-#define	WT_STAT_DSRC_TXN_READ_RACE_PREPARE_UPDATE	2218
+#define	WT_STAT_DSRC_TXN_READ_RACE_PREPARE_UPDATE	2214
 /*!
  * transaction: rollback to stable history store records with stop
  * timestamps older than newer records
  */
-#define	WT_STAT_DSRC_TXN_RTS_HS_STOP_OLDER_THAN_NEWER_START	2219
+#define	WT_STAT_DSRC_TXN_RTS_HS_STOP_OLDER_THAN_NEWER_START	2215
 /*! transaction: rollback to stable inconsistent checkpoint */
-#define	WT_STAT_DSRC_TXN_RTS_INCONSISTENT_CKPT		2220
+#define	WT_STAT_DSRC_TXN_RTS_INCONSISTENT_CKPT		2216
 /*! transaction: rollback to stable keys removed */
-#define	WT_STAT_DSRC_TXN_RTS_KEYS_REMOVED		2221
+#define	WT_STAT_DSRC_TXN_RTS_KEYS_REMOVED		2217
 /*! transaction: rollback to stable keys restored */
-#define	WT_STAT_DSRC_TXN_RTS_KEYS_RESTORED		2222
+#define	WT_STAT_DSRC_TXN_RTS_KEYS_RESTORED		2218
 /*! transaction: rollback to stable restored tombstones from history store */
-#define	WT_STAT_DSRC_TXN_RTS_HS_RESTORE_TOMBSTONES	2223
+#define	WT_STAT_DSRC_TXN_RTS_HS_RESTORE_TOMBSTONES	2219
 /*! transaction: rollback to stable restored updates from history store */
-#define	WT_STAT_DSRC_TXN_RTS_HS_RESTORE_UPDATES		2224
+#define	WT_STAT_DSRC_TXN_RTS_HS_RESTORE_UPDATES		2220
 /*! transaction: rollback to stable skipping delete rle */
-#define	WT_STAT_DSRC_TXN_RTS_DELETE_RLE_SKIPPED		2225
+#define	WT_STAT_DSRC_TXN_RTS_DELETE_RLE_SKIPPED		2221
 /*! transaction: rollback to stable skipping stable rle */
-#define	WT_STAT_DSRC_TXN_RTS_STABLE_RLE_SKIPPED		2226
+#define	WT_STAT_DSRC_TXN_RTS_STABLE_RLE_SKIPPED		2222
 /*! transaction: rollback to stable sweeping history store keys */
-#define	WT_STAT_DSRC_TXN_RTS_SWEEP_HS_KEYS		2227
+#define	WT_STAT_DSRC_TXN_RTS_SWEEP_HS_KEYS		2223
 /*! transaction: rollback to stable updates removed from history store */
-#define	WT_STAT_DSRC_TXN_RTS_HS_REMOVED			2228
+#define	WT_STAT_DSRC_TXN_RTS_HS_REMOVED			2224
 /*! transaction: transaction checkpoints due to obsolete pages */
-#define	WT_STAT_DSRC_TXN_CHECKPOINT_OBSOLETE_APPLIED	2229
+#define	WT_STAT_DSRC_TXN_CHECKPOINT_OBSOLETE_APPLIED	2225
 /*! transaction: update conflicts */
-#define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		2230
+#define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		2226
 
 /*!
  * @}
