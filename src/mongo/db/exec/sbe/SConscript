@@ -130,19 +130,6 @@ env.Library(
     )
 
 env.Library(
-    target='query_sbe_parser',
-    source=[
-        'parser/parser.cpp',
-        ],
-    LIBDEPS=[
-        'query_sbe',
-        'query_sbe_abt',
-        'query_sbe_stages',
-        'query_sbe_storage',
-        ]
-    )
-
-env.Library(
     target='query_sbe_abt',
     source=[
         'abt/abt_lower.cpp',
@@ -203,7 +190,6 @@ env.CppUnitTest(
         'expressions/sbe_trigonometric_expressions_test.cpp',
         'expressions/sbe_trunc_builtin_test.cpp',
         'expressions/sbe_ts_second_ts_increment_test.cpp',
-        'parser/sbe_parser_test.cpp',
         'sbe_column_scan_test.cpp',
         'sbe_filter_test.cpp',
         'sbe_hash_agg_test.cpp',
@@ -237,7 +223,6 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
-        'query_sbe_parser',
         'sbe_plan_stage_test',
     ],
 )
