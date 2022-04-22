@@ -1,11 +1,15 @@
 /**
  * Checks that setClusterParameter command only run once
  *
+ * We have a restart in the test with some stored values that must be preserved so it cannot run in
+ * inMemory variants
+ *
  * @tags: [
  *   # Requires all nodes to be running the latest binary.
  *   requires_fcv_60,
  *   featureFlagClusterWideConfig,
- *   does_not_support_stepdowns
+ *   does_not_support_stepdowns,
+ *   requires_persistence,
  *  ]
  */
 (function() {
