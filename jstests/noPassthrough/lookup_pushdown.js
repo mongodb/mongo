@@ -306,6 +306,16 @@ function setLookupPushdownDisabled(value) {
     assert.commandWorked(foreignColl.dropIndexes());
 })();
 
+// Construct an index with a partial filter expression. In this case, we should NOT use INLJ.
+(function testPartialFilterExpressionIndexesAreIgnored() {
+    assert.commandWorked(foreignColl.dropIndexes());
+    assert.commandWorked(foreignColl.createIndex({b: 1}, {partialFilterExpression: {b: 1}}));
+    runTest(coll,
+            [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
+            JoinAlgorithm.NLJ /* expectedJoinAlgorithm */);
+    assert.commandWorked(foreignColl.dropIndexes());
+})();
+
 // Build a hashed index on the foreign collection that matches the foreignField. Indexed nested loop
 // join strategy should be used.
 (function testIndexNestedLoopJoinHashedIndex() {
