@@ -382,9 +382,7 @@ typedef uint64_t wt_timestamp_t;
 /*******************************************
  * WiredTiger internal include files.
  *******************************************/
-#if defined(_lint)
-#include "lint.h"
-#elif defined(__GNUC__)
+#if defined(__GNUC__)
 #include "gcc.h"
 #elif defined(_MSC_VER)
 #include "msvc.h"
