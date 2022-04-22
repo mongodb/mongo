@@ -1191,7 +1191,7 @@ TEST_F(ShardingCatalogClientTest, ApplyChunkOpsDeprecatedSuccessful) {
     });
 
     onCommand([updateOps, preCondition, nss](const RemoteCommandRequest& request) {
-        ASSERT_EQUALS("config", request.dbname);
+        ASSERT_EQUALS("admin", request.dbname);
         ASSERT_BSONOBJ_EQ(BSON("w"
                                << "majority"
                                << "wtimeout" << 60000),

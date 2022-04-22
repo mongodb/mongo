@@ -920,7 +920,7 @@ Status ShardingCatalogClientImpl::applyChunkOpsDeprecated(OperationContext* opCt
         Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            "config",
+            NamespaceString::kAdminDb.toString(),
             cmd,
             Shard::RetryPolicy::kIdempotent);
 

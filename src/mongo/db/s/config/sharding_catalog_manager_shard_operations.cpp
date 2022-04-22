@@ -984,7 +984,7 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
         configShard->runCommandWithFixedRetryAttempts(
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            ShardType::ConfigNS.db().toString(),
+            NamespaceString::kAdminDb.toString(),
             command,
             Shard::RetryPolicy::kIdempotent);
 
