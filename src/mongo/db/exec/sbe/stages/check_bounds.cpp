@@ -58,7 +58,15 @@ void CheckBoundsStage::prepare(CompileCtx& ctx) {
 
     _inKeyAccessor = _children[0]->getAccessor(ctx, _inKeySlot);
     _inRecordIdAccessor = _children[0]->getAccessor(ctx, _inRecordIdSlot);
-    _indexBoundsCode = _params.indexBoundsExpression->compileDirect(ctx);
+
+    // Set up the IndexBounds accessor for the slot where IndexBounds will be stored.
+    _indexBoundsAccessor = stdx::visit(
+        visit_helper::Overloaded{
+            [](const IndexBounds&) -> RuntimeEnvironment::Accessor* { return nullptr; },
+            [&ctx](CheckBoundsParams::RuntimeEnvironmentSlotId slot) {
+                return ctx.getRuntimeEnvAccessor(slot);
+            }},
+        _params.indexBounds);
 }
 
 value::SlotAccessor* CheckBoundsStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
@@ -74,19 +82,23 @@ void CheckBoundsStage::open(bool reOpen) {
 
     _commonStats.opens++;
     _children[0]->open(reOpen);
-
-    // Set up the IndexBounds and IndexBoundsChecker by evaluating the '_compiledBoundsExpression'.
-    auto [owned, tag, val] = vm::ByteCode().run(&_indexBoundsCode);
-    tassert(6335100,
-            "The index bounds expression must be of type 'indexBounds'",
-            tag == value::TypeTags::indexBounds);
-    _indexBounds.emplace(*value::getIndexBoundsView(val));
-    _checker.emplace(_indexBounds.get_ptr(), _params.keyPattern, _params.direction);
-    if (owned) {
-        releaseValue(tag, val);
-    }
-
     _isEOF = false;
+
+    // Set up the IndexBoundsChecker by extracting the IndexBounds from the RuntimeEnvironment if
+    // value is provided there.
+    auto indexBoundsPtr = stdx::visit(
+        visit_helper::Overloaded{
+            [](const IndexBounds& indexBounds) { return &indexBounds; },
+            [&](CheckBoundsParams::RuntimeEnvironmentSlotId) -> const IndexBounds* {
+                tassert(6579900, "'_indexBoundsAccessor' must be populated", _indexBoundsAccessor);
+                auto [tag, val] = _indexBoundsAccessor->getViewOfValue();
+                tassert(6579901,
+                        "The index bounds expression must be of type 'indexBounds'",
+                        tag == value::TypeTags::indexBounds);
+                return value::getIndexBoundsView(val);
+            }},
+        _params.indexBounds);
+    _checker.emplace(indexBoundsPtr, _params.keyPattern, _params.direction);
 }
 
 PlanState CheckBoundsStage::getNext() {
@@ -193,9 +205,11 @@ size_t CheckBoundsStage::estimateCompileTimeSize() const {
     size += size_estimator::estimate(_children);
     size += size_estimator::estimate(_specificStats);
     size += size_estimator::estimate(_params.keyPattern);
-    if (_indexBounds) {
-        size += size_estimator::estimate(*_indexBounds);
-    }
+    size += stdx::visit(
+        visit_helper::Overloaded{
+            [](const IndexBounds& indexBounds) { return size_estimator::estimate(indexBounds); },
+            [](CheckBoundsParams::RuntimeEnvironmentSlotId) -> size_t { return 0; }},
+        _params.indexBounds);
     size += size_estimator::estimate(_seekPoint);
     if (_checker) {
         size += size_estimator::estimate(*_checker);

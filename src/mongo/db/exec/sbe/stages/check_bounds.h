@@ -35,44 +35,16 @@
 
 namespace mongo::sbe {
 struct CheckBoundsParams {
-    CheckBoundsParams(std::unique_ptr<EExpression> boundsExpression,
-                      const BSONObj& keyPattern,
-                      const int direction,
-                      const KeyString::Version version,
-                      const Ordering ord)
-        : indexBoundsExpression(std::move(boundsExpression)),
-          keyPattern(keyPattern),
-          direction(direction),
-          version(version),
-          ord(ord) {}
+    // The 'IndexBounds' object can either be provided directly to the chkbounds stage, or via a
+    // runtime environment slot.
+    using RuntimeEnvironmentSlotId = value::SlotId;
+    using IndexBoundsType = stdx::variant<RuntimeEnvironmentSlotId, IndexBounds>;
 
-    CheckBoundsParams(const CheckBoundsParams& params)
-        : indexBoundsExpression(params.indexBoundsExpression->clone()),
-          keyPattern(params.keyPattern),
-          direction(params.direction),
-          version(params.version),
-          ord(params.ord) {}
-
-    CheckBoundsParams& operator=(const CheckBoundsParams& other) {
-        if (this != &other) {
-            indexBoundsExpression = other.indexBoundsExpression->clone();
-            keyPattern = other.keyPattern;
-            direction = other.direction;
-            version = other.version;
-            ord = other.ord;
-        }
-
-        return *this;
-    };
-    ~CheckBoundsParams() = default;
-    CheckBoundsParams(CheckBoundsParams&& other) = default;
-    CheckBoundsParams& operator=(CheckBoundsParams&& other) = default;
-
-    std::unique_ptr<EExpression> indexBoundsExpression;
-    BSONObj keyPattern;
-    int direction;
-    KeyString::Version version;
-    Ordering ord;
+    const IndexBoundsType indexBounds;
+    const BSONObj keyPattern;
+    const int direction;
+    const KeyString::Version version;
+    const Ordering ord;
 };
 
 /**
@@ -124,14 +96,14 @@ protected:
 
 private:
     const CheckBoundsParams _params;
-    vm::CodeFragment _indexBoundsCode;
     boost::optional<IndexBoundsChecker> _checker;
-    boost::optional<IndexBounds> _indexBounds;
 
     const value::SlotId _inKeySlot;
     const value::SlotId _inRecordIdSlot;
     const value::SlotId _outSlot;
 
+    // Will only be set if IndexBounds will be stored in the RuntimeEnvironment, nullptr otherwise.
+    RuntimeEnvironment::Accessor* _indexBoundsAccessor{nullptr};
     value::SlotAccessor* _inKeyAccessor{nullptr};
     value::SlotAccessor* _inRecordIdAccessor{nullptr};
     value::OwnedValueAccessor _outAccessor;
