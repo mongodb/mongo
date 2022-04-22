@@ -296,10 +296,9 @@ void DocumentSourceSort::serializeToArray(
 
         MutableDocument mutDoc{Document{{
             {"$_internalBoundedSort"_sd,
-             Document{{
-                 {"sortKey"_sd, std::move(sortKey)},
-                 {"bound"_sd, _timeSorter->serializeBound()},
-             }}},
+             Document{{{"sortKey"_sd, std::move(sortKey)},
+                       {"bound"_sd, _timeSorter->serializeBound()},
+                       {"limit"_sd, static_cast<long long>(_timeSorter->limit())}}}},
         }}};
 
         if (explain >= ExplainOptions::Verbosity::kExecStats) {
@@ -470,10 +469,16 @@ intrusive_ptr<DocumentSourceSort> DocumentSourceSort::parseBoundedSort(
             boundBase == kMin || boundBase == kMax);
 
     SortOptions opts;
-    opts.maxMemoryUsageBytes = internalQueryMaxBlockingSortMemoryUsageBytes.load();
+    opts.MaxMemoryUsageBytes(internalQueryMaxBlockingSortMemoryUsageBytes.load());
     if (expCtx->allowDiskUse) {
-        opts.extSortAllowed = true;
-        opts.tempDir = expCtx->tempDir;
+        opts.ExtSortAllowed(true);
+        opts.TempDir(expCtx->tempDir);
+    }
+    if (BSONElement limitElem = args["limit"]) {
+        uassert(6588100,
+                "$_internalBoundedSort limit must be a non-negative number if specified",
+                limitElem.isNumber() && limitElem.numberLong() >= 0);
+        opts.Limit(limitElem.numberLong());
     }
 
     auto ds = DocumentSourceSort::create(expCtx, pat);

@@ -136,10 +136,10 @@ function runTest(ascending) {
                         $_internalBoundedSort: {
                             sortKey: {t: ascending ? 1 : -1},
                             bound: ascending ? {base: "min"}
-                                             : {base: "min", offset: bucketMaxSpanSeconds}
+                                             : {base: "min", offset: bucketMaxSpanSeconds},
+                            limit: 100
                         }
                     },
-                    {$limit: 100},
                 ])
                 .toArray();
         assertSorted(optFromMin, ascending);
@@ -155,10 +155,10 @@ function runTest(ascending) {
                         $_internalBoundedSort: {
                             sortKey: {t: ascending ? 1 : -1},
                             bound: ascending ? {base: "max", offset: -bucketMaxSpanSeconds}
-                                             : {base: "max"}
+                                             : {base: "max"},
+                            limit: 100
                         }
-                    },
-                    {$limit: 100},
+                    }
                 ])
                 .toArray();
         assertSorted(optFromMax, ascending);
