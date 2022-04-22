@@ -47,12 +47,10 @@ class test_tiered03(wttest.WiredTigerTestCase):
             bucket = get_bucket1_name('dir_store'),
             bucket_prefix = "pfx_",
             ss_name = 'dir_store')),
-        # FIXME-WT-8896 The S3 extension gets stuck during initialization if more than one
-        # simultaneous WT connection is created. Enable once we have fixed this issue.
-        #('s3', dict(auth_token = get_auth_token('s3_store'),
-        #    bucket = get_bucket1_name('s3_store'),
-        #    bucket_prefix = generate_s3_prefix(),
-        #    ss_name = 's3_store')),
+        ('s3', dict(auth_token = get_auth_token('s3_store'),
+           bucket = get_bucket1_name('s3_store'),
+           bucket_prefix = generate_s3_prefix(),
+           ss_name = 's3_store')),
     ]
     # Occasionally add a lot of records to vary the amount of work flush does.
     record_count_scenarios = wtscenario.quick_scenarios(

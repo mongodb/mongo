@@ -41,13 +41,11 @@ class test_tiered10(wttest.WiredTigerTestCase):
             prefix1 = '1_',
             prefix2 = '2_',
             ss_name = 'dir_store')),
-        # FIXME-WT-8896 The S3 extension gets stuck during initialization if more than one
-        # simultaneous WT connection is created. Enable once we have fixed this issue.
-        #('s3', dict(auth_token = get_auth_token('s3_store'),
-        #    bucket = get_bucket1_name('s3_store'),
-        #    prefix1 = generate_s3_prefix(),
-        #    prefix2 = generate_s3_prefix(),
-        #    ss_name = 's3_store')),
+        ('s3', dict(auth_token = get_auth_token('s3_store'),
+           bucket = get_bucket1_name('s3_store'),
+           prefix1 = generate_s3_prefix(),
+           prefix2 = generate_s3_prefix(),
+           ss_name = 's3_store')),
     ]
     # Make scenarios for different cloud service providers
     scenarios = make_scenarios(storage_sources)
@@ -89,9 +87,9 @@ class test_tiered10(wttest.WiredTigerTestCase):
         config = ''
         # S3 store is built as an optional loadable extension, not all test environments build S3.
         if self.ss_name == 's3_store':
-            #config = '=(config=\"(verbose=1)\")'
+            # config = '=(config=\"(verbose=[api:1,version,tiered:1])\")'
             extlist.skip_if_missing = True
-        #if self.ss_name == 'dir_store':
+        # if self.ss_name == 'dir_store':
             #config = '=(config=\"(verbose=1,delay_ms=200,force_delay=3)\")'
         # Windows doesn't support dynamically loaded extension libraries.
         if os.name == 'nt':
@@ -142,8 +140,11 @@ class test_tiered10(wttest.WiredTigerTestCase):
         session2.flush_tier(None)
         conn1_obj1 = os.path.join(self.bucket, self.prefix1 + self.obj1file)
         conn2_obj1 = os.path.join(self.bucket, self.prefix2 + self.obj1file)
-        self.assertTrue(os.path.exists(conn1_obj1))
-        self.assertTrue(os.path.exists(conn2_obj1))
+
+        if self.ss_name == 'dir_store':
+            self.assertTrue(os.path.exists(conn1_obj1))
+            self.assertTrue(os.path.exists(conn2_obj1))
+
         conn1.close()
         conn2.close()
 

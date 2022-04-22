@@ -32,9 +32,11 @@
 #include <list>
 #include <errno.h>
 #include <filesystem>
+#include <mutex>
 
 #include "s3_connection.h"
 #include "s3_log_system.h"
+#include "s3_aws_manager.h"
 
 #include <aws/auth/credentials.h>
 #include <aws/core/Aws.h>
@@ -104,8 +106,9 @@ struct S3FileHandle {
 const double throughputTargetGbps = 5;
 const uint64_t partSize = 8 * 1024 * 1024; // 8 MB.
 
-// Setting SDK options.
-Aws::SDKOptions options;
+// Define the AwsManager class
+std::mutex AwsManager::InitGuard;
+AwsManager AwsManager::aws_instance;
 
 static int S3GetDirectory(
   const S3Storage &, const std::string &, const std::string &, bool, std::string &);
@@ -754,7 +757,7 @@ S3Terminate(WT_STORAGE_SOURCE *storageSource, WT_SESSION *session)
     S3LogStatistics(*s3);
 
     Aws::Utils::Logging::ShutdownAWSLogging();
-    Aws::ShutdownAPI(options);
+    AwsManager::Terminate();
 
     s3->log->LogDebugMessage("S3Terminate: Terminated S3 storage source.");
     delete (s3);
@@ -774,7 +777,9 @@ S3Flush(WT_STORAGE_SOURCE *storageSource, WT_SESSION *session, WT_FILE_SYSTEM *f
     FS2S3(fileSystem)->statistics.putObjectCount++;
 
     // Confirm that the file exists on the native filesystem.
-    if ((ret = wtFileSystem->fs_exist(wtFileSystem, session, source, &nativeExist)) != 0) {
+    std::string srcPath = S3Path(fs->homeDir, source);
+
+    if ((ret = wtFileSystem->fs_exist(wtFileSystem, session, srcPath.c_str(), &nativeExist)) != 0) {
         s3->log->LogErrorMessage("S3Flush: Failed to check for the existence of " +
           std::string(source) + " on the native filesystem.");
         return (ret);
@@ -784,8 +789,10 @@ S3Flush(WT_STORAGE_SOURCE *storageSource, WT_SESSION *session, WT_FILE_SYSTEM *f
         return (ENOENT);
     }
 
+    s3->log->LogDebugMessage(
+      "S3Flush: Uploading object: " + std::string(object) + "into bucket using PutObject");
     // Upload the object into the bucket.
-    if (ret = (fs->connection->PutObject(object, source)) != 0)
+    if (ret = (fs->connection->PutObject(object, srcPath)) != 0)
         s3->log->LogErrorMessage("S3Flush: PutObject request to S3 failed.");
     else
         s3->log->LogDebugMessage("S3Flush: Uploaded object to S3.");
@@ -877,9 +884,9 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
     // Set up statistics.
     s3->statistics = {0};
 
-    // Initialize the AWS SDK.
+    // Initialize the AWS SDK and logging.
+    AwsManager::Init();
     Aws::Utils::Logging::InitializeAWSLogging(s3->log);
-    Aws::InitAPI(options);
 
     // Allocate a S3 storage structure, with a WT_STORAGE structure as the first field, allowing us
     // to treat references to either type of structure as a reference to the other type.
@@ -898,7 +905,7 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
         s3->log->LogErrorMessage(
           "wiredtiger_extension_init: Could not load S3 storage source, shutting down.");
         Aws::Utils::Logging::ShutdownAWSLogging();
-        Aws::ShutdownAPI(options);
+        AwsManager::Terminate();
         delete (s3);
     }
 
