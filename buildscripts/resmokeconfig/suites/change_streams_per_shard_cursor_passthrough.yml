@@ -3,6 +3,9 @@ test_kind: js_test
 selector:
   roots:
   - jstests/change_streams/**/*.js
+  exclude_files:
+  # Expects a change stream cursor to be open on each of 2 shards.
+  - jstests/change_streams/projection_fakes_internal_event.js
   exclude_with_any_tags:
   ##
   # The next tags correspond to the special errors thrown by the
