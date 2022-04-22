@@ -56,9 +56,6 @@ using namespace mongo;
 
 class CollectionTest : public CatalogTestFixture {
 protected:
-    // TODO (SERVER-65194): Use wiredTiger.
-    CollectionTest() : CatalogTestFixture(Options{}.engine("ephemeralForTest")) {}
-
     void makeCapped(NamespaceString nss, long long cappedSize = 8192);
     void makeTimeseries(NamespaceString nss);
     void makeCollectionForMultikey(NamespaceString nss, StringData indexName);
@@ -281,7 +278,7 @@ TEST_F(CollectionTest, SetIndexIsMultikeyRemovesUncommittedChangesOnRollback) {
     MultikeyPaths paths = {{0}};
 
     {
-        FailPointEnableBlock failPoint("EFTAlwaysThrowWCEOnWrite");
+        FailPointEnableBlock failPoint("WTWriteConflictException");
         WriteUnitOfWork wuow(opCtx);
         ASSERT_THROWS(coll->setIndexIsMultikey(opCtx, indexName, paths), WriteConflictException);
     }
@@ -329,7 +326,7 @@ TEST_F(CollectionTest, ForceSetIndexIsMultikeyRemovesUncommittedChangesOnRollbac
     MultikeyPaths paths = {{0}};
 
     {
-        FailPointEnableBlock failPoint("EFTAlwaysThrowWCEOnWrite");
+        FailPointEnableBlock failPoint("WTWriteConflictException");
         WriteUnitOfWork wuow(opCtx);
         auto desc = coll->getIndexCatalog()->findIndexByName(opCtx, indexName);
         ASSERT_THROWS(coll->forceSetIndexIsMultikey(opCtx, desc, true, paths),
@@ -817,7 +814,7 @@ TEST_F(CollectionTest, CappedCursorRollover) {
     }
 
     // Cursor should now be dead.
-    ASSERT_FALSE(cursor->restore());
+    ASSERT_FALSE(cursor->restore(false));
     ASSERT(!cursor->next());
 }
 
