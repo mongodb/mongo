@@ -40,6 +40,7 @@
 namespace mongo {
 namespace repl {
 MONGO_FAIL_POINT_DEFINE(skipOplogBatcherWaitForData);
+MONGO_FAIL_POINT_DEFINE(oplogBatcherPauseAfterSuccessfulPeek);
 
 OplogBatcher::OplogBatcher(OplogApplier* oplogApplier, OplogBuffer* oplogBuffer)
     : _oplogApplier(oplogApplier), _oplogBuffer(oplogBuffer), _ops(0) {}
@@ -150,7 +151,7 @@ std::size_t OplogBatcher::getOpCount(const OplogEntry& entry) {
 }
 
 StatusWith<std::vector<OplogEntry>> OplogBatcher::getNextApplierBatch(
-    OperationContext* opCtx, const BatchLimits& batchLimits) {
+    OperationContext* opCtx, const BatchLimits& batchLimits, Milliseconds waitToFillBatch) {
     if (batchLimits.ops == 0) {
         return Status(ErrorCodes::InvalidOptions, "Batch size must be greater than 0.");
     }
@@ -159,7 +160,13 @@ StatusWith<std::vector<OplogEntry>> OplogBatcher::getNextApplierBatch(
     std::uint32_t totalBytes = 0;
     std::vector<OplogEntry> ops;
     BSONObj op;
+    Date_t batchDeadline;
+    if (waitToFillBatch > Milliseconds(0)) {
+        batchDeadline =
+            opCtx->getServiceContext()->getPreciseClockSource()->now() + waitToFillBatch;
+    }
     while (_oplogBuffer->peek(opCtx, &op)) {
+        oplogBatcherPauseAfterSuccessfulPeek.pauseWhileSet();
         auto entry = OplogEntry(op);
 
         // Check for oplog version change.
@@ -221,6 +228,25 @@ StatusWith<std::vector<OplogEntry>> OplogBatcher::getNextApplierBatch(
         totalBytes += opBytes;
         ops.push_back(std::move(entry));
         _consume(opCtx, _oplogBuffer);
+        // At this point we either have a partial batch or an exactly full batch; if we are using
+        // a wait to fill the batch, we should wait if and only if the batch is partial.
+        if (batchDeadline != Date_t() && totalOps < batchLimits.ops &&
+            totalBytes < batchLimits.bytes) {
+            LOGV2_DEBUG(6572301,
+                        3,
+                        "Waiting for batch to fill",
+                        "deadline"_attr = batchDeadline,
+                        "waitToFillBatch"_attr = waitToFillBatch,
+                        "totalOps"_attr = totalOps,
+                        "totalBytes"_attr = totalBytes);
+            try {
+                _oplogBuffer->waitForDataUntil(batchDeadline, opCtx);
+            } catch (const ExceptionForCat<ErrorCategory::Interruption>& e) {
+                LOGV2(6572300,
+                      "Interrupted in oplog batching; returning current partial batch.",
+                      "error"_attr = e);
+            }
+        }
     }
     return std::move(ops);
 }
@@ -291,8 +317,9 @@ void OplogBatcher::_run(StorageInterface* storageInterface) {
             // Locks the oplog to check its max size, do this in the UninterruptibleLockGuard.
             batchLimits.bytes = getBatchLimitOplogBytes(opCtx.get(), storageInterface);
 
-            auto oplogEntries =
-                fassertNoTrace(31004, getNextApplierBatch(opCtx.get(), batchLimits));
+            auto oplogEntries = fassertNoTrace(
+                31004,
+                getNextApplierBatch(opCtx.get(), batchLimits, Milliseconds(oplogBatchDelayMillis)));
             for (const auto& oplogEntry : oplogEntries) {
                 ops.emplace_back(oplogEntry);
             }
