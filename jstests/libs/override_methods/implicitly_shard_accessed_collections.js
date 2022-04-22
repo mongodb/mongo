@@ -65,6 +65,11 @@ function shardCollection(collection) {
 }
 
 function shardCollectionWithSpec({db, collName, shardKey, timeseriesSpec}) {
+    // Don't attempt to shard if this operation is running on mongoD.
+    if (!FixtureHelpers.isMongos(db)) {
+        return;
+    }
+
     var dbName = db.getName();
     var fullName = dbName + "." + collName;
 

@@ -12,70 +12,18 @@
 "use strict";
 
 load("jstests/libs/change_stream_rewrite_util.js");  // For rewrite helpers.
-load("jstests/libs/fixture_helpers.js");             // For isMongos.
 
 const dbName = "change_stream_rewrite_null_existence_test";
-
 const collName = "coll1";
-const collNameAfterRename = "coll_renamed";
 
 // Establish a resume token at a point before anything actually happens in the test.
 const startPoint = db.getMongo().watch().getResumeToken();
 
-// If this is a sharded passthrough, make sure we shard on something other than _id.
-if (FixtureHelpers.isMongos(db)) {
-    assertDropCollection(db, collName);
-    assert.commandWorked(db.adminCommand({enableSharding: dbName}));
-    assert.commandWorked(
-        db.adminCommand({shardCollection: `${dbName}.${collName}`, key: {shardKey: "hashed"}}));
-}
-
 const testDB = db.getSiblingDB(dbName);
-let testColl = testDB[collName];
-
 const numDocs = 8;
 
-// Generate the write workload.
-(function performWriteWorkload() {
-    // Insert some documents.
-    for (let i = 0; i < numDocs; ++i) {
-        assert.commandWorked(testColl.insert(
-            {_id: i, shardKey: i, a: [1, [2], {b: 3}], f1: {subField: true}, f2: false}));
-    }
-
-    // Update half of them. We generate these updates individually so that they generate different
-    // values for the 'updatedFields', 'removedFields' and 'truncatedArrays' subfields.
-    const updateSpecs = [
-        [{$set: {f2: true}}],                                // only populates 'updatedFields'
-        [{$unset: ["f1"]}],                                  // only populates 'removedFields'
-        [{$set: {a: [1, [2]]}}],                             // only populates 'truncatedArrays'
-        [{$set: {a: [1, [2]], f2: true}}, {$unset: ["f1"]}]  // populates all fields
-    ];
-    for (let i = 0; i < numDocs / 2; ++i) {
-        assert.commandWorked(
-            testColl.update({_id: i, shardKey: i}, updateSpecs[(i % updateSpecs.length)]));
-    }
-
-    // Replace the other half.
-    for (let i = numDocs / 2; i < numDocs; ++i) {
-        assert.commandWorked(testColl.replaceOne({_id: i, shardKey: i}, {_id: i, shardKey: i}));
-    }
-
-    // Delete half of the updated documents.
-    for (let i = 0; i < numDocs / 4; ++i) {
-        assert.commandWorked(testColl.remove({_id: i, shardKey: i}));
-    }
-})();
-
-// Rename the collection.
-assert.commandWorked(testColl.renameCollection(collNameAfterRename));
-testColl = testDB[collNameAfterRename];
-
-// Drop the collection.
-assert(testColl.drop());
-
-// Drop the database.
-assert.commandWorked(testDB.dropDatabase());
+// Generate a write workload for the change stream to consume.
+generateChangeStreamWriteWorkload(testDB, collName, numDocs);
 
 // Function to generate a list of all paths to be tested from those observed in the event stream.
 function traverseEvent(event, outputMap, prefixPath = "") {
@@ -110,11 +58,6 @@ function traverseEvent(event, outputMap, prefixPath = "") {
             }
         }
 
-        // Helper function to check whether this value is a plain old javascript object.
-        function isPlainObject(value) {
-            return (value && typeof (value) == "object" && value.constructor === Object);
-        }
-
         // Add a predicate on the full field, whether scalar, object, or array.
         addToPredicatesList(fieldPath, fieldVal);
 
@@ -139,29 +82,8 @@ function traverseEvent(event, outputMap, prefixPath = "") {
     }
 }
 
-// Helper function to fully exhaust a change stream from the start point and return all events.
-function getAllChangeStreamEvents(extraStages, csOptions) {
-    // Open a whole-cluster stream based on the supplied arguments.
-    const csCursor = testDB.getMongo().watch(
-        extraStages, Object.assign({resumeAfter: startPoint, maxAwaitTimeMS: 1}, csOptions));
-
-    // Run getMore until the post-batch resume token advances. In a sharded passthrough, this will
-    // guarantee that all shards have returned results, and we expect all results to fit into a
-    // single batch, so we know we have exhausted the stream.
-    while (bsonWoCompare(csCursor._postBatchResumeToken, startPoint) == 0) {
-        csCursor.hasNext();  // runs a getMore
-    }
-
-    // Close the cursor since we have already retrieved all results.
-    csCursor.close();
-
-    // Extract all events from the streams. Since the cursor is closed, it will not attempt to
-    // retrieve any more batches from the server.
-    return csCursor.toArray();
-}
-
 // Obtain a list of all events that occurred during the write workload.
-const allEvents = getAllChangeStreamEvents([], {fullDocument: "updateLookup"});
+const allEvents = getAllChangeStreamEvents(testDB, [], {fullDocument: "updateLookup"}, startPoint);
 
 jsTestLog(`All events: ${tojson(allEvents)}`);
 
@@ -253,8 +175,10 @@ for (let csConfig of [{fullDocument: "updateLookup"}]) {
             const optimizedPipeline = [matchExpr];
 
             // Extract all results from each of the pipelines.
-            const nonOptimizedOutput = getAllChangeStreamEvents(nonOptimizedPipeline, csConfig);
-            const optimizedOutput = getAllChangeStreamEvents(optimizedPipeline, csConfig);
+            const nonOptimizedOutput =
+                getAllChangeStreamEvents(testDB, nonOptimizedPipeline, csConfig, startPoint);
+            const optimizedOutput =
+                getAllChangeStreamEvents(testDB, optimizedPipeline, csConfig, startPoint);
 
             // We never expect to see more optimized results than unoptimized.
             assert(optimizedOutput.length <= nonOptimizedOutput.length,

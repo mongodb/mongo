@@ -58,8 +58,14 @@ bool isShardConfigEvent(const Document& eventDoc) {
 
     auto opType = eventDoc[DocumentSourceChangeStream::kOperationTypeField];
 
-    if (!opType.missing() &&
-        opType.getStringData() == DocumentSourceChangeStream::kNewShardDetectedOpType) {
+    // If opType isn't a string, then this document has been manipulated. This means it cannot have
+    // been produced by the internal shard-monitoring cursor that we opened on the config servers,
+    // or by the kNewShardDetectedOpType mechanism, which bypasses filtering and projection stages.
+    if (opType.getType() != BSONType::String) {
+        return false;
+    }
+
+    if (opType.getStringData() == DocumentSourceChangeStream::kNewShardDetectedOpType) {
         // If the failpoint is enabled, throw the 'ChangeStreamToplogyChange' exception to the
         // client. This is used in testing to confirm that the swallowed 'kNewShardDetected' event
         // has reached the mongoS.
@@ -73,10 +79,33 @@ bool isShardConfigEvent(const Document& eventDoc) {
         return true;
     }
 
+    // Check whether this event occurred on the config.shards collection.
     auto nsObj = eventDoc[DocumentSourceChangeStream::kNamespaceField];
-    return nsObj.getType() == BSONType::Object &&
+    const bool isConfigDotShardsEvent = nsObj["db"_sd].getType() == BSONType::String &&
         nsObj["db"_sd].getStringData() == ShardType::ConfigNS.db() &&
+        nsObj["coll"_sd].getType() == BSONType::String &&
         nsObj["coll"_sd].getStringData() == ShardType::ConfigNS.coll();
+
+    // If it isn't from config.shards, treat it as a normal user event.
+    if (!isConfigDotShardsEvent) {
+        return false;
+    }
+
+    // We need to validate that this event hasn't been faked by a user projection in a way that
+    // would cause us to tassert. Check the clusterTime field, which is needed to determine the
+    // point from which the new shard should start reporting change events.
+    if (eventDoc["clusterTime"].getType() != BSONType::bsonTimestamp) {
+        return false;
+    }
+    // Check the fullDocument field, which should contain details of the new shard's name and hosts.
+    auto fullDocument = eventDoc[DocumentSourceChangeStream::kFullDocumentField];
+    if (opType.getStringData() == "insert"_sd && fullDocument.getType() != BSONType::Object) {
+        return false;
+    }
+
+    // The event is on config.shards and is well-formed. It is still possible that it is a forgery,
+    // but all the user can do is cause their own stream to uassert.
+    return true;
 }
 }  // namespace
 
