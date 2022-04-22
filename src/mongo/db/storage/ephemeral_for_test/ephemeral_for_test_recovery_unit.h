@@ -45,8 +45,6 @@ public:
     RecoveryUnit(KVEngine* parentKVEngine, std::function<void()> cb = nullptr);
     ~RecoveryUnit();
 
-    void beginUnitOfWork(OperationContext* opCtx) override final;
-
     virtual bool waitUntilDurable(OperationContext* opCtx) override;
 
     virtual void setOrderedCommit(bool orderedCommit) override;
@@ -109,6 +107,8 @@ public:
     static RecoveryUnit* get(OperationContext* opCtx);
 
 private:
+    void doBeginUnitOfWork() override final;
+
     void doCommitUnitOfWork() override final;
 
     void doAbortUnitOfWork() override final;

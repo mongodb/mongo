@@ -345,6 +345,7 @@ public:
                 // Create the agg request equivalent of the find operation, with the explain
                 // verbosity included.
                 auto aggRequest = aggregation_request_helper::parseFromBSON(
+                    opCtx,
                     nss,
                     viewAggCmd,
                     verbosity,

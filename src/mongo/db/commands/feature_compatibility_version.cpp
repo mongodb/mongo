@@ -200,10 +200,6 @@ Lock::ResourceMutex fcvLock("featureCompatibilityVersionLock");
 Timestamp lastFCVUpdateTimestamp;
 SimpleMutex lastFCVUpdateTimestampMutex;
 
-bool isWriteableStorageEngine() {
-    return !storageGlobalParams.readOnly && (storageGlobalParams.engine != "devnull");
-}
-
 /**
  * Build update command for featureCompatibilityVersion document updates.
  */
@@ -498,8 +494,10 @@ void FeatureCompatibilityVersion::fassertInitializedAfterStartup(OperationContex
 
     // If we are part of a replica set and are started up with no data files, we do not set the
     // featureCompatibilityVersion until a primary is chosen. For this case, we expect the in-memory
-    // featureCompatibilityVersion parameter to still be uninitialized until after startup.
-    if (isWriteableStorageEngine() && (!usingReplication || nonLocalDatabases)) {
+    // featureCompatibilityVersion parameter to still be uninitialized until after startup. In
+    // standalone mode, FCV is initialized during startup, even in read-only mode.
+    bool isWriteableStorageEngine = storageGlobalParams.engine != "devnull";
+    if (isWriteableStorageEngine && (!usingReplication || nonLocalDatabases)) {
         invariant(serverGlobalParams.featureCompatibility.isVersionInitialized());
     }
 }

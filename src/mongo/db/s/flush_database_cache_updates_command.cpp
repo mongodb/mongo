@@ -115,7 +115,7 @@ public:
 
             uassert(ErrorCodes::IllegalOperation,
                     "Can't call _flushDatabaseCacheUpdates if in read-only mode",
-                    !storageGlobalParams.readOnly);
+                    !opCtx->readOnly());
 
             boost::optional<SharedSemiFuture<void>> criticalSectionSignal;
 

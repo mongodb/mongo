@@ -364,16 +364,6 @@ void ReplicationRecoveryImpl::recoverFromOplogAsStandalone(OperationContext* opC
     if (!_duringInitialSync) {
         // Initial sync will reconstruct prepared transactions when it is completely done.
         reconstructPreparedTransactions(opCtx, OplogApplication::Mode::kRecovering);
-
-        // Two-phase index builds are built in the background, which may still be in-progress after
-        // recovering from the oplog. To prevent crashing the server, skip enabling read-only mode.
-        if (IndexBuildsCoordinator::get(opCtx)->noIndexBuildInProgress()) {
-            LOGV2_WARNING(21558,
-                          "Setting mongod to readOnly mode as a result of specifying "
-                          "'recoverFromOplogAsStandalone'");
-
-            storageGlobalParams.readOnly = true;
-        }
     }
 }
 

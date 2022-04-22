@@ -610,7 +610,7 @@ MONGO_COMPILER_NOINLINE DocumentSource::GetNextResult DocumentSourceGroup::initi
             }
         }
 
-        if (kDebugBuild && !storageGlobalParams.readOnly) {
+        if (kDebugBuild && !pExpCtx->opCtx->readOnly()) {
             // In debug mode, spill every time we have a duplicate id to stress merge logic.
             if (!inserted &&           // is a dup
                 !pExpCtx->inMongos &&  // can't spill to disk in mongos

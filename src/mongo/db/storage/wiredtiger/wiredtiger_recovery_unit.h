@@ -105,7 +105,6 @@ public:
     WiredTigerRecoveryUnit(WiredTigerSessionCache* sc, WiredTigerOplogManager* oplogManager);
     ~WiredTigerRecoveryUnit();
 
-    void beginUnitOfWork(OperationContext* opCtx) override;
     void prepareUnitOfWork() override;
 
     bool waitUntilDurable(OperationContext* opCtx) override;
@@ -232,6 +231,7 @@ public:
     void storeWriteContextForDebugging(const BSONObj& info);
 
 private:
+    void doBeginUnitOfWork() override;
     void doCommitUnitOfWork() override;
     void doAbortUnitOfWork() override;
 

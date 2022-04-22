@@ -320,7 +320,7 @@ public:
 
     void dumpOplog() {
         OneOffRead oor(_opCtx, Timestamp::min());
-        _opCtx->recoveryUnit()->beginUnitOfWork(_opCtx);
+        _opCtx->recoveryUnit()->beginUnitOfWork(_opCtx->readOnly());
         LOGV2(8423335, "Dumping oplog collection");
         AutoGetCollectionForRead oplogRaii(_opCtx, NamespaceString::kRsOplogNamespace);
         const CollectionPtr& oplogColl = oplogRaii.getCollection();

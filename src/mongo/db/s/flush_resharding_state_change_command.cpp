@@ -108,7 +108,7 @@ public:
 
             uassert(ErrorCodes::IllegalOperation,
                     "Can't call _flushReshardingStateChange if in read-only mode",
-                    !storageGlobalParams.readOnly);
+                    !opCtx->readOnly());
 
             ExecutorFuture<void>(Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor())
                 .then([svcCtx = opCtx->getServiceContext(), nss = ns()] {

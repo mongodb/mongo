@@ -234,6 +234,13 @@ ServiceContext* initialize(const char* yaml_config) {
         serviceContext, serviceContext->getPreciseClockSource());
     serviceContext->setPeriodicRunner(std::move(periodicRunner));
 
+    // When starting the server with --queryableBackupMode or --recoverFromOplogAsStandalone, we are
+    // in read-only mode and don't allow user-originating operations to perform writes
+    if (storageGlobalParams.queryableBackupMode ||
+        repl::ReplSettings::shouldRecoverFromOplogAsStandalone()) {
+        serviceContext->disallowUserWrites();
+    }
+
     setUpCatalog(serviceContext);
 
     // Creating the operation context before initializing the storage engine allows the storage
@@ -278,15 +285,11 @@ ServiceContext* initialize(const char* yaml_config) {
         uassert(50677, ss.str().c_str(), boost::filesystem::exists(storageGlobalParams.dbpath));
     }
 
-    if (!storageGlobalParams.readOnly) {
-        boost::filesystem::remove_all(storageGlobalParams.dbpath + "/_tmp/");
-    }
+    boost::filesystem::remove_all(storageGlobalParams.dbpath + "/_tmp/");
 
     ReadWriteConcernDefaults::create(serviceContext, readWriteConcernDefaultsCacheLookupEmbedded);
 
-    bool canCallFCVSetIfCleanStartup =
-        !storageGlobalParams.readOnly && !(storageGlobalParams.engine == "devnull");
-    if (canCallFCVSetIfCleanStartup) {
+    if (storageGlobalParams.engine != "devnull") {
         Lock::GlobalWrite lk(startupOpCtx.get());
         FeatureCompatibilityVersion::setIfCleanStartup(startupOpCtx.get(),
                                                        repl::StorageInterface::get(serviceContext));

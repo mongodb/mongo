@@ -49,15 +49,17 @@ namespace aggregation_request_helper {
 /**
  * Validate the aggregate command object.
  */
-void validate(const BSONObj& cmdObj,
+void validate(OperationContext* opCtx,
+              const BSONObj& cmdObj,
               const NamespaceString& nss,
               boost::optional<ExplainOptions::Verbosity> explainVerbosity);
 
-AggregateCommandRequest parseFromBSON(const std::string& dbName,
+AggregateCommandRequest parseFromBSON(OperationContext* opCtx,
+                                      const std::string& dbName,
                                       const BSONObj& cmdObj,
                                       boost::optional<ExplainOptions::Verbosity> explainVerbosity,
                                       bool apiStrict) {
-    return parseFromBSON(parseNs(dbName, cmdObj), cmdObj, explainVerbosity, apiStrict);
+    return parseFromBSON(opCtx, parseNs(dbName, cmdObj), cmdObj, explainVerbosity, apiStrict);
 }
 
 StatusWith<AggregateCommandRequest> parseFromBSONForTests(
@@ -66,7 +68,7 @@ StatusWith<AggregateCommandRequest> parseFromBSONForTests(
     boost::optional<ExplainOptions::Verbosity> explainVerbosity,
     bool apiStrict) {
     try {
-        return parseFromBSON(nss, cmdObj, explainVerbosity, apiStrict);
+        return parseFromBSON(/*opCtx=*/nullptr, nss, cmdObj, explainVerbosity, apiStrict);
     } catch (const AssertionException&) {
         return exceptionToStatus();
     }
@@ -78,13 +80,14 @@ StatusWith<AggregateCommandRequest> parseFromBSONForTests(
     boost::optional<ExplainOptions::Verbosity> explainVerbosity,
     bool apiStrict) {
     try {
-        return parseFromBSON(dbName, cmdObj, explainVerbosity, apiStrict);
+        return parseFromBSON(/*opCtx=*/nullptr, dbName, cmdObj, explainVerbosity, apiStrict);
     } catch (const AssertionException&) {
         return exceptionToStatus();
     }
 }
 
-AggregateCommandRequest parseFromBSON(NamespaceString nss,
+AggregateCommandRequest parseFromBSON(OperationContext* opCtx,
+                                      NamespaceString nss,
                                       const BSONObj& cmdObj,
                                       boost::optional<ExplainOptions::Verbosity> explainVerbosity,
                                       bool apiStrict) {
@@ -111,7 +114,7 @@ AggregateCommandRequest parseFromBSON(NamespaceString nss,
         request.setExplain(explainVerbosity);
     }
 
-    validate(cmdObj, nss, explainVerbosity);
+    validate(opCtx, cmdObj, nss, explainVerbosity);
     return request;
 }
 
@@ -149,7 +152,8 @@ Document serializeToCommandDoc(const AggregateCommandRequest& request) {
     return Document(request.toBSON(BSONObj()).getOwned());
 }
 
-void validate(const BSONObj& cmdObj,
+void validate(OperationContext* opCtx,
+              const BSONObj& cmdObj,
               const NamespaceString& nss,
               boost::optional<ExplainOptions::Verbosity> explainVerbosity) {
     bool hasAllowDiskUseElem = cmdObj.hasField(AggregateCommandRequest::kAllowDiskUseFieldName);
@@ -177,10 +181,12 @@ void validate(const BSONObj& cmdObj,
                           << "' without '" << AggregateCommandRequest::kFromMongosFieldName << "'",
             (!hasNeedsMergeElem || hasFromMongosElem));
 
-    uassert(ErrorCodes::IllegalOperation,
-            str::stream() << "The '" << AggregateCommandRequest::kAllowDiskUseFieldName
-                          << "' option is not permitted in read-only mode.",
-            (!hasAllowDiskUseElem || !storageGlobalParams.readOnly));
+    if (opCtx) {
+        uassert(ErrorCodes::IllegalOperation,
+                str::stream() << "The '" << AggregateCommandRequest::kAllowDiskUseFieldName
+                              << "' option is not permitted in read-only mode.",
+                (!hasAllowDiskUseElem || !opCtx->readOnly()));
+    }
 
     auto requestReshardingResumeTokenElem =
         cmdObj[AggregateCommandRequest::kRequestReshardingResumeTokenFieldName];

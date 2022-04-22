@@ -99,8 +99,7 @@ private:
                                                     0,
                                                     true,
                                                     false,
-                                                    _forRepair,
-                                                    false);
+                                                    _forRepair);
     }
 
     const std::unique_ptr<ClockSource> _cs = std::make_unique<ClockSourceMock>();
@@ -514,29 +513,29 @@ TEST_F(WiredTigerKVEngineTest, WiredTigerDowngrade) {
 
     // (Generic FCV reference): When FCV is kLatest, no downgrade is necessary.
     serverGlobalParams.mutableFeatureCompatibility.setVersion(multiversion::GenericFCV::kLatest);
-    ASSERT_FALSE(version.shouldDowngrade(/*readOnly=*/false, /*hasRecoveryTimestamp=*/false));
+    ASSERT_FALSE(version.shouldDowngrade(/*hasRecoveryTimestamp=*/false));
     ASSERT_EQ(WiredTigerFileVersion::kLatestWTRelease, version.getDowngradeString());
 
     // (Generic FCV reference): When FCV is kLastContinuous or kLastLTS, a downgrade may be needed.
     serverGlobalParams.mutableFeatureCompatibility.setVersion(
         multiversion::GenericFCV::kLastContinuous);
-    ASSERT_TRUE(version.shouldDowngrade(/*readOnly=*/false, /*hasRecoveryTimestamp=*/false));
+    ASSERT_TRUE(version.shouldDowngrade(/*hasRecoveryTimestamp=*/false));
     ASSERT_EQ(WiredTigerFileVersion::kLastContinuousWTRelease, version.getDowngradeString());
 
     serverGlobalParams.mutableFeatureCompatibility.setVersion(multiversion::GenericFCV::kLastLTS);
-    ASSERT_TRUE(version.shouldDowngrade(/*readOnly=*/false, /*hasRecoveryTimestamp=*/false));
+    ASSERT_TRUE(version.shouldDowngrade(/*hasRecoveryTimestamp=*/false));
     ASSERT_EQ(WiredTigerFileVersion::kLastLTSWTRelease, version.getDowngradeString());
 
     // (Generic FCV reference): While we're in a semi-downgraded state, we shouldn't try downgrading
     // the WiredTiger compatibility version.
     serverGlobalParams.mutableFeatureCompatibility.setVersion(
         multiversion::GenericFCV::kDowngradingFromLatestToLastContinuous);
-    ASSERT_FALSE(version.shouldDowngrade(/*readOnly=*/false, /*hasRecoveryTimestamp=*/false));
+    ASSERT_FALSE(version.shouldDowngrade(/*hasRecoveryTimestamp=*/false));
     ASSERT_EQ(WiredTigerFileVersion::kLatestWTRelease, version.getDowngradeString());
 
     serverGlobalParams.mutableFeatureCompatibility.setVersion(
         multiversion::GenericFCV::kDowngradingFromLatestToLastLTS);
-    ASSERT_FALSE(version.shouldDowngrade(/*readOnly=*/false, /*hasRecoveryTimestamp=*/false));
+    ASSERT_FALSE(version.shouldDowngrade(/*hasRecoveryTimestamp=*/false));
     ASSERT_EQ(WiredTigerFileVersion::kLatestWTRelease, version.getDowngradeString());
 }
 

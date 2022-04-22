@@ -126,8 +126,7 @@ public:
                     StringData ident,
                     KeyFormat rsKeyFormat,
                     const IndexDescriptor* desc,
-                    bool isLogged,
-                    bool readOnly);
+                    bool isLogged);
 
     virtual Status insert(OperationContext* opCtx,
                           const KeyString::Value& keyString,
@@ -232,8 +231,7 @@ protected:
     KeyString::Version _handleVersionInfo(OperationContext* ctx,
                                           const std::string& uri,
                                           const IndexDescriptor* desc,
-                                          bool isLogged,
-                                          bool isReadOnly);
+                                          bool isLogged);
 
     RecordId _decodeRecordIdAtEnd(const void* buffer, size_t size);
 
@@ -263,8 +261,7 @@ public:
                           StringData ident,
                           KeyFormat rsKeyFormat,
                           const IndexDescriptor* desc,
-                          bool isLogged,
-                          bool readOnly = false);
+                          bool isLogged);
 
     std::unique_ptr<SortedDataInterface::Cursor> newCursor(OperationContext* opCtx,
                                                            bool forward) const override;
@@ -305,8 +302,7 @@ public:
                       const std::string& uri,
                       StringData ident,
                       const IndexDescriptor* desc,
-                      bool isLogged,
-                      bool readOnly = false);
+                      bool isLogged);
 
     std::unique_ptr<Cursor> newCursor(OperationContext* opCtx,
                                       bool isForward = true) const override;
@@ -357,8 +353,7 @@ public:
                             StringData ident,
                             KeyFormat rsKeyFormat,
                             const IndexDescriptor* desc,
-                            bool isLogged,
-                            bool readOnly = false);
+                            bool isLogged);
 
     std::unique_ptr<SortedDataInterface::Cursor> newCursor(OperationContext* opCtx,
                                                            bool forward) const override;

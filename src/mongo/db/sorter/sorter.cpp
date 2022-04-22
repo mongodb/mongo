@@ -1075,9 +1075,6 @@ private:
                           << " Pass allowDiskUse:true to opt in.");
         }
 
-        // We should check readOnly before getting here.
-        invariant(!storageGlobalParams.readOnly);
-
         sort();
         updateCutoff();
 

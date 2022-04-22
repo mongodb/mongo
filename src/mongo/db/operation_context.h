@@ -588,6 +588,19 @@ public:
      */
     void restoreMaxTimeMS();
 
+    /**
+     * Returns whether this operation must run in read-only mode.
+     *
+     * If the read-only flag is set on the ServiceContext then:
+     * - Internal operations are allowed to perform writes.
+     * - User originating operations are not allowed to perform writes.
+     */
+    bool readOnly() const {
+        if (!getClient()->isFromUserConnection())
+            return false;
+        return !getServiceContext()->userWritesAllowed();
+    }
+
 private:
     StatusWith<stdx::cv_status> waitForConditionOrInterruptNoAssertUntil(
         stdx::condition_variable& cv, BasicLockableAdapter m, Date_t deadline) noexcept override;

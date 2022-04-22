@@ -110,7 +110,7 @@ public:
             uassert(ErrorCodes::IllegalOperation,
                     str::stream() << "Can't call " << Derived::Request::kCommandName
                                   << " if in read-only mode",
-                    !storageGlobalParams.readOnly);
+                    !opCtx->readOnly());
 
             boost::optional<SharedSemiFuture<void>> criticalSectionSignal;
 

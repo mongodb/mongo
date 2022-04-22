@@ -76,7 +76,7 @@ public:
         AtomicWord<bool> _dirty;
     };
 
-    WiredTigerSizeStorer(WT_CONNECTION* conn, const std::string& storageUri, bool readOnly = false);
+    WiredTigerSizeStorer(WT_CONNECTION* conn, const std::string& storageUri);
     ~WiredTigerSizeStorer() = default;
 
     /**
@@ -96,7 +96,6 @@ private:
     WT_CONNECTION* _conn;
     const std::string _storageUri;
     const uint64_t _tableId;  // Not persisted
-    const bool _readOnly;
 
     // Serializes flushes to disk.
     Mutex _flushMutex = MONGO_MAKE_LATCH("WiredTigerSessionStorer::_flushMutex");

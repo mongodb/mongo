@@ -493,7 +493,7 @@ public:
                           wireSpec->incomingExternalClient.maxWireVersion);
         }
 
-        result.append(HelloCommandReply::kReadOnlyFieldName, storageGlobalParams.readOnly);
+        result.append(HelloCommandReply::kReadOnlyFieldName, opCtx->readOnly());
 
         if (auto param = ServerParameterSet::getNodeParameterSet()->getIfExists(
                 kAutomationServiceDescriptorFieldName)) {

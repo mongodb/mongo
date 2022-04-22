@@ -129,13 +129,6 @@ void generateSystemIndexForExistingCollection(OperationContext* opCtx,
 }  // namespace
 
 Status verifySystemIndexes(OperationContext* opCtx) {
-    // Do not try and generate any system indexes in read only mode.
-    if (storageGlobalParams.readOnly) {
-        LOGV2_WARNING(22489,
-                      "Running in queryable backup mode. Unable to create authorization indexes");
-        return Status::OK();
-    }
-
     const NamespaceString& systemUsers = AuthorizationManager::usersCollectionNamespace;
     const NamespaceString& systemRoles = AuthorizationManager::rolesCollectionNamespace;
 

@@ -77,18 +77,39 @@ class EphemeralForTestKVEngineTest : public ServiceContextTest {
 public:
     EphemeralForTestKVEngineTest() : _helper(getServiceContext()), _engine(_helper.getEngine()) {}
 
+    ServiceContext::UniqueOperationContext makeOpCtx() {
+        auto opCtx = makeOperationContext();
+        opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(_engine->newRecoveryUnit()),
+                               WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+        opCtx->swapLockState(std::make_unique<LockerNoop>(), WithLock::withoutLock());
+        return opCtx;
+    }
+
+    std::vector<std::pair<ServiceContext::UniqueClient, ServiceContext::UniqueOperationContext>>
+    makeOpCtxs(unsigned num) {
+        std::vector<std::pair<ServiceContext::UniqueClient, ServiceContext::UniqueOperationContext>>
+            opCtxs;
+        opCtxs.reserve(num);
+
+        for (unsigned i = 0; i < num; ++i) {
+            auto client = getServiceContext()->makeClient(std::to_string(i));
+
+            auto opCtx = client->makeOperationContext();
+            opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(_engine->newRecoveryUnit()),
+                                   WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+            opCtx->swapLockState(std::make_unique<LockerNoop>(), WithLock::withoutLock());
+
+            opCtxs.emplace_back(std::move(client), std::move(opCtx));
+        }
+
+        return opCtxs;
+    }
+
 protected:
     std::unique_ptr<KVHarnessHelper> helper;
     KVHarnessHelper _helper;
     KVEngine* _engine;
 };
-
-class OperationContextFromKVEngine : public OperationContextNoop {
-public:
-    OperationContextFromKVEngine(KVEngine* engine)
-        : OperationContextNoop(engine->newRecoveryUnit()) {}
-};
-
 
 TEST_F(EphemeralForTestKVEngineTest, AvailableHistoryUpdate) {
     NamespaceString nss("a.b");
@@ -98,9 +119,9 @@ TEST_F(EphemeralForTestKVEngineTest, AvailableHistoryUpdate) {
 
     std::unique_ptr<mongo::RecordStore> rs;
     {
-        OperationContextFromKVEngine opCtx(_engine);
-        ASSERT_OK(_engine->createRecordStore(&opCtx, nss, ident, defaultCollectionOptions));
-        rs = _engine->getRecordStore(&opCtx, nss, ident, defaultCollectionOptions);
+        auto opCtx = makeOpCtx();
+        ASSERT_OK(_engine->createRecordStore(opCtx.get(), nss, ident, defaultCollectionOptions));
+        rs = _engine->getRecordStore(opCtx.get(), nss, ident, defaultCollectionOptions);
         ASSERT(rs);
     }
 
@@ -112,10 +133,10 @@ TEST_F(EphemeralForTestKVEngineTest, AvailableHistoryUpdate) {
     ASSERT_EQ(_engine->getOldestTimestamp(), currentMaster);
 
     {
-        OperationContextFromKVEngine opCtx(_engine);
-        WriteUnitOfWork uow(&opCtx);
+        auto opCtx = makeOpCtx();
+        WriteUnitOfWork uow(opCtx.get());
         StatusWith<RecordId> res =
-            rs->insertRecord(&opCtx, record.c_str(), record.length() + 1, Timestamp());
+            rs->insertRecord(opCtx.get(), record.c_str(), record.length() + 1, Timestamp());
         ASSERT_OK(res.getStatus());
         uow.commit();
     }
@@ -135,9 +156,9 @@ TEST_F(EphemeralForTestKVEngineTest, PinningOldestTimestampWithReadTransaction) 
 
     std::unique_ptr<mongo::RecordStore> rs;
     {
-        OperationContextFromKVEngine opCtx(_engine);
-        ASSERT_OK(_engine->createRecordStore(&opCtx, nss, ident, defaultCollectionOptions));
-        rs = _engine->getRecordStore(&opCtx, nss, ident, defaultCollectionOptions);
+        auto opCtx = makeOpCtx();
+        ASSERT_OK(_engine->createRecordStore(opCtx.get(), nss, ident, defaultCollectionOptions));
+        rs = _engine->getRecordStore(opCtx.get(), nss, ident, defaultCollectionOptions);
         ASSERT(rs);
     }
 
@@ -146,24 +167,26 @@ TEST_F(EphemeralForTestKVEngineTest, PinningOldestTimestampWithReadTransaction) 
 
     RecordId loc;
     {
-        OperationContextFromKVEngine opCtx(_engine);
-        WriteUnitOfWork uow(&opCtx);
+        auto opCtx = makeOpCtx();
+        WriteUnitOfWork uow(opCtx.get());
         StatusWith<RecordId> res =
-            rs->insertRecord(&opCtx, record.c_str(), record.length() + 1, Timestamp());
+            rs->insertRecord(opCtx.get(), record.c_str(), record.length() + 1, Timestamp());
         ASSERT_OK(res.getStatus());
         loc = res.getValue();
         uow.commit();
     }
 
-    OperationContextFromKVEngine opCtxRead(_engine);
+    auto opCtxs = makeOpCtxs(2);
+
+    auto opCtxRead = opCtxs[0].second.get();
     RecordData rd;
-    ASSERT(rs->findRecord(&opCtxRead, loc, &rd));
+    ASSERT(rs->findRecord(opCtxRead, loc, &rd));
 
     {
-        OperationContextFromKVEngine opCtx(_engine);
-        WriteUnitOfWork uow(&opCtx);
+        auto opCtx = opCtxs[1].second.get();
+        WriteUnitOfWork uow(opCtx);
         StatusWith<RecordId> res =
-            rs->insertRecord(&opCtx, record.c_str(), record.length() + 1, Timestamp());
+            rs->insertRecord(opCtx, record.c_str(), record.length() + 1, Timestamp());
         ASSERT_OK(res.getStatus());
         uow.commit();
     }
@@ -181,9 +204,9 @@ TEST_F(EphemeralForTestKVEngineTest, SettingOldestTimestampClearsHistory) {
 
     std::unique_ptr<mongo::RecordStore> rs;
     {
-        OperationContextFromKVEngine opCtx(_engine);
-        ASSERT_OK(_engine->createRecordStore(&opCtx, nss, ident, defaultCollectionOptions));
-        rs = _engine->getRecordStore(&opCtx, nss, ident, defaultCollectionOptions);
+        auto opCtx = makeOpCtx();
+        ASSERT_OK(_engine->createRecordStore(opCtx.get(), nss, ident, defaultCollectionOptions));
+        rs = _engine->getRecordStore(opCtx.get(), nss, ident, defaultCollectionOptions);
         ASSERT(rs);
     }
 
@@ -192,24 +215,26 @@ TEST_F(EphemeralForTestKVEngineTest, SettingOldestTimestampClearsHistory) {
 
     RecordId loc;
     {
-        OperationContextFromKVEngine opCtx(_engine);
-        WriteUnitOfWork uow(&opCtx);
+        auto opCtx = makeOpCtx();
+        WriteUnitOfWork uow(opCtx.get());
         StatusWith<RecordId> res =
-            rs->insertRecord(&opCtx, record.c_str(), record.length() + 1, Timestamp());
+            rs->insertRecord(opCtx.get(), record.c_str(), record.length() + 1, Timestamp());
         ASSERT_OK(res.getStatus());
         loc = res.getValue();
         uow.commit();
     }
 
-    OperationContextFromKVEngine opCtxRead(_engine);
+    auto opCtxs = makeOpCtxs(2);
+
+    auto opCtxRead = opCtxs[0].second.get();
     RecordData rd;
-    ASSERT(rs->findRecord(&opCtxRead, loc, &rd));
+    ASSERT(rs->findRecord(opCtxRead, loc, &rd));
 
     {
-        OperationContextFromKVEngine opCtx(_engine);
-        WriteUnitOfWork uow(&opCtx);
+        auto opCtx = opCtxs[1].second.get();
+        WriteUnitOfWork uow(opCtx);
         StatusWith<RecordId> res =
-            rs->insertRecord(&opCtx, record.c_str(), record.length() + 1, Timestamp());
+            rs->insertRecord(opCtx, record.c_str(), record.length() + 1, Timestamp());
         ASSERT_OK(res.getStatus());
         uow.commit();
     }
@@ -227,17 +252,17 @@ TEST_F(EphemeralForTestKVEngineTest, SettingOldestTimestampToMax) {
 
     std::unique_ptr<mongo::RecordStore> rs;
     {
-        OperationContextFromKVEngine opCtx(_engine);
-        ASSERT_OK(_engine->createRecordStore(&opCtx, nss, ident, defaultCollectionOptions));
-        rs = _engine->getRecordStore(&opCtx, nss, ident, defaultCollectionOptions);
+        auto opCtx = makeOpCtx();
+        ASSERT_OK(_engine->createRecordStore(opCtx.get(), nss, ident, defaultCollectionOptions));
+        rs = _engine->getRecordStore(opCtx.get(), nss, ident, defaultCollectionOptions);
         ASSERT(rs);
     }
 
     {
-        OperationContextFromKVEngine opCtx(_engine);
-        WriteUnitOfWork uow(&opCtx);
+        auto opCtx = makeOpCtx();
+        WriteUnitOfWork uow(opCtx.get());
         StatusWith<RecordId> res =
-            rs->insertRecord(&opCtx, record.c_str(), record.length() + 1, Timestamp());
+            rs->insertRecord(opCtx.get(), record.c_str(), record.length() + 1, Timestamp());
         ASSERT_OK(res.getStatus());
         uow.commit();
     }
@@ -258,9 +283,9 @@ TEST_F(EphemeralForTestKVEngineTest, CleanHistoryWithOpenTransaction) {
 
     std::unique_ptr<mongo::RecordStore> rs;
     {
-        OperationContextFromKVEngine opCtx(_engine);
-        ASSERT_OK(_engine->createRecordStore(&opCtx, nss, ident, defaultCollectionOptions));
-        rs = _engine->getRecordStore(&opCtx, nss, ident, defaultCollectionOptions);
+        auto opCtx = makeOpCtx();
+        ASSERT_OK(_engine->createRecordStore(opCtx.get(), nss, ident, defaultCollectionOptions));
+        rs = _engine->getRecordStore(opCtx.get(), nss, ident, defaultCollectionOptions);
         ASSERT(rs);
     }
 
@@ -269,25 +294,27 @@ TEST_F(EphemeralForTestKVEngineTest, CleanHistoryWithOpenTransaction) {
 
     RecordId loc;
     {
-        OperationContextFromKVEngine opCtx(_engine);
-        WriteUnitOfWork uow(&opCtx);
+        auto opCtx = makeOpCtx();
+        WriteUnitOfWork uow(opCtx.get());
         StatusWith<RecordId> res =
-            rs->insertRecord(&opCtx, record.c_str(), record.length() + 1, Timestamp());
+            rs->insertRecord(opCtx.get(), record.c_str(), record.length() + 1, Timestamp());
         ASSERT_OK(res.getStatus());
         loc = res.getValue();
         uow.commit();
     }
 
-    OperationContextFromKVEngine opCtxRead(_engine);
+    auto opCtxs = makeOpCtxs(2);
+
+    auto opCtxRead = opCtxs[0].second.get();
     Timestamp readTime1 = _engine->getHistory_forTest().rbegin()->first;
     RecordData rd;
-    ASSERT(rs->findRecord(&opCtxRead, loc, &rd));
+    ASSERT(rs->findRecord(opCtxRead, loc, &rd));
 
     {
-        OperationContextFromKVEngine opCtx(_engine);
-        WriteUnitOfWork uow(&opCtx);
+        auto opCtx = opCtxs[1].second.get();
+        WriteUnitOfWork uow(opCtx);
         StatusWith<RecordId> res =
-            rs->insertRecord(&opCtx, record.c_str(), record.length() + 1, Timestamp());
+            rs->insertRecord(opCtx, record.c_str(), record.length() + 1, Timestamp());
         ASSERT_OK(res.getStatus());
         uow.commit();
     }
@@ -295,13 +322,16 @@ TEST_F(EphemeralForTestKVEngineTest, CleanHistoryWithOpenTransaction) {
     Timestamp readTime2 = _engine->getHistory_forTest().rbegin()->first;
 
     {
-        OperationContextFromKVEngine opCtx(_engine);
-        WriteUnitOfWork uow(&opCtx);
+        auto opCtx = opCtxs[1].second.get();
+        WriteUnitOfWork uow(opCtx);
         StatusWith<RecordId> res =
-            rs->insertRecord(&opCtx, record.c_str(), record.length() + 1, Timestamp());
+            rs->insertRecord(opCtx, record.c_str(), record.length() + 1, Timestamp());
         ASSERT_OK(res.getStatus());
         uow.commit();
     }
+
+    // Destruct the client used for writes prior to checking use_count().
+    opCtxs.pop_back();
 
     Timestamp readTime3 = _engine->getHistory_forTest().rbegin()->first;
     _engine->cleanHistory();
@@ -321,44 +351,46 @@ TEST_F(EphemeralForTestKVEngineTest, ReadOlderSnapshotsSimple) {
 
     std::unique_ptr<mongo::RecordStore> rs;
     {
-        OperationContextFromKVEngine opCtx(_engine);
-        ASSERT_OK(_engine->createRecordStore(&opCtx, nss, ident, defaultCollectionOptions));
-        rs = _engine->getRecordStore(&opCtx, nss, ident, defaultCollectionOptions);
+        auto opCtx = makeOpCtx();
+        ASSERT_OK(_engine->createRecordStore(opCtx.get(), nss, ident, defaultCollectionOptions));
+        rs = _engine->getRecordStore(opCtx.get(), nss, ident, defaultCollectionOptions);
         ASSERT(rs);
     }
 
+    auto opCtxs = makeOpCtxs(2);
+
     // Pin oldest timestamp with a read transaction.
-    OperationContextFromKVEngine pinningOldest(_engine);
-    ASSERT(!rs->findRecord(&pinningOldest, RecordId(1), nullptr));
+    auto pinningOldest = opCtxs[0].second.get();
+    ASSERT(!rs->findRecord(pinningOldest, RecordId(1), nullptr));
 
     // Set readFrom to timestamp with no committed transactions.
     Timestamp readFrom = _engine->getHistory_forTest().rbegin()->first;
 
-    OperationContextFromKVEngine opCtx(_engine);
-    WriteUnitOfWork uow1(&opCtx);
+    auto opCtx = opCtxs[1].second.get();
+    WriteUnitOfWork uow1(opCtx);
     StatusWith<RecordId> res1 =
-        rs->insertRecord(&opCtx, record.c_str(), record.length() + 1, Timestamp());
+        rs->insertRecord(opCtx, record.c_str(), record.length() + 1, Timestamp());
     ASSERT_OK(res1.getStatus());
     RecordId loc1 = res1.getValue();
     uow1.commit();
 
-    WriteUnitOfWork uow2(&opCtx);
+    WriteUnitOfWork uow2(opCtx);
     StatusWith<RecordId> res2 =
-        rs->insertRecord(&opCtx, record.c_str(), record.length() + 1, Timestamp());
+        rs->insertRecord(opCtx, record.c_str(), record.length() + 1, Timestamp());
     ASSERT_OK(res2.getStatus());
     RecordId loc2 = res2.getValue();
     uow2.commit();
 
     RecordData rd;
-    opCtx.recoveryUnit()->abandonSnapshot();
-    opCtx.recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided, readFrom);
-    ASSERT(!rs->findRecord(&opCtx, loc1, &rd));
-    ASSERT(!rs->findRecord(&opCtx, loc2, &rd));
+    opCtx->recoveryUnit()->abandonSnapshot();
+    opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided, readFrom);
+    ASSERT(!rs->findRecord(opCtx, loc1, &rd));
+    ASSERT(!rs->findRecord(opCtx, loc2, &rd));
 
-    opCtx.recoveryUnit()->abandonSnapshot();
-    opCtx.recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
-    ASSERT(rs->findRecord(&opCtx, loc1, &rd));
-    ASSERT(rs->findRecord(&opCtx, loc2, &rd));
+    opCtx->recoveryUnit()->abandonSnapshot();
+    opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
+    ASSERT(rs->findRecord(opCtx, loc1, &rd));
+    ASSERT(rs->findRecord(opCtx, loc2, &rd));
 }
 
 TEST_F(EphemeralForTestKVEngineTest, ReadOutdatedSnapshot) {
@@ -369,44 +401,50 @@ TEST_F(EphemeralForTestKVEngineTest, ReadOutdatedSnapshot) {
 
     std::unique_ptr<mongo::RecordStore> rs;
     {
-        OperationContextFromKVEngine opCtx(_engine);
-        ASSERT_OK(_engine->createRecordStore(&opCtx, nss, ident, defaultCollectionOptions));
-        rs = _engine->getRecordStore(&opCtx, nss, ident, defaultCollectionOptions);
+        auto opCtx = makeOpCtx();
+        ASSERT_OK(_engine->createRecordStore(opCtx.get(), nss, ident, defaultCollectionOptions));
+        rs = _engine->getRecordStore(opCtx.get(), nss, ident, defaultCollectionOptions);
         ASSERT(rs);
     }
 
     RecordId loc1;
     {
-        OperationContextFromKVEngine opCtx(_engine);
-        WriteUnitOfWork uow(&opCtx);
+        auto opCtx = makeOpCtx();
+        WriteUnitOfWork uow(opCtx.get());
         StatusWith<RecordId> res =
-            rs->insertRecord(&opCtx, record.c_str(), record.length() + 1, Timestamp());
+            rs->insertRecord(opCtx.get(), record.c_str(), record.length() + 1, Timestamp());
         ASSERT_OK(res.getStatus());
         loc1 = res.getValue();
         uow.commit();
     }
 
-    OperationContextFromKVEngine opCtxRead(_engine);
+    auto opCtxs = makeOpCtxs(2);
+
+    auto opCtxRead = opCtxs[0].second.get();
     RecordData rd;
-    ASSERT(rs->findRecord(&opCtxRead, loc1, &rd));
+    ASSERT(rs->findRecord(opCtxRead, loc1, &rd));
     Timestamp readFrom = _engine->getHistory_forTest().rbegin()->first;
 
     RecordId loc2;
     {
-        OperationContextFromKVEngine opCtx(_engine);
-        WriteUnitOfWork uow(&opCtx);
+        auto opCtx = opCtxs[1].second.get();
+        WriteUnitOfWork uow(opCtx);
         StatusWith<RecordId> res =
-            rs->insertRecord(&opCtx, record.c_str(), record.length() + 1, Timestamp());
+            rs->insertRecord(opCtx, record.c_str(), record.length() + 1, Timestamp());
         ASSERT_OK(res.getStatus());
         loc2 = res.getValue();
         uow.commit();
     }
 
-    ASSERT(rs->findRecord(&opCtxRead, loc1, &rd));
-    opCtxRead.recoveryUnit()->abandonSnapshot();
-    opCtxRead.recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided, readFrom);
+    // Destruct the client used for writes prior to trying to get a snapshot too old.
+    opCtxs.pop_back();
+
+    ASSERT(rs->findRecord(opCtxRead, loc1, &rd));
+    opCtxRead->recoveryUnit()->abandonSnapshot();
+    opCtxRead->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
+                                                      readFrom);
     ASSERT_THROWS_CODE(
-        rs->findRecord(&opCtxRead, loc1, &rd), DBException, ErrorCodes::SnapshotTooOld);
+        rs->findRecord(opCtxRead, loc1, &rd), DBException, ErrorCodes::SnapshotTooOld);
 }
 
 TEST_F(EphemeralForTestKVEngineTest, SetReadTimestampBehindOldestTimestamp) {
@@ -417,18 +455,18 @@ TEST_F(EphemeralForTestKVEngineTest, SetReadTimestampBehindOldestTimestamp) {
 
     std::unique_ptr<mongo::RecordStore> rs;
     {
-        OperationContextFromKVEngine opCtx(_engine);
-        ASSERT_OK(_engine->createRecordStore(&opCtx, nss, ident, defaultCollectionOptions));
-        rs = _engine->getRecordStore(&opCtx, nss, ident, defaultCollectionOptions);
+        auto opCtx = makeOpCtx();
+        ASSERT_OK(_engine->createRecordStore(opCtx.get(), nss, ident, defaultCollectionOptions));
+        rs = _engine->getRecordStore(opCtx.get(), nss, ident, defaultCollectionOptions);
         ASSERT(rs);
     }
 
     RecordId loc1;
     {
-        OperationContextFromKVEngine opCtx(_engine);
-        WriteUnitOfWork uow(&opCtx);
+        auto opCtx = makeOpCtx();
+        WriteUnitOfWork uow(opCtx.get());
         StatusWith<RecordId> res =
-            rs->insertRecord(&opCtx, record.c_str(), record.length() + 1, Timestamp());
+            rs->insertRecord(opCtx.get(), record.c_str(), record.length() + 1, Timestamp());
         ASSERT_OK(res.getStatus());
         loc1 = res.getValue();
         uow.commit();
@@ -436,22 +474,23 @@ TEST_F(EphemeralForTestKVEngineTest, SetReadTimestampBehindOldestTimestamp) {
 
     RecordData rd;
     Timestamp readFrom = _engine->getHistory_forTest().begin()->first;
-    OperationContextFromKVEngine opCtx(_engine);
-    WriteUnitOfWork uow(&opCtx);
+    auto opCtx = makeOpCtx();
+    WriteUnitOfWork uow(opCtx.get());
     StatusWith<RecordId> res =
-        rs->insertRecord(&opCtx, record.c_str(), record.length() + 1, Timestamp());
+        rs->insertRecord(opCtx.get(), record.c_str(), record.length() + 1, Timestamp());
     ASSERT_OK(res.getStatus());
     RecordId loc2 = res.getValue();
     uow.commit();
 
-    opCtx.recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided, readFrom);
+    opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided, readFrom);
     _engine->setOldestTimestamp(Timestamp::max(), true);
-    ASSERT_THROWS_CODE(rs->findRecord(&opCtx, loc2, &rd), DBException, ErrorCodes::SnapshotTooOld);
+    ASSERT_THROWS_CODE(
+        rs->findRecord(opCtx.get(), loc2, &rd), DBException, ErrorCodes::SnapshotTooOld);
 
-    opCtx.recoveryUnit()->abandonSnapshot();
-    opCtx.recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
-    ASSERT(rs->findRecord(&opCtx, loc1, &rd));
-    ASSERT(rs->findRecord(&opCtx, loc2, &rd));
+    opCtx->recoveryUnit()->abandonSnapshot();
+    opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
+    ASSERT(rs->findRecord(opCtx.get(), loc1, &rd));
+    ASSERT(rs->findRecord(opCtx.get(), loc2, &rd));
 }
 
 }  // namespace ephemeral_for_test

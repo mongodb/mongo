@@ -542,7 +542,8 @@ public:
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) const {
         const NamespaceString nss(parseNs(dbname, cmdObj));
-        return auth::checkAuthForCollMod(AuthorizationSession::get(client), nss, cmdObj, false);
+        return auth::checkAuthForCollMod(
+            client->getOperationContext(), AuthorizationSession::get(client), nss, cmdObj, false);
     }
 
     bool runWithRequestParser(OperationContext* opCtx,

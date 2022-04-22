@@ -72,7 +72,8 @@ public:
                                const std::string& dbname,
                                const BSONObj& cmdObj) const override {
         const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbname, cmdObj));
-        return auth::checkAuthForCollMod(AuthorizationSession::get(client), nss, cmdObj, true);
+        return auth::checkAuthForCollMod(
+            client->getOperationContext(), AuthorizationSession::get(client), nss, cmdObj, true);
     }
 
     bool supportsWriteConcern(const BSONObj& cmd) const override {

@@ -797,10 +797,6 @@ void StorageEngineImpl::cleanShutdown() {
 StorageEngineImpl::~StorageEngineImpl() {}
 
 void StorageEngineImpl::startTimestampMonitor() {
-    if (storageGlobalParams.readOnly) {
-        return;
-    }
-
     // Unless explicitly disabled, all storage engines should create a TimestampMonitor for
     // drop-pending internal idents, even if they do not support pending drops for collections
     // and indexes.

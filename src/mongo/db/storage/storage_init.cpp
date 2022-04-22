@@ -68,7 +68,7 @@ public:
         bob.append("dropPendingIdents",
                    static_cast<long long>(engine->getDropPendingIdents().size()));
         bob.append("supportsSnapshotReadConcern", engine->supportsReadConcernSnapshot());
-        bob.append("readOnly", storageGlobalParams.readOnly);
+        bob.append("readOnly", !opCtx->getServiceContext()->userWritesAllowed());
         bob.append("persistent", !engine->isEphemeral());
         bob.append("backupCursorOpen", backupCursorHooks->isBackupCursorOpen());
 

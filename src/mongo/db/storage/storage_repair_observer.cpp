@@ -65,8 +65,6 @@ const auto getRepairObserver =
 }  // namespace
 
 StorageRepairObserver::StorageRepairObserver(const std::string& dbpath) {
-    invariant(!storageGlobalParams.readOnly);
-
     using boost::filesystem::path;
     _repairIncompleteFilePath = path(dbpath) / path(kRepairIncompleteFileName);
 

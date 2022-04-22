@@ -832,9 +832,7 @@ void WiredTigerUtil::notifyStartupComplete() {
         _tableLoggingInfo.isInitializing = false;
     }
 
-    if (!storageGlobalParams.readOnly) {
-        removeTableChecksFile();
-    }
+    removeTableChecksFile();
 }
 
 void WiredTigerUtil::resetTableLoggingInfo() {
@@ -878,7 +876,6 @@ Status WiredTigerUtil::setTableLogging(OperationContext* opCtx, const std::strin
     WiredTigerSessionCache* sessionCache = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache();
     sessionCache->closeAllCursors(uri);
 
-    invariant(!storageGlobalParams.readOnly);
     stdx::lock_guard<Latch> lk(_tableLoggingInfoMutex);
 
     // Update the table logging settings regardless if we're no longer starting up the process.

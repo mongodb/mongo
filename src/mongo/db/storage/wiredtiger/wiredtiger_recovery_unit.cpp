@@ -228,7 +228,7 @@ void WiredTigerRecoveryUnit::_abort() {
     _setState(State::kInactive);
 }
 
-void WiredTigerRecoveryUnit::beginUnitOfWork(OperationContext* opCtx) {
+void WiredTigerRecoveryUnit::doBeginUnitOfWork() {
     invariant(!_inUnitOfWork(), toString(_getState()));
     invariant(!_isCommittingOrAborting(),
               str::stream() << "cannot begin unit of work while commit or rollback handlers are "

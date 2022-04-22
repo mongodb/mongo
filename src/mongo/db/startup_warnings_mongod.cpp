@@ -388,5 +388,12 @@ void logMongodStartupWarnings(const StorageGlobalParams& storageParams,
             {logv2::LogTag::kStartupWarnings},
             "Running with --restore. This should only be used when restoring from a backup");
     }
+
+    if (repl::ReplSettings::shouldRecoverFromOplogAsStandalone()) {
+        LOGV2_WARNING_OPTIONS(21558,
+                              {logv2::LogTag::kStartupWarnings},
+                              "Setting mongod to readOnly mode as a result of specifying "
+                              "'recoverFromOplogAsStandalone'");
+    }
 }
 }  // namespace mongo

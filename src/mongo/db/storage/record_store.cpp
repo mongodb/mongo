@@ -35,22 +35,22 @@
 
 namespace mongo {
 namespace {
-void validateWriteAllowed() {
+void validateWriteAllowed(OperationContext* opCtx) {
     uassert(ErrorCodes::IllegalOperation,
             "Cannot execute a write operation in read-only mode",
-            !storageGlobalParams.readOnly);
+            !opCtx->readOnly());
 }
 }  // namespace
 
 void RecordStore::deleteRecord(OperationContext* opCtx, const RecordId& dl) {
-    validateWriteAllowed();
+    validateWriteAllowed(opCtx);
     doDeleteRecord(opCtx, dl);
 }
 
 Status RecordStore::insertRecords(OperationContext* opCtx,
                                   std::vector<Record>* inOutRecords,
                                   const std::vector<Timestamp>& timestamps) {
-    validateWriteAllowed();
+    validateWriteAllowed(opCtx);
     return doInsertRecords(opCtx, inOutRecords, timestamps);
 }
 
@@ -58,7 +58,7 @@ Status RecordStore::updateRecord(OperationContext* opCtx,
                                  const RecordId& recordId,
                                  const char* data,
                                  int len) {
-    validateWriteAllowed();
+    validateWriteAllowed(opCtx);
     return doUpdateRecord(opCtx, recordId, data, len);
 }
 
@@ -67,22 +67,22 @@ StatusWith<RecordData> RecordStore::updateWithDamages(OperationContext* opCtx,
                                                       const RecordData& oldRec,
                                                       const char* damageSource,
                                                       const mutablebson::DamageVector& damages) {
-    validateWriteAllowed();
+    validateWriteAllowed(opCtx);
     return doUpdateWithDamages(opCtx, loc, oldRec, damageSource, damages);
 }
 
 Status RecordStore::truncate(OperationContext* opCtx) {
-    validateWriteAllowed();
+    validateWriteAllowed(opCtx);
     return doTruncate(opCtx);
 }
 
 void RecordStore::cappedTruncateAfter(OperationContext* opCtx, RecordId end, bool inclusive) {
-    validateWriteAllowed();
+    validateWriteAllowed(opCtx);
     doCappedTruncateAfter(opCtx, end, inclusive);
 }
 
 Status RecordStore::compact(OperationContext* opCtx) {
-    validateWriteAllowed();
+    validateWriteAllowed(opCtx);
     return doCompact(opCtx);
 }
 

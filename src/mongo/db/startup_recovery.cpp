@@ -74,7 +74,7 @@ MONGO_FAIL_POINT_DEFINE(exitBeforeRepairInvalidatesConfig);
 
 // Returns true if storage engine is writable.
 bool isWriteableStorageEngine() {
-    return !storageGlobalParams.readOnly && (storageGlobalParams.engine != "devnull");
+    return storageGlobalParams.engine != "devnull";
 }
 
 // Attempt to restore the featureCompatibilityVersion document if it is missing.
@@ -452,7 +452,7 @@ void setReplSetMemberInStandaloneMode(OperationContext* opCtx, StartupRecoveryMo
 
 // Perform startup procedures for --repair mode.
 void startupRepair(OperationContext* opCtx, StorageEngine* storageEngine) {
-    invariant(!storageGlobalParams.readOnly);
+    invariant(!storageGlobalParams.queryableBackupMode);
 
     if (MONGO_unlikely(exitBeforeDataRepair.shouldFail())) {
         LOGV2(21006, "Exiting because 'exitBeforeDataRepair' fail point was set.");
@@ -539,26 +539,12 @@ void startupRepair(OperationContext* opCtx, StorageEngine* storageEngine) {
     }
 }
 
-// Perform startup procedures for read-only mode.
-void startupRecoveryReadOnly(OperationContext* opCtx, StorageEngine* storageEngine) {
-    invariant(!storageGlobalParams.repair);
-
-    setReplSetMemberInStandaloneMode(opCtx, StartupRecoveryMode::kAuto);
-
-    FeatureCompatibilityVersion::initializeForStartup(opCtx);
-
-    openDatabases(opCtx, storageEngine, [&](auto db) {
-        // Ensures all collections meet requirements such as having _id indexes.
-        uassertStatusOK(ensureCollectionProperties(opCtx, db, EnsureIndexPolicy::kError));
-    });
-}
-
 // Perform routine startup recovery procedure.
 void startupRecovery(OperationContext* opCtx,
                      StorageEngine* storageEngine,
                      StorageEngine::LastShutdownState lastShutdownState,
                      StartupRecoveryMode mode) {
-    invariant(!storageGlobalParams.readOnly && !storageGlobalParams.repair);
+    invariant(!storageGlobalParams.repair);
 
     // Determine whether this is a replica set node running in standalone mode. This must be set
     // before determining whether to restart index builds.
@@ -630,8 +616,6 @@ void repairAndRecoverDatabases(OperationContext* opCtx,
 
     if (storageGlobalParams.repair) {
         startupRepair(opCtx, storageEngine);
-    } else if (storageGlobalParams.readOnly) {
-        startupRecoveryReadOnly(opCtx, storageEngine);
     } else {
         startupRecovery(opCtx, storageEngine, lastShutdownState, StartupRecoveryMode::kAuto);
     }
@@ -648,7 +632,7 @@ void runStartupRecoveryInMode(OperationContext* opCtx,
     auto const storageEngine = opCtx->getServiceContext()->getStorageEngine();
     Lock::GlobalWrite lk(opCtx);
 
-    invariant(isWriteableStorageEngine() && !storageGlobalParams.readOnly);
+    invariant(isWriteableStorageEngine());
     invariant(!storageGlobalParams.repair);
     const bool usingReplication = repl::ReplicationCoordinator::get(opCtx)->isReplEnabled();
     invariant(usingReplication);

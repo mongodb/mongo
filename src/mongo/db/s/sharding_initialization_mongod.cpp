@@ -289,9 +289,9 @@ void ShardingInitializationMongoD::shutDown(OperationContext* opCtx) {
 bool ShardingInitializationMongoD::initializeShardingAwarenessIfNeeded(OperationContext* opCtx) {
     invariant(!opCtx->lockState()->isLocked());
 
-    // In sharded readOnly mode, we ignore the shardIdentity document on disk and instead *require*
-    // a shardIdentity document to be passed through --overrideShardIdentity
-    if (storageGlobalParams.readOnly) {
+    // In sharded queryableBackupMode mode, we ignore the shardIdentity document on disk and instead
+    // *require* a shardIdentity document to be passed through --overrideShardIdentity
+    if (storageGlobalParams.queryableBackupMode) {
         if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
             uassert(ErrorCodes::InvalidOptions,
                     "If started with --shardsvr in queryableBackupMode, a shardIdentity document "
@@ -516,7 +516,7 @@ void initializeGlobalShardingStateForMongoD(OperationContext* opCtx,
     auto const service = opCtx->getServiceContext();
 
     if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
-        if (storageGlobalParams.readOnly) {
+        if (storageGlobalParams.queryableBackupMode) {
             CatalogCacheLoader::set(service, std::make_unique<ReadOnlyCatalogCacheLoader>());
         } else {
             CatalogCacheLoader::set(service,

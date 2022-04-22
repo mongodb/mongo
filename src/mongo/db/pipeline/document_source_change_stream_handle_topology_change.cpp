@@ -214,7 +214,7 @@ BSONObj DocumentSourceChangeStreamHandleTopologyChange::createUpdatedCommandForN
 
     // Create the 'AggregateCommandRequest' object which will help in creating the parsed pipeline.
     auto aggCmdRequest = aggregation_request_helper::parseFromBSON(
-        pExpCtx->ns, shardCommand, boost::none, apiStrict);
+        opCtx, pExpCtx->ns, shardCommand, boost::none, apiStrict);
 
     // Parse and optimize the pipeline.
     auto pipeline = Pipeline::parse(aggCmdRequest.getPipeline(), pExpCtx);

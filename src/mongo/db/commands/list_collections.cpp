@@ -239,7 +239,7 @@ BSONObj buildCollectionBson(OperationContext* opCtx,
     b.append("options", options.toBSON(false));
 
     BSONObjBuilder infoBuilder;
-    infoBuilder.append("readOnly", storageGlobalParams.readOnly);
+    infoBuilder.append("readOnly", opCtx->readOnly());
     if (options.uuid)
         infoBuilder.appendElements(options.uuid->toBSON());
     b.append("info", infoBuilder.obj());

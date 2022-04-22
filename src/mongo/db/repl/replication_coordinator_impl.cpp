@@ -898,7 +898,7 @@ void ReplicationCoordinatorImpl::startup(OperationContext* opCtx,
             _replicationProcess->getReplicationRecovery()->recoverFromOplogAsStandalone(opCtx);
         }
 
-        if (storageGlobalParams.readOnly && !recoverToOplogTimestamp.empty()) {
+        if (storageGlobalParams.queryableBackupMode && !recoverToOplogTimestamp.empty()) {
             BSONObj recoverToTimestampObj = fromjson(recoverToOplogTimestamp);
             uassert(ErrorCodes::BadValue,
                     str::stream() << "'recoverToOplogTimestamp' needs to have a 'timestamp' field",
@@ -917,9 +917,6 @@ void ReplicationCoordinatorImpl::startup(OperationContext* opCtx,
                     cfg.isOK());
 
             // Need to perform replication recovery up to and including the given timestamp.
-            // Temporarily turn off read-only mode for this procedure as we'll have to do writes.
-            storageGlobalParams.readOnly = false;
-            ON_BLOCK_EXIT([&] { storageGlobalParams.readOnly = true; });
             _replicationProcess->getReplicationRecovery()->recoverFromOplogUpTo(opCtx,
                                                                                 recoverToTimestamp);
         }
