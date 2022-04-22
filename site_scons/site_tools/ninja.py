@@ -1003,8 +1003,11 @@ def get_command_env(env):
     return command_env
 
 
-def gen_get_response_file_command(env, rule, tool, tool_is_dynamic=False, custom_env={}):
+def gen_get_response_file_command(env, rule, tool, tool_is_dynamic=False, custom_env=None):
     """Generate a response file command provider for rule name."""
+
+    if custom_env is None:
+        custom_env = {}
 
     # If win32 using the environment with a response file command will cause
     # ninja to fail to create the response file. Additionally since these rules

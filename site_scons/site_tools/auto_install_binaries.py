@@ -226,8 +226,8 @@ def scan_for_transitive_install(node, env, _path):
     if component is None:
         return []
 
-    scanned = getattr(node.attributes, "AIB_SCANNED", [])
-    if scanned:
+    scanned = getattr(node.attributes, "AIB_SCANNED", None)
+    if scanned is not None:
         return scanned
 
     # Access directly by keys because we don't want to accidentally

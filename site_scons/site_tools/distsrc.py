@@ -92,11 +92,13 @@ class DistSrcTarArchive(DistSrcArchive):
         self,
         filename,
         file_contents,
-        mtime=time.time(),
+        mtime=None,
         mode=0o644,
         uname="root",
         gname="root",
     ):
+        if mtime is None:
+            mtime = time.time()
         file_metadata = tarfile.TarInfo(name=filename)
         file_metadata.mtime = mtime
         file_metadata.mode = mode
@@ -142,11 +144,13 @@ class DistSrcZipArchive(DistSrcArchive):
         self,
         filename,
         file_contents,
-        mtime=time.time(),
+        mtime=None,
         mode=0o644,
         uname="root",
         gname="root",
     ):
+        if mtime is None:
+            mtime = time.time()
         self.archive_file.writestr(filename, file_contents)
 
     def append_file(self, filename, localfile):
