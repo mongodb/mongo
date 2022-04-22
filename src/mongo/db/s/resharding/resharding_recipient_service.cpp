@@ -558,6 +558,8 @@ ReshardingRecipientService::RecipientStateMachine::_makeDataReplication(Operatio
                 donor.getShardId(),
                 std::make_unique<ReshardingOplogApplierMetrics>(_metricsNew.get(), boost::none));
         }
+    } else {
+        invariant(_applierMetricsMap.size() == _donorShards.size());
     }
 
     return _dataReplicationFactory(opCtx,
@@ -1120,7 +1122,8 @@ void ReshardingRecipientService::RecipientStateMachine::_restoreMetrics(
     reshardingOpCtxKilledWhileRestoringMetrics.execute(
         [&opCtx](const BSONObj& data) { opCtx->markKilled(); });
 
-    std::vector<std::pair<ShardId, ReshardingOplogApplierProgress>> progressDocList;
+    std::vector<std::pair<ShardId, boost::optional<ReshardingOplogApplierProgress>>>
+        progressDocList;
     for (const auto& donor : _donorShards) {
         {
             AutoGetCollection oplogBufferColl(
@@ -1154,6 +1157,8 @@ void ReshardingRecipientService::RecipientStateMachine::_restoreMetrics(
                         progressDocList.emplace_back(donor.getShardId(), progressDoc);
                     }
                 }
+            } else {
+                progressDocList.emplace_back(donor.getShardId(), boost::none);
             }
         }
     }
@@ -1164,7 +1169,14 @@ void ReshardingRecipientService::RecipientStateMachine::_restoreMetrics(
         const auto& shardId = shardIdDocPair.first;
         const auto& progressDoc = shardIdDocPair.second;
 
-        _metricsNew->accumulateFrom(progressDoc);
+        if (!progressDoc) {
+            _applierMetricsMap.emplace(
+                shardId,
+                std::make_unique<ReshardingOplogApplierMetrics>(_metricsNew.get(), boost::none));
+            continue;
+        }
+
+        _metricsNew->accumulateFrom(*progressDoc);
 
         auto applierMetrics =
             std::make_unique<ReshardingOplogApplierMetrics>(_metricsNew.get(), progressDoc);
