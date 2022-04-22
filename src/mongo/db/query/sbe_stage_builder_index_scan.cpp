@@ -704,26 +704,25 @@ generateGenericMultiIntervalIndexScan(StageBuilderState& state,
         savedSlots.push_back(*savedKeyPattern);
     }
 
-    // Pass IndexBounds to the recursive branch of the index scan as an EExpression. In case the
-    // 'bounds' are not defined during the function call, register a slot in the runtime
-    // environment, where IndexBounds will be defined.
-    auto [boundsExpr, indexBoundsSlot] =
-        [&]() -> std::pair<std::unique_ptr<sbe::EExpression>, boost::optional<sbe::value::SlotId>> {
+    // Pass IndexBounds to the recursive branch of the index scan. In case the 'bounds' are not
+    // defined during the function call, register a slot in the runtime environment, where
+    // IndexBounds will be defined.
+    auto indexBounds = [&]() -> sbe::CheckBoundsParams::IndexBoundsType {
         if (!hasDynamicIndexBounds) {
-            return {makeConstant(sbe::value::TypeTags::indexBounds,
-                                 sbe::value::bitcastFrom<IndexBounds*>(
-                                     std::make_unique<IndexBounds>(ixn->bounds).release())),
-                    boost::none};
+            return ixn->bounds;
         }
 
         const auto boundsSlot = state.data->env->registerSlot(
             sbe::value::TypeTags::Nothing, 0, true /* owned */, state.slotIdGenerator);
-        return {makeVariable(boundsSlot), boundsSlot};
+        return boundsSlot;
     }();
+    const auto indexBoundsSlot = stdx::holds_alternative<sbe::value::SlotId>(indexBounds)
+        ? boost::make_optional(stdx::get<sbe::value::SlotId>(indexBounds))
+        : boost::none;
     auto [recursiveSlot, recursiveBranch] = makeRecursiveBranchForGenericIndexScan(
         collection,
         ixn->index.identifier.catalogName,
-        {std::move(boundsExpr), ixn->index.keyPattern, ixn->direction, version, ordering},
+        {std::move(indexBounds), ixn->index.keyPattern, ixn->direction, version, ordering},
         spoolId,
         indexKeysToInclude,
         savedIndexKeySlots,
