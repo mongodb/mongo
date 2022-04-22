@@ -2783,6 +2783,94 @@ TEST_F(BSONColumnTest, InterleavedDoubleIncreaseScaleFromDeltaNoRescale) {
     test(true, appendInterleavedStart);
 }
 
+TEST_F(BSONColumnTest, InterleavedScalarToObject) {
+    auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
+        BSONColumnBuilder cb("test"_sd, arrayCompression);
+
+        std::vector<BSONElement> elems = {
+            createElementObj(BSON("x" << 1)),
+            createElementObj(BSON("x" << 2)),
+            createElementObj(BSON("x" << BSON("y" << 1 << "z" << 1))),
+            createElementObj(BSON("x" << BSON("y" << 2 << "z" << 3)))};
+
+        for (auto elem : elems) {
+            if (!elem.eoo())
+                cb.append(elem);
+            else
+                cb.skip();
+        }
+
+        BufBuilder expected;
+        appendInterleavedStartFunc(expected, elems.front().Obj());
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected,
+                               {kDeltaForBinaryEqualValues,
+                                deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+                               1);
+        appendEOO(expected);
+
+        appendInterleavedStartFunc(expected, elems[2].Obj());
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected,
+                               {kDeltaForBinaryEqualValues,
+                                deltaInt32(elems[3].Obj()["x"_sd].Obj()["y"_sd],
+                                           elems[2].Obj()["x"_sd].Obj()["y"_sd])},
+                               1);
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected,
+                               {kDeltaForBinaryEqualValues,
+                                deltaInt32(elems[3].Obj()["x"_sd].Obj()["z"_sd],
+                                           elems[2].Obj()["x"_sd].Obj()["z"_sd])},
+                               1);
+        appendEOO(expected);
+
+        appendEOO(expected);
+
+        auto binData = cb.finalize();
+        verifyBinary(binData, expected);
+        verifyDecompression(binData, elems);
+    };
+
+    test(false, appendInterleavedStartLegacy);
+    test(true, appendInterleavedStart);
+}
+
+TEST_F(BSONColumnTest, DecodeInterleavedObjectAsScalar) {
+    auto test = [&](auto appendInterleavedStartFunc) {
+        // Verify that we can decompress the following elements when sub-objects are encoded as
+        // scalars in a single interleaved stream
+        std::vector<BSONElement> elems = {
+            createElementObj(BSON("x" << 1)),
+            createElementObj(BSON("x" << 2)),
+            createElementObj(BSON("x" << BSON("y" << 1 << "z" << 1))),
+            createElementObj(BSON("x" << BSON("y" << 2 << "z" << 3))),
+            createElementObj(BSON("x" << BSON("y" << 2 << "z" << 3)))};
+
+        BufBuilder expected;
+        appendInterleavedStartFunc(expected, elems.front().Obj());
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected,
+                               {kDeltaForBinaryEqualValues,
+                                deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+                               1);
+        appendLiteral(expected, elems[2].Obj()["x"_sd]);
+        appendLiteral(expected, elems[3].Obj()["x"_sd]);
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+        appendEOO(expected);
+        appendEOO(expected);
+
+        BSONBinData binData;
+        binData.data = expected.buf();
+        binData.length = expected.len();
+        binData.type = BinDataType::Column;
+        verifyDecompression(binData, elems);
+    };
+
+    test(appendInterleavedStartLegacy);
+    test(appendInterleavedStart);
+}
+
 TEST_F(BSONColumnTest, InterleavedMix64And128Bit) {
     auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
         BSONColumnBuilder cb("test"_sd, arrayCompression);
@@ -4419,6 +4507,47 @@ TEST_F(BSONColumnTest, InterleavedMergeWithUnrelatedArray) {
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
     verifyDecompression(binData, elems);
+}
+
+TEST_F(BSONColumnTest, InterleavedMergeWithScalarObjectMismatch) {
+    auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
+        BSONColumnBuilder cb("test"_sd, arrayCompression);
+
+        // Test that we can successfully build reference object when there are unrelated fields with
+        // object and scalar mismatch.
+        std::vector<BSONElement> elems = {
+            createElementObj(BSON("z" << BSON("x" << 1))),
+            createElementObj(BSON("y" << 1 << "z" << BSON("x" << 2)))};
+
+        for (auto elem : elems) {
+            if (!elem.eoo())
+                cb.append(elem);
+            else
+                cb.skip();
+        }
+
+        BufBuilder expected;
+        appendInterleavedStartFunc(
+            expected,
+            BSON("y" << elems[1].Obj()["y"_sd].Int() << "z" << elems[0].Obj()["z"_sd].Obj()));
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected, {boost::none, kDeltaForBinaryEqualValues}, 1);
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected,
+                               {kDeltaForBinaryEqualValues,
+                                deltaInt32(elems[1].Obj()["z"_sd].Obj()["x"_sd],
+                                           elems[0].Obj()["z"_sd].Obj()["x"_sd])},
+                               1);
+        appendEOO(expected);
+        appendEOO(expected);
+
+        auto binData = cb.finalize();
+        verifyBinary(binData, expected);
+        verifyDecompression(binData, elems);
+    };
+
+    test(false, appendInterleavedStartLegacy);
+    test(true, appendInterleavedStart);
 }
 
 TEST_F(BSONColumnTest, InterleavedArrayAppend) {

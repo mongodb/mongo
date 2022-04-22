@@ -140,11 +140,15 @@ std::pair<BSONObj::iterator, bool> _traverseLockStep(const BSONObj& reference,
                 }
             }
         } else {
+            bool sameField = it != end && elem.fieldNameStringData() == it->fieldNameStringData();
+
+            // Going from scalar to object is not allowed, this would compress inefficiently
+            if (sameField && (it->type() == Object || it->type() == Array)) {
+                return {it, false};
+            }
+
             // Non-object, call provided function with the two elements
-            elemFunc(elem,
-                     it != end && elem.fieldNameStringData() == it->fieldNameStringData()
-                         ? *(it++)
-                         : BSONElement());
+            elemFunc(elem, sameField ? *(it++) : BSONElement());
         }
     }
     // Extra elements in 'obj' are not allowed. These needs to be merged in to 'reference' to be
@@ -356,11 +360,14 @@ std::pair<BSONObj::iterator, bool> _traverseLockStepLegacy(const BSONObj& refere
                 }
             }
         } else {
+            bool sameField = it != end && elem.fieldNameStringData() == it->fieldNameStringData();
+
+            // Going from scalar to object is not allowed, this would compress inefficiently
+            if (sameField && it->type() == Object) {
+                return {it, false};
+            }
             // Non-object, call provided function with the two elements
-            elemFunc(elem,
-                     it != end && elem.fieldNameStringData() == it->fieldNameStringData()
-                         ? *(it++)
-                         : BSONElement());
+            elemFunc(elem, sameField ? *(it++) : BSONElement());
         }
     }
     // Extra elements in 'obj' are not allowed. These needs to be merged in to 'reference' to be
