@@ -17,6 +17,7 @@
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');
 load('jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js');
+load("jstests/libs/override_methods/retry_writes_at_least_once.js");
 
 // This workload involves running commands outside a session.
 TestData.disableImplicitSessions = true;
@@ -230,12 +231,20 @@ var $config = extendWorkload($config, function($config, $super) {
             const res = assert.commandWorked(db.adminCommand(testInternalTxnCmdObj));
             print(`Response: ${tojsononeline(res)}`);
             res.responses.forEach(response => assert.commandWorked(response));
-            assert.eq(res.responses.length, 2);
-            const writeCmdRes = res.responses[0];
-            const insertCmdRes = res.responses[1];
+            if (executionCtxType == executionContextTypes.kClientRetryableWrite) {
+                // If the command was retried, 'responses' would only contain the response for
+                // 'writeCmdObj'.
+                assert.lte(res.responses.length, 2);
+            } else {
+                assert.eq(res.responses.length, 2);
+            }
 
+            const writeCmdRes = res.responses[0];
             checkResponseFunc(writeCmdRes);
-            assert.eq(insertCmdRes.n, 1, insertCmdRes);
+            if (res.responses.length == 2) {
+                const insertCmdRes = res.responses[1];
+                assert.eq(insertCmdRes.n, 1, insertCmdRes);
+            }
         };
 
         if (executionCtxType == executionContextTypes.kClientTransaction) {
