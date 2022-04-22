@@ -28,7 +28,8 @@ function runWithRetries(mongo, cmdObj, clientFunction, clientFunctionArguments) 
         cmdName = Object.keys(cmdObj)[0];
     }
 
-    const isRetryableWriteCmd = RetryableWritesUtil.isRetryableWriteCmdName(cmdName);
+    const isRetryableWriteCmd = cmdObj.hasOwnProperty("lsid") &&
+        cmdObj.hasOwnProperty("txnNumber") && RetryableWritesUtil.isRetryableWriteCmdName(cmdName);
     const canRetryWrites = _ServerSession.canRetryWrites(cmdObj);
 
     let res = clientFunction.apply(mongo, clientFunctionArguments);

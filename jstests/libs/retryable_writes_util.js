@@ -27,8 +27,14 @@ var RetryableWritesUtil = (function() {
         });
     }
 
-    const kRetryableWriteCommands =
-        new Set(["delete", "findandmodify", "findAndModify", "insert", "update"]);
+    const kRetryableWriteCommands = new Set([
+        "delete",
+        "findandmodify",
+        "findAndModify",
+        "insert",
+        "update",
+        "testInternalTransactions"
+    ]);
 
     /**
      * Returns true if the command name is that of a retryable write command.
