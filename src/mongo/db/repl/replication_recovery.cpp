@@ -215,7 +215,10 @@ public:
     void clear(OperationContext*) final {
         MONGO_UNREACHABLE;
     }
-    bool waitForData(Seconds) final {
+    bool waitForDataFor(Milliseconds, Interruptible*) final {
+        MONGO_UNREACHABLE;
+    }
+    bool waitForDataUntil(Date_t, Interruptible*) final {
         MONGO_UNREACHABLE;
     }
     boost::optional<Value> lastObjectPushed(OperationContext*) const final {

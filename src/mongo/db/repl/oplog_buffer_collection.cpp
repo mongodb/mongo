@@ -272,10 +272,20 @@ bool OplogBufferCollection::tryPop(OperationContext* opCtx, Value* value) {
     return _pop_inlock(opCtx, value);
 }
 
-bool OplogBufferCollection::waitForData(Seconds waitDuration) {
+bool OplogBufferCollection::waitForDataFor(Milliseconds waitDuration,
+                                           Interruptible* interruptible) {
     stdx::unique_lock<Latch> lk(_mutex);
-    if (!_cvNoLongerEmpty.wait_for(
-            lk, waitDuration.toSystemDuration(), [&]() { return _count != 0; })) {
+    if (!interruptible->waitForConditionOrInterruptFor(
+            _cvNoLongerEmpty, lk, waitDuration, [&]() { return _count != 0; })) {
+        return false;
+    }
+    return _count != 0;
+}
+
+bool OplogBufferCollection::waitForDataUntil(Date_t deadline, Interruptible* interruptible) {
+    stdx::unique_lock<Latch> lk(_mutex);
+    if (!interruptible->waitForConditionOrInterruptUntil(
+            _cvNoLongerEmpty, lk, deadline, [&]() { return _count != 0; })) {
         return false;
     }
     return _count != 0;

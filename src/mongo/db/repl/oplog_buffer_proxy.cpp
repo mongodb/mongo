@@ -112,14 +112,24 @@ bool OplogBufferProxy::tryPop(OperationContext* opCtx, Value* value) {
     return true;
 }
 
-bool OplogBufferProxy::waitForData(Seconds waitDuration) {
+bool OplogBufferProxy::waitForDataFor(Milliseconds waitDuration, Interruptible* interruptible) {
     {
         stdx::unique_lock<Latch> lk(_lastPushedMutex);
         if (_lastPushed) {
             return true;
         }
     }
-    return _target->waitForData(waitDuration);
+    return _target->waitForDataFor(waitDuration, interruptible);
+}
+
+bool OplogBufferProxy::waitForDataUntil(Date_t deadline, Interruptible* interruptible) {
+    {
+        stdx::unique_lock<Latch> lk(_lastPushedMutex);
+        if (_lastPushed) {
+            return true;
+        }
+    }
+    return _target->waitForDataUntil(deadline, interruptible);
 }
 
 bool OplogBufferProxy::peek(OperationContext* opCtx, Value* value) {
