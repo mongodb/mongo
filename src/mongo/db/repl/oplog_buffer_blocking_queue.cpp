@@ -112,11 +112,20 @@ bool OplogBufferBlockingQueue::tryPop(OperationContext*, Value* value) {
     return true;
 }
 
-bool OplogBufferBlockingQueue::waitForData(Seconds waitDuration) {
+bool OplogBufferBlockingQueue::waitForDataFor(Milliseconds waitDuration,
+                                              Interruptible* interruptible) {
     Value ignored;
     stdx::unique_lock<Latch> lk(_notEmptyMutex);
-    _notEmptyCv.wait_for(
-        lk, waitDuration.toSystemDuration(), [&] { return _drainMode || _queue.peek(ignored); });
+    interruptible->waitForConditionOrInterruptFor(
+        _notEmptyCv, lk, waitDuration, [&] { return _drainMode || _queue.peek(ignored); });
+    return _queue.peek(ignored);
+}
+
+bool OplogBufferBlockingQueue::waitForDataUntil(Date_t deadline, Interruptible* interruptible) {
+    Value ignored;
+    stdx::unique_lock<Latch> lk(_notEmptyMutex);
+    interruptible->waitForConditionOrInterruptUntil(
+        _notEmptyCv, lk, deadline, [&] { return _drainMode || _queue.peek(ignored); });
     return _queue.peek(ignored);
 }
 
