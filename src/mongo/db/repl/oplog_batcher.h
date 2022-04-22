@@ -169,9 +169,16 @@ public:
      *     at most "BatchLimits::bytes" worth of OplogEntries
      *     only OplogEntries from before the "BatchLimits::secondaryDelaySecsLatestTimestamp" point
      *     a single command OplogEntry (excluding applyOps, which are grouped with CRUD ops)
+     *
+     * If waitToFillBatch is non-zero and any data is available, waits for more data up to that many
+     * milliseconds from the start of the batch when the batch is not full.  The wait is
+     * interruptible but aside from ending the wait, interrupts will be ignored to avoid losing
+     * data. (that is, on interrupt, data already in the batch is returned immediately)
      */
-    StatusWith<std::vector<OplogEntry>> getNextApplierBatch(OperationContext* opCtx,
-                                                            const BatchLimits& batchLimits);
+    StatusWith<std::vector<OplogEntry>> getNextApplierBatch(
+        OperationContext* opCtx,
+        const BatchLimits& batchLimits,
+        Milliseconds waitToFillBatch = Milliseconds(0));
 
     /**
      * Helper method indicating that this oplog entry must be in a batch of its own.

@@ -159,8 +159,10 @@ public:
     /**
      * Calls the OplogBatcher's getNextApplierBatch.
      */
-    StatusWith<std::vector<OplogEntry>> getNextApplierBatch(OperationContext* opCtx,
-                                                            const BatchLimits& batchLimits);
+    StatusWith<std::vector<OplogEntry>> getNextApplierBatch(
+        OperationContext* opCtx,
+        const BatchLimits& batchLimits,
+        Milliseconds waitToFillBatch = Milliseconds(0));
 
     const Options& getOptions() const;
 
