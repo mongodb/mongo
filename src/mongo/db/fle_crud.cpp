@@ -1169,8 +1169,9 @@ uint64_t FLEQueryInterfaceImpl::countDocuments(const NamespaceString& nss) {
     auto firstBatch = cursorResponse.getBatch();
     if (!firstBatch.empty()) {
         auto countObj = firstBatch.front();
-        docCount = countObj.getIntField("n"_sd);
-        uassert(6520701, "Unexpected negative document count", docCount >= 0);
+        int64_t signedDocCount = countObj.getIntField("n"_sd);
+        uassert(6520701, "Unexpected negative document count", signedDocCount >= 0);
+        docCount = static_cast<uint64_t>(signedDocCount);
     }
 
     return docCount;
