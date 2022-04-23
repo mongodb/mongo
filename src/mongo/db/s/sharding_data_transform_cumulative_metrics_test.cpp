@@ -327,7 +327,7 @@ public:
         addExpectedField(CoordinatorStateEnum::kAborting);
         addExpectedField(CoordinatorStateEnum::kCommitting);
 
-        for (const auto expectedState : expectedStateFieldCount) {
+        for (const auto& expectedState : expectedStateFieldCount) {
             const auto actualValue = serverStatusSubObj.getIntField(expectedState.first);
             if (actualValue != expectedState.second) {
                 LOGV2_DEBUG(6438600,
