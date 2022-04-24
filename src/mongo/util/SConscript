@@ -615,6 +615,7 @@ icuEnv.CppUnitTest(
         'future_test_shared_future.cpp',
         'future_util_test.cpp',
         'hierarchical_acquisition_test.cpp',
+        'histogram_test.cpp',
         'icu_test.cpp',
         'static_immortal_test.cpp',
         'invalidating_lru_cache_test.cpp',
