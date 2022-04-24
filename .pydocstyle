@@ -9,6 +9,10 @@ inherit = false
 # D212 - Multi-line docstring summary should start at the first line
 # D213 - Multi-line docstring summary should start at the second line
 # D301 - Use r""" if any backslashes in a docstring
-ignore = D105,D202,D203,D212,D213,D301
+# D401 - First line should be in imperative mood
+# D407 - Missing dashed underline after section
+# D413 - Missing blank line after last section
+# D415 - First line should end with a period, question mark, or exclamation point
+ignore = D105,D202,D203,D212,D213,D301,D401,D407,D413,D415
 # Do not run on buildscripts/tests/
 match = ^((?!buildscripts[\\\/]tests[\\\/]).)*$

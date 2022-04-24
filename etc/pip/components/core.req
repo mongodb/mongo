@@ -2,4 +2,5 @@
 psutil <= 5.8.0
 pymongo >= 3.9, < 4.0
 PyYAML >= 3.0.0, <= 6.0.0
+types-PyYAML ~= 6.0.5
 requests >= 2.0.0, <= 2.26.0

@@ -37,7 +37,6 @@ import inspect
 import os
 import sys
 from typing import List, Union
-from yaml import nodes
 import yaml
 
 from . import common
