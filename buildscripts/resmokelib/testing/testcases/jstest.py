@@ -109,9 +109,8 @@ class _SingleJSTestCase(interface.ProcessTestCase):
 
     def _make_process(self):
         return core.programs.mongo_shell_program(
-            self.logger, self.fixture.job_num, test_id=self._id, executable=self.shell_executable,
-            filename=self.js_filename, connection_string=self.fixture.get_driver_connection_url(),
-            **self.shell_options)
+            self.logger, executable=self.shell_executable, filename=self.js_filename,
+            connection_string=self.fixture.get_driver_connection_url(), **self.shell_options)
 
 
 class JSTestCaseBuilder:

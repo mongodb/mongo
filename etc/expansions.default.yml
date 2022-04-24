@@ -30,7 +30,6 @@ content_type: application/x-gzip
 jstestfuzz_concurrent_num_files: "10"
 curator_release: "latest"
 ext: tgz
-spawn_resmoke_using: "python"
 
 # SCons compile expansions.
 compiling_for_test: "false"

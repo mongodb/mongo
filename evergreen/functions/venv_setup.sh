@@ -73,12 +73,6 @@ toolchain_txt="$pip_dir/toolchain-requirements.txt"
 activate_venv
 echo "Upgrading pip to 21.0.1"
 
-# ref: https://github.com/grpc/grpc/issues/25082#issuecomment-778392661
-if [ "$(uname -m)" = "arm64" ] && [ "$(uname)" == "Darwin" ]; then
-  export GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=1
-  export GRPC_PYTHON_BUILD_SYSTEM_ZLIB=1
-fi
-
 python -m pip --disable-pip-version-check install "pip==21.0.1" "wheel==0.37.0" || exit 1
 python -m pip --disable-pip-version-check install -r "$toolchain_txt" -q --log install.log
 if [ $? != 0 ]; then

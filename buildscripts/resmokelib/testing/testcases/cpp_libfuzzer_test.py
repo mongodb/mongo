@@ -41,6 +41,4 @@ class CPPLibfuzzerTestCase(interface.ProcessTestCase):
             f"-runs={self.runs}",
             self.corpus_directory,
         ]
-        self.program_options["job_num"] = self.fixture.job_num
-        self.program_options["test_id"] = self._id
         return core.programs.make_process(self.logger, default_args, **self.program_options)

@@ -11,7 +11,6 @@ from buildscripts.resmokelib import errors
 from buildscripts.resmokelib.core import redirect as redirect_lib
 from buildscripts.resmokelib.logging import buildlogger
 from buildscripts.resmokelib.logging import formatters
-from buildscripts.resmokelib.logging import jasper_logger
 
 _DEFAULT_FORMAT = "[%(name)s] %(message)s"
 
@@ -170,10 +169,7 @@ def new_fixture_logger(fixture_class, job_num):
     full_name = "%s:job%d" % (fixture_class, job_num)
     logger = FixtureLogger(_shorten(full_name), full_name)
     logger.parent = ROOT_FIXTURE_LOGGER
-    if config.SPAWN_USING == "jasper":
-        _add_jasper_logger_handler(logger, job_num)
-    else:
-        _add_build_logger_handler(logger, job_num)
+    _add_build_logger_handler(logger, job_num)
 
     _FIXTURE_LOGGER_REGISTRY[job_num] = logger
     return logger
@@ -223,10 +219,6 @@ def new_test_logger(test_shortname, test_basename, command, parent, job_num, tes
             meta_logger.info("Writing output of %s to %s.", test_basename, url)
 
         return (test_id, url)
-
-    if config.SPAWN_USING == "jasper":
-        _add_jasper_logger_handler(logger, job_num, test_id=test_id)
-        return (logger, None)
 
     (test_id, url) = _get_test_endpoint(job_num, test_basename, command, job_logger)
     _add_build_logger_handler(logger, job_num, test_id)
@@ -291,12 +283,6 @@ def _get_buildlogger_handler_info(logger_info):
         if handler_info.pop("class") == "buildlogger":
             return handler_info
     return None
-
-
-def _add_jasper_logger_handler(logger, job_num, test_id=None):
-    handler = jasper_logger.JasperHandler(logger.name, job_num, test_id)
-    handler.setFormatter(formatters.TimestampFormatter(_DEFAULT_FORMAT))
-    logger.addHandler(handler)
 
 
 def _fallback_buildlogger_handler(include_logger_name=True):
