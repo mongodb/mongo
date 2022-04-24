@@ -325,7 +325,6 @@ or explicitly pass --installDir to the run subcommand of buildscripts/resmoke.py
     _config.REPORT_FAILURE_STATUS = config.pop("report_failure_status")
     _config.REPORT_FILE = config.pop("report_file")
     _config.SERVICE_EXECUTOR = config.pop("service_executor")
-    _config.SPAWN_USING = config.pop("spawn_using")
     _config.EXPORT_MONGOD_CONFIG = config.pop("export_mongod_config")
     _config.STAGGER_JOBS = config.pop("stagger_jobs") == "on"
     _config.STORAGE_ENGINE = config.pop("storage_engine")
@@ -354,10 +353,6 @@ or explicitly pass --installDir to the run subcommand of buildscripts/resmoke.py
     _config.EVERGREEN_TASK_DOC = config.pop("task_doc")
     _config.EVERGREEN_VARIANT_NAME = config.pop("variant_name")
     _config.EVERGREEN_VERSION_ID = config.pop("version_id")
-
-    # Cedar options.
-    _config.CEDAR_URL = config.pop("cedar_url")
-    _config.CEDAR_RPC_PORT = config.pop("cedar_rpc_port")
 
     # Archival options. Archival is enabled only when running on evergreen.
     if not _config.EVERGREEN_TASK_ID:

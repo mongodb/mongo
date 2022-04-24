@@ -106,11 +106,6 @@ class TestReport(unittest.TestResult):  # pylint: disable=too-many-instance-attr
         unittest.TestResult.startTest(self, test)
 
         test_info = TestInfo(test.id(), test.test_name, test.dynamic)
-        if _config.SPAWN_USING == "jasper":
-            # The group id represents the group of logs this test belongs to in
-            # cedar buildlogger. It must be sent to evergreen/cedar in order to
-            # create the correct log URL.
-            test_info.group_id = str(self.job_num)
 
         basename = test.basename()
         command = test.as_command()
@@ -385,14 +380,8 @@ class TestInfo(object):  # pylint: disable=too-many-instance-attributes
         """Initialize the TestInfo instance."""
 
         self.test_id = test_id
-        # If spawned using jasper, we need to set the display_test_name and the
-        # test_file since these are distinct in cedar buildlogger.
-        if _config.SPAWN_USING == "jasper":
-            self.test_file = str(test_id)
-            self.display_test_name = test_file
-        else:
-            self.test_file = test_file
-            self.display_test_name = None
+        self.test_file = test_file
+        self.display_test_name = None
         self.dynamic = dynamic
 
         self.group_id = None

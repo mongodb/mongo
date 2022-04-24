@@ -57,22 +57,20 @@ class FixtureLib:
         return core.programs.mongod_program(logger, job_num, executable, process_kwargs,
                                             mongod_options)
 
-    def mongos_program(  # pylint: disable=too-many-arguments
-            self, logger, job_num, test_id=None, executable=None, process_kwargs=None,
-            mongos_options=None):
+    def mongos_program(self, logger, job_num, executable=None, process_kwargs=None,
+                       mongos_options=None):  # pylint: disable=too-many-arguments
         """Return a Process instance that starts a mongos with arguments constructed from 'kwargs'."""
-        return core.programs.mongos_program(logger, job_num, test_id, executable, process_kwargs,
+        return core.programs.mongos_program(logger, job_num, executable, process_kwargs,
                                             mongos_options)
 
-    def generic_program(self, logger, args, job_num, test_id=None, process_kwargs=None, **kwargs):  # pylint: disable=too-many-arguments
+    def generic_program(self, logger, args, process_kwargs=None, **kwargs):  # pylint: disable=too-many-arguments
         """Return a Process instance that starts an arbitrary executable.
 
         The executable arguments are constructed from 'kwargs'.
 
         The args parameter is an array of strings containing the command to execute.
         """
-        return core.programs.generic_program(logger, args, job_num, test_id, process_kwargs,
-                                             **kwargs)
+        return core.programs.generic_program(logger, args, process_kwargs, **kwargs)
 
     #########
     # Utils #

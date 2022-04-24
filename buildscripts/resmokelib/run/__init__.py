@@ -14,12 +14,6 @@ import shutil
 import curatorbin
 import pkg_resources
 
-try:
-    import grpc_tools.protoc
-    import grpc
-except ImportError:
-    pass
-
 from buildscripts.resmokelib import parser as main_parser
 from buildscripts.resmokelib import config
 from buildscripts.resmokelib import configure_resmoke
@@ -30,8 +24,6 @@ from buildscripts.resmokelib import sighandler
 from buildscripts.resmokelib import suitesconfig
 from buildscripts.resmokelib import testing
 from buildscripts.resmokelib import utils
-from buildscripts.resmokelib.core import process
-from buildscripts.resmokelib.core import jasper_process
 from buildscripts.resmokelib.plugin import PluginInterface, Subcommand
 from buildscripts.resmokelib.run import generate_multiversion_exclude_tags
 from buildscripts.resmokelib.run import runtime_recorder
@@ -56,7 +48,6 @@ class TestRunner(Subcommand):  # pylint: disable=too-many-instance-attributes
         self._exec_logger = None
         self._resmoke_logger = None
         self._archive = None
-        self._jasper_server = None
         self._interrupted = False
         self._exit_code = 0
 
@@ -133,8 +124,6 @@ class TestRunner(Subcommand):  # pylint: disable=too-many-instance-attributes
             # self._exit_logging() may never return when the log output is incomplete.
             # Our workaround is to call os._exit().
             self._exit_logging()
-            if config.SPAWN_USING == "jasper":
-                self._exit_jasper()
 
     def list_suites(self):
         """List the suites that are available to execute."""
@@ -236,8 +225,6 @@ class TestRunner(Subcommand):  # pylint: disable=too-many-instance-attributes
         try:
             suites = self._get_suites()
             self._setup_archival()
-            if config.SPAWN_USING == "jasper":
-                self._setup_jasper()
             self._setup_signal_handler(suites)
 
             for suite in suites:
@@ -381,93 +368,11 @@ class TestRunner(Subcommand):  # pylint: disable=too-many-instance-attributes
         if self._archive and not self._interrupted:
             self._archive.exit()
 
-    def _setup_jasper(self):
-        """Start up the jasper process manager."""
-        curator_path = _get_jasper_reqs()
-
-        from jasper import jasper_pb2
-        from jasper import jasper_pb2_grpc
-
-        jasper_process.Process.pb = jasper_pb2
-        jasper_process.Process.rpc = jasper_pb2_grpc
-        logging.jasper_logger.JasperHandler.pb = jasper_pb2
-        logging.jasper_logger.JasperHandler.rpc = jasper_pb2_grpc
-
-        jasper_port = config.BASE_PORT - 1
-        jasper_conn_str = "localhost:%d" % jasper_port
-        jasper_command = [
-            curator_path, "jasper", "service", "run", "rpc", "--port",
-            str(jasper_port)
-        ]
-        if sys.platform == "win32" or sys.platform == "cygwin":
-            # If running on windows, we need to add the `--interactive` flag
-            # for jasper to run.
-            jasper_command.append("--interactive")
-        self._jasper_server = process.Process(self._resmoke_logger, jasper_command)
-        self._jasper_server.start()
-        config.JASPER_CONNECTION_STR = jasper_conn_str
-
-        channel = grpc.insecure_channel(jasper_conn_str)
-        grpc.channel_ready_future(channel).result()
-
-    def _exit_jasper(self):
-        if self._jasper_server:
-            self._jasper_server.stop()
-
     def exit(self, exit_code):
         """Exit with the provided exit code."""
         self._exit_code = exit_code
         self._resmoke_logger.info("Exiting with code: %d", exit_code)
         sys.exit(exit_code)
-
-
-# pylint: disable=too-many-instance-attributes,too-many-statements,too-many-locals
-def _get_jasper_reqs():
-    """Ensure that we have all requirements for running jasper."""
-    root_dir = os.getcwd()
-    proto_file = os.path.join(root_dir, "buildscripts", "resmokelib", "core", "jasper.proto")
-    if not os.path.exists(proto_file):
-        raise RuntimeError("Resmoke must be run from the root of the mongo repo.")
-
-    try:
-        well_known_protos_include = pkg_resources.resource_filename("grpc_tools", "_proto")
-    except ImportError:
-        raise ImportError("You must run: sys.executable + '-m pip install grpcio grpcio-tools "
-                          "googleapis-common-protos' to use --spawnUsing=jasper.")
-
-    # We use the build/ directory as the output directory because the generated files aren't
-    # meant to because tracked by git or linted.
-    proto_out = os.path.join(root_dir, "build", "jasper")
-
-    shutil.rmtree(proto_out, ignore_errors=True)
-    os.makedirs(proto_out)
-
-    # We make 'proto_out' into a Python package so we can add it to 'sys.path' and import the
-    # *pb2*.py modules from it.
-    with open(os.path.join(proto_out, "__init__.py"), "w"):
-        pass
-
-    ret = grpc_tools.protoc.main([
-        grpc_tools.protoc.__file__,
-        "--grpc_python_out",
-        proto_out,
-        "--python_out",
-        proto_out,
-        "--proto_path",
-        os.path.dirname(proto_file),
-        "--proto_path",
-        well_known_protos_include,
-        os.path.basename(proto_file),
-    ])
-
-    if ret != 0:
-        raise RuntimeError("Failed to generated gRPC files from the jasper.proto file")
-
-    sys.path.extend([os.path.dirname(proto_out), proto_out])
-
-    curator_path = curatorbin.get_curator_path()
-
-    return curator_path
 
 
 _TagInfo = collections.namedtuple("_TagInfo", ["tag_name", "evergreen_aware", "suite_options"])
@@ -686,11 +591,6 @@ class RunPlugin(PluginInterface):
 
         parser.add_argument("--genny", dest="genny_executable", metavar="PATH",
                             help="The path to the genny executable for resmoke to use.")
-
-        parser.add_argument(
-            "--spawnUsing", dest="spawn_using", choices=("python", "jasper"),
-            help=("Allows you to spawn resmoke processes using python or Jasper."
-                  "Defaults to python. Options are 'python' or 'jasper'."))
 
         parser.add_argument(
             "--includeWithAnyTags", action="append", dest="include_with_any_tags",
@@ -1082,17 +982,6 @@ class RunPlugin(PluginInterface):
 
         evergreen_options.add_argument("--versionId", dest="version_id", metavar="VERSION_ID",
                                        help="Sets the version ID of the task.")
-
-        cedar_options = parser.add_argument_group(
-            title=_CEDAR_ARGUMENT_TITLE,
-            description=("Options used to propagate Cedar service connection information."))
-
-        cedar_options.add_argument("--cedarURL", dest="cedar_url", metavar="CEDAR_URL",
-                                   help=("The URL of the Cedar service."))
-
-        cedar_options.add_argument("--cedarRPCPort", dest="cedar_rpc_port",
-                                   metavar="CEDAR_RPC_PORT",
-                                   help=("The RPC port of the Cedar service."))
 
         benchmark_options = parser.add_argument_group(
             title=_BENCHMARK_ARGUMENT_TITLE,

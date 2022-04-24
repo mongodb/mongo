@@ -10,7 +10,6 @@ import stat
 
 from buildscripts.resmokelib import config
 from buildscripts.resmokelib import utils
-from buildscripts.resmokelib.core import jasper_process
 from buildscripts.resmokelib.core import process
 from buildscripts.resmokelib.core import network
 from buildscripts.resmokelib.testing.fixtures import standalone, shardedcluster
@@ -19,14 +18,8 @@ from buildscripts.resmokelib.utils.history import make_historic, HistoryDict
 
 
 def make_process(*args, **kwargs):
-    """Choose whether to use python built in process or jasper."""
+    """Set up the environment for subprocesses."""
     process_cls = process.Process
-    if config.SPAWN_USING == "jasper":
-        process_cls = jasper_process.Process
-    else:
-        # remove jasper process specific args
-        kwargs.pop("job_num", None)
-        kwargs.pop("test_id", None)
 
     # Add the current working directory and /data/multiversion to the PATH.
     env_vars = kwargs.get("env_vars", {}).copy()
@@ -55,6 +48,7 @@ def mongod_program(logger, job_num, executable, process_kwargs, mongod_options):
     Return a Process instance that starts mongod arguments constructed from 'mongod_options'.
 
     @param logger - The logger to pass into the process.
+    @param job_num - The Resmoke job number running this process.
     @param executable - The mongod executable to run.
     @param process_kwargs - A dict of key-value pairs to pass to the process.
     @param mongod_options - A HistoryDict describing the various options to pass to the mongod.
@@ -75,7 +69,6 @@ def mongod_program(logger, job_num, executable, process_kwargs, mongod_options):
     _set_keyfile_permissions(mongod_options)
 
     process_kwargs = make_historic(utils.default_if_none(process_kwargs, {}))
-    process_kwargs["job_num"] = job_num
     if config.EXPORT_MONGOD_CONFIG == "regular":
         mongod_options.dump_history(f"{logger.name}_config.yml")
     elif config.EXPORT_MONGOD_CONFIG == "detailed":
@@ -83,8 +76,7 @@ def mongod_program(logger, job_num, executable, process_kwargs, mongod_options):
     return make_process(logger, args, **process_kwargs), mongod_options["port"]
 
 
-def mongos_program(  # pylint: disable=too-many-arguments
-        logger, job_num, test_id=None, executable=None, process_kwargs=None, mongos_options=None):
+def mongos_program(logger, job_num, executable=None, process_kwargs=None, mongos_options=None):  # pylint: disable=too-many-arguments
     """Return a Process instance that starts a mongos with arguments constructed from 'kwargs'."""
     args = [executable]
 
@@ -102,14 +94,12 @@ def mongos_program(  # pylint: disable=too-many-arguments
     _set_keyfile_permissions(mongos_options)
 
     process_kwargs = make_historic(utils.default_if_none(process_kwargs, {}))
-    process_kwargs["job_num"] = job_num
-    process_kwargs["test_id"] = test_id
     return make_process(logger, args, **process_kwargs), mongos_options["port"]
 
 
 def mongo_shell_program(  # pylint: disable=too-many-arguments,too-many-branches,too-many-locals,too-many-statements
-        logger, job_num, test_id=None, executable=None, connection_string=None, filename=None,
-        test_filename=None, process_kwargs=None, **kwargs):
+        logger, executable=None, connection_string=None, filename=None, test_filename=None,
+        process_kwargs=None, **kwargs):
     """Return a Process instance that starts a mongo shell.
 
     The shell is started with the given connection string and arguments constructed from 'kwargs'.
@@ -300,8 +290,6 @@ def mongo_shell_program(  # pylint: disable=too-many-arguments,too-many-branches
     _set_keyfile_permissions(test_data)
 
     process_kwargs = utils.default_if_none(process_kwargs, {})
-    process_kwargs["job_num"] = job_num
-    process_kwargs["test_id"] = test_id
     return make_process(logger, args, **process_kwargs)
 
 
@@ -331,8 +319,7 @@ def _format_shell_vars(sb, paths, value):
         _format_shell_vars(sb, paths + [subkey], value[subkey])
 
 
-def dbtest_program(logger, job_num, test_id=None, executable=None, suites=None, process_kwargs=None,
-                   **kwargs):  # pylint: disable=too-many-arguments
+def dbtest_program(logger, executable=None, suites=None, process_kwargs=None, **kwargs):
     """Return a Process instance that starts a dbtest with arguments constructed from 'kwargs'."""
 
     executable = utils.default_if_none(executable, config.DEFAULT_DBTEST_EXECUTABLE)
@@ -348,19 +335,17 @@ def dbtest_program(logger, job_num, test_id=None, executable=None, suites=None, 
     if config.FLOW_CONTROL is not None:
         kwargs["flowControl"] = (config.FLOW_CONTROL == "on")
 
-    return generic_program(logger, args, job_num, test_id=test_id, process_kwargs=process_kwargs,
-                           **kwargs)
+    return generic_program(logger, args, process_kwargs=process_kwargs, **kwargs)
 
 
-def genny_program(logger, job_num, test_id=None, executable=None, process_kwargs=None, **kwargs):
+def genny_program(logger, executable=None, process_kwargs=None, **kwargs):
     """Return a Process instance that starts a genny executable with arguments constructed from 'kwargs'."""
     executable = utils.default_if_none(executable, config.DEFAULT_GENNY_EXECUTABLE)
     args = [executable]
-    return generic_program(logger, args, job_num, test_id=test_id, process_kwargs=process_kwargs,
-                           **kwargs)
+    return generic_program(logger, args, process_kwargs=process_kwargs, **kwargs)
 
 
-def generic_program(logger, args, job_num, test_id=None, process_kwargs=None, **kwargs):
+def generic_program(logger, args, process_kwargs=None, **kwargs):
     """Return a Process instance that starts an arbitrary executable.
 
     The executable arguments are constructed from 'kwargs'.
@@ -374,8 +359,6 @@ def generic_program(logger, args, job_num, test_id=None, process_kwargs=None, **
     _apply_kwargs(args, kwargs)
 
     process_kwargs = utils.default_if_none(process_kwargs, {})
-    process_kwargs["job_num"] = job_num
-    process_kwargs["test_id"] = test_id
     return make_process(logger, args, **process_kwargs)
 
 

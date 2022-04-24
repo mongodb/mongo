@@ -10,9 +10,6 @@ flask == 1.1.1
 itsdangerous == 2.0.0
 ocspbuilder == 0.10.2
 Werkzeug == 2.0.3
-grpcio == 1.37.0; platform_machine == "x86_64" or platform_machine == "aarch64" or platform_machine == "arm64" or sys_platform == "win32"
-grpcio-tools == 1.37.0; platform_machine == "x86_64" or platform_machine == "aarch64" or platform_machine == "arm64" or sys_platform == "win32"
-googleapis-common-protos == 1.53.0
 blackduck == 1.0.1
 PyGithub == 1.53
 urllib3 >= 1.26.0, <= 1.26.7
