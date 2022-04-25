@@ -178,16 +178,18 @@ namespace {
 class DisabledTestParameter : public ServerParameter {
 public:
     explicit DisabledTestParameter(ServerParameter* sp)
-        : ServerParameter(sp->name(), sp->getServerParameterType()), _sp(sp) {
-        setTestOnly();
-    }
+        : ServerParameter(sp->name(), sp->getServerParameterType()), _sp(sp) {}
 
     void append(OperationContext* opCtx, BSONObjBuilder& b, const std::string& name) final {}
 
+    Status validate(const BSONElement& newValueElement) const final {
+        return {ErrorCodes::BadValue,
+                str::stream() << "Server parameter: '" << name() << "' is currently disabled"};
+    }
+
     Status setFromString(const std::string&) final {
         return {ErrorCodes::BadValue,
-                str::stream() << "setParameter: '" << name()
-                              << "' is only supported with 'enableTestCommands=true'"};
+                str::stream() << "Server parameter: '" << name() << "' is currently disabled"};
     }
 
     Status set(const BSONElement& newValueElement) final {
@@ -196,6 +198,10 @@ public:
 
     Status reset() final {
         return setFromString("");
+    }
+
+    bool isEnabled() const override {
+        return false;
     }
 
 private:

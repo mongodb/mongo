@@ -206,6 +206,10 @@ public:
         _redact = true;
     }
 
+    virtual bool isEnabled() const {
+        return true;
+    }
+
 protected:
     // Helper for translating setParameter values from BSON to string.
     StatusWith<std::string> _coerceToString(const BSONElement&);

@@ -1,23 +1,32 @@
 /**
  * Util functions used by cluster server parameter tests.
  *
- * When adding new cluster server parameters, do the following:
- * 1. Add its name to clusterParameterNames.
- * 2. Add the clusterParameter document that's expected as default to clusterParametersDefault.
+ * When adding new cluster server parameter, do the following:
+ * 1. If it's test-only, add its name to the end of testOnlyClusterParameterNames. Otherwise, add it
+ *    it to the end of nonTestClusterParameterNames.
+ * 2. Add the clusterParameter document that's expected as default to the end of
+ * testOnlyClusterParametersDefault if it's test-only. Otherwise, add it to the end of
+ * nonTestOnlyClusterParametersDefault.
  * 3. Add the clusterParameter document that setClusterParameter is expected to insert after its
- *    first invocation to clusterParametersInsert.
+ *    first invocation to the end of testOnlyClusterParametersInsert if it's test-only. Otherwise,
+ *    add it to the end of nonTestOnlyClusterParametersInsert.
  * 4. Add the clusterParameter document that setClusterParameter is expected to update to after its
- *    second invocation to clusterParametersUpdate.
+ *    second invocation to the end of testOnlyClusterParametersUpdate if it's test-only. Otherwise,
+ *    add it to the end of nonTestOnlyClusterParametersUpdate.
  *
  */
 
-const clusterParameterNames = [
+const testOnlyClusterParameterNames = [
     "testStrClusterParameter",
     "testIntClusterParameter",
     "testBoolClusterParameter",
-    "changeStreamOptions"
 ];
-const clusterParametersDefault = [
+const nonTestClusterParameterNames = [
+    "changeStreamOptions",
+];
+const clusterParameterNames = testOnlyClusterParameterNames.concat(nonTestClusterParameterNames);
+
+const testOnlyClusterParametersDefault = [
     {
         _id: "testStrClusterParameter",
         strData: "off",
@@ -30,15 +39,17 @@ const clusterParametersDefault = [
         _id: "testBoolClusterParameter",
         boolData: false,
     },
-    {
-        _id: "changeStreamOptions",
-        preAndPostImages: {
-            expireAfterSeconds: "off",
-        },
-    }
 ];
+const nonTestClusterParametersDefault = [{
+    _id: "changeStreamOptions",
+    preAndPostImages: {
+        expireAfterSeconds: "off",
+    },
+}];
+const clusterParametersDefault =
+    testOnlyClusterParametersDefault.concat(nonTestClusterParametersDefault);
 
-const clusterParametersInsert = [
+const testOnlyClusterParametersInsert = [
     {
         _id: "testStrClusterParameter",
         strData: "on",
@@ -51,15 +62,17 @@ const clusterParametersInsert = [
         _id: "testBoolClusterParameter",
         boolData: true,
     },
-    {
-        _id: "changeStreamOptions",
-        preAndPostImages: {
-            expireAfterSeconds: 30,
-        },
-    }
 ];
+const nonTestClusterParametersInsert = [{
+    _id: "changeStreamOptions",
+    preAndPostImages: {
+        expireAfterSeconds: 30,
+    },
+}];
+const clusterParametersInsert =
+    testOnlyClusterParametersInsert.concat(nonTestClusterParametersInsert);
 
-const clusterParametersUpdate = [
+const testOnlyClusterParametersUpdate = [
     {
         _id: "testStrClusterParameter",
         strData: "sleep",
@@ -72,13 +85,15 @@ const clusterParametersUpdate = [
         _id: "testBoolClusterParameter",
         boolData: false,
     },
-    {
-        _id: "changeStreamOptions",
-        preAndPostImages: {
-            expireAfterSeconds: "off",
-        },
-    }
 ];
+const nonTestClusterParametersUpdate = [{
+    _id: "changeStreamOptions",
+    preAndPostImages: {
+        expireAfterSeconds: "off",
+    },
+}];
+const clusterParametersUpdate =
+    testOnlyClusterParametersUpdate.concat(nonTestClusterParametersUpdate);
 
 // Set the log level for get/setClusterParameter logging to appear.
 function setupNode(conn) {
@@ -244,12 +259,74 @@ function testValidClusterParameterCommands(conn) {
     }
 }
 
+// Assert that explicitly getting a disabled cluster server parameter fails on a node.
+function testExplicitDisabledGetClusterParameter(conn) {
+    const adminDB = conn.getDB('admin');
+    assert.commandFailedWithCode(
+        adminDB.runCommand({getClusterParameter: "testIntClusterParameter"}), ErrorCodes.BadValue);
+    assert.commandFailedWithCode(
+        adminDB.runCommand(
+            {getClusterParameter: ["changeStreamOptions", "testIntClusterParameter"]}),
+        ErrorCodes.BadValue);
+}
+
+// Tests that disabled cluster server parameters return errors or are filtered out as appropriate
+// by get/setClusterParameter.
+function testDisabledClusterParameters(conn) {
+    if (conn instanceof ReplSetTest) {
+        // Assert that explicitly setting a disabled cluster server parameter fails.
+        const adminDB = conn.getPrimary().getDB('admin');
+        assert.commandFailedWithCode(
+            adminDB.runCommand({setClusterParameter: {testIntClusterParameter: {intData: 5}}}),
+            ErrorCodes.BadValue);
+
+        // Assert that explicitly getting a disabled cluster server parameter fails on the primary.
+        testExplicitDisabledGetClusterParameter(conn.getPrimary());
+
+        // Assert that explicitly getting a disabled cluster server parameter fails on secondaries.
+        conn.getSecondaries().forEach(function(secondary) {
+            testExplicitDisabledGetClusterParameter(secondary);
+        });
+
+        // Assert that getClusterParameter: '*' succeeds but only returns enabled cluster
+        // parameters.
+        runGetClusterParameterReplicaSet(conn, '*', nonTestClusterParametersDefault);
+    } else {
+        // Assert that explicitly setting a disabled cluster server parameter fails.
+        const adminDB = conn.s0.getDB('admin');
+        assert.commandFailedWithCode(
+            adminDB.runCommand({setClusterParameter: {testIntClusterParameter: {intData: 5}}}),
+            ErrorCodes.BadValue);
+
+        // Assert that explicitly getting a disabled cluster server parameter fails on mongos.
+        testExplicitDisabledGetClusterParameter(conn.s0);
+
+        // Assert that explicitly getting a disabled cluster server parameter on each shard replica
+        // set and the config replica set fails.
+        const shards = [conn.rs0, conn.rs1, conn.rs2];
+        const configRS = conn.configRS;
+        shards.forEach(function(shard) {
+            testExplicitDisabledGetClusterParameter(shard.getPrimary());
+            shard.getSecondaries().forEach(function(secondary) {
+                testExplicitDisabledGetClusterParameter(secondary);
+            });
+        });
+
+        testExplicitDisabledGetClusterParameter(configRS.getPrimary());
+        configRS.getSecondaries().forEach(function(secondary) {
+            testExplicitDisabledGetClusterParameter(secondary);
+        });
+
+        // Assert that getClusterParameter: '*' succeeds but only returns enabled cluster
+        // parameters.
+        runGetClusterParameterSharded(conn, '*', nonTestClusterParametersDefault);
+    }
+}
+
 // Tests that invalid uses of getClusterParameter fails on a given node.
 function testInvalidGetClusterParameter(conn) {
     const adminDB = conn.getDB('admin');
     // Assert that specifying a nonexistent parameter returns an error.
-    assert.commandFailed(
-        adminDB.runCommand({setClusterParameter: {nonexistentParam: {intData: 5}}}));
     assert.commandFailedWithCode(adminDB.runCommand({getClusterParameter: "nonexistentParam"}),
                                  ErrorCodes.NoSuchKey);
     assert.commandFailedWithCode(adminDB.runCommand({getClusterParameter: ["nonexistentParam"]}),
@@ -257,9 +334,8 @@ function testInvalidGetClusterParameter(conn) {
     assert.commandFailedWithCode(
         adminDB.runCommand({getClusterParameter: ["testIntClusterParameter", "nonexistentParam"]}),
         ErrorCodes.NoSuchKey);
-
-    // Assert that specifying a known parameter with a scalar value fails.
-    assert.commandFailed(adminDB.runCommand({setClusterParameter: {testIntClusterParameter: 5}}));
+    assert.commandFailedWithCode(adminDB.runCommand({getClusterParameter: []}),
+                                 ErrorCodes.BadValue);
 }
 
 // Tests that invalid uses of set/getClusterParameter fail with the appropriate errors.

@@ -96,17 +96,36 @@ public:
                             Map clusterParameterMap = clusterParameters->getMap();
                             requestedParameterNames.reserve(clusterParameterMap.size());
                             for (const auto& param : clusterParameterMap) {
-                                parameterNameBuilder.append(param.first);
-                                requestedParameterNames.push_back(param.first);
+                                // Skip any disabled test parameters.
+                                if (param.second->isEnabled()) {
+                                    parameterNameBuilder.append(param.first);
+                                    requestedParameterNames.push_back(param.first);
+                                }
                             }
                         } else {
+                            // Return an error if a disabled cluster parameter is explicitly
+                            // requested.
+                            uassert(ErrorCodes::BadValue,
+                                    str::stream() << "Server parameter: '" << strParameterName
+                                                  << "' is currently disabled'",
+                                    clusterParameters->get(strParameterName)->isEnabled());
                             parameterNameBuilder.append(strParameterName);
                             requestedParameterNames.push_back(strParameterName);
                         }
                     },
                     [&](const std::vector<std::string>& listParameterNames) {
+                        uassert(ErrorCodes::BadValue,
+                                "Must supply at least one cluster server parameter name to "
+                                "getClusterParameter",
+                                listParameterNames.size() > 0);
                         requestedParameterNames.reserve(listParameterNames.size());
                         for (const auto& requestedParameterName : listParameterNames) {
+                            // Return an error if a disabled cluster parameter is explicitly
+                            // requested.
+                            uassert(ErrorCodes::BadValue,
+                                    str::stream() << "Server parameter: '" << requestedParameterName
+                                                  << "' is currently disabled'",
+                                    clusterParameters->get(requestedParameterName)->isEnabled());
                             parameterNameBuilder.append(requestedParameterName);
                             requestedParameterNames.push_back(requestedParameterName);
                         }
