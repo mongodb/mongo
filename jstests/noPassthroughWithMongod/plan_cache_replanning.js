@@ -126,8 +126,8 @@ assertPlanHasIxScanStage(entry, "b_1", queryHash);
 
 // Now run a plan that will perform poorly with both indices (it will be required to scan 500
 // documents). This will result in replanning (and the cache entry being deactivated). However, the
-// new plan will have a very high works value, and will not replace the existing cache entry. It
-// will only bump the existing cache entry's works value.
+// new plan will have a very high works value, and will replace the existing cache entry with a new
+// cache entry whose works value got updated to the new higher value.
 for (let i = 0; i < 500; i++) {
     assert.commandWorked(coll.insert({a: 3, b: 3}));
 }
@@ -136,7 +136,7 @@ assert.eq(500, coll.find({a: 3, b: 3}).itcount());
 // The cache entry should have been deactivated.
 entry = getCachedPlanForQuery({a: 3, b: 3});
 assert.eq(entry.isActive, false);
-assertPlanHasIxScanStage(entry, "b_1", queryHash);
+assertPlanHasIxScanStage(entry, "a_1", queryHash);
 
 // The works value should have doubled.
 assert.eq(entry.works, entryWorks * 2);

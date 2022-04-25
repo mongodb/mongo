@@ -235,7 +235,7 @@ using PlanCacheEntry = PlanCacheEntryBase<SolutionCacheData, plan_cache_debug_in
 using CachedSolution = CachedPlanHolder<SolutionCacheData, plan_cache_debug_info::DebugInfo>;
 
 struct BudgetEstimator {
-    size_t operator()(const PlanCacheEntry&) {
+    size_t operator()(const std::shared_ptr<const PlanCacheEntry>&) {
         return 1;
     }
 };
