@@ -1,6 +1,11 @@
 /**
  * Tests that tickets can be resized during runtime. This test exercises both increase and decrease
  * of tickets.
+ *
+ * @tags: [
+ *   requires_replication,  # Tickets can only be resized when using the WiredTiger engine.
+ *   requires_wiredtiger,
+ * ]
  */
 (function() {
 'use strict';
