@@ -99,9 +99,6 @@ private:
  * Implemented as a doubly-linked list with a hash map for quickly locating the kv-store entries.
  * The add(), get(), and remove() operations are all O(1).
  *
- * The keys of generic type K map to values of type V*. The V*
- * pointers are owned by the kv-store.
- *
  * TODO: We could move this into the util/ directory and do any cleanup necessary to make it
  * fully general.
  */
@@ -114,7 +111,7 @@ public:
         clear();
     }
 
-    typedef std::pair<K, V*> KVListEntry;
+    typedef std::pair<K, V> KVListEntry;
 
     typedef std::list<KVListEntry> KVList;
     typedef typename KVList::iterator KVListIt;
@@ -129,50 +126,47 @@ public:
     using value_type = typename KVMap::value_type;
 
     /**
-     * Add an (K, V*) pair to the store, where 'key' can be used to retrieve value 'entry' from the
-     * store. Takes ownership of 'entry'. If 'key' already exists in the kv-store, 'entry' will
-     * simply replace what is already there. If after the add() operation the kv-store exceeds its
-     * budget, then the least recently used entries will be evicted until the size is again
-     * under-budget. Returns the number of evicted entries.
+     * Add an (K, V) pair to the store, where 'key' can be used to retrieve value 'entry' from the
+     * store. If 'key' already exists in the kv-store, 'entry' will simply replace what is already
+     * there. If after the add() operation the kv-store exceeds its budget, then the least recently
+     * used entries will be evicted until the size is again under-budget. Returns the number of
+     * evicted entries.
      */
-    size_t add(const K& key, V* entry) {
-        // If the key already exists, delete it first.
+    size_t add(const K& key, V entry) {
         KVMapConstIt i = _kvMap.find(key);
         if (i != _kvMap.end()) {
             KVListIt found = i->second;
-            _budgetTracker.onRemove(*found->second);
-            delete found->second;
+            _budgetTracker.onRemove(found->second);
             _kvMap.erase(i);
             _kvList.erase(found);
         }
 
-        _kvList.push_front(std::make_pair(key, entry));
+        _budgetTracker.onAdd(entry);
+        _kvList.push_front(std::make_pair(key, std::move(entry)));
         _kvMap[key] = _kvList.begin();
-        _budgetTracker.onAdd(*entry);
 
         return evict();
     }
 
     /**
-     * Retrieve the value associated with 'key' from the kv-store. The kv-store retains ownership of
-     * 'entryOut', so it should not be deleted by the caller. As a side effect, the retrieved entry
-     * is promoted to the most recently used.
+     * Retrieve the iterator to the value associated with 'key' from the kv-store. Note that this
+     * iterator returned is only guaranteed to be valid until the next call to any method in this
+     * class. As a side effect, the retrieved entry is promoted to the most recently used.
      */
-    StatusWith<V*> get(const K& key) const {
+    StatusWith<KVListIt> get(const K& key) const {
         KVMapConstIt i = _kvMap.find(key);
         if (i == _kvMap.end()) {
             return Status(ErrorCodes::NoSuchKey, "no such key in LRU key-value store");
         }
         KVListIt found = i->second;
-        V* foundEntry = found->second;
 
         // Promote the kv-store entry to the front of the list. It is now the most recently used.
+        _kvList.push_front(std::make_pair(key, std::move(found->second)));
         _kvMap.erase(i);
         _kvList.erase(found);
-        _kvList.push_front(std::make_pair(key, foundEntry));
         _kvMap[key] = _kvList.begin();
 
-        return foundEntry;
+        return _kvList.begin();
     }
 
     /**
@@ -185,8 +179,7 @@ public:
             return false;
         }
         KVListIt found = i->second;
-        _budgetTracker.onRemove(*i->second->second);
-        delete found->second;
+        _budgetTracker.onRemove(found->second);
         _kvMap.erase(i);
         _kvList.erase(found);
         return true;
@@ -201,8 +194,7 @@ public:
         size_t removed = 0;
         for (auto it = _kvList.begin(); it != _kvList.end();) {
             if (predicate(it->first, *it->second)) {
-                std::unique_ptr<V> entryToRemove{it->second};
-                _budgetTracker.onRemove(*entryToRemove);
+                _budgetTracker.onRemove(it->second);
                 _kvMap.erase(it->first);
                 it = _kvList.erase(it);
                 ++removed;
@@ -217,10 +209,6 @@ public:
      * Deletes all entries in the kv-store.
      */
     void clear() {
-        for (KVListIt i = _kvList.begin(); i != _kvList.end(); i++) {
-            delete i->second;
-        }
-
         _budgetTracker.onClear();
         _kvList.clear();
         _kvMap.clear();
@@ -269,10 +257,8 @@ private:
         size_t nEvicted = 0;
         while (_budgetTracker.isOverBudget()) {
             invariant(!_kvList.empty());
-            std::unique_ptr<V> evictedEntry{_kvList.back().second};
-            invariant(evictedEntry);
-            _budgetTracker.onRemove(*evictedEntry);
 
+            _budgetTracker.onRemove(_kvList.back().second);
             _kvMap.erase(_kvList.back().first);
             _kvList.pop_back();
 
@@ -284,7 +270,7 @@ private:
 
     LRUBudgetTracker<V, BudgetEstimator> _budgetTracker;
 
-    // (K, V*) pairs are stored in this std::list. They are sorted in order of use, where the front
+    // (K, V) pairs are stored in this std::list. They are sorted in order of use, where the front
     // is the most recently used and the back is the least recently used.
     mutable KVList _kvList;
 

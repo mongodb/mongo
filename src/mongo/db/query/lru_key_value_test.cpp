@@ -45,15 +45,39 @@ namespace {
 // Convenience types and functions.
 //
 
+struct ValueType {
+    bool operator==(const ValueType& other) const {
+        return val == other.val;
+    }
+
+    bool operator!=(const ValueType& other) const {
+        return !(*this == other);
+    }
+
+    friend std::ostream& operator<<(std::ostream& stream, const ValueType& val) {
+        return stream << val.val;
+    }
+
+    int val;
+};
+
 struct TrivialBudgetEstimator {
     static constexpr size_t kSize = 1;
 
-    size_t operator()(int) {
+    size_t operator()(const ValueType&) {
+        return kSize;
+    }
+
+    size_t operator()(const std::shared_ptr<int>&) {
+        return kSize;
+    }
+
+    size_t operator()(const std::unique_ptr<int>&) {
         return kSize;
     }
 };
 
-using TestKeyValue = LRUKeyValue<int, int, TrivialBudgetEstimator>;
+using TestSharedPtrValue = LRUKeyValue<int, std::shared_ptr<int>, TrivialBudgetEstimator>;
 
 struct NonTrivialEntry {
     NonTrivialEntry(size_t key, size_t budgetSize) : key{key}, budgetSize{budgetSize} {}
@@ -63,35 +87,39 @@ struct NonTrivialEntry {
 };
 
 struct NonTrivialBudgetEstimator {
-    size_t operator()(const NonTrivialEntry& value) {
-        return value.budgetSize;
+    size_t operator()(const std::shared_ptr<NonTrivialEntry>& value) {
+        return value->budgetSize;
     }
 };
 
-using NonTrivialTestKeyValue = LRUKeyValue<size_t, NonTrivialEntry, NonTrivialBudgetEstimator>;
+using NonTrivialTestSharedPtrValue =
+    LRUKeyValue<size_t, std::shared_ptr<NonTrivialEntry>, NonTrivialBudgetEstimator>;
 
 template <typename Key, typename Value, typename Estimator>
 void assertInKVStore(LRUKeyValue<Key, Value, Estimator>& cache, Key key, Value value) {
     ASSERT_TRUE(cache.hasKey(key));
     auto s = cache.get(key);
-    ASSERT_OK(s);
-    ASSERT_EQUALS(*s.getValue(), value);
+    ASSERT(s.isOK());
+    auto kvItr = s.getValue();
+
+    ASSERT_EQUALS(*(kvItr->second), *value);
 }
 
 template <typename Key, typename Value, typename Estimator>
 void assertNotInKVStore(LRUKeyValue<Key, Value, Estimator>& cache, Key key) {
     ASSERT_FALSE(cache.hasKey(key));
     auto s = cache.get(key);
-    ASSERT_NOT_OK(s);
+    ASSERT(!s.isOK());
 }
 
 /**
  * Test that we can add an entry and get it back out.
  */
 TEST(LRUKeyValueTest, BasicAddGet) {
-    TestKeyValue cache{100};
-    cache.add(1, new int(2));
-    assertInKVStore(cache, 1, 2);
+    TestSharedPtrValue cache{100};
+    auto val = std::make_shared<int>(2);
+    cache.add(1, val);
+    assertInKVStore(cache, 1, val);
 }
 
 /**
@@ -99,8 +127,8 @@ TEST(LRUKeyValueTest, BasicAddGet) {
  * that at the very least we don't blow up.
  */
 TEST(LRUKeyValueTest, SizeZeroCache) {
-    TestKeyValue cache{0};
-    cache.add(1, new int(2));
+    TestSharedPtrValue cache{0};
+    cache.add(1, std::make_shared<int>(2));
     assertNotInKVStore(cache, 1);
 }
 
@@ -108,14 +136,16 @@ TEST(LRUKeyValueTest, SizeZeroCache) {
  * Make sure eviction and promotion work properly with a kv-store of size 1.
  */
 TEST(LRUKeyValueTest, SizeOneCache) {
-    TestKeyValue cache{1};
-    cache.add(0, new int(0));
-    assertInKVStore(cache, 0, 0);
+    TestSharedPtrValue cache{1};
+    auto val = std::make_shared<int>(0);
+    cache.add(0, val);
+    assertInKVStore(cache, 0, val);
 
+    val = std::make_shared<int>(1);
     // Second entry should immediately evict the first.
-    cache.add(1, new int(1));
+    cache.add(1, val);
     assertNotInKVStore(cache, 0);
-    assertInKVStore(cache, 1, 1);
+    assertInKVStore(cache, 1, val);
 }
 
 /**
@@ -125,12 +155,12 @@ TEST(LRUKeyValueTest, SizeOneCache) {
  */
 TEST(LRUKeyValueTest, EvictionTest) {
     int maxSize = 10;
-    TestKeyValue cache{static_cast<size_t>(maxSize)};
+    TestSharedPtrValue cache{static_cast<size_t>(maxSize)};
     for (int i = 0; i < maxSize; ++i) {
-        auto nEvicted = cache.add(i, new int(i));
+        auto nEvicted = cache.add(i, std::make_shared<int>(i));
         ASSERT_EQ(0, nEvicted);
     }
-    ASSERT_EQUALS(cache.size(), (size_t)maxSize);
+    ASSERT_EQUALS(cache.size(), static_cast<size_t>(maxSize));
 
     // Call get() on all but one key.
     int evictKey = 5;
@@ -138,12 +168,12 @@ TEST(LRUKeyValueTest, EvictionTest) {
         if (i == evictKey) {
             continue;
         }
-        assertInKVStore(cache, i, i);
+        assertInKVStore(cache, i, std::make_shared<int>(i));
     }
 
     // Adding another entry causes an eviction.
-    auto nEvicted = cache.add(maxSize + 1, new int(maxSize + 1));
-    ASSERT_EQUALS(cache.size(), (size_t)maxSize);
+    auto nEvicted = cache.add(maxSize + 1, std::make_shared<int>(maxSize + 1));
+    ASSERT_EQUALS(cache.size(), static_cast<size_t>(maxSize));
     ASSERT_EQ(1ul, nEvicted);
 
     // Check that the least recently accessed has been evicted.
@@ -151,7 +181,7 @@ TEST(LRUKeyValueTest, EvictionTest) {
         if (i == evictKey) {
             assertNotInKVStore(cache, evictKey);
         } else {
-            assertInKVStore(cache, i, i);
+            assertInKVStore(cache, i, std::make_shared<int>(i));
         }
     }
 }
@@ -161,11 +191,11 @@ TEST(LRUKeyValueTest, EvictionTest) {
  */
 TEST(LRUKeyValueTest, EvictionTestWithNonTrivialEstimator) {
     constexpr size_t maxSize = 55;
-    NonTrivialTestKeyValue cache{maxSize};
+    NonTrivialTestSharedPtrValue cache{maxSize};
     size_t item = 0;
     // Adding entries {0, 1}, {1, 2} ... {9, 10} to the LRU store.
     for (; cache.size() + (item + 1) <= maxSize; ++item) {
-        auto nEvicted = cache.add(item, new NonTrivialEntry{item, item + 1});
+        auto nEvicted = cache.add(item, std::make_shared<NonTrivialEntry>(item, item + 1));
         ASSERT_EQ(0, nEvicted);
     }
     ASSERT_EQ(10u, item);
@@ -182,24 +212,25 @@ TEST(LRUKeyValueTest, EvictionTestWithNonTrivialEstimator) {
 
     currentSize += newItemSize - sizeOfExpectedToBeEvictedItems;
 
-    auto nEvicted = cache.add(newItemKey, new NonTrivialEntry{newItemKey, newItemSize});
+    auto nEvicted =
+        cache.add(newItemKey, std::make_shared<NonTrivialEntry>(newItemKey, newItemSize));
 
     ASSERT_EQ(expectedToBeEvicted, nEvicted);
     ASSERT_EQ(currentSize, cache.size());
 }
 
-TEST(LRUKeyValueTest, AddAnEntryWithBiggetThanBudgetSize) {
+TEST(LRUKeyValueTest, AddAnEntryWithBiggerThanBudgetSize) {
     constexpr size_t maxSize = 55;
-    NonTrivialTestKeyValue cache{maxSize};
+    NonTrivialTestSharedPtrValue cache{maxSize};
     size_t item = 0;
     for (; cache.size() + (item + 1) <= maxSize; ++item) {
-        auto nEvicted = cache.add(item, new NonTrivialEntry{item, item + 1});
+        auto nEvicted = cache.add(item, std::make_shared<NonTrivialEntry>(item, item + 1));
         ASSERT_EQ(0, nEvicted);
     }
     ASSERT_EQ(10u, item);
     ASSERT_EQ(maxSize, cache.size());
 
-    auto nEvicted = cache.add(17, new NonTrivialEntry(15, 57));
+    auto nEvicted = cache.add(17, std::make_shared<NonTrivialEntry>(15, 57));
     ASSERT_EQ(item + 1, nEvicted);  // all entries including the one just added must be evicted
     ASSERT_EQ(0ul, cache.size());   // the LRU store must be empty now
 }
@@ -212,28 +243,28 @@ TEST(LRUKeyValueTest, AddAnEntryWithBiggetThanBudgetSize) {
  */
 TEST(LRUKeyValueTest, PromotionTest) {
     int maxSize = 10;
-    TestKeyValue cache{static_cast<size_t>(maxSize)};
+    TestSharedPtrValue cache{static_cast<size_t>(maxSize)};
     for (int i = 0; i < maxSize; ++i) {
-        auto nEvicted = cache.add(i, new int(i));
+        auto nEvicted = cache.add(i, std::make_shared<int>(i));
         ASSERT_EQ(0, nEvicted);
     }
-    ASSERT_EQUALS(cache.size(), (size_t)maxSize);
+    ASSERT_EQUALS(cache.size(), static_cast<size_t>(maxSize));
 
     // Call get() on a particular key.
     int promoteKey = 5;
-    assertInKVStore(cache, promoteKey, promoteKey);
+    assertInKVStore(cache, promoteKey, std::make_shared<int>(promoteKey));
 
     // Evict all but one of the original entries.
     for (int i = maxSize; i < (maxSize + maxSize - 1); ++i) {
-        auto nEvicted = cache.add(i, new int(i));
+        auto nEvicted = cache.add(i, std::make_shared<int>(i));
         ASSERT_GT(nEvicted, 0);
     }
-    ASSERT_EQUALS(cache.size(), (size_t)maxSize);
+    ASSERT_EQUALS(cache.size(), static_cast<size_t>(maxSize));
 
     // Check that the promoteKey has not been evicted.
     for (int i = 0; i < maxSize; ++i) {
         if (i == promoteKey) {
-            assertInKVStore(cache, promoteKey, promoteKey);
+            assertInKVStore(cache, promoteKey, std::make_shared<int>(promoteKey));
         } else {
             assertNotInKVStore(cache, i);
         }
@@ -245,23 +276,25 @@ TEST(LRUKeyValueTest, PromotionTest) {
  * in the kv-store deletes the existing entry.
  */
 TEST(LRUKeyValueTest, ReplaceKeyTest) {
-    TestKeyValue cache{10};
-    cache.add(4, new int(4));
-    assertInKVStore(cache, 4, 4);
-    cache.add(4, new int(5));
-    assertInKVStore(cache, 4, 5);
+    TestSharedPtrValue cache{10};
+    auto val = std::make_shared<int>(4);
+    cache.add(4, val);
+    assertInKVStore(cache, 4, val);
+
+    auto newVal = std::make_shared<int>(5);
+    cache.add(4, newVal);
+    assertInKVStore(cache, 4, newVal);
 }
 
 /**
  * Test iteration over the kv-store.
  */
 TEST(LRUKeyValueTest, IterationTest) {
-    TestKeyValue cache{2};
-    cache.add(1, new int(1));
-    cache.add(2, new int(2));
+    TestSharedPtrValue cache{2};
+    cache.add(1, std::make_shared<int>(1));
+    cache.add(2, std::make_shared<int>(2));
 
-    typedef std::list<std::pair<int, int*>>::const_iterator CacheIterator;
-    CacheIterator i = cache.begin();
+    auto i = cache.begin();
     ASSERT_EQUALS(i->first, 2);
     ASSERT_EQUALS(*i->second, 2);
     ++i;
@@ -272,9 +305,9 @@ TEST(LRUKeyValueTest, IterationTest) {
 }
 
 TEST(LRUKeyValueTest, RemoveIfTest) {
-    TestKeyValue cache{10};
+    TestSharedPtrValue cache{10};
     for (int i = 0; i < 10; ++i) {
-        cache.add(i, new int(i));
+        cache.add(i, std::make_shared<int>(i));
     }
 
     size_t sizeBefore = cache.size();
@@ -289,7 +322,7 @@ TEST(LRUKeyValueTest, RemoveIfTest) {
             assertNotInKVStore(cache, i);
             continue;
         }
-        assertInKVStore(cache, i, i);
+        assertInKVStore(cache, i, std::make_shared<int>(i));
     }
 
     // Assert that all even keys are not in store.
@@ -300,6 +333,57 @@ TEST(LRUKeyValueTest, RemoveIfTest) {
     size_t sizeAfter = cache.size();
 
     ASSERT_EQ(sizeAfter + nRemoved * TrivialBudgetEstimator::kSize, sizeBefore);
+}
+
+using TestUniquePtrValue = LRUKeyValue<int, std::unique_ptr<int>, TrivialBudgetEstimator>;
+
+TEST(LRUKeyValueTest, UniquePtrKeyValue) {
+    TestUniquePtrValue cache{100};
+    cache.add(1, std::make_unique<int>(2));
+    assertInKVStore(cache, 1, std::make_unique<int>(2));
+    assertNotInKVStore(cache, 3);
+
+    cache.add(1, std::make_unique<int>(3));
+    assertInKVStore(cache, 1, std::make_unique<int>(3));
+
+    // Test eviction.
+    TestUniquePtrValue cacheForEviction{2};
+    cacheForEviction.add(1, std::make_unique<int>(1));
+    cacheForEviction.add(2, std::make_unique<int>(2));
+    cacheForEviction.add(3, std::make_unique<int>(3));
+
+    ASSERT_EQUALS(cacheForEviction.size(), static_cast<size_t>(2));
+    assertNotInKVStore(cacheForEviction, 1);  // The entry with key '1' has been Evicted.
+}
+
+using TestScalarValue = LRUKeyValue<int, ValueType, TrivialBudgetEstimator>;
+
+void assertValueInKVStore(TestScalarValue& cache, int key, ValueType value) {
+    ASSERT_TRUE(cache.hasKey(key));
+    auto s = cache.get(key);
+    ASSERT(s.isOK());
+    auto kvItr = s.getValue();
+
+    ASSERT_EQUALS(kvItr->second, value);
+}
+
+TEST(LRUKeyValueTest, ScalarKeyValue) {
+    TestScalarValue cache{100};
+    cache.add(1, ValueType{2});
+    assertValueInKVStore(cache, 1, ValueType{2});
+    assertNotInKVStore(cache, 3);
+
+    cache.add(1, ValueType{3});
+    assertValueInKVStore(cache, 1, ValueType{3});
+
+    // Test eviction.
+    TestScalarValue cacheForEviction{2};
+    cacheForEviction.add(1, ValueType{1});
+    cacheForEviction.add(2, ValueType{2});
+    cacheForEviction.add(3, ValueType{3});
+
+    ASSERT_EQUALS(cacheForEviction.size(), static_cast<size_t>(2));
+    assertNotInKVStore(cacheForEviction, 1);  // The entry with key '1' has been Evicted.
 }
 
 }  // namespace

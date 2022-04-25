@@ -177,8 +177,8 @@ struct CachedSbePlan {
 using PlanCacheEntry = PlanCacheEntryBase<CachedSbePlan, plan_cache_debug_info::DebugInfoSBE>;
 
 struct BudgetEstimator {
-    size_t operator()(const PlanCacheEntry& entry) {
-        return entry.estimatedEntrySizeBytes;
+    size_t operator()(const std::shared_ptr<const PlanCacheEntry>& entry) {
+        return entry->estimatedEntrySizeBytes;
     }
 };
 
