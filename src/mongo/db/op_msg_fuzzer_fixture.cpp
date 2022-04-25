@@ -97,7 +97,7 @@ OpMsgFuzzerFixture::OpMsgFuzzerFixture(bool skipGlobalInitializers)
     auto opCtx = _serviceContext->makeOperationContext(clientGuard.get());
 
     storageGlobalParams.dbpath = _dir.path();
-    storageGlobalParams.engine = "ephemeralForTest";
+    storageGlobalParams.engine = "wiredTiger";
     storageGlobalParams.engineSetByUser = true;
     storageGlobalParams.repair = false;
     serverGlobalParams.enableMajorityReadConcern = false;
