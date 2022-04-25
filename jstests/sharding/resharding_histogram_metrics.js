@@ -2,7 +2,6 @@
  * Test to verify that latency metrics are collected in both currentOp and cumulativeOp during
  * resharding.
  * @tags: [
- *  requires_fcv_53,
  *  uses_atclustertime,
  * ]
  */
@@ -66,6 +65,14 @@ function getReshardingMetricsReport(mongo, role) {
     }
 }
 
+function readHistogramTotal(histogram) {
+    let total = histogram["totalCount"];
+    if (total === undefined) {
+        total = histogram["ops"];
+    }
+    return total;
+}
+
 const mongos = testColl.getMongo();
 const topology = DiscoverTopology.findConnectedNodes(mongos);
 const recipientShardNames = reshardingTest.recipientShardNames;
@@ -123,12 +130,12 @@ reshardingTest.withReshardingInBackground(
                 // We expect 1 batch insert per document on each shard, plus 1 empty batch
                 // to discover no documents are left.
                 const expectedBatchInserts = reshardingMetrics[kDocumentsCopied] + 1;
-                const receivedBatchInserts = collClonerFillBatchForInsertHist["totalCount"];
+                const receivedBatchInserts = readHistogramTotal(collClonerFillBatchForInsertHist);
                 assert(expectedBatchInserts == receivedBatchInserts,
                        `expected ${expectedBatchInserts} batch inserts,
                        received ${receivedBatchInserts}`);
 
-                firstReshardBatchApplies += oplogApplierApplyBatchHist["totalCount"];
+                firstReshardBatchApplies += readHistogramTotal(oplogApplierApplyBatchHist);
             });
 
             assert(firstReshardBatchApplies > 0,
@@ -175,8 +182,8 @@ recipientShardNames.forEach(function(shardName) {
     const collClonerFillBatchForInsertHist =
         reshardingMetrics[kCollClonerFillBatchForInsertLatencyMillis];
 
-    cumulativeBatchApplies += oplogApplierApplyBatchHist["totalCount"];
-    cumulativeBatchInserts += collClonerFillBatchForInsertHist["totalCount"];
+    cumulativeBatchApplies += readHistogramTotal(oplogApplierApplyBatchHist);
+    cumulativeBatchInserts += readHistogramTotal(collClonerFillBatchForInsertHist);
     totalDocumentsCopied += reshardingMetrics[kDocumentsCopied];
 });
 
