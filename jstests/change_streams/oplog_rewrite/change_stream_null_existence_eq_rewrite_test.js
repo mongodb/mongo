@@ -12,14 +12,18 @@
 "use strict";
 
 load("jstests/libs/change_stream_rewrite_util.js");  // For rewrite helpers.
+load('jstests/libs/change_stream_util.js');          // For isChangeStreamsVisibilityEnabled.
 
 const dbName = "change_stream_rewrite_null_existence_test";
 const collName = "coll1";
 
+const testDB = db.getSiblingDB(dbName);
+if (!isChangeStreamsVisibilityEnabled(testDB)) {
+    return;
+}
+
 // Establish a resume token at a point before anything actually happens in the test.
 const startPoint = db.getMongo().watch().getResumeToken();
-
-const testDB = db.getSiblingDB(dbName);
 const numDocs = 8;
 
 // Generate a write workload for the change stream to consume.
@@ -83,7 +87,8 @@ function traverseEvent(event, outputMap, prefixPath = "") {
 }
 
 // Obtain a list of all events that occurred during the write workload.
-const allEvents = getAllChangeStreamEvents(testDB, [], {fullDocument: "updateLookup"}, startPoint);
+const allEvents = getAllChangeStreamEvents(
+    testDB, [], {fullDocument: "updateLookup", showExpandedEvents: true}, startPoint);
 
 jsTestLog(`All events: ${tojson(allEvents)}`);
 
@@ -160,7 +165,7 @@ function generateExprFilters(fieldPath) {
 const failedTestCases = [];
 
 // Confirm that the output of an optimized change stream matches an unoptimized stream.
-for (let csConfig of [{fullDocument: "updateLookup"}]) {
+for (let csConfig of [{fullDocument: "updateLookup", showExpandedEvents: true}]) {
     for (let fieldToTest in fieldsToBeTested) {
         const predicatesToTest =
             generateMatchFilters(fieldToTest).concat(generateExprFilters(fieldToTest));
