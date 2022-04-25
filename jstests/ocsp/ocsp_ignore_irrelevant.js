@@ -1,5 +1,5 @@
 // Check that OCSP ignores statuses of irrelevant certificates in the response
-// @tags: [requires_http_client]
+// @tags: [requires_http_client, requires_ocsp_stapling]
 
 load("jstests/ocsp/lib/mock_ocsp.js");
 
