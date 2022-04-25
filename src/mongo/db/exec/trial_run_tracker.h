@@ -82,6 +82,12 @@ public:
         return _done;
     }
 
+    template <TrialRunMetric metric>
+    size_t getMetric() const {
+        static_assert(metric >= 0 && metric < sizeof(_metrics) / sizeof(size_t));
+        return _metrics[metric];
+    }
+
 private:
     const size_t _maxMetrics[TrialRunMetric::kLastElem];
     size_t _metrics[TrialRunMetric::kLastElem]{0};

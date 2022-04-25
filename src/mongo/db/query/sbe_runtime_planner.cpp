@@ -35,9 +35,68 @@
 #include "mongo/db/exec/trial_period_utils.h"
 #include "mongo/db/exec/trial_run_tracker.h"
 #include "mongo/db/query/plan_executor_sbe.h"
+#include "mongo/util/histogram.h"
 
 namespace mongo::sbe {
 namespace {
+
+Counter64 sbeMicrosTotal;
+Counter64 sbeNumReadsTotal;
+Counter64 sbeCount;
+
+Histogram<uint64_t> sbeMicrosHistogram{{0,
+                                        1024,
+                                        4096,
+                                        16384,
+                                        65536,
+                                        262144,
+                                        1048576,
+                                        4194304,
+                                        16777216,
+                                        67108864,
+                                        268435456,
+                                        1073741824}};
+Histogram<uint64_t> sbeNumReadsHistogram{{0, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768}};
+Histogram<uint64_t> sbeNumPlansHistogram{{0, 2, 4, 8, 16, 32}};
+
+/**
+ * Aggregation of the total number of microseconds spent (in SBE multiplanner).
+ */
+ServerStatusMetricField<Counter64> sbeMicrosTotalDisplay("query.multiPlanner.sbeMicros",
+                                                         &sbeMicrosTotal);
+
+/**
+ * Aggregation of the total number of reads done (in SBE multiplanner).
+ */
+ServerStatusMetricField<Counter64> sbeNumReadsTotalDisplay("query.multiPlanner.sbeNumReads",
+                                                           &sbeNumReadsTotal);
+
+/**
+ * Aggregation of the total number of invocations (of the SBE multiplanner).
+ */
+ServerStatusMetricField<Counter64> sbeCountDisplay("query.multiPlanner.sbeCount", &sbeCount);
+
+/**
+ * An element in this histogram is the number of microseconds spent in an invocation (of the SBE
+ * multiplanner).
+ */
+ServerStatusMetricField<Histogram<uint64_t>> sbeMicrosHistogramDisplay(
+    "query.multiPlanner.histograms.sbeMicros", sbeMicrosHistogram);
+
+/**
+ * An element in this histogram is the number of reads performance during an invocation (of the SBE
+ * multiplanner).
+ */
+ServerStatusMetricField<Histogram<uint64_t>> sbeNumReadsHistogramDisplay(
+    "query.multiPlanner.histograms.sbeNumReads", sbeNumReadsHistogram);
+
+/**
+ * An element in this histogram is the number of plans in the candidate set of an invocation (of the
+ * SBE multiplanner).
+ */
+ServerStatusMetricField<Histogram<uint64_t>> sbeNumPlansHistogramDisplay(
+    "query.multiPlanner.histograms.sbeNumPlans", sbeNumPlansHistogram);
+
 /**
  * Fetches a next document form the given plan stage tree and returns 'true' if the plan stage
  * returns EOF, or throws 'TrialRunTracker::EarlyExitException' exception. Otherwise, the
@@ -133,6 +192,11 @@ std::vector<plan_ranker::CandidatePlan> BaseRuntimePlanner::collectExecutionStat
 
     const auto maxNumResults{trial_period::getTrialPeriodNumToReturn(_cq)};
 
+    auto tickSource = _opCtx->getServiceContext()->getTickSource();
+    auto startTicks = tickSource->getTicks();
+    sbeNumPlansHistogram.increment(solutions.size());
+    sbeCount.increment();
+
     for (size_t ix = 0; ix < roots.size(); ++ix) {
         auto&& [root, data] = roots[ix];
 
@@ -182,6 +246,19 @@ std::vector<plan_ranker::CandidatePlan> BaseRuntimePlanner::collectExecutionStat
         }
         done = done || (numCandidatesFailedOrExitedEarly == candidates.size());
     }
+
+    uint64_t totalNumReads = 0;
+    for (auto&& tracker : trialRunTrackers) {
+        totalNumReads += tracker.second->getMetric<TrialRunTracker::kNumReads>();
+    }
+
+    sbeNumReadsHistogram.increment(totalNumReads);
+    sbeNumReadsTotal.increment(totalNumReads);
+
+    auto durationMicros = durationCount<Microseconds>(
+        tickSource->ticksTo<Microseconds>(tickSource->getTicks() - startTicks));
+    sbeMicrosHistogram.increment(durationMicros);
+    sbeMicrosTotal.increment(durationMicros);
 
     return candidates;
 }
