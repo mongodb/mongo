@@ -36,7 +36,7 @@ var {withTxnAndAutoRetry, isKilledSessionCode} = (function() {
         // Don't retry the entire transaction on commit errors that aren't labeled as transient
         // transaction errors because it's unknown if the commit succeeded. commitTransaction is
         // individually retryable and should be retried at a lower level (e.g.
-        // network_error_and_txn_override.js or commitTransactionWithKilledSessionRetries()), so any
+        // network_error_and_txn_override.js or commitTransactionWithRetries()), so any
         // error that reached here must not be transient.
         if (hasCommitTxnError) {
             print("-=-=-=- Cannot retry entire transaction on commit transaction error without" +
@@ -59,8 +59,9 @@ var {withTxnAndAutoRetry, isKilledSessionCode} = (function() {
     }
 
     // Commits the transaction active on the given session, retrying on killed session errors if
-    // configured to do so. Throws if the commit fails and cannot be retried.
-    function commitTransactionWithKilledSessionRetries(session, retryOnKilledSession) {
+    // configured to do so. Also retries commitTransaction on FailedToSatisfyReadPreference error.
+    // Throws if the commit fails and cannot be retried.
+    function commitTransactionWithRetries(session, retryOnKilledSession) {
         while (true) {
             const commitRes = session.commitTransaction_forTesting();
 
@@ -72,6 +73,14 @@ var {withTxnAndAutoRetry, isKilledSessionCode} = (function() {
             const wcFailedWithInterruption = KilledSessionUtil.hasKilledSessionWCError(commitRes);
             if (retryOnKilledSession && (failedWithInterruption || wcFailedWithInterruption)) {
                 print("-=-=-=- Retrying commit after killed session code, sessionId: " +
+                      tojsononeline(session.getSessionId()) +
+                      ", txnNumber: " + tojsononeline(session.getTxnNumber_forTesting()) +
+                      ", res: " + tojsononeline(commitRes));
+                continue;
+            }
+
+            if (commitRes.code === ErrorCodes.FailedToSatisfyReadPreference) {
+                print("-=-=-=- Retrying commit due to FailedToSatisfyReadPreference, sessionId: " +
                       tojsononeline(session.getSessionId()) +
                       ", txnNumber: " + tojsononeline(session.getTxnNumber_forTesting()) +
                       ", res: " + tojsononeline(commitRes));
@@ -141,7 +150,7 @@ var {withTxnAndAutoRetry, isKilledSessionCode} = (function() {
                         const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
                         PrepareHelpers.commitTransaction(session, prepareTimestamp);
                     } else {
-                        commitTransactionWithKilledSessionRetries(session, retryOnKilledSession);
+                        commitTransactionWithRetries(session, retryOnKilledSession);
                     }
                 } catch (e) {
                     hasCommitTxnError = true;
@@ -163,15 +172,6 @@ var {withTxnAndAutoRetry, isKilledSessionCode} = (function() {
 
                 if (shouldRetryEntireTxnOnError(e, hasCommitTxnError, retryOnKilledSession)) {
                     print("Retrying transaction due to transient error: " + tojson(e));
-                    hasTransientError = true;
-                    continue;
-                }
-
-                // FailedToSatisfyReadPreference errors are not retryable.
-                // However, they should be because if there is no primary, there should be one soon.
-                // TODO SERVER-60706: Make FailedToSatisfyReadPreference a transient error
-                if (e.code == ErrorCodes.FailedToSatisfyReadPreference) {
-                    print("Retrying transaction due to a FailedToSatisfyReadPreference error.");
                     hasTransientError = true;
                     continue;
                 }
