@@ -300,8 +300,4 @@ std::unique_ptr<PlanStageStats> IndexScan::getStats() {
     return ret;
 }
 
-const SpecificStats* IndexScan::getSpecificStats() const {
-    return &_specificStats;
-}
-
 }  // namespace mongo
