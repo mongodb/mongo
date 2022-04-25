@@ -192,7 +192,6 @@ Status RSLocalClient::runAggregation(
         }
 
         try {
-            // TODO SERVER-58938 pass DBClientCursor::_postBatchResumeToken to callback
             if (!callback(batchDocs, boost::none)) {
                 break;
             }
