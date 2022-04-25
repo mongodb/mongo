@@ -85,10 +85,13 @@ public:
 
             // For each parameter, generate a BSON representation of it and retrieve its name.
             auto makeBSON = [&](ServerParameter* requestedParameter) {
-                BSONObjBuilder bob;
-                requestedParameter->append(opCtx, bob, requestedParameter->name());
-                parameterValues.push_back(bob.obj());
-                parameterNames.push_back(requestedParameter->name());
+                // Skip any disabled cluster parameters.
+                if (requestedParameter->isEnabled()) {
+                    BSONObjBuilder bob;
+                    requestedParameter->append(opCtx, bob, requestedParameter->name());
+                    parameterValues.push_back(bob.obj());
+                    parameterNames.push_back(requestedParameter->name());
+                }
             };
 
             stdx::visit(
@@ -103,16 +106,29 @@ public:
                                 makeBSON(param.second);
                             }
                         } else {
-                            // Any other string must correspond to a single parameter name.
+                            // Any other string must correspond to a single parameter name. Return
+                            // an error if a disabled cluster parameter is explicitly requested.
                             ServerParameter* sp = clusterParameters->get(strParameterName);
+                            uassert(ErrorCodes::BadValue,
+                                    str::stream() << "Server parameter: '" << strParameterName
+                                                  << "' is currently disabled",
+                                    sp->isEnabled());
                             makeBSON(sp);
                         }
                     },
                     [&](const std::vector<std::string>& listParameterNames) {
+                        uassert(ErrorCodes::BadValue,
+                                "Must supply at least one cluster server parameter name to "
+                                "getClusterParameter",
+                                listParameterNames.size() > 0);
                         parameterValues.reserve(listParameterNames.size());
                         parameterNames.reserve(listParameterNames.size());
                         for (const auto& requestedParameterName : listParameterNames) {
                             ServerParameter* sp = clusterParameters->get(requestedParameterName);
+                            uassert(ErrorCodes::BadValue,
+                                    str::stream() << "Server parameter: '" << requestedParameterName
+                                                  << "' is currently disabled'",
+                                    sp->isEnabled());
                             makeBSON(sp);
                         }
                     }},

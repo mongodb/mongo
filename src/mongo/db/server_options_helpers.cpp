@@ -152,6 +152,7 @@ Status validateBaseOptions(const moe::Environment& params) {
         } else {
             // Deregister test-only parameters.
             ServerParameterSet::getNodeParameterSet()->disableTestParameters();
+            ServerParameterSet::getClusterParameterSet()->disableTestParameters();
         }
 
         // Must come after registerAllFailPointsAsServerParameters() above.
@@ -164,7 +165,7 @@ Status validateBaseOptions(const moe::Environment& params) {
                         str::stream() << "Unknown --setParameter '" << setParam.first << "'"};
             }
 
-            if (!enableTestCommandsValue && param->isTestOnly()) {
+            if (!param->isEnabled()) {
                 return {ErrorCodes::BadValue,
                         str::stream() << "--setParameter '" << setParam.first
                                       << "' only available when used with 'enableTestCommands'"};
