@@ -42,7 +42,7 @@
 #include "mongo/db/s/migration_session_id.h"
 #include "mongo/db/s/session_catalog_migration_source.h"
 #include "mongo/platform/mutex.h"
-#include "mongo/s/request_types/move_chunk_request.h"
+#include "mongo/s/request_types/move_range_request_gen.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/net/hostandport.h"
@@ -88,7 +88,8 @@ class MigrationChunkClonerSourceLegacy final : public MigrationChunkClonerSource
     MigrationChunkClonerSourceLegacy& operator=(const MigrationChunkClonerSourceLegacy&) = delete;
 
 public:
-    MigrationChunkClonerSourceLegacy(MoveChunkRequest request,
+    MigrationChunkClonerSourceLegacy(const ShardsvrMoveRange& request,
+                                     const WriteConcernOptions& writeConcern,
                                      const BSONObj& shardKeyPattern,
                                      ConnectionString donorConnStr,
                                      HostAndPort recipientHost);
@@ -205,6 +206,20 @@ public:
      */
     std::shared_ptr<Notification<bool>> getNotificationForNextSessionMigrationBatch();
 
+    const NamespaceString& nss() {
+        return _args.getCommandParameter();
+    }
+
+    const BSONObj& getMin() {
+        invariant(_args.getMin());
+        return *_args.getMin();
+    }
+
+    const BSONObj& getMax() {
+        invariant(_args.getMax());
+        return *_args.getMax();
+    }
+
 private:
     friend class LogOpForShardingHandler;
     friend class LogTransactionOperationsForShardingHandler;
@@ -307,8 +322,11 @@ private:
      */
     Status _checkRecipientCloningStatus(OperationContext* opCtx, Milliseconds maxTimeToWait);
 
-    // The original move chunk request
-    const MoveChunkRequest _args;
+    // The original move range request
+    const ShardsvrMoveRange _args;
+
+    // The write concern associated with the move range
+    const WriteConcernOptions _writeConcern;
 
     // The shard key associated with the namespace
     const ShardKeyPattern _shardKeyPattern;

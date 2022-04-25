@@ -178,7 +178,7 @@ public:
         const bool waitForDelete =
             cmdObj["_waitForDelete"].trueValue() || cmdObj["waitForDelete"].trueValue();
 
-        MoveRangeRequest moveRangeReq;
+        MoveRangeRequestBase moveRangeReq;
         moveRangeReq.setToShard(to->getId());
         moveRangeReq.setMin(chunk->getMin());
         moveRangeReq.setMax(chunk->getMax());
@@ -188,7 +188,7 @@ public:
 
         ConfigsvrMoveRange configsvrRequest(nss);
         configsvrRequest.setDbName(NamespaceString::kAdminDb);
-        configsvrRequest.setMoveRangeRequest(moveRangeReq);
+        configsvrRequest.setMoveRangeRequestBase(moveRangeReq);
         if (secondaryThrottle.getSecondaryThrottle() == MigrationSecondaryThrottleOptions::kOn) {
             configsvrRequest.setSecondaryThrottle(secondaryThrottle);
         }

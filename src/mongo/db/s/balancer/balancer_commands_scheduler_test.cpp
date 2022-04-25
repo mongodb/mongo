@@ -178,10 +178,11 @@ TEST_F(BalancerCommandsSchedulerTest, SuccessfulMoveRangeCommand) {
     ShardsvrMoveRange shardsvrRequest(kNss);
     shardsvrRequest.setDbName(NamespaceString::kAdminDb);
     shardsvrRequest.setFromShard(kShardId0);
-    auto& moveRangeRequest = shardsvrRequest.getMoveRangeRequest();
-    moveRangeRequest.setToShard(kShardId1);
-    moveRangeRequest.setMin({});
-    moveRangeRequest.setMax({});
+    shardsvrRequest.setMaxChunkSizeBytes(1024);
+    auto& moveRangeRequestBase = shardsvrRequest.getMoveRangeRequestBase();
+    moveRangeRequestBase.setToShard(kShardId1);
+    moveRangeRequestBase.setMin({});
+    moveRangeRequestBase.setMax({});
 
     auto networkResponseFuture = launchAsync([&]() {
         onCommand(

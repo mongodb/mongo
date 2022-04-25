@@ -45,13 +45,21 @@ public:
     MoveTimingHelper(OperationContext* opCtx,
                      const std::string& where,
                      const std::string& ns,
-                     const BSONObj& min,
-                     const BSONObj& max,
+                     const boost::optional<BSONObj>& min,
+                     const boost::optional<BSONObj>& max,
                      int totalNumSteps,
                      std::string* cmdErrmsg,
                      const ShardId& toShard,
                      const ShardId& fromShard);
     ~MoveTimingHelper();
+
+    void setMin(const BSONObj& min) {
+        _min.emplace(min);
+    }
+
+    void setMax(const BSONObj& max) {
+        _max.emplace(max);
+    }
 
     void done(int step);
 
@@ -64,6 +72,8 @@ private:
     const std::string _ns;
     const ShardId _to;
     const ShardId _from;
+
+    boost::optional<BSONObj> _min, _max;
     const int _totalNumSteps;
     const std::string* _cmdErrmsg;
 

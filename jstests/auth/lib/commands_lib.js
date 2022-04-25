@@ -5025,7 +5025,7 @@ var authCommandsLib = {
         },
         {
           testname: "d_moveChunk",
-          command: {moveChunk: "test.x", fromShard: "a", toShard: "b", min: {}, max: {}},
+          command: {moveChunk: "test.x", fromShard: "a", toShard: "b", min: {}, max: {}, maxChunkSizeBytes: 1024},
           skipSharded: true, // TODO SERVER-64204 review this condition
           testcases: [
               {
