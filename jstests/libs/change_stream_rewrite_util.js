@@ -27,6 +27,22 @@ function generateChangeStreamWriteWorkload(db, collName, numDocs, includInvalida
     }));
     assert.commandWorked(testColl.dropIndex({a: 1}));
 
+    // Modify the collection's validation options.
+    assert.commandWorked(testColl.runCommand({
+        collMod: collName,
+        validator: {},
+        validationLevel: "off",
+        validationAction: "warn",
+    }));
+
+    // Change the validation options back.
+    assert.commandWorked(testColl.runCommand({
+        collMod: collName,
+        validator: {},
+        validationLevel: "strict",
+        validationAction: "error",
+    }));
+
     // Insert some documents.
     for (let i = 0; i < numDocs; ++i) {
         assert.commandWorked(testColl.insert(
@@ -55,6 +71,11 @@ function generateChangeStreamWriteWorkload(db, collName, numDocs, includInvalida
     for (let i = 0; i < numDocs / 4; ++i) {
         assert.commandWorked(testColl.remove({_id: i, shardKey: i}));
     }
+
+    // Create, modify, and drop a view on the collection.
+    assert.commandWorked(db.createView("view", collName, []));
+    assert.commandWorked(db.runCommand({collMod: "view", viewOn: "viewOnView", pipeline: []}));
+    assertDropCollection(db, "view");
 
     // If the caller is prepared to handle potential invalidations, include the following events.
     if (includInvalidatingEvents) {
