@@ -71,6 +71,11 @@ public:
         n = childResult;
     }
 
+    void transport(ABT& n, const CollationNode& /*node*/, ABT& childResult, ABT& refs) {
+        // Skip over collation nodes.
+        n = childResult;
+    }
+
     template <typename T, typename... Ts>
     void transport(ABT& /*n*/, const T& /*node*/, Ts&&...) {
         if constexpr (std::is_base_of_v<Node, T>) {
