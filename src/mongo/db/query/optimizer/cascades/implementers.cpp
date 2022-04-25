@@ -730,11 +730,6 @@ public:
         PhysProps leftPhysProps = _physProps;
         PhysProps rightPhysProps = _physProps;
 
-        // Specifically do not propagate limit-skip.
-        // TODO: handle similarly to physical join.
-        removeProperty<LimitSkipRequirement>(leftPhysProps);
-        removeProperty<LimitSkipRequirement>(rightPhysProps);
-
         getProperty<DistributionRequirement>(leftPhysProps).setDisableExchanges(false);
         getProperty<DistributionRequirement>(rightPhysProps).setDisableExchanges(false);
 
@@ -821,12 +816,98 @@ public:
         }
     }
 
-    void operator()(const ABT& /*n*/, const BinaryJoinNode& node) {
-        // TODO: optimize binary joins
-        uasserted(6624105, "not implemented");
+    void operator()(const ABT& n, const BinaryJoinNode& node) {
+        if (hasProperty<LimitSkipRequirement>(_physProps)) {
+            // We cannot satisfy limit-skip requirements.
+            return;
+        }
+        if (getPropertyConst<DistributionRequirement>(_physProps)
+                .getDistributionAndProjections()
+                ._type != DistributionType::Centralized) {
+            // For now we only support centralized distribution.
+            return;
+        }
+
+        const GroupIdType leftGroupId =
+            node.getLeftChild().cast<MemoLogicalDelegatorNode>()->getGroupId();
+        const GroupIdType rightGroupId =
+            node.getRightChild().cast<MemoLogicalDelegatorNode>()->getGroupId();
+
+        const LogicalProps& leftLogicalProps = _memo.getGroup(leftGroupId)._logicalProperties;
+        const LogicalProps& rightLogicalProps = _memo.getGroup(rightGroupId)._logicalProperties;
+
+        const ProjectionNameSet& leftProjections =
+            getPropertyConst<ProjectionAvailability>(leftLogicalProps).getProjections();
+        const ProjectionNameSet& rightProjections =
+            getPropertyConst<ProjectionAvailability>(rightLogicalProps).getProjections();
+
+        PhysProps leftPhysProps = _physProps;
+        PhysProps rightPhysProps = _physProps;
+
+        {
+            auto reqProjections =
+                getPropertyConst<ProjectionRequirement>(_physProps).getProjections();
+
+            // Add expression references to requirements.
+            VariableNameSetType references = collectVariableReferences(n);
+            for (const auto& varName : references) {
+                reqProjections.emplace_back(varName);
+            }
+
+            // Split required projections between inner and outer side.
+            ProjectionNameOrderPreservingSet leftChildProjections;
+            ProjectionNameOrderPreservingSet rightChildProjections;
+
+            for (const ProjectionName& projectionName : reqProjections.getVector()) {
+
+                if (leftProjections.count(projectionName) > 0) {
+                    leftChildProjections.emplace_back(projectionName);
+                } else if (rightProjections.count(projectionName) > 0) {
+                    rightChildProjections.emplace_back(projectionName);
+                } else {
+                    uasserted(6624304,
+                              "Required projection must appear in either the left or the right "
+                              "child projections");
+                    return;
+                }
+            }
+
+            setPropertyOverwrite<ProjectionRequirement>(leftPhysProps,
+                                                        std::move(leftChildProjections));
+            setPropertyOverwrite<ProjectionRequirement>(rightPhysProps,
+                                                        std::move(rightChildProjections));
+        }
+
+        if (hasProperty<CollationRequirement>(_physProps)) {
+            const auto& collationSpec =
+                getPropertyConst<CollationRequirement>(_physProps).getCollationSpec();
+
+            // Split collation between inner and outer side.
+            const CollationSplitResult& collationSplit = splitCollationSpec(
+                "" /*ridProjName*/, collationSpec, leftProjections, rightProjections);
+            if (!collationSplit._validSplit) {
+                return;
+            }
+
+            setPropertyOverwrite<CollationRequirement>(leftPhysProps,
+                                                       collationSplit._leftCollation);
+            setPropertyOverwrite<CollationRequirement>(rightPhysProps,
+                                                       collationSplit._leftCollation);
+        }
+
+        // TODO: consider hash join if the predicate is equality.
+        ABT physicalJoin = n;
+        BinaryJoinNode& newNode = *physicalJoin.cast<BinaryJoinNode>();
+
+        optimizeChildren<BinaryJoinNode>(
+            _queue,
+            kDefaultPriority,
+            std::move(physicalJoin),
+            ChildPropsType{{&newNode.getLeftChild(), std::move(leftPhysProps)},
+                           {&newNode.getRightChild(), std::move(rightPhysProps)}});
     }
 
-    void operator()(const ABT& n, const UnionNode& node) {
+    void operator()(const ABT& /*n*/, const UnionNode& node) {
         if (hasProperty<LimitSkipRequirement>(_physProps)) {
             // We cannot satisfy limit-skip requirements.
             return;

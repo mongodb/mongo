@@ -488,7 +488,134 @@ public:
     }
 
     void visit(const DocumentSourceLookUp* source) override {
-        unsupportedStage(source);
+        // This is an **experimental** implementation of $lookup. To achieve fully compatible
+        // implementation we need the following:
+        //   1. Add support for unwind to emit not just the array elements, but in addition the
+        //   array itself. Such unwinding needs to occur on the inner side in order to match the
+        //   left side both against the elements and the array itself. The inner side would perform
+        //   a regular unwind.
+        //   2. Add support for left outer join. Currently we only results when there is a match.
+        //   3. Add ability to generate unique values (sequential or otherwise) in order to
+        //   eliminate reliance of _id. This can be achieved for example via a stateful function.
+        //   Currently, after joining the unwound elements, we perform a de-duplication based on _id
+        //   to determine which corresponding documents match.
+
+        uassert(6624303, "$lookup needs to be SBE compatible", source->sbeCompatible());
+
+        std::string scanDefName = source->getFromNs().coll().toString();
+        const ProjectionName& scanProjName = _ctx.getNextId("scan");
+
+        PrefixId prefixId;
+        ABT pipelineABT = _metadata._scanDefs.at(scanDefName).exists()
+            ? make<ScanNode>(scanProjName, scanDefName)
+            : make<ValueScanNode>(ProjectionNameVector{scanProjName});
+
+        const ProjectionName& localIdProjName = _ctx.getNextId("localId");
+        auto entry = _ctx.getNode();
+        _ctx.setNode<EvaluationNode>(entry._rootProjection,
+                                     localIdProjName,
+                                     make<EvalPath>(make<PathGet>("_id", make<PathIdentity>()),
+                                                    make<Variable>(entry._rootProjection)),
+                                     std::move(entry._node));
+
+        const auto& localPath = source->getLocalField();
+        ProjectionName localProjName = entry._rootProjection;
+        for (size_t index = 0; index < localPath->getPathLength(); index++) {
+            ABT path = make<EvalPath>(
+                make<PathGet>(localPath->getFieldName(index).toString(), make<PathIdentity>()),
+                make<Variable>(std::move(localProjName)));
+
+            localProjName = _ctx.getNextId("local");
+            entry = _ctx.getNode();
+            _ctx.setNode<EvaluationNode>(
+                entry._rootProjection, localProjName, std::move(path), std::move(entry._node));
+
+            entry = _ctx.getNode();
+            _ctx.setNode<UnwindNode>(std::move(entry._rootProjection),
+                                     localProjName,
+                                     _ctx.getNextId("unwoundPidLocal"),
+                                     true /*retainNonArrays*/,
+                                     std::move(entry._node));
+        }
+
+        const ProjectionName& foreignIdProjName = _ctx.getNextId("foreignId");
+        pipelineABT =
+            make<EvaluationNode>(foreignIdProjName,
+                                 make<EvalPath>(make<PathGet>("_id", make<PathIdentity>()),
+                                                make<Variable>(scanProjName)),
+                                 std::move(pipelineABT));
+
+        const auto& foreignPath = source->getForeignField();
+        ProjectionName foreignProjName = scanProjName;
+        for (size_t index = 0; index < foreignPath->getPathLength(); index++) {
+            ABT path = make<EvalPath>(
+                make<PathGet>(foreignPath->getFieldName(index).toString(), make<PathIdentity>()),
+                make<Variable>(foreignProjName));
+
+            foreignProjName = _ctx.getNextId("foreign");
+            pipelineABT =
+                make<EvaluationNode>(foreignProjName, std::move(path), std::move(pipelineABT));
+
+            // For the last field on the path we need to also emit arrays as values themselves (we
+            // need a new unwind option).
+            pipelineABT = make<UnwindNode>(foreignProjName,
+                                           _ctx.getNextId("unwoundPidForeign"),
+                                           true /*retainNonArrays*/,
+                                           std::move(pipelineABT));
+        }
+
+        const auto comparisonExprFn = [](const ProjectionName& projName) {
+            return make<If>(make<FunctionCall>("exists", makeSeq(make<Variable>(projName))),
+                            make<Variable>(projName),
+                            Constant::null());
+        };
+
+        entry = _ctx.getNode();
+        // TODO: use LeftOuter join when we support it.
+        _ctx.setNode<BinaryJoinNode>(std::move(entry._rootProjection),
+                                     JoinType::Inner,
+                                     ProjectionNameSet{},
+                                     make<BinaryOp>(Operations::Eq,
+                                                    comparisonExprFn(localProjName),
+                                                    comparisonExprFn(foreignProjName)),
+                                     std::move(entry._node),
+                                     std::move(pipelineABT));
+
+        const ProjectionName& localRootProjId = _ctx.getNextId("localRoot");
+        const ProjectionName& foreignRootProjId = _ctx.getNextId("foreignRoot");
+        entry = _ctx.getNode();
+        ABT groupByDedupNode = make<GroupByNode>(
+            ProjectionNameVector{localIdProjName, foreignIdProjName},
+            ProjectionNameVector{localRootProjId, foreignRootProjId},
+            makeSeq(make<FunctionCall>("$first", makeSeq(make<Variable>(entry._rootProjection))),
+                    make<FunctionCall>("$first", makeSeq(make<Variable>(scanProjName)))),
+            std::move(entry._node));
+
+        const ProjectionName& localFoldedProjName = _ctx.getNextId("localFolded");
+        const ProjectionName& foreignFoldedProjName = _ctx.getNextId("foreignFolded");
+        ABT groupByFoldNode = make<GroupByNode>(
+            ProjectionNameVector{localIdProjName},
+            ProjectionNameVector{localFoldedProjName, foreignFoldedProjName},
+            makeSeq(make<FunctionCall>("$first", makeSeq(make<Variable>(localRootProjId))),
+                    make<FunctionCall>("$push", makeSeq(make<Variable>(foreignRootProjId)))),
+            std::move(groupByDedupNode));
+
+        ABT resultPath = translateFieldPath(
+            source->getAsField(),
+            make<PathConstant>(make<Variable>(foreignFoldedProjName)),
+            [](const std::string& fieldName, const bool isLastElement, ABT input) {
+                if (!isLastElement) {
+                    input = make<PathTraverse>(std::move(input));
+                }
+                return make<PathField>(fieldName, std::move(input));
+            });
+
+        const ProjectionName& resultProjName = _ctx.getNextId("result");
+        _ctx.setNode<EvaluationNode>(
+            resultProjName,
+            resultProjName,
+            make<EvalPath>(std::move(resultPath), make<Variable>(localFoldedProjName)),
+            std::move(groupByFoldNode));
     }
 
     void visit(const DocumentSourceMatch* source) override {

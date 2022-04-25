@@ -91,10 +91,18 @@ public:
     }
 
     CEType transport(const BinaryJoinNode& node,
-                     CEType /*leftChildResult*/,
-                     CEType /*rightChildResult*/,
+                     CEType leftChildResult,
+                     CEType rightChildResult,
                      CEType /*exprResult*/) {
-        uasserted(6624039, "CE derivation not implemented.");
+        const auto& filter = node.getFilter();
+
+        double selectivity = 0.1;
+        if (filter == Constant::boolean(false)) {
+            selectivity = 0.0;
+        } else if (filter == Constant::boolean(true)) {
+            selectivity = 1.0;
+        }
+        return leftChildResult * rightChildResult * selectivity;
     }
 
     CEType transport(const UnionNode& node,

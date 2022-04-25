@@ -34,13 +34,13 @@
 namespace mongo::optimizer::properties {
 
 CollationRequirement::CollationRequirement(ProjectionCollationSpec spec) : _spec(std::move(spec)) {
+    uassert(6624302, "Empty collation spec", !_spec.empty());
+
     ProjectionNameSet projections;
     for (const auto& entry : _spec) {
         uassert(6624021, "Repeated projection name", projections.insert(entry.first).second);
     }
 }
-
-CollationRequirement CollationRequirement::Empty = CollationRequirement();
 
 bool CollationRequirement::operator==(const CollationRequirement& other) const {
     return _spec == other._spec;

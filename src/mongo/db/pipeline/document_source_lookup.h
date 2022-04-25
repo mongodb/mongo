@@ -250,7 +250,7 @@ public:
         return _sbeCompatible;
     }
 
-    const NamespaceString& getFromNs() {
+    const NamespaceString& getFromNs() const {
         return _fromNs;
     }
 

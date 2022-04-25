@@ -249,12 +249,28 @@ public:
     }
 
     LogicalProps transport(const BinaryJoinNode& node,
-                           LogicalProps /*leftChildResult*/,
-                           LogicalProps /*rightChildResult*/,
+                           LogicalProps leftChildResult,
+                           LogicalProps rightChildResult,
                            LogicalProps /*exprResult*/) {
-        // TODO: remove indexing availability property when implemented.
-        // TODO: combine scan defs from all children for CollectionAvailability.
-        uasserted(6624043, "Logical property derivation not implemented.");
+        // We are specifically not adding the node's projection to ProjectionAvailability here.
+        // The logical properties already contains projection availability which is derived first
+        // when the memo group is created.
+
+        LogicalProps result = std::move(leftChildResult);
+        auto& mergedScanDefs = getProperty<CollectionAvailability>(result).getScanDefSet();
+        auto& mergedDistributionSet =
+            getProperty<DistributionAvailability>(result).getDistributionSet();
+
+        auto rightChildScanDefs =
+            getProperty<CollectionAvailability>(rightChildResult).getScanDefSet();
+        mergedScanDefs.merge(std::move(rightChildScanDefs));
+
+        auto rightChildDistributionSet =
+            getProperty<DistributionAvailability>(rightChildResult).getDistributionSet();
+        mergedDistributionSet.merge(std::move(rightChildDistributionSet));
+
+        removeProperty<IndexingAvailability>(result);
+        return maybeUpdateNodePropsMap(node, std::move(result));
     }
 
     LogicalProps transport(const UnionNode& node,

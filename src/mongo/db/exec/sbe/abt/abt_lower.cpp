@@ -275,6 +275,8 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::transport(
         name = "max";
     } else if (name == "$addToSet") {
         name = "addToSet";
+    } else if (name == "$push") {
+        name = "addToArray";
     }
 
     return sbe::makeE<sbe::EFunction>(name, toInlinedVector(std::move(args)));

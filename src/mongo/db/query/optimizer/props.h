@@ -170,9 +170,6 @@ inline auto makePhysProps(Args&&... args) {
  */
 class CollationRequirement final : public PhysPropertyTag {
 public:
-    static CollationRequirement Empty;
-
-    CollationRequirement() = default;
     CollationRequirement(ProjectionCollationSpec spec);
 
     bool operator==(const CollationRequirement& other) const;

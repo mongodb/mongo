@@ -4532,5 +4532,81 @@ TEST(PhysRewriter, UnionRewrite) {
         optimized);
 }
 
+TEST(PhysRewriter, JoinRewrite) {
+    using namespace properties;
+
+    ABT scanNode1 = make<ScanNode>("ptest1", "test1");
+    ABT scanNode2 = make<ScanNode>("ptest2", "test2");
+
+    // Each branch produces two projections, pUnion1 and pUnion2.
+    ABT evalNode1 = make<EvaluationNode>(
+        "p11",
+        make<EvalPath>(make<PathGet>("a", make<PathIdentity>()), make<Variable>("ptest1")),
+        std::move(scanNode1));
+    ABT evalNode2 = make<EvaluationNode>(
+        "p12",
+        make<EvalPath>(make<PathGet>("b", make<PathIdentity>()), make<Variable>("ptest1")),
+        std::move(evalNode1));
+
+    ABT evalNode3 = make<EvaluationNode>(
+        "p21",
+        make<EvalPath>(make<PathGet>("a", make<PathIdentity>()), make<Variable>("ptest2")),
+        std::move(scanNode2));
+    ABT evalNode4 = make<EvaluationNode>(
+        "p22",
+        make<EvalPath>(make<PathGet>("b", make<PathIdentity>()), make<Variable>("ptest2")),
+        std::move(evalNode3));
+
+    ABT joinNode = make<BinaryJoinNode>(
+        JoinType::Inner,
+        ProjectionNameSet{},
+        make<BinaryOp>(Operations::Eq, make<Variable>("p12"), make<Variable>("p22")),
+        std::move(evalNode2),
+        std::move(evalNode4));
+
+    ABT rootNode = make<RootNode>(ProjectionRequirement{ProjectionNameVector{"p11", "p21"}},
+                                  std::move(joinNode));
+
+    PrefixId prefixId;
+    OptPhaseManager phaseManager(
+        {OptPhaseManager::OptPhase::MemoSubstitutionPhase,
+         OptPhaseManager::OptPhase::MemoExplorationPhase,
+         OptPhaseManager::OptPhase::MemoImplementationPhase},
+        prefixId,
+        {{{"test1", {{}, {}}}, {"test2", {{}, {}}}}},
+        {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
+
+    ABT optimized = std::move(rootNode);
+    ASSERT_TRUE(phaseManager.optimize(optimized));
+    ASSERT_EQ(4, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+
+    ASSERT_EXPLAIN_V2(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       p11\n"
+        "|   |       p21\n"
+        "|   RefBlock: \n"
+        "|       Variable [p11]\n"
+        "|       Variable [p21]\n"
+        "BinaryJoin [joinType: Inner]\n"
+        "|   |   BinaryOp [Eq]\n"
+        "|   |   |   Variable [p22]\n"
+        "|   |   Variable [p12]\n"
+        "|   PhysicalScan [{'a': p21, 'b': p22}, test2]\n"
+        "|       BindBlock:\n"
+        "|           [p21]\n"
+        "|               Source []\n"
+        "|           [p22]\n"
+        "|               Source []\n"
+        "PhysicalScan [{'a': p11, 'b': p12}, test1]\n"
+        "    BindBlock:\n"
+        "        [p11]\n"
+        "            Source []\n"
+        "        [p12]\n"
+        "            Source []\n",
+        optimized);
+}
+
+
 }  // namespace
 }  // namespace mongo::optimizer
