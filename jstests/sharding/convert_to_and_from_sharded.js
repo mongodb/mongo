@@ -10,9 +10,6 @@
 // This test calls removeShard which can leave docs in config.rangeDeletions in state "pending",
 // therefore preventing orphans from being cleaned up.
 TestData.skipCheckOrphans = true;
-// Disable the check, since it causes the test to hang when run within the
-// 'sharding_batched_deletes_passthrough' suite
-TestData.skipCheckRoutingTableConsistency = true;
 
 var NUM_NODES = 3;
 
@@ -128,6 +125,5 @@ replShard.awaitNodesAgreeOnPrimary();
 priConn = replShard.getPrimary();
 checkBasicCRUD(priConn.getDB('test').unsharded);
 checkBasicCRUD(priConn.getDB('test').sharded);
-jsTest.log("TROLL!!");
 replShard.stopSet();
 })();
