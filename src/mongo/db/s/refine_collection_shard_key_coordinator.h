@@ -83,9 +83,7 @@ private:
 
     RefineCollectionShardKeyCoordinatorDocument _doc;
     const KeyPattern _newShardKey;
-    KeyPattern _oldShardKey;
     const bool _persistCoordinatorDocument;  // TODO: SERVER-62850 remove this then 6.0 branches out
-    boost::optional<UUID> _collectionUUID;
 };
 
 // TODO: SERVER-62850 remove this then 6.0 branches out

@@ -33,9 +33,7 @@
 
 #include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/op_observer.h"
 #include "mongo/db/s/dist_lock_manager.h"
 #include "mongo/db/s/shard_key_util.h"
 #include "mongo/db/s/sharding_ddl_util.h"
@@ -45,42 +43,6 @@
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 
 namespace mongo {
-
-namespace {
-
-void notifyChangeStreamsOnRefineCollectionShardKeyComplete(OperationContext* opCtx,
-                                                           const NamespaceString& collNss,
-                                                           const KeyPattern& shardKey,
-                                                           const KeyPattern& oldShardKey,
-                                                           const UUID& collUUID) {
-
-    const std::string oMessage = str::stream()
-        << "Refine shard key for collection " << collNss << " with " << shardKey.toString();
-
-    BSONObjBuilder cmdBuilder;
-    cmdBuilder.append("refineCollectionShardKey", collNss.ns());
-    cmdBuilder.append("shardKey", shardKey.toBSON());
-    cmdBuilder.append("oldShardKey", oldShardKey.toBSON());
-
-    auto const serviceContext = opCtx->getClient()->getServiceContext();
-
-    writeConflictRetry(
-        opCtx, "RefineCollectionShardKey", NamespaceString::kRsOplogNamespace.ns(), [&] {
-            AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
-            WriteUnitOfWork uow(opCtx);
-            serviceContext->getOpObserver()->onInternalOpMessage(opCtx,
-                                                                 collNss,
-                                                                 collUUID,
-                                                                 BSON("msg" << oMessage),
-                                                                 cmdBuilder.obj(),
-                                                                 boost::none,
-                                                                 boost::none,
-                                                                 boost::none,
-                                                                 boost::none);
-            uow.commit();
-        });
-}
-}  // namespace
 
 RefineCollectionShardKeyCoordinator::RefineCollectionShardKeyCoordinator(
     ShardingDDLCoordinatorService* service, const BSONObj& initialState)
@@ -166,10 +128,6 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
                 {
                     AutoGetCollection coll{
                         opCtx, nss(), MODE_IS, AutoGetCollectionViewMode::kViewsPermitted};
-                    tassert(6295600,
-                            str::stream() << "Cant find collection for namespace " << nss(),
-                            coll);
-                    _collectionUUID = coll->uuid();
                     checkCollectionUUIDMismatch(opCtx, nss(), *coll, _doc.getCollectionUUID());
                 }
 
@@ -179,7 +137,6 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
                 const auto cm = uassertStatusOK(
                     Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(
                         opCtx, nss()));
-                _oldShardKey = cm.getShardKeyPattern().getKeyPattern();
                 ConfigsvrRefineCollectionShardKey configsvrRefineCollShardKey(
                     nss(), _newShardKey.toBSON(), cm.getVersion().epoch());
                 configsvrRefineCollShardKey.setDbName(nss().db().toString());
@@ -221,13 +178,6 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
             auto opCtxHolder = cc().makeOperationContext();
             auto* opCtx = opCtxHolder.get();
             getForwardableOpMetadata().setOn(opCtx);
-
-            if (status.isOK()) {
-                tassert(6295601, "Failed to set collection uuid", _collectionUUID);
-                notifyChangeStreamsOnRefineCollectionShardKeyComplete(
-                    opCtx, nss(), _newShardKey, _oldShardKey, *_collectionUUID);
-            }
-
             if (_persistCoordinatorDocument) {
                 sharding_ddl_util::resumeMigrations(opCtx, nss(), boost::none);
             }
