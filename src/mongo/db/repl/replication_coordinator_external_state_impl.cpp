@@ -86,6 +86,7 @@
 #include "mongo/db/s/periodic_balancer_config_refresher.h"
 #include "mongo/db/s/periodic_sharded_index_consistency_checker.h"
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
+#include "mongo/db/s/shard_local.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
 #include "mongo/db/s/sharding_state_recovery.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
@@ -939,6 +940,30 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
         ChunkSplitter::get(_service).onStepUp();
         PeriodicBalancerConfigRefresher::get(_service).onStepUp(_service);
         TransactionCoordinatorService::get(_service)->onStepUp(opCtx);
+
+        // Create uuid index on config.rangeDeletions if needed
+        auto minKeyFieldName = RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMinKey;
+        auto maxKeyFieldName = RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMaxKey;
+        Status indexStatus = createIndexOnConfigCollection(
+            opCtx,
+            NamespaceString::kRangeDeletionNamespace,
+            BSON(RangeDeletionTask::kCollectionUuidFieldName << 1 << minKeyFieldName << 1
+                                                             << maxKeyFieldName << 1),
+            false);
+        if (!indexStatus.isOK()) {
+            // If the node is shutting down or it lost quorum just as it was becoming primary,
+            // don't run the sharding onStepUp machinery. The onStepDown counterpart to these
+            // methods is already idempotent, so the machinery will remain in the stepped down
+            // state.
+            if (ErrorCodes::isShutdownError(indexStatus.code()) ||
+                ErrorCodes::isNotPrimaryError(indexStatus.code())) {
+                return;
+            }
+            fassertFailedWithStatus(
+                64285,
+                indexStatus.withContext("Failed to create index on config.rangeDeletions on "
+                                        "shard's first transition to primary"));
+        }
 
         // Note, these must be done after the configOpTime is recovered via
         // ShardingStateRecovery::recover above, because they may trigger filtering metadata

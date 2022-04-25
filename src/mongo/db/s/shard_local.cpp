@@ -134,10 +134,10 @@ StatusWith<Shard::QueryResponse> ShardLocal::_exhaustiveFindOnConfig(
         opCtx, readPref, readConcernLevel, nss, query, sort, limit, hint);
 }
 
-Status ShardLocal::createIndexOnConfig(OperationContext* opCtx,
-                                       const NamespaceString& ns,
-                                       const BSONObj& keys,
-                                       bool unique) {
+Status createIndexOnConfigCollection(OperationContext* opCtx,
+                                     const NamespaceString& ns,
+                                     const BSONObj& keys,
+                                     bool unique) {
     invariant(ns.db() == "config" || ns.db() == "admin");
 
     try {
@@ -148,7 +148,7 @@ Status ShardLocal::createIndexOnConfig(OperationContext* opCtx,
         if (!collection) {
             CollectionOptions options;
             options.uuid = UUID::gen();
-            writeConflictRetry(opCtx, "ShardLocal::createIndexOnConfig", ns.ns(), [&] {
+            writeConflictRetry(opCtx, "createIndexOnConfigCollection", ns.ns(), [&] {
                 WriteUnitOfWork wunit(opCtx);
                 auto db = autoColl.ensureDbExists(opCtx);
                 collection = db->createCollection(opCtx, ns, options);
@@ -190,7 +190,7 @@ Status ShardLocal::createIndexOnConfig(OperationContext* opCtx,
             IndexBuildsCoordinator::get(opCtx)->createIndex(
                 opCtx, collection->uuid(), indexSpec, indexConstraints, fromMigrate);
         } else {
-            writeConflictRetry(opCtx, "ShardLocal::createIndexOnConfig", ns.ns(), [&] {
+            writeConflictRetry(opCtx, "createIndexOnConfigCollection", ns.ns(), [&] {
                 WriteUnitOfWork wunit(opCtx);
                 CollectionWriter collWriter(opCtx, collection->uuid());
                 IndexBuildsCoordinator::get(opCtx)->createIndexesOnEmptyCollection(
@@ -203,6 +203,13 @@ Status ShardLocal::createIndexOnConfig(OperationContext* opCtx,
     }
 
     return Status::OK();
+}
+
+Status ShardLocal::createIndexOnConfig(OperationContext* opCtx,
+                                       const NamespaceString& ns,
+                                       const BSONObj& keys,
+                                       bool unique) {
+    return createIndexOnConfigCollection(opCtx, ns, keys, unique);
 }
 
 void ShardLocal::runFireAndForgetCommand(OperationContext* opCtx,

@@ -34,6 +34,11 @@
 
 namespace mongo {
 
+Status createIndexOnConfigCollection(OperationContext* opCtx,
+                                     const NamespaceString& ns,
+                                     const BSONObj& keys,
+                                     bool unique);
+
 class ShardLocal : public Shard {
     ShardLocal(const ShardLocal&) = delete;
     ShardLocal& operator=(const ShardLocal&) = delete;
