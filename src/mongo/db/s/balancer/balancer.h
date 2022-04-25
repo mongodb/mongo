@@ -292,7 +292,7 @@ private:
     stdx::condition_variable _defragmentationCondVar;
 
     // Number of moved chunks in last round
-    int _balancedLastTime;
+    int _numMigrationsInRound;
 
     // Source of randomness when metadata needs to be randomized.
     BalancerRandomSource _random;
