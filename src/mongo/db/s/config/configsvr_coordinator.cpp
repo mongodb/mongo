@@ -110,13 +110,14 @@ SemiFuture<void> ConfigsvrCoordinator::run(std::shared_ptr<executor::ScopedTaskE
         })
         .onCompletion([this, executor, token, anchor = shared_from_this()](const Status& status) {
             if (!status.isOK()) {
-                if (!status.isA<ErrorCategory::NotPrimaryError>() &&
-                    !status.isA<ErrorCategory::ShutdownError>()) {
-                    LOGV2_ERROR(6347301,
-                                "Error executing ConfigsvrCoordinator",
-                                "error"_attr = redact(status));
-                }
+                LOGV2_ERROR(
+                    6347301, "Error executing ConfigsvrCoordinator", "error"_attr = redact(status));
 
+                // Nothing else to do, the _completionPromise will be cancelled once the coordinator
+                // is interrupted, because the only reasons to stop forward progress in this node is
+                // because of a stepdown happened or the coordinator was canceled.
+                dassert((token.isCanceled() && status.isA<ErrorCategory::CancellationError>()) ||
+                        status.isA<ErrorCategory::NotPrimaryError>());
                 return status;
             }
 
