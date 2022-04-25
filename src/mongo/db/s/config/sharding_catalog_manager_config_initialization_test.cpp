@@ -81,15 +81,13 @@ void assertBSONObjsSame(const std::vector<BSONObj>& expectedBSON,
 
 class ConfigInitializationTest : public ConfigServerTestFixture {
 protected:
-    // TODO (SERVER-65308): Use wiredTiger.
-    ConfigInitializationTest() : ConfigServerTestFixture(Options{}.engine("ephemeralForTest")) {}
-
     /*
      * Initializes the sharding state and locks both the config db and rstl.
      */
     void setUp() override {
         // Prevent DistLockManager from writing to lockpings collection before we create the
         // indexes.
+        // TODO (SERVER-64987): Remove lock acquisition.
         _autoDb = setUpAndLockConfigDb();
     }
 
@@ -112,6 +110,7 @@ TEST_F(ConfigInitializationTest, UpgradeNotNeeded) {
     ASSERT_OK(ShardingCatalogManager::get(operationContext())
                   ->initializeConfigDatabaseIfNeeded(operationContext()));
 
+    _autoDb.reset();
     auto versionDoc =
         assertGet(findOneOnConfigCollection(operationContext(), VersionType::ConfigNS, BSONObj()));
 
@@ -134,6 +133,7 @@ TEST_F(ConfigInitializationTest, InitIncompatibleVersion) {
               ShardingCatalogManager::get(operationContext())
                   ->initializeConfigDatabaseIfNeeded(operationContext()));
 
+    _autoDb.reset();
     auto versionDoc =
         assertGet(findOneOnConfigCollection(operationContext(), VersionType::ConfigNS, BSONObj()));
 
@@ -185,6 +185,7 @@ TEST_F(ConfigInitializationTest, InitNoVersionDocEmptyConfig) {
     ASSERT_OK(ShardingCatalogManager::get(operationContext())
                   ->initializeConfigDatabaseIfNeeded(operationContext()));
 
+    _autoDb.reset();
     auto versionDoc =
         assertGet(findOneOnConfigCollection(operationContext(), VersionType::ConfigNS, BSONObj()));
 
@@ -212,6 +213,7 @@ TEST_F(ConfigInitializationTest, OnlyRunsOnce) {
     ASSERT_OK(ShardingCatalogManager::get(operationContext())
                   ->initializeConfigDatabaseIfNeeded(operationContext()));
 
+    _autoDb.reset();
     auto versionDoc =
         assertGet(findOneOnConfigCollection(operationContext(), VersionType::ConfigNS, BSONObj()));
 
@@ -230,6 +232,7 @@ TEST_F(ConfigInitializationTest, ReRunsIfDocRolledBackThenReElected) {
     ASSERT_OK(ShardingCatalogManager::get(operationContext())
                   ->initializeConfigDatabaseIfNeeded(operationContext()));
 
+    _autoDb.reset();
     auto versionDoc =
         assertGet(findOneOnConfigCollection(operationContext(), VersionType::ConfigNS, BSONObj()));
 
