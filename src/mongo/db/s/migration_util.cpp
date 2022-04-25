@@ -820,12 +820,17 @@ void persistCommitDecision(OperationContext* opCtx,
               *migrationDoc.getDecision() == DecisionEnum::kCommitted);
 
     hangInPersistMigrateCommitDecisionInterruptible.pauseWhileSet(opCtx);
-
-    PersistentTaskStore<MigrationCoordinatorDocument> store(
-        NamespaceString::kMigrationCoordinatorsNamespace);
-    store.upsert(opCtx,
-                 BSON(MigrationCoordinatorDocument::kIdFieldName << migrationDoc.getId()),
-                 migrationDoc.toBSON());
+    try {
+        PersistentTaskStore<MigrationCoordinatorDocument> store(
+            NamespaceString::kMigrationCoordinatorsNamespace);
+        store.update(opCtx,
+                     BSON(MigrationCoordinatorDocument::kIdFieldName << migrationDoc.getId()),
+                     migrationDoc.toBSON());
+    } catch (const ExceptionFor<ErrorCodes::NoMatchingDocument>&) {
+        LOGV2_ERROR(6439800,
+                    "No coordination doc found on disk for migration",
+                    "migration"_attr = redact(migrationDoc.toBSON()));
+    }
 
     if (hangInPersistMigrateCommitDecisionThenSimulateErrorUninterruptible.shouldFail()) {
         hangInPersistMigrateCommitDecisionThenSimulateErrorUninterruptible.pauseWhileSet(opCtx);
@@ -839,12 +844,17 @@ void persistAbortDecision(OperationContext* opCtx,
     invariant(migrationDoc.getDecision() && *migrationDoc.getDecision() == DecisionEnum::kAborted);
 
     hangInPersistMigrateAbortDecisionInterruptible.pauseWhileSet(opCtx);
-
-    PersistentTaskStore<MigrationCoordinatorDocument> store(
-        NamespaceString::kMigrationCoordinatorsNamespace);
-    store.upsert(opCtx,
-                 BSON(MigrationCoordinatorDocument::kIdFieldName << migrationDoc.getId()),
-                 migrationDoc.toBSON());
+    try {
+        PersistentTaskStore<MigrationCoordinatorDocument> store(
+            NamespaceString::kMigrationCoordinatorsNamespace);
+        store.update(opCtx,
+                     BSON(MigrationCoordinatorDocument::kIdFieldName << migrationDoc.getId()),
+                     migrationDoc.toBSON());
+    } catch (const ExceptionFor<ErrorCodes::NoMatchingDocument>&) {
+        LOGV2(6439801,
+              "No coordination doc found on disk for migration",
+              "migration"_attr = redact(migrationDoc.toBSON()));
+    }
 
     if (hangInPersistMigrateAbortDecisionThenSimulateErrorUninterruptible.shouldFail()) {
         hangInPersistMigrateAbortDecisionThenSimulateErrorUninterruptible.pauseWhileSet(opCtx);
