@@ -95,7 +95,7 @@ class TestAcceptance(unittest.TestCase):
         )  # yapf: disable
 
         under_test.burn_in(repeat_config, gen_config, "", "testfile.json", False, MagicMock(),
-                           repos, None, None)
+                           repos, None, None, 'install_dir/bin')
 
         write_json_mock.assert_called_once()
         written_config = json.loads(write_json_mock.call_args[0][1])
@@ -126,7 +126,7 @@ class TestAcceptance(unittest.TestCase):
         evg_config = get_evergreen_config("etc/evergreen.yml")
 
         under_test.burn_in(repeat_config, gen_config, "", "testfile.json", False, evg_config, repos,
-                           None, None)
+                           None, None, 'install_dir/bin')
 
         write_json_mock.assert_called_once()
         written_config = json.loads(write_json_mock.call_args[0][1])

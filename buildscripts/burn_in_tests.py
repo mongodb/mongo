@@ -658,7 +658,7 @@ def create_task_list_for_tests(
 
 
 def create_tests_by_task(build_variant: str, evg_conf: EvergreenProjectConfig,
-                         changed_tests: Set[str]) -> Dict:
+                         changed_tests: Set[str], install_dir: str) -> Dict:
     """
     Create a list of tests by task.
 
@@ -672,7 +672,7 @@ def create_tests_by_task(build_variant: str, evg_conf: EvergreenProjectConfig,
         exclude_tests.append(f"{ENTERPRISE_MODULE_PATH}/**/*")
     changed_tests = filter_tests(changed_tests, exclude_tests)
 
-    buildscripts.resmokelib.parser.set_run_options()
+    buildscripts.resmokelib.parser.set_run_options(f"--installDir={shlex.quote(install_dir)}")
     if changed_tests:
         return create_task_list_for_tests(changed_tests, build_variant, evg_conf, exclude_suites,
                                           exclude_tasks)
@@ -763,7 +763,8 @@ def _get_evg_api(evg_api_config: str, local_mode: bool) -> Optional[EvergreenApi
 
 def burn_in(repeat_config: RepeatConfig, generate_config: GenerateConfig, resmoke_args: str,
             generate_tasks_file: str, no_exec: bool, evg_conf: EvergreenProjectConfig,
-            repos: List[Repo], evg_api: EvergreenApi, origin_rev: Optional[str]) -> None:
+            repos: List[Repo], evg_api: EvergreenApi, origin_rev: Optional[str],
+            install_dir: str) -> None:
     """
     Run burn_in_tests with the given configuration.
 
@@ -784,7 +785,8 @@ def burn_in(repeat_config: RepeatConfig, generate_config: GenerateConfig, resmok
     # Populate the config values in order to use the helpers from resmokelib.suitesconfig.
     resmoke_cmd = _set_resmoke_cmd(repeat_config, list(resmoke_args))
 
-    tests_by_task = create_tests_by_task(generate_config.build_variant, evg_conf, changed_tests)
+    tests_by_task = create_tests_by_task(generate_config.build_variant, evg_conf, changed_tests,
+                                         install_dir)
     LOGGER.debug("tests and tasks found", tests_by_task=tests_by_task)
 
     if generate_tasks_file:
@@ -797,6 +799,7 @@ def burn_in(repeat_config: RepeatConfig, generate_config: GenerateConfig, resmok
         LOGGER.info("Not running tests due to 'no_exec' option.")
 
 
+# pylint: disable=too-many-function-args
 @click.command()
 @click.option("--no-exec", "no_exec", default=False, is_flag=True,
               help="Do not execute the found tests.")
@@ -828,11 +831,13 @@ def burn_in(repeat_config: RepeatConfig, generate_config: GenerateConfig, resmok
 @click.option(
     "--origin-rev", "origin_rev", default=None,
     help="The revision in the mongo repo that changes will be compared against if specified.")
+@click.option("--install-dir", "install_dir", required=True, type=str,
+              help="Path to bin directory of a testable installation")
 @click.argument("resmoke_args", nargs=-1, type=click.UNPROCESSED)
 # pylint: disable=too-many-arguments,too-many-locals
 def main(build_variant, run_build_variant, distro, project, generate_tasks_file, no_exec,
          repeat_tests_num, repeat_tests_min, repeat_tests_max, repeat_tests_secs, resmoke_args,
-         local_mode, evg_api_config, verbose, task_id, origin_rev):
+         local_mode, evg_api_config, verbose, task_id, origin_rev, install_dir: str):
     """
     Run new or changed tests in repeated mode to validate their stability.
 
@@ -902,7 +907,7 @@ def main(build_variant, run_build_variant, distro, project, generate_tasks_file,
     repos = [Repo(x) for x in DEFAULT_REPO_LOCATIONS if os.path.isdir(x)]
 
     burn_in(repeat_config, generate_config, resmoke_args, generate_tasks_file, no_exec, evg_conf,
-            repos, evg_api, origin_rev)
+            repos, evg_api, origin_rev, install_dir)
 
 
 if __name__ == "__main__":

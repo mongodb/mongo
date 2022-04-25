@@ -1552,7 +1552,7 @@ functions:
           # Multiversion exclusions can be used when selecting tests.
           $python buildscripts/evergreen_gen_multiversion_tests.py generate-exclude-tags --task-path-suffix=/data/multiversion --output=multiversion_exclude_tags.yml
 
-          PATH=$PATH:$HOME $python buildscripts/burn_in_tags.py --expansion-file expansions.yml
+          PATH=$PATH:$HOME $python buildscripts/burn_in_tags.py --expansion-file expansions.yml --install-dir "${install_dir}"
     - command: archive.targz_pack
       params:
         target: burn_in_tags_gen.tgz
@@ -4052,6 +4052,7 @@ tasks:
     - func: "run tests"
       vars:
         resmoke_args: --suites=sdam_json_test
+        install_dir: build/install/bin
 
 - name: server_selection_json_test
   commands:
@@ -4064,6 +4065,7 @@ tasks:
     - func: "run tests"
       vars:
         resmoke_args: --suites=server_selection_json_test
+        install_dir: build/install/bin
 
 ## dbtest ##
 - name: dbtest
@@ -4535,7 +4537,7 @@ tasks:
         fi
         burn_in_args="$burn_in_args --repeat-tests-min=2 --repeat-tests-max=1000 --repeat-tests-secs=600"
         # Evergreen executable is in $HOME.
-        PATH=$PATH:$HOME $python buildscripts/burn_in_tests.py --project=${project} $build_variant_opts --distro=${distro_id} --generate-tasks-file=burn_in_tests_gen.json --task_id ${task_id} $burn_in_args --verbose
+        PATH=$PATH:$HOME $python buildscripts/burn_in_tests.py --project=${project} $build_variant_opts --distro=${distro_id} --generate-tasks-file=burn_in_tests_gen.json --task_id ${task_id} $burn_in_args --verbose --install-dir "${install_dir}"
   - command: archive.targz_pack
     params:
       target: src/burn_in_tests_gen.tgz

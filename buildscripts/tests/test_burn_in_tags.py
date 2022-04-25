@@ -113,7 +113,7 @@ class TestGenerateEvgTasks(unittest.TestCase):
         evergreen_api = MagicMock()
         repo = MagicMock(working_dir=os.getcwd())
         under_test._generate_evg_tasks(evergreen_api, shrub_config, expansions_file_data,
-                                       buildvariant_map, [repo], evg_conf_mock)
+                                       buildvariant_map, [repo], evg_conf_mock, 'install-dir/bin')
 
         self.assertEqual(shrub_config.as_dict(), EMPTY_PROJECT)
 
@@ -142,7 +142,7 @@ class TestGenerateEvgTasks(unittest.TestCase):
             MagicMock(test_file="dir/test2.js", avg_duration_pass=10)
         ]
         under_test._generate_evg_tasks(evergreen_api, shrub_config, expansions_file_data,
-                                       buildvariant_map, [repo], evg_conf_mock)
+                                       buildvariant_map, [repo], evg_conf_mock, 'install-dir/bin')
 
         generated_config = shrub_config.as_dict()
         self.assertEqual(len(generated_config["buildvariants"]), 2)
@@ -217,7 +217,7 @@ class TestAcceptance(unittest.TestCase):
 
         create_evg_build_variant_map_mock.return_value = CREATE_EVG_BUILD_VARIANT_MAP
 
-        under_test.burn_in(EXPANSIONS_FILE_DATA, evg_conf_mock, None, repos)
+        under_test.burn_in(EXPANSIONS_FILE_DATA, evg_conf_mock, None, repos, 'install_dir/bin')
 
         write_to_file_mock.assert_called_once()
         shrub_config = write_to_file_mock.call_args[0][2]
@@ -246,7 +246,7 @@ class TestAcceptance(unittest.TestCase):
             'jstests/aggregation/accumulators/accumulator_js.js'
         }
 
-        under_test.burn_in(EXPANSIONS_FILE_DATA, evg_conf, None, repos)
+        under_test.burn_in(EXPANSIONS_FILE_DATA, evg_conf, None, repos, 'install_dir/bin')
 
         write_to_file_mock.assert_called_once()
         written_config = write_to_file_mock.call_args[0][2]

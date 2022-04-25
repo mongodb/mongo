@@ -103,10 +103,12 @@ def create_multiversion_generate_tasks_config(tests_by_task: Dict, evg_api: Ever
 @click.option("--verbose", "verbose", default=False, is_flag=True, help="Enable extra logging.")
 @click.option("--task_id", "task_id", default=None, metavar='TASK_ID',
               help="The evergreen task id.")
+@click.option("--install_dir", "install_dir", default=None, metavar='INSTALL_DIR',
+              help="Path to testable installation of MongoDB")
 @click.argument("resmoke_args", nargs=-1, type=click.UNPROCESSED)
 # pylint: disable=too-many-arguments,too-many-locals
 def main(build_variant, run_build_variant, distro, project, generate_tasks_file, no_exec,
-         resmoke_args, evg_api_config, verbose, task_id):
+         resmoke_args, evg_api_config, verbose, task_id, install_dir: str):
     """
     Run new or changed tests in repeated mode to validate their stability.
 
@@ -161,7 +163,8 @@ def main(build_variant, run_build_variant, distro, project, generate_tasks_file,
     resmoke_cmd = _set_resmoke_cmd(repeat_config, list(resmoke_args))
 
     changed_tests = find_changed_tests(repos, evg_api=evg_api, task_id=task_id)
-    tests_by_task = create_tests_by_task(generate_config.build_variant, evg_conf, changed_tests)
+    tests_by_task = create_tests_by_task(generate_config.build_variant, evg_conf, changed_tests,
+                                         install_dir)
     LOGGER.debug("tests and tasks found", tests_by_task=tests_by_task)
 
     if generate_tasks_file:

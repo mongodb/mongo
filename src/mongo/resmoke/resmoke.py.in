@@ -1,0 +1,55 @@
+#!/usr/bin/env python3
+import importlib.util
+import os
+import os.path
+import argparse
+import sys
+import shlex
+import textwrap
+
+BUILD_BIN_DIR=r"@install_dir@"
+
+class _SilentArgumentParser(argparse.ArgumentParser):
+    """ArgumentParser variant that silently swallows errors."""
+    def error(self, message):
+        pass
+
+# We do not want people to use this wrapper and provide --installDir,
+# especially if the user tries to supply the wrong installDir. Prevent that
+# by parsing the command line flags and make sure that --installDir is not
+# passed in. (only the run command supports this flag)
+try:
+    parser = _SilentArgumentParser(add_help=False)
+
+    subparsers = parser.add_subparsers(dest="cmd")
+    run = subparsers.add_parser("run")
+    run.add_argument("--installDir")
+    args, _ = parser.parse_known_args()
+    if "installDir" in args and args.installDir is not None:
+        err = textwrap.dedent(f"""\
+Argument '--installDir' passed to resmoke wrapper script, but this action can
+have unforeseen consequences. Either remove --installDir, or call resmoke as
+`buildscripts/resmoke.py run --installDir={shlex.quote(args.installDir)}`""")
+        raise RuntimeError(err)
+
+    run_cmd_called = args.cmd == "run"
+except RuntimeError:
+    raise
+except:
+    run_cmd_called = False
+
+# If the run subcommand is being used, inject installDir
+if run_cmd_called:
+    i = sys.argv.index("run")
+    sys.argv.insert(i+1, "--installDir")
+    sys.argv.insert(i+2, BUILD_BIN_DIR)
+
+path_to_resmoke_py = os.path.join("buildscripts", "resmoke.py")
+
+# import and run the cli
+spec = importlib.util.spec_from_file_location("__main__", path_to_resmoke_py)
+resmoke = importlib.util.module_from_spec(spec)
+resmoke.__package__ = None
+spec.loader.exec_module(resmoke)
+
+# -*- mode: python -*-

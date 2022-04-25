@@ -642,6 +642,7 @@ class NinjaState:
         for rule, kwargs in self.rules.items():
             ninja.rule(rule, **kwargs)
 
+        # TODO SERVER-64664
         generated_source_files = sorted({
             output
             # First find builds which have header files in their outputs.

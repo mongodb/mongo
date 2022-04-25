@@ -3,7 +3,6 @@
 
 import argparse
 import sys
-
 import yaml
 
 DEFAULT_REQUIRED_BUILD_TIMEOUT_SECS = 30 * 60
