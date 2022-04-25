@@ -153,12 +153,15 @@ public:
         }
 
         // Additively compose equality comparisons, creating one for each constant in 'equalities'.
-        auto [firstTag, firstVal] = convertFrom(Value(equalities[0]));
-        ABT result = make<PathCompare>(Operations::Eq, make<Constant>(firstTag, firstVal));
-        for (size_t i = 1; i < equalities.size(); i++) {
-            auto [tag, val] = convertFrom(Value(equalities[i]));
-            result = make<PathComposeA>(
-                std::move(result), make<PathCompare>(Operations::Eq, make<Constant>(tag, val)));
+        ABT result = make<PathIdentity>();
+        for (const auto& pred : equalities) {
+            const auto [tag, val] = convertFrom(Value(pred));
+            if (tag == sbe::value::TypeTags::Null) {
+                // Handle null and missing.
+                maybeComposePath<PathComposeA>(result, make<PathDefault>(Constant::boolean(true)));
+            }
+            maybeComposePath<PathComposeA>(
+                result, make<PathCompare>(Operations::Eq, make<Constant>(tag, val)));
         }
 
         // The path can be empty if we are within an $elemMatch.
