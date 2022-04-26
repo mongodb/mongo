@@ -549,11 +549,10 @@ void updateChunkAndTagsDocsForTempNss(OperationContext* opCtx,
 void executeMetadataChangesInTxn(
     OperationContext* opCtx,
     unique_function<void(OperationContext*, TxnNumber)> changeMetadataFunc) {
-    ShardingCatalogManager::withTransaction(
-        opCtx,
-        NamespaceString::kConfigReshardingOperationsNamespace,
-        [&](OperationContext* opCtx, TxnNumber txnNumber) { changeMetadataFunc(opCtx, txnNumber); },
-        ShardingCatalogClient::kLocalWriteConcern);
+    ShardingCatalogManager::withTransaction(opCtx,
+                                            NamespaceString::kConfigReshardingOperationsNamespace,
+                                            std::move(changeMetadataFunc),
+                                            ShardingCatalogClient::kLocalWriteConcern);
 }
 
 BSONObj makeFlushRoutingTableCacheUpdatesCmd(const NamespaceString& nss) {
