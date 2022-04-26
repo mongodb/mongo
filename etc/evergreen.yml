@@ -41,6 +41,10 @@ ignore:
 ## Some variables for convenience:
 variables:
 
+- &batchtime_one_day 1440
+- &batchtime_one_week 10080
+- &batchtime_one_year 525600
+
 # Used when the tests it runs depend only on mongod, mongos, the mongo shell and the tools.
 - &task_template
   name: template
@@ -8839,7 +8843,7 @@ buildvariants:
 - &linux-64-debug-template
   name: linux-64-debug
   display_name: "! Linux DEBUG"
-  batchtime: 1440 # 1 day
+  batchtime: *batchtime_one_week
   run_on:
   - rhel62-large
   expansions:
@@ -9725,7 +9729,7 @@ buildvariants:
 
 - name: windows-debug
   display_name: "* Windows DEBUG"
-  batchtime: 1440 # 1 day
+  batchtime: *batchtime_one_week
   run_on:
   - windows-vsCurrent-small
   expansions:
@@ -9792,7 +9796,7 @@ buildvariants:
 
 - name: enterprise-windows-required
   display_name: "! Enterprise Windows"
-  batchtime: 1440 # 1 day
+  batchtime: *batchtime_one_week
   modules:
   - enterprise
   run_on:
@@ -9835,7 +9839,7 @@ buildvariants:
 
 - name: enterprise-windows
   display_name: "* Enterprise Windows"
-  batchtime: 1440 # 1 day
+  batchtime: *batchtime_one_week
   modules:
     - enterprise
   run_on:
@@ -10095,7 +10099,7 @@ buildvariants:
 
 - name: macos-debug
   display_name: "* macOS DEBUG"
-  batchtime: 1440 # 1 day
+  batchtime: *batchtime_one_week
   run_on:
   - macos-1014
   expansions:
@@ -10159,7 +10163,7 @@ buildvariants:
   display_name: "Embedded SDK - macOS"
   run_on:
   - macos-1014
-  batchtime: 10080 # 7 days
+  batchtime: *batchtime_one_week
   expansions:
     test_flags: --excludeWithAnyTags=uses_transactions
     cmake_path: /Applications/cmake-3.11.0-Darwin-x86_64/CMake.app/Contents/bin/cmake
@@ -10210,7 +10214,7 @@ buildvariants:
 
 - name: enterprise-rhel-62-64-bit
   display_name: "! Enterprise RHEL 6.2"
-  batchtime: 1440 # 1 day
+  batchtime: *batchtime_one_week
   modules:
   - enterprise
   run_on:
@@ -10330,7 +10334,7 @@ buildvariants:
 
 - name: enterprise-rhel-62-64-bit-store-fam-images-in-side-coll
   display_name: "Enterprise RHEL 6.2 (storeFindAndModifyImagesInSideCollection=True)"
-  batchtime: 1440 # 1 day
+  batchtime: *batchtime_one_week
   modules:
   - enterprise
   run_on:
@@ -10435,7 +10439,7 @@ buildvariants:
   - enterprise
   run_on:
   - rhel62-small
-  batchtime: 10080 # 7 days
+  batchtime: *batchtime_one_week
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     compile_flags: >-
@@ -10615,7 +10619,7 @@ buildvariants:
   - enterprise
   run_on:
   - rhel62-small
-  batchtime: 10080 # 7 days
+  batchtime: *batchtime_one_week
   expansions: &enterprise-rhel-62-64-bit-flow-control-off
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     test_flags: >-
@@ -10728,7 +10732,7 @@ buildvariants:
     - enterprise
   run_on:
     - rhel62-large
-  batchtime: 10080 # 7 days
+  batchtime: *batchtime_one_week
   stepback: false
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
@@ -10789,7 +10793,7 @@ buildvariants:
 - &enterprise-rhel-70-64-bit-template
   name: enterprise-rhel-70-64-bit
   display_name: "* Enterprise RHEL 7.0"
-  batchtime: 1440 # 1 day
+  batchtime: *batchtime_one_week
   modules:
   - enterprise
   run_on:
@@ -10958,7 +10962,7 @@ buildvariants:
 - <<: *enterprise-rhel-70-64-bit-template
   name: hot_backups-rhel-70-64-bit
   display_name: "hot_backups RHEL 7.0"
-  batchtime: 10080 # 7 days
+  batchtime: *batchtime_one_week
   run_on:
   - rhel70
   expansions:
@@ -10974,7 +10978,7 @@ buildvariants:
 - <<: *enterprise-rhel-70-64-bit-template
   name: enterprise-rhel-70-64-bit-no-libunwind
   display_name: "~ Enterprise RHEL 7.0 (no-libunwind)"
-  batchtime: 10080  # 1 week
+  batchtime: *batchtime_one_week
   run_on:
   - rhel70
   expansions:
@@ -11017,7 +11021,7 @@ buildvariants:
   - enterprise
   run_on:
   - rhel81-power8-small
-  batchtime: 10080 # 7 days
+  batchtime: *batchtime_one_week
   stepback: false
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
@@ -11064,7 +11068,7 @@ buildvariants:
 
 - name: ubuntu1604-debug
   display_name: "* Ubuntu 16.04 DEBUG"
-  batchtime: 1440 # 1 day
+  batchtime: *batchtime_one_week
   run_on:
   - ubuntu1604-test
   expansions:
@@ -11323,7 +11327,7 @@ buildvariants:
   - enterprise
   run_on:
   - rhel71-power8-test
-  batchtime: 10080 # 7 days
+  batchtime: *batchtime_one_week
   stepback: false
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
@@ -11374,7 +11378,7 @@ buildvariants:
   - enterprise
   run_on:
   - rhel72-zseries-test
-  batchtime: 10080 # 7 days
+  batchtime: *batchtime_one_week
   stepback: false
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
@@ -11476,7 +11480,7 @@ buildvariants:
 
 - name: enterprise-ubuntu-dynamic-1604-clang
   display_name: "! Shared Library Enterprise Ubuntu 16.04 (Clang)"
-  batchtime: 1440 # 1 day
+  batchtime: *batchtime_one_week
   modules:
   - enterprise
   run_on:
@@ -11504,7 +11508,7 @@ buildvariants:
 
 - name: enterprise-ubuntu-dynamic-1604-clang-tidy
   display_name: "* Enterprise Clang Tidy"
-  batchtime: 1440 # 1 day
+  batchtime: *batchtime_one_week
   modules:
   - enterprise
   run_on:
@@ -11525,7 +11529,7 @@ buildvariants:
 
 - name: ubuntu-dynamic-1604-clang
   display_name: "* Shared Library Ubuntu 16.04 (Clang)"
-  batchtime: 1440 # 1 day
+  batchtime: *batchtime_one_week
   run_on:
    - ubuntu1604-test
   expansions:
@@ -12049,7 +12053,7 @@ buildvariants:
   - enterprise
   run_on:
   - rhel71-power8-test
-  batchtime: 10080 # 7 days
+  batchtime: *batchtime_one_week
   stepback: false
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
@@ -12085,7 +12089,7 @@ buildvariants:
   - enterprise
   run_on:
   - rhel72-zseries-test
-  batchtime: 10080 # 7 days
+  batchtime: *batchtime_one_week
   stepback: false
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
@@ -12278,7 +12282,7 @@ buildvariants:
 
 - name: ubuntu1804-debug-aubsan-lite
   display_name: "! {A,UB}SAN Enterprise Ubuntu 18.04 DEBUG"
-  batchtime: 1440 # 1 day
+  batchtime: *batchtime_one_week
   modules:
   - enterprise
   run_on:
@@ -12327,7 +12331,7 @@ buildvariants:
 
 - name: enterprise-ubuntu-dynamic-1604-64-bit
   display_name: "* Shared Library Enterprise Ubuntu 16.04"
-  batchtime: 1440 # 1 day
+  batchtime: *batchtime_one_week
   modules:
   - enterprise
   expansions:
@@ -12348,7 +12352,7 @@ buildvariants:
 
 - name: enterprise-ubuntu-no-latch-1604-64-bit
   display_name: "~ Enterprise Ubuntu 16.04 (without Diagnostic Latches)"
-  batchtime: 10080 # 7 days
+  batchtime: *batchtime_one_week
   modules:
   - enterprise
   expansions:
@@ -12360,7 +12364,7 @@ buildvariants:
 
 - name: enterprise-ubuntu-no-latch-1804-64-bit
   display_name: "~ Enterprise Ubuntu 18.04 DEBUG (Unoptimized)"
-  batchtime: 10080 # 7 days
+  batchtime: *batchtime_one_week
   modules:
   - enterprise
   expansions:
@@ -12373,7 +12377,7 @@ buildvariants:
 
 - name: enterprise-ubuntu-scanning-replica-set-monitor-1604-64-bit
   display_name: "~ Enterprise Ubuntu 16.04 (with ScanningReplicaSetMonitor)"
-  batchtime: 10080 # 7 days
+  batchtime: *batchtime_one_week
   run_on:
     - ubuntu1604-test
   modules:
@@ -12405,7 +12409,7 @@ buildvariants:
 
 - name: enterprise-ubuntu-sdam-replica-set-monitor-1604-64-bit
   display_name: "~ Enterprise Ubuntu 16.04 (with SdamReplicaSetMonitor)"
-  batchtime: 10080 # 7 days
+  batchtime: *batchtime_one_week
   run_on:
     - ubuntu1604-test
   modules:
@@ -12436,7 +12440,7 @@ buildvariants:
 
 - name: enterprise-ubuntu-task-executor-pool-size-1604-64-bit
   display_name: "~ Enterprise Ubuntu 16.04 (with {taskExecutorPoolSize: 4})"
-  batchtime: 10080 # 7 days
+  batchtime: *batchtime_one_week
   run_on:
     - ubuntu1604-test
   modules:
@@ -12486,7 +12490,7 @@ buildvariants:
     - enterprise
   run_on:
     - rhel62-small
-  batchtime: 10080 # 7 days
+  batchtime: *batchtime_one_week
   stepback: false
   expansions:
     selected_tests_buildvariants: enterprise-rhel-62-64-bit enterprise-windows-required linux-64-debug enterprise-ubuntu-dynamic-1604-clang ubuntu1804-debug-aubsan-lite
@@ -12499,7 +12503,7 @@ buildvariants:
   - enterprise
   run_on:
     - rhel62-small
-  batchtime: 10080 # 7 days
+  batchtime: *batchtime_one_week
   stepback: false
   expansions:
     additional_package_targets: archive-mh archive-mh-debug
