@@ -298,7 +298,8 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
         replset_config_options["configsvr"] = True
 
         mongod_options = self.mongod_options.copy()
-        mongod_options.update(
+        mongod_options = self.fixturelib.merge_mongo_option_dicts(
+            mongod_options,
             self.fixturelib.make_historic(configsvr_options.pop("mongod_options", {})))
         mongod_options["configsvr"] = ""
         mongod_options["dbpath"] = os.path.join(self._dbpath_prefix, "config")
@@ -340,8 +341,8 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
                                                     num_rs_nodes_per_shard]
 
         mongod_options = self.mongod_options.copy()
-        mongod_options.update(
-            self.fixturelib.make_historic(shard_options.pop("mongod_options", {})))
+        mongod_options = self.fixturelib.merge_mongo_option_dicts(
+            mongod_options, self.fixturelib.make_historic(shard_options.pop("mongod_options", {})))
         mongod_options["shardsvr"] = ""
         mongod_options["dbpath"] = os.path.join(self._dbpath_prefix, "shard{}".format(index))
         mongod_options["replSet"] = ShardedClusterFixture._SHARD_REPLSET_NAME_PREFIX + str(index)
