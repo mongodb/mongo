@@ -6,7 +6,6 @@ env = env.Clone()
 env.SConscript(
     dirs=[
         'devnull',
-        'ephemeral_for_test',
         'kv',
         'wiredtiger',
     ],

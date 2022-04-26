@@ -759,7 +759,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/read_write_concern_defaults',
         '$BUILD_DIR/mongo/db/read_write_concern_defaults_mock',
         '$BUILD_DIR/mongo/db/repl/repl_server_parameters',
-        '$BUILD_DIR/mongo/db/storage/ephemeral_for_test/storage_ephemeral_for_test',
         '$BUILD_DIR/mongo/db/storage/storage_engine_common',
     ],
 )
@@ -1684,7 +1683,6 @@ if wiredtiger:
             '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
             '$BUILD_DIR/mongo/db/service_context_test_fixture',
             '$BUILD_DIR/mongo/db/stats/counters',
-            '$BUILD_DIR/mongo/db/storage/ephemeral_for_test/storage_ephemeral_for_test_core',
             '$BUILD_DIR/mongo/db/storage/storage_control',
             '$BUILD_DIR/mongo/db/transaction',
             '$BUILD_DIR/mongo/db/update/update_test_helpers',

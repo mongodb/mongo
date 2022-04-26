@@ -171,7 +171,6 @@ env.Program(
         "$BUILD_DIR/mongo/db/server_options_core",
         "$BUILD_DIR/mongo/db/sessions_collection_standalone",
         "$BUILD_DIR/mongo/db/storage/durable_catalog_impl",
-        "$BUILD_DIR/mongo/db/storage/ephemeral_for_test/storage_ephemeral_for_test",
         "$BUILD_DIR/mongo/db/storage/storage_engine_impl",
         "$BUILD_DIR/mongo/db/traffic_reader",
         "$BUILD_DIR/mongo/db/transaction",
