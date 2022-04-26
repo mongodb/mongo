@@ -113,6 +113,11 @@ class ShardSplitLifeCycle(object):
             self.__test_state = self._TEST_FINISHED_STATE
             self.__cond.notify_all()
 
+    def is_test_finished(self):
+        """Return true if the current test has finished."""
+        with self.__lock:
+            return self.__test_state == self._TEST_FINISHED_STATE
+
     def stop(self):
         """Signal to the shard split thread that it should exit.
 
@@ -341,6 +346,13 @@ class _ShardSplitThread(threading.Thread):  # pylint: disable=too-many-instance-
             res = self._commit_shard_split(donor_client, split_opts)
             is_committed = res["state"] == "committed"
 
+            # Garbage collect the split prior to throwing error to avoid conflicting operations
+            # in the next test.
+            if is_committed:
+                # Wait for the donor/proxy to reroute at least one command before doing garbage
+                # collection. Stop waiting when the test finishes.
+                self._wait_for_reroute_or_test_completion(donor_client, split_opts)
+
             self._forget_shard_split(donor_client, split_opts)
             self._wait_for_garbage_collection(split_opts)
 
@@ -484,3 +496,33 @@ class _ShardSplitThread(threading.Thread):  # pylint: disable=too-many-instance-
                 f"Error waiting for shard split '{split_opts.migration_id}' from donor replica set '{split_opts.get_donor_name()} to recipient replica set '{split_opts.recipient_set_name}' to be garbage collected."
             )
             raise
+
+    def _wait_for_reroute_or_test_completion(self, donor_client, split_opts):
+        start_time = time.time()
+
+        self.logger.info(
+            f"Waiting for donor primary of replica set '{split_opts.get_donor_name()}' for shard split '{split_opts.migration_id}' to reroute at least one conflicting command. Stop waiting when the test finishes."
+        )
+
+        while not self.__lifecycle.is_test_finished():
+            try:
+                # We are reusing the infrastructure originally developed for tenant migrations,
+                # and aren't concerned about conflicts because we don't expect the tenant migration
+                # and shard split hooks to run concurrently.
+                doc = donor_client["testTenantMigration"]["rerouted"].find_one(
+                    {"_id": split_opts.get_migration_id_as_binary()})
+                if doc is not None:
+                    return
+            except pymongo.errors.ConnectionFailure:
+                self.logger.info(
+                    f"Retrying waiting for donor primary of replica set '{split_opts.get_donor_name()}' for shard split '{split_opts.migration_id}' to reroute at least one conflicting command."
+                )
+                continue
+            except pymongo.errors.PyMongoError:
+                end_time = time.time()
+                self.logger.exception(
+                    f"Error running find command on donor primary replica set '{split_opts.get_donor_name()}' after waiting for reroute for {(end_time - start_time) * 1000} ms"
+                )
+                raise
+
+            time.sleep(self.POLL_INTERVAL_SECS)

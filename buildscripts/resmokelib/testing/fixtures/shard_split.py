@@ -90,9 +90,6 @@ class ShardSplitFixture(interface.MultiClusterFixture):  # pylint: disable=too-m
         # TODO(SERVER-41031, SERVER-36417): Stop keeping retired donors alive once nodes which are
         # removed from a replica set stop trying to send heartbeats to the replica set. We keep
         # them alive for now to prevent a large amount of log lines from failed heartbeats.
-        # TODO(SERVER-65145): It may be possible to improve the inject_tenant_prefix override to
-        # prevent spurious errors caused by shutting down the replica set the shell originally
-        # connects to.
         self._retired_donors = []
 
     def pids(self):

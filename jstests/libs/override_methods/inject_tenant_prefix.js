@@ -1,7 +1,7 @@
 /**
- * Overrides the database name of each accessed database ("config", "admin", "local" excluded) to
- * have the prefix TestData.tenantId so that the accessed data will be migrated by the background
- * tenant migrations run by the ContinuousTenantMigration hook.
+ * Overrides the runCommand method to prefix all databases and namespaces ("config", "admin",
+ * "local" excluded) with a tenant prefix, so that the accessed data will be migrated by the
+ * background operations run by the ContinuousTenantMigration and ContinuousShardSplit hooks.
  */
 (function() {
 'use strict';
@@ -31,9 +31,11 @@ function isDenylistedDb(dbName) {
     return kDenylistedDbNames.has(dbName);
 }
 
+const kTenantPrefixMap = {};
+
 /**
- * If the database with the given name can be migrated, prepends TestData.tenantId to the name if
- * it does not already start with the prefix.
+ * If the database with the given name can be migrated, prepend a tenant prefix if one has not
+ * already been applied.
  */
 function prependTenantIdToDbNameIfApplicable(dbName) {
     if (dbName.length === 0) {
@@ -41,50 +43,76 @@ function prependTenantIdToDbNameIfApplicable(dbName) {
         // ignored.
         return dbName;
     }
-    const prefix = TestData.tenantId + "_";
-    return isDenylistedDb(dbName) || dbName.startsWith(prefix) ? dbName : prefix + dbName;
+
+    let prefix;
+    // If `TestData.tenantIds` is present, then assign a database to a randomly selected tenant
+    if (TestData.tenantIds) {
+        if (!kTenantPrefixMap[dbName]) {
+            const tenantId =
+                TestData.tenantIds[Math.floor(Math.random() * TestData.tenantIds.length)];
+            kTenantPrefixMap[dbName] = `${tenantId}_`;
+        }
+
+        prefix = kTenantPrefixMap[dbName];
+    } else {
+        prefix = `${TestData.tenantId}_`;
+    }
+
+    return (isDenylistedDb(dbName) || dbName.startsWith(prefix)) ? dbName : `${prefix}${dbName}`;
 }
 
 /**
- * If the database for the given namespace can be migrated, prepends TestData.tenantId to the
- * namespace if it does not already start with the prefix.
+ * If the database for the given namespace can be migrated, prepend a tenant prefix if one has not
+ * already been applied.
  */
 function prependTenantIdToNsIfApplicable(ns) {
     if (ns.length === 0 || !ns.includes(".")) {
         // There are input validation tests that use invalid namespaces, those should be ignored.
         return ns;
     }
-    let splitNs = ns.split(".");
+
+    const splitNs = ns.split(".");
     splitNs[0] = prependTenantIdToDbNameIfApplicable(splitNs[0]);
     return splitNs.join(".");
 }
 
 /**
- * If the given database name starts TestData.tenantId, removes the prefix.
+ * Remove a tenant prefix from the provided database name, if applicable.
  */
 function extractOriginalDbName(dbName) {
-    return dbName.replace(TestData.tenantId + "_", "");
+    if (TestData.tenantIds) {
+        const anyTenantPrefixOnceRegex = new RegExp(Object.values(kTenantPrefixMap).join('|'), '');
+        return dbName.replace(anyTenantPrefixOnceRegex, "");
+    }
+
+    return dbName.replace(`${TestData.tenantId}_`, "");
 }
 
 /**
- * If the database name for the given namespace starts TestData.tenantId, removes the prefix.
+ * Remove a tenant prefix from the provided namespace, if applicable.
  */
 function extractOriginalNs(ns) {
-    let splitNs = ns.split(".");
+    const splitNs = ns.split(".");
     splitNs[0] = extractOriginalDbName(splitNs[0]);
     return splitNs.join(".");
 }
 
 /**
- * Removes all occurrences of TestDatabase.tenantId in the string.
+ * Removes all occurrences of a tenant prefix in the provided string.
  */
 function removeTenantIdFromString(string) {
-    return string.replace(new RegExp(TestData.tenantId + "_", "g"), "");
+    if (TestData.tenantIds) {
+        const anyTenantPrefixGlobalRegex =
+            new RegExp(Object.values(kTenantPrefixMap).join('|'), 'g');
+        return string.replace(anyTenantPrefixGlobalRegex, "");
+    }
+
+    return string.replace(new RegExp(`${TestData.tenantId}_`, 'g'), "");
 }
 
 /**
- * Prepends TestDatabase.tenantId to all the database name and namespace fields inside the given
- * object.
+ * Prepends a tenant prefix to all database name and namespace fields in the provided object, where
+ * applicable.
  */
 function prependTenantId(obj) {
     for (let k of Object.keys(obj)) {
@@ -103,12 +131,13 @@ function prependTenantId(obj) {
             obj[k] = prependTenantId(v);
         }
     }
+
     return obj;
 }
 
 /**
- * Removes TestDatabase.tenantId from all the database name and namespace fields inside the given
- * object.
+ * Removes a tenant prefix from all the database name and namespace fields in the provided object,
+ * where applicable.
  */
 function removeTenantId(obj) {
     for (let k of Object.keys(obj)) {
@@ -130,6 +159,7 @@ function removeTenantId(obj) {
             obj[originalK] = removeTenantId(v);
         }
     }
+
     return obj;
 }
 
@@ -137,18 +167,15 @@ const kCmdsWithNsAsFirstField =
     new Set(["renameCollection", "checkShardingIndex", "dataSize", "datasize", "splitVector"]);
 
 /**
- * Returns true if cmdObj has been marked as having TestData.tenantId prepended to all of its
- * database name and namespace fields, and false otherwise. Assumes that 'createCmdObjWithTenantId'
- * sets cmdObj.comment.isCmdObjWithTenantId to true.
+ * Returns true if the provided command object has had a tenant prefix appended to its namespaces.
  */
 function isCmdObjWithTenantId(cmdObj) {
     return cmdObj.comment && cmdObj.comment.isCmdObjWithTenantId;
 }
 
 /**
- * If cmdObj.comment.isCmdObjWithTenantId is false, returns a new cmdObj with TestData.tenantId
- * prepended to all of its database name and namespace fields, and sets the flag to true after doing
- * so. Otherwise, returns an exact copy of cmdObj.
+ * Prepend a tenant prefix to all namespaces within a provided command object, and record a comment
+ * indicating that the command object has alrady been modified.
  */
 function createCmdObjWithTenantId(cmdObj) {
     const cmdName = Object.keys(cmdObj)[0];
@@ -337,22 +364,40 @@ function removeSuccessfulOpIndexesExceptForUpserted(resObj, indexMap, ordered) {
 }
 
 /**
- * Returns the state document for the outgoing tenant migration for TestData.tenantId. Asserts
- * that there is only one such migration.
+ * Rewrites a server connection string (ex: rsName/host,host,host) to a URI that the shell can
+ * connect to.
  */
-function getTenantMigrationStateDoc(conn) {
-    const findRes = assert.commandWorked(originalRunCommand.apply(
-        conn,
-        ["config", {find: "tenantMigrationDonors", filter: {tenantId: TestData.tenantId}}, 0]));
-    const docs = findRes.cursor.firstBatch;
-    // There should only be one active migration at any given time.
-    assert.eq(docs.length, 1, tojson(docs));
-    return docs[0];
+function convertServerConnectionStringToURI(input) {
+    const inputParts = input.split('/');
+    return `mongodb://${inputParts[1]}/${inputParts[0]}`;
 }
 
 /**
- * Marks the outgoing migration for TestData.tenantId as having caused the shell to reroute
- * commands by inserting a document for it into the testTenantMigration.rerouted collection.
+ * Returns the state document for the outgoing tenant migration or shard split operation. Asserts
+ * that there is only one such operation.
+ */
+function getOperationStateDocument(conn) {
+    const collection = TestData.tenantIds ? "tenantSplitDonors" : "tenantMigrationDonors";
+    const filter =
+        TestData.tenantIds ? {tenantIds: TestData.tenantIds} : {tenantId: TestData.tenantId};
+    const findRes = assert.commandWorked(
+        originalRunCommand.apply(conn, ["config", {find: collection, filter}, 0]));
+    const docs = findRes.cursor.firstBatch;
+    // There should only be one active migration at any given time.
+    assert.eq(docs.length, 1, tojson(docs));
+
+    const result = docs[0];
+    if (TestData.tenantIds) {
+        result.recipientConnectionString =
+            convertServerConnectionStringToURI(result.recipientConnectionString);
+    }
+
+    return result;
+}
+
+/**
+ * Marks the outgoing tenant migration or shard split operation as having caused the shell to
+ * reroute commands by inserting a document for it into the testTenantMigration.rerouted collection.
  */
 function recordRerouteDueToTenantMigration(conn, migrationStateDoc) {
     assert.neq(null, conn._conn);
@@ -528,7 +573,7 @@ function runCommandRetryOnTenantMigrationErrors(
                     dbNameWithTenantId} after trying ${numAttempts} times: ${tojson(resObj)}`);
                 // Store the connection to the recipient so the next commands can be rerouted.
                 const donorConnection = getRoutingConnection(conn);
-                const migrationStateDoc = getTenantMigrationStateDoc(donorConnection);
+                const migrationStateDoc = getOperationStateDocument(donorConnection);
                 setRoutingConnection(
                     conn, connect(migrationStateDoc.recipientConnectionString).getMongo());
 
@@ -592,17 +637,16 @@ function runCommandRetryOnTenantMigrationErrors(
 Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
     const dbNameWithTenantId = prependTenantIdToDbNameIfApplicable(dbName);
 
-    // Use cmdObj with TestData.tenantId prepended to all the applicable database names and
-    // namespaces.
+    // Prepend a tenant prefix to all database names and namespaces, where applicable.
     const originalCmdObjContainsTenantId = isCmdObjWithTenantId(cmdObj);
-    let cmdObjWithTenantId =
+    const cmdObjWithTenantId =
         originalCmdObjContainsTenantId ? cmdObj : createCmdObjWithTenantId(cmdObj);
 
-    let resObj = runCommandRetryOnTenantMigrationErrors(
+    const resObj = runCommandRetryOnTenantMigrationErrors(
         this, dbNameWithTenantId, cmdObjWithTenantId, options);
 
     if (!originalCmdObjContainsTenantId) {
-        // Remove TestData.tenantId from all database names and namespaces in the resObj since tests
+        // Remove the tenant prefix from all database names and namespaces in the result since tests
         // assume the command was run against the original database.
         removeTenantId(resObj);
     }

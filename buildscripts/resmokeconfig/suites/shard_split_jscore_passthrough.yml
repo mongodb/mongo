@@ -39,6 +39,7 @@ selector:
   # process.
   - uses_full_validation
   - tenant_migration_incompatible
+  - shard_split_incompatible
 
 executor:
   archive:
@@ -52,6 +53,7 @@ executor:
     shell_options:
       eval: >-
         testingReplication = true;
+        load('jstests/libs/override_methods/inject_tenant_prefix.js');
         jsTest.authenticate(db.getMongo());
       global_vars:
         TestData: &TestData
