@@ -874,6 +874,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-rhel80
     compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    csfle_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
     multiversion_platform: rhel80
     multiversion_edition: enterprise
     has_packages: true
@@ -956,6 +957,10 @@ buildvariants:
   - name: .sharding .common
   - name: snmp
   - name: .stitch
+  - name: .csfle
+    distros:
+    - rhel80-large
+  - name: .publish_csfle
   - name: .updatefuzzer
   - name: secondary_reads_passthrough_gen
   - name: server_discovery_and_monitoring_json_test_TG
