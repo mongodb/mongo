@@ -113,7 +113,7 @@ public:
             }
 
             // If the collection doesn't exists or is empty return 0
-            if (dataSizeBytes == 0) {
+            if (numRecords == 0 || dataSizeBytes == 0) {
                 return 0LL;
             }
 
