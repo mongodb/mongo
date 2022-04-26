@@ -1041,6 +1041,14 @@ Status runAggregate(OperationContext* opCtx,
         // For an optimized away pipeline, signal the cache that a query operation has completed.
         // For normal pipelines this is done in DocumentSourceCursor.
         if (ctx) {
+            // Due to yielding, the collection pointers saved in MultipleCollectionAccessor might
+            // have become invalid. We will need to refresh them here.
+            collections = MultipleCollectionAccessor(opCtx,
+                                                     &ctx->getCollection(),
+                                                     ctx->getNss(),
+                                                     ctx->isAnySecondaryNamespaceAViewOrSharded(),
+                                                     secondaryExecNssList);
+
             if (const auto& coll = ctx->getCollection()) {
                 CollectionQueryInfo::get(coll).notifyOfQuery(opCtx, coll, stats);
             }
