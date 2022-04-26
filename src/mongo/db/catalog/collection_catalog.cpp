@@ -1271,7 +1271,9 @@ void CollectionCatalog::_ensureNamespaceDoesNotExist(OperationContext* opCtx,
                     5725003,
                     "Conflicted registering namespace, already have a view with the same namespace",
                     "nss"_attr = nss);
-                throw WriteConflictException();
+                uasserted(ErrorCodes::NamespaceExists,
+                          "Conflicted registering namespace, already have a view with the same "
+                          "namespace");
             }
         }
     }
