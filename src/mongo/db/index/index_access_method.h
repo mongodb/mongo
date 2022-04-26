@@ -40,7 +40,6 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
-#include "mongo/db/sorter/sorter.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/yieldable.h"
 
