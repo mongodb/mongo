@@ -59,10 +59,12 @@ extern AtomicWord<int> rangeDeleterBatchDelayMS;
 class ScopedRangeDeleterLock {
 public:
     ScopedRangeDeleterLock(OperationContext* opCtx);
+    ScopedRangeDeleterLock(OperationContext* opCtx, const UUID& collectionUuid);
 
 private:
     Lock::DBLock _configLock;
     Lock::CollectionLock _rangeDeletionLock;
+    boost::optional<Lock::ResourceLock> _collectionUuidLock;
 };
 
 /**

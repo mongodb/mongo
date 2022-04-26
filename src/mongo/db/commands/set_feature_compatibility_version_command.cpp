@@ -503,10 +503,7 @@ public:
                 migrationutil::drainMigrationsPendingRecovery(opCtx);
 
                 if (orphanTrackingCondition) {
-                    {
-                        ScopedRangeDeleterLock rangeDeleterLock(opCtx);
-                        setOrphanCountersOnRangeDeletionTasks(opCtx);
-                    }
+                    setOrphanCountersOnRangeDeletionTasks(opCtx);
                     BalancerStatsRegistry::get(opCtx)->initializeAsync(opCtx);
                 }
             }

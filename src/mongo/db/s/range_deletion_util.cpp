@@ -645,6 +645,7 @@ void setOrphanCountersOnRangeDeletionTasks(OperationContext* opCtx) {
         BSONObj(),
         [opCtx, &store, &setNumOrphansOnTask](const RangeDeletionTask& deletionTask) {
             AutoGetCollection collection(opCtx, deletionTask.getNss(), MODE_IX);
+            ScopedRangeDeleterLock rangeDeleterLock(opCtx, deletionTask.getCollectionUuid());
             if (!collection || collection->uuid() != deletionTask.getCollectionUuid()) {
                 // The deletion task is referring to a collection that has been dropped
                 setNumOrphansOnTask(deletionTask, 0);
@@ -704,10 +705,19 @@ void clearOrphanCountersFromRangeDeletionTasks(OperationContext* opCtx) {
     }
 }
 
-// TODO (SERVER-65015) Use granular locks for synchronizing orphan tracking
 ScopedRangeDeleterLock::ScopedRangeDeleterLock(OperationContext* opCtx)
-    : _configLock(Lock::DBLock(opCtx, NamespaceString::kConfigDb, MODE_IX)),
-      _rangeDeletionLock(
-          Lock::CollectionLock(opCtx, NamespaceString::kRangeDeletionNamespace, MODE_X)) {}
+    : _configLock(opCtx, NamespaceString::kConfigDb, MODE_IX),
+      _rangeDeletionLock(opCtx, NamespaceString::kRangeDeletionNamespace, MODE_X) {}
+
+// Take DB and Collection lock in mode IX as well as collection UUID lock to serialize with
+// operations that take the above version of the ScopedRangeDeleterLock such as FCV downgrade and
+// BalancerStatsRegistry initialization.
+ScopedRangeDeleterLock::ScopedRangeDeleterLock(OperationContext* opCtx, const UUID& collectionUuid)
+    : _configLock(opCtx, NamespaceString::kConfigDb, MODE_IX),
+      _rangeDeletionLock(opCtx, NamespaceString::kRangeDeletionNamespace, MODE_IX),
+      _collectionUuidLock(Lock::ResourceLock(
+          opCtx->lockState(),
+          ResourceId(RESOURCE_MUTEX, "RangeDeleterCollLock::" + collectionUuid.toString()),
+          MODE_X)) {}
 
 }  // namespace mongo
