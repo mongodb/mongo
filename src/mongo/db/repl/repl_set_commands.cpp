@@ -506,7 +506,7 @@ public:
         Status status = ReplicationCoordinator::get(opCtx)->checkReplEnabledForCommand(&result);
         uassertStatusOK(status);
 
-        int secs = (int)cmdObj.firstElement().numberInt();
+        auto secs = cmdObj.firstElement().safeNumberInt();
         uassertStatusOK(ReplicationCoordinator::get(opCtx)->processReplSetFreeze(secs, &result));
         return true;
     }
