@@ -203,7 +203,9 @@ intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
                                                     std::move(collator),
                                                     mongoProcessInterface,
                                                     _resolvedNamespaces,
-                                                    uuid);
+                                                    uuid,
+                                                    boost::none /* letParameters */,
+                                                    mayDbProfile);
 
     expCtx->inMongos = inMongos;
     expCtx->maxFeatureCompatibilityVersion = maxFeatureCompatibilityVersion;
