@@ -642,7 +642,8 @@ void QueryPlannerAnalysis::determineLookupStrategy(
             if ((index.type == INDEX_BTREE || index.type == INDEX_HASHED) &&
                 index.keyPattern.firstElement().fieldName() ==
                     eqLookupNode->joinFieldForeign.fullPath() &&
-                !index.filterExpr && CollatorInterface::collatorsMatch(collator, index.collator)) {
+                !index.filterExpr && !index.sparse &&
+                CollatorInterface::collatorsMatch(collator, index.collator)) {
                 return index;
             }
         }

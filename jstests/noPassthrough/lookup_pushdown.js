@@ -414,6 +414,17 @@ function setLookupPushdownDisabled(value) {
     assert.commandWorked(foreignColl.dropIndexes());
 }());
 
+// Build a sparse index on the foreign collection that matches the foreignField. In this case, we
+// should use regular nested loop join.
+(function testSparseIndexesNotUsedForPushDown() {
+    assert.commandWorked(foreignColl.dropIndexes());
+    assert.commandWorked(foreignColl.createIndex({b: 1}, {sparse: true}));
+    runTest(coll,
+            [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
+            JoinAlgorithm.NLJ /* expectedJoinAlgorithm */);
+    assert.commandWorked(foreignColl.dropIndexes());
+}());
+
 // Build a compound index containing the foreignField, but not as the first field. In this case,
 // we should use regular nested loop join.
 (function testForeignFieldNotPrefixInhibitsIndexNestedLoopJoin() {
