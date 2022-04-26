@@ -321,6 +321,8 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& in
     bool hasCollationField = false;
     bool hasWeightsField = false;
     bool hasOriginalSpecField = false;
+    bool unique = false;
+    bool prepareUnique = false;
     auto clusteredField = indexSpec["clustered"];
     bool apiStrict = opCtx && APIParameters::get(opCtx).getAPIStrict().value_or(false);
 
@@ -532,12 +534,19 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& in
                     IndexDescriptor::k2dsphereFinestIndexedLevel == indexSpecElemFieldName ||
                     IndexDescriptor::kDropDuplicatesFieldName == indexSpecElemFieldName ||
                     IndexDescriptor::kPrepareUniqueFieldName == indexSpecElemFieldName ||
-                    "clustered" == indexSpecElemFieldName) &&
-                   !indexSpecElem.isNumber() && !indexSpecElem.isBoolean()) {
-            return {ErrorCodes::TypeMismatch,
-                    str::stream() << "The field '" << indexSpecElemFieldName << " has value "
-                                  << indexSpecElem.toString()
-                                  << ", which is not convertible to bool"};
+                    "clustered" == indexSpecElemFieldName)) {
+            if (!indexSpecElem.isNumber() && !indexSpecElem.isBoolean()) {
+                return {ErrorCodes::TypeMismatch,
+                        str::stream()
+                            << "The field '" << indexSpecElemFieldName << " has value "
+                            << indexSpecElem.toString() << ", which is not convertible to bool"};
+            }
+            if (IndexDescriptor::kUniqueFieldName == indexSpecElemFieldName) {
+                unique = indexSpecElem.trueValue();
+            }
+            if (IndexDescriptor::kPrepareUniqueFieldName == indexSpecElemFieldName) {
+                prepareUnique = indexSpecElem.trueValue();
+            }
         } else if ((IndexDescriptor::kDefaultLanguageFieldName == indexSpecElemFieldName ||
                     IndexDescriptor::kLanguageOverrideFieldName == indexSpecElemFieldName) &&
                    indexSpecElem.type() != BSONType::String) {
@@ -607,6 +616,14 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& in
                 str::stream() << "Invalid index specification " << indexSpec << "; the field '"
                               << IndexDescriptor::kWeightsFieldName
                               << "' can only be specified with text indexes"};
+    }
+
+    if (unique && prepareUnique) {
+        return {ErrorCodes::CannotCreateIndex,
+                str::stream() << "Invalid index specification " << indexSpec
+                              << "; cannot create an index with the '"
+                              << IndexDescriptor::kUniqueFieldName << "' option and the '"
+                              << IndexDescriptor::kPrepareUniqueFieldName << "' option"};
     }
 
     BSONObj modifiedSpec = indexSpec;

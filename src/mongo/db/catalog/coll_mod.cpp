@@ -376,7 +376,8 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(Operati
         if (cmdIndex.getPrepareUnique()) {
             parsed.numModifications++;
             // Attempting to modify with the same value should be treated as a no-op.
-            if (cmrIndex->idx->prepareUnique() == *cmdIndex.getPrepareUnique()) {
+            if (cmrIndex->idx->prepareUnique() == *cmdIndex.getPrepareUnique() ||
+                cmrIndex->idx->unique()) {
                 indexForOplog->setPrepareUnique(boost::none);
             } else {
                 cmrIndex->indexPrepareUnique = cmdIndex.getPrepareUnique();
