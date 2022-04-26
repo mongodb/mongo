@@ -619,6 +619,10 @@ restart_read_insert:
         cbt->slot = cbt->row_iteration_slot / 2 - 1;
 restart_read_page:
         rip = &page->pg_row[cbt->slot];
+        /*
+         * The saved cursor key from the slot is used later to get the value from the history store
+         * if the on-disk data is not visible.
+         */
         WT_RET(__cursor_row_slot_key_return(cbt, rip, &kpack));
 
         if (F_ISSET(&cbt->iface, WT_CURSTD_KEY_ONLY))
