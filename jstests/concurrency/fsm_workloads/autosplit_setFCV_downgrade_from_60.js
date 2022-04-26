@@ -7,7 +7,9 @@
  *
  * Checks that chunks are split when downgrading to an FCV lower than 6.0.
  *
- * @tags: [requires_sharding]
+ * @tags: [requires_sharding,
+ *  # Requires all nodes to be running the latest binary.
+ *   multiversion_incompatible]
  */
 
 load('jstests/sharding/libs/find_chunks_util.js');
