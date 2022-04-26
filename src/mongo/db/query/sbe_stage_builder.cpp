@@ -533,10 +533,13 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
     }
 
     for (auto&& [id, name] : Variables::kIdToBuiltinVarName) {
-        if (id != Variables::kRootId && id != Variables::kRemoveId &&
-            expCtx->variables.hasValue(id)) {
+        // This can happen if the query that created the cache entry had no value for a system
+        // variable, whereas the current query has a value for the system variable but does not
+        // actually make use of it in the query plan.
+        if (auto slot = env->getSlotIfExists(name); id != Variables::kRootId &&
+            id != Variables::kRemoveId && expCtx->variables.hasValue(id) && slot) {
             auto [tag, val] = makeValue(expCtx->variables.getValue(id));
-            env->resetSlot(env->getSlot(name), tag, val, true);
+            env->resetSlot(*slot, tag, val, true);
         }
     }
 
