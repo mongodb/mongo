@@ -49,6 +49,8 @@ const auto sessionTransactionTableDecoration = ServiceContext::declareDecoration
 const auto operationSessionDecoration =
     OperationContext::declareDecoration<boost::optional<SessionCatalog::ScopedCheckedOutSession>>();
 
+MONGO_FAIL_POINT_DEFINE(hangAfterIncrementingNumWaitingToCheckOut);
+
 }  // namespace
 
 SessionCatalog::~SessionCatalog() {
@@ -96,6 +98,12 @@ SessionCatalog::ScopedCheckedOutSession SessionCatalog::_checkOutSessionInner(
     // completed.
     ++session->_numWaitingToCheckOut;
     ON_BLOCK_EXIT([&] { --session->_numWaitingToCheckOut; });
+
+    if (MONGO_unlikely(hangAfterIncrementingNumWaitingToCheckOut.shouldFail())) {
+        ul.unlock();
+        hangAfterIncrementingNumWaitingToCheckOut.pauseWhileSet(opCtx);
+        ul.lock();
+    }
 
     opCtx->waitForConditionOrInterrupt(
         sri->availableCondVar, ul, [&ul, &sri, &session, forKill = killToken.has_value()]() {
