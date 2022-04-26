@@ -281,10 +281,9 @@ Status SortedDataIndexAccessMethod::insertKeys(OperationContext* opCtx,
         // wiredtiger. See SERVER-59831.
         dupsAllowed = true;
     } else if (prepareUnique) {
-        // This currently is only used by collMod command when converting a regular index to a
-        // unique index. The regular index will start rejecting duplicates even before the
-        // conversion finishes.
-        dupsAllowed = false;
+        // Before the index build commits, duplicate keys are allowed to exist with the
+        // 'prepareUnique' option. After that, duplicates are not allowed.
+        dupsAllowed = !coll->isIndexReady(_descriptor->indexName());
     } else {
         dupsAllowed = !unique;
     }
