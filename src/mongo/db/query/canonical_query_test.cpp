@@ -34,6 +34,7 @@
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/query_test_service_context.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -454,5 +455,18 @@ TEST(CanonicalQueryTest, InvalidSortOrdersFailToCanonicalize) {
     assertInvalidSortOrder(fromjson("{'': -1}"));
 }
 
+TEST(CanonicalQueryTest, DoNotParameterizeTextExpressions) {
+    RAIIServerParameterControllerForTest controllerSBEPlanCache("featureFlagSbePlanCache", true);
+    auto cq =
+        canonicalize("{$text: {$search: \"Hello World!\"}}",
+                     MatchExpressionParser::kDefaultSpecialFeatures | MatchExpressionParser::kText);
+    ASSERT_FALSE(cq->isParameterized());
+}
+
+TEST(CanonicalQueryTest, DoParameterizeRegularExpressions) {
+    RAIIServerParameterControllerForTest controllerSBEPlanCache("featureFlagSbePlanCache", true);
+    auto cq = canonicalize("{a: 1, b: {$lt: 5}}");
+    ASSERT_TRUE(cq->isParameterized());
+}
 }  // namespace
 }  // namespace mongo

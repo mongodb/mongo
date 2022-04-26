@@ -724,21 +724,39 @@ public:
     void visit(const ModMatchExpression* expr) final {
         auto divisorParam = expr->getDivisorInputParamId();
         auto remainderParam = expr->getRemainderInputParamId();
-        tassert(6512901, "$mod expression should have divisor param", divisorParam);
-        tassert(6512902, "$mod expression should have remainder param", remainderParam);
+        if (divisorParam) {
+            tassert(6512902,
+                    "$mod expression should have divisor and remainder params",
+                    remainderParam);
 
-        encodeParamMarker(*divisorParam);
-        encodeParamMarker(*remainderParam);
+            encodeParamMarker(*divisorParam);
+            encodeParamMarker(*remainderParam);
+        } else {
+            tassert(6579300,
+                    "If divisor param is not set in $mod expression reminder param must be unset "
+                    "as well",
+                    !remainderParam);
+            encodeFull(expr);
+        }
     }
 
     void visit(const RegexMatchExpression* expr) final {
         auto sourceRegexParam = expr->getSourceRegexInputParamId();
         auto compiledRegexParam = expr->getCompiledRegexInputParamId();
-        tassert(6512903, "regex expression should have source param", sourceRegexParam);
-        tassert(6512904, "regex expression should have compiled param", compiledRegexParam);
+        if (sourceRegexParam) {
+            tassert(6512904,
+                    "regex expression should have source and compiled params",
+                    compiledRegexParam);
 
-        encodeParamMarker(*sourceRegexParam);
-        encodeParamMarker(*compiledRegexParam);
+            encodeParamMarker(*sourceRegexParam);
+            encodeParamMarker(*compiledRegexParam);
+        } else {
+            tassert(6579301,
+                    "If source param is not set in $regex expression compiled param must be unset "
+                    "as well",
+                    !compiledRegexParam);
+            encodeFull(expr);
+        }
     }
 
     void visit(const SizeMatchExpression* expr) final {
@@ -898,11 +916,21 @@ private:
     void encodeBitTestExpression(const BitTestMatchExpression* expr) {
         auto bitPositionsParam = expr->getBitPositionsParamId();
         auto bitMaskParam = expr->getBitMaskParamId();
-        tassert(6512905, "bit-test expression should have bit positions param", bitPositionsParam);
-        tassert(6512906, "$mod expression should have bitmask param", bitMaskParam);
+        if (bitPositionsParam) {
 
-        encodeParamMarker(*bitPositionsParam);
-        encodeParamMarker(*bitMaskParam);
+            tassert(6512906,
+                    "bit-test expression should have bit positions and bitmask params",
+                    bitMaskParam);
+
+            encodeParamMarker(*bitPositionsParam);
+            encodeParamMarker(*bitMaskParam);
+        } else {
+            tassert(6579302,
+                    "If positions param is not set in a bit-test expression bitmask param must be "
+                    "unset as well",
+                    !bitMaskParam);
+            encodeFull(expr);
+        }
     }
 
     /**
