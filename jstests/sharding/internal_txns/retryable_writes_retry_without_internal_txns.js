@@ -2,7 +2,7 @@
  * Test that retryable writes executed using or without using internal transactions execute exactly
  * once regardless of how they are retried.
  *
- * @tags: [requires_fcv_60, uses_transactions]
+ * @tags: [requires_fcv_60, uses_transactions, requires_persistence]
  */
 (function() {
 "use strict";
