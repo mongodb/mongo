@@ -956,14 +956,26 @@ retry:
                 /*
                  * Removed FLCS records read as 0 values, there's no out-of-band value. Therefore,
                  * the FLCS cursor validity check cannot return "does not exist", fail the insert.
-                 * Even so, we still have to call the cursor validity check function we return the
-                 * found value for any duplicate key.
+                 * Even so, we still have to call the cursor validity check function so we return
+                 * the found value for any duplicate key, and for FLCS we need to set 0 explicitly.
                  */
                 WT_ERR(__wt_cursor_valid(cbt, NULL, cbt->recno, &valid));
-                if (valid || btree->type == BTREE_COL_FIX)
+                if (valid)
                     goto duplicate;
-            } else if (__cursor_fix_implicit(btree, cbt))
+                if (btree->type == BTREE_COL_FIX) {
+                    cbt->v = 0;
+                    cbt->upd_value->type = WT_UPDATE_STANDARD;
+                    cbt->upd_value->buf.data = &cbt->v;
+                    cbt->upd_value->buf.size = 1;
+                    goto duplicate;
+                }
+            } else if (__cursor_fix_implicit(btree, cbt)) {
+                cbt->v = 0;
+                cbt->upd_value->type = WT_UPDATE_STANDARD;
+                cbt->upd_value->buf.data = &cbt->v;
+                cbt->upd_value->buf.size = 1;
                 goto duplicate;
+            }
         }
 
         WT_ERR(__cursor_col_modify(cbt, &cbt->iface.value, WT_UPDATE_STANDARD));
