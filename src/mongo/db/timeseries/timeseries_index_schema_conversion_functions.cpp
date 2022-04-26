@@ -147,7 +147,8 @@ StatusWith<BSONObj> createBucketsSpecFromTimeseriesSpec(const TimeseriesOptions&
 
         // Indexes on measurement fields are only supported when the 'gTimeseriesMetricIndexes'
         // feature flag is enabled.
-        if (!feature_flags::gTimeseriesMetricIndexes.isEnabledAndIgnoreFCV()) {
+        if (!feature_flags::gTimeseriesMetricIndexes.isEnabled(
+                serverGlobalParams.featureCompatibility)) {
             auto reason = str::stream();
             reason << "Invalid index spec for time-series collection: "
                    << redact(timeseriesIndexSpecBSON) << ". ";
