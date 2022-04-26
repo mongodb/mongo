@@ -69,5 +69,22 @@ assert.eq(indexBulkBuilderSection.resumed, 1, tojson(indexBulkBuilderSection));
 assert.eq(indexBulkBuilderSection.filesOpenedForExternalSort, 1, tojson(indexBulkBuilderSection));
 assert.eq(indexBulkBuilderSection.filesClosedForExternalSort, 1, tojson(indexBulkBuilderSection));
 
+// Confirm that metrics are updated during initial sync.
+const newNode = replSet.add({setParameter: {maxIndexBuildMemoryUsageMegabytes: 50}});
+replSet.reInitiate();
+replSet.waitForState(newNode, ReplSetTest.State.SECONDARY);
+replSet.awaitReplication();
+let newNodeTestDB = newNode.getDB(testDB.getName());
+let newNodeColl = newNodeTestDB.getCollection(coll.getName());
+IndexBuildTest.assertIndexes(newNodeColl, 3, ['_id_', 'a_1', 'b_1']);
+indexBulkBuilderSection = newNodeTestDB.serverStatus().indexBulkBuilder;
+// We expect initial sync to build at least three indexes for the test collection in addition
+// to indexes for internal collections required for the proper running of the server.
+// The test collection has the only index that will cause the external sorter to spill to disk,
+// so the file descriptor open/closed counters should each report a value of one.
+assert.gte(indexBulkBuilderSection.count, 3, tojson(indexBulkBuilderSection));
+assert.eq(indexBulkBuilderSection.filesOpenedForExternalSort, 1, tojson(indexBulkBuilderSection));
+assert.eq(indexBulkBuilderSection.filesClosedForExternalSort, 1, tojson(indexBulkBuilderSection));
+
 replSet.stopSet();
 })();
