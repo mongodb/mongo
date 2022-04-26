@@ -273,10 +273,6 @@ file_runtime_config = common_runtime_config + [
         the file is read-only. All methods that may modify a file are
         disabled. See @ref readonly for more information''',
         type='boolean'),
-    Config('tiered_object', 'false', r'''
-        this file is a tiered object. When opened on its own, it is marked as
-        readonly and may be restricted in other ways''',
-        type='boolean', undoc=True),
 ]
 
 # Per-file configuration
@@ -440,6 +436,10 @@ file_meta = file_config + [
         LSN of the last checkpoint'''),
     Config('id', '', r'''
         the file's ID number'''),
+    Config('tiered_object', 'false', r'''
+        this file is a tiered object. When opened on its own, it is marked as
+        readonly and may be restricted in other ways''',
+        type='boolean', undoc=True),
     Config('version', '(major=0,minor=0)', r'''
         the file version'''),
 ]
@@ -467,6 +467,7 @@ tiered_meta = file_meta + tiered_config + [
 ]
 
 tier_meta = file_meta + tiered_tree_config
+
 # Objects need to have the readonly setting set and bucket_prefix.
 # The file_meta already contains those pieces.
 object_meta = file_meta + [

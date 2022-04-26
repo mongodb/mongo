@@ -166,7 +166,7 @@ __tiered_create_local(WT_SESSION_IMPL *session, WT_TIERED *tiered)
     WT_DECL_ITEM(build);
     WT_DECL_RET;
     WT_TIERED_TIERS *this_tier;
-    const char *cfg[4] = {NULL, NULL, NULL, NULL};
+    const char *cfg[3] = {NULL, NULL, NULL};
     const char *config, *name;
 
     config = name = NULL;
@@ -180,7 +180,6 @@ __tiered_create_local(WT_SESSION_IMPL *session, WT_TIERED *tiered)
     __wt_verbose(session, WT_VERB_TIERED, "TIER_CREATE_LOCAL: LOCAL: %s", name);
     cfg[0] = WT_CONFIG_BASE(session, object_meta);
     cfg[1] = tiered->obj_config;
-    cfg[2] = "tiered_object=true,readonly=true";
     __wt_verbose(session, WT_VERB_TIERED, "TIER_CREATE_LOCAL: obj_config: %s : %s", name, cfg[1]);
     WT_ASSERT(session, tiered->obj_config != NULL);
     WT_ERR(__wt_config_merge(session, cfg, NULL, (const char **)&config));
@@ -302,15 +301,6 @@ __tiered_create_object(WT_SESSION_IMPL *session, WT_TIERED *tiered)
     config = name = orig_name = NULL;
     orig_name = tiered->tiers[WT_TIERED_INDEX_LOCAL].name;
     /*
-     * If we have an existing local file in the tier, alter the table to indicate this one is now
-     * readonly. We are already holding the schema lock so we can call alter.
-     */
-    if (orig_name != NULL) {
-        cfg[0] = "readonly=true";
-        WT_WITHOUT_DHANDLE(session, ret = __wt_schema_alter(session, orig_name, cfg));
-        WT_ERR(ret);
-    }
-    /*
      * Create the name and metadata of the new shared object of the current local object. The data
      * structure keeps this id so that we don't have to parse and manipulate strings.
      */
@@ -318,7 +308,7 @@ __tiered_create_object(WT_SESSION_IMPL *session, WT_TIERED *tiered)
       __wt_tiered_name(session, &tiered->iface, tiered->current_id, WT_TIERED_NAME_OBJECT, &name));
     cfg[0] = WT_CONFIG_BASE(session, object_meta);
     cfg[1] = tiered->obj_config;
-    cfg[2] = "flush_time=0,flush_timestamp=0,readonly=true";
+    cfg[2] = "flush_time=0,flush_timestamp=0";
     WT_ASSERT(session, tiered->obj_config != NULL);
     WT_ERR(__wt_config_merge(session, cfg, NULL, (const char **)&config));
     __wt_verbose(
@@ -342,7 +332,7 @@ __tiered_create_tier_tree(WT_SESSION_IMPL *session, WT_TIERED *tiered)
     WT_DECL_ITEM(tmp);
     WT_DECL_RET;
     WT_TIERED_TIERS *this_tier;
-    const char *cfg[4] = {NULL, NULL, NULL, NULL};
+    const char *cfg[3] = {NULL, NULL, NULL};
     const char *config, *name;
 
     config = name = NULL;
@@ -352,9 +342,10 @@ __tiered_create_tier_tree(WT_SESSION_IMPL *session, WT_TIERED *tiered)
     WT_ERR(__wt_tiered_name(session, &tiered->iface, 0, WT_TIERED_NAME_SHARED, &name));
     cfg[0] = WT_CONFIG_BASE(session, tier_meta);
     WT_ASSERT(session, tiered->bstorage != NULL);
-    WT_ERR(__wt_buf_fmt(session, tmp, ",readonly=true,tiered_storage=(bucket=%s,bucket_prefix=%s)",
+    WT_ERR(__wt_buf_fmt(session, tmp,
+      ",readonly=true,tiered_object=true,tiered_storage=(bucket=%s,bucket_prefix=%s)",
       tiered->bstorage->bucket, tiered->bstorage->bucket_prefix));
-    cfg[2] = tmp->data;
+    cfg[1] = tmp->data;
     WT_ERR(__wt_config_merge(session, cfg, NULL, &config));
     /* Set up a tier:example metadata for the first time. */
     __wt_verbose(session, WT_VERB_TIERED, "CREATE_TIER_TREE: schema create: %s : %s", name, config);
@@ -632,7 +623,7 @@ __tiered_open(WT_SESSION_IMPL *session, const char *cfg[])
     WT_TIERED_WORK_UNIT *entry;
     uint32_t unused;
     char *metaconf;
-    const char *obj_cfg[] = {WT_CONFIG_BASE(session, object_meta), NULL, NULL};
+    const char *obj_cfg[] = {WT_CONFIG_BASE(session, object_meta), NULL, NULL, NULL};
     const char **tiered_cfg, *config;
 
     dhandle = session->dhandle;
@@ -656,9 +647,11 @@ __tiered_open(WT_SESSION_IMPL *session, const char *cfg[])
 
     /*
      * Pull in any configuration of the original table for the object and file components that may
-     * have been sent in on the create.
+     * have been sent in on the create. This is a saved configuration for all objects, set them to
+     * readonly and indicate they are tiered objects.
      */
     obj_cfg[1] = config;
+    obj_cfg[2] = "readonly=true,tiered_object=true";
     WT_ERR(__wt_config_collapse(session, obj_cfg, &metaconf));
     tiered->obj_config = metaconf;
     metaconf = NULL;
