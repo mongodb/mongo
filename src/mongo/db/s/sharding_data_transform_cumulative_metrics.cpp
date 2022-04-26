@@ -163,7 +163,14 @@ ShardingDataTransformCumulativeMetrics::ShardingDataTransformCumulativeMetrics(
                             AtomicWord<int64_t>{0},
                             AtomicWord<int64_t>{0},
                             AtomicWord<int64_t>{0},
-                            AtomicWord<int64_t>{0}} {}
+                            AtomicWord<int64_t>{0}},
+      _donorStateList{AtomicWord<int64_t>{0},
+                      AtomicWord<int64_t>{0},
+                      AtomicWord<int64_t>{0},
+                      AtomicWord<int64_t>{0},
+                      AtomicWord<int64_t>{0},
+                      AtomicWord<int64_t>{0},
+                      AtomicWord<int64_t>{0}} {}
 
 ShardingDataTransformCumulativeMetrics::DeregistrationFunction
 ShardingDataTransformCumulativeMetrics::registerInstanceMetrics(const InstanceObserver* metrics) {
@@ -234,8 +241,8 @@ void ShardingDataTransformCumulativeMetrics::reportActive(BSONObjBuilder* bob) c
     s.append(kUpdatesApplied, kPlaceholderLong);
     s.append(kDeletesApplied, kPlaceholderLong);
     s.append(kCountWritesToStashCollections, kPlaceholderLong);
-    s.append(kCountWritesDuringCriticalSection, kPlaceholderLong);
-    s.append(kCountReadsDuringCriticalSection, kPlaceholderLong);
+    s.append(kCountWritesDuringCriticalSection, _writesDuringCriticalSection.load());
+    s.append(kCountReadsDuringCriticalSection, _readsDuringCriticalSection.load());
 }
 
 void ShardingDataTransformCumulativeMetrics::reportOldestActive(BSONObjBuilder* bob) const {
@@ -272,17 +279,17 @@ void ShardingDataTransformCumulativeMetrics::reportLatencies(BSONObjBuilder* bob
 void ShardingDataTransformCumulativeMetrics::reportCurrentInSteps(BSONObjBuilder* bob) const {
     BSONObjBuilder s(bob->subobjStart(kCurrentInSteps));
 
-    auto reportCoordinatorState = [this, &s](auto state) {
-        s.append(fieldNameFor(state), getCoordinatorStateCounter(state)->load());
+    auto reportState = [this, &s](auto state) {
+        s.append(fieldNameFor(state), getStateCounter(state)->load());
     };
 
-    reportCoordinatorState(CoordinatorStateEnum::kInitializing);
-    reportCoordinatorState(CoordinatorStateEnum::kPreparingToDonate);
-    reportCoordinatorState(CoordinatorStateEnum::kCloning);
-    reportCoordinatorState(CoordinatorStateEnum::kApplying);
-    reportCoordinatorState(CoordinatorStateEnum::kBlockingWrites);
-    reportCoordinatorState(CoordinatorStateEnum::kAborting);
-    reportCoordinatorState(CoordinatorStateEnum::kCommitting);
+    reportState(CoordinatorStateEnum::kInitializing);
+    reportState(CoordinatorStateEnum::kPreparingToDonate);
+    reportState(CoordinatorStateEnum::kCloning);
+    reportState(CoordinatorStateEnum::kApplying);
+    reportState(CoordinatorStateEnum::kBlockingWrites);
+    reportState(CoordinatorStateEnum::kAborting);
+    reportState(CoordinatorStateEnum::kCommitting);
 
     s.append(kCountInstancesInRecipientState1AwaitingFetchTimestamp, kPlaceholderInt);
     s.append(kCountInstancesInRecipientState2CreatingCollection, kPlaceholderInt);
@@ -291,13 +298,14 @@ void ShardingDataTransformCumulativeMetrics::reportCurrentInSteps(BSONObjBuilder
     s.append(kCountInstancesInRecipientState5Error, kPlaceholderInt);
     s.append(kCountInstancesInRecipientState6StrictConsistency, kPlaceholderInt);
     s.append(kCountInstancesInRecipientState7Done, kPlaceholderInt);
-    s.append(kCountInstancesInDonorState1PreparingToDonate, kPlaceholderInt);
-    s.append(kCountInstancesInDonorState2DonatingInitialData, kPlaceholderInt);
-    s.append(kCountInstancesInDonorState3DonatingOplogEntries, kPlaceholderInt);
-    s.append(kCountInstancesInDonorState4PreparingToBlockWrites, kPlaceholderInt);
-    s.append(kCountInstancesInDonorState5Error, kPlaceholderInt);
-    s.append(kCountInstancesInDonorState6BlockingWrites, kPlaceholderInt);
-    s.append(kCountInstancesInDonorState7Done, kPlaceholderInt);
+
+    reportState(DonorStateEnum::kPreparingToDonate);
+    reportState(DonorStateEnum::kDonatingInitialData);
+    reportState(DonorStateEnum::kDonatingOplogEntries);
+    reportState(DonorStateEnum::kPreparingToBlockWrites);
+    reportState(DonorStateEnum::kError);
+    reportState(DonorStateEnum::kBlockingWrites);
+    reportState(DonorStateEnum::kDone);
 }
 
 const ShardingDataTransformCumulativeMetrics::InstanceObserver*
@@ -353,44 +361,24 @@ void ShardingDataTransformCumulativeMetrics::setLastOpEndingChunkImbalance(int64
     _lastOpEndingChunkImbalance.store(imbalanceCount);
 }
 
-AtomicWord<int64_t>* ShardingDataTransformCumulativeMetrics::getMutableCoordinatorStateCounter(
-    ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum state) {
-    if (state == ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum::kUnused) {
-        return nullptr;
-    }
-
-    invariant(static_cast<size_t>(state) <
-              static_cast<size_t>(
-                  ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum::kNumStates));
-    return &_coordinatorStateList[static_cast<size_t>(state)];
+ShardingDataTransformCumulativeMetrics::CoordinatorStateArray*
+ShardingDataTransformCumulativeMetrics::getStateArrayFor(CoordinatorStateEnum state) {
+    return &_coordinatorStateList;
 }
 
-const AtomicWord<int64_t>* ShardingDataTransformCumulativeMetrics::getCoordinatorStateCounter(
-    ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum state) const {
-    if (state == ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum::kUnused) {
-        return nullptr;
-    }
-
-    invariant(static_cast<size_t>(state) <
-              static_cast<size_t>(
-                  ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum::kNumStates));
-    return &_coordinatorStateList[static_cast<size_t>(state)];
+const ShardingDataTransformCumulativeMetrics::CoordinatorStateArray*
+ShardingDataTransformCumulativeMetrics::getStateArrayFor(CoordinatorStateEnum state) const {
+    return &_coordinatorStateList;
 }
 
-void ShardingDataTransformCumulativeMetrics::onCoordinatorStateTransition(
-    boost::optional<ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum> before,
-    boost::optional<ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum> after) {
-    if (before) {
-        if (auto counter = getMutableCoordinatorStateCounter(*before)) {
-            counter->fetchAndSubtract(1);
-        }
-    }
+ShardingDataTransformCumulativeMetrics::DonorStateArray*
+ShardingDataTransformCumulativeMetrics::getStateArrayFor(DonorStateEnum state) {
+    return &_donorStateList;
+}
 
-    if (after) {
-        if (auto counter = getMutableCoordinatorStateCounter(*after)) {
-            counter->fetchAndAdd(1);
-        }
-    }
+const ShardingDataTransformCumulativeMetrics::DonorStateArray*
+ShardingDataTransformCumulativeMetrics::getStateArrayFor(DonorStateEnum state) const {
+    return &_donorStateList;
 }
 
 const char* ShardingDataTransformCumulativeMetrics::fieldNameFor(
@@ -452,6 +440,48 @@ void ShardingDataTransformCumulativeMetrics::onBatchRetrievedDuringOplogApplying
     _oplogApplyingTotalBatchesRetrieved.fetchAndAdd(count);
     _oplogApplyingTotalBatchesRetrievalTimeMillis.fetchAndAdd(
         durationCount<Milliseconds>(elapsedTime));
+}
+
+const char* ShardingDataTransformCumulativeMetrics::fieldNameFor(
+    ShardingDataTransformCumulativeMetrics::DonorStateEnum state) {
+    switch (state) {
+        case DonorStateEnum::kPreparingToDonate:
+            return kCountInstancesInDonorState1PreparingToDonate;
+
+        case DonorStateEnum::kDonatingInitialData:
+            return kCountInstancesInDonorState2DonatingInitialData;
+
+        case DonorStateEnum::kDonatingOplogEntries:
+            return kCountInstancesInDonorState3DonatingOplogEntries;
+
+        case DonorStateEnum::kPreparingToBlockWrites:
+            return kCountInstancesInDonorState4PreparingToBlockWrites;
+
+        case DonorStateEnum::kError:
+            return kCountInstancesInDonorState5Error;
+
+        case DonorStateEnum::kBlockingWrites:
+            return kCountInstancesInDonorState6BlockingWrites;
+
+        case DonorStateEnum::kDone:
+            return kCountInstancesInDonorState7Done;
+
+        default:
+            uasserted(6438700,
+                      str::stream()
+                          << "no field name for donor state " << static_cast<int32_t>(state));
+            break;
+    }
+
+    MONGO_UNREACHABLE;
+}
+
+void ShardingDataTransformCumulativeMetrics::onReadDuringCriticalSection() {
+    _readsDuringCriticalSection.fetchAndAdd(1);
+}
+
+void ShardingDataTransformCumulativeMetrics::onWriteDuringCriticalSection() {
+    _writesDuringCriticalSection.fetchAndAdd(1);
 }
 
 }  // namespace mongo

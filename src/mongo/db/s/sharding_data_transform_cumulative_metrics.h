@@ -56,6 +56,18 @@ public:
         kNumStates
     };
 
+    enum class DonorStateEnum : int32_t {
+        kUnused = -1,
+        kPreparingToDonate,
+        kDonatingInitialData,
+        kDonatingOplogEntries,
+        kPreparingToBlockWrites,
+        kError,
+        kBlockingWrites,
+        kDone,
+        kNumStates
+    };
+
     using Role = ShardingDataTransformMetrics::Role;
     using InstanceObserver = ShardingDataTransformMetricsObserverInterface;
     using DeregistrationFunction = unique_function<void()>;
@@ -81,10 +93,15 @@ public:
      * The before can be boost::none to represent the initial state transition and
      * after can be boost::none to represent cases where it is no longer active.
      */
-    void onCoordinatorStateTransition(boost::optional<CoordinatorStateEnum> before,
-                                      boost::optional<CoordinatorStateEnum> after);
+    template <typename T>
+    void onStateTransition(boost::optional<T> before, boost::optional<T> after);
+
+    void onReadDuringCriticalSection();
+    void onWriteDuringCriticalSection();
 
     static const char* fieldNameFor(CoordinatorStateEnum state);
+    static const char* fieldNameFor(DonorStateEnum state);
+
     void onInsertsDuringCloning(int64_t count, const Milliseconds& elapsedTime);
     void onRemoteBatchRetrievedDuringOplogFetching(int64_t count, const Milliseconds& elapsedTime);
     void onLocalInsertDuringOplogFetching(const Milliseconds& elapsedTime);
@@ -102,6 +119,10 @@ private:
         }
     };
     using MetricsSet = std::set<const InstanceObserver*, MetricsComparer>;
+    using CoordinatorStateArray =
+        std::array<AtomicWord<int64_t>, static_cast<size_t>(CoordinatorStateEnum::kNumStates)>;
+    using DonorStateArray =
+        std::array<AtomicWord<int64_t>, static_cast<size_t>(DonorStateEnum::kNumStates)>;
 
     void reportActive(BSONObjBuilder* bob) const;
     void reportOldestActive(BSONObjBuilder* bob) const;
@@ -111,8 +132,16 @@ private:
     MetricsSet& getMetricsSetForRole(Role role);
     const MetricsSet& getMetricsSetForRole(Role role) const;
     const InstanceObserver* getOldestOperation(WithLock, Role role) const;
-    const AtomicWord<int64_t>* getCoordinatorStateCounter(CoordinatorStateEnum state) const;
-    AtomicWord<int64_t>* getMutableCoordinatorStateCounter(CoordinatorStateEnum state);
+
+    template <typename T>
+    const AtomicWord<int64_t>* getStateCounter(T state) const;
+    template <typename T>
+    AtomicWord<int64_t>* getMutableStateCounter(T state);
+
+    CoordinatorStateArray* getStateArrayFor(CoordinatorStateEnum state);
+    const CoordinatorStateArray* getStateArrayFor(CoordinatorStateEnum state) const;
+    DonorStateArray* getStateArrayFor(DonorStateEnum state);
+    const DonorStateArray* getStateArrayFor(DonorStateEnum state) const;
 
     MetricsSet::iterator insertMetrics(const InstanceObserver* metrics, MetricsSet& set);
 
@@ -127,9 +156,11 @@ private:
     AtomicWord<int64_t> _countCancelled{0};
 
     AtomicWord<int64_t> _lastOpEndingChunkImbalance{0};
+    AtomicWord<int64_t> _readsDuringCriticalSection{0};
+    AtomicWord<int64_t> _writesDuringCriticalSection{0};
 
-    std::array<AtomicWord<int64_t>, static_cast<size_t>(CoordinatorStateEnum::kNumStates)>
-        _coordinatorStateList;
+    CoordinatorStateArray _coordinatorStateList;
+    DonorStateArray _donorStateList;
 
     AtomicWord<int64_t> _collectionCloningTotalLocalInserts{0};
     AtomicWord<int64_t> _collectionCloningTotalLocalInsertTimeMillis{0};
@@ -140,5 +171,41 @@ private:
     AtomicWord<int64_t> _oplogApplyingTotalBatchesRetrieved{0};
     AtomicWord<int64_t> _oplogApplyingTotalBatchesRetrievalTimeMillis{0};
 };
+
+template <typename T>
+void ShardingDataTransformCumulativeMetrics::onStateTransition(boost::optional<T> before,
+                                                               boost::optional<T> after) {
+    if (before) {
+        if (auto counter = getMutableStateCounter(*before)) {
+            counter->fetchAndSubtract(1);
+        }
+    }
+
+    if (after) {
+        if (auto counter = getMutableStateCounter(*after)) {
+            counter->fetchAndAdd(1);
+        }
+    }
+}
+
+template <typename T>
+const AtomicWord<int64_t>* ShardingDataTransformCumulativeMetrics::getStateCounter(T state) const {
+    if (state == T::kUnused) {
+        return nullptr;
+    }
+
+    invariant(static_cast<size_t>(state) < static_cast<size_t>(T::kNumStates));
+    return &((*getStateArrayFor(state))[static_cast<size_t>(state)]);
+}
+
+template <typename T>
+AtomicWord<int64_t>* ShardingDataTransformCumulativeMetrics::getMutableStateCounter(T state) {
+    if (state == T::kUnused) {
+        return nullptr;
+    }
+
+    invariant(static_cast<size_t>(state) < static_cast<size_t>(T::kNumStates));
+    return &((*getStateArrayFor(state))[static_cast<size_t>(state)]);
+}
 
 }  // namespace mongo

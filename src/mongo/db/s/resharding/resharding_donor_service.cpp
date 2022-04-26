@@ -182,6 +182,41 @@ public:
     }
 };
 
+ShardingDataTransformCumulativeMetrics::DonorStateEnum toMetricsState(DonorStateEnum enumVal) {
+    using MetricsEnum = ShardingDataTransformCumulativeMetrics::DonorStateEnum;
+
+    switch (enumVal) {
+        case DonorStateEnum::kUnused:
+            return MetricsEnum::kUnused;
+
+        case DonorStateEnum::kPreparingToDonate:
+            return MetricsEnum::kPreparingToDonate;
+
+        case DonorStateEnum::kDonatingInitialData:
+            return MetricsEnum::kDonatingInitialData;
+
+        case DonorStateEnum::kDonatingOplogEntries:
+            return MetricsEnum::kDonatingOplogEntries;
+
+        case DonorStateEnum::kPreparingToBlockWrites:
+            return MetricsEnum::kPreparingToBlockWrites;
+
+        case DonorStateEnum::kError:
+            return MetricsEnum::kError;
+
+        case DonorStateEnum::kBlockingWrites:
+            return MetricsEnum::kBlockingWrites;
+
+        case DonorStateEnum::kDone:
+            return MetricsEnum::kDone;
+        default:
+            invariant(false,
+                      str::stream() << "Unexpected resharding coordinator state: "
+                                    << DonorState_serializer(enumVal));
+            MONGO_UNREACHABLE;
+    }
+}
+
 }  // namespace
 
 ThreadPool::Limits ReshardingDonorService::getThreadPoolLimits() const {
@@ -229,6 +264,10 @@ ReshardingDonorService::DonorStateMachine::DonorStateMachine(
               _recipientShardIds.end();
       }()) {
     invariant(_externalState);
+
+    if (ShardingDataTransformMetrics::isEnabled()) {
+        _metricsNew->onStateTransition(boost::none, toMetricsState(_donorCtx.getState()));
+    }
 }
 
 ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_runUntilBlockingWritesOrErrored(
@@ -419,6 +458,10 @@ Status ReshardingDonorService::DonorStateMachine::_runMandatoryCleanup(
 
     if (stepdownToken.isCanceled()) {
         _metrics()->onStepDown(ReshardingMetrics::Role::kDonor);
+    }
+
+    if (ShardingDataTransformMetrics::isEnabled()) {
+        _metricsNew->onStateTransition(toMetricsState(_donorCtx.getState()), boost::none);
     }
 
     return status;
@@ -833,6 +876,10 @@ void ReshardingDonorService::DonorStateMachine::_transitionState(DonorShardConte
 
     _updateDonorDocument(std::move(newDonorCtx));
     _metrics()->setDonorState(newState);
+
+    if (ShardingDataTransformMetrics::isEnabled()) {
+        _metricsNew->onStateTransition(toMetricsState(oldState), toMetricsState(newState));
+    }
 
     LOGV2_INFO(5279505,
                "Transitioned resharding donor state",

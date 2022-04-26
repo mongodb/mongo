@@ -328,6 +328,7 @@ void ShardingDataTransformInstanceMetrics::onOplogEntriesApplied(int64_t numEntr
 
 void ShardingDataTransformInstanceMetrics::onWriteDuringCriticalSection() {
     _writesDuringCriticalSection.addAndFetch(1);
+    _cumulativeMetrics->onWriteDuringCriticalSection();
 }
 
 void ShardingDataTransformInstanceMetrics::onCriticalSectionBegin() {
@@ -360,6 +361,7 @@ void ShardingDataTransformInstanceMetrics::onWriteToStashedCollections() {
 
 void ShardingDataTransformInstanceMetrics::onReadDuringCriticalSection() {
     _readsDuringCriticalSection.fetchAndAdd(1);
+    _cumulativeMetrics->onWriteDuringCriticalSection();
 }
 
 void ShardingDataTransformInstanceMetrics::accumulateValues(int64_t insertsApplied,

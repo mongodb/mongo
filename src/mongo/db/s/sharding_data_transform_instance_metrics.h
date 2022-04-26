@@ -65,6 +65,22 @@ public:
     Milliseconds getLowEstimateRemainingTimeMillis() const;
     Date_t getStartTimestamp() const;
     const UUID& getInstanceId() const;
+
+    template <typename T>
+    void onStateTransition(T before, boost::none_t after) {
+        _cumulativeMetrics->onStateTransition<T>(before, after);
+    }
+
+    template <typename T>
+    void onStateTransition(boost::none_t before, T after) {
+        _cumulativeMetrics->onStateTransition<T>(before, after);
+    }
+
+    template <typename T>
+    void onStateTransition(T before, T after) {
+        _cumulativeMetrics->onStateTransition<T>(before, after);
+    }
+
     void onCopyingBegin();
     void onCopyingEnd();
     void onApplyingBegin();
