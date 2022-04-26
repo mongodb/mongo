@@ -238,8 +238,7 @@ void makeCollection(OperationContext* opCtx, const NamespaceString& ns) {
 
         assertCanWrite_inlock(opCtx, ns);
         if (!CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
-                opCtx,
-                ns)) {  // someone else may have beat us to it.
+                opCtx, ns)) {  // someone else may have beat us to it.
             uassertStatusOK(userAllowedCreateNS(opCtx, ns));
             OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
                 unsafeCreateCollection(opCtx);
