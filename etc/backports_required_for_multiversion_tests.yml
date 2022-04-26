@@ -206,6 +206,8 @@ last-continuous:
       test_file: jstests/sharding/change_stream_shard_failover.js
     - ticket: SERVER-63049
       test_file: jstests/noPassthrough/operator_counters_accumulators.js
+    - ticket: SERVER-65300
+      test_file: jstests/replsets/tenant_migration_recipient_rollback_recovery.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -545,6 +547,8 @@ last-lts:
       test_file: jstests/replsets/capped_deletes.js
     - ticket: SERVER-65022
       test_file: jstests/sharding/change_stream_shard_failover.js
+    - ticket: SERVER-65300
+      test_file: jstests/replsets/tenant_migration_recipient_rollback_recovery.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:

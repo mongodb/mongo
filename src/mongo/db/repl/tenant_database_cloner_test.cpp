@@ -694,7 +694,7 @@ TEST_F(TenantDatabaseClonerTest, ResumingFromLastClonedCollection) {
         sizeOfOneCollection = swSize.getValue();
     }
 
-    TenantMigrationSharedData resumingSharedData(&_clock, _migrationId, /*resuming=*/true);
+    TenantMigrationSharedData resumingSharedData(&_clock, _migrationId, ResumePhase::kDataSync);
     auto cloner = makeDatabaseCloner(&resumingSharedData);
     cloner->setStopAfterStage_forTest("listExistingCollections");
 
@@ -758,7 +758,7 @@ TEST_F(TenantDatabaseClonerTest, LastClonedCollectionDeleted_AllGreater) {
         sizeANss = swSize.getValue();
     }
 
-    TenantMigrationSharedData resumingSharedData(&_clock, _migrationId, /*resuming=*/true);
+    TenantMigrationSharedData resumingSharedData(&_clock, _migrationId, ResumePhase::kDataSync);
     auto cloner = makeDatabaseCloner(&resumingSharedData);
     cloner->setStopAfterStage_forTest("listExistingCollections");
 
@@ -837,7 +837,7 @@ TEST_F(TenantDatabaseClonerTest, LastClonedCollectionDeleted_SomeGreater) {
         ANssBNssSize += swSizeBNss.getValue();
     }
 
-    TenantMigrationSharedData resumingSharedData(&_clock, _migrationId, /*resuming=*/true);
+    TenantMigrationSharedData resumingSharedData(&_clock, _migrationId, ResumePhase::kDataSync);
     auto cloner = makeDatabaseCloner(&resumingSharedData);
     cloner->setStopAfterStage_forTest("listExistingCollections");
 
@@ -927,7 +927,7 @@ TEST_F(TenantDatabaseClonerTest, LastClonedCollectionDeleted_AllLess) {
         sizeOfAllColls += swSizeCNss.getValue();
     }
 
-    TenantMigrationSharedData resumingSharedData(&_clock, _migrationId, /*resuming=*/true);
+    TenantMigrationSharedData resumingSharedData(&_clock, _migrationId, ResumePhase::kDataSync);
     auto cloner = makeDatabaseCloner(&resumingSharedData);
     cloner->setStopAfterStage_forTest("listExistingCollections");
 

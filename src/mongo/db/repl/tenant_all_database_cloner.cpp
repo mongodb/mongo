@@ -175,7 +175,7 @@ BaseCloner::AfterStageBehavior TenantAllDatabaseCloner::listExistingDatabasesSta
         }
     }
 
-    if (!getSharedData()->isResuming()) {
+    if (getSharedData()->getResumePhase() == ResumePhase::kNone) {
         uassert(ErrorCodes::NamespaceExists,
                 str::stream() << "Tenant '" << _tenantId
                               << "': databases already exist prior to data sync",

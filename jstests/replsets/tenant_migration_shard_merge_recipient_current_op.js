@@ -1,14 +1,13 @@
 /**
- * Tests the currentOp command during a multi-tenant migration protocol. A tenant migration
- * is started, and the currentOp command is tested as the recipient moves through below
- * state sequence.
+ * Tests the currentOp command during a shard merge protocol. A tenant migration is started, and the
+ * currentOp command is tested as the recipient moves through below state sequence.
  *
- * kStarted ---> kConsistent ---> kDone.
+ * kStarted ---> kLearnedFilenames ---> kConsistent ---> kDone.
  *
  * Tenant migrations are not expected to be run on servers with ephemeralForTest.
  *
  * @tags: [
- *   incompatible_with_shard_merge,
+ *   featureFlagShardMerge,
  *   incompatible_with_eft,
  *   incompatible_with_macos,
  *   incompatible_with_windows_tls,
@@ -78,22 +77,8 @@ function checkPostConsistentFieldsOK(res) {
     assert(currOp.hasOwnProperty("cloneFinishedRecipientOpTime") &&
                checkOptime(currOp.cloneFinishedRecipientOpTime),
            res);
-    assert(currOp.hasOwnProperty("dataConsistentStopDonorOpTime") &&
-               checkOptime(currOp.dataConsistentStopDonorOpTime),
-           res);
-
-    assert(currOp.hasOwnProperty("approxTotalDataSize") &&
-               currOp.approxTotalDataSize instanceof NumberLong,
-           res);
-    assert(currOp.hasOwnProperty("approxTotalBytesCopied") &&
-               currOp.approxTotalBytesCopied instanceof NumberLong,
-           res);
-    assert(currOp.hasOwnProperty("totalReceiveElapsedMillis") &&
-               currOp.totalReceiveElapsedMillis instanceof NumberLong,
-           res);
-    assert(currOp.hasOwnProperty("remainingReceiveEstimatedMillis") &&
-               currOp.remainingReceiveEstimatedMillis instanceof NumberLong,
-           res);
+    // Not applicable to shard merge protocol.
+    assert(!currOp.hasOwnProperty("dataConsistentStopDonorOpTime"));
 }
 
 // Validates the fields of an optime object.
@@ -113,8 +98,6 @@ const fpAfterPersistingStateDoc =
                        {action: "hang"});
 const fpAfterRetrievingStartOpTime = configureFailPoint(
     recipientPrimary, "fpAfterRetrievingStartOpTimesMigrationRecipientInstance", {action: "hang"});
-const fpBeforeFetchingTransactions =
-    configureFailPoint(recipientPrimary, "fpBeforeFetchingCommittedTransactions", {action: "hang"});
 const fpAfterDataConsistent = configureFailPoint(
     recipientPrimary, "fpAfterDataConsistentMigrationRecipientInstance", {action: "hang"});
 const fpAfterForgetMigration = configureFailPoint(
@@ -142,11 +125,9 @@ assert.commandWorked(
     assert(!currOp.hasOwnProperty("expireAt"), res);
     assert(!currOp.hasOwnProperty("donorSyncSource"), res);
     assert(!currOp.hasOwnProperty("cloneFinishedRecipientOpTime"), res);
+    // Not applicable to shard merge protocol.
     assert(!currOp.hasOwnProperty("dataConsistentStopDonorOpTime"), res);
-    assert(!currOp.hasOwnProperty("approxTotalDataSize"), res);
-    assert(!currOp.hasOwnProperty("approxTotalBytesCopied"), res);
-    assert(!currOp.hasOwnProperty("totalReceiveElapsedMillis"), res);
-    assert(!currOp.hasOwnProperty("remainingReceiveEstimatedMillis"), res);
+
     fpAfterPersistingStateDoc.off();
 }
 
@@ -160,7 +141,9 @@ assert.commandWorked(
     checkStandardFieldsOK(res);
     let currOp = res.inprog[0];
     assert.gt(new Date(), currOp.receiveStart, tojson(res));
-    assert.eq(currOp.state, TenantMigrationTest.RecipientStateEnum.kStarted, res);
+
+    assert.eq(currOp.state, TenantMigrationTest.RecipientStateEnum.kLearnedFilenames, res);
+
     assert.eq(currOp.migrationCompleted, false, res);
     assert.eq(currOp.dataSyncCompleted, false, res);
     assert(!currOp.hasOwnProperty("expireAt"), res);
@@ -173,55 +156,10 @@ assert.commandWorked(
            res);
     assert(currOp.hasOwnProperty("donorSyncSource") && typeof currOp.donorSyncSource === 'string',
            res);
+    // Not applicable to shard merge protocol.
     assert(!currOp.hasOwnProperty("dataConsistentStopDonorOpTime"), res);
-    assert(!currOp.hasOwnProperty("approxTotalDataSize"), res);
-    assert(!currOp.hasOwnProperty("approxTotalBytesCopied"), res);
-    assert(!currOp.hasOwnProperty("totalReceiveElapsedMillis"), res);
-    assert(!currOp.hasOwnProperty("remainingReceiveEstimatedMillis"), res);
+
     fpAfterRetrievingStartOpTime.off();
-}
-
-{
-    jsTestLog("Waiting until we are ready to fetch committed transactions.");
-    fpBeforeFetchingTransactions.wait();
-
-    let res = recipientPrimary.adminCommand({currentOp: true, desc: "tenant recipient migration"});
-    checkStandardFieldsOK(res);
-    let currOp = res.inprog[0];
-
-    assert.eq(currOp.state, TenantMigrationTest.RecipientStateEnum.kStarted, res);
-
-    assert.eq(currOp.migrationCompleted, false, res);
-    assert.eq(currOp.dataSyncCompleted, false, res);
-    assert(!currOp.hasOwnProperty("expireAt"), res);
-    // Must exist now.
-    assert(currOp.hasOwnProperty("startFetchingDonorOpTime") &&
-               checkOptime(currOp.startFetchingDonorOpTime),
-           res);
-    assert(currOp.hasOwnProperty("startApplyingDonorOpTime") &&
-               checkOptime(currOp.startApplyingDonorOpTime),
-           res);
-    assert(currOp.hasOwnProperty("donorSyncSource") && typeof currOp.donorSyncSource === 'string',
-           res);
-    assert(currOp.hasOwnProperty("dataConsistentStopDonorOpTime") &&
-               checkOptime(currOp.dataConsistentStopDonorOpTime),
-           res);
-    assert(currOp.hasOwnProperty("cloneFinishedRecipientOpTime") &&
-               checkOptime(currOp.cloneFinishedRecipientOpTime),
-           res);
-    assert(currOp.hasOwnProperty("approxTotalDataSize") &&
-               currOp.approxTotalDataSize instanceof NumberLong,
-           res);
-    assert(currOp.hasOwnProperty("approxTotalBytesCopied") &&
-               currOp.approxTotalBytesCopied instanceof NumberLong,
-           res);
-    assert(currOp.hasOwnProperty("totalReceiveElapsedMillis") &&
-               currOp.totalReceiveElapsedMillis instanceof NumberLong,
-           res);
-    assert(currOp.hasOwnProperty("remainingReceiveEstimatedMillis") &&
-               currOp.remainingReceiveEstimatedMillis instanceof NumberLong,
-           res);
-    fpBeforeFetchingTransactions.off();
 }
 
 {
@@ -298,33 +236,6 @@ forgetMigrationThread.start();
     assert.eq(currOp.state, TenantMigrationTest.RecipientStateEnum.kDone, res);
     assert.eq(currOp.migrationCompleted, true, res);
     assert(currOp.hasOwnProperty("expireAt") && currOp.expireAt instanceof Date, res);
-
-    assert(currOp.hasOwnProperty("databases"));
-    assert.eq(0, currOp.databases.databasesClonedBeforeFailover, tojson(res));
-    assert.eq(dbsToClone.length, currOp.databases.databasesToClone, tojson(res));
-    assert.eq(dbsToClone.length, currOp.databases.databasesCloned, tojson(res));
-    for (const db of dbsToClone) {
-        const tenantDB = tenantMigrationTest.tenantDB(kTenantId, db);
-        assert(currOp.databases.hasOwnProperty(tenantDB), tojson(res));
-        const dbStats = currOp.databases[tenantDB];
-        assert.eq(0, dbStats.clonedCollectionsBeforeFailover, tojson(res));
-        assert.eq(collsToClone.length, dbStats.collections, tojson(res));
-        assert.eq(collsToClone.length, dbStats.clonedCollections, tojson(res));
-        assert(dbStats.hasOwnProperty("start"), tojson(res));
-        assert(dbStats.hasOwnProperty("end"), tojson(res));
-        assert.neq(0, dbStats.elapsedMillis, tojson(res));
-        for (const coll of collsToClone) {
-            assert(dbStats.hasOwnProperty(`${tenantDB}.${coll}`), tojson(res));
-            const collStats = dbStats[`${tenantDB}.${coll}`];
-            assert.eq(docs.length, collStats.documentsToCopy, tojson(res));
-            assert.eq(docs.length, collStats.documentsCopied, tojson(res));
-            assert.eq(1, collStats.indexes, tojson(res));
-            assert.eq(collStats.insertedBatches, collStats.receivedBatches, tojson(res));
-            assert(collStats.hasOwnProperty("start"), tojson(res));
-            assert(collStats.hasOwnProperty("end"), tojson(res));
-            assert.neq(0, collStats.elapsedMillis, tojson(res));
-        }
-    }
 }
 
 tenantMigrationTest.stop();

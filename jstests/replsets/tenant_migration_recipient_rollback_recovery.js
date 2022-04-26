@@ -314,7 +314,7 @@ testRollbackInitialState();
 
 jsTest.log("Test roll back recipient's state doc update");
 [{
-    pauseFailPoint: "fpBeforeMarkingCollectionClonerDone",
+    pauseFailPoint: "fpBeforeMarkingCloneSuccess",
     nextState: "reject",
     query: {dataConsistentStopDonorOpTime: {$exists: 1}}
 },

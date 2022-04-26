@@ -73,7 +73,7 @@ public:
 
     TenantOplogApplier(const UUID& migrationUuid,
                        const std::string& tenantId,
-                       OpTime applyFromOpTime,
+                       OpTime StartApplyingAfterOpTime,
                        RandomAccessOplogBuffer* oplogBuffer,
                        std::shared_ptr<executor::TaskExecutor> executor,
                        ThreadPool* writerPool,
@@ -101,14 +101,14 @@ public:
     void setCloneFinishedRecipientOpTime(OpTime cloneFinishedRecipientOpTime);
 
     /**
-     * Returns the optime the applier will start applying from. Used for testing.
+     * Returns the optime the applier will start applying from.
      */
-    OpTime getBeginApplyingOpTime_forTest() const;
+    OpTime getStartApplyingAfterOpTime() const;
 
     /**
-     * Returns the timestamp the applier will resume batching from. Used for testing.
+     * Returns the timestamp the applier will resume batching from.
      */
-    Timestamp getResumeBatchingTs_forTest() const;
+    Timestamp getResumeBatchingTs() const;
 
 private:
     Status _doStartup_inlock() noexcept final;
@@ -160,7 +160,7 @@ private:
     std::shared_ptr<TenantOplogBatcher> _oplogBatcher;  // (R)
     const UUID _migrationUuid;                          // (R)
     const std::string _tenantId;                        // (R)
-    const OpTime _beginApplyingAfterOpTime;             // (R)
+    const OpTime _startApplyingAfterOpTime;             // (R)
     RandomAccessOplogBuffer* _oplogBuffer;              // (R)
     std::shared_ptr<executor::TaskExecutor> _executor;  // (R)
     // All no-op entries written by this tenant migration should have OpTime greater than this

@@ -65,7 +65,7 @@ MONGO_FAIL_POINT_DEFINE(fpBeforeTenantOplogApplyingBatch);
 
 TenantOplogApplier::TenantOplogApplier(const UUID& migrationUuid,
                                        const std::string& tenantId,
-                                       OpTime applyFromOpTime,
+                                       OpTime startApplyingAfterOpTime,
                                        RandomAccessOplogBuffer* oplogBuffer,
                                        std::shared_ptr<executor::TaskExecutor> executor,
                                        ThreadPool* writerPool,
@@ -73,7 +73,7 @@ TenantOplogApplier::TenantOplogApplier(const UUID& migrationUuid,
     : AbstractAsyncComponent(executor.get(), std::string("TenantOplogApplier_") + tenantId),
       _migrationUuid(migrationUuid),
       _tenantId(tenantId),
-      _beginApplyingAfterOpTime(applyFromOpTime),
+      _startApplyingAfterOpTime(startApplyingAfterOpTime),
       _oplogBuffer(oplogBuffer),
       _executor(std::move(executor)),
       _writerPool(writerPool),
@@ -93,7 +93,7 @@ SemiFuture<TenantOplogApplier::OpTimePair> TenantOplogApplier::getNotificationFo
     }
     // If this optime has already passed, just return a ready future.
     if (_lastAppliedOpTimesUpToLastBatch.donorOpTime >= donorOpTime ||
-        _beginApplyingAfterOpTime >= donorOpTime) {
+        _startApplyingAfterOpTime >= donorOpTime) {
         return SemiFuture<OpTimePair>::makeReady(_lastAppliedOpTimesUpToLastBatch);
     }
 
@@ -103,11 +103,11 @@ SemiFuture<TenantOplogApplier::OpTimePair> TenantOplogApplier::getNotificationFo
     return iter->second.getFuture().semi();
 }
 
-OpTime TenantOplogApplier::getBeginApplyingOpTime_forTest() const {
-    return _beginApplyingAfterOpTime;
+OpTime TenantOplogApplier::getStartApplyingAfterOpTime() const {
+    return _startApplyingAfterOpTime;
 }
 
-Timestamp TenantOplogApplier::getResumeBatchingTs_forTest() const {
+Timestamp TenantOplogApplier::getResumeBatchingTs() const {
     return _resumeBatchingTs;
 }
 
@@ -121,7 +121,7 @@ void TenantOplogApplier::setCloneFinishedRecipientOpTime(OpTime cloneFinishedRec
 
 Status TenantOplogApplier::_doStartup_inlock() noexcept {
     _oplogBatcher = std::make_shared<TenantOplogBatcher>(
-        _tenantId, _oplogBuffer, _executor, _resumeBatchingTs, _beginApplyingAfterOpTime);
+        _tenantId, _oplogBuffer, _executor, _resumeBatchingTs, _startApplyingAfterOpTime);
     auto status = _oplogBatcher->startup();
     if (!status.isOK())
         return status;
@@ -906,9 +906,9 @@ std::vector<std::vector<const OplogEntry*>> TenantOplogApplier::_fillWriterVecto
     CachedCollectionProperties collPropertiesCache;
 
     for (auto&& op : batch->ops) {
-        // If the operation's optime is before or the same as the beginApplyingAfterOpTime we don't
+        // If the operation's optime is before or the same as the startApplyingAfterOpTime we don't
         // want to apply it, so don't include it in writerVectors.
-        if (op.entry.getOpTime() <= _beginApplyingAfterOpTime)
+        if (op.entry.getOpTime() <= _startApplyingAfterOpTime)
             continue;
         uassert(4886006,
                 "Tenant oplog application does not support prepared transactions.",

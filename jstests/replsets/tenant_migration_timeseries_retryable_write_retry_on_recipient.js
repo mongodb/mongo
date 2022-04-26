@@ -41,8 +41,8 @@ function testRetryOnRecipient(ordered) {
     const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
     const recipientDb = recipientPrimary.getDB(kDbName);
 
-    const waitBeforeFetchingTransactions = configureFailPoint(
-        recipientPrimary, "fpBeforeFetchingCommittedTransactions", {action: "hang"});
+    const pauseTenantMigrationBeforeLeavingDataSyncState =
+        configureFailPoint(donorPrimary, "pauseTenantMigrationBeforeLeavingDataSyncState");
 
     const migrationId = UUID();
     const migrationOpts = {
@@ -96,14 +96,14 @@ function testRetryOnRecipient(ordered) {
         new Thread(TenantMigrationUtil.runMigrationAsync, migrationOpts, donorRstArgs);
     migrationThread.start();
 
-    waitBeforeFetchingTransactions.wait();
+    pauseTenantMigrationBeforeLeavingDataSyncState.wait();
 
     jsTestLog("Run retryable writes during the migration");
     assert.commandWorked(donorDb.runCommand(duringWrites.retryableInsertCommand));
 
     // Wait for the migration to complete.
     jsTest.log("Waiting for migration to complete");
-    waitBeforeFetchingTransactions.off();
+    pauseTenantMigrationBeforeLeavingDataSyncState.off();
     TenantMigrationTest.assertCommitted(migrationThread.returnData());
 
     // Print the no-op oplog entries for debugging purposes.

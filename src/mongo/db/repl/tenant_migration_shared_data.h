@@ -34,12 +34,15 @@
 
 namespace mongo {
 namespace repl {
+
+enum class ResumePhase { kNone, kDataSync, kOplogCatchup };
+
 class TenantMigrationSharedData final : public ReplSyncSharedData {
 public:
     TenantMigrationSharedData(ClockSource* clock, const UUID& migrationId)
-        : ReplSyncSharedData(clock), _migrationId(migrationId), _resuming(false) {}
-    TenantMigrationSharedData(ClockSource* clock, const UUID& migrationId, bool resuming)
-        : ReplSyncSharedData(clock), _migrationId(migrationId), _resuming(resuming) {}
+        : ReplSyncSharedData(clock), _migrationId(migrationId), _resumePhase(ResumePhase::kNone) {}
+    TenantMigrationSharedData(ClockSource* clock, const UUID& migrationId, ResumePhase resumePhase)
+        : ReplSyncSharedData(clock), _migrationId(migrationId), _resumePhase(resumePhase) {}
 
     void setLastVisibleOpTime(WithLock, OpTime opTime);
 
@@ -49,8 +52,8 @@ public:
         return _migrationId;
     }
 
-    bool isResuming() const {
-        return _resuming;
+    ResumePhase getResumePhase() const {
+        return _resumePhase;
     }
 
 private:
@@ -61,8 +64,9 @@ private:
     // Id of the current tenant migration.
     const UUID _migrationId;
 
-    // Indicate whether the tenant migration is resuming from a failover.
-    const bool _resuming;
+    // Indicate the phase from which the tenant migration is resuming due to recipient/donor
+    // failovers.
+    const ResumePhase _resumePhase;
 };
 }  // namespace repl
 }  // namespace mongo

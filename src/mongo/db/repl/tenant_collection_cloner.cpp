@@ -324,7 +324,7 @@ BaseCloner::AfterStageBehavior TenantCollectionCloner::createCollectionStage() {
         uassert(ErrorCodes::NamespaceExists,
                 str::stream() << "Tenant '" << _tenantId << "': collection '" << collection->ns()
                               << "' already exists prior to data sync",
-                getSharedData()->isResuming());
+                getSharedData()->getResumePhase() == ResumePhase::kDataSync);
 
         _existingNss = collection->ns();
         LOGV2(5342502,
@@ -393,7 +393,8 @@ BaseCloner::AfterStageBehavior TenantCollectionCloner::createCollectionStage() {
                                                     _collectionOptions,
                                                     !_idIndexSpec.isEmpty() /* createIdIndex */,
                                                     _idIndexSpec);
-        if (status == ErrorCodes::NamespaceExists && getSharedData()->isResuming()) {
+        if (status == ErrorCodes::NamespaceExists &&
+            getSharedData()->getResumePhase() == ResumePhase::kDataSync) {
             // If we are resuming from a recipient failover we can get ErrorCodes::NamespaceExists
             // due to following conditions:
             //

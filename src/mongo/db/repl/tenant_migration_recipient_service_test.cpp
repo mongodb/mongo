@@ -1725,7 +1725,7 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogFetcherResumesFromTopOfOplogBuf
 
     // Hang after creating the oplog buffer collection but before starting the oplog fetcher.
     const auto hangBeforeFetcherFp =
-        globalFailPointRegistry().find("pauseAfterCreatingOplogBuffer");
+        globalFailPointRegistry().find("fpAfterRetrievingStartOpTimesMigrationRecipientInstance");
     auto initialTimesEntered = hangBeforeFetcherFp->setMode(FailPoint::alwaysOn,
                                                             0,
                                                             BSON("action"
@@ -1839,7 +1839,7 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogFetcherNoDocInBufferToResumeFro
 
     // Hang after creating the oplog buffer collection but before starting the oplog fetcher.
     const auto hangBeforeFetcherFp =
-        globalFailPointRegistry().find("pauseAfterCreatingOplogBuffer");
+        globalFailPointRegistry().find("fpAfterRetrievingStartOpTimesMigrationRecipientInstance");
     auto initialTimesEntered = hangBeforeFetcherFp->setMode(FailPoint::alwaysOn,
                                                             0,
                                                             BSON("action"
@@ -2040,8 +2040,8 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogApplierResumesFromLastNoOpOplog
     // The oplog applier should have started batching and applying at the donor opTime equal to
     // 'resumeOpTime'.
     const auto oplogApplier = getTenantOplogApplier(instance.get());
-    ASSERT_EQUALS(resumeOpTime, oplogApplier->getBeginApplyingOpTime_forTest());
-    ASSERT_EQUALS(resumeOpTime.getTimestamp(), oplogApplier->getResumeBatchingTs_forTest());
+    ASSERT_EQUALS(resumeOpTime, oplogApplier->getStartApplyingAfterOpTime());
+    ASSERT_EQUALS(resumeOpTime.getTimestamp(), oplogApplier->getResumeBatchingTs());
 
     // Stop the oplog applier.
     instance->stopOplogApplier_forTest();
@@ -2213,10 +2213,9 @@ TEST_F(TenantMigrationRecipientServiceTest,
     const auto oplogApplier = getTenantOplogApplier(instance.get());
     // Resume batching from the first migration no-op oplog entry. In this test, this is before
     // the 'startApplyingDonorOpTime'.
-    ASSERT_EQUALS(beforeStartApplyingOpTime.getTimestamp(),
-                  oplogApplier->getResumeBatchingTs_forTest());
+    ASSERT_EQUALS(beforeStartApplyingOpTime.getTimestamp(), oplogApplier->getResumeBatchingTs());
     // The oplog applier starts applying from the donor opTime equal to 'beginApplyingOpTime'.
-    ASSERT_EQUALS(startApplyingOpTime, oplogApplier->getBeginApplyingOpTime_forTest());
+    ASSERT_EQUALS(startApplyingOpTime, oplogApplier->getStartApplyingAfterOpTime());
 
     // Stop the oplog applier.
     instance->stopOplogApplier_forTest();
@@ -2360,9 +2359,9 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogApplierResumesFromStartDonorApp
     const auto oplogApplier = getTenantOplogApplier(instance.get());
     // There is no oplog entry to resume batching from, so we treat it as if we are resuming
     // oplog application from the start. The 'resumeBatchingTs' will be a null timestamp.
-    ASSERT_EQUALS(Timestamp(), oplogApplier->getResumeBatchingTs_forTest());
+    ASSERT_EQUALS(Timestamp(), oplogApplier->getResumeBatchingTs());
     // The oplog applier starts applying from the donor opTime equal to 'beginApplyingOpTime'.
-    ASSERT_EQUALS(startApplyingOpTime, oplogApplier->getBeginApplyingOpTime_forTest());
+    ASSERT_EQUALS(startApplyingOpTime, oplogApplier->getStartApplyingAfterOpTime());
 
     // Stop the oplog applier.
     instance->stopOplogApplier_forTest();
@@ -2401,7 +2400,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
 
     // Hang after creating the oplog buffer collection but before starting the oplog fetcher.
     const auto hangBeforeFetcherFp =
-        globalFailPointRegistry().find("pauseAfterCreatingOplogBuffer");
+        globalFailPointRegistry().find("fpAfterRetrievingStartOpTimesMigrationRecipientInstance");
     auto initialTimesEntered = hangBeforeFetcherFp->setMode(FailPoint::alwaysOn,
                                                             0,
                                                             BSON("action"

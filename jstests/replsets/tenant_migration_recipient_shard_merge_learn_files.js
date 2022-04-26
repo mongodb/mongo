@@ -42,7 +42,7 @@ const donorPrimary = tenantMigrationTest.getDonorPrimary();
 // Do a majority write.
 tenantMigrationTest.insertDonorDB(tenantDB, collName);
 
-const failpoint = "fpAfterStartingOplogApplierMigrationRecipientInstance";
+const failpoint = "fpBeforeMarkingCloneSuccess";
 const waitInFailPoint = configureFailPoint(recipientPrimary, failpoint, {action: "hang"});
 
 // In order to prevent the copying of "testTenantId" databases via logical cloning from donor to

@@ -890,7 +890,7 @@ TEST_F(TenantCollectionClonerTest, QueryPlanKilledThenNamespaceNotFoundSubsequen
 }
 
 TEST_F(TenantCollectionClonerTest, ResumeFromEmptyCollectionMissingAllSecondaryIndexes) {
-    TenantMigrationSharedData resumingSharedData(&_clock, _migrationId, /*resuming=*/true);
+    TenantMigrationSharedData resumingSharedData(&_clock, _migrationId, ResumePhase::kDataSync);
     auto cloner = makeCollectionCloner(CollectionOptions(), &resumingSharedData);
 
     // Simulate that the collection already exists with no data and no secondary index.
@@ -922,7 +922,7 @@ TEST_F(TenantCollectionClonerTest, ResumeFromEmptyCollectionMissingAllSecondaryI
 }
 
 TEST_F(TenantCollectionClonerTest, ResumeFromEmptyCollectionMissingSomeSecondaryIndexes) {
-    TenantMigrationSharedData resumingSharedData(&_clock, _migrationId, /*resuming=*/true);
+    TenantMigrationSharedData resumingSharedData(&_clock, _migrationId, ResumePhase::kDataSync);
     auto cloner = makeCollectionCloner(CollectionOptions(), &resumingSharedData);
 
     // Simulate that the collection already exists with no data and some secondary indexes.
@@ -956,7 +956,7 @@ TEST_F(TenantCollectionClonerTest, ResumeFromEmptyCollectionMissingSomeSecondary
 }
 
 TEST_F(TenantCollectionClonerTest, ResumeFromEmptyCollectionMissingNoSecondaryIndexes) {
-    TenantMigrationSharedData resumingSharedData(&_clock, _migrationId, /*resuming=*/true);
+    TenantMigrationSharedData resumingSharedData(&_clock, _migrationId, ResumePhase::kDataSync);
     auto cloner = makeCollectionCloner(CollectionOptions(), &resumingSharedData);
 
     // Simulate that the collection already exists with no data and all matching secondary indexes.
@@ -982,7 +982,7 @@ TEST_F(TenantCollectionClonerTest, ResumeFromEmptyCollectionMissingNoSecondaryIn
 }
 
 TEST_F(TenantCollectionClonerTest, ResumeFromNonEmptyCollection) {
-    TenantMigrationSharedData resumingSharedData(&_clock, _migrationId, /*resuming=*/true);
+    TenantMigrationSharedData resumingSharedData(&_clock, _migrationId, ResumePhase::kDataSync);
     auto cloner = makeCollectionCloner(CollectionOptions(), &resumingSharedData);
 
     // Simulate that the collection already exists with some data.
@@ -1015,7 +1015,7 @@ TEST_F(TenantCollectionClonerTest, ResumeFromNonEmptyCollection) {
 }
 
 TEST_F(TenantCollectionClonerTest, ResumeFromRecreatedCollection) {
-    TenantMigrationSharedData resumingSharedData(&_clock, _migrationId, /*resuming=*/true);
+    TenantMigrationSharedData resumingSharedData(&_clock, _migrationId, ResumePhase::kDataSync);
     auto cloner = makeCollectionCloner(CollectionOptions(), &resumingSharedData);
 
     // Simulate that the namespace already exists under a different uuid.
@@ -1045,7 +1045,7 @@ TEST_F(TenantCollectionClonerTest, ResumeFromRecreatedCollection) {
 }
 
 TEST_F(TenantCollectionClonerTest, ResumeFromRenamedCollection) {
-    TenantMigrationSharedData resumingSharedData(&_clock, _migrationId, /*resuming=*/true);
+    TenantMigrationSharedData resumingSharedData(&_clock, _migrationId, ResumePhase::kDataSync);
     auto cloner = makeCollectionCloner(CollectionOptions(), &resumingSharedData);
 
     // Simulate that the collection already exists under a different name with no index and no data.

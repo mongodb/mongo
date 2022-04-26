@@ -357,7 +357,7 @@ public:
          * Creates and connects both the oplog fetcher client and the client used for other
          * operations.
          */
-        SemiFuture<ConnectionPair> _createAndConnectClients();
+        SemiFuture<void> _createAndConnectClients();
 
         /**
          * Fetches all key documents from the donor's admin.system.keys collection, stores them in
@@ -376,9 +376,9 @@ public:
         ExecutorFuture<void> _killBackupCursor();
 
         /**
-         * Retrieves the start optimes from the donor and updates the in-memory state accordingly.
+         * Retrieves the start optimes from the donor and updates the on-disk state accordingly.
          */
-        void _getStartOpTimesFromDonor(WithLock lk);
+        SemiFuture<void> _getStartOpTimesFromDonor();
 
         /**
          * Pushes documents from oplog fetcher to oplog buffer.
@@ -394,7 +394,7 @@ public:
          * Creates the oplog buffer that will be populated by donor oplog entries from the retryable
          * writes fetching stage and oplog fetching stage.
          */
-        void _createOplogBuffer();
+        void _createOplogBuffer(WithLock, OperationContext* opCtx);
 
         /**
          * Runs an aggregation that gets the entire oplog chain for every retryable write entry in
@@ -439,22 +439,27 @@ public:
         BSONObj _getOplogFetcherFilter() const;
 
         /*
-         * Indicates that the recipient has completed the tenant cloning phase.
-         */
-        bool _isCloneCompletedMarkerSet(WithLock) const;
-
-        /*
          * Traverse backwards through the oplog to find the optime which tenant oplog application
          * should resume from. The oplog applier should resume applying entries that have a greater
          * optime than the returned value.
          */
-        OpTime _getOplogResumeApplyingDonorOptime() const;
+        OpTime _getOplogResumeApplyingDonorOptime(const OpTime& cloneFinishedRecipientOpTime) const;
 
         /*
          * Starts the tenant cloner.
          * Returns future that will be fulfilled when the cloner completes.
          */
         Future<void> _startTenantAllDatabaseCloner(WithLock lk);
+
+        /*
+         * Starts the tenant oplog applier.
+         */
+        void _startOplogApplier();
+
+        /*
+         * Waits for tenant oplog applier to stop.
+         */
+        SemiFuture<TenantOplogApplier::OpTimePair> _waitForOplogApplierToStop();
 
         /*
          * Advances the stableTimestamp to be >= startApplyingDonorOpTime by:
@@ -466,7 +471,7 @@ public:
                                                                const CancellationToken& token);
 
         /*
-         * Gets called when the cloner completes cloning data successfully.
+         * Gets called when the logical/file cloner completes cloning data successfully.
          * And, it is responsible to populate the 'dataConsistentStopDonorOpTime'
          * and 'cloneFinishedRecipientOpTime' fields in the state doc.
          */
@@ -477,6 +482,22 @@ public:
          * state.
          */
         SemiFuture<void> _getDataConsistentFuture();
+
+        /*
+         * Wait for the data cloned via logical cloner to be consistent.
+         */
+        SemiFuture<TenantOplogApplier::OpTimePair> _waitForDataToBecomeConsistent();
+
+        /*
+         * Transitions the instance state to 'kConsistent'.
+         */
+        SemiFuture<void> _enterConsistentState();
+
+        /*
+         * Persists the instance state doc and waits for it to be majority replicated.
+         * Throws an user assertion on failure.
+         */
+        SemiFuture<void> _persistConsistentState();
 
         /*
          * Cancels the tenant migration recipient instance task work.
@@ -514,18 +535,34 @@ public:
         /*
          * Returns the majority OpTime on the donor node that 'client' is connected to.
          */
-
         OpTime _getDonorMajorityOpTime(std::unique_ptr<mongo::DBClientConnection>& client);
+
+        /*
+         * Detects recipient FCV changes during migration.
+         */
+        SemiFuture<void> _checkIfFcvHasChangedSinceLastAttempt();
+
         /**
          * Enforces that the donor and recipient share the same featureCompatibilityVersion.
          */
         void _compareRecipientAndDonorFCV() const;
 
-        /**
+        /*
          * Increments either 'totalSuccessfulMigrationsReceived' or 'totalFailedMigrationsReceived'
          * in TenantMigrationStatistics by examining status and promises.
          */
         void _setMigrationStatsOnCompletion(Status completionStatus) const;
+
+        /*
+         * Sets up internal state to begin migration.
+         */
+        void _setup();
+
+        SemiFuture<TenantOplogApplier::OpTimePair> _migrateUsingMTMProtocol(
+            const CancellationToken& token);
+
+        SemiFuture<TenantOplogApplier::OpTimePair> _migrateUsingShardMergeProtocol(
+            const CancellationToken& token);
 
         mutable Mutex _mutex = MONGO_MAKE_LATCH("TenantMigrationRecipientService::_mutex");
 
@@ -616,9 +653,10 @@ public:
 
         // Waiters are notified when 'tenantOplogApplier' is valid on restart.
         stdx::condition_variable _restartOplogApplierCondVar;  // (M)
-        // Indicates that the oplog applier is being cleaned up due to restart of the future chain.
-        // This is set to true when the oplog applier is started up again.
-        bool _isRestartingOplogApplier = false;  // (M)
+        // Waiters are notified when 'tenantOplogApplier' is ready to use.
+        stdx::condition_variable _oplogApplierReadyCondVar;  // (M)
+        // Indicates whether 'tenantOplogApplier' is ready to use or not.
+        bool _oplogApplierReady = false;  // (M)
     };
 
 private:

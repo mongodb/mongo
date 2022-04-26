@@ -402,7 +402,7 @@ TEST_F(TenantAllDatabaseClonerTest, ResumingFromLastClonedDb) {
     _mockServer->setCommandReply("find", createFindResponse());
     _mockServer->setCommandReply("dbStats", fromjson("{ok:1, dataSize: 30}"));
 
-    TenantMigrationSharedData resumingSharedData(&_clock, _migrationId, /*resuming=*/true);
+    TenantMigrationSharedData resumingSharedData(&_clock, _migrationId, ResumePhase::kDataSync);
     auto cloner = makeAllDatabaseCloner(&resumingSharedData);
     cloner->setStopAfterStage_forTest("initializeStatsStage");
 
@@ -445,7 +445,7 @@ TEST_F(TenantAllDatabaseClonerTest, LastClonedDbDeleted_AllGreater) {
     _mockServer->setCommandReply("find", createFindResponse());
     _mockServer->setCommandReply("dbStats", fromjson("{ok:1, dataSize: 30}"));
 
-    TenantMigrationSharedData resumingSharedData(&_clock, _migrationId, /*resuming=*/true);
+    TenantMigrationSharedData resumingSharedData(&_clock, _migrationId, ResumePhase::kDataSync);
     auto cloner = makeAllDatabaseCloner(&resumingSharedData);
     cloner->setStopAfterStage_forTest("initializeStatsStage");
 
@@ -502,7 +502,7 @@ TEST_F(TenantAllDatabaseClonerTest, LastClonedDbDeleted_SomeGreater) {
     _mockServer->setCommandReply("find", createFindResponse());
     _mockServer->setCommandReply("dbStats", fromjson("{ok:1, dataSize: 30}"));
 
-    TenantMigrationSharedData resumingSharedData(&_clock, _migrationId, /*resuming=*/true);
+    TenantMigrationSharedData resumingSharedData(&_clock, _migrationId, ResumePhase::kDataSync);
     auto cloner = makeAllDatabaseCloner(&resumingSharedData);
     cloner->setStopAfterStage_forTest("initializeStatsStage");
 
@@ -570,7 +570,7 @@ TEST_F(TenantAllDatabaseClonerTest, LastClonedDbDeleted_AllLess) {
     _mockServer->setCommandReply("find", createFindResponse());
     _mockServer->setCommandReply("dbStats", fromjson("{ok:1, dataSize: 30}"));
 
-    TenantMigrationSharedData resumingSharedData(&_clock, _migrationId, /*resuming=*/true);
+    TenantMigrationSharedData resumingSharedData(&_clock, _migrationId, ResumePhase::kDataSync);
     auto cloner = makeAllDatabaseCloner(&resumingSharedData);
     cloner->setStopAfterStage_forTest("initializeStatsStage");
 
