@@ -113,7 +113,7 @@ repl::OpTime persistParticipantListBlocking(
                 3,
                 "{sessionId}:{txnNumberAndRetryCounter} Going to write participant list",
                 "Going to write participant list",
-                "sessionId"_attr = lsid.getId(),
+                "sessionId"_attr = lsid,
                 "txnNumberAndRetryCounter"_attr = txnNumberAndRetryCounter);
 
     if (MONGO_unlikely(hangBeforeWritingParticipantList.shouldFail())) {
@@ -184,7 +184,7 @@ repl::OpTime persistParticipantListBlocking(
     LOGV2_DEBUG(22465,
                 3,
                 "{sessionId}:{txnNumberAndRetryCounter} Wrote participant list",
-                "sessionId"_attr = lsid.getId(),
+                "sessionId"_attr = lsid,
                 "txnNumberAndRetryCounter"_attr = txnNumberAndRetryCounter);
 
     return repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
@@ -334,7 +334,7 @@ repl::OpTime persistDecisionBlocking(OperationContext* opCtx,
     LOGV2_DEBUG(22467,
                 3,
                 "{sessionId}:{txnNumberAndRetryCounter} Going to write decision {decision}",
-                "sessionId"_attr = lsid.getId(),
+                "sessionId"_attr = lsid,
                 "txnNumberAndRetryCounter"_attr = txnNumberAndRetryCounter,
                 "decision"_attr = (isCommit ? "commit" : "abort"));
 
@@ -413,7 +413,7 @@ repl::OpTime persistDecisionBlocking(OperationContext* opCtx,
                 3,
                 "{sessionId}:{txnNumberAndRetryCounter} Wrote decision {decision}",
                 "Wrote decision",
-                "sessionId"_attr = lsid.getId(),
+                "sessionId"_attr = lsid,
                 "txnNumberAndRetryCounter"_attr = txnNumberAndRetryCounter,
                 "decision"_attr = (isCommit ? "commit" : "abort"));
 
@@ -544,7 +544,7 @@ void deleteCoordinatorDocBlocking(OperationContext* opCtx,
                 3,
                 "{sessionId}:{txnNumberAndRetryCounter} Going to delete coordinator doc",
                 "Going to delete coordinator doc",
-                "sessionId"_attr = lsid.getId(),
+                "sessionId"_attr = lsid,
                 "txnNumberAndRetryCounter"_attr = txnNumberAndRetryCounter);
 
     if (MONGO_unlikely(hangBeforeDeletingCoordinatorDoc.shouldFail())) {
@@ -609,7 +609,7 @@ void deleteCoordinatorDocBlocking(OperationContext* opCtx,
                 3,
                 "{sessionId}:{txnNumberAndRetryCounter} Deleted coordinator doc",
                 "Deleted coordinator doc",
-                "sessionId"_attr = lsid.getId(),
+                "sessionId"_attr = lsid,
                 "txnNumberAndRetryCounter"_attr = txnNumberAndRetryCounter);
 
     hangAfterDeletingCoordinatorDoc.execute([&](const BSONObj& data) {
@@ -691,7 +691,7 @@ Future<PrepareResponse> sendPrepareToShard(ServiceContext* service,
                         "{sessionId}:{txnNumberAndRetryCounter} Coordinator going to send command "
                         "{command} to {localOrRemote} shard {shardId}",
                         "Coordinator going to send command to shard",
-                        "sessionId"_attr = lsid.getId(),
+                        "sessionId"_attr = lsid,
                         "txnNumberAndRetryCounter"_attr = txnNumberAndRetryCounter,
                         "command"_attr = commandObj,
                         "localOrRemote"_attr = (isLocalShard ? "local" : "remote"),
@@ -726,7 +726,7 @@ Future<PrepareResponse> sendPrepareToShard(ServiceContext* service,
                             LOGV2(22477,
                                   "{sessionId}:{txnNumberAndRetryCounter} {error}",
                                   "Coordinator received error from transaction participant",
-                                  "sessionId"_attr = lsid.getId(),
+                                  "sessionId"_attr = lsid,
                                   "txnNumberAndRetryCounter"_attr = txnNumberAndRetryCounter,
                                   "error"_attr = redact(abortStatus));
 
@@ -741,7 +741,7 @@ Future<PrepareResponse> sendPrepareToShard(ServiceContext* service,
                             "vote to commit from shard {shardId} with prepareTimestamp: "
                             "{prepareTimestamp}",
                             "Coordinator shard received a vote to commit from participant shard",
-                            "sessionId"_attr = lsid.getId(),
+                            "sessionId"_attr = lsid,
                             "txnNumberAndRetryCounter"_attr = txnNumberAndRetryCounter,
                             "shardId"_attr = shardId,
                             "prepareTimestampField"_attr = prepareTimestampField.timestamp());
@@ -757,7 +757,7 @@ Future<PrepareResponse> sendPrepareToShard(ServiceContext* service,
                                 "{sessionId}:{txnNumberAndRetryCounter} Coordinator shard received "
                                 "{error} from shard {shardId} for {command}",
                                 "Coordinator shard received response from shard",
-                                "sessionId"_attr = lsid.getId(),
+                                "sessionId"_attr = lsid,
                                 "txnNumberAndRetryCounter"_attr = txnNumberAndRetryCounter,
                                 "error"_attr = status,
                                 "shardId"_attr = shardId,
@@ -796,7 +796,7 @@ Future<PrepareResponse> sendPrepareToShard(ServiceContext* service,
                 "{sessionId}:{txnNumberAndRetryCounter} Prepare stopped retrying due to retrying "
                 "being cancelled",
                 "Prepare stopped retrying due to retrying being cancelled",
-                "sessionId"_attr = lsid.getId(),
+                "sessionId"_attr = lsid,
                 "txnNumberAndRetryCounter"_attr = txnNumberAndRetryCounter);
             return PrepareResponse{shardId,
                                    boost::none,
@@ -834,7 +834,7 @@ Future<void> sendDecisionToShard(ServiceContext* service,
                         "{sessionId}:{txnNumberAndRetryCounter} Coordinator going to send command "
                         "{command} to {localOrRemote} shard {shardId}",
                         "Coordinator going to send command to shard",
-                        "sessionId"_attr = lsid.getId(),
+                        "sessionId"_attr = lsid,
                         "txnNumberAndRetryCounter"_attr = txnNumberAndRetryCounter,
                         "command"_attr = commandObj,
                         "localOrRemote"_attr = (isLocalShard ? "local" : "remote"),
@@ -860,7 +860,7 @@ Future<void> sendDecisionToShard(ServiceContext* service,
                         "{sessionId}:{txnNumberAndRetryCounter}  Coordinator shard received "
                         "{status} in response to {command} from shard {shardId}",
                         "Coordinator shard received response from shard",
-                        "sessionId"_attr = lsid.getId(),
+                        "sessionId"_attr = lsid,
                         "txnNumberAndRetryCounter"_attr = txnNumberAndRetryCounter,
                         "status"_attr = status,
                         "command"_attr = commandObj,

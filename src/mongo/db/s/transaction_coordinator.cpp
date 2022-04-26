@@ -117,7 +117,7 @@ TransactionCoordinator::TransactionCoordinator(
                                  LOGV2_DEBUG(5047000,
                                              1,
                                              "TransactionCoordinator deadline reached",
-                                             "sessionId"_attr = _lsid.getId(),
+                                             "sessionId"_attr = _lsid,
                                              "txnNumberAndRetryCounter"_attr =
                                                  _txnNumberAndRetryCounter);
                                  cancelIfCommitNotYetStarted();
@@ -226,7 +226,7 @@ TransactionCoordinator::TransactionCoordinator(
                             "{sessionId}:{_txnNumberAndRetryCounter} Advancing cluster time to "
                             "the commit timestamp {commitTimestamp}",
                             "Advancing cluster time to the commit timestamp",
-                            "sessionId"_attr = _lsid.getId(),
+                            "sessionId"_attr = _lsid,
                             "txnNumberAndRetryCounter"_attr = _txnNumberAndRetryCounter,
                             "commitTimestamp"_attr = *_decision->getCommitTimestamp());
 
@@ -241,7 +241,7 @@ TransactionCoordinator::TransactionCoordinator(
                 // and convert the internal error code to the public one.
                 LOGV2(5047001,
                       "Transaction coordinator made abort decision",
-                      "sessionId"_attr = lsid.getId(),
+                      "sessionId"_attr = lsid,
                       "txnNumberAndRetryCounter"_attr = txnNumberAndRetryCounter,
                       "status"_attr = redact(status));
                 stdx::lock_guard<Latch> lg(_mutex);
@@ -431,15 +431,15 @@ void TransactionCoordinator::_done(Status status) {
     // *receiving* node was stepping down.
     if (status == ErrorCodes::TransactionCoordinatorSteppingDown)
         status = Status(ErrorCodes::InterruptedDueToReplStateChange,
-                        str::stream() << "Coordinator " << _lsid.getId() << ':'
-                                      << _txnNumberAndRetryCounter.toBSON()
-                                      << " stopped due to: " << status.reason());
+                        str::stream()
+                            << "Coordinator " << _lsid << ':' << _txnNumberAndRetryCounter.toBSON()
+                            << " stopped due to: " << status.reason());
 
     LOGV2_DEBUG(22447,
                 3,
                 "{sessionId}:{_txnNumberAndRetryCounter} Two-phase commit completed with {status}",
                 "Two-phase commit completed",
-                "sessionId"_attr = _lsid.getId(),
+                "sessionId"_attr = _lsid,
                 "txnNumberAndRetryCounter"_attr = _txnNumberAndRetryCounter,
                 "status"_attr = redact(status));
 
