@@ -714,7 +714,14 @@ protected:
     /**
      * Fills out planner parameters if not already filled.
      */
-    virtual void initializePlannerParamsIfNeeded() = 0;
+    void initializePlannerParamsIfNeeded() {
+        if (_plannerParamsInitialized) {
+            return;
+        }
+        fillOutPlannerParams(_opCtx, getMainCollection(), _cq, &_plannerParams);
+
+        _plannerParamsInitialized = true;
+    }
 
     /**
      * Constructs a PlanStage tree from the given query 'solution'.
@@ -780,15 +787,6 @@ public:
     }
 
 protected:
-    void initializePlannerParamsIfNeeded() final {
-        if (_plannerParamsInitialized) {
-            return;
-        }
-        fillOutPlannerParams(_opCtx, _collection, _cq, &_plannerParams);
-
-        _plannerParamsInitialized = true;
-    }
-
     std::unique_ptr<PlanStage> buildExecutableTree(const QuerySolution& solution) const final {
         return stage_builder::buildClassicExecutableTree(_opCtx, _collection, *_cq, solution, _ws);
     }
@@ -988,15 +986,6 @@ public:
     }
 
 protected:
-    void initializePlannerParamsIfNeeded() final {
-        if (_plannerParamsInitialized) {
-            return;
-        }
-        fillOutPlannerParams(_opCtx, _collections, _cq, &_plannerParams);
-
-        _plannerParamsInitialized = true;
-    }
-
     std::unique_ptr<SlotBasedPrepareExecutionResult> buildIdHackPlan() {
         // When the SBE plan cache is enabled we rely on it for fast find-by-_id queries rather than
         // having a special implementation of the idhack. Therefore, this function returns nullptr
