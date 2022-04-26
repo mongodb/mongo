@@ -47,6 +47,7 @@
 #include "mongo/db/query/indexability.h"
 #include "mongo/db/query/projection_parser.h"
 #include "mongo/db/query/query_planner_common.h"
+#include "mongo/logv2/log.h"
 namespace mongo {
 namespace {
 
@@ -201,10 +202,19 @@ Status CanonicalQuery::init(OperationContext* opCtx,
     auto unavailableMetadata = validStatus.getValue();
     _root = MatchExpression::normalize(std::move(root));
     if (feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
-        // When the SBE plan cache is enabled, we auto-parameterize queries in the hopes of caching
-        // a parameterized plan. Here we add parameter markers to the appropriate match expression
-        // leaf nodes.
-        _inputParamIdToExpressionMap = MatchExpression::parameterize(_root.get());
+        const bool hasNoTextNodes =
+            !QueryPlannerCommon::hasNode(_root.get(), MatchExpression::TEXT);
+        if (hasNoTextNodes) {
+            // When the SBE plan cache is enabled, we auto-parameterize queries in the hopes of
+            // caching a parameterized plan. Here we add parameter markers to the appropriate match
+            // expression leaf nodes.
+            _inputParamIdToExpressionMap = MatchExpression::parameterize(_root.get());
+        } else {
+            LOGV2_DEBUG(6579310,
+                        5,
+                        "The query was not auto-parameterized since its match expression tree "
+                        "contains TEXT nodes");
+        }
     }
     // The tree must always be valid after normalization.
     dassert(isValid(_root.get(), *_findCommand).isOK());
