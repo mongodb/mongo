@@ -77,10 +77,6 @@ public:
     ServerStatusMetricField(const std::string& name, const T* t)
         : ServerStatusMetric(name), _t(t) {}
 
-    const T* get() {
-        return _t;
-    }
-
     virtual void appendAtLeaf(BSONObjBuilder& b) const {
         b.append(_leafName, *_t);
     }
