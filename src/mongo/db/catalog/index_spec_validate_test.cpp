@@ -349,6 +349,14 @@ TEST(IndexSpecValidateTest, ReturnsAnErrorIfUnknownFieldIsPresentInSpecV1) {
     ASSERT_EQ(ErrorCodes::InvalidIndexSpecificationOption, result);
 }
 
+TEST(IndexSpecValidateTest, DisallowSpecifyingBothUniqueAndPrepareUnique) {
+    auto result = validateIndexSpec(kDefaultOpCtx,
+                                    BSON("key" << BSON("a" << 1) << "name"
+                                               << "indexName"
+                                               << "unique" << true << "prepareUnique" << true));
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::CannotCreateIndex);
+}
+
 TEST(IdIndexSpecValidateTest, ReturnsAnErrorIfKeyPatternIsIncorrectForIdIndex) {
     ASSERT_EQ(ErrorCodes::BadValue,
               validateIdIndexSpec(BSON("key" << BSON("_id" << -1) << "name"
