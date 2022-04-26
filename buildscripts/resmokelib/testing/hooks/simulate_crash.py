@@ -126,3 +126,15 @@ class SimulateCrash(bghook.BGHook):
 
             shutil.rmtree(path, ignore_errors=True)
         return True
+
+    def after_test(self, test, test_report):
+        """Each test will call this after it executes. Check if the hook found an error."""
+        self._background_job.kill()
+        self._background_job.join()
+
+        if self._background_job.err is not None and test_report.wasSuccessful():
+            self.logger.error("Encountered an error inside the hook after all tests passed: %s.",
+                              self._background_job.err)
+            raise self._background_job.err
+        else:
+            self.logger.info("Reached end of cycle in the hook, killing background thread.")
