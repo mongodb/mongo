@@ -165,5 +165,65 @@ function assertQueryHashAndPlanCacheKey(sbe, classic) {
     assertQueryHashAndPlanCacheKey(sbe.attr, classic.attr);
 })();
 
+// Validate that a query with pushed down $lookup stage uses classic plan cache key encoding.
+(function validateLookupQueryHashMap() {
+    const lookupColl = db.lookupColl;
+    lookupColl.drop();
+    assert.commandWorked(lookupColl.createIndex({b: 1}));
+    const [sbe, classic] =
+        runTestAgainstSbeAndClassicEngines(
+            function(engine) {
+                const pipeline = [
+                    {
+                        $lookup:
+                        {
+                            from: lookupColl.getName(),
+                            localField: "a",
+                            foreignField: "b",
+                            as: "whatever"
+                        }
+                    }
+                ];
+                return coll.explain().aggregate(pipeline);
+            });
+
+    assert.neq(sbe, null);
+    assert.neq(classic, null);
+    assert.eq(sbe.explainVersion, "2", sbe);
+    assert.eq(classic.explainVersion, "1", classic);
+
+    // The query hashes and the plan cache keys ('the keys') are different now because
+    // 'internalQueryForceClassicEngine' flag is encoded into query shape, once this flag is removed
+    // from the query shape encoding the keys will be the same until SERVER-61507 is completed, then
+    // the keys will be different forever.
+    assertQueryHashAndPlanCacheKey(sbe.queryPlanner, classic.stages[0]["$cursor"].queryPlanner);
+})();
+
+// Validate that a query with pushed down $group stage uses classic plan cache key encoding.
+(function validateGroupQueryHashMap() {
+    const groupColl = db.groupColl;
+    groupColl.drop();
+    assert.commandWorked(groupColl.insertOne({b: 1}));
+    const [sbe, classic] = runTestAgainstSbeAndClassicEngines(function(engine) {
+        const pipeline = [{
+            $group: {
+                _id: "$b",
+            }
+        }];
+        return groupColl.explain().aggregate(pipeline);
+    });
+
+    assert.neq(sbe, null);
+    assert.neq(classic, null);
+    assert.eq(sbe.explainVersion, "2", sbe);
+    assert.eq(classic.explainVersion, "1", classic);
+
+    // The query hashes and the plan cache keys ('the keys') are different now because
+    // 'internalQueryForceClassicEngine' flag is encoded into query shape, once this flag is removed
+    // from the query shape encoding the keys will be the same until SERVER-61507 is completed, then
+    // the keys will be different forever.
+    assertQueryHashAndPlanCacheKey(sbe.queryPlanner, classic.stages[0]["$cursor"].queryPlanner);
+})();
+
 MongoRunner.stopMongod(conn);
 }());

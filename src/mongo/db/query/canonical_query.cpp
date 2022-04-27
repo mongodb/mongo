@@ -540,8 +540,10 @@ std::string CanonicalQuery::toStringShort() const {
 }
 
 CanonicalQuery::QueryShapeString CanonicalQuery::encodeKey() const {
+    // TODO SERVER-61507: remove '_pipeline.empty()' check. Canonical queries with pushed down
+    // $group/$lookup stages are not SBE-compatible until SERVER-61507 is complete.
     return (feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV() &&
-            !_forceClassicEngine && _sbeCompatible)
+            !_forceClassicEngine && _sbeCompatible && _pipeline.empty())
         ? canonical_query_encoder::encodeSBE(*this)
         : canonical_query_encoder::encode(*this);
 }

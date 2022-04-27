@@ -307,25 +307,6 @@ assertCacheUsage(false /*multiPlanning*/,
 // replanning the cached query.
 verifyCorrectLookupAlgorithmUsed("HashJoin", avoidReplanLookupPipeline, {allowDiskUse: true});
 
-// TODO(SERVER-65345): When the SBE plan cache is enabled, we will encode the 'allowDiskUse'
-//  option when constructing the plan cache key. As such, we will not be able to reuse the cache
-//  entry generated above to execute a HashJoin.
-if (checkSBEEnabled(db, ["featureFlagSbePlanCache"])) {
-    runLookupQuery({allowDiskUse: true});
-    assertCacheUsage(true /*multiPlanning*/,
-                     false /*activeCacheEntry*/,
-                     {b: 1} /*cachedIndex*/,
-                     avoidReplanLookupPipeline,
-                     {allowDiskUse: true});
-
-    runLookupQuery({allowDiskUse: true});
-    assertCacheUsage(true /*multiPlanning*/,
-                     true /*activeCacheEntry*/,
-                     {b: 1} /*cachedIndex*/,
-                     avoidReplanLookupPipeline,
-                     {allowDiskUse: true});
-}
-
 runLookupQuery({allowDiskUse: true});
 assertCacheUsage(false /*multiPlanning*/,
                  true /*activeCacheEntry*/,
@@ -388,15 +369,12 @@ let explain = coll.explain().aggregate(avoidReplanLookupPipeline);
 const eqLookupNodes = getAggPlanStages(explain, "EQ_LOOKUP");
 assert.eq(eqLookupNodes.length, 0, "expected no EQ_LOOKUP nodes; got " + tojson(explain));
 
-// TODO(SERVER-61507): When the SBE plan cache is enabled, we will end up creating a separate
-// plan cache entry for the non-pushed down $lookup plan. As such, we assert that we have two
-// cache entries for the same query hash.
 if (checkSBEEnabled(db, ["featureFlagSbePlanCache"])) {
     runLookupQuery();
     const profileObj = getLatestProfilerEntry(db, {op: "command", ns: coll.getFullName()});
     const matchingCacheEntries =
         coll.getPlanCache().list([{$match: {queryHash: profileObj.queryHash}}]);
-    assert.eq(2, matchingCacheEntries.length);
+    assert.eq(1, matchingCacheEntries.length);
 } else {
     // When the SBE plan cache is disabled, we will be able to reuse the same cache entry.
     runLookupQuery();
@@ -454,15 +432,12 @@ explain = coll.explain().aggregate(avoidReplanLookupPipeline);
 groupNodes = getAggPlanStages(explain, "GROUP");
 assert.eq(groupNodes.length, 0);
 
-// TODO(SERVER-61507): When the SBE plan cache is enabled, we will end up creating a separate
-// plan cache entry for the non-pushed down $lookup plan. As such, we assert that we have two
-// cache entries for the same query hash.
 if (checkSBEEnabled(db, ["featureFlagSbePlanCache"])) {
     runGroupQuery();
     const profileObj = getLatestProfilerEntry(db, {op: "command", ns: coll.getFullName()});
     const matchingCacheEntries =
         coll.getPlanCache().list([{$match: {queryHash: profileObj.queryHash}}]);
-    assert.eq(2, matchingCacheEntries.length);
+    assert.eq(1, matchingCacheEntries.length);
 } else {
     // When the SBE plan cache is disabled, we will be able to reuse the same cache entry.
     runGroupQuery();
