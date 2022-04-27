@@ -1,7 +1,7 @@
 /**
  * Tests basic functionality of pushing $lookup into the find layer.
  *
- * @tags: [requires_sharding]
+ * @tags: [requires_sharding, uses_transactions]
  */
 (function() {
 "use strict";
@@ -707,6 +707,72 @@ MongoRunner.stopMongod(conn);
             {allowDiskUse: true});
 
     MongoRunner.stopMongod(conn);
+}());
+
+// Verify that $lookup works in transaction.
+(function verifyLookupInTransaction() {
+    const rst = new ReplSetTest({nodes: 1});
+    rst.startSet();
+    rst.initiate();
+    const primary = rst.getPrimary();
+
+    function runTransactionTest(pipeline, aggOptions = {}) {
+        // Clear the collections.
+        primary.getDB(name).getCollection(name).drop();
+        primary.getDB(name).getCollection(foreignCollName).drop();
+
+        // Start a snapshot transaction.
+        const session = primary.startSession({causalConsistency: false});
+        const db = session.getDatabase(name);
+        const coll = db.getCollection(name);
+        const foreignColl = db.getCollection(foreignCollName);
+        assert.commandWorked(coll.insert({_id: 0, a: 0}));
+        assert.commandWorked(foreignColl.insert({_id: 0, b: 0}));
+        session.startTransaction({readConcern: {level: "snapshot"}});
+
+        function verifySingleDoc(cursor) {
+            assert.docEq(cursor.next(), {_id: 0, a: 0, out: [{_id: 0, b: 0}]});
+            assert(!cursor.hasNext());
+        }
+
+        // Transaction starts with single doc.
+        let cursor = coll.aggregate(
+            [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}]);
+        verifySingleDoc(cursor);
+
+        // Insert a document outside the transaction, should not be visible in the transaction.
+        assert.commandWorked(primary.getDB(name).getCollection(name).insert({_id: "outside_txn"}));
+
+        cursor = coll.aggregate(pipeline, aggOptions);
+        verifySingleDoc(cursor);
+
+        assert.commandWorked(session.commitTransaction_forTesting());
+    }
+
+    // Basic $lookup should exercise NLJ.
+    runTransactionTest(
+        [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
+        {allowDiskUse: false});
+
+    // $lookup with index on '_id' foreign field should exercise INLJ.
+    runTransactionTest(
+        [{$lookup: {from: foreignCollName, localField: "a", foreignField: "_id", as: "out"}}],
+        {allowDiskUse: false});
+
+    // $lookup with 'allowDiskUse' should exercise HJ.
+    runTransactionTest(
+        [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}]);
+
+    assert.commandWorked(primary.adminCommand({
+        setParameter: 1,
+        internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill: 1,
+    }));
+
+    // $lookup with HJ in transaction still works with spilling.
+    runTransactionTest(
+        [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}]);
+
+    rst.stopSet();
 }());
 
 // Sharded cases.
