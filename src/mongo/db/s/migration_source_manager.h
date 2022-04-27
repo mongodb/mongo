@@ -35,7 +35,7 @@
 #include "mongo/db/s/migration_chunk_cloner_source.h"
 #include "mongo/db/s/migration_coordinator.h"
 #include "mongo/db/s/move_timing_helper.h"
-#include "mongo/s/request_types/move_chunk_request.h"
+#include "mongo/s/request_types/move_range_request_gen.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
@@ -101,7 +101,8 @@ public:
      *      to be after acquiring the distributed lock.
      */
     MigrationSourceManager(OperationContext* opCtx,
-                           MoveChunkRequest request,
+                           ShardsvrMoveRange&& request,
+                           WriteConcernOptions&& writeConcern,
                            ConnectionString donorConnStr,
                            HostAndPort recipientHost);
     ~MigrationSourceManager();
@@ -171,6 +172,10 @@ public:
      */
     BSONObj getMigrationStatusReport() const;
 
+    const NamespaceString& nss() {
+        return _args.getCommandParameter();
+    }
+
 private:
     // Used to track the current state of the source manager. See the methods above, which have
     // comments explaining the various state transitions.
@@ -206,8 +211,11 @@ private:
     // The caller must guarantee it outlives the MigrationSourceManager.
     OperationContext* const _opCtx;
 
-    // The parameters to the moveChunk command
-    const MoveChunkRequest _args;
+    // The parameters to the moveRange command
+    ShardsvrMoveRange _args;
+
+    // The write concern received for the moveRange command
+    const WriteConcernOptions _writeConcern;
 
     // The resolved connection string of the donor shard
     const ConnectionString _donorConnStr;

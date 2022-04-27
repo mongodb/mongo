@@ -71,7 +71,7 @@ public:
 
             ConfigsvrMoveRange configsvrRequest(nss);
             configsvrRequest.setDbName(NamespaceString::kAdminDb);
-            configsvrRequest.setMoveRangeRequest(req.getMoveRangeRequest());
+            configsvrRequest.setMoveRangeRequestBase(req.getMoveRangeRequestBase());
 
             auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
             const auto commandResponse =

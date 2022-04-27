@@ -58,27 +58,22 @@ protected:
     ServiceContext::UniqueOperationContext _opCtx;
 };
 
-MoveChunkRequest createMoveChunkRequest(const NamespaceString& nss) {
-    const ChunkVersion chunkVersion(1, 2, OID::gen(), Timestamp(1, 1));
-
-    BSONObjBuilder builder;
-    MoveChunkRequest::appendAsCommand(
-        &builder,
-        nss,
-        chunkVersion,
-        ShardId("shard0001"),
-        ShardId("shard0002"),
-        ChunkRange(BSON("Key" << -100), BSON("Key" << 100)),
-        1024,
-        MigrationSecondaryThrottleOptions::create(MigrationSecondaryThrottleOptions::kOff),
-        true,
-        MoveChunkRequest::ForceJumbo::kDoNotForce);
-    return assertGet(MoveChunkRequest::createFromCommand(nss, builder.obj()));
+ShardsvrMoveRange createMoveRangeRequest(const NamespaceString& nss,
+                                         const OID& epoch = OID::gen()) {
+    const ShardId fromShard = ShardId("shard0001");
+    const long long maxChunkSizeBytes = 1024;
+    ShardsvrMoveRange req(nss, fromShard, maxChunkSizeBytes);
+    req.setEpoch(epoch);
+    req.getMoveRangeRequestBase().setToShard(ShardId("shard0002"));
+    req.setMaxChunkSizeBytes(1024);
+    req.getMoveRangeRequestBase().setMin(BSON("Key" << -100));
+    req.getMoveRangeRequestBase().setMax(BSON("Key" << 100));
+    return req;
 }
 
 TEST_F(MoveChunkRegistration, ScopedDonateChunkMoveConstructorAndAssignment) {
     auto originalScopedDonateChunk = assertGet(_registry.registerDonateChunk(
-        operationContext(), createMoveChunkRequest(NamespaceString("TestDB", "TestColl"))));
+        operationContext(), createMoveRangeRequest(NamespaceString("TestDB", "TestColl"))));
     ASSERT(originalScopedDonateChunk.mustExecute());
 
     ScopedDonateChunk movedScopedDonateChunk(std::move(originalScopedDonateChunk));
@@ -97,7 +92,7 @@ TEST_F(MoveChunkRegistration, GetActiveMigrationNamespace) {
     const NamespaceString nss("TestDB", "TestColl");
 
     auto originalScopedDonateChunk =
-        assertGet(_registry.registerDonateChunk(operationContext(), createMoveChunkRequest(nss)));
+        assertGet(_registry.registerDonateChunk(operationContext(), createMoveRangeRequest(nss)));
 
     ASSERT_EQ(nss.ns(), _registry.getActiveDonateChunkNss()->ns());
 
@@ -107,10 +102,10 @@ TEST_F(MoveChunkRegistration, GetActiveMigrationNamespace) {
 
 TEST_F(MoveChunkRegistration, SecondMigrationReturnsConflictingOperationInProgress) {
     auto originalScopedDonateChunk = assertGet(_registry.registerDonateChunk(
-        operationContext(), createMoveChunkRequest(NamespaceString("TestDB", "TestColl1"))));
+        operationContext(), createMoveRangeRequest(NamespaceString("TestDB", "TestColl1"))));
 
     auto secondScopedDonateChunkStatus = _registry.registerDonateChunk(
-        operationContext(), createMoveChunkRequest(NamespaceString("TestDB", "TestColl2")));
+        operationContext(), createMoveRangeRequest(NamespaceString("TestDB", "TestColl2")));
     ASSERT_EQ(ErrorCodes::ConflictingOperationInProgress,
               secondScopedDonateChunkStatus.getStatus());
 
@@ -118,12 +113,14 @@ TEST_F(MoveChunkRegistration, SecondMigrationReturnsConflictingOperationInProgre
 }
 
 TEST_F(MoveChunkRegistration, SecondMigrationWithSameArgumentsJoinsFirst) {
+    const auto epoch = OID::gen();
+
     auto originalScopedDonateChunk = assertGet(_registry.registerDonateChunk(
-        operationContext(), createMoveChunkRequest(NamespaceString("TestDB", "TestColl"))));
+        operationContext(), createMoveRangeRequest(NamespaceString("TestDB", "TestColl"), epoch)));
     ASSERT(originalScopedDonateChunk.mustExecute());
 
     auto secondScopedDonateChunk = assertGet(_registry.registerDonateChunk(
-        operationContext(), createMoveChunkRequest(NamespaceString("TestDB", "TestColl"))));
+        operationContext(), createMoveRangeRequest(NamespaceString("TestDB", "TestColl"), epoch)));
     ASSERT(!secondScopedDonateChunk.mustExecute());
 
     originalScopedDonateChunk.signalComplete({ErrorCodes::InternalError, "Test error"});
@@ -171,7 +168,7 @@ TEST_F(MoveChunkRegistration, TestBlockingDonateChunk) {
         // 6. Now that we're woken up by the registry thread, let's attempt to start to donate.
         // This will block and call the lambda set on the baton above.
         auto scopedDonateChunk = _registry.registerDonateChunk(
-            opCtx.get(), createMoveChunkRequest(NamespaceString("TestDB", "TestColl")));
+            opCtx.get(), createMoveRangeRequest(NamespaceString("TestDB", "TestColl")));
 
         ASSERT_OK(scopedDonateChunk.getStatus());
         scopedDonateChunk.getValue().signalComplete(Status::OK());
@@ -262,7 +259,7 @@ TEST_F(MoveChunkRegistration, TestBlockingWhileDonateInProgress) {
     auto result = stdx::async(stdx::launch::async, [&] {
         // 2. Start a migration so that the registry lock will block when acquired.
         auto scopedDonateChunk = _registry.registerDonateChunk(
-            operationContext(), createMoveChunkRequest(NamespaceString("TestDB", "TestColl")));
+            operationContext(), createMoveRangeRequest(NamespaceString("TestDB", "TestColl")));
         ASSERT_OK(scopedDonateChunk.getStatus());
 
         // 3. Signal the registry locking thread that the registry is ready to be locked.

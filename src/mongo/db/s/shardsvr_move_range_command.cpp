@@ -33,7 +33,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/active_migrations_registry.h"
-#include "mongo/db/s/auto_split_vector.h"
 #include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_statistics.h"
@@ -86,31 +85,6 @@ public:
         void typedRun(OperationContext* opCtx) {
             uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
             opCtx->setAlwaysInterruptAtStepDownOrUp();
-            const auto& originalReq = request();
-
-            const auto WC = opCtx->getWriteConcern();
-            BSONObjBuilder moveChunkReqBuilder(originalReq.toBSON({}));
-            moveChunkReqBuilder.append(WriteConcernOptions::kWriteConcernField, WC.toBSON());
-
-            // TODO SERVER-64926 do not assume min always present
-            const auto& min = *request().getMin();
-
-            // TODO SERVER-64817 compute missing bound of `moveRange` within MigrationSourceManager
-            if (!originalReq.getMax().is_initialized()) {
-                // Compute the max bound in case only `min` is set (moveRange)
-                const auto cm = uassertStatusOK(
-                    Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, ns()));
-                uassert(ErrorCodes::NamespaceNotSharded,
-                        "Could not move chunk. Collection is no longer sharded",
-                        cm.isSharded());
-
-                const auto owningChunk = cm.findIntersectingChunkWithSimpleCollation(min);
-                const auto max = computeMaxBound(opCtx, owningChunk, cm.getShardKeyPattern());
-                moveChunkReqBuilder.append(MoveRangeRequest::kMaxFieldName, max);
-            }
-
-            MoveChunkRequest moveChunkRequest = uassertStatusOK(
-                MoveChunkRequest::createFromCommand(ns(), moveChunkReqBuilder.obj()));
 
             // Make sure we're as up-to-date as possible with shard information. This catches the
             // case where we might have changed a shard's host by removing/adding a shard with the
@@ -118,13 +92,14 @@ public:
             Grid::get(opCtx)->shardRegistry()->reload(opCtx);
 
             auto scopedMigration = uassertStatusOK(
-                ActiveMigrationsRegistry::get(opCtx).registerDonateChunk(opCtx, moveChunkRequest));
+                ActiveMigrationsRegistry::get(opCtx).registerDonateChunk(opCtx, request()));
 
             // Check if there is an existing migration running and if so, join it
             if (scopedMigration.mustExecute()) {
                 auto moveChunkComplete =
                     ExecutorFuture<void>(_getExecutor())
-                        .then([moveChunkRequest,
+                        .then([req = request(),
+                               writeConcern = opCtx->getWriteConcern(),
                                scopedMigration = std::move(scopedMigration),
                                serviceContext = opCtx->getServiceContext()]() mutable {
                             // This local variable is created to enforce that the scopedMigration is
@@ -157,7 +132,7 @@ public:
                             Status status = {ErrorCodes::InternalError, "Uninitialized value"};
 
                             try {
-                                _runImpl(opCtx, moveChunkRequest);
+                                _runImpl(opCtx, std::move(req), std::move(writeConcern));
                                 status = Status::OK();
                             } catch (const DBException& e) {
                                 status = e.toStatus();
@@ -180,7 +155,7 @@ public:
                 uassertStatusOK(scopedMigration.waitForCompletion(opCtx));
             }
 
-            if (moveChunkRequest.getWaitForDelete()) {
+            if (request().getWaitForDelete()) {
                 // Ensure we capture the latest opTime in the system, since range deletion happens
                 // asynchronously with a different OperationContext. This must be done after the
                 // above join, because each caller must set the opTime to wait for writeConcern for
@@ -214,35 +189,10 @@ public:
                                                            ActionType::internal));
         }
 
-        /*
-         * Compute the max bound in case only `min` is set (moveRange).
-         *
-         * Taking into account the provided max chunk size, returns:
-         * - A `max` bound to perform split+move in case the chunk owning `min` is splittable.
-         * - The `max` bound of the chunk owning `min in case it can't be split (too small or
-         * jumbo).
-         */
-        BSONObj computeMaxBound(OperationContext* opCtx,
-                                const Chunk& owningChunk,
-                                const ShardKeyPattern& skPattern) {
-            // TODO SERVER-64926 do not assume min always present
-            const auto& min = *request().getMin();
-            auto [splitKeys, _] = autoSplitVector(opCtx,
-                                                  ns(),
-                                                  skPattern.toBSON(),
-                                                  min,
-                                                  owningChunk.getMax(),
-                                                  *request().getMaxChunkSizeBytes(),
-                                                  1);
-            if (splitKeys.size()) {
-                return std::move(splitKeys.front());
-            }
-
-            return owningChunk.getMax();
-        }
-
-        static void _runImpl(OperationContext* opCtx, const MoveChunkRequest& moveChunkRequest) {
-            if (moveChunkRequest.getFromShardId() == moveChunkRequest.getToShardId()) {
+        static void _runImpl(OperationContext* opCtx,
+                             ShardsvrMoveRange&& request,
+                             WriteConcernOptions&& writeConcern) {
+            if (request.getFromShard() == request.getToShard()) {
                 // TODO: SERVER-46669 handle wait for delete.
                 return;
             }
@@ -251,18 +201,18 @@ public:
             auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
 
             const auto donorConnStr =
-                uassertStatusOK(shardRegistry->getShard(opCtx, moveChunkRequest.getFromShardId()))
+                uassertStatusOK(shardRegistry->getShard(opCtx, request.getFromShard()))
                     ->getConnString();
             const auto recipientHost = uassertStatusOK([&] {
-                auto recipientShard = uassertStatusOK(
-                    shardRegistry->getShard(opCtx, moveChunkRequest.getToShardId()));
+                auto recipientShard =
+                    uassertStatusOK(shardRegistry->getShard(opCtx, request.getToShard()));
 
                 return recipientShard->getTargeter()->findHost(
                     opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly});
             }());
 
             MigrationSourceManager migrationSourceManager(
-                opCtx, moveChunkRequest, donorConnStr, recipientHost);
+                opCtx, std::move(request), std::move(writeConcern), donorConnStr, recipientHost);
 
             migrationSourceManager.startClone();
             migrationSourceManager.awaitToCatchUp();

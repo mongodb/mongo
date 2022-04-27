@@ -33,7 +33,8 @@
 
 #include "mongo/db/s/migration_session_id.h"
 #include "mongo/platform/mutex.h"
-#include "mongo/s/request_types/move_chunk_request.h"
+#include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/request_types/move_range_request_gen.h"
 #include "mongo/util/concurrency/notification.h"
 
 namespace mongo {
@@ -87,7 +88,7 @@ public:
      * Otherwise returns a ConflictingOperationInProgress error.
      */
     StatusWith<ScopedDonateChunk> registerDonateChunk(OperationContext* opCtx,
-                                                      const MoveChunkRequest& args);
+                                                      const ShardsvrMoveRange& args);
 
     /**
      * If there are no migrations or split/merges running on this shard, registers an active receive
@@ -132,7 +133,7 @@ private:
 
     // Describes the state of a currently active moveChunk operation
     struct ActiveMoveChunkState {
-        ActiveMoveChunkState(MoveChunkRequest inArgs)
+        ActiveMoveChunkState(ShardsvrMoveRange inArgs)
             : args(std::move(inArgs)), notification(std::make_shared<Notification<Status>>()) {}
 
         /**
@@ -141,7 +142,7 @@ private:
         Status constructErrorStatus() const;
 
         // Exact arguments of the currently active operation
-        MoveChunkRequest args;
+        ShardsvrMoveRange args;
 
         // Notification event that will be signaled when the currently active operation completes
         std::shared_ptr<Notification<Status>> notification;

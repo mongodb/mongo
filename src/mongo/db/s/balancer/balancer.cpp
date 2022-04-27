@@ -413,7 +413,7 @@ Status Balancer::moveRange(OperationContext* opCtx,
 
     ShardsvrMoveRange shardSvrRequest(nss);
     shardSvrRequest.setDbName(NamespaceString::kAdminDb);
-    shardSvrRequest.setMoveRangeRequest(request.getMoveRangeRequest());
+    shardSvrRequest.setMoveRangeRequestBase(request.getMoveRangeRequestBase());
     shardSvrRequest.setMaxChunkSizeBytes(maxChunkSize);
     shardSvrRequest.setFromShard(fromShardId);
     shardSvrRequest.setEpoch(coll.getEpoch());
@@ -982,7 +982,7 @@ int Balancer::_moveChunks(OperationContext* opCtx,
             return _commandScheduler->requestMoveChunk(opCtx, migrateInfo, settings);
         }
 
-        MoveRangeRequest requestBase(migrateInfo.to);
+        MoveRangeRequestBase requestBase(migrateInfo.to);
         requestBase.setWaitForDelete(balancerConfig->waitForDelete());
         requestBase.setMin(migrateInfo.minKey);
         if (!feature_flags::gNoMoreAutoSplitter.isEnabled(
@@ -993,7 +993,7 @@ int Balancer::_moveChunks(OperationContext* opCtx,
 
         ShardsvrMoveRange shardSvrRequest(migrateInfo.nss);
         shardSvrRequest.setDbName(NamespaceString::kAdminDb);
-        shardSvrRequest.setMoveRangeRequest(requestBase);
+        shardSvrRequest.setMoveRangeRequestBase(requestBase);
         shardSvrRequest.setMaxChunkSizeBytes(maxChunkSizeBytes);
         shardSvrRequest.setFromShard(migrateInfo.from);
         shardSvrRequest.setEpoch(coll.getEpoch());
