@@ -195,8 +195,9 @@ var $config = extendWorkload($config, function($config, $super) {
 
     function assertDocWasUpdated(collection, idToUpdate, currentShardKey, newShardKey, newCounter) {
         assertWhenOwnColl.isnull(collection.findOne({_id: idToUpdate, skey: currentShardKey}));
-        assertWhenOwnColl.eq(collection.findOne({_id: idToUpdate, skey: newShardKey}),
-                             {_id: idToUpdate, skey: newShardKey, counter: newCounter});
+        assertWhenOwnColl.eq(
+            collection.findOne({_id: idToUpdate, skey: newShardKey}),
+            {_id: idToUpdate, skey: newShardKey, tid: this.tid, counter: newCounter});
     }
 
     function wasDocUpdated(collection, idToUpdate, currentShardKey) {
