@@ -2385,7 +2385,7 @@ tasks:
   - *f_expansions_write
   - func: "scons compile"
     vars:
-      targets: generated-sources compiledb
+      targets: compiledb
       compiling_for_test: true
   - command: subprocess.exec
     type: test
