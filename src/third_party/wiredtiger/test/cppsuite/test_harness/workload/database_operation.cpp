@@ -87,7 +87,7 @@ database_operation::populate(
     testutil_assert(key_count <= pow(10, key_size));
 
     logger::log_msg(
-      LOG_INFO, "Populate: " + std::to_string(collection_count) + " creating collections.");
+      LOG_INFO, "Populate: creating " + std::to_string(collection_count) + " collections.");
 
     /* Create n collections as per the configuration. */
     for (int64_t i = 0; i < collection_count; ++i)
@@ -242,6 +242,81 @@ database_operation::read_operation(thread_context *tc)
         testutil_check(cursor->reset(cursor.get()));
     }
     /* Make sure the last transaction is rolled back now the work is finished. */
+    if (tc->transaction.active())
+        tc->transaction.rollback();
+}
+
+void
+database_operation::remove_operation(thread_context *tc)
+{
+    logger::log_msg(
+      LOG_INFO, type_string(tc->type) + " thread {" + std::to_string(tc->id) + "} commencing.");
+
+    /*
+     * We need two types of cursors. One cursor is a random cursor to randomly select a key and the
+     * other one is a standard cursor to remove the random key. This is required as the random
+     * cursor does not support the remove operation.
+     */
+    std::map<uint64_t, scoped_cursor> rnd_cursors, cursors;
+
+    /* Loop while the test is running. */
+    while (tc->running()) {
+        /*
+         * Sleep the period defined by the op_rate in the configuration. Do this at the start of the
+         * loop as it could be skipped by a subsequent continue call.
+         */
+        tc->sleep();
+
+        /* Choose a random collection to update. */
+        collection &coll = tc->db.get_random_collection();
+
+        /* Look for existing cursors in our cursor cache. */
+        if (cursors.find(coll.id) == cursors.end()) {
+            logger::log_msg(LOG_TRACE,
+              "Thread {" + std::to_string(tc->id) +
+                "} Creating cursor for collection: " + coll.name);
+            /* Open the two cursors for the chosen collection. */
+            scoped_cursor rnd_cursor =
+              tc->session.open_scoped_cursor(coll.name, "next_random=true");
+            rnd_cursors.emplace(coll.id, std::move(rnd_cursor));
+            scoped_cursor cursor = tc->session.open_scoped_cursor(coll.name);
+            cursors.emplace(coll.id, std::move(cursor));
+        }
+
+        /* Start a transaction if possible. */
+        tc->transaction.try_begin();
+
+        /* Get the cursor associated with the collection. */
+        scoped_cursor &rnd_cursor = rnd_cursors[coll.id];
+        scoped_cursor &cursor = cursors[coll.id];
+
+        /* Choose a random key to delete. */
+        const char *key_str;
+        int ret = rnd_cursor->next(rnd_cursor.get());
+        /* It is possible not to find anything if the collection is empty. */
+        testutil_assert(ret == 0 || ret == WT_NOTFOUND);
+        if (ret == WT_NOTFOUND) {
+            /*
+             * If we cannot find any record, finish the current transaction as we might be able to
+             * see new records after starting a new one.
+             */
+            WT_IGNORE_RET_BOOL(tc->transaction.commit());
+            continue;
+        }
+        testutil_check(rnd_cursor->get_key(rnd_cursor.get(), &key_str));
+        if (!tc->remove(cursor, coll.id, key_str)) {
+            tc->transaction.rollback();
+        }
+
+        /* Reset our cursor to avoid pinning content. */
+        testutil_check(cursor->reset(cursor.get()));
+
+        /* Commit the current transaction if we're able to. */
+        if (tc->transaction.can_commit())
+            WT_IGNORE_RET_BOOL(tc->transaction.commit());
+    }
+
+    /* Make sure the last operation is rolled back now the work is finished. */
     if (tc->transaction.active())
         tc->transaction.rollback();
 }

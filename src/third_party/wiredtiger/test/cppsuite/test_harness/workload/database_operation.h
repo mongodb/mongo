@@ -56,6 +56,9 @@ class database_operation {
     /* Basic read operation that chooses a random collection and walks a cursor. */
     virtual void read_operation(thread_context *tc);
 
+    /* Basic remove operation that chooses a random key and deletes it. */
+    virtual void remove_operation(thread_context *tc);
+
     /* Basic update operation that chooses a random key and updates it. */
     virtual void update_operation(thread_context *tc);
 

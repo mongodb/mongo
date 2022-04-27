@@ -63,6 +63,7 @@ extern const std::string OPS_PER_TRANSACTION;
 extern const std::string POPULATE_CONFIG;
 extern const std::string POSTRUN_STATISTICS;
 extern const std::string READ_OP_CONFIG;
+extern const std::string REMOVE_OP_CONFIG;
 extern const std::string RUNTIME_STATISTICS;
 extern const std::string SAVE;
 extern const std::string STABLE_LAG;

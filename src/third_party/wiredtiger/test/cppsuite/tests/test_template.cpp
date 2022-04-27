@@ -69,6 +69,12 @@ class test_template : public test_harness::test {
     }
 
     void
+    remove_operation(test_harness::thread_context *) override final
+    {
+        std::cout << "remove_operation: nothing done." << std::endl;
+    }
+
+    void
     update_operation(test_harness::thread_context *) override final
     {
         std::cout << "update_operation: nothing done." << std::endl;

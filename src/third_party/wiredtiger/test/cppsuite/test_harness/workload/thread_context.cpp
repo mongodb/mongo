@@ -46,6 +46,8 @@ type_string(thread_type type)
         return ("insert");
     case thread_type::READ:
         return ("read");
+    case thread_type::REMOVE:
+        return ("remove");
     case thread_type::UPDATE:
         return ("update");
     default:
