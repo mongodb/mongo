@@ -8,6 +8,22 @@
 
 #include "wt_internal.h"
 
+/* Holds metadata entry name and the associated config string. */
+typedef struct {
+    char *name;
+    char *config;
+} WT_IMPORT_ENTRY;
+
+/* Array of metadata entries used when importing from a metadata file. */
+typedef struct {
+    size_t entries_allocated; /* allocated */
+    size_t entries_next;      /* next slot */
+    const char *uri;          /* entries in the list will be related to this uri */
+    const char *uri_suffix;   /* suffix of the URI */
+
+    WT_IMPORT_ENTRY *entries;
+} WT_IMPORT_LIST;
+
 /*
  * __wt_direct_io_size_check --
  *     Return a size from the configuration, complaining if it's insufficient for direct I/O.
@@ -962,6 +978,96 @@ __create_data_source(
 }
 
 /*
+ * __create_import_cmp --
+ *     Qsort function: sort the import entries array by name.
+ */
+static int WT_CDECL
+__create_import_cmp(const void *a, const void *b)
+{
+    WT_IMPORT_ENTRY *ae, *be;
+
+    ae = (WT_IMPORT_ENTRY *)a;
+    be = (WT_IMPORT_ENTRY *)b;
+
+    return strcmp(ae->name, be->name);
+}
+
+/*
+ * __create_meta_entry_worker --
+ *     Worker function for metadata file reader procedure. The function populates the import list
+ *     with entries related to the import URI.
+ */
+static int
+__create_meta_entry_worker(WT_SESSION_IMPL *session, WT_ITEM *key, WT_ITEM *value, void *state)
+{
+    WT_IMPORT_LIST *import_list;
+    const char *meta_key, *meta_key_suffix, *meta_value;
+
+    import_list = (WT_IMPORT_LIST *)state;
+    meta_key = (const char *)key->data;
+    meta_value = (const char *)value->data;
+
+    /* Get suffix of the key. */
+    meta_key_suffix = strchr(meta_key, ':');
+    WT_ASSERT(session, meta_key_suffix != NULL && meta_key_suffix[1] != '\0');
+    ++meta_key_suffix;
+
+    /*
+     * We want to skip unrelated entries. We have stripped out the URI prefixes and want to get all
+     * the entries that match the URI. This check will match overlapping entries (i.e. if we're
+     * importing table:name but name123 also exists) but should reduce the resources needed for the
+     * list of possible entries.
+     */
+    if (!WT_PREFIX_MATCH(meta_key_suffix, import_list->uri_suffix))
+        return (0);
+
+    /*
+     * We are not checking if the entry already exists in the metadata. It will be handled later in
+     * the appropriate create call.
+     */
+
+    /* Grow the entries array if needed. */
+    WT_RET(__wt_realloc_def(session, &import_list->entries_allocated, import_list->entries_next + 1,
+      &import_list->entries));
+
+    /* Populate the next entry. */
+    WT_RET(__wt_strndup(
+      session, meta_key, key->size, &import_list->entries[import_list->entries_next].name));
+    WT_RET(__wt_strndup(
+      session, meta_value, value->size, &import_list->entries[import_list->entries_next].config));
+    import_list->entries_next++;
+
+    return (0);
+}
+
+/*
+ * __create_parse_export --
+ *     Parse export metadata file and populate array of name/config entries related to uri. The
+ *     array is sorted by entry name. Caller is responsible to free any memory allocated for the
+ *     import list.
+ */
+static int
+__create_parse_export(
+  WT_SESSION_IMPL *session, const char *export_file, WT_IMPORT_LIST *import_list)
+{
+    bool exist;
+
+    exist = false;
+
+    /* Open the specified metadata file and iterate over the key value pairs. */
+    WT_RET(__wt_read_metadata_file(
+      session, export_file, __create_meta_entry_worker, import_list, &exist));
+    if (!exist)
+        return (0);
+
+    /* Sort the array by name. We will use binary search later to get config string. */
+    __wt_qsort(import_list->entries, import_list->entries_next, sizeof(WT_IMPORT_ENTRY),
+      __create_import_cmp);
+
+    return (0);
+}
+
+/*
  * __schema_create --
  *     Process a WT_SESSION::create operation for all supported types.
  */
@@ -971,7 +1077,13 @@ __schema_create(WT_SESSION_IMPL *session, const char *uri, const char *config)
     WT_CONFIG_ITEM cval;
     WT_DATA_SOURCE *dsrc;
     WT_DECL_RET;
+    WT_IMPORT_LIST import_list;
+    size_t i;
+    char *export_file;
     bool exclusive, import;
+
+    WT_CLEAR(import_list);
+    export_file = NULL;
 
     exclusive = __wt_config_getones(session, config, "exclusive", &cval) == 0 && cval.val != 0;
     import = __wt_config_getones(session, config, "import.enabled", &cval) == 0 && cval.val != 0;
@@ -985,8 +1097,22 @@ __schema_create(WT_SESSION_IMPL *session, const char *uri, const char *config)
      * back it all out.
      */
     WT_RET(__wt_meta_track_on(session));
-    if (import)
+    if (import) {
         F_SET(session, WT_SESSION_IMPORT);
+
+        if (__wt_config_getones(session, config, "import.metadata_file", &cval) == 0 &&
+          cval.len != 0 && (cval.type == WT_CONFIG_ITEM_STRING || cval.type == WT_CONFIG_ITEM_ID)) {
+            WT_ERR(__wt_strndup(session, cval.str, cval.len, &export_file));
+            import_list.uri = uri;
+
+            /* Get suffix of the URI. */
+            import_list.uri_suffix = strchr(uri, ':');
+            WT_ASSERT(session, import_list.uri_suffix != NULL && import_list.uri_suffix[1] != '\0');
+            ++import_list.uri_suffix;
+
+            WT_ERR(__create_parse_export(session, export_file, &import_list));
+        }
+    }
 
     if (WT_PREFIX_MATCH(uri, "colgroup:"))
         ret = __create_colgroup(session, uri, exclusive, config);
@@ -1010,9 +1136,18 @@ __schema_create(WT_SESSION_IMPL *session, const char *uri, const char *config)
     else
         ret = __wt_bad_object_type(session, uri);
 
+err:
     session->dhandle = NULL;
     F_CLR(session, WT_SESSION_IMPORT);
     WT_TRET(__wt_meta_track_off(session, true, ret != 0));
+
+    for (i = 0; i < import_list.entries_next; ++i) {
+        __wt_free(session, import_list.entries[i].name);
+        __wt_free(session, import_list.entries[i].config);
+    }
+
+    __wt_free(session, import_list.entries);
+    __wt_free(session, export_file);
 
     return (ret);
 }
