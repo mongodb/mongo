@@ -19,10 +19,14 @@ if [[ "${push_name}" == "macos"* ]]; then
   chmod +x ./linux_amd64/macnotary
   bins=("mongo-binaries.tgz" "mongo-shell.tgz" "mongo-cryptd.tgz" "mh.tgz")
   for archive in ${bins[@]}; do
-    TEMP_ARCHIVE="$(mktemp -p $PWD)"
-    mv "$archive" "$TEMP_ARCHIVE"
-    ./linux_amd64/macnotary -f "$TEMP_ARCHIVE" -m notarizeAndSign -u https://dev.macos-notary.build.10gen.cc/api -k server -s ${MACOS_NOTARY_TOKEN} -b server.mongodb.com -o "$archive"
-    rm -f "$TEMP_ARCHIVE"
+    if [ -f "$archive" ]; then
+      TEMP_ARCHIVE="$(mktemp -p $PWD)"
+      mv "$archive" "$TEMP_ARCHIVE"
+      ./linux_amd64/macnotary -f "$TEMP_ARCHIVE" -m notarizeAndSign -u https://dev.macos-notary.build.10gen.cc/api -k server -s ${MACOS_NOTARY_TOKEN} -b server.mongodb.com -o "$archive"
+      rm -f "$TEMP_ARCHIVE"
+    else
+      echo "Skipping macos notarization for $archive because it doesn't exist."
+    fi
   done
 fi
 
