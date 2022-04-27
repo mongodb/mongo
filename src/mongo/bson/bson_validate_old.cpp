@@ -329,7 +329,7 @@ Status validateBSONIterative(Buffer* buffer) {
                     return makeError("bson size is larger than buffer size", idElem, StringData());
                 }
                 state = ValidationState::WithinObj;
-            // fall through
+                [[fallthrough]];
             case ValidationState::WithinObj: {
                 const bool atTopLevel = frames.size() == 1;
                 // check if we've finished validating idElem and are at start of next element.
