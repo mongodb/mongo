@@ -1544,6 +1544,7 @@ if wiredtiger:
             'abstract_async_component_test.cpp',
             'apply_ops_test.cpp',
             'check_quorum_for_config_change_test.cpp',
+            'delayable_timeout_callback_test.cpp',
             'drop_pending_collection_reaper_test.cpp',
             'idempotency_document_structure_test.cpp',
             'idempotency_update_sequence_test.cpp',
@@ -1624,6 +1625,7 @@ if wiredtiger:
             '$BUILD_DIR/mongo/util/concurrency/thread_pool',
             'abstract_async_component',
             'data_replicator_external_state_mock',
+            'delayable_timeout_callback',
             'drop_pending_collection_reaper',
             'idempotency_test_fixture',
             'idempotency_test_util',
@@ -1882,5 +1884,16 @@ env.Library(
         '$BUILD_DIR/mongo/db/logical_session_id',
         '$BUILD_DIR/mongo/idl/idl_parser',
         'oplog_entry',
+    ],
+)
+
+env.Library(
+    target='delayable_timeout_callback',
+    source=[
+        'delayable_timeout_callback.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/executor/task_executor_interface',
     ],
 )
