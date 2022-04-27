@@ -78,6 +78,7 @@
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/net/ssl_peer_info.h"
 #include "mongo/util/password_digest.h"
+#include "mongo/util/testing_proctor.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/version.h"
 
@@ -743,6 +744,16 @@ bool DBClientConnection::call(Message& toSend,
     checkConnection();
     ScopeGuard killSessionOnError([this] { _markFailed(kEndSession); });
     auto maybeThrow = [&](const auto& errStatus) {
+        // TODO SERVER-65946 Remove the following log statement.
+        if (TestingProctor::instance().isEnabled()) {
+            LOGV2(6599701,
+                  "DBClient failed to communicate with the server",
+                  "error"_attr = errStatus,
+                  "server"_attr = getServerAddress(),
+                  "local"_attr = _session->local(),
+                  "remote"_attr = _session->remote());
+        }
+
         if (assertOk)
             uassertStatusOKWithContext(errStatus,
                                        str::stream() << "dbclient error communicating with server "
