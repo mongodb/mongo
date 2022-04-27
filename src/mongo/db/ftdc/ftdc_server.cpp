@@ -210,6 +210,8 @@ public:
         // "defaultRWConcern" is excluded because it changes rarely and instead included in rotation
         // "mirroredReads" is included to append the number of mirror-able operations observed and
         // mirrored by this process in FTDC collections.
+        // "oplog" is included to append the earliest and latest optimes, which allow calculation of
+        // the oplog window.
 
         BSONObjBuilder commandBuilder;
         commandBuilder.append(kCommand, 1);
@@ -217,6 +219,7 @@ public:
         commandBuilder.append("timing", false);
         commandBuilder.append("defaultRWConcern", false);
         commandBuilder.append(MirrorMaestro::kServerStatusSectionName, true);
+        commandBuilder.append("oplog", true);
 
         // Exclude 'serverStatus.transactions.lastCommittedTransactions' because it triggers
         // frequent schema changes.
