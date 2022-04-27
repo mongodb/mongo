@@ -260,6 +260,8 @@ var $config = extendWorkload($config, function($config, $super) {
     };
 
     $config.setup = function setup(db, collName, cluster) {
+        assert.commandWorked(db.createCollection(collName, {writeConcern: {w: "majority"}}));
+
         // Store the findAndModify images in the oplog half of the time.
         const enableFindAndModifyImageCollection = this.generateRandomBool();
         this.originalStoreFindAndModifyImagesInSideCollection =
