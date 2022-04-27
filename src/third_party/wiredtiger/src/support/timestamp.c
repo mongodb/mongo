@@ -391,7 +391,7 @@ __time_value_validate_parent(
 
     if (tw->prepare && !parent->prepare)
         WT_TIME_VALIDATE_RET(session,
-          "value time window is prepared but its parent is not; time window %s, parent %s",
+          "aggregate time window is prepared but its parent is not; time aggregate %s, parent %s",
           __wt_time_window_to_string(tw, time_string[0]),
           __wt_time_aggregate_to_string(parent, time_string[1]));
 
