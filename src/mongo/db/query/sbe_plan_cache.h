@@ -43,6 +43,20 @@ namespace mongo {
 namespace sbe {
 
 /**
+ * Represents the sharding epoch of the collection which entry will be stored in the plan cache. The
+ * sharding epoch is not updated on operations like chunk splits and moves but rather on sharding
+ * and refine shard key operations.
+ */
+struct PlanCacheKeyShardingEpoch {
+    bool operator==(const PlanCacheKeyShardingEpoch& other) const {
+        return epoch == other.epoch && ts == other.ts;
+    }
+
+    OID epoch;
+    Timestamp ts;
+};
+
+/**
  * Represents the "key" used in the PlanCache mapping from query shape -> query plan.
  */
 class PlanCacheKey {
@@ -51,12 +65,12 @@ public:
                  UUID collectionUuid,
                  size_t collectionVersion,
                  boost::optional<Timestamp> newestVisibleIndexTimestamp,
-                 bool isShardedCollection)
+                 boost::optional<PlanCacheKeyShardingEpoch> shardVersion)
         : _info{std::move(info)},
           _collectionUuid{collectionUuid},
           _collectionVersion{collectionVersion},
           _newestVisibleIndexTimestamp{newestVisibleIndexTimestamp},
-          _isShardedCollection{isShardedCollection} {}
+          _shardVersion{shardVersion} {}
 
     const UUID& getCollectionUuid() const {
         return _collectionUuid;
@@ -66,16 +80,11 @@ public:
         return _collectionVersion;
     }
 
-    bool isShardedCollection() const {
-        return _isShardedCollection;
-    }
-
     bool operator==(const PlanCacheKey& other) const {
         return other._collectionVersion == _collectionVersion &&
-            other._isShardedCollection == _isShardedCollection &&
             other._collectionUuid == _collectionUuid &&
             other._newestVisibleIndexTimestamp == _newestVisibleIndexTimestamp &&
-            other._info == _info;
+            other._info == _info && other._shardVersion == _shardVersion;
     }
 
     bool operator!=(const PlanCacheKey& other) const {
@@ -93,7 +102,10 @@ public:
         if (_newestVisibleIndexTimestamp) {
             boost::hash_combine(hash, _newestVisibleIndexTimestamp->asULL());
         }
-        boost::hash_combine(hash, _isShardedCollection);
+        if (_shardVersion) {
+            _shardVersion->epoch.hash_combine(hash);
+            boost::hash_combine(hash, _shardVersion->ts.asULL());
+        }
         return hash;
     }
 
@@ -131,10 +143,11 @@ private:
     // In the future, this could instead be solved with point-in-time catalog lookups.
     const boost::optional<Timestamp> _newestVisibleIndexTimestamp;
 
-    // Ensures that a cached SBE plan cannot be reused if the collection has since become sharded.
-    // The cached plan may no longer be valid after sharding, since orphan filtering is necessary
-    // for sharded collections.
-    const bool _isShardedCollection;
+    // Ensures that a cached SBE plan cannot be reused if the collection has since become sharded or
+    // changed its shard key. The cached plan may no longer be valid after sharding or shard key
+    // refining since the structure of the plan depends on whether the collection is sharded, and if
+    // sharded depends on the shard key.
+    const boost::optional<PlanCacheKeyShardingEpoch> _shardVersion;
 };
 
 class PlanCacheKeyHasher {
