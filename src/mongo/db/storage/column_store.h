@@ -319,6 +319,19 @@ public:
         return res;
     }
 
+    /**
+     * Returns the parent path for the given path, if there is one.
+     */
+    static boost::optional<PathView> getParentPath(PathView path) {
+        auto lastDot = path.rfind('.');
+        if (lastDot == std::string::npos) {
+            return {};
+        }
+
+        return path.substr(0, lastDot);
+    }
+
+
 protected:
     class Cursor {
     public:
