@@ -751,6 +751,7 @@ functions:
     command: timeout.update
     params:
       exec_timeout_secs: ${exec_timeout_secs}
+      timeout_secs: ${timeout_secs}
 
   ### Set expansion macros used in each task.
   "set task expansion macros": &set_task_expansion_macros
@@ -1142,6 +1143,7 @@ functions:
   - *configure_evergreen_api_credentials
   - *determine_task_timeout
   - *update_task_timeout_expansions
+  - *update_task_timeout
   - *f_expansions_write
   - command: subprocess.exec
     params:

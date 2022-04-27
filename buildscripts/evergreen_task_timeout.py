@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """Determine the timeout value a task should use in evergreen."""
+from __future__ import annotations
 
 import argparse
 import math
 import os
+import shlex
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional
-import shlex
 
 import inject
 import structlog
@@ -16,8 +17,8 @@ import yaml
 from pydantic import BaseModel
 from evergreen import EvergreenApi, RetryingEvergreenApi
 
-from buildscripts.task_generation.resmoke_proxy import ResmokeProxyService
 from buildscripts.ciconfig.evergreen import (EvergreenProjectConfig, parse_evergreen_file)
+from buildscripts.task_generation.resmoke_proxy import ResmokeProxyService
 from buildscripts.timeouts.timeout_service import (TimeoutParams, TimeoutService, TimeoutSettings)
 from buildscripts.util.cmdutils import enable_logging
 from buildscripts.util.taskname import determine_task_base_name
@@ -55,6 +56,18 @@ class TimeoutOverride(BaseModel):
     task: str
     exec_timeout: Optional[int] = None
     idle_timeout: Optional[int] = None
+
+    @classmethod
+    def from_seconds(cls, task: str, exec_timeout_secs: Optional[float],
+                     idle_timeout_secs: Optional[float]) -> TimeoutOverride:
+        """Create an instance of an override from seconds."""
+        exec_timeout = exec_timeout_secs / 60 if exec_timeout_secs else None
+        idle_timeout = idle_timeout_secs / 60 if idle_timeout_secs else None
+        return cls(
+            task=task,
+            exec_timeout=exec_timeout,
+            idle_timeout=idle_timeout,
+        )
 
     def get_exec_timeout(self) -> Optional[timedelta]:
         """Get a timedelta of the exec timeout to use."""
@@ -173,14 +186,16 @@ class TaskTimeoutOrchestrator:
 
         :param timeout_service: Service for calculating historic timeouts.
         :param timeout_overrides: Timeout overrides for specific tasks.
+        :param evg_project_config: Evergreen project configuration.
         """
         self.timeout_service = timeout_service
         self.timeout_overrides = timeout_overrides
         self.evg_project_config = evg_project_config
 
-    def determine_exec_timeout(
-            self, task_name: str, variant: str, idle_timeout: Optional[timedelta] = None,
-            exec_timeout: Optional[timedelta] = None, evg_alias: str = "") -> timedelta:
+    def determine_exec_timeout(self, task_name: str, variant: str,
+                               idle_timeout: Optional[timedelta] = None,
+                               exec_timeout: Optional[timedelta] = None, evg_alias: str = "",
+                               historic_timeout: Optional[timedelta] = None) -> timedelta:
         """
         Determine what exec timeout should be used.
 
@@ -189,9 +204,12 @@ class TaskTimeoutOrchestrator:
         :param idle_timeout: Idle timeout if specified.
         :param exec_timeout: Override to use for exec_timeout or 0 if no override.
         :param evg_alias: Evergreen alias running the task.
+        :param historic_timeout: Timeout determined by looking at previous task executions.
         :return: Exec timeout to use for running task.
         """
         determined_timeout = DEFAULT_NON_REQUIRED_BUILD_TIMEOUT
+        if historic_timeout is not None:
+            determined_timeout = historic_timeout
 
         override = self.timeout_overrides.lookup_exec_override(variant, task_name)
 
@@ -200,24 +218,25 @@ class TaskTimeoutOrchestrator:
                         exec_timeout_secs=exec_timeout.total_seconds())
             determined_timeout = exec_timeout
 
+        elif override is not None:
+            LOGGER.info("Overriding configured timeout", exec_timeout_secs=override.total_seconds())
+            determined_timeout = override
+
         elif task_name == UNITTEST_TASK and override is None:
             LOGGER.info("Overriding unittest timeout",
                         exec_timeout_secs=UNITTESTS_TIMEOUT.total_seconds())
             determined_timeout = UNITTESTS_TIMEOUT
 
+        elif _is_required_build_variant(
+                variant) and determined_timeout > DEFAULT_REQUIRED_BUILD_TIMEOUT:
+            LOGGER.info("Overriding required-builder timeout",
+                        exec_timeout_secs=DEFAULT_REQUIRED_BUILD_TIMEOUT.total_seconds())
+            determined_timeout = DEFAULT_REQUIRED_BUILD_TIMEOUT
+
         elif evg_alias == COMMIT_QUEUE_ALIAS:
             LOGGER.info("Overriding commit-queue timeout",
                         exec_timeout_secs=COMMIT_QUEUE_TIMEOUT.total_seconds())
             determined_timeout = COMMIT_QUEUE_TIMEOUT
-
-        elif override is not None:
-            LOGGER.info("Overriding configured timeout", exec_timeout_secs=override.total_seconds())
-            determined_timeout = override
-
-        elif _is_required_build_variant(variant):
-            LOGGER.info("Overriding required-builder timeout",
-                        exec_timeout_secs=DEFAULT_REQUIRED_BUILD_TIMEOUT.total_seconds())
-            determined_timeout = DEFAULT_REQUIRED_BUILD_TIMEOUT
 
         # The timeout needs to be at least as large as the idle timeout.
         if idle_timeout and determined_timeout.total_seconds() < idle_timeout.total_seconds():
@@ -228,16 +247,19 @@ class TaskTimeoutOrchestrator:
         return determined_timeout
 
     def determine_idle_timeout(self, task_name: str, variant: str,
-                               idle_timeout: Optional[timedelta] = None) -> Optional[timedelta]:
+                               idle_timeout: Optional[timedelta] = None,
+                               historic_timeout: Optional[timedelta] = None) -> Optional[timedelta]:
         """
         Determine what idle timeout should be used.
 
         :param task_name: Name of task being run.
         :param variant: Name of build variant being run.
         :param idle_timeout: Override to use for idle_timeout.
+        :param historic_timeout: Timeout determined by looking at previous task executions.
         :return: Idle timeout to use for running task.
         """
-        determined_timeout = None
+        determined_timeout = historic_timeout
+
         override = self.timeout_overrides.lookup_idle_override(variant, task_name)
 
         if idle_timeout and idle_timeout.total_seconds() != 0:
@@ -252,7 +274,7 @@ class TaskTimeoutOrchestrator:
         return determined_timeout
 
     def determine_historic_timeout(self, task: str, variant: str, suite_name: str,
-                                   exec_timeout_factor: Optional[float]) -> Optional[timedelta]:
+                                   exec_timeout_factor: Optional[float]) -> TimeoutOverride:
         """
         Calculate the timeout based on historic test results.
 
@@ -262,7 +284,7 @@ class TaskTimeoutOrchestrator:
         :param exec_timeout_factor: Scaling factor to use when determining timeout.
         """
         if suite_name in IGNORED_SUITES:
-            return None
+            return TimeoutOverride(task=task, exec_timeout=None, idle_timeout=None)
 
         timeout_params = TimeoutParams(
             evg_project="mongodb-mongo-master",
@@ -275,10 +297,12 @@ class TaskTimeoutOrchestrator:
         if timeout_estimate and timeout_estimate.is_specified():
             exec_timeout = timeout_estimate.calculate_task_timeout(
                 repeat_factor=1, scaling_factor=exec_timeout_factor)
-            if exec_timeout is not None:
-                LOGGER.info("Using historic based timeout", exec_timeout_secs=exec_timeout)
-                return timedelta(seconds=exec_timeout)
-        return None
+            idle_timeout = timeout_estimate.calculate_test_timeout(repeat_factor=1)
+            if exec_timeout is not None or idle_timeout is not None:
+                LOGGER.info("Getting historic based timeout", exec_timeout_secs=exec_timeout,
+                            idle_timeout_secs=idle_timeout)
+                return TimeoutOverride.from_seconds(task, exec_timeout, idle_timeout)
+        return TimeoutOverride(task=task, exec_timeout=None, idle_timeout=None)
 
     def is_build_variant_asan(self, build_variant: str) -> bool:
         """
@@ -305,14 +329,13 @@ class TaskTimeoutOrchestrator:
         :param suite_name: Name of evergreen suite being run.
         :param exec_timeout_factor: Scaling factor to use when determining timeout.
         """
-        idle_timeout = self.determine_idle_timeout(task, variant, cli_idle_timeout)
-        exec_timeout = self.determine_exec_timeout(task, variant, idle_timeout, cli_exec_timeout,
-                                                   evg_alias)
-
         historic_timeout = self.determine_historic_timeout(task, variant, suite_name,
                                                            exec_timeout_factor)
-        if historic_timeout:
-            exec_timeout = historic_timeout
+
+        idle_timeout = self.determine_idle_timeout(task, variant, cli_idle_timeout,
+                                                   historic_timeout.get_idle_timeout())
+        exec_timeout = self.determine_exec_timeout(task, variant, idle_timeout, cli_exec_timeout,
+                                                   evg_alias, historic_timeout.get_exec_timeout())
 
         output_timeout(exec_timeout, idle_timeout, outfile)
 

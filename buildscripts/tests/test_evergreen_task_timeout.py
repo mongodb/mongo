@@ -109,105 +109,156 @@ class TestTimeoutOverrides(unittest.TestCase):
 
 
 class TestDetermineExecTimeout(unittest.TestCase):
-    def test_timeout_used_if_specified(self):
-        mock_timeout_overrides = under_test.TimeoutOverrides(overrides={})
+    def _validate_exec_timeout(self, idle_timeout, exec_timeout, historic_timeout, evg_alias,
+                               build_variant, timeout_override, expected_timeout):
+        task_name = "task_name"
+        variant = build_variant
+        overrides = {}
+        if timeout_override is not None:
+            overrides[variant] = [{"task": task_name, "exec_timeout": timeout_override}]
+
+        mock_timeout_overrides = under_test.TimeoutOverrides(overrides=overrides)
+
         orchestrator = under_test.TaskTimeoutOrchestrator(
             timeout_service=MagicMock(spec_set=TimeoutService),
             timeout_overrides=mock_timeout_overrides,
             evg_project_config=MagicMock(spec_set=EvergreenProjectConfig))
-        timeout = timedelta(seconds=42)
-        self.assertEqual(
-            orchestrator.determine_exec_timeout("task_name", "variant", None, timeout), timeout)
+
+        actual_timeout = orchestrator.determine_exec_timeout(
+            task_name, variant, idle_timeout, exec_timeout, evg_alias, historic_timeout)
+
+        self.assertEqual(actual_timeout, expected_timeout)
+
+    def test_timeout_used_if_specified(self):
+        self._validate_exec_timeout(idle_timeout=None, exec_timeout=timedelta(seconds=42),
+                                    historic_timeout=None, evg_alias=None, build_variant="variant",
+                                    timeout_override=None, expected_timeout=timedelta(seconds=42))
 
     def test_default_is_returned_with_no_timeout(self):
-        mock_timeout_overrides = under_test.TimeoutOverrides(overrides={})
-        orchestrator = under_test.TaskTimeoutOrchestrator(
-            timeout_service=MagicMock(spec_set=TimeoutService),
-            timeout_overrides=mock_timeout_overrides,
-            evg_project_config=MagicMock(spec_set=EvergreenProjectConfig))
-        self.assertEqual(
-            orchestrator.determine_exec_timeout("task_name", "variant"),
-            under_test.DEFAULT_NON_REQUIRED_BUILD_TIMEOUT)
+        self._validate_exec_timeout(idle_timeout=None, exec_timeout=None, historic_timeout=None,
+                                    evg_alias=None, build_variant="variant", timeout_override=None,
+                                    expected_timeout=under_test.DEFAULT_NON_REQUIRED_BUILD_TIMEOUT)
 
     def test_default_is_returned_with_timeout_at_zero(self):
-        mock_timeout_overrides = under_test.TimeoutOverrides(overrides={})
-        orchestrator = under_test.TaskTimeoutOrchestrator(
-            timeout_service=MagicMock(spec_set=TimeoutService),
-            timeout_overrides=mock_timeout_overrides,
-            evg_project_config=MagicMock(spec_set=EvergreenProjectConfig))
-        self.assertEqual(
-            orchestrator.determine_exec_timeout("task_name", "variant", timedelta(seconds=0)),
-            under_test.DEFAULT_NON_REQUIRED_BUILD_TIMEOUT)
+        self._validate_exec_timeout(idle_timeout=None, exec_timeout=timedelta(seconds=0),
+                                    historic_timeout=None, evg_alias=None, build_variant="variant",
+                                    timeout_override=None,
+                                    expected_timeout=under_test.DEFAULT_NON_REQUIRED_BUILD_TIMEOUT)
 
     def test_default_required_returned_on_required_variants(self):
-        mock_timeout_overrides = under_test.TimeoutOverrides(overrides={})
-        orchestrator = under_test.TaskTimeoutOrchestrator(
-            timeout_service=MagicMock(spec_set=TimeoutService),
-            timeout_overrides=mock_timeout_overrides,
-            evg_project_config=MagicMock(spec_set=EvergreenProjectConfig))
-        self.assertEqual(
-            orchestrator.determine_exec_timeout("task_name", "variant-required"),
-            under_test.DEFAULT_REQUIRED_BUILD_TIMEOUT)
+        self._validate_exec_timeout(idle_timeout=None, exec_timeout=None, historic_timeout=None,
+                                    evg_alias=None, build_variant="variant-required",
+                                    timeout_override=None,
+                                    expected_timeout=under_test.DEFAULT_REQUIRED_BUILD_TIMEOUT)
+
+    def test_override_on_required_should_use_override(self):
+        self._validate_exec_timeout(idle_timeout=None, exec_timeout=None, historic_timeout=None,
+                                    evg_alias=None, build_variant="variant-required",
+                                    timeout_override=3 * 60,
+                                    expected_timeout=timedelta(minutes=3 * 60))
 
     def test_task_specific_timeout(self):
-        mock_timeout_overrides = under_test.TimeoutOverrides(
-            overrides={"linux-64-debug": [{"task": "auth", "exec_timeout": 60}]})
-        orchestrator = under_test.TaskTimeoutOrchestrator(
-            timeout_service=MagicMock(spec_set=TimeoutService),
-            timeout_overrides=mock_timeout_overrides,
-            evg_project_config=MagicMock(spec_set=EvergreenProjectConfig))
-        self.assertEqual(
-            orchestrator.determine_exec_timeout("auth", "linux-64-debug"), timedelta(minutes=60))
+        self._validate_exec_timeout(idle_timeout=None, exec_timeout=timedelta(seconds=0),
+                                    historic_timeout=None, evg_alias=None, build_variant="variant",
+                                    timeout_override=60, expected_timeout=timedelta(minutes=60))
 
     def test_commit_queue_items_use_commit_queue_timeout(self):
-        mock_timeout_overrides = under_test.TimeoutOverrides(overrides={})
-        orchestrator = under_test.TaskTimeoutOrchestrator(
-            timeout_service=MagicMock(spec_set=TimeoutService),
-            timeout_overrides=mock_timeout_overrides,
-            evg_project_config=MagicMock(spec_set=EvergreenProjectConfig))
-        timeout = orchestrator.determine_exec_timeout("auth", "variant",
-                                                      evg_alias=under_test.COMMIT_QUEUE_ALIAS)
-        self.assertEqual(timeout, under_test.COMMIT_QUEUE_TIMEOUT)
+        self._validate_exec_timeout(idle_timeout=None, exec_timeout=None, historic_timeout=None,
+                                    evg_alias=under_test.COMMIT_QUEUE_ALIAS,
+                                    build_variant="variant", timeout_override=None,
+                                    expected_timeout=under_test.COMMIT_QUEUE_TIMEOUT)
 
     def test_use_idle_timeout_if_greater_than_exec_timeout(self):
-        mock_timeout_overrides = under_test.TimeoutOverrides(overrides={})
-        orchestrator = under_test.TaskTimeoutOrchestrator(
-            timeout_service=MagicMock(spec_set=TimeoutService),
-            timeout_overrides=mock_timeout_overrides,
-            evg_project_config=MagicMock(spec_set=EvergreenProjectConfig))
-        idle_timeout = timedelta(hours=2)
-        exec_timeout = timedelta(minutes=10)
-        timeout = orchestrator.determine_exec_timeout(
-            "task_name", "variant", idle_timeout=idle_timeout, exec_timeout=exec_timeout)
+        self._validate_exec_timeout(
+            idle_timeout=timedelta(hours=2), exec_timeout=timedelta(minutes=10),
+            historic_timeout=None, evg_alias=None, build_variant="variant", timeout_override=None,
+            expected_timeout=timedelta(hours=2))
 
-        self.assertEqual(timeout, idle_timeout)
+    def test_historic_timeout_should_be_used_if_given(self):
+        self._validate_exec_timeout(idle_timeout=None, exec_timeout=None,
+                                    historic_timeout=timedelta(minutes=15), evg_alias=None,
+                                    build_variant="variant", timeout_override=None,
+                                    expected_timeout=timedelta(minutes=15))
+
+    def test_commit_queue_should_override_historic_timeouts(self):
+        self._validate_exec_timeout(
+            idle_timeout=None, exec_timeout=None, historic_timeout=timedelta(minutes=15),
+            evg_alias=under_test.COMMIT_QUEUE_ALIAS, build_variant="variant", timeout_override=None,
+            expected_timeout=under_test.COMMIT_QUEUE_TIMEOUT)
+
+    def test_override_should_override_historic_timeouts(self):
+        self._validate_exec_timeout(idle_timeout=None, exec_timeout=None,
+                                    historic_timeout=timedelta(minutes=15), evg_alias=None,
+                                    build_variant="variant", timeout_override=33,
+                                    expected_timeout=timedelta(minutes=33))
+
+    def test_historic_timeout_should_not_be_overridden_by_required_bv(self):
+        self._validate_exec_timeout(idle_timeout=None, exec_timeout=None,
+                                    historic_timeout=timedelta(minutes=15), evg_alias=None,
+                                    build_variant="variant-required", timeout_override=None,
+                                    expected_timeout=timedelta(minutes=15))
+
+    def test_historic_timeout_should_not_be_increase_required_bv_timeout(self):
+        self._validate_exec_timeout(
+            idle_timeout=None, exec_timeout=None,
+            historic_timeout=under_test.DEFAULT_REQUIRED_BUILD_TIMEOUT + timedelta(minutes=30),
+            evg_alias=None, build_variant="variant-required", timeout_override=None,
+            expected_timeout=under_test.DEFAULT_REQUIRED_BUILD_TIMEOUT)
 
 
 class TestDetermineIdleTimeout(unittest.TestCase):
-    def test_timeout_used_if_specified(self):
-        mock_timeout_overrides = under_test.TimeoutOverrides(overrides={})
+    def _validate_idle_timeout(self, idle_timeout, historic_timeout, build_variant,
+                               timeout_override, expected_timeout):
+        task_name = "task_name"
+        overrides = {}
+        if timeout_override is not None:
+            overrides[build_variant] = [{"task": task_name, "idle_timeout": timeout_override}]
+
+        mock_timeout_overrides = under_test.TimeoutOverrides(overrides=overrides)
+
         orchestrator = under_test.TaskTimeoutOrchestrator(
             timeout_service=MagicMock(spec_set=TimeoutService),
             timeout_overrides=mock_timeout_overrides,
             evg_project_config=MagicMock(spec_set=EvergreenProjectConfig))
-        timeout = timedelta(seconds=42)
-        self.assertEqual(
-            orchestrator.determine_idle_timeout("task_name", "variant", timeout), timeout)
+
+        actual_timeout = orchestrator.determine_idle_timeout(task_name, build_variant, idle_timeout,
+                                                             historic_timeout)
+
+        self.assertEqual(actual_timeout, expected_timeout)
+
+    def test_timeout_used_if_specified(self):
+        self._validate_idle_timeout(
+            idle_timeout=timedelta(seconds=42),
+            historic_timeout=None,
+            build_variant="variant",
+            timeout_override=None,
+            expected_timeout=timedelta(seconds=42),
+        )
 
     def test_default_is_returned_with_no_timeout(self):
-        mock_timeout_overrides = under_test.TimeoutOverrides(overrides={})
-        orchestrator = under_test.TaskTimeoutOrchestrator(
-            timeout_service=MagicMock(spec_set=TimeoutService),
-            timeout_overrides=mock_timeout_overrides,
-            evg_project_config=MagicMock(spec_set=EvergreenProjectConfig))
-        self.assertIsNone(orchestrator.determine_idle_timeout("task_name", "variant"))
+        self._validate_idle_timeout(
+            idle_timeout=None,
+            historic_timeout=None,
+            build_variant="variant",
+            timeout_override=None,
+            expected_timeout=None,
+        )
 
     def test_task_specific_timeout(self):
-        mock_timeout_overrides = under_test.TimeoutOverrides(
-            overrides={"linux-64-debug": [{"task": "auth", "idle_timeout": 60}]})
-        orchestrator = under_test.TaskTimeoutOrchestrator(
-            timeout_service=MagicMock(spec_set=TimeoutService),
-            timeout_overrides=mock_timeout_overrides,
-            evg_project_config=MagicMock(spec_set=EvergreenProjectConfig))
-        self.assertEqual(
-            orchestrator.determine_idle_timeout("auth", "linux-64-debug"), timedelta(minutes=60))
+        self._validate_idle_timeout(
+            idle_timeout=None,
+            historic_timeout=None,
+            build_variant="variant",
+            timeout_override=60,
+            expected_timeout=timedelta(minutes=60),
+        )
+
+    def test_historic_timeout_should_be_used_if_given(self):
+        self._validate_idle_timeout(idle_timeout=None, historic_timeout=timedelta(minutes=15),
+                                    build_variant="variant", timeout_override=None,
+                                    expected_timeout=timedelta(minutes=15))
+
+    def test_override_should_override_historic_timeout(self):
+        self._validate_idle_timeout(idle_timeout=None, historic_timeout=timedelta(minutes=15),
+                                    build_variant="variant", timeout_override=30,
+                                    expected_timeout=timedelta(minutes=30))
