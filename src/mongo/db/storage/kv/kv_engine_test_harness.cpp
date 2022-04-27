@@ -333,11 +333,6 @@ TEST_F(KVEngineTestHarness, AllDurableTimestamp) {
     std::unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create(getServiceContext()));
     KVEngine* engine = helper->getEngine();
 
-    // TODO SERVER-65151: Remove after removing EFT.
-    if (engine->isEphemeral()) {
-        return;
-    }
-
     std::string ns = "a.b";
     std::unique_ptr<RecordStore> rs;
     {
