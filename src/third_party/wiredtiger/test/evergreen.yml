@@ -1042,7 +1042,7 @@ tasks:
 
             ${test_env_vars|} $(pwd)/test/cppsuite/run -t hs_cleanup -C 'debug_mode=(cursor_copy=true)' -f test/cppsuite/configs/hs_cleanup_default.txt -l 2
 
-  - name: cppsuite-search-near-default
+  - name: cppsuite-search-near-01-default
     tags: ["pull_request"]
     depends_on:
       - name: compile
@@ -1056,6 +1056,20 @@ tasks:
             set -o verbose
 
             ${test_env_vars|} $(pwd)/test/cppsuite/run -t search_near_01 -f test/cppsuite/configs/search_near_01_default.txt -l 2
+
+  - name: cppsuite-search-near-02-default
+    tags: ["pull_request"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/build_posix/"
+          script: |
+            set -o errexit
+            set -o verbose
+
             ${test_env_vars|} $(pwd)/test/cppsuite/run -t search_near_02 -f test/cppsuite/configs/search_near_02_default.txt -l 2
 
   - name: cppsuite-base-test-stress
@@ -1086,7 +1100,7 @@ tasks:
 
             ${test_env_vars|} $(pwd)/run -t hs_cleanup -f configs/hs_cleanup_stress.txt -l 2
   
-  - name: cppsuite-search-near-stress
+  - name: cppsuite-search-near-01-stress
     depends_on:
       - name: compile
     commands:
@@ -1099,6 +1113,19 @@ tasks:
             set -o verbose
 
             ${test_env_vars|} $(pwd)/test/cppsuite/run -t search_near_01 -f test/cppsuite/configs/search_near_01_stress.txt -l 2
+
+  - name: cppsuite-search-near-02-stress
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/build_posix/"
+          script: |
+            set -o errexit
+            set -o verbose
+
             ${test_env_vars|} $(pwd)/test/cppsuite/run -t search_near_02 -f test/cppsuite/configs/search_near_02_stress.txt -l 2
 
   # End of cppsuite test tasks.
@@ -2050,6 +2077,8 @@ tasks:
     - name: compile
     - name: generate-datafile-little-endian
       variant: little-endian
+    - name: verify-datafile-little-endian
+      variant: little-endian
     commands:
       - func: "fetch artifacts"
       - func: "fetch artifacts from little-endian"
@@ -2111,6 +2140,8 @@ tasks:
     depends_on:
     - name: compile
     - name: generate-datafile-big-endian
+      variant: big-endian
+    - name: verify-datafile-big-endian
       variant: big-endian
     commands:
       - func: "fetch artifacts"
@@ -2916,7 +2947,7 @@ tasks:
             virtualenv -p python3 venv
             source venv/bin/activate
             pip3 install "pymongo[srv]==3.12.2"
-            res_dir=`find ./ -type d -name "many-collection-[0-9]*" -print`
+            res_dir=`find ./ -type d -name "many-collection-artifacts" -print`
             ./upload-results-atlas.py ${atlas_wt_perf_test_user} ${atlas_wt_perf_pass} wt-perf-tests many-collection-test ${branch_name} $res_dir/results/results.json
 
   - name: cyclomatic-complexity
@@ -3780,7 +3811,8 @@ buildvariants:
     - name: make-check-test
     - name: cppsuite-base-test-default
     - name: cppsuite-hs-cleanup-default
-    - name: cppsuite-search-near-default
+    - name: cppsuite-search-near-01-default
+    - name: cppsuite-search-near-02-default
 
 - name: ubuntu2004-compilers
   display_name: "! Ubuntu 20.04 Compilers"
@@ -3907,8 +3939,8 @@ buildvariants:
       --prefix=$(pwd)/LOCAL_INSTALL
     test_env_vars:
       PATH=/opt/mongodbtoolchain/v3/bin:$PATH
-    upload_source_dir: mongo-tests/largescale/many-collection/dbpath/diagnostic.data
-    upload_filename: diagnostic.data.tgz
+    upload_source_dir: mongo-tests/largescale/many-collection-artifacts
+    upload_filename: many-collection.tgz
   tasks:
     - name: many-dhandle-stress-test
     - name: many-collection-test
@@ -3939,7 +3971,8 @@ buildvariants:
     - name: compile
     - name: cppsuite-base-test-stress
     - name: cppsuite-hs-cleanup-stress
-    - name: cppsuite-search-near-stress
+    - name: cppsuite-search-near-01-stress
+    - name: cppsuite-search-near-02-stress
 
 - name: package
   display_name: "~ Package"
@@ -4021,6 +4054,9 @@ buildvariants:
 
 - name: code-statistics
   display_name: "Code statistics"
+  # Code coverage and complexity metrics are not required on the mongodb-5.0 branch as
+  # they are only required on the 'develop' branch.
+  activate: false
   batchtime: 10080 # 7 days
   run_on:
   - ubuntu2004-test

@@ -18,19 +18,19 @@ runtime_monitor=
 (
     stat_cache_size=
     (
-        enabled=true,
+        enabled=false,
         limit=110
     ),
     # The data files compress to around 25MB per table at the end of a run so 250MB total.
     # +1.4GB for the history store. With an additional 150MB margin.
     stat_db_size=
     (
-        enabled=true,
+        enabled=false,
         limit=1900000000,
     ),
     # Seems to insert around 477K records. Give it +-20K margin.
     # Seems to remove 180K records. Give it a similar margin.
-    postrun_statistics=[cache_hs_insert:457000:497000, cc_pages_removed:170000:200000]
+    #postrun_statistics=[cache_hs_insert:457000:497000, cc_pages_removed:170000:200000]
 ),
 timestamp_manager=
 (

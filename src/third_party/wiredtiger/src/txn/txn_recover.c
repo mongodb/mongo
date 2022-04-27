@@ -825,6 +825,8 @@ __wt_txn_recover(WT_SESSION_IMPL *session, const char *cfg[])
     metafile = &r.files[WT_METAFILE_ID];
     metafile->c = metac;
 
+    WT_ERR(__recovery_set_ckpt_base_write_gen(&r));
+
     /*
      * If no log was found (including if logging is disabled), or if the last checkpoint was done
      * with logging disabled, recovery should not run. Scan the metadata to figure out the largest
@@ -1001,7 +1003,6 @@ done:
     WT_ERR(__recovery_set_checkpoint_timestamp(&r));
     WT_ERR(__recovery_set_oldest_timestamp(&r));
     WT_ERR(__recovery_set_checkpoint_snapshot(session));
-    WT_ERR(__recovery_set_ckpt_base_write_gen(&r));
 
     /*
      * Set the history store file size as it may already exist after a restart.
