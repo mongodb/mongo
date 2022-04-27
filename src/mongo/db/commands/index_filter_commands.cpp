@@ -78,17 +78,29 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(SetupIndexFilterCommands, ())
 
 /**
  * Remove the plan cache entries whose 'indexFilterKey' matches any key in 'indexFilterKeys'. Please
- * note that we do not handle handle 'indexFilterKey' hash collisions, namely it's fine to clear a
- * plan cache entry that we technically could have kept around.
+ * note that we do not handle 'indexFilterKey' hash collisions, namely it's fine to clear a plan
+ * cache entry that we technically could have kept around.
  */
-template <typename KeyType, typename... Args>
 void removePlanCacheEntriesByIndexFilterKeys(const stdx::unordered_set<uint32_t>& indexFilterKeys,
-                                             PlanCacheBase<KeyType, Args...>* planCache) {
-    planCache->removeIf([&indexFilterKeys](const KeyType& key, const auto& entry) {
+                                             PlanCache* planCache) {
+    planCache->removeIf([&indexFilterKeys](const PlanCacheKey& key, const PlanCacheEntry& entry) {
         return indexFilterKeys.contains(entry.indexFilterKey);
     });
 }
 
+/**
+ * Similar to removePlanCacheEntriesByIndexFilterKeys() above. This function clears cache entries in
+ * a SBE plan cache. There is an extra check on the collection UUID because all collections share
+ * one single 'sbe::PlanCache' instance.
+ */
+void removePlanCacheEntriesByIndexFilterKeys(const stdx::unordered_set<uint32_t>& indexFilterKeys,
+                                             const UUID& collectionUuid,
+                                             sbe::PlanCache* planCache) {
+    planCache->removeIf([&](const sbe::PlanCacheKey& key, const sbe::PlanCacheEntry& entry) {
+        return indexFilterKeys.contains(entry.indexFilterKey) &&
+            key.getCollectionUuid() == collectionUuid;
+    });
+}
 }  // namespace
 
 namespace mongo {
@@ -250,7 +262,8 @@ Status ClearFilters::clear(OperationContext* opCtx,
             canonical_query_encoder::encodeForIndexFilters(*cq))});
         removePlanCacheEntriesByIndexFilterKeys(indexFilterKeys, planCacheClassic);
         if (planCacheSBE) {
-            removePlanCacheEntriesByIndexFilterKeys(indexFilterKeys, planCacheSBE);
+            removePlanCacheEntriesByIndexFilterKeys(
+                indexFilterKeys, collection->uuid(), planCacheSBE);
         }
         LOGV2(20479, "Removed index filter on query", "query"_attr = redact(cq->toStringShort()));
 
@@ -309,7 +322,7 @@ Status ClearFilters::clear(OperationContext* opCtx,
     }
     removePlanCacheEntriesByIndexFilterKeys(indexFilterKeys, planCacheClassic);
     if (planCacheSBE) {
-        removePlanCacheEntriesByIndexFilterKeys(indexFilterKeys, planCacheSBE);
+        removePlanCacheEntriesByIndexFilterKeys(indexFilterKeys, collection->uuid(), planCacheSBE);
     }
 
     LOGV2(20480,
@@ -394,7 +407,7 @@ Status SetFilter::set(OperationContext* opCtx,
         canonical_query_encoder::encodeForIndexFilters(*cq))});
     removePlanCacheEntriesByIndexFilterKeys(indexFilterKeys, planCacheClassic);
     if (planCacheSBE) {
-        removePlanCacheEntriesByIndexFilterKeys(indexFilterKeys, planCacheSBE);
+        removePlanCacheEntriesByIndexFilterKeys(indexFilterKeys, collection->uuid(), planCacheSBE);
     }
 
     LOGV2(20481,
