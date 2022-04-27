@@ -637,12 +637,32 @@ private:
      */
     void _setUserWriteBlockingStateOnNewShard(OperationContext* opCtx,
                                               RemoteCommandTargeter* targeter);
-
+    /**
+     * Given a vector of cluster parameters in disk format, sets them locally.
+     */
+    void _setClusterParametersLocally(OperationContext* opCtx,
+                                      const std::vector<BSONObj>& parameters);
 
     /**
-     * Sets the cluster parameters on the shard that is being added.
+     * Gets the cluster parameters set on the shard and then saves them locally.
      */
-    void _setClusterParametersOnNewShard(OperationContext* opCtx, RemoteCommandTargeter* targeter);
+    void _pullClusterParametersFromNewShard(OperationContext* opCtx,
+                                            RemoteCommandTargeter* targeter);
+
+    /**
+     * Clean all possible leftover cluster parameters on the new added shard and sets the ones
+     * stored on the config server.
+     */
+    void _pushClusterParametersToNewShard(OperationContext* opCtx,
+                                          RemoteCommandTargeter* targeter,
+                                          const std::vector<BSONObj>& clusterParameters);
+
+    /**
+     * Determines whether to absorb the cluster parameters on the newly added shard (if we're
+     * converting from a replica set to a sharded cluster) or set the cluster parameters stored on
+     * the config server in the newly added shard.
+     */
+    void _standardizeClusterParameters(OperationContext* opCtx, RemoteCommandTargeter* targeter);
 
     // The owning service context
     ServiceContext* const _serviceContext;

@@ -39,6 +39,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/set_feature_compatibility_version_gen.h"
 #include "mongo/db/ops/write_ops.h"
+#include "mongo/db/query/cursor_response.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/s/add_shard_cmd_gen.h"
 #include "mongo/db/s/add_shard_util.h"
@@ -171,9 +172,35 @@ protected:
         });
     }
 
-    void expectRemoveSetClusterParameterDocs(const HostAndPort& target) {
+    void expectClusterParametersRequest(const HostAndPort& target) {
         if (!gFeatureFlagClusterWideConfig.isEnabled(serverGlobalParams.featureCompatibility))
             return;
+        auto clusterParameterDocs = uassertStatusOK(getConfigShard()->exhaustiveFindOnConfig(
+            operationContext(),
+            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+            repl::ReadConcernLevel::kLocalReadConcern,
+            NamespaceString::kClusterParametersNamespace,
+            BSONObj(),
+            BSONObj(),
+            boost::none));
+
+        auto shardsDocs = uassertStatusOK(getConfigShard()->exhaustiveFindOnConfig(
+            operationContext(),
+            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+            repl::ReadConcernLevel::kLocalReadConcern,
+            ShardType::ConfigNS,
+            BSONObj(),
+            BSONObj(),
+            boost::none));
+
+        if (shardsDocs.docs.empty() && clusterParameterDocs.docs.empty()) {
+            expectFindClusterParameterDocs(target);
+        } else {
+            expectRemoveClusterParameterDocs(target);
+        }
+    }
+
+    void expectRemoveClusterParameterDocs(const HostAndPort& target) {
         onCommandForAddShard([&](const RemoteCommandRequest& request) {
             ASSERT_EQ(request.target, target);
             ASSERT_EQ(request.dbname, NamespaceString::kClusterParametersNamespace.db());
@@ -189,6 +216,20 @@ protected:
             ASSERT_BSONOBJ_EQ(rpc::makeEmptyMetadata(), request.metadata);
 
             return BSON("ok" << 1);
+        });
+    }
+
+    void expectFindClusterParameterDocs(const HostAndPort& target) {
+        onCommandForAddShard([&](const RemoteCommandRequest& request) {
+            ASSERT_EQ(request.target, target);
+            ASSERT_EQ(request.dbname, NamespaceString::kClusterParametersNamespace.db());
+            ASSERT_BSONOBJ_EQ(request.cmdObj,
+                              BSON("find" << NamespaceString::kClusterParametersNamespace.coll()
+                                          << "maxTimeMS" << 30000 << "readConcern"
+                                          << BSON("level"
+                                                  << "majority")));
+            auto cursorRes = CursorResponse(NamespaceString::kClusterParametersNamespace, 0, {});
+            return cursorRes.toBSON(CursorResponse::ResponseType::InitialResponse);
         });
     }
 
@@ -462,8 +503,9 @@ TEST_F(AddShardTest, StandaloneBasicSuccess) {
     // The shard receives a delete op to clear any leftover user_writes_critical_sections doc.
     expectRemoveUserWritesCriticalSectionsDocs(shardTarget);
 
-    // The shard receives a delete op to clear any leftover clusterParameters doc.
-    expectRemoveSetClusterParameterDocs(shardTarget);
+    // The shard receives a delete op to clear any leftover clusterParameters doc or a find to get
+    // all cluster parameters in the replica set that is being promoted to a sharded cluster.
+    expectClusterParametersRequest(shardTarget);
 
     // The shard receives the setFeatureCompatibilityVersion command.
     expectSetFeatureCompatibilityVersion(shardTarget, BSON("ok" << 1), expectWriteConcern.toBSON());
@@ -548,10 +590,11 @@ TEST_F(AddShardTest, StandaloneGenerateName) {
     // The shard receives a delete op to clear any leftover user_writes_critical_sections doc.
     expectRemoveUserWritesCriticalSectionsDocs(shardTarget);
 
-    // The shard receives a delete op to clear any leftover clusterParameters doc.
-    expectRemoveSetClusterParameterDocs(shardTarget);
+    // The shard receives a delete op to clear any leftover clusterParameters doc or a find to get
+    // all cluster parameters in the replica set that is being promoted to a sharded cluster.
+    expectClusterParametersRequest(shardTarget);
 
-    // The shard receives the setFeatureCompatibilityVersion command.
+    // The shard receives the setFeatureCompatibilityVersion command
     expectSetFeatureCompatibilityVersion(
         shardTarget, BSON("ok" << 1), operationContext()->getWriteConcern().toBSON());
 
@@ -949,8 +992,9 @@ TEST_F(AddShardTest, SuccessfullyAddReplicaSet) {
     // The shard receives a delete op to clear any leftover user_writes_critical_sections doc.
     expectRemoveUserWritesCriticalSectionsDocs(shardTarget);
 
-    // The shard receives a delete op to clear any leftover clusterParameters doc.
-    expectRemoveSetClusterParameterDocs(shardTarget);
+    // The shard receives a delete op to clear any leftover clusterParameters doc or a find to get
+    // all cluster parameters in the replica set that is being promoted to a sharded cluster.
+    expectClusterParametersRequest(shardTarget);
 
     // The shard receives the setFeatureCompatibilityVersion command.
     expectSetFeatureCompatibilityVersion(
@@ -1020,8 +1064,9 @@ TEST_F(AddShardTest, ReplicaSetExtraHostsDiscovered) {
     // The shard receives a delete op to clear any leftover user_writes_critical_sections doc.
     expectRemoveUserWritesCriticalSectionsDocs(shardTarget);
 
-    // The shard receives a delete op to clear any leftover clusterParameters doc.
-    expectRemoveSetClusterParameterDocs(shardTarget);
+    // The shard receives a delete op to clear any leftover clusterParameters doc or a find to get
+    // all cluster parameters in the replica set that is being promoted to a sharded cluster.
+    expectClusterParametersRequest(shardTarget);
 
     // The shard receives the setFeatureCompatibilityVersion command.
     expectSetFeatureCompatibilityVersion(
@@ -1104,8 +1149,9 @@ TEST_F(AddShardTest, AddShardSucceedsEvenIfAddingDBsFromNewShardFails) {
     // The shard receives a delete op to clear any leftover user_writes_critical_sections doc.
     expectRemoveUserWritesCriticalSectionsDocs(shardTarget);
 
-    // The shard receives a delete op to clear any leftover clusterParameters doc.
-    expectRemoveSetClusterParameterDocs(shardTarget);
+    // The shard receives a delete op to clear any leftover clusterParameters doc or a find to get
+    // all cluster parameters in the replica set that is being promoted to a sharded cluster.
+    expectClusterParametersRequest(shardTarget);
 
     // The shard receives the setFeatureCompatibilityVersion command.
     expectSetFeatureCompatibilityVersion(
