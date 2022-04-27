@@ -133,7 +133,7 @@ class TieredConfigMixin:
             'tiered_storage=(auth_token=%s,' % self.auth_token + \
             'bucket=%s,' % self.bucket + \
             'bucket_prefix=%s,' % self.bucket_prefix + \
-            'name=%s),tiered_manager=(wait=0)' % self.ss_name
+            'name=%s),' % self.ss_name
 
     # Load the storage sources extension.
     def conn_extensions(self, extlist):

@@ -7,26 +7,6 @@
  */
 
 /*
- * WT_TIERED_MANAGER --
- *	A structure that holds resources used to manage any tiered storage
- *	for the whole database.
- */
-struct __wt_tiered_manager {
-    uint64_t wait_usecs; /* Wait time period */
-    uint32_t workers;    /* Current number of workers */
-    uint32_t workers_max;
-    uint32_t workers_min;
-
-#define WT_TIERED_MAX_WORKERS 20
-#define WT_TIERED_MIN_WORKERS 1
-
-/* AUTOMATIC FLAG VALUE GENERATION START 0 */
-#define WT_TIERED_MANAGER_SHUTDOWN 0x1u /* Manager has shut down */
-                                        /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
-    uint32_t flags;
-};
-
-/*
  * Define the maximum number of tiers for convenience. We expect at most two initially. This can
  * change if more are needed. It is easier to have the array statically allocated initially than
  * worrying about the memory management. For now also assign types to slots. Local files in slot 0.

@@ -835,24 +835,6 @@ connection_runtime_config = [
         @ref statistics for more information''',
         type='list',
         choices=['all', 'cache_walk', 'fast', 'none', 'clear', 'tree_walk']),
-    Config('tiered_manager', '', r'''
-        tiered storage manager configuration options''',
-        type='category', undoc=True, subconfig=[
-            Config('threads_max', '8', r'''
-                maximum number of threads WiredTiger will start to help manage
-                tiered storage maintenance. Each worker thread uses a session
-                from the configured session_max''',
-                min=1, max=20),
-            Config('threads_min', '1', r'''
-                minimum number of threads WiredTiger will start to help manage
-                tiered storage maintenance.''',
-                min=1, max=20),
-            Config('wait', '0', r'''
-                seconds to wait between each periodic housekeeping of
-                tiered storage. Setting this value above 0 configures periodic
-                management inside WiredTiger''',
-                min='0', max='100000'),
-            ]),
     Config('timing_stress_for_test', '', r'''
         enable code that interrupts the usual timing of operations with a goal
         of uncovering race conditions and unexpected blocking. This option is

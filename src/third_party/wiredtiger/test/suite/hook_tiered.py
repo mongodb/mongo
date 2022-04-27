@@ -76,7 +76,7 @@ def wiredtiger_open_tiered(ignored_self, args):
     tier_string = ',tiered_storage=(auth_token=%s,' % auth_token + \
       'bucket=%s,' % bucket + \
       'bucket_prefix=%s,' % prefix + \
-      'name=%s),tiered_manager=(wait=0),' % extension_name + \
+      'name=%s),' % extension_name + \
       'extensions=[\"%s\"],' % extension_libs[0]
 
     args = list(args)         # convert from a readonly tuple to a writeable list

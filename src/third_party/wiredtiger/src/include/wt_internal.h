@@ -333,8 +333,6 @@ struct __wt_thread_group;
 typedef struct __wt_thread_group WT_THREAD_GROUP;
 struct __wt_tiered;
 typedef struct __wt_tiered WT_TIERED;
-struct __wt_tiered_manager;
-typedef struct __wt_tiered_manager WT_TIERED_MANAGER;
 struct __wt_tiered_object;
 typedef struct __wt_tiered_object WT_TIERED_OBJECT;
 struct __wt_tiered_tiers;
