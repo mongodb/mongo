@@ -361,14 +361,6 @@ TEST(ReplSetConfig, ParseFailsWithBadOrMissingTermField) {
                                      << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                               << "localhost:12345")))));
     ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
-    ASSERT_OK(config.initialize(BSON("_id"
-                                     << "rs0"
-                                     << "version" << 1 << "term"
-                                     << static_cast<long long>(std::numeric_limits<int>::max()) + 1
-                                     << "protocolVersion" << 1 << "members"
-                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                              << "localhost:12345")))));
-    ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
 
     // If we provide an explicit term field, then we should not fail initialize since we overwrite
     // the invalid term. This tests the case where a reconfig command passes in an invalid term.
@@ -1758,6 +1750,38 @@ TEST(ReplSetConfig, ReplSetId) {
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
     ASSERT_STRING_CONTAINS(status.reason(),
                            "\"replicaSetId\" had the wrong type. Expected objectId, found int");
+}
+
+TEST(ReplSetConfig, LongLongTermParsesOK) {
+    long long term = std::numeric_limits<long long>::max() - 100;
+
+    ReplSetConfig config;
+    ASSERT_OK(config.initialize(BSON("_id"
+                                     << "rs0"
+                                     << "version" << 1 << "term" << term << "protocolVersion" << 1
+                                     << "members"
+                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                              << "localhost:12345")))));
+
+    ASSERT_OK(config.validate());
+    ASSERT_EQUALS("rs0", config.getReplSetName());
+    ASSERT_EQUALS(1, config.getConfigVersion());
+    ASSERT_EQUALS(term, config.getConfigTerm());
+    ASSERT_EQUALS(1, config.getNumMembers());
+    ASSERT_EQUALS(MemberId(0), config.membersBegin()->getId());
+    ASSERT_EQUALS(1, config.getDefaultWriteConcern().wNumNodes);
+    ASSERT_EQUALS("", config.getDefaultWriteConcern().wMode);
+    ASSERT_EQUALS(ReplSetConfig::kDefaultHeartbeatInterval, config.getHeartbeatInterval());
+    ASSERT_EQUALS(ReplSetConfig::kDefaultHeartbeatTimeoutPeriod,
+                  config.getHeartbeatTimeoutPeriod());
+    ASSERT_EQUALS(ReplSetConfig::kDefaultElectionTimeoutPeriod, config.getElectionTimeoutPeriod());
+    ASSERT_TRUE(config.isChainingAllowed());
+    ASSERT_TRUE(config.getWriteConcernMajorityShouldJournal());
+    ASSERT_FALSE(config.isConfigServer());
+    ASSERT_EQUALS(1, config.getProtocolVersion());
+    ASSERT_EQUALS(
+        ConnectionString::forReplicaSet("rs0", {HostAndPort{"localhost:12345"}}).toString(),
+        config.getConnectionString().toString());
 }
 
 TEST(ReplSetConfig, ConfigVersionAndTermComparison) {

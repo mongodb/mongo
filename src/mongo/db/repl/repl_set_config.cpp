@@ -432,7 +432,7 @@ Status ReplSetConfig::validate() const {
                       str::stream() << kVersionFieldName << " field value of " << _version
                                     << " is out of range");
     }
-    if (_term < -1 || _term > std::numeric_limits<int>::max()) {
+    if (_term < -1 || _term > std::numeric_limits<long long>::max()) {
         return Status(ErrorCodes::BadValue,
                       str::stream()
                           << kTermFieldName << " field value of " << _term << " is out of range");
