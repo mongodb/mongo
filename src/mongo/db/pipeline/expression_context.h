@@ -442,6 +442,9 @@ public:
     // True if this ExpressionContext is used to parse a view definition pipeline.
     bool isParsingViewDefinition = false;
 
+    // True if this ExpressionContext is being used to parse an update pipeline.
+    bool isParsingPipelineUpdate = false;
+
     // True if this ExpressionContext is used to parse a collection validator expression.
     bool isParsingCollectionValidator = false;
 

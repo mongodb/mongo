@@ -193,11 +193,12 @@ void ParsedUpdate::parseUpdate() {
         source == OperationSource::kTimeseriesUpdate) {
         _driver.setSkipDotsDollarsCheck(true);
     }
-
+    _expCtx->isParsingPipelineUpdate = true;
     _driver.parse(_request->getUpdateModification(),
                   _arrayFilters,
                   _request->getUpdateConstants(),
                   _request->isMulti());
+    _expCtx->isParsingPipelineUpdate = false;
 }
 
 PlanYieldPolicy::YieldPolicy ParsedUpdate::yieldPolicy() const {
