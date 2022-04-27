@@ -31,6 +31,7 @@
 
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/planner_ixselect.h"
+#include "mongo/db/s/operation_sharding_state.h"
 
 namespace mongo {
 namespace plan_cache_detail {
@@ -135,12 +136,17 @@ sbe::PlanCacheKey make(const CanonicalQuery& query,
                        PlanCacheKeyTag<sbe::PlanCacheKey>) {
     OperationContext* opCtx = query.getOpCtx();
     auto collectionVersion = CollectionQueryInfo::get(collection).getPlanCacheInvalidatorVersion();
+    const auto shardVersion{OperationShardingState::get(opCtx).getShardVersion(collection->ns())};
+    const auto keyShardingEpoch = shardVersion
+        ? boost::make_optional(
+              sbe::PlanCacheKeyShardingEpoch{shardVersion->epoch(), shardVersion->getTimestamp()})
+        : boost::none;
 
     return {makePlanCacheKeyInfo(query, collection),
             collection->uuid(),
             collectionVersion,
             computeNewestVisibleIndexTimestamp(opCtx, collection),
-            collection.isSharded()};
+            keyShardingEpoch};
 }
 }  // namespace plan_cache_detail
 }  // namespace mongo
