@@ -124,8 +124,10 @@ class TieredConfigMixin:
             return ''
 
         # Setup directories structure for local tiered storage.
-        if self.is_local_storage and not os.path.exists(self.bucket):
-            os.mkdir(self.bucket)
+        if self.is_local_storage:
+            bucket_full_path = os.path.join(self.home, self.bucket)
+            if not os.path.exists(bucket_full_path):
+                os.mkdir(bucket_full_path)
 
         # Build tiered storage connection string.
         return \

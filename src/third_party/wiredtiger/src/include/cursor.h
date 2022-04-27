@@ -64,14 +64,15 @@ struct __wt_cursor_backup {
 #define WT_CURBACKUP_CKPT_FAKE 0x001u   /* Object has fake checkpoint */
 #define WT_CURBACKUP_CONSOLIDATE 0x002u /* Consolidate returned info on this object */
 #define WT_CURBACKUP_DUP 0x004u         /* Duplicated backup cursor */
-#define WT_CURBACKUP_FORCE_FULL 0x008u  /* Force full file copy for this cursor */
-#define WT_CURBACKUP_FORCE_STOP 0x010u  /* Force stop incremental backup */
-#define WT_CURBACKUP_HAS_CB_INFO 0x020u /* Object has checkpoint backup info */
-#define WT_CURBACKUP_INCR 0x040u        /* Incremental backup cursor */
-#define WT_CURBACKUP_INCR_INIT 0x080u   /* Cursor traversal initialized */
-#define WT_CURBACKUP_LOCKER 0x100u      /* Hot-backup started */
-#define WT_CURBACKUP_QUERYID 0x200u     /* Backup cursor for incremental ids */
-#define WT_CURBACKUP_RENAME 0x400u      /* Object had a rename */
+#define WT_CURBACKUP_EXPORT 0x008u      /* Special backup cursor for export operation */
+#define WT_CURBACKUP_FORCE_FULL 0x010u  /* Force full file copy for this cursor */
+#define WT_CURBACKUP_FORCE_STOP 0x020u  /* Force stop incremental backup */
+#define WT_CURBACKUP_HAS_CB_INFO 0x040u /* Object has checkpoint backup info */
+#define WT_CURBACKUP_INCR 0x080u        /* Incremental backup cursor */
+#define WT_CURBACKUP_INCR_INIT 0x100u   /* Cursor traversal initialized */
+#define WT_CURBACKUP_LOCKER 0x200u      /* Hot-backup started */
+#define WT_CURBACKUP_QUERYID 0x400u     /* Backup cursor for incremental ids */
+#define WT_CURBACKUP_RENAME 0x800u      /* Object had a rename */
                                         /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t flags;
 };

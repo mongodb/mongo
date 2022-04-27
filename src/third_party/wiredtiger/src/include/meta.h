@@ -18,6 +18,7 @@
  * Backup related WiredTiger files.
  */
 #define WT_BACKUP_TMP "WiredTiger.backup.tmp"  /* Backup tmp file */
+#define WT_EXPORT_BACKUP "WiredTiger.export"   /* Export backup file */
 #define WT_METADATA_BACKUP "WiredTiger.backup" /* Hot backup file */
 #define WT_LOGINCR_BACKUP "WiredTiger.ibackup" /* Log incremental backup */
 #define WT_LOGINCR_SRC "WiredTiger.isrc"       /* Log incremental source */

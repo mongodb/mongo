@@ -107,6 +107,7 @@ __wt_backup_file_remove(WT_SESSION_IMPL *session)
      * there's any chance of an incremental backup file existing.
      */
     WT_TRET(__wt_remove_if_exists(session, WT_BACKUP_TMP, true));
+    WT_TRET(__wt_remove_if_exists(session, WT_EXPORT_BACKUP, true));
     WT_TRET(__wt_remove_if_exists(session, WT_LOGINCR_BACKUP, true));
     WT_TRET(__wt_remove_if_exists(session, WT_LOGINCR_SRC, true));
     WT_TRET(__wt_remove_if_exists(session, WT_METADATA_BACKUP, true));
@@ -291,13 +292,15 @@ __wt_curbackup_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *other,
         WT_CURSOR_BACKUP_CHECK_STOP(othercb);
 
     /* Special backup cursor to query incremental IDs. */
-    if (strcmp(uri, "backup:query_id") == 0) {
+    if (WT_STRING_MATCH("backup:query_id", uri, strlen("backup:query_id"))) {
         /* Top level cursor code does not allow a URI and cursor. We don't need to check here. */
         WT_ASSERT(session, othercb == NULL);
         if (!F_ISSET(S2C(session), WT_CONN_INCR_BACKUP))
             WT_RET_MSG(session, EINVAL, "Incremental backup is not configured");
         F_SET(cb, WT_CURBACKUP_QUERYID);
-    }
+    } else if (WT_STRING_MATCH("backup:export", uri, strlen("backup:export")))
+        /* Special backup cursor for export operation. */
+        F_SET(cb, WT_CURBACKUP_EXPORT);
 
     /*
      * Start the backup and fill in the cursor's list. Acquire the schema lock, we need a consistent
@@ -789,7 +792,7 @@ __backup_start(
         WT_ERR(__wt_fopen(session, WT_LOGINCR_SRC, WT_FS_OPEN_CREATE, WT_STREAM_WRITE, &srcfs));
         WT_ERR(__backup_list_append(session, cb, dest));
     } else {
-        dest = WT_METADATA_BACKUP;
+        dest = F_ISSET(cb, WT_CURBACKUP_EXPORT) ? WT_EXPORT_BACKUP : WT_METADATA_BACKUP;
         WT_ERR(__backup_list_append(session, cb, dest));
         WT_ERR(__wt_fs_exist(session, WT_BASECONFIG, &exist));
         if (exist)
@@ -890,7 +893,8 @@ __backup_list_uri_append(WT_SESSION_IMPL *session, const char *name, bool *skip)
      */
     if (!WT_PREFIX_MATCH(name, "file:") && !WT_PREFIX_MATCH(name, "colgroup:") &&
       !WT_PREFIX_MATCH(name, "index:") && !WT_PREFIX_MATCH(name, "lsm:") &&
-      !WT_PREFIX_MATCH(name, WT_SYSTEM_PREFIX) && !WT_PREFIX_MATCH(name, "table:") &&
+      !WT_PREFIX_MATCH(name, "object:") && !WT_PREFIX_MATCH(name, WT_SYSTEM_PREFIX) &&
+      !WT_PREFIX_MATCH(name, "table:") && !WT_PREFIX_MATCH(name, "tier:") &&
       !WT_PREFIX_MATCH(name, "tiered:"))
         WT_RET_MSG(session, ENOTSUP, "hot backup is not supported for objects of type %s", name);
 
