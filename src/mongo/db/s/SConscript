@@ -283,6 +283,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/collection_options',
         '$BUILD_DIR/mongo/db/catalog_raii',
         '$BUILD_DIR/mongo/db/commands/mongod_fcv',
+        '$BUILD_DIR/mongo/db/commands/set_cluster_parameter_invocation',
         '$BUILD_DIR/mongo/db/commands/set_feature_compatibility_version_idl',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/dbdirectclient',
