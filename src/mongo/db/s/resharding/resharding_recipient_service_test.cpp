@@ -31,6 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/op_observer_noop.h"
 #include "mongo/db/op_observer_registry.h"
@@ -48,6 +49,7 @@
 #include "mongo/db/s/resharding/resharding_recipient_service.h"
 #include "mongo/db/s/resharding/resharding_recipient_service_external_state.h"
 #include "mongo/db/s/resharding/resharding_service_test_helpers.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/util/fail_point.h"
@@ -265,6 +267,15 @@ public:
         options.uuid = recipientDoc.getSourceUUID();
         resharding::data_copy::ensureCollectionDropped(opCtx, recipientDoc.getSourceNss());
         resharding::data_copy::ensureCollectionExists(opCtx, recipientDoc.getSourceNss(), options);
+    }
+
+    void createTempReshardingCollection(OperationContext* opCtx,
+                                        const ReshardingRecipientDocument& recipientDoc) {
+        CollectionOptions options;
+        options.uuid = recipientDoc.getReshardingUUID();
+        resharding::data_copy::ensureCollectionDropped(opCtx, recipientDoc.getTempReshardingNss());
+        resharding::data_copy::ensureCollectionExists(
+            opCtx, recipientDoc.getTempReshardingNss(), options);
     }
 
     void notifyToStartCloning(OperationContext* opCtx,
@@ -857,6 +868,60 @@ TEST_F(ReshardingRecipientServiceTest, RestoreMetricsAfterStepUp) {
         if (state != RecipientStateEnum::kDone)
             stepUp(opCtx.get());
     }
+}
+
+TEST_F(ReshardingRecipientServiceTest, RestoreMetricsAfterStepUpWithMissingProgressDoc) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagShardingDataTransformMetrics", true);
+
+    auto doc = makeStateDocument(false);
+    auto instanceId =
+        BSON(ReshardingRecipientDocument::kReshardingUUIDFieldName << doc.getReshardingUUID());
+    auto opCtx = makeOperationContext();
+
+    auto donorShards = doc.getDonorShards();
+    auto insertFn = [&](const NamespaceString nss, const InsertStatement insertStatement) {
+        resharding::data_copy::ensureCollectionExists(opCtx.get(), nss, CollectionOptions());
+
+        std::vector<InsertStatement> inserts{insertStatement};
+        resharding::data_copy::insertBatch(opCtx.get(), nss, inserts);
+    };
+
+    for (unsigned i = 0; i < donorShards.size(); i++) {
+        if (i == 0) {
+            continue;
+        }
+
+        const auto& donor = donorShards[i];
+
+        // Setup oplogBuffer collection.
+        ReshardingDonorOplogId donorOplogId{{20, i}, {19, 0}};
+        insertFn(getLocalOplogBufferNamespace(doc.getSourceUUID(), donor.getShardId()),
+                 InsertStatement{BSON("_id" << donorOplogId.toBSON())});
+
+        // Setup reshardingApplierProgress collection.
+        ReshardingOplogApplierProgress progressDoc(
+            {doc.getReshardingUUID(), donor.getShardId()}, donorOplogId, 10 /* numOplogApplied */);
+        insertFn(NamespaceString::kReshardingApplierProgressNamespace,
+                 InsertStatement{progressDoc.toBSON()});
+    }
+
+    auto mutableState = doc.getMutableState();
+    mutableState.setState(RecipientStateEnum::kApplying);
+    doc.setMutableState(mutableState);
+    doc.setCloneTimestamp(Timestamp{10, 0});
+    doc.setStartConfigTxnCloneTime(Date_t::now());
+
+    auto metadata = doc.getCommonReshardingMetadata();
+    metadata.setStartTime(Date_t::now());
+    doc.setCommonReshardingMetadata(metadata);
+
+    createTempReshardingCollection(opCtx.get(), doc);
+
+    RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
+    auto recipient = RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
+    notifyReshardingCommitting(opCtx.get(), *recipient, doc);
+    ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
 }
 
 }  // namespace

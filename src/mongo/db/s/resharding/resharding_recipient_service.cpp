@@ -559,7 +559,9 @@ ReshardingRecipientService::RecipientStateMachine::_makeDataReplication(Operatio
                 std::make_unique<ReshardingOplogApplierMetrics>(_metricsNew.get(), boost::none));
         }
     } else {
-        invariant(_applierMetricsMap.size() == _donorShards.size());
+        invariant(_applierMetricsMap.size() == _donorShards.size(),
+                  str::stream() << "applier metrics map size: " << _applierMetricsMap.size()
+                                << " != donor shards count: " << _donorShards.size());
     }
 
     return _dataReplicationFactory(opCtx,
@@ -1135,31 +1137,28 @@ void ReshardingRecipientService::RecipientStateMachine::_restoreMetrics(
             }
         }
 
-        {
-            AutoGetCollection progressApplierColl(
-                opCtx.get(), NamespaceString::kReshardingApplierProgressNamespace, MODE_IS);
-            if (progressApplierColl) {
-                BSONObj result;
-                Helpers::findOne(
-                    opCtx.get(),
-                    progressApplierColl.getCollection(),
-                    BSON(ReshardingOplogApplierProgress::kOplogSourceIdFieldName
-                         << (ReshardingSourceId{_metadata.getReshardingUUID(), donor.getShardId()})
-                                .toBSON()),
-                    result);
+        boost::optional<ReshardingOplogApplierProgress> progressDoc;
+        AutoGetCollection progressApplierColl(
+            opCtx.get(), NamespaceString::kReshardingApplierProgressNamespace, MODE_IS);
+        if (progressApplierColl) {
+            BSONObj result;
+            Helpers::findOne(
+                opCtx.get(),
+                progressApplierColl.getCollection(),
+                BSON(ReshardingOplogApplierProgress::kOplogSourceIdFieldName
+                     << (ReshardingSourceId{_metadata.getReshardingUUID(), donor.getShardId()})
+                            .toBSON()),
+                result);
 
-                if (!result.isEmpty()) {
-                    auto progressDoc = ReshardingOplogApplierProgress::parse(
-                        IDLParserErrorContext("resharding-recipient-service-progress-doc"), result);
-                    oplogEntriesApplied += progressDoc.getNumEntriesApplied();
-
-                    if (ShardingDataTransformMetrics::isEnabled()) {
-                        progressDocList.emplace_back(donor.getShardId(), progressDoc);
-                    }
-                }
-            } else {
-                progressDocList.emplace_back(donor.getShardId(), boost::none);
+            if (!result.isEmpty()) {
+                progressDoc = ReshardingOplogApplierProgress::parse(
+                    IDLParserErrorContext("resharding-recipient-service-progress-doc"), result);
+                oplogEntriesApplied += progressDoc->getNumEntriesApplied();
             }
+        }
+
+        if (ShardingDataTransformMetrics::isEnabled()) {
+            progressDocList.emplace_back(donor.getShardId(), progressDoc);
         }
     }
 
