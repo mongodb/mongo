@@ -1094,7 +1094,7 @@ buildvariants:
   - name: .stitch
   - name: .csfle
     distros:
-    - rhel80-large
+    - rhel82-arm64-large
   - name: .publish_csfle
   - name: test_packages
     distros:
