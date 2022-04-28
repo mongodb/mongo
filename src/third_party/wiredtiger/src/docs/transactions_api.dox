@@ -70,7 +70,7 @@ allocated to hold the data required to satisfy transactional readers, operations
 may fail and return ::WT_ROLLBACK.
 
 \warning
-A thread with active transactions should avoid pausing or blocking. This may delay
+A thread with an active transaction should avoid pausing or blocking. This may delay
 other transactions that require the same resources, leading to performance problems that
 are hard to diagnose.
 
