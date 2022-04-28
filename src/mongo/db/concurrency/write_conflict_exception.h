@@ -29,17 +29,11 @@
 
 #pragma once
 
-#include <exception>
-
 #include "mongo/base/string_data.h"
-#include "mongo/db/concurrency/temporarily_unavailable_exception.h"
-#include "mongo/db/curop.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/fail_point.h"
 
 namespace mongo {
-
-extern FailPoint skipWriteConflictRetries;
 
 /**
  * This is thrown if during a write, two or more operations conflict with each other.
@@ -49,83 +43,25 @@ extern FailPoint skipWriteConflictRetries;
 class WriteConflictException final : public DBException {
 public:
     WriteConflictException();
-    WriteConflictException(StringData context);
 
-    /**
-     * Will log a message if sensible and will do an exponential backoff to make sure
-     * we don't hammer the same doc over and over.
-     * @param attempt - what attempt is this, 1 based
-     * @param operation - e.g. "update"
-     */
-    static void logAndBackoff(int attempt, StringData operation, StringData ns);
+    WriteConflictException(StringData context) : WriteConflictException() {
+        // Avoid unnecessary update to embedded Status within DBException.
+        if (context.empty()) {
+            return;
+        }
+        addContext(context);
+    }
+
+    WriteConflictException(const Status& status) : DBException(status) {}
 
     /**
      * If true, will call printStackTrace on every WriteConflictException created.
      * Can be set via setParameter named traceWriteConflictExceptions.
      */
-    static AtomicWord<bool> trace;
+    static inline AtomicWord<bool> trace{false};
 
 private:
     void defineOnlyInFinalSubclassToPreventSlicing() final {}
 };
-
-/**
- * Runs the argument function f as many times as needed for f to complete or throw an exception
- * other than WriteConflictException or TemporarilyUnavailableException. For each time f throws an
- * one of these exceptions, logs the error, waits a spell, cleans up, and then tries f again.
- * Imposes no upper limit on the number of times to re-try f after a WriteConflictException, so any
- * required timeout behavior must be enforced within f. When retrying a
- * TemporarilyUnavailableException, f is called a finite number of times before we eventually let
- * the error escape.
- *
- * If we are already in a WriteUnitOfWork, we assume that we are being called within a
- * WriteConflictException retry loop up the call stack. Hence, this retry loop is reduced to an
- * invocation of the argument function f without any exception handling and retry logic.
- */
-template <typename F>
-auto writeConflictRetry(OperationContext* opCtx, StringData opStr, StringData ns, F&& f) {
-    invariant(opCtx);
-    invariant(opCtx->lockState());
-    invariant(opCtx->recoveryUnit());
-
-    // This failpoint disables exception handling for write conflicts. Only allow this exception to
-    // escape user operations. Do not allow exceptions to escape internal threads, which may rely on
-    // this exception handler to avoid crashing.
-    bool userSkipWriteConflictRetry = MONGO_unlikely(skipWriteConflictRetries.shouldFail()) &&
-        opCtx->getClient()->isFromUserConnection();
-    if (opCtx->lockState()->inAWriteUnitOfWork() || userSkipWriteConflictRetry) {
-        try {
-            return f();
-        } catch (TemporarilyUnavailableException const& e) {
-            if (opCtx->inMultiDocumentTransaction()) {
-                TemporarilyUnavailableException::handleInTransaction(opCtx, opStr, ns, e);
-            }
-            throw;
-        }
-    }
-
-    int attempts = 0;
-    int attemptsTempUnavailable = 0;
-    // TODO (SERVER-54284) Remove redundant catch for WriteConflictExpection and
-    // ExceptionFor<ErrorCodes::WriteConflict>
-    while (true) {
-        try {
-            return f();
-        } catch (WriteConflictException const&) {
-            CurOp::get(opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
-            WriteConflictException::logAndBackoff(attempts, opStr, ns);
-            ++attempts;
-            opCtx->recoveryUnit()->abandonSnapshot();
-        } catch (ExceptionFor<ErrorCodes::WriteConflict> const&) {
-            CurOp::get(opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
-            WriteConflictException::logAndBackoff(attempts, opStr, ns);
-            ++attempts;
-            opCtx->recoveryUnit()->abandonSnapshot();
-        } catch (TemporarilyUnavailableException const& e) {
-            CurOp::get(opCtx)->debug().additiveMetrics.incrementTemporarilyUnavailableErrors(1);
-            TemporarilyUnavailableException::handle(opCtx, ++attemptsTempUnavailable, opStr, ns, e);
-        }
-    }
-}
 
 }  // namespace mongo

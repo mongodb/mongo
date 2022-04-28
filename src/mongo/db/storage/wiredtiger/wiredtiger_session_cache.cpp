@@ -36,7 +36,6 @@
 #include <memory>
 
 #include "mongo/base/error_codes.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/global_settings.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/storage/journal_listener.h"

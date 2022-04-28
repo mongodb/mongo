@@ -42,7 +42,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/map_reduce_gen.h"
 #include "mongo/db/commands/mr_common.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/json.h"
 #include "mongo/db/op_observer_noop.h"

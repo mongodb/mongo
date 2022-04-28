@@ -33,7 +33,7 @@
 #include "mongo/db/serverless/shard_split_donor_service.h"
 #include "mongo/client/streamable_replica_set_monitor.h"
 #include "mongo/db/catalog_raii.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/repl/repl_client_info.h"

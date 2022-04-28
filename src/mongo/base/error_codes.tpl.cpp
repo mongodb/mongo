@@ -32,6 +32,8 @@
 #include "mongo/base/error_codes.h"
 
 #include "mongo/base/static_assert.h"
+#include "mongo/db/concurrency/temporarily_unavailable_exception.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 

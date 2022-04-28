@@ -40,7 +40,7 @@
 
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/delete_stage.h"
 #include "mongo/db/exec/working_set_common.h"
@@ -691,7 +691,7 @@ void clearOrphanCountersFromRangeDeletionTasks(OperationContext* opCtx) {
     BSONObj allDocsQuery;
     PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
     try {
-        // TODO (SERVER-54284) Remove writeConflictRetry loop
+        // TODO SERVER-65996 Remove writeConflictRetry loop
         writeConflictRetry(
             opCtx, "clearOrphanCounters", NamespaceString::kRangeDeletionNamespace.ns(), [&] {
                 store.update(

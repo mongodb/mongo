@@ -40,9 +40,10 @@
 
 #include "mongo/base/simple_string_data_comparator.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/concurrency/exception_util_gen.h"
 #include "mongo/db/concurrency/temporarily_unavailable_exception.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/concurrency/write_conflict_exception_gen.h"
 #include "mongo/db/global_settings.h"
 #include "mongo/db/server_options_general_gen.h"
 #include "mongo/db/snapshot_window_options_gen.h"

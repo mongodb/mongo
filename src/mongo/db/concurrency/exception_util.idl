@@ -28,7 +28,9 @@
 
 global:
     cpp_namespace: "mongo"
-    cpp_includes: "mongo/db/concurrency/write_conflict_exception.h"
+    cpp_includes:
+      - "mongo/db/concurrency/temporarily_unavailable_exception.h"
+      - "mongo/db/concurrency/write_conflict_exception.h"
 
 server_parameters:
     traceWriteConflictExceptions:

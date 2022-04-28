@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include <exception>
-
+#include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
-#include "mongo/db/operation_context.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
@@ -44,27 +44,14 @@ namespace mongo {
  */
 class TemporarilyUnavailableException final : public DBException {
 public:
-    static AtomicWord<long long> maxRetryAttempts;
-    static AtomicWord<long long> retryBackoffBaseMs;
+    // These are initialized by IDL as server parameters.
+    static inline AtomicWord<long long> maxRetryAttempts;
+    static inline AtomicWord<long long> retryBackoffBaseMs;
 
-    TemporarilyUnavailableException(StringData context);
+    TemporarilyUnavailableException(StringData context)
+        : DBException({ErrorCodes::TemporarilyUnavailable, context}) {}
 
-    /**
-     * Handle a TemporarilyUnavailableException.
-     */
-    static void handle(OperationContext* opCtx,
-                       int attempts,
-                       StringData opStr,
-                       StringData ns,
-                       const TemporarilyUnavailableException& e);
-
-    /**
-     * Handle a TemporarilyUnavailableException inside a multi-document transaction.
-     */
-    static void handleInTransaction(OperationContext* opCtx,
-                                    StringData opStr,
-                                    StringData ns,
-                                    const TemporarilyUnavailableException& e);
+    TemporarilyUnavailableException(const Status& status) : DBException(status) {}
 
 private:
     void defineOnlyInFinalSubclassToPreventSlicing() final {}

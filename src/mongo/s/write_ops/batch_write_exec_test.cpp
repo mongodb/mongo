@@ -33,6 +33,7 @@
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/s/catalog/type_shard.h"
@@ -2413,11 +2414,9 @@ TEST_F(BatchWriteExecTransactionTest, ErrorInBatchSets_TransientTxnError) {
     auto future = launchAsync([&] {
         BatchedCommandResponse response;
         BatchWriteExecStats stats;
-        ASSERT_THROWS_CODE(
-            BatchWriteExec::executeBatch(
-                operationContext(), singleShardNSTargeter, request, &response, &stats),
-            AssertionException,
-            ErrorCodes::WriteConflict);
+        ASSERT_THROWS(BatchWriteExec::executeBatch(
+                          operationContext(), singleShardNSTargeter, request, &response, &stats),
+                      WriteConflictException);
     });
 
     expectInsertsReturnTransientTxnErrors({BSON("x" << 1), BSON("x" << 2)});
