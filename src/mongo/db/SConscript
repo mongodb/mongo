@@ -258,6 +258,16 @@ env.Library(
 )
 
 env.Library(
+    target='tenant_id',
+    source=[
+        'tenant_id.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
+env.Library(
     target='update_index_data',
     source=[
         'update_index_data.cpp'
@@ -286,7 +296,6 @@ env.Library(
     target='multitenancy_params',
     source=[
         'multitenancy.idl',
-        'tenant_id.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',

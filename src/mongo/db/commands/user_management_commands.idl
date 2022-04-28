@@ -128,12 +128,6 @@ commands:
                 description: "List of valid authentication mechanisms for the user"
                 type: array<string>
                 optional: true
-            "$tenant":
-                # Only available with enableTestCommands and multitenancySupport
-                description: "Associate this user with a specific tenant"
-                type: tenant_id
-                cpp_name: tenantOverride
-                optional: true
 
     updateUser:
         description: "Modify a user"

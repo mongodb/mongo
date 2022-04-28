@@ -32,6 +32,7 @@ global:
     cpp_includes:
         - "mongo/db/logical_time.h"
         - "mongo/db/namespace_string.h"
+        - "mongo/db/tenant_id.h"
         - "mongo/idl/basic_types.h"
         - "mongo/util/uuid.h"
 
@@ -255,6 +256,12 @@ types:
         cpp_type: "mongo::IDLAnyTypeOwned"
         serializer: mongo::IDLAnyTypeOwned::serializeToBSON
         deserializer: mongo::IDLAnyTypeOwned::parseFromBSON
+    tenant_id:
+        bson_serialization_type: any
+        description: "A struct representing a tenant id"
+        cpp_type: "TenantId"
+        deserializer: "mongo::TenantId::parseFromBSON"
+        serializer: "mongo::TenantId::serializeToBSON"
 
 enums:
     CollationCaseFirst:

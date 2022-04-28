@@ -71,6 +71,39 @@ class TestBinder(testcase.IDLTestcase):
 
     # pylint: disable=too-many-public-methods
 
+    # Create a text wrap for common types.
+    common_types = textwrap.dedent("""
+    types:
+        object:
+            description: foo
+            cpp_type: foo
+            bson_serialization_type: object
+            serializer: foo
+            deserializer: foo
+
+        string:
+            description: foo
+            cpp_type: foo
+            bson_serialization_type: string
+            serializer: foo
+            deserializer: foo
+
+        any_type:
+            description: foo
+            cpp_type: foo
+            bson_serialization_type: any
+            serializer: foo
+            deserializer: foo
+
+        tenant_id:
+            bson_serialization_type: any
+            description: foo
+            cpp_type: foo
+            deserializer: foo
+            serializer: foo
+
+    """)
+
     def test_empty(self):
         # type: () -> None
         """Test an empty document works."""
@@ -1687,16 +1720,7 @@ class TestBinder(testcase.IDLTestcase):
         """Positive command tests."""
 
         # Setup some common types
-        test_preamble = textwrap.dedent("""
-        types:
-            string:
-                description: foo
-                cpp_type: foo
-                bson_serialization_type: string
-                serializer: foo
-                deserializer: foo
-                default: foo
-
+        test_preamble = self.common_types + textwrap.dedent("""
         structs:
             reply:
                 description: foo
@@ -1722,17 +1746,7 @@ class TestBinder(testcase.IDLTestcase):
         """Negative command tests."""
 
         # Setup some common types
-        test_preamble = textwrap.dedent("""
-        types:
-            string:
-                description: foo
-                cpp_type: foo
-                bson_serialization_type: string
-                serializer: foo
-                deserializer: foo
-                default: foo
-        """)
-
+        test_preamble = self.common_types
         # Commands cannot be fields in other commands
         self.assert_bind_fail(
             test_preamble + textwrap.dedent("""
@@ -1816,22 +1830,7 @@ class TestBinder(testcase.IDLTestcase):
         # pylint: disable=invalid-name
 
         # Setup some common types
-        test_preamble = textwrap.dedent("""
-        types:
-            object:
-                description: foo
-                cpp_type: foo
-                bson_serialization_type: object
-                serializer: foo
-                deserializer: foo
-
-            string:
-                description: foo
-                cpp_type: foo
-                bson_serialization_type: string
-                serializer: foo
-                deserializer: foo
-
+        test_preamble = self.common_types + textwrap.dedent("""
         structs:
             foo_struct:
                 description: foo
@@ -1872,29 +1871,7 @@ class TestBinder(testcase.IDLTestcase):
         # pylint: disable=invalid-name
 
         # Setup some common types
-        test_preamble = textwrap.dedent("""
-        types:
-            object:
-                description: foo
-                cpp_type: foo
-                bson_serialization_type: object
-                serializer: foo
-                deserializer: foo
-
-            string:
-                description: foo
-                cpp_type: foo
-                bson_serialization_type: string
-                serializer: foo
-                deserializer: foo
-
-            any_type:
-                description: foo
-                cpp_type: foo
-                bson_serialization_type: any
-                serializer: foo
-                deserializer: foo
-        """)
+        test_preamble = self.common_types
 
         test_preamble2 = test_preamble + textwrap.dedent("""
         structs:
@@ -1965,15 +1942,8 @@ class TestBinder(testcase.IDLTestcase):
     def test_command_type_positive(self):
         # type: () -> None
         """Positive command custom type test cases."""
-        test_preamble = textwrap.dedent("""
-        types:
-            string:
-                description: foo
-                cpp_type: foo
-                bson_serialization_type: string
-                serializer: foo
-                deserializer: foo
-        """)
+        # Setup some common types
+        test_preamble = self.common_types
 
         # string
         self.assert_bind(test_preamble + textwrap.dedent("""
@@ -2006,15 +1976,8 @@ class TestBinder(testcase.IDLTestcase):
     def test_command_type_negative(self):
         # type: () -> None
         """Negative command type test cases."""
-        test_preamble = textwrap.dedent("""
-        types:
-            string:
-                description: foo
-                cpp_type: foo
-                bson_serialization_type: string
-                serializer: foo
-                deserializer: foo
-        """)
+        # Setup some common types
+        test_preamble = self.common_types
 
         # supports_doc_sequence must be a bool
         self.assert_bind_fail(
@@ -2448,15 +2411,7 @@ class TestBinder(testcase.IDLTestcase):
         # type: () -> None
         """Test access check."""
 
-        test_preamble = textwrap.dedent("""
-        types:
-            string:
-                description: foo
-                cpp_type: foo
-                bson_serialization_type: string
-                serializer: foo
-                deserializer: foo
-
+        test_preamble = self.common_types + textwrap.dedent("""
         enums:
             AccessCheck:
                 description: "test"
@@ -2560,15 +2515,7 @@ class TestBinder(testcase.IDLTestcase):
         # type: () -> None
         """Negative access check tests."""
 
-        test_preamble = textwrap.dedent("""
-        types:
-            string:
-                description: foo
-                cpp_type: foo
-                bson_serialization_type: string
-                serializer: foo
-                deserializer: foo
-
+        test_preamble = self.common_types + textwrap.dedent("""
         enums:
             AccessCheck:
                 description: "test"

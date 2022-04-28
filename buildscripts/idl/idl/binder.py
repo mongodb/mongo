@@ -410,6 +410,19 @@ def _inject_hidden_command_fields(command):
 
     command.fields.append(db_field)
 
+    # Inject "$tenant" for use by cluster administrators overriding tenant in multitenancy.
+    tenant_field = syntax.Field(command.file_name, command.line, command.column)
+    tenant_field.name = "$tenant"
+    tenant_field.type = syntax.FieldTypeSingle(command.file_name, command.line, command.column)
+    tenant_field.type.type_name = "tenant_id"  # This comes from basic_types.idl
+    tenant_field.cpp_name = "dollarTenant"
+    tenant_field.optional = True
+    # The $tenant field should be injected when serializing to OpMsgRequest and to
+    # BSONObjBuilder if it exists.
+    tenant_field.serialize_op_msg_request_only = False
+
+    command.fields.append(tenant_field)
+
 
 def _bind_struct_type(struct):
     # type: (syntax.Struct) -> ast.Type
