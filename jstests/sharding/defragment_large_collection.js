@@ -27,7 +27,12 @@ const st = new ShardingTest({
     shards: numShards,
     other: {
         enableBalancer: true,
-        configOptions: {setParameter: {logComponentVerbosity: tojson({sharding: {verbosity: 3}})}},
+        configOptions: {
+            setParameter: {
+                logComponentVerbosity: tojson({sharding: {verbosity: 3}}),
+                chunkDefragmentationThrottlingMS: 0
+            }
+        },
     }
 });
 
