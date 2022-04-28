@@ -374,7 +374,7 @@ buildvariants:
   - name: .csfle
     distros:
     - amazon2-arm64-large
-  - name: csfle_build_debug_and_test
+  - name: .publish_csfle
     distros:
     - amazon2-arm64-large
   - name: secondary_reads_passthrough_gen
