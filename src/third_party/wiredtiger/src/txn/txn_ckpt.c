@@ -525,7 +525,6 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, bool *trackingp, const char *cfg[
     WT_TXN_GLOBAL *txn_global;
     WT_TXN_SHARED *txn_shared;
     uint64_t original_snap_min;
-    u_int wait_time;
     const char *txn_cfg[] = {
       WT_CONFIG_BASE(session, WT_SESSION_begin_transaction), "isolation=snapshot", NULL};
     bool use_timestamp;
@@ -534,7 +533,6 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, bool *trackingp, const char *cfg[
     txn = session->txn;
     txn_global = &conn->txn_global;
     txn_shared = WT_SESSION_TXN_SHARED(session);
-    wait_time = 0;
 
     WT_RET(__wt_config_gets(session, cfg, "use_timestamp", &cval));
     use_timestamp = (cval.val != 0);
@@ -607,8 +605,7 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, bool *trackingp, const char *cfg[
      * Set the checkpoint transaction's timestamp, if requested.
      *
      * We rely on having the global transaction data locked so the oldest timestamp can't move past
-     * the stable timestamp we select until our read timestamp is in place. (Then it contributes to
-     * the pinned timestamp computation so our reads remain safe.)
+     * the stable timestamp.
      */
     WT_ASSERT(session,
       !F_ISSET(txn, WT_TXN_HAS_TS_COMMIT | WT_TXN_SHARED_TS_DURABLE | WT_TXN_SHARED_TS_READ));
@@ -662,34 +659,10 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, bool *trackingp, const char *cfg[
     }
 
     /*
-     * Wait for any transactions that are supposed to be stable to finish committing. This prevents
-     * a race where a transaction can begin committing at a time past stable, and another thread
-     * moves stable past that transaction's commit time, and we start checkpointing before it
-     * finishes; we need it in this checkpoint, but it won't be unless we wait for it. If we do,
-     * then this race reduces to the race described in the next comment.
-     *
-     * Note that arguably the proper solution for this race is to not allow stable to advance past a
-     * transaction that hasn't finished committing (or to make it wait instead of us) but that is
-     * not currently feasible.
-     */
-    if (use_timestamp && txn_global->meta_ckpt_timestamp != WT_TS_NONE) {
-        while (__wt_txn_checkpoint_cannot_start(session)) {
-            __wt_sleep(0, 100 * WT_THOUSAND);
-            WT_STAT_CONN_INCRV(session, txn_checkpoint_prep_wait, 100);
-            wait_time++;
-        }
-        /* Grumble (with timing data) if we had to wait more than five seconds. */
-        if (wait_time > 50)
-            __checkpoint_verbose_track(
-              session, "Finished waiting for necessary transactions to commit");
-    }
-
-    /*
-     * Refresh our snapshot here without publishing our shared ids to the world. This prevents a
-     * race where the application finishes committing a transaction and moves stable up to include
-     * that transaction in between when we began the checkpoint transaction and when we fetched
-     * stable. We want that transaction in the checkpoint, but it won't be unless we get a new
-     * snapshot.
+     * Refresh our snapshot here without publishing our shared ids to the world, doing so prevents
+     * us from racing with the stable timestamp moving ahead of current snapshot. i.e. if the stable
+     * timestamp moves after we begin the checkpoint transaction but before we set the checkpoint
+     * timestamp we can end up missing updates in our checkpoint.
      */
     __wt_txn_bump_snapshot(session);
 

@@ -1049,8 +1049,7 @@ __wt_txn_publish_durable_timestamp(WT_SESSION_IMPL *session)
          * If we know for a fact that this is a prepared transaction and we only have a commit
          * timestamp, don't add to the durable queue. If we poll all_durable after setting the
          * commit timestamp of a prepared transaction, that prepared transaction should NOT be
-         * visible. Note: this only happens when the commit timestamp is set in advance with
-         * timestamp_transaction; at commit time a durable timestamp is required.
+         * visible.
          */
         if (F_ISSET(txn, WT_TXN_PREPARE))
             return;
@@ -1104,51 +1103,4 @@ __wt_txn_clear_read_timestamp(WT_SESSION_IMPL *session)
         F_CLR(txn, WT_TXN_SHARED_TS_READ);
     }
     txn_shared->read_timestamp = WT_TS_NONE;
-}
-
-/*
- * __wt_txn_checkpoint_cannot_start --
- *     Return true if there's a transaction we need to wait for. This means transactions that have
- *     begun committing with durable timestamp at or before the checkpoint timestamp, but have not
- *     yet finished.
- */
-bool
-__wt_txn_checkpoint_cannot_start(WT_SESSION_IMPL *session)
-{
-    WT_CONNECTION_IMPL *conn;
-    WT_TXN_GLOBAL *txn_global;
-    WT_TXN_SHARED *txn_shared;
-    wt_timestamp_t durable_ts;
-    uint32_t i, session_count;
-
-    conn = S2C(session);
-    txn_global = &conn->txn_global;
-
-    /* We're going to scan the table: wait for the lock. */
-    __wt_readlock(session, &txn_global->rwlock);
-
-    /* Walk the array of concurrent transactions. */
-    WT_ORDERED_READ(session_count, conn->session_cnt);
-    WT_STAT_CONN_INCR(session, txn_walk_sessions);
-    for (i = 0, txn_shared = txn_global->txn_shared_list; i < session_count; i++, txn_shared++) {
-        WT_STAT_CONN_INCR(session, txn_sessions_walked);
-
-        if (txn_shared->id == WT_TXN_NONE)
-            continue;
-
-        /*
-         * FUTURE: there is currently no way to tell if a transaction has started committing, or has
-         * only been assigned a durable or commit timestamp with timestamp_transaction(). It would
-         * be better not to wait for transactions that haven't actually started committing yet.
-         */
-        __txn_get_durable_timestamp(txn_shared, &durable_ts);
-
-        if (durable_ts != WT_TXN_NONE && durable_ts <= txn_global->meta_ckpt_timestamp) {
-            __wt_readunlock(session, &txn_global->rwlock);
-            return (true);
-        }
-    }
-
-    __wt_readunlock(session, &txn_global->rwlock);
-    return (false);
 }
