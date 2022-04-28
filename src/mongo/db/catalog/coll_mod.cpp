@@ -928,29 +928,6 @@ Status _collModInternal(OperationContext* opCtx,
                 opCtx, coll.getWritableCollection(opCtx), desc, CreateIndexEntryFlags::kIsReady);
         }
 
-        // (Generic FCV reference): TODO SERVER-60912: When kLastLTS is 6.0, remove this FCV-gated
-        // upgrade/downgrade code.
-        const auto currentVersion = serverGlobalParams.featureCompatibility.getVersion();
-        if (coll->getTimeseriesOptions() && !coll->getTimeseriesBucketsMayHaveMixedSchemaData() &&
-            (currentVersion == multiversion::GenericFCV::kUpgradingFromLastLTSToLatest ||
-             currentVersion == multiversion::GenericFCV::kLatest)) {
-            // (Generic FCV reference): While upgrading the FCV from kLastLTS to kLatest, collMod is
-            // called as part of the upgrade process to add the
-            // 'timeseriesBucketsMayHaveMixedSchemaData=true' catalog entry flag for time-series
-            // collections that are missing the flag. This indicates that the time-series collection
-            // existed in earlier server versions and may have mixed-schema data.
-            coll.getWritableCollection(opCtx)->setTimeseriesBucketsMayHaveMixedSchemaData(opCtx,
-                                                                                          true);
-        } else if (coll->getTimeseriesBucketsMayHaveMixedSchemaData() &&
-                   (currentVersion == multiversion::GenericFCV::kDowngradingFromLatestToLastLTS ||
-                    currentVersion == multiversion::GenericFCV::kLastLTS)) {
-            // (Generic FCV reference): While downgrading the FCV to kLastLTS, collMod is called as
-            // part of the downgrade process to remove the 'timeseriesBucketsMayHaveMixedSchemaData'
-            // catalog entry flag for time-series collections that have the flag.
-            coll.getWritableCollection(opCtx)->setTimeseriesBucketsMayHaveMixedSchemaData(
-                opCtx, boost::none);
-        }
-
         // Only observe non-view collMods, as view operations are observed as operations on the
         // system.views collection.
         auto* const opObserver = opCtx->getServiceContext()->getOpObserver();

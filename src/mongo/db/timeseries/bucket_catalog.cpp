@@ -275,12 +275,6 @@ public:
     bool schemaIncompatible(const BSONObj& input,
                             boost::optional<StringData> metaField,
                             const StringData::ComparatorInterface* comparator) {
-        // (Generic FCV reference): TODO (SERVER-60912): Update once kLastLTS is 6.0
-        if (serverGlobalParams.featureCompatibility.getVersion() ==
-            multiversion::GenericFCV::kLastLTS) {
-            return false;
-        }
-
         auto result = _schema.update(input, metaField, comparator);
         return (result == timeseries::Schema::UpdateStatus::Failed);
     }
