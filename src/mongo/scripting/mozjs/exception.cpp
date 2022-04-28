@@ -51,10 +51,12 @@ void mongoToJSException(JSContext* cx) {
     auto status = exceptionToStatus();
 
     if (status.code() != ErrorCodes::JSUncatchableError) {
-        JS::RootedValue val(cx);
-        statusToJSException(cx, status, &val);
+        if (!JS_IsExceptionPending(cx)) {
+            JS::RootedValue val(cx);
+            statusToJSException(cx, status, &val);
 
-        JS_SetPendingException(cx, val);
+            JS_SetPendingException(cx, val);
+        }
     } else {
         // If a JSAPI callback returns false without setting a pending exception, SpiderMonkey will
         // treat it as an uncatchable error.

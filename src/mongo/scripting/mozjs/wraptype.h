@@ -359,7 +359,14 @@ public:
             JS::ObjectValue(T::installType == InstallType::OverNative ? *_constructor : *_proto));
         JS::RootedObject result(_context);
 
-        out.set(_assertPtr(JS::Construct(_context, fVal, args, &result) ? result.get() : nullptr));
+        bool success = JS::Construct(_context, fVal, args, &result);
+        if (success) {
+            out.set(result.get());
+        } else {
+            throwCurrentJSException(_context,
+                                    ErrorCodes::JSInterpreterFailure,
+                                    "Failed to JS::Construct (to set on JS::MutableHandleObject)");
+        }
     }
 
     void newInstance(JS::MutableHandleValue out) {
@@ -377,8 +384,14 @@ public:
             JS::ObjectValue(T::installType == InstallType::OverNative ? *_constructor : *_proto));
         JS::RootedObject result(_context);
 
-        out.setObjectOrNull(
-            _assertPtr(JS::Construct(_context, fVal, args, &result) ? result.get() : nullptr));
+        bool success = JS::Construct(_context, fVal, args, &result);
+        if (success) {
+            out.setObjectOrNull(result.get());
+        } else {
+            throwCurrentJSException(_context,
+                                    ErrorCodes::JSInterpreterFailure,
+                                    "Failed to JS::Construct (to set on JS::MutableHandleValue)");
+        }
     }
 
     // instanceOf doesn't go up the prototype tree.  It's a lower level more specific match
