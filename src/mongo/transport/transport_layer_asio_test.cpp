@@ -53,6 +53,7 @@
 #include "mongo/transport/session_asio.h"
 #include "mongo/transport/transport_options_gen.h"
 #include "mongo/unittest/assert_that.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/notification.h"
@@ -1046,6 +1047,36 @@ TEST_F(BatonASIOLinuxTest, AddAndRemoveTimerWhileInPoll) {
 
     // TODO SERVER-64174 Change the following to `ASSERT_TRUE` once the underlying issue is fixed.
     ASSERT_FALSE(cancelTimerResult.get(opCtx.get()));
+}
+
+DEATH_TEST_F(BatonASIOLinuxTest, AddAnAlreadyAddedSession, "invariant") {
+    auto opCtx = client().makeOperationContext();
+    auto baton = opCtx->getBaton()->networking();
+    auto session = client().session();
+
+    baton->addSession(*session, transport::NetworkingBaton::Type::In).getAsync([](Status) {});
+    baton->addSession(*session, transport::NetworkingBaton::Type::In).getAsync([](Status) {});
+}
+
+// This could be considered a test for either `ASIOSession` or `BatonASIOLinux`, as it's testing the
+// interaction between the two when `ASIOSession` calls `addSession` and `cancelAsyncOperations` on
+// the networking baton. This is currently added to the `BatonASIOLinuxTest` fixture to utilize the
+// existing infrastructure.
+TEST_F(BatonASIOLinuxTest, CancelAsyncOperationsInterruptsOngoingOperations) {
+    MilestoneThread thread([&](Notification<void>& isReady) {
+        // Blocks the main thread as it schedules an opportunistic read, but before it starts
+        // polling on the networking baton. Then it cancels the operation before unblocking the main
+        // thread.
+        FailPointEnableBlock fp("transportLayerASIOBlockBeforeOpportunisticRead");
+        isReady.set();
+        waitForTimesEntered(fp, 1);
+        client().session()->cancelAsyncOperations();
+    });
+
+    auto opCtx = client().makeOperationContext();
+    ASSERT_THROWS_CODE(client().session()->asyncSourceMessage(opCtx->getBaton()).get(),
+                       DBException,
+                       ErrorCodes::CallbackCanceled);
 }
 
 #endif  // __linux__

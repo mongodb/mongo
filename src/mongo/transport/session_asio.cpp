@@ -42,6 +42,7 @@ namespace mongo::transport {
 
 MONGO_FAIL_POINT_DEFINE(transportLayerASIOshortOpportunisticReadWrite);
 MONGO_FAIL_POINT_DEFINE(transportLayerASIOSessionPauseBeforeSetSocketOption);
+MONGO_FAIL_POINT_DEFINE(transportLayerASIOBlockBeforeOpportunisticRead);
 
 namespace {
 
@@ -51,12 +52,12 @@ public:
 #ifdef _WIN32
     using TimeoutType = DWORD;
 
-    ASIOSocketTimeoutOption(Milliseconds timeoutVal) : _timeout(timeoutVal.count()) {}
+    explicit ASIOSocketTimeoutOption(Milliseconds timeoutVal) : _timeout(timeoutVal.count()) {}
 
 #else
     using TimeoutType = timeval;
 
-    ASIOSocketTimeoutOption(Milliseconds timeoutVal) {
+    explicit ASIOSocketTimeoutOption(Milliseconds timeoutVal) {
         _timeout.tv_sec = duration_cast<Seconds>(timeoutVal).count();
         const auto minusSeconds = timeoutVal - Seconds{_timeout.tv_sec};
         _timeout.tv_usec = duration_cast<Microseconds>(minusSeconds).count();
@@ -86,6 +87,10 @@ public:
 private:
     TimeoutType _timeout;
 };
+
+Status makeCanceledStatus() {
+    return {ErrorCodes::CallbackCanceled, "Operation was canceled"};
+}
 
 }  // namespace
 
@@ -190,14 +195,7 @@ Future<void> TransportLayerASIO::ASIOSession::asyncWaitForData() noexcept try {
 
 Status TransportLayerASIO::ASIOSession::sinkMessage(Message message) noexcept try {
     ensureSync();
-
-    return write(asio::buffer(message.buf(), message.size()))
-        .then([this, &message] {
-            if (_isIngressSession) {
-                networkCounter.hitPhysicalOut(message.size());
-            }
-        })
-        .getNoThrow();
+    return sinkMessageImpl(std::move(message)).getNoThrow();
 } catch (const DBException& ex) {
     return ex.toStatus();
 }
@@ -205,22 +203,34 @@ Status TransportLayerASIO::ASIOSession::sinkMessage(Message message) noexcept tr
 Future<void> TransportLayerASIO::ASIOSession::asyncSinkMessage(
     Message message, const BatonHandle& baton) noexcept try {
     ensureAsync();
+    return sinkMessageImpl(std::move(message), baton);
+} catch (const DBException& ex) {
+    return ex.toStatus();
+}
+
+Future<void> TransportLayerASIO::ASIOSession::sinkMessageImpl(Message message,
+                                                              const BatonHandle& baton) {
+    _asyncOpState.start();
     return write(asio::buffer(message.buf(), message.size()), baton)
         .then([this, message /*keep the buffer alive*/]() {
             if (_isIngressSession) {
                 networkCounter.hitPhysicalOut(message.size());
             }
+        })
+        .onCompletion([this](Status status) {
+            _asyncOpState.complete();
+            return status;
         });
-} catch (const DBException& ex) {
-    return ex.toStatus();
 }
 
 void TransportLayerASIO::ASIOSession::cancelAsyncOperations(const BatonHandle& baton) {
     LOGV2_DEBUG(4615608,
                 3,
-                "Cancelling outstanding I/O operations on connection to {remote}",
-                "Cancelling outstanding I/O operations on connection to remote",
+                "Canceling outstanding I/O operations on connection to {remote}",
+                "Canceling outstanding I/O operations on connection to remote",
                 "remote"_attr = _remote);
+    stdx::lock_guard lk(_asyncOpMutex);
+    _asyncOpState.cancel();
     if (baton && baton->networking() && baton->networking()->cancelSession(*this)) {
         // If we have a baton, it was for networking, and it owned our session, then we're done.
         return;
@@ -397,6 +407,12 @@ ExecutorFuture<void> TransportLayerASIO::ASIOSession::parseProxyProtocolHeader(
                 _proxiedDstEndpoint = {};
             }
 
+            // `opportunisticRead` expects to run as part of an asynchronous operation. We start the
+            // operation below and make sure to mark it as completed, regardless of the completion
+            // status of the future continuation returned by `opportunisticRead`.
+            _asyncOpState.start();
+            ScopeGuard guard([&] { _asyncOpState.complete(); });
+
             // Drain the read buffer.
             opportunisticRead(_socket, asio::buffer(buffer.get(), results->bytesParsed)).get();
         })
@@ -413,6 +429,7 @@ Future<Message> TransportLayerASIO::ASIOSession::sourceMessageImpl(const BatonHa
 
     auto headerBuffer = SharedBuffer::allocate(kHeaderSize);
     auto ptr = headerBuffer.get();
+    _asyncOpState.start();
     return read(asio::buffer(ptr, kHeaderSize), baton)
         .then([headerBuffer = std::move(headerBuffer), this, baton]() mutable {
             if (checkForHTTPRequest(asio::buffer(headerBuffer.get(), kHeaderSize))) {
@@ -454,13 +471,16 @@ Future<Message> TransportLayerASIO::ASIOSession::sourceMessageImpl(const BatonHa
                     }
                     return Message(std::move(buffer));
                 });
+        })
+        .onCompletion([this](StatusWith<Message> swMessage) {
+            _asyncOpState.complete();
+            return swMessage;
         });
 }
 
 template <typename MutableBufferSequence>
 Future<void> TransportLayerASIO::ASIOSession::read(const MutableBufferSequence& buffers,
                                                    const BatonHandle& baton) {
-    // TODO SERVER-64191 Guard active ops for cancellation here.
 #ifdef MONGO_CONFIG_SSL
     if (_sslSocket) {
         return opportunisticRead(*_sslSocket, buffers, baton);
@@ -487,7 +507,6 @@ Future<void> TransportLayerASIO::ASIOSession::read(const MutableBufferSequence& 
 template <typename ConstBufferSequence>
 Future<void> TransportLayerASIO::ASIOSession::write(const ConstBufferSequence& buffers,
                                                     const BatonHandle& baton) {
-    // TODO SERVER-64191 Guard active ops for cancellation here.
 #ifdef MONGO_CONFIG_SSL
     _ranHandshake = true;
     if (_sslSocket) {
@@ -514,6 +533,8 @@ Future<void> TransportLayerASIO::ASIOSession::opportunisticRead(
     Stream& stream, const MutableBufferSequence& buffers, const BatonHandle& baton) {
     std::error_code ec;
     size_t size;
+
+    transportLayerASIOBlockBeforeOpportunisticRead.pauseWhileSet();
 
     if (MONGO_unlikely(transportLayerASIOshortOpportunisticReadWrite.shouldFail()) &&
         _blockingMode == Async) {
@@ -546,6 +567,9 @@ Future<void> TransportLayerASIO::ASIOSession::opportunisticRead(
             asyncBuffers += size;
         }
 
+        stdx::lock_guard lk(_asyncOpMutex);
+        if (_asyncOpState.isCanceled())
+            return makeCanceledStatus();
         if (auto networkingBaton = baton ? baton->networking() : nullptr;
             networkingBaton && networkingBaton->canWait()) {
             return networkingBaton->addSession(*this, NetworkingBaton::Type::In)
@@ -618,6 +642,9 @@ Future<void> TransportLayerASIO::ASIOSession::opportunisticWrite(Stream& stream,
             return std::move(*more);
         }
 
+        stdx::lock_guard lk(_asyncOpMutex);
+        if (_asyncOpState.isCanceled())
+            return makeCanceledStatus();
         if (auto networkingBaton = baton ? baton->networking() : nullptr;
             networkingBaton && networkingBaton->canWait()) {
             return networkingBaton->addSession(*this, NetworkingBaton::Type::Out)
