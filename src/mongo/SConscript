@@ -160,6 +160,7 @@ baseEnv.Library(
         'bson/simple_bsonobj_comparator.cpp',
         'bson/timestamp.cpp',
         'bson/util/builder.cpp',
+        'db/concurrency/write_conflict_exception.cpp',
         'logv2/attributes.cpp',
         'logv2/bson_formatter.cpp',
         'logv2/console.cpp',

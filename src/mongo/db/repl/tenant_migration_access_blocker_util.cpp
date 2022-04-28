@@ -35,7 +35,7 @@
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 
 #include "mongo/db/catalog_raii.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_registry.h"

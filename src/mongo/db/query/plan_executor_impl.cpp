@@ -37,6 +37,7 @@
 
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/cached_plan.h"
@@ -427,8 +428,7 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* ob
 
             CurOp::get(_opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
             writeConflictsInARow++;
-            WriteConflictException::logAndBackoff(
-                writeConflictsInARow, "plan execution", _nss.ns());
+            logWriteConflictAndBackoff(writeConflictsInARow, "plan execution", _nss.ns());
 
             // If we're allowed to, we will yield next time through the loop.
             if (_yieldPolicy->canAutoYield()) {

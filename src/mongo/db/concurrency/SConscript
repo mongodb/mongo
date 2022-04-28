@@ -15,18 +15,17 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
+        '$BUILD_DIR/mongo/db/concurrency/exception_util',
         '$BUILD_DIR/mongo/db/db_raii',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
-        'write_conflict_exception',
     ],
 )
 
 env.Library(
-    target='write_conflict_exception',
+    target='exception_util',
     source=[
-        'temporarily_unavailable_exception.cpp',
-        'write_conflict_exception.cpp',
-        'write_conflict_exception.idl',
+        'exception_util.cpp',
+        'exception_util.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -111,7 +110,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/transport/transport_layer_common',
         '$BUILD_DIR/mongo/transport/transport_layer_mock',
         '$BUILD_DIR/mongo/util/progress_meter',
+        'exception_util',
         'lock_manager',
-        'write_conflict_exception',
     ]
 )

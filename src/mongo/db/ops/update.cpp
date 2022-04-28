@@ -38,7 +38,7 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/exec/update_stage.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/op_observer.h"

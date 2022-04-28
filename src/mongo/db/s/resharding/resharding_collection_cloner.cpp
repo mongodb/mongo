@@ -39,7 +39,6 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/logical_session_id_helpers.h"
