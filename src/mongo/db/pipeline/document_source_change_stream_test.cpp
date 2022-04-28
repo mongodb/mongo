@@ -1189,11 +1189,12 @@ TEST_F(ChangeStreamStageTest, TransformRename) {
     OplogEntry rename =
         createCommand(BSON("renameCollection" << nss.ns() << "to" << otherColl.ns()), testUuid());
 
+    const auto opDesc = Value(D{{"to", D{{"db", otherColl.db()}, {"coll", otherColl.coll()}}}});
     Document expectedRename{
         {DSChangeStream::kRenameTargetNssField,
          D{{"db", otherColl.db()}, {"coll", otherColl.coll()}}},
         {DSChangeStream::kIdField,
-         makeResumeToken(kDefaultTs, testUuid(), Value(), DSChangeStream::kRenameCollectionOpType)},
+         makeResumeToken(kDefaultTs, testUuid(), opDesc, DSChangeStream::kRenameCollectionOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kRenameCollectionOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kWallTimeField, Date_t()},
@@ -1203,7 +1204,7 @@ TEST_F(ChangeStreamStageTest, TransformRename) {
         {DSChangeStream::kIdField,
          makeResumeToken(kDefaultTs,
                          testUuid(),
-                         Value(),
+                         opDesc,
                          DSChangeStream::kRenameCollectionOpType,
                          ResumeTokenData::FromInvalidate::kFromInvalidate)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kInvalidateOpType},
@@ -1221,28 +1222,27 @@ TEST_F(ChangeStreamStageTest, TransformRenameShowExpandedEvents) {
                                                               << "dropTarget" << dropTarget),
                                       testUuid());
 
-    const auto opDescription = D{
-        {"to", D{{"db", otherColl.db()}, {"coll", otherColl.coll()}}},
-        {"dropTarget", dropTarget},
+    const auto opDesc = V{
+        D{{"to", D{{"db", otherColl.db()}, {"coll", otherColl.coll()}}},
+          {"dropTarget", dropTarget}},
     };
     Document expectedRename{
         {DSChangeStream::kRenameTargetNssField,
          D{{"db", otherColl.db()}, {"coll", otherColl.coll()}}},
         {DSChangeStream::kIdField,
-         makeResumeToken(
-             kDefaultTs, testUuid(), V{opDescription}, DSChangeStream::kRenameCollectionOpType)},
+         makeResumeToken(kDefaultTs, testUuid(), opDesc, DSChangeStream::kRenameCollectionOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kRenameCollectionOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kCollectionUuidField, testUuid()},
         {DSChangeStream::kWallTimeField, Date_t()},
         {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
-        {DSChangeStream::kOperationDescriptionField, opDescription},
+        {DSChangeStream::kOperationDescriptionField, opDesc},
     };
     Document expectedInvalidate{
         {DSChangeStream::kIdField,
          makeResumeToken(kDefaultTs,
                          testUuid(),
-                         V{opDescription},
+                         opDesc,
                          DSChangeStream::kRenameCollectionOpType,
                          ResumeTokenData::FromInvalidate::kFromInvalidate)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kInvalidateOpType},
@@ -1277,10 +1277,11 @@ TEST_F(ChangeStreamStageTest, TransformRenameTarget) {
     OplogEntry rename =
         createCommand(BSON("renameCollection" << otherColl.ns() << "to" << nss.ns()), testUuid());
 
+    const auto opDesc = Value(D{{"to", D{{"db", nss.db()}, {"coll", nss.coll()}}}});
     Document expectedRename{
         {DSChangeStream::kRenameTargetNssField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
         {DSChangeStream::kIdField,
-         makeResumeToken(kDefaultTs, testUuid(), Value(), DSChangeStream::kRenameCollectionOpType)},
+         makeResumeToken(kDefaultTs, testUuid(), opDesc, DSChangeStream::kRenameCollectionOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kRenameCollectionOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kWallTimeField, Date_t()},
@@ -1290,7 +1291,7 @@ TEST_F(ChangeStreamStageTest, TransformRenameTarget) {
         {DSChangeStream::kIdField,
          makeResumeToken(kDefaultTs,
                          testUuid(),
-                         Value(),
+                         opDesc,
                          DSChangeStream::kRenameCollectionOpType,
                          ResumeTokenData::FromInvalidate::kFromInvalidate)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kInvalidateOpType},
@@ -2378,11 +2379,12 @@ TEST_F(ChangeStreamStageTest, ClusterTimeMatchesOplogEntry) {
                       boost::none,
                       opTime);
 
+    const auto opDesc = Value(D{{"to", D{{"db", otherColl.db()}, {"coll", otherColl.coll()}}}});
     Document expectedRename{
         {DSChangeStream::kRenameTargetNssField,
          D{{"db", otherColl.db()}, {"coll", otherColl.coll()}}},
         {DSChangeStream::kIdField,
-         makeResumeToken(ts, testUuid(), Value(), DSChangeStream::kRenameCollectionOpType)},
+         makeResumeToken(ts, testUuid(), opDesc, DSChangeStream::kRenameCollectionOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kRenameCollectionOpType},
         {DSChangeStream::kClusterTimeField, ts},
         {DSChangeStream::kWallTimeField, Date_t()},
@@ -2760,10 +2762,11 @@ TEST_F(ChangeStreamStageTest, RenameFromSystemToUserCollectionShouldIncludeNotif
         createCommand(BSON("renameCollection" << systemColl.ns() << "to" << nss.ns()), testUuid());
 
     // Note that the collection rename does *not* have the queued invalidated field.
+    const auto opDesc = Value(D{{"to", D{{"db", nss.db()}, {"coll", nss.coll()}}}});
     Document expectedRename{
         {DSChangeStream::kRenameTargetNssField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
         {DSChangeStream::kIdField,
-         makeResumeToken(kDefaultTs, testUuid(), Value(), DSChangeStream::kRenameCollectionOpType)},
+         makeResumeToken(kDefaultTs, testUuid(), opDesc, DSChangeStream::kRenameCollectionOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kRenameCollectionOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kWallTimeField, Date_t()},
@@ -2779,11 +2782,12 @@ TEST_F(ChangeStreamStageTest, RenameFromUserToSystemCollectionShouldIncludeNotif
         createCommand(BSON("renameCollection" << nss.ns() << "to" << systemColl.ns()), testUuid());
 
     // Note that the collection rename does *not* have the queued invalidated field.
+    const auto opDesc = Value(D{{"to", D{{"db", systemColl.db()}, {"coll", systemColl.coll()}}}});
     Document expectedRename{
         {DSChangeStream::kRenameTargetNssField,
          D{{"db", systemColl.db()}, {"coll", systemColl.coll()}}},
         {DSChangeStream::kIdField,
-         makeResumeToken(kDefaultTs, testUuid(), Value(), DSChangeStream::kRenameCollectionOpType)},
+         makeResumeToken(kDefaultTs, testUuid(), opDesc, DSChangeStream::kRenameCollectionOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kRenameCollectionOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kWallTimeField, Date_t()},
@@ -3117,11 +3121,12 @@ TEST_F(ChangeStreamStageDBTest, TransformRename) {
     OplogEntry rename =
         createCommand(BSON("renameCollection" << nss.ns() << "to" << otherColl.ns()), testUuid());
 
+    const auto opDesc = Value(D{{"to", D{{"db", otherColl.db()}, {"coll", otherColl.coll()}}}});
     Document expectedRename{
         {DSChangeStream::kRenameTargetNssField,
          D{{"db", otherColl.db()}, {"coll", otherColl.coll()}}},
         {DSChangeStream::kIdField,
-         makeResumeToken(kDefaultTs, testUuid(), Value(), DSChangeStream::kRenameCollectionOpType)},
+         makeResumeToken(kDefaultTs, testUuid(), opDesc, DSChangeStream::kRenameCollectionOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kRenameCollectionOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kWallTimeField, Date_t()},
@@ -3505,11 +3510,12 @@ TEST_F(ChangeStreamStageDBTest, RenameFromSystemToUserCollectionShouldIncludeNot
         BSON("renameCollection" << systemColl.ns() << "to" << renamedColl.ns()), testUuid());
 
     // Note that the collection rename does *not* have the queued invalidated field.
+    const auto opDesc = Value(D{{"to", D{{"db", renamedColl.db()}, {"coll", renamedColl.coll()}}}});
     Document expectedRename{
         {DSChangeStream::kRenameTargetNssField,
          D{{"db", renamedColl.db()}, {"coll", renamedColl.coll()}}},
         {DSChangeStream::kIdField,
-         makeResumeToken(kDefaultTs, testUuid(), Value(), DSChangeStream::kRenameCollectionOpType)},
+         makeResumeToken(kDefaultTs, testUuid(), opDesc, DSChangeStream::kRenameCollectionOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kRenameCollectionOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kWallTimeField, Date_t()},
@@ -3525,11 +3531,12 @@ TEST_F(ChangeStreamStageDBTest, RenameFromUserToSystemCollectionShouldIncludeNot
         createCommand(BSON("renameCollection" << nss.ns() << "to" << systemColl.ns()), testUuid());
 
     // Note that the collection rename does *not* have the queued invalidated field.
+    const auto opDesc = Value(D{{"to", D{{"db", systemColl.db()}, {"coll", systemColl.coll()}}}});
     Document expectedRename{
         {DSChangeStream::kRenameTargetNssField,
          D{{"db", systemColl.db()}, {"coll", systemColl.coll()}}},
         {DSChangeStream::kIdField,
-         makeResumeToken(kDefaultTs, testUuid(), Value(), DSChangeStream::kRenameCollectionOpType)},
+         makeResumeToken(kDefaultTs, testUuid(), opDesc, DSChangeStream::kRenameCollectionOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kRenameCollectionOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kWallTimeField, Date_t()},

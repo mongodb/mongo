@@ -266,15 +266,12 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
                 // We keep the top-level 'to' field for backwards-compatibility.
                 doc.addField(DocumentSourceChangeStream::kRenameTargetNssField, renameTarget);
 
-                // If 'showExpandedEvents' is set, include full details of the rename in
-                // 'operationDescription'.
-                if (_changeStreamSpec.getShowExpandedEvents()) {
-                    MutableDocument opDescBuilder(
-                        copyDocExceptFields(oField, {"renameCollection"_sd, "stayTemp"_sd}));
-                    opDescBuilder.setField(DocumentSourceChangeStream::kRenameTargetNssField,
-                                           renameTarget);
-                    operationDescription = opDescBuilder.freezeToValue();
-                }
+                // Include full details of the rename in 'operationDescription'.
+                MutableDocument opDescBuilder(
+                    copyDocExceptFields(oField, {"renameCollection"_sd, "stayTemp"_sd}));
+                opDescBuilder.setField(DocumentSourceChangeStream::kRenameTargetNssField,
+                                       renameTarget);
+                operationDescription = opDescBuilder.freezeToValue();
             } else if (!oField.getField("dropDatabase").missing()) {
                 operationType = DocumentSourceChangeStream::kDropDatabaseOpType;
 
