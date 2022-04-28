@@ -41,6 +41,7 @@
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_consistency.h"
 #include "mongo/db/client.h"
+#include "mongo/db/commands/server_status.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/index/index_build_interceptor.h"
@@ -54,6 +55,7 @@
 #include "mongo/db/storage/execution_context.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/logv2/log.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/progress_meter.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/stacktrace.h"
@@ -70,6 +72,36 @@ MONGO_FAIL_POINT_DEFINE(hangDuringIndexBuildBulkLoadYield);
 MONGO_FAIL_POINT_DEFINE(hangDuringIndexBuildBulkLoadYieldSecond);
 
 namespace {
+
+/**
+ * Metrics for index bulk builder operations. Intended to support index build diagnostics
+ * during the following scenarios:
+ * - createIndex commands;
+ * - collection cloning during initial sync; and
+ * - resuming index builds at startup.
+ *
+ * Also includes statistics for disk usage (by the external sorter) for index builds that
+ * do not fit in memory.
+ */
+class IndexBulkBuilderSSS : public ServerStatusSection {
+public:
+    IndexBulkBuilderSSS() : ServerStatusSection("indexBulkBuilder") {}
+
+    bool includeByDefault() const final {
+        return true;
+    }
+
+    void addRequiredPrivileges(std::vector<Privilege>* out) final {}
+
+    BSONObj generateSection(OperationContext* opCtx, const BSONElement& configElement) const final {
+        BSONObjBuilder builder;
+        builder.append("count", count.loadRelaxed());
+        return builder.obj();
+    }
+
+    // Number of instances of the bulk builder created.
+    AtomicWord<long long> count;
+} indexBulkBuilderSSS;
 
 /**
  * Returns true if at least one prefix of any of the indexed fields causes the index to be
@@ -641,7 +673,9 @@ std::unique_ptr<IndexAccessMethod::BulkBuilder> SortedDataIndexAccessMethod::ini
 SortedDataIndexAccessMethod::BulkBuilderImpl::BulkBuilderImpl(SortedDataIndexAccessMethod* iam,
                                                               size_t maxMemoryUsageBytes,
                                                               StringData dbName)
-    : _iam(iam), _sorter(_makeSorter(maxMemoryUsageBytes, dbName)) {}
+    : _iam(iam), _sorter(_makeSorter(maxMemoryUsageBytes, dbName)) {
+    indexBulkBuilderSSS.count.addAndFetch(1);
+}
 
 SortedDataIndexAccessMethod::BulkBuilderImpl::BulkBuilderImpl(SortedDataIndexAccessMethod* iam,
                                                               size_t maxMemoryUsageBytes,
@@ -652,7 +686,9 @@ SortedDataIndexAccessMethod::BulkBuilderImpl::BulkBuilderImpl(SortedDataIndexAcc
           _makeSorter(maxMemoryUsageBytes, dbName, stateInfo.getFileName(), stateInfo.getRanges())),
       _keysInserted(stateInfo.getNumKeys().value_or(0)),
       _isMultiKey(stateInfo.getIsMultikey()),
-      _indexMultikeyPaths(createMultikeyPaths(stateInfo.getMultikeyPaths())) {}
+      _indexMultikeyPaths(createMultikeyPaths(stateInfo.getMultikeyPaths())) {
+    indexBulkBuilderSSS.count.addAndFetch(1);
+}
 
 Status SortedDataIndexAccessMethod::BulkBuilderImpl::insert(
     OperationContext* opCtx,
