@@ -130,6 +130,12 @@ selector:
   # for dbCheck. TODO (SERVER-63951): Remove this exclusion.
   - jstests/concurrency/fsm_workloads/create_collection_and_view.js
 
+  # This suite runs the RunDBCheckInBackground hook and the dbCheck command generates oplog entries
+  # but those oplog entries are not supported by resharding.
+  # TODO (SERVER-66011): Enable internal_transactions_resharding.js in the
+  # concurrency_sharded_multi_stmt_txn_with_balancer suite
+  - jstests/concurrency/fsm_workloads/internal_transactions_resharding.js
+
 
   exclude_with_any_tags:
   - assumes_balancer_off

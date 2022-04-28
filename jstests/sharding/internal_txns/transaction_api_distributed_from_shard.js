@@ -70,17 +70,11 @@ function runTestFailure() {
     // Insert initial data.
     assert.commandWorked(st.s.getCollection(kNs).insert([{_id: 1}]));
 
-    const res = assert.commandWorked(shard0Primary.adminCommand(
-        {testInternalTransactions: 1, commandInfos: commands, useClusterClient: true}));
-    // The clusterCount is rejected without being run, so expect one fewer response.
-    assert.eq(res.responses.length, commands.length - 1, tojson(res));
-
-    assert.commandWorked(res.responses[0], tojson(res));
-    assert.eq(res.responses[0], {n: 2, ok: 1}, tojson(res));
-
-    assert.commandWorked(res.responses[1], tojson(res));
-    assert.sameMembers(
-        res.responses[1].cursor.firstBatch, [{_id: 1}, {_id: 2}, {_id: 3}], tojson(res));
+    const res = assert.commandFailedWithCode(
+        shard0Primary.adminCommand(
+            {testInternalTransactions: 1, commandInfos: commands, useClusterClient: true}),
+        6349501);
+    assert(!res.hasOwnProperty("responses"));
 
     // Verify the API didn't insert any documents.
     assert.sameMembers(st.s.getCollection(kNs).find().toArray(), [{_id: 1}]);

@@ -74,9 +74,7 @@ public:
                                     Base::request().kCommandName,
                                     Base::request().getUseClusterClient());
 
-            // Swallow errors and let clients inspect the responses array to determine success /
-            // failure.
-            (void)txn.runNoThrow(
+            txn.run(
                 opCtx,
                 [sharedBlock](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
                     sharedBlock->responses.clear();
@@ -123,6 +121,7 @@ public:
                     }
                     return SemiFuture<void>::makeReady();
                 });
+
             return TestInternalTransactionsCommandReply(std::move(sharedBlock->responses));
         };
 
