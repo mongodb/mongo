@@ -271,10 +271,12 @@ void QueryPlannerTest::runQuery(BSONObj query) {
 }
 
 void QueryPlannerTest::runQueryWithPipeline(
-    BSONObj query, std::vector<std::unique_ptr<InnerPipelineStageInterface>> queryLayerPipeline) {
+    BSONObj query,
+    BSONObj proj,
+    std::vector<std::unique_ptr<InnerPipelineStageInterface>> queryLayerPipeline) {
     runQueryFull(query,
                  BSONObj(),
-                 BSONObj(),
+                 proj,
                  0,
                  0,
                  BSONObj(),

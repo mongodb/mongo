@@ -293,6 +293,8 @@ private:
 
     boost::optional<SortPattern> _sortPattern;
 
+    // A query can include a post-processing pipeline here. Logically it is applied after all the
+    // other operations (filter, sort, project, skip, limit).
     std::vector<std::unique_ptr<InnerPipelineStageInterface>> _pipeline;
 
     // Keeps track of what metadata has been explicitly requested.

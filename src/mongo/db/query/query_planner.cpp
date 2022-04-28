@@ -208,11 +208,6 @@ void tryToAddColumnScan(const QueryPlannerParams& params,
         // We only support column scans in SBE.
         return;
     }
-    if (!query.pipeline().empty()) {
-        LOGV2_DEBUG(
-            6430502, 3, "Not yet prepared to handle and test CQ pipeline with a columnstore index");
-        return;
-    }
 
     // TODO SERVER-63123: Check if the columnar index actually provides the fields we need.
     auto [filterSplitByColumn, residualPredicate] =
@@ -237,6 +232,7 @@ void tryToAddColumnScan(const QueryPlannerParams& params,
                     "canPushFilters"_attr = canPushFilters);
         return;
     }
+
     // We have few enough dependencies that we suspect a column scan is still better than a
     // collection scan. Add that solution.
     out.push_back(QueryPlannerAnalysis::analyzeDataAccess(query, params, std::move(columnScan)));

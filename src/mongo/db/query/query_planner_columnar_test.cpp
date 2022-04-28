@@ -29,9 +29,15 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/inner_pipeline_stage_impl.h"
+#include "mongo/db/pipeline/inner_pipeline_stage_interface.h"
+#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_test_fixture.h"
+#include "mongo/db/query/query_planner_test_lib.h"
 #include "mongo/unittest/death_test.h"
 
 namespace mongo {
@@ -63,6 +69,15 @@ protected:
 
     void addColumnarIndex() {
         params.columnarIndexes.emplace_back(kIndexName);
+    }
+
+    std::vector<std::unique_ptr<InnerPipelineStageInterface>> makeInnerPipelineStages(
+        const Pipeline& pipeline) {
+        std::vector<std::unique_ptr<InnerPipelineStageInterface>> stages;
+        for (auto&& source : pipeline.getSources()) {
+            stages.emplace_back(std::make_unique<InnerPipelineStageImpl>(source));
+        }
+        return stages;
     }
 };
 
@@ -440,5 +455,95 @@ TEST_F(QueryPlannerColumnarTest, EmptyQueryPredicateIsEligible) {
             node: {column_ixscan: {filtersByPath: {}, outputFields: ['a'], matchFields: []}}
         }
     })");
+}
+
+TEST_F(QueryPlannerColumnarTest, GroupTest) {
+    addColumnarIndex();
+
+    auto pipeline = Pipeline::parse({fromjson("{$group: {_id: '$foo', s: {$sum: '$x'}}}")}, expCtx);
+
+    runQueryWithPipeline(
+        BSONObj(), BSON("foo" << 1 << "x" << 1 << "_id" << 0), makeInnerPipelineStages(*pipeline));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(R"(
+        {proj: {spec: {foo: 1, x: 1, _id: 0}, node:
+        {column_ixscan: {filtersByPath: {}, outputFields: ['foo', 'x'], matchFields: []}}}})");
+
+    ASSERT(!cq->pipeline().empty());
+    auto solution =
+        QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]), {} /* secondaryCollInfos */);
+    // TODO SERVER-66061: The project stage should be removed.
+    ASSERT_OK(QueryPlannerTestLib::solutionMatches(
+        "{group: {key: {_id: '$foo'}, accs: [{s: {$sum: '$x'}}], node: "
+        "{proj: {spec: {foo:1, x:1, _id: 0}, node: "
+        "{column_ixscan: {filtersByPath: {}, outputFields: ['foo', 'x'], matchFields: []}}"
+        "}}}}",
+        solution->root()))
+        << solution->root()->toString();
+}
+
+TEST_F(QueryPlannerColumnarTest, MatchGroupTest) {
+    addColumnarIndex();
+
+    auto pipeline = Pipeline::parse({fromjson("{$group: {_id: '$foo', s: {$sum: '$x'}}}")}, expCtx);
+
+    runQueryWithPipeline(BSON("name"
+                              << "bob"),
+                         BSON("foo" << 1 << "x" << 1 << "_id" << 0),
+                         makeInnerPipelineStages(*pipeline));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(R"(
+        {proj: {spec: {foo: 1, x: 1, _id: 0}, node:
+        {column_ixscan: {filtersByPath: {name: {name: {$eq: 'bob'}}},
+                         outputFields: ['foo', 'x'],
+                         matchFields: ['name']}}}})");
+
+    ASSERT(!cq->pipeline().empty());
+    auto solution =
+        QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]), {} /* secondaryCollInfos */);
+    // TODO SERVER-66061: The project stage should be removed.
+    ASSERT_OK(QueryPlannerTestLib::solutionMatches(
+        "{group: {key: {_id: '$foo'}, accs: [{s: {$sum: '$x'}}], node: "
+        "{proj: {spec: {foo:1, x:1, _id: 0}, node: "
+        "{column_ixscan: {filtersByPath: {name: {name: {$eq: 'bob'}}}, outputFields: ['foo', 'x'], "
+        "matchFields: ['name']}}"
+        "}}}}",
+        solution->root()))
+        << solution->root()->toString();
+}
+
+TEST_F(QueryPlannerColumnarTest, MatchGroupWithOverlappingFieldsTest) {
+    addColumnarIndex();
+
+    auto pipeline = Pipeline::parse(
+        {fromjson("{$group: {_id: '$foo', s: {$sum: '$x'}, name: {$first: '$name'}}}")}, expCtx);
+
+    runQueryWithPipeline(BSON("name"
+                              << "bob"),
+                         BSON("foo" << 1 << "x" << 1 << "name" << 1 << "_id" << 0),
+                         makeInnerPipelineStages(*pipeline));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(R"(
+    {proj: {spec: {foo: 1, x: 1, name:1, _id: 0}, node:
+    {column_ixscan: {filtersByPath: {name: {name: {$eq: 'bob'}}},
+                     outputFields: ['foo', 'x', 'name'],
+                     matchFields: ['name']}}}})");
+
+    ASSERT(!cq->pipeline().empty());
+    auto solution =
+        QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]), {} /* secondaryCollInfos */);
+    // TODO SERVER-66061: The project stage should be removed.
+    ASSERT_OK(QueryPlannerTestLib::solutionMatches(
+        "{group: {key: {_id: '$foo'}, accs: [{s: {$sum: '$x'}}, {name: {$first: '$name'}}], node: "
+        "{proj: {spec: {foo:1, x:1, name:1, _id: 0}, node: "
+        "{column_ixscan: {filtersByPath: {name: {name: {$eq: 'bob'}}}, outputFields: ['foo', 'x', "
+        "'name'], "
+        "matchFields: ['name']}}"
+        "}}}}",
+        solution->root()))
+        << solution->root()->toString();
 }
 }  // namespace mongo

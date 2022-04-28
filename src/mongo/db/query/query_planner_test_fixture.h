@@ -91,7 +91,13 @@ protected:
 
     void runQueryWithPipeline(
         BSONObj query,
+        BSONObj proj,
         std::vector<std::unique_ptr<InnerPipelineStageInterface>> queryLayerPipeline);
+    void runQueryWithPipeline(
+        BSONObj query,
+        std::vector<std::unique_ptr<InnerPipelineStageInterface>> queryLayerPipeline) {
+        runQueryWithPipeline(query, BSONObj(), std::move(queryLayerPipeline));
+    }
 
     void runQuerySortProj(const BSONObj& query, const BSONObj& sort, const BSONObj& proj);
 
