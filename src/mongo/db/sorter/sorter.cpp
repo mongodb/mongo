@@ -621,8 +621,8 @@ protected:
                    "maxNumSpills"_attr = numTargetedSpills);
 
         while (iterators.size() > numTargetedSpills) {
-            std::shared_ptr<File> newSpillsFile =
-                std::make_shared<File>(this->_opts.tempDir + "/" + nextFileName());
+            std::shared_ptr<File> newSpillsFile = std::make_shared<File>(
+                this->_opts.tempDir + "/" + nextFileName(), this->_opts.sorterFileStats);
 
             LOGV2_DEBUG(6033103,
                         1,
@@ -1114,14 +1114,15 @@ private:
 template <typename Key, typename Value>
 Sorter<Key, Value>::Sorter(const SortOptions& opts)
     : _opts(opts),
-      _file(opts.extSortAllowed
-                ? std::make_shared<Sorter<Key, Value>::File>(opts.tempDir + "/" + nextFileName())
-                : nullptr) {}
+      _file(opts.extSortAllowed ? std::make_shared<Sorter<Key, Value>::File>(
+                                      opts.tempDir + "/" + nextFileName(), opts.sorterFileStats)
+                                : nullptr) {}
 
 template <typename Key, typename Value>
 Sorter<Key, Value>::Sorter(const SortOptions& opts, const std::string& fileName)
     : _opts(opts),
-      _file(std::make_shared<Sorter<Key, Value>::File>(opts.tempDir + "/" + fileName)) {
+      _file(std::make_shared<Sorter<Key, Value>::File>(opts.tempDir + "/" + fileName,
+                                                       opts.sorterFileStats)) {
     invariant(opts.extSortAllowed);
     invariant(!opts.tempDir.empty());
     invariant(!fileName.empty());
@@ -1143,6 +1144,10 @@ typename Sorter<Key, Value>::PersistedState Sorter<Key, Value>::persistDataForSh
 
 template <typename Key, typename Value>
 Sorter<Key, Value>::File::~File() {
+    if (_stats && _file.is_open()) {
+        _stats->closed.addAndFetch(1);
+    }
+
     if (_keep) {
         return;
     }
@@ -1235,6 +1240,10 @@ void Sorter<Key, Value>::File::_open() {
             str::stream() << "Error opening file " << _path.string() << ": "
                           << sorter::myErrnoWithDescription(),
             _file.good());
+
+    if (_stats) {
+        _stats->opened.addAndFetch(1);
+    }
 }
 
 template <typename Key, typename Value>
@@ -1356,7 +1365,7 @@ BoundedSorter<Key, Value, Comparator, BoundMaker>::BoundedSorter(const SortOptio
       _opts(opts),
       _heap(Greater{&compare}),
       _file(opts.extSortAllowed ? std::make_shared<typename Sorter<Key, Value>::File>(
-                                      opts.tempDir + "/" + nextFileName())
+                                      opts.tempDir + "/" + nextFileName(), opts.sorterFileStats)
                                 : nullptr) {}
 
 template <typename Key, typename Value, typename Comparator, typename BoundMaker>

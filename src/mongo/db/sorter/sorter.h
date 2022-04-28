@@ -43,6 +43,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/sorter/sorter_gen.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
 
@@ -95,6 +96,14 @@
 namespace mongo {
 
 /**
+ * For collecting file usage metrics.
+ */
+struct SorterFileStats {
+    AtomicWord<long long> opened;
+    AtomicWord<long long> closed;
+};
+
+/**
  * Runtime options that control the Sorter's behavior
  */
 struct SortOptions {
@@ -118,6 +127,9 @@ struct SortOptions {
     // extSortAllowed is true.
     std::string tempDir;
 
+    // If set, allows us to observe Sorter file handle usage.
+    SorterFileStats* sorterFileStats;
+
     // If set to true and sorted data fits into memory, sorted data will be moved into iterator
     // instead of copying.
     bool moveSortedDataIntoIterator;
@@ -126,6 +138,7 @@ struct SortOptions {
         : limit(0),
           maxMemoryUsageBytes(64 * 1024 * 1024),
           extSortAllowed(false),
+          sorterFileStats(nullptr),
           moveSortedDataIntoIterator(false) {}
 
     // Fluent API to support expressions like SortOptions().Limit(1000).ExtSortAllowed(true)
@@ -152,6 +165,11 @@ struct SortOptions {
 
     SortOptions& DBName(std::string newDbName) {
         dbName = std::move(newDbName);
+        return *this;
+    }
+
+    SortOptions& FileStats(SorterFileStats* newSorterFileStats) {
+        sorterFileStats = newSorterFileStats;
         return *this;
     }
 
@@ -261,7 +279,8 @@ public:
      */
     class File {
     public:
-        File(std::string path) : _path(std::move(path)) {
+        File(std::string path, SorterFileStats* stats = nullptr)
+            : _path(std::move(path)), _stats(stats) {
             invariant(!_path.empty());
         }
 
@@ -311,6 +330,9 @@ public:
 
         // Whether to keep the on-disk file even after this in-memory object has been destructed.
         bool _keep = false;
+
+        // If set, this points to an external metrics holder for tracking file open/close activity.
+        SorterFileStats* _stats;
     };
 
     explicit Sorter(const SortOptions& opts);
