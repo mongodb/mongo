@@ -106,13 +106,17 @@ assert(db3.auth('spencer', 'pwd'));
     assert.eq(2, db1.foo.findOne().a);
 
     // s1/db2 should update its cache in 10 seconds.
-    assert.soon(function() {
-        var res = db2.foo.update({}, {$inc: {a: 1}});
-        if (res instanceof WriteCommandError) {
-            return false;
-        }
-        return db2.foo.findOne().a == 3;
-    }, "Mongos did not update its user cache after 10 seconds", 10 * 1000);
+    sleep(10000);
+    assert.soon(
+        function() {
+            var res = db2.foo.update({}, {$inc: {a: 1}});
+            if (res instanceof WriteCommandError) {
+                return false;
+            }
+            return db2.foo.findOne().a == 3;
+        },
+        "Mongos did not update its user cache after 10 seconds",
+        5 * 1000 /* Additional 5 seconds of buffer in case of slow update */);
 
     // We manually invalidate the cache on s2/db3.
     db3.adminCommand("invalidateUserCache");
@@ -131,10 +135,14 @@ assert(db3.auth('spencer', 'pwd'));
 
     jsTest.log("Beginning wait for s1/db2 cache update.");
     // s1/db2 should update its cache in 10 seconds.
-    assert.soon(function() {
-        var res = db2.foo.update({}, {$inc: {a: 1}});
-        return res instanceof WriteCommandError && res.code == authzErrorCode;
-    }, "Mongos did not update its user cache after 10 seconds", 10 * 1000);
+    sleep(10000);
+    assert.soon(
+        function() {
+            var res = db2.foo.update({}, {$inc: {a: 1}});
+            return res instanceof WriteCommandError && res.code == authzErrorCode;
+        },
+        "Mongos did not update its user cache after 10 seconds",
+        5 * 1000 /* Additional 5 seconds of buffer in case of slow update */);
 
     // We manually invalidate the cache on s1/db3.
     db3.adminCommand("invalidateUserCache");
@@ -154,9 +162,13 @@ assert(db3.auth('spencer', 'pwd'));
     assert.commandWorked(db1.foo.update({}, {$inc: {a: 1}}));
 
     // s1/db2 should update its cache in 10 seconds.
-    assert.soon(function() {
-        return !(db2.foo.update({}, {$inc: {a: 1}}) instanceof WriteCommandError);
-    }, "Mongos did not update its user cache after 10 seconds", 10 * 1000);
+    sleep(10000);
+    assert.soon(
+        function() {
+            return !(db2.foo.update({}, {$inc: {a: 1}}) instanceof WriteCommandError);
+        },
+        "Mongos did not update its user cache after 10 seconds",
+        5 * 1000 /* Additional 5 seconds of buffer in case of slow update */);
 
     // We manually invalidate the cache on s1/db3.
     db3.adminCommand("invalidateUserCache");
@@ -202,9 +214,13 @@ assert(db3.auth('spencer', 'pwd'));
     assert.commandFailedWithCode(db1.foo.runCommand("collStats"), authzErrorCode);
 
     // s1/db2 should update its cache in 10 seconds.
-    assert.soon(function() {
-        return db2.foo.runCommand("collStats").code == authzErrorCode;
-    }, "Mongos did not update its user cache after 10 seconds", 10 * 1000);
+    sleep(10000);
+    assert.soon(
+        function() {
+            return db2.foo.runCommand("collStats").code == authzErrorCode;
+        },
+        "Mongos did not update its user cache after 10 seconds",
+        5 * 1000 /* Additional 5 seconds of buffer in case of slow update */);
 
     // We manually invalidate the cache on s2/db3.
     db3.adminCommand("invalidateUserCache");
