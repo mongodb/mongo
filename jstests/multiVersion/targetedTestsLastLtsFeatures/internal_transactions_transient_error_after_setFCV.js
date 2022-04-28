@@ -1,8 +1,6 @@
 /*
  * Tests that we send the proper error back to the client to retry the transaction if there's a
  * failover and FCV change that causes the server to lose previous transaction metadata.
- *
- * @tags: [requires_fcv_60]
  */
 
 (function() {

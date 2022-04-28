@@ -1,7 +1,5 @@
 /*
  * Test that internal sessions are only supported in FCV latest.
- *
- * @tags: [requires_fcv_60]
  */
 (function() {
 'use strict';

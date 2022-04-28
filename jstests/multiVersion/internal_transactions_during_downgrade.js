@@ -2,7 +2,7 @@
  * Tests the setFCV command kills internal sessions with unprepared transactions that start
  * immediately before the FCV change and abort those transactions.
  *
- * @tags: [requires_fcv_60, uses_transactions]
+ * @tags: [uses_transactions]
  */
 (function() {
 'use strict';
