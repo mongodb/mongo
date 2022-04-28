@@ -288,17 +288,10 @@ StatusWith<DurableCatalog::Entry> DurableCatalogImpl::_addEntry(OperationContext
         md.ns = nss.ns();
         md.options = options;
 
-        // (Generic FCV reference): TODO SERVER-60912: When kLastLTS is 6.0, remove this FCV-gated
-        // upgrade code.
-        if (options.timeseries &&
-            (serverGlobalParams.featureCompatibility.getVersion() ==
-                 multiversion::GenericFCV::kUpgradingFromLastLTSToLatest ||
-             serverGlobalParams.featureCompatibility.getVersion() ==
-                 multiversion::GenericFCV::kLatest)) {
-            // When upgrading FCV from kLastLTS to kLatest, all newly created catalog entries for
-            // time-series collections will have this flag set to false by default as mixed-schema
-            // data is only possible in versions 5.1 and earlier. We do not have to wait for FCV to
-            // be fully upgraded to start this process.
+        if (options.timeseries) {
+            // All newly created catalog entries for time-series collections will have this flag set
+            // to false by default as mixed-schema data is only possible in versions 5.1 and
+            // earlier.
             md.timeseriesBucketsMayHaveMixedSchemaData = false;
         }
         b.append("md", md.toBSON());
