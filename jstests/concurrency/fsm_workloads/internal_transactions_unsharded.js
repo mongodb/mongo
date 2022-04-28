@@ -10,7 +10,6 @@
  *
  * @tags: [
  *  requires_fcv_60,
- *  requires_persistence,
  *  uses_transactions,
  *  assumes_unsharded_collection
  * ]
@@ -200,11 +199,24 @@ var $config = extendWorkload($config, function($config, $super) {
     };
 
     /**
+     * Returns true if 'res' contains an acceptable retry error for a retryable write command.
+     */
+    $config.data.isAcceptableRetryError = function isAcceptableRetryError(res) {
+        // This workload does not involve data placement changes so retries should always succeed.
+        // Workloads that extend this workload should override this method accordingly.
+        return false;
+    };
+
+    /**
      * Runs the given the write command 'writeCmdObj' inside an internal transaction using the given
      * client 'executionCtxType'.
      */
     $config.data.runInternalTransaction = function runInternalTransaction(
         db, collection, executionCtxType, writeCmdObj, checkResponseFunc, checkDocsFunc) {
+        // The testInternalTransactions command below runs with the session setting defined by
+        // 'executionCtxType'.
+        fsm.forceRunningOutsideTransaction(this);
+
         if (executionCtxType == executionContextTypes.kClientRetryableWrite) {
             writeCmdObj.stmtId = NumberInt(1);
         }
@@ -228,9 +240,23 @@ var $config = extendWorkload($config, function($config, $super) {
             tojsononeline(testInternalTxnCmdObj)}: ${tojsononeline({executionCtxType})}`);
 
         let runFunc = () => {
-            const res = assert.commandWorked(db.adminCommand(testInternalTxnCmdObj));
-            print(`Response: ${tojsononeline(res)}`);
-            res.responses.forEach(response => assert.commandWorked(response));
+            let res;
+            try {
+                res = db.adminCommand(testInternalTxnCmdObj);
+                print(`Response: ${tojsononeline(res)}`);
+                assert.commandWorked(res);
+            } catch (e) {
+                if ((executionCtxType == executionContextTypes.kClientRetryableWrite) &&
+                    this.isAcceptableRetryError(res)) {
+                    print("Ignoring retry error for retryable write: " + tojsononeline(res));
+                    return;
+                }
+                throw e;
+            }
+
+            res.responses.forEach(innerRes => {
+                assert.commandWorked(innerRes);
+            });
             if (executionCtxType == executionContextTypes.kClientRetryableWrite) {
                 // If the command was retried, 'responses' would only contain the response for
                 // 'writeCmdObj'.
@@ -238,7 +264,6 @@ var $config = extendWorkload($config, function($config, $super) {
             } else {
                 assert.eq(res.responses.length, 2);
             }
-
             const writeCmdRes = res.responses[0];
             checkResponseFunc(writeCmdRes);
             if (res.responses.length == 2) {
