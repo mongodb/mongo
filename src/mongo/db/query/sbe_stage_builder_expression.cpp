@@ -401,6 +401,7 @@ public:
     void visit(const ExpressionSortArray* expr) final {}
     void visit(const ExpressionSlice* expr) final {}
     void visit(const ExpressionIsArray* expr) final {}
+    void visit(const ExpressionInternalFindAllValuesAtPath* expr) final {}
     void visit(const ExpressionRound* expr) final {}
     void visit(const ExpressionSplit* expr) final {}
     void visit(const ExpressionSqrt* expr) final {}
@@ -632,6 +633,7 @@ public:
     void visit(const ExpressionSortArray* expr) final {}
     void visit(const ExpressionSlice* expr) final {}
     void visit(const ExpressionIsArray* expr) final {}
+    void visit(const ExpressionInternalFindAllValuesAtPath* expr) final {}
     void visit(const ExpressionRound* expr) final {}
     void visit(const ExpressionSplit* expr) final {}
     void visit(const ExpressionSqrt* expr) final {}
@@ -2717,6 +2719,9 @@ public:
 
         _context->pushExpr(
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(exprIsArr)));
+    }
+    void visit(const ExpressionInternalFindAllValuesAtPath* expr) final {
+        unsupportedExpression(expr->getOpName());
     }
     void visit(const ExpressionRound* expr) final {
         unsupportedExpression(expr->getOpName());

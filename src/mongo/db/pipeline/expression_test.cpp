@@ -1375,6 +1375,70 @@ TEST(ExpressionIndexOfArray,
         optimizedIndexInRangeWithDuplcateValues->evaluate(Document{{"x", 2}}, &expCtx.variables));
 }
 
+TEST(ExpressionInternalFindAllValuesAtPath, PreservesSimpleArray) {
+    auto expCtx = ExpressionContextForTest{};
+    VariablesParseState vps = expCtx.variablesParseState;
+    const BSONObj obj = BSON("$_internalFindAllValuesAtPath" << Value("a"_sd));
+    auto expression = Expression::parseExpression(&expCtx, obj, vps);
+    auto result =
+        expression->evaluate(Document{{"a", Value({Value(1), Value(2)})}}, &expCtx.variables);
+    ASSERT_VALUE_EQ(Value(BSON_ARRAY(1 << 2)), result);
+}
+
+TEST(ExpressionInternalFindAllValuesAtPath, PreservesSimpleNestedArray) {
+    auto expCtx = ExpressionContextForTest{};
+    VariablesParseState vps = expCtx.variablesParseState;
+    const BSONObj obj = BSON("$_internalFindAllValuesAtPath" << Value("a.b"_sd));
+    auto expression = Expression::parseExpression(&expCtx, obj, vps);
+    auto doc = Document{{"a", Value(Document{{"b", Value({Value(1), Value(2)})}})}};
+    auto result = expression->evaluate(doc, &expCtx.variables);
+    ASSERT_VALUE_EQ(Value(BSON_ARRAY(1 << 2)), result);
+}
+
+TEST(ExpressionInternalFindAllValuesAtPath, DescendsThroughSingleArrayAndObject) {
+    auto expCtx = ExpressionContextForTest{};
+    VariablesParseState vps = expCtx.variablesParseState;
+    const BSONObj obj = BSON("$_internalFindAllValuesAtPath" << Value("a.b"_sd));
+    auto expression = Expression::parseExpression(&expCtx, obj, vps);
+    Document doc = Document{
+        {"a",
+         Value({Document{{"b", Value(1)}}, Document{{"b", Value(2)}}, Document{{"b", Value(3)}}})}};
+    auto result = expression->evaluate(doc, &expCtx.variables);
+    ASSERT_VALUE_EQ(Value(BSON_ARRAY(1 << 2 << 3)), result);
+}
+
+TEST(ExpressionInternalFindAllValuesAtPath, DescendsThroughMultipleObjectArrayPairs) {
+    auto expCtx = ExpressionContextForTest{};
+    VariablesParseState vps = expCtx.variablesParseState;
+    const BSONObj obj = BSON("$_internalFindAllValuesAtPath" << Value("a.b"_sd));
+    auto expression = Expression::parseExpression(&expCtx, obj, vps);
+    Document doc = Document{{"a",
+                             Value({Document{{"b", Value({Value(1), Value(2)})}},
+                                    Document{{"b", Value({Value(3), Value(4)})}},
+                                    Document{{"b", Value({Value(5), Value(6)})}}})}};
+    auto result = expression->evaluate(doc, &expCtx.variables);
+    ASSERT_VALUE_EQ(Value(BSON_ARRAY(1 << 2 << 3 << 4 << 5 << 6)), result);
+}
+
+TEST(ExpressionInternalFindAllValuesAtPath, DoesNotDescendThroughDoubleArray) {
+    auto expCtx = ExpressionContextForTest{};
+    VariablesParseState vps = expCtx.variablesParseState;
+    const BSONObj obj = BSON("$_internalFindAllValuesAtPath" << Value("a.b"_sd));
+    auto expression = Expression::parseExpression(&expCtx, obj, vps);
+    Document seenDoc1 = Document{{"b", Value({Value(5), Value(6)})}};
+    Document seenDoc2 = Document{{"b", Value({Value(3), Value(4)})}};
+    Document unseenDoc1 = Document{{"b", Value({Value(1), Value(2)})}};
+    Document unseenDoc2 = Document{{"b", Value({Value(7), Value(8)})}};
+
+    Document doc = Document{{"a",
+                             Value({
+                                 Value({unseenDoc1, unseenDoc2}),
+                                 Value(seenDoc1),
+                                 Value(seenDoc2),
+                             })}};
+    auto result = expression->evaluate(doc, &expCtx.variables);
+    ASSERT_VALUE_EQ(Value(BSON_ARRAY(3 << 4 << 5 << 6)), result);
+}
 namespace Parse {
 
 namespace Object {

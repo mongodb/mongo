@@ -413,6 +413,10 @@ public:
         unsupportedExpression(expr->getOpName());
     }
 
+    void visit(const ExpressionInternalFindAllValuesAtPath* expr) override final {
+        unsupportedExpression(expr->getOpName());
+    }
+
     void visit(const ExpressionRound* expr) override final {
         unsupportedExpression(expr->getOpName());
     }

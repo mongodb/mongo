@@ -2956,6 +2956,64 @@ public:
     }
 };
 
+/**
+ * Expression used for distinct only. This expression unwinds all singly nested arrays along the
+ * specified path, but does not descend into doubly nested arrays. The resulting array of values
+ * is placed into a specially named field that is consumed by distinct.
+ *
+ * Aggregation's distinct behavior must match Find's, so numeric path components can be treated
+ * as both array indexes and field names.
+ */
+class ExpressionInternalFindAllValuesAtPath final
+    : public ExpressionFixedArity<ExpressionInternalFindAllValuesAtPath, 1> {
+public:
+    explicit ExpressionInternalFindAllValuesAtPath(ExpressionContext* expCtx)
+        : ExpressionFixedArity<ExpressionInternalFindAllValuesAtPath, 1>(expCtx) {}
+
+    explicit ExpressionInternalFindAllValuesAtPath(ExpressionContext* expCtx,
+                                                   ExpressionVector&& children)
+        : ExpressionFixedArity<ExpressionInternalFindAllValuesAtPath, 1>(expCtx,
+                                                                         std::move(children)) {}
+    Value evaluate(const Document& root, Variables* variables) const final;
+    const char* getOpName() const {
+        return "$_internalFindAllValuesAtPath";
+    }
+
+    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
+        return visitor->visit(this);
+    }
+
+    /**
+     * The base class' optimize will think this expression is const because the argument to it must
+     * be const. However, the results still change based on the document. Therefore skip optimizing.
+     */
+    boost::intrusive_ptr<Expression> optimize() override {
+        return this;
+    }
+
+protected:
+    void _doAddDependencies(DepsTracker* deps) const override {
+        auto fp = getFieldPath();
+        // We require everything below the first field.
+        deps->fields.insert(std::string(fp.getSubpath(0)));
+    }
+
+private:
+    FieldPath getFieldPath() const {
+        auto inputConstExpression = dynamic_cast<ExpressionConstant*>(_children[0].get());
+        uassert(5511201,
+                "Expected const expression as argument to _internalUnwindAllAlongPath",
+                inputConstExpression);
+        auto constVal = inputConstExpression->getValue();
+        // getString asserts if type != string, which is the correct behavior for what we want.
+        return FieldPath(constVal.getString());
+    }
+};
+
 class ExpressionRound final : public ExpressionRangedArity<ExpressionRound, 1, 2> {
 public:
     explicit ExpressionRound(ExpressionContext* const expCtx)
