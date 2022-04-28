@@ -329,10 +329,11 @@ class SortedFileWriterAndFileIteratorTests {
 public:
     void run() {
         unittest::TempDir tempDir("sortedFileWriterTests");
-        const SortOptions opts = SortOptions().TempDir(tempDir.path());
+        SorterFileStats sorterFileStats;
+        const SortOptions opts = SortOptions().TempDir(tempDir.path()).FileStats(&sorterFileStats);
         auto makeFile = [&] {
-            return std::make_shared<Sorter<IntWrapper, IntWrapper>::File>(opts.tempDir + "/" +
-                                                                          nextFileName());
+            return std::make_shared<Sorter<IntWrapper, IntWrapper>::File>(
+                opts.tempDir + "/" + nextFileName(), opts.sorterFileStats);
         };
 
         {  // small
@@ -345,6 +346,10 @@ public:
             ASSERT_ITERATORS_EQUIVALENT(std::shared_ptr<IWIterator>(sorter.done()),
                                         std::make_shared<IntIterator>(0, 5));
         }
+
+        ASSERT_EQ(sorterFileStats.opened.load(), 1);
+        ASSERT_EQ(sorterFileStats.closed.load(), 1);
+
         {  // big
             SortedFileWriter<IntWrapper, IntWrapper> sorter(opts, makeFile());
             for (int i = 0; i < 10 * 1000 * 1000; i++)
@@ -353,6 +358,9 @@ public:
             ASSERT_ITERATORS_EQUIVALENT(std::shared_ptr<IWIterator>(sorter.done()),
                                         std::make_shared<IntIterator>(0, 10 * 1000 * 1000));
         }
+
+        ASSERT_EQ(sorterFileStats.opened.load(), 2);
+        ASSERT_EQ(sorterFileStats.closed.load(), 2);
 
         ASSERT(boost::filesystem::is_empty(tempDir.path()));
     }
