@@ -1271,6 +1271,9 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
             self._writer.write_line('++expectedFieldNumber;')
 
+        if field.validator:
+            self._writer.write_line('%s(values);' % (_get_field_member_validator_name(field)))
+
         if field.chained_struct_field:
             if field.type.is_variant:
                 self._writer.write_line('%s.%s(%s(std::move(values)));' %

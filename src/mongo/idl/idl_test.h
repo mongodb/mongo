@@ -101,6 +101,20 @@ inline Status validateOneInt(const std::vector<mongo::idl::import::One_int>& val
 }
 
 /**
+ * Validate strings in a vector are only made up of capital letters.
+ */
+inline Status validateAllCapsArray(const std::vector<std::string>& array) {
+    for (const auto& str : array) {
+        if (!std::all_of(str.begin(), str.end(), [](char c) { return std::isupper(c); })) {
+            return {ErrorCodes::BadValue, "A non-upper character exists in the string."};
+        }
+    }
+
+    return Status::OK();
+}
+
+
+/**
  * Check that the two values in the struct are equal, assert otherwise.
  */
 void checkValuesEqual(StructWithValidator* structToValidate);

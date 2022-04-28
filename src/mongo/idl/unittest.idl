@@ -875,6 +875,21 @@ structs:
                 type: array<one_int>
                 validator: { callback: 'validateOneInt' }
 
+    int_array_validators:
+        description: Struct using fields with integer array validators
+        fields:
+            int_even:
+                type: array<int>
+                validator: { callback: 'validateEvenNumber' }
+
+    string_array_validators:
+        description: Struct using fields with string array validators
+        fields:
+            caps_strings:
+                type: array<string>
+                validator: { callback: 'validateAllCapsArray' }
+
+
 
 ##################################################################################################
 #

@@ -3351,6 +3351,67 @@ TEST(IDLValidatedField, Callback_validators) {
     ASSERT_THROWS(obj1.setOne_int(One_int(7)), AssertionException);
 }
 
+// Test validation of integer array
+TEST(IDLValidatedArray, IntArrayValidation) {
+
+    const auto tryPass = [](std::vector<std::int32_t> int_even) {
+        IDLParserErrorContext ctxt("root");
+        auto doc = BSON("int_even" << int_even);
+        auto obj = Int_array_validators::parse(ctxt, doc);
+
+        ASSERT_EQUALS(obj.getInt_even().size(), int_even.size());
+        for (size_t i = 0; i < int_even.size(); ++i) {
+            ASSERT_EQ(obj.getInt_even()[i], int_even[i]);
+        }
+    };
+
+    tryPass({2, 4, 6, 10, 100, 200, 2456});
+    tryPass({});
+    tryPass({344});
+
+    const auto tryFail = [](std::vector<std::int32_t> int_uneven) {
+        IDLParserErrorContext ctxt("root");
+        auto doc = BSON("int_even" << int_uneven);
+        ASSERT_THROWS(Int_array_validators::parse(ctxt, doc), AssertionException);
+    };
+
+    tryFail({1, 3, 5, 7});
+    tryFail({9, 35, 4});
+    tryFail({90, 22, 33});
+    tryFail({122, 44, 101, 64});
+}
+
+// Test validation of string array
+TEST(IDLValidatedArray, StringArrayValidation) {
+
+    const auto tryPass = [](std::vector<std::string> valid) {
+        IDLParserErrorContext ctxt("root");
+        auto doc = BSON("caps_strings" << valid);
+        auto obj = String_array_validators::parse(ctxt, doc);
+
+        ASSERT_EQUALS(obj.getCaps_strings().size(), valid.size());
+        for (size_t i = 0; i < valid.size(); ++i) {
+            ASSERT_EQ(obj.getCaps_strings()[i], valid[i]);
+        }
+    };
+
+    tryPass({"HELLO"});
+    tryPass({});
+    tryPass({"ABC", "DEF", "XYZ"});
+
+    const auto tryFail = [](std::vector<std::string> invalid) {
+        IDLParserErrorContext ctxt("root");
+        auto doc = BSON("caps_strings" << invalid);
+        ASSERT_THROWS(String_array_validators::parse(ctxt, doc), AssertionException);
+    };
+
+    tryFail({"hello"});
+    tryFail({"AB1"});
+    tryFail({"MONGO", "car", "QWERTY"});
+    tryFail({"SLD", "SLA", "KS D"});
+    tryFail({"S3LD", "SLA", "ED"});
+}
+
 // Positive: verify a command a string arg
 TEST(IDLTypeCommand, TestString) {
     IDLParserErrorContext ctxt("root");
