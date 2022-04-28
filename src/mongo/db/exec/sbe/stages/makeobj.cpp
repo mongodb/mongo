@@ -424,7 +424,7 @@ void MakeObjStageBase<O>::doSaveState(bool relinquishCursor) {
         return;
     }
 
-    _obj.makeOwned();
+    prepareForYielding(_obj);
 }
 
 // Explicit template instantiations.

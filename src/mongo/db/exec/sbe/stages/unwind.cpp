@@ -207,10 +207,10 @@ void UnwindStage::doSaveState(bool fullSave) {
     }
 
     if (_outFieldOutputAccessor) {
-        _outFieldOutputAccessor->makeOwned();
+        prepareForYielding(*_outFieldOutputAccessor);
     }
     if (_outIndexOutputAccessor) {
-        _outIndexOutputAccessor->makeOwned();
+        prepareForYielding(*_outIndexOutputAccessor);
     }
 }
 

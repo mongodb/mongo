@@ -278,8 +278,8 @@ void TraverseStage::close() {
 
 void TraverseStage::doSaveState(bool relinquishCursor) {
     if (_isReadingLeftSide) {
-        // If we yield while reading the left side, there is no need to makeOwned() data held in
-        // the right side, since we will have to re-open it anyway.
+        // If we yield while reading the left side, there is no need to prepareForYielding() data
+        // held in the right side, since we will have to re-open it anyway.
         const bool recursive = true;
         _children[1]->disableSlotAccess(recursive);
 
@@ -292,7 +292,7 @@ void TraverseStage::doSaveState(bool relinquishCursor) {
         return;
     }
 
-    _outFieldOutputAccessor.makeOwned();
+    prepareForYielding(_outFieldOutputAccessor);
 }
 
 void TraverseStage::doRestoreState(bool relinquishCursor) {

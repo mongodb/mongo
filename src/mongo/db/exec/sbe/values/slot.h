@@ -402,12 +402,16 @@ public:
      */
     void makeOwned() {
         for (size_t idx = 0; idx < _count; ++idx) {
-            if (!owned()[idx]) {
-                auto [tag, val] = value::copyValue(tags()[idx], values()[idx]);
-                values()[idx] = val;
-                tags()[idx] = tag;
-                owned()[idx] = true;
-            }
+            makeOwned(idx);
+        }
+    }
+
+    void makeOwned(size_t idx) {
+        if (!owned()[idx]) {
+            auto [tag, val] = value::copyValue(tags()[idx], values()[idx]);
+            values()[idx] = val;
+            tags()[idx] = tag;
+            owned()[idx] = true;
         }
     }
 
