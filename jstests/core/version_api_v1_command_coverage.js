@@ -5,6 +5,7 @@
  * @tags: [
  *   requires_non_retryable_commands,
  *   uses_api_parameters,
+ *   requires_fcv_53,
  * ]
  */
 
@@ -45,7 +46,7 @@ const commands = [
     {cmd: () => ({serverStatus: 1}), apiVersion1: false},
     {cmd: () => ({usersInfo: 1}), apiVersion1: false},
     {cmd: () => ({aggregate: testColl.getName(), pipeline: [], cursor: {}}), apiVersion1: true},
-    {cmd: () => ({count: "system.js"}), apiVersion1: false},
+    {cmd: () => ({count: "system.js"}), apiVersion1: true},
     {cmd: () => ({create: counter_fun()}), apiVersion1: true},
     {cmd: () => ({find: counter_fun()}), apiVersion1: true},
     {
