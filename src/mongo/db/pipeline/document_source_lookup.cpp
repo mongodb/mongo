@@ -182,14 +182,13 @@ DocumentSourceLookUp::DocumentSourceLookUp(
     initializeResolvedIntrospectionPipeline();
 }
 
-boost::optional<BSONObj> extractDocumentsStage(const std::vector<BSONObj>& pipeline) {
-    // TODO SERVER-59628 We should be able to check for any valid data source here, not just
-    // $documents.
-    if (pipeline.size() > 0 && pipeline[0].hasField(DocumentSourceDocuments::kStageName)) {
+std::vector<BSONObj> extractSourceStage(const std::vector<BSONObj>& pipeline) {
+    if (!pipeline.empty() &&
+        (pipeline[0].hasField(DocumentSourceDocuments::kStageName) ||
+         pipeline[0].hasField("$search"_sd))) {
         return {pipeline[0]};
-    } else {
-        return boost::none;
     }
+    return {};
 }
 
 DocumentSourceLookUp::DocumentSourceLookUp(
@@ -210,17 +209,13 @@ DocumentSourceLookUp::DocumentSourceLookUp(
 
         // Append a BSONObj to '_resolvedPipeline' as a placeholder for the stage corresponding to
         // the local/foreignField $match. It must next after $documents if present.
-        auto docs = extractDocumentsStage(pipeline);
-        int offset = docs ? 1 : 0;
-        _resolvedPipeline.reserve(_resolvedPipeline.size() + 1 + offset);
-        if (docs) {
-            _resolvedPipeline.push_back(*docs);
-        }
+        auto sourceStages = extractSourceStage(pipeline);
+        _resolvedPipeline.insert(_resolvedPipeline.end(), sourceStages.begin(), sourceStages.end());
         _resolvedPipeline.push_back(BSON("$match" << BSONObj()));
         _fieldMatchPipelineIdx = _resolvedPipeline.size() - 1;
         // Add the user pipeline to '_resolvedPipeline' after any potential view prefix and $match
         _resolvedPipeline.insert(
-            _resolvedPipeline.end(), pipeline.begin() + offset, pipeline.end());
+            _resolvedPipeline.end(), pipeline.begin() + sourceStages.size(), pipeline.end());
     } else {
         // When local/foreignFields are included, we cannot enable the cache because the $match
         // is a correlated prefix that will not be detected. Here, local/foreignFields are absent,
