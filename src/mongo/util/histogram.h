@@ -35,7 +35,6 @@
 #include <vector>
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/commands.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 
@@ -183,49 +182,5 @@ void appendHistogram(BSONObjBuilder& bob, const Histogram<T>& hist, const String
     }
     histBob.append("totalCount", totalCount);
 }
-
-namespace histogram_detail {
-/**
- * Append the histogram as an array of {bound: <lower>, count: <count>} objects.
- */
-template <typename T>
-void appendHistogramAsArray(const Histogram<T>& hist,
-                            const StringData histKey,
-                            bool includeFirstBucket,
-                            BSONObjBuilder& bob) {
-    BSONArrayBuilder histBob(bob.subarrayStart(histKey));
-
-    for (auto&& [count, lower, upper] : hist) {
-        // First bucket is indicated by 'lower' = nullptr.
-        if (lower) {
-            histBob.append(
-                BSON("lowerBound" << static_cast<long long>(*lower) << "count" << count));
-        } else if (includeFirstBucket) {
-            histBob.append(BSON("lowerBound"
-                                << "-INF"
-                                << "count" << count));
-        }
-    }
-}
-}  // namespace histogram_detail
-
-/**
- * A metric reported in serverStatus with type histogram. This is a partial specialization of
- * ServerStatusMetricField<T>. We cannot include it there due to cyclic header dependency via
- * "commands.h".
- */
-template <typename T>
-class ServerStatusMetricField<Histogram<T>> : public ServerStatusMetric {
-public:
-    ServerStatusMetricField(const std::string& name, const Histogram<T>& t)
-        : ServerStatusMetric(name), _hist(t) {}
-
-    virtual void appendAtLeaf(BSONObjBuilder& b) const {
-        histogram_detail::appendHistogramAsArray(_hist, _leafName, false, b);
-    }
-
-private:
-    const Histogram<T>& _hist;
-};
 
 }  // namespace mongo

@@ -31,11 +31,11 @@
 #include "mongo/db/query/sbe_runtime_planner.h"
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/exec/histogram_server_status_metric.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/trial_period_utils.h"
 #include "mongo/db/exec/trial_run_tracker.h"
 #include "mongo/db/query/plan_executor_sbe.h"
-#include "mongo/util/histogram.h"
 
 namespace mongo::sbe {
 namespace {
@@ -43,21 +43,6 @@ namespace {
 Counter64 sbeMicrosTotal;
 Counter64 sbeNumReadsTotal;
 Counter64 sbeCount;
-
-Histogram<uint64_t> sbeMicrosHistogram{{0,
-                                        1024,
-                                        4096,
-                                        16384,
-                                        65536,
-                                        262144,
-                                        1048576,
-                                        4194304,
-                                        16777216,
-                                        67108864,
-                                        268435456,
-                                        1073741824}};
-Histogram<uint64_t> sbeNumReadsHistogram{{0, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768}};
-Histogram<uint64_t> sbeNumPlansHistogram{{0, 2, 4, 8, 16, 32}};
 
 /**
  * Aggregation of the total number of microseconds spent (in SBE multiplanner).
@@ -80,22 +65,22 @@ ServerStatusMetricField<Counter64> sbeCountDisplay("query.multiPlanner.sbeCount"
  * An element in this histogram is the number of microseconds spent in an invocation (of the SBE
  * multiplanner).
  */
-ServerStatusMetricField<Histogram<uint64_t>> sbeMicrosHistogramDisplay(
-    "query.multiPlanner.histograms.sbeMicros", sbeMicrosHistogram);
+HistogramServerStatusMetric sbeMicrosHistogram("query.multiPlanner.histograms.sbeMicros",
+                                               HistogramServerStatusMetric::pow(11, 1024, 4));
 
 /**
  * An element in this histogram is the number of reads performance during an invocation (of the SBE
  * multiplanner).
  */
-ServerStatusMetricField<Histogram<uint64_t>> sbeNumReadsHistogramDisplay(
-    "query.multiPlanner.histograms.sbeNumReads", sbeNumReadsHistogram);
+HistogramServerStatusMetric sbeNumReadsHistogram("query.multiPlanner.histograms.sbeNumReads",
+                                                 HistogramServerStatusMetric::pow(9, 128, 2));
 
 /**
  * An element in this histogram is the number of plans in the candidate set of an invocation (of the
  * SBE multiplanner).
  */
-ServerStatusMetricField<Histogram<uint64_t>> sbeNumPlansHistogramDisplay(
-    "query.multiPlanner.histograms.sbeNumPlans", sbeNumPlansHistogram);
+HistogramServerStatusMetric sbeNumPlansHistogram("query.multiPlanner.histograms.sbeNumPlans",
+                                                 HistogramServerStatusMetric::pow(5, 2, 2));
 
 /**
  * Fetches a next document form the given plan stage tree and returns 'true' if the plan stage

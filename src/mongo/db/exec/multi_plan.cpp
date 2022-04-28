@@ -40,6 +40,7 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/exec/histogram_server_status_metric.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/trial_period_utils.h"
 #include "mongo/db/exec/working_set_common.h"
@@ -72,21 +73,6 @@ Counter64 classicMicrosTotal;
 Counter64 classicWorksTotal;
 Counter64 classicCount;
 
-Histogram<uint64_t> classicMicrosHistogram{{0,
-                                            1024,
-                                            4096,
-                                            16384,
-                                            65536,
-                                            262144,
-                                            1048576,
-                                            4194304,
-                                            16777216,
-                                            67108864,
-                                            268435456,
-                                            1073741824}};
-Histogram<uint64_t> classicWorksHistogram{{0, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768}};
-Histogram<uint64_t> classicNumPlansHistogram{{0, 2, 4, 8, 16, 32}};
-
 /**
  * Aggregation of the total number of microseconds spent (in the classic multiplanner).
  */
@@ -109,22 +95,22 @@ ServerStatusMetricField<Counter64> classicCountDisplay("query.multiPlanner.class
  * An element in this histogram is the number of microseconds spent in an invocation (of the
  * classic multiplanner).
  */
-ServerStatusMetricField<Histogram<uint64_t>> classicMicrosHistogramDisplay(
-    "query.multiPlanner.histograms.classicMicros", classicMicrosHistogram);
+HistogramServerStatusMetric classicMicrosHistogram("query.multiPlanner.histograms.classicMicros",
+                                                   HistogramServerStatusMetric::pow(11, 1024, 4));
 
 /**
  * An element in this histogram is the number of "works" performed during an invocation (of the
  * classic multiplanner).
  */
-ServerStatusMetricField<Histogram<uint64_t>> classicWorksHistogramDisplay(
-    "query.multiPlanner.histograms.classicWorks", classicWorksHistogram);
+HistogramServerStatusMetric classicWorksHistogram("query.multiPlanner.histograms.classicWorks",
+                                                  HistogramServerStatusMetric::pow(9, 128, 2));
 
 /**
  * An element in this histogram is the number of plans in the candidate set of an invocation (of the
  * classic multiplanner).
  */
-ServerStatusMetricField<Histogram<uint64_t>> classicNumPlansHistogramDisplay(
-    "query.multiPlanner.histograms.classicNumPlans", classicNumPlansHistogram);
+HistogramServerStatusMetric classicNumPlansHistogram(
+    "query.multiPlanner.histograms.classicNumPlans", HistogramServerStatusMetric::pow(5, 2, 2));
 
 }  // namespace
 
