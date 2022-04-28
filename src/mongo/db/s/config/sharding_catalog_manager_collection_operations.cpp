@@ -296,7 +296,8 @@ void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
     struct RefineTimers {
         Timer executionTimer;
         Timer totalTimer;
-    } timers;
+    };
+    auto timers = std::make_shared<RefineTimers>();
 
     const auto newEpoch = OID::gen();
 
@@ -332,9 +333,9 @@ void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
               "{durationMillis} ms. Total time taken: {totalTimeMillis} ms.",
               "refineCollectionShardKey updated collection entry",
               "namespace"_attr = nss.ns(),
-              "durationMillis"_attr = timers.executionTimer.millis(),
-              "totalTimeMillis"_attr = timers.totalTimer.millis());
-        timers.executionTimer.reset();
+              "durationMillis"_attr = timers->executionTimer.millis(),
+              "totalTimeMillis"_attr = timers->totalTimer.millis());
+        timers->executionTimer.reset();
 
         if (MONGO_unlikely(hangRefineCollectionShardKeyBeforeUpdatingChunks.shouldFail())) {
             LOGV2(21934, "Hit hangRefineCollectionShardKeyBeforeUpdatingChunks failpoint");
@@ -363,9 +364,9 @@ void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
               "{durationMillis} ms. Total time taken: {totalTimeMillis} ms.",
               "refineCollectionShardKey: updated chunk entries",
               "namespace"_attr = nss.ns(),
-              "durationMillis"_attr = timers.executionTimer.millis(),
-              "totalTimeMillis"_attr = timers.totalTimer.millis());
-        timers.executionTimer.reset();
+              "durationMillis"_attr = timers->executionTimer.millis(),
+              "totalTimeMillis"_attr = timers->totalTimer.millis());
+        timers->executionTimer.reset();
 
         // Update all config.tags entries for the given namespace by setting their bounds for
         // each new field in the refined key to MinKey (except for the global max tag where the
@@ -387,8 +388,8 @@ void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
               "{durationMillis} ms. Total time taken: {totalTimeMillis} ms.",
               "refineCollectionShardKey: updated zone entries",
               "namespace"_attr = nss.ns(),
-              "durationMillis"_attr = timers.executionTimer.millis(),
-              "totalTimeMillis"_attr = timers.totalTimer.millis());
+              "durationMillis"_attr = timers->executionTimer.millis(),
+              "totalTimeMillis"_attr = timers->totalTimer.millis());
 
         if (MONGO_unlikely(hangRefineCollectionShardKeyBeforeCommit.shouldFail())) {
             LOGV2(21937, "Hit hangRefineCollectionShardKeyBeforeCommit failpoint");
@@ -397,8 +398,8 @@ void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
     };
 
     auto updateCollectionAndChunksWithAPIFn =
-        [collType, newFields, nss, &timers](const txn_api::TransactionClient& txnClient,
-                                            ExecutorPtr txnExec) -> SemiFuture<void> {
+        [collType, newFields, nss, timers](const txn_api::TransactionClient& txnClient,
+                                           ExecutorPtr txnExec) -> SemiFuture<void> {
         auto [chunkUpdates, tagUpdates] = makeChunkAndTagUpdatesForRefine(newFields);
 
         // Update the config.collections entry for the given namespace.
@@ -410,7 +411,7 @@ void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
                                                  false /* multi */);
         return txnClient.runCRUDOp(catalogUpdateRequest, {})
             .thenRunOn(txnExec)
-            .then([&txnClient, &timers, collType, nss, chunkUpdates = std::move(chunkUpdates)](
+            .then([&txnClient, timers, collType, nss, chunkUpdates = std::move(chunkUpdates)](
                       auto catalogResponse) {
                 uassertStatusOK(catalogResponse.toStatus());
 
@@ -419,9 +420,9 @@ void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
                       "{durationMillis} ms. Total time taken: {totalTimeMillis} ms.",
                       "refineCollectionShardKey updated collection entry",
                       "namespace"_attr = nss.ns(),
-                      "durationMillis"_attr = timers.executionTimer.millis(),
-                      "totalTimeMillis"_attr = timers.totalTimer.millis());
-                timers.executionTimer.reset();
+                      "durationMillis"_attr = timers->executionTimer.millis(),
+                      "totalTimeMillis"_attr = timers->totalTimer.millis());
+                timers->executionTimer.reset();
 
                 if (MONGO_unlikely(hangRefineCollectionShardKeyBeforeUpdatingChunks.shouldFail())) {
                     LOGV2(5875907,
@@ -444,32 +445,32 @@ void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
                 return txnClient.runCRUDOp(chunkUpdateRequest, {});
             })
             .thenRunOn(txnExec)
-            .then([&txnClient, &timers, nss, tagUpdates = std::move(tagUpdates)](
-                      auto chunksResponse) {
-                uassertStatusOK(chunksResponse.toStatus());
+            .then(
+                [&txnClient, timers, nss, tagUpdates = std::move(tagUpdates)](auto chunksResponse) {
+                    uassertStatusOK(chunksResponse.toStatus());
 
-                LOGV2(5875908,
-                      "refineCollectionShardKey: updated chunk entries for {namespace}: took "
-                      "{durationMillis} ms. Total time taken: {totalTimeMillis} ms.",
-                      "refineCollectionShardKey: updated chunk entries",
-                      "namespace"_attr = nss.ns(),
-                      "durationMillis"_attr = timers.executionTimer.millis(),
-                      "totalTimeMillis"_attr = timers.totalTimer.millis());
-                timers.executionTimer.reset();
+                    LOGV2(5875908,
+                          "refineCollectionShardKey: updated chunk entries for {namespace}: took "
+                          "{durationMillis} ms. Total time taken: {totalTimeMillis} ms.",
+                          "refineCollectionShardKey: updated chunk entries",
+                          "namespace"_attr = nss.ns(),
+                          "durationMillis"_attr = timers->executionTimer.millis(),
+                          "totalTimeMillis"_attr = timers->totalTimer.millis());
+                    timers->executionTimer.reset();
 
-                // Update all config.tags entries for the given namespace by setting their bounds
-                // for each new field in the refined key to MinKey (except for the global max tag
-                // where the max bounds are set to MaxKey).
-                auto tagUpdateRequest =
-                    BatchedCommandRequest::buildPipelineUpdateOp(TagsType::ConfigNS,
-                                                                 BSON("ns" << nss.ns()),
-                                                                 tagUpdates,
-                                                                 false /* upsert */,
-                                                                 true /* useMultiUpdate */);
-                return txnClient.runCRUDOp(tagUpdateRequest, {});
-            })
+                    // Update all config.tags entries for the given namespace by setting their
+                    // bounds for each new field in the refined key to MinKey (except for the global
+                    // max tag where the max bounds are set to MaxKey).
+                    auto tagUpdateRequest =
+                        BatchedCommandRequest::buildPipelineUpdateOp(TagsType::ConfigNS,
+                                                                     BSON("ns" << nss.ns()),
+                                                                     tagUpdates,
+                                                                     false /* upsert */,
+                                                                     true /* useMultiUpdate */);
+                    return txnClient.runCRUDOp(tagUpdateRequest, {});
+                })
             .thenRunOn(txnExec)
-            .then([&txnClient, &timers, nss](auto tagsResponse) {
+            .then([&txnClient, timers, nss](auto tagsResponse) {
                 uassertStatusOK(tagsResponse.toStatus());
 
                 LOGV2(5875909,
@@ -477,8 +478,8 @@ void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
                       "{durationMillis} ms. Total time taken: {totalTimeMillis} ms.",
                       "refineCollectionShardKey: updated zone entries",
                       "namespace"_attr = nss.ns(),
-                      "durationMillis"_attr = timers.executionTimer.millis(),
-                      "totalTimeMillis"_attr = timers.totalTimer.millis());
+                      "durationMillis"_attr = timers->executionTimer.millis(),
+                      "totalTimeMillis"_attr = timers->totalTimer.millis());
 
                 if (MONGO_unlikely(hangRefineCollectionShardKeyBeforeCommit.shouldFail())) {
                     LOGV2(5875910, "Hit hangRefineCollectionShardKeyBeforeCommit failpoint");
