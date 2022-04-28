@@ -975,9 +975,12 @@ void IndexBuildsCoordinator::applyCommitIndexBuild(OperationContext* opCtx,
             !opCtx->recoveryUnit()->getCommitTimestamp().isNull());
 
     // There is a possibility that we cannot find an active index build with the given build UUID.
-    // This can be the case when the index already exists or was dropped on the sync source before
-    // the collection was cloned during initial sync. The oplog code will ignore the NoSuchKey
-    // error code.
+    // This can be the case when:
+    //   - The index already exists during initial sync.
+    //   - The index was dropped on the sync source before the collection was cloned during initial
+    //   sync.
+    //   - A node is restarted with unfinished index builds and --recoverFromOplogAsStandalone.
+    // The oplog code will ignore the NoSuchKey error code.
     //
     // Case 1: Index already exists:
     // +-----------------------------------------+--------------------------------+
@@ -1009,7 +1012,42 @@ void IndexBuildsCoordinator::applyCommitIndexBuild(OperationContext* opCtx,
     // | Apply commitIndexBuild 'x'.    |                                |
     // | --- Index build not found ---  |                                |
     // +--------------------------------+--------------------------------+
-    auto replState = uassertStatusOK(_getIndexBuild(buildUUID));
+    //
+    // Case 3: Node has unfinished index builds that are not restarted:
+    // +--------------------------------+-------------------------------------------------+
+    // |         Before Shutdown        |        After restart in standalone with         |
+    // |                                |         --recoverFromOplogAsStandalone          |
+    // +--------------------------------+-------------------------------------------------+
+    // | startIndexBuild 'x' at TS: 1.  | Recovery at TS: 1.                              |
+    // |                                | - Unfinished index build is not restarted.      |
+    // | ***** Checkpoint taken *****   |                                                 |
+    // |                                | Oplog replay operations starting with TS: 2.    |
+    // | commitIndexBuild 'x' at TS: 2. | Apply commitIndexBuild 'x' oplog entry at TS: 2.|
+    // |                                |                                                 |
+    // |                                | ------------ Index build not found ------------ |
+    // +--------------------------------+-------------------------------------------------+
+
+    auto swReplState = _getIndexBuild(buildUUID);
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+
+    // Index builds are not restarted in standalone mode. If the node is started with
+    // recoverFromOplogAsStandalone and when replaying the commitIndexBuild oplog entry for a paused
+    // index, there is no active index build thread to commit.
+    if (!swReplState.isOK() && replCoord->getSettings().shouldRecoverFromOplogAsStandalone()) {
+        // Restart the 'paused' index build in the background.
+        IndexBuilds buildsToRestart;
+        IndexBuildDetails details{collUUID};
+        for (auto spec : oplogEntry.indexSpecs) {
+            details.indexSpecs.emplace_back(spec.getOwned());
+        }
+        buildsToRestart.insert({buildUUID, details});
+
+        restartIndexBuildsForRecovery(opCtx, buildsToRestart, /*buildsToResume=*/{});
+
+        // Get the builder.
+        swReplState = _getIndexBuild(buildUUID);
+    }
+    auto replState = uassertStatusOK(swReplState);
 
     // Retry until we are able to put the index build in the kPrepareCommit state. None of the
     // conditions for retrying are common or expected to be long-lived, so we believe this to be
