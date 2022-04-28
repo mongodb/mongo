@@ -1104,10 +1104,13 @@ __wt_rec_col_fix_write_auxheader(WT_SESSION_IMPL *session, uint32_t entries,
  */
 static int
 __rec_col_var_helper(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_SALVAGE_COOKIE *salvage,
-  WT_ITEM *value, WT_TIME_WINDOW *tw, uint64_t rle, bool deleted, bool overflow_type)
+  WT_ITEM *value, WT_TIME_WINDOW *tw, uint64_t rle, bool deleted, bool *ovfl_usedp)
 {
     WT_BTREE *btree;
     WT_REC_KV *val;
+
+    if (ovfl_usedp != NULL)
+        *ovfl_usedp = false;
 
     btree = S2BT(session);
     val = &r->v;
@@ -1147,12 +1150,13 @@ __rec_col_var_helper(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_SALVAGE_COOKI
         val->buf.data = NULL;
         val->buf.size = 0;
         val->len = val->cell_len;
-    } else if (overflow_type) {
+    } else if (ovfl_usedp != NULL) {
         val->cell_len =
           __wt_cell_pack_ovfl(session, &val->cell, WT_CELL_VALUE_OVFL, tw, rle, value->size);
         val->buf.data = value->data;
         val->buf.size = value->size;
         val->len = val->cell_len + value->size;
+        *ovfl_usedp = true;
     } else
         WT_RET(__wt_rec_cell_build_val(session, r, value->data, value->size, tw, rle));
 
@@ -1161,7 +1165,7 @@ __rec_col_var_helper(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_SALVAGE_COOKI
         WT_RET(__wt_rec_split_crossing_bnd(session, r, val->len));
 
     /* Copy the value onto the page. */
-    if (!deleted && !overflow_type && btree->dictionary)
+    if (!deleted && ovfl_usedp == NULL && btree->dictionary)
         WT_RET(__wt_rec_dict_replace(session, r, tw, rle, val));
     __wt_rec_image_copy(session, r, val);
     WT_TIME_AGGREGATE_UPDATE(session, &r->cur_ptr->ta, tw);
@@ -1200,7 +1204,7 @@ __wt_rec_col_var(
     WT_UPDATE_SELECT upd_select;
     uint64_t n, nrepeat, repeat_count, rle, skip, src_recno;
     uint32_t i, size;
-    bool deleted, orig_deleted, orig_stale, update_no_copy;
+    bool deleted, orig_deleted, orig_stale, ovfl_used, update_no_copy;
     const void *data;
 
     btree = S2BT(session);
@@ -1248,7 +1252,7 @@ __wt_rec_col_var(
             salvage->take += salvage->missing;
         } else
             WT_ERR(__rec_col_var_helper(
-              session, r, NULL, NULL, &clear_tw, salvage->missing, true, false));
+              session, r, NULL, NULL, &clear_tw, salvage->missing, true, NULL));
     }
 
     /*
@@ -1367,19 +1371,23 @@ record_loop:
                      */
                     if (rle != 0) {
                         WT_ERR(__rec_col_var_helper(
-                          session, r, salvage, last.value, &last.tw, rle, last.deleted, false));
+                          session, r, salvage, last.value, &last.tw, rle, last.deleted, NULL));
                         rle = 0;
                     }
 
                     last.value->data = vpack->data;
                     last.value->size = vpack->size;
                     WT_ERR(__rec_col_var_helper(
-                      session, r, salvage, last.value, twp, repeat_count, false, true));
+                      session, r, salvage, last.value, twp, repeat_count, false, &ovfl_used));
 
-                    /* Track if page has overflow items. */
-                    r->ovfl_items = true;
-
-                    ovfl_state = OVFL_USED;
+                    /*
+                     * Salvage may have caused us to skip the overflow item, only update overflow
+                     * items we use.
+                     */
+                    if (ovfl_used) {
+                        r->ovfl_items = true; /* Track if page has overflow items. */
+                        ovfl_state = OVFL_USED;
+                    }
                     continue;
                 case OVFL_USED:
                     /*
@@ -1464,7 +1472,7 @@ compare:
                     continue;
                 }
                 WT_ERR(__rec_col_var_helper(
-                  session, r, salvage, last.value, &last.tw, rle, last.deleted, false));
+                  session, r, salvage, last.value, &last.tw, rle, last.deleted, NULL));
             }
 
             /*
@@ -1610,7 +1618,7 @@ compare:
                     goto next;
                 }
                 WT_ERR(__rec_col_var_helper(
-                  session, r, salvage, last.value, &last.tw, rle, last.deleted, false));
+                  session, r, salvage, last.value, &last.tw, rle, last.deleted, NULL));
             }
 
             /*
@@ -1653,8 +1661,8 @@ next:
 
     /* If we were tracking a record, write it. */
     if (rle != 0)
-        WT_ERR(__rec_col_var_helper(
-          session, r, salvage, last.value, &last.tw, rle, last.deleted, false));
+        WT_ERR(
+          __rec_col_var_helper(session, r, salvage, last.value, &last.tw, rle, last.deleted, NULL));
 
     /* Write the remnant page. */
     ret = __wt_rec_split_finish(session, r);
