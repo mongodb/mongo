@@ -236,9 +236,11 @@ std::unique_ptr<MatchExpression> buildInternalOpFilter(
     }
     internalOpTypeOrBuilder.done();
 
+    auto nsRegex = DocumentSourceChangeStream::getNsRegexForChangeStream(expCtx->ns);
     return MatchExpressionParser::parseAndNormalize(BSON("op"
                                                          << "n"
-                                                         << "$or" << internalOpTypeOrBuilder.arr()),
+                                                         << "ns" << BSONRegEx(nsRegex) << "$or"
+                                                         << internalOpTypeOrBuilder.arr()),
                                                     expCtx);
 }
 
