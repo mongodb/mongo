@@ -181,6 +181,8 @@ var $config = (function() {
         refineShardKey: {moveChunk: 0.33, mergeChunks: 0.33, splitChunks: 0.33},
     };
 
+    let defaultChunkDefragmentationThrottlingMS;
+
     function setup(db, collName, cluster) {
         const mongos = cluster.getDB('config').getMongo();
         // Create all fragmented collections
@@ -204,6 +206,12 @@ var $config = (function() {
                     true /* disableCollectionBalancing*/);
             }
         }
+        // Remove throttling to speed up test execution
+        cluster.executeOnConfigNodes((db) => {
+            const res = db.adminCommand({setParameter: 1, chunkDefragmentationThrottlingMS: 0});
+            assert.commandWorked(res);
+            defaultChunkDefragmentationThrottlingMS = res.was;
+        });
     }
 
     function teardown(db, collName, cluster) {
@@ -232,6 +240,13 @@ var $config = (function() {
                 defragmentationUtil.waitForEndOfDefragmentation(mongos, fullNs);
                 defragmentationUtil.checkPostDefragmentationState(
                     mongos, fullNs, maxChunkSizeMB, "key");
+                // Resume original throttling value
+                cluster.executeOnConfigNodes((db) => {
+                    assert.commandWorked(db.adminCommand({
+                        setParameter: 1,
+                        chunkDefragmentationThrottlingMS: defaultChunkDefragmentationThrottlingMS
+                    }));
+                });
             }
         }
     }

@@ -45,4 +45,4 @@ server_parameters:
         cpp_varname: chunkDefragmentationThrottlingMS
         validator:
           gte: 0
-        default: 0
+        default: 1000

@@ -108,12 +108,25 @@ var $config = (function() {
         setFCV: {create: 0.33, drop: 0.165, insert: 0.495}
     };
 
+    let defaultChunkDefragmentationThrottlingMS;
+
     function setup(db, collName, cluster) {
         let configDB = cluster.getDB('config');
         configDB.settings.save({_id: "chunksize", value: /*<sizeInMB>*/ 1});
+        cluster.executeOnConfigNodes((db) => {
+            const res = db.adminCommand({setParameter: 1, chunkDefragmentationThrottlingMS: 0});
+            assert.commandWorked(res);
+            defaultChunkDefragmentationThrottlingMS = res.was;
+        });
     }
 
     function teardown(db, collName, cluster) {
+        cluster.executeOnConfigNodes((db) => {
+            assert.commandWorked(db.adminCommand({
+                setParameter: 1,
+                chunkDefragmentationThrottlingMS: defaultChunkDefragmentationThrottlingMS
+            }));
+        });
     }
 
     return {

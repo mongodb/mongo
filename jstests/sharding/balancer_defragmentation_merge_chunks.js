@@ -29,6 +29,7 @@ const st = new ShardingTest({
         configOptions: {
             setParameter: {
                 logComponentVerbosity: tojson({sharding: {verbosity: 2}}),
+                chunkDefragmentationThrottlingMS: 0,
                 reshardingCriticalSectionTimeoutMillis: 24 * 60 * 60 * 1000 /* 1 day */
             }
         },
