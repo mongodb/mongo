@@ -12,7 +12,7 @@ load('jstests/libs/profiler.js');             // For various profiler helpers.
 load('jstests/aggregation/extras/utils.js');  // For arrayEq()
 load("jstests/libs/fail_point_util.js");      // for configureFailPoint.
 load("jstests/libs/log.js");                  // For findMatchingLogLines.
-load("jstests/libs/sbe_util.js");             // For checkSBEEnabled.
+load("jstests/libs/feature_flag_util.js");    // For isEnabled.
 
 const st = new ShardingTest({name: jsTestName(), mongos: 1, shards: 2, rs: {nodes: 2}});
 
@@ -510,8 +510,7 @@ assertAggResultAndRouting(pipeline, expectedRes, {comment: "lookup_foreign_does_
     // and we've figured out that the foreign collection is unsharded, we no longer need to target a
     // shard and instead can read locally. As such, we will not generate an entry in the profiler
     // for querying the foreign collection.
-    subPipelineRemote: checkSBEEnabled(mongosDB, ["featureFlagSBELookupPushdown"]) ? [0, 0]
-                                                                                   : [1, 0],
+    subPipelineRemote: FeatureFlagUtil.isEnabled(mongosDB, "SBELookupPushdown") ? [0, 0] : [1, 0],
 });
 
 //
