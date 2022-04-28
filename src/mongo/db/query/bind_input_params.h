@@ -44,4 +44,15 @@ namespace mongo::input_params {
 void bind(const CanonicalQuery&,
           const stage_builder::InputParamToSlotMap&,
           sbe::RuntimeEnvironment*);
+
+/**
+ * Binds index bounds evaluated from IETs to index bounds slots for the given query.
+ *
+ * - 'cq' is the query
+ * - 'indexBoundsInfo' contains the IETs and the slots
+ * - runtimeEnvironment SBE runtime environment
+ */
+void bindIndexBounds(const CanonicalQuery& cq,
+                     const stage_builder::IndexBoundsEvaluationInfo& indexBoundsInfo,
+                     sbe::RuntimeEnvironment* runtimeEnvironment);
 }  // namespace mongo::input_params

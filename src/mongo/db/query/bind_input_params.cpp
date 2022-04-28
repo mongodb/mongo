@@ -33,7 +33,9 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_where.h"
+#include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/sbe_stage_builder_filter.h"
+#include "mongo/db/query/sbe_stage_builder_index_scan.h"
 
 namespace mongo::input_params {
 namespace {
@@ -290,9 +292,6 @@ private:
                 guard->reset();
             }
             accessor->reset(owned, typeTag, value);
-        } else {
-            // TODO SERVER-65361: add tassert here if the slotId is missing from
-            // _inputParamToSlotMap but not from IETs.
         }
     }
 
@@ -318,6 +317,38 @@ public:
 private:
     MatchExpressionParameterBindingVisitor* const _visitor;
 };
+
+/**
+ * Evaluates IndexBounds from the given IntervalEvaluationTrees for the given query.
+ * 'indexBoundsInfo' contains the interval evaluation trees.
+ *
+ * Returns the built index bounds.
+ */
+std::unique_ptr<IndexBounds> makeIndexBounds(
+    const stage_builder::IndexBoundsEvaluationInfo& indexBoundsInfo, const CanonicalQuery& cq) {
+    auto bounds = std::make_unique<IndexBounds>();
+    bounds->fields.reserve(indexBoundsInfo.iets.size());
+
+    tassert(6335200,
+            "IET list size must be equal to the number of fields in the key pattern",
+            static_cast<size_t>(indexBoundsInfo.index.keyPattern.nFields()) ==
+                indexBoundsInfo.iets.size());
+
+    BSONObjIterator it{indexBoundsInfo.index.keyPattern};
+    BSONElement keyElt = it.next();
+    for (auto&& iet : indexBoundsInfo.iets) {
+        auto oil = interval_evaluation_tree::evaluateIntervals(
+            iet, cq.getInputParamIdToMatchExpressionMap(), keyElt, indexBoundsInfo.index);
+        bounds->fields.emplace_back(std::move(oil));
+        keyElt = it.next();
+    }
+
+    IndexBoundsBuilder::alignBounds(bounds.get(),
+                                    indexBoundsInfo.index.keyPattern,
+                                    indexBoundsInfo.index.collator != nullptr,
+                                    indexBoundsInfo.direction);
+    return bounds;
+}
 }  // namespace
 
 void bind(const CanonicalQuery& canonicalQuery,
@@ -326,5 +357,52 @@ void bind(const CanonicalQuery& canonicalQuery,
     MatchExpressionParameterBindingVisitor visitor{inputParamToSlotMap, runtimeEnvironment};
     MatchExpressionParameterBindingWalker walker{&visitor};
     tree_walker::walk<true, MatchExpression>(canonicalQuery.root(), &walker);
+}
+
+void bindIndexBounds(const CanonicalQuery& cq,
+                     const stage_builder::IndexBoundsEvaluationInfo& indexBoundsInfo,
+                     sbe::RuntimeEnvironment* runtimeEnvironment) {
+    auto bounds = makeIndexBounds(indexBoundsInfo, cq);
+    auto intervals = stage_builder::makeIntervalsFromIndexBounds(*bounds,
+                                                                 indexBoundsInfo.direction == 1,
+                                                                 indexBoundsInfo.keyStringVersion,
+                                                                 indexBoundsInfo.ordering);
+    const bool isGenericScan = intervals.empty();
+    runtimeEnvironment->resetSlot(indexBoundsInfo.slots.isGenericScan,
+                                  sbe::value::TypeTags::Boolean,
+                                  sbe::value::bitcastFrom<bool>(isGenericScan),
+                                  /*owned*/ true);
+    if (isGenericScan) {
+        IndexBoundsChecker checker{
+            bounds.get(), indexBoundsInfo.index.keyPattern, indexBoundsInfo.direction};
+        IndexSeekPoint seekPoint;
+        if (checker.getStartSeekPoint(&seekPoint)) {
+            auto startKey = std::make_unique<KeyString::Value>(
+                IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                    seekPoint,
+                    indexBoundsInfo.keyStringVersion,
+                    indexBoundsInfo.ordering,
+                    indexBoundsInfo.direction == 1));
+            runtimeEnvironment->resetSlot(
+                indexBoundsInfo.slots.initialStartKey,
+                sbe::value::TypeTags::ksValue,
+                sbe::value::bitcastFrom<KeyString::Value*>(startKey.release()),
+                /*owned*/ true);
+            runtimeEnvironment->resetSlot(indexBoundsInfo.slots.indexBounds,
+                                          sbe::value::TypeTags::indexBounds,
+                                          sbe::value::bitcastFrom<IndexBounds*>(bounds.release()),
+                                          /*owned*/ true);
+        } else {
+            runtimeEnvironment->resetSlot(indexBoundsInfo.slots.initialStartKey,
+                                          sbe::value::TypeTags::Nothing,
+                                          0,
+                                          /*owned*/ true);
+        }
+    } else {
+        auto [boundsTag, boundsVal] =
+            stage_builder::packIndexIntervalsInSbeArray(std::move(intervals));
+        runtimeEnvironment->resetSlot(
+            indexBoundsInfo.slots.lowHighKeyIntervals, boundsTag, boundsVal, /*owned*/ true);
+    }
 }
 }  // namespace mongo::input_params

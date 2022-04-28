@@ -73,6 +73,7 @@
 #include "mongo/db/query/sbe_stage_builder_filter.h"
 #include "mongo/db/query/sbe_stage_builder_index_scan.h"
 #include "mongo/db/query/sbe_stage_builder_projection.h"
+#include "mongo/db/query/sbe_utils.h"
 #include "mongo/db/query/shard_filterer_factory_impl.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/db/s/collection_sharding_state.h"
@@ -354,91 +355,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateEofPlan(
 
     return {std::move(stage), std::move(outputs)};
 }
-
-/**
- * Evaluates IndexBounds from the given IntervalEvaluationTrees for the given query.
- * 'indexBoundsInfo' contains the interval evaluation trees.
- *
- * Returns the built index bounds.
- */
-std::unique_ptr<IndexBounds> makeIndexBounds(const IndexBoundsEvaluationInfo& indexBoundsInfo,
-                                             const CanonicalQuery& cq) {
-    auto bounds = std::make_unique<IndexBounds>();
-    bounds->fields.reserve(indexBoundsInfo.iets.size());
-
-    tassert(6335200,
-            "IET list size must be equal to the number of fields in the key pattern",
-            static_cast<size_t>(indexBoundsInfo.index.keyPattern.nFields()) ==
-                indexBoundsInfo.iets.size());
-
-    BSONObjIterator it{indexBoundsInfo.index.keyPattern};
-    BSONElement keyElt = it.next();
-    for (auto&& iet : indexBoundsInfo.iets) {
-        auto oil = interval_evaluation_tree::evaluateIntervals(
-            iet, cq.getInputParamIdToMatchExpressionMap(), keyElt, indexBoundsInfo.index);
-        bounds->fields.emplace_back(std::move(oil));
-        keyElt = it.next();
-    }
-
-    IndexBoundsBuilder::alignBounds(bounds.get(),
-                                    indexBoundsInfo.index.keyPattern,
-                                    indexBoundsInfo.index.collator != nullptr,
-                                    indexBoundsInfo.direction);
-    return bounds;
-}
-
-/**
- * Binds index bounds evaluated from IETs to index bounds slots for the given query.
- *
- * - 'cq' is the query
- * - 'indexBoundsInfo' contains the IETs and the slots
- * - runtimeEnvironment SBE runtime environment
- */
-void bindIndexBoundsParams(const CanonicalQuery& cq,
-                           const IndexBoundsEvaluationInfo& indexBoundsInfo,
-                           sbe::RuntimeEnvironment* runtimeEnvironment) {
-    auto bounds = makeIndexBounds(indexBoundsInfo, cq);
-    auto intervals = makeIntervalsFromIndexBounds(*bounds,
-                                                  indexBoundsInfo.direction == 1,
-                                                  indexBoundsInfo.keyStringVersion,
-                                                  indexBoundsInfo.ordering);
-    const bool isGenericScan = intervals.empty();
-    runtimeEnvironment->resetSlot(indexBoundsInfo.slots.isGenericScan,
-                                  sbe::value::TypeTags::Boolean,
-                                  sbe::value::bitcastFrom<bool>(isGenericScan),
-                                  /*owned*/ true);
-    if (isGenericScan) {
-        IndexBoundsChecker checker{
-            bounds.get(), indexBoundsInfo.index.keyPattern, indexBoundsInfo.direction};
-        IndexSeekPoint seekPoint;
-        if (checker.getStartSeekPoint(&seekPoint)) {
-            auto startKey = std::make_unique<KeyString::Value>(
-                IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                    seekPoint,
-                    indexBoundsInfo.keyStringVersion,
-                    indexBoundsInfo.ordering,
-                    indexBoundsInfo.direction == 1));
-            runtimeEnvironment->resetSlot(
-                indexBoundsInfo.slots.initialStartKey,
-                sbe::value::TypeTags::ksValue,
-                sbe::value::bitcastFrom<KeyString::Value*>(startKey.release()),
-                /*owned*/ true);
-            runtimeEnvironment->resetSlot(indexBoundsInfo.slots.indexBounds,
-                                          sbe::value::TypeTags::indexBounds,
-                                          sbe::value::bitcastFrom<IndexBounds*>(bounds.release()),
-                                          /*owned*/ true);
-        } else {
-            runtimeEnvironment->resetSlot(indexBoundsInfo.slots.initialStartKey,
-                                          sbe::value::TypeTags::Nothing,
-                                          0,
-                                          /*owned*/ true);
-        }
-    } else {
-        auto [boundsTag, boundsVal] = packIndexIntervalsInSbeArray(std::move(intervals));
-        runtimeEnvironment->resetSlot(
-            indexBoundsInfo.slots.lowHighKeyIntervals, boundsTag, boundsVal, /*owned*/ true);
-    }
-}
 }  // namespace
 
 std::unique_ptr<sbe::RuntimeEnvironment> makeRuntimeEnvironment(
@@ -543,12 +459,13 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
         }
     }
 
+    // TODO SERVER-66039: Add dassert on sbe::validateInputParamsBindings().
     // If the cached plan is parameterized, bind new values for the parameters into the runtime
     // environment.
     input_params::bind(cq, data->inputParamToSlotMap, env);
 
     for (auto&& indexBoundsInfo : data->indexBoundsEvaluationInfos) {
-        bindIndexBoundsParams(cq, indexBoundsInfo, env);
+        input_params::bindIndexBounds(cq, indexBoundsInfo, env);
     }
 }
 

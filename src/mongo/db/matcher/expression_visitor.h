@@ -101,90 +101,67 @@ class WhereNoOpMatchExpression;
 template <bool IsConst = false>
 class MatchExpressionVisitor {
 public:
+    template <typename T>
+    using MaybeConstPtr = tree_walker::MaybeConstPtr<IsConst, T>;
+
     virtual ~MatchExpressionVisitor() = default;
-    virtual void visit(tree_walker::MaybeConstPtr<IsConst, AlwaysFalseMatchExpression> expr) = 0;
-    virtual void visit(tree_walker::MaybeConstPtr<IsConst, AlwaysTrueMatchExpression> expr) = 0;
-    virtual void visit(tree_walker::MaybeConstPtr<IsConst, AndMatchExpression> expr) = 0;
-    virtual void visit(tree_walker::MaybeConstPtr<IsConst, BitsAllClearMatchExpression> expr) = 0;
-    virtual void visit(tree_walker::MaybeConstPtr<IsConst, BitsAllSetMatchExpression> expr) = 0;
-    virtual void visit(tree_walker::MaybeConstPtr<IsConst, BitsAnyClearMatchExpression> expr) = 0;
-    virtual void visit(tree_walker::MaybeConstPtr<IsConst, BitsAnySetMatchExpression> expr) = 0;
-    virtual void visit(
-        tree_walker::MaybeConstPtr<IsConst, ElemMatchObjectMatchExpression> expr) = 0;
-    virtual void visit(tree_walker::MaybeConstPtr<IsConst, ElemMatchValueMatchExpression> expr) = 0;
-    virtual void visit(tree_walker::MaybeConstPtr<IsConst, EqualityMatchExpression> expr) = 0;
-    virtual void visit(tree_walker::MaybeConstPtr<IsConst, ExistsMatchExpression> expr) = 0;
-    virtual void visit(tree_walker::MaybeConstPtr<IsConst, ExprMatchExpression> expr) = 0;
-    virtual void visit(tree_walker::MaybeConstPtr<IsConst, GTEMatchExpression> expr) = 0;
-    virtual void visit(tree_walker::MaybeConstPtr<IsConst, GTMatchExpression> expr) = 0;
-    virtual void visit(tree_walker::MaybeConstPtr<IsConst, GeoMatchExpression> expr) = 0;
-    virtual void visit(tree_walker::MaybeConstPtr<IsConst, GeoNearMatchExpression> expr) = 0;
-    virtual void visit(tree_walker::MaybeConstPtr<IsConst, InMatchExpression> expr) = 0;
-    virtual void visit(
-        tree_walker::MaybeConstPtr<IsConst, InternalBucketGeoWithinMatchExpression> expr) = 0;
-    virtual void visit(tree_walker::MaybeConstPtr<IsConst, InternalExprEqMatchExpression> expr) = 0;
-    virtual void visit(tree_walker::MaybeConstPtr<IsConst, InternalExprGTMatchExpression> expr) = 0;
-    virtual void visit(
-        tree_walker::MaybeConstPtr<IsConst, InternalExprGTEMatchExpression> expr) = 0;
-    virtual void visit(tree_walker::MaybeConstPtr<IsConst, InternalExprLTMatchExpression> expr) = 0;
-    virtual void visit(
-        tree_walker::MaybeConstPtr<IsConst, InternalExprLTEMatchExpression> expr) = 0;
-    virtual void visit(
-        tree_walker::MaybeConstPtr<IsConst, InternalSchemaAllElemMatchFromIndexMatchExpression>
-            expr) = 0;
-    virtual void visit(
-        tree_walker::MaybeConstPtr<IsConst, InternalSchemaAllowedPropertiesMatchExpression>
-            expr) = 0;
-    virtual void visit(
-        tree_walker::MaybeConstPtr<IsConst, InternalSchemaBinDataEncryptedTypeExpression> expr) = 0;
-    virtual void visit(
-        tree_walker::MaybeConstPtr<IsConst, InternalSchemaBinDataFLE2EncryptedTypeExpression>
-            expr) = 0;
-    virtual void visit(
-        tree_walker::MaybeConstPtr<IsConst, InternalSchemaBinDataSubTypeExpression> expr) = 0;
-    virtual void visit(
-        tree_walker::MaybeConstPtr<IsConst, InternalSchemaCondMatchExpression> expr) = 0;
-    virtual void visit(
-        tree_walker::MaybeConstPtr<IsConst, InternalSchemaEqMatchExpression> expr) = 0;
-    virtual void visit(
-        tree_walker::MaybeConstPtr<IsConst, InternalSchemaFmodMatchExpression> expr) = 0;
-    virtual void visit(
-        tree_walker::MaybeConstPtr<IsConst, InternalSchemaMatchArrayIndexMatchExpression> expr) = 0;
-    virtual void visit(
-        tree_walker::MaybeConstPtr<IsConst, InternalSchemaMaxItemsMatchExpression> expr) = 0;
-    virtual void visit(
-        tree_walker::MaybeConstPtr<IsConst, InternalSchemaMaxLengthMatchExpression> expr) = 0;
-    virtual void visit(
-        tree_walker::MaybeConstPtr<IsConst, InternalSchemaMaxPropertiesMatchExpression> expr) = 0;
-    virtual void visit(
-        tree_walker::MaybeConstPtr<IsConst, InternalSchemaMinItemsMatchExpression> expr) = 0;
-    virtual void visit(
-        tree_walker::MaybeConstPtr<IsConst, InternalSchemaMinLengthMatchExpression> expr) = 0;
-    virtual void visit(
-        tree_walker::MaybeConstPtr<IsConst, InternalSchemaMinPropertiesMatchExpression> expr) = 0;
-    virtual void visit(
-        tree_walker::MaybeConstPtr<IsConst, InternalSchemaObjectMatchExpression> expr) = 0;
-    virtual void visit(
-        tree_walker::MaybeConstPtr<IsConst, InternalSchemaRootDocEqMatchExpression> expr) = 0;
-    virtual void visit(tree_walker::MaybeConstPtr<IsConst, InternalSchemaTypeExpression> expr) = 0;
-    virtual void visit(
-        tree_walker::MaybeConstPtr<IsConst, InternalSchemaUniqueItemsMatchExpression> expr) = 0;
-    virtual void visit(
-        tree_walker::MaybeConstPtr<IsConst, InternalSchemaXorMatchExpression> expr) = 0;
-    virtual void visit(tree_walker::MaybeConstPtr<IsConst, LTEMatchExpression> expr) = 0;
-    virtual void visit(tree_walker::MaybeConstPtr<IsConst, LTMatchExpression> expr) = 0;
-    virtual void visit(tree_walker::MaybeConstPtr<IsConst, ModMatchExpression> expr) = 0;
-    virtual void visit(tree_walker::MaybeConstPtr<IsConst, NorMatchExpression> expr) = 0;
-    virtual void visit(tree_walker::MaybeConstPtr<IsConst, NotMatchExpression> expr) = 0;
-    virtual void visit(tree_walker::MaybeConstPtr<IsConst, OrMatchExpression> expr) = 0;
-    virtual void visit(tree_walker::MaybeConstPtr<IsConst, RegexMatchExpression> expr) = 0;
-    virtual void visit(tree_walker::MaybeConstPtr<IsConst, SizeMatchExpression> expr) = 0;
-    virtual void visit(tree_walker::MaybeConstPtr<IsConst, TextMatchExpression> expr) = 0;
-    virtual void visit(tree_walker::MaybeConstPtr<IsConst, TextNoOpMatchExpression> expr) = 0;
-    virtual void visit(tree_walker::MaybeConstPtr<IsConst, TwoDPtInAnnulusExpression> expr) = 0;
-    virtual void visit(tree_walker::MaybeConstPtr<IsConst, TypeMatchExpression> expr) = 0;
-    virtual void visit(tree_walker::MaybeConstPtr<IsConst, WhereMatchExpression> expr) = 0;
-    virtual void visit(tree_walker::MaybeConstPtr<IsConst, WhereNoOpMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<AlwaysFalseMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<AlwaysTrueMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<AndMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<BitsAllClearMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<BitsAllSetMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<BitsAnyClearMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<BitsAnySetMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<ElemMatchObjectMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<ElemMatchValueMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<EqualityMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<ExistsMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<ExprMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<GTEMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<GTMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<GeoMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<GeoNearMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<InMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<InternalBucketGeoWithinMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<InternalExprEqMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<InternalExprGTMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<InternalExprGTEMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<InternalExprLTMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<InternalExprLTEMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<InternalSchemaAllElemMatchFromIndexMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<InternalSchemaAllowedPropertiesMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<InternalSchemaBinDataEncryptedTypeExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<InternalSchemaBinDataFLE2EncryptedTypeExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<InternalSchemaBinDataSubTypeExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<InternalSchemaCondMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<InternalSchemaEqMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<InternalSchemaFmodMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<InternalSchemaMatchArrayIndexMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<InternalSchemaMaxItemsMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<InternalSchemaMaxLengthMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<InternalSchemaMaxPropertiesMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<InternalSchemaMinItemsMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<InternalSchemaMinLengthMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<InternalSchemaMinPropertiesMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<InternalSchemaObjectMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<InternalSchemaRootDocEqMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<InternalSchemaTypeExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<InternalSchemaUniqueItemsMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<InternalSchemaXorMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<LTEMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<LTMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<ModMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<NorMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<NotMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<OrMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<RegexMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<SizeMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<TextMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<TextNoOpMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<TwoDPtInAnnulusExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<TypeMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<WhereMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<WhereNoOpMatchExpression> expr) = 0;
 };
 
 using MatchExpressionMutableVisitor = MatchExpressionVisitor<false>;
