@@ -122,10 +122,11 @@ void eventProcessingThread() {
 
     HANDLE event = CreateEventA(nullptr, TRUE, FALSE, eventName.c_str());
     if (event == nullptr) {
+        auto ec = lastSystemError();
         LOGV2_WARNING(23382,
                       "eventProcessingThread CreateEvent failed: {error}",
                       "eventProcessingThread CreateEvent failed",
-                      "error"_attr = errnoWithDescription());
+                      "error"_attr = errorMessage(ec));
         return;
     }
 
@@ -134,16 +135,18 @@ void eventProcessingThread() {
     int returnCode = WaitForSingleObject(event, INFINITE);
     if (returnCode != WAIT_OBJECT_0) {
         if (returnCode == WAIT_FAILED) {
+            auto ec = lastSystemError();
             LOGV2_WARNING(23383,
                           "eventProcessingThread WaitForSingleObject failed: {error}",
                           "eventProcessingThread WaitForSingleObject failed",
-                          "error"_attr = errnoWithDescription());
+                          "error"_attr = errorMessage(ec));
             return;
         } else {
+            auto ec = systemError(returnCode);
             LOGV2_WARNING(23384,
                           "eventProcessingThread WaitForSingleObject failed: {error}",
                           "eventProcessingThread WaitForSingleObject failed",
-                          "error"_attr = errnoWithDescription(returnCode));
+                          "error"_attr = errorMessage(ec));
             return;
         }
     }

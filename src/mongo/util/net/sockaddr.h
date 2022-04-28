@@ -63,9 +63,6 @@ struct sockaddr_un {
 
 #endif  // _WIN32
 
-// Generate a string representation for getaddrinfo return codes
-std::string getAddrInfoStrError(int code);
-
 /**
  * Wrapper around os representation of network address.
  */

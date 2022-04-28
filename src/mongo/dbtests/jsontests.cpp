@@ -402,7 +402,8 @@ public:
         char* _oldTimezonePtr = getenv("TZ");
         _oldTimezone = std::string(_oldTimezonePtr ? _oldTimezonePtr : "");
         if (-1 == putenv(tzEnvString)) {
-            FAIL(errnoWithDescription());
+            auto ec = lastSystemError();
+            FAIL(errorMessage(ec));
         }
         tzset();
     }
@@ -418,7 +419,8 @@ public:
             }
 #else
             if (-1 == setenv("TZ", _oldTimezone.c_str(), 1)) {
-                FAIL(errnoWithDescription());
+                auto ec = lastSystemError();
+                FAIL(errorMessage(ec));
             }
 #endif
         } else {
@@ -431,7 +433,8 @@ public:
             }
 #else
             if (-1 == unsetenv("TZ")) {
-                FAIL(errnoWithDescription());
+                auto ec = lastSystemError();
+                FAIL(errorMessage(ec));
             }
 #endif
         }

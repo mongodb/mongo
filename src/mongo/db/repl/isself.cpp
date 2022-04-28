@@ -89,20 +89,6 @@ MONGO_INITIALIZER(GenerateInstanceId)(InitializerContext*) {
 namespace {
 
 /**
- * Helper to convert a message from a networking function to a string.
- * Needed because errnoWithDescription uses strerror on linux, when
- * we need gai_strerror.
- */
-std::string stringifyError(int code) {
-#if FASTPATH_UNIX
-    return gai_strerror(code);
-#elif defined(_WIN32)
-    // FormatMessage in errnoWithDescription works here on windows
-    return errnoWithDescription(code);
-#endif
-}
-
-/**
  * Resolves a host and port to a list of IP addresses. This requires a syscall. If the
  * ipv6enabled parameter is true, both IPv6 and IPv4 addresses will be returned.
  */
@@ -121,11 +107,12 @@ std::vector<std::string> getAddrsForHost(const std::string& iporhost,
     int err = getaddrinfo(iporhost.c_str(), portNum.c_str(), &hints, &addrs);
 
     if (err) {
+        auto ec = addrInfoError(err);
         LOGV2_WARNING(21207,
                       "getaddrinfo(\"{host}\") failed: {error}",
                       "getaddrinfo() failed",
                       "host"_attr = iporhost,
-                      "error"_attr = stringifyError(err));
+                      "error"_attr = errorMessage(ec));
         return out;
     }
 
@@ -139,10 +126,11 @@ std::vector<std::string> getAddrsForHost(const std::string& iporhost,
             err = getnameinfo(
                 addr->ai_addr, addr->ai_addrlen, host, NI_MAXHOST, nullptr, 0, NI_NUMERICHOST);
             if (err) {
+                auto ec = addrInfoError(err);
                 LOGV2_WARNING(21208,
                               "getnameinfo() failed: {error}",
                               "getnameinfo() failed",
-                              "error"_attr = stringifyError(err));
+                              "error"_attr = errorMessage(ec));
                 continue;
             }
             out.push_back(host);
@@ -281,12 +269,12 @@ std::vector<std::string> getBoundAddrs(const bool ipv6enabled) {
 
     ifaddrs* addrs;
 
-    int err = getifaddrs(&addrs);
-    if (err) {
+    if (getifaddrs(&addrs)) {
+        auto ec = lastSystemError();
         LOGV2_WARNING(21210,
                       "getifaddrs failure: {error}",
                       "getifaddrs() failed",
-                      "error"_attr = errnoWithDescription(err));
+                      "error"_attr = errorMessage(ec));
         return out;
     }
     ON_BLOCK_EXIT([&] { freeifaddrs(addrs); });
@@ -299,7 +287,7 @@ std::vector<std::string> getBoundAddrs(const bool ipv6enabled) {
         char host[NI_MAXHOST];
 
         if (family == AF_INET || (ipv6enabled && (family == AF_INET6))) {
-            err = getnameinfo(
+            int err = getnameinfo(
                 addr->ifa_addr,
                 (family == AF_INET ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6)),
                 host,
@@ -311,7 +299,7 @@ std::vector<std::string> getBoundAddrs(const bool ipv6enabled) {
                 LOGV2_WARNING(21211,
                               "getnameinfo() failed: {error}",
                               "getnameinfo() failed",
-                              "error"_attr = gai_strerror(err));
+                              "error"_attr = errorMessage(addrInfoError(err)));
                 continue;
             }
             out.push_back(host);
@@ -351,7 +339,7 @@ std::vector<std::string> getBoundAddrs(const bool ipv6enabled) {
         LOGV2_WARNING(21212,
                       "GetAdaptersAddresses() failed: {error}",
                       "GetAdaptersAddresses() failed",
-                      "error"_attr = errnoWithDescription(err));
+                      "error"_attr = errorMessage(systemError(err)));
         return out;
     }
 

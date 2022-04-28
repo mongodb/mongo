@@ -455,10 +455,10 @@ void installServiceOrDie(const wstring& serviceName,
     BOOL ret = ::ChangeServiceConfig2(
         schService, SERVICE_CONFIG_PRESHUTDOWN_INFO, &servicePreshutdownInfo);
     if (!ret) {
-        DWORD gle = ::GetLastError();
+        auto ec = lastSystemError();
         LOGV2_ERROR(23317,
                     "Failed to set timeout for pre-shutdown notification",
-                    "__error__"_attr = errnoWithDescription(gle));
+                    "__error__"_attr = errorMessage(ec));
         serviceInstalled = false;
     }
 

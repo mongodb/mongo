@@ -62,11 +62,11 @@ void doMinidumpWithException(struct _EXCEPTION_POINTERS* exceptionInfo) {
 
     DWORD ret = GetModuleFileNameW(nullptr, &moduleFileName[0], ARRAYSIZE(moduleFileName));
     if (ret == 0) {
-        int gle = GetLastError();
+        auto ec = lastSystemError();
         LOGV2(23130,
               "GetModuleFileName failed {error}",
               "GetModuleFileName failed",
-              "error"_attr = errnoWithDescription(gle));
+              "error"_attr = errorMessage(ec));
 
         // Fallback name
         wcscpy_s(moduleFileName, L"mongo");
@@ -88,12 +88,12 @@ void doMinidumpWithException(struct _EXCEPTION_POINTERS* exceptionInfo) {
     HANDLE hFile = CreateFileW(
         dumpName.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (INVALID_HANDLE_VALUE == hFile) {
-        DWORD lasterr = GetLastError();
+        auto ec = lastSystemError();
         LOGV2(23131,
               "Failed to open minidump file {dumpName}: {error}",
               "Failed to open minidump file",
               "dumpName"_attr = toUtf8String(dumpName.c_str()),
-              "error"_attr = errnoWithDescription(lasterr));
+              "error"_attr = errorMessage(ec));
         return;
     }
 
@@ -122,11 +122,11 @@ void doMinidumpWithException(struct _EXCEPTION_POINTERS* exceptionInfo) {
                                      nullptr,
                                      nullptr);
     if (FALSE == bstatus) {
-        DWORD lasterr = GetLastError();
+        auto ec = lastSystemError();
         LOGV2(23133,
               "Failed to create minidump: {error}",
               "Failed to create minidump",
-              "error"_attr = errnoWithDescription(lasterr));
+              "error"_attr = errorMessage(ec));
     }
 
     CloseHandle(hFile);

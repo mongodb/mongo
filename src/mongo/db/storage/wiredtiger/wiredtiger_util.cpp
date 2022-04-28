@@ -98,10 +98,11 @@ void createTableChecksFile() {
                   "incomplete."
                << std::endl;
     if (fileStream.fail()) {
+        auto ec = lastSystemError();
         LOGV2_FATAL_NOTRACE(4366400,
                             "Failed to write to file",
                             "file"_attr = path.generic_string(),
-                            "error"_attr = errnoWithDescription());
+                            "error"_attr = errorMessage(ec));
     }
     fileStream.close();
 

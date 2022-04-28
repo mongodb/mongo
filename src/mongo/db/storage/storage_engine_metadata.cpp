@@ -234,13 +234,15 @@ void flushMyDirectory(const boost::filesystem::path& file) {
     LOGV2_DEBUG(22284, 1, "flushing directory {dir_string}", "dir_string"_attr = dir.string());
 
     int fd = ::open(dir.string().c_str(), O_RDONLY);  // DO NOT THROW OR ASSERT BEFORE CLOSING
-    massert(13650,
-            str::stream() << "Couldn't open directory '" << dir.string()
-                          << "' for flushing: " << errnoWithDescription(),
-            fd >= 0);
+    if (fd < 0) {
+        auto ec = lastPosixError();
+        msgasserted(13650,
+                    str::stream() << "Couldn't open directory '" << dir.string()
+                                  << "' for flushing: " << errorMessage(ec));
+    }
     if (fsync(fd) != 0) {
-        int e = errno;
-        if (e == EINVAL) {  // indicates filesystem does not support synchronization
+        auto ec = lastPosixError();
+        if (ec == posixError(EINVAL)) {  // indicates filesystem does not support synchronization
             if (!_warnedAboutFilesystem) {
                 LOGV2_OPTIONS(
                     22285,
@@ -252,10 +254,9 @@ void flushMyDirectory(const boost::filesystem::path& file) {
             }
         } else {
             close(fd);
-            massert(13651,
-                    str::stream() << "Couldn't fsync directory '" << dir.string()
-                                  << "': " << errnoWithDescription(e),
-                    false);
+            msgasserted(13651,
+                        str::stream() << "Couldn't fsync directory '" << dir.string()
+                                      << "': " << errorMessage(ec));
         }
     }
     close(fd);
@@ -273,20 +274,20 @@ Status StorageEngineMetadata::write() const {
     {
         std::ofstream ofs(metadataTempPath.c_str(), std::ios_base::out | std::ios_base::binary);
         if (!ofs) {
+            auto ec = lastSystemError();
             return Status(ErrorCodes::FileNotOpen,
-                          str::stream()
-                              << "Failed to write metadata to " << metadataTempPath.string() << ": "
-                              << errnoWithDescription());
+                          str::stream() << "Failed to write metadata to "
+                                        << metadataTempPath.string() << ": " << errorMessage(ec));
         }
 
         BSONObj obj = BSON(
             "storage" << BSON("engine" << _storageEngine << "options" << _storageEngineOptions));
         ofs.write(obj.objdata(), obj.objsize());
         if (!ofs) {
+            auto ec = lastSystemError();
             return Status(ErrorCodes::OperationFailed,
-                          str::stream()
-                              << "Failed to write BSON data to " << metadataTempPath.string()
-                              << ": " << errnoWithDescription());
+                          str::stream() << "Failed to write BSON data to "
+                                        << metadataTempPath.string() << ": " << errorMessage(ec));
         }
     }
 

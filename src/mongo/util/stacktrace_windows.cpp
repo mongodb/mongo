@@ -95,8 +95,9 @@ public:
         const auto symbolPath = symbolPathBuilder.str();
 
         if (!SymInitializeW(handle, symbolPath.c_str(), TRUE)) {
+            auto ec = lastSystemError();
             LOGV2_ERROR(
-                31443, "Stack trace initialization failed", "error"_attr = errnoWithDescription());
+                31443, "Stack trace initialization failed", "error"_attr = errorMessage(ec));
             return;
         }
 

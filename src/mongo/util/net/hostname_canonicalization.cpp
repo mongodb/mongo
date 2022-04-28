@@ -91,15 +91,15 @@ StatusWith<std::vector<std::string>> getHostFQDNs(std::string hostName,
     int err;
     auto nativeHostName = shim_toNativeString(hostName.c_str());
     if ((err = shim_getaddrinfo(nativeHostName.c_str(), nullptr, &hints, &info)) != 0) {
-        auto errorStr = getAddrInfoStrError(err);
+        auto ec = addrInfoError(err);
         LOGV2_DEBUG(23170,
                     3,
                     "Failed to obtain address information for host {hostName}: {error}",
                     "Failed to obtain address information for host",
                     "hostName"_attr = hostName,
-                    "error"_attr = errorStr);
+                    "error"_attr = errorMessage(ec));
 
-        return Status(ErrorCodes::BadValue, errorStr);
+        return Status(ErrorCodes::BadValue, errorMessage(ec));
     }
 
     const ScopeGuard guard(shim_freeaddrinfo);
@@ -137,7 +137,7 @@ StatusWith<std::vector<std::string>> getHostFQDNs(std::string hostName,
                 getNameInfoError << "Unknown address family: " << p->ai_family;
             }
 
-            getNameInfoError << ": \"" << getAddrInfoStrError(err);
+            getNameInfoError << ": \"" << errorMessage(addrInfoError(err));
         }
         getNameInfoErrors.push_back(getNameInfoError.str());
     }

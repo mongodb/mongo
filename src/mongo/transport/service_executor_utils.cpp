@@ -86,11 +86,10 @@ Status launchServiceWorkerThread(unique_function<void()> task) noexcept {
         if (limits.rlim_cur >= kStackSize) {
             int failed = pthread_attr_setstacksize(&attrs, kStackSize);
             if (failed) {
-                const auto ewd = errnoWithDescription(failed);
                 LOGV2_WARNING(22949,
                               "pthread_attr_setstacksize failed: {error}",
                               "pthread_attr_setstacksize failed",
-                              "error"_attr = ewd);
+                              "error"_attr = errorMessage(posixError(failed)));
             }
         } else if (limits.rlim_cur < kStackSize) {
             LOGV2_WARNING(22950,
@@ -116,17 +115,17 @@ Status launchServiceWorkerThread(unique_function<void()> task) noexcept {
                                 {logv2::UserAssertAfterLog()},
                                 "pthread_create failed: error: {error}",
                                 "pthread_create failed",
-                                "error"_attr = errnoWithDescription(failed));
+                                "error"_attr = errorMessage(posixError(failed)));
         } else if (failed < 0) {
-            auto savedErrno = errno;
+            auto ec = lastPosixError();
             LOGV2_ERROR_OPTIONS(4850901,
                                 {logv2::UserAssertAfterLog()},
                                 "pthread_create failed with a negative return code: {code}, errno: "
                                 "{errno}, error: {error}",
                                 "pthread_create failed with a negative return code",
                                 "code"_attr = failed,
-                                "errno"_attr = savedErrno,
-                                "error"_attr = errnoWithDescription(savedErrno));
+                                "errno"_attr = ec.value(),
+                                "error"_attr = errorMessage(ec));
         }
 
         ctx.release();

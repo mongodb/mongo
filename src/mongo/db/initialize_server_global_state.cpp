@@ -66,7 +66,7 @@ namespace mongo {
 
 #ifndef _WIN32
 static void croak(StringData prefix, int savedErr = errno) {
-    std::cout << prefix << ": " << errnoWithDescription(savedErr) << std::endl;
+    std::cout << prefix << ": " << errorMessage(posixError(savedErr)) << std::endl;
     quickExit(EXIT_ABRUPT);
 }
 
@@ -85,10 +85,11 @@ void signalForkSuccess() {
             if (savedErr == EPIPE)
                 break;  // The pipe read side has closed.
             else {
+                auto ec = posixError(savedErr);
                 LOGV2_WARNING(4656300,
                               "Write to child pipe failed",
-                              "errno"_attr = savedErr,
-                              "errnoDesc"_attr = errnoWithDescription(savedErr));
+                              "errno"_attr = ec.value(),
+                              "errnoDesc"_attr = errorMessage(ec));
                 quickExit(1);
             }
         } else if (nw == 0) {
@@ -98,11 +99,11 @@ void signalForkSuccess() {
         }
     }
     if (close(*f) == -1) {
-        int savedErr = errno;
+        auto ec = lastPosixError();
         LOGV2_WARNING(4656301,
                       "Closing write pipe failed",
-                      "errno"_attr = savedErr,
-                      "errnoDesc"_attr = errnoWithDescription(savedErr));
+                      "errno"_attr = ec.value(),
+                      "errnoDesc"_attr = errorMessage(ec));
     }
     *f = -1;
 }

@@ -97,8 +97,8 @@ AddrInfoPtr resolveAddrInfo(StringData hostOrIp, int port, sa_family_t familyHin
     };
 
     auto validateResolution = [](AddrError addrErr) -> AddrInfoPtr {
-        uassert(ErrorCodes::HostUnreachable, getAddrInfoStrError(addrErr.err), addrErr.err == 0);
-
+        auto ec = addrInfoError(addrErr.err);
+        uassert(ErrorCodes::HostUnreachable, errorMessage(ec), !ec);
         return std::move(addrErr.addr);
     };
 
@@ -116,15 +116,6 @@ AddrInfoPtr resolveAddrInfo(StringData hostOrIp, int port, sa_family_t familyHin
 }
 
 }  // namespace
-
-std::string getAddrInfoStrError(int code) {
-#if !defined(_WIN32)
-    return gai_strerror(code);
-#else
-    /* gai_strerrorA is not threadsafe on windows. don't use it. */
-    return errnoWithDescription(code);
-#endif
-}
 
 SockAddr::SockAddr() {
     addressSize = sizeof(sa);
@@ -308,8 +299,9 @@ std::string SockAddr::getAddr() const {
             const int buflen = 128;
             char buffer[buflen];
             int ret = getnameinfo(raw(), addressSize, buffer, buflen, nullptr, 0, NI_NUMERICHOST);
-            massert(
-                13082, str::stream() << "getnameinfo error " << getAddrInfoStrError(ret), ret == 0);
+            massert(13082,
+                    str::stream() << "getnameinfo error " << errorMessage(addrInfoError(ret)),
+                    ret == 0);
             return buffer;
         }
 

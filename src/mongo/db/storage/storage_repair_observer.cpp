@@ -122,11 +122,12 @@ void StorageRepairObserver::_touchRepairIncompleteFile() {
     boost::filesystem::ofstream fileStream(_repairIncompleteFilePath);
     fileStream << "This file indicates that a repair operation is in progress or incomplete.";
     if (fileStream.fail()) {
+        auto ec = lastSystemError();
         LOGV2_FATAL_NOTRACE(50920,
                             "Failed to write to file {file}: {error}",
                             "Failed to write to file",
                             "file"_attr = _repairIncompleteFilePath.generic_string(),
-                            "error"_attr = errnoWithDescription());
+                            "error"_attr = errorMessage(ec));
     }
     fileStream.close();
 

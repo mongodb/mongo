@@ -65,7 +65,7 @@ std::string statusWithDescription(NTSTATUS status) {
             ULONG errorCode = RtlNtStatusToDosErrorFunc(status);
 
             if (errorCode != ERROR_MR_MID_NOT_FOUND) {
-                return errnoWithDescription(errorCode);
+                return errorMessage(systemError(errorCode));
             }
         }
     }

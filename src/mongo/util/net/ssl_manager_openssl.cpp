@@ -3561,10 +3561,11 @@ void SSLManagerOpenSSL::_handleSSLError(SSLConnectionOpenSSL* conn, int ret) {
             } else if (ret == 0) {
                 LOGV2_ERROR(23261, "Unexpected EOF encountered during SSL communication");
             } else {
+                auto ec = lastSystemError();
                 LOGV2_ERROR(23262,
                             "The SSL BIO reported an I/O error {error}",
                             "The SSL BIO reported an I/O error",
-                            "error"_attr = errnoWithDescription());
+                            "error"_attr = errorMessage(ec));
             }
             break;
         case SSL_ERROR_SSL: {

@@ -69,11 +69,11 @@ namespace mongo {
 const struct WinsockInit {
     WinsockInit() {
         WSADATA d;
-        if (WSAStartup(MAKEWORD(2, 2), &d) != 0) {
+        if (int e = WSAStartup(MAKEWORD(2, 2), &d)) {
             LOGV2(23201,
                   "ERROR: wsastartup failed {error}",
                   "ERROR: wsastartup failed",
-                  "error"_attr = errnoWithDescription());
+                  "error"_attr = errorMessage(systemError(e)));
             quickExit(EXIT_NTSERVICE_ERROR);
         }
     }
@@ -150,12 +150,12 @@ void setSocketKeepAliveParams(int sock,
                      &sent,
                      nullptr,
                      nullptr)) {
-            int wsaErr = WSAGetLastError();
+            auto ec = lastSocketError();
             LOGV2_DEBUG(23204,
                         logSeverity,
                         "failed setting keepalive values: {error}",
                         "Failed setting keepalive values",
-                        "error"_attr = errnoWithDescription(wsaErr));
+                        "error"_attr = errorMessage(ec));
         }
     }
 #elif defined(__APPLE__) || defined(__linux__)
@@ -165,13 +165,13 @@ void setSocketKeepAliveParams(int sock,
         socklen_t optValLen = sizeof(rawOptVal);
 
         if (getsockopt(sock, level, optnum, reinterpret_cast<char*>(&rawOptVal), &optValLen)) {
-            int savedErrno = errno;
+            auto ec = lastSystemError();
             LOGV2_DEBUG(23205,
                         logSeverity,
                         "can't get {optname}: {error}",
                         "Can't get socket option",
                         "optname"_attr = optname,
-                        "error"_attr = errnoWithDescription(savedErrno));
+                        "error"_attr = errorMessage(ec));
         }
 
         if (optVal > maxVal) {
@@ -179,13 +179,13 @@ void setSocketKeepAliveParams(int sock,
             socklen_t maxValLen = sizeof(rawMaxVal);
 
             if (setsockopt(sock, level, optnum, reinterpret_cast<char*>(&rawMaxVal), maxValLen)) {
-                int savedErrno = errno;
+                auto ec = lastSystemError();
                 LOGV2_DEBUG(23206,
                             logSeverity,
                             "can't set {optname}: {error}",
                             "Can't set socket option",
                             "optname"_attr = optname,
-                            "error"_attr = errnoWithDescription(savedErrno));
+                            "error"_attr = errorMessage(ec));
             }
         }
     };
@@ -234,10 +234,11 @@ std::string getHostName() {
     char buf[256];
     int ec = gethostname(buf, 127);
     if (ec || *buf == 0) {
+        auto ec = lastSocketError();
         LOGV2(23202,
               "can't get this server's hostname {error}",
               "Can't get this server's hostname",
-              "error"_attr = errnoWithDescription());
+              "error"_attr = errorMessage(ec));
         return "";
     }
     return buf;

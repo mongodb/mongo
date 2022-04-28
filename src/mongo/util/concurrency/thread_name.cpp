@@ -144,7 +144,7 @@ void setOSThreadName(StringData threadName) {
         LOGV2(23102,
               "Ignoring error from setting thread name: {error}",
               "Ignoring error from setting thread name",
-              "error"_attr = errnoWithDescription(error));
+              "error"_attr = errorMessage(posixError(error)));
     }
 #elif defined(__linux__) && defined(MONGO_CONFIG_HAVE_PTHREAD_SETNAME_NP)
     // Do not set thread name on the main() thread. Setting the name on main thread breaks
@@ -168,7 +168,7 @@ void setOSThreadName(StringData threadName) {
             LOGV2(23103,
                   "Ignoring error from setting thread name: {error}",
                   "Ignoring error from setting thread name",
-                  "error"_attr = errnoWithDescription(error));
+                  "error"_attr = errorMessage(posixError(error)));
         }
     }
 #endif

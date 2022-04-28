@@ -59,14 +59,16 @@ std::string askPassword() {
     if (isatty(stdinfd)) {
         int i = tcgetattr(stdinfd, &termio);
         if (i == -1) {
-            std::cerr << "Cannot get terminal attributes " << errnoWithDescription() << std::endl;
+            auto ec = lastSystemError();
+            std::cerr << "Cannot get terminal attributes " << errorMessage(ec) << std::endl;
             return std::string();
         }
         old = termio.c_lflag;
         termio.c_lflag &= ~ECHO;
         i = tcsetattr(stdinfd, TCSANOW, &termio);
         if (i == -1) {
-            std::cerr << "Cannot set terminal attributes " << errnoWithDescription() << std::endl;
+            auto ec = lastSystemError();
+            std::cerr << "Cannot set terminal attributes " << errorMessage(ec) << std::endl;
             return std::string();
         }
     }
@@ -77,33 +79,38 @@ std::string askPassword() {
         termio.c_lflag = old;
         int i = tcsetattr(stdinfd, TCSANOW, &termio);
         if (i == -1) {
-            std::cerr << "Cannot set terminal attributes " << errnoWithDescription() << std::endl;
+            auto ec = lastSystemError();
+            std::cerr << "Cannot set terminal attributes " << errorMessage(ec) << std::endl;
             return std::string();
         }
     }
 #else
     HANDLE stdinh = GetStdHandle(STD_INPUT_HANDLE);
     if (stdinh == INVALID_HANDLE_VALUE) {
-        std::cerr << "Cannot get stdin handle " << GetLastError() << "\n";
+        auto ec = lastSystemError();
+        std::cerr << "Cannot get stdin handle " << errorMessage(ec) << "\n";
         return std::string();
     }
 
     DWORD old;
     if (!GetConsoleMode(stdinh, &old)) {
-        std::cerr << "Cannot get console mode " << GetLastError() << "\n";
+        auto ec = lastSystemError();
+        std::cerr << "Cannot get console mode " << errorMessage(ec) << "\n";
         return std::string();
     }
 
     DWORD noecho = ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT;
     if (!SetConsoleMode(stdinh, noecho)) {
-        std::cerr << "Cannot set console mode " << GetLastError() << "\n";
+        auto ec = lastSystemError();
+        std::cerr << "Cannot set console mode " << errorMessage(ec) << "\n";
         return std::string();
     }
 
     getline(std::cin, password);
 
     if (!SetConsoleMode(stdinh, old)) {
-        std::cerr << "Cannot set console mode " << GetLastError() << "\n";
+        auto ec = lastSystemError();
+        std::cerr << "Cannot set console mode " << errorMessage(ec) << "\n";
         return std::string();
     }
 #endif

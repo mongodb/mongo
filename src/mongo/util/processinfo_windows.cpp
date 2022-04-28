@@ -77,10 +77,10 @@ LpiRecords getLogicalProcessorInformationRecords() {
                 lpiRecords.slpiRecords = std::unique_ptr<SlpiBuf[]>(
                     new SlpiBuf[((returnLength - 1) / sizeof(Slpi)) + 1]);
             } else {
-                DWORD gle = GetLastError();
+                auto ec = lastSystemError();
                 LOGV2_WARNING(23811,
                               "GetLogicalProcessorInformation failed",
-                              "error"_attr = errnoWithDescription(gle));
+                              "error"_attr = errorMessage(ec));
                 return LpiRecords{};
             }
         }
@@ -147,8 +147,8 @@ int ProcessInfo::getVirtualMemorySize() {
     mse.dwLength = sizeof(mse);
     BOOL status = GlobalMemoryStatusEx(&mse);
     if (!status) {
-        DWORD gle = GetLastError();
-        LOGV2_ERROR(23812, "GlobalMemoryStatusEx failed", "error"_attr = errnoWithDescription(gle));
+        auto ec = lastSystemError();
+        LOGV2_ERROR(23812, "GlobalMemoryStatusEx failed", "error"_attr = errorMessage(ec));
         fassert(28621, status);
     }
 
@@ -161,8 +161,8 @@ int ProcessInfo::getResidentSize() {
     PROCESS_MEMORY_COUNTERS pmc;
     BOOL status = GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc));
     if (!status) {
-        DWORD gle = GetLastError();
-        LOGV2_ERROR(23813, "GetProcessMemoryInfo failed", "error"_attr = errnoWithDescription(gle));
+        auto ec = lastSystemError();
+        LOGV2_ERROR(23813, "GetProcessMemoryInfo failed", "error"_attr = errorMessage(ec));
         fassert(28622, status);
     }
 
@@ -193,32 +193,32 @@ void ProcessInfo::getExtraInfo(BSONObjBuilder& info) {
 bool getFileVersion(const char* filePath, DWORD& fileVersionMS, DWORD& fileVersionLS) {
     DWORD verSize = GetFileVersionInfoSizeA(filePath, NULL);
     if (verSize == 0) {
-        DWORD gle = GetLastError();
+        auto ec = lastSystemError();
         LOGV2_WARNING(23807,
                       "GetFileVersionInfoSizeA failed",
                       "path"_attr = filePath,
-                      "error"_attr = errnoWithDescription(gle));
+                      "error"_attr = errorMessage(ec));
         return false;
     }
 
     std::unique_ptr<char[]> verData(new char[verSize]);
     if (GetFileVersionInfoA(filePath, NULL, verSize, verData.get()) == 0) {
-        DWORD gle = GetLastError();
+        auto ec = lastSystemError();
         LOGV2_WARNING(23808,
                       "GetFileVersionInfoSizeA failed",
                       "path"_attr = filePath,
-                      "error"_attr = errnoWithDescription(gle));
+                      "error"_attr = errorMessage(ec));
         return false;
     }
 
     UINT size;
     VS_FIXEDFILEINFO* verInfo;
     if (VerQueryValueA(verData.get(), "\\", (LPVOID*)&verInfo, &size) == 0) {
-        DWORD gle = GetLastError();
+        auto ec = lastSystemError();
         LOGV2_WARNING(23809,
                       "VerQueryValueA failed",
                       "path"_attr = filePath,
-                      "error"_attr = errnoWithDescription(gle));
+                      "error"_attr = errorMessage(ec));
         return false;
     }
 

@@ -815,7 +815,10 @@ TEST(SetupOptions, UnlinkedCwd) {
     // Naive rmdir of cwd doesn't work on Solaris doesn't work (no matter how it's specified).
     // So we use a subprocess to unlink the dir.
     pid_t pid = fork();
-    ASSERT_NOT_EQUALS(pid, -1) << "unable to fork: " << ::mongo::errnoWithDescription();
+    if (pid == -1) {
+        auto ec = lastSystemError();
+        FAIL("unable to fork") << errorMessage(ec);
+    }
     if (pid == 0) {
         // Subprocess
         // No exceptions, ASSERT(), FAIL() or logging.

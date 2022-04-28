@@ -82,19 +82,20 @@ public:
     using std::runtime_error::runtime_error;
 };
 
-#define LOG_AND_THROW_WITH_ERRNO(expr) logAndThrowWithErrnoAt(expr, __FILE__, __LINE__, errno)
+#define LOG_AND_THROW_WITH_ERRNO(expr) logAndThrowWithErrnoAt(expr, __FILE__, __LINE__)
 
-void logAndThrowWithErrnoAt(StringData expr, StringData file, unsigned line, int err) {
+void logAndThrowWithErrnoAt(StringData expr, StringData file, unsigned line) {
+    auto ec = lastPosixError();
     LOGV2_ERROR(24138,
                 "{expr} failed: {error} @{file}:{line}",
                 "expression failed",
                 "expr"_attr = expr,
-                "error"_attr = errnoWithDescription(err),
+                "error"_attr = errorMessage(ec),
                 "file"_attr = file,
                 "line"_attr = line);
     breakpoint();
     throw DeathTestSyscallException(
-        "{} failed: {} @{}:{}"_format(expr, errnoWithDescription(err), file, line));
+        "{} failed: {} @{}:{}"_format(expr, errorMessage(ec), file, line));
 }
 
 

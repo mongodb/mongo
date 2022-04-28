@@ -913,8 +913,8 @@ namespace {
 bool trySetSockOpt(int level, int opt, int val) {
     auto sock = ::socket(AF_INET, SOCK_STREAM, 0);
     if (sock == -1) {
-        int ec = errno;
-        LOGV2_WARNING(5128700, "socket() failed", "error"_attr = errnoWithDescription(ec));
+        auto ec = lastSocketError();
+        LOGV2_WARNING(5128700, "socket() failed", "error"_attr = errorMessage(ec));
         return false;
     }
 
@@ -1112,13 +1112,16 @@ Status TransportLayerASIO::setup() {
     for (const auto& addr : endpoints) {
 #ifndef _WIN32
         if (addr.family() == AF_UNIX) {
-            if (::unlink(addr.toString().c_str()) == -1 && errno != ENOENT) {
-                LOGV2_ERROR(23024,
-                            "Failed to unlink socket file {path} {error}",
-                            "Failed to unlink socket file",
-                            "path"_attr = addr.toString().c_str(),
-                            "error"_attr = errnoWithDescription(errno));
-                fassertFailedNoTrace(40486);
+            if (::unlink(addr.toString().c_str()) == -1) {
+                auto ec = lastPosixError();
+                if (ec != posixError(ENOENT)) {
+                    LOGV2_ERROR(23024,
+                                "Failed to unlink socket file {path} {error}",
+                                "Failed to unlink socket file",
+                                "path"_attr = addr.toString().c_str(),
+                                "error"_attr = errorMessage(ec));
+                    fassertFailedNoTrace(40486);
+                }
             }
         }
 #endif
@@ -1188,11 +1191,12 @@ Status TransportLayerASIO::setup() {
 #ifndef _WIN32
         if (addr.family() == AF_UNIX) {
             if (::chmod(addr.toString().c_str(), serverGlobalParams.unixSocketPermissions) == -1) {
+                auto ec = lastPosixError();
                 LOGV2_ERROR(23026,
                             "Failed to chmod socket file {path} {error}",
                             "Failed to chmod socket file",
                             "path"_attr = addr.toString().c_str(),
-                            "error"_attr = errnoWithDescription(errno));
+                            "error"_attr = errorMessage(ec));
                 fassertFailedNoTrace(40487);
             }
         }
@@ -1288,12 +1292,12 @@ void TransportLayerASIO::_runListener() noexcept {
             LOGV2(
                 23017, "removing socket file: {path}", "removing socket file", "path"_attr = path);
             if (::unlink(path.c_str()) != 0) {
-                const auto ewd = errnoWithDescription();
+                auto ec = lastPosixError();
                 LOGV2_WARNING(23022,
                               "Unable to remove UNIX socket {path}: {error}",
                               "Unable to remove UNIX socket",
                               "path"_attr = path,
-                              "error"_attr = ewd);
+                              "error"_attr = errorMessage(ec));
             }
         }
     }

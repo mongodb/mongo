@@ -142,7 +142,8 @@ BSONObj cd(const BSONObj& args, void* data) {
         return BSONObj();
     }
 #endif
-    uasserted(16832, str::stream() << "cd command failed: " << errnoWithDescription());
+    auto ec = lastSystemError();
+    uasserted(16832, str::stream() << "cd command failed: " << errorMessage(ec));
     return BSONObj();
 }
 

@@ -75,8 +75,8 @@ public:
         auto name = "/proc/{}/stat"_format(pid.asUInt32());
         FILE* f = fopen(name.c_str(), "r");
         if (!f) {
-            auto e = errno;
-            msgasserted(13538, "couldn't open [{}] {}"_format(name, errnoWithDescription(e)));
+            auto ec = lastSystemError();
+            msgasserted(13538, "couldn't open [{}] {}"_format(name, errorMessage(ec)));
         }
         int found = fscanf(f,
                            "%d %127s %c "
@@ -664,10 +664,10 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     LinuxSysHelper::getLinuxDistro(distroName, distroVersion);
 
     if (uname(&unameData) == -1) {
-        auto e = errno;
+        auto ec = lastSystemError();
         LOGV2(23339,
               "Unable to collect detailed system information",
-              "error"_attr = errnoWithDescription(e));
+              "error"_attr = errorMessage(ec));
     }
 
     osType = "Linux";

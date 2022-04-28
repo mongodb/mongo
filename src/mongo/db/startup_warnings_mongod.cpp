@@ -96,11 +96,11 @@ StatusWith<std::string> StartupWarningsMongod::readTransparentHugePagesParameter
 
         std::string line;
         if (!std::getline(ifs, line)) {
-            int errorcode = errno;
-            return StatusWith<std::string>(
-                ErrorCodes::FileStreamFailed,
-                str::stream() << "failed to read from " << filename << ": "
-                              << ((ifs.eof()) ? "EOF" : errnoWithDescription(errorcode)));
+            auto ec = lastSystemError();
+            return StatusWith<std::string>(ErrorCodes::FileStreamFailed,
+                                           str::stream()
+                                               << "failed to read from " << filename << ": "
+                                               << ((ifs.eof()) ? "EOF" : errorMessage(ec)));
         }
 
         std::string::size_type posBegin = line.find("[");
@@ -188,10 +188,11 @@ void logMongodStartupWarnings(const StorageGlobalParams& storageParams,
             std::string line;  // we only need the first line
             std::getline(f, line);
             if (f.fail()) {
+                auto ec = lastSystemError();
                 LOGV2_WARNING_OPTIONS(22200,
                                       {logv2::LogTag::kStartupWarnings},
                                       "Failed to read from /proc/self/numa_maps",
-                                      "error"_attr = errnoWithDescription());
+                                      "error"_attr = errorMessage(ec));
             } else {
                 // skip over pointer
                 std::string::size_type where = line.find(' ');
@@ -324,12 +325,12 @@ void logMongodStartupWarnings(const StorageGlobalParams& storageParams,
                                   "recommendedMinimum"_attr = minNumFiles);
         }
     } else {
-        const auto errmsg = errnoWithDescription();
+        auto ec = lastSystemError();
         LOGV2_WARNING_OPTIONS(22186,
                               {logv2::LogTag::kStartupWarnings},
                               "getrlimit failed: {error}",
                               "getrlimit failed",
-                              "error"_attr = errmsg);
+                              "error"_attr = errorMessage(ec));
     }
 
 // Solaris does not have RLIMIT_MEMLOCK, these are exposed via getrctl(2) instead
@@ -352,12 +353,12 @@ void logMongodStartupWarnings(const StorageGlobalParams& storageParams,
                                       minLockedPages * ProcessInfo::getPageSize());
         }
     } else {
-        const auto errmsg = errnoWithDescription();
+        auto ec = lastSystemError();
         LOGV2_WARNING_OPTIONS(22190,
                               {logv2::LogTag::kStartupWarnings},
                               "** WARNING: getrlimit failed: {error}",
                               "getrlimit failed",
-                              "error"_attr = errmsg);
+                              "error"_attr = errorMessage(ec));
     }
 #endif
 #endif

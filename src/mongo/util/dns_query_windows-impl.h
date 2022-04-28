@@ -279,16 +279,16 @@ public:
                        const DNSQueryClass class_,
                        const DNSQueryType type) {
         PDNS_RECORDA queryResults;
-        auto ec = DnsQuery_UTF8(service.c_str(),
-                                WORD(type),
-                                DNS_QUERY_BYPASS_CACHE,
-                                nullptr,
-                                reinterpret_cast<PDNS_RECORD*>(&queryResults),
-                                nullptr);
-
-        if (ec) {
+        auto e = DnsQuery_UTF8(service.c_str(),
+                               WORD(type),
+                               DNS_QUERY_BYPASS_CACHE,
+                               nullptr,
+                               reinterpret_cast<PDNS_RECORD*>(&queryResults),
+                               nullptr);
+        if (e) {
+            auto ec = systemError(e);
             uasserted(ErrorCodes::DNSHostNotFound,
-                      "Failed to look up service \""s + "\":"s + errnoWithDescription(ec));
+                      "Failed to look up service \""s + "\":"s + errorMessage(ec));
         }
         return DNSResponse{service, queryResults};
     }

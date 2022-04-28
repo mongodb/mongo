@@ -114,8 +114,8 @@ StatusWith<unsigned> pollASIOSocket(asio::generic::stream_protocol::socket& sock
     };
     int result = ::select(fd + 1, fdsPtr(0), fdsPtr(1), fdsPtr(2), &timeoutTv);
     if (result == SOCKET_ERROR) {
-        auto errDesc = errnoWithDescription(WSAGetLastError());
-        return {ErrorCodes::InternalError, errDesc};
+        auto ec = lastSocketError();
+        return {ErrorCodes::InternalError, errorMessage(ec)};
     } else if (result == 0) {
         return {ErrorCodes::NetworkTimeout, "Timed out waiting for poll"};
     }
@@ -150,8 +150,8 @@ StatusWith<unsigned> pollASIOSocket(asio::generic::stream_protocol::socket& sock
     } while (result == -1 && errno == EINTR);
 
     if (result == -1) {
-        int errCode = errno;
-        return {ErrorCodes::InternalError, errnoWithDescription(errCode)};
+        auto ec = lastPosixError();
+        return {ErrorCodes::InternalError, errorMessage(ec)};
     } else if (result == 0) {
         return {ErrorCodes::NetworkTimeout, "Timed out waiting for poll"};
     }

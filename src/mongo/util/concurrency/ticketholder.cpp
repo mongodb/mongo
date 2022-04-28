@@ -54,7 +54,7 @@ namespace {
 void failWithErrno(int err) {
     LOGV2_FATAL(28604,
                 "error in Ticketholder: {errnoWithDescription_err}",
-                "errnoWithDescription_err"_attr = errnoWithDescription(err));
+                "errnoWithDescription_err"_attr = errorMessage(posixError(err)));
 }
 
 /*

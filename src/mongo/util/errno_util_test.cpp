@@ -37,37 +37,49 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/errno_util.h"
 
+namespace mongo {
 namespace {
-using namespace mongo;
 
 const std::string kUnknownError = "Unknown error";
 
-TEST(ErrnoWithDescription, CommonErrors) {
+/** Force a predictable error message language. */
+void initLanguage() {
 #if defined(_WIN32)
-    // Force error messages to be returned in en-US.
     LANGID lang = MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US);
     ASSERT_EQ(SetThreadUILanguage(lang), lang);
-
-    ASSERT_STRING_OMITS(errnoWithDescription(ERROR_SUCCESS), kUnknownError);
-    ASSERT_STRING_OMITS(errnoWithDescription(ERROR_FILE_NOT_FOUND), kUnknownError);
-    ASSERT_STRING_OMITS(errnoWithDescription(ERROR_PATH_NOT_FOUND), kUnknownError);
-    ASSERT_STRING_OMITS(errnoWithDescription(ERROR_TOO_MANY_OPEN_FILES), kUnknownError);
-    ASSERT_STRING_OMITS(errnoWithDescription(ERROR_ACCESS_DENIED), kUnknownError);
-    ASSERT_STRING_OMITS(errnoWithDescription(ERROR_PRIVILEGE_NOT_HELD), kUnknownError);
 #else
-    // Force the minimal locale to ensure the standard error message localization text.
     ASSERT(setlocale(LC_MESSAGES, "C"));
+#endif
+}
 
-    ASSERT_STRING_OMITS(errnoWithDescription(EPERM), kUnknownError);
-    ASSERT_STRING_OMITS(errnoWithDescription(ENOENT), kUnknownError);
-    ASSERT_STRING_OMITS(errnoWithDescription(EIO), kUnknownError);
-    ASSERT_STRING_OMITS(errnoWithDescription(EBADF), kUnknownError);
-    ASSERT_STRING_OMITS(errnoWithDescription(ENOMEM), kUnknownError);
-    ASSERT_STRING_OMITS(errnoWithDescription(EACCES), kUnknownError);
+TEST(ErrnoWithDescription, CommonErrors) {
+#if defined(_WIN32)
+    static const std::array knownErrors{
+        ERROR_SUCCESS,
+        ERROR_FILE_NOT_FOUND,
+        ERROR_PATH_NOT_FOUND,
+        ERROR_TOO_MANY_OPEN_FILES,
+        ERROR_ACCESS_DENIED,
+        ERROR_PRIVILEGE_NOT_HELD,
+    };
+#else
+    static const std::array knownErrors{
+        EPERM,
+        ENOENT,
+        EIO,
+        EBADF,
+        ENOMEM,
+        EACCES,
+    };
 #endif
 
-    // INT_MAX is currently invalid.  In the unlikely event that it becomes valid, then this check
-    // will have to be removed or adjusted.
-    ASSERT_STRING_CONTAINS(errnoWithDescription(INT_MAX), kUnknownError);
+    initLanguage();
+
+    for (auto e : knownErrors)
+        ASSERT_STRING_OMITS(errorMessage(systemError(e)), kUnknownError);
+
+    // Update if INT_MAX becomes a valid code.
+    ASSERT_STRING_CONTAINS(errorMessage(systemError(INT_MAX)), kUnknownError);
 }
 }  // namespace
+}  // namespace mongo

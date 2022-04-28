@@ -54,10 +54,9 @@ MONGO_INITIALIZER(PdhInit)(InitializerContext* context) {
 
     hPdhLibrary = LoadLibraryW(L"pdh.dll");
     if (nullptr == hPdhLibrary) {
-        DWORD gle = GetLastError();
+        auto ec = lastSystemError();
         uasserted(ErrorCodes::WindowsPdhError,
-                  str::stream() << "LoadLibrary of pdh.dll failed with "
-                                << errnoWithDescription(gle));
+                  str::stream() << "LoadLibrary of pdh.dll failed with " << errorMessage(ec));
     }
 }
 

@@ -94,7 +94,7 @@ bool readBytes(size_t toRead, char* buf, int fd) {
             uassert(ErrorCodes::FileStreamFailed,
                     str::stream() << "failed to read bytes: errno(" << ec.value()
                                   << ") : " << errorMessage(ec),
-                    ec.value() == EINTR);
+                    ec == posixError(EINTR));
 
             continue;
         } else if (r == 0) {

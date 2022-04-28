@@ -59,9 +59,9 @@ namespace {
 Nanoseconds getThreadCPUTime() {
     struct timespec t;
     if (auto ret = clock_gettime(CLOCK_THREAD_CPUTIME_ID, &t); ret != 0) {
-        int ec = errno;
-        iassert(Status(ErrorCodes::InternalError,
-                       "Unable to get time: {}"_format(errnoWithDescription(ec))));
+        auto ec = lastSystemError();
+        iassert(
+            Status(ErrorCodes::InternalError, "Unable to get time: {}"_format(errorMessage(ec))));
     }
     return Seconds(t.tv_sec) + Nanoseconds(t.tv_nsec);
 }

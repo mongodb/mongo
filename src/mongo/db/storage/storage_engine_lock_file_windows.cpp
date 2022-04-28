@@ -52,17 +52,17 @@ Status _truncateFile(HANDLE handle) {
     LARGE_INTEGER largeint;
     largeint.QuadPart = 0;
     if (::SetFilePointerEx(handle, largeint, NULL, FILE_BEGIN) == FALSE) {
-        int errorcode = GetLastError();
+        auto ec = lastSystemError();
         return Status(ErrorCodes::FileStreamFailed,
                       str::stream() << "Unable to truncate lock file (SetFilePointerEx failed) "
-                                    << errnoWithDescription(errorcode));
+                                    << errorMessage(ec));
     }
 
     if (::SetEndOfFile(handle) == FALSE) {
-        int errorcode = GetLastError();
+        auto ec = lastSystemError();
         return Status(ErrorCodes::FileStreamFailed,
                       str::stream() << "Unable to truncate lock file (SetEndOfFile failed) "
-                                    << errnoWithDescription(errorcode));
+                                    << errorMessage(ec));
     }
 
     return Status::OK();
@@ -119,8 +119,8 @@ Status StorageEngineLockFile::open() {
                                         NULL);
 
     if (lockFileHandle == INVALID_HANDLE_VALUE) {
-        int errorcode = GetLastError();
-        if (errorcode == ERROR_ACCESS_DENIED) {
+        auto ec = lastSystemError();
+        if (ec == systemError(ERROR_ACCESS_DENIED)) {
             return Status(ErrorCodes::IllegalOperation,
                           str::stream()
                               << "Attempted to create a lock file on a read-only directory: "
@@ -128,7 +128,7 @@ Status StorageEngineLockFile::open() {
         }
         return Status(ErrorCodes::DBPathInUse,
                       str::stream() << "Unable to create/open the lock file: " << _filespec << " ("
-                                    << errnoWithDescription(errorcode) << ")."
+                                    << errorMessage(ec) << ")."
                                     << " Ensure the user executing mongod is the owner of the lock "
                                        "file and has the appropriate permissions. Also make sure "
                                        "that another mongod instance is not already running on the "
@@ -164,10 +164,10 @@ Status StorageEngineLockFile::writeString(StringData str) {
                     static_cast<DWORD>(str.size()),
                     &bytesWritten,
                     NULL) == FALSE) {
-        int errorcode = GetLastError();
+        auto ec = lastSystemError();
         return Status(ErrorCodes::FileStreamFailed,
                       str::stream() << "Unable to write string " << str << " to file: " << _filespec
-                                    << ' ' << errnoWithDescription(errorcode));
+                                    << ' ' << errorMessage(ec));
     } else if (bytesWritten == 0) {
         return Status(ErrorCodes::FileStreamFailed,
                       str::stream() << "Unable to write string " << str << " to file: " << _filespec

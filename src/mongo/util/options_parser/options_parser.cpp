@@ -1364,8 +1364,9 @@ Status checkFileOwnershipAndMode(int fd, mode_t prohibit, StringData modeDesc) {
     struct stat stats;
 
     if (::fstat(fd, &stats) == -1) {
-        const auto& ewd = errnoWithDescription();
-        return {ErrorCodes::InvalidPath, str::stream() << "Error reading file metadata: " << ewd};
+        auto ec = lastSystemError();
+        return {ErrorCodes::InvalidPath,
+                str::stream() << "Error reading file metadata: " << errorMessage(ec)};
     }
 
     if (stats.st_uid != ::getuid()) {
@@ -1437,8 +1438,9 @@ Status OptionsParser::readConfigFile(const std::string& filename,
 #endif
 
     if (fd < 0) {
-        const auto& ewd = errnoWithDescription();
-        return {ErrorCodes::InternalError, str::stream() << "Error opening config file: " << ewd};
+        auto ec = lastPosixError();
+        return {ErrorCodes::InternalError,
+                str::stream() << "Error opening config file: " << errorMessage(ec)};
     }
 
 #ifdef _WIN32

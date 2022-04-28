@@ -100,7 +100,8 @@ MONGO_INITIALIZER(SetTimeZoneToEasternForTest)(InitializerContext*) {
     int ret = putenv(tzEnvString);
 #endif
     if (ret == -1) {
-        uasserted(ErrorCodes::BadValue, errnoWithDescription());
+        auto ec = lastPosixError();
+        uasserted(ErrorCodes::BadValue, errorMessage(ec));
     }
     tzset();
 }

@@ -33,9 +33,33 @@
 #include <fmt/format.h>
 #include <system_error>
 
+#ifndef _WIN32
+#include <netdb.h>
+#endif
+
 namespace mongo {
 
 using namespace fmt::literals;
+
+class AddrInfoErrorCategory : public std::error_category {
+public:
+    const char* name() const noexcept override {
+        return "getaddrinfo";
+    }
+
+    std::string message(int e) const override {
+#ifdef _WIN32
+        return systemError(e).message();
+#else
+        return gai_strerror(e);
+#endif
+    }
+};
+
+const std::error_category& addrInfoCategory() {
+    static auto p = new AddrInfoErrorCategory;
+    return *p;
+}
 
 std::string errorMessage(std::error_code ec) {
     std::string r = ec.message();

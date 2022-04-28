@@ -66,21 +66,7 @@ struct EventFDHolder {
     EventFDHolder(const EventFDHolder&) = delete;
     EventFDHolder& operator=(const EventFDHolder&) = delete;
 
-    EventFDHolder() : fd(::eventfd(0, EFD_CLOEXEC)) {
-        // On error, -1 is returned and `errno` is set
-        if (fd < 0) {
-            const auto savedErrno = errno;
-            const auto errorCode = savedErrno == EMFILE || savedErrno == ENFILE
-                ? ErrorCodes::TooManyFilesOpen
-                : ErrorCodes::UnknownError;
-            Status status(errorCode,
-                          fmt::format("error in creating eventfd: {}, errno: {}",
-                                      errnoWithDescription(savedErrno),
-                                      savedErrno));
-            LOGV2_ERROR(6328201, "Unable to create eventfd object", "error"_attr = status);
-            iasserted(status);
-        }
-    }
+    EventFDHolder() = default;
 
     ~EventFDHolder() {
         ::close(fd);
@@ -106,7 +92,27 @@ struct EventFDHolder {
         }
     }
 
-    const int fd;
+private:
+    static int _initFd() {
+        int fd = ::eventfd(0, EFD_CLOEXEC);
+        // On error, -1 is returned and `errno` is set
+        if (fd < 0) {
+            auto ec = lastPosixError();
+            const auto errorCode = ec == posixError(EMFILE) || ec == posixError(ENFILE)
+                ? ErrorCodes::TooManyFilesOpen
+                : ErrorCodes::UnknownError;
+            Status status(errorCode,
+                          fmt::format("error in creating eventfd: {}, errno: {}",
+                                      errorMessage(ec),
+                                      ec.value()));
+            LOGV2_ERROR(6328201, "Unable to create eventfd object", "error"_attr = status);
+            iasserted(status);
+        }
+        return fd;
+    }
+
+public:
+    const int fd = _initFd();
 };
 
 const auto getEventFDForClient = Client::declareDecoration<EventFDHolder>();
@@ -349,9 +355,10 @@ std::list<Promise<void>> TransportLayerASIO::BatonASIO::_poll(stdx::unique_lock<
         blockBatonASIOBeforePoll.pauseWhileSet();
         int timeout = deadline ? Milliseconds(*deadline - now).count() : -1;
         int events = ::poll(_pollSet.data(), _pollSet.size(), timeout);
-        const auto savedErrno = errno;
-        if (events < 0 && savedErrno != EINTR) {
-            LOGV2_FATAL(50834, "error in poll", "error"_attr = errnoWithDescription(savedErrno));
+        if (events < 0) {
+            auto ec = lastSystemError();
+            if (ec != systemError(EINTR))
+                LOGV2_FATAL(50834, "error in poll", "error"_attr = errorMessage(ec));
         }
         return events;
     }();

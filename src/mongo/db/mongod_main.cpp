@@ -936,9 +936,9 @@ Status shutdownProcessByDBPathPidFile(const std::string& dbpath) {
     std::cout << "Killing process with pid: " << pid << std::endl;
     int ret = kill(pid, SIGTERM);
     if (ret) {
-        int e = errno;
+        auto ec = lastSystemError();
         return {ErrorCodes::OperationFailed,
-                str::stream() << "Failed to kill process: " << errnoWithDescription(e)};
+                str::stream() << "Failed to kill process: " << errorMessage(ec)};
     }
 
     // Wait for process to terminate.

@@ -136,8 +136,8 @@ void safeClose(int fd) {
     const ScopedSignalBlocker block;
 #endif
     if (close(fd) != 0) {
-        const auto ewd = errnoWithDescription();
-        LOGV2_ERROR(22829, "Failed to close fd", "fd"_attr = fd, "error"_attr = ewd);
+        auto ec = lastPosixError();
+        LOGV2_ERROR(22829, "Failed to close fd", "fd"_attr = fd, "error"_attr = errorMessage(ec));
         fassertFailed(40318);
     }
 }
@@ -258,9 +258,10 @@ bool ProgramRegistry::waitForPid(const ProcessId pid, const bool block, int* con
     if (ret == WAIT_TIMEOUT) {
         return false;
     } else if (ret != WAIT_OBJECT_0) {
-        const auto ewd = errnoWithDescription();
-        LOGV2_INFO(
-            22811, "ProgramRegistry::waitForPid: WaitForSingleObject failed", "error"_attr = ewd);
+        auto ec = lastSystemError();
+        LOGV2_INFO(22811,
+                   "ProgramRegistry::waitForPid: WaitForSingleObject failed",
+                   "error"_attr = errorMessage(ec));
     }
 
     DWORD tmp;
@@ -279,8 +280,8 @@ bool ProgramRegistry::waitForPid(const ProcessId pid, const bool block, int* con
         unregisterProgram(pid);
         return true;
     } else {
-        const auto ewd = errnoWithDescription();
-        LOGV2_INFO(22812, "GetExitCodeProcess failed", "error"_attr = ewd);
+        auto ec = lastSystemError();
+        LOGV2_INFO(22812, "GetExitCodeProcess failed", "error"_attr = errorMessage(ec));
         return false;
     }
 #else
@@ -558,10 +559,9 @@ void ProgramRunner::start() {
         // Holding the lock for the duration of those events prevents the leaks and thus the
         // associated deadlocks.
         stdx::lock_guard<Latch> lk(_createProcessMtx);
-        int status = pipe(pipeEnds);
-        if (status != 0) {
-            const auto ewd = errnoWithDescription();
-            LOGV2_ERROR(22830, "Failed to create pipe", "error"_attr = ewd);
+        if (pipe(pipeEnds)) {
+            auto ec = lastPosixError();
+            LOGV2_ERROR(22830, "Failed to create pipe", "error"_attr = errorMessage(ec));
             fassertFailed(16701);
         }
 #ifndef _WIN32
@@ -569,16 +569,16 @@ void ProgramRunner::start() {
         // about to fork do *not* inherit the file descriptors for the pipe. If grandchild processes
         // could inherit the FD for the pipe, than the pipe wouldn't close on child process exit. On
         // windows, instead the handle inherit flag is turned off after the call to CreateProcess.
-        status = fcntl(pipeEnds[0], F_SETFD, FD_CLOEXEC);
-        if (status != 0) {
-            const auto ewd = errnoWithDescription();
-            LOGV2_ERROR(22831, "Failed to set FD_CLOEXEC on pipe end 0", "error"_attr = ewd);
+        if (fcntl(pipeEnds[0], F_SETFD, FD_CLOEXEC)) {
+            auto ec = lastPosixError();
+            LOGV2_ERROR(
+                22831, "Failed to set FD_CLOEXEC on pipe end 0", "error"_attr = errorMessage(ec));
             fassertFailed(40308);
         }
-        status = fcntl(pipeEnds[1], F_SETFD, FD_CLOEXEC);
-        if (status != 0) {
-            const auto ewd = errnoWithDescription();
-            LOGV2_ERROR(22832, "Failed to set FD_CLOEXEC on pipe end 1", "error"_attr = ewd);
+        if (fcntl(pipeEnds[1], F_SETFD, FD_CLOEXEC)) {
+            auto ec = lastPosixError();
+            LOGV2_ERROR(
+                22832, "Failed to set FD_CLOEXEC on pipe end 1", "error"_attr = errorMessage(ec));
             fassertFailed(40317);
         }
 #endif
@@ -772,8 +772,8 @@ void ProgramRunner::launchProcess(int child_stdout) {
                                   &si,
                                   &pi) != 0;
     if (!success) {
-        const auto ewd = errnoWithDescription();
-        ss << "couldn't start process " << _argv[0] << "; " << ewd;
+        const auto ec = lastSystemError();
+        ss << "couldn't start process " << _argv[0] << "; " << errorMessage(ec);
         uasserted(14042, ss.str());
     }
 
@@ -803,8 +803,8 @@ void ProgramRunner::launchProcess(int child_stdout) {
 
     if (nativePid == -1) {
         // Fork failed so it is time for the process to exit
-        const auto ewd = errnoWithDescription();
-        cout << "ProgramRunner is unable to fork child process: " << ewd << endl;
+        const auto ec = lastPosixError();
+        cout << "ProgramRunner is unable to fork child process: " << errorMessage(ec) << endl;
         fassertFailed(34363);
     }
 
@@ -968,13 +968,11 @@ BSONObj ResetDbpath(const BSONObj& a, void* data) {
     // will retry on all errors.
     auto wpath = toNativeString(path.c_str());
     retryWithBackOff([wpath]() {
-        BOOL ret = CreateDirectoryW(wpath.c_str(), NULL);
-        if (!ret) {
-            auto gle = GetLastError();
-            uassert(6088702,
-                    str::stream() << "CreateDirectory failed with unexpected error: "
-                                  << errnoWithDescription(gle),
-                    gle != ERROR_SUCCESS);
+        if (!CreateDirectoryW(wpath.c_str(), nullptr)) {
+            auto ec = lastSystemError();
+            uasserted(6088702,
+                      str::stream()
+                          << "CreateDirectory failed with unexpected error: " << errorMessage(ec));
         }
     });
 #else
@@ -1060,10 +1058,9 @@ inline void kill_wrapper(ProcessId pid, int sig, int port, const BSONObj& opt) {
 
     HANDLE event = OpenEventA(EVENT_MODIFY_STATE, FALSE, eventName.c_str());
     if (event == nullptr) {
-        int gle = GetLastError();
-        if (gle != ERROR_FILE_NOT_FOUND) {
-            const auto ewd = errnoWithDescription();
-            LOGV2_WARNING(22827, "kill_wrapper OpenEvent failed", "error"_attr = ewd);
+        auto ec = lastSystemError();
+        if (ec != systemError(ERROR_FILE_NOT_FOUND)) {
+            LOGV2_WARNING(22827, "kill_wrapper OpenEvent failed", "error"_attr = errorMessage(ec));
         } else {
             LOGV2_INFO(
                 22815,
@@ -1109,19 +1106,18 @@ inline void kill_wrapper(ProcessId pid, int sig, int port, const BSONObj& opt) {
 
     bool result = SetEvent(event);
     if (!result) {
-        const auto ewd = errnoWithDescription();
-        LOGV2_ERROR(22833, "kill_wrapper SetEvent failed", "error"_attr = ewd);
+        auto ec = lastSystemError();
+        LOGV2_ERROR(22833, "kill_wrapper SetEvent failed", "error"_attr = errorMessage(ec));
         return;
     }
 #else
-    int x = kill(pid.toNative(), sig);
-    if (x) {
-        if (errno == ESRCH) {
+    if (kill(pid.toNative(), sig)) {
+        auto ec = lastPosixError();
+        if (ec == posixError(ESRCH)) {
         } else {
-            const auto ewd = errnoWithDescription();
-            LOGV2_INFO(22816, "Kill failed", "error"_attr = ewd);
+            LOGV2_INFO(22816, "Kill failed", "error"_attr = errorMessage(ec));
             uasserted(ErrorCodes::UnknownError,
-                      "kill({}, {}) failed: {}"_format(pid.toNative(), sig, ewd));
+                      "kill({}, {}) failed: {}"_format(pid.toNative(), sig, errorMessage(ec)));
         }
     }
 

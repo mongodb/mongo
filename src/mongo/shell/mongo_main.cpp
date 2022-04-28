@@ -599,7 +599,8 @@ static void edit(const std::string& whatToEdit) {
     FILE* tempFileStream;
     tempFileStream = fopen(filename.c_str(), "wt");
     if (!tempFileStream) {
-        std::cout << "couldn't create temp file (" << filename << "): " << errnoWithDescription()
+        auto ec = lastPosixError();
+        std::cout << "couldn't create temp file (" << filename << "): " << errorMessage(ec)
                   << std::endl;
         return;
     }
@@ -607,9 +608,8 @@ static void edit(const std::string& whatToEdit) {
     // Write JSON into the temp file
     size_t fileSize = js.size();
     if (fwrite(js.data(), sizeof(char), fileSize, tempFileStream) != fileSize) {
-        int systemErrno = errno;
-        std::cout << "failed to write to temp file: " << errnoWithDescription(systemErrno)
-                  << std::endl;
+        auto ec = lastPosixError();
+        std::cout << "failed to write to temp file: " << errorMessage(ec) << std::endl;
         fclose(tempFileStream);
         remove(filename.c_str());
         return;
@@ -625,9 +625,9 @@ static void edit(const std::string& whatToEdit) {
     }();
     if (ret) {
         if (ret == -1) {
-            int systemErrno = errno;
-            std::cout << "failed to launch $EDITOR (" << editor
-                      << "): " << errnoWithDescription(systemErrno) << std::endl;
+            auto ec = lastPosixError();
+            std::cout << "failed to launch $EDITOR (" << editor << "): " << errorMessage(ec)
+                      << std::endl;
         } else
             std::cout << "editor exited with error (" << ret << "), not applying changes"
                       << std::endl;
@@ -638,7 +638,8 @@ static void edit(const std::string& whatToEdit) {
     // The editor gave return code zero, so read the file back in
     tempFileStream = fopen(filename.c_str(), "rt");
     if (!tempFileStream) {
-        std::cout << "couldn't open temp file on return from editor: " << errnoWithDescription()
+        auto ec = lastPosixError();
+        std::cout << "couldn't open temp file on return from editor: " << errorMessage(ec)
                   << std::endl;
         remove(filename.c_str());
         return;
@@ -649,7 +650,8 @@ static void edit(const std::string& whatToEdit) {
         char buf[1024];
         bytes = fread(buf, sizeof(char), sizeof buf, tempFileStream);
         if (ferror(tempFileStream)) {
-            std::cout << "failed to read temp file: " << errnoWithDescription() << std::endl;
+            auto ec = lastPosixError();
+            std::cout << "failed to read temp file: " << errorMessage(ec) << std::endl;
             fclose(tempFileStream);
             remove(filename.c_str());
             return;

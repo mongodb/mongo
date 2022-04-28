@@ -71,23 +71,23 @@ intmax_t File::freeSpace(const std::string& path) {
                             nullptr)) {  // ptr to returned total free
         return avail.QuadPart;
     }
-    DWORD dosError = GetLastError();
+    auto ec = lastSystemError();
     LOGV2(23140,
           "In File::freeSpace(), GetDiskFreeSpaceEx for '{path}' failed with {error}",
           "In File::freeSpace(), GetDiskFreeSpaceEx failed",
           "path"_attr = path,
-          "error"_attr = errnoWithDescription(dosError));
+          "error"_attr = errorMessage(ec));
     return -1;
 }
 
 void File::fsync() const {
     if (FlushFileBuffers(_handle) == 0) {
-        DWORD dosError = GetLastError();
+        auto ec = lastSystemError();
         LOGV2(23141,
               "In File::fsync(), FlushFileBuffers for '{fileName}' failed with {error}",
               "In File::fsync(), FlushFileBuffers failed",
               "fileName"_attr = _name,
-              "error"_attr = errnoWithDescription(dosError));
+              "error"_attr = errorMessage(ec));
     }
 }
 
@@ -101,12 +101,12 @@ fileofs File::len() {
         return li.QuadPart;
     }
     _bad = true;
-    DWORD dosError = GetLastError();
+    auto ec = lastSystemError();
     LOGV2(23142,
           "In File::len(), GetFileSizeEx for '{fileName}' failed with {error}",
           "In File::len(), GetFileSizeEx failed",
           "fileName"_attr = _name,
-          "error"_attr = errnoWithDescription(dosError));
+          "error"_attr = errorMessage(ec));
     return 0;
 }
 
@@ -121,12 +121,12 @@ void File::open(const char* filename, bool readOnly, bool direct) {
                           nullptr);                                       // template
     _bad = !is_open();
     if (_bad) {
-        DWORD dosError = GetLastError();
+        auto ec = lastSystemError();
         LOGV2(23143,
               "In File::open(), CreateFileW for '{fileName}' failed with {error}",
               "In File::open(), CreateFileW failed",
               "fileName"_attr = _name,
-              "error"_attr = errnoWithDescription(dosError));
+              "error"_attr = errorMessage(ec));
     }
 }
 
@@ -135,25 +135,25 @@ void File::read(fileofs o, char* data, unsigned len) {
     li.QuadPart = o;
     if (SetFilePointerEx(_handle, li, nullptr, FILE_BEGIN) == 0) {
         _bad = true;
-        DWORD dosError = GetLastError();
+        auto ec = lastSystemError();
         LOGV2(23144,
               "In File::read(), SetFilePointerEx for '{fileName}' tried to set the file pointer to "
               "{failPointer} but failed with {error}",
               "In File::read(), SetFilePointerEx failed to set file pointer",
               "fileName"_attr = _name,
               "failPointer"_attr = o,
-              "error"_attr = errnoWithDescription(dosError));
+              "error"_attr = errorMessage(ec));
         return;
     }
     DWORD bytesRead;
     if (!ReadFile(_handle, data, len, &bytesRead, 0)) {
         _bad = true;
-        DWORD dosError = GetLastError();
+        auto ec = lastSystemError();
         LOGV2(23145,
               "In File::read(), ReadFile for '{fileName}' failed with {error}",
               "In File::read(), ReadFile failed",
               "fileName"_attr = _name,
-              "error"_attr = errnoWithDescription(dosError));
+              "error"_attr = errorMessage(ec));
     } else if (bytesRead != len) {
         _bad = true;
         msgasserted(10438,
@@ -171,24 +171,24 @@ void File::truncate(fileofs size) {
     li.QuadPart = size;
     if (SetFilePointerEx(_handle, li, nullptr, FILE_BEGIN) == 0) {
         _bad = true;
-        DWORD dosError = GetLastError();
+        auto ec = lastSystemError();
         LOGV2(23146,
               "In File::truncate(), SetFilePointerEx for '{fileName}' tried to set the file "
               "pointer to {filePointer} but failed with {error}",
               "In File::truncate(), SetFilePointerEx failed to set file pointer",
               "fileName"_attr = _name,
               "filePointer"_attr = size,
-              "error"_attr = errnoWithDescription(dosError));
+              "error"_attr = errorMessage(ec));
         return;
     }
     if (SetEndOfFile(_handle) == 0) {
         _bad = true;
-        DWORD dosError = GetLastError();
+        auto ec = lastSystemError();
         LOGV2(23147,
               "In File::truncate(), SetEndOfFile for '{fileName}' failed with {error}",
               "In File::truncate(), SetEndOfFile failed",
               "fileName"_attr = _name,
-              "error"_attr = errnoWithDescription(dosError));
+              "error"_attr = errorMessage(ec));
     }
 }
 
@@ -197,7 +197,7 @@ void File::write(fileofs o, const char* data, unsigned len) {
     li.QuadPart = o;
     if (SetFilePointerEx(_handle, li, nullptr, FILE_BEGIN) == 0) {
         _bad = true;
-        DWORD dosError = GetLastError();
+        auto ec = lastSystemError();
         LOGV2(
             23148,
             "In File::write(), SetFilePointerEx for '{fileName}' tried to set the file pointer to "
@@ -205,13 +205,13 @@ void File::write(fileofs o, const char* data, unsigned len) {
             "In File::write(), SetFilePointerEx failed to set file pointer",
             "fileName"_attr = _name,
             "filePointer"_attr = o,
-            "error"_attr = errnoWithDescription(dosError));
+            "error"_attr = errorMessage(ec));
         return;
     }
     DWORD bytesWritten;
     if (WriteFile(_handle, data, len, &bytesWritten, nullptr) == 0) {
         _bad = true;
-        DWORD dosError = GetLastError();
+        auto ec = lastSystemError();
         LOGV2(23149,
               "In File::write(), WriteFile for '{fileName}' tried to write {bytesToWrite} bytes "
               "but only wrote {bytesWritten} bytes, failing with {error}",
@@ -219,7 +219,7 @@ void File::write(fileofs o, const char* data, unsigned len) {
               "fileName"_attr = _name,
               "bytesToWrite"_attr = len,
               "bytesWritten"_attr = bytesWritten,
-              "error"_attr = errnoWithDescription(dosError));
+              "error"_attr = errorMessage(ec));
     }
 }
 
@@ -239,21 +239,23 @@ intmax_t File::freeSpace(const std::string& path) {
     if (statvfs(path.c_str(), &info) == 0) {
         return static_cast<intmax_t>(info.f_bavail) * info.f_frsize;
     }
+    auto ec = lastSystemError();
     LOGV2(23150,
           "In File::freeSpace(), statvfs for '{path}' failed with {error}",
           "In File::freeSpace(), statvfs failed",
           "path"_attr = path,
-          "error"_attr = errnoWithDescription());
+          "error"_attr = errorMessage(ec));
     return -1;
 }
 
 void File::fsync() const {
     if (::fsync(_fd)) {
+        auto ec = lastSystemError();
         LOGV2(23151,
               "In File::fsync(), ::fsync for '{fileName}' failed with {error}",
               "In File::fsync(), ::fsync failed",
               "fileName"_attr = _name,
-              "error"_attr = errnoWithDescription());
+              "error"_attr = errorMessage(ec));
     }
 }
 
@@ -267,11 +269,12 @@ fileofs File::len() {
         return o;
     }
     _bad = true;
+    auto ec = lastSystemError();
     LOGV2(23152,
           "In File::len(), lseek for '{fileName}' failed with {error}",
           "In File::len(), lseek failed",
           "fileName"_attr = _name,
-          "error"_attr = errnoWithDescription());
+          "error"_attr = errorMessage(ec));
     return 0;
 }
 
@@ -290,23 +293,25 @@ void File::open(const char* filename, bool readOnly, bool direct) {
                  S_IRUSR | S_IWUSR);
     _bad = !is_open();
     if (_bad) {
+        auto ec = lastSystemError();
         LOGV2(23153,
               "In File::open(), ::open for '{fileName}' failed with {error}",
               "In File::open(), ::open failed",
               "fileName"_attr = _name,
-              "error"_attr = errnoWithDescription());
+              "error"_attr = errorMessage(ec));
     }
 }
 
 void File::read(fileofs o, char* data, unsigned len) {
     ssize_t bytesRead = ::pread(_fd, data, len, o);
     if (bytesRead == -1) {
+        auto ec = lastSystemError();
         _bad = true;
         LOGV2(23154,
               "In File::read(), ::pread for '{fileName}' failed with {error}",
               "In File::read(), ::pread failed",
               "fileName"_attr = _name,
-              "error"_attr = errnoWithDescription());
+              "error"_attr = errorMessage(ec));
     } else if (bytesRead != static_cast<ssize_t>(len)) {
         _bad = true;
         msgasserted(16569,
@@ -321,6 +326,7 @@ void File::truncate(fileofs size) {
         return;
     }
     if (ftruncate(_fd, size) != 0) {
+        auto ec = lastSystemError();
         _bad = true;
         LOGV2(23155,
               "In File::truncate(), ftruncate for '{fileName}' tried to set the file pointer to "
@@ -328,7 +334,7 @@ void File::truncate(fileofs size) {
               "In File::truncate(), ftruncate failed to set file pointer",
               "fileName"_attr = _name,
               "filePointer"_attr = size,
-              "error"_attr = errnoWithDescription());
+              "error"_attr = errorMessage(ec));
         return;
     }
 }
@@ -336,6 +342,9 @@ void File::truncate(fileofs size) {
 void File::write(fileofs o, const char* data, unsigned len) {
     ssize_t bytesWritten = ::pwrite(_fd, data, len, o);
     if (bytesWritten != static_cast<ssize_t>(len)) {
+        std::error_code ec;
+        if (bytesWritten == -1)
+            ec = lastSystemError();
         _bad = true;
         LOGV2(23156,
               "In File::write(), ::pwrite for '{fileName}' tried to write {bytesToWrite} bytes but "
@@ -344,7 +353,7 @@ void File::write(fileofs o, const char* data, unsigned len) {
               "fileName"_attr = _name,
               "bytesToWrite"_attr = len,
               "bytesWritten"_attr = bytesWritten,
-              "error"_attr = errnoWithDescription());
+              "error"_attr = errorMessage(ec));
     }
 }
 
