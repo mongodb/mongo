@@ -1056,6 +1056,9 @@ wiredtiger_open_tiered_storage_configuration = [
             a directory to store locally cached versions of files in the storage source.  By
             default, it is named with \c "-cache" appended to the bucket name.  A relative
             directory name is relative to the home directory'''),
+        Config('interval', '60', r'''
+            interval in seconds at which to check for tiered storage related work to
+            perform''', min=1, max=1000),
         Config('name', 'none', r'''
             Permitted values are \c "none"
             or custom storage name created with

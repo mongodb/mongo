@@ -271,7 +271,7 @@ __tiered_restart_work(WT_SESSION_IMPL *session, WT_TIERED *tiered)
             WT_ERR(__wt_metadata_search(session, obj_uri, (char **)&obj_val));
             WT_ERR(__wt_config_getones(session, obj_val, "flush_time", &cval));
             __wt_verbose(session, WT_VERB_TIERED,
-              "OLDER_OBJECTS: local object %s has flush time %d", obj_uri, (int)cval.val);
+              "RESTART_WORK: local object %s has flush time %" PRId64, obj_uri, cval.val);
             if (cval.val == 0)
                 WT_ERR(__wt_tiered_put_flush(session, tiered, i));
             else
@@ -560,28 +560,17 @@ __wt_tiered_switch(WT_SESSION_IMPL *session, const char *config)
 }
 
 /*
- * __wt_tiered_name --
- *     Given a dhandle structure and object number generate the URI name of the given type.
+ * __wt_tiered_name_str --
+ *     Given a name and object number generate the URI name of the given type.
  */
 int
-__wt_tiered_name(
-  WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle, uint32_t id, uint32_t flags, const char **retp)
+__wt_tiered_name_str(
+  WT_SESSION_IMPL *session, const char *name, uint32_t id, uint32_t flags, const char **retp)
 {
     WT_DECL_ITEM(tmp);
     WT_DECL_RET;
-    const char *name;
 
     WT_RET(__wt_scr_alloc(session, 0, &tmp));
-    name = dhandle->name;
-    /* Skip the prefix depending on what we're given. */
-    if (dhandle->type == WT_DHANDLE_TYPE_TIERED)
-        WT_PREFIX_SKIP_REQUIRED(session, name, "tiered:");
-    else {
-        WT_ASSERT(session, dhandle->type == WT_DHANDLE_TYPE_TIERED_TREE);
-        WT_ASSERT(session, !LF_ISSET(WT_TIERED_NAME_SHARED));
-        WT_PREFIX_SKIP_REQUIRED(session, name, "tier:");
-    }
-
     /*
      * Separate object numbers from the base table name with a dash. Separate from the suffix with a
      * dot. We generate a different name style based on the type.
@@ -596,6 +585,11 @@ __wt_tiered_name(
             WT_ERR(__wt_buf_fmt(session, tmp, "object:%s-", name));
         else
             WT_ERR(__wt_buf_fmt(session, tmp, "object:%s-%010" PRIu32 ".wtobj", name, id));
+    } else if (LF_ISSET(WT_TIERED_NAME_ONLY)) {
+        if (LF_ISSET(WT_TIERED_NAME_PREFIX))
+            WT_ERR(__wt_buf_fmt(session, tmp, "%s-", name));
+        else
+            WT_ERR(__wt_buf_fmt(session, tmp, "%s-%010" PRIu32 ".wtobj", name, id));
     } else {
         WT_ASSERT(session, !LF_ISSET(WT_TIERED_NAME_PREFIX));
         WT_ASSERT(session, LF_ISSET(WT_TIERED_NAME_SHARED));
@@ -606,6 +600,28 @@ __wt_tiered_name(
 err:
     __wt_scr_free(session, &tmp);
     return (ret);
+}
+
+/*
+ * __wt_tiered_name --
+ *     Given a dhandle structure and object number generate the URI name of the given type.
+ */
+int
+__wt_tiered_name(
+  WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle, uint32_t id, uint32_t flags, const char **retp)
+{
+    const char *name;
+
+    name = dhandle->name;
+    /* Skip the prefix depending on what we're given. */
+    if (dhandle->type == WT_DHANDLE_TYPE_TIERED)
+        WT_PREFIX_SKIP_REQUIRED(session, name, "tiered:");
+    else {
+        WT_ASSERT(session, dhandle->type == WT_DHANDLE_TYPE_TIERED_TREE);
+        WT_ASSERT(session, !LF_ISSET(WT_TIERED_NAME_SHARED));
+        WT_PREFIX_SKIP_REQUIRED(session, name, "tier:");
+    }
+    return (__wt_tiered_name_str(session, name, id, flags, retp));
 }
 
 /*

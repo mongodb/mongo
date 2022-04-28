@@ -438,12 +438,12 @@ struct __wt_connection_impl {
     const char *stat_stamp; /* Statistics log entry timestamp */
     uint64_t stat_usecs;    /* Statistics log period */
 
-    uint64_t tiered_retention;       /* Earliest time to check to remove local overlap copies */
     WT_SESSION_IMPL *tiered_session; /* Tiered thread session */
     wt_thread_t tiered_tid;          /* Tiered thread */
     bool tiered_tid_set;             /* Tiered thread set */
     WT_CONDVAR *flush_cond;          /* Flush wait mutex */
     WT_CONDVAR *tiered_cond;         /* Tiered wait mutex */
+    uint64_t tiered_interval;        /* Tiered work interval */
     bool tiered_server_running;      /* Internal tiered server operating */
     bool flush_ckpt_complete;        /* Checkpoint after flush completed */
     uint64_t flush_most_recent;      /* Clock value of last flush_tier */
