@@ -328,8 +328,8 @@ void MergeJoinStage::doSaveState(bool relinquishCursor) {
     }
 
     // We only have to save shallow non-owning materialized rows.
-    _currentOuterKey.makeOwned();
-    _currentInnerKey.makeOwned();
+    prepareForYielding(_currentOuterKey);
+    prepareForYielding(_currentInnerKey);
 }
 
 std::unique_ptr<PlanStageStats> MergeJoinStage::getStats(bool includeDebugInfo) const {

@@ -223,6 +223,6 @@ void CheckBoundsStage::doSaveState(bool relinquishCursor) {
         return;
     }
 
-    _outAccessor.makeOwned();
+    prepareForYielding(_outAccessor);
 }
 }  // namespace mongo::sbe

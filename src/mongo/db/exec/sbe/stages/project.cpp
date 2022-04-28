@@ -161,7 +161,7 @@ void ProjectStage::doSaveState(bool relinquishCursor) {
 
     for (auto& [slotId, codeAndAccessor] : _fields) {
         auto& [code, accessor] = codeAndAccessor;
-        accessor.makeOwned();
+        prepareForYielding(accessor);
     }
 }
 

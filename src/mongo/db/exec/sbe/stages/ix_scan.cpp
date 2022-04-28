@@ -159,13 +159,13 @@ void IndexScanStage::doSaveState(bool relinquishCursor) {
     if (relinquishCursor) {
         if (slotsAccessible()) {
             if (_recordAccessor) {
-                _recordAccessor->makeOwned();
+                prepareForYielding(*_recordAccessor);
             }
             if (_recordIdAccessor) {
-                _recordIdAccessor->makeOwned();
+                prepareForYielding(*_recordIdAccessor);
             }
             for (auto& accessor : _accessors) {
-                accessor.makeOwned();
+                prepareForYielding(accessor);
             }
         }
 
@@ -173,10 +173,10 @@ void IndexScanStage::doSaveState(bool relinquishCursor) {
         // as the index scan is opened.
         if (_open) {
             if (_seekKeyLowHolder) {
-                _seekKeyLowHolder->makeOwned();
+                prepareForYielding(*_seekKeyLowHolder);
             }
             if (_seekKeyHighHolder) {
-                _seekKeyHighHolder->makeOwned();
+                prepareForYielding(*_seekKeyHighHolder);
             }
         }
 

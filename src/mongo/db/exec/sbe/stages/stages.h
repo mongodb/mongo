@@ -119,6 +119,26 @@ public:
     CanChangeState() = default;
 
     /**
+     * Ensures that accessor owns the underlying BSON value, which can be potentially owned by
+     * storage.
+     */
+    static void prepareForYielding(value::OwnedValueAccessor& accessor) {
+        auto [tag, value] = accessor.getViewOfValue();
+        if (shouldCopyValue(tag)) {
+            accessor.makeOwned();
+        }
+    }
+
+    static void prepareForYielding(value::MaterializedRow& row) {
+        for (size_t idx = 0; idx < row.size(); idx++) {
+            auto [tag, value] = row.getViewOfValue(idx);
+            if (shouldCopyValue(tag)) {
+                row.makeOwned(idx);
+            }
+        }
+    }
+
+    /**
      * Notifies the stage that the underlying data source may change.
      *
      * It is illegal to call work() or isEOF() when a stage is in the "saved" state. May be called
@@ -192,6 +212,18 @@ protected:
     enum class SaveState { kNotSaved, kSavedFull, kSavedNotFull };
     SaveState _saveState{SaveState::kNotSaved};
 #endif
+
+    static bool shouldCopyValue(value::TypeTags tag) {
+        switch (tag) {
+            case value::TypeTags::Array:
+            case value::TypeTags::ArraySet:
+            case value::TypeTags::Object:
+                return false;
+
+            default:
+                return true;
+        }
+    }
 };
 
 template <typename T>

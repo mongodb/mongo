@@ -279,7 +279,7 @@ void SpoolLazyProducerStage::doSaveState(bool relinquishCursor) {
     }
 
     for (auto& [slot, accessor] : _outAccessors) {
-        accessor.makeOwned();
+        prepareForYielding(accessor);
     }
 }
 

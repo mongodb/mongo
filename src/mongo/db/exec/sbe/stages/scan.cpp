@@ -183,13 +183,13 @@ void ScanStage::doSaveState(bool relinquishCursor) {
 
         if (relinquishCursor) {
             if (_recordAccessor) {
-                _recordAccessor->makeOwned();
+                prepareForYielding(*_recordAccessor);
             }
             if (_recordIdAccessor) {
-                _recordIdAccessor->makeOwned();
+                prepareForYielding(*_recordIdAccessor);
             }
             for (auto& [fieldName, accessor] : _fieldAccessors) {
-                accessor->makeOwned();
+                prepareForYielding(*accessor);
             }
         }
     }
@@ -722,13 +722,13 @@ void ParallelScanStage::doSaveState(bool relinquishCursor) {
 #endif
 
         if (_recordAccessor) {
-            _recordAccessor->makeOwned();
+            prepareForYielding(*_recordAccessor);
         }
         if (_recordIdAccessor) {
-            _recordIdAccessor->makeOwned();
+            prepareForYielding(*_recordIdAccessor);
         }
         for (auto& [fieldName, accessor] : _fieldAccessors) {
-            accessor->makeOwned();
+            prepareForYielding(*accessor);
         }
     }
 
