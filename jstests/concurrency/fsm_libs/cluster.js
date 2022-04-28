@@ -234,7 +234,7 @@ var Cluster = function(options) {
             // SERVER-43099 Reenable random chunk migration failpoint for concurrency with_balancer
             // suites
             // if (options.sharded.enableBalancer === true) {
-            //     st.forEachConfigServer((conn) => {
+            //     st._configServers.forEach((conn) => {
             //         const configDb = conn.getDB('admin');
 
             //         configDb.adminCommand({
@@ -314,7 +314,7 @@ var Cluster = function(options) {
         if (!fn || typeof (fn) !== 'function' || fn.length !== 1) {
             throw new Error('config function must be a function that takes a db as an argument');
         }
-        st.forEachConfigServer(function(conn) {
+        st._configServers.forEach(function(conn) {
             fn(conn.getDB('admin'));
         });
     };
@@ -608,7 +608,8 @@ var Cluster = function(options) {
         assert(this.isSharded(), 'cluster is not sharded');
 
         var data = {};
-        st.forEachConfigServer(config => (data[config.host] = this.recordConfigServerData(config)));
+        st._configServers.forEach(config =>
+                                      (data[config.host] = this.recordConfigServerData(config)));
 
         return data;
     };
