@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/config.h"
-#include "mongo/db/exec/fake_column_cursor.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/stages/collection_helpers.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
@@ -78,36 +77,6 @@ protected:
         TrialRunTracker* tracker, TrialRunTrackerAttachResultMask childrenAttachResult) override;
 
 private:
-    struct ColumnCursor {
-        std::unique_ptr<FakeCursorForPath> cursor;
-        boost::optional<FakeCell> lastCell;
-        bool includeInOutput = false;
-
-        boost::optional<FakeCell>& next() {
-            // TODO For some reason the destructor of 'lastCell' is not called
-            // on my local asan build unless we explicitly reset it. Maybe
-            // the same compiler bug Nikita ran into?
-            lastCell.reset();
-            lastCell = cursor->next();
-            return lastCell;
-        }
-
-        boost::optional<FakeCell>& seekAtOrPast(RecordId id) {
-            lastCell.reset();
-            lastCell = cursor->seekAtOrPast(id);
-            return lastCell;
-        }
-
-        const PathValue& path() const {
-            return cursor->path();
-        }
-    };
-
-    void readParentsIntoObj(StringData path,
-                            value::Object* out,
-                            StringDataSet* pathsReadSetOut,
-                            bool first = true);
-
     const UUID _collUuid;
     const std::string _columnIndexName;
     const value::SlotVector _fieldSlots;
@@ -140,10 +109,7 @@ private:
 
     CollectionPtr _coll;
 
-    std::unique_ptr<SeekableRecordCursor> _rowStoreCursor;
-
-    std::vector<ColumnCursor> _columnCursors;
-    StringMap<std::unique_ptr<FakeCursorForPath>> _parentPathCursors;
+    std::unique_ptr<SeekableRecordCursor> _cursor;
 
     RecordId _recordId;
 
