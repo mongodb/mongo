@@ -41,6 +41,7 @@
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_consistency.h"
 #include "mongo/db/client.h"
+#include "mongo/db/commands/server_status.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/index/index_build_interceptor.h"
@@ -53,6 +54,7 @@
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/logv2/log.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/progress_meter.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/stacktrace.h"
@@ -73,6 +75,36 @@ namespace {
 // Reserved RecordId against which multikey metadata keys are indexed.
 static const RecordId kMultikeyMetadataKeyId =
     RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId};
+
+/**
+ * Metrics for index bulk builder operations. Intended to support index build diagnostics
+ * during the following scenarios:
+ * - createIndex commands;
+ * - collection cloning during initial sync; and
+ * - resuming index builds at startup.
+ *
+ * Also includes statistics for disk usage (by the external sorter) for index builds that
+ * do not fit in memory.
+ */
+class IndexBulkBuilderSSS : public ServerStatusSection {
+public:
+    IndexBulkBuilderSSS() : ServerStatusSection("indexBulkBuilder") {}
+
+    bool includeByDefault() const final {
+        return true;
+    }
+
+    void addRequiredPrivileges(std::vector<Privilege>* out) final {}
+
+    BSONObj generateSection(OperationContext* opCtx, const BSONElement& configElement) const final {
+        BSONObjBuilder builder;
+        builder.append("count", count.loadRelaxed());
+        return builder.obj();
+    }
+
+    // Number of instances of the bulk builder created.
+    AtomicWord<long long> count;
+} indexBulkBuilderSSS;
 
 /**
  * Returns true if at least one prefix of any of the indexed fields causes the index to be
@@ -535,7 +567,9 @@ AbstractIndexAccessMethod::BulkBuilderImpl::BulkBuilderImpl(IndexCatalogEntry* i
           std::pair<KeyString::Value::SorterDeserializeSettings,
                     mongo::NullValue::SorterDeserializeSettings>(
               {index->accessMethod()->getSortedDataInterface()->getKeyStringVersion()}, {}))),
-      _indexCatalogEntry(index) {}
+      _indexCatalogEntry(index) {
+    indexBulkBuilderSSS.count.addAndFetch(1);
+}
 
 Status AbstractIndexAccessMethod::BulkBuilderImpl::insert(OperationContext* opCtx,
                                                           const BSONObj& obj,
