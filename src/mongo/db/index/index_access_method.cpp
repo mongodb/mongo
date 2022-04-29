@@ -97,6 +97,8 @@ public:
         BSONObjBuilder builder;
         builder.append("count", count.loadRelaxed());
         builder.append("resumed", resumed.loadRelaxed());
+        builder.append("filesOpenedForExternalSort", sorterFileStats.opened.loadRelaxed());
+        builder.append("filesClosedForExternalSort", sorterFileStats.closed.loadRelaxed());
         return builder.obj();
     }
 
@@ -106,6 +108,12 @@ public:
     // Number of times the bulk builder was created for a resumable index build.
     // This value should not exceed 'count'.
     AtomicWord<long long> resumed;
+
+    // Number of times the external sorter opened/closed a file handle to spill data to disk.
+    // This pair of counters in aggregate indicate the number of open file handles used by
+    // the external sorter and may be useful in diagnosing situations where the process is
+    // close to exhausting this finite resource.
+    SorterFileStats sorterFileStats;
 } indexBulkBuilderSSS;
 
 /**
@@ -124,6 +132,7 @@ SortOptions makeSortOptions(size_t maxMemoryUsageBytes, StringData dbName) {
         .TempDir(storageGlobalParams.dbpath + "/_tmp")
         .ExtSortAllowed()
         .MaxMemoryUsageBytes(maxMemoryUsageBytes)
+        .FileStats(&indexBulkBuilderSSS.sorterFileStats)
         .DBName(dbName.toString());
 }
 
