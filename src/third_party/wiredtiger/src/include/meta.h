@@ -176,6 +176,7 @@ struct __wt_ckpt {
  *     Snapshot and timestamp information associated with a checkpoint.
  */
 struct __wt_ckpt_snapshot {
+    uint64_t ckpt_id;
     uint64_t oldest_ts;
     uint64_t stable_ts;
     uint64_t snapshot_write_gen;

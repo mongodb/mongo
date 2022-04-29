@@ -1135,6 +1135,7 @@ __wt_curhs_open(WT_SESSION_IMPL *session, WT_CURSOR *owner, WT_CURSOR **cursorp)
       __wt_cursor_notsup,                             /* largest_key */
       __wt_cursor_notsup,                             /* cache */
       __wt_cursor_reopen_notsup,                      /* reopen */
+      __wt_cursor_checkpoint_id,                      /* checkpoint ID */
       __curhs_close);                                 /* close */
     WT_CURSOR *cursor;
     WT_CURSOR_HS *hs_cursor;

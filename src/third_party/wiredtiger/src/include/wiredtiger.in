@@ -617,6 +617,20 @@ struct __wt_cursor {
 	int __F(reserve)(WT_CURSOR *cursor);
 	/*! @} */
 
+#ifndef DOXYGEN
+	/*!
+	 * If the cursor is opened on a checkpoint, return a unique identifier for the checkpoint;
+	 * otherwise return 0.
+	 *
+	 * This allows applications to confirm that checkpoint cursors opened on default checkpoints
+	 * in different objects reference the same database checkpoint.
+	 *
+	 * @param cursor the cursor handle
+	 * @errors
+	 */
+	uint64_t __F(checkpoint_id)(WT_CURSOR *cursor);
+#endif
+
 	/*!
 	 * Close the cursor.
 	 *

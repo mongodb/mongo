@@ -54,6 +54,7 @@ __wt_curconfig_open(
       __wt_cursor_notsup,                             /* largest_key */
       __wt_cursor_notsup,                             /* cache */
       __wt_cursor_reopen_notsup,                      /* reopen */
+      __wt_cursor_checkpoint_id,                      /* checkpoint ID */
       __curconfig_close);
     WT_CURSOR_CONFIG *cconfig;
     WT_CURSOR *cursor;

@@ -456,6 +456,7 @@ __wt_curindex_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, 
       __wt_cursor_notsup,                             /* largest_key */
       __wt_cursor_notsup,                             /* cache */
       __wt_cursor_reopen_notsup,                      /* reopen */
+      __wt_cursor_checkpoint_id,                      /* checkpoint ID */
       __curindex_close);                              /* close */
     WT_CURSOR_INDEX *cindex;
     WT_CURSOR *cursor;

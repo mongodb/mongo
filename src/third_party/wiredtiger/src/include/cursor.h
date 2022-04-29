@@ -14,25 +14,25 @@
  */
 #define WT_CURSOR_STATIC_INIT(n, get_key, get_value, set_key, set_value, compare, equals, next, \
   prev, reset, search, search_near, insert, modify, update, remove, reserve, reconfigure,       \
-  largest_key, cache, reopen, close)                                                            \
+  largest_key, cache, reopen, checkpoint_id, close)                                             \
     static const WT_CURSOR n = {                                                                \
       NULL, /* session */                                                                       \
       NULL, /* uri */                                                                           \
       NULL, /* key_format */                                                                    \
       NULL, /* value_format */                                                                  \
       get_key, get_value, set_key, set_value, compare, equals, next, prev, reset, search,       \
-      search_near, insert, modify, update, remove, reserve, close, largest_key, reconfigure,    \
-      cache, reopen, 0,      /* uri_hash */                                                     \
-      {NULL, NULL},          /* TAILQ_ENTRY q */                                                \
-      0,                     /* recno key */                                                    \
-      {0},                   /* recno raw buffer */                                             \
-      NULL,                  /* json_private */                                                 \
-      NULL,                  /* lang_private */                                                 \
-      {NULL, 0, NULL, 0, 0}, /* WT_ITEM key */                                                  \
-      {NULL, 0, NULL, 0, 0}, /* WT_ITEM value */                                                \
-      0,                     /* int saved_err */                                                \
-      NULL,                  /* internal_uri */                                                 \
-      0                      /* uint32_t flags */                                               \
+      search_near, insert, modify, update, remove, reserve, checkpoint_id, close, largest_key,  \
+      reconfigure, cache, reopen, 0, /* uri_hash */                                             \
+      {NULL, NULL},                  /* TAILQ_ENTRY q */                                        \
+      0,                             /* recno key */                                            \
+      {0},                           /* recno raw buffer */                                     \
+      NULL,                          /* json_private */                                         \
+      NULL,                          /* lang_private */                                         \
+      {NULL, 0, NULL, 0, 0},         /* WT_ITEM key */                                          \
+      {NULL, 0, NULL, 0, 0},         /* WT_ITEM value */                                        \
+      0,                             /* int saved_err */                                        \
+      NULL,                          /* internal_uri */                                         \
+      0                              /* uint32_t flags */                                       \
     }
 
 struct __wt_cursor_backup {
@@ -200,12 +200,15 @@ struct __wt_cursor_btree {
      * Bits used by checkpoint cursor: a private transaction, used to provide the proper read
      * snapshot; a reference to the corresponding history store checkpoint, which keeps it from
      * disappearing under us if it's unnamed and also tracks its identity for use in history store
-     * accesses; and a write generation, used to override the tree's base write generation in the
-     * unpacking cleanup code.
+     * accesses; a write generation, used to override the tree's base write generation in the
+     * unpacking cleanup code; and a checkpoint ID, which is available to applications through an
+     * undocumented interface to allow them to open cursors on multiple files and check if they got
+     * the same checkpoint in all of them.
      */
     WT_TXN *checkpoint_txn;
     WT_DATA_HANDLE *checkpoint_hs_dhandle;
     uint64_t checkpoint_write_gen;
+    uint64_t checkpoint_id;
 
     /*
      * Fixed-length column-store items are a single byte, and it's simpler and cheaper to allocate

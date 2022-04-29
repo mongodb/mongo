@@ -428,6 +428,7 @@ __wt_curds_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, con
       __wt_cursor_notsup,                             /* largest_key */
       __wt_cursor_notsup,                             /* cache */
       __wt_cursor_reopen_notsup,                      /* reopen */
+      __wt_cursor_checkpoint_id,                      /* checkpoint ID */
       __curds_close);                                 /* close */
     WT_CONFIG_ITEM cval, metadata;
     WT_CURSOR *cursor, *source;

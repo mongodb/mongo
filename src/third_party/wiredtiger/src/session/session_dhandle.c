@@ -372,6 +372,7 @@ __wt_session_get_btree_ckpt(WT_SESSION_IMPL *session, const char *uri, const cha
     if (hs_dhandlep != NULL)
         *hs_dhandlep = NULL;
     if (ckpt_snapshot != NULL) {
+        ckpt_snapshot->ckpt_id = 0;
         ckpt_snapshot->oldest_ts = WT_TS_NONE;
         ckpt_snapshot->stable_ts = WT_TS_NONE;
         ckpt_snapshot->snapshot_write_gen = 0;
@@ -534,6 +535,21 @@ __wt_session_get_btree_ckpt(WT_SESSION_IMPL *session, const char *uri, const cha
             if (ds_time > snapshot_time || hs_time > snapshot_time || stable_time > snapshot_time ||
               oldest_time > snapshot_time)
                 ret = __wt_set_return(session, EBUSY);
+
+            /*
+             * Return the snapshot's wall time as the (global) checkpoint ID. The ID is a 64-bit
+             * value of unspecified semantics such that if you open the same checkpoint name and get
+             * different IDs, the cursors you got are looking at different versions of that
+             * checkpoint, which usually isn't what you want. Test code uses this to check whether a
+             * collection of checkpoint cursors they opened on different files all came from the
+             * same global checkpoint or not. This is the same problem as checking if the history
+             * store checkpoint and data store checkpoint match, so the wall time is the right thing
+             * to use for it. Note that it will be 0 for all checkpoints from before this run;
+             * however, it is impossible to open the same checkpoint name twice and get two
+             * different checkpoints from before the current database run, since the newer one must
+             * have just been created.
+             */
+            ckpt_snapshot->ckpt_id = snapshot_time;
         }
 
         if (ret == 0) {
