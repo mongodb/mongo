@@ -1331,19 +1331,14 @@ checkpoint_worker(void *arg)
         goto err;
     }
 
-    while (!wtperf->stop || wtperf->flushthreads != NULL) {
+    while (!wtperf->ckpt_stop && !wtperf->error) {
         /* Break the sleep up, so we notice interrupts faster. */
         for (i = 0; i < opts->checkpoint_interval; i++) {
             sleep(1);
-            if (wtperf->stop)
+            if (wtperf->ckpt_stop || wtperf->error)
                 break;
         }
-        /*
-         * If the workers are done, don't bother with a final call unless the flush tier worker
-         * needs to a final checkpoint to complete. The checkpoint thread keeps running as long as
-         * there is a flush tier worker thread running.
-         */
-        if (wtperf->stop && wtperf->flushthreads == NULL)
+        if (wtperf->ckpt_stop || wtperf->error)
             break;
 
         wtperf->ckpt = true;
@@ -1657,12 +1652,13 @@ execute_populate(WTPERF *wtperf)
         free(wtperf->flushthreads);
         wtperf->flushthreads = NULL;
     }
+    wtperf->ckpt_stop = true;
     if (wtperf->ckptthreads != NULL) {
         stop_threads(1, wtperf->ckptthreads);
         free(wtperf->ckptthreads);
         wtperf->ckptthreads = NULL;
     }
-    wtperf->stop = false;
+    wtperf->ckpt_stop = wtperf->stop = false;
 
     return (0);
 }
@@ -2381,6 +2377,7 @@ err:
     stop_threads(1, wtperf->backupthreads);
     /* We must stop the flush thread before the checkpoint thread. */
     stop_threads(1, wtperf->flushthreads);
+    wtperf->ckpt_stop = true;
     stop_threads(1, wtperf->ckptthreads);
     stop_threads(1, wtperf->scanthreads);
 
