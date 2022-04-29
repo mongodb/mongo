@@ -12,9 +12,11 @@ import signal
 import subprocess
 import sys
 import threading
+import time
 from datetime import datetime
 from shlex import quote
 
+import psutil
 from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib import utils
@@ -278,8 +280,15 @@ class Process(object):
         return " ".join(sb)
 
     def pause(self):
-        """Send the SIGSTOP signal to the process."""
-        self._process.send_signal(signal.SIGSTOP)
+        """Send the SIGSTOP signal to the process and wait for it to be stopped."""
+        while True:
+            self._process.send_signal(signal.SIGSTOP)
+            mongod_process = psutil.Process(self.pid)
+            process_status = mongod_process.status()
+            if process_status == psutil.STATUS_STOPPED:
+                break
+            self.logger.info("Process status: {}".format(process_status))
+            time.sleep(1)
 
     def resume(self):
         """Send the SIGCONT signal to the process."""
