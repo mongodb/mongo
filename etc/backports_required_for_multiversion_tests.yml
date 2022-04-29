@@ -203,6 +203,8 @@ all:
     test_file: jstests/replsets/rollback_during_step_up.js
   - ticket: SERVER-63141
     test_file: jstests/aggregation/lookup_let_optimization.js
+  - ticket: SERVER-66089
+    test_file: jstests/replsets/initial_sync_with_partial_transaction.js
 
 
 suites:
