@@ -100,7 +100,7 @@ public:
         Direction direction = FORWARD,
         boost::optional<RecordIdBound> minRecord = boost::none,
         boost::optional<RecordIdBound> maxRecord = boost::none,
-        boost::optional<std::unique_ptr<BatchedDeleteStageBatchParams>> batchParams = boost::none);
+        std::unique_ptr<BatchedDeleteStageBatchParams> batchParams = nullptr);
 
     /**
      * Returns an index scan.  Caller owns returned pointer.
@@ -117,7 +117,8 @@ public:
         int options = IXSCAN_DEFAULT);
 
     /**
-     * Returns an IXSCAN => FETCH => DELETE plan.
+     * Returns an IXSCAN => FETCH => DELETE plan, or an IXSCAN => FETCH => BATCHED_DELETE plan if
+     * 'batchParams' is set.
      */
     static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> deleteWithIndexScan(
         OperationContext* opCtx,
@@ -128,7 +129,8 @@ public:
         const BSONObj& endKey,
         BoundInclusion boundInclusion,
         PlanYieldPolicy::YieldPolicy yieldPolicy,
-        Direction direction = FORWARD);
+        Direction direction = FORWARD,
+        std::unique_ptr<BatchedDeleteStageBatchParams> batchParams = nullptr);
 
     /**
      * Returns a scan over the 'shardKeyIdx'. If the 'shardKeyIdx' is a non-clustered index, returns

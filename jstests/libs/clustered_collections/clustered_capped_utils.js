@@ -296,11 +296,31 @@ var ClusteredCappedUtils = class {
         assert.eq(0, db.getCollection(collName).find().itcount());
 
         // The TTL deletion has been replicated to the oplog.
+        const isBatched = assert.commandWorked(db.adminCommand(
+            {getParameter: 1, "ttlMonitorBatchDeletes": 1}))["ttlMonitorBatchDeletes"];
         const ns = db.getName() + "." + collName;
-        assert.eq(1,
-                  db.getSiblingDB("local")
-                      .oplog.rs.find({op: "d", ns: ns, "o._id": tenDaysAgo})
-                      .itcount());
+
+        const featureFlagBatchMultiDeletes = assert.commandWorked(db.adminCommand({
+            getParameter: 1,
+            "featureFlagBatchMultiDeletes": 1
+        }))["featureFlagBatchMultiDeletes"]["value"];
+
+        if (featureFlagBatchMultiDeletes && isBatched) {
+            assert.eq(1,
+                      db.getSiblingDB("local")
+                          .oplog.rs
+                          .find({
+                              op: "c",
+                              ns: "admin.$cmd",
+                              "o.applyOps": {$elemMatch: {op: "d", ns: ns, "o._id": tenDaysAgo}}
+                          })
+                          .itcount());
+        } else {
+            assert.eq(1,
+                      db.getSiblingDB("local")
+                          .oplog.rs.find({op: "d", ns: ns, "o._id": tenDaysAgo})
+                          .itcount());
+        }
 
         db.getCollection(collName).drop();
     }

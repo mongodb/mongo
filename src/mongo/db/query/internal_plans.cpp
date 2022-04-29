@@ -208,7 +208,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
     Direction direction,
     boost::optional<RecordIdBound> minRecord,
     boost::optional<RecordIdBound> maxRecord,
-    boost::optional<std::unique_ptr<BatchedDeleteStageBatchParams>> batchParams) {
+    std::unique_ptr<BatchedDeleteStageBatchParams> batchParams) {
     const auto& collection = *coll;
     invariant(collection);
     auto ws = std::make_unique<WorkingSet>();
@@ -228,7 +228,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
     if (batchParams) {
         root = std::make_unique<BatchedDeleteStage>(expCtx.get(),
                                                     std::move(params),
-                                                    std::move(*batchParams),
+                                                    std::move(batchParams),
                                                     ws.get(),
                                                     collection,
                                                     root.release());
@@ -294,7 +294,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
     const BSONObj& endKey,
     BoundInclusion boundInclusion,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
-    Direction direction) {
+    Direction direction,
+    std::unique_ptr<BatchedDeleteStageBatchParams> batchParams) {
     const auto& collection = *coll;
     invariant(collection);
     auto ws = std::make_unique<WorkingSet>();
@@ -312,8 +313,17 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
                                                  direction,
                                                  InternalPlanner::IXSCAN_FETCH);
 
-    root = std::make_unique<DeleteStage>(
-        expCtx.get(), std::move(params), ws.get(), collection, root.release());
+    if (batchParams) {
+        root = std::make_unique<BatchedDeleteStage>(expCtx.get(),
+                                                    std::move(params),
+                                                    std::move(batchParams),
+                                                    ws.get(),
+                                                    collection,
+                                                    root.release());
+    } else {
+        root = std::make_unique<DeleteStage>(
+            expCtx.get(), std::move(params), ws.get(), collection, root.release());
+    }
 
     auto executor = plan_executor_factory::make(expCtx,
                                                 std::move(ws),

@@ -44,3 +44,10 @@ server_parameters:
         default: 60
         validator:
             gt: 0
+
+    ttlMonitorBatchDeletes:
+        description: "Allow the TTL monitor to batch deletes."
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: ttlMonitorBatchDeletes
+        default: true

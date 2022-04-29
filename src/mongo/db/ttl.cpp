@@ -57,6 +57,7 @@
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/bucket_catalog.h"
 #include "mongo/db/ttl_collection_cache.h"
 #include "mongo/db/ttl_gen.h"
@@ -459,7 +460,8 @@ private:
                                                  endKey,
                                                  BoundInclusion::kIncludeBothStartAndEndKeys,
                                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                                                 direction);
+                                                 direction,
+                                                 _getBatchedDeleteParamsIfEnabled(collection));
 
         try {
             const auto numDeleted = exec->executeDelete();
@@ -551,7 +553,8 @@ private:
                                                       PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                       InternalPlanner::Direction::FORWARD,
                                                       startId,
-                                                      endId);
+                                                      endId,
+                                                      _getBatchedDeleteParamsIfEnabled(collection));
 
         try {
             const auto numDeleted = exec->executeDelete();
@@ -573,6 +576,23 @@ private:
             // It is expected that a collection drop can kill a query plan while the TTL monitor
             // is deleting an old document, so ignore this error.
         }
+    }
+
+    // Returns BatchedDeleteStageBatchParams pointer only if the feature flag and the server
+    // parameter are enabled. Due to current issues with change streams, for sharded collections,
+    // returns nullptr to disable batch deletion.
+    // TODO: Remove exclusion of sharded collections after resolution of SERVER-64107 and
+    // SERVER-65644.
+
+    std::unique_ptr<BatchedDeleteStageBatchParams> _getBatchedDeleteParamsIfEnabled(
+        const CollectionPtr& collection) {
+        // Load batched delete parameters.
+        if (!collection.isSharded() &&
+            feature_flags::gBatchMultiDeletes.isEnabled(serverGlobalParams.featureCompatibility) &&
+            ttlMonitorBatchDeletes.load()) {
+            return std::make_unique<BatchedDeleteStageBatchParams>();
+        }
+        return nullptr;
     }
 
     // Protects the state below.
