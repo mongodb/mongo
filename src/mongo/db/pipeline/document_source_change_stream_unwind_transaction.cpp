@@ -65,6 +65,13 @@ std::unique_ptr<MatchExpression> buildUnwindTransactionFilter(
     // filtered out by the default 'ns' filter this stage gets initialized with.
     auto unwindFilter = std::make_unique<AndMatchExpression>(buildOperationFilter(expCtx, nullptr));
 
+    // To correctly handle filtering out entries of direct write operations on orphaned documents,
+    // we include a filter for "fromMigrate" flagged operations, unless "fromMigrate" events are
+    // explicitly requested in the spec.
+    if (!expCtx->changeStreamSpec->getShowMigrationEvents()) {
+        unwindFilter->add(buildNotFromMigrateFilter(expCtx, userMatch));
+    }
+
     // Attempt to rewrite the user's filter and combine it with the standard operation filter. We do
     // this separately because we need to exclude certain fields from the user's filters. Unwound
     // transaction events do not have these fields until we populate them from the commitTransaction
