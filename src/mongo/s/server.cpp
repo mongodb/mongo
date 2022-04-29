@@ -298,6 +298,12 @@ void cleanupTask(ServiceContext* serviceContext) {
 
         if (serviceContext) {
             serviceContext->setKillAllOperations();
+            FailPoint* hangBeforeInterruptfailPoint =
+                globalFailPointRegistry().find("hangBeforeCheckingMongosShutdownInterrupt");
+            if (hangBeforeInterruptfailPoint) {
+                hangBeforeInterruptfailPoint->setMode(FailPoint::Mode::off);
+                sleepsecs(3);
+            }
         }
 
         // Perform all shutdown operations after setKillAllOperations is called in order to ensure

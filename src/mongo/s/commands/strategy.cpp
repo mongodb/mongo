@@ -96,7 +96,7 @@ using namespace fmt::literals;
 
 namespace mongo {
 namespace {
-
+MONGO_FAIL_POINT_DEFINE(hangBeforeCheckingMongosShutdownInterrupt);
 const auto kOperationTime = "operationTime"_sd;
 
 /**
@@ -395,13 +395,6 @@ void runCommand(OperationContext* opCtx,
     uassert(ErrorCodes::InvalidOptions,
             "no such command option $maxTimeMs; use maxTimeMS instead",
             request.body[QueryRequest::queryOptionMaxTimeMS].eoo());
-    const int maxTimeMS = uassertStatusOK(
-        QueryRequest::parseMaxTimeMS(request.body[QueryRequest::cmdOptionMaxTimeMS]));
-    if (maxTimeMS > 0 && command->getLogicalOp() != LogicalOp::opGetMore) {
-        opCtx->setDeadlineAfterNowBy(Milliseconds{maxTimeMS}, ErrorCodes::MaxTimeMSExpired);
-    }
-    opCtx->checkForInterrupt();  // May trigger maxTimeAlwaysTimeOut fail point.
-
     // If the command includes a 'comment' field, set it on the current OpCtx.
     if (auto commentField = request.body["comment"]) {
         opCtx->setComment(commentField.wrap());
@@ -454,6 +447,28 @@ void runCommand(OperationContext* opCtx,
 
     boost::optional<RouterOperationContextSession> routerSession;
     try {
+
+        const int maxTimeMS = uassertStatusOK(
+            QueryRequest::parseMaxTimeMS(request.body[QueryRequest::cmdOptionMaxTimeMS]));
+        if (maxTimeMS > 0 && command->getLogicalOp() != LogicalOp::opGetMore) {
+            opCtx->setDeadlineAfterNowBy(Milliseconds{maxTimeMS}, ErrorCodes::MaxTimeMSExpired);
+        }
+        if (MONGO_unlikely(
+                hangBeforeCheckingMongosShutdownInterrupt.shouldFail([&](const BSONObj& data) {
+                    if (data.hasField("cmdName") && data.hasField("ns")) {
+                        std::string cmdNS = ns;
+                        return ((data.getStringField("cmdName") == commandName) &&
+                                (data.getStringField("ns") == cmdNS));
+                    }
+                    return false;
+                }))) {
+
+            LOGV2(6217501, "Hanging before hangBeforeCheckingMongosShutdownInterrupt is cancelled");
+            hangBeforeCheckingMongosShutdownInterrupt.pauseWhileSet();
+        }
+
+        opCtx->checkForInterrupt();  // May trigger maxTimeAlwaysTimeOut fail point.
+
         if (isHello) {
             // Preload generic ClientMetadata ahead of our first hello request. After the first
             // request, metaElement should always be empty.
