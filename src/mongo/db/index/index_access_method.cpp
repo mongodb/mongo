@@ -96,11 +96,16 @@ public:
     BSONObj generateSection(OperationContext* opCtx, const BSONElement& configElement) const final {
         BSONObjBuilder builder;
         builder.append("count", count.loadRelaxed());
+        builder.append("resumed", resumed.loadRelaxed());
         return builder.obj();
     }
 
     // Number of instances of the bulk builder created.
     AtomicWord<long long> count;
+
+    // Number of times the bulk builder was created for a resumable index build.
+    // This value should not exceed 'count'.
+    AtomicWord<long long> resumed;
 } indexBulkBuilderSSS;
 
 /**
@@ -609,6 +614,7 @@ AbstractIndexAccessMethod::BulkBuilderImpl::BulkBuilderImpl(const IndexCatalogEn
       _isMultiKey(stateInfo.getIsMultikey()),
       _indexMultikeyPaths(createMultikeyPaths(stateInfo.getMultikeyPaths())) {
     indexBulkBuilderSSS.count.addAndFetch(1);
+    indexBulkBuilderSSS.resumed.addAndFetch(1);
 }
 
 Status AbstractIndexAccessMethod::BulkBuilderImpl::insert(
