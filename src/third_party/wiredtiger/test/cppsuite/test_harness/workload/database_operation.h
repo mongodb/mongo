@@ -62,6 +62,9 @@ class database_operation {
     /* Basic update operation that chooses a random key and updates it. */
     virtual void update_operation(thread_context *tc);
 
+    virtual void validate(const std::string &operation_table_name,
+      const std::string &schema_table_name, const std::vector<uint64_t> &known_collection_ids);
+
     virtual ~database_operation() = default;
 };
 } // namespace test_harness

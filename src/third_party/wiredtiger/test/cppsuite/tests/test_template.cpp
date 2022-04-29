@@ -79,4 +79,10 @@ class test_template : public test_harness::test {
     {
         std::cout << "update_operation: nothing done." << std::endl;
     }
+
+    void
+    validate(const std::string &, const std::string &, const std::vector<uint64_t> &) override final
+    {
+        std::cout << "validate: nothing done." << std::endl;
+    }
 };

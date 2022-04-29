@@ -37,7 +37,6 @@
 #include "test.h"
 #include "thread_manager.h"
 #include "timestamp_manager.h"
-#include "workload/workload_validation.h"
 #include "util/api_const.h"
 
 namespace test_harness {
@@ -162,12 +161,10 @@ test::run()
         it->finish();
 
     /* Validation stage. */
-    if (_workload_tracking->enabled()) {
-        workload_validation wv;
-        wv.validate(_workload_tracking->get_operation_table_name(),
+    if (_workload_tracking->enabled())
+        this->validate(_workload_tracking->get_operation_table_name(),
           _workload_tracking->get_schema_table_name(),
           _workload_generator->get_database().get_collection_ids());
-    }
 
     logger::log_msg(LOG_INFO, "SUCCESS");
 }

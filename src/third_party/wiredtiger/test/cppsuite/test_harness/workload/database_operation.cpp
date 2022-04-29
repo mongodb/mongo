@@ -35,6 +35,7 @@
 #include "database_operation.h"
 #include "random_generator.h"
 #include "workload_tracking.h"
+#include "workload_validation.h"
 
 namespace test_harness {
 /* Static methods. */
@@ -378,4 +379,11 @@ database_operation::update_operation(thread_context *tc)
         tc->transaction.rollback();
 }
 
+void
+database_operation::validate(const std::string &operation_table_name,
+  const std::string &schema_table_name, const std::vector<uint64_t> &known_collection_ids)
+{
+    workload_validation wv;
+    wv.validate(operation_table_name, schema_table_name, known_collection_ids);
+}
 } // namespace test_harness
