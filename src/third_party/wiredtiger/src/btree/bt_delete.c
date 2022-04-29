@@ -242,10 +242,15 @@ __wt_delete_page_skip(WT_SESSION_IMPL *session, WT_REF *ref, bool visible_all)
      * The fast-truncate structure can be freed as soon as the delete is stable: it is only read
      * when the ref state is locked. It is worth checking every time we come through because once
      * this is freed, we no longer need synchronization to check the ref.
+     *
+     * If we are reading from a checkpoint, we can't do the visible_all check (it checks the current
+     * state of the world and not the checkpoint) but also, because the checkpoint is immutable the
+     * delete can't ever become fully stable so we should never discard the fast-truncate structure.
      */
     if (skip && ref->ft_info.del != NULL &&
       (visible_all ||
-        __wt_txn_visible_all(session, ref->ft_info.del->txnid, ref->ft_info.del->timestamp)))
+        (!WT_READING_CHECKPOINT(session) &&
+          __wt_txn_visible_all(session, ref->ft_info.del->txnid, ref->ft_info.del->timestamp))))
         __wt_overwrite_and_free(session, ref->ft_info.del);
 
     WT_REF_SET_STATE(ref, WT_REF_DELETED);
@@ -406,8 +411,15 @@ __wt_delete_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
     /*
      * We no longer need the WT_PAGE_DELETED structure, all of its information should have been
      * transferred to the list of WT_UPDATE structures (if any).
+     *
+     * Except when the tree is read-only; in a read-only tree, eviction will just discard the
+     * instantiated page instead of saving it, so instead of this being a permanent transition we
+     * need to be able to regenerate the instantiated page arbitrarily many times. Note that keeping
+     * the structure around would cause horrible things to happen in reconciliation if we ever
+     * reached that code; but we won't.
      */
-    __wt_overwrite_and_free(session, ref->ft_info.del);
+    if (!F_ISSET(btree, WT_BTREE_READONLY))
+        __wt_overwrite_and_free(session, ref->ft_info.del);
     if (update_list != NULL)
         ref->ft_info.update = update_list;
 

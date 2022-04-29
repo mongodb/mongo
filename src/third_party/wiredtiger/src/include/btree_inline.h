@@ -1509,6 +1509,14 @@ __wt_page_del_active(WT_SESSION_IMPL *session, WT_REF *ref, bool visible_all)
         return (false);
     if (page_del->txnid == WT_TXN_ABORTED)
         return (false);
+    /*
+     * If we are reading from a checkpoint, visible_all checks don't work (they check the current
+     * state of the world and not the checkpoint) so operate under the assumption that if the
+     * truncate operation appears in the checkpoint, it must have been visible to somebody, and
+     * because the checkpoint is immutable, that won't ever change.
+     */
+    if (WT_READING_CHECKPOINT(session) && visible_all)
+        return (true);
     WT_ORDERED_READ(prepare_state, page_del->prepare_state);
     if (prepare_state == WT_PREPARE_INPROGRESS || prepare_state == WT_PREPARE_LOCKED)
         return (true);
