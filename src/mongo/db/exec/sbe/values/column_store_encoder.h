@@ -67,12 +67,12 @@ struct ColumnStoreEncoder {
 
     std::pair<TypeTags, Value> operator()(BSONObj value) {
         tassert(6343901, "Unexpected non-trivial object in columnar value", value.isEmpty());
-        return {TypeTags::Object, reinterpret_cast<Value>(&emptyObject)};
+        return {TypeTags::Object, bitcastFrom<const Object*>(&emptyObject)};
     }
 
     std::pair<TypeTags, Value> operator()(BSONArray value) {
         tassert(6343902, "Unexpected non-trivial array in columnar value", value.isEmpty());
-        return {TypeTags::Array, reinterpret_cast<Value>(&emptyArray)};
+        return {TypeTags::Array, bitcastFrom<const Array*>(&emptyArray)};
     }
 
     std::pair<TypeTags, Value> operator()(bool value) {
@@ -113,14 +113,14 @@ struct ColumnStoreEncoder {
 
     std::pair<TypeTags, Value> operator()(Decimal128 value) {
         DataView(temporaryStorage.data()).write(value);
-        return {TypeTags::NumberDecimal, reinterpret_cast<Value>(temporaryStorage.data())};
+        return {TypeTags::NumberDecimal, bitcastFrom<const char*>(temporaryStorage.data())};
     }
 
     std::pair<TypeTags, Value> operator()(const OID& value) {
         auto oidBytes = value.view().view();
         std::copy(oidBytes, oidBytes + OID::kOIDSize, temporaryStorage.begin());
 
-        return {TypeTags::ObjectId, reinterpret_cast<Value>(temporaryStorage.data())};
+        return {TypeTags::ObjectId, bitcastFrom<const char*>(temporaryStorage.data())};
     }
 
     std::pair<TypeTags, Value> operator()(const UUID& value) {
@@ -140,7 +140,7 @@ struct ColumnStoreEncoder {
         static_assert(sizeof(value.data()) == UUID::kNumBytes);
         binDataView.write(value.data(), offset);  // No need to update 'offset' for the last write.
 
-        return {TypeTags::ObjectId, reinterpret_cast<Value>(temporaryStorage.data())};
+        return {TypeTags::ObjectId, bitcastFrom<const char*>(temporaryStorage.data())};
     }
 
 private:

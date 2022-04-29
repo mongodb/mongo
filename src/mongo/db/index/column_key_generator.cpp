@@ -62,9 +62,8 @@ bool identicalBSONElementArrays(const std::vector<BSONElement>& lhs,
 /**
  * This class handles the logic of key generation for columnar indexes. It produces
  * UnencodedCellViews, which have all of the data that should be put in the index values, but it is
- * not responsible for encoding that data into a flat buffer. That is handled by XXX.
- *
- * TODO once the code for that that is written (SERVER-64766) update this to replace the XXX.
+ * not responsible for encoding that data into a flat buffer. This final serialization step is
+ * handled by the 'writeEncodedCell' function.
  *
  * "Shredding" is an informal term for taking a single BSON document and splitting it into the data
  * for each unique path. The data at each path should be sufficient to reconstruct the object in

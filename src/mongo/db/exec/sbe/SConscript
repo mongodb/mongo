@@ -210,6 +210,7 @@ env.CppUnitTest(
         'sbe_trial_run_tracker_test.cpp',
         'sbe_unique_test.cpp',
         'util/stage_results_printer_test.cpp',
+        'values/column_store_encoder_test.cpp',
         'values/columnar_test.cpp',
         'values/sbe_pattern_value_cmp_test.cpp',
         'values/slot_printer_test.cpp',
@@ -220,6 +221,7 @@ env.CppUnitTest(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/index/columnar_index',
         '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
         '$BUILD_DIR/mongo/db/service_context_test_fixture',

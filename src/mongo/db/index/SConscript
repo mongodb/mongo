@@ -147,11 +147,22 @@ env.Library(
     ]
 )
 
+env.Library(
+    target="columnar_index",
+    source=[
+        'column_cell.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+    ]
+)
+
 env.CppUnitTest(
     target='db_index_test',
     source=[
         '2d_key_generator_test.cpp',
         'btree_key_generator_test.cpp',
+        'column_cell_test.cpp',
         'column_key_generator_test.cpp',
         'hash_key_generator_test.cpp',
         's2_key_generator_test.cpp',
@@ -168,6 +179,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
         '$BUILD_DIR/mongo/db/query/sort_pattern',
         '$BUILD_DIR/mongo/db/record_id_helpers',
+        'columnar_index',
         'expression_params',
         'key_generator',
     ],

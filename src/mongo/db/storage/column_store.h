@@ -159,15 +159,20 @@ public:
         static constexpr uint8_t kOID = 0x27;   // 12 bytes follow
         static constexpr uint8_t kUUID = 0x28;  // 16 bytes follow (newUUID subtype)
 
-        // Gap from 0x29 - 0x32 (room for more simple types and more encodings of Decimal128)
+        // Gap from 0x29 - 0x2f (room for more simple types and more encodings of Decimal128)
 
-        static constexpr uint8_t kDecimal128 = 0x33;  // 16 bytes follow
+        static constexpr uint8_t kDecimal128 = 0x30;  // 16 bytes follow
 
-        // Both are NumberDouble
-        static constexpr uint8_t kDouble = 0x34;       // 8 bytes follow
-        static constexpr uint8_t kShortDouble = 0x35;  // 4 bytes follow (when float(x) == x)
-        // 0x36 and 0x37 are reserved for bfloat16 (truncated single) and IEEE754 float16.
-        static constexpr uint8_t kInt1Double = 0x38;  // 1 bytes follow (when int8_t(x) == x)
+        // NumberDouble
+        static constexpr uint8_t kDouble = 0x31;       // 8 bytes follow
+        static constexpr uint8_t kShortDouble = 0x32;  // 4 bytes follow (when float(x) == x)
+        // 0x33 and 0x34 are reserved for bfloat16 (truncated single) and IEEE754 float16.
+        static constexpr uint8_t kInt1Double = 0x35;  // 1 bytes follow (when int8_t(x) == x)
+
+        // NumberDouble when (100 * x) can safely be represented as an integer
+        static constexpr uint8_t kCents1Double = 0x36;  // 1 byte follows
+        static constexpr uint8_t kCents2Double = 0x37;  // 2 bytes follow
+        static constexpr uint8_t kCents4Double = 0x38;  // 4 bytes follow
 
         // NumberInt (N bytes follow)
         static constexpr uint8_t kInt1 = 0x39;
@@ -194,7 +199,9 @@ public:
 
         // Bytes here or above indicate prefix data before the data. Any byte below this is the
         // start of data. Prefix data is all optional, but when present, must be in this order:
-        //   - kSubObjMarker
+        //   - kSubPathsMarker
+        //   - kSparseMarker
+        //   - kDoubleNestedArraysMarker
         //   - kArrInfoSizeXXX
         static constexpr uint8_t kFirstPrefixByte = 0xd0;
 
@@ -210,9 +217,12 @@ public:
         static constexpr uint8_t kArrInfoSize4 = 0xef;
         static constexpr uint8_t kLastArrInfoSize = 0xef;
 
-        // Gap from 0xf0 - 0xfe
+        // Gap from 0xf0 - 0xfb
 
-        static constexpr uint8_t kSubObjMarker = 0xff;
+        static constexpr uint8_t kDuplicateFieldsMarker = 0xfc;
+        static constexpr uint8_t kSubPathsMarker = 0xfd;
+        static constexpr uint8_t kSparseMarker = 0xfe;
+        static constexpr uint8_t kDoubleNestedArraysMarker = 0xff;
 
         // Rest is helpers to make these constants easier to use.
 
@@ -411,7 +421,7 @@ struct SplitCellView {
 
         // This block handles all prefix bytes, and leaves firstByteAddr pointing at the first elem.
         if (firstByte >= Bytes::kFirstPrefixByte) {
-            if (firstByte == ColumnStore::Bytes::kSubObjMarker) {
+            if (firstByte == ColumnStore::Bytes::kSubPathsMarker) {
                 hasSubObjects = true;
                 firstByte = *++firstByteAddr;
             }
@@ -514,6 +524,21 @@ struct SplitCellView {
                     auto val = ConstDataView(ptr).read<LittleEndian<int8_t>>();
                     ptr += 1;
                     return encoder(double(val));
+                }
+                case Bytes::kCents1Double: {
+                    auto val = ConstDataView(ptr).read<LittleEndian<int8_t>>();
+                    ptr += 1;
+                    return encoder(double(val) / 100);
+                }
+                case Bytes::kCents2Double: {
+                    auto val = ConstDataView(ptr).read<LittleEndian<int16_t>>();
+                    ptr += 2;
+                    return encoder(double(val) / 100);
+                }
+                case Bytes::kCents4Double: {
+                    auto val = ConstDataView(ptr).read<LittleEndian<int32_t>>();
+                    ptr += 4;
+                    return encoder(double(val) / 100);
                 }
                 case Bytes::kInt1: {
                     auto val = ConstDataView(ptr).read<LittleEndian<int8_t>>();
