@@ -900,6 +900,10 @@ void InitialSyncer::_lastOplogEntryFetcherCallbackForDefaultBeginFetchingOpTime(
     std::string logMsg = str::stream() << "Initial Syncer got the defaultBeginFetchingTimestamp: "
                                        << defaultBeginFetchingOpTime.toString();
     pauseAtInitialSyncFuzzerSyncronizationPoints(logMsg);
+    LOGV2_DEBUG(6608900,
+                1,
+                "Initial Syncer got the defaultBeginFetchingOpTime",
+                "defaultBeginFetchingOpTime"_attr = defaultBeginFetchingOpTime);
 
     status = _scheduleGetBeginFetchingOpTime_inlock(onCompletionGuard, defaultBeginFetchingOpTime);
     if (!status.isOK()) {
@@ -915,10 +919,10 @@ Status InitialSyncer::_scheduleGetBeginFetchingOpTime_inlock(
     const auto preparedState = DurableTxnState_serializer(DurableTxnStateEnum::kPrepared);
     const auto inProgressState = DurableTxnState_serializer(DurableTxnStateEnum::kInProgress);
 
-    // Obtain the oldest active transaction timestamp from the remote by querying their
-    // transactions table. To prevent oplog holes from causing this query to return an inaccurate
-    // timestamp, we specify an afterClusterTime of Timestamp(0, 1) so that we wait for all previous
-    // writes to be visible.
+    // Obtain the oldest active transaction timestamp from the remote by querying their transactions
+    // table. To prevent oplog holes (primary) or a stale lastAppliedSnapshot (secondary) from
+    // causing this query to return an inaccurate timestamp, we specify an afterClusterTime of the
+    // defaultBeginFetchingOpTime so that we wait for all previous writes to be visible.
     BSONObjBuilder cmd;
     cmd.append("find", NamespaceString::kSessionTransactionsTableNamespace.coll().toString());
     cmd.append("filter",
@@ -927,7 +931,7 @@ Status InitialSyncer::_scheduleGetBeginFetchingOpTime_inlock(
     cmd.append("readConcern",
                BSON("level"
                     << "local"
-                    << "afterClusterTime" << Timestamp(0, 1)));
+                    << "afterClusterTime" << defaultBeginFetchingOpTime.getTimestamp()));
     cmd.append("limit", 1);
 
     _beginFetchingOpTimeFetcher = std::make_unique<Fetcher>(
