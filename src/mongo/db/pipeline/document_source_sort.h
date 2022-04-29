@@ -42,10 +42,6 @@ namespace mongo {
 
 class DocumentSourceSort final : public DocumentSource {
 public:
-    static constexpr StringData kMin = "min"_sd;
-    static constexpr StringData kMax = "max"_sd;
-    static constexpr StringData kOffset = "offsetSeconds"_sd;
-
     struct SortableDate {
         Date_t date;
 
@@ -134,12 +130,6 @@ public:
         return create(pExpCtx, {sortOrder, pExpCtx});
     }
 
-    static boost::intrusive_ptr<DocumentSourceSort> createBoundedSort(
-        SortPattern pat,
-        StringData boundBase,
-        long long boundOffset,
-        boost::optional<long long> limit,
-        const boost::intrusive_ptr<ExpressionContext>& expCtx);
     /**
      * Parse a stage that uses BoundedSorter.
      */
@@ -173,10 +163,6 @@ public:
     bool isPopulated() {
         return _populated;
     };
-
-    bool isBoundedSortStage() {
-        return (_timeSorter) ? true : false;
-    }
 
     bool hasLimit() const {
         return _sortExecutor->hasLimit();

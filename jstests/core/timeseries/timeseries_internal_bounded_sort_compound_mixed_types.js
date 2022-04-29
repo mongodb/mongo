@@ -131,7 +131,7 @@ function runTest(sortSpec) {
                 // Use a much looser bound than necessary, to exercise the partitioning logic more.
                 // With such a loose bound, events are only released due to a partition boundary,
                 // never a bucket boundary.
-                bound: {base: "min", offsetSeconds: -sortSpec.t * 10 * bucketMaxSpanSeconds},
+                bound: {base: "min", offset: -sortSpec.t * 10 * bucketMaxSpanSeconds},
             }
         },
     ];
@@ -152,7 +152,7 @@ function runTest(sortSpec) {
                 // Use a much looser bound than necessary, to exercise the partitioning logic more.
                 // With such a loose bound, events are only released due to a partition boundary,
                 // never a bucket boundary.
-                bound: {base: "max", offsetSeconds: -sortSpec.t * 10 * bucketMaxSpanSeconds},
+                bound: {base: "max", offset: -sortSpec.t * 10 * bucketMaxSpanSeconds},
             }
         },
     ];

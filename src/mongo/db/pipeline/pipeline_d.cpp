@@ -28,7 +28,6 @@
  */
 
 #include "mongo/db/query/projection_parser.h"
-#include "mongo/db/server_options.h"
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 #include "mongo/platform/basic.h"
@@ -54,7 +53,6 @@
 #include "mongo/db/exec/unpack_timeseries_bucket.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/index/index_access_method.h"
-#include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/write_ops_exec.h"
@@ -79,7 +77,6 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_executor_factory.h"
-#include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
@@ -408,35 +405,6 @@ std::pair<DocumentSourceSample*, DocumentSourceInternalUnpackBucket*> extractSam
     }
 
     return std::pair{sampleStage, unpackStage};
-}
-
-std::tuple<DocumentSourceInternalUnpackBucket*, DocumentSourceSort*> findUnpackThenSort(
-    const Pipeline::SourceContainer& sources) {
-    DocumentSourceSort* sortStage = nullptr;
-    DocumentSourceInternalUnpackBucket* unpackStage = nullptr;
-
-    auto sourcesIt = sources.begin();
-    while (sourcesIt != sources.end()) {
-        if (!sortStage) {
-            sortStage = dynamic_cast<DocumentSourceSort*>(sourcesIt->get());
-
-            if (sortStage) {
-                // Do not double optimize
-                if (sortStage->isBoundedSortStage()) {
-                    return {nullptr, nullptr};
-                }
-
-                return {unpackStage, sortStage};
-            }
-        }
-
-        if (!unpackStage) {
-            unpackStage = dynamic_cast<DocumentSourceInternalUnpackBucket*>(sourcesIt->get());
-        }
-        ++sourcesIt;
-    }
-
-    return {unpackStage, sortStage};
 }
 }  // namespace
 
@@ -975,165 +943,6 @@ PipelineD::buildInnerQueryExecutorGeneric(const MultipleCollectionAccessor& coll
                                                 aggRequest,
                                                 Pipeline::kAllowedMatcherFeatures,
                                                 &shouldProduceEmptyDocs));
-
-    // If this is a query on a time-series collection then it may be eligible for a post-planning
-    // sort optimization. We check eligibility and perform the rewrite here.
-    auto [unpack, sort] = findUnpackThenSort(pipeline->_sources);
-    if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-        serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
-            multiversion::FeatureCompatibilityVersion::kVersion_6_1) &&
-        feature_flags::gFeatureFlagBucketUnpackWithSort.isEnabled(
-            serverGlobalParams.featureCompatibility) &&
-        unpack && sort) {
-        auto execImpl = dynamic_cast<PlanExecutorImpl*>(exec.get());
-        if (execImpl) {
-
-            // Get source stage
-            PlanStage* rootStage = execImpl->getRootStage();
-            while (rootStage && rootStage->getChildren().size() == 1) {
-                switch (rootStage->stageType()) {
-                    case STAGE_FETCH:
-                        rootStage = rootStage->child().get();
-                        break;
-                    case STAGE_SHARDING_FILTER:
-                        rootStage = rootStage->child().get();
-                        break;
-                    default:
-                        rootStage = nullptr;
-                }
-            }
-
-            if (rootStage && rootStage->getChildren().size() != 0) {
-                rootStage = nullptr;
-            }
-
-            const auto& sortPattern = sort->getSortKeyPattern();
-            if (auto agree = unpack->supportsSort(rootStage, sortPattern)) {
-                // Scan the pipeline to check if it's compatible with the  optimization.
-                bool badStage = false;
-                bool seenSort = false;
-                std::list<boost::intrusive_ptr<DocumentSource>>::iterator iter =
-                    pipeline->_sources.begin();
-                std::list<boost::intrusive_ptr<DocumentSource>>::iterator unpackIter =
-                    pipeline->_sources.end();
-                for (; !badStage && iter != pipeline->_sources.end() && !seenSort; ++iter) {
-                    if (dynamic_cast<const DocumentSourceSort*>(iter->get())) {
-                        seenSort = true;
-                    } else if (dynamic_cast<const DocumentSourceMatch*>(iter->get())) {
-                        // do nothing
-                    } else if (dynamic_cast<const DocumentSourceInternalUnpackBucket*>(
-                                   iter->get())) {
-                        unpackIter = iter;
-                    } else if (auto projection =
-                                   dynamic_cast<const DocumentSourceSingleDocumentTransformation*>(
-                                       iter->get())) {
-                        auto modPaths = projection->getModifiedPaths();
-
-                        // Check to see if the sort paths are modified.
-                        for (auto sortIter = sortPattern.begin();
-                             !badStage && sortIter != sortPattern.end();
-                             ++sortIter) {
-
-                            auto fieldPath = sortIter->fieldPath;
-                            // If they are then escap the loop & don't optimize.
-                            if (!fieldPath || modPaths.canModify(*fieldPath)) {
-                                badStage = true;
-                            }
-                        }
-
-                    } else {
-                        badStage = true;
-                    }
-                }
-                if (!badStage && seenSort) {
-                    auto [indexSortOrderAgree, indexOrderedByMinTime] = *agree;
-                    // This is safe because we have seen a sort so we must have at least one stage
-                    // to the left of the current iterator position.
-                    --iter;
-
-                    if (indexOrderedByMinTime) {
-                        unpack->setIncludeMinTimeAsMetadata();
-                    } else {
-                        unpack->setIncludeMaxTimeAsMetadata();
-                    }
-
-                    if (indexSortOrderAgree) {
-                        pipeline->_sources.insert(
-                            iter,
-                            DocumentSourceSort::createBoundedSort(sort->getSortKeyPattern(),
-                                                                  (indexOrderedByMinTime
-                                                                       ? DocumentSourceSort::kMin
-                                                                       : DocumentSourceSort::kMax),
-                                                                  0,
-                                                                  sort->getLimit(),
-                                                                  expCtx));
-                    } else {
-                        // Since the sortPattern and the direction of the index don't agree we must
-                        // use the offset to get an estimate on the bounds of the bucket.
-                        pipeline->_sources.insert(
-                            iter,
-                            DocumentSourceSort::createBoundedSort(
-                                sort->getSortKeyPattern(),
-                                (indexOrderedByMinTime ? DocumentSourceSort::kMin
-                                                       : DocumentSourceSort::kMax),
-                                ((indexOrderedByMinTime) ? unpack->getBucketMaxSpanSeconds()
-                                                         : -unpack->getBucketMaxSpanSeconds()) *
-                                    1000,
-                                sort->getLimit(),
-                                expCtx));
-
-                        /**
-                         * We wish to create the following predicate to avoid returning incorrect
-                         * results in the unlikely event bucketMaxSpanSeconds changes under us.
-                         *
-                         * {$expr:
-                         *   {$lte: [
-                         *     {$subtract: [$control.max.timeField, $control.min.timeField]},
-                         *     {$const: bucketMaxSpanSeconds, in milliseconds}
-                         * ]}}
-                         */
-                        auto minTime = unpack->getMinTimeField();
-                        auto maxTime = unpack->getMaxTimeField();
-                        auto match = std::make_unique<ExprMatchExpression>(
-                            // This produces {$lte: ... }
-                            make_intrusive<ExpressionCompare>(
-                                expCtx.get(),
-                                ExpressionCompare::CmpOp::LTE,
-                                // This produces [...]
-                                makeVector<boost::intrusive_ptr<Expression>>(
-                                    // This produces {$subtract: ... }
-                                    make_intrusive<ExpressionSubtract>(
-                                        expCtx.get(),
-                                        // This produces [...]
-                                        makeVector<boost::intrusive_ptr<Expression>>(
-                                            // This produces "$control.max.timeField"
-                                            ExpressionFieldPath::createPathFromString(
-                                                expCtx.get(), maxTime, expCtx->variablesParseState),
-                                            // This produces "$control.min.timeField"
-                                            ExpressionFieldPath::createPathFromString(
-                                                expCtx.get(),
-                                                minTime,
-                                                expCtx->variablesParseState))),
-                                    // This produces {$const: maxBucketSpanSeconds}
-                                    make_intrusive<ExpressionConstant>(
-                                        expCtx.get(),
-                                        Value{unpack->getBucketMaxSpanSeconds() * 1000}))),
-                            expCtx);
-                        pipeline->_sources.insert(
-                            unpackIter,
-                            make_intrusive<DocumentSourceMatch>(std::move(match), expCtx));
-                    }
-                    // Ensure we're erasing the sort source.
-                    tassert(6434901,
-                            "we must erase a $sort stage and replace it with a bounded sort stage",
-                            strcmp((*iter)->getSourceName(),
-                                   DocumentSourceSort::kStageName.rawData()) == 0);
-                    pipeline->_sources.erase(iter);
-                    pipeline->stitch();
-                }
-            }
-        }
-    }
 
     const auto cursorType = shouldProduceEmptyDocs
         ? DocumentSourceCursor::CursorType::kEmptyDocuments

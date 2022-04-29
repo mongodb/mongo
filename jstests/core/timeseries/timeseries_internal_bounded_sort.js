@@ -88,7 +88,7 @@ function runTest(ascending) {
                         $_internalBoundedSort: {
                             sortKey: {t: ascending ? 1 : -1},
                             bound: ascending ? {base: "min"}
-                                             : {base: "min", offsetSeconds: bucketMaxSpanSeconds}
+                                             : {base: "min", offset: bucketMaxSpanSeconds}
                         }
                     },
                 ])
@@ -104,7 +104,7 @@ function runTest(ascending) {
                     {
                         $_internalBoundedSort: {
                             sortKey: {t: ascending ? 1 : -1},
-                            bound: ascending ? {base: "max", offsetSeconds: -bucketMaxSpanSeconds}
+                            bound: ascending ? {base: "max", offset: -bucketMaxSpanSeconds}
                                              : {base: "max"}
                         }
                     },
@@ -136,7 +136,7 @@ function runTest(ascending) {
                         $_internalBoundedSort: {
                             sortKey: {t: ascending ? 1 : -1},
                             bound: ascending ? {base: "min"}
-                                             : {base: "min", offsetSeconds: bucketMaxSpanSeconds},
+                                             : {base: "min", offset: bucketMaxSpanSeconds},
                             limit: 100
                         }
                     },
@@ -154,7 +154,7 @@ function runTest(ascending) {
                     {
                         $_internalBoundedSort: {
                             sortKey: {t: ascending ? 1 : -1},
-                            bound: ascending ? {base: "max", offsetSeconds: -bucketMaxSpanSeconds}
+                            bound: ascending ? {base: "max", offset: -bucketMaxSpanSeconds}
                                              : {base: "max"},
                             limit: 100
                         }

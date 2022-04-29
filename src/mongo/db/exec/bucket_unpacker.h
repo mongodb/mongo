@@ -37,7 +37,6 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/timeseries/timeseries_constants.h"
 
 namespace mongo {
 /**
@@ -288,22 +287,6 @@ public:
 
     bool includeMaxTimeAsMetadata() const {
         return _includeMaxTimeAsMetadata;
-    }
-
-    const std::string& getTimeField() const {
-        return _spec.timeField();
-    }
-
-    const boost::optional<std::string>& getMetaField() const {
-        return _spec.metaField();
-    }
-
-    std::string getMinField(StringData field) const {
-        return std::string{timeseries::kControlMinFieldNamePrefix} + field;
-    }
-
-    std::string getMaxField(StringData field) const {
-        return std::string{timeseries::kControlMaxFieldNamePrefix} + field;
     }
 
     void setBucketSpecAndBehavior(BucketSpec&& bucketSpec, Behavior behavior);

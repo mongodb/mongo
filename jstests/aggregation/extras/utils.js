@@ -441,75 +441,46 @@ function desugarSingleStageAggregation(db, coll, stage) {
 /**
  * Runs and asserts an explain command for an aggregation with the given pipeline. Returns just the
  * pipeline from the explain results regardless of cluster topology.
- * The fourth parameter `options` is for a few options for unusual scenarios.
- * options.inhibitOptimization defaults to true. This prepends an inhibitOptimization stage to the
- * query and removes it before returning results. This is sub ideal for views. options.hint is an
- * optional hint that will get passed on to the aggregation stage. It defaults to undefined.
  */
-function getExplainedPipelineFromAggregation(
-    db, coll, pipeline, {inhibitOptimization = true, hint} = {}) {
+function getExplainedPipelineFromAggregation(db, coll, pipeline) {
     // Prevent stages from being absorbed into the .find() layer
-    if (inhibitOptimization) {
-        pipeline.unshift({$_internalInhibitOptimization: {}});
-    }
-
-    const aggOptions = hint ? {hint: hint} : {};
-
-    const result = coll.explain().aggregate(pipeline, aggOptions);
+    pipeline.unshift({$_internalInhibitOptimization: {}});
+    const result = coll.explain().aggregate(pipeline);
 
     assert.commandWorked(result);
-    return getExplainPipelineFromAggregationResult(db, result, {inhibitOptimization});
+    return getExplainPipelineFromAggregationResult(db, result);
 }
 
-function getExplainPipelineFromAggregationResult(db, result, {
-    inhibitOptimization = true,
-} = {}) {
+function getExplainPipelineFromAggregationResult(db, result) {
     // We proceed by cases based on topology.
     if (!FixtureHelpers.isMongos(db)) {
         assert(Array.isArray(result.stages), result);
-        // The first two stages should be the .find() cursor and the inhibit-optimization stage (if
-        // enabled); the rest of the stages are what the user's 'stage' expanded to.
+        // The first two stages should be the .find() cursor and the inhibit-optimization stage;
+        // the rest of the stages are what the user's 'stage' expanded to.
         assert(result.stages[0].$cursor, result);
-        if (inhibitOptimization) {
-            assert(result.stages[1].$_internalInhibitOptimization, result);
-            return result.stages.slice(2);
-        } else {
-            return result.stages.slice(1);
-        }
+        assert(result.stages[1].$_internalInhibitOptimization, result);
+        return result.stages.slice(2);
     } else {
         if (result.splitPipeline) {
-            let shardsPart = null;
-            if (inhibitOptimization) {
-                assert(result.splitPipeline.shardsPart[0].$_internalInhibitOptimization, result);
-                shardsPart = result.splitPipeline.shardsPart.slice(1);
-            } else {
-                shardsPart = result.splitPipeline.shardsPart;
-            }
+            assert(result.splitPipeline.shardsPart[0].$_internalInhibitOptimization, result);
+            const shardsPart = result.splitPipeline.shardsPart.slice(1);
             assert(result.splitPipeline.mergerPart[0].$mergeCursors, result);
             const mergerPart = result.splitPipeline.mergerPart.slice(1);
             return [].concat(shardsPart).concat(mergerPart);
         } else if (result.stages) {
             // Required for aggregation_mongos_passthrough.
             assert(Array.isArray(result.stages), result);
-            // The first two stages should be the .find() cursor and the inhibit-optimization stage
-            // (if enabled); the rest of the stages are what the user's 'stage' expanded to.
+            // The first two stages should be the .find() cursor and the inhibit-optimization stage;
+            // the rest of the stages are what the user's 'stage' expanded to.
             assert(result.stages[0].$cursor, result);
-            if (inhibitOptimization) {
-                assert(result.stages[1].$_internalInhibitOptimization, result);
-                return result.stages.slice(2);
-            } else {
-                return result.stages.slice(1);
-            }
+            assert(result.stages[1].$_internalInhibitOptimization, result);
+            return result.stages.slice(2);
         } else {
             // Required for aggregation_one_shard_sharded_collections.
             assert(Array.isArray(result.shards["shard-rs0"].stages), result);
             assert(result.shards["shard-rs0"].stages[0].$cursor, result);
-            if (inhibitOptimization) {
-                assert(result.shards["shard-rs0"].stages[1].$_internalInhibitOptimization, result);
-                return result.shards["shard-rs0"].stages.slice(2);
-            } else {
-                return result.shards["shard-rs0"].stages.slice(1);
-            }
+            assert(result.shards["shard-rs0"].stages[1].$_internalInhibitOptimization, result);
+            return result.shards["shard-rs0"].stages.slice(2);
         }
     }
 }

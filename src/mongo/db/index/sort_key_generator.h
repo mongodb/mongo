@@ -75,10 +75,6 @@ public:
         return _sortPattern.isSingleElementKey();
     }
 
-    const SortPattern& getSortPattern() const {
-        return _sortPattern;
-    }
-
 private:
     // Returns the sort key for the input 'doc' as a Value.
     //

@@ -59,6 +59,9 @@ using std::unique_ptr;
 using std::vector;
 
 namespace {
+constexpr StringData kMin = "min"_sd;
+constexpr StringData kMax = "max"_sd;
+
 struct BoundMakerMin {
     const long long offset;  // Offset in millis
 
@@ -69,9 +72,7 @@ struct BoundMakerMin {
     }
 
     Document serialize() const {
-        // Convert from millis to seconds.
-        return Document{{{"base"_sd, DocumentSourceSort::kMin},
-                         {DocumentSourceSort::kOffset, (offset / 1000)}}};
+        return Document{{{"base"_sd, kMin}, {"offset"_sd, offset}}};
     }
 };
 
@@ -85,9 +86,7 @@ struct BoundMakerMax {
     }
 
     Document serialize() const {
-        // Convert from millis to seconds.
-        return Document{{{"base"_sd, DocumentSourceSort::kMax},
-                         {DocumentSourceSort::kOffset, (offset / 1000)}}};
+        return Document{{{"base"_sd, kMax}, {"offset"_sd, offset}}};
     }
 };
 struct CompAsc {
@@ -424,58 +423,6 @@ intrusive_ptr<DocumentSourceSort> DocumentSourceSort::create(
     return pSort;
 }
 
-intrusive_ptr<DocumentSourceSort> DocumentSourceSort::createBoundedSort(
-    SortPattern pat,
-    StringData boundBase,
-    long long boundOffset,
-    boost::optional<long long> limit,
-    const intrusive_ptr<ExpressionContext>& expCtx) {
-
-    auto ds = DocumentSourceSort::create(expCtx, pat);
-
-    SortOptions opts;
-    opts.maxMemoryUsageBytes = internalQueryMaxBlockingSortMemoryUsageBytes.load();
-    if (expCtx->allowDiskUse) {
-        opts.extSortAllowed = true;
-        opts.tempDir = expCtx->tempDir;
-    }
-
-    if (limit) {
-        opts.Limit(limit.get());
-    }
-
-    if (boundBase == kMin) {
-        if (pat.back().isAscending) {
-            ds->_timeSorter.reset(
-                new TimeSorterAscMin{opts, CompAsc{}, BoundMakerMin{boundOffset}});
-        } else {
-            ds->_timeSorter.reset(
-                new TimeSorterDescMin{opts, CompDesc{}, BoundMakerMin{boundOffset}});
-        }
-        ds->_requiredMetadata.set(DocumentMetadataFields::MetaType::kTimeseriesBucketMinTime);
-    } else if (boundBase == kMax) {
-        if (pat.back().isAscending) {
-            ds->_timeSorter.reset(
-                new TimeSorterAscMax{opts, CompAsc{}, BoundMakerMax{boundOffset}});
-        } else {
-            ds->_timeSorter.reset(
-                new TimeSorterDescMax{opts, CompDesc{}, BoundMakerMax{boundOffset}});
-        }
-        ds->_requiredMetadata.set(DocumentMetadataFields::MetaType::kTimeseriesBucketMaxTime);
-    } else {
-        MONGO_UNREACHABLE;
-    }
-
-    if (pat.size() > 1) {
-        SortPattern partitionKey =
-            std::vector<SortPattern::SortPatternPart>(pat.begin(), pat.end() - 1);
-        ds->_timeSorterPartitionKeyGen =
-            SortKeyGenerator{std::move(partitionKey), expCtx->getCollator()};
-    }
-
-    return ds;
-}
-
 intrusive_ptr<DocumentSourceSort> DocumentSourceSort::parseBoundedSort(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(6369905,
@@ -504,7 +451,7 @@ intrusive_ptr<DocumentSourceSort> DocumentSourceSort::parseBoundedSort(
     uassert(
         6460200, "$_internalBoundedSort bound must be an object", bound && bound.type() == Object);
 
-    BSONElement boundOffsetElem = bound.Obj()[DocumentSourceSort::kOffset];
+    BSONElement boundOffsetElem = bound.Obj()["offset"];
     long long boundOffset = 0;
     if (boundOffsetElem && boundOffsetElem.isNumber()) {
         boundOffset = uassertStatusOK(boundOffsetElem.parseIntegerElementToLong()) *
