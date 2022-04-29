@@ -923,7 +923,7 @@ Status MigrationChunkClonerSourceLegacy::_storeCurrentLocs(OperationContext* opC
         if (avgRecSize == 0) {
             avgRecSize = BSONObj::kMinBSONLength;
         }
-        maxRecsWhenFull = _args.getMaxChunkSizeBytes() / avgRecSize;
+        maxRecsWhenFull = std::max(_args.getMaxChunkSizeBytes() / avgRecSize, 1LL);
         maxRecsWhenFull = 2 * maxRecsWhenFull;  // pad some slack
     } else {
         avgRecSize = 0;
