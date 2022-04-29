@@ -92,10 +92,21 @@ reshardingTest.withReshardingInBackground(
             operationType: "reshardBegin"
         };
 
-        cstDonor0.assertNextChangesEqual(
-            {cursor: changeStreamsCursorDonor0, expectedChanges: [expectedReshardBeginEvent]});
-        cstDonor1.assertNextChangesEqual(
-            {cursor: changeStreamsCursorDonor1, expectedChanges: [expectedReshardBeginEvent]});
+        const reshardBeginDonor0Event =
+            cstDonor0.getNextChanges(changeStreamsCursorDonor0, 1, false /* skipFirstBatch */);
+
+        // The 'ns' field was added after 6.0, so the field will be absent when running on a 6.0
+        // mongod. Delete the field so that the test can run on a mixed version suite.
+        //
+        // TODO SERVER-66645: Remove this line after branching for 7.0.
+        delete reshardBeginDonor0Event[0].ns;
+
+        assertChangeStreamEventEq(reshardBeginDonor0Event[0], expectedReshardBeginEvent);
+
+        const reshardBeginDonor1Event =
+            cstDonor1.getNextChanges(changeStreamsCursorDonor1, 1, false /* skipFirstBatch */);
+        delete reshardBeginDonor1Event[0].ns;
+        assertChangeStreamEventEq(reshardBeginDonor1Event[0], expectedReshardBeginEvent);
     },
     {
         postDecisionPersistedFn: () => {
@@ -105,10 +116,16 @@ reshardingTest.withReshardingInBackground(
                 operationType: "reshardDoneCatchUp"
             };
 
-            cstRecipient0.assertNextChangesEqual({
-                cursor: changeStreamsCursorRecipient0,
-                expectedChanges: [expectedReshardDoneCatchUpEvent]
-            });
+            const reshardDoneCatchUpEvent = cstRecipient0.getNextChanges(
+                changeStreamsCursorRecipient0, 1, false /* skipFirstBatch */);
+
+            // The 'ns' field was added after 6.0, so the field will be absent when running on a 6.0
+            // mongod. Delete the field so that the test can run on a mixed version suite.
+            //
+            // TODO SERVER-66645: Remove this line after branching for 7.0.
+            delete reshardDoneCatchUpEvent[0].ns;
+
+            assertChangeStreamEventEq(reshardDoneCatchUpEvent[0], expectedReshardDoneCatchUpEvent);
         }
     });
 

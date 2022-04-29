@@ -230,8 +230,9 @@ public:
     // The internal change events that are not exposed to the users.
     static constexpr StringData kReshardBeginOpType = "reshardBegin"_sd;
     static constexpr StringData kReshardDoneCatchUpOpType = "reshardDoneCatchUp"_sd;
+
     // Internal op type to signal mongos to open cursors on new shards.
-    static constexpr StringData kNewShardDetectedOpType = "kNewShardDetected"_sd;
+    static constexpr StringData kNewShardDetectedOpType = "migrateChunkToNewShard"_sd;
 
     // These events are guarded behind the 'showExpandedEvents' flag.
     static constexpr StringData kCreateOpType = "create"_sd;

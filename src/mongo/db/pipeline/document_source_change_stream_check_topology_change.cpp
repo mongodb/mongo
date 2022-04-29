@@ -31,6 +31,7 @@
 
 #include "mongo/db/pipeline/document_source_change_stream_check_topology_change.h"
 
+#include "mongo/db/pipeline/change_stream_helpers_legacy.h"
 #include "mongo/db/pipeline/change_stream_topology_change_info.h"
 
 namespace mongo {
@@ -78,7 +79,7 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamCheckTopologyChange::doG
     // Throw the 'ChangeStreamTopologyChangeInfo' exception, wrapping the topology change event
     // along with its metadata. This will bypass the remainder of the pipeline and will be passed
     // directly up to mongoS.
-    if (eventOpType == DocumentSourceChangeStream::kNewShardDetectedOpType) {
+    if (eventOpType == change_stream_legacy::getNewShardDetectedOpName(pExpCtx)) {
         uasserted(ChangeStreamTopologyChangeInfo(eventDoc.toBsonWithMetaData()),
                   "Collection migrated to new shard");
     }

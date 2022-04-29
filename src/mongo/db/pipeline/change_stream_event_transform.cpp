@@ -31,6 +31,7 @@
 
 #include "mongo/db/pipeline/change_stream_document_diff_parser.h"
 #include "mongo/db/pipeline/change_stream_filter_helpers.h"
+#include "mongo/db/pipeline/change_stream_helpers_legacy.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/db/pipeline/document_source_change_stream_add_post_image.h"
@@ -335,17 +336,21 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
             break;
         }
         case repl::OpTypeEnum::kNoop: {
+            // TODO SERVER-66138: The legacy oplog format for some no-op operations can include
+            // 'type' field, which was removed post 6.0. We can remove all the logic related to the
+            // 'type' field once 7.0 is release.
+            const auto o2Field = change_stream_legacy::convertFromLegacyOplogFormat(
+                input[repl::OplogEntry::kObject2FieldName].getDocument(), nss);
+
             // Check whether this is a shardCollection oplog entry.
-            if (!input.getNestedField("o2.shardCollection").missing()) {
-                const auto o2Field = input[repl::OplogEntry::kObject2FieldName].getDocument();
+            if (!o2Field["shardCollection"].missing()) {
                 operationType = DocumentSourceChangeStream::kShardCollectionOpType;
                 operationDescription = Value(copyDocExceptFields(o2Field, {"shardCollection"_sd}));
                 break;
             }
 
             // Check if this is a migration of the last chunk off a shard.
-            if (!input.getNestedField("o2.migrateLastChunkFromShard").missing()) {
-                const auto o2Field = input[repl::OplogEntry::kObject2FieldName].getDocument();
+            if (!o2Field["migrateLastChunkFromShard"].missing()) {
                 operationType = DocumentSourceChangeStream::kMigrateLastChunkFromShardOpType;
                 operationDescription =
                     Value(copyDocExceptFields(o2Field, {"migrateLastChunkFromShard"_sd}));
@@ -353,8 +358,7 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
             }
 
             // Check whether this is a refineCollectionShardKey oplog entry.
-            if (!input.getNestedField("o2.refineCollectionShardKey").missing()) {
-                const auto o2Field = input[repl::OplogEntry::kObject2FieldName].getDocument();
+            if (!o2Field["refineCollectionShardKey"].missing()) {
                 operationType = DocumentSourceChangeStream::kRefineCollectionShardKeyOpType;
                 operationDescription =
                     Value(copyDocExceptFields(o2Field, {"refineCollectionShardKey"_sd}));
@@ -362,41 +366,39 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
             }
 
             // Check whether this is a reshardCollection oplog entry.
-            if (!input.getNestedField("o2.reshardCollection").missing()) {
-                const auto o2Field = input[repl::OplogEntry::kObject2FieldName].getDocument();
+            if (!o2Field["reshardCollection"].missing()) {
                 operationType = DocumentSourceChangeStream::kReshardCollectionOpType;
                 operationDescription =
                     Value(copyDocExceptFields(o2Field, {"reshardCollection"_sd}));
                 break;
             }
 
-            // Otherwise, o2.type determines the message type.
-            auto o2Type = input.getNestedField("o2.type");
-            tassert(5052200, "o2.type is missing from noop oplog event", !o2Type.missing());
+            if (!o2Field["migrateChunkToNewShard"].missing()) {
+                operationType = change_stream_legacy::getNewShardDetectedOpName(_expCtx);
+                operationDescription =
+                    Value(copyDocExceptFields(o2Field, {"migrateChunkToNewShard"_sd}));
+                break;
+            }
 
-            if (o2Type.getString() == "migrateChunkToNewShard"_sd) {
-                operationType = DocumentSourceChangeStream::kNewShardDetectedOpType;
-                // Generate a fake document Id for NewShardDetected operation so that we can
-                // resume after this operation.
-                documentKey = Value(Document{{DocumentSourceChangeStream::kIdField,
-                                              input[repl::OplogEntry::kObject2FieldName]}});
-            } else if (o2Type.getString() == "reshardBegin"_sd) {
+            if (!o2Field["reshardBegin"].missing()) {
                 operationType = DocumentSourceChangeStream::kReshardBeginOpType;
                 doc.addField(DocumentSourceChangeStream::kReshardingUuidField,
-                             input.getNestedField("o2.reshardingUUID"));
-                documentKey = Value(Document{{DocumentSourceChangeStream::kIdField,
-                                              input[repl::OplogEntry::kObject2FieldName]}});
-            } else if (o2Type.getString() == "reshardDoneCatchUp"_sd) {
+                             o2Field["reshardingUUID"]);
+                operationDescription = Value(copyDocExceptFields(o2Field, {"reshardBegin"_sd}));
+                break;
+            }
+
+            if (!o2Field["reshardDoneCatchUp"].missing()) {
                 operationType = DocumentSourceChangeStream::kReshardDoneCatchUpOpType;
                 doc.addField(DocumentSourceChangeStream::kReshardingUuidField,
-                             input.getNestedField("o2.reshardingUUID"));
-                documentKey = Value(Document{{DocumentSourceChangeStream::kIdField,
-                                              input[repl::OplogEntry::kObject2FieldName]}});
-            } else {
-                // We should never see an unknown noop entry.
-                MONGO_UNREACHABLE_TASSERT(5052201);
+                             o2Field["reshardingUUID"]);
+                operationDescription =
+                    Value(copyDocExceptFields(o2Field, {"reshardDoneCatchUp"_sd}));
+                break;
             }
-            break;
+
+            // We should never see an unknown noop entry.
+            MONGO_UNREACHABLE_TASSERT(5052201);
         }
         default: { MONGO_UNREACHABLE_TASSERT(6330501); }
     }
@@ -442,14 +444,6 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
     const auto wallTime = input[repl::OplogEntry::kWallClockTimeFieldName];
     checkValueType(wallTime, repl::OplogEntry::kWallClockTimeFieldName, BSONType::Date);
     doc.addField(DocumentSourceChangeStream::kWallTimeField, wallTime);
-
-    // Invalidation, topology change, and resharding events have fewer fields.
-    if (operationType == DocumentSourceChangeStream::kInvalidateOpType ||
-        operationType == DocumentSourceChangeStream::kNewShardDetectedOpType ||
-        operationType == DocumentSourceChangeStream::kReshardBeginOpType ||
-        operationType == DocumentSourceChangeStream::kReshardDoneCatchUpOpType) {
-        return doc.freeze();
-    }
 
     // Add the post-image, pre-image id, namespace, documentKey and other fields as appropriate.
     doc.addField(DocumentSourceChangeStream::kFullDocumentField, std::move(fullDocument));

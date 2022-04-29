@@ -121,6 +121,50 @@ const standardTestCases = [
                 deletes: [{q: {sk: 1}, limit: 0}, {q: {sk: -2}, limit: 0}, {q: {sk: -1}, limit: 0}]
             }));
         }
+    },
+    // Basic createIndex.
+    {
+        testName: "CreateIndex",
+        generateOpLogEntry: function(coll) {
+            const collName = "CreateIndex";
+            const targetColl = coll.getDB()[collName];
+            assert.commandWorked(targetColl.createIndex({x: 1}));
+            assert.commandWorked(targetColl.insert({x: 0}));
+        }
+    },
+    // Basic dropIndex.
+    {
+        testName: "DropIndex",
+        generateOpLogEntry: function(coll) {
+            const collName = "DropIndex";
+            const targetColl = coll.getDB()[collName];
+            assert.commandWorked(targetColl.createIndex({x: 1}));
+            assert.commandWorked(targetColl.dropIndex({x: 1}));
+        }
+    },
+    // Basic collMod.
+    {
+        testName: "CollMod",
+        generateOpLogEntry: function(coll) {
+            const collName = "collMod";
+            const targetColl = coll.getDB()[collName];
+            assert.commandWorked(targetColl.insert({x: 1}));
+            assert.commandWorked(targetColl.runCommand({
+                collMod: collName,
+                validator: {x: 1},
+                validationLevel: "moderate",
+                validationAction: "warn"
+            }));
+        }
+    },
+    // Basic reshardCollection.
+    {
+        testName: "ReshardCollection",
+        generateOpLogEntry: function(coll) {
+            assert.commandWorked(coll.insert({sk: 2, a: 1}));
+            assert.commandWorked(coll.getDB().adminCommand(
+                {reshardCollection: coll.getFullName(), key: {sk: 1, a: 1}}));
+        }
     }
 ];
 
@@ -165,6 +209,16 @@ const changeStreamsVariants = [
     {
         watch: function(options) {
             return st.s.watch([], Object.assign(options, {fullDocument: "updateLookup"}));
+        }
+    },
+    {
+        // With all the options enabled.
+        watch: function(options) {
+            return st.s.watch([], Object.assign(options, {
+                showExpandedEvents: true,
+                showSystemEvents: true,
+                fullDocument: "updateLookup"
+            }));
         }
     }
 ];
@@ -262,7 +316,8 @@ function resumeStreamsOnDowngradedVersion(changeStreams) {
             }
             try {
                 const nextEvent = csCursor.next();
-                return (nextEvent.documentKey._id == changeStream.endSentinelEntry);
+                return (nextEvent.documentKey &&
+                        nextEvent.documentKey._id == changeStream.endSentinelEntry);
             } catch (e) {
                 jsTestLog("Error occurred while reading change stream. " + tojson(e));
 

@@ -132,5 +132,47 @@ boost::optional<Document> legacyLookupPreImage(boost::intrusive_ptr<ExpressionCo
     return Document{opLogEntry.getObject().getOwned()};
 }
 
+// TODO SERVER-66138: This function can be removed after we branch for 7.0.
+void populateInternalOperationFilter(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                     BSONArrayBuilder* orBuilder) {
+    std::vector<StringData> opTypes = {"reshardBegin"_sd, "reshardDoneCatchUp"_sd};
+
+    // Noop change events that are only applicable when merging results on mongoS:
+    //   - migrateChunkToNewShard: A chunk migrated to a shard that didn't have any chunks.
+    if (expCtx->inMongos || expCtx->needsMerge) {
+        opTypes.push_back("migrateChunkToNewShard"_sd);
+    }
+
+    for (const auto& eventName : opTypes) {
+        // Legacy oplog messages used the "o2.type" field to indicate the message type.
+        orBuilder->append(BSON("o2.type" << eventName));
+    }
+}
+
+// TODO SERVER-66138: This function can be removed after we branch for 7.0.
+Document convertFromLegacyOplogFormat(const Document& o2Entry, const NamespaceString& nss) {
+    auto type = o2Entry["type"];
+    if (type.missing()) {
+        return o2Entry;
+    }
+
+    MutableDocument doc(o2Entry);
+    doc.remove("type");
+
+    // This field would be the first field in the new format, but the current change stream code
+    // does not depend on the field order.
+    doc.addField(type.getString(), Value(nss.toString()));
+    return doc.freeze();
+}
+
+// TODO SERVER-66138: This function can be removed after we branch for 7.0.
+StringData getNewShardDetectedOpName(const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    // The op name on 6.0 and older versions.
+    const StringData kNewShardDetectedOpTypeLegacyName = "kNewShardDetected"_sd;
+    return (expCtx->changeStreamTokenVersion == ResumeTokenData::kDefaultTokenVersion)
+        ? DocumentSourceChangeStream::kNewShardDetectedOpType
+        : kNewShardDetectedOpTypeLegacyName;
+}
+
 }  // namespace change_stream_legacy
 }  // namespace mongo

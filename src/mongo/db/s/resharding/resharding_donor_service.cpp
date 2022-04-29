@@ -650,8 +650,10 @@ void ReshardingDonorService::DonorStateMachine::
         auto rawOpCtx = opCtx.get();
 
         auto generateOplogEntry = [&]() {
-            ReshardingChangeEventO2Field changeEvent{_metadata.getReshardingUUID(),
-                                                     ReshardingChangeEventEnum::kReshardBegin};
+            ReshardBeginChangeEventO2Field changeEvent{
+                _metadata.getSourceNss(),
+                _metadata.getReshardingUUID(),
+            };
 
             repl::MutableOplogEntry oplog;
             oplog.setNss(_metadata.getSourceNss());

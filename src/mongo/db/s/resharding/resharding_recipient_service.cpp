@@ -809,8 +809,8 @@ void ReshardingRecipientService::RecipientStateMachine::_writeStrictConsistencyO
     auto rawOpCtx = opCtx.get();
 
     auto generateOplogEntry = [&]() {
-        ReshardingChangeEventO2Field changeEvent{_metadata.getReshardingUUID(),
-                                                 ReshardingChangeEventEnum::kReshardDoneCatchUp};
+        ReshardDoneCatchUpChangeEventO2Field changeEvent{_metadata.getTempReshardingNss(),
+                                                         _metadata.getReshardingUUID()};
 
         repl::MutableOplogEntry oplog;
         oplog.setOpType(repl::OpTypeEnum::kNoop);

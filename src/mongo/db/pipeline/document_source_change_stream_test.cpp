@@ -1306,8 +1306,7 @@ TEST_F(ChangeStreamStageTest, MatchFiltersDropDatabaseCommand) {
     OplogEntry dropDB = createCommand(BSON("dropDatabase" << 1), boost::none, false);
     checkTransformation(dropDB, boost::none);
 }
-
-TEST_F(ChangeStreamStageTest, TransformNewShardDetected) {
+TEST_F(ChangeStreamStageTest, TransformNewShardDetectedLegacyFormat) {
     auto o2Field = D{{"type", "migrateChunkToNewShard"_sd}};
     auto newShardDetected = makeOplogEntry(OpTypeEnum::kNoop,
                                            nss,
@@ -1318,14 +1317,12 @@ TEST_F(ChangeStreamStageTest, TransformNewShardDetected) {
 
     Document expectedNewShardDetected{
         {DSChangeStream::kIdField,
-         makeResumeTokenWithEventId(
-             kDefaultTs,
-             testUuid(),
-             Document{{"operationType", DSChangeStream::kNewShardDetectedOpType},
-                      {"documentKey", BSON("_id" << o2Field)}})},
+         makeResumeToken(
+             kDefaultTs, testUuid(), V{D{{}}}, DSChangeStream::kNewShardDetectedOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kNewShardDetectedOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
     };
 
     getExpCtx()->needsMerge = true;
@@ -1333,11 +1330,70 @@ TEST_F(ChangeStreamStageTest, TransformNewShardDetected) {
     checkTransformation(newShardDetected, expectedNewShardDetected);
 }
 
+TEST_F(ChangeStreamStageTest, TransformNewShardDetected) {
+    auto o2Field = D{{"migrateChunkToNewShard", nss.toString()},
+                     {"fromShardId", "fromShard"_sd},
+                     {"toShardId", "toShard"_sd}};
+    auto newShardDetected = makeOplogEntry(OpTypeEnum::kNoop,
+                                           nss,
+                                           BSONObj(),
+                                           testUuid(),
+                                           boost::none,  // fromMigrate
+                                           o2Field.toBson());
+
+    const auto opDesc = Value(D{{"fromShardId", "fromShard"_sd}, {"toShardId", "toShard"_sd}});
+    Document expectedNewShardDetected{
+        {DSChangeStream::kIdField,
+         makeResumeToken(kDefaultTs, testUuid(), opDesc, DSChangeStream::kNewShardDetectedOpType)},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kNewShardDetectedOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kCollectionUuidField, testUuid()},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kOperationDescriptionField, opDesc},
+    };
+
+    getExpCtx()->needsMerge = true;
+
+    checkTransformation(newShardDetected, expectedNewShardDetected, kShowExpandedEventsSpec);
+}
+
+TEST_F(ChangeStreamStageTest, TransformReshardBeginLegacyFormat) {
+    auto uuid = UUID::gen();
+    auto reshardingUuid = UUID::gen();
+
+    const auto o2FieldInLegacyFormat = BSON("type"
+                                            << "reshardBegin"
+                                            << "reshardingUUID" << reshardingUuid);
+    auto reshardingBegin = makeOplogEntry(OpTypeEnum::kNoop,
+                                          nss,
+                                          BSONObj(),
+                                          uuid,
+                                          true,  // fromMigrate
+                                          o2FieldInLegacyFormat);
+
+    auto spec = fromjson("{$changeStream: {showMigrationEvents: true, showExpandedEvents: true}}");
+
+    const auto opDesc = V{D{{"reshardingUUID", reshardingUuid}}};
+    Document expectedReshardingBegin{
+        {DSChangeStream::kReshardingUuidField, reshardingUuid},
+        {DSChangeStream::kIdField,
+         makeResumeToken(kDefaultTs, uuid, opDesc, DSChangeStream::kReshardBeginOpType)},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kReshardBeginOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kCollectionUuidField, uuid},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kOperationDescriptionField, opDesc},
+    };
+    checkTransformation(reshardingBegin, expectedReshardingBegin, spec);
+}
+
 TEST_F(ChangeStreamStageTest, TransformReshardBegin) {
     auto uuid = UUID::gen();
     auto reshardingUuid = UUID::gen();
 
-    ReshardingChangeEventO2Field o2Field{reshardingUuid, ReshardingChangeEventEnum::kReshardBegin};
+    ReshardBeginChangeEventO2Field o2Field{nss, reshardingUuid};
     auto reshardingBegin = makeOplogEntry(OpTypeEnum::kNoop,
                                           nss,
                                           BSONObj(),
@@ -1345,20 +1401,60 @@ TEST_F(ChangeStreamStageTest, TransformReshardBegin) {
                                           true,  // fromMigrate
                                           o2Field.toBSON());
 
-    auto spec = fromjson("{$changeStream: {showMigrationEvents: true}}");
+    auto spec = fromjson("{$changeStream: {showMigrationEvents: true, showExpandedEvents: true}}");
 
+    const auto opDesc = V{D{{"reshardingUUID", reshardingUuid}}};
     Document expectedReshardingBegin{
         {DSChangeStream::kReshardingUuidField, reshardingUuid},
         {DSChangeStream::kIdField,
-         makeResumeTokenWithEventId(kDefaultTs,
-                                    uuid,
-                                    Document{{"operationType", DSChangeStream::kReshardBeginOpType},
-                                             {"documentKey", BSON("_id" << o2Field.toBSON())}})},
+         makeResumeToken(kDefaultTs, uuid, opDesc, DSChangeStream::kReshardBeginOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kReshardBeginOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kCollectionUuidField, uuid},
         {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kOperationDescriptionField, opDesc},
     };
     checkTransformation(reshardingBegin, expectedReshardingBegin, spec);
+}
+
+TEST_F(ChangeStreamStageTest, TransformReshardDoneCatchUpLegacyFormat) {
+    auto existingUuid = UUID::gen();
+    auto reshardingUuid = UUID::gen();
+    auto temporaryNs = constructTemporaryReshardingNss(nss.db(), existingUuid);
+
+    const auto o2FieldInLegacyFormat = BSON("type"
+                                            << "reshardDoneCatchUp"
+                                            << "reshardingUUID" << reshardingUuid);
+    auto reshardDoneCatchUp = makeOplogEntry(OpTypeEnum::kNoop,
+                                             temporaryNs,
+                                             BSONObj(),
+                                             reshardingUuid,
+                                             true,  // fromMigrate
+                                             o2FieldInLegacyFormat);
+
+    auto spec = fromjson(
+        "{$changeStream: {showMigrationEvents: true, allowToRunOnSystemNS: true, "
+        "showExpandedEvents: true}}");
+    auto expCtx = getExpCtx();
+    expCtx->ns = temporaryNs;
+
+    const auto opDesc = V{D{{"reshardingUUID", reshardingUuid}}};
+    Document expectedReshardingDoneCatchUp{
+        {DSChangeStream::kReshardingUuidField, reshardingUuid},
+        {DSChangeStream::kIdField,
+         makeResumeToken(
+             kDefaultTs, reshardingUuid, opDesc, DSChangeStream::kReshardDoneCatchUpOpType)},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kReshardDoneCatchUpOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kCollectionUuidField, reshardingUuid},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kNamespaceField,
+         D{{"db", temporaryNs.db()}, {"coll", temporaryNs.coll()}}},
+        {DSChangeStream::kOperationDescriptionField, opDesc},
+    };
+
+    checkTransformation(reshardDoneCatchUp, expectedReshardingDoneCatchUp, spec);
 }
 
 TEST_F(ChangeStreamStageTest, TransformReshardDoneCatchUp) {
@@ -1366,8 +1462,7 @@ TEST_F(ChangeStreamStageTest, TransformReshardDoneCatchUp) {
     auto reshardingUuid = UUID::gen();
     auto temporaryNs = constructTemporaryReshardingNss(nss.db(), existingUuid);
 
-    ReshardingChangeEventO2Field o2Field{reshardingUuid,
-                                         ReshardingChangeEventEnum::kReshardDoneCatchUp};
+    ReshardDoneCatchUpChangeEventO2Field o2Field{temporaryNs, reshardingUuid};
     auto reshardDoneCatchUp = makeOplogEntry(OpTypeEnum::kNoop,
                                              temporaryNs,
                                              BSONObj(),
@@ -1375,22 +1470,25 @@ TEST_F(ChangeStreamStageTest, TransformReshardDoneCatchUp) {
                                              true,  // fromMigrate
                                              o2Field.toBSON());
 
-    auto spec =
-        fromjson("{$changeStream: {showMigrationEvents: true, allowToRunOnSystemNS: true}}");
+    auto spec = fromjson(
+        "{$changeStream: {showMigrationEvents: true, allowToRunOnSystemNS: true, "
+        "showExpandedEvents: true}}");
     auto expCtx = getExpCtx();
     expCtx->ns = temporaryNs;
 
+    const auto opDesc = V{D{{"reshardingUUID", reshardingUuid}}};
     Document expectedReshardingDoneCatchUp{
         {DSChangeStream::kReshardingUuidField, reshardingUuid},
         {DSChangeStream::kIdField,
-         makeResumeTokenWithEventId(
-             kDefaultTs,
-             reshardingUuid,
-             Document{{"operationType", DSChangeStream::kReshardDoneCatchUpOpType},
-                      {"documentKey", BSON("_id" << o2Field.toBSON())}})},
+         makeResumeToken(
+             kDefaultTs, reshardingUuid, opDesc, DSChangeStream::kReshardDoneCatchUpOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kReshardDoneCatchUpOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kCollectionUuidField, reshardingUuid},
         {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kNamespaceField,
+         D{{"db", temporaryNs.db()}, {"coll", temporaryNs.coll()}}},
+        {DSChangeStream::kOperationDescriptionField, opDesc},
     };
 
     checkTransformation(reshardDoneCatchUp, expectedReshardingDoneCatchUp, spec);

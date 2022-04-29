@@ -764,9 +764,9 @@ void notifyChangeStreamsOnRecipientFirstChunk(OperationContext* opCtx,
         << " with no chunks for this collection";
 
     // The message expected by change streams
-    const auto o2Message = BSON("type"
-                                << "migrateChunkToNewShard"
-                                << "from" << fromShardId << "to" << toShardId);
+    const auto o2Message =
+        BSON("migrateChunkToNewShard" << collNss.toString() << "fromShardId" << fromShardId
+                                      << "toShardId" << toShardId);
 
     auto const serviceContext = opCtx->getClient()->getServiceContext();
 

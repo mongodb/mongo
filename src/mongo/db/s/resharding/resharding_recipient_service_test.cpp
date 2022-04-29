@@ -643,10 +643,9 @@ TEST_F(ReshardingRecipientServiceTest, WritesNoopOplogEntryOnReshardDoneCatchUp)
     ASSERT_FALSE(cursor->more()) << "Found multiple oplog entries for source collection: "
                                  << op.getEntry() << " and " << cursor->nextSafe();
 
-    ReshardingChangeEventO2Field expectedChangeEvent{
-        doc.getReshardingUUID(), ReshardingChangeEventEnum::kReshardDoneCatchUp};
-    auto receivedChangeEvent = ReshardingChangeEventO2Field::parse(
-        IDLParserErrorContext("ReshardingChangeEventO2Field"), *op.getObject2());
+    ReshardDoneCatchUpChangeEventO2Field expectedChangeEvent{sourceNss, doc.getReshardingUUID()};
+    auto receivedChangeEvent = ReshardDoneCatchUpChangeEventO2Field::parse(
+        IDLParserErrorContext("ReshardDoneCatchUpChangeEventO2Field"), *op.getObject2());
 
     ASSERT_EQ(OpType_serializer(op.getOpType()), OpType_serializer(repl::OpTypeEnum::kNoop))
         << op.getEntry();

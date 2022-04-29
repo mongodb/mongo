@@ -294,7 +294,9 @@ std::unique_ptr<MatchExpression> buildInternalOpFilter(
     // Noop change events:
     //   - reshardBegin: A resharding operation begins.
     //   - reshardDoneCatchUp: "Catch up" phase of reshard operation completes.
-    std::vector<StringData> internalOpTypes = {"reshardBegin"_sd, "reshardDoneCatchUp"_sd};
+    //   - shardCollection: A shardCollection operation has completed.
+    std::vector<StringData> internalOpTypes = {
+        "reshardBegin"_sd, "reshardDoneCatchUp"_sd, "shardCollection"_sd};
 
     // Noop change events that are only applicable when merging results on mongoS:
     //   - migrateChunkToNewShard: A chunk migrated to a shard that didn't have any chunks.
@@ -302,28 +304,25 @@ std::unique_ptr<MatchExpression> buildInternalOpFilter(
         internalOpTypes.push_back("migrateChunkToNewShard"_sd);
     }
 
-    // Build the oplog filter to match the required internal op types.
-    BSONArrayBuilder internalOpTypeOrBuilder;
-    for (const auto& eventName : internalOpTypes) {
-        internalOpTypeOrBuilder.append(BSON("o2.type" << eventName));
-    }
-
-    // Also filter for shardCollection events, which are recorded as {op: 'n'} in the oplog.
-    internalOpTypeOrBuilder.append(BSON("o2.shardCollection" << BSON("$exists" << true)));
-
     // Only return the 'migrateLastChunkFromShard' event if 'showSystemEvents' is set.
     if (expCtx->changeStreamSpec->getShowSystemEvents()) {
-        internalOpTypeOrBuilder.append(
-            BSON("o2.migrateLastChunkFromShard" << BSON("$exists" << true)));
+        internalOpTypes.push_back("migrateLastChunkFromShard"_sd);
     }
 
     if (feature_flags::gFeatureFlagChangeStreamsFurtherEnrichedEvents.isEnabled(
             serverGlobalParams.featureCompatibility)) {
-        internalOpTypeOrBuilder.append(
-            BSON("o2.refineCollectionShardKey" << BSON("$exists" << true)));
-
-        internalOpTypeOrBuilder.append(BSON("o2.reshardCollection" << BSON("$exists" << true)));
+        internalOpTypes.push_back("refineCollectionShardKey"_sd);
+        internalOpTypes.push_back("reshardCollection"_sd);
     }
+
+    // Build the oplog filter to match the required internal op types.
+    BSONArrayBuilder internalOpTypeOrBuilder;
+    for (const auto& eventName : internalOpTypes) {
+        internalOpTypeOrBuilder.append(BSON("o2." + eventName << BSON("$exists" << true)));
+    }
+
+    // TODO SERVER-66138: This filter can be removed after 7.0 release.
+    change_stream_legacy::populateInternalOperationFilter(expCtx, &internalOpTypeOrBuilder);
 
     // Finalize the array of $or filter predicates.
     internalOpTypeOrBuilder.done();

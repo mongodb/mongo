@@ -121,8 +121,9 @@ function assertChangeStreamBehaviour(projection, expectedEvents, expectedErrorCo
     csCursor.close();
 }
 
-// Test that a projection which fakes a 'kNewShardDetected' event is swallowed but has no effect.
-let testProjection = {operationType: "kNewShardDetected"};
+// Test that a projection which fakes a 'migrateChunkToNewShard' event is swallowed but has no
+// effect.
+let testProjection = {operationType: "migrateChunkToNewShard"};
 assertChangeStreamBehaviour(testProjection, []);
 
 // Test that a projection which fakes an event on config.shards with a non-string operationType is

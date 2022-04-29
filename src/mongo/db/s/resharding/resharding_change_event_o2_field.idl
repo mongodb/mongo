@@ -37,25 +37,27 @@ global:
 imports:
     - "mongo/idl/basic_types.idl"
 
-enums:
-    ReshardingChangeEvent:
-        description: "Types of possible change events during a resharding operation."
-        type: string
-        values:
-            kReshardBegin: "reshardBegin"
-            kReshardDoneCatchUp: "reshardDoneCatchUp"
-
 structs:
-    ReshardingChangeEventO2Field:
+    ReshardBeginChangeEventO2Field:
         description: >-
-            Represents a change that occurs during a resharding operation.
-            Stored in the o2 field of an oplog entry.
+            Represents a change event which signifies the beginning of a resharding operation.
         generate_comparison_operators: true
         strict: false
         fields:
+            reshardBegin:
+                type: namespacestring
             reshardingUUID:
                 type: uuid
                 description: "The UUID for this resharding operation."
-            type:
-                type: ReshardingChangeEvent
-                description: "The type of change that occured during the resharding operation."
+
+    ReshardDoneCatchUpChangeEventO2Field:
+        description: >-
+            Represents a change event which signifies that the catchup phase is complete.
+        generate_comparison_operators: true
+        strict: false
+        fields:
+            reshardDoneCatchUp:
+                type: namespacestring
+            reshardingUUID:
+                type: uuid
+                description: "The UUID for this resharding operation."

@@ -5,6 +5,16 @@ selector:
   exclude_files:
   # This test explicitly compares v1 and v2 tokens, and must be able to generate the former.
   - jstests/change_streams/generate_v1_resume_token.js
+
+  # The following tests run in a sharded fixture where the mongod generates a new shard detected
+  # internal event, which needs to be swallowed by the mongos. This is not supported here, because
+  # this suite will return the event op name as 'kNewShardDetected', but the mongos expects the
+  # event op name to be 'migrateChunkToNewShard'.
+  - jstests/change_streams/create_event_from_chunk_migration.js
+  - jstests/change_streams/migrate_last_chunk_from_shard_event.js
+  - jstests/change_streams/oplog_rewrite/match_pushdown_namespace_rewrite_with_expanded_events.js
+  - jstests/change_streams/projection_fakes_internal_event.js
+
   exclude_with_any_tags:
   ##
   # The next tags correspond to the special errors thrown by the

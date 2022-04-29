@@ -66,4 +66,19 @@ static const std::set<StringData> kClassicOperationTypes =
                          DocumentSourceChangeStream::kReshardDoneCatchUpOpType,
                          DocumentSourceChangeStream::kNewShardDetectedOpType};
 
+/**
+ * Adds filtering for legacy-format {op: 'n'} oplog messages, which used the "o2.type" field to
+ * indicate the message type.
+ */
+void populateInternalOperationFilter(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                     BSONArrayBuilder* filter);
+
+/**
+ * Converts legacy-format oplog o2 fields of type {type: <op name>, ...} to
+ * {..., <op name>: <namespace>}. Does nothing if the 'type' field is not present inside 'o2'.
+ */
+Document convertFromLegacyOplogFormat(const Document& legacyO2Entry, const NamespaceString& nss);
+
+StringData getNewShardDetectedOpName(const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
 }  // namespace mongo::change_stream_legacy
