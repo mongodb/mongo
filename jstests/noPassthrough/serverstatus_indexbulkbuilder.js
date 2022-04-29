@@ -12,6 +12,7 @@
 
 const replSet = new ReplSetTest({
     nodes: 1,
+    nodeOptions: {setParameter: {maxIndexBuildMemoryUsageMegabytes: 50}},
 });
 replSet.startSet();
 replSet.initiate();
@@ -23,7 +24,7 @@ let coll = testDB.getCollection('t');
 for (let i = 0; i < 10; i++) {
     assert.commandWorked(coll.insert({
         _id: i,
-        a: i,
+        a: 'a'.repeat(10 * 1024 * 1024),
     }));
 }
 
@@ -35,6 +36,8 @@ assert(serverStatus.hasOwnProperty('indexBulkBuilder'),
 
 let indexBulkBuilderSection = serverStatus.indexBulkBuilder;
 assert.eq(indexBulkBuilderSection.count, 1, tojson(indexBulkBuilderSection));
+assert.eq(indexBulkBuilderSection.filesOpenedForExternalSort, 1, tojson(indexBulkBuilderSection));
+assert.eq(indexBulkBuilderSection.filesClosedForExternalSort, 1, tojson(indexBulkBuilderSection));
 
 replSet.stopSet();
 })();
