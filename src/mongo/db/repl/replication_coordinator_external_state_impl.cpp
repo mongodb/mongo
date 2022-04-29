@@ -1140,18 +1140,10 @@ std::size_t ReplicationCoordinatorExternalStateImpl::getOplogFetcherInitialSyncM
 JournalListener::Token ReplicationCoordinatorExternalStateImpl::getToken(OperationContext* opCtx) {
     // If in state PRIMARY, the oplogTruncateAfterPoint must be used for the Durable timestamp
     // in order to avoid majority confirming any writes that could later be truncated.
-    //
-    // TODO (SERVER-45847): temporary hack for the ephemeral storage engine that passes in a
-    // nullptr for the opCtx. The ephemeral engine does not do parallel writes to cause oplog
-    // holes, therefore it is safe to skip updating the oplogTruncateAfterPoint that tracks
-    // oplog holes.
-    if (MONGO_likely(opCtx)) {
-        auto truncatePoint = repl::ReplicationProcess::get(opCtx)
+    if (auto truncatePoint = repl::ReplicationProcess::get(opCtx)
                                  ->getConsistencyMarkers()
-                                 ->refreshOplogTruncateAfterPointIfPrimary(opCtx);
-        if (truncatePoint) {
-            return truncatePoint.get();
-        }
+                                 ->refreshOplogTruncateAfterPointIfPrimary(opCtx)) {
+        return *truncatePoint;
     }
 
     // All other repl states use the 'lastApplied'.
