@@ -121,7 +121,7 @@ public:
                 const CollectionPtr& collection,
                 PlanStage* child);
 
-    bool isEOF() final;
+    bool isEOF();
     StageState doWork(WorkingSetID* out);
 
     StageType stageType() const {

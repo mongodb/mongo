@@ -115,8 +115,10 @@ public:
 
     // Inserts documents later deleted in a single 'batch' due to targetBatchTimMS or
     // targetBatchDocs. Tells the opObserver how much to advance the clock when a document is about
-    // to be deleted.
-    void insertTimedBatch(std::vector<std::pair<BSONObj, Milliseconds>> timedBatch) {
+    // to be deleted. For tests that change the targetBatchTimeMS, skips verifying the batch meets
+    // the default targetBatchTimeMS expectations.
+    void insertTimedBatch(std::vector<std::pair<BSONObj, Milliseconds>> timedBatch,
+                          bool verifyBatchTimeWithDefaultTargetBatchTimeMS = true) {
         Milliseconds totalDurationOfBatch{0};
         for (auto [doc, duration] : timedBatch) {
             _client.insert(nss.ns(), doc);
@@ -124,12 +126,15 @@ public:
             totalDurationOfBatch += duration;
         }
 
-        // Enfore test correctness:
-        // If the totalDurationOfBatch is larger than the targetBatchTimeMS, the last document of
-        // the 'timedBatch' made the batch exceed targetBatchTimeMS.
-        if (totalDurationOfBatch > targetBatchTimeMS) {
-            auto batchSize = timedBatch.size();
-            ASSERT_LT(totalDurationOfBatch - timedBatch[batchSize - 1].second, targetBatchTimeMS);
+        if (verifyBatchTimeWithDefaultTargetBatchTimeMS) {
+            // Enfore test correctness:
+            // If the totalDurationOfBatch is larger than the targetBatchTimeMS, the last document
+            // of the 'timedBatch' made the batch exceed targetBatchTimeMS.
+            if (totalDurationOfBatch > targetBatchTimeMS) {
+                auto batchSize = timedBatch.size();
+                ASSERT_LT(totalDurationOfBatch - timedBatch[batchSize - 1].second,
+                          targetBatchTimeMS);
+            }
         }
     }
 
@@ -183,20 +188,36 @@ public:
         ExpressionContext* expCtx,
         CanonicalQuery* deleteParamsFilter = nullptr) {
 
-        CollectionScanParams collScanParams;
-        auto batchedDeleteParams = std::make_unique<BatchedDeleteStageBatchParams>();
-        batchedDeleteParams->targetBatchDocs = targetBatchDocs;
-        batchedDeleteParams->targetBatchTimeMS = targetBatchTimeMS;
+        auto batchParams = std::make_unique<BatchedDeleteStageBatchParams>();
+        batchParams->targetBatchDocs = targetBatchDocs;
+        batchParams->targetBatchTimeMS = targetBatchTimeMS;
+        return makeBatchedDeleteStage(ws,
+                                      coll,
+                                      expCtx,
+                                      std::move(batchParams),
+                                      std::make_unique<BatchedDeleteStagePassParams>(),
+                                      deleteParamsFilter);
+    }
+
+    std::unique_ptr<BatchedDeleteStage> makeBatchedDeleteStage(
+        WorkingSet* ws,
+        const CollectionPtr& coll,
+        ExpressionContext* expCtx,
+        std::unique_ptr<BatchedDeleteStageBatchParams> batchedDeleteBatchParams,
+        std::unique_ptr<BatchedDeleteStagePassParams> batchedDeletePassParams,
+        CanonicalQuery* deleteParamsFilter = nullptr) {
 
         // DeleteStageParams must always be multi.
         auto deleteParams = std::make_unique<DeleteStageParams>();
         deleteParams->isMulti = true;
         deleteParams->canonicalQuery = deleteParamsFilter;
 
+        CollectionScanParams collScanParams;
         return std::make_unique<BatchedDeleteStage>(
             expCtx,
             std::move(deleteParams),
-            std::move(batchedDeleteParams),
+            std::move(batchedDeleteBatchParams),
+            std::move(batchedDeletePassParams),
             ws,
             coll,
             new CollectionScan(expCtx, coll, collScanParams, ws, nullptr));
@@ -542,19 +563,11 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetBatchTimeMSBasic) {
 
     // Batch 1 deletions.
     {
-        // Drain the rest of the buffer before fetching from a new WorkingSetMember.
         Timer timer(tickSource());
         state = deleteStage->work(&id);
         ASSERT_EQ(stats->docsDeleted, nDocs);
-        ASSERT_EQ(state, PlanStage::NEED_TIME);
-        ASSERT_LTE(Milliseconds(timer.millis()), targetBatchTimeMS);
-    }
-
-    // Completes multi delete execution.
-    {
-        state = deleteStage->work(&id);
-        ASSERT_EQ(stats->docsDeleted, nDocs);
         ASSERT_EQ(state, PlanStage::IS_EOF);
+        ASSERT_LTE(Milliseconds(timer.millis()), targetBatchTimeMS);
     }
 }
 
@@ -649,6 +662,322 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetBatchTimeMSWithTargetBatc
         ASSERT_EQ(stats->docsDeleted, nDocs);
         ASSERT_EQ(state, PlanStage::IS_EOF);
         ASSERT_LT(Milliseconds(timer.millis()), targetBatchTimeMS);
+    }
+}
+
+TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetPassDocsBasic) {
+    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
+    auto nDocs = 52;
+    prePopulateCollection(nDocs);
+
+    const CollectionPtr& coll = ctx.getCollection();
+    ASSERT(coll);
+
+    WorkingSet ws;
+
+    auto targetBatchDocs = 10;
+    auto batchParams = std::make_unique<BatchedDeleteStageBatchParams>();
+    batchParams->targetBatchTimeMS = Milliseconds(0);
+    batchParams->targetBatchDocs = targetBatchDocs;
+
+    // 'targetPassDocs' are only checked after each batch is committed.
+    auto targetPassDocs = 20;
+    auto passParams = std::make_unique<BatchedDeleteStagePassParams>();
+    passParams->targetPassDocs = targetPassDocs;
+
+    auto deleteStage = makeBatchedDeleteStage(
+        &ws, coll, _expCtx.get(), std::move(batchParams), std::move(passParams));
+    const DeleteStats* stats = static_cast<const DeleteStats*>(deleteStage->getSpecificStats());
+
+    PlanStage::StageState state = PlanStage::NEED_TIME;
+    WorkingSetID id = WorkingSet::INVALID_ID;
+
+    // Stages up to 'targetBatchDocs' - 1 documents in the buffer. The first work() initiates the
+    // collection scan and doesn't fetch a document to stage.
+    {
+        for (auto i = 0; i < targetBatchDocs; i++) {
+            state = deleteStage->work(&id);
+            ASSERT_EQ(stats->docsDeleted, 0);
+            ASSERT_EQ(state, PlanStage::NEED_TIME);
+        }
+    }
+
+    // Delete the first batch.
+    {
+        state = deleteStage->work(&id);
+        ASSERT_EQ(stats->docsDeleted, targetBatchDocs);
+        ASSERT_EQ(state, PlanStage::NEED_TIME);
+    }
+
+    // Stage the next 'targetBatchDocs' - 1.
+    {
+        for (auto i = 0; i < targetBatchDocs - 1; i++) {
+            state = deleteStage->work(&id);
+            ASSERT_EQ(stats->docsDeleted, targetBatchDocs);
+            ASSERT_EQ(state, PlanStage::NEED_TIME);
+        }
+    }
+
+    // Fetches the final document for the batch, commits the deletes, and reaches pass completion.
+    {
+        state = deleteStage->work(&id);
+        // Exactly 'targetPassDocs' are deleted here because 'targetPassDocs' is an exact multiple
+        // of 'targetBatchDocs'.
+        ASSERT_EQ(stats->docsDeleted, targetPassDocs);
+        ASSERT_EQ(state, PlanStage::IS_EOF);
+    }
+}
+
+// No limits on batch targets means all deletes will be committed in a single batch, and the
+// 'targetPassDocs' will be ignored.
+TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetPassDocsWithUnlimitedBatchTargets) {
+    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
+    auto nDocs = 52;
+    prePopulateCollection(nDocs);
+
+    const CollectionPtr& coll = ctx.getCollection();
+    ASSERT(coll);
+
+    WorkingSet ws;
+
+    auto targetBatchDocs = 0;
+    auto batchParams = std::make_unique<BatchedDeleteStageBatchParams>();
+    batchParams->targetBatchTimeMS = Milliseconds(0);
+    batchParams->targetBatchDocs = targetBatchDocs;
+
+    // Since 'targetPassDocs' is only checked after each batch commit, and there are no batch
+    // limits, it has no impact on the batched delete.
+    auto targetPassDocs = 10;
+    auto passParams = std::make_unique<BatchedDeleteStagePassParams>();
+    passParams->targetPassDocs = targetPassDocs;
+
+    auto deleteStage = makeBatchedDeleteStage(
+        &ws, coll, _expCtx.get(), std::move(batchParams), std::move(passParams));
+    const DeleteStats* stats = static_cast<const DeleteStats*>(deleteStage->getSpecificStats());
+
+    PlanStage::StageState state = PlanStage::NEED_TIME;
+    WorkingSetID id = WorkingSet::INVALID_ID;
+
+    // Stage a batch of documents (all the documents).
+    {
+        for (auto i = 0; i <= nDocs; i++) {
+            state = deleteStage->work(&id);
+            ASSERT_EQ(stats->docsDeleted, 0);
+            ASSERT_EQ(state, PlanStage::NEED_TIME);
+        }
+    }
+
+    // Delete the batch when the child has no more documents to fetch. 'targetPassDocs' has no
+    // impact on the number of documents deleted.
+    {
+        state = deleteStage->work(&id);
+        ASSERT_EQ(stats->docsDeleted, nDocs);
+        ASSERT_EQ(state, PlanStage::IS_EOF);
+    }
+}
+
+TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetPassTimeMSBasic) {
+    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
+    auto nDocs = 52;
+    prePopulateCollection(nDocs);
+
+    const CollectionPtr& coll = ctx.getCollection();
+    ASSERT(coll);
+
+    WorkingSet ws;
+
+    auto targetBatchDocs = 3;  // Lower the default number of documents in a batch for simplicity.
+    auto batchParams = std::make_unique<BatchedDeleteStageBatchParams>();
+    batchParams->targetBatchTimeMS = Milliseconds(0);
+    batchParams->targetBatchDocs = targetBatchDocs;
+
+    auto targetPassTimeMS = Milliseconds(3);
+    auto passParams = std::make_unique<BatchedDeleteStagePassParams>();
+    passParams->targetPassTimeMS = targetPassTimeMS;
+
+    auto deleteStage = makeBatchedDeleteStage(
+        &ws, coll, _expCtx.get(), std::move(batchParams), std::move(passParams));
+    const DeleteStats* stats = static_cast<const DeleteStats*>(deleteStage->getSpecificStats());
+
+    PlanStage::StageState state = PlanStage::NEED_TIME;
+    WorkingSetID id = WorkingSet::INVALID_ID;
+
+    // Stages the first batch.
+    {
+        for (auto i = 0; i < targetBatchDocs; i++) {
+            state = deleteStage->work(&id);
+            ASSERT_EQ(stats->docsDeleted, 0);
+            ASSERT_EQ(state, PlanStage::NEED_TIME);
+            tickSource()->advance(Milliseconds(1));
+        }
+    }
+
+    // Deletes the first batch and reaches completion since 'targetPassTimeMS' is met.
+    {
+        state = deleteStage->work(&id);
+        ASSERT_EQ(stats->docsDeleted, targetBatchDocs);
+        ASSERT_EQ(state, PlanStage::IS_EOF);
+    }
+}
+
+// Demonstrates 'targetPassTimeMS' has no impact when there are no batch limits.
+TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetPassTimeMSWithUnlimitedBatchTargets) {
+    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
+    auto nDocs = 52;
+    prePopulateCollection(nDocs);
+
+    const CollectionPtr& coll = ctx.getCollection();
+    ASSERT(coll);
+
+    WorkingSet ws;
+
+    auto batchParams = std::make_unique<BatchedDeleteStageBatchParams>();
+    batchParams->targetBatchTimeMS = Milliseconds(0);
+    batchParams->targetBatchDocs = 0;
+
+    auto targetPassTimeMS = Milliseconds(3);
+    auto passParams = std::make_unique<BatchedDeleteStagePassParams>();
+    passParams->targetPassTimeMS = targetPassTimeMS;
+
+    auto deleteStage = makeBatchedDeleteStage(
+        &ws, coll, _expCtx.get(), std::move(batchParams), std::move(passParams));
+    const DeleteStats* stats = static_cast<const DeleteStats*>(deleteStage->getSpecificStats());
+
+    PlanStage::StageState state = PlanStage::NEED_TIME;
+    WorkingSetID id = WorkingSet::INVALID_ID;
+
+    // Stages the first batch (all the documents).
+    {
+        for (auto i = 0; i <= nDocs; i++) {
+            state = deleteStage->work(&id);
+            ASSERT_EQ(stats->docsDeleted, 0);
+            ASSERT_EQ(state, PlanStage::NEED_TIME);
+            tickSource()->advance(Milliseconds(1));
+        }
+    }
+
+    // Delete the batch when the child has no more documents to fetch. 'targetPassTimeMS' has no
+    // impact on the number of documents deleted despite being reached much earlier during the
+    // initial batch staging.
+    {
+        state = deleteStage->work(&id);
+        ASSERT_EQ(stats->docsDeleted, nDocs);
+        ASSERT_EQ(state, PlanStage::IS_EOF);
+    }
+}
+
+// Tests a more realistic scenario where both batch and pass targets are set. In this case,
+// 'targetPassTimeMS' is met before 'targetPassDocs' is.
+TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetPassTimeMSReachedBeforeTargetPassDocs) {
+    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
+
+    // Prepare the targets such that 'targetPassTimeMS' will be reached before 'targetPassDocs'.
+    auto targetBatchDocs = 3;
+    auto targetPassDocs = 21;
+
+    auto targetBatchTimeMS = Milliseconds(5);
+    auto targetPassTimeMS = Milliseconds(10);
+
+    // Reaches 'targetBatchDocs'.
+    std::vector<std::pair<BSONObj, Milliseconds>> batch0{
+        {BSON("_id" << 1 << "a" << 1), Milliseconds(1)},
+        {BSON("_id" << 2 << "a" << 2), Milliseconds(0)},
+        {BSON("_id" << 3 << "a" << 3), Milliseconds(0)},
+    };
+
+    // Reaches 'targetBatchTimeMS'.
+    std::vector<std::pair<BSONObj, Milliseconds>> batch1{
+        {BSON("_id" << 4 << "a" << 4), Milliseconds(4)},
+        {BSON("_id" << 5 << "a" << 5), Milliseconds(6)},
+    };
+
+    // 'targetPassTimeMS' is met, the buffer is partilly drained, this is the last batch to commit
+    // before pass completion.
+    std::vector<std::pair<BSONObj, Milliseconds>> batch2{
+        {BSON("_id" << 6 << "a" << 6), Milliseconds(0)},
+    };
+
+    // Populate the collection before executing the BatchedDeleteStage.
+    insertTimedBatch(batch0, false /** verify with default targetBatchTimeMS **/);
+    insertTimedBatch(batch1, false /** verify with default targetBatchTimeMS **/);
+    insertTimedBatch(batch2, false /** verify with default targetBatchTimeMS **/);
+
+    // Insert some documents that won't be deleted in this batch.
+    insertTimedBatch({{BSON("_id" << 7 << "a" << 7), Milliseconds(0)}}, false);
+    insertTimedBatch({{BSON("_id" << 8 << "a" << 8), Milliseconds(0)}}, false);
+
+    // Verify we expect to reach completion before 'targetPassDocs' is met.
+    auto expectedDocsDeleted = batch0.size() + batch1.size() + batch2.size();
+    ASSERT_LT(expectedDocsDeleted, targetPassDocs);
+
+    auto batchParams = std::make_unique<BatchedDeleteStageBatchParams>();
+    batchParams->targetBatchTimeMS = targetBatchTimeMS;
+    batchParams->targetBatchDocs = targetBatchDocs;
+
+    auto passParams = std::make_unique<BatchedDeleteStagePassParams>();
+    passParams->targetPassTimeMS = targetPassTimeMS;
+    passParams->targetPassDocs = targetPassDocs;
+
+    const CollectionPtr& coll = ctx.getCollection();
+    ASSERT(coll);
+
+    WorkingSet ws;
+
+    auto deleteStage = makeBatchedDeleteStage(
+        &ws, coll, _expCtx.get(), std::move(batchParams), std::move(passParams));
+    const DeleteStats* stats = static_cast<const DeleteStats*>(deleteStage->getSpecificStats());
+
+    PlanStage::StageState state = PlanStage::NEED_TIME;
+    WorkingSetID id = WorkingSet::INVALID_ID;
+
+    // Track the total amount of time the pass takes.
+    Timer passTimer(tickSource());
+
+    // Stages up to 'targetBatchDocs' - 1 documents in the buffer. The first work() initiates the
+    // collection scan and doesn't fetch a document to stage.
+    {
+        for (auto i = 0; i < targetBatchDocs; i++) {
+            state = deleteStage->work(&id);
+            ASSERT_EQ(stats->docsDeleted, 0);
+            ASSERT_EQ(state, PlanStage::NEED_TIME);
+        }
+    }
+
+    // Batch0 deletions.
+    {
+        state = deleteStage->work(&id);
+        ASSERT_EQ(stats->docsDeleted, batch0.size());
+        ASSERT_EQ(state, PlanStage::NEED_TIME);
+
+        // 'targetPassTimeMS' isn't met yet, more documents can be staged.
+        ASSERT_LTE(Milliseconds(passTimer.millis()), targetPassTimeMS);
+    }
+
+    // Stages up to 'targetBatchDocs' - 1 in the buffer.
+    {
+        for (auto i = 0; i < targetBatchDocs - 1; i++) {
+            state = deleteStage->work(&id);
+            ASSERT_EQ(stats->docsDeleted, batch0.size());
+            ASSERT_EQ(state, PlanStage::NEED_TIME);
+        }
+    }
+
+    // Batch1 deletions.
+    {
+        state = deleteStage->work(&id);
+        ASSERT_EQ(stats->docsDeleted, batch0.size() + batch1.size());
+
+        // Despite reaching the 'targetPassTimeMS', the remaining deletes staged in the buffer still
+        // need to be committed.
+        ASSERT_GTE(Milliseconds(passTimer.millis()), targetPassTimeMS);
+        ASSERT_EQ(state, PlanStage::NEED_TIME);
+    }
+
+    // Complete the operation by committing the remaining deletes.
+    {
+        state = deleteStage->work(&id);
+        ASSERT_EQ(stats->docsDeleted, expectedDocsDeleted);
+        ASSERT_EQ(state, PlanStage::IS_EOF);
     }
 }
 }  // namespace QueryStageBatchedDelete

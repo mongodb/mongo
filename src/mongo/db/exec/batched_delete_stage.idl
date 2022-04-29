@@ -57,4 +57,3 @@ server_parameters:
     default: 5
     validator:
       gte: 0
-
