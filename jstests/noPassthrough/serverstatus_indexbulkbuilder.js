@@ -14,6 +14,7 @@ load('jstests/noPassthrough/libs/index_build.js');
 
 const replSet = new ReplSetTest({
     nodes: 1,
+    nodeOptions: {setParameter: {maxIndexBuildMemoryUsageMegabytes: 50}},
 });
 replSet.startSet();
 replSet.initiate();
@@ -25,7 +26,7 @@ let coll = testDB.getCollection('t');
 for (let i = 0; i < 10; i++) {
     assert.commandWorked(coll.insert({
         _id: i,
-        a: i,
+        a: 'a'.repeat(10 * 1024 * 1024),
     }));
 }
 
@@ -38,6 +39,8 @@ assert(serverStatus.hasOwnProperty('indexBulkBuilder'),
 let indexBulkBuilderSection = serverStatus.indexBulkBuilder;
 assert.eq(indexBulkBuilderSection.count, 1, tojson(indexBulkBuilderSection));
 assert.eq(indexBulkBuilderSection.resumed, 0, tojson(indexBulkBuilderSection));
+assert.eq(indexBulkBuilderSection.filesOpenedForExternalSort, 1, tojson(indexBulkBuilderSection));
+assert.eq(indexBulkBuilderSection.filesClosedForExternalSort, 1, tojson(indexBulkBuilderSection));
 
 // Shut down server during an index to verify 'resumable' value on restart.
 IndexBuildTest.pauseIndexBuilds(primary);
@@ -60,6 +63,11 @@ ResumableIndexBuildTest.assertCompleted(primary, coll, [buildUUID], ['a_1', 'b_1
 indexBulkBuilderSection = testDB.serverStatus().indexBulkBuilder;
 assert.eq(indexBulkBuilderSection.count, 1, tojson(indexBulkBuilderSection));
 assert.eq(indexBulkBuilderSection.resumed, 1, tojson(indexBulkBuilderSection));
+// Even though the amount of index data for b_1 is well under the configured memory usage limit,
+// the resumable index build logic dictates that we spill the sorter data to disk on shutdown
+// and read it back on startup.
+assert.eq(indexBulkBuilderSection.filesOpenedForExternalSort, 1, tojson(indexBulkBuilderSection));
+assert.eq(indexBulkBuilderSection.filesClosedForExternalSort, 1, tojson(indexBulkBuilderSection));
 
 replSet.stopSet();
 })();
