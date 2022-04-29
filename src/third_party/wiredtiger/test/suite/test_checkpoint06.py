@@ -33,7 +33,7 @@ from wtscenario import make_scenarios
 # Verify that we rollback the truncation that is committed after stable
 # timestamp in the checkpoint.
 class test_checkpoint06(wttest.WiredTigerTestCase):
-    conn_config = 'create,cache_size=50MB'
+    conn_config = 'create,cache_size=10MB'
 
     format_values = [
         ('column-fix', dict(key_format='r', value_format='8t')),
@@ -41,12 +41,20 @@ class test_checkpoint06(wttest.WiredTigerTestCase):
         ('row_integer', dict(key_format='i', value_format='S')),
     ]
 
-    scenarios = make_scenarios(format_values)
+    prepare_values = [
+        ('prepare', dict(prepare=True)),
+        ('no_prepare', dict(prepare=False)),
+    ]
+
+    scenarios = make_scenarios(format_values, prepare_values)
 
     def test_rollback_truncation_in_checkpoint(self):
+        nrows = 10000
         self.uri = 'table:ckpt06'
+        self.uri_evict = 'table:ckpt06_evict'
         config = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         self.session.create(self.uri, config)
+        self.session.create(self.uri_evict, config)
 
         if self.value_format == '8t':
             value = 72
@@ -55,11 +63,12 @@ class test_checkpoint06(wttest.WiredTigerTestCase):
 
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
         cursor = self.session.open_cursor(self.uri)
-        self.session.begin_transaction()
         # Setup: Insert some data
-        for i in range(1, 10001):
+        for i in range(1, nrows + 1):
+            self.session.begin_transaction()
             cursor[i] = value
-        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
+        cursor.close()
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(2))
 
         # Flush everything to disk
@@ -72,15 +81,35 @@ class test_checkpoint06(wttest.WiredTigerTestCase):
         end = self.session.open_cursor(self.uri)
         end.set_key(9995)
         self.session.truncate(None, start, None, None)
-        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(3))
+        if self.prepare:
+            self.session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(3))
+            self.session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(3))
+            self.session.timestamp_transaction('durable_timestamp=' + self.timestamp_str(5))
+            self.session.commit_transaction()
+        else:
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(3))
+
+        # Increase the stable timestamp to 4 which is less than truncate durable timestamp.
+        if self.prepare:
+            self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(4) +
+            ',stable_timestamp=' + self.timestamp_str(4))
+
+        cursor = self.session.open_cursor(self.uri_evict)
+        # Insert some more data to trigger eviction
+        for i in range(1, nrows + 1):
+            self.session.begin_transaction()
+            cursor[i] = value
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(6))
+        cursor.close()
 
         # Do a checkpoint
         self.session.checkpoint()
 
         # rollback to stable
-        self.reopen_conn()
+        self.conn.rollback_to_stable()
 
         # Verify the truncation is rolled back.
         cursor = self.session.open_cursor(self.uri)
-        for i in range(1, 1001):
+        for i in range(1, nrows + 1):
             self.assertEqual(cursor[i], value)
+        cursor.close()

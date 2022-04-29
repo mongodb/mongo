@@ -250,7 +250,8 @@ __wt_delete_page_skip(WT_SESSION_IMPL *session, WT_REF *ref, bool visible_all)
     if (skip && ref->ft_info.del != NULL &&
       (visible_all ||
         (!WT_READING_CHECKPOINT(session) &&
-          __wt_txn_visible_all(session, ref->ft_info.del->txnid, ref->ft_info.del->timestamp))))
+          __wt_txn_visible_all(
+            session, ref->ft_info.del->txnid, ref->ft_info.del->durable_timestamp))))
         __wt_overwrite_and_free(session, ref->ft_info.del);
 
     WT_REF_SET_STATE(ref, WT_REF_DELETED);
