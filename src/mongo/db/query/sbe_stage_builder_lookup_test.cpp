@@ -58,25 +58,14 @@ public:
     void setUp() override {
         SbeStageBuilderTestFixture::setUp();
 
-        // Set up the storage engine.
-        auto service = getServiceContext();
-        _storage = std::make_unique<repl::StorageInterfaceImpl>();
-        // Set up ReplicationCoordinator and ensure that we are primary.
-        auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(service);
-        ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
-        repl::ReplicationCoordinator::set(service, std::move(replCoord));
-
-        // Set up oplog collection. The oplog collection is expected to exist when fetching the
-        // next opTime (LocalOplogInfo::getNextOpTimes) to use for a write.
-        repl::createOplog(opCtx());
-
         // Create local and foreign collections.
-        ASSERT_OK(_storage->createCollection(opCtx(), _nss, CollectionOptions()));
-        ASSERT_OK(_storage->createCollection(opCtx(), _foreignNss, CollectionOptions()));
+        ASSERT_OK(
+            storageInterface()->createCollection(operationContext(), _nss, CollectionOptions()));
+        ASSERT_OK(storageInterface()->createCollection(
+            operationContext(), _foreignNss, CollectionOptions()));
     }
 
-    virtual void tearDown() {
-        _storage.reset();
+    void tearDown() override {
         _localCollLock.reset();
         _foreignCollLock.reset();
         SbeStageBuilderTestFixture::tearDown();
@@ -86,16 +75,19 @@ public:
                          std::unique_ptr<AutoGetCollection>& lock,
                          const std::vector<BSONObj>& docs) {
         std::vector<InsertStatement> inserts{docs.begin(), docs.end()};
-        lock = std::make_unique<AutoGetCollection>(opCtx(), nss, LockMode::MODE_X);
+        lock = std::make_unique<AutoGetCollection>(operationContext(), nss, LockMode::MODE_X);
         {
-            WriteUnitOfWork wuow{opCtx()};
-            ASSERT_OK(lock.get()->getWritableCollection(opCtx())->insertDocuments(
-                opCtx(), inserts.begin(), inserts.end(), nullptr /* opDebug */));
+            WriteUnitOfWork wuow{operationContext()};
+            ASSERT_OK(
+                lock.get()
+                    ->getWritableCollection(operationContext())
+                    ->insertDocuments(
+                        operationContext(), inserts.begin(), inserts.end(), nullptr /* opDebug */));
             wuow.commit();
         }
 
         // Before we read, lock the collection in MODE_IS.
-        lock = std::make_unique<AutoGetCollection>(opCtx(), nss, LockMode::MODE_IS);
+        lock = std::make_unique<AutoGetCollection>(operationContext(), nss, LockMode::MODE_IS);
     }
 
     void insertDocuments(const std::vector<BSONObj>& localDocs,
@@ -103,7 +95,7 @@ public:
         insertDocuments(_nss, _localCollLock, localDocs);
         insertDocuments(_foreignNss, _foreignCollLock, foreignDocs);
 
-        _collections = MultipleCollectionAccessor(opCtx(),
+        _collections = MultipleCollectionAccessor(operationContext(),
                                                   &_localCollLock->getCollection(),
                                                   _nss,
                                                   false /* isAnySecondaryNamespaceAViewOrSharded */,
@@ -258,8 +250,6 @@ protected:
         EqLookupNode::LookupStrategy::kNestedLoopJoin, EqLookupNode::LookupStrategy::kHashJoin};
 
 private:
-    std::unique_ptr<repl::StorageInterface> _storage;
-
     const NamespaceString _foreignNss{"testdb.sbe_stage_builder_foreign"};
     std::unique_ptr<AutoGetCollection> _localCollLock = nullptr;
     std::unique_ptr<AutoGetCollection> _foreignCollLock = nullptr;

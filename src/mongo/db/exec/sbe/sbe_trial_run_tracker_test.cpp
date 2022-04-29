@@ -221,7 +221,7 @@ TEST_F(TrialRunTrackerTest, OnlyDeepestNestedBlockingStageHasTrialRunTracker) {
         kEmptyPlanNodeId);
 
     hashAggStage->prepare(*ctx);
-    hashAggStage->attachToOperationContext(opCtx());
+    hashAggStage->attachToOperationContext(operationContext());
 
     {
         // We expect the TrialRunTracker to attach to the SortStage but not the root HashAggStage.

@@ -56,22 +56,25 @@ SbeStageBuilderTestFixture::buildPlanStage(
     std::unique_ptr<CollatorInterface> collator) {
     auto findCommand = std::make_unique<FindCommandRequest>(_nss);
     const boost::intrusive_ptr<ExpressionContext> expCtx(
-        new ExpressionContextForTest(opCtx(), _nss, std::move(collator)));
+        new ExpressionContextForTest(operationContext(), _nss, std::move(collator)));
     auto statusWithCQ =
-        CanonicalQuery::canonicalize(opCtx(), std::move(findCommand), false, expCtx);
+        CanonicalQuery::canonicalize(operationContext(), std::move(findCommand), false, expCtx);
     ASSERT_OK(statusWithCQ.getStatus());
 
     CollectionMock coll(_nss);
     CollectionPtr collPtr(&coll);
     MultipleCollectionAccessor& colls = _collections;
     if (shardFiltererInterface) {
-        auto shardFilterer = shardFiltererInterface->makeShardFilterer(opCtx());
+        auto shardFilterer = shardFiltererInterface->makeShardFilterer(operationContext());
         collPtr.setShardKeyPattern(shardFilterer->getKeyPattern().toBSON());
         colls = MultipleCollectionAccessor(collPtr);
     }
 
-    stage_builder::SlotBasedStageBuilder builder{
-        opCtx(), colls, *statusWithCQ.getValue(), *querySolution, nullptr /* YieldPolicy */};
+    stage_builder::SlotBasedStageBuilder builder{operationContext(),
+                                                 colls,
+                                                 *statusWithCQ.getValue(),
+                                                 *querySolution,
+                                                 nullptr /* YieldPolicy */};
 
     auto stage = builder.build(querySolution->root());
     auto data = builder.getPlanStageData();
@@ -79,7 +82,7 @@ SbeStageBuilderTestFixture::buildPlanStage(
     // Reset "shardFilterer".
     if (auto shardFiltererSlot = data.env->getSlotIfExists("shardFilterer"_sd);
         shardFiltererSlot && shardFiltererInterface) {
-        auto shardFilterer = shardFiltererInterface->makeShardFilterer(opCtx());
+        auto shardFilterer = shardFiltererInterface->makeShardFilterer(operationContext());
         data.env->resetSlot(*shardFiltererSlot,
                             sbe::value::TypeTags::shardFilterer,
                             sbe::value::bitcastFrom<ShardFilterer*>(shardFilterer.release()),

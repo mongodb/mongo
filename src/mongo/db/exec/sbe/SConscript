@@ -147,6 +147,7 @@ env.Library(
         'sbe_plan_stage_test.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/catalog/catalog_test_fixture',
         '$BUILD_DIR/mongo/db/query/sbe_stage_builder_helpers',
         '$BUILD_DIR/mongo/unittest/unittest',
         'query_sbe',

@@ -188,7 +188,7 @@ public:
 
         // Run the stage after the knob is set and spill to disk. We need to hold a global IS lock
         // to read from WT.
-        Lock::GlobalLock lk(opCtx(), MODE_IS);
+        Lock::GlobalLock lk(operationContext(), MODE_IS);
         stage->open(true);
         std::stringstream fourthStream;
         StageResultsPrinters::make(fourthStream, printOptions)

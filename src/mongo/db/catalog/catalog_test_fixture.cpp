@@ -54,7 +54,7 @@ void CatalogTestFixture::setUp() {
 
     // Set up oplog collection. If the WT storage engine is used, the oplog collection is expected
     // to exist when fetching the next opTime (LocalOplogInfo::getNextOpTimes) to use for a write.
-    repl::createOplog(_opCtx.get());
+    repl::createOplog(operationContext());
 }
 
 void CatalogTestFixture::tearDown() {
