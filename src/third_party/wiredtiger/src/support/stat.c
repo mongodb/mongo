@@ -1470,7 +1470,6 @@ static const char *const __stats_connection_desc[] = {
   "session: tiered operations dequeued and processed",
   "session: tiered operations scheduled",
   "session: tiered storage local retention time (secs)",
-  "session: tiered storage object size",
   "thread-state: active filesystem fsync calls",
   "thread-state: active filesystem read calls",
   "thread-state: active filesystem write calls",
@@ -2029,7 +2028,6 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->tiered_work_units_dequeued = 0;
     stats->tiered_work_units_created = 0;
     /* not clearing tiered_retention */
-    /* not clearing tiered_object_size */
     /* not clearing thread_fsync_active */
     /* not clearing thread_read_active */
     /* not clearing thread_write_active */
@@ -2601,7 +2599,6 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->tiered_work_units_dequeued += WT_STAT_READ(from, tiered_work_units_dequeued);
     to->tiered_work_units_created += WT_STAT_READ(from, tiered_work_units_created);
     to->tiered_retention += WT_STAT_READ(from, tiered_retention);
-    to->tiered_object_size += WT_STAT_READ(from, tiered_object_size);
     to->thread_fsync_active += WT_STAT_READ(from, thread_fsync_active);
     to->thread_read_active += WT_STAT_READ(from, thread_read_active);
     to->thread_write_active += WT_STAT_READ(from, thread_write_active);

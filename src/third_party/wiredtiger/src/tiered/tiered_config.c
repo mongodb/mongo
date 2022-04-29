@@ -48,9 +48,6 @@ __tiered_common_config(WT_SESSION_IMPL *session, const char **cfg, WT_BUCKET_STO
     WT_RET(__wt_config_gets(session, cfg, "tiered_storage.local_retention", &cval));
     bstorage->retain_secs = (uint64_t)cval.val;
 
-    WT_RET(__wt_config_gets(session, cfg, "tiered_storage.object_target_size", &cval));
-    bstorage->object_size = (uint64_t)cval.val;
-
     return (0);
 }
 
@@ -178,7 +175,6 @@ __wt_tiered_conn_config(WT_SESSION_IMPL *session, const char **cfg, bool reconfi
     conn->tiered_interval = (uint64_t)cval.val;
 
     WT_ASSERT(session, conn->bstorage != NULL);
-    WT_STAT_CONN_SET(session, tiered_object_size, conn->bstorage->object_size);
     WT_STAT_CONN_SET(session, tiered_retention, conn->bstorage->retain_secs);
 
     /*
